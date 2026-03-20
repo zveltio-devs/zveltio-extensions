@@ -1,0 +1,28 @@
+{
+  "name": "zveltio-extensions",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "bun@1.2.0",
+  "description": "Official Zveltio extensions — analytics, auth, automation, communications, compliance, content, CRM, data, developer tools, geospatial, i18n, multitenancy, operations, storage, workflow.",
+  "workspaces": [
+    "*/*/studio"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "@zveltio/sdk": "*",
+    "@zveltio/engine": "*"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0",
+    "bun-types": "latest",
+    "svelte": "^5.0.0",
+    "@sveltejs/kit": "^2.5.0",
+    "@sveltejs/adapter-static": "^3.0.0",
+    "@sveltejs/vite-plugin-svelte": "^5.0.0"
+  }
+}
