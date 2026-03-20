@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": false,
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "baseUrl": ".",
+    "paths": {
+      "@zveltio/sdk": ["../zveltio/packages/sdk/src/index.ts"],
+      "@zveltio/sdk/*": ["../zveltio/packages/sdk/src/*"],
+      "svelte": ["../zveltio/packages/studio/node_modules/svelte"],
+      "svelte/*": ["../zveltio/packages/studio/node_modules/svelte/*"],
+      "@lucide/svelte": ["../zveltio/packages/studio/node_modules/@lucide/svelte"],
+      "@lucide/svelte/*": ["../zveltio/packages/studio/node_modules/@lucide/svelte/*"]
+    },
+    "typeRoots": [
+      "../zveltio/packages/studio/node_modules/@types"
+    ]
+  },
+  "include": [
+    "**/*.svelte",
+    "**/*.ts"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/dist"
+  ]
+}
