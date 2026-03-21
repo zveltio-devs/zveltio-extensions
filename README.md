@@ -11,11 +11,33 @@ Official Zveltio extensions. Each extension is a self-contained folder with an `
     routes.ts         — Hono route handlers (optional)
     migrations/       — SQL migration files
     lib/              — shared helpers
-  studio/             — SvelteKit UI panels (optional)
+  studio/             — Admin UI panels for the Zveltio Studio (optional)
     src/
     package.json
-  manifest.json       — extension metadata
+  client/             — End-user Svelte 5 components for apps built on Zveltio (optional)
+    index.ts          — named exports for all components
+    *.svelte          — components
+  manifest.json       — extension metadata (contributes.client = true if client/ exists)
 ```
+
+### Client components
+
+Extensions that ship with `client/` provide ready-to-use Svelte 5 components
+for end-user applications. Import them directly:
+
+```svelte
+<script>
+  import { FileUpload } from 'zveltio-extensions/storage/cloud/client';
+  import { MapPicker }  from 'zveltio-extensions/geospatial/postgis/client';
+  import { HeroSection, GridSection } from 'zveltio-extensions/content/page-builder/client';
+</script>
+```
+
+| Extension | Client components |
+|---|---|
+| `storage/cloud` | `FileUpload` |
+| `geospatial/postgis` | `MapPicker` |
+| `content/page-builder` | `HeroSection`, `GridSection`, `CTASection`, `TextSection` |
 
 ## Categories
 

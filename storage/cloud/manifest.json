@@ -11,6 +11,8 @@
   "contributes": {
     "engine": true,
     "studio": false,
+    "client": true,
+    "clientComponents": ["FileUpload"],
     "fieldTypes": []
   }
 }

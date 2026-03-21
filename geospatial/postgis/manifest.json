@@ -14,6 +14,8 @@
   "contributes": {
     "engine": true,
     "studio": true,
+    "client": true,
+    "clientComponents": ["MapPicker"],
     "fieldTypes": ["location", "polygon", "linestring"]
   }
 }
