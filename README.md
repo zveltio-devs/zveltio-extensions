@@ -19,12 +19,12 @@ Official Zveltio extensions. Each extension is a self-contained folder with an `
 
 ## Categories
 
+> **Note:** AI, Flows, and Multi-tenancy are **core engine features** — they are built into Zveltio and not available as separate extensions.
+
 | Category | Extensions |
 |---|---|
-| `ai` | `core-ai` |
 | `analytics` | `insights`, `quality` |
 | `auth` | `ldap`, `saml` |
-| `automation` | `flows` |
 | `communications` | `mail` |
 | `compliance` | `gdpr`, `ro/*` |
 | `content` | `document-templates`, `documents`, `drafts`, `media`, `page-builder` |
@@ -33,7 +33,6 @@ Official Zveltio extensions. Each extension is a self-contained folder with an `
 | `developer` | `api-docs`, `byod`, `database`, `edge-functions`, `graphql`, `saved-queries`, `schema-branches`, `validation` |
 | `geospatial` | `postgis` |
 | `i18n` | `translations` |
-| `multitenancy` | Multi-tenant isolation |
 | `operations` | `backup` |
 | `storage` | `cloud` |
 | `workflow` | `approvals`, `checklists` |
