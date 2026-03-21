@@ -11,6 +11,8 @@
   "contributes": {
     "engine": true,
     "studio": true,
+    "client": true,
+    "clientComponents": ["HeroSection", "GridSection", "CTASection", "TextSection"],
     "fieldTypes": []
   }
 }
