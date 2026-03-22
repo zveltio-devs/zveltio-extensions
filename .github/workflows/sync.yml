@@ -1,0 +1,31 @@
+name: Sync to Registry
+
+on:
+  push:
+    branches: [main, master]
+  # Also runs when a version tag is pushed (e.g. after zveltio releases v1.x.x)
+  repository_dispatch:
+    types: [engine-released]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          # Use dispatched version if available, otherwise read from package.json
+          if [ -n "${{ github.event.client_payload.version }}" ]; then
+            echo "version=${{ github.event.client_payload.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Sync official extensions to registry
+        env:
+          REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
+          REGISTRY_SYNC_TOKEN: ${{ secrets.REGISTRY_SYNC_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: node scripts/sync-to-registry.mjs --version ${{ steps.version.outputs.version }}
