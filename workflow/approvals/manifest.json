@@ -11,6 +11,7 @@
   "contributes": {
     "engine": true,
     "studio": true,
+    "studioComponents": ["WorkflowActions"],
     "fieldTypes": []
   }
 }

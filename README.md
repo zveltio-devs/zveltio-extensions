@@ -52,7 +52,7 @@ for end-user applications. Import them directly:
 | `content` | `document-templates`, `documents`, `drafts`, `media`, `page-builder` |
 | `crm` | CRM module |
 | `data` | `export`, `import` |
-| `developer` | `api-docs`, `byod`, `database`, `edge-functions`, `graphql`, `saved-queries`, `schema-branches`, `validation` |
+| `developer` | `api-docs`, `byod`, `database`, `edge-functions`, `graphql`, `saved-queries`, `schema-branches`, `validation`, `views` |
 | `geospatial` | `postgis` |
 | `i18n` | `translations` |
 | `operations` | `backup` |
