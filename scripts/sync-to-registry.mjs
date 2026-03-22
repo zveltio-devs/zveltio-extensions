@@ -66,6 +66,8 @@ for (const p of manifestPaths) {
       displayName: m.displayName ?? m.name,
       description: m.description ?? '',
       category: m.category ?? 'general',
+      // Each extension carries its own version — engine version is just a fallback
+      version: m.version ?? version,
       zveltioMinVersion: m.zveltioMinVersion ?? '1.0.0',
       zveltioMaxVersion: m.zveltioMaxVersion,
     });
