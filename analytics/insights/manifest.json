@@ -8,5 +8,10 @@
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "2.0.0",
   "permissions": ["database"],
-  "contributes": { "engine": true, "studio": true }
+  "contributes": {
+    "engine": true,
+    "studio": true,
+    "client": false,
+    "studioComponents": ["DonutChart", "SimpleBarChart", "RecentActivity", "SummaryCards", "InspectorSelector", "ReportGenerator", "UnitPrintLabel"]
+  }
 }

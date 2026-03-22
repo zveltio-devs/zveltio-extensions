@@ -10,7 +10,8 @@
   "permissions": ["database", "storage"],
   "contributes": {
     "engine": true,
-    "studio": false,
+    "studio": true,
+    "studioComponents": ["AttachmentManager", "FilePicker"],
     "client": true,
     "clientComponents": ["FileUpload"],
     "fieldTypes": []

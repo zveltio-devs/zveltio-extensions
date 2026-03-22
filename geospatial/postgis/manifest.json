@@ -16,6 +16,7 @@
     "studio": true,
     "client": true,
     "clientComponents": ["MapPicker"],
+    "studioComponents": ["MapPicker", "LocationField", "MapView"],
     "fieldTypes": ["location", "polygon", "linestring"]
   }
 }

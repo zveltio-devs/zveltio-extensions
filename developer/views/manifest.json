@@ -1,0 +1,17 @@
+{
+  "name": "views",
+  "package": "@zveltio/ext-views",
+  "category": "developer",
+  "displayName": "Alternative Views",
+  "description": "Calendar, Card, and List views for collection data",
+  "version": "1.0.0",
+  "zveltioMinVersion": "1.0.0",
+  "zveltioMaxVersion": "2.0.0",
+  "permissions": [],
+  "contributes": {
+    "engine": false,
+    "studio": true,
+    "client": false,
+    "studioComponents": ["CalendarView", "CardView", "ListView"]
+  }
+}
