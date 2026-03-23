@@ -1,0 +1,12 @@
+{
+  "name": "helpdesk",
+  "package": "@zveltio/ext-helpdesk",
+  "category": "projects",
+  "displayName": "Helpdesk",
+  "description": "Support ticket management with SLA timers, priorities, assignments and message threads",
+  "version": "1.0.0",
+  "zveltioMinVersion": "1.0.0",
+  "zveltioMaxVersion": "2.0.0",
+  "permissions": ["database"],
+  "contributes": { "engine": true, "studio": true, "fieldTypes": [] }
+}

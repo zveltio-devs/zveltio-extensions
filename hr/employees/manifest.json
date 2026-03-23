@@ -1,0 +1,12 @@
+{
+  "name": "hr",
+  "package": "@zveltio/ext-hr",
+  "category": "hr",
+  "displayName": "HR",
+  "description": "Employee records, departments, job positions, contracts and onboarding checklists",
+  "version": "1.0.0",
+  "zveltioMinVersion": "1.0.0",
+  "zveltioMaxVersion": "2.0.0",
+  "permissions": ["database"],
+  "contributes": { "engine": true, "studio": true, "fieldTypes": [] }
+}
