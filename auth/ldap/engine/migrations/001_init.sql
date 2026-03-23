@@ -1,0 +1,2 @@
+-- LDAP auth extension — config stored in zv_settings under key 'ldap_config'
+-- No extension-specific tables in init

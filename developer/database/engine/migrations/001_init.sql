@@ -1,0 +1,3 @@
+-- Developer database extension uses core engine tables:
+-- zv_saved_queries, zv_audit_log
+-- No extension-specific tables in init

@@ -1,0 +1,2 @@
+-- GDPR compliance — uses core zv_audit_log, zv_notifications, zv_api_keys
+-- No extension-specific tables in init

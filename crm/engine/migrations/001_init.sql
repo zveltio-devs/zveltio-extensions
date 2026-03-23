@@ -1,0 +1,2 @@
+-- CRM extension — uses core tables plus zvd_ prefixed collection tables
+-- No extension-specific tables in init

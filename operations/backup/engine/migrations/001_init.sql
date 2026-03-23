@@ -1,0 +1,2 @@
+-- Backup extension — uses core zv_backups, zv_pitr_config, zv_pitr_restore_points tables
+-- No extension-specific tables in init

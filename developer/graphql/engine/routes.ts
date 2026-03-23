@@ -1,15 +1,28 @@
 /**
- * GraphQL auto-generated API
+ * GraphQL auto-generated API — Enterprise Edition
  *
  * Builds a live GraphQL schema from zv_collections + zv_fields (via DDLManager)
  * and resolves relations from zvd_relations.
  *
- * GET  /api/graphql               — GraphiQL playground
- * POST /api/graphql               — Execute query/mutation (auth required)
- * POST /api/graphql/refresh-schema — Invalidate cached schema (admin only)
+ * GET  /api/graphql                        — GraphiQL playground
+ * POST /api/graphql                        — Execute query/mutation (auth required, logs operation)
+ * POST /api/graphql/refresh-schema         — Invalidate cached schema (admin only)
+ * GET  /api/graphql/persisted              — List persisted queries
+ * POST /api/graphql/persisted              — Create persisted query (admin)
+ * DELETE /api/graphql/persisted/:id        — Delete persisted query (admin)
+ * POST /api/graphql/persisted/:name/execute — Execute persisted query by name (auth)
+ * GET  /api/graphql/logs                   — List operation logs (admin)
+ * DELETE /api/graphql/logs                 — Clear logs older than 30 days (admin)
+ * GET  /api/graphql/stats                  — Operation stats (admin)
+ * GET  /api/graphql/field-policies         — List field policies (admin)
+ * POST /api/graphql/field-policies         — Create field policy (admin)
+ * DELETE /api/graphql/field-policies/:id   — Delete field policy (admin)
  */
 
 import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
+import * as crypto from 'crypto';
 import {
   graphql,
   GraphQLSchema,
@@ -28,6 +41,24 @@ import { DDLManager } from '../../../../packages/engine/src/lib/ddl-manager.js';
 import { auth } from '../../../../packages/engine/src/lib/auth.js';
 import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
 import { DataLoaderRegistry, checkQueryDepth } from '../../../../packages/engine/src/lib/graphql-dataloader.js';
+
+// ── Zod schemas ───────────────────────────────────────────────────────────────
+
+const PersistedQueryCreateSchema = z.object({
+  name: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/, 'Name must be alphanumeric with underscores/hyphens'),
+  description: z.string().optional(),
+  query: z.string().min(1),
+  variables_schema: z.record(z.any()).optional(),
+  is_public: z.boolean().default(false),
+  allowed_roles: z.array(z.string()).default([]),
+});
+
+const FieldPolicyCreateSchema = z.object({
+  collection: z.string().min(1).max(100),
+  field: z.string().min(1).max(100),
+  allowed_roles: z.array(z.string()).default([]),
+  deny_roles: z.array(z.string()).default([]),
+});
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -107,8 +138,8 @@ async function buildDynamicSchema(db: Database): Promise<GraphQLSchema> {
     updated_at: { type: GraphQLString },
   };
 
-  const queryFields:      Record<string, any>           = {};
-  const mutationFields:   Record<string, any>           = {};
+  const queryFields:      Record<string, any>               = {};
+  const mutationFields:   Record<string, any>               = {};
   const collectionTypes:  Record<string, GraphQLObjectType> = {};
 
   // ── First pass: create all object types ──
@@ -223,7 +254,7 @@ async function buildDynamicSchema(db: Database): Promise<GraphQLSchema> {
       const liveFields = colType.getFields();
 
       for (const rel of collectionRelations) {
-        const fieldName      = rel.source_field;
+        const fieldName       = rel.source_field;
         const targetTableName = DDLManager.getTableName(rel.target_collection);
         const targetType      = collectionTypes[rel.target_collection];
         if (!targetType) continue;
@@ -343,13 +374,24 @@ const PLAYGROUND_HTML = `<!DOCTYPE html>
   </body>
 </html>`;
 
+// ── Operation type detector ───────────────────────────────────────────────────
+
+function detectOperationType(query: string): 'query' | 'mutation' | 'subscription' {
+  const trimmed = query.trimStart().toLowerCase();
+  if (trimmed.startsWith('mutation')) return 'mutation';
+  if (trimmed.startsWith('subscription')) return 'subscription';
+  return 'query';
+}
+
 // ── Route factory ─────────────────────────────────────────────────────────────
 
 export function graphqlRoutes(db: Database, _auth: any): Hono {
   const app = new Hono();
 
+  // ── GET / — GraphiQL ──────────────────────────────────────────────────────
   app.get('/', (c) => c.html(PLAYGROUND_HTML));
 
+  // ── POST / — Execute GraphQL operation ───────────────────────────────────
   app.post('/', async (c) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.json({ errors: [{ message: 'Unauthorized' }] }, 401);
@@ -367,22 +409,53 @@ export function graphqlRoutes(db: Database, _auth: any): Hono {
     const depthError = checkQueryDepth(query, 5);
     if (depthError) return c.json({ errors: [{ message: depthError }] }, 400);
 
+    const queryHash = crypto.createHash('sha256').update(query).digest('hex');
+    const opType = detectOperationType(query);
+    const startMs = Date.now();
+    const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+
+    let result: any;
+    let errorCount = 0;
+
     try {
       const schema = await getSchema(db);
       const loaders = new DataLoaderRegistry(db);
-      const result = await graphql({
+      result = await graphql({
         schema,
         source: query,
         variableValues: variables,
         operationName,
         contextValue: { user: session.user, db, loaders },
       });
-      return c.json(result);
+      errorCount = result.errors?.length ?? 0;
     } catch (err) {
-      return c.json({ errors: [{ message: String(err) }] }, 400);
+      errorCount = 1;
+      result = { errors: [{ message: String(err) }] };
     }
+
+    const durationMs = Date.now() - startMs;
+    const resultStr = JSON.stringify(result);
+    const resultSizeBytes = Buffer.byteLength(resultStr, 'utf8');
+
+    // Fire-and-forget operation log
+    sql`
+      INSERT INTO zvd_graphql_operation_logs
+        (operation_name, operation_type, query_hash, variables,
+         duration_ms, result_size_bytes, error_count, user_id, ip)
+      VALUES
+        (${operationName ?? null}, ${opType}, ${queryHash},
+         ${variables ? JSON.stringify(variables) : null}::jsonb,
+         ${durationMs}, ${resultSizeBytes}, ${errorCount},
+         ${session.user.id}, ${ip})
+    `.execute(db).catch(() => {});
+
+    if (errorCount > 0 && !result.data) {
+      return c.json(result, 400);
+    }
+    return c.json(result);
   });
 
+  // ── POST /refresh-schema — admin only ─────────────────────────────────────
   app.post('/refresh-schema', async (c) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.json({ error: 'Unauthorized' }, 401);
@@ -393,6 +466,236 @@ export function graphqlRoutes(db: Database, _auth: any): Hono {
     _cachedSchema = null;
     await getSchema(db);
     return c.json({ success: true, message: 'Schema refreshed' });
+  });
+
+  // ── GET /persisted — list persisted queries ───────────────────────────────
+  app.get('/persisted', async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+
+    // Public queries are accessible to anyone; private require auth
+    if (!session) {
+      const rows = await sql<any>`
+        SELECT id, name, description, query, variables_schema,
+               is_public, allowed_roles, use_count, last_used_at, created_at
+        FROM zvd_graphql_persisted_queries
+        WHERE is_public = true
+        ORDER BY name ASC
+      `.execute(db);
+      return c.json({ queries: rows.rows });
+    }
+
+    const rows = await sql<any>`
+      SELECT id, name, description, query, variables_schema,
+             is_public, allowed_roles, use_count, last_used_at, created_at
+      FROM zvd_graphql_persisted_queries
+      ORDER BY name ASC
+    `.execute(db);
+    return c.json({ queries: rows.rows });
+  });
+
+  // ── POST /persisted — create persisted query (admin only) ─────────────────
+  app.post('/persisted', zValidator('json', PersistedQueryCreateSchema), async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
+
+    const body = c.req.valid('json');
+    const row = await sql<any>`
+      INSERT INTO zvd_graphql_persisted_queries
+        (name, description, query, variables_schema, is_public, allowed_roles, created_by)
+      VALUES
+        (${body.name}, ${body.description ?? null}, ${body.query},
+         ${body.variables_schema ? JSON.stringify(body.variables_schema) : null}::jsonb,
+         ${body.is_public}, ${body.allowed_roles as any}, ${session.user.id})
+      RETURNING *
+    `.execute(db);
+    return c.json({ query: row.rows[0] }, 201);
+  });
+
+  // ── DELETE /persisted/:id — delete persisted query (admin only) ───────────
+  app.delete('/persisted/:id', async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
+
+    const id = c.req.param('id');
+    const res = await (db as any)
+      .deleteFrom('zvd_graphql_persisted_queries')
+      .where('id', '=', id)
+      .executeTakeFirst();
+
+    if ((res?.numDeletedRows ?? 0n) === 0n) return c.json({ error: 'Not found' }, 404);
+    return c.json({ success: true });
+  });
+
+  // ── POST /persisted/:name/execute — execute persisted query by name ────────
+  app.post('/persisted/:name/execute', async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ errors: [{ message: 'Unauthorized' }] }, 401);
+
+    const name = c.req.param('name');
+    const pqRes = await sql<any>`
+      SELECT * FROM zvd_graphql_persisted_queries WHERE name = ${name}
+    `.execute(db);
+
+    const pq = pqRes.rows[0];
+    if (!pq) return c.json({ errors: [{ message: 'Persisted query not found' }] }, 404);
+
+    // Check access: public or user role in allowed_roles
+    if (!pq.is_public && pq.allowed_roles?.length > 0) {
+      const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+      if (!isAdmin) return c.json({ errors: [{ message: 'Access denied to this persisted query' }] }, 403);
+    }
+
+    let variables: Record<string, any> = {};
+    try {
+      const bodyText = await c.req.text();
+      if (bodyText) variables = JSON.parse(bodyText).variables || {};
+    } catch { /* no variables */ }
+
+    const depthError = checkQueryDepth(pq.query, 5);
+    if (depthError) return c.json({ errors: [{ message: depthError }] }, 400);
+
+    try {
+      const schema = await getSchema(db);
+      const loaders = new DataLoaderRegistry(db);
+      const result = await graphql({
+        schema,
+        source: pq.query,
+        variableValues: variables,
+        contextValue: { user: session.user, db, loaders },
+      });
+
+      // Update use stats
+      sql`
+        UPDATE zvd_graphql_persisted_queries
+        SET use_count = use_count + 1, last_used_at = NOW(), updated_at = NOW()
+        WHERE name = ${name}
+      `.execute(db).catch(() => {});
+
+      return c.json(result);
+    } catch (err) {
+      return c.json({ errors: [{ message: String(err) }] }, 400);
+    }
+  });
+
+  // ── GET /logs — list operation logs (admin only) ──────────────────────────
+  app.get('/logs', async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
+
+    const rows = await sql<any>`
+      SELECT id, operation_name, operation_type, query_hash,
+             duration_ms, result_size_bytes, error_count, user_id, ip, created_at
+      FROM zvd_graphql_operation_logs
+      ORDER BY created_at DESC
+      LIMIT 100
+    `.execute(db);
+    return c.json({ logs: rows.rows });
+  });
+
+  // ── DELETE /logs — clear logs older than 30 days (admin only) ────────────
+  app.delete('/logs', async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
+
+    const res = await sql<any>`
+      DELETE FROM zvd_graphql_operation_logs
+      WHERE created_at < NOW() - INTERVAL '30 days'
+    `.execute(db);
+    return c.json({ deleted: Number(res.numAffectedRows ?? 0) });
+  });
+
+  // ── GET /stats — operation stats (admin only) ─────────────────────────────
+  app.get('/stats', async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
+
+    const [totalsRes, topOpsRes] = await Promise.all([
+      sql<any>`
+        SELECT
+          COUNT(*) FILTER (WHERE operation_type = 'query')::int AS total_queries,
+          COUNT(*) FILTER (WHERE operation_type = 'mutation')::int AS total_mutations,
+          ROUND(AVG(duration_ms))::int AS avg_duration_ms,
+          COUNT(*) FILTER (WHERE error_count > 0)::int AS total_errors
+        FROM zvd_graphql_operation_logs
+      `.execute(db),
+      sql<any>`
+        SELECT operation_name, COUNT(*)::int AS count,
+               ROUND(AVG(duration_ms))::int AS avg_duration_ms
+        FROM zvd_graphql_operation_logs
+        WHERE operation_name IS NOT NULL
+        GROUP BY operation_name
+        ORDER BY count DESC
+        LIMIT 10
+      `.execute(db),
+    ]);
+
+    return c.json({
+      ...totalsRes.rows[0],
+      top_operations: topOpsRes.rows,
+    });
+  });
+
+  // ── GET /field-policies — list field policies (admin only) ────────────────
+  app.get('/field-policies', async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
+
+    const rows = await sql<any>`
+      SELECT * FROM zvd_graphql_field_policies ORDER BY collection ASC, field ASC
+    `.execute(db);
+    return c.json({ policies: rows.rows });
+  });
+
+  // ── POST /field-policies — create field policy (admin only) ──────────────
+  app.post('/field-policies', zValidator('json', FieldPolicyCreateSchema), async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
+
+    const body = c.req.valid('json');
+    const row = await sql<any>`
+      INSERT INTO zvd_graphql_field_policies
+        (collection, field, allowed_roles, deny_roles, created_by)
+      VALUES
+        (${body.collection}, ${body.field},
+         ${body.allowed_roles as any}, ${body.deny_roles as any},
+         ${session.user.id})
+      ON CONFLICT (collection, field) DO UPDATE
+        SET allowed_roles = EXCLUDED.allowed_roles,
+            deny_roles = EXCLUDED.deny_roles
+      RETURNING *
+    `.execute(db);
+    return c.json({ policy: row.rows[0] }, 201);
+  });
+
+  // ── DELETE /field-policies/:id — delete field policy (admin only) ─────────
+  app.delete('/field-policies/:id', async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
+
+    const id = c.req.param('id');
+    const res = await (db as any)
+      .deleteFrom('zvd_graphql_field_policies')
+      .where('id', '=', id)
+      .executeTakeFirst();
+
+    if ((res?.numDeletedRows ?? 0n) === 0n) return c.json({ error: 'Not found' }, 404);
+    return c.json({ success: true });
   });
 
   return app;

@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { Database } from '../../../../packages/engine/src/db/index.js';
+import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
 import { createFileVersion, listFileVersions, restoreFileVersion } from './lib/file-versions.js';
 import { moveToTrash, restoreFromTrash, listTrash, purgeExpiredTrash } from './lib/trash.js';
 import { createShareLink, validateShareToken, incrementDownloadCount, listUserShares, revokeShare } from './lib/sharing.js';
@@ -17,6 +18,16 @@ export function cloudRoutes(db: Database, auth: any, s3: S3Client): Hono {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session?.user) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', session.user);
+    await next();
+  };
+
+  const requireAdmin = async (c: any, next: any) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session?.user) return c.json({ error: 'Unauthorized' }, 401);
+    c.set('user', session.user);
+    if (!(await checkPermission(session.user.id, 'admin', '*'))) {
+      return c.json({ error: 'Admin access required' }, 403);
+    }
     await next();
   };
 
@@ -35,6 +46,10 @@ export function cloudRoutes(db: Database, auth: any, s3: S3Client): Hono {
     try {
       const buffer = Buffer.from(await file.arrayBuffer());
       const result = await createFileVersion(db, s3, fileId, buffer, file.type, file.size, user.id);
+
+      // Log access
+      await logAccess(db, fileId, user.id, 'version', c.req.header('user-agent'), null, null);
+
       return c.json({ version: result.versionNum, message: 'New version uploaded' }, 201);
     } catch (err: any) {
       return c.json({ error: err.message }, 400);
@@ -115,6 +130,12 @@ export function cloudRoutes(db: Database, auth: any, s3: S3Client): Hono {
         maxDownloads: data.max_downloads,
         createdBy: user.id,
       });
+
+      // Log share action
+      if (data.file_id) {
+        await logAccess(db, data.file_id, user.id, 'share', c.req.header('user-agent'), null, null);
+      }
+
       return c.json(result, 201);
     } catch (err: any) {
       return c.json({ error: err.message }, 400);
@@ -139,7 +160,8 @@ export function cloudRoutes(db: Database, auth: any, s3: S3Client): Hono {
 
   app.get('/share/:token', async (c) => {
     const password = c.req.query('password');
-    const result = await validateShareToken(db, c.req.param('token'), password || undefined);
+    const token = c.req.param('token');
+    const result = await validateShareToken(db, token, password || undefined);
 
     if (!result.valid) {
       return c.json({ error: result.error }, result.error === 'Password required' ? 401 : 403);
@@ -153,7 +175,32 @@ export function cloudRoutes(db: Database, auth: any, s3: S3Client): Hono {
       }), { expiresIn: 3600 });
 
       await incrementDownloadCount(db, result.share.id);
+
+      // Log download access
+      await logAccess(
+        db,
+        result.file.id,
+        null,
+        'download',
+        c.req.header('user-agent'),
+        token,
+        c.req.header('x-forwarded-for') || null
+      );
+
       return c.redirect(presigned);
+    }
+
+    // Log view access
+    if (result.file) {
+      await logAccess(
+        db,
+        result.file.id,
+        null,
+        'view',
+        c.req.header('user-agent'),
+        token,
+        c.req.header('x-forwarded-for') || null
+      );
     }
 
     return c.json({
@@ -212,7 +259,7 @@ export function cloudRoutes(db: Database, auth: any, s3: S3Client): Hono {
   });
 
   // =============================================
-  // STORAGE QUOTA
+  // STORAGE QUOTA (user self)
   // =============================================
 
   app.get('/quota', requireAuth, async (c) => {
@@ -241,7 +288,333 @@ export function cloudRoutes(db: Database, auth: any, s3: S3Client): Hono {
     });
   });
 
+  // =============================================
+  // ADMIN: QUOTA MANAGEMENT
+  // =============================================
+
+  const QuotaSchema = z.object({
+    user_id: z.string().optional(),
+    role_name: z.string().optional(),
+    quota_bytes: z.number().int().min(1),
+    max_file_size_bytes: z.number().int().min(1).default(104857600),
+    allowed_extensions: z.array(z.string()).default([]),
+  }).refine((d) => d.user_id || d.role_name, {
+    message: 'Either user_id or role_name is required',
+  });
+
+  // GET /admin/quotas — list all quota settings (admin only)
+  app.get('/admin/quotas', requireAdmin, async (c) => {
+    const quotas = await (db as any)
+      .selectFrom('zv_storage_quotas')
+      .selectAll()
+      .orderBy('created_at', 'desc')
+      .execute();
+
+    return c.json({ quotas });
+  });
+
+  // POST /admin/quotas — create/update quota for user or role (admin only)
+  app.post('/admin/quotas', requireAdmin, zValidator('json', QuotaSchema), async (c) => {
+    const user = c.get('user') as any;
+    const data = c.req.valid('json');
+
+    // Upsert: if quota for this user/role exists, update it
+    const existing = data.user_id
+      ? await (db as any).selectFrom('zv_storage_quotas').select('id').where('user_id', '=', data.user_id).executeTakeFirst()
+      : await (db as any).selectFrom('zv_storage_quotas').select('id').where('role_name', '=', data.role_name).executeTakeFirst();
+
+    if (existing) {
+      await (db as any)
+        .updateTable('zv_storage_quotas')
+        .set({
+          quota_bytes: data.quota_bytes,
+          max_file_size_bytes: data.max_file_size_bytes,
+          allowed_extensions: JSON.stringify(data.allowed_extensions),
+          updated_at: new Date(),
+        })
+        .where('id', '=', existing.id)
+        .execute();
+
+      return c.json({ success: true, quota_id: existing.id });
+    }
+
+    const quota = await (db as any)
+      .insertInto('zv_storage_quotas')
+      .values({
+        user_id: data.user_id ?? null,
+        role_name: data.role_name ?? null,
+        quota_bytes: data.quota_bytes,
+        max_file_size_bytes: data.max_file_size_bytes,
+        allowed_extensions: JSON.stringify(data.allowed_extensions),
+        created_by: user.id,
+      })
+      .returningAll()
+      .executeTakeFirst();
+
+    return c.json({ quota }, 201);
+  });
+
+  // DELETE /admin/quotas/:id — delete quota rule (admin only)
+  app.delete('/admin/quotas/:id', requireAdmin, async (c) => {
+    await (db as any)
+      .deleteFrom('zv_storage_quotas')
+      .where('id', '=', c.req.param('id'))
+      .execute();
+
+    return c.json({ success: true });
+  });
+
+  // =============================================
+  // ACCESS LOGS
+  // =============================================
+
+  // GET /access-logs/:fileId — list access logs for a file (admin or file owner)
+  app.get('/access-logs/:fileId', requireAuth, async (c) => {
+    const user = c.get('user') as any;
+    const fileId = c.req.param('fileId');
+
+    const isAdmin = await checkPermission(user.id, 'admin', '*');
+
+    if (!isAdmin) {
+      // Check file ownership
+      const file = await sql<{ uploaded_by: string }>`
+        SELECT uploaded_by FROM zv_media_files WHERE id = ${fileId}
+      `.execute(db);
+
+      if (!file.rows[0]) return c.json({ error: 'File not found' }, 404);
+      if (file.rows[0].uploaded_by !== user.id) {
+        return c.json({ error: 'Forbidden' }, 403);
+      }
+    }
+
+    const logs = await sql<any>`
+      SELECT id::text, file_id, user_id, ip, action, share_token, user_agent, created_at
+      FROM zv_cloud_access_logs
+      WHERE file_id = ${fileId}
+      ORDER BY created_at DESC
+      LIMIT 100
+    `.execute(db);
+
+    return c.json({ file_id: fileId, logs: logs.rows });
+  });
+
+  // =============================================
+  // RETENTION POLICIES
+  // =============================================
+
+  const RetentionPolicySchema = z.object({
+    name: z.string().min(1),
+    folder_path: z.string().optional(),
+    file_extension: z.string().optional(),
+    max_versions: z.number().int().min(1).default(10),
+    delete_after_days: z.number().int().min(1).optional(),
+    archive_after_days: z.number().int().min(1).optional(),
+    is_active: z.boolean().default(true),
+  });
+
+  // GET /retention-policies — list retention policies (admin only)
+  app.get('/retention-policies', requireAdmin, async (c) => {
+    const policies = await (db as any)
+      .selectFrom('zv_cloud_retention_policies')
+      .selectAll()
+      .where('is_active', '=', true)
+      .orderBy('created_at', 'desc')
+      .execute();
+
+    return c.json({ policies });
+  });
+
+  // POST /retention-policies — create retention policy (admin only)
+  app.post('/retention-policies', requireAdmin, zValidator('json', RetentionPolicySchema), async (c) => {
+    const user = c.get('user') as any;
+    const data = c.req.valid('json');
+
+    const policy = await (db as any)
+      .insertInto('zv_cloud_retention_policies')
+      .values({
+        name: data.name,
+        folder_path: data.folder_path ?? null,
+        file_extension: data.file_extension ?? null,
+        max_versions: data.max_versions,
+        delete_after_days: data.delete_after_days ?? null,
+        archive_after_days: data.archive_after_days ?? null,
+        is_active: data.is_active,
+        created_by: user.id,
+      })
+      .returningAll()
+      .executeTakeFirst();
+
+    return c.json({ policy }, 201);
+  });
+
+  // DELETE /retention-policies/:id — delete retention policy (admin only)
+  app.delete('/retention-policies/:id', requireAdmin, async (c) => {
+    await (db as any)
+      .deleteFrom('zv_cloud_retention_policies')
+      .where('id', '=', c.req.param('id'))
+      .execute();
+
+    return c.json({ success: true });
+  });
+
+  // POST /retention-policies/apply — dry-run or apply retention policies (admin only)
+  app.post(
+    '/retention-policies/apply',
+    requireAdmin,
+    zValidator('json', z.object({ dry_run: z.boolean().default(true) })),
+    async (c) => {
+      const { dry_run } = c.req.valid('json');
+
+      const policies = await (db as any)
+        .selectFrom('zv_cloud_retention_policies')
+        .selectAll()
+        .where('is_active', '=', true)
+        .execute();
+
+      const actions: { action: string; file_id: string; reason: string }[] = [];
+
+      for (const policy of policies) {
+        // Handle max_versions: find files with too many versions
+        if (policy.max_versions) {
+          const filesWithExcessVersions = await sql<{ file_id: string; version_count: string }>`
+            SELECT file_id, COUNT(*) as version_count
+            FROM zv_cloud_file_versions
+            ${policy.folder_path ? sql`WHERE file_id IN (SELECT id FROM zv_media_files WHERE folder_path LIKE ${policy.folder_path + '%'})` : sql``}
+            GROUP BY file_id
+            HAVING COUNT(*) > ${policy.max_versions}
+          `.execute(db);
+
+          for (const row of filesWithExcessVersions.rows) {
+            // Get versions to delete (oldest ones beyond max_versions)
+            const versionsToDelete = await sql<{ id: string; version_number: number }>`
+              SELECT id::text, version_number
+              FROM zv_cloud_file_versions
+              WHERE file_id = ${row.file_id}
+              ORDER BY version_number ASC
+              LIMIT ${parseInt(row.version_count) - policy.max_versions}
+            `.execute(db);
+
+            for (const ver of versionsToDelete.rows) {
+              actions.push({
+                action: 'delete_version',
+                file_id: row.file_id,
+                reason: `Version ${ver.version_number} exceeds max_versions (${policy.max_versions}) for policy "${policy.name}"`,
+              });
+
+              if (!dry_run) {
+                await sql`DELETE FROM zv_cloud_file_versions WHERE id = ${ver.id}`.execute(db);
+              }
+            }
+          }
+        }
+
+        // Handle delete_after_days: move old files to trash
+        if (policy.delete_after_days) {
+          const cutoff = new Date(Date.now() - policy.delete_after_days * 24 * 60 * 60 * 1000);
+
+          let filesQuery = sql<{ id: string }>`
+            SELECT id::text FROM zv_media_files
+            WHERE created_at < ${cutoff} AND deleted_at IS NULL
+            ${policy.folder_path ? sql`AND folder_path LIKE ${policy.folder_path + '%'}` : sql``}
+            ${policy.file_extension ? sql`AND original_filename ILIKE ${'%.' + policy.file_extension}` : sql``}
+          `;
+
+          const oldFiles = await filesQuery.execute(db);
+
+          for (const file of oldFiles.rows) {
+            actions.push({
+              action: 'move_to_trash',
+              file_id: file.id,
+              reason: `File older than ${policy.delete_after_days} days per policy "${policy.name}"`,
+            });
+
+            if (!dry_run) {
+              await moveToTrash(db, file.id, 'system:retention');
+            }
+          }
+        }
+      }
+
+      return c.json({
+        dry_run,
+        actions_count: actions.length,
+        actions: dry_run ? actions : actions.map((a) => ({ ...a, applied: true })),
+      });
+    }
+  );
+
+  // =============================================
+  // ADMIN: STATS
+  // =============================================
+
+  // GET /admin/stats — admin storage statistics
+  app.get('/admin/stats', requireAdmin, async (c) => {
+    const totalFilesResult = await sql<{ count: string; total_size: string | null }>`
+      SELECT COUNT(*) as count, SUM(size_bytes)::text as total_size
+      FROM zv_media_files WHERE deleted_at IS NULL
+    `.execute(db);
+
+    const byTypeResult = await sql<{ mime_type: string; count: string; total_size: string }>`
+      SELECT
+        SPLIT_PART(mime_type, '/', 1) as mime_type,
+        COUNT(*) as count,
+        COALESCE(SUM(size_bytes), 0)::text as total_size
+      FROM zv_media_files WHERE deleted_at IS NULL
+      GROUP BY SPLIT_PART(mime_type, '/', 1)
+      ORDER BY count DESC
+      LIMIT 10
+    `.execute(db);
+
+    const shareCountResult = await sql<{ count: string }>`
+      SELECT COUNT(*) as count FROM zv_cloud_shares WHERE (expires_at IS NULL OR expires_at > NOW())
+    `.execute(db);
+
+    const quotaViolationsResult = await sql<{ count: string }>`
+      SELECT COUNT(DISTINCT uploaded_by) as count
+      FROM (
+        SELECT uploaded_by, SUM(size_bytes) as used_bytes
+        FROM zv_media_files WHERE deleted_at IS NULL
+        GROUP BY uploaded_by
+      ) usage
+      INNER JOIN zv_storage_quotas q ON q.user_id = usage.uploaded_by
+      WHERE usage.used_bytes > q.quota_bytes
+    `.execute(db);
+
+    return c.json({
+      total_files: parseInt(totalFilesResult.rows[0]?.count || '0'),
+      total_size_bytes: totalFilesResult.rows[0]?.total_size ? parseInt(totalFilesResult.rows[0].total_size) : 0,
+      files_by_type: byTypeResult.rows.map((r) => ({
+        type: r.mime_type,
+        count: parseInt(r.count),
+        total_size_bytes: parseInt(r.total_size),
+      })),
+      share_count: parseInt(shareCountResult.rows[0]?.count || '0'),
+      quota_violations_count: parseInt(quotaViolationsResult.rows[0]?.count || '0'),
+    });
+  });
+
   return app;
+}
+
+// ── Helper: log access ──────────────────────────────────────────
+
+async function logAccess(
+  db: Database,
+  fileId: string,
+  userId: string | null,
+  action: string,
+  userAgent: string | undefined,
+  shareToken: string | null,
+  ip: string | null
+): Promise<void> {
+  try {
+    await sql`
+      INSERT INTO zv_cloud_access_logs (file_id, user_id, ip, action, share_token, user_agent)
+      VALUES (${fileId}, ${userId}, ${ip}, ${action}, ${shareToken}, ${userAgent ?? null})
+    `.execute(db);
+  } catch {
+    // Non-fatal: access logging should not break main flow
+  }
 }
 
 /**
@@ -253,7 +626,8 @@ export function publicShareRouter(db: Database, s3: S3Client): Hono {
 
   app.get('/:token', async (c) => {
     const password = c.req.query('password');
-    const result = await validateShareToken(db, c.req.param('token'), password || undefined);
+    const token = c.req.param('token');
+    const result = await validateShareToken(db, token, password || undefined);
 
     if (!result.valid) {
       return c.json({ error: result.error }, result.error === 'Password required' ? 401 : 403);
@@ -267,7 +641,32 @@ export function publicShareRouter(db: Database, s3: S3Client): Hono {
       }), { expiresIn: 3600 });
 
       await incrementDownloadCount(db, result.share.id);
+
+      // Log download access
+      await logAccess(
+        db,
+        result.file.id,
+        null,
+        'download',
+        c.req.header('user-agent'),
+        token,
+        c.req.header('x-forwarded-for') || null
+      );
+
       return c.redirect(presigned);
+    }
+
+    // Log view access
+    if (result.file) {
+      await logAccess(
+        db,
+        result.file.id,
+        null,
+        'view',
+        c.req.header('user-agent'),
+        token,
+        c.req.header('x-forwarded-for') || null
+      );
     }
 
     return c.json({
