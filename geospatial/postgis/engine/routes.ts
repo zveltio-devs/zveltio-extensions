@@ -2,8 +2,8 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
-import { DDLManager } from '../../../../packages/engine/src/lib/ddl-manager.js';
+import { checkPermission } from '@zveltio/engine/lib/permissions.js';
+import { DDLManager } from '@zveltio/engine/lib/ddl-manager.js';
 
 async function getUser(c: any, auth: any) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -173,7 +173,7 @@ export function postgisRoutes(db: any, auth: any): Hono {
       name: z.string().min(1),
       description: z.string().optional(),
       coordinates: z.array(z.array(z.tuple([z.number(), z.number()]))),
-      metadata: z.record(z.any()).default({}),
+      metadata: z.record(z.string(), z.any()).default({}),
     })),
     async (c) => {
       const user = await getUser(c, auth);
@@ -205,7 +205,7 @@ export function postgisRoutes(db: any, auth: any): Hono {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const { lat, lng } = c.req.valid('json');
-    const result = await sql`
+    const result = await sql<{ contains: boolean }>`
       SELECT ST_Contains(zone::geometry, ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)) AS contains
       FROM zv_geofences WHERE id = ${c.req.param('id')}::uuid
     `.execute(db);
@@ -277,7 +277,7 @@ export function postgisRoutes(db: any, auth: any): Hono {
       speed_kmh: z.number().nonnegative().optional(),
       heading_deg: z.number().min(0).max(360).optional(),
       source: z.enum(['api', 'gps', 'manual']).default('api'),
-      metadata: z.record(z.any()).default({}),
+      metadata: z.record(z.string(), z.any()).default({}),
       recorded_at: z.string().datetime().optional(),
     })),
     async (c) => {
@@ -368,7 +368,7 @@ export function postgisRoutes(db: any, auth: any): Hono {
       name: z.string().min(1),
       description: z.string().optional(),
       waypoints: z.array(z.object({ lat: z.number(), lng: z.number(), name: z.string().optional() })).min(2),
-      metadata: z.record(z.any()).default({}),
+      metadata: z.record(z.string(), z.any()).default({}),
     })),
     async (c) => {
       const user = await getUser(c, auth);
@@ -418,7 +418,7 @@ export function postgisRoutes(db: any, auth: any): Hono {
       trigger_on: z.enum(['enter', 'exit', 'both']),
       entity_type: z.string().optional(),
       action_type: z.enum(['webhook', 'notification', 'email']).default('webhook'),
-      action_config: z.record(z.any()).default({}),
+      action_config: z.record(z.string(), z.any()).default({}),
     })),
     async (c) => {
       const user = await getUser(c, auth);

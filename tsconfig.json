@@ -25,7 +25,9 @@
       "kysely": ["../zveltio/packages/engine/node_modules/kysely/dist/cjs/index.d.ts"],
       "kysely/*": ["../zveltio/packages/engine/node_modules/kysely/dist/cjs/*"],
       "better-auth": ["../zveltio/packages/engine/node_modules/better-auth/dist/index.d.ts"],
-      "better-auth/*": ["../zveltio/packages/engine/node_modules/better-auth/dist/*"]
+      "better-auth/*": ["../zveltio/packages/engine/node_modules/better-auth/dist/*"],
+      "@zveltio/engine": ["../zveltio/packages/engine/src/index.ts"],
+      "@zveltio/engine/*": ["../zveltio/packages/engine/src/*"]
     },
     "typeRoots": [
       "../zveltio/packages/studio/node_modules/@types",
