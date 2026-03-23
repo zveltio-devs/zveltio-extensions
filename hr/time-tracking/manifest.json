@@ -1,0 +1,12 @@
+{
+  "name": "time-tracking",
+  "package": "@zveltio/ext-time-tracking",
+  "category": "hr",
+  "displayName": "Time Tracking",
+  "description": "Timesheets, project-based time logging, billable hours and client reports",
+  "version": "1.0.0",
+  "zveltioMinVersion": "1.0.0",
+  "zveltioMaxVersion": "2.0.0",
+  "permissions": ["database"],
+  "contributes": { "engine": true, "studio": true, "fieldTypes": [] }
+}

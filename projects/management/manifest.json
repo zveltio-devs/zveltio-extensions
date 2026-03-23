@@ -1,0 +1,12 @@
+{
+  "name": "projects",
+  "package": "@zveltio/ext-projects",
+  "category": "projects",
+  "displayName": "Project Management",
+  "description": "Projects, milestones, tasks, kanban board, team assignments and progress tracking",
+  "version": "1.0.0",
+  "zveltioMinVersion": "1.0.0",
+  "zveltioMaxVersion": "2.0.0",
+  "permissions": ["database"],
+  "contributes": { "engine": true, "studio": true, "fieldTypes": [] }
+}

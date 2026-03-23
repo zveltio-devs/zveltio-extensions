@@ -1,0 +1,12 @@
+{
+  "name": "leave",
+  "package": "@zveltio/ext-leave",
+  "category": "hr",
+  "displayName": "Leave Management",
+  "description": "Vacation and leave requests with balance tracking, approval workflow and calendar view",
+  "version": "1.0.0",
+  "zveltioMinVersion": "1.0.0",
+  "zveltioMaxVersion": "2.0.0",
+  "permissions": ["database"],
+  "contributes": { "engine": true, "studio": true, "fieldTypes": [] }
+}
