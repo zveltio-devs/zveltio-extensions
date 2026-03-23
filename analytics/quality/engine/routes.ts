@@ -23,7 +23,7 @@ const RuleSchema = z.object({
   collection: z.string().min(1),
   field_name: z.string().optional(),
   rule_type: z.enum(['not_null','unique','pattern','range','reference','custom']),
-  rule_config: z.record(z.any()).default({}),
+  rule_config: z.record(z.string(), z.any()).default({}),
   severity: z.enum(['info','warning','error','critical']).default('warning'),
 });
 

@@ -387,8 +387,8 @@ export function ecommerceRoutes(db: any, auth: any): Hono {
   app.post('/orders', zValidator('json', z.object({
     customer_email: z.string().email(),
     customer_name: z.string().min(1),
-    billing_address: z.record(z.any()).default({}),
-    shipping_address: z.record(z.any()).default({}),
+    billing_address: z.record(z.string(), z.any()).default({}),
+    shipping_address: z.record(z.string(), z.any()).default({}),
     payment_method: z.string().optional(),
     currency: z.string().default('RON'),
     coupon_code: z.string().optional(),
