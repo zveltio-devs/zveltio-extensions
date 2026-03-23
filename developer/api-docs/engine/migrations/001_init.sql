@@ -1,0 +1,2 @@
+-- API Docs extension — uses core DDL tables (zv_collections, zv_fields)
+-- No extension-specific tables in init

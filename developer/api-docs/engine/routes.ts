@@ -1,7 +1,42 @@
 import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
+import { sql } from 'kysely';
+import * as crypto from 'crypto';
 import type { Database } from '../../../../packages/engine/src/db/index.js';
 import { DDLManager } from '../../../../packages/engine/src/lib/ddl-manager.js';
 import { auth } from '../../../../packages/engine/src/lib/auth.js';
+import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
+
+// ── Zod schemas ───────────────────────────────────────────────────────────────
+
+const ChangelogCreateSchema = z.object({
+  version: z.string().min(1).max(50),
+  title: z.string().min(1).max(255),
+  changes: z.string().min(1),
+  breaking_changes: z.string().optional(),
+  migration_guide: z.string().optional(),
+});
+
+const ChangelogUpdateSchema = ChangelogCreateSchema.partial();
+
+const TokenCreateSchema = z.object({
+  name: z.string().min(1).max(100),
+  scopes: z.array(z.string()).default([]),
+  expires_at: z.string().datetime().optional(),
+});
+
+const CustomDocCreateSchema = z.object({
+  title: z.string().min(1).max(255),
+  slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
+  body: z.string().min(1),
+  sort_order: z.number().int().default(0),
+  is_published: z.boolean().default(true),
+});
+
+const CustomDocUpdateSchema = CustomDocCreateSchema.partial();
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function getSettingValue(db: Database, key: string): Promise<any> {
   try {
@@ -259,10 +294,13 @@ async function checkDocsAccess(db: Database, c: any): Promise<boolean> {
   return !!session;
 }
 
+// ── Route factory ─────────────────────────────────────────────────────────────
+
 export function apiDocsRoutes(db: Database, _auth: any): Hono {
   const router = new Hono();
 
-  // GET /api/docs — Swagger UI
+  // ── GET / — Swagger UI ────────────────────────────────────────────────────
+
   router.get('/', async (c) => {
     const accessible = await checkDocsAccess(db, c);
     if (!accessible) return c.json({ error: 'API docs are private. Sign in to view.' }, 401);
@@ -312,7 +350,8 @@ export function apiDocsRoutes(db: Database, _auth: any): Hono {
 </html>`);
   });
 
-  // GET /api/docs/openapi.json
+  // ── GET /openapi.json ─────────────────────────────────────────────────────
+
   router.get('/openapi.json', async (c) => {
     const accessible = await checkDocsAccess(db, c);
     if (!accessible) return c.json({ error: 'API docs are private. Sign in to view.' }, 401);
@@ -320,7 +359,8 @@ export function apiDocsRoutes(db: Database, _auth: any): Hono {
     return c.json(spec);
   });
 
-  // GET /api/docs/postman
+  // ── GET /postman ──────────────────────────────────────────────────────────
+
   router.get('/postman', async (c) => {
     const accessible = await checkDocsAccess(db, c);
     if (!accessible) return c.json({ error: 'API docs are private. Sign in to view.' }, 401);
@@ -347,6 +387,248 @@ export function apiDocsRoutes(db: Database, _auth: any): Hono {
 
     c.header('Content-Disposition', 'attachment; filename="api-collection.json"');
     return c.json(postman);
+  });
+
+  // ── Changelogs ────────────────────────────────────────────────────────────
+
+  // GET /changelogs — public endpoint (published only)
+  router.get('/changelogs', async (c) => {
+    const rows = await sql<any>`
+      SELECT id, version, title, changes, breaking_changes, migration_guide,
+             published_at, is_published, created_by, created_at
+      FROM zvd_api_changelogs
+      WHERE is_published = true
+      ORDER BY published_at DESC NULLS LAST, created_at DESC
+    `.execute(db);
+    return c.json({ changelogs: rows.rows });
+  });
+
+  // POST /changelogs — admin only
+  router.post('/changelogs', zValidator('json', ChangelogCreateSchema), async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
+
+    const body = c.req.valid('json');
+    const row = await sql<any>`
+      INSERT INTO zvd_api_changelogs
+        (version, title, changes, breaking_changes, migration_guide, created_by)
+      VALUES
+        (${body.version}, ${body.title}, ${body.changes},
+         ${body.breaking_changes ?? null}, ${body.migration_guide ?? null},
+         ${session.user.id})
+      RETURNING *
+    `.execute(db);
+    return c.json({ changelog: row.rows[0] }, 201);
+  });
+
+  // PATCH /changelogs/:id — admin only
+  router.patch('/changelogs/:id', zValidator('json', ChangelogUpdateSchema), async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
+
+    const id = c.req.param('id');
+    const body = c.req.valid('json');
+
+    const setClauses: string[] = [];
+    const values: any[] = [];
+
+    if (body.version !== undefined) { setClauses.push(`version = $${setClauses.length + 1}`); values.push(body.version); }
+    if (body.title !== undefined) { setClauses.push(`title = $${setClauses.length + 1}`); values.push(body.title); }
+    if (body.changes !== undefined) { setClauses.push(`changes = $${setClauses.length + 1}`); values.push(body.changes); }
+    if (body.breaking_changes !== undefined) { setClauses.push(`breaking_changes = $${setClauses.length + 1}`); values.push(body.breaking_changes); }
+    if (body.migration_guide !== undefined) { setClauses.push(`migration_guide = $${setClauses.length + 1}`); values.push(body.migration_guide); }
+
+    if (setClauses.length === 0) return c.json({ error: 'No fields to update' }, 400);
+
+    const row = await (db as any)
+      .updateTable('zvd_api_changelogs')
+      .set(Object.fromEntries(
+        Object.entries(body).filter(([, v]) => v !== undefined),
+      ))
+      .where('id', '=', id)
+      .returningAll()
+      .executeTakeFirst();
+
+    if (!row) return c.json({ error: 'Not found' }, 404);
+    return c.json({ changelog: row });
+  });
+
+  // DELETE /changelogs/:id — admin only
+  router.delete('/changelogs/:id', async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
+
+    const id = c.req.param('id');
+    const res = await (db as any)
+      .deleteFrom('zvd_api_changelogs')
+      .where('id', '=', id)
+      .executeTakeFirst();
+
+    if ((res?.numDeletedRows ?? 0n) === 0n) return c.json({ error: 'Not found' }, 404);
+    return c.json({ success: true });
+  });
+
+  // POST /changelogs/:id/publish — admin only
+  router.post('/changelogs/:id/publish', async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
+
+    const id = c.req.param('id');
+    const row = await (db as any)
+      .updateTable('zvd_api_changelogs')
+      .set({ is_published: true, published_at: new Date() })
+      .where('id', '=', id)
+      .returningAll()
+      .executeTakeFirst();
+
+    if (!row) return c.json({ error: 'Not found' }, 404);
+    return c.json({ changelog: row });
+  });
+
+  // ── API Access Tokens ─────────────────────────────────────────────────────
+
+  // GET /tokens — list tokens for current user (redacted)
+  router.get('/tokens', async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+
+    const rows = await sql<any>`
+      SELECT id, name, token_prefix, scopes, expires_at, last_used_at,
+             use_count, created_at, revoked_at
+      FROM zvd_api_access_tokens
+      WHERE created_by = ${session.user.id}
+        AND revoked_at IS NULL
+      ORDER BY created_at DESC
+    `.execute(db);
+    return c.json({ tokens: rows.rows });
+  });
+
+  // POST /tokens — create token (returns plaintext once)
+  router.post('/tokens', zValidator('json', TokenCreateSchema), async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+
+    const body = c.req.valid('json');
+    const plaintext = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(plaintext).digest('hex');
+    const tokenPrefix = plaintext.slice(0, 8);
+
+    const row = await sql<any>`
+      INSERT INTO zvd_api_access_tokens
+        (name, token_hash, token_prefix, scopes, expires_at, created_by)
+      VALUES
+        (${body.name}, ${tokenHash}, ${tokenPrefix},
+         ${body.scopes as any}, ${body.expires_at ? new Date(body.expires_at) : null},
+         ${session.user.id})
+      RETURNING id, name, token_prefix, scopes, expires_at, created_at
+    `.execute(db);
+
+    return c.json({
+      token: row.rows[0],
+      plaintext_token: plaintext,
+      warning: 'Store this token securely — it will not be shown again.',
+    }, 201);
+  });
+
+  // DELETE /tokens/:id — revoke token
+  router.delete('/tokens/:id', async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+
+    const id = c.req.param('id');
+    const row = await (db as any)
+      .updateTable('zvd_api_access_tokens')
+      .set({ revoked_at: new Date() })
+      .where('id', '=', id)
+      .where('created_by', '=', session.user.id)
+      .where('revoked_at', 'is', null)
+      .returningAll()
+      .executeTakeFirst();
+
+    if (!row) return c.json({ error: 'Token not found or already revoked' }, 404);
+    return c.json({ success: true });
+  });
+
+  // ── Custom Docs ───────────────────────────────────────────────────────────
+
+  // GET /custom-docs — list published sections (public)
+  router.get('/custom-docs', async (c) => {
+    const rows = await sql<any>`
+      SELECT id, title, slug, body, sort_order, is_published, created_at, updated_at
+      FROM zvd_api_custom_docs
+      WHERE is_published = true
+      ORDER BY sort_order ASC, created_at ASC
+    `.execute(db);
+    return c.json({ docs: rows.rows });
+  });
+
+  // POST /custom-docs — create section (admin only)
+  router.post('/custom-docs', zValidator('json', CustomDocCreateSchema), async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
+
+    const body = c.req.valid('json');
+    const row = await sql<any>`
+      INSERT INTO zvd_api_custom_docs
+        (title, slug, body, sort_order, is_published, created_by)
+      VALUES
+        (${body.title}, ${body.slug}, ${body.body},
+         ${body.sort_order}, ${body.is_published}, ${session.user.id})
+      RETURNING *
+    `.execute(db);
+    return c.json({ doc: row.rows[0] }, 201);
+  });
+
+  // PATCH /custom-docs/:id — update section (admin only)
+  router.patch('/custom-docs/:id', zValidator('json', CustomDocUpdateSchema), async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
+
+    const id = c.req.param('id');
+    const body = c.req.valid('json');
+    const updates: Record<string, any> = {
+      ...Object.fromEntries(Object.entries(body).filter(([, v]) => v !== undefined)),
+      updated_at: new Date(),
+    };
+
+    const row = await (db as any)
+      .updateTable('zvd_api_custom_docs')
+      .set(updates)
+      .where('id', '=', id)
+      .returningAll()
+      .executeTakeFirst();
+
+    if (!row) return c.json({ error: 'Not found' }, 404);
+    return c.json({ doc: row });
+  });
+
+  // DELETE /custom-docs/:id — delete section (admin only)
+  router.delete('/custom-docs/:id', async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
+
+    const id = c.req.param('id');
+    const res = await (db as any)
+      .deleteFrom('zvd_api_custom_docs')
+      .where('id', '=', id)
+      .executeTakeFirst();
+
+    if ((res?.numDeletedRows ?? 0n) === 0n) return c.json({ error: 'Not found' }, 404);
+    return c.json({ success: true });
   });
 
   return router;

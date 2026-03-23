@@ -1,0 +1,2 @@
+-- Validation extension — uses core zv_validation_rules table
+-- No extension-specific tables in init

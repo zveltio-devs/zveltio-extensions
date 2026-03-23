@@ -483,5 +483,141 @@ export function mediaRoutes(db: Database, auth: any): Hono {
     });
   });
 
+  // ==========================================
+  // COLLECTIONS (curated galleries)
+  // ==========================================
+
+  router.get('/collections', async (c) => {
+    const user = c.get('user' as never) as any;
+    const collections = await (db as any)
+      .selectFrom('zv_media_collections')
+      .selectAll()
+      .where((eb: any) => eb.or([
+        eb('is_public', '=', true),
+        eb('created_by', '=', user.id),
+      ]))
+      .orderBy('created_at', 'desc')
+      .execute();
+    return c.json({ collections });
+  });
+
+  router.post('/collections', zValidator('json', z.object({
+    name: z.string().min(1),
+    description: z.string().optional(),
+    is_public: z.boolean().default(false),
+    cover_file_id: z.string().uuid().optional(),
+  })), async (c) => {
+    const user = c.get('user' as never) as any;
+    const data = c.req.valid('json');
+    const coll = await (db as any)
+      .insertInto('zv_media_collections')
+      .values({ ...data, cover_file_id: data.cover_file_id || null, created_by: user.id })
+      .returningAll()
+      .executeTakeFirst();
+    return c.json({ collection: coll }, 201);
+  });
+
+  router.patch('/collections/:id', zValidator('json', z.object({
+    name: z.string().min(1).optional(),
+    description: z.string().optional(),
+    is_public: z.boolean().optional(),
+    cover_file_id: z.string().uuid().nullable().optional(),
+  })), async (c) => {
+    const user = c.get('user' as never) as any;
+    const id = c.req.param('id');
+    const existing = await (db as any).selectFrom('zv_media_collections').select(['id', 'created_by']).where('id', '=', id).executeTakeFirst();
+    if (!existing) return c.json({ error: 'Collection not found' }, 404);
+    if (existing.created_by !== user.id) return c.json({ error: 'Forbidden' }, 403);
+    const updated = await (db as any).updateTable('zv_media_collections').set({ ...c.req.valid('json'), updated_at: new Date() }).where('id', '=', id).returningAll().executeTakeFirst();
+    return c.json({ collection: updated });
+  });
+
+  router.delete('/collections/:id', async (c) => {
+    const user = c.get('user' as never) as any;
+    const id = c.req.param('id');
+    const existing = await (db as any).selectFrom('zv_media_collections').select(['id', 'created_by']).where('id', '=', id).executeTakeFirst();
+    if (!existing) return c.json({ error: 'Collection not found' }, 404);
+    if (existing.created_by !== user.id) return c.json({ error: 'Forbidden' }, 403);
+    await (db as any).deleteFrom('zv_media_collections').where('id', '=', id).execute();
+    return c.json({ success: true });
+  });
+
+  router.get('/collections/:id/files', async (c) => {
+    const files = await (db as any)
+      .selectFrom('zv_media_collection_files as cf')
+      .innerJoin('zv_media_files as f', 'f.id', 'cf.file_id')
+      .select(['f.id', 'f.original_filename', 'f.mime_type', 'f.size_bytes', 'f.thumbnail_url', 'f.title', 'cf.sort_order'])
+      .where('cf.collection_id', '=', c.req.param('id'))
+      .where('f.deleted_at', 'is', null)
+      .orderBy('cf.sort_order', 'asc')
+      .execute();
+    return c.json({ files });
+  });
+
+  router.post('/collections/:id/files', zValidator('json', z.object({
+    file_ids: z.array(z.string().uuid()).min(1),
+  })), async (c) => {
+    const user = c.get('user' as never) as any;
+    const collId = c.req.param('id');
+    const { file_ids } = c.req.valid('json');
+    const existing = await (db as any)
+      .selectFrom('zv_media_collection_files')
+      .select('file_id')
+      .where('collection_id', '=', collId)
+      .execute();
+    const existingIds = new Set(existing.map((r: any) => r.file_id));
+    const toInsert = file_ids.filter((id: string) => !existingIds.has(id));
+    if (toInsert.length > 0) {
+      await (db as any).insertInto('zv_media_collection_files')
+        .values(toInsert.map((fid: string, i: number) => ({ collection_id: collId, file_id: fid, sort_order: existing.length + i, added_by: user.id })))
+        .execute();
+    }
+    return c.json({ added: toInsert.length });
+  });
+
+  router.delete('/collections/:id/files/:fileId', async (c) => {
+    await (db as any)
+      .deleteFrom('zv_media_collection_files')
+      .where('collection_id', '=', c.req.param('id'))
+      .where('file_id', '=', c.req.param('fileId'))
+      .execute();
+    return c.json({ success: true });
+  });
+
+  // ==========================================
+  // ADMIN QUOTA MANAGEMENT
+  // ==========================================
+
+  router.get('/admin/quotas', async (c) => {
+    const quotas = await (db as any).selectFrom('zv_storage_quotas').selectAll().orderBy('created_at', 'desc').execute();
+    return c.json({ quotas });
+  });
+
+  router.post('/admin/quotas', zValidator('json', z.object({
+    user_id: z.string().optional(),
+    role_name: z.string().optional(),
+    quota_bytes: z.number().int().positive(),
+    max_file_size_bytes: z.number().int().positive().default(104857600),
+    allowed_extensions: z.array(z.string()).default([]),
+  }).refine(d => d.user_id || d.role_name, { message: 'user_id or role_name required' })), async (c) => {
+    const user = c.get('user' as never) as any;
+    const data = c.req.valid('json');
+    const quota = await (db as any)
+      .insertInto('zv_storage_quotas')
+      .values({ ...data, created_by: user.id })
+      .onConflict((oc: any) => oc
+        .columns(data.user_id ? ['user_id'] : ['role_name'])
+        .doUpdateSet({ quota_bytes: data.quota_bytes, max_file_size_bytes: data.max_file_size_bytes, allowed_extensions: data.allowed_extensions, updated_at: new Date() })
+      )
+      .returningAll()
+      .executeTakeFirst();
+    return c.json({ quota }, 201);
+  });
+
+  router.delete('/admin/quotas/:id', async (c) => {
+    await (db as any).deleteFrom('zv_storage_quotas').where('id', '=', c.req.param('id')).execute();
+    return c.json({ success: true });
+  });
+
   return router;
 }

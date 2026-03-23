@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
+import { sql } from 'kysely';
 
 export function checklistsRoutes(db: any, auth: any): Hono {
   const app = new Hono();
@@ -38,6 +39,10 @@ export function checklistsRoutes(db: any, auth: any): Hono {
             description: z.string().optional(),
             required: z.boolean().default(false),
             order_idx: z.number().default(0),
+            time_estimate_minutes: z.number().int().optional(),
+            assignee_role: z.string().optional(),
+            condition_item_label: z.string().optional(),
+            condition_checked: z.boolean().optional(),
           })
         ).default([]),
       })
@@ -61,6 +66,10 @@ export function checklistsRoutes(db: any, auth: any): Hono {
             description: item.description,
             required: item.required,
             order_idx: item.order_idx ?? i,
+            time_estimate_minutes: item.time_estimate_minutes ?? null,
+            assignee_role: item.assignee_role ?? null,
+            condition_item_label: item.condition_item_label ?? null,
+            condition_checked: item.condition_checked ?? null,
           })))
           .execute();
       }
@@ -115,6 +124,10 @@ export function checklistsRoutes(db: any, auth: any): Hono {
             description: z.string().optional(),
             required: z.boolean().default(false),
             order_idx: z.number().default(0),
+            time_estimate_minutes: z.number().int().optional(),
+            assignee_role: z.string().optional(),
+            condition_item_label: z.string().optional(),
+            condition_checked: z.boolean().optional(),
           })
         ).optional(),
       })
@@ -157,6 +170,10 @@ export function checklistsRoutes(db: any, auth: any): Hono {
               description: item.description,
               required: item.required,
               order_idx: item.order_idx ?? i,
+              time_estimate_minutes: (item as any).time_estimate_minutes ?? null,
+              assignee_role: (item as any).assignee_role ?? null,
+              condition_item_label: (item as any).condition_item_label ?? null,
+              condition_checked: (item as any).condition_checked ?? null,
             })))
             .execute();
         }
@@ -254,7 +271,6 @@ export function checklistsRoutes(db: any, auth: any): Hono {
         .returningAll()
         .executeTakeFirst();
 
-      // Resolve items from template or custom
       let itemsToInsert: any[] = [];
       if (template_id) {
         itemsToInsert = await db
@@ -290,24 +306,40 @@ export function checklistsRoutes(db: any, auth: any): Hono {
     }
   );
 
-  // PATCH /items/:itemId — check/uncheck an item
+  // PATCH /items/:itemId — check/uncheck an item + update extra fields
   app.patch(
     '/items/:itemId',
-    zValidator('json', z.object({ checked: z.boolean() })),
+    zValidator(
+      'json',
+      z.object({
+        checked: z.boolean().optional(),
+        time_spent_minutes: z.number().int().min(0).optional(),
+        notes: z.string().optional(),
+        assignee_user_id: z.string().optional(),
+        due_at: z.string().datetime().optional(),
+      })
+    ),
     async (c) => {
       const user = await getUser(c);
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-      const { checked } = c.req.valid('json');
+      const { checked, time_spent_minutes, notes, assignee_user_id, due_at } = c.req.valid('json');
       const now = new Date();
+
+      const updateSet: Record<string, any> = {};
+      if (checked !== undefined) {
+        updateSet.checked = checked;
+        updateSet.checked_by = checked ? user.id : null;
+        updateSet.checked_at = checked ? now : null;
+      }
+      if (time_spent_minutes !== undefined) updateSet.time_spent_minutes = time_spent_minutes;
+      if (notes !== undefined) updateSet.notes = notes;
+      if (assignee_user_id !== undefined) updateSet.assignee_user_id = assignee_user_id;
+      if (due_at !== undefined) updateSet.due_at = new Date(due_at);
 
       const item = await db
         .updateTable('zv_checklist_items')
-        .set({
-          checked,
-          checked_by: checked ? user.id : null,
-          checked_at: checked ? now : null,
-        })
+        .set(updateSet)
         .where('id', '=', c.req.param('itemId'))
         .returningAll()
         .executeTakeFirst();
@@ -315,34 +347,383 @@ export function checklistsRoutes(db: any, auth: any): Hono {
       if (!item) return c.json({ error: 'Item not found' }, 404);
 
       // Auto-complete checklist if all required items are checked
-      const allItems = await db
-        .selectFrom('zv_checklist_items')
-        .selectAll()
-        .where('checklist_id', '=', item.checklist_id)
-        .execute();
-
-      const allRequiredChecked = allItems
-        .filter((i: any) => i.required)
-        .every((i: any) => i.checked);
-
-      if (allRequiredChecked) {
-        await db
-          .updateTable('zv_checklists')
-          .set({ completed_at: now, updated_at: now })
-          .where('id', '=', item.checklist_id)
-          .where('completed_at', 'is', null)
+      if (checked !== undefined) {
+        const allItems = await db
+          .selectFrom('zv_checklist_items')
+          .selectAll()
+          .where('checklist_id', '=', item.checklist_id)
           .execute();
-      } else {
-        await db
-          .updateTable('zv_checklists')
-          .set({ completed_at: null, updated_at: now })
+
+        const allRequiredChecked = allItems
+          .filter((i: any) => i.required)
+          .every((i: any) => i.checked);
+
+        const checklist = await db
+          .selectFrom('zv_checklists')
+          .selectAll()
           .where('id', '=', item.checklist_id)
-          .execute();
+          .executeTakeFirst();
+
+        if (allRequiredChecked && checklist && !checklist.completed_at) {
+          // Calculate time_to_complete_minutes
+          let timeToComplete: number | null = null;
+          if (checklist.created_at) {
+            timeToComplete = Math.round((now.getTime() - new Date(checklist.created_at).getTime()) / 60000);
+          }
+
+          await db
+            .updateTable('zv_checklists')
+            .set({
+              completed_at: now,
+              updated_at: now,
+              completed_by: user.id,
+              time_to_complete_minutes: timeToComplete,
+            })
+            .where('id', '=', item.checklist_id)
+            .where('completed_at', 'is', null)
+            .execute();
+        } else if (!allRequiredChecked) {
+          await db
+            .updateTable('zv_checklists')
+            .set({ completed_at: null, updated_at: now })
+            .where('id', '=', item.checklist_id)
+            .execute();
+        }
       }
 
       return c.json({ item });
     }
   );
+
+  // ─── Enterprise: Bulk Check ────────────────────────────────────
+
+  // POST /items/bulk-check — check/uncheck multiple items at once
+  app.post(
+    '/items/bulk-check',
+    zValidator(
+      'json',
+      z.object({
+        item_ids: z.array(z.string().uuid()).min(1),
+        checked: z.boolean(),
+      })
+    ),
+    async (c) => {
+      const user = await getUser(c);
+      if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+      const { item_ids, checked } = c.req.valid('json');
+      const now = new Date();
+
+      const updateSet: Record<string, any> = {
+        checked,
+        checked_by: checked ? user.id : null,
+        checked_at: checked ? now : null,
+      };
+
+      const updatedItems = await Promise.all(
+        item_ids.map(async (itemId) => {
+          const item = await db
+            .updateTable('zv_checklist_items')
+            .set(updateSet)
+            .where('id', '=', itemId)
+            .returningAll()
+            .executeTakeFirst();
+          return item;
+        })
+      );
+
+      const validItems = updatedItems.filter(Boolean);
+
+      // Auto-complete affected checklists
+      const affectedChecklistIds = [...new Set(validItems.map((i: any) => i.checklist_id))];
+      for (const checklistId of affectedChecklistIds) {
+        const allItems = await db
+          .selectFrom('zv_checklist_items')
+          .selectAll()
+          .where('checklist_id', '=', checklistId)
+          .execute();
+
+        const allRequiredChecked = allItems
+          .filter((i: any) => i.required)
+          .every((i: any) => i.checked);
+
+        const checklist = await db
+          .selectFrom('zv_checklists')
+          .selectAll()
+          .where('id', '=', checklistId)
+          .executeTakeFirst();
+
+        if (allRequiredChecked && checklist && !checklist.completed_at) {
+          let timeToComplete: number | null = null;
+          if (checklist.created_at) {
+            timeToComplete = Math.round((now.getTime() - new Date(checklist.created_at).getTime()) / 60000);
+          }
+          await db
+            .updateTable('zv_checklists')
+            .set({ completed_at: now, updated_at: now, completed_by: user.id, time_to_complete_minutes: timeToComplete })
+            .where('id', '=', checklistId)
+            .where('completed_at', 'is', null)
+            .execute();
+        } else if (!allRequiredChecked) {
+          await db
+            .updateTable('zv_checklists')
+            .set({ completed_at: null, updated_at: now })
+            .where('id', '=', checklistId)
+            .execute();
+        }
+      }
+
+      return c.json({ updated: validItems.length, items: validItems });
+    }
+  );
+
+  // ─── Enterprise: Overdue Items ─────────────────────────────────
+
+  // GET /overdue-items — list checklist items where due_at < NOW() and not checked
+  app.get('/overdue-items', async (c) => {
+    const user = await getUser(c);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const items = await sql<any>`
+      SELECT ci.*, cl.name as checklist_name, cl.collection, cl.record_id
+      FROM zv_checklist_items ci
+      INNER JOIN zv_checklists cl ON cl.id = ci.checklist_id
+      WHERE ci.due_at IS NOT NULL
+        AND ci.due_at < NOW()
+        AND ci.checked = false
+      ORDER BY ci.due_at ASC
+    `.execute(db);
+
+    return c.json({ items: items.rows, count: items.rows.length });
+  });
+
+  // ─── Enterprise: Recurrence ────────────────────────────────────
+
+  // GET /recurrence — list recurrence schedules
+  app.get('/recurrence', async (c) => {
+    const user = await getUser(c);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const schedules = await db
+      .selectFrom('zv_checklist_recurrence as r')
+      .leftJoin('zv_checklist_templates as t', 't.id', 'r.template_id')
+      .select([
+        'r.id', 'r.template_id', 'r.collection', 'r.record_id',
+        'r.frequency', 'r.next_run_at', 'r.last_run_at', 'r.is_active',
+        'r.created_by', 'r.created_at',
+        't.name as template_name',
+      ])
+      .where('r.is_active', '=', true)
+      .orderBy('r.next_run_at', 'asc')
+      .execute();
+
+    return c.json({ schedules });
+  });
+
+  // POST /recurrence — create recurrence schedule
+  app.post(
+    '/recurrence',
+    zValidator(
+      'json',
+      z.object({
+        template_id: z.string().uuid(),
+        collection: z.string().min(1),
+        record_id: z.string().uuid(),
+        frequency: z.enum(['daily', 'weekly', 'monthly', 'quarterly']),
+        next_run_at: z.string().datetime(),
+      })
+    ),
+    async (c) => {
+      const user = await getUser(c);
+      if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+      const { template_id, collection, record_id, frequency, next_run_at } = c.req.valid('json');
+
+      const template = await db
+        .selectFrom('zv_checklist_templates')
+        .select('id')
+        .where('id', '=', template_id)
+        .executeTakeFirst();
+
+      if (!template) return c.json({ error: 'Template not found' }, 404);
+
+      const schedule = await db
+        .insertInto('zv_checklist_recurrence')
+        .values({
+          template_id,
+          collection,
+          record_id,
+          frequency,
+          next_run_at: new Date(next_run_at),
+          created_by: user.id,
+        })
+        .returningAll()
+        .executeTakeFirst();
+
+      return c.json({ schedule }, 201);
+    }
+  );
+
+  // DELETE /recurrence/:id — delete recurrence schedule
+  app.delete('/recurrence/:id', async (c) => {
+    const user = await getUser(c);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    await db
+      .updateTable('zv_checklist_recurrence')
+      .set({ is_active: false })
+      .where('id', '=', c.req.param('id'))
+      .execute();
+
+    return c.json({ success: true });
+  });
+
+  // POST /recurrence/trigger — run due recurrences (admin only)
+  app.post('/recurrence/trigger', async (c) => {
+    const user = await getUser(c);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    // Admin check via session roles
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    const isAdmin = session?.user?.role === 'admin';
+    if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
+
+    const now = new Date();
+
+    const dueSchedules = await db
+      .selectFrom('zv_checklist_recurrence')
+      .selectAll()
+      .where('is_active', '=', true)
+      .where('next_run_at', '<=', now)
+      .execute();
+
+    const created: any[] = [];
+
+    for (const schedule of dueSchedules) {
+      try {
+        // Get template items
+        const templateItems = await db
+          .selectFrom('zv_checklist_template_items')
+          .selectAll()
+          .where('template_id', '=', schedule.template_id)
+          .orderBy('order_idx', 'asc')
+          .execute();
+
+        const templateData = await db
+          .selectFrom('zv_checklist_templates')
+          .selectAll()
+          .where('id', '=', schedule.template_id)
+          .executeTakeFirst();
+
+        if (!templateData) continue;
+
+        // Create checklist instance
+        const checklist = await db
+          .insertInto('zv_checklists')
+          .values({
+            template_id: schedule.template_id,
+            collection: schedule.collection,
+            record_id: schedule.record_id,
+            name: `${templateData.name} (${now.toLocaleDateString()})`,
+            created_by: schedule.created_by,
+          })
+          .returningAll()
+          .executeTakeFirst();
+
+        if (templateItems.length > 0) {
+          await db.insertInto('zv_checklist_items')
+            .values(templateItems.map((item: any, i: number) => ({
+              checklist_id: checklist.id,
+              label: item.label,
+              description: item.description,
+              required: item.required ?? false,
+              order_idx: item.order_idx ?? i,
+            })))
+            .execute();
+        }
+
+        // Calculate next_run_at based on frequency
+        const nextRun = new Date(schedule.next_run_at);
+        switch (schedule.frequency) {
+          case 'daily':
+            nextRun.setDate(nextRun.getDate() + 1);
+            break;
+          case 'weekly':
+            nextRun.setDate(nextRun.getDate() + 7);
+            break;
+          case 'monthly':
+            nextRun.setMonth(nextRun.getMonth() + 1);
+            break;
+          case 'quarterly':
+            nextRun.setMonth(nextRun.getMonth() + 3);
+            break;
+        }
+
+        await db
+          .updateTable('zv_checklist_recurrence')
+          .set({ last_run_at: now, next_run_at: nextRun })
+          .where('id', '=', schedule.id)
+          .execute();
+
+        created.push({ schedule_id: schedule.id, checklist_id: checklist.id });
+      } catch (err: any) {
+        console.error(`Failed to trigger recurrence ${schedule.id}:`, err.message);
+      }
+    }
+
+    return c.json({ triggered: created.length, created });
+  });
+
+  // ─── Enterprise: Stats ─────────────────────────────────────────
+
+  // GET /stats/:collection — stats for a collection
+  app.get('/stats/:collection', async (c) => {
+    const user = await getUser(c);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { collection } = c.req.param();
+
+    const totalResult = await sql<{ count: string }>`
+      SELECT COUNT(*) as count FROM zv_checklists WHERE collection = ${collection}
+    `.execute(db);
+
+    const completedResult = await sql<{ count: string }>`
+      SELECT COUNT(*) as count FROM zv_checklists
+      WHERE collection = ${collection} AND completed_at IS NOT NULL
+    `.execute(db);
+
+    const avgTimeResult = await sql<{ avg_minutes: string | null }>`
+      SELECT AVG(time_to_complete_minutes) as avg_minutes
+      FROM zv_checklists
+      WHERE collection = ${collection} AND time_to_complete_minutes IS NOT NULL
+    `.execute(db);
+
+    const overdueResult = await sql<{ count: string }>`
+      SELECT COUNT(*) as count
+      FROM zv_checklist_items ci
+      INNER JOIN zv_checklists cl ON cl.id = ci.checklist_id
+      WHERE cl.collection = ${collection}
+        AND ci.due_at IS NOT NULL
+        AND ci.due_at < NOW()
+        AND ci.checked = false
+    `.execute(db);
+
+    const total = parseInt(totalResult.rows[0]?.count || '0');
+    const completed = parseInt(completedResult.rows[0]?.count || '0');
+
+    return c.json({
+      collection,
+      total_checklists: total,
+      completed_checklists: completed,
+      in_progress_checklists: total - completed,
+      avg_completion_minutes: avgTimeResult.rows[0]?.avg_minutes
+        ? parseFloat(parseFloat(avgTimeResult.rows[0].avg_minutes).toFixed(1))
+        : null,
+      overdue_items_count: parseInt(overdueResult.rows[0]?.count || '0'),
+    });
+  });
+
+  // ─── Summary + Delete ──────────────────────────────────────────
 
   // GET /summary — overview of recent checklists across all records
   app.get('/summary', async (c) => {
