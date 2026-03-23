@@ -49,7 +49,7 @@ const CreateRequestSchema = z.object({
   workflow_id: z.string().uuid(),
   collection: z.string(),
   record_id: z.string(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
   priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
 });
 

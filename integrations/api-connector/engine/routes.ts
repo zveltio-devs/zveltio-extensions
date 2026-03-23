@@ -123,7 +123,7 @@ export function apiConnectorRoutes(db: any, auth: any): Hono {
     name: z.string().min(1),
     base_url: z.string().url(),
     auth_type: z.enum(['none','api_key','bearer','basic','oauth2']).default('none'),
-    auth_config: z.record(z.any()).default({}),
+    auth_config: z.record(z.string(), z.any()).default({}),
     default_headers: z.record(z.string()).default({}),
     retry_count: z.number().int().min(0).max(5).default(3),
     timeout_ms: z.number().int().min(1000).max(120000).default(30000),
@@ -143,7 +143,7 @@ export function apiConnectorRoutes(db: any, auth: any): Hono {
 
   app.patch('/connections/:id', zValidator('json', z.object({
     name: z.string().optional(),
-    auth_config: z.record(z.any()).optional(),
+    auth_config: z.record(z.string(), z.any()).optional(),
     default_headers: z.record(z.string()).optional(),
     is_active: z.boolean().optional(),
     retry_count: z.number().int().min(0).max(5).optional(),

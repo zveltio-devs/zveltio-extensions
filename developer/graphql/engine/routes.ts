@@ -48,7 +48,7 @@ const PersistedQueryCreateSchema = z.object({
   name: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/, 'Name must be alphanumeric with underscores/hyphens'),
   description: z.string().optional(),
   query: z.string().min(1),
-  variables_schema: z.record(z.any()).optional(),
+  variables_schema: z.record(z.string(), z.any()).optional(),
   is_public: z.boolean().default(false),
   allowed_roles: z.array(z.string()).default([]),
 });

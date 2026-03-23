@@ -21,7 +21,7 @@ const PageSchema = z.object({
   description: z.string().optional(),
   template: z.string().default('default'),
   blocks: z.array(z.any()).default([]),
-  meta: z.record(z.any()).default({}),
+  meta: z.record(z.string(), z.any()).default({}),
   locale: z.string().default('ro'),
   og_image: z.string().url().optional(),
   is_noindex: z.boolean().default(false),
