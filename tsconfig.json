@@ -10,36 +10,52 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "paths": {
       "@zveltio/sdk": ["../zveltio/packages/sdk/src/index.ts"],
       "@zveltio/sdk/*": ["../zveltio/packages/sdk/src/*"],
       "svelte": ["../zveltio/packages/studio/node_modules/svelte"],
       "svelte/*": ["../zveltio/packages/studio/node_modules/svelte/*"],
-      "@lucide/svelte": ["../zveltio/packages/studio/node_modules/@lucide/svelte"],
-      "@lucide/svelte/*": ["../zveltio/packages/studio/node_modules/@lucide/svelte/*"],
-      "hono": ["../zveltio/packages/engine/node_modules/hono/dist/types/index.d.ts"],
+      "@lucide/svelte": [
+        "../zveltio/packages/studio/node_modules/@lucide/svelte"
+      ],
+      "@lucide/svelte/*": [
+        "../zveltio/packages/studio/node_modules/@lucide/svelte/*"
+      ],
+      "hono": [
+        "../zveltio/packages/engine/node_modules/hono/dist/types/index.d.ts"
+      ],
       "hono/*": ["../zveltio/packages/engine/node_modules/hono/dist/types/*"],
       "zod": ["../zveltio/packages/engine/node_modules/zod/index.d.ts"],
       "zod/*": ["../zveltio/packages/engine/node_modules/zod/*"],
-      "@hono/zod-validator": ["../zveltio/packages/engine/node_modules/@hono/zod-validator/dist/index.d.ts"],
-      "kysely": ["../zveltio/packages/engine/node_modules/kysely/dist/cjs/index.d.ts"],
+      "@hono/zod-validator": [
+        "../zveltio/packages/engine/node_modules/@hono/zod-validator/dist/index.d.ts"
+      ],
+      "kysely": [
+        "../zveltio/packages/engine/node_modules/kysely/dist/cjs/index.d.ts"
+      ],
       "kysely/*": ["../zveltio/packages/engine/node_modules/kysely/dist/cjs/*"],
-      "better-auth": ["../zveltio/packages/engine/node_modules/better-auth/dist/index.d.ts"],
-      "better-auth/*": ["../zveltio/packages/engine/node_modules/better-auth/dist/*"],
+      "better-auth": [
+        "../zveltio/packages/engine/node_modules/better-auth/dist/index.d.ts"
+      ],
+      "better-auth/*": [
+        "../zveltio/packages/engine/node_modules/better-auth/dist/*"
+      ],
       "@zveltio/engine": ["../zveltio/packages/engine/src/index.ts"],
-      "@zveltio/engine/*": ["../zveltio/packages/engine/src/*"]
+      "@zveltio/engine/*": ["../zveltio/packages/engine/src/*"],
+      "@zveltio/engine-db": ["../zveltio/packages/engine/src/db/index.js"],
+      "@zveltio/engine-permissions": [
+        "../zveltio/packages/engine/src/lib/permissions.js"
+      ],
+      "@zveltio/engine-ddl": [
+        "../zveltio/packages/engine/src/lib/ddl-manager.js"
+      ]
     },
     "typeRoots": [
       "../zveltio/packages/studio/node_modules/@types",
       "../zveltio/packages/engine/node_modules/@types"
     ]
   },
-  "include": [
-    "**/*.svelte",
-    "**/*.ts"
-  ],
-  "exclude": [
-    "**/node_modules",
-    "**/dist"
-  ]
+  "include": ["**/*.svelte", "**/*.ts", "**/*.d.ts"],
+  "exclude": ["**/node_modules", "**/dist"]
 }
