@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS zv_document_access_log (
 -- Document number sequences (per template prefix)
 CREATE TABLE IF NOT EXISTS zv_document_number_sequences (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  template_id UUID NOT NULL REFERENCES zv_document_templates(id) ON DELETE CASCADE UNIQUE,
+  template_id UUID NOT NULL UNIQUE, -- soft ref to zv_document_templates (content/document-templates ext)
   prefix TEXT NOT NULL DEFAULT 'DOC',
   next_number INT NOT NULL DEFAULT 1,
   year_reset BOOLEAN NOT NULL DEFAULT true,

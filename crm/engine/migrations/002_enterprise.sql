@@ -65,11 +65,10 @@ CREATE TABLE IF NOT EXISTS zvd_crm_lead_scores (
   UNIQUE (contact_id)
 );
 
--- Add stage tracking to transactions
-ALTER TABLE zvd_transactions ADD COLUMN IF NOT EXISTS pipeline_stage_id UUID REFERENCES zvd_crm_pipeline_stages(id) ON DELETE SET NULL;
-ALTER TABLE zvd_transactions ADD COLUMN IF NOT EXISTS stage_changed_at TIMESTAMPTZ;
-ALTER TABLE zvd_transactions ADD COLUMN IF NOT EXISTS expected_close_date DATE;
-ALTER TABLE zvd_transactions ADD COLUMN IF NOT EXISTS lead_score INT NOT NULL DEFAULT 0;
+-- Wire the FK from transactions.pipeline_stage_id (created in 001) to pipeline stages (created above)
+ALTER TABLE zvd_transactions
+  ADD CONSTRAINT fk_txn_pipeline_stage
+  FOREIGN KEY (pipeline_stage_id) REFERENCES zvd_crm_pipeline_stages(id) ON DELETE SET NULL;
 
 CREATE INDEX idx_crm_activities_entity ON zvd_crm_activities(entity_type, entity_id, created_at DESC);
 CREATE INDEX idx_crm_lead_scores_score ON zvd_crm_lead_scores(score DESC);

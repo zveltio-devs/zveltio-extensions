@@ -42,6 +42,5 @@ CREATE TABLE IF NOT EXISTS zvd_asset_transfers (
 -- Link depreciation to accounting journal entries
 ALTER TABLE zvd_asset_depreciation ADD COLUMN IF NOT EXISTS journal_entry_id UUID;
 ALTER TABLE zvd_asset_depreciation ADD COLUMN IF NOT EXISTS is_posted BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE zvd_assets ADD COLUMN IF NOT EXISTS accumulated_depreciation NUMERIC(18,2) NOT NULL DEFAULT 0;
 ALTER TABLE zvd_assets ADD COLUMN IF NOT EXISTS depreciation_account_id UUID;
 ALTER TABLE zvd_assets ADD COLUMN IF NOT EXISTS accumulated_dep_account_id UUID;

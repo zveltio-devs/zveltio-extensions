@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS zvd_assets (
   residual_value NUMERIC(15,2) NOT NULL DEFAULT 0,
   useful_life_months INT NOT NULL DEFAULT 60,
   depreciation_method TEXT NOT NULL DEFAULT 'straight_line' CHECK (depreciation_method IN ('straight_line','declining_balance','none')),
-  accumulated_depreciation NUMERIC(15,2) NOT NULL DEFAULT 0,
+  accumulated_depreciation NUMERIC(18,2) NOT NULL DEFAULT 0,
   current_book_value NUMERIC(15,2) NOT NULL,
   location TEXT,
   serial_number TEXT,

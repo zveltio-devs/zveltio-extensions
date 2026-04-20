@@ -1,7 +1,7 @@
 -- Generated documents
 CREATE TABLE IF NOT EXISTS zv_generated_docs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  template_id UUID REFERENCES zv_document_templates(id) ON DELETE SET NULL,
+  template_id UUID, -- soft ref to zv_document_templates (content/document-templates ext)
   template_name TEXT NOT NULL,
   source_collection TEXT,
   source_record_id UUID,

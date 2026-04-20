@@ -18,7 +18,6 @@ CREATE TABLE IF NOT EXISTS zvd_pos_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id UUID NOT NULL REFERENCES zvd_pos_sessions(id),
   order_number TEXT NOT NULL UNIQUE,
-  customer_id TEXT,
   payment_method TEXT NOT NULL DEFAULT 'cash' CHECK (payment_method IN ('cash','card','transfer','voucher')),
   subtotal NUMERIC(15,2) NOT NULL DEFAULT 0,
   tax_amount NUMERIC(15,2) NOT NULL DEFAULT 0,

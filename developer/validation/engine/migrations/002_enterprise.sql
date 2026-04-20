@@ -1,7 +1,7 @@
 -- Test cases for validation rules
 CREATE TABLE IF NOT EXISTS zvd_validation_test_cases (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  rule_id UUID NOT NULL REFERENCES zv_validation_rules(id) ON DELETE CASCADE,
+  rule_id UUID NOT NULL, -- soft ref to zv_validation_rules (core engine table)
   label TEXT NOT NULL,
   input_value TEXT NOT NULL,
   expected_result BOOLEAN NOT NULL,
