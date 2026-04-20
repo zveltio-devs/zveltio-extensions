@@ -45,7 +45,6 @@ CREATE TABLE IF NOT EXISTS zv_document_render_jobs (
 
 -- Add columns to templates
 ALTER TABLE zv_document_templates ADD COLUMN IF NOT EXISTS version_number INT NOT NULL DEFAULT 1;
-ALTER TABLE zv_document_templates ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE zv_document_templates ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT '{}';
 ALTER TABLE zv_document_templates ADD COLUMN IF NOT EXISTS usage_count INT NOT NULL DEFAULT 0;
 ALTER TABLE zv_document_templates ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMPTZ;

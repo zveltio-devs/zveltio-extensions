@@ -31,5 +31,3 @@ ALTER TABLE zvd_time_entries ADD COLUMN IF NOT EXISTS invoice_id UUID;
 -- Add budget columns to projects
 ALTER TABLE zvd_time_projects ADD COLUMN IF NOT EXISTS budget_amount NUMERIC(15,2);
 ALTER TABLE zvd_time_projects ADD COLUMN IF NOT EXISTS description TEXT;
--- Add reject to timesheet workflow
-ALTER TABLE zvd_timesheets ADD COLUMN IF NOT EXISTS rejection_reason TEXT;

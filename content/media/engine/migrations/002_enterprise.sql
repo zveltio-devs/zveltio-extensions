@@ -32,19 +32,7 @@ CREATE TABLE IF NOT EXISTS zv_media_collection_files (
   PRIMARY KEY (collection_id, file_id)
 );
 
--- Storage quota policies (per user or role)
-CREATE TABLE IF NOT EXISTS zv_storage_quotas (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id TEXT UNIQUE,
-  role_name TEXT UNIQUE,
-  quota_bytes BIGINT NOT NULL DEFAULT 5368709120,
-  max_file_size_bytes BIGINT NOT NULL DEFAULT 104857600,
-  allowed_extensions TEXT[] NOT NULL DEFAULT '{}',
-  created_by TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CHECK (user_id IS NOT NULL OR role_name IS NOT NULL)
-);
+-- NOTE: storage quotas are owned by storage/cloud extension (zv_storage_quotas)
 
 -- CDN cache invalidation log
 CREATE TABLE IF NOT EXISTS zv_media_cdn_invalidations (
