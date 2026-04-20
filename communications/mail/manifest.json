@@ -1,5 +1,5 @@
 {
-  "name": "mail",
+  "name": "communications/mail",
   "package": "@zveltio/ext-mail",
   "category": "communications",
   "displayName": "Mail Client",
@@ -15,7 +15,21 @@
   },
   "contributes": {
     "engine": true,
-    "studio": false,
-    "fieldTypes": []
+    "studio": true,
+    "fieldTypes": [],
+    "studioPages": [
+      {
+        "path": "mail",
+        "component": "MailPage",
+        "label": "Mail",
+        "icon": "mail"
+      },
+      {
+        "path": "mail/settings",
+        "component": "MailSettingsPage",
+        "label": "Mail Settings",
+        "icon": "settings"
+      }
+    ]
   }
 }
