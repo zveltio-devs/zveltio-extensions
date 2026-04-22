@@ -364,6 +364,35 @@ export function schemaBranchesRoutes(db: Database, _auth: any): Hono {
         console.error('Failed to close branch:', error);
         return c.json({ error: 'Failed to close branch' }, 500);
       }
+    })
+
+    // POST /api/schema/branches/:id/preview — enable preview environment
+    .post('/branches/:id/preview', async (c) => {
+      const id = c.req.param('id');
+      const result = await sql<{ id: string; branch_schema: string; preview_token: string | null }>`
+        SELECT id, branch_schema, preview_token FROM zv_schema_branches WHERE id = ${id}
+      `.execute(db);
+      if (!result.rows[0]) return c.json({ error: 'Branch not found' }, 404);
+      const branch = result.rows[0];
+      const token = branch.preview_token ?? crypto.randomUUID().replace(/-/g, '');
+      await sql`
+        UPDATE zv_schema_branches
+        SET preview_enabled = true, preview_token = ${token},
+            preview_schema = ${branch.branch_schema}, preview_enabled_at = NOW()
+        WHERE id = ${id}
+      `.execute(db);
+      return c.json({ preview_token: token, preview_schema: branch.branch_schema });
+    })
+
+    // DELETE /api/schema/branches/:id/preview — disable preview environment
+    .delete('/branches/:id/preview', async (c) => {
+      const id = c.req.param('id');
+      await sql`
+        UPDATE zv_schema_branches
+        SET preview_enabled = false, preview_token = NULL, preview_enabled_at = NULL
+        WHERE id = ${id}
+      `.execute(db);
+      return c.json({ success: true });
     });
 
   return router;
