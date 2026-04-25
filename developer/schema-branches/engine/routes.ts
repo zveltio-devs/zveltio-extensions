@@ -212,6 +212,49 @@ export function schemaBranchesRoutes(db: Database, _auth: any): Hono {
       }
     })
 
+    // POST /api/schema/branches/:id/review — submit a review (approve / reject / request_changes)
+    .post('/branches/:id/review', async (c) => {
+      const user = c.get('user');
+      const id = c.req.param('id');
+      const body = await c.req.json().catch(() => ({}));
+      const status: string = body?.status;
+      if (!['approved', 'rejected', 'changes_requested'].includes(status)) {
+        return c.json({ error: 'status must be approved | rejected | changes_requested' }, 400);
+      }
+
+      const branch = await sql<{ id: string; review_status: string | null }>`
+        SELECT id, review_status FROM zv_schema_branches WHERE id = ${id} AND status = 'open'
+      `.execute(db).then(r => r.rows[0]);
+      if (!branch) return c.json({ error: 'Branch not found or already merged' }, 404);
+
+      // Upsert review request
+      await sql`
+        INSERT INTO zvd_branch_review_requests (branch_id, requested_by, reviewer_id, status, reviewer_note, reviewed_at)
+        VALUES (${id}, ${user.id}, ${user.id}, ${status}, ${body?.note ?? null}, NOW())
+        ON CONFLICT DO NOTHING
+      `.execute(db).catch(() => {});
+
+      // Update branch review_status
+      await sql`
+        UPDATE zv_schema_branches
+        SET review_status = ${status}
+        WHERE id = ${id}
+      `.execute(db);
+
+      return c.json({ success: true, review_status: status });
+    })
+
+    // GET /api/schema/branches/:id/reviews — list reviews for a branch
+    .get('/branches/:id/reviews', async (c) => {
+      const id = c.req.param('id');
+      const reviews = await sql<any>`
+        SELECT * FROM zvd_branch_review_requests
+        WHERE branch_id = ${id}
+        ORDER BY created_at DESC
+      `.execute(db);
+      return c.json({ reviews: reviews.rows });
+    })
+
     // POST /api/schema/branches/:id/merge
     .post('/branches/:id/merge', async (c) => {
       const user = c.get('user');
@@ -223,14 +266,25 @@ export function schemaBranchesRoutes(db: Database, _auth: any): Hono {
           branch_schema: string;
           status: string;
           changes: any[];
+          requires_approval: boolean;
+          review_status: string | null;
         }>`
-          SELECT id, name, branch_schema, status, changes
+          SELECT id, name, branch_schema, status, changes, requires_approval, review_status
           FROM zv_schema_branches WHERE id = ${id} AND status = 'open'
         `.execute(db);
 
         if (branchResult.rows.length === 0) return c.json({ error: 'Branch not found or already merged' }, 404);
 
         const branch = branchResult.rows[0];
+
+        // ── Approval gate ──────────────────────────────────────────────────
+        if (branch.requires_approval && branch.review_status !== 'approved') {
+          return c.json({
+            error: 'Merge blocked: this branch requires an approved review before merging.',
+            review_status: branch.review_status ?? 'none',
+          }, 403);
+        }
+
         const changes = branch.changes || [];
         const applied: string[] = [];
         const errors: string[] = [];
@@ -367,21 +421,66 @@ export function schemaBranchesRoutes(db: Database, _auth: any): Hono {
     })
 
     // POST /api/schema/branches/:id/preview — enable preview environment
+    // Body: { ttl_hours?: number }  (default 168 = 7 days; 0 = no expiry)
     .post('/branches/:id/preview', async (c) => {
       const id = c.req.param('id');
+      const body = await c.req.json().catch(() => ({}));
+      const ttlHours: number = typeof body?.ttl_hours === 'number' ? body.ttl_hours : 168;
+
       const result = await sql<{ id: string; branch_schema: string; preview_token: string | null }>`
         SELECT id, branch_schema, preview_token FROM zv_schema_branches WHERE id = ${id}
       `.execute(db);
       if (!result.rows[0]) return c.json({ error: 'Branch not found' }, 404);
       const branch = result.rows[0];
-      const token = branch.preview_token ?? crypto.randomUUID().replace(/-/g, '');
+
+      // Always generate a fresh token on enable
+      const token = crypto.randomUUID().replace(/-/g, '');
+      const expiresAt = ttlHours > 0
+        ? new Date(Date.now() + ttlHours * 3_600_000)
+        : null;
+
       await sql`
         UPDATE zv_schema_branches
-        SET preview_enabled = true, preview_token = ${token},
-            preview_schema = ${branch.branch_schema}, preview_enabled_at = NOW()
+        SET preview_enabled = true,
+            preview_token = ${token},
+            preview_schema = ${branch.branch_schema},
+            preview_enabled_at = NOW(),
+            preview_expires_at = ${expiresAt},
+            preview_token_rotated_at = NOW()
         WHERE id = ${id}
       `.execute(db);
-      return c.json({ preview_token: token, preview_schema: branch.branch_schema });
+
+      return c.json({
+        preview_token: token,
+        preview_schema: branch.branch_schema,
+        expires_at: expiresAt,
+      });
+    })
+
+    // POST /api/schema/branches/:id/preview/rotate — issue a new token without disabling
+    .post('/branches/:id/preview/rotate', async (c) => {
+      const id = c.req.param('id');
+      const body = await c.req.json().catch(() => ({}));
+      const ttlHours: number = typeof body?.ttl_hours === 'number' ? body.ttl_hours : 168;
+
+      const branch = await sql<{ preview_enabled: boolean; branch_schema: string }>`
+        SELECT preview_enabled, branch_schema FROM zv_schema_branches WHERE id = ${id}
+      `.execute(db).then(r => r.rows[0]);
+      if (!branch) return c.json({ error: 'Branch not found' }, 404);
+      if (!branch.preview_enabled) return c.json({ error: 'Preview not enabled for this branch' }, 400);
+
+      const newToken = crypto.randomUUID().replace(/-/g, '');
+      const expiresAt = ttlHours > 0 ? new Date(Date.now() + ttlHours * 3_600_000) : null;
+
+      await sql`
+        UPDATE zv_schema_branches
+        SET preview_token = ${newToken},
+            preview_expires_at = ${expiresAt},
+            preview_token_rotated_at = NOW()
+        WHERE id = ${id}
+      `.execute(db);
+
+      return c.json({ preview_token: newToken, expires_at: expiresAt });
     })
 
     // DELETE /api/schema/branches/:id/preview — disable preview environment
@@ -389,7 +488,10 @@ export function schemaBranchesRoutes(db: Database, _auth: any): Hono {
       const id = c.req.param('id');
       await sql`
         UPDATE zv_schema_branches
-        SET preview_enabled = false, preview_token = NULL, preview_enabled_at = NULL
+        SET preview_enabled = false,
+            preview_token = NULL,
+            preview_enabled_at = NULL,
+            preview_expires_at = NULL
         WHERE id = ${id}
       `.execute(db);
       return c.json({ success: true });
