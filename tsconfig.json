@@ -54,7 +54,7 @@
     "typeRoots": [
       "../zveltio/packages/studio/node_modules/@types",
       "../zveltio/packages/engine/node_modules/@types"
-    ]
+    ],
   },
   "include": ["**/*.svelte", "**/*.ts", "**/*.d.ts"],
   "exclude": ["**/node_modules", "**/dist"]

@@ -1,3 +1,4 @@
+/// <reference path="../../../import-meta.d.ts" />
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
 import { join } from 'path';
 import { mailRoutes } from './routes.js';
