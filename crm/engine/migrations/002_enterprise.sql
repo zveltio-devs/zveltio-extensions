@@ -66,9 +66,11 @@ CREATE TABLE IF NOT EXISTS zvd_crm_lead_scores (
 );
 
 -- Wire the FK from transactions.pipeline_stage_id (created in 001) to pipeline stages (created above)
-ALTER TABLE zvd_transactions
-  ADD CONSTRAINT fk_txn_pipeline_stage
-  FOREIGN KEY (pipeline_stage_id) REFERENCES zvd_crm_pipeline_stages(id) ON DELETE SET NULL;
+DO $$ BEGIN
+  ALTER TABLE zvd_transactions ADD CONSTRAINT fk_txn_pipeline_stage
+    FOREIGN KEY (pipeline_stage_id) REFERENCES zvd_crm_pipeline_stages(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE INDEX idx_crm_activities_entity ON zvd_crm_activities(entity_type, entity_id, created_at DESC);
-CREATE INDEX idx_crm_lead_scores_score ON zvd_crm_lead_scores(score DESC);
+CREATE INDEX IF NOT EXISTS idx_crm_activities_entity ON zvd_crm_activities(entity_type, entity_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_crm_lead_scores_score ON zvd_crm_lead_scores(score DESC);
