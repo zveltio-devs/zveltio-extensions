@@ -12,6 +12,12 @@
     "dev": "turbo run dev",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
+  "dependencies": {
+    "@hono/zod-validator": "^0.4.0",
+    "hono": "^4.4.0",
+    "kysely": "^0.27.6",
+    "zod": "^3.22.0"
+  },
   "peerDependencies": {
     "@zveltio/sdk": "*",
     "@zveltio/engine": "*"
