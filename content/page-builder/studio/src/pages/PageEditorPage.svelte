@@ -1,259 +1,246 @@
 <script lang="ts">
- import { onMount } from 'svelte';
- import { Save, Plus, Eye, Trash2, ChevronUp, ChevronDown } from '@lucide/svelte';
+  import { onMount, onDestroy } from 'svelte';
+  import { Monitor, Tablet, Smartphone, Save, Globe, RotateCcw, RotateCw, ArrowLeft, Check, LoaderCircle } from '@lucide/svelte';
+  import type { Block, DeviceMode } from '../lib/builder-types.js';
+  import BlockLibrary from '../components/builder/BlockLibrary.svelte';
+  import Canvas from '../components/builder/Canvas.svelte';
+  import PropertiesPanel from '../components/builder/PropertiesPanel.svelte';
 
- const engineUrl = (window as any).__ZVELTIO_ENGINE_URL__ || '';
+  const engineUrl = (window as any).__ZVELTIO_ENGINE_URL__ ?? '';
+  const pageId = window.location.hash.match(/\/pages\/([^/]+)\/edit/)?.[1];
 
- // Extract page ID from route hash: #/pages/:id/edit
- const pageId = window.location.hash.match(/\/pages\/([^/]+)\/edit/)?.[1];
+  // ── Page state ─────────────────────────────────────────────────────────────
 
- let page = $state<any>(null);
- let blockTypes = $state<any[]>([]);
- let loading = $state(true);
- let saving = $state(false);
- let saved = $state(false);
- let activeBlock = $state<number | null>(null);
- let showBlockPicker = $state(false);
+  let page = $state<any>(null);
+  let loading = $state(true);
+  let saving = $state(false);
+  let savedFlash = $state(false);
+  let titleEditing = $state(false);
 
- onMount(async () => {
- await Promise.all([loadPage(), loadBlockTypes()]);
- });
+  // ── Builder state ───────────────────────────────────────────────────────────
 
- async function loadPage() {
- if (!pageId) return;
- const res = await fetch(`${engineUrl}/api/pages/${pageId}`, { credentials: 'include' });
- const data = await res.json();
- page = data.page;
- loading = false;
- }
+  let blocks = $state<Block[]>([]);
+  let selectedId = $state<string | null>(null);
+  let device = $state<DeviceMode>('desktop');
 
- async function loadBlockTypes() {
- const res = await fetch(`${engineUrl}/api/pages/block-types`, { credentials: 'include' });
- const data = await res.json();
- blockTypes = data.block_types || [];
- }
+  // ── Undo / redo ─────────────────────────────────────────────────────────────
 
- function addBlock(type: any) {
- const newBlock = {
- id: crypto.randomUUID(),
- type: type.name,
- props: { ...type.default_props },
- };
- page.blocks = [...(page.blocks || []), newBlock];
- activeBlock = page.blocks.length - 1;
- showBlockPicker = false;
- }
+  let history = $state<Block[][]>([]);
+  let future  = $state<Block[][]>([]);
 
- function removeBlock(i: number) {
- page.blocks = page.blocks.filter((_: any, idx: number) => idx !== i);
- if (activeBlock === i) activeBlock = null;
- else if (activeBlock !== null && activeBlock > i) activeBlock--;
- }
+  function commit(next: Block[]) {
+    history = [...history, blocks];
+    future = [];
+    blocks = next;
+  }
 
- function moveBlock(i: number, dir: -1 | 1) {
- const j = i + dir;
- if (j < 0 || j >= page.blocks.length) return;
- const b = [...page.blocks];
- [b[i], b[j]] = [b[j], b[i]];
- page.blocks = b;
- activeBlock = j;
- }
+  function undo() {
+    if (!history.length) return;
+    future = [blocks, ...future];
+    blocks = history[history.length - 1];
+    history = history.slice(0, -1);
+  }
 
- async function save(status?: string) {
- if (!page) return;
- saving = true;
- try {
- await fetch(`${engineUrl}/api/pages/${pageId}`, {
- method: 'PATCH',
- credentials: 'include',
- headers: { 'Content-Type': 'application/json' },
- body: JSON.stringify({
- title: page.title,
- slug: page.slug,
- description: page.description,
- blocks: page.blocks,
- meta: page.meta,
- ...(status ? { status } : {}),
- }),
- });
- saved = true;
- setTimeout(() => (saved = false), 2000);
- } finally {
- saving = false;
- }
- }
+  function redo() {
+    if (!future.length) return;
+    history = [...history, blocks];
+    blocks = future[0];
+    future = future.slice(1);
+  }
 
- function getBlockType(typeName: string) {
- return blockTypes.find((bt) => bt.name === typeName);
- }
+  // ── Computed selected block ─────────────────────────────────────────────────
+
+  const selectedBlock = $derived(blocks.find(b => b.id === selectedId) ?? null);
+
+  // ── Load ─────────────────────────────────────────────────────────────────────
+
+  onMount(async () => {
+    if (!pageId) { loading = false; return; }
+    try {
+      const res = await fetch(`${engineUrl}/api/pages/${pageId}`, { credentials: 'include' });
+      const data = await res.json();
+      page = data.page;
+      blocks = Array.isArray(page?.blocks) ? page.blocks : [];
+    } finally {
+      loading = false;
+    }
+  });
+
+  // ── Save / publish ───────────────────────────────────────────────────────────
+
+  async function save(status?: string) {
+    if (!page || saving) return;
+    saving = true;
+    try {
+      await fetch(`${engineUrl}/api/pages/${pageId}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title:       page.title,
+          slug:        page.slug,
+          description: page.description,
+          blocks,
+          meta:        page.meta,
+          ...(status ? { status } : {}),
+        }),
+      });
+      if (status) page.status = status;
+      savedFlash = true;
+      setTimeout(() => (savedFlash = false), 2000);
+    } finally {
+      saving = false;
+    }
+  }
+
+  // ── Keyboard shortcuts ───────────────────────────────────────────────────────
+
+  function onKeydown(e: KeyboardEvent) {
+    const mod = e.metaKey || e.ctrlKey;
+    if (mod && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
+    if (mod && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); return; }
+    if (mod && e.key === 's') { e.preventDefault(); save(); return; }
+    if (e.key === 'Escape') { selectedId = null; return; }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+      const active = document.activeElement;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) return;
+      e.preventDefault();
+      commit(blocks.filter(b => b.id !== selectedId));
+      selectedId = null;
+    }
+  }
+
+  onMount(() => { window.addEventListener('keydown', onKeydown); });
+  onDestroy(() => { window.removeEventListener('keydown', onKeydown); });
+
+  // ── Block operations (passed to Canvas / Library) ─────────────────────────
+
+  function onAdd(block: Block) {
+    commit([...blocks, block]);
+    selectedId = block.id;
+  }
+
+  function onCanvasChange(next: Block[]) {
+    commit(next);
+  }
+
+  function onPatch(fn: (b: Block) => Block) {
+    commit(blocks.map(b => b.id === selectedId ? fn(b) : b));
+  }
 </script>
 
 {#if loading}
- <div class="flex justify-center py-12"><span class="loading loading-spinner loading-lg"></span></div>
+  <div class="flex items-center justify-center h-screen">
+    <LoaderCircle size={28} class="animate-spin text-base-content/40" />
+  </div>
 {:else if !page}
- <div class="text-center py-12"><p class="text-error">Page not found</p></div>
+  <div class="flex flex-col items-center justify-center h-screen gap-3 text-base-content/40">
+    <p class="text-lg">Page not found</p>
+    <a href="#/pages" class="btn btn-ghost btn-sm">← Back to pages</a>
+  </div>
 {:else}
- <div class="flex h-[calc(100vh-4rem)] gap-0">
- <!-- Left: Block canvas -->
- <div class="flex-1 overflow-y-auto border-r border-base-300">
- <!-- Top bar -->
- <div class="sticky top-0 bg-base-100 border-b border-base-300 px-4 py-2 flex items-center justify-between z-10">
- <div class="flex items-center gap-3">
- <a href="#/pages" class="btn btn-ghost btn-xs">← Pages</a>
- <div>
- <input
- type="text"
- bind:value={page.title}
- class="font-bold text-lg bg-transparent border-none outline-none"
- />
- <p class="text-xs text-base-content/40 font-mono">/{page.slug}</p>
- </div>
- </div>
- <div class="flex gap-2">
- <span class="badge {page.status === 'published' ? 'badge-success' : 'badge-warning'} badge-sm">{page.status}</span>
- {#if page.status !== 'published'}
- <button class="btn btn-ghost btn-sm" onclick={() => save('published')}>Publish</button>
- {/if}
- <button class="btn btn-primary btn-sm gap-1" onclick={() => save()} disabled={saving}>
- {#if saving}
- <span class="loading loading-spinner loading-xs"></span>
- {:else if saved}
- ✓
- {:else}
- <Save size={14} />
- {/if}
- Save
- </button>
- </div>
- </div>
+  <div class="flex flex-col h-screen overflow-hidden bg-base-200">
 
- <!-- Blocks -->
- <div class="p-6 space-y-2">
- {#each page.blocks as block, i}
- <div
- class="relative border-2 rounded-lg transition-colors cursor-pointer {activeBlock === i ? 'border-primary' : 'border-transparent hover:border-base-300'}"
- onclick={() => (activeBlock = i)}
- role="button"
- tabindex="0"
- >
- <!-- Block header -->
- <div class="absolute -top-3 left-2 flex items-center gap-1 bg-base-100 px-2 text-xs text-base-content/40">
- {getBlockType(block.type)?.display_name || block.type}
- </div>
+    <!-- ── Top bar ─────────────────────────────────────────────────────────── -->
+    <header class="flex items-center justify-between gap-3 px-3 py-2 bg-base-100 border-b border-base-300 shrink-0 z-30">
 
- <!-- Block controls -->
- {#if activeBlock === i}
- <div class="absolute -top-3 right-2 flex gap-1 bg-base-100">
- <button class="btn btn-ghost btn-xs" onclick={(e) => { e.stopPropagation(); moveBlock(i, -1); }} disabled={i === 0}>
- <ChevronUp size={12} />
- </button>
- <button class="btn btn-ghost btn-xs" onclick={(e) => { e.stopPropagation(); moveBlock(i, 1); }} disabled={i === page.blocks.length - 1}>
- <ChevronDown size={12} />
- </button>
- <button class="btn btn-ghost btn-xs text-error" onclick={(e) => { e.stopPropagation(); removeBlock(i); }}>
- <Trash2 size={12} />
- </button>
- </div>
- {/if}
+      <!-- Left: back + title -->
+      <div class="flex items-center gap-2 min-w-0">
+        <a href="#/pages" class="btn btn-ghost btn-xs gap-1 shrink-0">
+          <ArrowLeft size={13} /> Pages
+        </a>
+        <div class="h-4 w-px bg-base-300 shrink-0"></div>
+        {#if titleEditing}
+          <input
+            class="input input-xs font-semibold max-w-[220px]"
+            bind:value={page.title}
+            onblur={() => (titleEditing = false)}
+            onkeydown={(e) => e.key === 'Enter' && (titleEditing = false)}
+            autofocus
+          />
+        {:else}
+          <button
+            class="text-sm font-semibold truncate max-w-[220px] hover:text-primary transition-colors text-left"
+            onclick={() => (titleEditing = true)}
+            title="Click to rename"
+          >{page.title}</button>
+        {/if}
+        <span class="text-xs text-base-content/30 font-mono truncate hidden sm:block">/{page.slug}</span>
+        <span class="badge badge-xs {page.status === 'published' ? 'badge-success' : 'badge-warning'} shrink-0">
+          {page.status}
+        </span>
+      </div>
 
- <!-- Block preview -->
- <div class="p-4">
- {#if block.type === 'hero'}
- <div class="text-center py-6 bg-base-200 rounded">
- <h2 class="text-2xl font-bold">{block.props.title || 'Hero Title'}</h2>
- {#if block.props.subtitle}<p class="text-base-content/60">{block.props.subtitle}</p>{/if}
- {#if block.props.cta_text}<button class="btn btn-primary btn-sm mt-2">{block.props.cta_text}</button>{/if}
- </div>
- {:else if block.type === 'richtext'}
- <div class="prose prose-sm max-w-none">{@html block.props.content || '<p>Empty text block</p>'}</div>
- {:else if block.type === 'image'}
- {#if block.props.url}
- <img src={block.props.url} alt={block.props.alt} class="max-w-full rounded" />
- {:else}
- <div class="bg-base-200 h-32 rounded flex items-center justify-center text-base-content/40">Image placeholder</div>
- {/if}
- {:else if block.type === 'spacer'}
- <div style="height: {block.props.height}px" class="bg-base-200 rounded flex items-center justify-center text-xs text-base-content/30">
- Spacer ({block.props.height}px)
- </div>
- {:else}
- <div class="bg-base-200 rounded p-3 text-sm text-base-content/60 font-mono">
- {block.type} block
- </div>
- {/if}
- </div>
- </div>
- {/each}
+      <!-- Center: device mode -->
+      <div class="flex items-center gap-0.5 bg-base-200 rounded-lg p-0.5 shrink-0">
+        {#each ([['desktop', Monitor], ['tablet', Tablet], ['mobile', Smartphone]] as const) as [mode, Icon]}
+          <button
+            class="p-1.5 rounded-md transition-colors {device === mode ? 'bg-base-100 shadow-sm text-primary' : 'text-base-content/40 hover:text-base-content'}"
+            onclick={() => (device = mode)}
+            title={mode}
+          ><Icon size={14} /></button>
+        {/each}
+      </div>
 
- <!-- Add block button -->
- <button
- class="w-full border-2 border-dashed border-base-300 rounded-lg py-4 text-base-content/40 hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2"
- onclick={() => (showBlockPicker = true)}
- >
- <Plus size={18} />
- Add Block
- </button>
- </div>
- </div>
+      <!-- Right: undo/redo + save + publish -->
+      <div class="flex items-center gap-1 shrink-0">
+        <button class="btn btn-ghost btn-xs" onclick={undo} disabled={!history.length} title="Undo (Ctrl+Z)">
+          <RotateCcw size={13} />
+        </button>
+        <button class="btn btn-ghost btn-xs" onclick={redo} disabled={!future.length} title="Redo (Ctrl+Y)">
+          <RotateCw size={13} />
+        </button>
+        <div class="h-4 w-px bg-base-300 mx-0.5"></div>
+        {#if page.status !== 'published'}
+          <button class="btn btn-ghost btn-xs gap-1" onclick={() => save('published')}>
+            <Globe size={13} /> Publish
+          </button>
+        {/if}
+        <button
+          class="btn btn-primary btn-xs gap-1"
+          onclick={() => save()}
+          disabled={saving}
+        >
+          {#if saving}
+            <LoaderCircle size={12} class="animate-spin" />
+          {:else if savedFlash}
+            <Check size={12} />
+          {:else}
+            <Save size={12} />
+          {/if}
+          {savedFlash ? 'Saved' : 'Save'}
+        </button>
+      </div>
+    </header>
 
- <!-- Right: Properties panel -->
- <div class="w-72 overflow-y-auto bg-base-100 p-4">
- {#if activeBlock !== null && page.blocks[activeBlock]}
- {@const block = page.blocks[activeBlock]}
- {@const btype = getBlockType(block.type)}
- <h3 class="font-semibold mb-3">{btype?.display_name || block.type} Properties</h3>
+    <!-- ── 3-panel body ───────────────────────────────────────────────────── -->
+    <div class="flex flex-1 overflow-hidden">
 
- {#if btype?.schema}
- <div class="space-y-3">
- {#each Object.entries(btype.schema) as [key, type]}
- <div class="form-control">
- <label class="label" for="block-prop-{key}"><span class="label-text text-sm capitalize">{key.replace(/_/g, ' ')}</span></label>
- {#if type === 'string'}
- {#if key === 'content'}
- <textarea id="block-prop-{key}" bind:value={block.props[key]} class="textarea textarea-sm" rows="4"></textarea>
- {:else}
- <input id="block-prop-{key}" type="text" bind:value={block.props[key]} class="input input-sm" />
- {/if}
- {:else if type === 'number'}
- <input id="block-prop-{key}" type="number" bind:value={block.props[key]} class="input input-sm" />
- {/if}
- </div>
- {/each}
- </div>
- {/if}
- {:else}
- <div class="text-center py-8 text-base-content/40 text-sm">
- Select a block to edit its properties
- </div>
- {/if}
- </div>
- </div>
+      <!-- Left: block library -->
+      <BlockLibrary onAdd={onAdd} />
 
- <!-- Block picker modal -->
- {#if showBlockPicker}
- <dialog class="modal modal-open">
- <div class="modal-box">
- <h3 class="font-bold text-lg mb-4">Add Block</h3>
- <div class="grid grid-cols-2 gap-2">
- {#each blockTypes as bt}
- <button
- class="btn btn-outline justify-start gap-2 h-auto py-3"
- onclick={() => addBlock(bt)}
- >
- <div class="text-left">
- <div class="font-medium text-sm">{bt.display_name}</div>
- {#if bt.description}
- <div class="text-xs text-base-content/50">{bt.description}</div>
- {/if}
- </div>
- </button>
- {/each}
- </div>
- <div class="modal-action">
- <button class="btn btn-ghost" onclick={() => (showBlockPicker = false)}>Cancel</button>
- </div>
- </div>
- <button class="modal-backdrop" onclick={() => (showBlockPicker = false)}></button>
- </dialog>
- {/if}
+      <!-- Center: canvas -->
+      <Canvas
+        {blocks}
+        {selectedId}
+        {device}
+        onChange={onCanvasChange}
+        onSelect={(id) => (selectedId = id)}
+      />
+
+      <!-- Right: properties -->
+      {#if selectedBlock}
+        <PropertiesPanel block={selectedBlock} {onPatch} />
+      {:else}
+        <div class="w-64 shrink-0 bg-base-100 border-l border-base-300 flex flex-col items-center justify-center gap-2 text-base-content/25 select-none">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+          </svg>
+          <p class="text-xs text-center px-4 leading-relaxed">Select a block to edit its properties</p>
+        </div>
+      {/if}
+
+    </div>
+  </div>
 {/if}
