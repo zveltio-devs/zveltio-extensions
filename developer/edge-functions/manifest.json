@@ -1,13 +1,15 @@
 {
-  "name": "edge-functions",
-  "package": "@zveltio/ext-edge-functions",
-  "category": "developer",
+  "name": "developer/edge-functions",
   "displayName": "Edge Functions",
+  "category": "developer",
   "description": "Write and deploy serverless functions that run inside the Zveltio engine",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "2.0.0",
-  "permissions": ["database"],
+  "package": "@zveltio/ext-edge-functions",
+  "permissions": [
+    "database"
+  ],
   "contributes": {
     "engine": true,
     "studio": true,

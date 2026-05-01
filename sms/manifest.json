@@ -1,8 +1,15 @@
 {
-  "id": "sms",
-  "name": "SMS / Push Notifications",
-  "version": "1.0.0",
+  "name": "sms",
+  "displayName": "SMS / Push Notifications",
+  "category": "sms",
   "description": "Send SMS via Twilio or Vonage with templates and delivery tracking",
+  "version": "1.0.0",
+  "zveltioMinVersion": "1.0.0",
+  "zveltioMaxVersion": "2.0.0",
+  "package": "@zveltio/ext-sms",
+  "permissions": [
+    "database"
+  ],
   "engine": {
     "routes": "./engine/routes.ts",
     "mountPath": "/extensions/sms"
@@ -16,5 +23,10 @@
         "icon": "message-square"
       }
     ]
+  },
+  "contributes": {
+    "engine": true,
+    "studio": false,
+    "fieldTypes": []
   }
 }

@@ -1,17 +1,27 @@
 {
   "name": "analytics/insights",
-  "package": "@zveltio/ext-insights",
-  "category": "analytics",
   "displayName": "Analytics Insights",
+  "category": "analytics",
   "description": "Dashboards and panels with ad-hoc query support",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "2.0.0",
-  "permissions": ["database"],
+  "package": "@zveltio/ext-insights",
+  "permissions": [
+    "database"
+  ],
   "contributes": {
     "engine": true,
     "studio": true,
     "client": false,
-    "studioComponents": ["DonutChart", "SimpleBarChart", "RecentActivity", "SummaryCards", "InspectorSelector", "ReportGenerator", "UnitPrintLabel"]
+    "studioComponents": [
+      "DonutChart",
+      "SimpleBarChart",
+      "RecentActivity",
+      "SummaryCards",
+      "InspectorSelector",
+      "ReportGenerator",
+      "UnitPrintLabel"
+    ]
   }
 }

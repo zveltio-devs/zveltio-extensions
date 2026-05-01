@@ -1,8 +1,15 @@
 {
-  "id": "search",
-  "name": "Search Adapter",
-  "version": "1.0.0",
+  "name": "search",
+  "displayName": "Search Adapter",
+  "category": "search",
   "description": "Full-text search via MeiliSearch or Typesense with automatic record sync",
+  "version": "1.0.0",
+  "zveltioMinVersion": "1.0.0",
+  "zveltioMaxVersion": "2.0.0",
+  "package": "@zveltio/ext-search",
+  "permissions": [
+    "database"
+  ],
   "engine": {
     "routes": "./engine/routes.ts",
     "mountPath": "/extensions/search"
@@ -16,5 +23,10 @@
         "icon": "search"
       }
     ]
+  },
+  "contributes": {
+    "engine": true,
+    "studio": false,
+    "fieldTypes": []
   }
 }

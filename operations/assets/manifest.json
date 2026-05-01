@@ -1,12 +1,18 @@
 {
-  "name": "assets",
-  "package": "@zveltio/ext-assets",
-  "category": "operations",
+  "name": "operations/assets",
   "displayName": "Fixed Assets",
+  "category": "operations",
   "description": "Fixed asset register, straight-line and declining balance depreciation, maintenance schedules",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "2.0.0",
-  "permissions": ["database"],
-  "contributes": { "engine": true, "studio": true, "fieldTypes": [] }
+  "package": "@zveltio/ext-assets",
+  "permissions": [
+    "database"
+  ],
+  "contributes": {
+    "engine": true,
+    "studio": true,
+    "fieldTypes": []
+  }
 }

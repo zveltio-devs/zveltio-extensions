@@ -1,18 +1,25 @@
 {
-  "name": "page-builder",
-  "package": "@zveltio/ext-page-builder",
-  "category": "content",
+  "name": "content/page-builder",
   "displayName": "Page Builder",
+  "category": "content",
   "description": "Visual drag-and-drop page builder with block-based content editing",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "2.0.0",
-  "permissions": ["database"],
+  "package": "@zveltio/ext-page-builder",
+  "permissions": [
+    "database"
+  ],
   "contributes": {
     "engine": true,
     "studio": true,
     "client": true,
-    "clientComponents": ["HeroSection", "GridSection", "CTASection", "TextSection"],
+    "clientComponents": [
+      "HeroSection",
+      "GridSection",
+      "CTASection",
+      "TextSection"
+    ],
     "fieldTypes": []
   }
 }

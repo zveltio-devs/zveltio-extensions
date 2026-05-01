@@ -1,13 +1,16 @@
 {
   "name": "communications/mail",
-  "package": "@zveltio/ext-mail",
-  "category": "communications",
   "displayName": "Mail Client",
+  "category": "communications",
   "description": "Full IMAP/SMTP email client with AI features, Sieve filtering, and contacts",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "2.0.0",
-  "permissions": ["database", "settings"],
+  "package": "@zveltio/ext-mail",
+  "permissions": [
+    "database",
+    "settings"
+  ],
   "peerDependencies": {
     "imapflow": "^1.0.0",
     "mailparser": "^3.6.0",

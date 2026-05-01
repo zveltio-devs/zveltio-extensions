@@ -1,22 +1,36 @@
 {
-  "name": "postgis",
-  "package": "@zveltio/ext-postgis",
-  "category": "geospatial",
+  "name": "geospatial/postgis",
   "displayName": "PostGIS",
+  "category": "geospatial",
   "description": "Geospatial queries — proximity search, bounding box, polygon containment",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "2.0.0",
-  "permissions": ["database"],
+  "package": "@zveltio/ext-postgis",
+  "permissions": [
+    "database"
+  ],
   "requires": {
-    "postgres_extensions": ["postgis"]
+    "postgres_extensions": [
+      "postgis"
+    ]
   },
   "contributes": {
     "engine": true,
     "studio": true,
     "client": true,
-    "clientComponents": ["MapPicker"],
-    "studioComponents": ["MapPicker", "LocationField", "MapView"],
-    "fieldTypes": ["location", "polygon", "linestring"]
+    "clientComponents": [
+      "MapPicker"
+    ],
+    "studioComponents": [
+      "MapPicker",
+      "LocationField",
+      "MapView"
+    ],
+    "fieldTypes": [
+      "location",
+      "polygon",
+      "linestring"
+    ]
   }
 }

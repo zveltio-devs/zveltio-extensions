@@ -1,12 +1,18 @@
 {
-  "name": "quotes",
-  "package": "@zveltio/ext-quotes",
-  "category": "finance",
+  "name": "finance/quotes",
   "displayName": "Quotes & Proposals",
+  "category": "finance",
   "description": "Generate branded PDF quotes and proposals linked to CRM contacts, with convert-to-invoice action",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "2.0.0",
-  "permissions": ["database"],
-  "contributes": { "engine": true, "studio": true, "fieldTypes": [] }
+  "package": "@zveltio/ext-quotes",
+  "permissions": [
+    "database"
+  ],
+  "contributes": {
+    "engine": true,
+    "studio": true,
+    "fieldTypes": []
+  }
 }
