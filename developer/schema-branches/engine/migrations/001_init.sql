@@ -1,2 +1,0 @@
--- Schema branches uses the core engine zv_schema_branches table
--- No extension-specific tables in init
