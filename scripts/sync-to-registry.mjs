@@ -63,6 +63,14 @@ function findManifests(dir, depth = 0) {
   return out;
 }
 
+// Extensions promoted to engine core — never publish these to the registry.
+const CORE_EXTENSIONS = new Set([
+  'analytics/insights',
+  'developer/saved-queries',
+  'developer/schema-branches',
+  'operations/backup',
+]);
+
 const manifestPaths = findManifests(ROOT);
 console.log(`Found ${manifestPaths.length} manifest files`);
 
@@ -73,6 +81,7 @@ for (const p of manifestPaths) {
   catch (e) { console.warn(`  skip ${p}: ${e.message}`); continue; }
 
   if (!m.name) { console.warn(`  skip ${p}: missing name`); continue; }
+  if (CORE_EXTENSIONS.has(m.name)) { console.log(`  skip ${m.name} (promoted to engine core)`); continue; }
   if (onlySet && !onlySet.has(m.name)) continue;
 
   // Sanity check: name must equal slug-from-path. Surface the inconsistency
