@@ -1,12 +1,18 @@
 {
-  "name": "inventory",
-  "package": "@zveltio/ext-inventory",
-  "category": "operations",
+  "name": "operations/inventory",
   "displayName": "Inventory",
+  "category": "operations",
   "description": "Warehouses, SKUs, stock movements, reorder alerts and barcode support",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "2.0.0",
-  "permissions": ["database"],
-  "contributes": { "engine": true, "studio": true, "fieldTypes": [] }
+  "package": "@zveltio/ext-inventory",
+  "permissions": [
+    "database"
+  ],
+  "contributes": {
+    "engine": true,
+    "studio": true,
+    "fieldTypes": []
+  }
 }

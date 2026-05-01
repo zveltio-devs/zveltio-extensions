@@ -1,12 +1,18 @@
 {
-  "name": "accounting",
-  "package": "@zveltio/ext-accounting",
-  "category": "finance",
+  "name": "finance/accounting",
   "displayName": "Accounting",
+  "category": "finance",
   "description": "Double-entry bookkeeping, chart of accounts, journal entries, P&L and balance sheet reports",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "2.0.0",
-  "permissions": ["database"],
-  "contributes": { "engine": true, "studio": true, "fieldTypes": [] }
+  "package": "@zveltio/ext-accounting",
+  "permissions": [
+    "database"
+  ],
+  "contributes": {
+    "engine": true,
+    "studio": true,
+    "fieldTypes": []
+  }
 }

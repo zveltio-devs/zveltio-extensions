@@ -1,8 +1,15 @@
 {
-  "id": "forms",
-  "name": "Form Builder",
-  "version": "1.0.0",
+  "name": "forms",
+  "displayName": "Form Builder",
+  "category": "forms",
   "description": "Drag-and-drop form builder with public submission endpoints",
+  "version": "1.0.0",
+  "zveltioMinVersion": "1.0.0",
+  "zveltioMaxVersion": "2.0.0",
+  "package": "@zveltio/ext-forms",
+  "permissions": [
+    "database"
+  ],
   "engine": {
     "routes": "./engine/routes.ts",
     "mountPath": "/extensions/forms"
@@ -28,5 +35,10 @@
         "icon": "inbox"
       }
     ]
+  },
+  "contributes": {
+    "engine": true,
+    "studio": false,
+    "fieldTypes": []
   }
 }

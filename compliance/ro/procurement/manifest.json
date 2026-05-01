@@ -1,13 +1,15 @@
 {
-  "name": "ro-procurement",
-  "package": "@zveltio/ext-ro-procurement",
-  "category": "compliance/ro",
+  "name": "compliance/ro/procurement",
   "displayName": "Achizitii Publice RO",
+  "category": "compliance/ro",
   "description": "Romanian public procurement management — purchase orders, supplier registry, budget tracking",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "2.0.0",
-  "permissions": ["database"],
+  "package": "@zveltio/ext-ro-procurement",
+  "permissions": [
+    "database"
+  ],
   "contributes": {
     "engine": true,
     "studio": true,

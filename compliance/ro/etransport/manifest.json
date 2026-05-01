@@ -1,13 +1,15 @@
 {
-  "name": "etransport",
-  "package": "@zveltio/ext-ro-etransport",
-  "category": "compliance/ro",
+  "name": "compliance/ro/etransport",
   "displayName": "e-Transport RO",
+  "category": "compliance/ro",
   "description": "Romanian e-Transport monitoring system — declare and track road transport of goods via ANAF",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "2.0.0",
-  "permissions": ["database"],
+  "package": "@zveltio/ext-ro-etransport",
+  "permissions": [
+    "database"
+  ],
   "contributes": {
     "engine": true,
     "studio": true,

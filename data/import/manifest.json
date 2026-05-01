@@ -1,12 +1,17 @@
 {
   "name": "data/import",
-  "package": "@zveltio/ext-import",
-  "category": "data",
   "displayName": "Data Import",
+  "category": "data",
   "description": "Import collection data from CSV or JSON files with column mapping and background processing",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "2.0.0",
-  "permissions": ["database"],
-  "contributes": { "engine": true, "studio": true }
+  "package": "@zveltio/ext-import",
+  "permissions": [
+    "database"
+  ],
+  "contributes": {
+    "engine": true,
+    "studio": true
+  }
 }

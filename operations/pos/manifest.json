@@ -1,12 +1,18 @@
 {
-  "name": "pos",
-  "package": "@zveltio/ext-pos",
-  "category": "operations",
+  "name": "operations/pos",
   "displayName": "Point of Sale",
+  "category": "operations",
   "description": "Cash register, receipt generation, end-of-day reports and inventory integration",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "2.0.0",
-  "permissions": ["database"],
-  "contributes": { "engine": true, "studio": true, "fieldTypes": [] }
+  "package": "@zveltio/ext-pos",
+  "permissions": [
+    "database"
+  ],
+  "contributes": {
+    "engine": true,
+    "studio": true,
+    "fieldTypes": []
+  }
 }

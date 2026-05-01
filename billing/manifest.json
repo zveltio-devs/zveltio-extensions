@@ -1,8 +1,15 @@
 {
-  "id": "billing",
-  "name": "Billing & Usage",
-  "version": "1.0.0",
+  "name": "billing",
+  "displayName": "Billing & Usage",
+  "category": "billing",
   "description": "Usage metering and Stripe billing integration",
+  "version": "1.0.0",
+  "zveltioMinVersion": "1.0.0",
+  "zveltioMaxVersion": "2.0.0",
+  "package": "@zveltio/ext-billing",
+  "permissions": [
+    "database"
+  ],
   "engine": {
     "routes": "./engine/routes.ts",
     "mountPath": "/extensions/billing"
@@ -22,5 +29,10 @@
         "icon": "bar-chart"
       }
     ]
+  },
+  "contributes": {
+    "engine": true,
+    "studio": false,
+    "fieldTypes": []
   }
 }

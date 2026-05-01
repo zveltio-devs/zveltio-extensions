@@ -1,19 +1,27 @@
 {
-  "name": "cloud",
-  "package": "@zveltio/ext-cloud",
-  "category": "storage",
+  "name": "storage/cloud",
   "displayName": "Cloud Storage",
+  "category": "storage",
   "description": "File versioning, trash bin, public share links, and storage quotas",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "2.0.0",
-  "permissions": ["database", "storage"],
+  "package": "@zveltio/ext-cloud",
+  "permissions": [
+    "database",
+    "storage"
+  ],
   "contributes": {
     "engine": true,
     "studio": true,
-    "studioComponents": ["AttachmentManager", "FilePicker"],
+    "studioComponents": [
+      "AttachmentManager",
+      "FilePicker"
+    ],
     "client": true,
-    "clientComponents": ["FileUpload"],
+    "clientComponents": [
+      "FileUpload"
+    ],
     "fieldTypes": []
   }
 }

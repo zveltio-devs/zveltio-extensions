@@ -1,12 +1,18 @@
 {
-  "name": "expenses",
-  "package": "@zveltio/ext-expenses",
-  "category": "finance",
+  "name": "finance/expenses",
   "displayName": "Expenses",
+  "category": "finance",
   "description": "Employee expense reports with receipt management, categorization and approval flow",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "2.0.0",
-  "permissions": ["database"],
-  "contributes": { "engine": true, "studio": true, "fieldTypes": [] }
+  "package": "@zveltio/ext-expenses",
+  "permissions": [
+    "database"
+  ],
+  "contributes": {
+    "engine": true,
+    "studio": true,
+    "fieldTypes": []
+  }
 }

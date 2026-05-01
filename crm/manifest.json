@@ -1,13 +1,15 @@
 {
   "name": "crm",
-  "package": "@zveltio/ext-crm",
-  "category": "business",
   "displayName": "CRM",
+  "category": "business",
   "description": "Contacts, Organizations, and Transactions — core Business OS data layer",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "2.0.0",
-  "permissions": ["database"],
+  "package": "@zveltio/ext-crm",
+  "permissions": [
+    "database"
+  ],
   "contributes": {
     "engine": true,
     "studio": true,
