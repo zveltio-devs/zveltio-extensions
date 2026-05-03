@@ -1,0 +1,16 @@
+{
+  "name": "content/pdf-viewer",
+  "displayName": "PDF Viewer",
+  "category": "content",
+  "description": "Inline PDF viewer for Studio asset manager, client apps, and page builder blocks.",
+  "version": "1.0.0",
+  "zveltioMinVersion": "1.0.0-alpha.52",
+  "package": "@zveltio/ext-pdf-viewer",
+  "permissions": [],
+  "contributes": {
+    "engine": false,
+    "studio": true,
+    "client": true,
+    "clientComponents": ["PdfViewer", "PdfBlock"]
+  }
+}
