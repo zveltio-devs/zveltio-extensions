@@ -1,4 +1,5 @@
-import type { ZveltioExtension } from '../../../packages/engine/src/lib/extension-loader.js';
+import type { ZveltioExtension } from '@zveltio/sdk/extension';
+import { join } from 'path';
 import { crmRoutes } from './routes.js';
 
 const extension: ZveltioExtension = {
@@ -7,9 +8,9 @@ const extension: ZveltioExtension = {
 
   getMigrations() {
     return [
-      import.meta.dir + '/migrations/001_init.sql',
-      import.meta.dir + '/migrations/002_enterprise.sql',
-      import.meta.dir + '/migrations/003_missing_columns.sql',
+      join(import.meta.dir, 'migrations/001_init.sql'),
+      join(import.meta.dir, 'migrations/002_enterprise.sql'),
+      join(import.meta.dir, 'migrations/003_missing_columns.sql'),
     ];
   },
 

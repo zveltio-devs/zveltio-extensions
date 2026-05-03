@@ -1,4 +1,4 @@
-import type { ZveltioExtension } from '@zveltio/sdk';
+import type { ZveltioExtension } from '@zveltio/sdk/extension';
 
 const extension: ZveltioExtension = {
   name: 'developer/views',
