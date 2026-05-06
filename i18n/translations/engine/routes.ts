@@ -2,9 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { Database } from '../../../../packages/engine/src/db/index.js';
-import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
-
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 // In-memory i18n cache: locale → key → value
 const i18nCache = new Map<string, Map<string, string>>();
 const CACHE_TTL = 5 * 60 * 1000;
@@ -15,14 +13,16 @@ function invalidateCache() {
   cacheExpiry = 0;
 }
 
-async function requireAdmin(c: any, auth: any): Promise<any | null> {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  if (!session) return null;
-  if (!(await checkPermission(session.user.id, 'admin', '*'))) return null;
-  return session.user;
-}
+export function translationsRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth, checkPermission } = ctx;
 
-export function translationsRoutes(db: Database, auth: any): Hono {
+  async function requireAdmin(c: any): Promise<any | null> {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return null;
+    if (!(await checkPermission(session.user.id, 'admin', '*'))) return null;
+    return session.user;
+  }
+
   const app = new Hono();
 
   // ── Public: Translation lookup ────────────────────────────────
@@ -61,7 +61,7 @@ export function translationsRoutes(db: Database, auth: any): Hono {
   // ── Admin: Manage locales ─────────────────────────────────────
 
   app.use('/locales*', async (c, next) => {
-    const user = await requireAdmin(c, auth);
+    const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', user);
     await next();
@@ -96,7 +96,7 @@ export function translationsRoutes(db: Database, auth: any): Hono {
   // ── Admin: All remaining routes ───────────────────────────────
 
   app.use('*', async (c, next) => {
-    const user = await requireAdmin(c, auth);
+    const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', user);
     await next();

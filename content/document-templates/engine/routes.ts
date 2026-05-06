@@ -21,10 +21,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { Database } from '../../../../packages/engine/src/db/index.js';
-import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
-import { generatePDFAsync } from '../../../../packages/engine/src/lib/pdf-queue.js';
-
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
 const DocumentTemplateSchema = z.object({
@@ -75,12 +72,15 @@ function populatePlaceholders(template: string, variables: Record<string, any>):
 
 // ── Route factory ─────────────────────────────────────────────────────────────
 
-export function documentTemplatesRoutes(db: Database, _auth: any): Hono {
+export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth, checkPermission } = ctx;
+  const { generatePDFAsync } = ctx.internals;
+
   const app = new Hono<{ Variables: { user: any } }>();
 
   // Admin-only middleware
   app.use('*', async (c, next) => {
-    const session = await _auth.api.getSession({ headers: c.req.raw.headers });
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', session.user);
     const hasAdmin = await checkPermission(session.user.id, 'admin', '*');
@@ -259,7 +259,7 @@ export function documentTemplatesRoutes(db: Database, _auth: any): Hono {
     if (!template.is_active) return c.json({ error: 'Template is not active' }, 400);
 
     const populated = populatePlaceholders(template.content, data.variables || {});
-    const pdfBuffer = await generatePDFAsync(populated, template.style_config ?? {});
+    const pdfBuffer = await generatePDFAsync(populated, template.style_config ?? {}) as Buffer;
 
     // Increment usage_count and last_used_at
     await (db as any)

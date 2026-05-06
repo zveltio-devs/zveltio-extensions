@@ -2,13 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { Database } from '../../../../packages/engine/src/db/index.js';
-import { auth } from '../../../../packages/engine/src/lib/auth.js';
-import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
-import { DDLManager } from '../../../../packages/engine/src/lib/ddl-manager.js';
-import { dynamicInsert } from '../../../../packages/engine/src/db/dynamic.js';
-import { fieldTypeRegistry } from '../../../../packages/engine/src/lib/field-type-registry.js';
-
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 // ─── CSV parsing ──────────────────────────────────────────────────────────────
 
 function parseCSVLine(line: string, delimiter: string): string[] {
@@ -58,7 +52,7 @@ function parseCSV(text: string, delimiter = ','): Record<string, string>[] {
 // ─── Background import runner ─────────────────────────────────────────────────
 
 async function runImport(
-  db: Database,
+  ctx: ExtensionContext,
   jobId: string,
   collection: string,
   rows: Record<string, any>[],
@@ -69,6 +63,8 @@ async function runImport(
   },
   collectionDef: any,
 ): Promise<void> {
+  const { db, DDLManager, fieldTypeRegistry } = ctx;
+  const { dynamicInsert } = ctx.internals;
   const insertedIds: string[] = [];
   let processed = 0;
   let success = 0;
@@ -101,7 +97,7 @@ async function runImport(
       }
 
       if (!dryRun) {
-        const inserted = await dynamicInsert(db, tableName, row);
+        const inserted = await dynamicInsert(db, tableName, row) as any;
         if (inserted?.id) insertedIds.push(inserted.id);
       }
       success++;
@@ -148,8 +144,11 @@ async function runImport(
 
 // ─── Route factory ────────────────────────────────────────────────────────────
 
-export function importRoutes(db: Database, _auth: any): Hono {
-  const app = new Hono();
+export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any } }> {
+  const { db, auth, checkPermission, DDLManager, fieldTypeRegistry } = ctx;
+  const { dynamicInsert } = ctx.internals;
+
+  const app = new Hono<{ Variables: { user: any } }>();
 
   // Auth + admin guard on all routes
   app.use('*', async (c, next) => {
@@ -581,7 +580,7 @@ export function importRoutes(db: Database, _auth: any): Hono {
     const options = { mapping, on_duplicate: onDuplicate, dry_run: dryRun };
 
     // Fire-and-forget
-    runImport(db, job.id, collection, rows, options, collectionDef).catch((err) => {
+    runImport(ctx, job.id, collection, rows, options, collectionDef).catch((err: any) => {
       (db as any)
         .updateTable('zv_import_logs')
         .set({

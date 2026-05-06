@@ -3,11 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import * as crypto from 'crypto';
-import type { Database } from '../../../../packages/engine/src/db/index.js';
-import { DDLManager } from '../../../../packages/engine/src/lib/ddl-manager.js';
-import { auth } from '../../../../packages/engine/src/lib/auth.js';
-import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
-
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 
 const ChangelogCreateSchema = z.object({
@@ -38,7 +34,7 @@ const CustomDocUpdateSchema = CustomDocCreateSchema.partial();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function getSettingValue(db: Database, key: string): Promise<any> {
+async function getSettingValue(db: any, key: string): Promise<any> {
   try {
     const row = await (db as any)
       .selectFrom('zv_settings')
@@ -52,7 +48,8 @@ async function getSettingValue(db: Database, key: string): Promise<any> {
   }
 }
 
-async function generateOpenAPISpec(db: Database, baseUrl: string): Promise<Record<string, any>> {
+async function generateOpenAPISpec(ctx: ExtensionContext, baseUrl: string): Promise<Record<string, any>> {
+  const { db, DDLManager } = ctx;
   const collections = await DDLManager.getCollections(db).catch(() => []);
   const paths: Record<string, any> = {};
   const schemas: Record<string, any> = {};
@@ -287,25 +284,27 @@ function resolveBaseUrl(c: any): string {
   return `${proto}://${host}`;
 }
 
-async function checkDocsAccess(db: Database, c: any): Promise<boolean> {
-  const docsPublic = await getSettingValue(db, 'api_docs_public');
+async function checkDocsAccess(ctx: ExtensionContext, c: any): Promise<boolean> {
+  const docsPublic = await getSettingValue(ctx.db, 'api_docs_public');
   if (docsPublic === true || docsPublic === 'true') return true;
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  const session = await ctx.auth.api.getSession({ headers: c.req.raw.headers });
   return !!session;
 }
 
 // ── Route factory ─────────────────────────────────────────────────────────────
 
-export function apiDocsRoutes(db: Database, _auth: any): Hono {
+export function apiDocsRoutes(ctx: ExtensionContext): Hono {
+  const { db, DDLManager, auth, checkPermission } = ctx;
+
   const router = new Hono();
 
   // ── GET / — Swagger UI ────────────────────────────────────────────────────
 
   router.get('/', async (c) => {
-    const accessible = await checkDocsAccess(db, c);
+    const accessible = await checkDocsAccess(ctx, c);
     if (!accessible) return c.json({ error: 'API docs are private. Sign in to view.' }, 401);
 
-    const spec = await generateOpenAPISpec(db, resolveBaseUrl(c));
+    const spec = await generateOpenAPISpec(ctx, resolveBaseUrl(c));
     const appName = (spec.info as any).title;
 
     return c.html(`<!DOCTYPE html>
@@ -353,19 +352,19 @@ export function apiDocsRoutes(db: Database, _auth: any): Hono {
   // ── GET /openapi.json ─────────────────────────────────────────────────────
 
   router.get('/openapi.json', async (c) => {
-    const accessible = await checkDocsAccess(db, c);
+    const accessible = await checkDocsAccess(ctx, c);
     if (!accessible) return c.json({ error: 'API docs are private. Sign in to view.' }, 401);
-    const spec = await generateOpenAPISpec(db, resolveBaseUrl(c));
+    const spec = await generateOpenAPISpec(ctx, resolveBaseUrl(c));
     return c.json(spec);
   });
 
   // ── GET /postman ──────────────────────────────────────────────────────────
 
   router.get('/postman', async (c) => {
-    const accessible = await checkDocsAccess(db, c);
+    const accessible = await checkDocsAccess(ctx, c);
     if (!accessible) return c.json({ error: 'API docs are private. Sign in to view.' }, 401);
 
-    const spec = await generateOpenAPISpec(db, resolveBaseUrl(c));
+    const spec = await generateOpenAPISpec(ctx, resolveBaseUrl(c));
     const postman = {
       info: {
         name: (spec.info as any).title,

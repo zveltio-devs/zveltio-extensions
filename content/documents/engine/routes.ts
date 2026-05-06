@@ -19,11 +19,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { Database } from '../../../../packages/engine/src/db/index.js';
-import { auth } from '../../../../packages/engine/src/lib/auth.js';
-import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
-import { renderTemplate, generatePDF } from '../../../../packages/engine/src/lib/doc-generator.js';
-
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
 const GenerateDocSchema = z.object({
@@ -49,7 +45,7 @@ const SequenceSchema = z.object({
 
 // ── Helper: get or generate next doc number ───────────────────────────────────
 
-async function getNextDocNumber(db: Database, templateId: string, prefix: string): Promise<string> {
+async function getNextDocNumber(db: any, templateId: string, prefix: string): Promise<string> {
   const now = new Date();
   const year = now.getFullYear();
 
@@ -97,7 +93,10 @@ async function getNextDocNumber(db: Database, templateId: string, prefix: string
 
 // ── Route factory ─────────────────────────────────────────────────────────────
 
-export function documentsRoutes(db: Database, _auth: any): Hono {
+export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any } }> {
+  const { db, auth, checkPermission } = ctx;
+  const { renderTemplate, generatePDF } = ctx.internals;
+
   const app = new Hono<{ Variables: { user: any } }>();
 
   // Auth middleware (skipped for public routes below)
@@ -237,7 +236,7 @@ export function documentsRoutes(db: Database, _auth: any): Hono {
 
     const htmlBody = typeof template.html_body === 'string' ? template.html_body : '';
     const htmlContent = renderTemplate(htmlBody, allVariables);
-    const pdfBuffer = await generatePDF(htmlContent, { title: `${template.name} ${docNumber}` });
+    const pdfBuffer = await generatePDF(htmlContent, { title: `${template.name} ${docNumber}` }) as Buffer;
 
     const expiresAt = data.expires_hours
       ? new Date(Date.now() + data.expires_hours * 3600 * 1000)

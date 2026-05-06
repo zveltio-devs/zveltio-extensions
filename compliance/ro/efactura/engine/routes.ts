@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import { generateUBLXML } from './ubl-generator.js';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 const lineSchema = z.object({
   description: z.string().min(1),
@@ -50,7 +51,8 @@ async function logStatusChange(db: any, invoiceId: string, oldStatus: string, ne
   `.execute(db).catch(() => {});
 }
 
-export function efacturaRoutes(db: any, auth: any): Hono {
+export function efacturaRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth } = ctx;
   const app = new Hono();
 
   // GET / — list invoices

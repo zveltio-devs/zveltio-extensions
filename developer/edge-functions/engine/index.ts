@@ -7,10 +7,10 @@ const extension: ZveltioExtension = {
 
   async register(app, ctx) {
     // Admin CRUD routes (/api/edge-functions)
-    app.route('/api/edge-functions', edgeFunctionsRoutes(ctx.db, ctx.auth));
+    app.route('/api/edge-functions', edgeFunctionsRoutes(ctx));
 
     // Mount active functions at their configured paths (e.g. /api/fn/my-function)
-    await mountEdgeFunctions(app, ctx.db, ctx.auth);
+    await mountEdgeFunctions(app, ctx);
   },
 };
 

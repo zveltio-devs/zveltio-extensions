@@ -21,11 +21,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { Database } from '../../../../packages/engine/src/db/index.js';
-import { auth } from '../../../../packages/engine/src/lib/auth.js';
-import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
-import { invalidateRulesCache } from '../../../../packages/engine/src/lib/validation-engine.js';
-
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 
 const RULE_TYPES = [
@@ -117,7 +113,10 @@ function applyRule(ruleType: string, ruleConfig: any, inputValue: string): boole
 
 // ── Route factory ─────────────────────────────────────────────────────────────
 
-export function validationRoutes(db: Database, _auth: any): Hono {
+export function validationRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth, checkPermission } = ctx;
+  const { invalidateRulesCache } = ctx.internals;
+
   const app = new Hono();
 
   // ── Auth middleware ───────────────────────────────────────────────────────

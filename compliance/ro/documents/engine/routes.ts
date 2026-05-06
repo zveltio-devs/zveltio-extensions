@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 async function getUser(c: any, auth: any) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -10,7 +11,8 @@ async function getUser(c: any, auth: any) {
 
 const DOC_TYPES = ['contract', 'pv', 'nir', 'dispozitie_plata', 'proces_verbal', 'notificare', 'other'] as const;
 
-export function roDocumentsRoutes(db: any, auth: any): Hono {
+export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth } = ctx;
   const app = new Hono();
 
   // GET /templates

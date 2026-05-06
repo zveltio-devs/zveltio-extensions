@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 async function getUser(c: any, auth: any) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -31,7 +32,8 @@ const poItemSchema = z.object({
   total: z.number(),
 });
 
-export function roProcurementRoutes(db: any, auth: any): Hono {
+export function roProcurementRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth } = ctx;
   const app = new Hono();
 
   // ─── Suppliers ─────────────────────────────────────────────────

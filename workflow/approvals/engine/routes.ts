@@ -2,9 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { Database } from '../../../../packages/engine/src/db/index.js';
-import { checkPermission, getUserRoles } from '../../../../packages/engine/src/lib/permissions.js';
-
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 const CreateWorkflowSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
@@ -53,7 +51,9 @@ const CreateRequestSchema = z.object({
   priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
 });
 
-export function approvalsRoutes(db: Database, auth: any): Hono {
+export function approvalsRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth, checkPermission, getUserRoles } = ctx;
+
   const app = new Hono();
 
   // Auth middleware

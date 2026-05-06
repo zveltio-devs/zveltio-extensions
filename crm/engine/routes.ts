@@ -2,10 +2,8 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { Database } from '../../../packages/engine/src/db/index.js';
-import { checkPermission } from '../../../packages/engine/src/lib/permissions.js';
-
-type Bindings = { db: Database; user: any };
+import type { ExtensionContext } from '@zveltio/sdk/extension';
+type Bindings = { db: any; user: any };
 
 function buildListQuery(table: string, allowed: string[]) {
   return (c: any) => {
@@ -18,7 +16,9 @@ function buildListQuery(table: string, allowed: string[]) {
   };
 }
 
-export function crmRoutes(db: Database, auth: any): Hono {
+export function crmRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth, checkPermission } = ctx;
+
   const app = new Hono();
 
   // ── Auth guard ────────────────────────────────────────────────────────────

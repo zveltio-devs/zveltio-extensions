@@ -11,7 +11,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/sms', smsRoutes(ctx.db as any, ctx.auth));
+    app.route('/api/sms', smsRoutes(ctx));
   },
 };
 

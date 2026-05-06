@@ -23,23 +23,22 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { Database } from '../../../../packages/engine/src/db/index.js';
-import { auth } from '../../../../packages/engine/src/lib/auth.js';
-import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
+export function gdprRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth, checkPermission } = ctx;
 
-async function requireUser(c: any) {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  return session?.user ?? null;
-}
+  async function requireUser(c: any) {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    return session?.user ?? null;
+  }
 
-async function requireAdmin(c: any) {
-  const user = await requireUser(c);
-  if (!user) return null;
-  const isAdmin = await checkPermission(user.id, 'admin', '*').catch(() => false);
-  return isAdmin ? user : null;
-}
+  async function requireAdmin(c: any) {
+    const user = await requireUser(c);
+    if (!user) return null;
+    const isAdmin = await checkPermission(user.id, 'admin', '*').catch(() => false);
+    return isAdmin ? user : null;
+  }
 
-export function gdprRoutes(db: Database, _auth: any): Hono {
   const app = new Hono();
 
   // ─── User self-service ──────────────────────────────────────────

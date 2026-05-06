@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 // RO 2024 statutory rates
 const RO_RATES = {
@@ -84,7 +85,8 @@ function generateRevisalCsv(employees: any[]): string {
   return [header, ...rows].join('\n');
 }
 
-export function payrollRoutes(db: any, auth: any): Hono {
+export function payrollRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth } = ctx;
   const app = new Hono();
 
   app.use('*', async (c, next) => {

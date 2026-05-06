@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 let poCounter = 0;
 async function nextPONumber(db: any): Promise<string> {
@@ -24,7 +25,8 @@ async function updateAvgCost(db: any, productId: string, addedQty: number, added
   await sql`UPDATE zvd_products SET avg_cost = ${newAvgCost}, total_value = ${totalValue}, updated_at = NOW() WHERE id = ${productId}`.execute(db);
 }
 
-export function inventoryRoutes(db: any, auth: any): Hono {
+export function inventoryRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth } = ctx;
   const app = new Hono();
 
   app.use('*', async (c, next) => {

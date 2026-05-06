@@ -2,22 +2,22 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { Database } from '@zveltio/engine-db';
-import { checkPermission } from '@zveltio/engine-permissions';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { UsageTracker } from './lib/usage-tracker.js';
 import { handleWebhook, initStripeClient } from './lib/stripe-client.js';
 
-async function requireAdmin(c: any, auth: any): Promise<any | null> {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  if (!session) return null;
-  if (!(await checkPermission(session.user.id, 'admin', '*'))) return null;
-  return session.user;
-}
-
 export function billingRoutes(
-  db: Database,
-  auth: any,
+  ctx: ExtensionContext,
 ): Hono<{ Variables: { user: any } }> {
+  const { db, auth, checkPermission } = ctx;
+
+  async function requireAdmin(c: any): Promise<any | null> {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return null;
+    if (!(await checkPermission(session.user.id, 'admin', '*'))) return null;
+    return session.user;
+  }
+
   const app = new Hono<{ Variables: { user: any } }>();
 
   // Initialize libs
@@ -26,19 +26,19 @@ export function billingRoutes(
 
   // Admin middleware for all routes except webhook
   app.use('/usage*', async (c, next) => {
-    const user = await requireAdmin(c, auth);
+    const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', user);
     await next();
   });
   app.use('/plans*', async (c, next) => {
-    const user = await requireAdmin(c, auth);
+    const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', user);
     await next();
   });
   app.use('/subscriptions*', async (c, next) => {
-    const user = await requireAdmin(c, auth);
+    const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', user);
     await next();

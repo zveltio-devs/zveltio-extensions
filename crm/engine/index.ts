@@ -15,7 +15,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    const routes = crmRoutes(ctx.db, ctx.auth);
+    const routes = crmRoutes(ctx);
     app.route('/api', routes);
   },
 };

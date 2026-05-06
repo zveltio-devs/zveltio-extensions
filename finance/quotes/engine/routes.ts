@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 async function nextQuoteNumber(db: any): Promise<string> {
   const row = await sql`SELECT COUNT(*) as cnt FROM zvd_quotes`.execute(db);
@@ -23,7 +24,8 @@ async function saveRevision(db: any, quoteId: string, userId: string, changeNote
   `.execute(db);
 }
 
-export function quotesRoutes(db: any, auth: any): Hono {
+export function quotesRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth } = ctx;
   const app = new Hono();
 
   // Public token route — no auth

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import { checkPermission } from '@zveltio/engine/lib/permissions.js';
 import { DDLManager } from '@zveltio/engine/lib/ddl-manager.js';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 async function getUser(c: any, auth: any) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -37,7 +38,8 @@ async function resolveCollection(db: any, userId: string, collection: string): P
 
 const latLng = z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) });
 
-export function postgisRoutes(db: any, auth: any): Hono {
+export function postgisRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth } = ctx;
   const app = new Hono();
 
   // ─── Proximity search ─────────────────────────────────────────

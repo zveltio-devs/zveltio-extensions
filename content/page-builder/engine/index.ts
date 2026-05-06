@@ -13,10 +13,10 @@ const extension: ZveltioExtension = {
 
   async register(app, ctx) {
     // Visual block editor routes
-    app.route('/api/pages', pageBuilderRoutes(ctx.db, ctx.auth));
+    app.route('/api/pages', pageBuilderRoutes(ctx));
     // CMS page management (public read + admin CRUD)
-    app.route('/api/cms/pages', publicPagesRoutes(ctx.db));
-    app.route('/api/admin/cms/pages', adminPagesRoutes(ctx.db, ctx.auth));
+    app.route('/api/cms/pages', publicPagesRoutes(ctx));
+    app.route('/api/admin/cms/pages', adminPagesRoutes(ctx));
   },
 };
 

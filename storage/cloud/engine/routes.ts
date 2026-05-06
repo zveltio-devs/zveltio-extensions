@@ -2,15 +2,16 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { Database } from '../../../../packages/engine/src/db/index.js';
-import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
 import { createFileVersion, listFileVersions, restoreFileVersion } from './lib/file-versions.js';
 import { moveToTrash, restoreFromTrash, listTrash, purgeExpiredTrash } from './lib/trash.js';
 import { createShareLink, validateShareToken, incrementDownloadCount, listUserShares, revokeShare } from './lib/sharing.js';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
-export function cloudRoutes(db: Database, auth: any, s3: S3Client): Hono {
+export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
+  const { db, auth, checkPermission } = ctx;
+
   const app = new Hono();
 
   // Auth middleware — all cloud routes require auth except /share/:token
@@ -599,7 +600,7 @@ export function cloudRoutes(db: Database, auth: any, s3: S3Client): Hono {
 // ── Helper: log access ──────────────────────────────────────────
 
 async function logAccess(
-  db: Database,
+  db: any,
   fileId: string,
   userId: string | null,
   action: string,
@@ -621,7 +622,9 @@ async function logAccess(
  * Public-only router for share link access — no auth required.
  * Mounted at /share so links are clean: https://app.com/share/<token>
  */
-export function publicShareRouter(db: Database, s3: S3Client): Hono {
+export function publicShareRouter(ctx: ExtensionContext, s3: S3Client): Hono {
+  const { db } = ctx;
+
   const app = new Hono();
 
   app.get('/:token', async (c) => {
