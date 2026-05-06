@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { generateSAFTXML } from './saft-generator.js';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 async function getUser(c: any, auth: any) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -31,7 +32,8 @@ const entrySchema = z.object({
   document_number: z.string().optional(),
 });
 
-export function saftRoutes(db: any, auth: any): Hono {
+export function saftRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth } = ctx;
   const app = new Hono();
 
   // --- Exports ---

@@ -3,11 +3,8 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { nanoid } from 'nanoid';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import type { Database } from '../../../../packages/engine/src/db/index.js';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 // @ts-ignore — cloud/trash is an optional extension
-import { moveToTrash } from '../../../../packages/engine/src/lib/cloud/trash.js';
-import { scheduleFileIndexing } from '../../../../packages/engine/src/lib/cloud/document-indexer.js';
-
 const s3 = new S3Client({
   region: process.env.S3_REGION || 'us-east-1',
   endpoint: process.env.S3_ENDPOINT,
@@ -18,7 +15,10 @@ const s3 = new S3Client({
   forcePathStyle: true,
 });
 
-export function mediaRoutes(db: Database, auth: any): Hono {
+export function mediaRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth } = ctx;
+  const { moveToTrash, scheduleFileIndexing } = ctx.internals;
+
   const router = new Hono();
 
   // Auth middleware — all media routes require authentication

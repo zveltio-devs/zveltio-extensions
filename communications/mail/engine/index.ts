@@ -12,7 +12,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/mail', mailRoutes(ctx.db, ctx.auth));
+    app.route('/api/mail', mailRoutes(ctx));
   },
 };
 

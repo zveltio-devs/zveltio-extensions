@@ -2,8 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
-
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 async function getUser(c: any, auth: any) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   return session?.user ?? null;
@@ -31,7 +30,9 @@ const UpdatePageSchema = PageSchema.partial().extend({
   status: z.enum(['draft', 'published', 'archived']).optional(),
 });
 
-export function pageBuilderRoutes(db: any, auth: any): Hono {
+export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth, checkPermission } = ctx;
+
   const app = new Hono();
 
   // ─── Block types ──────────────────────────────────────────────────────────

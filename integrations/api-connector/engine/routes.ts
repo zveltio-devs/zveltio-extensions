@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 const ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
 
@@ -96,7 +97,8 @@ async function resolveOAuth2Token(db: any, connectionId: string, authConfig: any
   return authConfig.access_token ?? '';
 }
 
-export function apiConnectorRoutes(db: any, auth: any): Hono {
+export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth } = ctx;
   const app = new Hono();
 
   app.use('*', async (c, next) => {

@@ -2,11 +2,13 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 const POINTS_PER_CURRENCY_UNIT = 1; // 1 RON = 1 point
 const POINT_VALUE = 0.01; // 1 point = 0.01 RON
 
-export function posRoutes(db: any, auth: any): Hono {
+export function posRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth } = ctx;
   const app = new Hono();
 
   app.use('*', async (c, next) => {

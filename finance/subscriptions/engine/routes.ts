@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 // Compute proration when changing plans mid-cycle
 function computeProration(
@@ -19,7 +20,8 @@ function computeProration(
 // Dunning intervals: retry on day 1, 3, 7, 14 after failure
 const DUNNING_DAYS = [1, 3, 7, 14];
 
-export function subscriptionsRoutes(db: any, auth: any): Hono {
+export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth } = ctx;
   const app = new Hono();
 
   app.use('*', async (c, next) => {

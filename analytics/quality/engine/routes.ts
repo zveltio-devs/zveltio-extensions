@@ -6,11 +6,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { Database } from '../../../../packages/engine/src/db/index.js';
-import { auth } from '../../../../packages/engine/src/lib/auth.js';
-import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
-import { runQualityScan } from '../../../../packages/engine/src/lib/data-quality.js';
-
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 const VALID_SCAN_TYPES = ['duplicates', 'anomalies', 'missing_data', 'normalization', 'full'];
 
 const ScanSchema = z.object({
@@ -35,7 +31,10 @@ const SlaTargetSchema = z.object({
   alert_email: z.string().email().optional(),
 });
 
-export function qualityRoutes(db: Database, _auth: any): Hono {
+export function qualityRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth, checkPermission } = ctx;
+  const { runQualityScan } = ctx.internals;
+
   const app = new Hono();
 
   app.use('*', async (c, next) => {

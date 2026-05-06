@@ -14,7 +14,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/time', timeTrackingRoutes(ctx.db, ctx.auth));
+    app.route('/api/time', timeTrackingRoutes(ctx));
   },
 };
 

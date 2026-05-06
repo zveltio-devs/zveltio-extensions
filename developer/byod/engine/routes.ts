@@ -2,11 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { Database } from '../../../../packages/engine/src/db/index.js';
-import { auth } from '../../../../packages/engine/src/lib/auth.js';
-import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
-import { introspectSchema } from '../../../../packages/engine/src/lib/introspection.js';
-
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 
 const ProfileCreateSchema = z.object({
@@ -27,7 +23,10 @@ const ImportBodySchema = z.object({
 
 // ── Auth + admin middleware ────────────────────────────────────────────────────
 
-export function introspectRoutes(db: Database, _auth: any): Hono {
+export function introspectRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth, checkPermission } = ctx;
+  const { introspectSchema } = ctx.internals;
+
   const router = new Hono();
 
   router.use('*', async (c, next) => {

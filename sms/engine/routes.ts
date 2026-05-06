@@ -1,21 +1,19 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import type { Database } from '@zveltio/engine-db';
-import { checkPermission } from '@zveltio/engine-permissions';
 import { SmsManager } from './lib/sms-manager.js';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
-async function requireAdmin(c: any, auth: any): Promise<any | null> {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  if (!session) return null;
-  if (!(await checkPermission(session.user.id, 'admin', '*'))) return null;
-  return session.user;
-}
+export function smsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any } }> {
+  const { db, auth, checkPermission } = ctx;
 
-export function smsRoutes(
-  db: Database,
-  auth: any,
-): Hono<{ Variables: { user: any } }> {
+  async function requireAdmin(c: any): Promise<any | null> {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return null;
+    if (!(await checkPermission(session.user.id, 'admin', '*'))) return null;
+    return session.user;
+  }
+
   const app = new Hono<{ Variables: { user: any } }>();
 
   // Initialize manager
@@ -23,25 +21,25 @@ export function smsRoutes(
 
   // Admin middleware for all except webhook
   app.use('/send', async (c, next) => {
-    const user = await requireAdmin(c, auth);
+    const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', user);
     await next();
   });
   app.use('/messages*', async (c, next) => {
-    const user = await requireAdmin(c, auth);
+    const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', user);
     await next();
   });
   app.use('/templates*', async (c, next) => {
-    const user = await requireAdmin(c, auth);
+    const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', user);
     await next();
   });
   app.use('/stats', async (c, next) => {
-    const user = await requireAdmin(c, auth);
+    const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', user);
     await next();

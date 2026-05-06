@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 // Minimal MT940 parser — handles :60F:, :61:, :86: tags
 function parseMT940(text: string): Array<{date: string, type: 'credit'|'debit', amount: number, description: string, reference: string}> {
@@ -59,7 +60,8 @@ async function applyRules(db: any, accountId: string, tx: any): Promise<string |
   return null;
 }
 
-export function bankingRoutes(db: any, auth: any): Hono {
+export function bankingRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth } = ctx;
   const app = new Hono();
 
   app.use('*', async (c, next) => {

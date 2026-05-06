@@ -1,13 +1,12 @@
 import { Hono } from 'hono';
 import { sql } from 'kysely';
-import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
-import { DDLManager } from '../../../../packages/engine/src/lib/ddl-manager.js';
-import type { Database } from '../../../../packages/engine/src/db/index.js';
-
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 // =========================================================
 // PUBLIC ROUTES — No auth required (serve the website)
 // =========================================================
-export function publicPagesRoutes(db: Database): Hono {
+export function publicPagesRoutes(ctx: ExtensionContext): Hono {
+  const { db, checkPermission, DDLManager } = ctx;
+
   const router = new Hono();
 
   // GET /api/pages — list active pages
@@ -269,7 +268,9 @@ export function publicPagesRoutes(db: Database): Hono {
 // =========================================================
 // ADMIN ROUTES — Auth + admin required
 // =========================================================
-export function adminPagesRoutes(db: Database, auth: any): Hono {
+export function adminPagesRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth, checkPermission, DDLManager } = ctx;
+
   const router = new Hono();
 
   async function requireSession(c: any) {

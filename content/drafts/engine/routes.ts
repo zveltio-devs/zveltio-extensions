@@ -6,10 +6,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { Database } from '../../../../packages/engine/src/db/index.js';
-import { auth } from '../../../../packages/engine/src/lib/auth.js';
-import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
-
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
 const CreateDraftSchema = z.object({
@@ -42,7 +39,9 @@ const CommentSchema = z.object({
 
 // ── Route factory ─────────────────────────────────────────────────────────────
 
-export function draftsRoutes(db: Database, _auth: any): Hono {
+export function draftsRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth, checkPermission } = ctx;
+
   const app = new Hono();
 
   // Auth middleware

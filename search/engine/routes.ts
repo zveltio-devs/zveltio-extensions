@@ -1,28 +1,26 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import type { Database } from '@zveltio/engine-db';
-import { checkPermission } from '@zveltio/engine-permissions';
 import { SearchManager } from './lib/search-manager.js';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
-async function requireAdmin(c: any, auth: any): Promise<any | null> {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  if (!session) return null;
-  if (!(await checkPermission(session.user.id, 'admin', '*'))) return null;
-  return session.user;
-}
+export function searchRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any } }> {
+  const { db, auth, checkPermission } = ctx;
 
-export function searchRoutes(
-  db: Database,
-  auth: any,
-): Hono<{ Variables: { user: any } }> {
+  async function requireAdmin(c: any): Promise<any | null> {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return null;
+    if (!(await checkPermission(session.user.id, 'admin', '*'))) return null;
+    return session.user;
+  }
+
   const app = new Hono<{ Variables: { user: any } }>();
 
   SearchManager.init(db);
 
   // All routes require admin
   app.use('*', async (c, next) => {
-    const user = await requireAdmin(c, auth);
+    const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', user);
     await next();

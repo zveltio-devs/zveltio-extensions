@@ -36,12 +36,7 @@ import {
   GraphQLID,
 } from 'graphql';
 import { sql } from 'kysely';
-import type { Database } from '../../../../packages/engine/src/db/index.js';
-import { DDLManager } from '../../../../packages/engine/src/lib/ddl-manager.js';
-import { auth } from '../../../../packages/engine/src/lib/auth.js';
-import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
-import { DataLoaderRegistry, checkQueryDepth } from '../../../../packages/engine/src/lib/graphql-dataloader.js';
-
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 
 const PersistedQueryCreateSchema = z.object({
@@ -106,7 +101,7 @@ function mapFieldType(fieldType: string): any {
 
 // ── Relations loader ──────────────────────────────────────────────────────────
 
-async function getRelations(db: Database): Promise<RelationInfo[]> {
+async function getRelations(db: any): Promise<RelationInfo[]> {
   try {
     const result = await sql<RelationInfo>`
       SELECT id, name, type,
@@ -123,7 +118,8 @@ async function getRelations(db: Database): Promise<RelationInfo[]> {
 
 // ── Schema builder ────────────────────────────────────────────────────────────
 
-async function buildDynamicSchema(db: Database): Promise<GraphQLSchema> {
+async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema> {
+  const { db, DDLManager } = ctx;
   let collections: any[] = [];
   let relations: RelationInfo[] = [];
 
@@ -345,10 +341,10 @@ let _cachedSchema: GraphQLSchema | null = null;
 let _schemaBuildTime = 0;
 const SCHEMA_TTL_MS = 60_000;
 
-async function getSchema(db: Database): Promise<GraphQLSchema> {
+async function getSchema(ctx: ExtensionContext): Promise<GraphQLSchema> {
   const now = Date.now();
   if (!_cachedSchema || now - _schemaBuildTime > SCHEMA_TTL_MS) {
-    _cachedSchema = await buildDynamicSchema(db);
+    _cachedSchema = await buildDynamicSchema(ctx);
     _schemaBuildTime = now;
   }
   return _cachedSchema;
@@ -385,7 +381,10 @@ function detectOperationType(query: string): 'query' | 'mutation' | 'subscriptio
 
 // ── Route factory ─────────────────────────────────────────────────────────────
 
-export function graphqlRoutes(db: Database, _auth: any): Hono {
+export function graphqlRoutes(ctx: ExtensionContext): Hono {
+  const { db, DDLManager, auth, checkPermission } = ctx;
+  const { DataLoaderRegistry, checkQueryDepth } = ctx.internals;
+
   const app = new Hono();
 
   // ── GET / — GraphiQL ──────────────────────────────────────────────────────
@@ -418,7 +417,7 @@ export function graphqlRoutes(db: Database, _auth: any): Hono {
     let errorCount = 0;
 
     try {
-      const schema = await getSchema(db);
+      const schema = await getSchema(ctx);
       const loaders = new DataLoaderRegistry(db);
       result = await graphql({
         schema,
@@ -464,7 +463,7 @@ export function graphqlRoutes(db: Database, _auth: any): Hono {
     if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
 
     _cachedSchema = null;
-    await getSchema(db);
+    await getSchema(ctx);
     return c.json({ success: true, message: 'Schema refreshed' });
   });
 
@@ -559,7 +558,7 @@ export function graphqlRoutes(db: Database, _auth: any): Hono {
     if (depthError) return c.json({ errors: [{ message: depthError }] }, 400);
 
     try {
-      const schema = await getSchema(db);
+      const schema = await getSchema(ctx);
       const loaders = new DataLoaderRegistry(db);
       const result = await graphql({
         schema,

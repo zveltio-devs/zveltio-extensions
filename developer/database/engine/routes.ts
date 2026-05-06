@@ -2,12 +2,12 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import type { User } from 'better-auth';
-import { auth } from '../../../../packages/engine/src/lib/auth.js';
-import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
-import type { Database } from '../../../../packages/engine/src/db/index.js';
 import { sql } from 'kysely';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
-export function databaseRoutes(db: Database, _auth: any): Hono {
+export function databaseRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth, checkPermission } = ctx;
+
   const router = new Hono<{ Variables: { user: User } }>()
 
     // Admin-only middleware

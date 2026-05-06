@@ -2,10 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { Database } from '../../../../packages/engine/src/db/index.js';
 import { syncImapAccount, fetchMessageBody, sendMail } from './lib/imap-client.js';
-import { aiProviderManager } from '../../../../packages/engine/src/lib/ai-provider.js';
-import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
 import {
   createImapFolder, renameImapFolder, deleteImapFolder,
   moveMessages, downloadMessageAsEml, getImapQuota,
@@ -13,12 +10,16 @@ import {
 import { buildReplyContext, saveDraft, sendDraft, autoCollectContacts } from './lib/compose.js';
 import { compileFiltersToSieve, uploadSieveScript, applyLocalFilters } from './lib/sieve.js';
 import { encryptPassword, decryptPassword } from './lib/crypto.js';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 /**
  * Mail Client routes — IMAP sync + SMTP send + AI features.
  * Mounted at /api/mail
  */
-export function mailRoutes(db: Database, auth: any): Hono {
+export function mailRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth, checkPermission } = ctx;
+  const { aiProviderManager } = ctx.internals;
+
   const app = new Hono();
 
   app.use('*', async (c, next) => {

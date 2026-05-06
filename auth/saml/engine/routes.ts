@@ -12,8 +12,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { createSamlInstance, validateSamlResponse } from './saml-provider.js';
-import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
-
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 // Config schema stored in zv_settings key "saml_config"
 const SamlConfigSchema = z.object({
   enabled: z.boolean().default(false),
@@ -27,13 +26,6 @@ const SamlConfigSchema = z.object({
   mapEmail: z.string().default('email'),
   mapName: z.string().default('displayName'),
 });
-
-async function requireAdmin(c: any, auth: any): Promise<any> {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  if (!session) return null;
-  const isAdmin = await checkPermission(session.user.id, 'admin', '*');
-  return isAdmin ? session.user : null;
-}
 
 async function getSamlConfig(db: any): Promise<z.infer<typeof SamlConfigSchema> | null> {
   try {
@@ -103,7 +95,16 @@ async function createSession(db: any, userId: string): Promise<string> {
   return token;
 }
 
-export function samlRoutes(db: any, auth: any): Hono {
+export function samlRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth, checkPermission } = ctx;
+
+  async function requireAdmin(c: any): Promise<any> {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return null;
+    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+    return isAdmin ? session.user : null;
+  }
+
   const router = new Hono();
 
   // GET /login — redirect user to IdP
@@ -181,7 +182,7 @@ export function samlRoutes(db: any, auth: any): Hono {
 
   // GET /config — read config (admin)
   router.get('/config', async (c) => {
-    const admin = await requireAdmin(c, auth);
+    const admin = await requireAdmin(c);
     if (!admin) return c.json({ error: 'Unauthorized' }, 401);
 
     const config = await getSamlConfig(db);
@@ -195,7 +196,7 @@ export function samlRoutes(db: any, auth: any): Hono {
 
   // POST /config — save config (admin)
   router.post('/config', zValidator('json', SamlConfigSchema), async (c) => {
-    const admin = await requireAdmin(c, auth);
+    const admin = await requireAdmin(c);
     if (!admin) return c.json({ error: 'Unauthorized' }, 401);
 
     const data = c.req.valid('json');

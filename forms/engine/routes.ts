@@ -1,8 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import type { Database } from '@zveltio/engine-db';
-import { checkPermission } from '@zveltio/engine-permissions';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 // Simple in-memory rate limiter: 10 submissions per minute per IP
 const submitRateLimiter = new Map<string, { count: number; resetAt: number }>();
@@ -17,13 +16,6 @@ function checkSubmitRateLimit(ip: string): boolean {
   if (entry.count >= 10) return false;
   entry.count++;
   return true;
-}
-
-async function requireAdmin(c: any, auth: any): Promise<any | null> {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  if (!session) return null;
-  if (!(await checkPermission(session.user.id, 'admin', '*'))) return null;
-  return session.user;
 }
 
 const fieldSchema = z.object({
@@ -59,14 +51,22 @@ const formSchema = z.object({
 });
 
 export function formsRoutes(
-  db: Database,
-  auth: any,
+  ctx: ExtensionContext,
 ): Hono<{ Variables: { user: any } }> {
+  const { db, auth, checkPermission } = ctx;
+
+  async function requireAdmin(c: any): Promise<any | null> {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return null;
+    if (!(await checkPermission(session.user.id, 'admin', '*'))) return null;
+    return session.user;
+  }
+
   const app = new Hono<{ Variables: { user: any } }>();
 
   // Admin middleware
   app.use('/forms*', async (c, next) => {
-    const user = await requireAdmin(c, auth);
+    const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', user);
     await next();

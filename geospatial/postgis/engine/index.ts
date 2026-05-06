@@ -52,7 +52,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/geo', postgisRoutes(ctx.db, ctx.auth));
+    app.route('/api/geo', postgisRoutes(ctx));
   },
 };
 

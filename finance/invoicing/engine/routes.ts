@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 let invoiceCounter = 0;
 async function nextInvoiceNumber(db: any, prefix = 'INV'): Promise<string> {
@@ -17,7 +18,8 @@ async function nextCreditNoteNumber(db: any): Promise<string> {
   return `CN-${String(n).padStart(5, '0')}`;
 }
 
-export function invoicingRoutes(db: any, auth: any): Hono {
+export function invoicingRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth } = ctx;
   const app = new Hono();
 
   app.use('*', async (c, next) => {

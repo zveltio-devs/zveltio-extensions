@@ -2,12 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { Database } from '../../../../packages/engine/src/db/index.js';
-import { auth } from '../../../../packages/engine/src/lib/auth.js';
-import { checkPermission } from '../../../../packages/engine/src/lib/permissions.js';
-import { DDLManager } from '../../../../packages/engine/src/lib/ddl-manager.js';
-import { fieldTypeRegistry } from '../../../../packages/engine/src/lib/field-type-registry.js';
-
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 // ─── Serialization helpers ────────────────────────────────────────────────────
 
 function toCSV(rows: any[]): string {
@@ -39,7 +34,7 @@ function toNDJSON(rows: any[]): string {
 // ─── Background export job runner ─────────────────────────────────────────────
 
 async function runExportJob(
-  db: Database,
+  ctx: ExtensionContext,
   jobId: string,
   collection: string,
   format: string,
@@ -48,6 +43,7 @@ async function runExportJob(
   sortField: string | undefined,
   sortOrder: string,
 ): Promise<void> {
+  const { db, DDLManager, fieldTypeRegistry } = ctx;
   try {
     await (db as any)
       .updateTable('zvd_export_jobs')
@@ -125,7 +121,9 @@ async function runExportJob(
 
 // ─── Route factory ────────────────────────────────────────────────────────────
 
-export function exportRoutes(db: Database, _auth: any): Hono {
+export function exportRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth, checkPermission, DDLManager, fieldTypeRegistry } = ctx;
+
   const app = new Hono();
 
   // Auth + admin guard on all routes
@@ -259,7 +257,7 @@ export function exportRoutes(db: Database, _auth: any): Hono {
 
       // Fire-and-forget background export
       runExportJob(
-        db,
+        ctx,
         job.id,
         body.collection,
         body.format,

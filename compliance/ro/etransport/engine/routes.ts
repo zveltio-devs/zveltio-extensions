@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
+import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 async function getUser(c: any, auth: any) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -31,7 +32,8 @@ const declarationSchema = z.object({
   purpose: z.enum(['commercial', 'personal', 'return']).default('commercial'),
 });
 
-export function etransportRoutes(db: any, auth: any): Hono {
+export function etransportRoutes(ctx: ExtensionContext): Hono {
+  const { db, auth } = ctx;
   const app = new Hono();
 
   app.get('/', async (c) => {

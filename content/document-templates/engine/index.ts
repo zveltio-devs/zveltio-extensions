@@ -11,7 +11,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/document-templates', documentTemplatesRoutes(ctx.db, ctx.auth));
+    app.route('/api/document-templates', documentTemplatesRoutes(ctx));
   },
 };
 
