@@ -4,17 +4,15 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 
-let invoiceCounter = 0;
 async function nextInvoiceNumber(db: any, prefix = 'INV'): Promise<string> {
-  const row = await sql`SELECT COUNT(*) as cnt FROM zvd_invoices`.execute(db);
-  const n = parseInt((row.rows[0] as any).cnt) + 1 + invoiceCounter++;
+  const row = await sql`SELECT nextval('zvd_invoice_seq') as n`.execute(db);
+  const n = (row.rows[0] as any).n;
   return `${prefix}-${String(n).padStart(5, '0')}`;
 }
 
-let cnCounter = 0;
 async function nextCreditNoteNumber(db: any): Promise<string> {
-  const row = await sql`SELECT COUNT(*) as cnt FROM zvd_credit_notes`.execute(db);
-  const n = parseInt((row.rows[0] as any).cnt) + 1 + cnCounter++;
+  const row = await sql`SELECT nextval('zvd_credit_note_seq') as n`.execute(db);
+  const n = (row.rows[0] as any).n;
   return `CN-${String(n).padStart(5, '0')}`;
 }
 
@@ -37,8 +35,8 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
     const rows = await sql`
       SELECT i.*,
         COALESCE(json_agg(json_build_object(
-          'id', l.id, 'description', l.description, 'quantity', l.quantity,
-          'unit_price', l.unit_price, 'tax_rate', l.tax_rate, 'total', l.total
+          'id', l.id, 'description', l.description, 'quantity', l.quantity, 'unit', l.unit,
+          'unit_price', l.unit_price, 'tax_rate', l.tax_rate, 'total', l.total, 'metadata', l.metadata
         ) ORDER BY l.sort_order) FILTER (WHERE l.id IS NOT NULL), '[]') as lines,
         COALESCE((SELECT SUM(p.amount) FROM zvd_invoice_payments p WHERE p.invoice_id = i.id), 0) as amount_paid_actual
       FROM zvd_invoices i
@@ -72,8 +70,9 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       SELECT i.*,
         COALESCE(json_agg(json_build_object(
-          'id', l.id, 'description', l.description, 'quantity', l.quantity,
-          'unit_price', l.unit_price, 'tax_rate', l.tax_rate, 'total', l.total, 'sort_order', l.sort_order
+          'id', l.id, 'description', l.description, 'quantity', l.quantity, 'unit', l.unit,
+          'unit_price', l.unit_price, 'tax_rate', l.tax_rate, 'total', l.total, 'sort_order', l.sort_order,
+          'metadata', l.metadata
         ) ORDER BY l.sort_order) FILTER (WHERE l.id IS NOT NULL), '[]') as lines
       FROM zvd_invoices i
       LEFT JOIN zvd_invoice_lines l ON l.invoice_id = i.id
@@ -104,9 +103,11 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
     lines: z.array(z.object({
       description: z.string().min(1),
       quantity: z.number().default(1),
+      unit: z.string().optional(),
       unit_price: z.number().default(0),
       tax_rate: z.number().default(19),
       sort_order: z.number().default(0),
+      metadata: z.record(z.unknown()).optional(),
     })).min(1),
   })), async (c) => {
     const user = c.get('user') as any;
@@ -132,10 +133,20 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
     const invId = (inv.rows[0] as any).id;
     for (const line of d.lines) {
       const lineTotal = line.quantity * line.unit_price * (1 - d.discount_percent / 100) * (1 + line.tax_rate / 100);
-      await sql`INSERT INTO zvd_invoice_lines (invoice_id, description, quantity, unit_price, tax_rate, total, sort_order)
-        VALUES (${invId}, ${line.description}, ${line.quantity}, ${line.unit_price}, ${line.tax_rate}, ${lineTotal}, ${line.sort_order})
+      await sql`
+        INSERT INTO zvd_invoice_lines (invoice_id, description, quantity, unit, unit_price, tax_rate, total, sort_order, metadata)
+        VALUES (${invId}, ${line.description}, ${line.quantity}, ${line.unit ?? null}, ${line.unit_price}, ${line.tax_rate}, ${lineTotal}, ${line.sort_order}, ${JSON.stringify(line.metadata ?? {})}::jsonb)
       `.execute(db);
     }
+
+    // Notify other extensions — generic event, invoicing does not know who listens
+    ctx.events.emit('record.created', {
+      collection: 'zvd_invoices',
+      record: inv.rows[0],
+      id: invId,
+      userId: user.id,
+    });
+
     return c.json({ data: inv.rows[0] }, 201);
   });
 
