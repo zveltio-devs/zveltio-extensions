@@ -51,5 +51,5 @@ CREATE TABLE IF NOT EXISTS zvd_quality_remediations (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_quality_scores_collection ON zvd_quality_scores(collection, calculated_at DESC);
-CREATE INDEX idx_quality_rules_collection ON zvd_quality_rules(collection);
+CREATE INDEX IF NOT EXISTS idx_quality_scores_collection ON zvd_quality_scores(collection, calculated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_quality_rules_collection ON zvd_quality_rules(collection);

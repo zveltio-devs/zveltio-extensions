@@ -30,9 +30,9 @@ CREATE TABLE IF NOT EXISTS zvd_products (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_products_sku ON zvd_products(sku);
-CREATE INDEX idx_zvd_products_barcode ON zvd_products(barcode);
-CREATE INDEX idx_zvd_products_category ON zvd_products(category);
+CREATE INDEX IF NOT EXISTS idx_zvd_products_sku ON zvd_products(sku);
+CREATE INDEX IF NOT EXISTS idx_zvd_products_barcode ON zvd_products(barcode);
+CREATE INDEX IF NOT EXISTS idx_zvd_products_category ON zvd_products(category);
 
 CREATE TABLE IF NOT EXISTS zvd_stock_levels (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -44,8 +44,8 @@ CREATE TABLE IF NOT EXISTS zvd_stock_levels (
   UNIQUE (product_id, warehouse_id)
 );
 
-CREATE INDEX idx_zvd_stock_product ON zvd_stock_levels(product_id);
-CREATE INDEX idx_zvd_stock_warehouse ON zvd_stock_levels(warehouse_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_stock_product ON zvd_stock_levels(product_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_stock_warehouse ON zvd_stock_levels(warehouse_id);
 
 CREATE TABLE IF NOT EXISTS zvd_stock_movements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -59,6 +59,6 @@ CREATE TABLE IF NOT EXISTS zvd_stock_movements (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_movements_product ON zvd_stock_movements(product_id);
-CREATE INDEX idx_zvd_movements_warehouse ON zvd_stock_movements(warehouse_id);
-CREATE INDEX idx_zvd_movements_created ON zvd_stock_movements(created_at);
+CREATE INDEX IF NOT EXISTS idx_zvd_movements_product ON zvd_stock_movements(product_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_movements_warehouse ON zvd_stock_movements(warehouse_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_movements_created ON zvd_stock_movements(created_at);

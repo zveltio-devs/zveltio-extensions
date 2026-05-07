@@ -36,9 +36,9 @@ CREATE TABLE IF NOT EXISTS zvd_bank_transactions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_bank_txn_account ON zvd_bank_transactions(account_id);
-CREATE INDEX idx_zvd_bank_txn_date ON zvd_bank_transactions(date);
-CREATE INDEX idx_zvd_bank_txn_status ON zvd_bank_transactions(status);
+CREATE INDEX IF NOT EXISTS idx_zvd_bank_txn_account ON zvd_bank_transactions(account_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_bank_txn_date ON zvd_bank_transactions(date);
+CREATE INDEX IF NOT EXISTS idx_zvd_bank_txn_status ON zvd_bank_transactions(status);
 
 CREATE TABLE IF NOT EXISTS zvd_bank_imports (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

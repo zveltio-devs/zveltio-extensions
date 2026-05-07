@@ -31,5 +31,5 @@ CREATE TABLE IF NOT EXISTS zvd_byod_scan_history (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_byod_scan_history_profile ON zvd_byod_scan_history(profile_id);
-CREATE INDEX idx_byod_scan_history_created ON zvd_byod_scan_history(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_byod_scan_history_profile ON zvd_byod_scan_history(profile_id);
+CREATE INDEX IF NOT EXISTS idx_byod_scan_history_created ON zvd_byod_scan_history(created_at DESC);

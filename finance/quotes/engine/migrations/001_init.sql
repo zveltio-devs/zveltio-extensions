@@ -25,8 +25,8 @@ CREATE TABLE IF NOT EXISTS zvd_quotes (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_quotes_status ON zvd_quotes(status);
-CREATE INDEX idx_zvd_quotes_client ON zvd_quotes(contact_id, organization_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_quotes_status ON zvd_quotes(status);
+CREATE INDEX IF NOT EXISTS idx_zvd_quotes_client ON zvd_quotes(contact_id, organization_id);
 
 CREATE TABLE IF NOT EXISTS zvd_quote_lines (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -40,4 +40,4 @@ CREATE TABLE IF NOT EXISTS zvd_quote_lines (
   sort_order INT NOT NULL DEFAULT 0
 );
 
-CREATE INDEX idx_zvd_quote_lines_quote ON zvd_quote_lines(quote_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_quote_lines_quote ON zvd_quote_lines(quote_id);

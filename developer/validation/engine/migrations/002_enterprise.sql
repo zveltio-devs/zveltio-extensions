@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS zvd_validation_test_cases (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_validation_test_cases_rule ON zvd_validation_test_cases(rule_id);
+CREATE INDEX IF NOT EXISTS idx_validation_test_cases_rule ON zvd_validation_test_cases(rule_id);
 
 -- Rule groups (combine multiple rules)
 CREATE TABLE IF NOT EXISTS zvd_validation_rule_groups (

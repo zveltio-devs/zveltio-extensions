@@ -26,8 +26,8 @@ CREATE TABLE IF NOT EXISTS zvd_assets (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_assets_category ON zvd_assets(category);
-CREATE INDEX idx_zvd_assets_status ON zvd_assets(status);
+CREATE INDEX IF NOT EXISTS idx_zvd_assets_category ON zvd_assets(category);
+CREATE INDEX IF NOT EXISTS idx_zvd_assets_status ON zvd_assets(status);
 
 CREATE TABLE IF NOT EXISTS zvd_asset_depreciation (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS zvd_asset_depreciation (
   UNIQUE (asset_id, period)
 );
 
-CREATE INDEX idx_zvd_asset_depreciation_asset ON zvd_asset_depreciation(asset_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_asset_depreciation_asset ON zvd_asset_depreciation(asset_id);
 
 CREATE TABLE IF NOT EXISTS zvd_asset_maintenance (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -56,6 +56,6 @@ CREATE TABLE IF NOT EXISTS zvd_asset_maintenance (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_asset_maintenance_asset ON zvd_asset_maintenance(asset_id);
-CREATE INDEX idx_zvd_asset_maintenance_status ON zvd_asset_maintenance(status);
-CREATE INDEX idx_zvd_asset_maintenance_date ON zvd_asset_maintenance(scheduled_date);
+CREATE INDEX IF NOT EXISTS idx_zvd_asset_maintenance_asset ON zvd_asset_maintenance(asset_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_asset_maintenance_status ON zvd_asset_maintenance(status);
+CREATE INDEX IF NOT EXISTS idx_zvd_asset_maintenance_date ON zvd_asset_maintenance(scheduled_date);

@@ -11,7 +11,7 @@
     "database"
   ],
   "peerDependencies": {
-    "node-saml": "^4.0.0"
+    "node-saml": "^3.1.0"
   },
   "contributes": {
     "engine": true,

@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS zvd_accounts (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_accounts_type ON zvd_accounts(type);
-CREATE INDEX idx_zvd_accounts_parent ON zvd_accounts(parent_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_accounts_type ON zvd_accounts(type);
+CREATE INDEX IF NOT EXISTS idx_zvd_accounts_parent ON zvd_accounts(parent_id);
 
 CREATE TABLE IF NOT EXISTS zvd_journal_entries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -27,8 +27,8 @@ CREATE TABLE IF NOT EXISTS zvd_journal_entries (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_journal_entries_date ON zvd_journal_entries(date);
-CREATE INDEX idx_zvd_journal_entries_status ON zvd_journal_entries(status);
+CREATE INDEX IF NOT EXISTS idx_zvd_journal_entries_date ON zvd_journal_entries(date);
+CREATE INDEX IF NOT EXISTS idx_zvd_journal_entries_status ON zvd_journal_entries(status);
 
 CREATE TABLE IF NOT EXISTS zvd_journal_lines (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -40,5 +40,5 @@ CREATE TABLE IF NOT EXISTS zvd_journal_lines (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_journal_lines_entry ON zvd_journal_lines(entry_id);
-CREATE INDEX idx_zvd_journal_lines_account ON zvd_journal_lines(account_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_journal_lines_entry ON zvd_journal_lines(entry_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_journal_lines_account ON zvd_journal_lines(account_id);

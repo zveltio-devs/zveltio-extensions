@@ -44,8 +44,8 @@ CREATE TABLE IF NOT EXISTS zvd_payroll_entries (
   UNIQUE (period_id, employee_id)
 );
 
-CREATE INDEX idx_zvd_payroll_entries_period ON zvd_payroll_entries(period_id);
-CREATE INDEX idx_zvd_payroll_entries_employee ON zvd_payroll_entries(employee_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_payroll_entries_period ON zvd_payroll_entries(period_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_payroll_entries_employee ON zvd_payroll_entries(employee_id);
 
 CREATE TABLE IF NOT EXISTS zvd_payroll_adjustments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -41,5 +41,5 @@ ALTER TABLE zv_generated_docs ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
 ALTER TABLE zv_generated_docs ADD COLUMN IF NOT EXISTS share_token TEXT UNIQUE DEFAULT encode(gen_random_bytes(16), 'hex');
 ALTER TABLE zv_generated_docs ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','expired','revoked'));
 
-CREATE INDEX idx_doc_sign_requests_token ON zv_document_sign_requests(sign_token);
-CREATE INDEX idx_doc_sign_requests_doc ON zv_document_sign_requests(document_id);
+CREATE INDEX IF NOT EXISTS idx_doc_sign_requests_token ON zv_document_sign_requests(sign_token);
+CREATE INDEX IF NOT EXISTS idx_doc_sign_requests_doc ON zv_document_sign_requests(document_id);

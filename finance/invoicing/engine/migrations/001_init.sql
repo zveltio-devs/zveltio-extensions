@@ -25,9 +25,9 @@ CREATE TABLE IF NOT EXISTS zvd_invoices (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_invoices_status ON zvd_invoices(status);
-CREATE INDEX idx_zvd_invoices_due_date ON zvd_invoices(due_date);
-CREATE INDEX idx_zvd_invoices_client ON zvd_invoices(client_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_invoices_status ON zvd_invoices(status);
+CREATE INDEX IF NOT EXISTS idx_zvd_invoices_due_date ON zvd_invoices(due_date);
+CREATE INDEX IF NOT EXISTS idx_zvd_invoices_client ON zvd_invoices(client_id);
 
 CREATE TABLE IF NOT EXISTS zvd_invoice_lines (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -40,4 +40,4 @@ CREATE TABLE IF NOT EXISTS zvd_invoice_lines (
   sort_order INT NOT NULL DEFAULT 0
 );
 
-CREATE INDEX idx_zvd_invoice_lines_invoice ON zvd_invoice_lines(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_invoice_lines_invoice ON zvd_invoice_lines(invoice_id);

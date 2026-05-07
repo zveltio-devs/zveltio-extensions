@@ -14,5 +14,5 @@ CREATE TABLE IF NOT EXISTS zv_generated_docs (
   generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_generated_docs_template ON zv_generated_docs(template_id);
-CREATE INDEX idx_generated_docs_source ON zv_generated_docs(source_collection, source_record_id);
+CREATE INDEX IF NOT EXISTS idx_generated_docs_template ON zv_generated_docs(template_id);
+CREATE INDEX IF NOT EXISTS idx_generated_docs_source ON zv_generated_docs(source_collection, source_record_id);

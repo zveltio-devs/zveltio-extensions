@@ -34,6 +34,6 @@ CREATE TABLE IF NOT EXISTS zv_publish_schedule (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_drafts_collection_record ON zv_content_drafts(collection, record_id);
-CREATE INDEX idx_drafts_status ON zv_content_drafts(status);
-CREATE INDEX idx_publish_schedule_pending ON zv_publish_schedule(scheduled_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_drafts_collection_record ON zv_content_drafts(collection, record_id);
+CREATE INDEX IF NOT EXISTS idx_drafts_status ON zv_content_drafts(status);
+CREATE INDEX IF NOT EXISTS idx_publish_schedule_pending ON zv_publish_schedule(scheduled_at) WHERE status = 'pending';

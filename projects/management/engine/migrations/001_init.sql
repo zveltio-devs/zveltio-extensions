@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS zvd_projects (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_projects_status ON zvd_projects(status);
+CREATE INDEX IF NOT EXISTS idx_zvd_projects_status ON zvd_projects(status);
 
 CREATE TABLE IF NOT EXISTS zvd_project_members (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS zvd_milestones (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_milestones_project ON zvd_milestones(project_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_milestones_project ON zvd_milestones(project_id);
 
 CREATE TABLE IF NOT EXISTS zvd_tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -62,9 +62,9 @@ CREATE TABLE IF NOT EXISTS zvd_tasks (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_tasks_project ON zvd_tasks(project_id);
-CREATE INDEX idx_zvd_tasks_status ON zvd_tasks(status);
-CREATE INDEX idx_zvd_tasks_assignee ON zvd_tasks(assignee_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_tasks_project ON zvd_tasks(project_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_tasks_status ON zvd_tasks(status);
+CREATE INDEX IF NOT EXISTS idx_zvd_tasks_assignee ON zvd_tasks(assignee_id);
 
 CREATE TABLE IF NOT EXISTS zvd_task_comments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -74,4 +74,4 @@ CREATE TABLE IF NOT EXISTS zvd_task_comments (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_task_comments_task ON zvd_task_comments(task_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_task_comments_task ON zvd_task_comments(task_id);

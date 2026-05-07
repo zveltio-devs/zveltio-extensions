@@ -11,8 +11,8 @@ CREATE TABLE IF NOT EXISTS zvd_pos_sessions (
   notes TEXT
 );
 
-CREATE INDEX idx_zvd_pos_sessions_cashier ON zvd_pos_sessions(cashier_id);
-CREATE INDEX idx_zvd_pos_sessions_status ON zvd_pos_sessions(status);
+CREATE INDEX IF NOT EXISTS idx_zvd_pos_sessions_cashier ON zvd_pos_sessions(cashier_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_pos_sessions_status ON zvd_pos_sessions(status);
 
 CREATE TABLE IF NOT EXISTS zvd_pos_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -28,9 +28,9 @@ CREATE TABLE IF NOT EXISTS zvd_pos_orders (
   created_by TEXT NOT NULL
 );
 
-CREATE INDEX idx_zvd_pos_orders_session ON zvd_pos_orders(session_id);
-CREATE INDEX idx_zvd_pos_orders_status ON zvd_pos_orders(status);
-CREATE INDEX idx_zvd_pos_orders_created ON zvd_pos_orders(created_at);
+CREATE INDEX IF NOT EXISTS idx_zvd_pos_orders_session ON zvd_pos_orders(session_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_pos_orders_status ON zvd_pos_orders(status);
+CREATE INDEX IF NOT EXISTS idx_zvd_pos_orders_created ON zvd_pos_orders(created_at);
 
 CREATE TABLE IF NOT EXISTS zvd_pos_order_lines (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -45,4 +45,4 @@ CREATE TABLE IF NOT EXISTS zvd_pos_order_lines (
   total NUMERIC(15,2) NOT NULL
 );
 
-CREATE INDEX idx_zvd_pos_lines_order ON zvd_pos_order_lines(order_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_pos_lines_order ON zvd_pos_order_lines(order_id);
