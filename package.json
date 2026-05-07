@@ -2,7 +2,6 @@
   "name": "zveltio-extensions",
   "version": "1.0.0",
   "private": true,
-  "packageManager": "bun@1.2.0",
   "description": "Official Zveltio extensions — analytics, auth, automation, communications, compliance, content, CRM, data, developer tools, geospatial, i18n, multitenancy, operations, storage, workflow.",
   "workspaces": [
     "*/*/studio"
@@ -13,10 +12,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@hono/zod-validator": "^0.4.0",
+    "@hono/zod-validator": "^0.7.6",
     "hono": "^4.4.0",
     "kysely": "^0.27.6",
-    "zod": "^3.22.0"
+    "zod": "^4.3.6"
   },
   "peerDependencies": {
     "@zveltio/sdk": "*",

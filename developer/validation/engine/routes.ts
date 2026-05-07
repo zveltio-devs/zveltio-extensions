@@ -156,8 +156,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
     const userMessage = `Field: ${field_name} (type: ${field_type || 'text'})\nDescription: ${description}`;
 
     try {
-      const { aiProviderManager } = await import('../../../../packages/engine/src/lib/ai-provider.js');
-      const provider = aiProviderManager.getDefault();
+      const provider = ctx.internals?.aiProviderManager?.getDefault?.();
       if (!provider) return c.json({ error: 'No AI provider configured' }, 503);
 
       const response = await provider.chat(
