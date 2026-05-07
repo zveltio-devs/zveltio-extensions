@@ -47,6 +47,6 @@ CREATE TABLE IF NOT EXISTS zvd_export_audit_log (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_export_jobs_status ON zvd_export_jobs(status);
-CREATE INDEX idx_export_jobs_created ON zvd_export_jobs(created_at DESC);
-CREATE INDEX idx_export_audit_collection ON zvd_export_audit_log(collection, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_export_jobs_status ON zvd_export_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_export_jobs_created ON zvd_export_jobs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_export_audit_collection ON zvd_export_audit_log(collection, created_at DESC);

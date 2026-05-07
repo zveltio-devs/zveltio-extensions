@@ -36,8 +36,8 @@ CREATE TABLE IF NOT EXISTS zvd_webhook_events (
   received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_webhook_events_webhook ON zvd_webhook_events(webhook_id);
-CREATE INDEX idx_zvd_webhook_events_received ON zvd_webhook_events(received_at);
+CREATE INDEX IF NOT EXISTS idx_zvd_webhook_events_webhook ON zvd_webhook_events(webhook_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_webhook_events_received ON zvd_webhook_events(received_at);
 
 -- Add columns to connections and logs
 ALTER TABLE zvd_api_connections ADD COLUMN IF NOT EXISTS default_headers JSONB NOT NULL DEFAULT '{}';

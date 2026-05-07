@@ -70,6 +70,6 @@ CREATE TABLE IF NOT EXISTS zvd_gdpr_breach_incidents (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_gdpr_consents_user ON zvd_gdpr_consents(user_id, purpose);
-CREATE INDEX idx_gdpr_consents_email ON zvd_gdpr_consents(email, purpose);
-CREATE INDEX idx_gdpr_access_requests_status ON zvd_gdpr_access_requests(status, due_date);
+CREATE INDEX IF NOT EXISTS idx_gdpr_consents_user ON zvd_gdpr_consents(user_id, purpose);
+CREATE INDEX IF NOT EXISTS idx_gdpr_consents_email ON zvd_gdpr_consents(email, purpose);
+CREATE INDEX IF NOT EXISTS idx_gdpr_access_requests_status ON zvd_gdpr_access_requests(status, due_date);

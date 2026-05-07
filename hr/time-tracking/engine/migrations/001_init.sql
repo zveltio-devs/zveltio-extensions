@@ -35,9 +35,9 @@ CREATE TABLE IF NOT EXISTS zvd_time_entries (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_time_entries_employee ON zvd_time_entries(employee_id);
-CREATE INDEX idx_zvd_time_entries_project ON zvd_time_entries(project_id);
-CREATE INDEX idx_zvd_time_entries_date ON zvd_time_entries(date);
+CREATE INDEX IF NOT EXISTS idx_zvd_time_entries_employee ON zvd_time_entries(employee_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_time_entries_project ON zvd_time_entries(project_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_time_entries_date ON zvd_time_entries(date);
 
 CREATE TABLE IF NOT EXISTS zvd_timesheets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -53,5 +53,5 @@ CREATE TABLE IF NOT EXISTS zvd_timesheets (
   UNIQUE (employee_id, week_start)
 );
 
-CREATE INDEX idx_zvd_timesheets_employee ON zvd_timesheets(employee_id);
-CREATE INDEX idx_zvd_timesheets_status ON zvd_timesheets(status);
+CREATE INDEX IF NOT EXISTS idx_zvd_timesheets_employee ON zvd_timesheets(employee_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_timesheets_status ON zvd_timesheets(status);

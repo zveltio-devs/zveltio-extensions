@@ -29,9 +29,9 @@ CREATE TABLE IF NOT EXISTS zvd_graphql_operation_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_graphql_logs_user ON zvd_graphql_operation_logs(user_id);
-CREATE INDEX idx_graphql_logs_created ON zvd_graphql_operation_logs(created_at DESC);
-CREATE INDEX idx_graphql_logs_op_name ON zvd_graphql_operation_logs(operation_name);
+CREATE INDEX IF NOT EXISTS idx_graphql_logs_user ON zvd_graphql_operation_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_graphql_logs_created ON zvd_graphql_operation_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_graphql_logs_op_name ON zvd_graphql_operation_logs(operation_name);
 
 -- GraphQL access control (per-collection field restrictions)
 CREATE TABLE IF NOT EXISTS zvd_graphql_field_policies (

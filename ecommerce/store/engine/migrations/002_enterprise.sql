@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS zvd_ec_product_variants (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_ec_variants_product ON zvd_ec_product_variants(product_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_ec_variants_product ON zvd_ec_product_variants(product_id);
 
 -- Shipping zones
 CREATE TABLE IF NOT EXISTS zvd_ec_shipping_zones (
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS zvd_ec_product_reviews (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_ec_reviews_product ON zvd_ec_product_reviews(product_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_ec_reviews_product ON zvd_ec_product_reviews(product_id);
 
 -- Add columns to products and orders
 ALTER TABLE zvd_ec_products ADD COLUMN IF NOT EXISTS avg_rating NUMERIC(3,2);

@@ -35,4 +35,4 @@ CREATE TABLE IF NOT EXISTS zvd_saml_attribute_mappings (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_saml_login_log_email ON zvd_saml_login_log(email, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_saml_login_log_email ON zvd_saml_login_log(email, created_at DESC);

@@ -51,9 +51,9 @@ CREATE TABLE IF NOT EXISTS zvd_employees (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_employees_dept ON zvd_employees(department_id);
-CREATE INDEX idx_zvd_employees_status ON zvd_employees(status);
-CREATE INDEX idx_zvd_employees_manager ON zvd_employees(manager_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_employees_dept ON zvd_employees(department_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_employees_status ON zvd_employees(status);
+CREATE INDEX IF NOT EXISTS idx_zvd_employees_manager ON zvd_employees(manager_id);
 
 CREATE TABLE IF NOT EXISTS zvd_employee_documents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -78,4 +78,4 @@ CREATE TABLE IF NOT EXISTS zvd_onboarding_tasks (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_onboarding_employee ON zvd_onboarding_tasks(employee_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_onboarding_employee ON zvd_onboarding_tasks(employee_id);

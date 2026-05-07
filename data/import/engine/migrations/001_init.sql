@@ -14,5 +14,5 @@ CREATE TABLE IF NOT EXISTS zv_import_logs (
   completed_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_import_logs_collection ON zv_import_logs(collection);
-CREATE INDEX idx_import_logs_status ON zv_import_logs(status);
+CREATE INDEX IF NOT EXISTS idx_import_logs_collection ON zv_import_logs(collection);
+CREATE INDEX IF NOT EXISTS idx_import_logs_status ON zv_import_logs(status);

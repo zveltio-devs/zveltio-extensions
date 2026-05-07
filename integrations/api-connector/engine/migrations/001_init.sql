@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS zvd_api_endpoints (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_api_endpoints_connection ON zvd_api_endpoints(connection_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_api_endpoints_connection ON zvd_api_endpoints(connection_id);
 
 CREATE TABLE IF NOT EXISTS zvd_api_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -42,5 +42,5 @@ CREATE TABLE IF NOT EXISTS zvd_api_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_api_logs_endpoint ON zvd_api_logs(endpoint_id);
-CREATE INDEX idx_zvd_api_logs_created ON zvd_api_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_zvd_api_logs_endpoint ON zvd_api_logs(endpoint_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_api_logs_created ON zvd_api_logs(created_at);

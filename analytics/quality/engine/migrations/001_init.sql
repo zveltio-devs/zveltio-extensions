@@ -30,6 +30,6 @@ CREATE TABLE IF NOT EXISTS zv_quality_issues (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_quality_scans_collection ON zv_quality_scans(collection);
-CREATE INDEX idx_quality_issues_scan ON zv_quality_issues(scan_id);
-CREATE INDEX idx_quality_issues_collection ON zv_quality_issues(collection);
+CREATE INDEX IF NOT EXISTS idx_quality_scans_collection ON zv_quality_scans(collection);
+CREATE INDEX IF NOT EXISTS idx_quality_issues_scan ON zv_quality_issues(scan_id);
+CREATE INDEX IF NOT EXISTS idx_quality_issues_collection ON zv_quality_issues(collection);

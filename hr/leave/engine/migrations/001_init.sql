@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS zvd_leave_balances (
   UNIQUE (employee_id, leave_type_id, year)
 );
 
-CREATE INDEX idx_zvd_leave_balances_employee ON zvd_leave_balances(employee_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_leave_balances_employee ON zvd_leave_balances(employee_id);
 
 CREATE TABLE IF NOT EXISTS zvd_leave_requests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -49,6 +49,6 @@ CREATE TABLE IF NOT EXISTS zvd_leave_requests (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_leave_requests_employee ON zvd_leave_requests(employee_id);
-CREATE INDEX idx_zvd_leave_requests_status ON zvd_leave_requests(status);
-CREATE INDEX idx_zvd_leave_requests_dates ON zvd_leave_requests(start_date, end_date);
+CREATE INDEX IF NOT EXISTS idx_zvd_leave_requests_employee ON zvd_leave_requests(employee_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_leave_requests_status ON zvd_leave_requests(status);
+CREATE INDEX IF NOT EXISTS idx_zvd_leave_requests_dates ON zvd_leave_requests(start_date, end_date);

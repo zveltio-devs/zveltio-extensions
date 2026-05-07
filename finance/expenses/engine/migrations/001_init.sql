@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS zvd_expense_reports (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_expense_reports_employee ON zvd_expense_reports(employee_id);
-CREATE INDEX idx_zvd_expense_reports_status ON zvd_expense_reports(status);
+CREATE INDEX IF NOT EXISTS idx_zvd_expense_reports_employee ON zvd_expense_reports(employee_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_expense_reports_status ON zvd_expense_reports(status);
 
 CREATE TABLE IF NOT EXISTS zvd_expenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -33,5 +33,5 @@ CREATE TABLE IF NOT EXISTS zvd_expenses (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_expenses_report ON zvd_expenses(report_id);
-CREATE INDEX idx_zvd_expenses_category ON zvd_expenses(category);
+CREATE INDEX IF NOT EXISTS idx_zvd_expenses_report ON zvd_expenses(report_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_expenses_category ON zvd_expenses(category);

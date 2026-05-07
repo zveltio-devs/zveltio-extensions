@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS zvd_subtasks (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_subtasks_task ON zvd_subtasks(task_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_subtasks_task ON zvd_subtasks(task_id);
 
 -- File attachments
 CREATE TABLE IF NOT EXISTS zvd_task_attachments (

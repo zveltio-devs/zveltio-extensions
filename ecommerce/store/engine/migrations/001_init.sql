@@ -39,9 +39,9 @@ CREATE TABLE IF NOT EXISTS zvd_ec_products (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_ec_products_status ON zvd_ec_products(status);
-CREATE INDEX idx_zvd_ec_products_category ON zvd_ec_products(category_id);
-CREATE INDEX idx_zvd_ec_products_slug ON zvd_ec_products(slug);
+CREATE INDEX IF NOT EXISTS idx_zvd_ec_products_status ON zvd_ec_products(status);
+CREATE INDEX IF NOT EXISTS idx_zvd_ec_products_category ON zvd_ec_products(category_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_ec_products_slug ON zvd_ec_products(slug);
 
 CREATE TABLE IF NOT EXISTS zvd_ec_customers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS zvd_ec_customers (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_ec_customers_email ON zvd_ec_customers(email);
+CREATE INDEX IF NOT EXISTS idx_zvd_ec_customers_email ON zvd_ec_customers(email);
 
 CREATE TABLE IF NOT EXISTS zvd_ec_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -87,9 +87,9 @@ CREATE TABLE IF NOT EXISTS zvd_ec_orders (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_ec_orders_status ON zvd_ec_orders(status);
-CREATE INDEX idx_zvd_ec_orders_customer ON zvd_ec_orders(customer_id);
-CREATE INDEX idx_zvd_ec_orders_created ON zvd_ec_orders(created_at);
+CREATE INDEX IF NOT EXISTS idx_zvd_ec_orders_status ON zvd_ec_orders(status);
+CREATE INDEX IF NOT EXISTS idx_zvd_ec_orders_customer ON zvd_ec_orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_ec_orders_created ON zvd_ec_orders(created_at);
 
 CREATE TABLE IF NOT EXISTS zvd_ec_order_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -104,7 +104,7 @@ CREATE TABLE IF NOT EXISTS zvd_ec_order_items (
   total NUMERIC(15,2) NOT NULL
 );
 
-CREATE INDEX idx_zvd_ec_order_items_order ON zvd_ec_order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_ec_order_items_order ON zvd_ec_order_items(order_id);
 
 CREATE TABLE IF NOT EXISTS zvd_ec_coupons (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

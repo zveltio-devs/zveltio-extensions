@@ -31,5 +31,5 @@ CREATE TABLE IF NOT EXISTS zvd_ldap_ip_allowlist (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_ldap_login_log_user ON zvd_ldap_login_log(username, created_at DESC);
-CREATE INDEX idx_ldap_login_log_ip ON zvd_ldap_login_log(ip, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ldap_login_log_user ON zvd_ldap_login_log(username, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ldap_login_log_ip ON zvd_ldap_login_log(ip, created_at DESC);

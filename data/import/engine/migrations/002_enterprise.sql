@@ -45,5 +45,5 @@ ALTER TABLE zv_import_logs ADD COLUMN IF NOT EXISTS profile_id UUID REFERENCES z
 ALTER TABLE zv_import_logs ADD COLUMN IF NOT EXISTS on_duplicate TEXT NOT NULL DEFAULT 'skip';
 ALTER TABLE zv_import_logs ADD COLUMN IF NOT EXISTS dry_run BOOLEAN NOT NULL DEFAULT false;
 
-CREATE INDEX idx_import_mappings_collection ON zvd_import_mappings(collection);
-CREATE INDEX idx_import_rollbacks_job ON zvd_import_rollbacks(job_id);
+CREATE INDEX IF NOT EXISTS idx_import_mappings_collection ON zvd_import_mappings(collection);
+CREATE INDEX IF NOT EXISTS idx_import_rollbacks_job ON zvd_import_rollbacks(job_id);

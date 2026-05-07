@@ -37,9 +37,9 @@ CREATE TABLE IF NOT EXISTS zvd_subscribers (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_subscribers_plan ON zvd_subscribers(plan_id);
-CREATE INDEX idx_zvd_subscribers_status ON zvd_subscribers(status);
-CREATE INDEX idx_zvd_subscribers_email ON zvd_subscribers(email);
+CREATE INDEX IF NOT EXISTS idx_zvd_subscribers_plan ON zvd_subscribers(plan_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_subscribers_status ON zvd_subscribers(status);
+CREATE INDEX IF NOT EXISTS idx_zvd_subscribers_email ON zvd_subscribers(email);
 
 CREATE TABLE IF NOT EXISTS zvd_subscription_invoices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -55,4 +55,4 @@ CREATE TABLE IF NOT EXISTS zvd_subscription_invoices (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_sub_invoices_subscriber ON zvd_subscription_invoices(subscriber_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_sub_invoices_subscriber ON zvd_subscription_invoices(subscriber_id);

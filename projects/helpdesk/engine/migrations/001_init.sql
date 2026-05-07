@@ -34,11 +34,11 @@ CREATE TABLE IF NOT EXISTS zvd_tickets (
   created_by TEXT NOT NULL
 );
 
-CREATE INDEX idx_zvd_tickets_status ON zvd_tickets(status);
-CREATE INDEX idx_zvd_tickets_priority ON zvd_tickets(priority);
-CREATE INDEX idx_zvd_tickets_assignee ON zvd_tickets(assignee_id);
-CREATE INDEX idx_zvd_tickets_requester ON zvd_tickets(requester_id);
-CREATE INDEX idx_zvd_tickets_sla ON zvd_tickets(sla_due_at);
+CREATE INDEX IF NOT EXISTS idx_zvd_tickets_status ON zvd_tickets(status);
+CREATE INDEX IF NOT EXISTS idx_zvd_tickets_priority ON zvd_tickets(priority);
+CREATE INDEX IF NOT EXISTS idx_zvd_tickets_assignee ON zvd_tickets(assignee_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_tickets_requester ON zvd_tickets(requester_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_tickets_sla ON zvd_tickets(sla_due_at);
 
 CREATE TABLE IF NOT EXISTS zvd_ticket_messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -52,4 +52,4 @@ CREATE TABLE IF NOT EXISTS zvd_ticket_messages (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_zvd_ticket_messages_ticket ON zvd_ticket_messages(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_zvd_ticket_messages_ticket ON zvd_ticket_messages(ticket_id);
