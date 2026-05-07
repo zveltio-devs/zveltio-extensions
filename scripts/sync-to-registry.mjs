@@ -10,6 +10,11 @@
  * Without phase 2, extensions appear in the marketplace catalog but Install/Enable
  * fail because the engine has nothing to download.
  *
+ * Before zipping, each extension's engine/index.ts is compiled to a self-contained
+ * engine/index.js bundle (bun build --bundle). This eliminates runtime module
+ * resolution issues in Bun compiled binaries — hono/zod/kysely are inlined into
+ * the bundle, no external node_modules lookup needed at activation time.
+ *
  * Usage:
  *   node scripts/sync-to-registry.mjs --version 1.1.0 [--no-upload] [--only=name1,name2]
  *
@@ -17,10 +22,12 @@
  *   REGISTRY_URL          e.g. https://registry.zveltio.com
  *   REGISTRY_SYNC_TOKEN   bearer token configured as SYNC_TOKEN in Cloudflare
  *
- * Tools required: a `zip` command on PATH (or set ZIP=path/to/zip).
+ * Tools required:
+ *   - `zip` command on PATH (or set ZIP=path/to/zip)
+ *   - `bun` command on PATH for engine bundling (or set BUN=path/to/bun)
  */
 
-import { readFileSync, readdirSync, statSync, existsSync, mkdtempSync, rmSync } from 'fs';
+import { readFileSync, readdirSync, statSync, existsSync, mkdtempSync, rmSync, unlinkSync } from 'fs';
 import { join, dirname, relative } from 'path';
 import { tmpdir } from 'os';
 import { spawnSync } from 'child_process';
@@ -34,6 +41,7 @@ const args = process.argv.slice(2);
 const versionArg = args.find((a) => a.startsWith('--version='))?.split('=')[1]
   ?? args[args.indexOf('--version') + 1];
 const noUpload = args.includes('--no-upload');
+const noBuild = args.includes('--no-build');
 const onlyArg = args.find((a) => a.startsWith('--only='))?.split('=')[1] ?? '';
 const onlySet = onlyArg ? new Set(onlyArg.split(',').map((s) => s.trim()).filter(Boolean)) : null;
 
@@ -48,6 +56,7 @@ if (!registryUrl) { console.error('ERROR: REGISTRY_URL env var is required'); pr
 if (!syncToken)   { console.error('ERROR: REGISTRY_SYNC_TOKEN env var is required'); process.exit(1); }
 
 const ZIP = process.env.ZIP || 'zip';
+const BUN = process.env.BUN || 'bun';
 
 // ── Discover manifests ───────────────────────────────────────────────────────
 function findManifests(dir, depth = 0) {
@@ -102,6 +111,9 @@ for (const p of manifestPaths) {
     version: m.version ?? version,
     zveltioMinVersion: m.zveltioMinVersion ?? '1.0.0',
     zveltioMaxVersion: m.zveltioMaxVersion,
+    // Needed for build step
+    contributes: m.contributes ?? {},
+    peerDependencies: m.peerDependencies ?? {},
   });
 }
 
@@ -114,11 +126,11 @@ console.log(`Syncing ${extensions.length} extensions at version ${version} to ${
 
 // ── Phase 1: metadata ────────────────────────────────────────────────────────
 console.log('— Phase 1: upsert metadata via /api/admin/sync-official');
-const meta = extensions.map(({ dir: _d, ...rest }) => rest);
+const meta = extensions.map(({ dir: _d, contributes: _c, peerDependencies: _p, ...rest }) => rest);
 const metaRes = await fetch(`${registryUrl}/api/admin/sync-official`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${syncToken}` },
-  body: JSON.stringify({ version, extensions: meta }),
+  body: JSON.stringify({ version, extensions: meta, prune: true }),
 });
 const metaData = await metaRes.json().catch(() => ({}));
 if (!metaRes.ok) {
@@ -126,6 +138,7 @@ if (!metaRes.ok) {
   process.exit(1);
 }
 console.log(`  synced ${metaData.synced} extension records`);
+if (metaData.pruned?.length) console.log(`  pruned orphans: ${metaData.pruned.join(', ')}`);
 if (metaData.errors?.length) console.warn(`  errors:`, metaData.errors);
 
 if (noUpload) {
@@ -133,8 +146,8 @@ if (noUpload) {
   process.exit(0);
 }
 
-// ── Phase 2: package + upload ZIPs ───────────────────────────────────────────
-console.log('\n— Phase 2: package + upload ZIPs via /api/admin/upload-package/:name');
+// ── Phase 2: build + package + upload ZIPs ───────────────────────────────────
+console.log('\n— Phase 2: build + package + upload ZIPs via /api/admin/upload-package/:name');
 
 // Verify `zip` is available
 const which = spawnSync(process.platform === 'win32' ? 'where' : 'which', [ZIP], { encoding: 'utf8' });
@@ -143,20 +156,83 @@ if (which.status !== 0) {
   process.exit(1);
 }
 
+// Check if bun is available for bundling
+const hasBun = spawnSync(process.platform === 'win32' ? 'where' : 'which', [BUN], { encoding: 'utf8' }).status === 0;
+if (!hasBun && !noBuild) {
+  console.warn(`[warn] '${BUN}' not found on PATH — engine bundles will not be compiled (extensions will use TypeScript source). Set BUN= or pass --no-build to suppress this warning.`);
+}
+
+/**
+ * Bundle engine/index.ts → engine/index.js using bun build --bundle.
+ * Bundles hono/zod/kysely INTO the output so no module resolution is needed
+ * at runtime in the Bun compiled binary. peerDependencies are left external
+ * (the engine installs them at activation time via installNpmDependencies).
+ *
+ * Returns the path to the bundle on success, null on skip/failure.
+ */
+function buildEngineBundle(ext) {
+  if (noBuild || !hasBun) return null;
+  if (ext.contributes.engine === false) return null; // UI-only extension
+
+  const entryTs = join(ext.dir, 'engine', 'index.ts');
+  if (!existsSync(entryTs)) return null;
+
+  const outFile = join(ext.dir, 'engine', 'index.js');
+
+  // Mark peerDependencies as external — the engine installs them at runtime.
+  const externals = [];
+  for (const pkg of Object.keys(ext.peerDependencies)) {
+    externals.push('--external', pkg);
+  }
+
+  const buildArgs = [
+    'build', entryTs,
+    `--outfile=${outFile}`,
+    '--bundle',
+    '--minify',
+    '--format=esm',
+    '--target=bun',
+    ...externals,
+  ];
+
+  const result = spawnSync(BUN, buildArgs, { cwd: ext.dir, encoding: 'utf8' });
+  if (result.status !== 0) {
+    const msg = (result.stderr || result.stdout || '').trim().slice(0, 400);
+    console.warn(`  ! ${ext.name}: bun build failed — engine/index.js not included\n    ${msg}`);
+    return null;
+  }
+
+  return outFile;
+}
+
 let uploaded = 0;
 const uploadErrors = [];
 
 for (const ext of extensions) {
+  // Build self-contained JS bundle before zipping
+  const bundlePath = buildEngineBundle(ext);
+  if (bundlePath) {
+    const sizeKB = (statSync(bundlePath).size / 1024).toFixed(1);
+    process.stdout.write(`  [build] ${ext.name} → engine/index.js (${sizeKB} KB)\n`);
+  }
+
   const tmp = mkdtempSync(join(tmpdir(), 'zveltio-pkg-'));
   const zipPath = join(tmp, 'package.zip');
 
   // Build a clean ZIP of the extension dir contents (NO top-level folder),
   // excluding node_modules, .git, dist, *.log, etc.
+  // engine/index.js (the bundle) IS included if it was just built.
   const zipArgs = [
     '-r', '-q', zipPath, '.',
     '-x', 'node_modules/*', '-x', '.git/*', '-x', 'dist/*', '-x', '*.log', '-x', '.DS_Store',
   ];
   const zr = spawnSync(ZIP, zipArgs, { cwd: ext.dir, encoding: 'utf8' });
+
+  // Clean up the bundle AFTER zipping so it isn't left in the working tree
+  if (bundlePath && existsSync(bundlePath)) {
+    try { unlinkSync(bundlePath); } catch { /* ignore */ }
+  }
+
   if (zr.status !== 0) {
     const msg = (zr.stderr || zr.stdout || '').trim();
     console.error(`  ✗ ${ext.name}: zip failed — ${msg}`);

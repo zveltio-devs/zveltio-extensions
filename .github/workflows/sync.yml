@@ -16,6 +16,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies (needed to bundle extension engine code)
+        run: bun install
+
       - name: Determine version
         id: version
         run: |
