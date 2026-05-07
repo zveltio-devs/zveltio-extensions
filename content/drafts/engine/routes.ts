@@ -401,10 +401,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     await (db as any).updateTable(tableName).set({ ...draftData, updated_at: new Date() }).where('id', '=', draft.record_id).execute();
     await (db as any).updateTable('zv_content_drafts').set({ status: 'approved', published_at: new Date() }).where('id', '=', id).execute();
 
-    try {
-      const { broadcastEvent } = await import('../../../../packages/engine/src/routes/ws.js');
-      broadcastEvent(draft.collection, 'update', { record_id: draft.record_id, source: 'draft_publish', timestamp: Date.now() });
-    } catch { /* non-critical */ }
+    // WebSocket broadcast skipped — ctx.internals will expose broadcastEvent in a future release
 
     return c.json({ success: true, record_id: draft.record_id });
   });
