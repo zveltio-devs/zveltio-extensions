@@ -10,6 +10,15 @@
   "permissions": [
     "database"
   ],
+  "studio": {
+    "pages": [
+      {
+        "path": "/admin/compliance/ro/efactura",
+        "label": "e-Factura RO",
+        "icon": "receipt"
+      }
+    ]
+  },
   "contributes": {
     "engine": true,
     "studio": true,
