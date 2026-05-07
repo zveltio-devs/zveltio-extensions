@@ -7,7 +7,9 @@
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "2.0.0",
   "package": "@zveltio/ext-traceability",
-  "permissions": ["database"],
+  "permissions": [
+    "database"
+  ],
   "peerDependencies": {
     "qrcode": "^1.5.3",
     "pdfkit": "^0.15.0"
