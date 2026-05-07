@@ -1,0 +1,6 @@
+{
+  "name": "@zveltio/ext-saml-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module"
+}
