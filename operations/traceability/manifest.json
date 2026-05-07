@@ -14,6 +14,15 @@
     "qrcode": "^1.5.3",
     "pdfkit": "^0.15.0"
   },
+  "studio": {
+    "pages": [
+      {
+        "path": "/admin/traceability",
+        "label": "Traceability",
+        "icon": "scan-search"
+      }
+    ]
+  },
   "contributes": {
     "engine": true,
     "studio": true,

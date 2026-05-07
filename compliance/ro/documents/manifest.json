@@ -10,6 +10,15 @@
   "permissions": [
     "database"
   ],
+  "studio": {
+    "pages": [
+      {
+        "path": "/admin/compliance/ro/documents",
+        "label": "RO Documents",
+        "icon": "file-text"
+      }
+    ]
+  },
   "contributes": {
     "engine": true,
     "studio": true,
