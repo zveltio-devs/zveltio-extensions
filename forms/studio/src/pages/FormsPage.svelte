@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
+  const goto = (path: string) => { window.location.hash = path; };
   import { api } from '$lib/api.js';
 
   let forms = $state<any[]>([]);

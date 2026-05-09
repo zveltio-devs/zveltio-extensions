@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- Document signing requests
 CREATE TABLE IF NOT EXISTS zv_document_sign_requests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

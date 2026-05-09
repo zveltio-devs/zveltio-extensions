@@ -17,7 +17,7 @@ function buildListQuery(table: string, allowed: string[]) {
 }
 
 export function crmRoutes(ctx: ExtensionContext): Hono {
-  const { db, auth, checkPermission } = ctx;
+  const { db, auth, checkPermission, events } = ctx;
 
   const app = new Hono();
 
@@ -107,7 +107,9 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
            ${d.source ?? null}, ${JSON.stringify(d.metadata ?? {})}::jsonb, ${user.id})
         RETURNING *
       `.execute(db);
-      return c.json({ data: result.rows[0] }, 201);
+      const contact = result.rows[0] as any;
+      events.emit('contact.created', { id: contact.id, contact });
+      return c.json({ data: contact }, 201);
     },
   );
 
@@ -137,7 +139,9 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       if (!sets.length) return c.json({ error: 'No fields to update' }, 400);
       const result = await db.executeQuery({ sql: `UPDATE zvd_contacts SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] } as any);
       if (!(result as any).rows.length) return c.json({ error: 'Not found' }, 404);
-      return c.json({ data: (result as any).rows[0] });
+      const contact = (result as any).rows[0];
+      events.emit('contact.updated', { id: contact.id, contact });
+      return c.json({ data: contact });
     },
   );
 
@@ -153,6 +157,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'Forbidden' }, 403);
     }
     await sql`DELETE FROM zvd_contacts WHERE id = ${id}`.execute(db);
+    events.emit('contact.deleted', { id });
     return c.json({ success: true });
   });
 
@@ -232,7 +237,9 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
            ${JSON.stringify(d.metadata ?? {})}::jsonb, ${user.id})
         RETURNING *
       `.execute(db);
-      return c.json({ data: result.rows[0] }, 201);
+      const organization = result.rows[0] as any;
+      events.emit('organization.created', { id: organization.id, organization });
+      return c.json({ data: organization }, 201);
     },
   );
 
@@ -263,7 +270,9 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       if (!sets.length) return c.json({ error: 'No fields to update' }, 400);
       const result = await db.executeQuery({ sql: `UPDATE zvd_organizations SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] } as any);
       if (!(result as any).rows.length) return c.json({ error: 'Not found' }, 404);
-      return c.json({ data: (result as any).rows[0] });
+      const organization = (result as any).rows[0];
+      events.emit('organization.updated', { id: organization.id, organization });
+      return c.json({ data: organization });
     },
   );
 
@@ -279,6 +288,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'Forbidden' }, 403);
     }
     await sql`DELETE FROM zvd_organizations WHERE id = ${id}`.execute(db);
+    events.emit('organization.deleted', { id });
     return c.json({ success: true });
   });
 

@@ -213,10 +213,34 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
+
+    // If inventory extension is active, find/create the canonical product by SKU
+    // so storefront and inventory share one product identity. The ec_products row
+    // becomes a storefront overlay (slug, SEO, images) on top of the canonical row.
+    let canonicalProductId: string | null = null;
+    const findBySku = ctx.services.get<(sku: string) => Promise<any | null>>('inventory.products.findBySku');
+    if (findBySku) {
+      try {
+        const existing = await findBySku(d.sku);
+        if (existing) {
+          canonicalProductId = existing.id;
+        } else {
+          // Create canonical product directly via the extension's writable db
+          const create = await sql<any>`
+            INSERT INTO zvd_products (sku, name, description, price, currency, tax_rate, is_active)
+            VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === 'active'})
+            ON CONFLICT (sku) DO UPDATE SET name = EXCLUDED.name
+            RETURNING id
+          `.execute(db).catch(() => null);
+          canonicalProductId = create?.rows[0]?.id ?? null;
+        }
+      } catch { /* inventory may be unavailable; storefront-only product is fine */ }
+    }
+
     const row = await sql`
-      INSERT INTO zvd_ec_products (name, slug, sku, description, short_description, category_id, price, compare_price, cost, currency,
+      INSERT INTO zvd_ec_products (name, slug, sku, canonical_product_id, description, short_description, category_id, price, compare_price, cost, currency,
         tax_rate, stock_qty, track_stock, allow_backorder, weight, images, tags, attributes, status, is_featured, digital_file_url, created_by)
-      VALUES (${d.name}, ${d.slug}, ${d.sku}, ${d.description ?? null}, ${d.short_description ?? null}, ${d.category_id ?? null},
+      VALUES (${d.name}, ${d.slug}, ${d.sku}, ${canonicalProductId}, ${d.description ?? null}, ${d.short_description ?? null}, ${d.category_id ?? null},
         ${d.price}, ${d.compare_price ?? null}, ${d.cost ?? null}, ${d.currency}, ${d.tax_rate},
         ${d.stock_qty}, ${d.track_stock}, ${d.allow_backorder}, ${d.weight ?? null},
         ${JSON.stringify(d.images)}, ${JSON.stringify(d.tags)}, '{}', ${d.status}, ${d.is_featured},
@@ -459,11 +483,36 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     const total = Math.max(0, subtotal - discount + taxAmount + shippingCost);
     const cnt = await sql`SELECT COUNT(*) as cnt FROM zvd_ec_orders`.execute(db);
     const orderNumber = `ORD-${String(+(cnt.rows[0] as any).cnt + 1).padStart(6, '0')}`;
+
+    // If CRM is active, find or create a canonical contact for this order's email.
+    // The shopper becomes a CRM contact; future invoices, support tickets, marketing
+    // see the same identity.
+    let canonicalContactId: string | null = null;
+    if (d.customer_email) {
+      const lookup = ctx.services.get<(email: string) => Promise<any | null>>('crm.contacts.findByEmail');
+      const create = ctx.services.get<(input: any) => Promise<any>>('crm.contacts.create');
+      if (lookup && create) {
+        try {
+          let contact = await lookup(d.customer_email);
+          if (!contact) {
+            const [first_name, ...rest] = (d.customer_name || d.customer_email).split(' ');
+            contact = await create({
+              first_name: first_name || d.customer_email,
+              last_name: rest.join(' ') || null,
+              email: d.customer_email,
+              created_by: 'system',
+            });
+          }
+          canonicalContactId = contact?.id ?? null;
+        } catch { /* CRM may be temporarily unavailable */ }
+      }
+    }
+
     const order = await sql`
-      INSERT INTO zvd_ec_orders (order_number, customer_email, customer_name, billing_address, shipping_address,
+      INSERT INTO zvd_ec_orders (order_number, customer_email, customer_name, canonical_contact_id, billing_address, shipping_address,
         payment_method, currency, subtotal, shipping_cost, discount, tax_amount, total,
         coupon_code, shipping_zone_id, notes, created_by)
-      VALUES (${orderNumber}, ${d.customer_email}, ${d.customer_name}, ${JSON.stringify(d.billing_address)},
+      VALUES (${orderNumber}, ${d.customer_email}, ${d.customer_name}, ${canonicalContactId}, ${JSON.stringify(d.billing_address)},
         ${JSON.stringify(d.shipping_address)}, ${d.payment_method ?? null}, ${d.currency},
         ${subtotal}, ${shippingCost}, ${discount}, ${taxAmount}, ${total},
         ${couponCode}, ${shippingZoneId}, ${d.notes ?? null}, 'guest')

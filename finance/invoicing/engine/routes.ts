@@ -112,6 +112,23 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
+
+    // If client_id is provided, enrich client_name/email from CRM. CRM is optional —
+    // when not active, ctx.services.get returns null and we fall back to the values
+    // the caller provided.
+    let clientName = d.client_name;
+    let clientEmail = d.client_email;
+    if (d.client_id) {
+      const crmLookup = ctx.services.get<(idOrEmail: string) => Promise<any | null>>('crm.contacts.lookup');
+      if (crmLookup) {
+        const contact = await crmLookup(d.client_id).catch(() => null);
+        if (contact) {
+          clientName = clientName ?? `${contact.first_name ?? ''} ${contact.last_name ?? ''}`.trim();
+          clientEmail = clientEmail ?? contact.email ?? null;
+        }
+      }
+    }
+
     const number = await nextInvoiceNumber(db);
     const subtotalBeforeDiscount = d.lines.reduce((s, l) => s + l.quantity * l.unit_price, 0);
     const discount_amount = subtotalBeforeDiscount * (d.discount_percent / 100);
@@ -122,8 +139,8 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_invoices (number, client_id, client_type, client_name, client_email, client_address,
         issue_date, due_date, currency, subtotal, tax_rate, tax_amount, total, discount_amount, discount_percent,
         notes, footer_notes, po_number, recurring_interval, amount_paid, created_by)
-      VALUES (${number}, ${d.client_id ?? null}, ${d.client_type ?? null}, ${d.client_name},
-        ${d.client_email ?? null}, ${d.client_address ?? null},
+      VALUES (${number}, ${d.client_id ?? null}, ${d.client_type ?? null}, ${clientName},
+        ${clientEmail ?? null}, ${d.client_address ?? null},
         ${d.issue_date ?? new Date().toISOString().slice(0,10)}, ${d.due_date},
         ${d.currency}, ${subtotal}, ${d.tax_rate}, ${tax_amount}, ${total}, ${discount_amount},
         ${d.discount_percent}, ${d.notes ?? null}, ${d.footer_notes ?? null}, ${d.po_number ?? null},
@@ -131,20 +148,32 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
       RETURNING *
     `.execute(db);
     const invId = (inv.rows[0] as any).id;
+    const insertedLines: any[] = [];
     for (const line of d.lines) {
       const lineTotal = line.quantity * line.unit_price * (1 - d.discount_percent / 100) * (1 + line.tax_rate / 100);
-      await sql`
+      const lineRow = await sql`
         INSERT INTO zvd_invoice_lines (invoice_id, description, quantity, unit, unit_price, tax_rate, total, sort_order, metadata)
         VALUES (${invId}, ${line.description}, ${line.quantity}, ${line.unit ?? null}, ${line.unit_price}, ${line.tax_rate}, ${lineTotal}, ${line.sort_order}, ${JSON.stringify(line.metadata ?? {})}::jsonb)
+        RETURNING *
       `.execute(db);
+      insertedLines.push(lineRow.rows[0]);
     }
 
-    // Notify other extensions — generic event, invoicing does not know who listens
+    // Generic record event — for engine-level data hooks (audit, search index, etc.)
     ctx.events.emit('record.created', {
       collection: 'zvd_invoices',
       record: inv.rows[0],
       id: invId,
       userId: user.id,
+    });
+
+    // Domain event — semantically meaningful "an invoice was created". Other
+    // extensions (efactura, accounting, traceability) listen to this rather than
+    // grepping record.created for collection = zvd_invoices.
+    ctx.events.emit('invoice.created', {
+      id: invId,
+      invoice: inv.rows[0],
+      lines: insertedLines,
     });
 
     return c.json({ data: inv.rows[0] }, 201);

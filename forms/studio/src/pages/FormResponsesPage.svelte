@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
-  import { goto } from '$app/navigation';
+  const page = { url: { pathname: window.location.pathname }, params: Object.fromEntries(new URL(window.location.href).searchParams) };
+  const goto = (path: string) => { window.location.hash = path; };
   import { api } from '$lib/api.js';
 
   let form = $state<any>(null);

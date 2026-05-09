@@ -5,7 +5,7 @@ import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 export function employeesRoutes(ctx: ExtensionContext): Hono {
-  const { db, auth } = ctx;
+  const { db, auth, events } = ctx;
   const app = new Hono();
 
   app.use('*', async (c, next) => {
@@ -198,6 +198,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
         VALUES (${emp.id}, ${d.hire_date}, ${d.salary}, ${d.salary_type}, ${d.currency}, 'Initial salary', ${user.id})
       `.execute(db);
     }
+    events.emit('employee.created', { id: emp.id, employee: emp });
     return c.json({ data: emp }, 201);
   });
 
@@ -242,7 +243,9 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
       WHERE id = ${c.req.param('id')} RETURNING *
     `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
-    return c.json({ data: row.rows[0] });
+    const emp = row.rows[0] as any;
+    events.emit('employee.updated', { id: emp.id, employee: emp });
+    return c.json({ data: emp });
   });
 
   app.post('/:id/terminate', zValidator('json', z.object({
@@ -255,7 +258,9 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
       WHERE id = ${c.req.param('id')} AND status != 'terminated' RETURNING *
     `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Employee not found or already terminated' }, 400);
-    return c.json({ data: row.rows[0] });
+    const emp = row.rows[0] as any;
+    events.emit('employee.terminated', { id: emp.id, employee: emp, end_date: d.end_date });
+    return c.json({ data: emp });
   });
 
   // ── Org chart ──────────────────────────────────────────────────

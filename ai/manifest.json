@@ -1,0 +1,21 @@
+{
+  "name": "ai",
+  "displayName": "AI",
+  "category": "intelligence",
+  "description": "AI capabilities: providers, chat, embeddings, semantic search, text-to-SQL, schema generation, agentic workflows.",
+  "version": "1.0.0",
+  "zveltioMinVersion": "1.0.0-alpha.67",
+  "package": "@zveltio/ext-ai",
+  "permissions": ["database", "settings", "network"],
+  "contributes": {
+    "engine": true,
+    "studio": true,
+    "fieldTypes": [],
+    "stepTypes": ["ai_decision"]
+  },
+  "studio": {
+    "pages": [
+      { "path": "/admin/ai", "label": "AI", "icon": "Bot" }
+    ]
+  }
+}

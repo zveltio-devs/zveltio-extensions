@@ -3,7 +3,7 @@
   import { Settings, Save, RefreshCw, Shield, Mail } from '@lucide/svelte';
   import PageHeader from '$lib/components/common/PageHeader.svelte';
   import Breadcrumb from '$lib/components/common/Breadcrumb.svelte';
-  import { base } from '$app/paths';
+  const base = '';
 
   let loading = $state(true);
   let saving = $state(false);

@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- Cloud Storage Extension
 -- File versioning, soft-delete trash bin, and public share links
 

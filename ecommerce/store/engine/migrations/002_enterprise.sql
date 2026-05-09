@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- Product variants (size, color, etc.)
 CREATE TABLE IF NOT EXISTS zvd_ec_product_variants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
