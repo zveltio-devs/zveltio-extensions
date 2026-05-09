@@ -10,3 +10,4 @@ bun.lock
 # Without them the engine cannot serve extension Studio pages.
 !**/studio/dist/
 !**/studio/dist/bundle.js
+!**/studio/dist/*.css

@@ -12,3 +12,5 @@ export default function register() {
     category: 'crm',
   });
 }
+
+register();
