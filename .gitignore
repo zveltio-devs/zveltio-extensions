@@ -5,3 +5,8 @@ build/
 .env.*
 *.local
 bun.lock
+
+# Ship pre-built Studio bundles — deployment artifact for extension UIs.
+# Without them the engine cannot serve extension Studio pages.
+!**/studio/dist/
+!**/studio/dist/bundle.js
