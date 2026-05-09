@@ -16,6 +16,13 @@ CREATE TABLE IF NOT EXISTS zvd_contacts (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Upgrade: add columns missing from pre-extension zvd_contacts schema
+ALTER TABLE zvd_contacts ADD COLUMN IF NOT EXISTS organization_id UUID;
+ALTER TABLE zvd_contacts ADD COLUMN IF NOT EXISTS owner_id TEXT;
+ALTER TABLE zvd_contacts ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE zvd_contacts ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE zvd_contacts ADD COLUMN IF NOT EXISTS created_by TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_crm_contacts_owner ON zvd_contacts(owner_id);
 CREATE INDEX IF NOT EXISTS idx_crm_contacts_org ON zvd_contacts(organization_id);
 CREATE INDEX IF NOT EXISTS idx_crm_contacts_email ON zvd_contacts(email);
@@ -35,11 +42,20 @@ CREATE TABLE IF NOT EXISTS zvd_organizations (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Upgrade: add columns missing from pre-extension zvd_organizations schema
+ALTER TABLE zvd_organizations ADD COLUMN IF NOT EXISTS owner_id TEXT;
+ALTER TABLE zvd_organizations ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE zvd_organizations ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE zvd_organizations ADD COLUMN IF NOT EXISTS created_by TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_crm_orgs_owner ON zvd_organizations(owner_id);
 
-ALTER TABLE zvd_contacts
-  ADD CONSTRAINT fk_crm_contact_org
-  FOREIGN KEY (organization_id) REFERENCES zvd_organizations(id) ON DELETE SET NULL;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_crm_contact_org') THEN
+    ALTER TABLE zvd_contacts ADD CONSTRAINT fk_crm_contact_org
+      FOREIGN KEY (organization_id) REFERENCES zvd_organizations(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS zvd_transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -60,6 +76,19 @@ CREATE TABLE IF NOT EXISTS zvd_transactions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Upgrade: add columns missing from pre-extension zvd_transactions schema
+ALTER TABLE zvd_transactions ADD COLUMN IF NOT EXISTS name TEXT;
+ALTER TABLE zvd_transactions ADD COLUMN IF NOT EXISTS owner_id TEXT;
+ALTER TABLE zvd_transactions ADD COLUMN IF NOT EXISTS contact_id UUID;
+ALTER TABLE zvd_transactions ADD COLUMN IF NOT EXISTS organization_id UUID;
+ALTER TABLE zvd_transactions ADD COLUMN IF NOT EXISTS pipeline_stage_id UUID;
+ALTER TABLE zvd_transactions ADD COLUMN IF NOT EXISTS stage_changed_at TIMESTAMPTZ;
+ALTER TABLE zvd_transactions ADD COLUMN IF NOT EXISTS expected_close_date DATE;
+ALTER TABLE zvd_transactions ADD COLUMN IF NOT EXISTS lead_score INT NOT NULL DEFAULT 0;
+ALTER TABLE zvd_transactions ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE zvd_transactions ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE zvd_transactions ADD COLUMN IF NOT EXISTS created_by TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_crm_txn_owner ON zvd_transactions(owner_id);
 CREATE INDEX IF NOT EXISTS idx_crm_txn_contact ON zvd_transactions(contact_id);

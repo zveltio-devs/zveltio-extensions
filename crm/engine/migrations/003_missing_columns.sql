@@ -26,8 +26,16 @@ ALTER TABLE zvd_organizations
   ADD COLUMN IF NOT EXISTS email            TEXT,
   ADD COLUMN IF NOT EXISTS metadata         JSONB NOT NULL DEFAULT '{}';
 
--- zvd_transactions: name was NOT NULL but routes never supply it — relax constraint
-ALTER TABLE zvd_transactions ALTER COLUMN name DROP NOT NULL;
+-- zvd_transactions: name was NOT NULL in the old core schema — relax it, but only if
+-- the column exists (on pre-extension installs name may not exist at all).
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'zvd_transactions' AND column_name = 'name'
+  ) THEN
+    ALTER TABLE zvd_transactions ALTER COLUMN name DROP NOT NULL;
+  END IF;
+END $$;
 
 -- Remove old status CHECK (open/won/lost/on_hold) so routes can use draft/pending/completed/cancelled/refunded
 ALTER TABLE zvd_transactions DROP CONSTRAINT IF EXISTS zvd_transactions_status_check;
