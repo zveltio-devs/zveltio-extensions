@@ -1,0 +1,84 @@
+$ vite build
+22:13:58 [vite-plugin-svelte] no Svelte config found at C:/Users/Liviu/zveltio-ecosystem/zveltio-extensions/operations/assets/studio - using default configuration.
+[36mvite v6.4.2 [32mbuilding for production...[36m[39m
+transforming...
+22:13:58 [vite-plugin-svelte] src/pages/Page.svelte:106:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+104: 
+105: {#if showForm}
+106:   <div class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onclick={(e) => e.target === e.currentTarget && (showForm = false)}>
+             ^
+107:     <div class="bg-base-100 rounded-xl p-6 w-full max-w-md">
+108:       <div class="flex items-center justify-between mb-4"><h2 class="text-xl font-semibold">New asset</h2><button class="btn btn-ghost btn-sm btn-square" onclick={() => (showForm = false)}><X class="h-4 w-4" /></button></div>
+22:13:58 [vite-plugin-svelte] src/pages/Page.svelte:106:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+104: 
+105: {#if showForm}
+106:   <div class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onclick={(e) => e.target === e.currentTarget && (showForm = false)}>
+             ^
+107:     <div class="bg-base-100 rounded-xl p-6 w-full max-w-md">
+108:       <div class="flex items-center justify-between mb-4"><h2 class="text-xl font-semibold">New asset</h2><button class="btn btn-ghost btn-sm btn-square" onclick={() => (showForm = false)}><X class="h-4 w-4" /></button></div>
+22:13:58 [vite-plugin-svelte] src/pages/Page.svelte:110:32 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+108:       <div class="flex items-center justify-between mb-4"><h2 class="text-xl font-semibold">New asset</h2><button class="btn btn-ghost btn-sm btn-square" onclick={() => (showForm = false)}><X class="h-4 w-4" /></button></div>
+109:       <div class="grid grid-cols-2 gap-3">
+110:         <div class="col-span-1"><label class="label label-text">Tag</label><input class="input input-bordered w-full font-mono" bind:value={form.asset_tag} /></div>
+                                                                                ^
+111:         <div class="col-span-1"><label class="label label-text">Category</label><select class="select select-bordered w-full" bind:value={form.category}><option value="equipment">Equipment</option><option value="vehicle">Vehicle</option><option value="building">Building</option><option value="furniture">Furniture</option><option value="other">Other</option></select></div>
+112:         <div class="col-span-2"><label class="label label-text">Name</label><input class="input input-bordered w-full" bind:value={form.name} /></div>
+22:13:58 [vite-plugin-svelte] src/pages/Page.svelte:111:32 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+109:       <div class="grid grid-cols-2 gap-3">
+110:         <div class="col-span-1"><label class="label label-text">Tag</label><input class="input input-bordered w-full font-mono" bind:value={form.asset_tag} /></div>
+111:         <div class="col-span-1"><label class="label label-text">Category</label><select class="select select-bordered w-full" bind:value={form.category}><option value="equipment">Equipment</option><option value="vehicle">Vehicle</option><option value="building">Building</option><option value="furniture">Furniture</option><option value="other">Other</option></select></div>
+                                                                                     ^
+112:         <div class="col-span-2"><label class="label label-text">Name</label><input class="input input-bordered w-full" bind:value={form.name} /></div>
+113:         <div><label class="label label-text">Acquired</label><input type="date" class="input input-bordered w-full" bind:value={form.purchase_date} /></div>
+22:13:58 [vite-plugin-svelte] src/pages/Page.svelte:112:32 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+110:         <div class="col-span-1"><label class="label label-text">Tag</label><input class="input input-bordered w-full font-mono" bind:value={form.asset_tag} /></div>
+111:         <div class="col-span-1"><label class="label label-text">Category</label><select class="select select-bordered w-full" bind:value={form.category}><option value="equipment">Equipment</option><option value="vehicle">Vehicle</option><option value="building">Building</option><option value="furniture">Furniture</option><option value="other">Other</option></select></div>
+112:         <div class="col-span-2"><label class="label label-text">Name</label><input class="input input-bordered w-full" bind:value={form.name} /></div>
+                                                                                 ^
+113:         <div><label class="label label-text">Acquired</label><input type="date" class="input input-bordered w-full" bind:value={form.purchase_date} /></div>
+114:         <div><label class="label label-text">Useful life (years)</label><input type="number" class="input input-bordered w-full" bind:value={form.useful_life_years} /></div>
+22:13:58 [vite-plugin-svelte] src/pages/Page.svelte:113:13 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+111:         <div class="col-span-1"><label class="label label-text">Category</label><select class="select select-bordered w-full" bind:value={form.category}><option value="equipment">Equipment</option><option value="vehicle">Vehicle</option><option value="building">Building</option><option value="furniture">Furniture</option><option value="other">Other</option></select></div>
+112:         <div class="col-span-2"><label class="label label-text">Name</label><input class="input input-bordered w-full" bind:value={form.name} /></div>
+113:         <div><label class="label label-text">Acquired</label><input type="date" class="input input-bordered w-full" bind:value={form.purchase_date} /></div>
+                                                                  ^
+114:         <div><label class="label label-text">Useful life (years)</label><input type="number" class="input input-bordered w-full" bind:value={form.useful_life_years} /></div>
+115:         <div><label class="label label-text">Cost</label><input type="number" step="0.01" class="input input-bordered w-full" bind:value={form.purchase_cost} /></div>
+22:13:58 [vite-plugin-svelte] src/pages/Page.svelte:114:13 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+112:         <div class="col-span-2"><label class="label label-text">Name</label><input class="input input-bordered w-full" bind:value={form.name} /></div>
+113:         <div><label class="label label-text">Acquired</label><input type="date" class="input input-bordered w-full" bind:value={form.purchase_date} /></div>
+114:         <div><label class="label label-text">Useful life (years)</label><input type="number" class="input input-bordered w-full" bind:value={form.useful_life_years} /></div>
+                                                                             ^
+115:         <div><label class="label label-text">Cost</label><input type="number" step="0.01" class="input input-bordered w-full" bind:value={form.purchase_cost} /></div>
+116:         <div><label class="label label-text">Currency</label><input class="input input-bordered w-full" bind:value={form.currency} maxlength="3" /></div>
+22:13:58 [vite-plugin-svelte] src/pages/Page.svelte:115:13 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+113:         <div><label class="label label-text">Acquired</label><input type="date" class="input input-bordered w-full" bind:value={form.purchase_date} /></div>
+114:         <div><label class="label label-text">Useful life (years)</label><input type="number" class="input input-bordered w-full" bind:value={form.useful_life_years} /></div>
+115:         <div><label class="label label-text">Cost</label><input type="number" step="0.01" class="input input-bordered w-full" bind:value={form.purchase_cost} /></div>
+                                                              ^
+116:         <div><label class="label label-text">Currency</label><input class="input input-bordered w-full" bind:value={form.currency} maxlength="3" /></div>
+117:         <div class="col-span-2"><label class="label label-text">Depreciation method</label><select class="select select-bordered w-full" bind:value={form.depreciation_method}><option value="straight_line">Straight line</option><option value="declining_balance">Declining balance</option></select></div>
+22:13:58 [vite-plugin-svelte] src/pages/Page.svelte:116:13 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+114:         <div><label class="label label-text">Useful life (years)</label><input type="number" class="input input-bordered w-full" bind:value={form.useful_life_years} /></div>
+115:         <div><label class="label label-text">Cost</label><input type="number" step="0.01" class="input input-bordered w-full" bind:value={form.purchase_cost} /></div>
+116:         <div><label class="label label-text">Currency</label><input class="input input-bordered w-full" bind:value={form.currency} maxlength="3" /></div>
+                                                                  ^
+117:         <div class="col-span-2"><label class="label label-text">Depreciation method</label><select class="select select-bordered w-full" bind:value={form.depreciation_method}><option value="straight_line">Straight line</option><option value="declining_balance">Declining balance</option></select></div>
+118:       </div>
+22:13:58 [vite-plugin-svelte] src/pages/Page.svelte:117:32 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+115:         <div><label class="label label-text">Cost</label><input type="number" step="0.01" class="input input-bordered w-full" bind:value={form.purchase_cost} /></div>
+116:         <div><label class="label label-text">Currency</label><input class="input input-bordered w-full" bind:value={form.currency} maxlength="3" /></div>
+117:         <div class="col-span-2"><label class="label label-text">Depreciation method</label><select class="select select-bordered w-full" bind:value={form.depreciation_method}><option value="straight_line">Straight line</option><option value="declining_balance">Declining balance</option></select></div>
+                                                                                                ^
+118:       </div>
+119:       <div class="flex justify-end gap-2 mt-4"><button class="btn btn-ghost" onclick={() => (showForm = false)}>Cancel</button><button class="btn btn-primary" disabled={saving || !form.name || !form.asset_tag} onclick={createAsset}>{saving ? 'Saving…' : 'Create'}</button></div>

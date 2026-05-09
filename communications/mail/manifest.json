@@ -11,6 +11,9 @@
     "database",
     "settings"
   ],
+  "dependencies": [
+    { "name": "ai", "minVersion": "1.0.0" }
+  ],
   "peerDependencies": {
     "imapflow": "^1.0.0",
     "mailparser": "^3.6.0",

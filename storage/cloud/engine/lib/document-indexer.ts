@@ -1,6 +1,10 @@
 import { sql } from 'kysely';
-import type { Database } from '../../db/index.js';
-import { aiProviderManager } from '../ai-provider.js';
+
+// AI provider lookup is injected by callers — extensions don't import directly
+// from other extensions; this file is invoked from extension routes that have
+// `ctx.services.get('ai.providers')`.
+type Database = any;
+type AIProviders = { getDefault(): { embed?: Function } | null } | null;
 
 const INDEXABLE_MIMES = [
   'text/plain', 'text/markdown', 'text/csv', 'text/html',
@@ -15,12 +19,13 @@ const INDEXABLE_MIMES = [
  */
 export async function indexFileContent(
   db: Database,
+  aiProviders: AIProviders,
   fileId: string,
   content: string,
 ): Promise<void> {
   if (!content.trim()) return;
 
-  const provider = aiProviderManager.getDefault();
+  const provider = aiProviders?.getDefault?.();
   if (!provider?.embed) return;
 
   try {
@@ -84,6 +89,7 @@ export async function extractTextFromFile(
  */
 export async function scheduleFileIndexing(
   db: Database,
+  aiProviders: AIProviders,
   fileId: string,
   buffer: Buffer,
   mimeType: string,
@@ -91,7 +97,7 @@ export async function scheduleFileIndexing(
   if (!INDEXABLE_MIMES.some(m => mimeType.startsWith(m.split('/')[0]) || mimeType === m)) return;
 
   extractTextFromFile(buffer, mimeType).then(async (text) => {
-    if (text) await indexFileContent(db, fileId, text);
+    if (text) await indexFileContent(db, aiProviders, fileId, text);
   }).catch(err => {
     console.error(`File indexing schedule failed [${fileId}]:`, err);
   });

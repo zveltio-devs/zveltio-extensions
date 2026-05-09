@@ -10,6 +10,9 @@
   "permissions": [
     "database"
   ],
+  "dependencies": [
+    { "name": "finance/accounting", "minVersion": "1.0.0" }
+  ],
   "contributes": {
     "engine": true,
     "studio": true,

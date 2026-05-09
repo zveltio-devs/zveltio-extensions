@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- Quote revisions
 CREATE TABLE IF NOT EXISTS zvd_quote_revisions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

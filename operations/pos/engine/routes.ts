@@ -36,10 +36,40 @@ export function posRoutes(ctx: ExtensionContext): Hono {
     notes: z.string().optional(),
   })), async (c) => {
     const d = c.req.valid('json');
+
+    // If CRM is active, look up an existing canonical contact by email.
+    // If none exists, create one. Then link it on the POS customer.
+    let canonicalContactId: string | null = null;
+    if (d.email) {
+      const lookup = ctx.services.get<(idOrEmail: string) => Promise<any | null>>('crm.contacts.findByEmail');
+      const create = ctx.services.get<(input: any) => Promise<any>>('crm.contacts.create');
+      if (lookup && create) {
+        try {
+          let contact = await lookup(d.email);
+          if (!contact) {
+            const [first_name, ...rest] = (d.name || '').split(' ');
+            contact = await create({
+              first_name: first_name || d.name,
+              last_name: rest.join(' ') || null,
+              email: d.email,
+              phone: d.phone,
+              created_by: 'system',
+            });
+          }
+          canonicalContactId = contact?.id ?? null;
+        } catch {
+          // CRM call failed — POS still functional, just unlinked
+        }
+      }
+    }
+
     const row = await sql`
-      INSERT INTO zvd_pos_customers (name, email, phone, notes)
-      VALUES (${d.name}, ${d.email ?? null}, ${d.phone ?? null}, ${d.notes ?? null})
-      ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name, phone = EXCLUDED.phone
+      INSERT INTO zvd_pos_customers (name, email, phone, notes, canonical_contact_id)
+      VALUES (${d.name}, ${d.email ?? null}, ${d.phone ?? null}, ${d.notes ?? null}, ${canonicalContactId})
+      ON CONFLICT (email) DO UPDATE SET
+        name = EXCLUDED.name,
+        phone = EXCLUDED.phone,
+        canonical_contact_id = COALESCE(zvd_pos_customers.canonical_contact_id, EXCLUDED.canonical_contact_id)
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
@@ -202,16 +232,52 @@ export function posRoutes(ctx: ExtensionContext): Hono {
     }
     const total = Math.max(0, subtotal + tax_amount - loyalty_discount);
     const earnedPoints = Math.floor(total * POINTS_PER_CURRENCY_UNIT);
+
+    // Resolve canonical contact id from the POS customer (if linked).
+    let canonicalContactId: string | null = null;
+    let customerName: string | null = null;
+    if (d.customer_id) {
+      const c2 = await sql<any>`SELECT name, canonical_contact_id FROM zvd_pos_customers WHERE id = ${d.customer_id}`.execute(db);
+      canonicalContactId = c2.rows[0]?.canonical_contact_id ?? null;
+      customerName = c2.rows[0]?.name ?? null;
+    }
+
     const order = await sql`
-      INSERT INTO zvd_pos_orders (session_id, cashier_id, payment_method, customer_id, customer_name, subtotal, tax_amount, total, loyalty_discount, loyalty_points_earned, loyalty_points_redeemed, notes, status)
-      VALUES (${d.session_id}, ${user.id}, ${d.payment_method}, ${d.customer_id ?? null}, ${null}, ${subtotal}, ${tax_amount}, ${total}, ${loyalty_discount}, ${earnedPoints}, ${redeemedPoints}, ${d.notes ?? null}, 'completed')
+      INSERT INTO zvd_pos_orders (session_id, cashier_id, payment_method, customer_id, customer_name, canonical_contact_id, subtotal, tax_amount, total, loyalty_discount, loyalty_points_earned, loyalty_points_redeemed, notes, status)
+      VALUES (${d.session_id}, ${user.id}, ${d.payment_method}, ${d.customer_id ?? null}, ${customerName}, ${canonicalContactId}, ${subtotal}, ${tax_amount}, ${total}, ${loyalty_discount}, ${earnedPoints}, ${redeemedPoints}, ${d.notes ?? null}, 'completed')
       RETURNING *
     `.execute(db);
     const orderId = (order.rows[0] as any).id;
+
+    // Drive stock movements via the inventory service when active. This keeps the
+    // canonical inventory in sync with POS sales without POS owning warehouses.
+    const inventoryMove = ctx.services.get<(input: any) => Promise<{ balance: number }>>('inventory.stock.move');
+    const lookupProduct = ctx.services.get<(idOrSku: string) => Promise<any | null>>('inventory.products.lookup');
+
     for (const line of d.lines) {
       const lineTotal = line.quantity * line.unit_price * (1 - line.discount / 100) * (1 + line.tax_rate / 100);
       await sql`INSERT INTO zvd_pos_order_lines (order_id, product_id, product_name, quantity, unit_price, tax_rate, discount, total) VALUES (${orderId}, ${line.product_id ?? null}, ${line.product_name}, ${line.quantity}, ${line.unit_price}, ${line.tax_rate}, ${line.discount}, ${lineTotal})`.execute(db);
+
+      // Decrement stock if inventory is connected and the line has a product id.
+      if (line.product_id && inventoryMove && lookupProduct) {
+        try {
+          // Find the default warehouse for the session, if any. Falls back to first warehouse.
+          const wh = await sql<any>`SELECT warehouse_id FROM zvd_pos_sessions WHERE id = ${d.session_id}`.execute(db);
+          const warehouseId = wh.rows[0]?.warehouse_id;
+          if (warehouseId) {
+            await inventoryMove({
+              productId: line.product_id,
+              warehouseId,
+              qty: line.quantity,
+              type: 'out',
+              reference: `pos:order:${orderId}`,
+              reason: `POS sale ${line.product_name}`,
+            }).catch(() => {});
+          }
+        } catch { /* non-fatal */ }
+      }
     }
+
     if (d.customer_id) {
       const pointDelta = earnedPoints - redeemedPoints;
       await sql`UPDATE zvd_pos_customers SET loyalty_points = loyalty_points + ${pointDelta}, total_spent = total_spent + ${total}, visit_count = visit_count + 1, updated_at = NOW() WHERE id = ${d.customer_id}`.execute(db);

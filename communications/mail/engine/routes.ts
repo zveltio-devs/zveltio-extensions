@@ -18,7 +18,9 @@ import type { ExtensionContext } from '@zveltio/sdk/extension';
  */
 export function mailRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
-  const { aiProviderManager } = ctx.internals;
+  // AI access goes through the cross-extension service registry. Returns null
+  // if the `ai` extension isn't active — AI compose/summarize endpoints will 503.
+  const aiProviderManager = ctx.services.get<{ getDefault(): any }>('ai.providers');
 
   const app = new Hono();
 
@@ -389,7 +391,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     if (!msgResult.rows[0]) return c.json({ error: 'Not found' }, 404);
     const { subject, body_text } = msgResult.rows[0] as any;
 
-    const provider = aiProviderManager.getDefault();
+    const provider = aiProviderManager?.getDefault?.();
     if (!provider?.chat) return c.json({ error: 'No AI provider configured' }, 503);
 
     const result = await provider.chat([
@@ -412,7 +414,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     if (!msgResult.rows[0]) return c.json({ error: 'Not found' }, 404);
     const { subject, body_text, from_address, from_name } = msgResult.rows[0] as any;
 
-    const provider = aiProviderManager.getDefault();
+    const provider = aiProviderManager?.getDefault?.();
     if (!provider?.chat) return c.json({ error: 'No AI provider configured' }, 503);
 
     const result = await provider.chat([

@@ -216,7 +216,7 @@ export default async function handler(ctx) {
  id="invoke-body"
 bind:value={invokeInput}
  class="textarea textarea-sm font-mono flex-1 resize-none text-xs"
- placeholder="{}"
+ placeholder={'{}'}
  ></textarea>
  <button
  class="btn btn-primary btn-sm mt-3 gap-1 w-full"

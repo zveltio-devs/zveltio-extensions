@@ -80,8 +80,8 @@
   {:else}
     <section class="chart-section">
       <h2>API Calls — Last 30 Days</h2>
+      {#if chartData().points}
       {@const chart = chartData()}
-      {#if chart.points}
         <div class="chart-wrapper">
           <svg viewBox="0 0 600 200" class="line-chart" aria-label="API calls chart">
             <!-- Grid lines -->

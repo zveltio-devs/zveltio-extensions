@@ -10,6 +10,10 @@
   "permissions": [
     "database"
   ],
+  "dependencies": [
+    { "name": "hr/employees",      "minVersion": "1.0.0" },
+    { "name": "finance/invoicing", "minVersion": "1.0.0" }
+  ],
   "contributes": {
     "engine": true,
     "studio": true,

@@ -2,9 +2,12 @@
   "name": "zveltio-extensions",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "bun@1.3.13",
   "description": "Official Zveltio extensions — analytics, auth, automation, communications, compliance, content, CRM, data, developer tools, geospatial, i18n, multitenancy, operations, storage, workflow.",
   "workspaces": [
-    "*/*/studio"
+    "*/studio",
+    "*/*/studio",
+    "*/*/*/studio"
   ],
   "scripts": {
     "build": "turbo run build",
