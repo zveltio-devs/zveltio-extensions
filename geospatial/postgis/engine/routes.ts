@@ -2,8 +2,6 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import { checkPermission } from '@zveltio/engine/lib/permissions.js';
-import { DDLManager } from '@zveltio/engine/lib/ddl-manager.js';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 async function getUser(c: any, auth: any) {
@@ -26,14 +24,19 @@ function safeFieldList(fields: string[] | undefined): ReturnType<typeof sql.raw>
   return sql.raw(fields.map(f => `"${f}"`).join(', ')) as any;
 }
 
-async function resolveCollection(db: any, userId: string, collection: string): Promise<string | null> {
+async function resolveCollection(ctx: ExtensionContext, userId: string, collection: string): Promise<string | null> {
   const shortName = collection.startsWith('zvd_') ? collection.slice(4) : collection;
   if (!/^[a-z][a-z0-9_]*$/.test(shortName)) return null;
-  const exists = await DDLManager.tableExists(db, shortName).catch(() => false);
+  const tableName = `zvd_${shortName}`;
+  const exists = await sql<{ exists: boolean }>`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.tables WHERE table_name = ${tableName}
+    ) AS exists
+  `.execute(ctx.db).then(r => r.rows[0]?.exists ?? false).catch(() => false);
   if (!exists) return null;
-  const canRead = await checkPermission(userId, `data:${shortName}`, 'read').catch(() => false);
+  const canRead = await (ctx.checkPermission as any)(userId, `data:${shortName}`, 'read').catch(() => false);
   if (!canRead) return null;
-  return DDLManager.getTableName(shortName);
+  return tableName;
 }
 
 const latLng = z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) });
@@ -60,7 +63,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
       const { collection, location_field, lat, lng, radius_meters, limit, fields } = c.req.valid('json');
-      const tableName = await resolveCollection(db, user.id, collection);
+      const tableName = await resolveCollection(ctx, user.id, collection);
       if (!tableName) return c.json({ error: 'Collection not found or access denied' }, 403);
 
       let fieldListSql: any;
@@ -100,7 +103,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
       const { collection, location_field, min_lat, min_lng, max_lat, max_lng, limit } = c.req.valid('json');
-      const tableName = await resolveCollection(db, user.id, collection);
+      const tableName = await resolveCollection(ctx, user.id, collection);
       if (!tableName) return c.json({ error: 'Collection not found or access denied' }, 403);
 
       let locationRef: any;
@@ -130,7 +133,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
       const { collection, location_field, eps_meters, min_points } = c.req.valid('json');
-      const tableName = await resolveCollection(db, user.id, collection);
+      const tableName = await resolveCollection(ctx, user.id, collection);
       if (!tableName) return c.json({ error: 'Collection not found or access denied' }, 403);
 
       let locationRef: any;
@@ -246,7 +249,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
       const { collection, location_field, limit } = c.req.valid('json');
-      const tableName = await resolveCollection(db, user.id, collection);
+      const tableName = await resolveCollection(ctx, user.id, collection);
       if (!tableName) return c.json({ error: 'Collection not found or access denied' }, 403);
 
       let locationRef: any;

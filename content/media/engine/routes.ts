@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { nanoid } from 'nanoid';
+import { randomUUID } from 'crypto';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 // @ts-ignore — cloud/trash is an optional extension
@@ -54,7 +54,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
       const user = c.get('user' as never) as any;
       const data = c.req.valid('json');
       const folder = {
-        id: nanoid(21),
+        id: randomUUID().replace(/-/g, ''),
         name: data.name,
         parent_id: data.parent_id || null,
         description: data.description || null,
@@ -232,7 +232,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'Storage quota exceeded' }, 413);
     }
 
-    const fileId = nanoid(21);
+    const fileId = randomUUID().replace(/-/g, '');
     const ext = file.name.split('.').pop();
     const filename = `${fileId}.${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -382,7 +382,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     })),
     async (c) => {
       const data = c.req.valid('json');
-      const tag = { id: nanoid(21), name: data.name, color: data.color || null };
+      const tag = { id: randomUUID().replace(/-/g, ''), name: data.name, color: data.color || null };
       try {
         await (db as any).insertInto('zv_media_tags').values(tag).execute();
         return c.json({ tag }, 201);

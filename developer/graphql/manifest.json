@@ -10,6 +10,9 @@
   "permissions": [
     "database"
   ],
+  "peerDependencies": {
+    "graphql": "^16.0.0"
+  },
   "contributes": {
     "engine": true,
     "studio": false

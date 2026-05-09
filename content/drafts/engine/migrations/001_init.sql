@@ -34,6 +34,19 @@ CREATE TABLE IF NOT EXISTS zv_publish_schedule (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Upgrade: add missing columns to existing tables from pre-extension schema
+ALTER TABLE zv_content_drafts ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'draft';
+ALTER TABLE zv_content_drafts ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE zv_content_drafts ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ;
+ALTER TABLE zv_content_drafts ADD COLUMN IF NOT EXISTS reviewed_by TEXT;
+ALTER TABLE zv_content_drafts ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+ALTER TABLE zv_content_drafts ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ;
+ALTER TABLE zv_collection_publish_settings ADD COLUMN IF NOT EXISTS require_review BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE zv_collection_publish_settings ADD COLUMN IF NOT EXISTS allow_self_publish BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE zv_collection_publish_settings ADD COLUMN IF NOT EXISTS notify_roles TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE zv_publish_schedule ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending';
+ALTER TABLE zv_publish_schedule ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ;
+
 CREATE INDEX IF NOT EXISTS idx_drafts_collection_record ON zv_content_drafts(collection, record_id);
 CREATE INDEX IF NOT EXISTS idx_drafts_status ON zv_content_drafts(status);
 CREATE INDEX IF NOT EXISTS idx_publish_schedule_pending ON zv_publish_schedule(scheduled_at) WHERE status = 'pending';

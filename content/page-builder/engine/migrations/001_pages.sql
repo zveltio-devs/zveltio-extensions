@@ -4,16 +4,24 @@ CREATE TABLE IF NOT EXISTS zv_pages (
   title       TEXT NOT NULL,
   slug        TEXT NOT NULL UNIQUE,
   description TEXT,
-  status      TEXT NOT NULL DEFAULT 'draft',  -- draft, published, archived
+  status      TEXT NOT NULL DEFAULT 'draft',
   template    TEXT NOT NULL DEFAULT 'default',
-  blocks      JSONB NOT NULL DEFAULT '[]',    -- ordered array of block objects
-  meta        JSONB NOT NULL DEFAULT '{}',    -- SEO meta: og_title, og_image, etc.
+  blocks      JSONB NOT NULL DEFAULT '[]',
+  meta        JSONB NOT NULL DEFAULT '{}',
   published_at TIMESTAMPTZ,
   created_by  UUID,
   updated_by  UUID,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Upgrade: add columns missing from pre-extension zv_pages schema
+ALTER TABLE zv_pages ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'draft';
+ALTER TABLE zv_pages ADD COLUMN IF NOT EXISTS template TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE zv_pages ADD COLUMN IF NOT EXISTS blocks JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE zv_pages ADD COLUMN IF NOT EXISTS meta JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE zv_pages ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ;
+ALTER TABLE zv_pages ADD COLUMN IF NOT EXISTS updated_by UUID;
 
 -- Page block type library
 CREATE TABLE IF NOT EXISTS zv_page_block_types (
