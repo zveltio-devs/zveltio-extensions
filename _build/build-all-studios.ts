@@ -18,7 +18,7 @@ import { join, relative } from 'path';
 const ROOT = join(import.meta.dir, '..');
 const ONLY = process.argv[2];
 
-// ── Correct vite.config.ts template ───────────────────────────────────────────
+// ── Correct vite.config.ts template (ESM format, import map for Svelte) ──────
 function makeViteConfig(libAlias: string | null, libName: string): string {
   const aliasBlock = libAlias
     ? `  resolve: {
@@ -37,24 +37,12 @@ ${aliasBlock}  build: {
     lib: {
       entry: 'src/index.ts',
       name: '${libName}',
-      formats: ['iife'],
+      formats: ['es'],
       fileName: () => 'bundle.js',
     },
     rollupOptions: {
+      // Svelte is provided by the Studio's import map — do not bundle it.
       external: (id: string) => id === 'svelte' || id.startsWith('svelte/'),
-      output: {
-        globals: (id: string) => {
-          const m: Record<string, string> = {
-            'svelte':                 'window.__SvelteRuntime.svelte',
-            'svelte/store':           'window.__SvelteRuntime.store',
-            'svelte/internal/client': 'window.__SvelteRuntime.internal_client',
-            'svelte/transition':      'window.__SvelteRuntime.transition',
-            'svelte/animate':         'window.__SvelteRuntime.animate',
-            'svelte/reactivity':      'window.__SvelteRuntime.reactivity',
-          };
-          return m[id] ?? 'window.__SvelteRuntime.__unknown';
-        },
-      },
     },
     outDir: 'dist',
   },
