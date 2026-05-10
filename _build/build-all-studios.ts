@@ -54,8 +54,8 @@ function patchViteConfig(studioDir: string): boolean {
   const configPath = join(studioDir, 'vite.config.ts');
   const src = readFileSync(configPath, 'utf8');
 
-  // Already has Svelte 5 function-based external — skip
-  if (src.includes("id.startsWith('svelte/')")) return false;
+  // Already correct (ESM format + function external) — skip
+  if (src.includes("formats: ['es']") && src.includes("id.startsWith('svelte/')")) return false;
 
   // Extract existing $lib alias URL if present
   const aliasMatch = src.match(/\$lib:\s*fileURLToPath\(new URL\('([^']+)'/);

@@ -1,4 +1,1764 @@
-var ZveltioExt=(function(Na,It){"use strict";function Ft(lt){const bt=Object.create(null,{[Symbol.toStringTag]:{value:"Module"}});if(lt){for(const T in lt)if(T!=="default"){const s=Object.getOwnPropertyDescriptor(lt,T);Object.defineProperty(bt,T,s.get?s:{enumerable:!0,get:()=>lt[T]})}}return bt.default=lt,Object.freeze(bt)}const t=Ft(It);var Et=t.from_html('<div class="alert alert-error"> </div>'),Jt=t.from_html('<div class="flex justify-center py-12"><span class="loading loading-spinner loading-lg"></span></div>'),Ut=t.from_html("<span> </span>"),Vt=t.from_html('<tr><td class="font-mono text-sm"> </td><td><div class="font-medium"> </div> <div class="text-xs text-base-content/50"> </div></td><td class="text-sm"> </td><td><span> </span></td><td class="text-sm"> </td><td class="text-sm"><!></td><td class="text-xs"> </td><td><a class="btn btn-ghost btn-xs">Detalii</a></td></tr>'),Bt=t.from_html('<tr><td colspan="8" class="text-center text-base-content/50 py-8">Niciun lot găsit</td></tr>'),Ht=t.from_html('<div class="flex justify-center gap-2"><button class="btn btn-sm">‹</button> <span class="flex items-center px-3 text-sm"> </span> <button class="btn btn-sm">›</button></div>'),Mt=t.from_html('<div class="overflow-x-auto"><table class="table table-zebra w-full"><thead><tr><th>Număr lot</th><th>Produs</th><th>Furnizor</th><th>Status</th><th>Cant. rămasă</th><th>Valabilitate</th><th>Locație</th><th></th></tr></thead><tbody><!><!></tbody></table></div> <!>',1),Gt=t.from_html('<div class="p-6 space-y-4"><div class="flex items-center justify-between"><h1 class="text-2xl font-bold">Loturi</h1> <a href="/admin/trace/reception" class="btn btn-primary btn-sm">+ Recepție nouă</a></div> <div class="flex gap-3 flex-wrap"><select class="select select-bordered select-sm"><option>Toate statusurile</option><option>Carantină</option><option>Disponibil</option><option>Epuizat</option><option>Retras</option></select></div> <!> <!></div>');function Zt(lt,bt){t.push(bt,!0);const T="/api/trace";let s=t.state(t.proxy([])),W=t.state(!0),Z=t.state(""),A=t.state(""),n=t.state(1),D=t.state(0);const r=50,st=t.derived(()=>Math.ceil(t.get(D)/r));async function K(){t.set(W,!0),t.set(Z,"");try{const C=new URLSearchParams({page:String(t.get(n)),limit:String(r)});t.get(A)&&C.set("status",t.get(A));const tt=await fetch(`${T}/lots?${C}`);if(!tt.ok)throw new Error(await tt.text());const et=await tt.json();t.set(s,et.data,!0),t.set(D,et.meta.total,!0)}catch(C){t.set(Z,C.message,!0)}finally{t.set(W,!1)}}t.user_effect(()=>{K()}),t.user_effect(()=>{t.get(n),t.get(A),K()});function f(C){return{available:"badge-success",quarantine:"badge-warning",exhausted:"badge-neutral",recalled:"badge-error",returned:"badge-info"}[C]??"badge-ghost"}function X(C){return C?Math.ceil((new Date(C).getTime()-Date.now())/864e5):999}var J=Gt(),Y=t.sibling(t.child(J),2),ft=t.child(Y),mt=t.child(ft);mt.value=mt.__value="";var wt=t.sibling(mt);wt.value=wt.__value="quarantine";var Ct=t.sibling(wt);Ct.value=Ct.__value="available";var ot=t.sibling(Ct);ot.value=ot.__value="exhausted";var $t=t.sibling(ot);$t.value=$t.__value="recalled",t.reset(ft),t.reset(Y);var ht=t.sibling(Y,2);{var pt=C=>{var tt=Et(),et=t.child(tt,!0);t.reset(tt),t.template_effect(()=>t.set_text(et,t.get(Z))),t.append(C,tt)};t.if(ht,C=>{t.get(Z)&&C(pt)})}var Rt=t.sibling(ht,2);{var g=C=>{var tt=Jt();t.append(C,tt)},Q=C=>{var tt=Mt(),et=t.first_child(tt),q=t.child(et),L=t.sibling(t.child(q)),dt=t.child(L);t.each(dt,17,()=>t.get(s),t.index,(_,b)=>{const O=t.derived(()=>X(t.get(b).best_before_date));var H=Vt(),x=t.child(H),h=t.child(x,!0);t.reset(x);var o=t.sibling(x),w=t.child(o),N=t.child(w,!0);t.reset(w);var i=t.sibling(w,2),a=t.child(i,!0);t.reset(i),t.reset(o);var u=t.sibling(o),y=t.child(u,!0);t.reset(u);var P=t.sibling(u),I=t.child(P),e=t.child(I,!0);t.reset(I),t.reset(P);var l=t.sibling(P),d=t.child(l);t.reset(l);var p=t.sibling(l),c=t.child(p);{var $=F=>{var R=Ut(),it=t.child(R,!0);t.reset(R),t.template_effect(()=>{t.set_class(R,1,t.clsx(t.get(O)<=3?"text-error font-bold":t.get(O)<=7?"text-warning":"")),t.set_text(it,t.get(b).best_before_date)}),t.append(F,R)},V=F=>{var R=t.text("—");t.append(F,R)};t.if(c,F=>{t.get(b).best_before_date?F($):F(V,-1)})}t.reset(p);var U=t.sibling(p),ct=t.child(U,!0);t.reset(U);var ut=t.sibling(U),B=t.child(ut);t.reset(ut),t.reset(H),t.template_effect((F,R)=>{t.set_class(H,1,t.clsx(t.get(O)<=3&&t.get(b).status==="available"?"bg-error/10":t.get(O)<=7&&t.get(b).status==="available"?"bg-warning/10":"")),t.set_text(h,t.get(b).lot_number),t.set_text(N,t.get(b).item_name),t.set_text(a,t.get(b).item_code),t.set_text(y,t.get(b).supplier_name??"—"),t.set_class(I,1,`badge ${F??""} badge-sm`),t.set_text(e,t.get(b).status),t.set_text(d,`${t.get(b).quantity_remaining??""} ${t.get(b).unit??""}`),t.set_text(ct,R),t.set_attribute(B,"href",`/admin/trace/lots/${t.get(b).id??""}`)},[()=>f(t.get(b).status),()=>[t.get(b).warehouse,t.get(b).row,t.get(b).shelf].filter(Boolean).join(" / ")||"—"]),t.append(_,H)});var m=t.sibling(dt);{var k=_=>{var b=Bt();t.append(_,b)};t.if(m,_=>{t.get(s).length===0&&_(k)})}t.reset(L),t.reset(q),t.reset(et);var M=t.sibling(et,2);{var v=_=>{var b=Ht(),O=t.child(b),H=t.sibling(O,2),x=t.child(H);t.reset(H);var h=t.sibling(H,2);t.reset(b),t.template_effect(()=>{O.disabled=t.get(n)===1,t.set_text(x,`Pagina ${t.get(n)??""} din ${t.get(st)??""}`),h.disabled=t.get(n)===t.get(st)}),t.delegated("click",O,()=>t.update(n,-1)),t.delegated("click",h,()=>t.update(n)),t.append(_,b)};t.if(M,_=>{t.get(st)>1&&_(v)})}t.append(C,tt)};t.if(Rt,C=>{t.get(W)?C(g):C(Q,-1)})}t.reset(J),t.bind_select_value(ft,()=>t.get(A),C=>t.set(A,C)),t.append(lt,J),t.pop()}t.delegate(["click"]);var Kt=t.from_html('<span class="badge badge-warning badge-sm ml-1"> </span>'),Qt=t.from_html('<div class="alert alert-error"> </div>'),Wt=t.from_html('<div class="alert alert-success mb-4">Expediere înregistrată cu succes pentru <strong> </strong>. <button class="btn btn-sm btn-ghost ml-2">+ Alta</button></div>'),Xt=t.from_html("<option> </option>"),Yt=t.from_html("<option> </option>"),te=t.from_html('<div class="max-w-lg"><!> <form class="space-y-3"><div><label class="label-text font-medium">Lot *</label> <select class="select select-bordered w-full" required=""><option>Selectați lot disponibil...</option><!></select></div> <div class="grid grid-cols-2 gap-3"><div><label class="label-text font-medium">Cantitate *</label> <input type="number" class="input input-bordered w-full" min="0.001" step="0.001" required=""/></div> <div><label class="label-text font-medium">UM</label> <select class="select select-bordered w-full"></select></div></div> <div><label class="label-text font-medium">Client *</label> <input type="text" class="input input-bordered w-full" required="" placeholder="Denumire client"/></div> <div><label class="label-text font-medium">Nr. factură / aviz (opțional)</label> <input type="text" class="input input-bordered w-full" placeholder="ex: INV-00123"/></div> <div><label class="label-text font-medium">Note</label> <textarea class="textarea textarea-bordered w-full" rows="2"></textarea></div> <button type="submit" class="btn btn-primary w-full"> </button></form></div>'),ee=t.from_html('<div class="flex justify-center py-8"><span class="loading loading-spinner"></span></div>'),ae=t.from_html('<tr><td class="text-sm font-medium"> </td><td><div class="text-sm"> </div> <div class="text-xs font-mono opacity-60"> </div></td><td class="text-sm"> </td><td class="text-xs opacity-60"> </td><td><button class="btn btn-ghost btn-xs"> </button></td></tr>'),ie=t.from_html('<tr><td colspan="5" class="text-center opacity-50 py-6"> </td></tr>'),se=t.from_html('<table class="table table-sm w-full"><thead><tr><th>Client</th><th>Produs / Lot</th><th>Cant. facturată</th><th>Factură</th><th></th></tr></thead><tbody><!><!></tbody></table>'),re=t.from_html('<div class="flex justify-between"><span class="opacity-60">Valabilitate</span> <span class="font-medium"> </span></div>'),le=t.from_html('<div class="flex justify-between"><span class="opacity-60">Factură</span> <span class="font-mono"> </span></div>'),ne=t.from_html("<option> </option>"),oe=t.from_html('<div class="alert alert-warning text-sm">Factura nu a avut lot specificat. Selectați lotul care se expediază:</div> <div class="flex gap-2"><select class="select select-bordered select-sm flex-1"><option>Selectați lot...</option><!></select> <button class="btn btn-sm btn-warning">Asignează</button></div>',1),de=t.from_html('<form class="space-y-2"><div><label class="label-text text-sm font-medium">Cantitate efectiv expediată <span class="opacity-50"> </span></label> <input type="number" class="input input-bordered w-full" min="0.001" step="0.001" required=""/></div> <div><label class="label-text text-sm">Note</label> <textarea class="textarea textarea-bordered w-full" rows="2"></textarea></div> <div class="flex gap-2"><button type="submit" class="btn btn-success flex-1"> </button> <button type="button" class="btn btn-ghost btn-sm">Anulează</button></div></form>'),ce=t.from_html("<!> <!>",1),ve=t.from_html('<div class="text-sm space-y-1"><div class="flex justify-between"><span class="opacity-60">Cantitate expediată</span> <span class="font-bold text-success"> </span></div> <div class="flex justify-between"><span class="opacity-60">Confirmat la</span> <span> </span></div></div>'),_e=t.from_html('<div class="card bg-base-200 p-4 space-y-3"><h3 class="font-bold"> </h3> <div class="space-y-1 text-sm"><div class="flex justify-between"><span class="opacity-60">Produs (facturat)</span> <span> </span></div> <div class="flex justify-between"><span class="opacity-60">Lot</span> <span class="font-mono"> </span></div> <!> <div class="flex justify-between"><span class="opacity-60">Disponibil în lot</span> <span class="font-bold"> </span></div> <div class="flex justify-between"><span class="opacity-60">Cantitate facturată</span> <span> </span></div> <!></div> <!> <button class="btn btn-ghost btn-sm w-full">Închide</button></div>'),pe=t.from_html('<div class="grid grid-cols-1 lg:grid-cols-2 gap-4"><div class="overflow-x-auto"><!></div> <!></div>'),ue=t.from_html('<div class="p-6 space-y-4"><h1 class="text-2xl font-bold">Expedieri</h1> <div class="tabs tabs-bordered"><button>În așteptare <!></button> <button>Confirmate</button> <button>+ Expediere directă</button></div> <!> <!></div>');function ge(lt,bt){t.push(bt,!0);const T="/api/trace";let s=t.state("pending"),W=t.state(t.proxy([])),Z=t.state(!1),A=t.state(""),n=t.state(null),D=t.state(t.proxy({quantity_dispatched:"",notes:""})),r=t.state(""),st=t.state(t.proxy([])),K=t.state(!1),f=t.state(t.proxy({lot_id:"",quantity_dispatched:"",unit:"buc",customer_name:"",invoice_number:"",notes:""})),X=t.state(!1),J=t.state(null);t.user_effect(()=>{t.get(s),Y()}),t.user_effect(()=>{t.get(s)==="direct"&&fetch(`${T}/lots?status=available&limit=200`).then(m=>m.json()).then(m=>{t.set(st,m.data??[],!0)})});async function Y(){t.set(Z,!0),t.set(A,"");try{const m=t.get(s)==="pending"?"pending":t.get(s)==="confirmed"?"confirmed":null,k=m?`?status=${m}`:"",M=await fetch(`${T}/dispatches${k}`);t.set(W,M.ok?(await M.json()).data:[],!0)}catch(m){t.set(A,m.message,!0)}finally{t.set(Z,!1)}}async function ft(m){const k=await fetch(`${T}/dispatches/${m.id}`);t.set(n,k.ok?(await k.json()).data:m,!0),t.set(D,{quantity_dispatched:String(t.get(n).quantity_invoiced??""),notes:""},!0),t.set(r,t.get(n).lot_id??"",!0)}async function mt(){if(!t.get(r)||!t.get(n))return;const m=await fetch(`${T}/dispatches/${t.get(n).id}/assign-lot`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({lot_id:t.get(r)})});m.ok?t.set(n,{...t.get(n),lot_id:t.get(r)},!0):t.set(A,(await m.json()).error,!0)}async function wt(m){m.preventDefault(),t.set(K,!0),t.set(A,"");try{const k=await fetch(`${T}/dispatches/${t.get(n).id}/confirm`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({quantity_dispatched:parseFloat(t.get(D).quantity_dispatched),notes:t.get(D).notes||void 0})});if(!k.ok)throw new Error((await k.json()).error);t.set(n,null),await Y()}catch(k){t.set(A,k.message,!0)}finally{t.set(K,!1)}}async function Ct(m){wt("Anulați expedierea?")&&(await fetch(`${T}/dispatches/${m}/cancel`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}),t.set(n,null),await Y())}async function ot(m){m.preventDefault(),t.set(X,!0),t.set(A,""),t.set(J,null);try{const k=await fetch(`${T}/dispatches/direct`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({lot_id:t.get(f).lot_id,quantity_dispatched:parseFloat(t.get(f).quantity_dispatched),unit:t.get(f).unit,customer_name:t.get(f).customer_name,invoice_number:t.get(f).invoice_number||void 0,notes:t.get(f).notes||void 0})});if(!k.ok)throw new Error((await k.json()).error);t.set(J,(await k.json()).data,!0),t.set(f,{lot_id:"",quantity_dispatched:"",unit:"buc",customer_name:"",invoice_number:"",notes:""},!0)}catch(k){t.set(A,k.message,!0)}finally{t.set(X,!1)}}var $t=ue(),ht=t.sibling(t.child($t),2),pt=t.child(ht),Rt=t.sibling(t.child(pt));{var g=m=>{var k=Kt(),M=t.child(k,!0);t.reset(k),t.template_effect(()=>t.set_text(M,t.get(W).length)),t.append(m,k)};t.if(Rt,m=>{t.get(s)==="pending"&&t.get(W).length>0&&m(g)})}t.reset(pt);var Q=t.sibling(pt,2),C=t.sibling(Q,2);t.reset(ht);var tt=t.sibling(ht,2);{var et=m=>{var k=Qt(),M=t.child(k,!0);t.reset(k),t.template_effect(()=>t.set_text(M,t.get(A))),t.append(m,k)};t.if(tt,m=>{t.get(A)&&m(et)})}var q=t.sibling(tt,2);{var L=m=>{var k=te(),M=t.child(k);{var v=p=>{var c=Wt(),$=t.sibling(t.child(c)),V=t.child($,!0);t.reset($);var U=t.sibling($,2);t.reset(c),t.template_effect(()=>t.set_text(V,t.get(J).customer_name)),t.delegated("click",U,()=>t.set(J,null)),t.append(p,c)};t.if(M,p=>{t.get(J)&&p(v)})}var _=t.sibling(M,2),b=t.child(_),O=t.sibling(t.child(b),2),H=t.child(O);H.value=H.__value="";var x=t.sibling(H);t.each(x,17,()=>t.get(st),t.index,(p,c)=>{var $=Xt(),V=t.child($);t.reset($);var U={};t.template_effect(()=>{t.set_text(V,`${t.get(c).lot_number??""} — ${t.get(c).item_name??""} (${t.get(c).quantity_remaining??""} ${t.get(c).unit??""})
-                ${t.get(c).best_before_date?" BBD: "+t.get(c).best_before_date:""}`),U!==(U=t.get(c).id)&&($.value=($.__value=t.get(c).id)??"")}),t.append(p,$)}),t.reset(O),t.reset(b);var h=t.sibling(b,2),o=t.child(h),w=t.sibling(t.child(o),2);t.remove_input_defaults(w),t.reset(o);var N=t.sibling(o,2),i=t.sibling(t.child(N),2);t.each(i,20,()=>["kg","g","l","ml","buc","cutie","sac","palet"],t.index,(p,c)=>{var $=Yt(),V=t.child($,!0);t.reset($);var U={};t.template_effect(()=>{t.set_text(V,c),U!==(U=c)&&($.value=($.__value=c)??"")}),t.append(p,$)}),t.reset(i),t.reset(N),t.reset(h);var a=t.sibling(h,2),u=t.sibling(t.child(a),2);t.remove_input_defaults(u),t.reset(a);var y=t.sibling(a,2),P=t.sibling(t.child(y),2);t.remove_input_defaults(P),t.reset(y);var I=t.sibling(y,2),e=t.sibling(t.child(I),2);t.remove_textarea_child(e),t.reset(I);var l=t.sibling(I,2),d=t.child(l,!0);t.reset(l),t.reset(_),t.reset(k),t.template_effect(()=>{l.disabled=t.get(X),t.set_text(d,t.get(X)?"Se înregistrează...":"✓ Înregistrează expedierea")}),t.event("submit",_,ot),t.bind_select_value(O,()=>t.get(f).lot_id,p=>t.get(f).lot_id=p),t.bind_value(w,()=>t.get(f).quantity_dispatched,p=>t.get(f).quantity_dispatched=p),t.bind_select_value(i,()=>t.get(f).unit,p=>t.get(f).unit=p),t.bind_value(u,()=>t.get(f).customer_name,p=>t.get(f).customer_name=p),t.bind_value(P,()=>t.get(f).invoice_number,p=>t.get(f).invoice_number=p),t.bind_value(e,()=>t.get(f).notes,p=>t.get(f).notes=p),t.append(m,k)},dt=m=>{var k=pe(),M=t.child(k),v=t.child(M);{var _=x=>{var h=ee();t.append(x,h)},b=x=>{var h=se(),o=t.sibling(t.child(h)),w=t.child(o);t.each(w,17,()=>t.get(W),t.index,(a,u)=>{var y=ae(),P=t.child(y),I=t.child(P,!0);t.reset(P);var e=t.sibling(P),l=t.child(e),d=t.child(l,!0);t.reset(l);var p=t.sibling(l,2),c=t.child(p,!0);t.reset(p),t.reset(e);var $=t.sibling(e),V=t.child($);t.reset($);var U=t.sibling($),ct=t.child(U,!0);t.reset(U);var ut=t.sibling(U),B=t.child(ut),F=t.child(B,!0);t.reset(B),t.reset(ut),t.reset(y),t.template_effect(()=>{var R;t.set_class(y,1,t.clsx(((R=t.get(n))==null?void 0:R.id)===t.get(u).id?"bg-primary/10":"")),t.set_text(I,t.get(u).customer_name??"—"),t.set_text(d,t.get(u).item_name_from_invoice??t.get(u).item_name??"?"),t.set_text(c,t.get(u).lot_number??"fără lot"),t.set_text(V,`${t.get(u).quantity_invoiced??""} ${t.get(u).unit??""}`),t.set_text(ct,t.get(u).invoice_number??"—"),t.set_text(F,t.get(s)==="pending"?"Confirmă":"Detalii")}),t.delegated("click",B,()=>ft(t.get(u))),t.append(a,y)});var N=t.sibling(w);{var i=a=>{var u=ie(),y=t.child(u),P=t.child(y,!0);t.reset(y),t.reset(u),t.template_effect(()=>t.set_text(P,t.get(s)==="pending"?"Nicio expediere în așteptare":"Nicio expediere confirmată")),t.append(a,u)};t.if(N,a=>{t.get(W).length===0&&a(i)})}t.reset(o),t.reset(h),t.append(x,h)};t.if(v,x=>{t.get(Z)?x(_):x(b,-1)})}t.reset(M);var O=t.sibling(M,2);{var H=x=>{var h=_e(),o=t.child(h),w=t.child(o,!0);t.reset(o);var N=t.sibling(o,2),i=t.child(N),a=t.sibling(t.child(i),2),u=t.child(a,!0);t.reset(a),t.reset(i);var y=t.sibling(i,2),P=t.sibling(t.child(y),2),I=t.child(P,!0);t.reset(P),t.reset(y);var e=t.sibling(y,2);{var l=S=>{var G=re(),z=t.sibling(t.child(G),2),rt=t.child(z,!0);t.reset(z),t.reset(G),t.template_effect(()=>t.set_text(rt,t.get(n).best_before_date)),t.append(S,G)};t.if(e,S=>{t.get(n).best_before_date&&S(l)})}var d=t.sibling(e,2),p=t.sibling(t.child(d),2),c=t.child(p);t.reset(p),t.reset(d);var $=t.sibling(d,2),V=t.sibling(t.child($),2),U=t.child(V);t.reset(V),t.reset($);var ct=t.sibling($,2);{var ut=S=>{var G=le(),z=t.sibling(t.child(G),2),rt=t.child(z,!0);t.reset(z),t.reset(G),t.template_effect(()=>t.set_text(rt,t.get(n).invoice_number)),t.append(S,G)};t.if(ct,S=>{t.get(n).invoice_number&&S(ut)})}t.reset(N);var B=t.sibling(N,2);{var F=S=>{var G=ce(),z=t.first_child(G);{var rt=vt=>{var at=oe(),_t=t.sibling(t.first_child(at),2),gt=t.child(_t),Ot=t.child(gt);Ot.value=Ot.__value="";var Pt=t.sibling(Ot);t.each(Pt,17,()=>t.get(st),t.index,(kt,jt)=>{var Tt=ne(),nt=t.child(Tt);t.reset(Tt);var Dt={};t.template_effect(()=>{t.set_text(nt,`${t.get(jt).lot_number??""} — ${t.get(jt).item_name??""} (${t.get(jt).quantity_remaining??""} ${t.get(jt).unit??""})`),Dt!==(Dt=t.get(jt).id)&&(Tt.value=(Tt.__value=t.get(jt).id)??"")}),t.append(kt,Tt)}),t.reset(gt);var xt=t.sibling(gt,2);t.reset(_t),t.bind_select_value(gt,()=>t.get(r),kt=>t.set(r,kt)),t.delegated("click",xt,mt),t.append(vt,at)};t.if(z,vt=>{t.get(n).lot_id||vt(rt)})}var St=t.sibling(z,2);{var qt=vt=>{var at=de(),_t=t.child(at),gt=t.child(_t),Ot=t.sibling(t.child(gt)),Pt=t.child(Ot);t.reset(Ot),t.reset(gt);var xt=t.sibling(gt,2);t.remove_input_defaults(xt),t.reset(_t);var kt=t.sibling(_t,2),jt=t.sibling(t.child(kt),2);t.remove_textarea_child(jt),t.reset(kt);var Tt=t.sibling(kt,2),nt=t.child(Tt),Dt=t.child(nt,!0);t.reset(nt);var zt=t.sibling(nt,2);t.reset(Tt),t.reset(at),t.template_effect(()=>{t.set_text(Pt,`(max ${t.get(n).lot_qty_remaining??""} ${t.get(n).unit??""})`),t.set_attribute(xt,"max",t.get(n).lot_qty_remaining),nt.disabled=t.get(K),t.set_text(Dt,t.get(K)?"Se procesează...":"✓ Confirmă expedierea")}),t.event("submit",at,wt),t.bind_value(xt,()=>t.get(D).quantity_dispatched,At=>t.get(D).quantity_dispatched=At),t.bind_value(jt,()=>t.get(D).notes,At=>t.get(D).notes=At),t.delegated("click",zt,()=>Ct(t.get(n).id)),t.append(vt,at)};t.if(St,vt=>{(t.get(n).lot_id||t.get(n).lot_number)&&vt(qt)})}t.append(S,G)},R=S=>{var G=ve(),z=t.child(G),rt=t.sibling(t.child(z),2),St=t.child(rt);t.reset(rt),t.reset(z);var qt=t.sibling(z,2),vt=t.sibling(t.child(qt),2),at=t.child(vt,!0);t.reset(vt),t.reset(qt),t.reset(G),t.template_effect(_t=>{t.set_text(St,`${t.get(n).quantity_dispatched??""} ${t.get(n).unit??""}`),t.set_text(at,_t)},[()=>t.get(n).confirmed_at?new Date(t.get(n).confirmed_at).toLocaleString("ro-RO"):"—"]),t.append(S,G)};t.if(B,S=>{t.get(s)==="pending"?S(F):S(R,-1)})}var it=t.sibling(B,2);t.reset(h),t.template_effect(()=>{t.set_text(w,t.get(n).customer_name),t.set_text(u,t.get(n).item_name_from_invoice??"?"),t.set_text(I,t.get(n).lot_number??"—"),t.set_text(c,`${t.get(n).lot_qty_remaining??""} ${t.get(n).unit??""}`),t.set_text(U,`${t.get(n).quantity_invoiced??""} ${t.get(n).unit??""}`)}),t.delegated("click",it,()=>t.set(n,null)),t.append(x,h)};t.if(O,x=>{t.get(n)&&x(H)})}t.reset(k),t.append(m,k)};t.if(q,m=>{t.get(s)==="direct"?m(L):m(dt,-1)})}t.reset($t),t.template_effect(()=>{t.set_class(pt,1,`tab ${t.get(s)==="pending"?"tab-active":""}`),t.set_class(Q,1,`tab ${t.get(s)==="confirmed"?"tab-active":""}`),t.set_class(C,1,`tab ${t.get(s)==="direct"?"tab-active":""}`)}),t.delegated("click",pt,()=>{t.set(s,"pending"),t.set(n,null)}),t.delegated("click",Q,()=>{t.set(s,"confirmed"),t.set(n,null)}),t.delegated("click",C,()=>{t.set(s,"direct"),t.set(n,null)}),t.append(lt,$t),t.pop()}t.delegate(["click"]);var be=t.from_html('<h1 class="text-2xl font-bold font-mono"> </h1> <span> </span>',1),fe=t.from_html('<div class="alert alert-error"> </div>'),me=t.from_html('<div class="flex justify-center py-12"><span class="loading loading-spinner loading-lg"></span></div>'),he=t.from_html('<button class="btn btn-success btn-sm"> </button>'),xe=t.from_html('<div><span class="text-sm opacity-60">Alergeni:</span> </div>'),ye=t.from_html('<div><span class="text-sm opacity-60">Condiții:</span> </div>'),we=t.from_html('<div><span class="text-sm opacity-60">BBD:</span> <span class="font-bold"> </span></div>'),$e=t.from_html('<div><span class="text-sm opacity-60">Data producție:</span> </div>'),ke=t.from_html('<div><span class="text-sm opacity-60">CUI:</span> </div>'),Se=t.from_html('<div><span class="text-sm opacity-60">Lot furnizor:</span> <span class="font-mono"> </span></div>'),je=t.from_html('<div><span class="text-sm opacity-60">Factură:</span> </div>'),Ce=t.from_html('<div><span class="text-sm opacity-60">Rând:</span> </div>'),qe=t.from_html('<div><span class="text-sm opacity-60">Raft:</span> </div>'),Pe=t.from_html('<div><span class="text-sm opacity-60">Zonă:</span> </div>'),Re=t.from_html('<div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="card bg-base-200 p-4 space-y-2"><h3 class="font-bold">Produs</h3> <div><span class="text-sm opacity-60">Denumire:</span> <span class="font-medium"> </span></div> <div><span class="text-sm opacity-60">Cod:</span> <span class="font-mono"> </span></div> <div><span class="text-sm opacity-60">Tip:</span> </div> <!> <!></div> <div class="card bg-base-200 p-4 space-y-2"><h3 class="font-bold">Cantitate & Valabilitate</h3> <div><span class="text-sm opacity-60">Inițial:</span> </div> <div><span class="text-sm opacity-60">Rămas:</span> <span class="font-bold"> </span></div> <!> <!> <div><span class="text-sm opacity-60">Data recepție:</span> </div></div> <div class="card bg-base-200 p-4 space-y-2"><h3 class="font-bold">Furnizor</h3> <div> </div> <!> <!> <!></div> <div class="card bg-base-200 p-4 space-y-2"><h3 class="font-bold">Locație</h3> <div> </div> <!> <!> <!></div></div>'),De=t.from_html('<div class="flex justify-center py-8"><span class="loading loading-spinner"></span></div>'),Te=t.from_html('<div class="card bg-base-200 p-4"><h3 class="font-bold mb-3">Materii prime (upstream)</h3> <pre class="text-sm font-mono whitespace-pre-wrap"> </pre></div>'),Oe=t.from_html('<tr><td class="text-xs"> </td><td><span class="badge badge-sm badge-outline"> </span></td><td class="font-mono"> </td><td class="text-sm"> </td><td class="text-xs"> </td></tr>'),ze=t.from_html('<tr><td colspan="5" class="text-center opacity-50 py-4">Nicio mișcare înregistrată</td></tr>'),Ae=t.from_html('<div class="overflow-x-auto"><table class="table table-sm w-full"><thead><tr><th>Data/Ora</th><th>Tip</th><th>Cantitate</th><th>Referință</th><th>Locație</th></tr></thead><tbody><!><!></tbody></table></div>'),Le=t.from_html('<div class="flex gap-2"><!> <button class="btn btn-outline btn-sm">🖨 Printează etichetă</button></div> <div class="tabs tabs-bordered"><button>Informații</button> <button>Arbore trasabilitate</button> <button>Cronologie</button></div> <!> <!> <!>',1),Ne=t.from_html('<div class="p-6 space-y-4"><div class="flex items-center gap-3"><a href="/admin/trace/lots" class="btn btn-ghost btn-sm">← Înapoi</a> <!></div> <!> <!></div>');function Ie(lt,bt){t.push(bt,!0);const T="/api/trace";let s=t.state(null),W=t.state(t.proxy([])),Z=t.state(null),A=t.state(!0),n=t.state(""),D=t.state("info"),r=t.state(!1);t.user_effect(()=>{st()});async function st(){t.set(A,!0),t.set(n,"");try{const[g,Q]=await Promise.all([fetch(`${T}/lots/${bt.id}`),fetch(`${T}/tree/${bt.id}/timeline`)]);if(!g.ok)throw new Error(await g.text());t.set(s,(await g.json()).data,!0),t.set(W,Q.ok?(await Q.json()).data:[],!0)}catch(g){t.set(n,g.message,!0)}finally{t.set(A,!1)}}async function K(){if(!t.get(Z))try{const g=await fetch(`${T}/tree/${bt.id}/upstream`);t.set(Z,g.ok?(await g.json()).data:null,!0)}catch{}}async function f(){if(confirm("Eliberați lotul din carantină?")){t.set(r,!0);try{const g=await fetch(`${T}/lots/${bt.id}/release`,{method:"PATCH"});if(!g.ok)throw new Error(await g.text());await st()}catch(g){alert(g.message)}finally{t.set(r,!1)}}}async function X(){window.open(`${T}/labels/${bt.id}`,"_blank")}function J(g){return{available:"badge-success",quarantine:"badge-warning",exhausted:"badge-neutral",recalled:"badge-error",returned:"badge-info"}[g]??"badge-ghost"}function Y(g,Q=0){if(!g)return"";const C="  ".repeat(Q),tt=g.status?` [${g.status}]`:"",et=`${C}${g.item_name??"?"} — ${g.lot_number??g.lot_id}${tt}`,q=(g.inputs??[]).map(L=>Y(L,Q+1)).join(`
-`);return q?`${et}
-${q}`:et}var ft=Ne(),mt=t.child(ft),wt=t.sibling(t.child(mt),2);{var Ct=g=>{var Q=be(),C=t.first_child(Q),tt=t.child(C,!0);t.reset(C);var et=t.sibling(C,2),q=t.child(et,!0);t.reset(et),t.template_effect(L=>{t.set_text(tt,t.get(s).lot_number),t.set_class(et,1,`badge ${L??""}`),t.set_text(q,t.get(s).status)},[()=>J(t.get(s).status)]),t.append(g,Q)};t.if(wt,g=>{t.get(s)&&g(Ct)})}t.reset(mt);var ot=t.sibling(mt,2);{var $t=g=>{var Q=fe(),C=t.child(Q,!0);t.reset(Q),t.template_effect(()=>t.set_text(C,t.get(n))),t.append(g,Q)};t.if(ot,g=>{t.get(n)&&g($t)})}var ht=t.sibling(ot,2);{var pt=g=>{var Q=me();t.append(g,Q)},Rt=g=>{var Q=Le(),C=t.first_child(Q),tt=t.child(C);{var et=x=>{var h=he(),o=t.child(h,!0);t.reset(h),t.template_effect(()=>{h.disabled=t.get(r),t.set_text(o,t.get(r)?"Se procesează...":"✓ Eliberează din carantină")}),t.delegated("click",h,f),t.append(x,h)};t.if(tt,x=>{t.get(s).status==="quarantine"&&x(et)})}var q=t.sibling(tt,2);t.reset(C);var L=t.sibling(C,2),dt=t.child(L),m=t.sibling(dt,2),k=t.sibling(m,2);t.reset(L);var M=t.sibling(L,2);{var v=x=>{var h=Re(),o=t.child(h),w=t.sibling(t.child(o),2),N=t.sibling(t.child(w),2),i=t.child(N,!0);t.reset(N),t.reset(w);var a=t.sibling(w,2),u=t.sibling(t.child(a),2),y=t.child(u,!0);t.reset(u),t.reset(a);var P=t.sibling(a,2),I=t.sibling(t.child(P));t.reset(P);var e=t.sibling(P,2);{var l=j=>{var E=xe(),yt=t.sibling(t.child(E));t.reset(E),t.template_effect(Lt=>t.set_text(yt,` ${Lt??""}`),[()=>t.get(s).allergens.join(", ")]),t.append(j,E)};t.if(e,j=>{var E;(E=t.get(s).allergens)!=null&&E.length&&j(l)})}var d=t.sibling(e,2);{var p=j=>{var E=ye(),yt=t.sibling(t.child(E));t.reset(E),t.template_effect(()=>t.set_text(yt,` ${t.get(s).storage_conditions??""}`)),t.append(j,E)};t.if(d,j=>{t.get(s).storage_conditions&&j(p)})}t.reset(o);var c=t.sibling(o,2),$=t.sibling(t.child(c),2),V=t.sibling(t.child($));t.reset($);var U=t.sibling($,2),ct=t.sibling(t.child(U),2),ut=t.child(ct);t.reset(ct),t.reset(U);var B=t.sibling(U,2);{var F=j=>{var E=we(),yt=t.sibling(t.child(E),2),Lt=t.child(yt,!0);t.reset(yt),t.reset(E),t.template_effect(()=>t.set_text(Lt,t.get(s).best_before_date)),t.append(j,E)};t.if(B,j=>{t.get(s).best_before_date&&j(F)})}var R=t.sibling(B,2);{var it=j=>{var E=$e(),yt=t.sibling(t.child(E));t.reset(E),t.template_effect(()=>t.set_text(yt,` ${t.get(s).production_date??""}`)),t.append(j,E)};t.if(R,j=>{t.get(s).production_date&&j(it)})}var S=t.sibling(R,2),G=t.sibling(t.child(S));t.reset(S),t.reset(c);var z=t.sibling(c,2),rt=t.sibling(t.child(z),2),St=t.child(rt,!0);t.reset(rt);var qt=t.sibling(rt,2);{var vt=j=>{var E=ke(),yt=t.sibling(t.child(E));t.reset(E),t.template_effect(()=>t.set_text(yt,` ${t.get(s).supplier_cui??""}`)),t.append(j,E)};t.if(qt,j=>{t.get(s).supplier_cui&&j(vt)})}var at=t.sibling(qt,2);{var _t=j=>{var E=Se(),yt=t.sibling(t.child(E),2),Lt=t.child(yt,!0);t.reset(yt),t.reset(E),t.template_effect(()=>t.set_text(Lt,t.get(s).supplier_lot_ref)),t.append(j,E)};t.if(at,j=>{t.get(s).supplier_lot_ref&&j(_t)})}var gt=t.sibling(at,2);{var Ot=j=>{var E=je(),yt=t.sibling(t.child(E));t.reset(E),t.template_effect(()=>t.set_text(yt,` ${t.get(s).invoice_ref??""}`)),t.append(j,E)};t.if(gt,j=>{t.get(s).invoice_ref&&j(Ot)})}t.reset(z);var Pt=t.sibling(z,2),xt=t.sibling(t.child(Pt),2),kt=t.child(xt,!0);t.reset(xt);var jt=t.sibling(xt,2);{var Tt=j=>{var E=Ce(),yt=t.sibling(t.child(E));t.reset(E),t.template_effect(()=>t.set_text(yt,` ${t.get(s).row??""}`)),t.append(j,E)};t.if(jt,j=>{t.get(s).row&&j(Tt)})}var nt=t.sibling(jt,2);{var Dt=j=>{var E=qe(),yt=t.sibling(t.child(E));t.reset(E),t.template_effect(()=>t.set_text(yt,` ${t.get(s).shelf??""}`)),t.append(j,E)};t.if(nt,j=>{t.get(s).shelf&&j(Dt)})}var zt=t.sibling(nt,2);{var At=j=>{var E=Pe(),yt=t.sibling(t.child(E));t.reset(E),t.template_effect(()=>t.set_text(yt,` ${t.get(s).temperature_zone??""}`)),t.append(j,E)};t.if(zt,j=>{t.get(s).temperature_zone&&j(At)})}t.reset(Pt),t.reset(h),t.template_effect(j=>{t.set_text(i,t.get(s).item_name),t.set_text(y,t.get(s).item_code),t.set_text(I,` ${t.get(s).item_type??""}`),t.set_text(V,` ${t.get(s).quantity_initial??""} ${t.get(s).unit??""}`),t.set_text(ut,`${t.get(s).quantity_remaining??""} ${t.get(s).unit??""}`),t.set_text(G,` ${j??""}`),t.set_text(St,t.get(s).supplier_name??"N/A"),t.set_text(kt,t.get(s).warehouse??"Nespecificat")},[()=>{var j;return t.get(s).reception_date??((j=t.get(s).created_at)==null?void 0:j.slice(0,10))}]),t.append(x,h)};t.if(M,x=>{t.get(D)==="info"&&x(v)})}var _=t.sibling(M,2);{var b=x=>{var h=t.comment(),o=t.first_child(h);{var w=i=>{var a=De();t.append(i,a)},N=i=>{var a=Te(),u=t.sibling(t.child(a),2),y=t.child(u,!0);t.reset(u),t.reset(a),t.template_effect(P=>t.set_text(y,P),[()=>Y(t.get(Z))]),t.append(i,a)};t.if(o,i=>{t.get(Z)?i(N,-1):i(w)})}t.append(x,h)};t.if(_,x=>{t.get(D)==="tree"&&x(b)})}var O=t.sibling(_,2);{var H=x=>{var h=Ae(),o=t.child(h),w=t.sibling(t.child(o)),N=t.child(w);t.each(N,17,()=>t.get(W),t.index,(u,y)=>{var P=Oe(),I=t.child(P),e=t.child(I,!0);t.reset(I);var l=t.sibling(I),d=t.child(l),p=t.child(d,!0);t.reset(d),t.reset(l);var c=t.sibling(l),$=t.child(c);t.reset(c);var V=t.sibling(c),U=t.child(V,!0);t.reset(V);var ct=t.sibling(V),ut=t.child(ct,!0);t.reset(ct),t.reset(P),t.template_effect((B,F)=>{t.set_text(e,B),t.set_text(p,t.get(y).type),t.set_text($,`${t.get(y).quantity>0?"+":""}${t.get(y).quantity??""} ${t.get(y).unit??""}`),t.set_text(U,t.get(y).reference_number??"—"),t.set_text(ut,F)},[()=>new Date(t.get(y).performed_at).toLocaleString("ro-RO"),()=>[t.get(y).from_warehouse,t.get(y).to_warehouse].filter(Boolean).join(" → ")||"—"]),t.append(u,P)});var i=t.sibling(N);{var a=u=>{var y=ze();t.append(u,y)};t.if(i,u=>{t.get(W).length===0&&u(a)})}t.reset(w),t.reset(o),t.reset(h),t.append(x,h)};t.if(O,x=>{t.get(D)==="timeline"&&x(H)})}t.template_effect(()=>{t.set_class(dt,1,`tab ${t.get(D)==="info"?"tab-active":""}`),t.set_class(m,1,`tab ${t.get(D)==="tree"?"tab-active":""}`),t.set_class(k,1,`tab ${t.get(D)==="timeline"?"tab-active":""}`)}),t.delegated("click",q,X),t.delegated("click",dt,()=>t.set(D,"info")),t.delegated("click",m,()=>{t.set(D,"tree"),K()}),t.delegated("click",k,()=>t.set(D,"timeline")),t.append(g,Q)};t.if(ht,g=>{t.get(A)?g(pt):t.get(s)&&g(Rt,1)})}t.reset(ft),t.append(lt,ft),t.pop()}t.delegate(["click"]);var Fe=t.from_html('<div class="alert alert-success mb-4"><div><div class="font-bold">Lot creat cu succes: <span class="font-mono"> </span></div> <div class="text-sm">Statusul inițial: carantină. Eliberați lotul după verificare.</div> <div class="mt-2 flex gap-2"><a class="btn btn-sm btn-success">Detalii lot</a> <a target="_blank" class="btn btn-sm btn-outline">🖨 Printează etichetă</a></div></div></div>'),Ee=t.from_html('<div class="alert alert-error mb-4"> </div>'),Je=t.from_html("<option> </option>"),Ue=t.from_html("<option> </option>"),Ve=t.from_html("<option> </option>"),Be=t.from_html("<option> </option>"),He=t.from_html('<div class="p-6 max-w-2xl"><h1 class="text-2xl font-bold mb-6">Recepție materie primă</h1> <!> <!> <form class="space-y-4"><div class="card bg-base-200 p-4"><h3 class="font-semibold mb-2">Scanare GS1 (opțional)</h3> <div class="flex gap-2"><input type="text" class="input input-bordered flex-1" placeholder="Scanați codul GS1-128 de pe eticheta furnizorului..."/> <button type="button" class="btn btn-outline btn-sm">Parsează</button></div></div> <div class="grid grid-cols-2 gap-4"><div class="col-span-2"><label class="label"><span class="label-text font-medium">Produs *</span></label> <select class="select select-bordered w-full" required=""><option>Selectați produsul...</option><!></select></div> <div><label class="label"><span class="label-text font-medium">Cantitate *</span></label> <input type="number" class="input input-bordered w-full" min="0.001" step="0.001" required=""/></div> <div><label class="label"><span class="label-text font-medium">Unitate *</span></label> <select class="select select-bordered w-full"></select></div> <div><label class="label"><span class="label-text font-medium">Furnizor</span></label> <select class="select select-bordered w-full"><option>—</option><!></select></div> <div><label class="label"><span class="label-text font-medium">Lot furnizor</span></label> <input type="text" class="input input-bordered w-full"/></div> <div><label class="label"><span class="label-text font-medium">Data valabilitate (BBD)</span></label> <input type="date" class="input input-bordered w-full"/></div> <div><label class="label"><span class="label-text font-medium">Data recepție *</span></label> <input type="date" class="input input-bordered w-full" required=""/></div> <div><label class="label"><span class="label-text font-medium">Factură / Aviz</span></label> <input type="text" class="input input-bordered w-full"/></div> <div><label class="label"><span class="label-text font-medium">Locație</span></label> <select class="select select-bordered w-full"><option>—</option><!></select></div> <div class="col-span-2"><label class="label"><span class="label-text font-medium">Note</span></label> <textarea class="textarea textarea-bordered w-full" rows="2"></textarea></div></div> <div class="flex justify-end gap-3"><a href="/admin/trace/lots" class="btn btn-ghost">Anulează</a> <button type="submit" class="btn btn-primary"> </button></div></form></div>');function Me(lt,bt){t.push(bt,!0);const T="/api/trace";let s=t.state(t.proxy([])),W=t.state(t.proxy([])),Z=t.state(t.proxy([])),A=t.state(!1),n=t.state(null),D=t.state(""),r=t.state(t.proxy({item_id:"",lot_type:"inbound",quantity_initial:"",unit:"kg",supplier_id:"",supplier_lot_ref:"",best_before_date:"",production_date:"",reception_date:new Date().toISOString().slice(0,10),invoice_ref:"",location_id:"",notes:"",gs1_raw:""}));t.user_effect(()=>{Promise.all([fetch(`${T}/items?type=raw`).then(e=>e.json()).then(e=>{t.set(s,e.data??[],!0)}),fetch(`${T}/suppliers`).then(e=>e.json()).then(e=>{t.set(W,e.data??[],!0)}),fetch(`${T}/locations`).then(e=>e.json()).then(e=>{t.set(Z,e.data??[],!0)})])});async function st(){if(t.get(r).gs1_raw.trim())try{const l=(await(await fetch(`${T}/scan/parse-gs1`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({raw:t.get(r).gs1_raw})})).json()).data;l.supplier_lot_ref&&(t.get(r).supplier_lot_ref=l.supplier_lot_ref),l.best_before_date&&(t.get(r).best_before_date=l.best_before_date)}catch{}}async function K(e){e.preventDefault(),t.set(A,!0),t.set(D,""),t.set(n,null);try{const l={item_id:t.get(r).item_id,lot_type:t.get(r).lot_type,quantity_initial:parseFloat(t.get(r).quantity_initial),unit:t.get(r).unit,reception_date:t.get(r).reception_date};t.get(r).supplier_id&&(l.supplier_id=t.get(r).supplier_id),t.get(r).supplier_lot_ref&&(l.supplier_lot_ref=t.get(r).supplier_lot_ref),t.get(r).best_before_date&&(l.best_before_date=t.get(r).best_before_date),t.get(r).production_date&&(l.production_date=t.get(r).production_date),t.get(r).invoice_ref&&(l.invoice_ref=t.get(r).invoice_ref),t.get(r).location_id&&(l.location_id=t.get(r).location_id),t.get(r).notes&&(l.notes=t.get(r).notes);const d=await fetch(`${T}/lots`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(l)});if(!d.ok)throw new Error(await d.text());t.set(n,(await d.json()).data,!0),t.set(r,{...t.get(r),item_id:"",quantity_initial:"",supplier_lot_ref:"",best_before_date:"",production_date:"",invoice_ref:"",notes:"",gs1_raw:""},!0)}catch(l){t.set(D,l.message,!0)}finally{t.set(A,!1)}}var f=He(),X=t.sibling(t.child(f),2);{var J=e=>{var l=Fe(),d=t.child(l),p=t.child(d),c=t.sibling(t.child(p)),$=t.child(c,!0);t.reset(c),t.reset(p);var V=t.sibling(p,4),U=t.child(V),ct=t.sibling(U,2);t.reset(V),t.reset(d),t.reset(l),t.template_effect(()=>{t.set_text($,t.get(n).lot_number),t.set_attribute(U,"href",`/admin/trace/lots/${t.get(n).id??""}`),t.set_attribute(ct,"href",`/api/trace/labels/${t.get(n).id??""}`)}),t.append(e,l)};t.if(X,e=>{t.get(n)&&e(J)})}var Y=t.sibling(X,2);{var ft=e=>{var l=Ee(),d=t.child(l,!0);t.reset(l),t.template_effect(()=>t.set_text(d,t.get(D))),t.append(e,l)};t.if(Y,e=>{t.get(D)&&e(ft)})}var mt=t.sibling(Y,2),wt=t.child(mt),Ct=t.sibling(t.child(wt),2),ot=t.child(Ct);t.remove_input_defaults(ot);var $t=t.sibling(ot,2);t.reset(Ct),t.reset(wt);var ht=t.sibling(wt,2),pt=t.child(ht),Rt=t.sibling(t.child(pt),2),g=t.child(Rt);g.value=g.__value="";var Q=t.sibling(g);t.each(Q,17,()=>t.get(s),t.index,(e,l)=>{var d=Je(),p=t.child(d);t.reset(d);var c={};t.template_effect(()=>{t.set_text(p,`${t.get(l).name??""} (${t.get(l).code??""})`),c!==(c=t.get(l).id)&&(d.value=(d.__value=t.get(l).id)??"")}),t.append(e,d)}),t.reset(Rt),t.reset(pt);var C=t.sibling(pt,2),tt=t.sibling(t.child(C),2);t.remove_input_defaults(tt),t.reset(C);var et=t.sibling(C,2),q=t.sibling(t.child(et),2);t.each(q,20,()=>["kg","g","l","ml","buc","cutie","sac","palet"],t.index,(e,l)=>{var d=Ue(),p=t.child(d,!0);t.reset(d);var c={};t.template_effect(()=>{t.set_text(p,l),c!==(c=l)&&(d.value=(d.__value=l)??"")}),t.append(e,d)}),t.reset(q),t.reset(et);var L=t.sibling(et,2),dt=t.sibling(t.child(L),2),m=t.child(dt);m.value=m.__value="";var k=t.sibling(m);t.each(k,17,()=>t.get(W),t.index,(e,l)=>{var d=Ve(),p=t.child(d,!0);t.reset(d);var c={};t.template_effect(()=>{t.set_text(p,t.get(l).name),c!==(c=t.get(l).id)&&(d.value=(d.__value=t.get(l).id)??"")}),t.append(e,d)}),t.reset(dt),t.reset(L);var M=t.sibling(L,2),v=t.sibling(t.child(M),2);t.remove_input_defaults(v),t.reset(M);var _=t.sibling(M,2),b=t.sibling(t.child(_),2);t.remove_input_defaults(b),t.reset(_);var O=t.sibling(_,2),H=t.sibling(t.child(O),2);t.remove_input_defaults(H),t.reset(O);var x=t.sibling(O,2),h=t.sibling(t.child(x),2);t.remove_input_defaults(h),t.reset(x);var o=t.sibling(x,2),w=t.sibling(t.child(o),2),N=t.child(w);N.value=N.__value="";var i=t.sibling(N);t.each(i,17,()=>t.get(Z),t.index,(e,l)=>{var d=Be(),p=t.child(d);t.reset(d);var c={};t.template_effect(()=>{t.set_text(p,`${t.get(l).warehouse??""}${t.get(l).row?" / "+t.get(l).row:""}${t.get(l).shelf?" / "+t.get(l).shelf:""}`),c!==(c=t.get(l).id)&&(d.value=(d.__value=t.get(l).id)??"")}),t.append(e,d)}),t.reset(w),t.reset(o);var a=t.sibling(o,2),u=t.sibling(t.child(a),2);t.remove_textarea_child(u),t.reset(a),t.reset(ht);var y=t.sibling(ht,2),P=t.sibling(t.child(y),2),I=t.child(P,!0);t.reset(P),t.reset(y),t.reset(mt),t.reset(f),t.template_effect(()=>{P.disabled=t.get(A),t.set_text(I,t.get(A)?"Se salvează...":"Salvează și creează lot")}),t.event("submit",mt,K),t.delegated("change",ot,st),t.bind_value(ot,()=>t.get(r).gs1_raw,e=>t.get(r).gs1_raw=e),t.delegated("click",$t,st),t.bind_select_value(Rt,()=>t.get(r).item_id,e=>t.get(r).item_id=e),t.bind_value(tt,()=>t.get(r).quantity_initial,e=>t.get(r).quantity_initial=e),t.bind_select_value(q,()=>t.get(r).unit,e=>t.get(r).unit=e),t.bind_select_value(dt,()=>t.get(r).supplier_id,e=>t.get(r).supplier_id=e),t.bind_value(v,()=>t.get(r).supplier_lot_ref,e=>t.get(r).supplier_lot_ref=e),t.bind_value(b,()=>t.get(r).best_before_date,e=>t.get(r).best_before_date=e),t.bind_value(H,()=>t.get(r).reception_date,e=>t.get(r).reception_date=e),t.bind_value(h,()=>t.get(r).invoice_ref,e=>t.get(r).invoice_ref=e),t.bind_select_value(w,()=>t.get(r).location_id,e=>t.get(r).location_id=e),t.bind_value(u,()=>t.get(r).notes,e=>t.get(r).notes=e),t.append(lt,f),t.pop()}t.delegate(["change","click"]);var Ge=t.from_html('<div class="alert alert-error"> </div>'),Ze=t.from_html("<option> </option>"),Ke=t.from_html("<option> </option>"),Qe=t.from_html("<option> </option>"),We=t.from_html('<div class="card bg-base-200 p-4"><h3 class="font-bold mb-3">Ordin nou de producție</h3> <form class="grid grid-cols-2 gap-3"><div class="col-span-2"><label class="label-text font-medium">Produs finit *</label> <select class="select select-bordered w-full" required=""><option>Selectați produsul...</option><!></select></div> <div><label class="label-text">Rețetă (opțional)</label> <select class="select select-bordered w-full"><option>—</option><!></select></div> <div><label class="label-text">Cantitate planificată *</label> <div class="flex gap-2"><input type="number" class="input input-bordered flex-1" min="0.001" step="0.001" required=""/> <select class="select select-bordered w-24"></select></div></div> <div class="col-span-2 flex justify-end gap-2"><button type="button" class="btn btn-ghost btn-sm">Anulează</button> <button type="submit" class="btn btn-primary btn-sm">Creează</button></div></form></div>'),Xe=t.from_html('<tr><td class="font-mono text-xs"> </td><td class="text-sm"> </td><td><span> </span></td><td class="text-sm"> </td><td><button class="btn btn-ghost btn-xs">Deschide</button></td></tr>'),Ye=t.from_html('<tr><td colspan="5" class="text-center opacity-50 py-4">Niciun ordin</td></tr>'),ta=t.from_html('<button class="btn btn-warning btn-sm w-full">▶ Pornește producția</button>'),ea=t.from_html("<option> </option>"),aa=t.from_html('<div class="card bg-base-200 p-4"><h4 class="font-semibold mb-2">Înregistrare consum materie primă</h4> <form class="flex gap-2"><select class="select select-bordered select-sm flex-1" required=""><option>Selectați lot...</option><!></select> <input type="number" class="input input-bordered input-sm w-24" placeholder="Cant." min="0.001" step="0.001" required=""/> <button type="submit" class="btn btn-primary btn-sm">+</button></form></div> <div class="card bg-base-200 p-4"><h4 class="font-semibold mb-2">Verificare CCP (HACCP)</h4> <form class="grid grid-cols-2 gap-2"><input type="text" class="input input-bordered input-sm col-span-2" placeholder="Punct CCP (ex: Temperatura coacere)" required=""/> <div class="flex gap-1"><input type="number" class="input input-bordered input-sm flex-1" placeholder="Valoare" step="0.1" required=""/> <input type="text" class="input input-bordered input-sm w-16" placeholder="UM"/></div> <div class="flex items-center gap-2"><input type="number" class="input input-bordered input-sm w-24" placeholder="Limită min" step="0.1"/> <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" class="checkbox checkbox-success checkbox-sm"/> <span class="text-sm">OK</span></label></div> <button type="submit" class="btn btn-sm btn-success col-span-2">Înregistrează CCP</button></form></div>',1),ia=t.from_html('<div class="text-sm flex justify-between"><span class="font-mono"> </span> <span> </span> <span class="font-medium"> </span></div>'),sa=t.from_html('<div class="card bg-base-200 p-4"><h4 class="font-semibold mb-2"> </h4> <div class="space-y-1"></div></div>'),ra=t.from_html('<span class="opacity-60"> </span>'),la=t.from_html('<div class="flex items-center gap-2 text-sm py-1 border-b border-base-300"><span> </span> <span> <strong> </strong></span> <!></div>'),na=t.from_html('<div class="card bg-base-200 p-4"><h4 class="font-semibold mb-2"> </h4> <!></div>'),oa=t.from_html('<div class="space-y-3"><div class="card bg-base-200 p-4"><div class="flex items-center justify-between mb-2"><h3 class="font-bold font-mono"> </h3> <span> </span></div> <!></div> <!> <!> <!></div>'),da=t.from_html('<div class="p-6 space-y-4"><div class="flex items-center justify-between"><h1 class="text-2xl font-bold">Ordine de producție</h1> <button class="btn btn-primary btn-sm">+ Ordin nou</button></div> <!> <!> <div class="flex gap-3"><select class="select select-bordered select-sm"><option>Toate</option><option>Draft</option><option>În execuție</option><option>Finalizat</option></select></div> <div class="grid grid-cols-1 lg:grid-cols-2 gap-4"><div class="overflow-x-auto"><table class="table table-sm w-full"><thead><tr><th>Număr</th><th>Produs finit</th><th>Status</th><th>Cant.</th><th></th></tr></thead><tbody><!><!></tbody></table></div> <!></div></div>');function ca(lt,bt){t.push(bt,!0);const T="/api/trace";let s=t.state(t.proxy([])),W=t.state(!0),Z=t.state(""),A=t.state(""),n=t.state(!1),D=t.state(t.proxy([])),r=t.state(t.proxy([])),st=t.state(t.proxy([])),K=t.proxy({output_item_id:"",recipe_id:"",planned_quantity:"",unit:"kg",notes:""}),f=t.state(null),X=t.state(t.proxy({lot_id:"",quantity_used:""})),J=t.state(t.proxy({ccp:"",value:"",unit:"°C",limit_min:"",ok:!0})),Y=t.state(!1);t.user_effect(()=>{ft(),fetch(`${T}/items?type=finished`).then(i=>i.json()).then(i=>{t.set(D,i.data??[],!0)}),fetch(`${T}/production/recipes`).then(i=>i.json()).then(i=>{t.set(r,i.data??[],!0)})}),t.user_effect(()=>{t.get(A),ft()});async function ft(){t.set(W,!0);try{const i=new URLSearchParams;t.get(A)&&i.set("status",t.get(A));const a=await fetch(`${T}/production?${i}`);t.set(s,a.ok?(await a.json()).data:[],!0)}finally{t.set(W,!1)}}async function mt(i){const a=await fetch(`${T}/lots?status=available&limit=200`);t.set(st,a.ok?(await a.json()).data:[],!0)}async function wt(i){i.preventDefault(),t.set(Y,!0),t.set(Z,"");try{const a=await fetch(`${T}/production`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({output_item_id:K.output_item_id,recipe_id:K.recipe_id||void 0,planned_quantity:parseFloat(K.planned_quantity),unit:K.unit,notes:K.notes||void 0})});if(!a.ok)throw new Error(await a.text());t.set(n,!1),await ft()}catch(a){t.set(Z,a.message,!0)}finally{t.set(Y,!1)}}async function Ct(i){var a;await fetch(`${T}/production/${i}/start`,{method:"PATCH"}),await ft(),((a=t.get(f))==null?void 0:a.id)===i&&await ot(i)}async function ot(i){const a=await fetch(`${T}/production/${i}`);a.ok&&(t.set(f,(await a.json()).data,!0),await mt(t.get(f).output_lot_id))}async function $t(i){i.preventDefault(),t.set(Y,!0),t.set(Z,"");try{const a=await fetch(`${T}/production/${t.get(f).id}/consume`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({lot_id:t.get(X).lot_id,quantity_used:parseFloat(t.get(X).quantity_used)})});if(!a.ok)throw new Error(await a.text());t.set(X,{lot_id:"",quantity_used:""},!0),await ot(t.get(f).id)}catch(a){t.set(Z,a.message,!0)}finally{t.set(Y,!1)}}async function ht(i){i.preventDefault(),t.set(Y,!0);try{await fetch(`${T}/production/${t.get(f).id}/haccp`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({check:{ccp:t.get(J).ccp,value:parseFloat(t.get(J).value),unit:t.get(J).unit,limit_min:t.get(J).limit_min?parseFloat(t.get(J).limit_min):void 0,ok:t.get(J).ok,checked_at:new Date().toISOString()}})}),t.set(J,{ccp:"",value:"",unit:"°C",limit_min:"",ok:!0},!0),await ot(t.get(f).id)}finally{t.set(Y,!1)}}function pt(i){return{draft:"badge-ghost",in_progress:"badge-warning",completed:"badge-success",cancelled:"badge-error"}[i]??"badge-ghost"}var Rt=da(),g=t.child(Rt),Q=t.sibling(t.child(g),2);t.reset(g);var C=t.sibling(g,2);{var tt=i=>{var a=Ge(),u=t.child(a,!0);t.reset(a),t.template_effect(()=>t.set_text(u,t.get(Z))),t.append(i,a)};t.if(C,i=>{t.get(Z)&&i(tt)})}var et=t.sibling(C,2);{var q=i=>{var a=We(),u=t.sibling(t.child(a),2),y=t.child(u),P=t.sibling(t.child(y),2),I=t.child(P);I.value=I.__value="";var e=t.sibling(I);t.each(e,17,()=>t.get(D),t.index,(R,it)=>{var S=Ze(),G=t.child(S,!0);t.reset(S);var z={};t.template_effect(()=>{t.set_text(G,t.get(it).name),z!==(z=t.get(it).id)&&(S.value=(S.__value=t.get(it).id)??"")}),t.append(R,S)}),t.reset(P),t.reset(y);var l=t.sibling(y,2),d=t.sibling(t.child(l),2),p=t.child(d);p.value=p.__value="";var c=t.sibling(p);t.each(c,17,()=>t.get(r),t.index,(R,it)=>{var S=Ke(),G=t.child(S);t.reset(S);var z={};t.template_effect(()=>{t.set_text(G,`${t.get(it).name??""} v${t.get(it).version??""}`),z!==(z=t.get(it).id)&&(S.value=(S.__value=t.get(it).id)??"")}),t.append(R,S)}),t.reset(d),t.reset(l);var $=t.sibling(l,2),V=t.sibling(t.child($),2),U=t.child(V);t.remove_input_defaults(U);var ct=t.sibling(U,2);t.each(ct,20,()=>["kg","g","l","ml","buc","cutie","sac","palet"],t.index,(R,it)=>{var S=Qe(),G=t.child(S,!0);t.reset(S);var z={};t.template_effect(()=>{t.set_text(G,it),z!==(z=it)&&(S.value=(S.__value=it)??"")}),t.append(R,S)}),t.reset(ct),t.reset(V),t.reset($);var ut=t.sibling($,2),B=t.child(ut),F=t.sibling(B,2);t.reset(ut),t.reset(u),t.reset(a),t.template_effect(()=>F.disabled=t.get(Y)),t.event("submit",u,wt),t.bind_select_value(P,()=>K.output_item_id,R=>K.output_item_id=R),t.bind_select_value(d,()=>K.recipe_id,R=>K.recipe_id=R),t.bind_value(U,()=>K.planned_quantity,R=>K.planned_quantity=R),t.bind_select_value(ct,()=>K.unit,R=>K.unit=R),t.delegated("click",B,()=>t.set(n,!1)),t.append(i,a)};t.if(et,i=>{t.get(n)&&i(q)})}var L=t.sibling(et,2),dt=t.child(L),m=t.child(dt);m.value=m.__value="";var k=t.sibling(m);k.value=k.__value="draft";var M=t.sibling(k);M.value=M.__value="in_progress";var v=t.sibling(M);v.value=v.__value="completed",t.reset(dt),t.reset(L);var _=t.sibling(L,2),b=t.child(_),O=t.child(b),H=t.sibling(t.child(O)),x=t.child(H);t.each(x,17,()=>t.get(s),t.index,(i,a)=>{var u=Xe(),y=t.child(u),P=t.child(y,!0);t.reset(y);var I=t.sibling(y),e=t.child(I,!0);t.reset(I);var l=t.sibling(I),d=t.child(l),p=t.child(d,!0);t.reset(d),t.reset(l);var c=t.sibling(l),$=t.child(c);t.reset(c);var V=t.sibling(c),U=t.child(V);t.reset(V),t.reset(u),t.template_effect(ct=>{var ut;t.set_class(u,1,t.clsx(((ut=t.get(f))==null?void 0:ut.id)===t.get(a).id?"bg-primary/10":"")),t.set_text(P,t.get(a).order_number),t.set_text(e,t.get(a).output_item_name??"—"),t.set_class(d,1,`badge badge-sm ${ct??""}`),t.set_text(p,t.get(a).status),t.set_text($,`${t.get(a).planned_quantity??""} ${t.get(a).unit??""}`)},[()=>pt(t.get(a).status)]),t.delegated("click",U,()=>ot(t.get(a).id)),t.append(i,u)});var h=t.sibling(x);{var o=i=>{var a=Ye();t.append(i,a)};t.if(h,i=>{t.get(s).length===0&&!t.get(W)&&i(o)})}t.reset(H),t.reset(O),t.reset(b);var w=t.sibling(b,2);{var N=i=>{var a=oa(),u=t.child(a),y=t.child(u),P=t.child(y),I=t.child(P,!0);t.reset(P);var e=t.sibling(P,2),l=t.child(e,!0);t.reset(e),t.reset(y);var d=t.sibling(y,2);{var p=B=>{var F=ta();t.delegated("click",F,()=>Ct(t.get(f).id)),t.append(B,F)};t.if(d,B=>{t.get(f).status==="draft"&&B(p)})}t.reset(u);var c=t.sibling(u,2);{var $=B=>{var F=aa(),R=t.first_child(F),it=t.sibling(t.child(R),2),S=t.child(it),G=t.child(S);G.value=G.__value="";var z=t.sibling(G);t.each(z,17,()=>t.get(st),t.index,(nt,Dt)=>{var zt=ea(),At=t.child(zt);t.reset(zt);var j={};t.template_effect(()=>{t.set_text(At,`${t.get(Dt).lot_number??""} — ${t.get(Dt).item_name??""} (${t.get(Dt).quantity_remaining??""} ${t.get(Dt).unit??""})`),j!==(j=t.get(Dt).id)&&(zt.value=(zt.__value=t.get(Dt).id)??"")}),t.append(nt,zt)}),t.reset(S);var rt=t.sibling(S,2);t.remove_input_defaults(rt);var St=t.sibling(rt,2);t.reset(it),t.reset(R);var qt=t.sibling(R,2),vt=t.sibling(t.child(qt),2),at=t.child(vt);t.remove_input_defaults(at);var _t=t.sibling(at,2),gt=t.child(_t);t.remove_input_defaults(gt);var Ot=t.sibling(gt,2);t.remove_input_defaults(Ot),t.reset(_t);var Pt=t.sibling(_t,2),xt=t.child(Pt);t.remove_input_defaults(xt);var kt=t.sibling(xt,2),jt=t.child(kt);t.remove_input_defaults(jt),t.next(2),t.reset(kt),t.reset(Pt);var Tt=t.sibling(Pt,2);t.reset(vt),t.reset(qt),t.template_effect(()=>{St.disabled=t.get(Y),Tt.disabled=t.get(Y)}),t.event("submit",it,$t),t.bind_select_value(S,()=>t.get(X).lot_id,nt=>t.get(X).lot_id=nt),t.bind_value(rt,()=>t.get(X).quantity_used,nt=>t.get(X).quantity_used=nt),t.event("submit",vt,ht),t.bind_value(at,()=>t.get(J).ccp,nt=>t.get(J).ccp=nt),t.bind_value(gt,()=>t.get(J).value,nt=>t.get(J).value=nt),t.bind_value(Ot,()=>t.get(J).unit,nt=>t.get(J).unit=nt),t.bind_value(xt,()=>t.get(J).limit_min,nt=>t.get(J).limit_min=nt),t.bind_checked(jt,()=>t.get(J).ok,nt=>t.get(J).ok=nt),t.append(B,F)};t.if(c,B=>{t.get(f).status==="in_progress"&&B($)})}var V=t.sibling(c,2);{var U=B=>{var F=sa(),R=t.child(F),it=t.child(R);t.reset(R);var S=t.sibling(R,2);t.each(S,21,()=>t.get(f).consumptions,t.index,(G,z)=>{var rt=ia(),St=t.child(rt),qt=t.child(St,!0);t.reset(St);var vt=t.sibling(St,2),at=t.child(vt,!0);t.reset(vt);var _t=t.sibling(vt,2),gt=t.child(_t);t.reset(_t),t.reset(rt),t.template_effect(()=>{t.set_text(qt,t.get(z).lot_number),t.set_text(at,t.get(z).item_name),t.set_text(gt,`${t.get(z).quantity_used??""} ${t.get(z).unit??""}`)}),t.append(G,rt)}),t.reset(S),t.reset(F),t.template_effect(()=>t.set_text(it,`Consumuri (${t.get(f).consumptions.length??""})`)),t.append(B,F)};t.if(V,B=>{var F;(F=t.get(f).consumptions)!=null&&F.length&&B(U)})}var ct=t.sibling(V,2);{var ut=B=>{var F=na(),R=t.child(F),it=t.child(R);t.reset(R);var S=t.sibling(R,2);t.each(S,17,()=>t.get(f).haccp_checks,t.index,(G,z)=>{var rt=la(),St=t.child(rt),qt=t.child(St,!0);t.reset(St);var vt=t.sibling(St,2),at=t.child(vt),_t=t.sibling(at),gt=t.child(_t);t.reset(_t),t.reset(vt);var Ot=t.sibling(vt,2);{var Pt=xt=>{var kt=ra(),jt=t.child(kt);t.reset(kt),t.template_effect(()=>t.set_text(jt,`min ${t.get(z).limit_min??""}`)),t.append(xt,kt)};t.if(Ot,xt=>{t.get(z).limit_min&&xt(Pt)})}t.reset(rt),t.template_effect(()=>{t.set_class(St,1,t.clsx(t.get(z).ok?"text-success":"text-error")),t.set_text(qt,t.get(z).ok?"✓":"✗"),t.set_text(at,`${t.get(z).ccp??""}: `),t.set_text(gt,`${t.get(z).value??""} ${t.get(z).unit??""}`)}),t.append(G,rt)}),t.reset(F),t.template_effect(()=>t.set_text(it,`Verificări CCP (${t.get(f).haccp_checks.length??""})`)),t.append(B,F)};t.if(ct,B=>{var F;(F=t.get(f).haccp_checks)!=null&&F.length&&B(ut)})}t.reset(a),t.template_effect(B=>{t.set_text(I,t.get(f).order_number),t.set_class(e,1,`badge ${B??""}`),t.set_text(l,t.get(f).status)},[()=>pt(t.get(f).status)]),t.append(i,a)};t.if(w,i=>{t.get(f)&&i(N)})}t.reset(_),t.reset(Rt),t.delegated("click",Q,()=>t.set(n,!0)),t.bind_select_value(dt,()=>t.get(A),i=>t.set(A,i)),t.append(lt,Rt),t.pop()}t.delegate(["click"]);var va=t.from_html('<span class="badge badge-error badge-sm ml-1"> </span>'),_a=t.from_html('<div class="alert alert-error"> </div>'),pa=t.from_html('<div class="text-sm flex justify-between py-1 border-b border-base-300"><span class="font-mono"> </span> <span> </span> <span> </span> <span class="badge badge-sm badge-outline"> </span></div>'),ua=t.from_html('<div class="card bg-base-200 p-4"><h4 class="font-semibold mb-2">Loturi finite afectate</h4> <div class="space-y-1"></div></div>'),ga=t.from_html('<div><div><div class="font-bold text-lg">Acțiune recomandată: <span class="uppercase"> </span></div> <div class="mt-2 grid grid-cols-3 gap-4 text-center"><div><div class="text-3xl font-bold"> </div> <div class="text-sm">Loturi afectate</div></div> <div><div class="text-3xl font-bold"> </div> <div class="text-sm">Clienți afectați</div></div> <div><div class="text-3xl font-bold"> </div> <div class="text-sm">Livrări afectate</div></div></div></div></div> <!> <div class="card bg-base-200 p-4"><h3 class="font-bold text-error mb-3">⚠ Pasul 2 — Declanșare recall REAL</h3> <p class="text-sm mb-3 opacity-70">Aceasta va marca toate loturile afectate ca "recalled" și va crea un dosar oficial.</p> <form class="space-y-3"><div><label class="label-text font-medium">Motiv recall *</label> <textarea class="textarea textarea-bordered w-full" rows="2" placeholder="Descrieți motivul retragerii (min 10 caractere)..." required=""></textarea></div> <div><label class="label-text font-medium">Tip recall</label> <select class="select select-bordered w-full"><option>Internal (fără distribuție externă)</option><option>Retragere de pe piață</option><option>Recall consumatori</option></select></div> <button type="submit" class="btn btn-error w-full"> </button></form></div>',1),ba=t.from_html('<div class="alert alert-success">Recall declanșat cu succes. ID: <span class="font-mono"> </span></div>'),fa=t.from_html('<div class="max-w-xl space-y-4"><div class="card bg-base-200 p-4"><h3 class="font-semibold mb-3">Pasul 1 — Identificați lotul suspect</h3> <div class="flex gap-2"><input type="text" class="input input-bordered flex-1" placeholder="UUID lot sau scanați QR-ul..."/> <button class="btn btn-primary"> </button></div></div> <!> <!> <!></div>'),ma=t.from_html('<div class="flex justify-center py-8"><span class="loading loading-spinner"></span></div>'),ha=t.from_html('<div class="text-center opacity-50 py-12">Niciun recall activ</div>'),xa=t.from_html('<form class="mt-3 flex gap-2"><input type="text" class="input input-bordered input-sm flex-1" placeholder="Note rezolvare (min 5 caractere)..." required=""/> <button type="submit" class="btn btn-sm btn-success">Confirmă</button> <button type="button" class="btn btn-sm btn-ghost">Anulează</button></form>'),ya=t.from_html('<div class="card bg-base-200 p-4"><div class="flex items-start justify-between"><div><div class="font-bold"> <span class="font-mono"> </span></div> <div class="text-sm opacity-70"> </div> <div class="text-sm mt-1"> </div> <span class="badge badge-error badge-sm mt-1"> </span></div> <button class="btn btn-sm btn-outline">Rezolvă</button></div> <!></div>'),wa=t.from_html('<div class="space-y-3"></div>'),$a=t.from_html('<div class="p-6 space-y-4"><h1 class="text-2xl font-bold">Recall / Retragere produs</h1> <div class="tabs tabs-bordered"><button>Simulator recall</button> <button>Recall-uri active <!></button></div> <!> <!></div>');function ka(lt,bt){t.push(bt,!0);const T="/api/trace";let s=t.state("simulate"),W=t.state(t.proxy([])),Z=t.state(!1),A=t.state(""),n=t.state(!1),D=t.state(null),r=t.state(""),st=t.proxy({reason:"",scope:"internal"}),K=t.state(!1),f=t.state(null),X=t.state(t.proxy({recallId:"",resolution_notes:""})),J=t.state(!1);t.user_effect(()=>{t.get(s)==="active"&&Y()});async function Y(){t.set(Z,!0);const q=await fetch(`${T}/recalls?status=active`);t.set(W,q.ok?(await q.json()).data:[],!0),t.set(Z,!1)}async function ft(){if(t.get(A).trim()){t.set(n,!0),t.set(r,""),t.set(D,null),t.set(f,null);try{const q=await fetch(`${T}/recalls/simulate/${t.get(A).trim()}`,{method:"POST"});if(!q.ok)throw new Error(await q.text());t.set(D,(await q.json()).data,!0)}catch(q){t.set(r,q.message,!0)}finally{t.set(n,!1)}}}async function mt(q){if(q.preventDefault(),!!confirm(`Confirmați declanșarea unui recall REAL (${st.scope})?`)){t.set(K,!0),t.set(r,"");try{const L=await fetch(`${T}/recalls/initiate`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({lot_id:t.get(A).trim(),reason:st.reason,scope:st.scope})});if(!L.ok)throw new Error(await L.text());t.set(f,(await L.json()).data,!0),t.set(D,null),await Y()}catch(L){t.set(r,L.message,!0)}finally{t.set(K,!1)}}}async function wt(q){q.preventDefault(),t.set(J,!0);try{const L=await fetch(`${T}/recalls/${t.get(X).recallId}/resolve`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({resolution_notes:t.get(X).resolution_notes})});if(!L.ok)throw new Error(await L.text());t.set(X,{recallId:"",resolution_notes:""},!0),await Y()}finally{t.set(J,!1)}}function Ct(q){return{consumer_recall:"alert-error",market_withdrawal:"alert-warning",internal:"alert-info"}[q]??"alert-info"}var ot=$a(),$t=t.sibling(t.child(ot),2),ht=t.child($t),pt=t.sibling(ht,2),Rt=t.sibling(t.child(pt));{var g=q=>{var L=va(),dt=t.child(L,!0);t.reset(L),t.template_effect(()=>t.set_text(dt,t.get(W).length)),t.append(q,L)};t.if(Rt,q=>{t.get(W).length&&q(g)})}t.reset(pt),t.reset($t);var Q=t.sibling($t,2);{var C=q=>{var L=fa(),dt=t.child(L),m=t.sibling(t.child(dt),2),k=t.child(m);t.remove_input_defaults(k);var M=t.sibling(k,2),v=t.child(M,!0);t.reset(M),t.reset(m),t.reset(dt);var _=t.sibling(dt,2);{var b=o=>{var w=_a(),N=t.child(w,!0);t.reset(w),t.template_effect(()=>t.set_text(N,t.get(r))),t.append(o,w)};t.if(_,o=>{t.get(r)&&o(b)})}var O=t.sibling(_,2);{var H=o=>{var w=ga(),N=t.first_child(w),i=t.child(N),a=t.child(i),u=t.sibling(t.child(a)),y=t.child(u,!0);t.reset(u),t.reset(a);var P=t.sibling(a,2),I=t.child(P),e=t.child(I),l=t.child(e,!0);t.reset(e),t.next(2),t.reset(I);var d=t.sibling(I,2),p=t.child(d),c=t.child(p,!0);t.reset(p),t.next(2),t.reset(d);var $=t.sibling(d,2),V=t.child($),U=t.child(V,!0);t.reset(V),t.next(2),t.reset($),t.reset(P),t.reset(i),t.reset(N);var ct=t.sibling(N,2);{var ut=at=>{var _t=ua(),gt=t.sibling(t.child(_t),2);t.each(gt,21,()=>t.get(D).affected_lots,t.index,(Ot,Pt)=>{var xt=pa(),kt=t.child(xt),jt=t.child(kt,!0);t.reset(kt);var Tt=t.sibling(kt,2),nt=t.child(Tt,!0);t.reset(Tt);var Dt=t.sibling(Tt,2),zt=t.child(Dt);t.reset(Dt);var At=t.sibling(Dt,2),j=t.child(At,!0);t.reset(At),t.reset(xt),t.template_effect(()=>{t.set_text(jt,t.get(Pt).lot_number),t.set_text(nt,t.get(Pt).item_name),t.set_text(zt,`${t.get(Pt).quantity_remaining??""} ${t.get(Pt).unit??""}`),t.set_text(j,t.get(Pt).status)}),t.append(Ot,xt)}),t.reset(gt),t.reset(_t),t.append(at,_t)};t.if(ct,at=>{t.get(D).affected_lots.length>0&&at(ut)})}var B=t.sibling(ct,2),F=t.sibling(t.child(B),4),R=t.child(F),it=t.sibling(t.child(R),2);t.remove_textarea_child(it),t.set_attribute(it,"minlength",10),t.reset(R);var S=t.sibling(R,2),G=t.sibling(t.child(S),2),z=t.child(G);z.value=z.__value="internal";var rt=t.sibling(z);rt.value=rt.__value="market_withdrawal";var St=t.sibling(rt);St.value=St.__value="consumer_recall",t.reset(G),t.reset(S);var qt=t.sibling(S,2),vt=t.child(qt,!0);t.reset(qt),t.reset(F),t.reset(B),t.template_effect((at,_t,gt)=>{t.set_class(N,1,`alert ${at??""}`),t.set_text(y,_t),t.set_text(l,t.get(D).total_lots_affected),t.set_text(c,t.get(D).total_customers_affected),t.set_text(U,t.get(D).affected_customers.length),qt.disabled=gt,t.set_text(vt,t.get(K)?"Se procesează...":"🚨 Declanșează recall REAL")},[()=>Ct(t.get(D).recommended_action),()=>t.get(D).recommended_action.replace("_"," "),()=>t.get(K)||!st.reason.trim()]),t.event("submit",F,mt),t.bind_value(it,()=>st.reason,at=>st.reason=at),t.bind_select_value(G,()=>st.scope,at=>st.scope=at),t.append(o,w)};t.if(O,o=>{t.get(D)&&o(H)})}var x=t.sibling(O,2);{var h=o=>{var w=ba(),N=t.sibling(t.child(w)),i=t.child(N,!0);t.reset(N),t.reset(w),t.template_effect(()=>t.set_text(i,t.get(f).id)),t.append(o,w)};t.if(x,o=>{t.get(f)&&o(h)})}t.reset(L),t.template_effect(o=>{M.disabled=o,t.set_text(v,t.get(n)?"Calculez...":"Simulare")},[()=>t.get(n)||!t.get(A).trim()]),t.bind_value(k,()=>t.get(A),o=>t.set(A,o)),t.delegated("click",M,ft),t.append(q,L)};t.if(Q,q=>{t.get(s)==="simulate"&&q(C)})}var tt=t.sibling(Q,2);{var et=q=>{var L=t.comment(),dt=t.first_child(L);{var m=v=>{var _=ma();t.append(v,_)},k=v=>{var _=ha();t.append(v,_)},M=v=>{var _=wa();t.each(_,21,()=>t.get(W),t.index,(b,O)=>{var H=ya(),x=t.child(H),h=t.child(x),o=t.child(h),w=t.child(o),N=t.sibling(w),i=t.child(N,!0);t.reset(N),t.reset(o);var a=t.sibling(o,2),u=t.child(a,!0);t.reset(a);var y=t.sibling(a,2),P=t.child(y,!0);t.reset(y);var I=t.sibling(y,2),e=t.child(I,!0);t.reset(I),t.reset(h);var l=t.sibling(h,2);t.reset(x);var d=t.sibling(x,2);{var p=c=>{var $=xa(),V=t.child($);t.remove_input_defaults(V),t.set_attribute(V,"minlength",5);var U=t.sibling(V,2),ct=t.sibling(U,2);t.reset($),t.template_effect(()=>U.disabled=t.get(J)),t.event("submit",$,wt),t.bind_value(V,()=>t.get(X).resolution_notes,ut=>t.get(X).resolution_notes=ut),t.delegated("click",ct,()=>t.set(X,{recallId:"",resolution_notes:""},!0)),t.append(c,$)};t.if(d,c=>{t.get(X).recallId===t.get(O).id&&c(p)})}t.reset(H),t.template_effect((c,$)=>{t.set_text(w,`${t.get(O).item_name??""} — `),t.set_text(i,t.get(O).lot_number),t.set_text(u,c),t.set_text(P,t.get(O).reason),t.set_text(e,$)},[()=>new Date(t.get(O).initiated_at).toLocaleString("ro-RO"),()=>t.get(O).scope.replace("_"," ")]),t.delegated("click",l,()=>{t.get(X).recallId=t.get(O).id}),t.append(b,H)}),t.reset(_),t.append(v,_)};t.if(dt,v=>{t.get(Z)?v(m):t.get(W).length===0?v(k,1):v(M,-1)})}t.append(q,L)};t.if(tt,q=>{t.get(s)==="active"&&q(et)})}t.reset(ot),t.template_effect(()=>{t.set_class(ht,1,`tab ${t.get(s)==="simulate"?"tab-active":""}`),t.set_class(pt,1,`tab ${t.get(s)==="active"?"tab-active":""}`)}),t.delegated("click",ht,()=>t.set(s,"simulate")),t.delegated("click",pt,()=>t.set(s,"active")),t.append(lt,ot),t.pop()}t.delegate(["click"]);var Sa=t.from_html('<div><label class="label-text text-sm">De la</label> <input type="date" class="input input-bordered input-sm"/></div> <div><label class="label-text text-sm">Până la</label> <input type="date" class="input input-bordered input-sm"/></div>',1),ja=t.from_html('<button class="btn btn-outline btn-sm">⬇ Descarcă CSV</button>'),Ca=t.from_html('<div class="alert alert-error"> </div>'),qa=t.from_html('<div class="text-sm opacity-60"> <!> <!></div>'),Pa=t.from_html('<th class="whitespace-nowrap"> </th>'),Ra=t.from_html('<span class="font-mono text-xs opacity-70"> </span>'),Da=t.from_html('<td class="whitespace-nowrap max-w-xs overflow-hidden text-ellipsis"><!></td>'),Ta=t.from_html("<tr></tr>"),Oa=t.from_html('<div class="overflow-x-auto" style="max-height: 60vh;"><table class="table table-xs table-zebra w-full"><thead><tr></tr></thead><tbody></tbody></table></div>'),za=t.from_html('<div class="text-center opacity-50 py-12">Selectați parametrii și apăsați "Generează" pentru a vedea raportul.</div>'),Aa=t.from_html('<div class="p-6 space-y-4"><h1 class="text-2xl font-bold">Rapoarte</h1> <div class="flex flex-wrap gap-3 items-end"><div><label class="label-text text-sm">Raport</label> <select class="select select-bordered select-sm"><option>Registru Trasabilitate ANSVSA (Ord. 111/2008)</option><option>Jurnal Recepții</option><option>Jurnal Consumuri</option><option>Stoc Curent (snapshot)</option><option>Registru HACCP / CCP</option></select></div> <!> <button class="btn btn-primary btn-sm"> </button> <!></div> <!> <!> <!></div>');function La(lt,bt){t.push(bt,!0);const T="/api/trace";let s=t.state("ansvsa"),W=t.state(t.proxy(new Date(Date.now()-30*864e5).toISOString().slice(0,10))),Z=t.state(t.proxy(new Date().toISOString().slice(0,10))),A=t.state(!1),n=t.state(t.proxy([])),D=t.state(""),r=t.state(null);const st={ansvsa:"ansvsa-traceability",reception:"reception-log",consumption:"consumption-log",stock:"stock-snapshot",haccp:"haccp-log"};async function K(){t.set(A,!0),t.set(D,""),t.set(n,[],!0),t.set(r,null);try{const v=new URLSearchParams;t.get(s)!=="stock"&&(v.set("from",t.get(W)),v.set("to",t.get(Z)));const _=await fetch(`${T}/reports/${st[t.get(s)]}?${v}`);if(!_.ok)throw new Error(await _.text());const b=await _.json();t.set(n,b.data??[],!0),t.set(r,b.meta??null,!0)}catch(v){t.set(D,v.message,!0)}finally{t.set(A,!1)}}function f(){const v=new URLSearchParams({format:"csv"});t.get(s)!=="stock"&&(v.set("from",t.get(W)),v.set("to",t.get(Z))),window.open(`${T}/reports/${st[t.get(s)]}?${v}`,"_blank")}const X=t.derived(()=>t.get(n).length>0?Object.keys(t.get(n)[0]):[]);var J=Aa(),Y=t.sibling(t.child(J),2),ft=t.child(Y),mt=t.sibling(t.child(ft),2),wt=t.child(mt);wt.value=wt.__value="ansvsa";var Ct=t.sibling(wt);Ct.value=Ct.__value="reception";var ot=t.sibling(Ct);ot.value=ot.__value="consumption";var $t=t.sibling(ot);$t.value=$t.__value="stock";var ht=t.sibling($t);ht.value=ht.__value="haccp",t.reset(mt),t.reset(ft);var pt=t.sibling(ft,2);{var Rt=v=>{var _=Sa(),b=t.first_child(_),O=t.sibling(t.child(b),2);t.remove_input_defaults(O),t.reset(b);var H=t.sibling(b,2),x=t.sibling(t.child(H),2);t.remove_input_defaults(x),t.reset(H),t.bind_value(O,()=>t.get(W),h=>t.set(W,h)),t.bind_value(x,()=>t.get(Z),h=>t.set(Z,h)),t.append(v,_)};t.if(pt,v=>{t.get(s)!=="stock"&&v(Rt)})}var g=t.sibling(pt,2),Q=t.child(g,!0);t.reset(g);var C=t.sibling(g,2);{var tt=v=>{var _=ja();t.delegated("click",_,f),t.append(v,_)};t.if(C,v=>{t.get(n).length>0&&v(tt)})}t.reset(Y);var et=t.sibling(Y,2);{var q=v=>{var _=Ca(),b=t.child(_,!0);t.reset(_),t.template_effect(()=>t.set_text(b,t.get(D))),t.append(v,_)};t.if(et,v=>{t.get(D)&&v(q)})}var L=t.sibling(et,2);{var dt=v=>{var _=qa(),b=t.child(_),O=t.sibling(b);{var H=o=>{var w=t.text();t.template_effect(()=>t.set_text(w,`| Perioadă: ${t.get(r).from??""} — ${t.get(r).to??""}`)),t.append(o,w)};t.if(O,o=>{t.get(r).from&&o(H)})}var x=t.sibling(O,2);{var h=o=>{var w=t.text();t.template_effect(N=>t.set_text(w,`| Generat la: ${N??""}`),[()=>new Date(t.get(r).generated_at).toLocaleString("ro-RO")]),t.append(o,w)};t.if(x,o=>{t.get(r).generated_at&&o(h)})}t.reset(_),t.template_effect(()=>t.set_text(b,`${t.get(r).count??t.get(n).length??""} înregistrări `)),t.append(v,_)};t.if(L,v=>{t.get(r)&&v(dt)})}var m=t.sibling(L,2);{var k=v=>{var _=Oa(),b=t.child(_),O=t.child(b),H=t.child(O);t.each(H,21,()=>t.get(X),t.index,(h,o)=>{var w=Pa(),N=t.child(w,!0);t.reset(w),t.template_effect(()=>t.set_text(N,t.get(o))),t.append(h,w)}),t.reset(H),t.reset(O);var x=t.sibling(O);t.each(x,21,()=>t.get(n),t.index,(h,o)=>{var w=Ta();t.each(w,21,()=>t.get(X),t.index,(N,i)=>{var a=Da(),u=t.child(a);{var y=I=>{var e=Ra(),l=t.child(e);t.reset(e),t.template_effect((d,p)=>{t.set_attribute(e,"title",d),t.set_text(l,`[${p??""}]`)},[()=>JSON.stringify(t.get(o)[t.get(i)]),()=>Array.isArray(t.get(o)[t.get(i)])?t.get(o)[t.get(i)].length+" items":"obj"]),t.append(I,e)},P=I=>{var e=t.text();t.template_effect(()=>t.set_text(e,t.get(o)[t.get(i)]??"—")),t.append(I,e)};t.if(u,I=>{typeof t.get(o)[t.get(i)]=="object"&&t.get(o)[t.get(i)]!==null?I(y):I(P,-1)})}t.reset(a),t.append(N,a)}),t.reset(w),t.append(h,w)}),t.reset(x),t.reset(b),t.reset(_),t.append(v,_)},M=v=>{var _=za();t.append(v,_)};t.if(m,v=>{t.get(n).length>0?v(k):t.get(A)||v(M,1)})}t.reset(J),t.template_effect(()=>{g.disabled=t.get(A),t.set_text(Q,t.get(A)?"Se încarcă...":"Generează")}),t.bind_select_value(mt,()=>t.get(s),v=>t.set(s,v)),t.delegated("click",g,K),t.append(lt,J),t.pop()}t.delegate(["click"]);function Nt(){const lt=window.__zveltio;lt.registerRoute({path:"trace/lots",component:Zt,label:"Loturi",icon:"Package",category:"traceability",parent:"Trasabilitate"}),lt.registerRoute({path:"trace/lots/:id",component:Ie,hidden:!0}),lt.registerRoute({path:"trace/reception",component:Me,label:"Recepție",icon:"PackagePlus",category:"traceability",parent:"Trasabilitate"}),lt.registerRoute({path:"trace/production",component:ca,label:"Producție",icon:"Factory",category:"traceability",parent:"Trasabilitate"}),lt.registerRoute({path:"trace/recalls",component:ka,label:"Recall / Retragere",icon:"AlertTriangle",category:"traceability",parent:"Trasabilitate"}),lt.registerRoute({path:"trace/dispatches",component:ge,label:"Expedieri",icon:"Truck",category:"traceability",parent:"Trasabilitate"}),lt.registerRoute({path:"trace/reports",component:La,label:"Rapoarte ANSVSA",icon:"FileText",category:"traceability",parent:"Trasabilitate"})}return Nt(),Nt})(window.__SvelteRuntime.__unknown,window.__SvelteRuntime.internal_client);
+import "svelte/internal/disclose-version";
+import * as t from "svelte/internal/client";
+var Nt = t.from_html('<div class="alert alert-error"> </div>'), It = t.from_html('<div class="flex justify-center py-12"><span class="loading loading-spinner loading-lg"></span></div>'), Ft = t.from_html("<span> </span>"), Et = t.from_html('<tr><td class="font-mono text-sm"> </td><td><div class="font-medium"> </div> <div class="text-xs text-base-content/50"> </div></td><td class="text-sm"> </td><td><span> </span></td><td class="text-sm"> </td><td class="text-sm"><!></td><td class="text-xs"> </td><td><a class="btn btn-ghost btn-xs">Detalii</a></td></tr>'), Jt = t.from_html('<tr><td colspan="8" class="text-center text-base-content/50 py-8">Niciun lot găsit</td></tr>'), Ut = t.from_html('<div class="flex justify-center gap-2"><button class="btn btn-sm">‹</button> <span class="flex items-center px-3 text-sm"> </span> <button class="btn btn-sm">›</button></div>'), Vt = t.from_html('<div class="overflow-x-auto"><table class="table table-zebra w-full"><thead><tr><th>Număr lot</th><th>Produs</th><th>Furnizor</th><th>Status</th><th>Cant. rămasă</th><th>Valabilitate</th><th>Locație</th><th></th></tr></thead><tbody><!><!></tbody></table></div> <!>', 1), Bt = t.from_html('<div class="p-6 space-y-4"><div class="flex items-center justify-between"><h1 class="text-2xl font-bold">Loturi</h1> <a href="/admin/trace/reception" class="btn btn-primary btn-sm">+ Recepție nouă</a></div> <div class="flex gap-3 flex-wrap"><select class="select select-bordered select-sm"><option>Toate statusurile</option><option>Carantină</option><option>Disponibil</option><option>Epuizat</option><option>Retras</option></select></div> <!> <!></div>');
+function Ht(bt, Ct) {
+  t.push(Ct, !0);
+  const E = "/api/trace";
+  let r = t.state(t.proxy([])), W = t.state(!0), K = t.state(""), z = t.state(""), n = t.state(1), D = t.state(0);
+  const s = 50, st = t.derived(() => Math.ceil(t.get(D) / s));
+  async function Q() {
+    t.set(W, !0), t.set(K, "");
+    try {
+      const j = new URLSearchParams({ page: String(t.get(n)), limit: String(s) });
+      t.get(z) && j.set("status", t.get(z));
+      const tt = await fetch(`${E}/lots?${j}`);
+      if (!tt.ok) throw new Error(await tt.text());
+      const et = await tt.json();
+      t.set(r, et.data, !0), t.set(D, et.meta.total, !0);
+    } catch (j) {
+      t.set(K, j.message, !0);
+    } finally {
+      t.set(W, !1);
+    }
+  }
+  t.user_effect(() => {
+    Q();
+  }), t.user_effect(() => {
+    t.get(n), t.get(z), Q();
+  });
+  function f(j) {
+    return {
+      available: "badge-success",
+      quarantine: "badge-warning",
+      exhausted: "badge-neutral",
+      recalled: "badge-error",
+      returned: "badge-info"
+    }[j] ?? "badge-ghost";
+  }
+  function X(j) {
+    return j ? Math.ceil((new Date(j).getTime() - Date.now()) / 864e5) : 999;
+  }
+  var J = Bt(), Y = t.sibling(t.child(J), 2), gt = t.child(Y), ft = t.child(gt);
+  ft.value = ft.__value = "";
+  var yt = t.sibling(ft);
+  yt.value = yt.__value = "quarantine";
+  var jt = t.sibling(yt);
+  jt.value = jt.__value = "available";
+  var nt = t.sibling(jt);
+  nt.value = nt.__value = "exhausted";
+  var wt = t.sibling(nt);
+  wt.value = wt.__value = "recalled", t.reset(gt), t.reset(Y);
+  var mt = t.sibling(Y, 2);
+  {
+    var _t = (j) => {
+      var tt = Nt(), et = t.child(tt, !0);
+      t.reset(tt), t.template_effect(() => t.set_text(et, t.get(K))), t.append(j, tt);
+    };
+    t.if(mt, (j) => {
+      t.get(K) && j(_t);
+    });
+  }
+  var Rt = t.sibling(mt, 2);
+  {
+    var g = (j) => {
+      var tt = It();
+      t.append(j, tt);
+    }, Z = (j) => {
+      var tt = Vt(), et = t.first_child(tt), q = t.child(et), A = t.sibling(t.child(q)), ot = t.child(A);
+      t.each(ot, 17, () => t.get(r), t.index, (_, b) => {
+        const T = t.derived(() => X(t.get(b).best_before_date));
+        var H = Et(), x = t.child(H), h = t.child(x, !0);
+        t.reset(x);
+        var o = t.sibling(x), w = t.child(o), L = t.child(w, !0);
+        t.reset(w);
+        var i = t.sibling(w, 2), a = t.child(i, !0);
+        t.reset(i), t.reset(o);
+        var u = t.sibling(o), y = t.child(u, !0);
+        t.reset(u);
+        var P = t.sibling(u), N = t.child(P), e = t.child(N, !0);
+        t.reset(N), t.reset(P);
+        var l = t.sibling(P), d = t.child(l);
+        t.reset(l);
+        var p = t.sibling(l), c = t.child(p);
+        {
+          var $ = (I) => {
+            var R = Ft(), it = t.child(R, !0);
+            t.reset(R), t.template_effect(() => {
+              t.set_class(R, 1, t.clsx(t.get(T) <= 3 ? "text-error font-bold" : t.get(T) <= 7 ? "text-warning" : "")), t.set_text(it, t.get(b).best_before_date);
+            }), t.append(I, R);
+          }, V = (I) => {
+            var R = t.text("—");
+            t.append(I, R);
+          };
+          t.if(c, (I) => {
+            t.get(b).best_before_date ? I($) : I(V, -1);
+          });
+        }
+        t.reset(p);
+        var U = t.sibling(p), dt = t.child(U, !0);
+        t.reset(U);
+        var pt = t.sibling(U), B = t.child(pt);
+        t.reset(pt), t.reset(H), t.template_effect(
+          (I, R) => {
+            t.set_class(H, 1, t.clsx(t.get(T) <= 3 && t.get(b).status === "available" ? "bg-error/10" : t.get(T) <= 7 && t.get(b).status === "available" ? "bg-warning/10" : "")), t.set_text(h, t.get(b).lot_number), t.set_text(L, t.get(b).item_name), t.set_text(a, t.get(b).item_code), t.set_text(y, t.get(b).supplier_name ?? "—"), t.set_class(N, 1, `badge ${I ?? ""} badge-sm`), t.set_text(e, t.get(b).status), t.set_text(d, `${t.get(b).quantity_remaining ?? ""} ${t.get(b).unit ?? ""}`), t.set_text(dt, R), t.set_attribute(B, "href", `/admin/trace/lots/${t.get(b).id ?? ""}`);
+          },
+          [
+            () => f(t.get(b).status),
+            () => [t.get(b).warehouse, t.get(b).row, t.get(b).shelf].filter(Boolean).join(" / ") || "—"
+          ]
+        ), t.append(_, H);
+      });
+      var m = t.sibling(ot);
+      {
+        var k = (_) => {
+          var b = Jt();
+          t.append(_, b);
+        };
+        t.if(m, (_) => {
+          t.get(r).length === 0 && _(k);
+        });
+      }
+      t.reset(A), t.reset(q), t.reset(et);
+      var G = t.sibling(et, 2);
+      {
+        var v = (_) => {
+          var b = Ut(), T = t.child(b), H = t.sibling(T, 2), x = t.child(H);
+          t.reset(H);
+          var h = t.sibling(H, 2);
+          t.reset(b), t.template_effect(() => {
+            T.disabled = t.get(n) === 1, t.set_text(x, `Pagina ${t.get(n) ?? ""} din ${t.get(st) ?? ""}`), h.disabled = t.get(n) === t.get(st);
+          }), t.delegated("click", T, () => t.update(n, -1)), t.delegated("click", h, () => t.update(n)), t.append(_, b);
+        };
+        t.if(G, (_) => {
+          t.get(st) > 1 && _(v);
+        });
+      }
+      t.append(j, tt);
+    };
+    t.if(Rt, (j) => {
+      t.get(W) ? j(g) : j(Z, -1);
+    });
+  }
+  t.reset(J), t.bind_select_value(gt, () => t.get(z), (j) => t.set(z, j)), t.append(bt, J), t.pop();
+}
+t.delegate(["click"]);
+var Gt = t.from_html('<span class="badge badge-warning badge-sm ml-1"> </span>'), Mt = t.from_html('<div class="alert alert-error"> </div>'), Kt = t.from_html('<div class="alert alert-success mb-4">Expediere înregistrată cu succes pentru <strong> </strong>. <button class="btn btn-sm btn-ghost ml-2">+ Alta</button></div>'), Qt = t.from_html("<option> </option>"), Zt = t.from_html("<option> </option>"), Wt = t.from_html('<div class="max-w-lg"><!> <form class="space-y-3"><div><label class="label-text font-medium">Lot *</label> <select class="select select-bordered w-full" required=""><option>Selectați lot disponibil...</option><!></select></div> <div class="grid grid-cols-2 gap-3"><div><label class="label-text font-medium">Cantitate *</label> <input type="number" class="input input-bordered w-full" min="0.001" step="0.001" required=""/></div> <div><label class="label-text font-medium">UM</label> <select class="select select-bordered w-full"></select></div></div> <div><label class="label-text font-medium">Client *</label> <input type="text" class="input input-bordered w-full" required="" placeholder="Denumire client"/></div> <div><label class="label-text font-medium">Nr. factură / aviz (opțional)</label> <input type="text" class="input input-bordered w-full" placeholder="ex: INV-00123"/></div> <div><label class="label-text font-medium">Note</label> <textarea class="textarea textarea-bordered w-full" rows="2"></textarea></div> <button type="submit" class="btn btn-primary w-full"> </button></form></div>'), Xt = t.from_html('<div class="flex justify-center py-8"><span class="loading loading-spinner"></span></div>'), Yt = t.from_html('<tr><td class="text-sm font-medium"> </td><td><div class="text-sm"> </div> <div class="text-xs font-mono opacity-60"> </div></td><td class="text-sm"> </td><td class="text-xs opacity-60"> </td><td><button class="btn btn-ghost btn-xs"> </button></td></tr>'), te = t.from_html('<tr><td colspan="5" class="text-center opacity-50 py-6"> </td></tr>'), ee = t.from_html('<table class="table table-sm w-full"><thead><tr><th>Client</th><th>Produs / Lot</th><th>Cant. facturată</th><th>Factură</th><th></th></tr></thead><tbody><!><!></tbody></table>'), ae = t.from_html('<div class="flex justify-between"><span class="opacity-60">Valabilitate</span> <span class="font-medium"> </span></div>'), ie = t.from_html('<div class="flex justify-between"><span class="opacity-60">Factură</span> <span class="font-mono"> </span></div>'), se = t.from_html("<option> </option>"), re = t.from_html('<div class="alert alert-warning text-sm">Factura nu a avut lot specificat. Selectați lotul care se expediază:</div> <div class="flex gap-2"><select class="select select-bordered select-sm flex-1"><option>Selectați lot...</option><!></select> <button class="btn btn-sm btn-warning">Asignează</button></div>', 1), le = t.from_html('<form class="space-y-2"><div><label class="label-text text-sm font-medium">Cantitate efectiv expediată <span class="opacity-50"> </span></label> <input type="number" class="input input-bordered w-full" min="0.001" step="0.001" required=""/></div> <div><label class="label-text text-sm">Note</label> <textarea class="textarea textarea-bordered w-full" rows="2"></textarea></div> <div class="flex gap-2"><button type="submit" class="btn btn-success flex-1"> </button> <button type="button" class="btn btn-ghost btn-sm">Anulează</button></div></form>'), ne = t.from_html("<!> <!>", 1), oe = t.from_html('<div class="text-sm space-y-1"><div class="flex justify-between"><span class="opacity-60">Cantitate expediată</span> <span class="font-bold text-success"> </span></div> <div class="flex justify-between"><span class="opacity-60">Confirmat la</span> <span> </span></div></div>'), de = t.from_html('<div class="card bg-base-200 p-4 space-y-3"><h3 class="font-bold"> </h3> <div class="space-y-1 text-sm"><div class="flex justify-between"><span class="opacity-60">Produs (facturat)</span> <span> </span></div> <div class="flex justify-between"><span class="opacity-60">Lot</span> <span class="font-mono"> </span></div> <!> <div class="flex justify-between"><span class="opacity-60">Disponibil în lot</span> <span class="font-bold"> </span></div> <div class="flex justify-between"><span class="opacity-60">Cantitate facturată</span> <span> </span></div> <!></div> <!> <button class="btn btn-ghost btn-sm w-full">Închide</button></div>'), ce = t.from_html('<div class="grid grid-cols-1 lg:grid-cols-2 gap-4"><div class="overflow-x-auto"><!></div> <!></div>'), ve = t.from_html('<div class="p-6 space-y-4"><h1 class="text-2xl font-bold">Expedieri</h1> <div class="tabs tabs-bordered"><button>În așteptare <!></button> <button>Confirmate</button> <button>+ Expediere directă</button></div> <!> <!></div>');
+function _e(bt, Ct) {
+  t.push(Ct, !0);
+  const E = "/api/trace";
+  let r = t.state("pending"), W = t.state(t.proxy([])), K = t.state(!1), z = t.state(""), n = t.state(null), D = t.state(t.proxy({ quantity_dispatched: "", notes: "" })), s = t.state(""), st = t.state(t.proxy([])), Q = t.state(!1), f = t.state(t.proxy({
+    lot_id: "",
+    quantity_dispatched: "",
+    unit: "buc",
+    customer_name: "",
+    invoice_number: "",
+    notes: ""
+  })), X = t.state(!1), J = t.state(null);
+  t.user_effect(() => {
+    t.get(r), Y();
+  }), t.user_effect(() => {
+    t.get(r) === "direct" && fetch(`${E}/lots?status=available&limit=200`).then((m) => m.json()).then((m) => {
+      t.set(st, m.data ?? [], !0);
+    });
+  });
+  async function Y() {
+    t.set(K, !0), t.set(z, "");
+    try {
+      const m = t.get(r) === "pending" ? "pending" : t.get(r) === "confirmed" ? "confirmed" : null, k = m ? `?status=${m}` : "", G = await fetch(`${E}/dispatches${k}`);
+      t.set(W, G.ok ? (await G.json()).data : [], !0);
+    } catch (m) {
+      t.set(z, m.message, !0);
+    } finally {
+      t.set(K, !1);
+    }
+  }
+  async function gt(m) {
+    const k = await fetch(`${E}/dispatches/${m.id}`);
+    t.set(n, k.ok ? (await k.json()).data : m, !0), t.set(
+      D,
+      {
+        quantity_dispatched: String(t.get(n).quantity_invoiced ?? ""),
+        notes: ""
+      },
+      !0
+    ), t.set(s, t.get(n).lot_id ?? "", !0);
+  }
+  async function ft() {
+    if (!t.get(s) || !t.get(n)) return;
+    const m = await fetch(`${E}/dispatches/${t.get(n).id}/assign-lot`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lot_id: t.get(s) })
+    });
+    m.ok ? t.set(n, { ...t.get(n), lot_id: t.get(s) }, !0) : t.set(z, (await m.json()).error, !0);
+  }
+  async function yt(m) {
+    m.preventDefault(), t.set(Q, !0), t.set(z, "");
+    try {
+      const k = await fetch(`${E}/dispatches/${t.get(n).id}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quantity_dispatched: parseFloat(t.get(D).quantity_dispatched),
+          notes: t.get(D).notes || void 0
+        })
+      });
+      if (!k.ok) throw new Error((await k.json()).error);
+      t.set(n, null), await Y();
+    } catch (k) {
+      t.set(z, k.message, !0);
+    } finally {
+      t.set(Q, !1);
+    }
+  }
+  async function jt(m) {
+    yt("Anulați expedierea?") && (await fetch(`${E}/dispatches/${m}/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}"
+    }), t.set(n, null), await Y());
+  }
+  async function nt(m) {
+    m.preventDefault(), t.set(X, !0), t.set(z, ""), t.set(J, null);
+    try {
+      const k = await fetch(`${E}/dispatches/direct`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lot_id: t.get(f).lot_id,
+          quantity_dispatched: parseFloat(t.get(f).quantity_dispatched),
+          unit: t.get(f).unit,
+          customer_name: t.get(f).customer_name,
+          invoice_number: t.get(f).invoice_number || void 0,
+          notes: t.get(f).notes || void 0
+        })
+      });
+      if (!k.ok) throw new Error((await k.json()).error);
+      t.set(J, (await k.json()).data, !0), t.set(
+        f,
+        {
+          lot_id: "",
+          quantity_dispatched: "",
+          unit: "buc",
+          customer_name: "",
+          invoice_number: "",
+          notes: ""
+        },
+        !0
+      );
+    } catch (k) {
+      t.set(z, k.message, !0);
+    } finally {
+      t.set(X, !1);
+    }
+  }
+  var wt = ve(), mt = t.sibling(t.child(wt), 2), _t = t.child(mt), Rt = t.sibling(t.child(_t));
+  {
+    var g = (m) => {
+      var k = Gt(), G = t.child(k, !0);
+      t.reset(k), t.template_effect(() => t.set_text(G, t.get(W).length)), t.append(m, k);
+    };
+    t.if(Rt, (m) => {
+      t.get(r) === "pending" && t.get(W).length > 0 && m(g);
+    });
+  }
+  t.reset(_t);
+  var Z = t.sibling(_t, 2), j = t.sibling(Z, 2);
+  t.reset(mt);
+  var tt = t.sibling(mt, 2);
+  {
+    var et = (m) => {
+      var k = Mt(), G = t.child(k, !0);
+      t.reset(k), t.template_effect(() => t.set_text(G, t.get(z))), t.append(m, k);
+    };
+    t.if(tt, (m) => {
+      t.get(z) && m(et);
+    });
+  }
+  var q = t.sibling(tt, 2);
+  {
+    var A = (m) => {
+      var k = Wt(), G = t.child(k);
+      {
+        var v = (p) => {
+          var c = Kt(), $ = t.sibling(t.child(c)), V = t.child($, !0);
+          t.reset($);
+          var U = t.sibling($, 2);
+          t.reset(c), t.template_effect(() => t.set_text(V, t.get(J).customer_name)), t.delegated("click", U, () => t.set(J, null)), t.append(p, c);
+        };
+        t.if(G, (p) => {
+          t.get(J) && p(v);
+        });
+      }
+      var _ = t.sibling(G, 2), b = t.child(_), T = t.sibling(t.child(b), 2), H = t.child(T);
+      H.value = H.__value = "";
+      var x = t.sibling(H);
+      t.each(x, 17, () => t.get(st), t.index, (p, c) => {
+        var $ = Qt(), V = t.child($);
+        t.reset($);
+        var U = {};
+        t.template_effect(() => {
+          t.set_text(V, `${t.get(c).lot_number ?? ""} — ${t.get(c).item_name ?? ""} (${t.get(c).quantity_remaining ?? ""} ${t.get(c).unit ?? ""})
+                ${t.get(c).best_before_date ? " BBD: " + t.get(c).best_before_date : ""}`), U !== (U = t.get(c).id) && ($.value = ($.__value = t.get(c).id) ?? "");
+        }), t.append(p, $);
+      }), t.reset(T), t.reset(b);
+      var h = t.sibling(b, 2), o = t.child(h), w = t.sibling(t.child(o), 2);
+      t.remove_input_defaults(w), t.reset(o);
+      var L = t.sibling(o, 2), i = t.sibling(t.child(L), 2);
+      t.each(i, 20, () => ["kg", "g", "l", "ml", "buc", "cutie", "sac", "palet"], t.index, (p, c) => {
+        var $ = Zt(), V = t.child($, !0);
+        t.reset($);
+        var U = {};
+        t.template_effect(() => {
+          t.set_text(V, c), U !== (U = c) && ($.value = ($.__value = c) ?? "");
+        }), t.append(p, $);
+      }), t.reset(i), t.reset(L), t.reset(h);
+      var a = t.sibling(h, 2), u = t.sibling(t.child(a), 2);
+      t.remove_input_defaults(u), t.reset(a);
+      var y = t.sibling(a, 2), P = t.sibling(t.child(y), 2);
+      t.remove_input_defaults(P), t.reset(y);
+      var N = t.sibling(y, 2), e = t.sibling(t.child(N), 2);
+      t.remove_textarea_child(e), t.reset(N);
+      var l = t.sibling(N, 2), d = t.child(l, !0);
+      t.reset(l), t.reset(_), t.reset(k), t.template_effect(() => {
+        l.disabled = t.get(X), t.set_text(d, t.get(X) ? "Se înregistrează..." : "✓ Înregistrează expedierea");
+      }), t.event("submit", _, nt), t.bind_select_value(T, () => t.get(f).lot_id, (p) => t.get(f).lot_id = p), t.bind_value(w, () => t.get(f).quantity_dispatched, (p) => t.get(f).quantity_dispatched = p), t.bind_select_value(i, () => t.get(f).unit, (p) => t.get(f).unit = p), t.bind_value(u, () => t.get(f).customer_name, (p) => t.get(f).customer_name = p), t.bind_value(P, () => t.get(f).invoice_number, (p) => t.get(f).invoice_number = p), t.bind_value(e, () => t.get(f).notes, (p) => t.get(f).notes = p), t.append(m, k);
+    }, ot = (m) => {
+      var k = ce(), G = t.child(k), v = t.child(G);
+      {
+        var _ = (x) => {
+          var h = Xt();
+          t.append(x, h);
+        }, b = (x) => {
+          var h = ee(), o = t.sibling(t.child(h)), w = t.child(o);
+          t.each(w, 17, () => t.get(W), t.index, (a, u) => {
+            var y = Yt(), P = t.child(y), N = t.child(P, !0);
+            t.reset(P);
+            var e = t.sibling(P), l = t.child(e), d = t.child(l, !0);
+            t.reset(l);
+            var p = t.sibling(l, 2), c = t.child(p, !0);
+            t.reset(p), t.reset(e);
+            var $ = t.sibling(e), V = t.child($);
+            t.reset($);
+            var U = t.sibling($), dt = t.child(U, !0);
+            t.reset(U);
+            var pt = t.sibling(U), B = t.child(pt), I = t.child(B, !0);
+            t.reset(B), t.reset(pt), t.reset(y), t.template_effect(() => {
+              var R;
+              t.set_class(y, 1, t.clsx(((R = t.get(n)) == null ? void 0 : R.id) === t.get(u).id ? "bg-primary/10" : "")), t.set_text(N, t.get(u).customer_name ?? "—"), t.set_text(d, t.get(u).item_name_from_invoice ?? t.get(u).item_name ?? "?"), t.set_text(c, t.get(u).lot_number ?? "fără lot"), t.set_text(V, `${t.get(u).quantity_invoiced ?? ""} ${t.get(u).unit ?? ""}`), t.set_text(dt, t.get(u).invoice_number ?? "—"), t.set_text(I, t.get(r) === "pending" ? "Confirmă" : "Detalii");
+            }), t.delegated("click", B, () => gt(t.get(u))), t.append(a, y);
+          });
+          var L = t.sibling(w);
+          {
+            var i = (a) => {
+              var u = te(), y = t.child(u), P = t.child(y, !0);
+              t.reset(y), t.reset(u), t.template_effect(() => t.set_text(P, t.get(r) === "pending" ? "Nicio expediere în așteptare" : "Nicio expediere confirmată")), t.append(a, u);
+            };
+            t.if(L, (a) => {
+              t.get(W).length === 0 && a(i);
+            });
+          }
+          t.reset(o), t.reset(h), t.append(x, h);
+        };
+        t.if(v, (x) => {
+          t.get(K) ? x(_) : x(b, -1);
+        });
+      }
+      t.reset(G);
+      var T = t.sibling(G, 2);
+      {
+        var H = (x) => {
+          var h = de(), o = t.child(h), w = t.child(o, !0);
+          t.reset(o);
+          var L = t.sibling(o, 2), i = t.child(L), a = t.sibling(t.child(i), 2), u = t.child(a, !0);
+          t.reset(a), t.reset(i);
+          var y = t.sibling(i, 2), P = t.sibling(t.child(y), 2), N = t.child(P, !0);
+          t.reset(P), t.reset(y);
+          var e = t.sibling(y, 2);
+          {
+            var l = (S) => {
+              var M = ae(), O = t.sibling(t.child(M), 2), rt = t.child(O, !0);
+              t.reset(O), t.reset(M), t.template_effect(() => t.set_text(rt, t.get(n).best_before_date)), t.append(S, M);
+            };
+            t.if(e, (S) => {
+              t.get(n).best_before_date && S(l);
+            });
+          }
+          var d = t.sibling(e, 2), p = t.sibling(t.child(d), 2), c = t.child(p);
+          t.reset(p), t.reset(d);
+          var $ = t.sibling(d, 2), V = t.sibling(t.child($), 2), U = t.child(V);
+          t.reset(V), t.reset($);
+          var dt = t.sibling($, 2);
+          {
+            var pt = (S) => {
+              var M = ie(), O = t.sibling(t.child(M), 2), rt = t.child(O, !0);
+              t.reset(O), t.reset(M), t.template_effect(() => t.set_text(rt, t.get(n).invoice_number)), t.append(S, M);
+            };
+            t.if(dt, (S) => {
+              t.get(n).invoice_number && S(pt);
+            });
+          }
+          t.reset(L);
+          var B = t.sibling(L, 2);
+          {
+            var I = (S) => {
+              var M = ne(), O = t.first_child(M);
+              {
+                var rt = (ct) => {
+                  var at = re(), vt = t.sibling(t.first_child(at), 2), ut = t.child(vt), Ot = t.child(ut);
+                  Ot.value = Ot.__value = "";
+                  var Pt = t.sibling(Ot);
+                  t.each(Pt, 17, () => t.get(st), t.index, ($t, St) => {
+                    var Tt = se(), lt = t.child(Tt);
+                    t.reset(Tt);
+                    var Dt = {};
+                    t.template_effect(() => {
+                      t.set_text(lt, `${t.get(St).lot_number ?? ""} — ${t.get(St).item_name ?? ""} (${t.get(St).quantity_remaining ?? ""} ${t.get(St).unit ?? ""})`), Dt !== (Dt = t.get(St).id) && (Tt.value = (Tt.__value = t.get(St).id) ?? "");
+                    }), t.append($t, Tt);
+                  }), t.reset(ut);
+                  var ht = t.sibling(ut, 2);
+                  t.reset(vt), t.bind_select_value(ut, () => t.get(s), ($t) => t.set(s, $t)), t.delegated("click", ht, ft), t.append(ct, at);
+                };
+                t.if(O, (ct) => {
+                  t.get(n).lot_id || ct(rt);
+                });
+              }
+              var kt = t.sibling(O, 2);
+              {
+                var qt = (ct) => {
+                  var at = le(), vt = t.child(at), ut = t.child(vt), Ot = t.sibling(t.child(ut)), Pt = t.child(Ot);
+                  t.reset(Ot), t.reset(ut);
+                  var ht = t.sibling(ut, 2);
+                  t.remove_input_defaults(ht), t.reset(vt);
+                  var $t = t.sibling(vt, 2), St = t.sibling(t.child($t), 2);
+                  t.remove_textarea_child(St), t.reset($t);
+                  var Tt = t.sibling($t, 2), lt = t.child(Tt), Dt = t.child(lt, !0);
+                  t.reset(lt);
+                  var zt = t.sibling(lt, 2);
+                  t.reset(Tt), t.reset(at), t.template_effect(() => {
+                    t.set_text(Pt, `(max ${t.get(n).lot_qty_remaining ?? ""} ${t.get(n).unit ?? ""})`), t.set_attribute(ht, "max", t.get(n).lot_qty_remaining), lt.disabled = t.get(Q), t.set_text(Dt, t.get(Q) ? "Se procesează..." : "✓ Confirmă expedierea");
+                  }), t.event("submit", at, yt), t.bind_value(ht, () => t.get(D).quantity_dispatched, (At) => t.get(D).quantity_dispatched = At), t.bind_value(St, () => t.get(D).notes, (At) => t.get(D).notes = At), t.delegated("click", zt, () => jt(t.get(n).id)), t.append(ct, at);
+                };
+                t.if(kt, (ct) => {
+                  (t.get(n).lot_id || t.get(n).lot_number) && ct(qt);
+                });
+              }
+              t.append(S, M);
+            }, R = (S) => {
+              var M = oe(), O = t.child(M), rt = t.sibling(t.child(O), 2), kt = t.child(rt);
+              t.reset(rt), t.reset(O);
+              var qt = t.sibling(O, 2), ct = t.sibling(t.child(qt), 2), at = t.child(ct, !0);
+              t.reset(ct), t.reset(qt), t.reset(M), t.template_effect(
+                (vt) => {
+                  t.set_text(kt, `${t.get(n).quantity_dispatched ?? ""} ${t.get(n).unit ?? ""}`), t.set_text(at, vt);
+                },
+                [
+                  () => t.get(n).confirmed_at ? new Date(t.get(n).confirmed_at).toLocaleString("ro-RO") : "—"
+                ]
+              ), t.append(S, M);
+            };
+            t.if(B, (S) => {
+              t.get(r) === "pending" ? S(I) : S(R, -1);
+            });
+          }
+          var it = t.sibling(B, 2);
+          t.reset(h), t.template_effect(() => {
+            t.set_text(w, t.get(n).customer_name), t.set_text(u, t.get(n).item_name_from_invoice ?? "?"), t.set_text(N, t.get(n).lot_number ?? "—"), t.set_text(c, `${t.get(n).lot_qty_remaining ?? ""} ${t.get(n).unit ?? ""}`), t.set_text(U, `${t.get(n).quantity_invoiced ?? ""} ${t.get(n).unit ?? ""}`);
+          }), t.delegated("click", it, () => t.set(n, null)), t.append(x, h);
+        };
+        t.if(T, (x) => {
+          t.get(n) && x(H);
+        });
+      }
+      t.reset(k), t.append(m, k);
+    };
+    t.if(q, (m) => {
+      t.get(r) === "direct" ? m(A) : m(ot, -1);
+    });
+  }
+  t.reset(wt), t.template_effect(() => {
+    t.set_class(_t, 1, `tab ${t.get(r) === "pending" ? "tab-active" : ""}`), t.set_class(Z, 1, `tab ${t.get(r) === "confirmed" ? "tab-active" : ""}`), t.set_class(j, 1, `tab ${t.get(r) === "direct" ? "tab-active" : ""}`);
+  }), t.delegated("click", _t, () => {
+    t.set(r, "pending"), t.set(n, null);
+  }), t.delegated("click", Z, () => {
+    t.set(r, "confirmed"), t.set(n, null);
+  }), t.delegated("click", j, () => {
+    t.set(r, "direct"), t.set(n, null);
+  }), t.append(bt, wt), t.pop();
+}
+t.delegate(["click"]);
+var pe = t.from_html('<h1 class="text-2xl font-bold font-mono"> </h1> <span> </span>', 1), ue = t.from_html('<div class="alert alert-error"> </div>'), ge = t.from_html('<div class="flex justify-center py-12"><span class="loading loading-spinner loading-lg"></span></div>'), be = t.from_html('<button class="btn btn-success btn-sm"> </button>'), fe = t.from_html('<div><span class="text-sm opacity-60">Alergeni:</span> </div>'), me = t.from_html('<div><span class="text-sm opacity-60">Condiții:</span> </div>'), he = t.from_html('<div><span class="text-sm opacity-60">BBD:</span> <span class="font-bold"> </span></div>'), xe = t.from_html('<div><span class="text-sm opacity-60">Data producție:</span> </div>'), ye = t.from_html('<div><span class="text-sm opacity-60">CUI:</span> </div>'), we = t.from_html('<div><span class="text-sm opacity-60">Lot furnizor:</span> <span class="font-mono"> </span></div>'), $e = t.from_html('<div><span class="text-sm opacity-60">Factură:</span> </div>'), ke = t.from_html('<div><span class="text-sm opacity-60">Rând:</span> </div>'), Se = t.from_html('<div><span class="text-sm opacity-60">Raft:</span> </div>'), Ce = t.from_html('<div><span class="text-sm opacity-60">Zonă:</span> </div>'), je = t.from_html('<div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="card bg-base-200 p-4 space-y-2"><h3 class="font-bold">Produs</h3> <div><span class="text-sm opacity-60">Denumire:</span> <span class="font-medium"> </span></div> <div><span class="text-sm opacity-60">Cod:</span> <span class="font-mono"> </span></div> <div><span class="text-sm opacity-60">Tip:</span> </div> <!> <!></div> <div class="card bg-base-200 p-4 space-y-2"><h3 class="font-bold">Cantitate & Valabilitate</h3> <div><span class="text-sm opacity-60">Inițial:</span> </div> <div><span class="text-sm opacity-60">Rămas:</span> <span class="font-bold"> </span></div> <!> <!> <div><span class="text-sm opacity-60">Data recepție:</span> </div></div> <div class="card bg-base-200 p-4 space-y-2"><h3 class="font-bold">Furnizor</h3> <div> </div> <!> <!> <!></div> <div class="card bg-base-200 p-4 space-y-2"><h3 class="font-bold">Locație</h3> <div> </div> <!> <!> <!></div></div>'), qe = t.from_html('<div class="flex justify-center py-8"><span class="loading loading-spinner"></span></div>'), Pe = t.from_html('<div class="card bg-base-200 p-4"><h3 class="font-bold mb-3">Materii prime (upstream)</h3> <pre class="text-sm font-mono whitespace-pre-wrap"> </pre></div>'), Re = t.from_html('<tr><td class="text-xs"> </td><td><span class="badge badge-sm badge-outline"> </span></td><td class="font-mono"> </td><td class="text-sm"> </td><td class="text-xs"> </td></tr>'), De = t.from_html('<tr><td colspan="5" class="text-center opacity-50 py-4">Nicio mișcare înregistrată</td></tr>'), Te = t.from_html('<div class="overflow-x-auto"><table class="table table-sm w-full"><thead><tr><th>Data/Ora</th><th>Tip</th><th>Cantitate</th><th>Referință</th><th>Locație</th></tr></thead><tbody><!><!></tbody></table></div>'), Oe = t.from_html('<div class="flex gap-2"><!> <button class="btn btn-outline btn-sm">🖨 Printează etichetă</button></div> <div class="tabs tabs-bordered"><button>Informații</button> <button>Arbore trasabilitate</button> <button>Cronologie</button></div> <!> <!> <!>', 1), ze = t.from_html('<div class="p-6 space-y-4"><div class="flex items-center gap-3"><a href="/admin/trace/lots" class="btn btn-ghost btn-sm">← Înapoi</a> <!></div> <!> <!></div>');
+function Ae(bt, Ct) {
+  t.push(Ct, !0);
+  const E = "/api/trace";
+  let r = t.state(null), W = t.state(t.proxy([])), K = t.state(null), z = t.state(!0), n = t.state(""), D = t.state("info"), s = t.state(!1);
+  t.user_effect(() => {
+    st();
+  });
+  async function st() {
+    t.set(z, !0), t.set(n, "");
+    try {
+      const [g, Z] = await Promise.all([
+        fetch(`${E}/lots/${Ct.id}`),
+        fetch(`${E}/tree/${Ct.id}/timeline`)
+      ]);
+      if (!g.ok) throw new Error(await g.text());
+      t.set(r, (await g.json()).data, !0), t.set(W, Z.ok ? (await Z.json()).data : [], !0);
+    } catch (g) {
+      t.set(n, g.message, !0);
+    } finally {
+      t.set(z, !1);
+    }
+  }
+  async function Q() {
+    if (!t.get(K))
+      try {
+        const g = await fetch(`${E}/tree/${Ct.id}/upstream`);
+        t.set(K, g.ok ? (await g.json()).data : null, !0);
+      } catch {
+      }
+  }
+  async function f() {
+    if (confirm("Eliberați lotul din carantină?")) {
+      t.set(s, !0);
+      try {
+        const g = await fetch(`${E}/lots/${Ct.id}/release`, { method: "PATCH" });
+        if (!g.ok) throw new Error(await g.text());
+        await st();
+      } catch (g) {
+        alert(g.message);
+      } finally {
+        t.set(s, !1);
+      }
+    }
+  }
+  async function X() {
+    window.open(`${E}/labels/${Ct.id}`, "_blank");
+  }
+  function J(g) {
+    return {
+      available: "badge-success",
+      quarantine: "badge-warning",
+      exhausted: "badge-neutral",
+      recalled: "badge-error",
+      returned: "badge-info"
+    }[g] ?? "badge-ghost";
+  }
+  function Y(g, Z = 0) {
+    if (!g) return "";
+    const j = "  ".repeat(Z), tt = g.status ? ` [${g.status}]` : "", et = `${j}${g.item_name ?? "?"} — ${g.lot_number ?? g.lot_id}${tt}`, q = (g.inputs ?? []).map((A) => Y(A, Z + 1)).join(`
+`);
+    return q ? `${et}
+${q}` : et;
+  }
+  var gt = ze(), ft = t.child(gt), yt = t.sibling(t.child(ft), 2);
+  {
+    var jt = (g) => {
+      var Z = pe(), j = t.first_child(Z), tt = t.child(j, !0);
+      t.reset(j);
+      var et = t.sibling(j, 2), q = t.child(et, !0);
+      t.reset(et), t.template_effect(
+        (A) => {
+          t.set_text(tt, t.get(r).lot_number), t.set_class(et, 1, `badge ${A ?? ""}`), t.set_text(q, t.get(r).status);
+        },
+        [() => J(t.get(r).status)]
+      ), t.append(g, Z);
+    };
+    t.if(yt, (g) => {
+      t.get(r) && g(jt);
+    });
+  }
+  t.reset(ft);
+  var nt = t.sibling(ft, 2);
+  {
+    var wt = (g) => {
+      var Z = ue(), j = t.child(Z, !0);
+      t.reset(Z), t.template_effect(() => t.set_text(j, t.get(n))), t.append(g, Z);
+    };
+    t.if(nt, (g) => {
+      t.get(n) && g(wt);
+    });
+  }
+  var mt = t.sibling(nt, 2);
+  {
+    var _t = (g) => {
+      var Z = ge();
+      t.append(g, Z);
+    }, Rt = (g) => {
+      var Z = Oe(), j = t.first_child(Z), tt = t.child(j);
+      {
+        var et = (x) => {
+          var h = be(), o = t.child(h, !0);
+          t.reset(h), t.template_effect(() => {
+            h.disabled = t.get(s), t.set_text(o, t.get(s) ? "Se procesează..." : "✓ Eliberează din carantină");
+          }), t.delegated("click", h, f), t.append(x, h);
+        };
+        t.if(tt, (x) => {
+          t.get(r).status === "quarantine" && x(et);
+        });
+      }
+      var q = t.sibling(tt, 2);
+      t.reset(j);
+      var A = t.sibling(j, 2), ot = t.child(A), m = t.sibling(ot, 2), k = t.sibling(m, 2);
+      t.reset(A);
+      var G = t.sibling(A, 2);
+      {
+        var v = (x) => {
+          var h = je(), o = t.child(h), w = t.sibling(t.child(o), 2), L = t.sibling(t.child(w), 2), i = t.child(L, !0);
+          t.reset(L), t.reset(w);
+          var a = t.sibling(w, 2), u = t.sibling(t.child(a), 2), y = t.child(u, !0);
+          t.reset(u), t.reset(a);
+          var P = t.sibling(a, 2), N = t.sibling(t.child(P));
+          t.reset(P);
+          var e = t.sibling(P, 2);
+          {
+            var l = (C) => {
+              var F = fe(), xt = t.sibling(t.child(F));
+              t.reset(F), t.template_effect((Lt) => t.set_text(xt, ` ${Lt ?? ""}`), [() => t.get(r).allergens.join(", ")]), t.append(C, F);
+            };
+            t.if(e, (C) => {
+              var F;
+              (F = t.get(r).allergens) != null && F.length && C(l);
+            });
+          }
+          var d = t.sibling(e, 2);
+          {
+            var p = (C) => {
+              var F = me(), xt = t.sibling(t.child(F));
+              t.reset(F), t.template_effect(() => t.set_text(xt, ` ${t.get(r).storage_conditions ?? ""}`)), t.append(C, F);
+            };
+            t.if(d, (C) => {
+              t.get(r).storage_conditions && C(p);
+            });
+          }
+          t.reset(o);
+          var c = t.sibling(o, 2), $ = t.sibling(t.child(c), 2), V = t.sibling(t.child($));
+          t.reset($);
+          var U = t.sibling($, 2), dt = t.sibling(t.child(U), 2), pt = t.child(dt);
+          t.reset(dt), t.reset(U);
+          var B = t.sibling(U, 2);
+          {
+            var I = (C) => {
+              var F = he(), xt = t.sibling(t.child(F), 2), Lt = t.child(xt, !0);
+              t.reset(xt), t.reset(F), t.template_effect(() => t.set_text(Lt, t.get(r).best_before_date)), t.append(C, F);
+            };
+            t.if(B, (C) => {
+              t.get(r).best_before_date && C(I);
+            });
+          }
+          var R = t.sibling(B, 2);
+          {
+            var it = (C) => {
+              var F = xe(), xt = t.sibling(t.child(F));
+              t.reset(F), t.template_effect(() => t.set_text(xt, ` ${t.get(r).production_date ?? ""}`)), t.append(C, F);
+            };
+            t.if(R, (C) => {
+              t.get(r).production_date && C(it);
+            });
+          }
+          var S = t.sibling(R, 2), M = t.sibling(t.child(S));
+          t.reset(S), t.reset(c);
+          var O = t.sibling(c, 2), rt = t.sibling(t.child(O), 2), kt = t.child(rt, !0);
+          t.reset(rt);
+          var qt = t.sibling(rt, 2);
+          {
+            var ct = (C) => {
+              var F = ye(), xt = t.sibling(t.child(F));
+              t.reset(F), t.template_effect(() => t.set_text(xt, ` ${t.get(r).supplier_cui ?? ""}`)), t.append(C, F);
+            };
+            t.if(qt, (C) => {
+              t.get(r).supplier_cui && C(ct);
+            });
+          }
+          var at = t.sibling(qt, 2);
+          {
+            var vt = (C) => {
+              var F = we(), xt = t.sibling(t.child(F), 2), Lt = t.child(xt, !0);
+              t.reset(xt), t.reset(F), t.template_effect(() => t.set_text(Lt, t.get(r).supplier_lot_ref)), t.append(C, F);
+            };
+            t.if(at, (C) => {
+              t.get(r).supplier_lot_ref && C(vt);
+            });
+          }
+          var ut = t.sibling(at, 2);
+          {
+            var Ot = (C) => {
+              var F = $e(), xt = t.sibling(t.child(F));
+              t.reset(F), t.template_effect(() => t.set_text(xt, ` ${t.get(r).invoice_ref ?? ""}`)), t.append(C, F);
+            };
+            t.if(ut, (C) => {
+              t.get(r).invoice_ref && C(Ot);
+            });
+          }
+          t.reset(O);
+          var Pt = t.sibling(O, 2), ht = t.sibling(t.child(Pt), 2), $t = t.child(ht, !0);
+          t.reset(ht);
+          var St = t.sibling(ht, 2);
+          {
+            var Tt = (C) => {
+              var F = ke(), xt = t.sibling(t.child(F));
+              t.reset(F), t.template_effect(() => t.set_text(xt, ` ${t.get(r).row ?? ""}`)), t.append(C, F);
+            };
+            t.if(St, (C) => {
+              t.get(r).row && C(Tt);
+            });
+          }
+          var lt = t.sibling(St, 2);
+          {
+            var Dt = (C) => {
+              var F = Se(), xt = t.sibling(t.child(F));
+              t.reset(F), t.template_effect(() => t.set_text(xt, ` ${t.get(r).shelf ?? ""}`)), t.append(C, F);
+            };
+            t.if(lt, (C) => {
+              t.get(r).shelf && C(Dt);
+            });
+          }
+          var zt = t.sibling(lt, 2);
+          {
+            var At = (C) => {
+              var F = Ce(), xt = t.sibling(t.child(F));
+              t.reset(F), t.template_effect(() => t.set_text(xt, ` ${t.get(r).temperature_zone ?? ""}`)), t.append(C, F);
+            };
+            t.if(zt, (C) => {
+              t.get(r).temperature_zone && C(At);
+            });
+          }
+          t.reset(Pt), t.reset(h), t.template_effect(
+            (C) => {
+              t.set_text(i, t.get(r).item_name), t.set_text(y, t.get(r).item_code), t.set_text(N, ` ${t.get(r).item_type ?? ""}`), t.set_text(V, ` ${t.get(r).quantity_initial ?? ""} ${t.get(r).unit ?? ""}`), t.set_text(pt, `${t.get(r).quantity_remaining ?? ""} ${t.get(r).unit ?? ""}`), t.set_text(M, ` ${C ?? ""}`), t.set_text(kt, t.get(r).supplier_name ?? "N/A"), t.set_text($t, t.get(r).warehouse ?? "Nespecificat");
+            },
+            [
+              () => {
+                var C;
+                return t.get(r).reception_date ?? ((C = t.get(r).created_at) == null ? void 0 : C.slice(0, 10));
+              }
+            ]
+          ), t.append(x, h);
+        };
+        t.if(G, (x) => {
+          t.get(D) === "info" && x(v);
+        });
+      }
+      var _ = t.sibling(G, 2);
+      {
+        var b = (x) => {
+          var h = t.comment(), o = t.first_child(h);
+          {
+            var w = (i) => {
+              var a = qe();
+              t.append(i, a);
+            }, L = (i) => {
+              var a = Pe(), u = t.sibling(t.child(a), 2), y = t.child(u, !0);
+              t.reset(u), t.reset(a), t.template_effect((P) => t.set_text(y, P), [() => Y(t.get(K))]), t.append(i, a);
+            };
+            t.if(o, (i) => {
+              t.get(K) ? i(L, -1) : i(w);
+            });
+          }
+          t.append(x, h);
+        };
+        t.if(_, (x) => {
+          t.get(D) === "tree" && x(b);
+        });
+      }
+      var T = t.sibling(_, 2);
+      {
+        var H = (x) => {
+          var h = Te(), o = t.child(h), w = t.sibling(t.child(o)), L = t.child(w);
+          t.each(L, 17, () => t.get(W), t.index, (u, y) => {
+            var P = Re(), N = t.child(P), e = t.child(N, !0);
+            t.reset(N);
+            var l = t.sibling(N), d = t.child(l), p = t.child(d, !0);
+            t.reset(d), t.reset(l);
+            var c = t.sibling(l), $ = t.child(c);
+            t.reset(c);
+            var V = t.sibling(c), U = t.child(V, !0);
+            t.reset(V);
+            var dt = t.sibling(V), pt = t.child(dt, !0);
+            t.reset(dt), t.reset(P), t.template_effect(
+              (B, I) => {
+                t.set_text(e, B), t.set_text(p, t.get(y).type), t.set_text($, `${t.get(y).quantity > 0 ? "+" : ""}${t.get(y).quantity ?? ""} ${t.get(y).unit ?? ""}`), t.set_text(U, t.get(y).reference_number ?? "—"), t.set_text(pt, I);
+              },
+              [
+                () => new Date(t.get(y).performed_at).toLocaleString("ro-RO"),
+                () => [t.get(y).from_warehouse, t.get(y).to_warehouse].filter(Boolean).join(" → ") || "—"
+              ]
+            ), t.append(u, P);
+          });
+          var i = t.sibling(L);
+          {
+            var a = (u) => {
+              var y = De();
+              t.append(u, y);
+            };
+            t.if(i, (u) => {
+              t.get(W).length === 0 && u(a);
+            });
+          }
+          t.reset(w), t.reset(o), t.reset(h), t.append(x, h);
+        };
+        t.if(T, (x) => {
+          t.get(D) === "timeline" && x(H);
+        });
+      }
+      t.template_effect(() => {
+        t.set_class(ot, 1, `tab ${t.get(D) === "info" ? "tab-active" : ""}`), t.set_class(m, 1, `tab ${t.get(D) === "tree" ? "tab-active" : ""}`), t.set_class(k, 1, `tab ${t.get(D) === "timeline" ? "tab-active" : ""}`);
+      }), t.delegated("click", q, X), t.delegated("click", ot, () => t.set(D, "info")), t.delegated("click", m, () => {
+        t.set(D, "tree"), Q();
+      }), t.delegated("click", k, () => t.set(D, "timeline")), t.append(g, Z);
+    };
+    t.if(mt, (g) => {
+      t.get(z) ? g(_t) : t.get(r) && g(Rt, 1);
+    });
+  }
+  t.reset(gt), t.append(bt, gt), t.pop();
+}
+t.delegate(["click"]);
+var Le = t.from_html('<div class="alert alert-success mb-4"><div><div class="font-bold">Lot creat cu succes: <span class="font-mono"> </span></div> <div class="text-sm">Statusul inițial: carantină. Eliberați lotul după verificare.</div> <div class="mt-2 flex gap-2"><a class="btn btn-sm btn-success">Detalii lot</a> <a target="_blank" class="btn btn-sm btn-outline">🖨 Printează etichetă</a></div></div></div>'), Ne = t.from_html('<div class="alert alert-error mb-4"> </div>'), Ie = t.from_html("<option> </option>"), Fe = t.from_html("<option> </option>"), Ee = t.from_html("<option> </option>"), Je = t.from_html("<option> </option>"), Ue = t.from_html('<div class="p-6 max-w-2xl"><h1 class="text-2xl font-bold mb-6">Recepție materie primă</h1> <!> <!> <form class="space-y-4"><div class="card bg-base-200 p-4"><h3 class="font-semibold mb-2">Scanare GS1 (opțional)</h3> <div class="flex gap-2"><input type="text" class="input input-bordered flex-1" placeholder="Scanați codul GS1-128 de pe eticheta furnizorului..."/> <button type="button" class="btn btn-outline btn-sm">Parsează</button></div></div> <div class="grid grid-cols-2 gap-4"><div class="col-span-2"><label class="label"><span class="label-text font-medium">Produs *</span></label> <select class="select select-bordered w-full" required=""><option>Selectați produsul...</option><!></select></div> <div><label class="label"><span class="label-text font-medium">Cantitate *</span></label> <input type="number" class="input input-bordered w-full" min="0.001" step="0.001" required=""/></div> <div><label class="label"><span class="label-text font-medium">Unitate *</span></label> <select class="select select-bordered w-full"></select></div> <div><label class="label"><span class="label-text font-medium">Furnizor</span></label> <select class="select select-bordered w-full"><option>—</option><!></select></div> <div><label class="label"><span class="label-text font-medium">Lot furnizor</span></label> <input type="text" class="input input-bordered w-full"/></div> <div><label class="label"><span class="label-text font-medium">Data valabilitate (BBD)</span></label> <input type="date" class="input input-bordered w-full"/></div> <div><label class="label"><span class="label-text font-medium">Data recepție *</span></label> <input type="date" class="input input-bordered w-full" required=""/></div> <div><label class="label"><span class="label-text font-medium">Factură / Aviz</span></label> <input type="text" class="input input-bordered w-full"/></div> <div><label class="label"><span class="label-text font-medium">Locație</span></label> <select class="select select-bordered w-full"><option>—</option><!></select></div> <div class="col-span-2"><label class="label"><span class="label-text font-medium">Note</span></label> <textarea class="textarea textarea-bordered w-full" rows="2"></textarea></div></div> <div class="flex justify-end gap-3"><a href="/admin/trace/lots" class="btn btn-ghost">Anulează</a> <button type="submit" class="btn btn-primary"> </button></div></form></div>');
+function Ve(bt, Ct) {
+  t.push(Ct, !0);
+  const E = "/api/trace";
+  let r = t.state(t.proxy([])), W = t.state(t.proxy([])), K = t.state(t.proxy([])), z = t.state(!1), n = t.state(null), D = t.state(""), s = t.state(t.proxy({
+    item_id: "",
+    lot_type: "inbound",
+    quantity_initial: "",
+    unit: "kg",
+    supplier_id: "",
+    supplier_lot_ref: "",
+    best_before_date: "",
+    production_date: "",
+    reception_date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10),
+    invoice_ref: "",
+    location_id: "",
+    notes: "",
+    gs1_raw: ""
+  }));
+  t.user_effect(() => {
+    Promise.all([
+      fetch(`${E}/items?type=raw`).then((e) => e.json()).then((e) => {
+        t.set(r, e.data ?? [], !0);
+      }),
+      fetch(`${E}/suppliers`).then((e) => e.json()).then((e) => {
+        t.set(W, e.data ?? [], !0);
+      }),
+      fetch(`${E}/locations`).then((e) => e.json()).then((e) => {
+        t.set(K, e.data ?? [], !0);
+      })
+    ]);
+  });
+  async function st() {
+    if (t.get(s).gs1_raw.trim())
+      try {
+        const l = (await (await fetch(`${E}/scan/parse-gs1`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ raw: t.get(s).gs1_raw })
+        })).json()).data;
+        l.supplier_lot_ref && (t.get(s).supplier_lot_ref = l.supplier_lot_ref), l.best_before_date && (t.get(s).best_before_date = l.best_before_date);
+      } catch {
+      }
+  }
+  async function Q(e) {
+    e.preventDefault(), t.set(z, !0), t.set(D, ""), t.set(n, null);
+    try {
+      const l = {
+        item_id: t.get(s).item_id,
+        lot_type: t.get(s).lot_type,
+        quantity_initial: parseFloat(t.get(s).quantity_initial),
+        unit: t.get(s).unit,
+        reception_date: t.get(s).reception_date
+      };
+      t.get(s).supplier_id && (l.supplier_id = t.get(s).supplier_id), t.get(s).supplier_lot_ref && (l.supplier_lot_ref = t.get(s).supplier_lot_ref), t.get(s).best_before_date && (l.best_before_date = t.get(s).best_before_date), t.get(s).production_date && (l.production_date = t.get(s).production_date), t.get(s).invoice_ref && (l.invoice_ref = t.get(s).invoice_ref), t.get(s).location_id && (l.location_id = t.get(s).location_id), t.get(s).notes && (l.notes = t.get(s).notes);
+      const d = await fetch(`${E}/lots`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(l)
+      });
+      if (!d.ok) throw new Error(await d.text());
+      t.set(n, (await d.json()).data, !0), t.set(
+        s,
+        {
+          ...t.get(s),
+          item_id: "",
+          quantity_initial: "",
+          supplier_lot_ref: "",
+          best_before_date: "",
+          production_date: "",
+          invoice_ref: "",
+          notes: "",
+          gs1_raw: ""
+        },
+        !0
+      );
+    } catch (l) {
+      t.set(D, l.message, !0);
+    } finally {
+      t.set(z, !1);
+    }
+  }
+  var f = Ue(), X = t.sibling(t.child(f), 2);
+  {
+    var J = (e) => {
+      var l = Le(), d = t.child(l), p = t.child(d), c = t.sibling(t.child(p)), $ = t.child(c, !0);
+      t.reset(c), t.reset(p);
+      var V = t.sibling(p, 4), U = t.child(V), dt = t.sibling(U, 2);
+      t.reset(V), t.reset(d), t.reset(l), t.template_effect(() => {
+        t.set_text($, t.get(n).lot_number), t.set_attribute(U, "href", `/admin/trace/lots/${t.get(n).id ?? ""}`), t.set_attribute(dt, "href", `/api/trace/labels/${t.get(n).id ?? ""}`);
+      }), t.append(e, l);
+    };
+    t.if(X, (e) => {
+      t.get(n) && e(J);
+    });
+  }
+  var Y = t.sibling(X, 2);
+  {
+    var gt = (e) => {
+      var l = Ne(), d = t.child(l, !0);
+      t.reset(l), t.template_effect(() => t.set_text(d, t.get(D))), t.append(e, l);
+    };
+    t.if(Y, (e) => {
+      t.get(D) && e(gt);
+    });
+  }
+  var ft = t.sibling(Y, 2), yt = t.child(ft), jt = t.sibling(t.child(yt), 2), nt = t.child(jt);
+  t.remove_input_defaults(nt);
+  var wt = t.sibling(nt, 2);
+  t.reset(jt), t.reset(yt);
+  var mt = t.sibling(yt, 2), _t = t.child(mt), Rt = t.sibling(t.child(_t), 2), g = t.child(Rt);
+  g.value = g.__value = "";
+  var Z = t.sibling(g);
+  t.each(Z, 17, () => t.get(r), t.index, (e, l) => {
+    var d = Ie(), p = t.child(d);
+    t.reset(d);
+    var c = {};
+    t.template_effect(() => {
+      t.set_text(p, `${t.get(l).name ?? ""} (${t.get(l).code ?? ""})`), c !== (c = t.get(l).id) && (d.value = (d.__value = t.get(l).id) ?? "");
+    }), t.append(e, d);
+  }), t.reset(Rt), t.reset(_t);
+  var j = t.sibling(_t, 2), tt = t.sibling(t.child(j), 2);
+  t.remove_input_defaults(tt), t.reset(j);
+  var et = t.sibling(j, 2), q = t.sibling(t.child(et), 2);
+  t.each(q, 20, () => ["kg", "g", "l", "ml", "buc", "cutie", "sac", "palet"], t.index, (e, l) => {
+    var d = Fe(), p = t.child(d, !0);
+    t.reset(d);
+    var c = {};
+    t.template_effect(() => {
+      t.set_text(p, l), c !== (c = l) && (d.value = (d.__value = l) ?? "");
+    }), t.append(e, d);
+  }), t.reset(q), t.reset(et);
+  var A = t.sibling(et, 2), ot = t.sibling(t.child(A), 2), m = t.child(ot);
+  m.value = m.__value = "";
+  var k = t.sibling(m);
+  t.each(k, 17, () => t.get(W), t.index, (e, l) => {
+    var d = Ee(), p = t.child(d, !0);
+    t.reset(d);
+    var c = {};
+    t.template_effect(() => {
+      t.set_text(p, t.get(l).name), c !== (c = t.get(l).id) && (d.value = (d.__value = t.get(l).id) ?? "");
+    }), t.append(e, d);
+  }), t.reset(ot), t.reset(A);
+  var G = t.sibling(A, 2), v = t.sibling(t.child(G), 2);
+  t.remove_input_defaults(v), t.reset(G);
+  var _ = t.sibling(G, 2), b = t.sibling(t.child(_), 2);
+  t.remove_input_defaults(b), t.reset(_);
+  var T = t.sibling(_, 2), H = t.sibling(t.child(T), 2);
+  t.remove_input_defaults(H), t.reset(T);
+  var x = t.sibling(T, 2), h = t.sibling(t.child(x), 2);
+  t.remove_input_defaults(h), t.reset(x);
+  var o = t.sibling(x, 2), w = t.sibling(t.child(o), 2), L = t.child(w);
+  L.value = L.__value = "";
+  var i = t.sibling(L);
+  t.each(i, 17, () => t.get(K), t.index, (e, l) => {
+    var d = Je(), p = t.child(d);
+    t.reset(d);
+    var c = {};
+    t.template_effect(() => {
+      t.set_text(p, `${t.get(l).warehouse ?? ""}${t.get(l).row ? " / " + t.get(l).row : ""}${t.get(l).shelf ? " / " + t.get(l).shelf : ""}`), c !== (c = t.get(l).id) && (d.value = (d.__value = t.get(l).id) ?? "");
+    }), t.append(e, d);
+  }), t.reset(w), t.reset(o);
+  var a = t.sibling(o, 2), u = t.sibling(t.child(a), 2);
+  t.remove_textarea_child(u), t.reset(a), t.reset(mt);
+  var y = t.sibling(mt, 2), P = t.sibling(t.child(y), 2), N = t.child(P, !0);
+  t.reset(P), t.reset(y), t.reset(ft), t.reset(f), t.template_effect(() => {
+    P.disabled = t.get(z), t.set_text(N, t.get(z) ? "Se salvează..." : "Salvează și creează lot");
+  }), t.event("submit", ft, Q), t.delegated("change", nt, st), t.bind_value(nt, () => t.get(s).gs1_raw, (e) => t.get(s).gs1_raw = e), t.delegated("click", wt, st), t.bind_select_value(Rt, () => t.get(s).item_id, (e) => t.get(s).item_id = e), t.bind_value(tt, () => t.get(s).quantity_initial, (e) => t.get(s).quantity_initial = e), t.bind_select_value(q, () => t.get(s).unit, (e) => t.get(s).unit = e), t.bind_select_value(ot, () => t.get(s).supplier_id, (e) => t.get(s).supplier_id = e), t.bind_value(v, () => t.get(s).supplier_lot_ref, (e) => t.get(s).supplier_lot_ref = e), t.bind_value(b, () => t.get(s).best_before_date, (e) => t.get(s).best_before_date = e), t.bind_value(H, () => t.get(s).reception_date, (e) => t.get(s).reception_date = e), t.bind_value(h, () => t.get(s).invoice_ref, (e) => t.get(s).invoice_ref = e), t.bind_select_value(w, () => t.get(s).location_id, (e) => t.get(s).location_id = e), t.bind_value(u, () => t.get(s).notes, (e) => t.get(s).notes = e), t.append(bt, f), t.pop();
+}
+t.delegate(["change", "click"]);
+var Be = t.from_html('<div class="alert alert-error"> </div>'), He = t.from_html("<option> </option>"), Ge = t.from_html("<option> </option>"), Me = t.from_html("<option> </option>"), Ke = t.from_html('<div class="card bg-base-200 p-4"><h3 class="font-bold mb-3">Ordin nou de producție</h3> <form class="grid grid-cols-2 gap-3"><div class="col-span-2"><label class="label-text font-medium">Produs finit *</label> <select class="select select-bordered w-full" required=""><option>Selectați produsul...</option><!></select></div> <div><label class="label-text">Rețetă (opțional)</label> <select class="select select-bordered w-full"><option>—</option><!></select></div> <div><label class="label-text">Cantitate planificată *</label> <div class="flex gap-2"><input type="number" class="input input-bordered flex-1" min="0.001" step="0.001" required=""/> <select class="select select-bordered w-24"></select></div></div> <div class="col-span-2 flex justify-end gap-2"><button type="button" class="btn btn-ghost btn-sm">Anulează</button> <button type="submit" class="btn btn-primary btn-sm">Creează</button></div></form></div>'), Qe = t.from_html('<tr><td class="font-mono text-xs"> </td><td class="text-sm"> </td><td><span> </span></td><td class="text-sm"> </td><td><button class="btn btn-ghost btn-xs">Deschide</button></td></tr>'), Ze = t.from_html('<tr><td colspan="5" class="text-center opacity-50 py-4">Niciun ordin</td></tr>'), We = t.from_html('<button class="btn btn-warning btn-sm w-full">▶ Pornește producția</button>'), Xe = t.from_html("<option> </option>"), Ye = t.from_html('<div class="card bg-base-200 p-4"><h4 class="font-semibold mb-2">Înregistrare consum materie primă</h4> <form class="flex gap-2"><select class="select select-bordered select-sm flex-1" required=""><option>Selectați lot...</option><!></select> <input type="number" class="input input-bordered input-sm w-24" placeholder="Cant." min="0.001" step="0.001" required=""/> <button type="submit" class="btn btn-primary btn-sm">+</button></form></div> <div class="card bg-base-200 p-4"><h4 class="font-semibold mb-2">Verificare CCP (HACCP)</h4> <form class="grid grid-cols-2 gap-2"><input type="text" class="input input-bordered input-sm col-span-2" placeholder="Punct CCP (ex: Temperatura coacere)" required=""/> <div class="flex gap-1"><input type="number" class="input input-bordered input-sm flex-1" placeholder="Valoare" step="0.1" required=""/> <input type="text" class="input input-bordered input-sm w-16" placeholder="UM"/></div> <div class="flex items-center gap-2"><input type="number" class="input input-bordered input-sm w-24" placeholder="Limită min" step="0.1"/> <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" class="checkbox checkbox-success checkbox-sm"/> <span class="text-sm">OK</span></label></div> <button type="submit" class="btn btn-sm btn-success col-span-2">Înregistrează CCP</button></form></div>', 1), ta = t.from_html('<div class="text-sm flex justify-between"><span class="font-mono"> </span> <span> </span> <span class="font-medium"> </span></div>'), ea = t.from_html('<div class="card bg-base-200 p-4"><h4 class="font-semibold mb-2"> </h4> <div class="space-y-1"></div></div>'), aa = t.from_html('<span class="opacity-60"> </span>'), ia = t.from_html('<div class="flex items-center gap-2 text-sm py-1 border-b border-base-300"><span> </span> <span> <strong> </strong></span> <!></div>'), sa = t.from_html('<div class="card bg-base-200 p-4"><h4 class="font-semibold mb-2"> </h4> <!></div>'), ra = t.from_html('<div class="space-y-3"><div class="card bg-base-200 p-4"><div class="flex items-center justify-between mb-2"><h3 class="font-bold font-mono"> </h3> <span> </span></div> <!></div> <!> <!> <!></div>'), la = t.from_html('<div class="p-6 space-y-4"><div class="flex items-center justify-between"><h1 class="text-2xl font-bold">Ordine de producție</h1> <button class="btn btn-primary btn-sm">+ Ordin nou</button></div> <!> <!> <div class="flex gap-3"><select class="select select-bordered select-sm"><option>Toate</option><option>Draft</option><option>În execuție</option><option>Finalizat</option></select></div> <div class="grid grid-cols-1 lg:grid-cols-2 gap-4"><div class="overflow-x-auto"><table class="table table-sm w-full"><thead><tr><th>Număr</th><th>Produs finit</th><th>Status</th><th>Cant.</th><th></th></tr></thead><tbody><!><!></tbody></table></div> <!></div></div>');
+function na(bt, Ct) {
+  t.push(Ct, !0);
+  const E = "/api/trace";
+  let r = t.state(t.proxy([])), W = t.state(!0), K = t.state(""), z = t.state(""), n = t.state(!1), D = t.state(t.proxy([])), s = t.state(t.proxy([])), st = t.state(t.proxy([])), Q = t.proxy({
+    output_item_id: "",
+    recipe_id: "",
+    planned_quantity: "",
+    unit: "kg",
+    notes: ""
+  }), f = t.state(null), X = t.state(t.proxy({ lot_id: "", quantity_used: "" })), J = t.state(t.proxy({ ccp: "", value: "", unit: "°C", limit_min: "", ok: !0 })), Y = t.state(!1);
+  t.user_effect(() => {
+    gt(), fetch(`${E}/items?type=finished`).then((i) => i.json()).then((i) => {
+      t.set(D, i.data ?? [], !0);
+    }), fetch(`${E}/production/recipes`).then((i) => i.json()).then((i) => {
+      t.set(s, i.data ?? [], !0);
+    });
+  }), t.user_effect(() => {
+    t.get(z), gt();
+  });
+  async function gt() {
+    t.set(W, !0);
+    try {
+      const i = new URLSearchParams();
+      t.get(z) && i.set("status", t.get(z));
+      const a = await fetch(`${E}/production?${i}`);
+      t.set(r, a.ok ? (await a.json()).data : [], !0);
+    } finally {
+      t.set(W, !1);
+    }
+  }
+  async function ft(i) {
+    const a = await fetch(`${E}/lots?status=available&limit=200`);
+    t.set(st, a.ok ? (await a.json()).data : [], !0);
+  }
+  async function yt(i) {
+    i.preventDefault(), t.set(Y, !0), t.set(K, "");
+    try {
+      const a = await fetch(`${E}/production`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          output_item_id: Q.output_item_id,
+          recipe_id: Q.recipe_id || void 0,
+          planned_quantity: parseFloat(Q.planned_quantity),
+          unit: Q.unit,
+          notes: Q.notes || void 0
+        })
+      });
+      if (!a.ok) throw new Error(await a.text());
+      t.set(n, !1), await gt();
+    } catch (a) {
+      t.set(K, a.message, !0);
+    } finally {
+      t.set(Y, !1);
+    }
+  }
+  async function jt(i) {
+    var a;
+    await fetch(`${E}/production/${i}/start`, { method: "PATCH" }), await gt(), ((a = t.get(f)) == null ? void 0 : a.id) === i && await nt(i);
+  }
+  async function nt(i) {
+    const a = await fetch(`${E}/production/${i}`);
+    a.ok && (t.set(f, (await a.json()).data, !0), await ft(t.get(f).output_lot_id));
+  }
+  async function wt(i) {
+    i.preventDefault(), t.set(Y, !0), t.set(K, "");
+    try {
+      const a = await fetch(`${E}/production/${t.get(f).id}/consume`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lot_id: t.get(X).lot_id,
+          quantity_used: parseFloat(t.get(X).quantity_used)
+        })
+      });
+      if (!a.ok) throw new Error(await a.text());
+      t.set(X, { lot_id: "", quantity_used: "" }, !0), await nt(t.get(f).id);
+    } catch (a) {
+      t.set(K, a.message, !0);
+    } finally {
+      t.set(Y, !1);
+    }
+  }
+  async function mt(i) {
+    i.preventDefault(), t.set(Y, !0);
+    try {
+      await fetch(`${E}/production/${t.get(f).id}/haccp`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          check: {
+            ccp: t.get(J).ccp,
+            value: parseFloat(t.get(J).value),
+            unit: t.get(J).unit,
+            limit_min: t.get(J).limit_min ? parseFloat(t.get(J).limit_min) : void 0,
+            ok: t.get(J).ok,
+            checked_at: (/* @__PURE__ */ new Date()).toISOString()
+          }
+        })
+      }), t.set(J, { ccp: "", value: "", unit: "°C", limit_min: "", ok: !0 }, !0), await nt(t.get(f).id);
+    } finally {
+      t.set(Y, !1);
+    }
+  }
+  function _t(i) {
+    return {
+      draft: "badge-ghost",
+      in_progress: "badge-warning",
+      completed: "badge-success",
+      cancelled: "badge-error"
+    }[i] ?? "badge-ghost";
+  }
+  var Rt = la(), g = t.child(Rt), Z = t.sibling(t.child(g), 2);
+  t.reset(g);
+  var j = t.sibling(g, 2);
+  {
+    var tt = (i) => {
+      var a = Be(), u = t.child(a, !0);
+      t.reset(a), t.template_effect(() => t.set_text(u, t.get(K))), t.append(i, a);
+    };
+    t.if(j, (i) => {
+      t.get(K) && i(tt);
+    });
+  }
+  var et = t.sibling(j, 2);
+  {
+    var q = (i) => {
+      var a = Ke(), u = t.sibling(t.child(a), 2), y = t.child(u), P = t.sibling(t.child(y), 2), N = t.child(P);
+      N.value = N.__value = "";
+      var e = t.sibling(N);
+      t.each(e, 17, () => t.get(D), t.index, (R, it) => {
+        var S = He(), M = t.child(S, !0);
+        t.reset(S);
+        var O = {};
+        t.template_effect(() => {
+          t.set_text(M, t.get(it).name), O !== (O = t.get(it).id) && (S.value = (S.__value = t.get(it).id) ?? "");
+        }), t.append(R, S);
+      }), t.reset(P), t.reset(y);
+      var l = t.sibling(y, 2), d = t.sibling(t.child(l), 2), p = t.child(d);
+      p.value = p.__value = "";
+      var c = t.sibling(p);
+      t.each(c, 17, () => t.get(s), t.index, (R, it) => {
+        var S = Ge(), M = t.child(S);
+        t.reset(S);
+        var O = {};
+        t.template_effect(() => {
+          t.set_text(M, `${t.get(it).name ?? ""} v${t.get(it).version ?? ""}`), O !== (O = t.get(it).id) && (S.value = (S.__value = t.get(it).id) ?? "");
+        }), t.append(R, S);
+      }), t.reset(d), t.reset(l);
+      var $ = t.sibling(l, 2), V = t.sibling(t.child($), 2), U = t.child(V);
+      t.remove_input_defaults(U);
+      var dt = t.sibling(U, 2);
+      t.each(dt, 20, () => ["kg", "g", "l", "ml", "buc", "cutie", "sac", "palet"], t.index, (R, it) => {
+        var S = Me(), M = t.child(S, !0);
+        t.reset(S);
+        var O = {};
+        t.template_effect(() => {
+          t.set_text(M, it), O !== (O = it) && (S.value = (S.__value = it) ?? "");
+        }), t.append(R, S);
+      }), t.reset(dt), t.reset(V), t.reset($);
+      var pt = t.sibling($, 2), B = t.child(pt), I = t.sibling(B, 2);
+      t.reset(pt), t.reset(u), t.reset(a), t.template_effect(() => I.disabled = t.get(Y)), t.event("submit", u, yt), t.bind_select_value(P, () => Q.output_item_id, (R) => Q.output_item_id = R), t.bind_select_value(d, () => Q.recipe_id, (R) => Q.recipe_id = R), t.bind_value(U, () => Q.planned_quantity, (R) => Q.planned_quantity = R), t.bind_select_value(dt, () => Q.unit, (R) => Q.unit = R), t.delegated("click", B, () => t.set(n, !1)), t.append(i, a);
+    };
+    t.if(et, (i) => {
+      t.get(n) && i(q);
+    });
+  }
+  var A = t.sibling(et, 2), ot = t.child(A), m = t.child(ot);
+  m.value = m.__value = "";
+  var k = t.sibling(m);
+  k.value = k.__value = "draft";
+  var G = t.sibling(k);
+  G.value = G.__value = "in_progress";
+  var v = t.sibling(G);
+  v.value = v.__value = "completed", t.reset(ot), t.reset(A);
+  var _ = t.sibling(A, 2), b = t.child(_), T = t.child(b), H = t.sibling(t.child(T)), x = t.child(H);
+  t.each(x, 17, () => t.get(r), t.index, (i, a) => {
+    var u = Qe(), y = t.child(u), P = t.child(y, !0);
+    t.reset(y);
+    var N = t.sibling(y), e = t.child(N, !0);
+    t.reset(N);
+    var l = t.sibling(N), d = t.child(l), p = t.child(d, !0);
+    t.reset(d), t.reset(l);
+    var c = t.sibling(l), $ = t.child(c);
+    t.reset(c);
+    var V = t.sibling(c), U = t.child(V);
+    t.reset(V), t.reset(u), t.template_effect(
+      (dt) => {
+        var pt;
+        t.set_class(u, 1, t.clsx(((pt = t.get(f)) == null ? void 0 : pt.id) === t.get(a).id ? "bg-primary/10" : "")), t.set_text(P, t.get(a).order_number), t.set_text(e, t.get(a).output_item_name ?? "—"), t.set_class(d, 1, `badge badge-sm ${dt ?? ""}`), t.set_text(p, t.get(a).status), t.set_text($, `${t.get(a).planned_quantity ?? ""} ${t.get(a).unit ?? ""}`);
+      },
+      [() => _t(t.get(a).status)]
+    ), t.delegated("click", U, () => nt(t.get(a).id)), t.append(i, u);
+  });
+  var h = t.sibling(x);
+  {
+    var o = (i) => {
+      var a = Ze();
+      t.append(i, a);
+    };
+    t.if(h, (i) => {
+      t.get(r).length === 0 && !t.get(W) && i(o);
+    });
+  }
+  t.reset(H), t.reset(T), t.reset(b);
+  var w = t.sibling(b, 2);
+  {
+    var L = (i) => {
+      var a = ra(), u = t.child(a), y = t.child(u), P = t.child(y), N = t.child(P, !0);
+      t.reset(P);
+      var e = t.sibling(P, 2), l = t.child(e, !0);
+      t.reset(e), t.reset(y);
+      var d = t.sibling(y, 2);
+      {
+        var p = (B) => {
+          var I = We();
+          t.delegated("click", I, () => jt(t.get(f).id)), t.append(B, I);
+        };
+        t.if(d, (B) => {
+          t.get(f).status === "draft" && B(p);
+        });
+      }
+      t.reset(u);
+      var c = t.sibling(u, 2);
+      {
+        var $ = (B) => {
+          var I = Ye(), R = t.first_child(I), it = t.sibling(t.child(R), 2), S = t.child(it), M = t.child(S);
+          M.value = M.__value = "";
+          var O = t.sibling(M);
+          t.each(O, 17, () => t.get(st), t.index, (lt, Dt) => {
+            var zt = Xe(), At = t.child(zt);
+            t.reset(zt);
+            var C = {};
+            t.template_effect(() => {
+              t.set_text(At, `${t.get(Dt).lot_number ?? ""} — ${t.get(Dt).item_name ?? ""} (${t.get(Dt).quantity_remaining ?? ""} ${t.get(Dt).unit ?? ""})`), C !== (C = t.get(Dt).id) && (zt.value = (zt.__value = t.get(Dt).id) ?? "");
+            }), t.append(lt, zt);
+          }), t.reset(S);
+          var rt = t.sibling(S, 2);
+          t.remove_input_defaults(rt);
+          var kt = t.sibling(rt, 2);
+          t.reset(it), t.reset(R);
+          var qt = t.sibling(R, 2), ct = t.sibling(t.child(qt), 2), at = t.child(ct);
+          t.remove_input_defaults(at);
+          var vt = t.sibling(at, 2), ut = t.child(vt);
+          t.remove_input_defaults(ut);
+          var Ot = t.sibling(ut, 2);
+          t.remove_input_defaults(Ot), t.reset(vt);
+          var Pt = t.sibling(vt, 2), ht = t.child(Pt);
+          t.remove_input_defaults(ht);
+          var $t = t.sibling(ht, 2), St = t.child($t);
+          t.remove_input_defaults(St), t.next(2), t.reset($t), t.reset(Pt);
+          var Tt = t.sibling(Pt, 2);
+          t.reset(ct), t.reset(qt), t.template_effect(() => {
+            kt.disabled = t.get(Y), Tt.disabled = t.get(Y);
+          }), t.event("submit", it, wt), t.bind_select_value(S, () => t.get(X).lot_id, (lt) => t.get(X).lot_id = lt), t.bind_value(rt, () => t.get(X).quantity_used, (lt) => t.get(X).quantity_used = lt), t.event("submit", ct, mt), t.bind_value(at, () => t.get(J).ccp, (lt) => t.get(J).ccp = lt), t.bind_value(ut, () => t.get(J).value, (lt) => t.get(J).value = lt), t.bind_value(Ot, () => t.get(J).unit, (lt) => t.get(J).unit = lt), t.bind_value(ht, () => t.get(J).limit_min, (lt) => t.get(J).limit_min = lt), t.bind_checked(St, () => t.get(J).ok, (lt) => t.get(J).ok = lt), t.append(B, I);
+        };
+        t.if(c, (B) => {
+          t.get(f).status === "in_progress" && B($);
+        });
+      }
+      var V = t.sibling(c, 2);
+      {
+        var U = (B) => {
+          var I = ea(), R = t.child(I), it = t.child(R);
+          t.reset(R);
+          var S = t.sibling(R, 2);
+          t.each(S, 21, () => t.get(f).consumptions, t.index, (M, O) => {
+            var rt = ta(), kt = t.child(rt), qt = t.child(kt, !0);
+            t.reset(kt);
+            var ct = t.sibling(kt, 2), at = t.child(ct, !0);
+            t.reset(ct);
+            var vt = t.sibling(ct, 2), ut = t.child(vt);
+            t.reset(vt), t.reset(rt), t.template_effect(() => {
+              t.set_text(qt, t.get(O).lot_number), t.set_text(at, t.get(O).item_name), t.set_text(ut, `${t.get(O).quantity_used ?? ""} ${t.get(O).unit ?? ""}`);
+            }), t.append(M, rt);
+          }), t.reset(S), t.reset(I), t.template_effect(() => t.set_text(it, `Consumuri (${t.get(f).consumptions.length ?? ""})`)), t.append(B, I);
+        };
+        t.if(V, (B) => {
+          var I;
+          (I = t.get(f).consumptions) != null && I.length && B(U);
+        });
+      }
+      var dt = t.sibling(V, 2);
+      {
+        var pt = (B) => {
+          var I = sa(), R = t.child(I), it = t.child(R);
+          t.reset(R);
+          var S = t.sibling(R, 2);
+          t.each(S, 17, () => t.get(f).haccp_checks, t.index, (M, O) => {
+            var rt = ia(), kt = t.child(rt), qt = t.child(kt, !0);
+            t.reset(kt);
+            var ct = t.sibling(kt, 2), at = t.child(ct), vt = t.sibling(at), ut = t.child(vt);
+            t.reset(vt), t.reset(ct);
+            var Ot = t.sibling(ct, 2);
+            {
+              var Pt = (ht) => {
+                var $t = aa(), St = t.child($t);
+                t.reset($t), t.template_effect(() => t.set_text(St, `min ${t.get(O).limit_min ?? ""}`)), t.append(ht, $t);
+              };
+              t.if(Ot, (ht) => {
+                t.get(O).limit_min && ht(Pt);
+              });
+            }
+            t.reset(rt), t.template_effect(() => {
+              t.set_class(kt, 1, t.clsx(t.get(O).ok ? "text-success" : "text-error")), t.set_text(qt, t.get(O).ok ? "✓" : "✗"), t.set_text(at, `${t.get(O).ccp ?? ""}: `), t.set_text(ut, `${t.get(O).value ?? ""} ${t.get(O).unit ?? ""}`);
+            }), t.append(M, rt);
+          }), t.reset(I), t.template_effect(() => t.set_text(it, `Verificări CCP (${t.get(f).haccp_checks.length ?? ""})`)), t.append(B, I);
+        };
+        t.if(dt, (B) => {
+          var I;
+          (I = t.get(f).haccp_checks) != null && I.length && B(pt);
+        });
+      }
+      t.reset(a), t.template_effect(
+        (B) => {
+          t.set_text(N, t.get(f).order_number), t.set_class(e, 1, `badge ${B ?? ""}`), t.set_text(l, t.get(f).status);
+        },
+        [() => _t(t.get(f).status)]
+      ), t.append(i, a);
+    };
+    t.if(w, (i) => {
+      t.get(f) && i(L);
+    });
+  }
+  t.reset(_), t.reset(Rt), t.delegated("click", Z, () => t.set(n, !0)), t.bind_select_value(ot, () => t.get(z), (i) => t.set(z, i)), t.append(bt, Rt), t.pop();
+}
+t.delegate(["click"]);
+var oa = t.from_html('<span class="badge badge-error badge-sm ml-1"> </span>'), da = t.from_html('<div class="alert alert-error"> </div>'), ca = t.from_html('<div class="text-sm flex justify-between py-1 border-b border-base-300"><span class="font-mono"> </span> <span> </span> <span> </span> <span class="badge badge-sm badge-outline"> </span></div>'), va = t.from_html('<div class="card bg-base-200 p-4"><h4 class="font-semibold mb-2">Loturi finite afectate</h4> <div class="space-y-1"></div></div>'), _a = t.from_html('<div><div><div class="font-bold text-lg">Acțiune recomandată: <span class="uppercase"> </span></div> <div class="mt-2 grid grid-cols-3 gap-4 text-center"><div><div class="text-3xl font-bold"> </div> <div class="text-sm">Loturi afectate</div></div> <div><div class="text-3xl font-bold"> </div> <div class="text-sm">Clienți afectați</div></div> <div><div class="text-3xl font-bold"> </div> <div class="text-sm">Livrări afectate</div></div></div></div></div> <!> <div class="card bg-base-200 p-4"><h3 class="font-bold text-error mb-3">⚠ Pasul 2 — Declanșare recall REAL</h3> <p class="text-sm mb-3 opacity-70">Aceasta va marca toate loturile afectate ca "recalled" și va crea un dosar oficial.</p> <form class="space-y-3"><div><label class="label-text font-medium">Motiv recall *</label> <textarea class="textarea textarea-bordered w-full" rows="2" placeholder="Descrieți motivul retragerii (min 10 caractere)..." required=""></textarea></div> <div><label class="label-text font-medium">Tip recall</label> <select class="select select-bordered w-full"><option>Internal (fără distribuție externă)</option><option>Retragere de pe piață</option><option>Recall consumatori</option></select></div> <button type="submit" class="btn btn-error w-full"> </button></form></div>', 1), pa = t.from_html('<div class="alert alert-success">Recall declanșat cu succes. ID: <span class="font-mono"> </span></div>'), ua = t.from_html('<div class="max-w-xl space-y-4"><div class="card bg-base-200 p-4"><h3 class="font-semibold mb-3">Pasul 1 — Identificați lotul suspect</h3> <div class="flex gap-2"><input type="text" class="input input-bordered flex-1" placeholder="UUID lot sau scanați QR-ul..."/> <button class="btn btn-primary"> </button></div></div> <!> <!> <!></div>'), ga = t.from_html('<div class="flex justify-center py-8"><span class="loading loading-spinner"></span></div>'), ba = t.from_html('<div class="text-center opacity-50 py-12">Niciun recall activ</div>'), fa = t.from_html('<form class="mt-3 flex gap-2"><input type="text" class="input input-bordered input-sm flex-1" placeholder="Note rezolvare (min 5 caractere)..." required=""/> <button type="submit" class="btn btn-sm btn-success">Confirmă</button> <button type="button" class="btn btn-sm btn-ghost">Anulează</button></form>'), ma = t.from_html('<div class="card bg-base-200 p-4"><div class="flex items-start justify-between"><div><div class="font-bold"> <span class="font-mono"> </span></div> <div class="text-sm opacity-70"> </div> <div class="text-sm mt-1"> </div> <span class="badge badge-error badge-sm mt-1"> </span></div> <button class="btn btn-sm btn-outline">Rezolvă</button></div> <!></div>'), ha = t.from_html('<div class="space-y-3"></div>'), xa = t.from_html('<div class="p-6 space-y-4"><h1 class="text-2xl font-bold">Recall / Retragere produs</h1> <div class="tabs tabs-bordered"><button>Simulator recall</button> <button>Recall-uri active <!></button></div> <!> <!></div>');
+function ya(bt, Ct) {
+  t.push(Ct, !0);
+  const E = "/api/trace";
+  let r = t.state("simulate"), W = t.state(t.proxy([])), K = t.state(!1), z = t.state(""), n = t.state(!1), D = t.state(null), s = t.state(""), st = t.proxy({ reason: "", scope: "internal" }), Q = t.state(!1), f = t.state(null), X = t.state(t.proxy({ recallId: "", resolution_notes: "" })), J = t.state(!1);
+  t.user_effect(() => {
+    t.get(r) === "active" && Y();
+  });
+  async function Y() {
+    t.set(K, !0);
+    const q = await fetch(`${E}/recalls?status=active`);
+    t.set(W, q.ok ? (await q.json()).data : [], !0), t.set(K, !1);
+  }
+  async function gt() {
+    if (t.get(z).trim()) {
+      t.set(n, !0), t.set(s, ""), t.set(D, null), t.set(f, null);
+      try {
+        const q = await fetch(`${E}/recalls/simulate/${t.get(z).trim()}`, { method: "POST" });
+        if (!q.ok) throw new Error(await q.text());
+        t.set(D, (await q.json()).data, !0);
+      } catch (q) {
+        t.set(s, q.message, !0);
+      } finally {
+        t.set(n, !1);
+      }
+    }
+  }
+  async function ft(q) {
+    if (q.preventDefault(), !!confirm(`Confirmați declanșarea unui recall REAL (${st.scope})?`)) {
+      t.set(Q, !0), t.set(s, "");
+      try {
+        const A = await fetch(`${E}/recalls/initiate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lot_id: t.get(z).trim(),
+            reason: st.reason,
+            scope: st.scope
+          })
+        });
+        if (!A.ok) throw new Error(await A.text());
+        t.set(f, (await A.json()).data, !0), t.set(D, null), await Y();
+      } catch (A) {
+        t.set(s, A.message, !0);
+      } finally {
+        t.set(Q, !1);
+      }
+    }
+  }
+  async function yt(q) {
+    q.preventDefault(), t.set(J, !0);
+    try {
+      const A = await fetch(`${E}/recalls/${t.get(X).recallId}/resolve`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resolution_notes: t.get(X).resolution_notes })
+      });
+      if (!A.ok) throw new Error(await A.text());
+      t.set(X, { recallId: "", resolution_notes: "" }, !0), await Y();
+    } finally {
+      t.set(J, !1);
+    }
+  }
+  function jt(q) {
+    return {
+      consumer_recall: "alert-error",
+      market_withdrawal: "alert-warning",
+      internal: "alert-info"
+    }[q] ?? "alert-info";
+  }
+  var nt = xa(), wt = t.sibling(t.child(nt), 2), mt = t.child(wt), _t = t.sibling(mt, 2), Rt = t.sibling(t.child(_t));
+  {
+    var g = (q) => {
+      var A = oa(), ot = t.child(A, !0);
+      t.reset(A), t.template_effect(() => t.set_text(ot, t.get(W).length)), t.append(q, A);
+    };
+    t.if(Rt, (q) => {
+      t.get(W).length && q(g);
+    });
+  }
+  t.reset(_t), t.reset(wt);
+  var Z = t.sibling(wt, 2);
+  {
+    var j = (q) => {
+      var A = ua(), ot = t.child(A), m = t.sibling(t.child(ot), 2), k = t.child(m);
+      t.remove_input_defaults(k);
+      var G = t.sibling(k, 2), v = t.child(G, !0);
+      t.reset(G), t.reset(m), t.reset(ot);
+      var _ = t.sibling(ot, 2);
+      {
+        var b = (o) => {
+          var w = da(), L = t.child(w, !0);
+          t.reset(w), t.template_effect(() => t.set_text(L, t.get(s))), t.append(o, w);
+        };
+        t.if(_, (o) => {
+          t.get(s) && o(b);
+        });
+      }
+      var T = t.sibling(_, 2);
+      {
+        var H = (o) => {
+          var w = _a(), L = t.first_child(w), i = t.child(L), a = t.child(i), u = t.sibling(t.child(a)), y = t.child(u, !0);
+          t.reset(u), t.reset(a);
+          var P = t.sibling(a, 2), N = t.child(P), e = t.child(N), l = t.child(e, !0);
+          t.reset(e), t.next(2), t.reset(N);
+          var d = t.sibling(N, 2), p = t.child(d), c = t.child(p, !0);
+          t.reset(p), t.next(2), t.reset(d);
+          var $ = t.sibling(d, 2), V = t.child($), U = t.child(V, !0);
+          t.reset(V), t.next(2), t.reset($), t.reset(P), t.reset(i), t.reset(L);
+          var dt = t.sibling(L, 2);
+          {
+            var pt = (at) => {
+              var vt = va(), ut = t.sibling(t.child(vt), 2);
+              t.each(ut, 21, () => t.get(D).affected_lots, t.index, (Ot, Pt) => {
+                var ht = ca(), $t = t.child(ht), St = t.child($t, !0);
+                t.reset($t);
+                var Tt = t.sibling($t, 2), lt = t.child(Tt, !0);
+                t.reset(Tt);
+                var Dt = t.sibling(Tt, 2), zt = t.child(Dt);
+                t.reset(Dt);
+                var At = t.sibling(Dt, 2), C = t.child(At, !0);
+                t.reset(At), t.reset(ht), t.template_effect(() => {
+                  t.set_text(St, t.get(Pt).lot_number), t.set_text(lt, t.get(Pt).item_name), t.set_text(zt, `${t.get(Pt).quantity_remaining ?? ""} ${t.get(Pt).unit ?? ""}`), t.set_text(C, t.get(Pt).status);
+                }), t.append(Ot, ht);
+              }), t.reset(ut), t.reset(vt), t.append(at, vt);
+            };
+            t.if(dt, (at) => {
+              t.get(D).affected_lots.length > 0 && at(pt);
+            });
+          }
+          var B = t.sibling(dt, 2), I = t.sibling(t.child(B), 4), R = t.child(I), it = t.sibling(t.child(R), 2);
+          t.remove_textarea_child(it), t.set_attribute(it, "minlength", 10), t.reset(R);
+          var S = t.sibling(R, 2), M = t.sibling(t.child(S), 2), O = t.child(M);
+          O.value = O.__value = "internal";
+          var rt = t.sibling(O);
+          rt.value = rt.__value = "market_withdrawal";
+          var kt = t.sibling(rt);
+          kt.value = kt.__value = "consumer_recall", t.reset(M), t.reset(S);
+          var qt = t.sibling(S, 2), ct = t.child(qt, !0);
+          t.reset(qt), t.reset(I), t.reset(B), t.template_effect(
+            (at, vt, ut) => {
+              t.set_class(L, 1, `alert ${at ?? ""}`), t.set_text(y, vt), t.set_text(l, t.get(D).total_lots_affected), t.set_text(c, t.get(D).total_customers_affected), t.set_text(U, t.get(D).affected_customers.length), qt.disabled = ut, t.set_text(ct, t.get(Q) ? "Se procesează..." : "🚨 Declanșează recall REAL");
+            },
+            [
+              () => jt(t.get(D).recommended_action),
+              () => t.get(D).recommended_action.replace("_", " "),
+              () => t.get(Q) || !st.reason.trim()
+            ]
+          ), t.event("submit", I, ft), t.bind_value(it, () => st.reason, (at) => st.reason = at), t.bind_select_value(M, () => st.scope, (at) => st.scope = at), t.append(o, w);
+        };
+        t.if(T, (o) => {
+          t.get(D) && o(H);
+        });
+      }
+      var x = t.sibling(T, 2);
+      {
+        var h = (o) => {
+          var w = pa(), L = t.sibling(t.child(w)), i = t.child(L, !0);
+          t.reset(L), t.reset(w), t.template_effect(() => t.set_text(i, t.get(f).id)), t.append(o, w);
+        };
+        t.if(x, (o) => {
+          t.get(f) && o(h);
+        });
+      }
+      t.reset(A), t.template_effect(
+        (o) => {
+          G.disabled = o, t.set_text(v, t.get(n) ? "Calculez..." : "Simulare");
+        },
+        [() => t.get(n) || !t.get(z).trim()]
+      ), t.bind_value(k, () => t.get(z), (o) => t.set(z, o)), t.delegated("click", G, gt), t.append(q, A);
+    };
+    t.if(Z, (q) => {
+      t.get(r) === "simulate" && q(j);
+    });
+  }
+  var tt = t.sibling(Z, 2);
+  {
+    var et = (q) => {
+      var A = t.comment(), ot = t.first_child(A);
+      {
+        var m = (v) => {
+          var _ = ga();
+          t.append(v, _);
+        }, k = (v) => {
+          var _ = ba();
+          t.append(v, _);
+        }, G = (v) => {
+          var _ = ha();
+          t.each(_, 21, () => t.get(W), t.index, (b, T) => {
+            var H = ma(), x = t.child(H), h = t.child(x), o = t.child(h), w = t.child(o), L = t.sibling(w), i = t.child(L, !0);
+            t.reset(L), t.reset(o);
+            var a = t.sibling(o, 2), u = t.child(a, !0);
+            t.reset(a);
+            var y = t.sibling(a, 2), P = t.child(y, !0);
+            t.reset(y);
+            var N = t.sibling(y, 2), e = t.child(N, !0);
+            t.reset(N), t.reset(h);
+            var l = t.sibling(h, 2);
+            t.reset(x);
+            var d = t.sibling(x, 2);
+            {
+              var p = (c) => {
+                var $ = fa(), V = t.child($);
+                t.remove_input_defaults(V), t.set_attribute(V, "minlength", 5);
+                var U = t.sibling(V, 2), dt = t.sibling(U, 2);
+                t.reset($), t.template_effect(() => U.disabled = t.get(J)), t.event("submit", $, yt), t.bind_value(V, () => t.get(X).resolution_notes, (pt) => t.get(X).resolution_notes = pt), t.delegated("click", dt, () => t.set(X, { recallId: "", resolution_notes: "" }, !0)), t.append(c, $);
+              };
+              t.if(d, (c) => {
+                t.get(X).recallId === t.get(T).id && c(p);
+              });
+            }
+            t.reset(H), t.template_effect(
+              (c, $) => {
+                t.set_text(w, `${t.get(T).item_name ?? ""} — `), t.set_text(i, t.get(T).lot_number), t.set_text(u, c), t.set_text(P, t.get(T).reason), t.set_text(e, $);
+              },
+              [
+                () => new Date(t.get(T).initiated_at).toLocaleString("ro-RO"),
+                () => t.get(T).scope.replace("_", " ")
+              ]
+            ), t.delegated("click", l, () => {
+              t.get(X).recallId = t.get(T).id;
+            }), t.append(b, H);
+          }), t.reset(_), t.append(v, _);
+        };
+        t.if(ot, (v) => {
+          t.get(K) ? v(m) : t.get(W).length === 0 ? v(k, 1) : v(G, -1);
+        });
+      }
+      t.append(q, A);
+    };
+    t.if(tt, (q) => {
+      t.get(r) === "active" && q(et);
+    });
+  }
+  t.reset(nt), t.template_effect(() => {
+    t.set_class(mt, 1, `tab ${t.get(r) === "simulate" ? "tab-active" : ""}`), t.set_class(_t, 1, `tab ${t.get(r) === "active" ? "tab-active" : ""}`);
+  }), t.delegated("click", mt, () => t.set(r, "simulate")), t.delegated("click", _t, () => t.set(r, "active")), t.append(bt, nt), t.pop();
+}
+t.delegate(["click"]);
+var wa = t.from_html('<div><label class="label-text text-sm">De la</label> <input type="date" class="input input-bordered input-sm"/></div> <div><label class="label-text text-sm">Până la</label> <input type="date" class="input input-bordered input-sm"/></div>', 1), $a = t.from_html('<button class="btn btn-outline btn-sm">⬇ Descarcă CSV</button>'), ka = t.from_html('<div class="alert alert-error"> </div>'), Sa = t.from_html('<div class="text-sm opacity-60"> <!> <!></div>'), Ca = t.from_html('<th class="whitespace-nowrap"> </th>'), ja = t.from_html('<span class="font-mono text-xs opacity-70"> </span>'), qa = t.from_html('<td class="whitespace-nowrap max-w-xs overflow-hidden text-ellipsis"><!></td>'), Pa = t.from_html("<tr></tr>"), Ra = t.from_html('<div class="overflow-x-auto" style="max-height: 60vh;"><table class="table table-xs table-zebra w-full"><thead><tr></tr></thead><tbody></tbody></table></div>'), Da = t.from_html('<div class="text-center opacity-50 py-12">Selectați parametrii și apăsați "Generează" pentru a vedea raportul.</div>'), Ta = t.from_html('<div class="p-6 space-y-4"><h1 class="text-2xl font-bold">Rapoarte</h1> <div class="flex flex-wrap gap-3 items-end"><div><label class="label-text text-sm">Raport</label> <select class="select select-bordered select-sm"><option>Registru Trasabilitate ANSVSA (Ord. 111/2008)</option><option>Jurnal Recepții</option><option>Jurnal Consumuri</option><option>Stoc Curent (snapshot)</option><option>Registru HACCP / CCP</option></select></div> <!> <button class="btn btn-primary btn-sm"> </button> <!></div> <!> <!> <!></div>');
+function Oa(bt, Ct) {
+  t.push(Ct, !0);
+  const E = "/api/trace";
+  let r = t.state("ansvsa"), W = t.state(t.proxy(new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10))), K = t.state(t.proxy((/* @__PURE__ */ new Date()).toISOString().slice(0, 10))), z = t.state(!1), n = t.state(t.proxy([])), D = t.state(""), s = t.state(null);
+  const st = {
+    ansvsa: "ansvsa-traceability",
+    reception: "reception-log",
+    consumption: "consumption-log",
+    stock: "stock-snapshot",
+    haccp: "haccp-log"
+  };
+  async function Q() {
+    t.set(z, !0), t.set(D, ""), t.set(n, [], !0), t.set(s, null);
+    try {
+      const v = new URLSearchParams();
+      t.get(r) !== "stock" && (v.set("from", t.get(W)), v.set("to", t.get(K)));
+      const _ = await fetch(`${E}/reports/${st[t.get(r)]}?${v}`);
+      if (!_.ok) throw new Error(await _.text());
+      const b = await _.json();
+      t.set(n, b.data ?? [], !0), t.set(s, b.meta ?? null, !0);
+    } catch (v) {
+      t.set(D, v.message, !0);
+    } finally {
+      t.set(z, !1);
+    }
+  }
+  function f() {
+    const v = new URLSearchParams({ format: "csv" });
+    t.get(r) !== "stock" && (v.set("from", t.get(W)), v.set("to", t.get(K))), window.open(`${E}/reports/${st[t.get(r)]}?${v}`, "_blank");
+  }
+  const X = t.derived(() => t.get(n).length > 0 ? Object.keys(t.get(n)[0]) : []);
+  var J = Ta(), Y = t.sibling(t.child(J), 2), gt = t.child(Y), ft = t.sibling(t.child(gt), 2), yt = t.child(ft);
+  yt.value = yt.__value = "ansvsa";
+  var jt = t.sibling(yt);
+  jt.value = jt.__value = "reception";
+  var nt = t.sibling(jt);
+  nt.value = nt.__value = "consumption";
+  var wt = t.sibling(nt);
+  wt.value = wt.__value = "stock";
+  var mt = t.sibling(wt);
+  mt.value = mt.__value = "haccp", t.reset(ft), t.reset(gt);
+  var _t = t.sibling(gt, 2);
+  {
+    var Rt = (v) => {
+      var _ = wa(), b = t.first_child(_), T = t.sibling(t.child(b), 2);
+      t.remove_input_defaults(T), t.reset(b);
+      var H = t.sibling(b, 2), x = t.sibling(t.child(H), 2);
+      t.remove_input_defaults(x), t.reset(H), t.bind_value(T, () => t.get(W), (h) => t.set(W, h)), t.bind_value(x, () => t.get(K), (h) => t.set(K, h)), t.append(v, _);
+    };
+    t.if(_t, (v) => {
+      t.get(r) !== "stock" && v(Rt);
+    });
+  }
+  var g = t.sibling(_t, 2), Z = t.child(g, !0);
+  t.reset(g);
+  var j = t.sibling(g, 2);
+  {
+    var tt = (v) => {
+      var _ = $a();
+      t.delegated("click", _, f), t.append(v, _);
+    };
+    t.if(j, (v) => {
+      t.get(n).length > 0 && v(tt);
+    });
+  }
+  t.reset(Y);
+  var et = t.sibling(Y, 2);
+  {
+    var q = (v) => {
+      var _ = ka(), b = t.child(_, !0);
+      t.reset(_), t.template_effect(() => t.set_text(b, t.get(D))), t.append(v, _);
+    };
+    t.if(et, (v) => {
+      t.get(D) && v(q);
+    });
+  }
+  var A = t.sibling(et, 2);
+  {
+    var ot = (v) => {
+      var _ = Sa(), b = t.child(_), T = t.sibling(b);
+      {
+        var H = (o) => {
+          var w = t.text();
+          t.template_effect(() => t.set_text(w, `| Perioadă: ${t.get(s).from ?? ""} — ${t.get(s).to ?? ""}`)), t.append(o, w);
+        };
+        t.if(T, (o) => {
+          t.get(s).from && o(H);
+        });
+      }
+      var x = t.sibling(T, 2);
+      {
+        var h = (o) => {
+          var w = t.text();
+          t.template_effect((L) => t.set_text(w, `| Generat la: ${L ?? ""}`), [
+            () => new Date(t.get(s).generated_at).toLocaleString("ro-RO")
+          ]), t.append(o, w);
+        };
+        t.if(x, (o) => {
+          t.get(s).generated_at && o(h);
+        });
+      }
+      t.reset(_), t.template_effect(() => t.set_text(b, `${t.get(s).count ?? t.get(n).length ?? ""} înregistrări `)), t.append(v, _);
+    };
+    t.if(A, (v) => {
+      t.get(s) && v(ot);
+    });
+  }
+  var m = t.sibling(A, 2);
+  {
+    var k = (v) => {
+      var _ = Ra(), b = t.child(_), T = t.child(b), H = t.child(T);
+      t.each(H, 21, () => t.get(X), t.index, (h, o) => {
+        var w = Ca(), L = t.child(w, !0);
+        t.reset(w), t.template_effect(() => t.set_text(L, t.get(o))), t.append(h, w);
+      }), t.reset(H), t.reset(T);
+      var x = t.sibling(T);
+      t.each(x, 21, () => t.get(n), t.index, (h, o) => {
+        var w = Pa();
+        t.each(w, 21, () => t.get(X), t.index, (L, i) => {
+          var a = qa(), u = t.child(a);
+          {
+            var y = (N) => {
+              var e = ja(), l = t.child(e);
+              t.reset(e), t.template_effect(
+                (d, p) => {
+                  t.set_attribute(e, "title", d), t.set_text(l, `[${p ?? ""}]`);
+                },
+                [
+                  () => JSON.stringify(t.get(o)[t.get(i)]),
+                  () => Array.isArray(t.get(o)[t.get(i)]) ? t.get(o)[t.get(i)].length + " items" : "obj"
+                ]
+              ), t.append(N, e);
+            }, P = (N) => {
+              var e = t.text();
+              t.template_effect(() => t.set_text(e, t.get(o)[t.get(i)] ?? "—")), t.append(N, e);
+            };
+            t.if(u, (N) => {
+              typeof t.get(o)[t.get(i)] == "object" && t.get(o)[t.get(i)] !== null ? N(y) : N(P, -1);
+            });
+          }
+          t.reset(a), t.append(L, a);
+        }), t.reset(w), t.append(h, w);
+      }), t.reset(x), t.reset(b), t.reset(_), t.append(v, _);
+    }, G = (v) => {
+      var _ = Da();
+      t.append(v, _);
+    };
+    t.if(m, (v) => {
+      t.get(n).length > 0 ? v(k) : t.get(z) || v(G, 1);
+    });
+  }
+  t.reset(J), t.template_effect(() => {
+    g.disabled = t.get(z), t.set_text(Z, t.get(z) ? "Se încarcă..." : "Generează");
+  }), t.bind_select_value(ft, () => t.get(r), (v) => t.set(r, v)), t.delegated("click", g, Q), t.append(bt, J), t.pop();
+}
+t.delegate(["click"]);
+function za() {
+  const bt = window.__zveltio;
+  bt.registerRoute({
+    path: "trace/lots",
+    component: Ht,
+    label: "Loturi",
+    icon: "Package",
+    category: "traceability",
+    parent: "Trasabilitate"
+  }), bt.registerRoute({
+    path: "trace/lots/:id",
+    component: Ae,
+    hidden: !0
+  }), bt.registerRoute({
+    path: "trace/reception",
+    component: Ve,
+    label: "Recepție",
+    icon: "PackagePlus",
+    category: "traceability",
+    parent: "Trasabilitate"
+  }), bt.registerRoute({
+    path: "trace/production",
+    component: na,
+    label: "Producție",
+    icon: "Factory",
+    category: "traceability",
+    parent: "Trasabilitate"
+  }), bt.registerRoute({
+    path: "trace/recalls",
+    component: ya,
+    label: "Recall / Retragere",
+    icon: "AlertTriangle",
+    category: "traceability",
+    parent: "Trasabilitate"
+  }), bt.registerRoute({
+    path: "trace/dispatches",
+    component: _e,
+    label: "Expedieri",
+    icon: "Truck",
+    category: "traceability",
+    parent: "Trasabilitate"
+  }), bt.registerRoute({
+    path: "trace/reports",
+    component: Oa,
+    label: "Rapoarte ANSVSA",
+    icon: "FileText",
+    category: "traceability",
+    parent: "Trasabilitate"
+  });
+}
+za();
+export {
+  za as default
+};

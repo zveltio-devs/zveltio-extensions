@@ -1,4 +1,7 @@
-var ZveltioExt=(function(Ke,fe,me){"use strict";function xe(r){const a=Object.create(null,{[Symbol.toStringTag]:{value:"Module"}});if(r){for(const u in r)if(u!=="default"){const l=Object.getOwnPropertyDescriptor(r,u);Object.defineProperty(a,u,l.get?l:{enumerable:!0,get:()=>r[u]})}}return a.default=r,Object.freeze(a)}const e=xe(fe);/**
+import "svelte/internal/disclose-version";
+import * as e from "svelte/internal/client";
+import { onMount as Me } from "svelte";
+/**
  * @license @lucide/svelte v0.511.0 - ISC
  *
  * ISC License
@@ -17,61 +20,437 @@ var ZveltioExt=(function(Ke,fe,me){"use strict";function xe(r){const a=Object.cr
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  * 
- */const ye={xmlns:"http://www.w3.org/2000/svg",width:24,height:24,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor","stroke-width":2,"stroke-linecap":"round","stroke-linejoin":"round"};var we=e.from_svg("<svg><!><!></svg>");function I(r,a){e.push(a,!0);const u=e.prop(a,"color",3,"currentColor"),l=e.prop(a,"size",3,24),h=e.prop(a,"strokeWidth",3,2),_=e.prop(a,"absoluteStrokeWidth",3,!1),o=e.prop(a,"iconNode",19,()=>[]),i=e.rest_props(a,["$$slots","$$events","$$legacy","name","color","size","strokeWidth","absoluteStrokeWidth","iconNode","children"]);var q=we();e.attribute_effect(q,N=>({...ye,...i,width:l(),height:l(),stroke:u(),"stroke-width":N,class:["lucide-icon lucide",a.name&&`lucide-${a.name}`,a.class]}),[()=>_()?Number(h())*24/Number(l()):h()]);var m=e.child(q);e.each(m,17,o,e.index,(N,n)=>{var x=e.derived(()=>e.to_array(e.get(n),2));let H=()=>e.get(x)[0],V=()=>e.get(x)[1];var D=e.comment(),X=e.first_child(D);e.element(X,H,!0,(Z,oe)=>{e.attribute_effect(Z,()=>({...V()}))}),e.append(N,D)});var $=e.sibling(m);e.snippet($,()=>a.children??e.noop),e.reset(q),e.append(r,q),e.pop()}function ke(r,a){e.push(a,!0);/**
- * @license @lucide/svelte v0.511.0 - ISC
- *
- * ISC License
- *
- * Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
- *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- *
- */let u=e.rest_props(a,["$$slots","$$events","$$legacy"]);const l=[["path",{d:"M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"}]];I(r,e.spread_props({name:"headphones"},()=>u,{get iconNode(){return l},children:(h,_)=>{var o=e.comment(),i=e.first_child(o);e.snippet(i,()=>a.children??e.noop),e.append(h,o)},$$slots:{default:!0}})),e.pop()}function je(r,a){e.push(a,!0);/**
- * @license @lucide/svelte v0.511.0 - ISC
- *
- * ISC License
- *
- * Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
- *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- *
- */let u=e.rest_props(a,["$$slots","$$events","$$legacy"]);const l=[["path",{d:"M5 12h14"}],["path",{d:"M12 5v14"}]];I(r,e.spread_props({name:"plus"},()=>u,{get iconNode(){return l},children:(h,_)=>{var o=e.comment(),i=e.first_child(o);e.snippet(i,()=>a.children??e.noop),e.append(h,o)},$$slots:{default:!0}})),e.pop()}function Se(r,a){e.push(a,!0);/**
- * @license @lucide/svelte v0.511.0 - ISC
- *
- * ISC License
- *
- * Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
- *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- *
- */let u=e.rest_props(a,["$$slots","$$events","$$legacy"]);const l=[["path",{d:"M18 6 6 18"}],["path",{d:"m6 6 12 12"}]];I(r,e.spread_props({name:"x"},()=>u,{get iconNode(){return l},children:(h,_)=>{var o=e.comment(),i=e.first_child(o);e.snippet(i,()=>a.children??e.noop),e.append(h,o)},$$slots:{default:!0}})),e.pop()}var $e=e.from_html('<div class="alert alert-error"> </div>'),Ne=e.from_html('<tr><td colspan="3" class="text-center py-6 text-base-content/60">No tickets.</td></tr>'),Pe=e.from_html('<tr><td> </td><td><span> </span></td><td><span class="badge badge-ghost badge-sm"> </span></td></tr>'),Te=e.from_html('<div class="text-center py-12 text-base-content/60">Select a ticket to view conversation.</div>'),Oe=e.from_html('<button class="btn btn-success btn-sm">Mark resolved</button>'),Me=e.from_html('<div><div class="text-xs text-base-content/60 mb-1"> </div> <div> </div></div>'),Ce=e.from_html('<div class="flex items-center justify-between mb-3"><div><div class="font-medium"> </div> <div class="text-xs text-base-content/60"> </div></div> <!></div> <div class="space-y-3 mb-4 max-h-[40vh] overflow-y-auto"><div class="bg-base-200 rounded-lg p-3 text-sm"> </div> <!></div> <div class="flex gap-2"><textarea class="textarea textarea-bordered flex-1" rows="2" placeholder="Reply..."></textarea> <button class="btn btn-primary self-end">Send</button></div>',1),qe=e.from_html("<option> </option>"),ze=e.from_html('<div class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"><div class="bg-base-100 rounded-xl p-6 w-full max-w-md"><div class="flex items-center justify-between mb-4"><h2 class="text-xl font-semibold">New ticket</h2><button class="btn btn-ghost btn-sm btn-square"><!></button></div> <div class="space-y-3"><div><label class="label label-text">Subject</label><input class="input input-bordered w-full"/></div> <div><label class="label label-text">Requester email</label><input type="email" class="input input-bordered w-full"/></div> <div class="grid grid-cols-2 gap-3"><div><label class="label label-text">Category</label><select class="select select-bordered w-full"><option>—</option><!></select></div> <div><label class="label label-text">Priority</label><select class="select select-bordered w-full"><option>Low</option><option>Medium</option><option>High</option><option>Urgent</option></select></div></div> <div><label class="label label-text">Description</label><textarea class="textarea textarea-bordered w-full" rows="4"></textarea></div></div> <div class="flex justify-end gap-2 mt-4"><button class="btn btn-ghost">Cancel</button><button class="btn btn-primary"> </button></div></div></div>'),Re=e.from_html('<div class="p-6 space-y-4"><header class="flex items-center justify-between"><h1 class="text-2xl font-semibold flex items-center gap-2"><!> Helpdesk</h1> <button class="btn btn-primary btn-sm gap-2"><!> New ticket</button></header> <!> <select class="select select-sm select-bordered max-w-xs"><option>All</option><option>Open</option><option>Pending</option><option>Resolved</option><option>Closed</option></select> <div class="grid grid-cols-12 gap-4"><div class="col-span-5 bg-base-100 rounded-lg shadow overflow-y-auto max-h-[70vh]"><table class="table table-sm"><thead><tr><th>Subject</th><th>Priority</th><th>Status</th></tr></thead><tbody><!></tbody></table></div> <div class="col-span-7 bg-base-100 rounded-lg shadow p-4"><!></div></div></div> <!>',1);function He(r,a){var _e;e.push(a,!0);const u=((_e=window.__zveltio)==null?void 0:_e.engineUrl)??"";let l=e.state(e.proxy([])),h=e.state(e.proxy([])),_=e.state(""),o=e.state("open"),i=e.state(null),q=e.state(e.proxy([])),m=e.state(""),$=e.state(!1),N=e.state(!1),n=e.state(e.proxy({subject:"",description:"",category_id:"",priority:"medium",requester_email:""}));async function x(t,s){const d=await fetch(`${u}${t}`,{credentials:"include",...s}),g=await d.json().catch(()=>({}));if(!d.ok)throw new Error(g.error||`HTTP ${d.status}`);return g}async function H(){try{const t=new URLSearchParams;e.get(o)!=="all"&&t.set("status",e.get(o));const s=await x(`/api/helpdesk/tickets?${t}`);e.set(l,s.data??[],!0)}catch(t){e.set(_,t.message,!0)}}async function V(){try{const t=await x("/api/helpdesk/categories");e.set(h,t.data??[],!0)}catch{}}async function D(t){try{const s=await x(`/api/helpdesk/tickets/${t}/messages`);e.set(q,s.data??[],!0)}catch(s){e.set(_,s.message,!0)}}async function X(){e.set(N,!0),e.set(_,"");try{await x("/api/helpdesk/tickets",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(e.get(n))}),e.set($,!1),e.set(n,{subject:"",description:"",category_id:"",priority:"medium",requester_email:""},!0),await H()}catch(t){e.set(_,t.message,!0)}finally{e.set(N,!1)}}async function Z(){if(!(!e.get(i)||!e.get(m).trim()))try{await x(`/api/helpdesk/tickets/${e.get(i).id}/messages`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({body:e.get(m)})}),e.set(m,""),await D(e.get(i).id)}catch(t){e.set(_,t.message,!0)}}async function oe(t){var s;try{await x(`/api/helpdesk/tickets/${t}/resolve`,{method:"POST"}),await H(),((s=e.get(i))==null?void 0:s.id)===t&&e.set(i,null)}catch(d){e.set(_,d.message,!0)}}e.user_effect(()=>{e.get(o),H()}),e.user_effect(()=>{e.get(i)&&D(e.get(i).id)}),me.onMount(()=>{H(),V()});function We(t){return{low:"badge-ghost",medium:"badge-info",high:"badge-warning",urgent:"badge-error"}[t]??"badge-ghost"}var ne=Re(),G=e.first_child(ne),K=e.child(G),Q=e.child(K),De=e.child(Q);ke(De,{class:"h-6 w-6"}),e.next(),e.reset(Q);var Y=e.sibling(Q,2),Ue=e.child(Y);je(Ue,{class:"h-4 w-4"}),e.next(),e.reset(Y),e.reset(K);var de=e.sibling(K,2);{var Fe=t=>{var s=$e(),d=e.child(s,!0);e.reset(s),e.template_effect(()=>e.set_text(d,e.get(_))),e.append(t,s)};e.if(de,t=>{e.get(_)&&t(Fe)})}var L=e.sibling(de,2),ee=e.child(L);ee.value=ee.__value="all";var te=e.sibling(ee);te.value=te.__value="open";var ae=e.sibling(te);ae.value=ae.__value="pending";var se=e.sibling(ae);se.value=se.__value="resolved";var ce=e.sibling(se);ce.value=ce.__value="closed",e.reset(L);var ve=e.sibling(L,2),ie=e.child(ve),ue=e.child(ie),ge=e.sibling(e.child(ue)),Le=e.child(ge);{var Ae=t=>{var s=Ne();e.append(t,s)},Be=t=>{var s=e.comment(),d=e.first_child(s);e.each(d,17,()=>e.get(l),g=>g.id,(g,p)=>{var y=Pe();let w;var k=e.child(y),W=e.child(k,!0);e.reset(k);var j=e.sibling(k),f=e.child(j),S=e.child(f,!0);e.reset(f),e.reset(j);var P=e.sibling(j),T=e.child(P),O=e.child(T,!0);e.reset(T),e.reset(P),e.reset(y),e.template_effect(z=>{var M;w=e.set_class(y,1,"cursor-pointer hover:bg-base-200",null,w,{"bg-base-200":((M=e.get(i))==null?void 0:M.id)===e.get(p).id}),e.set_text(W,e.get(p).subject),e.set_class(f,1,`badge ${z??""} badge-sm`),e.set_text(S,e.get(p).priority),e.set_text(O,e.get(p).status)},[()=>We(e.get(p).priority)]),e.delegated("click",y,()=>e.set(i,e.get(p),!0)),e.append(g,y)}),e.append(t,s)};e.if(Le,t=>{e.get(l).length===0?t(Ae):t(Be,-1)})}e.reset(ge),e.reset(ue),e.reset(ie);var pe=e.sibling(ie,2),Ee=e.child(pe);{var Je=t=>{var s=Te();e.append(t,s)},Ie=t=>{var s=Ce(),d=e.first_child(s),g=e.child(d),p=e.child(g),y=e.child(p,!0);e.reset(p);var w=e.sibling(p,2),k=e.child(w);e.reset(w),e.reset(g);var W=e.sibling(g,2);{var j=v=>{var b=Oe();e.delegated("click",b,()=>oe(e.get(i).id)),e.append(v,b)};e.if(W,v=>{e.get(i).status!=="resolved"&&e.get(i).status!=="closed"&&v(j)})}e.reset(d);var f=e.sibling(d,2),S=e.child(f),P=e.child(S,!0);e.reset(S);var T=e.sibling(S,2);e.each(T,17,()=>e.get(q),v=>v.id,(v,b)=>{var C=Me(),R=e.child(C),A=e.child(R);e.reset(R);var U=e.sibling(R,2),B=e.child(U,!0);e.reset(U),e.reset(C),e.template_effect(E=>{e.set_class(C,1,`rounded-lg p-3 text-sm ${e.get(b).is_internal?"bg-primary/10":""}`),e.set_text(A,`${e.get(b).author_name??e.get(b).author_id??""} · ${E??""}`),e.set_text(B,e.get(b).body)},[()=>new Date(e.get(b).created_at).toLocaleString()]),e.append(v,C)}),e.reset(f);var O=e.sibling(f,2),z=e.child(O);e.remove_textarea_child(z);var M=e.sibling(z,2);e.reset(O),e.template_effect(v=>{e.set_text(y,e.get(i).subject),e.set_text(k,`From: ${e.get(i).requester_email??e.get(i).requester_id??"—"??""}`),e.set_text(P,e.get(i).description),M.disabled=v},[()=>!e.get(m).trim()]),e.bind_value(z,()=>e.get(m),v=>e.set(m,v)),e.delegated("click",M,Z),e.append(t,s)};e.if(Ee,t=>{e.get(i)?t(Ie,-1):t(Je)})}e.reset(pe),e.reset(ve),e.reset(G);var Ve=e.sibling(G,2);{var Xe=t=>{var s=ze(),d=e.child(s),g=e.child(d),p=e.sibling(e.child(g)),y=e.child(p);Se(y,{class:"h-4 w-4"}),e.reset(p),e.reset(g);var w=e.sibling(g,2),k=e.child(w),W=e.sibling(e.child(k));e.remove_input_defaults(W),e.reset(k);var j=e.sibling(k,2),f=e.sibling(e.child(j));e.remove_input_defaults(f),e.reset(j);var S=e.sibling(j,2),P=e.child(S),T=e.sibling(e.child(P)),O=e.child(T);O.value=O.__value="";var z=e.sibling(O);e.each(z,17,()=>e.get(h),c=>c.id,(c,re)=>{var F=qe(),Ge=e.child(F,!0);e.reset(F);var he={};e.template_effect(()=>{e.set_text(Ge,e.get(re).name),he!==(he=e.get(re).id)&&(F.value=(F.__value=e.get(re).id)??"")}),e.append(c,F)}),e.reset(T),e.reset(P);var M=e.sibling(P,2),v=e.sibling(e.child(M)),b=e.child(v);b.value=b.__value="low";var C=e.sibling(b);C.value=C.__value="medium";var R=e.sibling(C);R.value=R.__value="high";var A=e.sibling(R);A.value=A.__value="urgent",e.reset(v),e.reset(M),e.reset(S);var U=e.sibling(S,2),B=e.sibling(e.child(U));e.remove_textarea_child(B),e.reset(U),e.reset(w);var E=e.sibling(w,2),be=e.child(E),J=e.sibling(be),Ze=e.child(J,!0);e.reset(J),e.reset(E),e.reset(d),e.reset(s),e.template_effect(()=>{J.disabled=e.get(N)||!e.get(n).subject||!e.get(n).description,e.set_text(Ze,e.get(N)?"Saving…":"Create")}),e.delegated("click",s,c=>c.target===c.currentTarget&&e.set($,!1)),e.delegated("click",p,()=>e.set($,!1)),e.bind_value(W,()=>e.get(n).subject,c=>e.get(n).subject=c),e.bind_value(f,()=>e.get(n).requester_email,c=>e.get(n).requester_email=c),e.bind_select_value(T,()=>e.get(n).category_id,c=>e.get(n).category_id=c),e.bind_select_value(v,()=>e.get(n).priority,c=>e.get(n).priority=c),e.bind_value(B,()=>e.get(n).description,c=>e.get(n).description=c),e.delegated("click",be,()=>e.set($,!1)),e.delegated("click",J,X),e.append(t,s)};e.if(Ve,t=>{e.get($)&&t(Xe)})}e.delegated("click",Y,()=>e.set($,!0)),e.bind_select_value(L,()=>e.get(o),t=>e.set(o,t)),e.append(r,ne),e.pop()}e.delegate(["click"]);function le(){const r=window.__zveltio;r&&r.registerRoute({path:"helpdesk",component:He,label:"Helpdesk",icon:"Headphones",category:"projects"})}return le(),le})(window.__SvelteRuntime.__unknown,window.__SvelteRuntime.internal_client,window.__SvelteRuntime.svelte);
+ */
+const qe = {
+  xmlns: "http://www.w3.org/2000/svg",
+  width: 24,
+  height: 24,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  "stroke-width": 2,
+  "stroke-linecap": "round",
+  "stroke-linejoin": "round"
+};
+var ze = e.from_svg("<svg><!><!></svg>");
+function re(u, s) {
+  e.push(s, !0);
+  const m = e.prop(s, "color", 3, "currentColor"), p = e.prop(s, "size", 3, 24), b = e.prop(s, "strokeWidth", 3, 2), g = e.prop(s, "absoluteStrokeWidth", 3, !1), r = e.prop(s, "iconNode", 19, () => []), i = e.rest_props(s, [
+    "$$slots",
+    "$$events",
+    "$$legacy",
+    "name",
+    "color",
+    "size",
+    "strokeWidth",
+    "absoluteStrokeWidth",
+    "iconNode",
+    "children"
+  ]);
+  var z = ze();
+  e.attribute_effect(
+    z,
+    (S) => ({
+      ...qe,
+      ...i,
+      width: p(),
+      height: p(),
+      stroke: m(),
+      "stroke-width": S,
+      class: [
+        "lucide-icon lucide",
+        s.name && `lucide-${s.name}`,
+        s.class
+      ]
+    }),
+    [
+      () => g() ? Number(b()) * 24 / Number(p()) : b()
+    ]
+  );
+  var f = e.child(z);
+  e.each(f, 17, r, e.index, (S, l) => {
+    var x = e.derived(() => e.to_array(e.get(l), 2));
+    let W = () => e.get(x)[0], I = () => e.get(x)[1];
+    var U = e.comment(), X = e.first_child(U);
+    e.element(X, W, !0, (G, le) => {
+      e.attribute_effect(G, () => ({ ...I() }));
+    }), e.append(S, U);
+  });
+  var N = e.sibling(f);
+  e.snippet(N, () => s.children ?? e.noop), e.reset(z), e.append(u, z), e.pop();
+}
+function He(u, s) {
+  e.push(s, !0);
+  /**
+   * @license @lucide/svelte v0.511.0 - ISC
+   *
+   * ISC License
+   *
+   * Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
+   *
+   * Permission to use, copy, modify, and/or distribute this software for any
+   * purpose with or without fee is hereby granted, provided that the above
+   * copyright notice and this permission notice appear in all copies.
+   *
+   * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+   * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+   * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+   * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+   * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+   * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+   * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   *
+   */
+  let m = e.rest_props(s, ["$$slots", "$$events", "$$legacy"]);
+  const p = [
+    [
+      "path",
+      {
+        d: "M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"
+      }
+    ]
+  ];
+  re(u, e.spread_props({ name: "headphones" }, () => m, {
+    get iconNode() {
+      return p;
+    },
+    children: (b, g) => {
+      var r = e.comment(), i = e.first_child(r);
+      e.snippet(i, () => s.children ?? e.noop), e.append(b, r);
+    },
+    $$slots: { default: !0 }
+  })), e.pop();
+}
+function Oe(u, s) {
+  e.push(s, !0);
+  /**
+   * @license @lucide/svelte v0.511.0 - ISC
+   *
+   * ISC License
+   *
+   * Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
+   *
+   * Permission to use, copy, modify, and/or distribute this software for any
+   * purpose with or without fee is hereby granted, provided that the above
+   * copyright notice and this permission notice appear in all copies.
+   *
+   * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+   * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+   * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+   * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+   * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+   * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+   * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   *
+   */
+  let m = e.rest_props(s, ["$$slots", "$$events", "$$legacy"]);
+  const p = [["path", { d: "M5 12h14" }], ["path", { d: "M12 5v14" }]];
+  re(u, e.spread_props({ name: "plus" }, () => m, {
+    get iconNode() {
+      return p;
+    },
+    children: (b, g) => {
+      var r = e.comment(), i = e.first_child(r);
+      e.snippet(i, () => s.children ?? e.noop), e.append(b, r);
+    },
+    $$slots: { default: !0 }
+  })), e.pop();
+}
+function We(u, s) {
+  e.push(s, !0);
+  /**
+   * @license @lucide/svelte v0.511.0 - ISC
+   *
+   * ISC License
+   *
+   * Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
+   *
+   * Permission to use, copy, modify, and/or distribute this software for any
+   * purpose with or without fee is hereby granted, provided that the above
+   * copyright notice and this permission notice appear in all copies.
+   *
+   * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+   * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+   * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+   * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+   * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+   * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+   * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   *
+   */
+  let m = e.rest_props(s, ["$$slots", "$$events", "$$legacy"]);
+  const p = [
+    ["path", { d: "M18 6 6 18" }],
+    ["path", { d: "m6 6 12 12" }]
+  ];
+  re(u, e.spread_props({ name: "x" }, () => m, {
+    get iconNode() {
+      return p;
+    },
+    children: (b, g) => {
+      var r = e.comment(), i = e.first_child(r);
+      e.snippet(i, () => s.children ?? e.noop), e.append(b, r);
+    },
+    $$slots: { default: !0 }
+  })), e.pop();
+}
+var Re = e.from_html('<div class="alert alert-error"> </div>'), Ue = e.from_html('<tr><td colspan="3" class="text-center py-6 text-base-content/60">No tickets.</td></tr>'), Fe = e.from_html('<tr><td> </td><td><span> </span></td><td><span class="badge badge-ghost badge-sm"> </span></td></tr>'), Le = e.from_html('<div class="text-center py-12 text-base-content/60">Select a ticket to view conversation.</div>'), Ae = e.from_html('<button class="btn btn-success btn-sm">Mark resolved</button>'), Be = e.from_html('<div><div class="text-xs text-base-content/60 mb-1"> </div> <div> </div></div>'), De = e.from_html('<div class="flex items-center justify-between mb-3"><div><div class="font-medium"> </div> <div class="text-xs text-base-content/60"> </div></div> <!></div> <div class="space-y-3 mb-4 max-h-[40vh] overflow-y-auto"><div class="bg-base-200 rounded-lg p-3 text-sm"> </div> <!></div> <div class="flex gap-2"><textarea class="textarea textarea-bordered flex-1" rows="2" placeholder="Reply..."></textarea> <button class="btn btn-primary self-end">Send</button></div>', 1), Je = e.from_html("<option> </option>"), Ee = e.from_html('<div class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"><div class="bg-base-100 rounded-xl p-6 w-full max-w-md"><div class="flex items-center justify-between mb-4"><h2 class="text-xl font-semibold">New ticket</h2><button class="btn btn-ghost btn-sm btn-square"><!></button></div> <div class="space-y-3"><div><label class="label label-text">Subject</label><input class="input input-bordered w-full"/></div> <div><label class="label label-text">Requester email</label><input type="email" class="input input-bordered w-full"/></div> <div class="grid grid-cols-2 gap-3"><div><label class="label label-text">Category</label><select class="select select-bordered w-full"><option>—</option><!></select></div> <div><label class="label label-text">Priority</label><select class="select select-bordered w-full"><option>Low</option><option>Medium</option><option>High</option><option>Urgent</option></select></div></div> <div><label class="label label-text">Description</label><textarea class="textarea textarea-bordered w-full" rows="4"></textarea></div></div> <div class="flex justify-end gap-2 mt-4"><button class="btn btn-ghost">Cancel</button><button class="btn btn-primary"> </button></div></div></div>'), Ie = e.from_html('<div class="p-6 space-y-4"><header class="flex items-center justify-between"><h1 class="text-2xl font-semibold flex items-center gap-2"><!> Helpdesk</h1> <button class="btn btn-primary btn-sm gap-2"><!> New ticket</button></header> <!> <select class="select select-sm select-bordered max-w-xs"><option>All</option><option>Open</option><option>Pending</option><option>Resolved</option><option>Closed</option></select> <div class="grid grid-cols-12 gap-4"><div class="col-span-5 bg-base-100 rounded-lg shadow overflow-y-auto max-h-[70vh]"><table class="table table-sm"><thead><tr><th>Subject</th><th>Priority</th><th>Status</th></tr></thead><tbody><!></tbody></table></div> <div class="col-span-7 bg-base-100 rounded-lg shadow p-4"><!></div></div></div> <!>', 1);
+function Xe(u, s) {
+  var ue;
+  e.push(s, !0);
+  const m = ((ue = window.__zveltio) == null ? void 0 : ue.engineUrl) ?? "";
+  let p = e.state(e.proxy([])), b = e.state(e.proxy([])), g = e.state(""), r = e.state("open"), i = e.state(null), z = e.state(e.proxy([])), f = e.state(""), N = e.state(!1), S = e.state(!1), l = e.state(e.proxy({
+    subject: "",
+    description: "",
+    category_id: "",
+    priority: "medium",
+    requester_email: ""
+  }));
+  async function x(t, a) {
+    const o = await fetch(`${m}${t}`, { credentials: "include", ...a }), c = await o.json().catch(() => ({}));
+    if (!o.ok) throw new Error(c.error || `HTTP ${o.status}`);
+    return c;
+  }
+  async function W() {
+    try {
+      const t = new URLSearchParams();
+      e.get(r) !== "all" && t.set("status", e.get(r));
+      const a = await x(`/api/helpdesk/tickets?${t}`);
+      e.set(p, a.data ?? [], !0);
+    } catch (t) {
+      e.set(g, t.message, !0);
+    }
+  }
+  async function I() {
+    try {
+      const t = await x("/api/helpdesk/categories");
+      e.set(b, t.data ?? [], !0);
+    } catch {
+    }
+  }
+  async function U(t) {
+    try {
+      const a = await x(`/api/helpdesk/tickets/${t}/messages`);
+      e.set(z, a.data ?? [], !0);
+    } catch (a) {
+      e.set(g, a.message, !0);
+    }
+  }
+  async function X() {
+    e.set(S, !0), e.set(g, "");
+    try {
+      await x("/api/helpdesk/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(e.get(l))
+      }), e.set(N, !1), e.set(
+        l,
+        {
+          subject: "",
+          description: "",
+          category_id: "",
+          priority: "medium",
+          requester_email: ""
+        },
+        !0
+      ), await W();
+    } catch (t) {
+      e.set(g, t.message, !0);
+    } finally {
+      e.set(S, !1);
+    }
+  }
+  async function G() {
+    if (!(!e.get(i) || !e.get(f).trim()))
+      try {
+        await x(`/api/helpdesk/tickets/${e.get(i).id}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body: e.get(f) })
+        }), e.set(f, ""), await U(e.get(i).id);
+      } catch (t) {
+        e.set(g, t.message, !0);
+      }
+  }
+  async function le(t) {
+    var a;
+    try {
+      await x(`/api/helpdesk/tickets/${t}/resolve`, { method: "POST" }), await W(), ((a = e.get(i)) == null ? void 0 : a.id) === t && e.set(i, null);
+    } catch (o) {
+      e.set(g, o.message, !0);
+    }
+  }
+  e.user_effect(() => {
+    e.get(r), W();
+  }), e.user_effect(() => {
+    e.get(i) && U(e.get(i).id);
+  }), Me(() => {
+    W(), I();
+  });
+  function he(t) {
+    return {
+      low: "badge-ghost",
+      medium: "badge-info",
+      high: "badge-warning",
+      urgent: "badge-error"
+    }[t] ?? "badge-ghost";
+  }
+  var oe = Ie(), K = e.first_child(oe), Q = e.child(K), V = e.child(Q), me = e.child(V);
+  He(me, { class: "h-6 w-6" }), e.next(), e.reset(V);
+  var Y = e.sibling(V, 2), fe = e.child(Y);
+  Oe(fe, { class: "h-4 w-4" }), e.next(), e.reset(Y), e.reset(Q);
+  var ne = e.sibling(Q, 2);
+  {
+    var xe = (t) => {
+      var a = Re(), o = e.child(a, !0);
+      e.reset(a), e.template_effect(() => e.set_text(o, e.get(g))), e.append(t, a);
+    };
+    e.if(ne, (t) => {
+      e.get(g) && t(xe);
+    });
+  }
+  var A = e.sibling(ne, 2), Z = e.child(A);
+  Z.value = Z.__value = "all";
+  var ee = e.sibling(Z);
+  ee.value = ee.__value = "open";
+  var te = e.sibling(ee);
+  te.value = te.__value = "pending";
+  var ae = e.sibling(te);
+  ae.value = ae.__value = "resolved";
+  var de = e.sibling(ae);
+  de.value = de.__value = "closed", e.reset(A);
+  var ce = e.sibling(A, 2), se = e.child(ce), ve = e.child(se), pe = e.sibling(e.child(ve)), ye = e.child(pe);
+  {
+    var we = (t) => {
+      var a = Ue();
+      e.append(t, a);
+    }, ke = (t) => {
+      var a = e.comment(), o = e.first_child(a);
+      e.each(o, 17, () => e.get(p), (c) => c.id, (c, v) => {
+        var y = Fe();
+        let w;
+        var k = e.child(y), R = e.child(k, !0);
+        e.reset(k);
+        var j = e.sibling(k), h = e.child(j), $ = e.child(h, !0);
+        e.reset(h), e.reset(j);
+        var P = e.sibling(j), T = e.child(P), C = e.child(T, !0);
+        e.reset(T), e.reset(P), e.reset(y), e.template_effect(
+          (H) => {
+            var M;
+            w = e.set_class(y, 1, "cursor-pointer hover:bg-base-200", null, w, { "bg-base-200": ((M = e.get(i)) == null ? void 0 : M.id) === e.get(v).id }), e.set_text(R, e.get(v).subject), e.set_class(h, 1, `badge ${H ?? ""} badge-sm`), e.set_text($, e.get(v).priority), e.set_text(C, e.get(v).status);
+          },
+          [() => he(e.get(v).priority)]
+        ), e.delegated("click", y, () => e.set(i, e.get(v), !0)), e.append(c, y);
+      }), e.append(t, a);
+    };
+    e.if(ye, (t) => {
+      e.get(p).length === 0 ? t(we) : t(ke, -1);
+    });
+  }
+  e.reset(pe), e.reset(ve), e.reset(se);
+  var ge = e.sibling(se, 2), je = e.child(ge);
+  {
+    var $e = (t) => {
+      var a = Le();
+      e.append(t, a);
+    }, Ne = (t) => {
+      var a = De(), o = e.first_child(a), c = e.child(o), v = e.child(c), y = e.child(v, !0);
+      e.reset(v);
+      var w = e.sibling(v, 2), k = e.child(w);
+      e.reset(w), e.reset(c);
+      var R = e.sibling(c, 2);
+      {
+        var j = (d) => {
+          var _ = Ae();
+          e.delegated("click", _, () => le(e.get(i).id)), e.append(d, _);
+        };
+        e.if(R, (d) => {
+          e.get(i).status !== "resolved" && e.get(i).status !== "closed" && d(j);
+        });
+      }
+      e.reset(o);
+      var h = e.sibling(o, 2), $ = e.child(h), P = e.child($, !0);
+      e.reset($);
+      var T = e.sibling($, 2);
+      e.each(T, 17, () => e.get(z), (d) => d.id, (d, _) => {
+        var q = Be(), O = e.child(q), B = e.child(O);
+        e.reset(O);
+        var F = e.sibling(O, 2), D = e.child(F, !0);
+        e.reset(F), e.reset(q), e.template_effect(
+          (J) => {
+            e.set_class(q, 1, `rounded-lg p-3 text-sm ${e.get(_).is_internal ? "bg-primary/10" : ""}`), e.set_text(B, `${e.get(_).author_name ?? e.get(_).author_id ?? ""} · ${J ?? ""}`), e.set_text(D, e.get(_).body);
+          },
+          [() => new Date(e.get(_).created_at).toLocaleString()]
+        ), e.append(d, q);
+      }), e.reset(h);
+      var C = e.sibling(h, 2), H = e.child(C);
+      e.remove_textarea_child(H);
+      var M = e.sibling(H, 2);
+      e.reset(C), e.template_effect(
+        (d) => {
+          e.set_text(y, e.get(i).subject), e.set_text(k, `From: ${e.get(i).requester_email ?? e.get(i).requester_id ?? "—" ?? ""}`), e.set_text(P, e.get(i).description), M.disabled = d;
+        },
+        [() => !e.get(f).trim()]
+      ), e.bind_value(H, () => e.get(f), (d) => e.set(f, d)), e.delegated("click", M, G), e.append(t, a);
+    };
+    e.if(je, (t) => {
+      e.get(i) ? t(Ne, -1) : t($e);
+    });
+  }
+  e.reset(ge), e.reset(ce), e.reset(K);
+  var Se = e.sibling(K, 2);
+  {
+    var Pe = (t) => {
+      var a = Ee(), o = e.child(a), c = e.child(o), v = e.sibling(e.child(c)), y = e.child(v);
+      We(y, { class: "h-4 w-4" }), e.reset(v), e.reset(c);
+      var w = e.sibling(c, 2), k = e.child(w), R = e.sibling(e.child(k));
+      e.remove_input_defaults(R), e.reset(k);
+      var j = e.sibling(k, 2), h = e.sibling(e.child(j));
+      e.remove_input_defaults(h), e.reset(j);
+      var $ = e.sibling(j, 2), P = e.child($), T = e.sibling(e.child(P)), C = e.child(T);
+      C.value = C.__value = "";
+      var H = e.sibling(C);
+      e.each(H, 17, () => e.get(b), (n) => n.id, (n, ie) => {
+        var L = Je(), Ce = e.child(L, !0);
+        e.reset(L);
+        var be = {};
+        e.template_effect(() => {
+          e.set_text(Ce, e.get(ie).name), be !== (be = e.get(ie).id) && (L.value = (L.__value = e.get(ie).id) ?? "");
+        }), e.append(n, L);
+      }), e.reset(T), e.reset(P);
+      var M = e.sibling(P, 2), d = e.sibling(e.child(M)), _ = e.child(d);
+      _.value = _.__value = "low";
+      var q = e.sibling(_);
+      q.value = q.__value = "medium";
+      var O = e.sibling(q);
+      O.value = O.__value = "high";
+      var B = e.sibling(O);
+      B.value = B.__value = "urgent", e.reset(d), e.reset(M), e.reset($);
+      var F = e.sibling($, 2), D = e.sibling(e.child(F));
+      e.remove_textarea_child(D), e.reset(F), e.reset(w);
+      var J = e.sibling(w, 2), _e = e.child(J), E = e.sibling(_e), Te = e.child(E, !0);
+      e.reset(E), e.reset(J), e.reset(o), e.reset(a), e.template_effect(() => {
+        E.disabled = e.get(S) || !e.get(l).subject || !e.get(l).description, e.set_text(Te, e.get(S) ? "Saving…" : "Create");
+      }), e.delegated("click", a, (n) => n.target === n.currentTarget && e.set(N, !1)), e.delegated("click", v, () => e.set(N, !1)), e.bind_value(R, () => e.get(l).subject, (n) => e.get(l).subject = n), e.bind_value(h, () => e.get(l).requester_email, (n) => e.get(l).requester_email = n), e.bind_select_value(T, () => e.get(l).category_id, (n) => e.get(l).category_id = n), e.bind_select_value(d, () => e.get(l).priority, (n) => e.get(l).priority = n), e.bind_value(D, () => e.get(l).description, (n) => e.get(l).description = n), e.delegated("click", _e, () => e.set(N, !1)), e.delegated("click", E, X), e.append(t, a);
+    };
+    e.if(Se, (t) => {
+      e.get(N) && t(Pe);
+    });
+  }
+  e.delegated("click", Y, () => e.set(N, !0)), e.bind_select_value(A, () => e.get(r), (t) => e.set(r, t)), e.append(u, oe), e.pop();
+}
+e.delegate(["click"]);
+function Ge() {
+  const u = window.__zveltio;
+  u && u.registerRoute({
+    path: "helpdesk",
+    component: Xe,
+    label: "Helpdesk",
+    icon: "Headphones",
+    category: "projects"
+  });
+}
+Ge();
+export {
+  Ge as default
+};

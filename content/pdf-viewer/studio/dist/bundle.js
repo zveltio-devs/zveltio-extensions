@@ -1,1 +1,24 @@
-var ZveltioExt=(function(l,a){"use strict";function s(n){const e=Object.create(null,{[Symbol.toStringTag]:{value:"Module"}});if(n){for(const t in n)if(t!=="default"){const i=Object.getOwnPropertyDescriptor(n,t);Object.defineProperty(e,t,i.get?i:{enumerable:!0,get:()=>n[t]})}}return e.default=n,Object.freeze(e)}const r=s(a);var u=r.from_html('<iframe class="w-full rounded border border-base-300" style="height: 65vh; min-height: 400px;"></iframe>');function c(n,e){r.push(e,!0);var t=u();r.template_effect(()=>{r.set_attribute(t,"src",e.asset.url),r.set_attribute(t,"title",e.asset.name??"PDF Document")}),r.append(n,t),r.pop()}function o(){const n=window.__zveltio;n&&n.registerAssetPreview({match:e=>{var t,i;return e.mimeType==="application/pdf"||((t=e.name)==null?void 0:t.toLowerCase().endsWith(".pdf"))||((i=e.url)==null?void 0:i.toLowerCase().endsWith(".pdf"))},component:c})}return o(),o})(window.__SvelteRuntime.__unknown,window.__SvelteRuntime.internal_client);
+import "svelte/internal/disclose-version";
+import * as t from "svelte/internal/client";
+var a = t.from_html('<iframe class="w-full rounded border border-base-300" style="height: 65vh; min-height: 400px;"></iframe>');
+function s(i, e) {
+  t.push(e, !0);
+  var r = a();
+  t.template_effect(() => {
+    t.set_attribute(r, "src", e.asset.url), t.set_attribute(r, "title", e.asset.name ?? "PDF Document");
+  }), t.append(i, r), t.pop();
+}
+function n() {
+  const i = window.__zveltio;
+  i && i.registerAssetPreview({
+    match: (e) => {
+      var r, o;
+      return e.mimeType === "application/pdf" || ((r = e.name) == null ? void 0 : r.toLowerCase().endsWith(".pdf")) || ((o = e.url) == null ? void 0 : o.toLowerCase().endsWith(".pdf"));
+    },
+    component: s
+  });
+}
+n();
+export {
+  n as default
+};

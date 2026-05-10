@@ -1,4 +1,7 @@
-var ZveltioExt=(function(Kt,ht,pt){"use strict";function gt(n){const a=Object.create(null,{[Symbol.toStringTag]:{value:"Module"}});if(n){for(const _ in n)if(_!=="default"){const r=Object.getOwnPropertyDescriptor(n,_);Object.defineProperty(a,_,r.get?r:{enumerable:!0,get:()=>n[_]})}}return a.default=n,Object.freeze(a)}const t=gt(ht);/**
+import "svelte/internal/disclose-version";
+import * as t from "svelte/internal/client";
+import { onMount as St } from "svelte";
+/**
  * @license @lucide/svelte v0.511.0 - ISC
  *
  * ISC License
@@ -17,99 +20,555 @@ var ZveltioExt=(function(Kt,ht,pt){"use strict";function gt(n){const a=Object.cr
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  * 
- */const bt={xmlns:"http://www.w3.org/2000/svg",width:24,height:24,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor","stroke-width":2,"stroke-linecap":"round","stroke-linejoin":"round"};var ft=t.from_svg("<svg><!><!></svg>");function V(n,a){t.push(a,!0);const _=t.prop(a,"color",3,"currentColor"),r=t.prop(a,"size",3,24),p=t.prop(a,"strokeWidth",3,2),$=t.prop(a,"absoluteStrokeWidth",3,!1),o=t.prop(a,"iconNode",19,()=>[]),c=t.rest_props(a,["$$slots","$$events","$$legacy","name","color","size","strokeWidth","absoluteStrokeWidth","iconNode","children"]);var k=ft();t.attribute_effect(k,T=>({...bt,...c,width:r(),height:r(),stroke:_(),"stroke-width":T,class:["lucide-icon lucide",a.name&&`lucide-${a.name}`,a.class]}),[()=>$()?Number(p())*24/Number(r()):p()]);var W=t.child(k);t.each(W,17,o,t.index,(T,E)=>{var Z=t.derived(()=>t.to_array(t.get(E),2));let at=()=>t.get(Z)[0],st=()=>t.get(Z)[1];var P=t.comment(),G=t.first_child(P);t.element(G,at,!0,(U,K)=>{t.attribute_effect(U,()=>({...st()}))}),t.append(T,P)});var d=t.sibling(W);t.snippet(d,()=>a.children??t.noop),t.reset(k),t.append(n,k),t.pop()}function lt(n,a){t.push(a,!0);/**
- * @license @lucide/svelte v0.511.0 - ISC
- *
- * ISC License
- *
- * Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
- *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- *
- */let _=t.rest_props(a,["$$slots","$$events","$$legacy"]);const r=[["rect",{width:"16",height:"20",x:"4",y:"2",rx:"2",ry:"2"}],["path",{d:"M9 22v-4h6v4"}],["path",{d:"M8 6h.01"}],["path",{d:"M16 6h.01"}],["path",{d:"M12 6h.01"}],["path",{d:"M12 10h.01"}],["path",{d:"M12 14h.01"}],["path",{d:"M16 10h.01"}],["path",{d:"M16 14h.01"}],["path",{d:"M8 10h.01"}],["path",{d:"M8 14h.01"}]];V(n,t.spread_props({name:"building"},()=>_,{get iconNode(){return r},children:(p,$)=>{var o=t.comment(),c=t.first_child(o);t.snippet(c,()=>a.children??t.noop),t.append(p,o)},$$slots:{default:!0}})),t.pop()}function mt(n,a){t.push(a,!0);/**
- * @license @lucide/svelte v0.511.0 - ISC
- *
- * ISC License
- *
- * Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
- *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- *
- */let _=t.rest_props(a,["$$slots","$$events","$$legacy"]);const r=[["path",{d:"M5 12h14"}],["path",{d:"M12 5v14"}]];V(n,t.spread_props({name:"plus"},()=>_,{get iconNode(){return r},children:(p,$)=>{var o=t.comment(),c=t.first_child(o);t.snippet(c,()=>a.children??t.noop),t.append(p,o)},$$slots:{default:!0}})),t.pop()}function xt(n,a){t.push(a,!0);/**
- * @license @lucide/svelte v0.511.0 - ISC
- *
- * ISC License
- *
- * Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
- *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- *
- */let _=t.rest_props(a,["$$slots","$$events","$$legacy"]);const r=[["path",{d:"M16 17h6v-6"}],["path",{d:"m22 17-8.5-8.5-5 5L2 7"}]];V(n,t.spread_props({name:"trending-down"},()=>_,{get iconNode(){return r},children:(p,$)=>{var o=t.comment(),c=t.first_child(o);t.snippet(c,()=>a.children??t.noop),t.append(p,o)},$$slots:{default:!0}})),t.pop()}function yt(n,a){t.push(a,!0);/**
- * @license @lucide/svelte v0.511.0 - ISC
- *
- * ISC License
- *
- * Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
- *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- *
- */let _=t.rest_props(a,["$$slots","$$events","$$legacy"]);const r=[["path",{d:"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"}]];V(n,t.spread_props({name:"wrench"},()=>_,{get iconNode(){return r},children:(p,$)=>{var o=t.comment(),c=t.first_child(o);t.snippet(c,()=>a.children??t.noop),t.append(p,o)},$$slots:{default:!0}})),t.pop()}function wt(n,a){t.push(a,!0);/**
- * @license @lucide/svelte v0.511.0 - ISC
- *
- * ISC License
- *
- * Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
- *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- *
- */let _=t.rest_props(a,["$$slots","$$events","$$legacy"]);const r=[["path",{d:"M18 6 6 18"}],["path",{d:"m6 6 12 12"}]];V(n,t.spread_props({name:"x"},()=>_,{get iconNode(){return r},children:(p,$)=>{var o=t.comment(),c=t.first_child(o);t.snippet(c,()=>a.children??t.noop),t.append(p,o)},$$slots:{default:!0}})),t.pop()}var Nt=t.from_html('<button class="btn btn-primary btn-sm gap-2"><!> New asset</button>'),kt=t.from_html('<div class="alert alert-error"> </div>'),Mt=t.from_html('<tr><td colspan="7" class="text-center py-6 text-base-content/60">No assets.</td></tr>'),St=t.from_html('<tr><td class="font-mono"> </td><td> </td><td><span class="badge badge-ghost badge-sm"> </span></td><td> </td><td class="text-right"> </td><td class="text-right"> </td><td><span class="badge badge-sm"> </span></td></tr>'),$t=t.from_html('<div class="overflow-x-auto bg-base-100 rounded-lg shadow"><table class="table table-sm"><thead><tr><th>Tag</th><th>Name</th><th>Category</th><th>Acquired</th><th class="text-right">Cost</th><th class="text-right">NBV</th><th>Status</th></tr></thead><tbody><!></tbody></table></div>'),Ot=t.from_html('<tr><td colspan="5" class="text-center py-6 text-base-content/60">No maintenance records.</td></tr>'),jt=t.from_html('<tr><td> </td><td> </td><td class="max-w-xs truncate"> </td><td class="text-right"> </td><td><span class="badge badge-sm"> </span></td></tr>'),Pt=t.from_html('<div class="overflow-x-auto bg-base-100 rounded-lg shadow"><table class="table table-sm"><thead><tr><th>Asset</th><th>Date</th><th>Description</th><th class="text-right">Cost</th><th>Status</th></tr></thead><tbody><!></tbody></table></div>'),Ct=t.from_html('<tr><td colspan="5" class="text-center py-6 text-base-content/60">No depreciation entries.</td></tr>'),Dt=t.from_html('<tr><td> </td><td> </td><td class="text-right"> </td><td class="text-right"> </td><td class="text-right"> </td></tr>'),At=t.from_html('<div class="overflow-x-auto bg-base-100 rounded-lg shadow"><table class="table table-sm"><thead><tr><th>Asset</th><th>Period</th><th class="text-right">Depreciation</th><th class="text-right">Accumulated</th><th class="text-right">NBV</th></tr></thead><tbody><!></tbody></table></div>'),zt=t.from_html('<div class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"><div class="bg-base-100 rounded-xl p-6 w-full max-w-md"><div class="flex items-center justify-between mb-4"><h2 class="text-xl font-semibold">New asset</h2><button class="btn btn-ghost btn-sm btn-square"><!></button></div> <div class="grid grid-cols-2 gap-3"><div class="col-span-1"><label class="label label-text">Tag</label><input class="input input-bordered w-full font-mono"/></div> <div class="col-span-1"><label class="label label-text">Category</label><select class="select select-bordered w-full"><option>Equipment</option><option>Vehicle</option><option>Building</option><option>Furniture</option><option>Other</option></select></div> <div class="col-span-2"><label class="label label-text">Name</label><input class="input input-bordered w-full"/></div> <div><label class="label label-text">Acquired</label><input type="date" class="input input-bordered w-full"/></div> <div><label class="label label-text">Useful life (years)</label><input type="number" class="input input-bordered w-full"/></div> <div><label class="label label-text">Cost</label><input type="number" step="0.01" class="input input-bordered w-full"/></div> <div><label class="label label-text">Currency</label><input class="input input-bordered w-full" maxlength="3"/></div> <div class="col-span-2"><label class="label label-text">Depreciation method</label><select class="select select-bordered w-full"><option>Straight line</option><option>Declining balance</option></select></div></div> <div class="flex justify-end gap-2 mt-4"><button class="btn btn-ghost">Cancel</button><button class="btn btn-primary"> </button></div></div></div>'),Rt=t.from_html('<div class="p-6 space-y-4"><header class="flex items-center justify-between"><h1 class="text-2xl font-semibold flex items-center gap-2"><!> Fixed Assets</h1> <!></header> <!> <div role="tablist" class="tabs tabs-bordered"><button role="tab"><!> Register</button> <button role="tab"><!> Maintenance</button> <button role="tab"><!> Depreciation</button></div> <!></div> <!>',1);function Tt(n,a){var _t;t.push(a,!0);const _=((_t=window.__zveltio)==null?void 0:_t.engineUrl)??"";let r=t.state("register"),p=t.state(t.proxy([])),$=t.state(t.proxy([])),o=t.state(t.proxy([])),c=t.state(""),k=t.state(!1),W=t.state(!1),d=t.state(t.proxy({name:"",asset_tag:"",category:"equipment",purchase_date:new Date().toISOString().slice(0,10),purchase_cost:0,useful_life_years:5,depreciation_method:"straight_line",currency:"RON"}));async function T(e,s){const u=await fetch(`${_}${e}`,{credentials:"include",...s}),g=await u.json().catch(()=>({}));if(!u.ok)throw new Error(g.error||`HTTP ${u.status}`);return g}async function E(){try{const e=await T("/api/assets");t.set(p,e.data??[],!0)}catch(e){t.set(c,e.message,!0)}}async function Z(){try{const e=await T("/api/assets/maintenance");t.set($,e.data??[],!0)}catch(e){t.set(c,e.message,!0)}}async function at(){try{const e=await T("/api/assets/depreciation");t.set(o,e.data??[],!0)}catch(e){t.set(c,e.message,!0)}}async function st(){t.set(W,!0),t.set(c,"");try{await T("/api/assets",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(t.get(d))}),t.set(k,!1),t.set(d,{name:"",asset_tag:"",category:"equipment",purchase_date:new Date().toISOString().slice(0,10),purchase_cost:0,useful_life_years:5,depreciation_method:"straight_line",currency:"RON"},!0),await E()}catch(e){t.set(c,e.message,!0)}finally{t.set(W,!1)}}t.user_effect(()=>{t.get(r)==="register"?E():t.get(r)==="maintenance"?Z():at()}),pt.onMount(E);function P(e,s="RON"){return new Intl.NumberFormat("ro-RO",{style:"currency",currency:s}).format(e)}var G=Rt(),U=t.first_child(G),K=t.child(U),rt=t.child(K),qt=t.child(rt);lt(qt,{class:"h-6 w-6"}),t.next(),t.reset(rt);var Wt=t.sibling(rt,2);{var Bt=e=>{var s=Nt(),u=t.child(s);mt(u,{class:"h-4 w-4"}),t.next(),t.reset(s),t.delegated("click",s,()=>t.set(k,!0)),t.append(e,s)};t.if(Wt,e=>{t.get(r)==="register"&&e(Bt)})}t.reset(K);var dt=t.sibling(K,2);{var Ft=e=>{var s=kt(),u=t.child(s,!0);t.reset(s),t.template_effect(()=>t.set_text(u,t.get(c))),t.append(e,s)};t.if(dt,e=>{t.get(c)&&e(Ft)})}var it=t.sibling(dt,2),H=t.child(it);let ot;var It=t.child(H);lt(It,{class:"h-4 w-4"}),t.next(),t.reset(H);var J=t.sibling(H,2);let ct;var Vt=t.child(J);yt(Vt,{class:"h-4 w-4"}),t.next(),t.reset(J);var Q=t.sibling(J,2);let ut;var Et=t.child(Q);xt(Et,{class:"h-4 w-4"}),t.next(),t.reset(Q),t.reset(it);var Ut=t.sibling(it,2);{var Ht=e=>{var s=$t(),u=t.child(s),g=t.sibling(t.child(u)),C=t.child(g);{var B=l=>{var h=Mt();t.append(l,h)},D=l=>{var h=t.comment(),A=t.first_child(h);t.each(A,17,()=>t.get(p),b=>b.id,(b,i)=>{var f=St(),m=t.child(f),z=t.child(m,!0);t.reset(m);var x=t.sibling(m),R=t.child(x,!0);t.reset(x);var y=t.sibling(x),O=t.child(y),w=t.child(O,!0);t.reset(O),t.reset(y);var M=t.sibling(y),j=t.child(M,!0);t.reset(M);var N=t.sibling(M),q=t.child(N,!0);t.reset(N);var S=t.sibling(N),F=t.child(S,!0);t.reset(S);var L=t.sibling(S),I=t.child(L),X=t.child(I,!0);t.reset(I),t.reset(L),t.reset(f),t.template_effect((Y,tt)=>{t.set_text(z,t.get(i).asset_tag),t.set_text(R,t.get(i).name),t.set_text(w,t.get(i).category),t.set_text(j,t.get(i).purchase_date),t.set_text(q,Y),t.set_text(F,tt),t.set_text(X,t.get(i).status??"active")},[()=>P(Number(t.get(i).purchase_cost),t.get(i).currency),()=>P(Number(t.get(i).net_book_value??t.get(i).purchase_cost),t.get(i).currency)]),t.append(b,f)}),t.append(l,h)};t.if(C,l=>{t.get(p).length===0?l(B):l(D,-1)})}t.reset(g),t.reset(u),t.reset(s),t.append(e,s)},Jt=e=>{var s=Pt(),u=t.child(s),g=t.sibling(t.child(u)),C=t.child(g);{var B=l=>{var h=Ot();t.append(l,h)},D=l=>{var h=t.comment(),A=t.first_child(h);t.each(A,17,()=>t.get($),b=>b.id,(b,i)=>{var f=jt(),m=t.child(f),z=t.child(m,!0);t.reset(m);var x=t.sibling(m),R=t.child(x,!0);t.reset(x);var y=t.sibling(x),O=t.child(y,!0);t.reset(y);var w=t.sibling(y),M=t.child(w,!0);t.reset(w);var j=t.sibling(w),N=t.child(j),q=t.child(N,!0);t.reset(N),t.reset(j),t.reset(f),t.template_effect(S=>{t.set_text(z,t.get(i).asset_name??t.get(i).asset_id),t.set_text(R,t.get(i).maintenance_date),t.set_text(O,t.get(i).description),t.set_text(M,S),t.set_text(q,t.get(i).status)},[()=>P(Number(t.get(i).cost??0))]),t.append(b,f)}),t.append(l,h)};t.if(C,l=>{t.get($).length===0?l(B):l(D,-1)})}t.reset(g),t.reset(u),t.reset(s),t.append(e,s)},Lt=e=>{var s=At(),u=t.child(s),g=t.sibling(t.child(u)),C=t.child(g);{var B=l=>{var h=Ct();t.append(l,h)},D=l=>{var h=t.comment(),A=t.first_child(h);t.each(A,17,()=>t.get(o),b=>b.id,(b,i)=>{var f=Dt(),m=t.child(f),z=t.child(m,!0);t.reset(m);var x=t.sibling(m),R=t.child(x,!0);t.reset(x);var y=t.sibling(x),O=t.child(y,!0);t.reset(y);var w=t.sibling(y),M=t.child(w,!0);t.reset(w);var j=t.sibling(w),N=t.child(j,!0);t.reset(j),t.reset(f),t.template_effect((q,S,F)=>{t.set_text(z,t.get(i).asset_name),t.set_text(R,t.get(i).period),t.set_text(O,q),t.set_text(M,S),t.set_text(N,F)},[()=>P(Number(t.get(i).depreciation_amount)),()=>P(Number(t.get(i).accumulated)),()=>P(Number(t.get(i).net_book_value))]),t.append(b,f)}),t.append(l,h)};t.if(C,l=>{t.get(o).length===0?l(B):l(D,-1)})}t.reset(g),t.reset(u),t.reset(s),t.append(e,s)};t.if(Ut,e=>{t.get(r)==="register"?e(Ht):t.get(r)==="maintenance"?e(Jt,1):e(Lt,-1)})}t.reset(U);var Xt=t.sibling(U,2);{var Zt=e=>{var s=zt(),u=t.child(s),g=t.child(u),C=t.sibling(t.child(g)),B=t.child(C);wt(B,{class:"h-4 w-4"}),t.reset(C),t.reset(g);var D=t.sibling(g,2),l=t.child(D),h=t.sibling(t.child(l));t.remove_input_defaults(h),t.reset(l);var A=t.sibling(l,2),b=t.sibling(t.child(A)),i=t.child(b);i.value=i.__value="equipment";var f=t.sibling(i);f.value=f.__value="vehicle";var m=t.sibling(f);m.value=m.__value="building";var z=t.sibling(m);z.value=z.__value="furniture";var x=t.sibling(z);x.value=x.__value="other",t.reset(b),t.reset(A);var R=t.sibling(A,2),y=t.sibling(t.child(R));t.remove_input_defaults(y),t.reset(R);var O=t.sibling(R,2),w=t.sibling(t.child(O));t.remove_input_defaults(w),t.reset(O);var M=t.sibling(O,2),j=t.sibling(t.child(M));t.remove_input_defaults(j),t.reset(M);var N=t.sibling(M,2),q=t.sibling(t.child(N));t.remove_input_defaults(q),t.reset(N);var S=t.sibling(N,2),F=t.sibling(t.child(S));t.remove_input_defaults(F),t.reset(S);var L=t.sibling(S,2),I=t.sibling(t.child(L)),X=t.child(I);X.value=X.__value="straight_line";var Y=t.sibling(X);Y.value=Y.__value="declining_balance",t.reset(I),t.reset(L),t.reset(D);var tt=t.sibling(D,2),vt=t.child(tt),et=t.sibling(vt),Gt=t.child(et,!0);t.reset(et),t.reset(tt),t.reset(u),t.reset(s),t.template_effect(()=>{et.disabled=t.get(W)||!t.get(d).name||!t.get(d).asset_tag,t.set_text(Gt,t.get(W)?"Saving…":"Create")}),t.delegated("click",s,v=>v.target===v.currentTarget&&t.set(k,!1)),t.delegated("click",C,()=>t.set(k,!1)),t.bind_value(h,()=>t.get(d).asset_tag,v=>t.get(d).asset_tag=v),t.bind_select_value(b,()=>t.get(d).category,v=>t.get(d).category=v),t.bind_value(y,()=>t.get(d).name,v=>t.get(d).name=v),t.bind_value(w,()=>t.get(d).purchase_date,v=>t.get(d).purchase_date=v),t.bind_value(j,()=>t.get(d).useful_life_years,v=>t.get(d).useful_life_years=v),t.bind_value(q,()=>t.get(d).purchase_cost,v=>t.get(d).purchase_cost=v),t.bind_value(F,()=>t.get(d).currency,v=>t.get(d).currency=v),t.bind_select_value(I,()=>t.get(d).depreciation_method,v=>t.get(d).depreciation_method=v),t.delegated("click",vt,()=>t.set(k,!1)),t.delegated("click",et,st),t.append(e,s)};t.if(Xt,e=>{t.get(k)&&e(Zt)})}t.template_effect(()=>{ot=t.set_class(H,1,"tab gap-2",null,ot,{"tab-active":t.get(r)==="register"}),ct=t.set_class(J,1,"tab gap-2",null,ct,{"tab-active":t.get(r)==="maintenance"}),ut=t.set_class(Q,1,"tab gap-2",null,ut,{"tab-active":t.get(r)==="depreciation"})}),t.delegated("click",H,()=>t.set(r,"register")),t.delegated("click",J,()=>t.set(r,"maintenance")),t.delegated("click",Q,()=>t.set(r,"depreciation")),t.append(n,G),t.pop()}t.delegate(["click"]);function nt(){const n=window.__zveltio;n&&n.registerRoute({path:"assets",component:Tt,label:"Fixed Assets",icon:"Building",category:"operations"})}return nt(),nt})(window.__SvelteRuntime.__unknown,window.__SvelteRuntime.internal_client,window.__SvelteRuntime.svelte);
+ */
+const Ct = {
+  xmlns: "http://www.w3.org/2000/svg",
+  width: 24,
+  height: 24,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  "stroke-width": 2,
+  "stroke-linecap": "round",
+  "stroke-linejoin": "round"
+};
+var At = t.from_svg("<svg><!><!></svg>");
+function X(u, a) {
+  t.push(a, !0);
+  const y = t.prop(a, "color", 3, "currentColor"), i = t.prop(a, "size", 3, 24), h = t.prop(a, "strokeWidth", 3, 2), S = t.prop(a, "absoluteStrokeWidth", 3, !1), d = t.prop(a, "iconNode", 19, () => []), o = t.rest_props(a, [
+    "$$slots",
+    "$$events",
+    "$$legacy",
+    "name",
+    "color",
+    "size",
+    "strokeWidth",
+    "absoluteStrokeWidth",
+    "iconNode",
+    "children"
+  ]);
+  var k = At();
+  t.attribute_effect(
+    k,
+    (q) => ({
+      ...Ct,
+      ...o,
+      width: i(),
+      height: i(),
+      stroke: y(),
+      "stroke-width": q,
+      class: [
+        "lucide-icon lucide",
+        a.name && `lucide-${a.name}`,
+        a.class
+      ]
+    }),
+    [
+      () => S() ? Number(h()) * 24 / Number(i()) : h()
+    ]
+  );
+  var B = t.child(k);
+  t.each(B, 17, d, t.index, (q, U) => {
+    var G = t.derived(() => t.to_array(t.get(U), 2));
+    let at = () => t.get(G)[0], st = () => t.get(G)[1];
+    var P = t.comment(), K = t.first_child(P);
+    t.element(K, at, !0, (V, Q) => {
+      t.attribute_effect(V, () => ({ ...st() }));
+    }), t.append(q, P);
+  });
+  var n = t.sibling(B);
+  t.snippet(n, () => a.children ?? t.noop), t.reset(k), t.append(u, k), t.pop();
+}
+function _t(u, a) {
+  t.push(a, !0);
+  /**
+   * @license @lucide/svelte v0.511.0 - ISC
+   *
+   * ISC License
+   *
+   * Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
+   *
+   * Permission to use, copy, modify, and/or distribute this software for any
+   * purpose with or without fee is hereby granted, provided that the above
+   * copyright notice and this permission notice appear in all copies.
+   *
+   * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+   * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+   * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+   * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+   * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+   * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+   * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   *
+   */
+  let y = t.rest_props(a, ["$$slots", "$$events", "$$legacy"]);
+  const i = [
+    [
+      "rect",
+      {
+        width: "16",
+        height: "20",
+        x: "4",
+        y: "2",
+        rx: "2",
+        ry: "2"
+      }
+    ],
+    ["path", { d: "M9 22v-4h6v4" }],
+    ["path", { d: "M8 6h.01" }],
+    ["path", { d: "M16 6h.01" }],
+    ["path", { d: "M12 6h.01" }],
+    ["path", { d: "M12 10h.01" }],
+    ["path", { d: "M12 14h.01" }],
+    ["path", { d: "M16 10h.01" }],
+    ["path", { d: "M16 14h.01" }],
+    ["path", { d: "M8 10h.01" }],
+    ["path", { d: "M8 14h.01" }]
+  ];
+  X(u, t.spread_props({ name: "building" }, () => y, {
+    get iconNode() {
+      return i;
+    },
+    children: (h, S) => {
+      var d = t.comment(), o = t.first_child(d);
+      t.snippet(o, () => a.children ?? t.noop), t.append(h, d);
+    },
+    $$slots: { default: !0 }
+  })), t.pop();
+}
+function Pt(u, a) {
+  t.push(a, !0);
+  /**
+   * @license @lucide/svelte v0.511.0 - ISC
+   *
+   * ISC License
+   *
+   * Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
+   *
+   * Permission to use, copy, modify, and/or distribute this software for any
+   * purpose with or without fee is hereby granted, provided that the above
+   * copyright notice and this permission notice appear in all copies.
+   *
+   * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+   * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+   * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+   * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+   * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+   * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+   * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   *
+   */
+  let y = t.rest_props(a, ["$$slots", "$$events", "$$legacy"]);
+  const i = [["path", { d: "M5 12h14" }], ["path", { d: "M12 5v14" }]];
+  X(u, t.spread_props({ name: "plus" }, () => y, {
+    get iconNode() {
+      return i;
+    },
+    children: (h, S) => {
+      var d = t.comment(), o = t.first_child(d);
+      t.snippet(o, () => a.children ?? t.noop), t.append(h, d);
+    },
+    $$slots: { default: !0 }
+  })), t.pop();
+}
+function Dt(u, a) {
+  t.push(a, !0);
+  /**
+   * @license @lucide/svelte v0.511.0 - ISC
+   *
+   * ISC License
+   *
+   * Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
+   *
+   * Permission to use, copy, modify, and/or distribute this software for any
+   * purpose with or without fee is hereby granted, provided that the above
+   * copyright notice and this permission notice appear in all copies.
+   *
+   * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+   * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+   * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+   * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+   * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+   * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+   * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   *
+   */
+  let y = t.rest_props(a, ["$$slots", "$$events", "$$legacy"]);
+  const i = [
+    ["path", { d: "M16 17h6v-6" }],
+    ["path", { d: "m22 17-8.5-8.5-5 5L2 7" }]
+  ];
+  X(u, t.spread_props({ name: "trending-down" }, () => y, {
+    get iconNode() {
+      return i;
+    },
+    children: (h, S) => {
+      var d = t.comment(), o = t.first_child(d);
+      t.snippet(o, () => a.children ?? t.noop), t.append(h, d);
+    },
+    $$slots: { default: !0 }
+  })), t.pop();
+}
+function Ot(u, a) {
+  t.push(a, !0);
+  /**
+   * @license @lucide/svelte v0.511.0 - ISC
+   *
+   * ISC License
+   *
+   * Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
+   *
+   * Permission to use, copy, modify, and/or distribute this software for any
+   * purpose with or without fee is hereby granted, provided that the above
+   * copyright notice and this permission notice appear in all copies.
+   *
+   * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+   * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+   * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+   * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+   * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+   * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+   * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   *
+   */
+  let y = t.rest_props(a, ["$$slots", "$$events", "$$legacy"]);
+  const i = [
+    [
+      "path",
+      {
+        d: "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"
+      }
+    ]
+  ];
+  X(u, t.spread_props({ name: "wrench" }, () => y, {
+    get iconNode() {
+      return i;
+    },
+    children: (h, S) => {
+      var d = t.comment(), o = t.first_child(d);
+      t.snippet(o, () => a.children ?? t.noop), t.append(h, d);
+    },
+    $$slots: { default: !0 }
+  })), t.pop();
+}
+function jt(u, a) {
+  t.push(a, !0);
+  /**
+   * @license @lucide/svelte v0.511.0 - ISC
+   *
+   * ISC License
+   *
+   * Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
+   *
+   * Permission to use, copy, modify, and/or distribute this software for any
+   * purpose with or without fee is hereby granted, provided that the above
+   * copyright notice and this permission notice appear in all copies.
+   *
+   * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+   * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+   * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+   * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+   * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+   * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+   * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   *
+   */
+  let y = t.rest_props(a, ["$$slots", "$$events", "$$legacy"]);
+  const i = [
+    ["path", { d: "M18 6 6 18" }],
+    ["path", { d: "m6 6 12 12" }]
+  ];
+  X(u, t.spread_props({ name: "x" }, () => y, {
+    get iconNode() {
+      return i;
+    },
+    children: (h, S) => {
+      var d = t.comment(), o = t.first_child(d);
+      t.snippet(o, () => a.children ?? t.noop), t.append(h, d);
+    },
+    $$slots: { default: !0 }
+  })), t.pop();
+}
+var zt = t.from_html('<button class="btn btn-primary btn-sm gap-2"><!> New asset</button>'), Tt = t.from_html('<div class="alert alert-error"> </div>'), qt = t.from_html('<tr><td colspan="7" class="text-center py-6 text-base-content/60">No assets.</td></tr>'), Wt = t.from_html('<tr><td class="font-mono"> </td><td> </td><td><span class="badge badge-ghost badge-sm"> </span></td><td> </td><td class="text-right"> </td><td class="text-right"> </td><td><span class="badge badge-sm"> </span></td></tr>'), Bt = t.from_html('<div class="overflow-x-auto bg-base-100 rounded-lg shadow"><table class="table table-sm"><thead><tr><th>Tag</th><th>Name</th><th>Category</th><th>Acquired</th><th class="text-right">Cost</th><th class="text-right">NBV</th><th>Status</th></tr></thead><tbody><!></tbody></table></div>'), Rt = t.from_html('<tr><td colspan="5" class="text-center py-6 text-base-content/60">No maintenance records.</td></tr>'), Ft = t.from_html('<tr><td> </td><td> </td><td class="max-w-xs truncate"> </td><td class="text-right"> </td><td><span class="badge badge-sm"> </span></td></tr>'), It = t.from_html('<div class="overflow-x-auto bg-base-100 rounded-lg shadow"><table class="table table-sm"><thead><tr><th>Asset</th><th>Date</th><th>Description</th><th class="text-right">Cost</th><th>Status</th></tr></thead><tbody><!></tbody></table></div>'), Ut = t.from_html('<tr><td colspan="5" class="text-center py-6 text-base-content/60">No depreciation entries.</td></tr>'), Vt = t.from_html('<tr><td> </td><td> </td><td class="text-right"> </td><td class="text-right"> </td><td class="text-right"> </td></tr>'), Et = t.from_html('<div class="overflow-x-auto bg-base-100 rounded-lg shadow"><table class="table table-sm"><thead><tr><th>Asset</th><th>Period</th><th class="text-right">Depreciation</th><th class="text-right">Accumulated</th><th class="text-right">NBV</th></tr></thead><tbody><!></tbody></table></div>'), Ht = t.from_html('<div class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"><div class="bg-base-100 rounded-xl p-6 w-full max-w-md"><div class="flex items-center justify-between mb-4"><h2 class="text-xl font-semibold">New asset</h2><button class="btn btn-ghost btn-sm btn-square"><!></button></div> <div class="grid grid-cols-2 gap-3"><div class="col-span-1"><label class="label label-text">Tag</label><input class="input input-bordered w-full font-mono"/></div> <div class="col-span-1"><label class="label label-text">Category</label><select class="select select-bordered w-full"><option>Equipment</option><option>Vehicle</option><option>Building</option><option>Furniture</option><option>Other</option></select></div> <div class="col-span-2"><label class="label label-text">Name</label><input class="input input-bordered w-full"/></div> <div><label class="label label-text">Acquired</label><input type="date" class="input input-bordered w-full"/></div> <div><label class="label label-text">Useful life (years)</label><input type="number" class="input input-bordered w-full"/></div> <div><label class="label label-text">Cost</label><input type="number" step="0.01" class="input input-bordered w-full"/></div> <div><label class="label label-text">Currency</label><input class="input input-bordered w-full" maxlength="3"/></div> <div class="col-span-2"><label class="label label-text">Depreciation method</label><select class="select select-bordered w-full"><option>Straight line</option><option>Declining balance</option></select></div></div> <div class="flex justify-end gap-2 mt-4"><button class="btn btn-ghost">Cancel</button><button class="btn btn-primary"> </button></div></div></div>'), Jt = t.from_html('<div class="p-6 space-y-4"><header class="flex items-center justify-between"><h1 class="text-2xl font-semibold flex items-center gap-2"><!> Fixed Assets</h1> <!></header> <!> <div role="tablist" class="tabs tabs-bordered"><button role="tab"><!> Register</button> <button role="tab"><!> Maintenance</button> <button role="tab"><!> Depreciation</button></div> <!></div> <!>', 1);
+function Lt(u, a) {
+  var ct;
+  t.push(a, !0);
+  const y = ((ct = window.__zveltio) == null ? void 0 : ct.engineUrl) ?? "";
+  let i = t.state("register"), h = t.state(t.proxy([])), S = t.state(t.proxy([])), d = t.state(t.proxy([])), o = t.state(""), k = t.state(!1), B = t.state(!1), n = t.state(t.proxy({
+    name: "",
+    asset_tag: "",
+    category: "equipment",
+    purchase_date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10),
+    purchase_cost: 0,
+    useful_life_years: 5,
+    depreciation_method: "straight_line",
+    currency: "RON"
+  }));
+  async function q(e, s) {
+    const c = await fetch(`${y}${e}`, { credentials: "include", ...s }), p = await c.json().catch(() => ({}));
+    if (!c.ok) throw new Error(p.error || `HTTP ${c.status}`);
+    return p;
+  }
+  async function U() {
+    try {
+      const e = await q("/api/assets");
+      t.set(h, e.data ?? [], !0);
+    } catch (e) {
+      t.set(o, e.message, !0);
+    }
+  }
+  async function G() {
+    try {
+      const e = await q("/api/assets/maintenance");
+      t.set(S, e.data ?? [], !0);
+    } catch (e) {
+      t.set(o, e.message, !0);
+    }
+  }
+  async function at() {
+    try {
+      const e = await q("/api/assets/depreciation");
+      t.set(d, e.data ?? [], !0);
+    } catch (e) {
+      t.set(o, e.message, !0);
+    }
+  }
+  async function st() {
+    t.set(B, !0), t.set(o, "");
+    try {
+      await q("/api/assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(t.get(n))
+      }), t.set(k, !1), t.set(
+        n,
+        {
+          name: "",
+          asset_tag: "",
+          category: "equipment",
+          purchase_date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10),
+          purchase_cost: 0,
+          useful_life_years: 5,
+          depreciation_method: "straight_line",
+          currency: "RON"
+        },
+        !0
+      ), await U();
+    } catch (e) {
+      t.set(o, e.message, !0);
+    } finally {
+      t.set(B, !1);
+    }
+  }
+  t.user_effect(() => {
+    t.get(i) === "register" ? U() : t.get(i) === "maintenance" ? G() : at();
+  }), St(U);
+  function P(e, s = "RON") {
+    return new Intl.NumberFormat("ro-RO", { style: "currency", currency: s }).format(e);
+  }
+  var K = Jt(), V = t.first_child(K), Q = t.child(V), rt = t.child(Q), ut = t.child(rt);
+  _t(ut, { class: "h-6 w-6" }), t.next(), t.reset(rt);
+  var ht = t.sibling(rt, 2);
+  {
+    var pt = (e) => {
+      var s = zt(), c = t.child(s);
+      Pt(c, { class: "h-4 w-4" }), t.next(), t.reset(s), t.delegated("click", s, () => t.set(k, !0)), t.append(e, s);
+    };
+    t.if(ht, (e) => {
+      t.get(i) === "register" && e(pt);
+    });
+  }
+  t.reset(Q);
+  var lt = t.sibling(Q, 2);
+  {
+    var gt = (e) => {
+      var s = Tt(), c = t.child(s, !0);
+      t.reset(s), t.template_effect(() => t.set_text(c, t.get(o))), t.append(e, s);
+    };
+    t.if(lt, (e) => {
+      t.get(o) && e(gt);
+    });
+  }
+  var it = t.sibling(lt, 2), E = t.child(it);
+  let nt;
+  var bt = t.child(E);
+  _t(bt, { class: "h-4 w-4" }), t.next(), t.reset(E);
+  var H = t.sibling(E, 2);
+  let dt;
+  var mt = t.child(H);
+  Ot(mt, { class: "h-4 w-4" }), t.next(), t.reset(H);
+  var Y = t.sibling(H, 2);
+  let ot;
+  var ft = t.child(Y);
+  Dt(ft, { class: "h-4 w-4" }), t.next(), t.reset(Y), t.reset(it);
+  var xt = t.sibling(it, 2);
+  {
+    var yt = (e) => {
+      var s = Bt(), c = t.child(s), p = t.sibling(t.child(c)), D = t.child(p);
+      {
+        var R = (l) => {
+          var _ = qt();
+          t.append(l, _);
+        }, O = (l) => {
+          var _ = t.comment(), j = t.first_child(_);
+          t.each(j, 17, () => t.get(h), (g) => g.id, (g, r) => {
+            var b = Wt(), m = t.child(b), z = t.child(m, !0);
+            t.reset(m);
+            var f = t.sibling(m), T = t.child(f, !0);
+            t.reset(f);
+            var x = t.sibling(f), C = t.child(x), w = t.child(C, !0);
+            t.reset(C), t.reset(x);
+            var M = t.sibling(x), A = t.child(M, !0);
+            t.reset(M);
+            var N = t.sibling(M), W = t.child(N, !0);
+            t.reset(N);
+            var $ = t.sibling(N), F = t.child($, !0);
+            t.reset($);
+            var J = t.sibling($), I = t.child(J), L = t.child(I, !0);
+            t.reset(I), t.reset(J), t.reset(b), t.template_effect(
+              (Z, tt) => {
+                t.set_text(z, t.get(r).asset_tag), t.set_text(T, t.get(r).name), t.set_text(w, t.get(r).category), t.set_text(A, t.get(r).purchase_date), t.set_text(W, Z), t.set_text(F, tt), t.set_text(L, t.get(r).status ?? "active");
+              },
+              [
+                () => P(Number(t.get(r).purchase_cost), t.get(r).currency),
+                () => P(Number(t.get(r).net_book_value ?? t.get(r).purchase_cost), t.get(r).currency)
+              ]
+            ), t.append(g, b);
+          }), t.append(l, _);
+        };
+        t.if(D, (l) => {
+          t.get(h).length === 0 ? l(R) : l(O, -1);
+        });
+      }
+      t.reset(p), t.reset(c), t.reset(s), t.append(e, s);
+    }, wt = (e) => {
+      var s = It(), c = t.child(s), p = t.sibling(t.child(c)), D = t.child(p);
+      {
+        var R = (l) => {
+          var _ = Rt();
+          t.append(l, _);
+        }, O = (l) => {
+          var _ = t.comment(), j = t.first_child(_);
+          t.each(j, 17, () => t.get(S), (g) => g.id, (g, r) => {
+            var b = Ft(), m = t.child(b), z = t.child(m, !0);
+            t.reset(m);
+            var f = t.sibling(m), T = t.child(f, !0);
+            t.reset(f);
+            var x = t.sibling(f), C = t.child(x, !0);
+            t.reset(x);
+            var w = t.sibling(x), M = t.child(w, !0);
+            t.reset(w);
+            var A = t.sibling(w), N = t.child(A), W = t.child(N, !0);
+            t.reset(N), t.reset(A), t.reset(b), t.template_effect(
+              ($) => {
+                t.set_text(z, t.get(r).asset_name ?? t.get(r).asset_id), t.set_text(T, t.get(r).maintenance_date), t.set_text(C, t.get(r).description), t.set_text(M, $), t.set_text(W, t.get(r).status);
+              },
+              [() => P(Number(t.get(r).cost ?? 0))]
+            ), t.append(g, b);
+          }), t.append(l, _);
+        };
+        t.if(D, (l) => {
+          t.get(S).length === 0 ? l(R) : l(O, -1);
+        });
+      }
+      t.reset(p), t.reset(c), t.reset(s), t.append(e, s);
+    }, Nt = (e) => {
+      var s = Et(), c = t.child(s), p = t.sibling(t.child(c)), D = t.child(p);
+      {
+        var R = (l) => {
+          var _ = Ut();
+          t.append(l, _);
+        }, O = (l) => {
+          var _ = t.comment(), j = t.first_child(_);
+          t.each(j, 17, () => t.get(d), (g) => g.id, (g, r) => {
+            var b = Vt(), m = t.child(b), z = t.child(m, !0);
+            t.reset(m);
+            var f = t.sibling(m), T = t.child(f, !0);
+            t.reset(f);
+            var x = t.sibling(f), C = t.child(x, !0);
+            t.reset(x);
+            var w = t.sibling(x), M = t.child(w, !0);
+            t.reset(w);
+            var A = t.sibling(w), N = t.child(A, !0);
+            t.reset(A), t.reset(b), t.template_effect(
+              (W, $, F) => {
+                t.set_text(z, t.get(r).asset_name), t.set_text(T, t.get(r).period), t.set_text(C, W), t.set_text(M, $), t.set_text(N, F);
+              },
+              [
+                () => P(Number(t.get(r).depreciation_amount)),
+                () => P(Number(t.get(r).accumulated)),
+                () => P(Number(t.get(r).net_book_value))
+              ]
+            ), t.append(g, b);
+          }), t.append(l, _);
+        };
+        t.if(D, (l) => {
+          t.get(d).length === 0 ? l(R) : l(O, -1);
+        });
+      }
+      t.reset(p), t.reset(c), t.reset(s), t.append(e, s);
+    };
+    t.if(xt, (e) => {
+      t.get(i) === "register" ? e(yt) : t.get(i) === "maintenance" ? e(wt, 1) : e(Nt, -1);
+    });
+  }
+  t.reset(V);
+  var kt = t.sibling(V, 2);
+  {
+    var Mt = (e) => {
+      var s = Ht(), c = t.child(s), p = t.child(c), D = t.sibling(t.child(p)), R = t.child(D);
+      jt(R, { class: "h-4 w-4" }), t.reset(D), t.reset(p);
+      var O = t.sibling(p, 2), l = t.child(O), _ = t.sibling(t.child(l));
+      t.remove_input_defaults(_), t.reset(l);
+      var j = t.sibling(l, 2), g = t.sibling(t.child(j)), r = t.child(g);
+      r.value = r.__value = "equipment";
+      var b = t.sibling(r);
+      b.value = b.__value = "vehicle";
+      var m = t.sibling(b);
+      m.value = m.__value = "building";
+      var z = t.sibling(m);
+      z.value = z.__value = "furniture";
+      var f = t.sibling(z);
+      f.value = f.__value = "other", t.reset(g), t.reset(j);
+      var T = t.sibling(j, 2), x = t.sibling(t.child(T));
+      t.remove_input_defaults(x), t.reset(T);
+      var C = t.sibling(T, 2), w = t.sibling(t.child(C));
+      t.remove_input_defaults(w), t.reset(C);
+      var M = t.sibling(C, 2), A = t.sibling(t.child(M));
+      t.remove_input_defaults(A), t.reset(M);
+      var N = t.sibling(M, 2), W = t.sibling(t.child(N));
+      t.remove_input_defaults(W), t.reset(N);
+      var $ = t.sibling(N, 2), F = t.sibling(t.child($));
+      t.remove_input_defaults(F), t.reset($);
+      var J = t.sibling($, 2), I = t.sibling(t.child(J)), L = t.child(I);
+      L.value = L.__value = "straight_line";
+      var Z = t.sibling(L);
+      Z.value = Z.__value = "declining_balance", t.reset(I), t.reset(J), t.reset(O);
+      var tt = t.sibling(O, 2), vt = t.child(tt), et = t.sibling(vt), $t = t.child(et, !0);
+      t.reset(et), t.reset(tt), t.reset(c), t.reset(s), t.template_effect(() => {
+        et.disabled = t.get(B) || !t.get(n).name || !t.get(n).asset_tag, t.set_text($t, t.get(B) ? "Saving…" : "Create");
+      }), t.delegated("click", s, (v) => v.target === v.currentTarget && t.set(k, !1)), t.delegated("click", D, () => t.set(k, !1)), t.bind_value(_, () => t.get(n).asset_tag, (v) => t.get(n).asset_tag = v), t.bind_select_value(g, () => t.get(n).category, (v) => t.get(n).category = v), t.bind_value(x, () => t.get(n).name, (v) => t.get(n).name = v), t.bind_value(w, () => t.get(n).purchase_date, (v) => t.get(n).purchase_date = v), t.bind_value(A, () => t.get(n).useful_life_years, (v) => t.get(n).useful_life_years = v), t.bind_value(W, () => t.get(n).purchase_cost, (v) => t.get(n).purchase_cost = v), t.bind_value(F, () => t.get(n).currency, (v) => t.get(n).currency = v), t.bind_select_value(I, () => t.get(n).depreciation_method, (v) => t.get(n).depreciation_method = v), t.delegated("click", vt, () => t.set(k, !1)), t.delegated("click", et, st), t.append(e, s);
+    };
+    t.if(kt, (e) => {
+      t.get(k) && e(Mt);
+    });
+  }
+  t.template_effect(() => {
+    nt = t.set_class(E, 1, "tab gap-2", null, nt, { "tab-active": t.get(i) === "register" }), dt = t.set_class(H, 1, "tab gap-2", null, dt, { "tab-active": t.get(i) === "maintenance" }), ot = t.set_class(Y, 1, "tab gap-2", null, ot, { "tab-active": t.get(i) === "depreciation" });
+  }), t.delegated("click", E, () => t.set(i, "register")), t.delegated("click", H, () => t.set(i, "maintenance")), t.delegated("click", Y, () => t.set(i, "depreciation")), t.append(u, K), t.pop();
+}
+t.delegate(["click"]);
+function Xt() {
+  const u = window.__zveltio;
+  u && u.registerRoute({
+    path: "assets",
+    component: Lt,
+    label: "Fixed Assets",
+    icon: "Building",
+    category: "operations"
+  });
+}
+Xt();
+export {
+  Xt as default
+};
