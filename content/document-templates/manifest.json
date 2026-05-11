@@ -10,9 +10,14 @@
   "permissions": [
     "database"
   ],
+  "studio": {
+    "pages": [
+      { "path": "/admin/content/document-templates", "label": "Document Templates", "icon": "FileType" }
+    ]
+  },
   "contributes": {
     "engine": true,
-    "studio": false,
+    "studio": true,
     "fieldTypes": []
   }
 }

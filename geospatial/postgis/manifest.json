@@ -15,6 +15,11 @@
       "postgis"
     ]
   },
+  "studio": {
+    "pages": [
+      { "path": "/admin/geospatial/postgis", "label": "PostGIS", "icon": "Map" }
+    ]
+  },
   "contributes": {
     "engine": true,
     "studio": true,

@@ -13,6 +13,11 @@
   "dependencies": [
     { "name": "ai", "minVersion": "1.0.0" }
   ],
+  "studio": {
+    "pages": [
+      { "path": "/admin/developer/validation", "label": "Validation Rules", "icon": "ShieldCheck" }
+    ]
+  },
   "contributes": {
     "engine": true,
     "studio": true

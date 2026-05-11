@@ -10,6 +10,11 @@
   "permissions": [
     "database"
   ],
+  "studio": {
+    "pages": [
+      { "path": "/admin/compliance/ro/saft", "label": "SAF-T RO", "icon": "FileSpreadsheet" }
+    ]
+  },
   "contributes": {
     "engine": true,
     "studio": true,

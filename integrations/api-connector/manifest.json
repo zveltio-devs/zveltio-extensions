@@ -10,6 +10,11 @@
   "permissions": [
     "database"
   ],
+  "studio": {
+    "pages": [
+      { "path": "/admin/integrations/api-connector", "label": "API Connector", "icon": "Plug" }
+    ]
+  },
   "contributes": {
     "engine": true,
     "studio": true,

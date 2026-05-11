@@ -8,6 +8,11 @@
   "zveltioMaxVersion": "2.0.0",
   "package": "@zveltio/ext-views",
   "permissions": [],
+  "studio": {
+    "pages": [
+      { "path": "/admin/developer/views", "label": "Custom Views", "icon": "LayoutGrid" }
+    ]
+  },
   "contributes": {
     "engine": false,
     "studio": true,
