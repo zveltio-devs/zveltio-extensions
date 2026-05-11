@@ -10,6 +10,11 @@
   "permissions": [
     "database"
   ],
+  "studio": {
+    "pages": [
+      { "path": "/admin/extensions/content/documents", "label": "Documents", "icon": "FileText" }
+    ]
+  },
   "contributes": {
     "engine": true,
     "studio": true

@@ -13,6 +13,11 @@
   "dependencies": [
     { "name": "finance/accounting", "minVersion": "1.0.0" }
   ],
+  "studio": {
+    "pages": [
+      { "path": "/admin/extensions/operations/assets", "label": "Fixed Assets", "icon": "Package" }
+    ]
+  },
   "contributes": {
     "engine": true,
     "studio": true,
