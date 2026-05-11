@@ -19,23 +19,14 @@
     "mailparser": "^3.6.0",
     "nodemailer": "^6.9.0"
   },
+  "studio": {
+    "pages": [
+      { "path": "/admin/mail", "label": "Mail", "icon": "Mail" }
+    ]
+  },
   "contributes": {
     "engine": true,
     "studio": true,
-    "fieldTypes": [],
-    "studioPages": [
-      {
-        "path": "mail",
-        "component": "MailPage",
-        "label": "Mail",
-        "icon": "mail"
-      },
-      {
-        "path": "mail/settings",
-        "component": "MailSettingsPage",
-        "label": "Mail Settings",
-        "icon": "settings"
-      }
-    ]
+    "fieldTypes": []
   }
 }

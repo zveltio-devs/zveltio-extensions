@@ -13,8 +13,13 @@
   "peerDependencies": {
     "graphql": "^16.0.0"
   },
+  "studio": {
+    "pages": [
+      { "path": "/admin/developer/graphql", "label": "GraphQL", "icon": "Network" }
+    ]
+  },
   "contributes": {
     "engine": true,
-    "studio": false
+    "studio": true
   }
 }

@@ -10,8 +10,13 @@
   "permissions": [
     "database"
   ],
+  "studio": {
+    "pages": [
+      { "path": "/admin/developer/api-docs", "label": "API Docs", "icon": "BookOpen" }
+    ]
+  },
   "contributes": {
     "engine": true,
-    "studio": false
+    "studio": true
   }
 }

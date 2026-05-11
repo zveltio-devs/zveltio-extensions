@@ -10,6 +10,11 @@
   "permissions": [
     "database"
   ],
+  "studio": {
+    "pages": [
+      { "path": "/admin/compliance/ro/procurement", "label": "Achizitii Publice RO", "icon": "Package" }
+    ]
+  },
   "contributes": {
     "engine": true,
     "studio": true,
