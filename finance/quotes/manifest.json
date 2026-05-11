@@ -15,7 +15,7 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/extensions/finance/quotes", "label": "Quotes", "icon": "FileText" }
+      { "path": "/admin/finance/quotes", "label": "Quotes", "icon": "FileText" }
     ]
   },
   "contributes": {

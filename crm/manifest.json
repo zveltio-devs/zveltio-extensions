@@ -12,7 +12,7 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/extensions/crm", "label": "CRM", "icon": "Users" }
+      { "path": "/admin/crm", "label": "CRM", "icon": "Users" }
     ]
   },
   "contributes": {

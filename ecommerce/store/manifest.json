@@ -15,7 +15,7 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/extensions/ecommerce/store", "label": "eCommerce", "icon": "ShoppingBag" }
+      { "path": "/admin/ecommerce/store", "label": "eCommerce", "icon": "ShoppingBag" }
     ]
   },
   "contributes": {

@@ -15,7 +15,7 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/extensions/operations/assets", "label": "Fixed Assets", "icon": "Package" }
+      { "path": "/admin/operations/assets", "label": "Fixed Assets", "icon": "Package" }
     ]
   },
   "contributes": {

@@ -15,7 +15,7 @@
   },
   "studio": {
     "pages": [
-      { "path": "/admin/extensions/auth/ldap", "label": "LDAP / AD", "icon": "Globe" }
+      { "path": "/admin/auth/ldap", "label": "LDAP / AD", "icon": "Globe" }
     ]
   },
   "contributes": {
