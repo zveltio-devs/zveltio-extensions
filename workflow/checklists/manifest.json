@@ -12,7 +12,7 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/extensions/checklists", "label": "Checklists", "icon": "CheckSquare" }
+      { "path": "/admin/checklists", "label": "Checklists", "icon": "CheckSquare" }
     ]
   },
   "contributes": {

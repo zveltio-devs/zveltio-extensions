@@ -16,7 +16,7 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/extensions/hr/time-tracking", "label": "Time Tracking", "icon": "Clock" }
+      { "path": "/admin/hr/time-tracking", "label": "Time Tracking", "icon": "Clock" }
     ]
   },
   "contributes": {
