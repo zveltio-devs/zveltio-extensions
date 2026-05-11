@@ -13,6 +13,11 @@
   "dependencies": [
     { "name": "finance/invoicing", "minVersion": "1.0.0" }
   ],
+  "studio": {
+    "pages": [
+      { "path": "/admin/extensions/finance/quotes", "label": "Quotes", "icon": "FileText" }
+    ]
+  },
   "contributes": {
     "engine": true,
     "studio": true,

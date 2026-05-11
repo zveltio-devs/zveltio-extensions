@@ -14,6 +14,11 @@
     { "name": "hr/employees",      "minVersion": "1.0.0" },
     { "name": "finance/invoicing", "minVersion": "1.0.0" }
   ],
+  "studio": {
+    "pages": [
+      { "path": "/admin/extensions/hr/time-tracking", "label": "Time Tracking", "icon": "Clock" }
+    ]
+  },
   "contributes": {
     "engine": true,
     "studio": true,
