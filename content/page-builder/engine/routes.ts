@@ -24,6 +24,7 @@ const PageSchema = z.object({
   locale: z.string().default('ro'),
   og_image: z.string().url().optional(),
   is_noindex: z.boolean().default(false),
+  status: z.enum(['draft', 'published', 'archived']).default('draft'),
 });
 
 const UpdatePageSchema = PageSchema.partial().extend({
@@ -186,6 +187,60 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
     });
   });
 
+  app.get('/:id/resolved', async (c) => {
+    const page = await db.selectFrom('zv_pages').selectAll().where('id', '=', c.req.param('id')).executeTakeFirst();
+    if (!page) return c.json({ error: 'Page not found' }, 404);
+
+    const rawBlocks: any[] = typeof page.blocks === 'string' ? JSON.parse(page.blocks) : (page.blocks ?? []);
+
+    const blocks = await Promise.all(rawBlocks.map(async (block: any) => {
+      if (block.type !== 'collection_list') return block;
+
+      const {
+        collection, limit = 10, sort_field = 'created_at', sort_dir = 'desc',
+        filters = [], display_fields = '',
+      } = block.content ?? {};
+
+      if (!collection || typeof collection !== 'string' || !/^[a-zA-Z0-9_]+$/.test(collection)) {
+        return { ...block, content: { ...block.content, _data: [], _error: 'Invalid or missing collection name' } };
+      }
+
+      try {
+        const fields = typeof display_fields === 'string'
+          ? display_fields.split(',').map((s: string) => s.trim()).filter(Boolean)
+          : [];
+
+        let q = fields.length > 0
+          ? (db as any).selectFrom(collection).select(fields)
+          : (db as any).selectFrom(collection).selectAll();
+
+        for (const f of (filters as any[])) {
+          if (!f.field || !f.op) continue;
+          if (f.op === 'is_null')     { q = q.where(f.field, 'is', null); continue; }
+          if (f.op === 'is_not_null') { q = q.where(f.field, 'is not', null); continue; }
+          const opMap: Record<string, string> = {
+            eq: '=', neq: '!=', like: 'ilike', gt: '>', gte: '>=', lt: '<', lte: '<=',
+          };
+          const sqlOp = opMap[f.op];
+          if (!sqlOp) continue;
+          const val = f.op === 'like' ? `%${f.value}%` : f.value;
+          q = q.where(f.field, sqlOp, val);
+        }
+
+        const data = await q
+          .orderBy(sort_field, sort_dir === 'asc' ? 'asc' : 'desc')
+          .limit(Math.min(Number(limit) || 10, 100))
+          .execute();
+
+        return { ...block, content: { ...block.content, _data: data } };
+      } catch (err: any) {
+        return { ...block, content: { ...block.content, _data: [], _error: err?.message ?? String(err) } };
+      }
+    }));
+
+    return c.json({ page: { ...page, blocks } });
+  });
+
   app.get('/:id', async (c) => {
     const page = await db.selectFrom('zv_pages').selectAll().where('id', '=', c.req.param('id')).executeTakeFirst();
     if (!page) return c.json({ error: 'Page not found' }, 404);
@@ -206,7 +261,7 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
     return c.json({ page }, 201);
   });
 
-  app.patch('/:id', zValidator('json', UpdatePageSchema), async (c) => {
+  app.on(['PUT', 'PATCH'], '/:id', zValidator('json', UpdatePageSchema), async (c) => {
     const user = await requireAuth(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
