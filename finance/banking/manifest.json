@@ -13,6 +13,11 @@
   "dependencies": [
     { "name": "finance/invoicing", "minVersion": "1.0.0" }
   ],
+  "studio": {
+    "pages": [
+      { "path": "/admin/finance/banking", "label": "Banking Sync", "icon": "Landmark" }
+    ]
+  },
   "contributes": {
     "engine": true,
     "studio": true,
