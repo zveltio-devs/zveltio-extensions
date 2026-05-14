@@ -106,7 +106,7 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
       SELECT p.*,
         COALESCE(SUM(sl.quantity), 0) as total_stock,
         COALESCE(json_agg(json_build_object(
-          'warehouse_id', sl.warehouse_id, 'warehouse_name', w.name, 'quantity', sl.quantity, 'reserved', sl.reserved_quantity
+          'warehouse_id', sl.warehouse_id, 'warehouse_name', w.name, 'quantity', sl.quantity, 'reserved', sl.reserved_qty
         )) FILTER (WHERE sl.id IS NOT NULL), '[]') as stock_levels
       FROM zvd_products p
       LEFT JOIN zvd_stock_levels sl ON sl.product_id = p.id
@@ -123,7 +123,7 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
   app.get('/products/:id', async (c) => {
     const row = await sql`
       SELECT p.*,
-        COALESCE(json_agg(json_build_object('warehouse_id', sl.warehouse_id, 'quantity', sl.quantity, 'reserved', sl.reserved_quantity)) FILTER (WHERE sl.id IS NOT NULL), '[]') as stock_levels,
+        COALESCE(json_agg(json_build_object('warehouse_id', sl.warehouse_id, 'quantity', sl.quantity, 'reserved', sl.reserved_qty)) FILTER (WHERE sl.id IS NOT NULL), '[]') as stock_levels,
         COALESCE(json_agg(DISTINCT jsonb_build_object('id', v.id, 'name', v.name, 'sku', v.sku, 'attributes', v.attributes)) FILTER (WHERE v.id IS NOT NULL), '[]') as variants
       FROM zvd_products p
       LEFT JOIN zvd_stock_levels sl ON sl.product_id = p.id

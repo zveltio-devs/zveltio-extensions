@@ -50,6 +50,26 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
     return c.json({ documents });
   });
 
+  // GET /stats
+  app.get('/stats', async (c) => {
+    const user = await getUser(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const stats = await sql<any>`
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'draft')::int AS drafts,
+        COUNT(*) FILTER (WHERE status = 'signed')::int AS signed,
+        COUNT(*) FILTER (WHERE status = 'archived')::int AS archived,
+        COUNT(*) FILTER (WHERE date >= CURRENT_DATE - INTERVAL '30 days')::int AS last_30_days,
+        type,
+        COUNT(*)::int AS count
+      FROM zv_ro_documents
+      GROUP BY GROUPING SETS ((), (type))
+    `.execute(db).catch(() => ({ rows: [] }));
+
+    return c.json({ stats: stats.rows });
+  });
+
   // GET /:id
   app.get('/:id', async (c) => {
     const user = await getUser(c, auth);
@@ -273,26 +293,6 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
       .execute();
 
     return c.json({ success: true });
-  });
-
-  // GET /stats
-  app.get('/stats', async (c) => {
-    const user = await getUser(c, auth);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
-
-    const stats = await sql<any>`
-      SELECT
-        COUNT(*) FILTER (WHERE status = 'draft')::int AS drafts,
-        COUNT(*) FILTER (WHERE status = 'signed')::int AS signed,
-        COUNT(*) FILTER (WHERE status = 'archived')::int AS archived,
-        COUNT(*) FILTER (WHERE date >= CURRENT_DATE - INTERVAL '30 days')::int AS last_30_days,
-        type,
-        COUNT(*)::int AS count
-      FROM zv_ro_documents
-      GROUP BY GROUPING SETS ((), (type))
-    `.execute(db).catch(() => ({ rows: [] }));
-
-    return c.json({ stats: stats.rows });
   });
 
   return app;

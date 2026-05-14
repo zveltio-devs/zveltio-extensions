@@ -51,6 +51,37 @@ export function saftRoutes(ctx: ExtensionContext): Hono {
     return c.json({ exports });
   });
 
+  // --- Accounts ---
+
+  app.get('/accounts', async (c) => {
+    const user = await getUser(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const accounts = await db
+      .selectFrom('zv_saft_accounts')
+      .selectAll()
+      .orderBy('code', 'asc')
+      .execute();
+
+    return c.json({ accounts });
+  });
+
+  // --- Journal Entries ---
+
+  app.get('/entries', async (c) => {
+    const user = await getUser(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { from, to, account_code } = c.req.query();
+    let query = db.selectFrom('zv_saft_journal_entries').selectAll();
+    if (from) query = query.where('entry_date', '>=', from);
+    if (to) query = query.where('entry_date', '<=', to);
+    if (account_code) query = query.where('account_code', '=', account_code);
+
+    const entries = await query.orderBy('entry_date', 'desc').execute();
+    return c.json({ entries });
+  });
+
   app.get('/:id', async (c) => {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
@@ -187,19 +218,6 @@ export function saftRoutes(ctx: ExtensionContext): Hono {
 
   // --- Accounts ---
 
-  app.get('/accounts', async (c) => {
-    const user = await getUser(c, auth);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
-
-    const accounts = await db
-      .selectFrom('zv_saft_accounts')
-      .selectAll()
-      .orderBy('code', 'asc')
-      .execute();
-
-    return c.json({ accounts });
-  });
-
   app.post('/accounts', zValidator('json', accountSchema), async (c) => {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
@@ -223,20 +241,6 @@ export function saftRoutes(ctx: ExtensionContext): Hono {
   });
 
   // --- Journal Entries ---
-
-  app.get('/entries', async (c) => {
-    const user = await getUser(c, auth);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
-
-    const { from, to, account_code } = c.req.query();
-    let query = db.selectFrom('zv_saft_journal_entries').selectAll();
-    if (from) query = query.where('entry_date', '>=', from);
-    if (to) query = query.where('entry_date', '<=', to);
-    if (account_code) query = query.where('account_code', '=', account_code);
-
-    const entries = await query.orderBy('entry_date', 'desc').execute();
-    return c.json({ entries });
-  });
 
   app.post('/entries', zValidator('json', entrySchema), async (c) => {
     const user = await getUser(c, auth);

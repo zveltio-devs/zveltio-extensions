@@ -104,6 +104,57 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: row.rows[0] });
   });
 
+  // ── Org chart ──────────────────────────────────────────────────
+  app.get('/org-chart', async (c) => {
+    const rows = await sql`
+      WITH RECURSIVE org AS (
+        SELECT id, first_name, last_name, position_id, department_id, manager_id,
+          0 as depth, ARRAY[id] as path
+        FROM zvd_employees WHERE manager_id IS NULL AND status = 'active'
+        UNION ALL
+        SELECT e.id, e.first_name, e.last_name, e.position_id, e.department_id, e.manager_id,
+          org.depth + 1, org.path || e.id
+        FROM zvd_employees e
+        JOIN org ON org.id = e.manager_id
+        WHERE e.status = 'active' AND NOT (e.id = ANY(org.path))
+      )
+      SELECT org.*, p.title as position_title, d.name as department_name
+      FROM org
+      LEFT JOIN zvd_job_positions p ON p.id = org.position_id
+      LEFT JOIN zvd_departments d ON d.id = org.department_id
+      ORDER BY depth, last_name
+    `.execute(db);
+    return c.json({ data: rows.rows });
+  });
+
+  // ── Stats ──────────────────────────────────────────────────────
+  app.get('/stats', async (c) => {
+    const row = await sql`
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status = 'active') as active,
+        COUNT(*) FILTER (WHERE status = 'terminated') as terminated,
+        COUNT(*) FILTER (WHERE status = 'on_leave') as on_leave,
+        COUNT(*) FILTER (WHERE employment_type = 'full_time') as full_time,
+        COUNT(*) FILTER (WHERE employment_type = 'part_time') as part_time,
+        COUNT(*) FILTER (WHERE employment_type = 'contractor') as contractors,
+        COUNT(*) FILTER (WHERE probation_end_date >= CURRENT_DATE AND status = 'active') as on_probation,
+        COUNT(*) FILTER (WHERE hire_date >= CURRENT_DATE - INTERVAL '90 days') as new_hires_90d,
+        COUNT(*) FILTER (WHERE expires_at_docs <= CURRENT_DATE + 30) as docs_expiring_soon
+      FROM zvd_employees e
+      LEFT JOIN LATERAL (
+        SELECT MIN(d.expires_at) as expires_at_docs
+        FROM zvd_employee_documents d WHERE d.employee_id = e.id AND d.expires_at IS NOT NULL
+      ) docs ON true
+    `.execute(db);
+    const byDept = await sql`
+      SELECT d.name as department, COUNT(e.id) as count
+      FROM zvd_departments d LEFT JOIN zvd_employees e ON e.department_id = d.id AND e.status = 'active'
+      GROUP BY d.id, d.name ORDER BY count DESC
+    `.execute(db);
+    return c.json({ data: { ...(row.rows[0] as any), by_department: byDept.rows } });
+  });
+
   // ── Employees ──────────────────────────────────────────────────
   app.get('/', async (c) => {
     const { limit = '50', page = '1', department_id, status, q } = c.req.query();
@@ -130,7 +181,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
       SELECT e.*, d.name as department_name, p.title as position_title,
         m.first_name || ' ' || m.last_name as manager_name,
         COALESCE(json_agg(DISTINCT ec.*::text::jsonb) FILTER (WHERE ec.id IS NOT NULL), '[]') as emergency_contacts,
-        COALESCE(json_agg(DISTINCT doc.*::text::jsonb ORDER BY (doc.created_at) DESC) FILTER (WHERE doc.id IS NOT NULL), '[]') as documents,
+        COALESCE(json_agg(DISTINCT doc.*::text::jsonb) FILTER (WHERE doc.id IS NOT NULL), '[]') as documents,
         COALESCE(json_agg(DISTINCT ben.*::text::jsonb) FILTER (WHERE ben.id IS NOT NULL), '[]') as benefits
       FROM zvd_employees e
       LEFT JOIN zvd_departments d ON d.id = e.department_id
@@ -261,29 +312,6 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     const emp = row.rows[0] as any;
     events.emit('employee.terminated', { id: emp.id, employee: emp, end_date: d.end_date });
     return c.json({ data: emp });
-  });
-
-  // ── Org chart ──────────────────────────────────────────────────
-  app.get('/org-chart', async (c) => {
-    const rows = await sql`
-      WITH RECURSIVE org AS (
-        SELECT id, first_name, last_name, position_id, department_id, manager_id,
-          0 as depth, ARRAY[id] as path
-        FROM zvd_employees WHERE manager_id IS NULL AND status = 'active'
-        UNION ALL
-        SELECT e.id, e.first_name, e.last_name, e.position_id, e.department_id, e.manager_id,
-          org.depth + 1, org.path || e.id
-        FROM zvd_employees e
-        JOIN org ON org.id = e.manager_id
-        WHERE e.status = 'active' AND NOT (e.id = ANY(org.path))
-      )
-      SELECT org.*, p.title as position_title, d.name as department_name
-      FROM org
-      LEFT JOIN zvd_job_positions p ON p.id = org.position_id
-      LEFT JOIN zvd_departments d ON d.id = org.department_id
-      ORDER BY depth, last_name
-    `.execute(db);
-    return c.json({ data: rows.rows });
   });
 
   // ── Emergency contacts ─────────────────────────────────────────
@@ -508,34 +536,6 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
-  });
-
-  // ── Stats ──────────────────────────────────────────────────────
-  app.get('/stats', async (c) => {
-    const row = await sql`
-      SELECT
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE status = 'active') as active,
-        COUNT(*) FILTER (WHERE status = 'terminated') as terminated,
-        COUNT(*) FILTER (WHERE status = 'on_leave') as on_leave,
-        COUNT(*) FILTER (WHERE employment_type = 'full_time') as full_time,
-        COUNT(*) FILTER (WHERE employment_type = 'part_time') as part_time,
-        COUNT(*) FILTER (WHERE employment_type = 'contractor') as contractors,
-        COUNT(*) FILTER (WHERE probation_end_date >= CURRENT_DATE AND status = 'active') as on_probation,
-        COUNT(*) FILTER (WHERE hire_date >= CURRENT_DATE - INTERVAL '90 days') as new_hires_90d,
-        COUNT(*) FILTER (WHERE expires_at_docs <= CURRENT_DATE + 30) as docs_expiring_soon
-      FROM zvd_employees e
-      LEFT JOIN LATERAL (
-        SELECT MIN(d.expires_at) as expires_at_docs
-        FROM zvd_employee_documents d WHERE d.employee_id = e.id AND d.expires_at IS NOT NULL
-      ) docs ON true
-    `.execute(db);
-    const byDept = await sql`
-      SELECT d.name as department, COUNT(e.id) as count
-      FROM zvd_departments d LEFT JOIN zvd_employees e ON e.department_id = d.id AND e.status = 'active'
-      GROUP BY d.id, d.name ORDER BY count DESC
-    `.execute(db);
-    return c.json({ data: { ...(row.rows[0] as any), by_department: byDept.rows } });
   });
 
   return app;
