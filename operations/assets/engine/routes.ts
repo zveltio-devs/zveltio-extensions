@@ -27,14 +27,11 @@ export function assetsRoutes(ctx: ExtensionContext): Hono {
   app.get('/:id', async (c) => {
     const row = await sql`
       SELECT a.*,
-        COALESCE(json_agg(DISTINCT d.*::text::jsonb ORDER BY (d.period_date)) FILTER (WHERE d.id IS NOT NULL), '[]') as depreciation_schedule,
-        COALESCE(json_agg(DISTINCT m.*::text::jsonb ORDER BY (m.date) DESC) FILTER (WHERE m.id IS NOT NULL), '[]') as maintenance_logs,
-        COALESCE(json_agg(DISTINCT ins.*::text::jsonb) FILTER (WHERE ins.id IS NOT NULL), '[]') as insurance_policies
+        COALESCE((SELECT json_agg(d ORDER BY d.period_date) FROM zvd_asset_depreciation d WHERE d.asset_id = a.id), '[]'::json) as depreciation_schedule,
+        COALESCE((SELECT json_agg(m ORDER BY m.date DESC) FROM zvd_asset_maintenance m WHERE m.asset_id = a.id), '[]'::json) as maintenance_logs,
+        COALESCE((SELECT json_agg(ins) FROM zvd_asset_insurance ins WHERE ins.asset_id = a.id), '[]'::json) as insurance_policies
       FROM zvd_assets a
-      LEFT JOIN zvd_asset_depreciation d ON d.asset_id = a.id
-      LEFT JOIN zvd_asset_maintenance m ON m.asset_id = a.id
-      LEFT JOIN zvd_asset_insurance ins ON ins.asset_id = a.id
-      WHERE a.id = ${c.req.param('id')} GROUP BY a.id
+      WHERE a.id = ${c.req.param('id')}
     `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });

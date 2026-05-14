@@ -38,7 +38,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
   app.get('/public/products/:slug', async (c) => {
     const row = await sql`
       SELECT p.*, cat.name as category_name,
-        COALESCE(json_agg(DISTINCT v.*::text::jsonb ORDER BY (v.sort_order)) FILTER (WHERE v.id IS NOT NULL AND v.is_active), '[]') as variants
+        COALESCE(json_agg(v ORDER BY v.sort_order) FILTER (WHERE v.id IS NOT NULL AND v.is_active), '[]'::json) as variants
       FROM zvd_ec_products p
       LEFT JOIN zvd_ec_categories cat ON cat.id = p.category_id
       LEFT JOIN zvd_ec_product_variants v ON v.product_id = p.id

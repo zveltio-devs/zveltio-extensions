@@ -132,12 +132,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     if (!(await checkPermission(user.id, 'admin', '*'))) return c.json({ error: 'Forbidden' }, 403);
 
     const [summary, latestScans, latestScores] = await Promise.all([
-      (db as any)
-        .selectFrom('zv_quality_issues as i')
-        .select(['i.collection', 'i.severity', (db as any).fn.count('i.id').as('count')])
-        .where('i.dismissed', '=', false)
-        .groupBy(['i.collection', 'i.severity'])
-        .execute(),
+      sql`SELECT i.collection, i.severity, COUNT(i.id) as count FROM zv_quality_issues i WHERE i.dismissed = false GROUP BY i.collection, i.severity`.execute(db).then(r => r.rows),
       (db as any)
         .selectFrom('zv_quality_scans')
         .select(['collection', 'status', 'issues_found', 'completed_at'])

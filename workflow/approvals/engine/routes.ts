@@ -158,6 +158,147 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
     return c.json({ request }, 202);
   });
 
+  // ── Enterprise: Delegation ─────────────────────────────────────
+
+  // GET /delegates — list delegations for current user
+  app.get('/delegates', async (c) => {
+    const user = c.get('user') as any;
+
+    const delegates = await (db as any)
+      .selectFrom('zv_approval_delegates as d')
+      .leftJoin('zv_approval_workflows as w', 'w.id', 'd.workflow_id')
+      .select([
+        'd.id', 'd.delegator_id', 'd.delegate_id', 'd.workflow_id',
+        'd.valid_from', 'd.valid_until', 'd.is_active', 'd.reason', 'd.created_at',
+        'w.name as workflow_name',
+      ])
+      .where((eb: any) =>
+        eb.or([
+          eb('d.delegator_id', '=', user.id),
+          eb('d.delegate_id', '=', user.id),
+        ])
+      )
+      .orderBy('d.created_at', 'desc')
+      .execute();
+
+    return c.json({ delegates });
+  });
+
+  // ── Enterprise: SLA ────────────────────────────────────────────
+
+  // GET /overdue — list pending requests where sla_due_at < NOW() (admin only)
+  app.get('/overdue', async (c) => {
+    const user = c.get('user') as any;
+    if (!(await checkPermission(user.id, 'admin', '*'))) {
+      return c.json({ error: 'Admin access required' }, 403);
+    }
+
+    const requests = await (db as any)
+      .selectFrom('zv_approval_requests as r')
+      .leftJoin('zv_approval_workflows as w', 'w.id', 'r.workflow_id')
+      .leftJoin('user as u', 'u.id', 'r.requested_by')
+      .select([
+        'r.id', 'r.workflow_id', 'r.collection', 'r.record_id',
+        'r.status', 'r.requested_at', 'r.sla_due_at', 'r.sla_breached',
+        'r.priority', 'r.metadata',
+        'w.name as workflow_name',
+        'u.name as requested_by_name',
+      ])
+      .where('r.status', '=', 'pending')
+      .where('r.sla_due_at', '<', new Date())
+      .orderBy('r.sla_due_at', 'asc')
+      .execute();
+
+    return c.json({ requests, count: requests.length });
+  });
+
+  // ── Enterprise: Stats ──────────────────────────────────────────
+
+  // GET /stats — approval stats
+  app.get('/stats', async (c) => {
+    const user = c.get('user') as any;
+    if (!(await checkPermission(user.id, 'admin', '*'))) {
+      return c.json({ error: 'Admin access required' }, 403);
+    }
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const pendingResult = await sql<{ count: string }>`
+      SELECT COUNT(*) as count FROM zv_approval_requests WHERE status = 'pending'
+    `.execute(db);
+
+    const approvedThisMonthResult = await sql<{ count: string }>`
+      SELECT COUNT(*) as count FROM zv_approval_requests
+      WHERE status = 'approved' AND completed_at >= ${startOfMonth}
+    `.execute(db);
+
+    const rejectedThisMonthResult = await sql<{ count: string }>`
+      SELECT COUNT(*) as count FROM zv_approval_requests
+      WHERE status = 'rejected' AND completed_at >= ${startOfMonth}
+    `.execute(db);
+
+    const avgHoursResult = await sql<{ avg_hours: string | null }>`
+      SELECT AVG(EXTRACT(EPOCH FROM (completed_at - requested_at)) / 3600) as avg_hours
+      FROM zv_approval_requests
+      WHERE status IN ('approved', 'rejected') AND completed_at IS NOT NULL
+    `.execute(db);
+
+    const overdueResult = await sql<{ count: string }>`
+      SELECT COUNT(*) as count FROM zv_approval_requests
+      WHERE status = 'pending' AND sla_due_at IS NOT NULL AND sla_due_at < NOW()
+    `.execute(db);
+
+    const byCollectionResult = await sql<{ collection: string; count: string }>`
+      SELECT collection, COUNT(*) as count
+      FROM zv_approval_requests
+      WHERE status = 'pending'
+      GROUP BY collection
+      ORDER BY count DESC
+    `.execute(db);
+
+    return c.json({
+      total_pending: parseInt(pendingResult.rows[0]?.count || '0'),
+      approved_this_month: parseInt(approvedThisMonthResult.rows[0]?.count || '0'),
+      rejected_this_month: parseInt(rejectedThisMonthResult.rows[0]?.count || '0'),
+      avg_decision_hours: avgHoursResult.rows[0]?.avg_hours
+        ? parseFloat(parseFloat(avgHoursResult.rows[0].avg_hours).toFixed(2))
+        : null,
+      overdue_count: parseInt(overdueResult.rows[0]?.count || '0'),
+      requests_by_collection: byCollectionResult.rows.map((r) => ({
+        collection: r.collection,
+        count: parseInt(r.count),
+      })),
+    });
+  });
+
+  // ── Workflow Management (Admin) ────────────────────────────────
+
+  // GET /workflows — List workflows
+  app.get('/workflows', async (c) => {
+    const workflows = await (db as any)
+      .selectFrom('zv_approval_workflows as w')
+      .select([
+        'w.id', 'w.name', 'w.description', 'w.collection',
+        'w.trigger_field', 'w.trigger_value', 'w.is_active', 'w.created_at',
+      ])
+      .orderBy('w.created_at', 'desc')
+      .execute();
+
+    const withStepCounts = await Promise.all(
+      workflows.map(async (wf: any) => {
+        const count = await (db as any)
+          .selectFrom('zv_approval_steps')
+          .select((eb: any) => eb.fn.count('id').as('count'))
+          .where('workflow_id', '=', wf.id)
+          .executeTakeFirst();
+        return { ...wf, step_count: parseInt(count?.count ?? '0') };
+      }),
+    );
+
+    return c.json({ workflows: withStepCounts });
+  });
+
   // GET /:id — Get request details with steps & decisions
   app.get('/:id', async (c) => {
     const request = await (db as any)
@@ -433,30 +574,6 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
 
   // ── Enterprise: Delegation ─────────────────────────────────────
 
-  // GET /delegates — list delegations for current user
-  app.get('/delegates', async (c) => {
-    const user = c.get('user') as any;
-
-    const delegates = await (db as any)
-      .selectFrom('zv_approval_delegates as d')
-      .leftJoin('zv_approval_workflows as w', 'w.id', 'd.workflow_id')
-      .select([
-        'd.id', 'd.delegator_id', 'd.delegate_id', 'd.workflow_id',
-        'd.valid_from', 'd.valid_until', 'd.is_active', 'd.reason', 'd.created_at',
-        'w.name as workflow_name',
-      ])
-      .where((eb: any) =>
-        eb.or([
-          eb('d.delegator_id', '=', user.id),
-          eb('d.delegate_id', '=', user.id),
-        ])
-      )
-      .orderBy('d.created_at', 'desc')
-      .execute();
-
-    return c.json({ delegates });
-  });
-
   // POST /delegates — create delegation
   app.post('/delegates', zValidator('json', CreateDelegateSchema), async (c) => {
     const user = c.get('user') as any;
@@ -506,32 +623,6 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
 
   // ── Enterprise: SLA ────────────────────────────────────────────
 
-  // GET /overdue — list pending requests where sla_due_at < NOW() (admin only)
-  app.get('/overdue', async (c) => {
-    const user = c.get('user') as any;
-    if (!(await checkPermission(user.id, 'admin', '*'))) {
-      return c.json({ error: 'Admin access required' }, 403);
-    }
-
-    const requests = await (db as any)
-      .selectFrom('zv_approval_requests as r')
-      .leftJoin('zv_approval_workflows as w', 'w.id', 'r.workflow_id')
-      .leftJoin('user as u', 'u.id', 'r.requested_by')
-      .select([
-        'r.id', 'r.workflow_id', 'r.collection', 'r.record_id',
-        'r.status', 'r.requested_at', 'r.sla_due_at', 'r.sla_breached',
-        'r.priority', 'r.metadata',
-        'w.name as workflow_name',
-        'u.name as requested_by_name',
-      ])
-      .where('r.status', '=', 'pending')
-      .where('r.sla_due_at', '<', new Date())
-      .orderBy('r.sla_due_at', 'asc')
-      .execute();
-
-    return c.json({ requests, count: requests.length });
-  });
-
   // POST /sla-check — scan pending requests and mark sla_breached (admin only)
   app.post('/sla-check', async (c) => {
     const user = c.get('user') as any;
@@ -554,92 +645,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
     return c.json({ success: true, newly_breached: count });
   });
 
-  // ── Enterprise: Stats ──────────────────────────────────────────
-
-  // GET /stats — approval stats
-  app.get('/stats', async (c) => {
-    const user = c.get('user') as any;
-    if (!(await checkPermission(user.id, 'admin', '*'))) {
-      return c.json({ error: 'Admin access required' }, 403);
-    }
-
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    const pendingResult = await sql<{ count: string }>`
-      SELECT COUNT(*) as count FROM zv_approval_requests WHERE status = 'pending'
-    `.execute(db);
-
-    const approvedThisMonthResult = await sql<{ count: string }>`
-      SELECT COUNT(*) as count FROM zv_approval_requests
-      WHERE status = 'approved' AND completed_at >= ${startOfMonth}
-    `.execute(db);
-
-    const rejectedThisMonthResult = await sql<{ count: string }>`
-      SELECT COUNT(*) as count FROM zv_approval_requests
-      WHERE status = 'rejected' AND completed_at >= ${startOfMonth}
-    `.execute(db);
-
-    const avgHoursResult = await sql<{ avg_hours: string | null }>`
-      SELECT AVG(EXTRACT(EPOCH FROM (completed_at - requested_at)) / 3600) as avg_hours
-      FROM zv_approval_requests
-      WHERE status IN ('approved', 'rejected') AND completed_at IS NOT NULL
-    `.execute(db);
-
-    const overdueResult = await sql<{ count: string }>`
-      SELECT COUNT(*) as count FROM zv_approval_requests
-      WHERE status = 'pending' AND sla_due_at IS NOT NULL AND sla_due_at < NOW()
-    `.execute(db);
-
-    const byCollectionResult = await sql<{ collection: string; count: string }>`
-      SELECT collection, COUNT(*) as count
-      FROM zv_approval_requests
-      WHERE status = 'pending'
-      GROUP BY collection
-      ORDER BY count DESC
-    `.execute(db);
-
-    return c.json({
-      total_pending: parseInt(pendingResult.rows[0]?.count || '0'),
-      approved_this_month: parseInt(approvedThisMonthResult.rows[0]?.count || '0'),
-      rejected_this_month: parseInt(rejectedThisMonthResult.rows[0]?.count || '0'),
-      avg_decision_hours: avgHoursResult.rows[0]?.avg_hours
-        ? parseFloat(parseFloat(avgHoursResult.rows[0].avg_hours).toFixed(2))
-        : null,
-      overdue_count: parseInt(overdueResult.rows[0]?.count || '0'),
-      requests_by_collection: byCollectionResult.rows.map((r) => ({
-        collection: r.collection,
-        count: parseInt(r.count),
-      })),
-    });
-  });
-
   // ── Workflow Management (Admin) ────────────────────────────────
-
-  // GET /workflows — List workflows
-  app.get('/workflows', async (c) => {
-    const workflows = await (db as any)
-      .selectFrom('zv_approval_workflows as w')
-      .select([
-        'w.id', 'w.name', 'w.description', 'w.collection',
-        'w.trigger_field', 'w.trigger_value', 'w.is_active', 'w.created_at',
-      ])
-      .orderBy('w.created_at', 'desc')
-      .execute();
-
-    const withStepCounts = await Promise.all(
-      workflows.map(async (wf: any) => {
-        const count = await (db as any)
-          .selectFrom('zv_approval_steps')
-          .select((eb: any) => eb.fn.count('id').as('count'))
-          .where('workflow_id', '=', wf.id)
-          .executeTakeFirst();
-        return { ...wf, step_count: parseInt(count?.count ?? '0') };
-      }),
-    );
-
-    return c.json({ workflows: withStepCounts });
-  });
 
   // GET /workflows/:id — Get workflow with steps
   app.get('/workflows/:id', async (c) => {

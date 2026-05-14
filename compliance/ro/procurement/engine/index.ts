@@ -7,7 +7,10 @@ const extension: ZveltioExtension = {
   category: 'compliance',
 
   getMigrations() {
-    return [join(import.meta.dir, 'migrations/001_procurement.sql')];
+    return [
+      join(import.meta.dir, 'migrations/001_procurement.sql'),
+      join(import.meta.dir, 'migrations/002_enterprise.sql'),
+    ];
   },
 
   async register(app, ctx) {
