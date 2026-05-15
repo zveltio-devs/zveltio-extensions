@@ -6,6 +6,10 @@ build/
 *.local
 bun.lock
 
+# zveltio extension types codegen output (S4-01) — regenerate via:
+#   $ zveltio extension types
+.zveltio/
+
 # Ship pre-built Studio bundles — deployment artifact for extension UIs.
 # Without them the engine cannot serve extension Studio pages.
 !**/studio/dist/
