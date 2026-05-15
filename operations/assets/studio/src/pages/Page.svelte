@@ -26,14 +26,14 @@
     return json as T;
   }
 
-  async function loadAssets() { try { const r = await api('/api/assets'); assets = r.data ?? []; } catch (e: any) { error = e.message; } }
-  async function loadMaintenance() { try { const r = await api('/api/assets/maintenance'); maintenance = r.data ?? []; } catch (e: any) { error = e.message; } }
-  async function loadDepreciation() { try { const r = await api('/api/assets/depreciation'); depreciation = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadAssets() { try { const r = await api('/ext/operations/assets'); assets = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadMaintenance() { try { const r = await api('/ext/operations/assets/maintenance'); maintenance = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadDepreciation() { try { const r = await api('/ext/operations/assets/depreciation'); depreciation = r.data ?? []; } catch (e: any) { error = e.message; } }
 
   async function createAsset() {
     saving = true; error = '';
     try {
-      await api('/api/assets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      await api('/ext/operations/assets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
       showForm = false;
       form = { name: '', asset_tag: '', category: 'equipment', purchase_date: new Date().toISOString().slice(0, 10), purchase_cost: 0, useful_life_years: 5, depreciation_method: 'straight_line', currency: 'RON' };
       await loadAssets();

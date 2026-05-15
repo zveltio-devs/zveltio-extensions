@@ -21,14 +21,14 @@
     return json as T;
   }
 
-  async function loadSubs() { try { const r = await api('/api/subscriptions/subscribers'); subscribers = r.data ?? []; } catch (e: any) { error = e.message; } }
-  async function loadPlans() { try { const r = await api('/api/subscriptions/plans'); plans = r.data ?? []; } catch (e: any) { error = e.message; } }
-  async function loadDunning() { try { const r = await api('/api/subscriptions/dunning'); dunning = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadSubs() { try { const r = await api('/ext/finance/subscriptions/subscribers'); subscribers = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadPlans() { try { const r = await api('/ext/finance/subscriptions/plans'); plans = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadDunning() { try { const r = await api('/ext/finance/subscriptions/dunning'); dunning = r.data ?? []; } catch (e: any) { error = e.message; } }
 
   async function createPlan() {
     saving = true; error = '';
     try {
-      await api('/api/subscriptions/plans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(planForm) });
+      await api('/ext/finance/subscriptions/plans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(planForm) });
       showPlanForm = false;
       planForm = { name: '', code: '', price: 0, currency: 'RON', interval: 'monthly', trial_days: 0 };
       await loadPlans();

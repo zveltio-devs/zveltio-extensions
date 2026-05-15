@@ -24,6 +24,8 @@ import { employeesRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'hr/employees',
   category: 'hr',
+  // S3-01: sub-app mounted at /ext/hr/employees by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [
@@ -33,7 +35,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/hr', employeesRoutes(ctx));
+    app.route('/', employeesRoutes(ctx));
 
     ctx.services.register('employees.lookup', async (id: string) => {
       const r = await sql<any>`SELECT * FROM zvd_employees WHERE id = ${id} LIMIT 1`.execute(ctx.db);

@@ -42,7 +42,7 @@
       const params = new URLSearchParams({ page: String(page), limit: '20' });
       if (search) params.set('search', search);
       if (statusFilter !== 'all') params.set('status', statusFilter);
-      const res = await api(`/api/invoicing/invoices?${params}`);
+      const res = await api(`/ext/finance/invoicing/invoices?${params}`);
       invoices = res.data ?? [];
       total = res.meta?.total ?? invoices.length;
     } catch (e: any) {
@@ -81,7 +81,7 @@
   async function createInvoice() {
     saving = true; error = '';
     try {
-      await api('/api/invoicing/invoices', {
+      await api('/ext/finance/invoicing/invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -100,14 +100,14 @@
 
   async function markPaid(id: string) {
     try {
-      await api(`/api/invoicing/invoices/${id}/mark-paid`, { method: 'POST' });
+      await api(`/ext/finance/invoicing/invoices/${id}/mark-paid`, { method: 'POST' });
       await loadInvoices();
     } catch (e: any) { error = e.message; }
   }
   async function cancelInvoice(id: string) {
     if (!confirm('Cancel invoice?')) return;
     try {
-      await api(`/api/invoicing/invoices/${id}/cancel`, { method: 'POST' });
+      await api(`/ext/finance/invoicing/invoices/${id}/cancel`, { method: 'POST' });
       await loadInvoices();
     } catch (e: any) { error = e.message; }
   }

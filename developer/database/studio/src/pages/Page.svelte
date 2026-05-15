@@ -23,7 +23,7 @@
   async function loadTables() {
     loading = true; error = '';
     try {
-      const r = await api('/api/database/tables');
+      const r = await api('/ext/developer/database/tables');
       tables = (r.data ?? r.tables ?? []).filter((t: any) => !t.name?.startsWith('zv_') || t.is_data);
     } catch (e: any) { error = e.message; }
     finally { loading = false; }
@@ -32,7 +32,7 @@
   async function openTable(t: any) {
     activeTable = t;
     try {
-      const r = await api(`/api/database/tables/${encodeURIComponent(t.name)}`);
+      const r = await api(`/ext/developer/database/tables/${encodeURIComponent(t.name)}`);
       columns = r.columns ?? r.data?.columns ?? [];
       rows = r.rows ?? r.data?.rows ?? [];
       rowCount = r.row_count ?? r.data?.row_count ?? rows.length;

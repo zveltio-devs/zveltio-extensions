@@ -24,6 +24,8 @@ import { invoicingRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'finance/invoicing',
   category: 'finance',
+  // S3-01: sub-app mounted at /ext/finance/invoicing by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [
@@ -36,7 +38,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/invoicing', invoicingRoutes(ctx));
+    app.route('/', invoicingRoutes(ctx));
 
     // ── Service registry — canonical invoices API ───────────────────────────
     ctx.services.register('invoicing.lookup', async (id: string) => {

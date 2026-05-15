@@ -33,9 +33,9 @@
     return json as T;
   }
 
-  async function loadEntries() { try { const r = await api('/api/accounting/journal-entries?limit=100'); entries = r.data ?? []; } catch (e: any) { error = e.message; } }
-  async function loadAccounts() { try { const r = await api('/api/accounting/accounts'); accounts = r.data ?? []; } catch (e: any) { error = e.message; } }
-  async function loadFiscal() { try { const r = await api('/api/accounting/fiscal-years'); fiscalYears = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadEntries() { try { const r = await api('/ext/finance/accounting/journal-entries?limit=100'); entries = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadAccounts() { try { const r = await api('/ext/finance/accounting/accounts'); accounts = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadFiscal() { try { const r = await api('/ext/finance/accounting/fiscal-years'); fiscalYears = r.data ?? []; } catch (e: any) { error = e.message; } }
 
   function lineSums() {
     const debit = entryForm.lines.reduce((s, l) => s + (Number(l.debit) || 0), 0);
@@ -50,7 +50,7 @@
   async function createEntry() {
     saving = true; error = '';
     try {
-      await api('/api/accounting/journal-entries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entryForm) });
+      await api('/ext/finance/accounting/journal-entries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entryForm) });
       showEntryForm = false;
       entryForm = { entry_date: new Date().toISOString().slice(0, 10), description: '', document_number: '',
         lines: [{ account_code: '', description: '', debit: 0, credit: 0 }, { account_code: '', description: '', debit: 0, credit: 0 }] };
@@ -61,7 +61,7 @@
   async function createAccount() {
     saving = true; error = '';
     try {
-      await api('/api/accounting/accounts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(accountForm) });
+      await api('/ext/finance/accounting/accounts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(accountForm) });
       showAccountForm = false;
       accountForm = { code: '', name: '', account_type: 'asset', parent_code: '' };
       await loadAccounts();

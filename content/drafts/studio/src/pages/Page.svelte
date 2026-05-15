@@ -12,9 +12,9 @@
     if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
     return json as T;
   }
-  async function load() { try { const r = await api('/api/drafts'); drafts = r.data ?? []; } catch (e: any) { error = e.message; } }
-  async function publish(id: string) { try { await api(`/api/drafts/${id}/publish`, { method: 'POST' }); await load(); } catch (e: any) { error = e.message; } }
-  async function discard(id: string) { if (!confirm('Discard draft?')) return; try { await api(`/api/drafts/${id}`, { method: 'DELETE' }); await load(); } catch (e: any) { error = e.message; } }
+  async function load() { try { const r = await api('/ext/content/drafts'); drafts = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function publish(id: string) { try { await api(`/ext/content/drafts/${id}/publish`, { method: 'POST' }); await load(); } catch (e: any) { error = e.message; } }
+  async function discard(id: string) { if (!confirm('Discard draft?')) return; try { await api(`/ext/content/drafts/${id}`, { method: 'DELETE' }); await load(); } catch (e: any) { error = e.message; } }
   onMount(load);
 </script>
 

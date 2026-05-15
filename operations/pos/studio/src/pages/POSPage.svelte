@@ -23,9 +23,9 @@
     loading = true; error = '';
     try {
       const [active, orders, reports] = await Promise.all([
-        api('/api/pos/sessions/active').catch(() => ({ data: null })),
-        api('/api/pos/orders?limit=20'),
-        api('/api/pos/z-reports?limit=10').catch(() => ({ data: [] })),
+        api('/ext/operations/pos/sessions/active').catch(() => ({ data: null })),
+        api('/ext/operations/pos/orders?limit=20'),
+        api('/ext/operations/pos/z-reports?limit=10').catch(() => ({ data: [] })),
       ]);
       activeSession = active.data;
       recentOrders = orders.data ?? [];
@@ -36,7 +36,7 @@
 
   async function openSession() {
     try {
-      await api('/api/pos/sessions/open', {
+      await api('/ext/operations/pos/sessions/open', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ opening_float: openingFloat }),
@@ -48,7 +48,7 @@
   async function closeSession() {
     if (!activeSession) return;
     try {
-      await api(`/api/pos/sessions/${activeSession.id}/close`, {
+      await api(`/ext/operations/pos/sessions/${activeSession.id}/close`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ closing_float: closingFloat }),

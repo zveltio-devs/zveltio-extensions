@@ -5,6 +5,8 @@ import { postgisRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'geospatial/postgis',
   category: 'geospatial',
+  // S3-01: sub-app mounted at /ext/geospatial/postgis by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [join(import.meta.dir, 'migrations/001_postgis.sql')];
@@ -52,7 +54,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/geo', postgisRoutes(ctx));
+    app.route('/', postgisRoutes(ctx));
   },
 };
 

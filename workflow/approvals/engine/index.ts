@@ -5,6 +5,8 @@ import { join } from 'path';
 const extension: ZveltioExtension = {
   name: 'workflow/approvals',
   category: 'workflow',
+  // S3-01: sub-app mounted at /ext/workflow/approvals by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [
@@ -13,7 +15,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/approvals', approvalsRoutes(ctx));
+    app.route('/', approvalsRoutes(ctx));
   },
 };
 

@@ -24,18 +24,18 @@
     try {
       const params = new URLSearchParams();
       if (q) params.set('q', q);
-      const r = await api(`/api/documents?${params}`);
+      const r = await api(`/ext/content/documents?${params}`);
       documents = r.data ?? [];
     } catch (e: any) { error = e.message; }
   }
-  async function loadTemplates() { try { const r = await api('/api/document-templates'); templates = r.data ?? []; } catch {} }
+  async function loadTemplates() { try { const r = await api('/ext/content/document-templates'); templates = r.data ?? []; } catch {} }
 
   async function generate() {
     saving = true; error = '';
     try {
       let vars = {};
       try { vars = JSON.parse(form.variables); } catch { throw new Error('Invalid JSON in variables'); }
-      await api('/api/documents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, variables: vars }) });
+      await api('/ext/content/documents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, variables: vars }) });
       showForm = false;
       form = { template_id: '', name: '', variables: '{}' };
       await loadDocs();
@@ -44,7 +44,7 @@
 
   onMount(() => { loadDocs(); loadTemplates(); });
 
-  function downloadUrl(id: string) { return `${engineUrl}/api/documents/${id}/download`; }
+  function downloadUrl(id: string) { return `${engineUrl}/ext/content/documents/${id}/download`; }
 </script>
 
 <div class="p-6 space-y-4">

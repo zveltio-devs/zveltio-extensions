@@ -41,7 +41,7 @@
  async function decide(requestId: string, decision: 'approved' | 'rejected') {
  const comment = decision === 'rejected' ? prompt('Rejection reason (optional):') : undefined;
 
- await fetch(`${engineUrl}/api/approvals/${requestId}/decide`, {
+ await fetch(`${engineUrl}/ext/workflow/approvals/${requestId}/decide`, {
  method: 'POST',
  credentials: 'include',
  headers: { 'Content-Type': 'application/json' },
@@ -53,7 +53,7 @@
 
  async function cancel(requestId: string) {
  if (!confirm('Cancel this approval request?')) return;
- await fetch(`${engineUrl}/api/approvals/${requestId}/cancel`, {
+ await fetch(`${engineUrl}/ext/workflow/approvals/${requestId}/cancel`, {
  method: 'POST',
  credentials: 'include',
  });

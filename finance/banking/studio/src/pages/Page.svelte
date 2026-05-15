@@ -22,13 +22,13 @@
     return json as T;
   }
 
-  async function loadAccounts() { try { const r = await api('/api/banking/accounts'); accounts = r.data ?? []; } catch (e: any) { error = e.message; } }
-  async function loadTransactions() { try { const r = await api('/api/banking/transactions?limit=100'); transactions = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadAccounts() { try { const r = await api('/ext/finance/banking/accounts'); accounts = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadTransactions() { try { const r = await api('/ext/finance/banking/transactions?limit=100'); transactions = r.data ?? []; } catch (e: any) { error = e.message; } }
   async function loadReconciliation() {
     try {
       const [u, inv] = await Promise.all([
-        api('/api/banking/transactions?reconciled=false&limit=100'),
-        api('/api/invoicing/invoices?status=sent&limit=100').catch(() => ({ data: [] })),
+        api('/ext/finance/banking/transactions?reconciled=false&limit=100'),
+        api('/ext/finance/invoicing/invoices?status=sent&limit=100').catch(() => ({ data: [] })),
       ]);
       unreconciled = u.data ?? [];
       openInvoices = inv.data ?? [];
@@ -38,7 +38,7 @@
   async function createAccount() {
     saving = true; error = '';
     try {
-      await api('/api/banking/accounts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      await api('/ext/finance/banking/accounts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
       showForm = false;
       form = { name: '', bank_name: '', iban: '', currency: 'RON', opening_balance: 0 };
       await loadAccounts();
@@ -47,7 +47,7 @@
 
   async function reconcile(txId: string, invoiceId: string) {
     try {
-      await api(`/api/banking/transactions/${txId}/reconcile`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoice_id: invoiceId }) });
+      await api(`/ext/finance/banking/transactions/${txId}/reconcile`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoice_id: invoiceId }) });
       await loadReconciliation();
     } catch (e: any) { error = e.message; }
   }

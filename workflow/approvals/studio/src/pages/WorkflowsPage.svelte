@@ -25,7 +25,7 @@
  async function loadWorkflows() {
  loading = true;
  try {
- const res = await fetch(`${engineUrl}/api/approvals/workflows`, { credentials: 'include' });
+ const res = await fetch(`${engineUrl}/ext/workflow/approvals/workflows`, { credentials: 'include' });
  const data = await res.json();
  workflows = data.workflows || [];
  } finally {
@@ -51,7 +51,7 @@
  if (!form.name || !form.collection || form.steps.some((s) => !s.name)) return;
  creating = true;
  try {
- const res = await fetch(`${engineUrl}/api/approvals/workflows`, {
+ const res = await fetch(`${engineUrl}/ext/workflow/approvals/workflows`, {
  method: 'POST',
  credentials: 'include',
  headers: { 'Content-Type': 'application/json' },
@@ -82,7 +82,7 @@
 
  async function deleteWorkflow(id: string) {
  if (!confirm('Delete this workflow?')) return;
- await fetch(`${engineUrl}/api/approvals/workflows/${id}`, {
+ await fetch(`${engineUrl}/ext/workflow/approvals/workflows/${id}`, {
  method: 'DELETE',
  credentials: 'include',
  });

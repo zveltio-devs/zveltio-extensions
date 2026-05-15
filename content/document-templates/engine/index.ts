@@ -5,13 +5,15 @@ import { documentTemplatesRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'content/document-templates',
   category: 'content',
+  // S3-01: sub-app mounted at /ext/content/document-templates by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [join(import.meta.dir, 'migrations/001_document_templates.sql')];
   },
 
   async register(app, ctx) {
-    app.route('/api/document-templates', documentTemplatesRoutes(ctx));
+    app.route('/', documentTemplatesRoutes(ctx));
   },
 };
 

@@ -6,13 +6,15 @@ import { mailRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'communications/mail',
   category: 'communications',
+  // S3-01: sub-app mounted at /ext/communications/mail by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [join(import.meta.dir, 'migrations/001_mail.sql')];
   },
 
   async register(app, ctx) {
-    app.route('/api/mail', mailRoutes(ctx));
+    app.route('/', mailRoutes(ctx));
   },
 };
 

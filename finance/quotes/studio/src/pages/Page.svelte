@@ -32,7 +32,7 @@
     try {
       const params = new URLSearchParams();
       if (statusFilter !== 'all') params.set('status', statusFilter);
-      const r = await api(`/api/quotes?${params}`);
+      const r = await api(`/ext/finance/quotes?${params}`);
       quotes = r.data ?? [];
     } catch (e: any) { error = e.message; }
   }
@@ -48,7 +48,7 @@
   async function createQuote() {
     saving = true; error = '';
     try {
-      await api('/api/quotes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      await api('/ext/finance/quotes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
       showForm = false;
       form.lines = [{ description: '', quantity: 1, unit_price: 0, tax_rate: 19 }];
       form.client_name = ''; form.client_id = '';
@@ -56,8 +56,8 @@
     } catch (e: any) { error = e.message; } finally { saving = false; }
   }
 
-  async function send(id: string) { try { await api(`/api/quotes/${id}/send`, { method: 'POST' }); await load(); } catch (e: any) { error = e.message; } }
-  async function convert(id: string) { try { await api(`/api/quotes/${id}/convert-to-invoice`, { method: 'POST' }); await load(); } catch (e: any) { error = e.message; } }
+  async function send(id: string) { try { await api(`/ext/finance/quotes/${id}/send`, { method: 'POST' }); await load(); } catch (e: any) { error = e.message; } }
+  async function convert(id: string) { try { await api(`/ext/finance/quotes/${id}/convert-to-invoice`, { method: 'POST' }); await load(); } catch (e: any) { error = e.message; } }
 
   $effect(() => { statusFilter; load(); });
   onMount(() => { load(); loadContacts(); });

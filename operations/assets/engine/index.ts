@@ -5,6 +5,8 @@ import { assetsRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'operations/assets',
   category: 'operations',
+  // S3-01: sub-app mounted at /ext/operations/assets by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [
@@ -14,7 +16,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/assets', assetsRoutes(ctx));
+    app.route('/', assetsRoutes(ctx));
   },
 };
 

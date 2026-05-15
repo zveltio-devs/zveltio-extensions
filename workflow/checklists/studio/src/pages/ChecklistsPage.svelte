@@ -19,7 +19,7 @@
  // Fetch recent checklist instances from engine
  // In production this would be a summary/dashboard endpoint
  // For now we use a simple query with a broad collection filter
- const res = await fetch(`${engineUrl}/api/checklists/summary`, { credentials: 'include' });
+ const res = await fetch(`${engineUrl}/ext/workflow/checklists/summary`, { credentials: 'include' });
  if (res.ok) {
  const data = await res.json();
  checklists = data.checklists || [];

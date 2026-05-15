@@ -14,7 +14,7 @@ import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 /**
  * Mail Client routes — IMAP sync + SMTP send + AI features.
- * Mounted at /api/mail
+ * Mounted at /ext/communications/mail
  */
 export function mailRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
@@ -33,7 +33,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
 
   // ═══ ACCOUNTS ═══
 
-  // GET /api/mail/accounts
+  // GET /ext/communications/mail/accounts
   app.get('/accounts', async (c) => {
     const user = c.get('user') as any;
     const accounts = await sql`
@@ -45,7 +45,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     return c.json({ accounts: accounts.rows });
   });
 
-  // POST /api/mail/accounts
+  // POST /ext/communications/mail/accounts
   app.post('/accounts', zValidator('json', z.object({
     name: z.string().min(1),
     email_address: z.string().email(),
@@ -111,7 +111,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     return c.json({ account: { ...account, imap_password: '***', smtp_password: '***' } }, 201);
   });
 
-  // PATCH /api/mail/accounts/:id
+  // PATCH /ext/communications/mail/accounts/:id
   app.patch('/accounts/:id', zValidator('json', z.object({
     name: z.string().min(1).optional(),
     display_name: z.string().optional(),
@@ -137,14 +137,14 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     return c.json({ success: true });
   });
 
-  // DELETE /api/mail/accounts/:id
+  // DELETE /ext/communications/mail/accounts/:id
   app.delete('/accounts/:id', async (c) => {
     const user = c.get('user') as any;
     await sql`DELETE FROM zv_mail_accounts WHERE id = ${c.req.param('id')} AND user_id = ${user.id}`.execute(db);
     return c.json({ success: true });
   });
 
-  // POST /api/mail/accounts/:id/sync
+  // POST /ext/communications/mail/accounts/:id/sync
   app.post('/accounts/:id/sync', async (c) => {
     const user = c.get('user') as any;
     const account = await sql`
@@ -158,7 +158,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
 
   // ═══ FOLDERS ═══
 
-  // GET /api/mail/accounts/:accountId/folders
+  // GET /ext/communications/mail/accounts/:accountId/folders
   app.get('/accounts/:accountId/folders', async (c) => {
     const user = c.get('user') as any;
     const folders = await sql`
@@ -177,7 +177,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
 
   // ═══ MESSAGES ═══
 
-  // GET /api/mail/folders/:folderId/messages
+  // GET /ext/communications/mail/folders/:folderId/messages
   app.get('/folders/:folderId/messages', async (c) => {
     const user = c.get('user') as any;
     const { page = '1', limit = '50', search, unread_only } = c.req.query();
@@ -208,7 +208,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     return c.json({ messages: messages.rows });
   });
 
-  // GET /api/mail/messages/:id
+  // GET /ext/communications/mail/messages/:id
   app.get('/messages/:id', async (c) => {
     const user = c.get('user') as any;
     const msgResult = await sql`
@@ -258,7 +258,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     return c.json({ message: { ...msg, attachments: attachments.rows } });
   });
 
-  // PATCH /api/mail/messages/:id — Update flags
+  // PATCH /ext/communications/mail/messages/:id — Update flags
   app.patch('/messages/:id', zValidator('json', z.object({
     is_read: z.boolean().optional(),
     is_starred: z.boolean().optional(),
@@ -288,7 +288,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     return c.json({ success: true });
   });
 
-  // DELETE /api/mail/messages/:id — Soft delete (move to trash)
+  // DELETE /ext/communications/mail/messages/:id — Soft delete (move to trash)
   app.delete('/messages/:id', async (c) => {
     const user = c.get('user') as any;
     // Find trash folder for this message's account
@@ -317,7 +317,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
 
   // ═══ COMPOSE / SEND ═══
 
-  // POST /api/mail/send
+  // POST /ext/communications/mail/send
   app.post('/send', zValidator('json', z.object({
     account_id: z.string().uuid(),
     to: z.array(z.string().email()).min(1),
@@ -379,7 +379,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
 
   // ═══ AI FEATURES ═══
 
-  // POST /api/mail/messages/:id/summarize
+  // POST /ext/communications/mail/messages/:id/summarize
   app.post('/messages/:id/summarize', async (c) => {
     const user = c.get('user') as any;
     const msgResult = await sql`
@@ -402,7 +402,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     return c.json({ summary: result.content });
   });
 
-  // POST /api/mail/messages/:id/reply-draft — AI drafts a reply
+  // POST /ext/communications/mail/messages/:id/reply-draft — AI drafts a reply
   app.post('/messages/:id/reply-draft', async (c) => {
     const user = c.get('user') as any;
     const msgResult = await sql`
@@ -433,7 +433,7 @@ Please draft a reply to this email.`,
     return c.json({ draft: result.content });
   });
 
-  // GET /api/mail/search — Full-text search across all accounts
+  // GET /ext/communications/mail/search — Full-text search across all accounts
   app.get('/search', async (c) => {
     const user = c.get('user') as any;
     const { q, limit = '20' } = c.req.query();
@@ -456,7 +456,7 @@ Please draft a reply to this email.`,
 
   // ═══ FOLDER MANAGEMENT ═══
 
-  // POST /api/mail/folders
+  // POST /ext/communications/mail/folders
   app.post('/folders', zValidator('json', z.object({
     account_id: z.string().uuid(),
     name: z.string().min(1),
@@ -479,7 +479,7 @@ Please draft a reply to this email.`,
     return c.json({ success: true, path: fullPath });
   });
 
-  // PUT /api/mail/folders/:id/rename
+  // PUT /ext/communications/mail/folders/:id/rename
   app.put('/folders/:id/rename', zValidator('json', z.object({ name: z.string().min(1) })), async (c) => {
     const user = c.get('user') as any;
     const folderResult = await sql`
@@ -500,7 +500,7 @@ Please draft a reply to this email.`,
     return c.json({ success: true });
   });
 
-  // DELETE /api/mail/folders/:id
+  // DELETE /ext/communications/mail/folders/:id
   app.delete('/folders/:id', async (c) => {
     const user = c.get('user') as any;
     const folderResult = await sql`
@@ -522,7 +522,7 @@ Please draft a reply to this email.`,
 
   // ═══ BULK OPERATIONS ═══
 
-  // POST /api/mail/bulk
+  // POST /ext/communications/mail/bulk
   app.post('/bulk', zValidator('json', z.object({
     message_ids: z.array(z.string().uuid()).min(1).max(500),
     action: z.enum(['mark_read', 'mark_unread', 'star', 'unstar', 'move', 'delete', 'spam']),
@@ -580,7 +580,7 @@ Please draft a reply to this email.`,
 
   // ═══ DOWNLOAD EML ═══
 
-  // GET /api/mail/messages/:id/eml
+  // GET /ext/communications/mail/messages/:id/eml
   app.get('/messages/:id/eml', async (c) => {
     const user = c.get('user') as any;
     const msgResult = await sql`
@@ -603,7 +603,7 @@ Please draft a reply to this email.`,
 
   // ═══ QUOTA ═══
 
-  // GET /api/mail/accounts/:id/quota
+  // GET /ext/communications/mail/accounts/:id/quota
   app.get('/accounts/:id/quota', async (c) => {
     const user = c.get('user') as any;
     const accountResult = await sql`SELECT * FROM zv_mail_accounts WHERE id = ${c.req.param('id')} AND user_id = ${user.id}`.execute(db);
@@ -615,7 +615,7 @@ Please draft a reply to this email.`,
 
   // ═══ REPLY / FORWARD CONTEXT ═══
 
-  // POST /api/mail/messages/:id/reply-context
+  // POST /ext/communications/mail/messages/:id/reply-context
   app.post('/messages/:id/reply-context', zValidator('json', z.object({
     type: z.enum(['reply', 'reply_all', 'forward']),
   })), async (c) => {
@@ -630,7 +630,7 @@ Please draft a reply to this email.`,
 
   // ═══ DRAFTS ═══
 
-  // GET /api/mail/drafts
+  // GET /ext/communications/mail/drafts
   app.get('/drafts', async (c) => {
     const user = c.get('user') as any;
     const drafts = await sql`
@@ -644,7 +644,7 @@ Please draft a reply to this email.`,
     return c.json({ drafts: drafts.rows });
   });
 
-  // GET /api/mail/drafts/:id
+  // GET /ext/communications/mail/drafts/:id
   app.get('/drafts/:id', async (c) => {
     const user = c.get('user') as any;
     const result = await sql`
@@ -656,7 +656,7 @@ Please draft a reply to this email.`,
     return c.json({ draft: result.rows[0] });
   });
 
-  // POST /api/mail/drafts — Create or autosave draft
+  // POST /ext/communications/mail/drafts — Create or autosave draft
   app.post('/drafts', zValidator('json', z.object({
     draft_id: z.string().uuid().nullable().optional(),
     account_id: z.string().uuid(),
@@ -695,7 +695,7 @@ Please draft a reply to this email.`,
     return c.json({ draft_id: draftId });
   });
 
-  // POST /api/mail/drafts/:id/send
+  // POST /ext/communications/mail/drafts/:id/send
   app.post('/drafts/:id/send', async (c) => {
     const user = c.get('user') as any;
     try {
@@ -706,7 +706,7 @@ Please draft a reply to this email.`,
     }
   });
 
-  // DELETE /api/mail/drafts/:id
+  // DELETE /ext/communications/mail/drafts/:id
   app.delete('/drafts/:id', async (c) => {
     await sql`DELETE FROM zv_mail_drafts WHERE id = ${c.req.param('id')}`.execute(db);
     return c.json({ success: true });
@@ -714,7 +714,7 @@ Please draft a reply to this email.`,
 
   // ═══ IDENTITIES ═══
 
-  // GET /api/mail/accounts/:accountId/identities
+  // GET /ext/communications/mail/accounts/:accountId/identities
   app.get('/accounts/:accountId/identities', async (c) => {
     const user = c.get('user') as any;
     const identities = await sql`
@@ -726,7 +726,7 @@ Please draft a reply to this email.`,
     return c.json({ identities: identities.rows });
   });
 
-  // POST /api/mail/accounts/:accountId/identities
+  // POST /ext/communications/mail/accounts/:accountId/identities
   app.post('/accounts/:accountId/identities', zValidator('json', z.object({
     email_address: z.string().email(),
     display_name: z.string().optional(),
@@ -745,7 +745,7 @@ Please draft a reply to this email.`,
     return c.json({ identity: result.rows[0] }, 201);
   });
 
-  // DELETE /api/mail/accounts/:accountId/identities/:id
+  // DELETE /ext/communications/mail/accounts/:accountId/identities/:id
   app.delete('/accounts/:accountId/identities/:id', async (c) => {
     await sql`DELETE FROM zv_mail_identities WHERE id = ${c.req.param('id')} AND account_id = ${c.req.param('accountId')}`.execute(db);
     return c.json({ success: true });
@@ -753,7 +753,7 @@ Please draft a reply to this email.`,
 
   // ═══ SIGNATURES ═══
 
-  // GET /api/mail/signatures
+  // GET /ext/communications/mail/signatures
   app.get('/signatures', async (c) => {
     const user = c.get('user') as any;
     const sigs = await sql`
@@ -762,7 +762,7 @@ Please draft a reply to this email.`,
     return c.json({ signatures: sigs.rows });
   });
 
-  // POST /api/mail/signatures
+  // POST /ext/communications/mail/signatures
   app.post('/signatures', zValidator('json', z.object({
     name: z.string().min(1),
     body_html: z.string(),
@@ -780,7 +780,7 @@ Please draft a reply to this email.`,
     return c.json({ signature: result.rows[0] }, 201);
   });
 
-  // PUT /api/mail/signatures/:id
+  // PUT /ext/communications/mail/signatures/:id
   app.put('/signatures/:id', zValidator('json', z.object({
     name: z.string().min(1).optional(),
     body_html: z.string().optional(),
@@ -806,7 +806,7 @@ Please draft a reply to this email.`,
     return c.json({ success: true });
   });
 
-  // DELETE /api/mail/signatures/:id
+  // DELETE /ext/communications/mail/signatures/:id
   app.delete('/signatures/:id', async (c) => {
     const user = c.get('user') as any;
     await sql`DELETE FROM zv_mail_signatures WHERE id = ${c.req.param('id')} AND user_id = ${user.id}`.execute(db);
@@ -815,7 +815,7 @@ Please draft a reply to this email.`,
 
   // ═══ FILTERS (Sieve) ═══
 
-  // GET /api/mail/accounts/:accountId/filters
+  // GET /ext/communications/mail/accounts/:accountId/filters
   app.get('/accounts/:accountId/filters', async (c) => {
     const filters = await sql`
       SELECT * FROM zv_mail_filters WHERE account_id = ${c.req.param('accountId')} ORDER BY sort_order
@@ -823,7 +823,7 @@ Please draft a reply to this email.`,
     return c.json({ filters: filters.rows });
   });
 
-  // POST /api/mail/accounts/:accountId/filters
+  // POST /ext/communications/mail/accounts/:accountId/filters
   app.post('/accounts/:accountId/filters', zValidator('json', z.object({
     name: z.string().min(1),
     conditions: z.array(z.object({
@@ -874,7 +874,7 @@ Please draft a reply to this email.`,
     return c.json({ filter: result.rows[0] }, 201);
   });
 
-  // PATCH /api/mail/accounts/:accountId/filters/:id
+  // PATCH /ext/communications/mail/accounts/:accountId/filters/:id
   app.patch('/accounts/:accountId/filters/:id', zValidator('json', z.object({
     name: z.string().min(1).optional(),
     is_active: z.boolean().optional(),
@@ -892,7 +892,7 @@ Please draft a reply to this email.`,
     return c.json({ success: true });
   });
 
-  // DELETE /api/mail/accounts/:accountId/filters/:id
+  // DELETE /ext/communications/mail/accounts/:accountId/filters/:id
   app.delete('/accounts/:accountId/filters/:id', async (c) => {
     await sql`DELETE FROM zv_mail_filters WHERE id = ${c.req.param('id')} AND account_id = ${c.req.param('accountId')}`.execute(db);
     return c.json({ success: true });
@@ -900,7 +900,7 @@ Please draft a reply to this email.`,
 
   // ═══ ADDRESS BOOK / AUTOCOMPLETE ═══
 
-  // GET /api/mail/contacts?q=...
+  // GET /ext/communications/mail/contacts?q=...
   app.get('/contacts', async (c) => {
     const user = c.get('user') as any;
     const q = c.req.query('q') || '';
@@ -928,7 +928,7 @@ Please draft a reply to this email.`,
     return c.json({ contacts: contacts.rows });
   });
 
-  // POST /api/mail/contacts — Manual add
+  // POST /ext/communications/mail/contacts — Manual add
   app.post('/contacts', zValidator('json', z.object({
     email: z.string().email(),
     display_name: z.string().optional(),
@@ -951,7 +951,7 @@ Please draft a reply to this email.`,
 
   // ═══ READ RECEIPTS (MDN) ═══
 
-  // POST /api/mail/messages/:id/read-receipt
+  // POST /ext/communications/mail/messages/:id/read-receipt
   app.post('/messages/:id/read-receipt', async (c) => {
     const user = c.get('user') as any;
     const msgResult = await sql`
@@ -981,7 +981,7 @@ Please draft a reply to this email.`,
 
   // ═══ ADMIN: MAIL CONFIG ═══
 
-  // GET /api/mail/admin/config
+  // GET /ext/communications/mail/admin/config
   app.get('/admin/config', async (c) => {
     const user = c.get('user') as any;
     const isAdmin = await checkPermission(user.id, 'admin', '*');
@@ -991,7 +991,7 @@ Please draft a reply to this email.`,
     return c.json({ config: config.rows[0] ? (config.rows[0] as any).value : {} });
   });
 
-  // PUT /api/mail/admin/config
+  // PUT /ext/communications/mail/admin/config
   app.put('/admin/config', zValidator('json', z.object({
     enabled: z.boolean().optional(),
     max_accounts_per_user: z.number().int().min(1).max(50).optional(),
@@ -1030,7 +1030,7 @@ Please draft a reply to this email.`,
 
   // ═══ STATISTICS ═══
 
-  // GET /api/mail/stats — per-user inbox stats
+  // GET /ext/communications/mail/stats — per-user inbox stats
   app.get('/stats', async (c) => {
     const user = c.get('user') as any;
     const stats = await sql`

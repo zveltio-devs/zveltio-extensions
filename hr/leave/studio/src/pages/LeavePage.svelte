@@ -30,9 +30,9 @@
       const params = new URLSearchParams();
       if (statusFilter !== 'all') params.set('status', statusFilter);
       const [reqs, emps, types] = await Promise.all([
-        api(`/api/leave/requests?${params}`),
-        api('/api/hr?limit=200'),
-        api('/api/leave/types'),
+        api(`/ext/hr/leave/requests?${params}`),
+        api('/ext/hr/employees?limit=200'),
+        api('/ext/hr/leave/types'),
       ]);
       requests = reqs.data ?? [];
       employees = emps.data ?? [];
@@ -44,7 +44,7 @@
   async function createRequest() {
     saving = true; error = '';
     try {
-      await api('/api/leave/requests', {
+      await api('/ext/hr/leave/requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -58,7 +58,7 @@
 
   async function approve(id: string, approved: boolean) {
     try {
-      await api(`/api/leave/requests/${id}/${approved ? 'approve' : 'reject'}`, { method: 'POST' });
+      await api(`/ext/hr/leave/requests/${id}/${approved ? 'approve' : 'reject'}`, { method: 'POST' });
       await loadAll();
     } catch (e: any) { error = e.message; }
   }

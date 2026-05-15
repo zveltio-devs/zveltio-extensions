@@ -29,7 +29,7 @@
   async function loadPeriods() {
     loading = true; error = '';
     try {
-      const res = await api('/api/payroll/periods');
+      const res = await api('/ext/hr/payroll/periods');
       periods = res.data ?? [];
       if (!selectedPeriod && periods.length > 0) selectedPeriod = periods[0].id;
     } catch (e: any) { error = e.message; }
@@ -39,7 +39,7 @@
   async function loadEntries() {
     if (!selectedPeriod) { entries = []; return; }
     try {
-      const res = await api(`/api/payroll/periods/${selectedPeriod}/entries`);
+      const res = await api(`/ext/hr/payroll/periods/${selectedPeriod}/entries`);
       entries = res.data ?? [];
     } catch (e: any) { error = e.message; }
   }
@@ -47,7 +47,7 @@
   async function createPeriod() {
     saving = true; error = '';
     try {
-      await api('/api/payroll/periods', {
+      await api('/ext/hr/payroll/periods', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(periodForm),
@@ -61,13 +61,13 @@
 
   async function generateEntries(periodId: string) {
     try {
-      await api(`/api/payroll/periods/${periodId}/generate`, { method: 'POST' });
+      await api(`/ext/hr/payroll/periods/${periodId}/generate`, { method: 'POST' });
       await loadEntries();
     } catch (e: any) { error = e.message; }
   }
 
   async function exportRevisal(periodId: string) {
-    window.open(`${engineUrl}/api/payroll/periods/${periodId}/revisal-export`, '_blank');
+    window.open(`${engineUrl}/ext/hr/payroll/periods/${periodId}/revisal-export`, '_blank');
   }
 
   onMount(loadPeriods);
