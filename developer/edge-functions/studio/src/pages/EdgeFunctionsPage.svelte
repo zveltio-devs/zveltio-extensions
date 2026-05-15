@@ -31,7 +31,7 @@ export default async function handler(ctx) {
  async function loadFunctions() {
  loading = true;
  try {
- const res = await fetch(`${engineUrl}/api/edge-functions`, { credentials: 'include' });
+ const res = await fetch(`${engineUrl}/ext/developer/edge-functions`, { credentials: 'include' });
  const data = await res.json();
  functions = data.functions || [];
  if (functions.length > 0 && !selected) {
@@ -43,7 +43,7 @@ export default async function handler(ctx) {
  }
 
  async function selectFunction(fn: any) {
- const res = await fetch(`${engineUrl}/api/edge-functions/${fn.id}`, { credentials: 'include' });
+ const res = await fetch(`${engineUrl}/ext/developer/edge-functions/${fn.id}`, { credentials: 'include' });
  const data = await res.json();
  selected = data.function;
  invokeResult = null;
@@ -53,7 +53,7 @@ export default async function handler(ctx) {
  if (!selected) return;
  saving = true;
  try {
- await fetch(`${engineUrl}/api/edge-functions/${selected.id}`, {
+ await fetch(`${engineUrl}/ext/developer/edge-functions/${selected.id}`, {
  method: 'PATCH',
  credentials: 'include',
  headers: { 'Content-Type': 'application/json' },
@@ -71,7 +71,7 @@ export default async function handler(ctx) {
  invoking = true;
  invokeResult = null;
  try {
- const res = await fetch(`${engineUrl}/api/edge-functions/${selected.id}/invoke`, {
+ const res = await fetch(`${engineUrl}/ext/developer/edge-functions/${selected.id}/invoke`, {
  method: 'POST',
  credentials: 'include',
  headers: { 'Content-Type': 'application/json' },
@@ -88,7 +88,7 @@ export default async function handler(ctx) {
  if (!form.name || !form.display_name) return;
  creating = true;
  try {
- const res = await fetch(`${engineUrl}/api/edge-functions`, {
+ const res = await fetch(`${engineUrl}/ext/developer/edge-functions`, {
  method: 'POST',
  credentials: 'include',
  headers: { 'Content-Type': 'application/json' },
@@ -106,13 +106,13 @@ export default async function handler(ctx) {
 
  async function deleteFunction(id: string) {
  if (!confirm('Delete this function?')) return;
- await fetch(`${engineUrl}/api/edge-functions/${id}`, { method: 'DELETE', credentials: 'include' });
+ await fetch(`${engineUrl}/ext/developer/edge-functions/${id}`, { method: 'DELETE', credentials: 'include' });
  selected = null;
  await loadFunctions();
  }
 
  async function toggleActive(fn: any) {
- await fetch(`${engineUrl}/api/edge-functions/${fn.id}`, {
+ await fetch(`${engineUrl}/ext/developer/edge-functions/${fn.id}`, {
  method: 'PATCH',
  credentials: 'include',
  headers: { 'Content-Type': 'application/json' },

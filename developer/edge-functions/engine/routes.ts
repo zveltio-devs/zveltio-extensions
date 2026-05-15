@@ -216,7 +216,9 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
  *  - To expose a function as a public endpoint (e.g. webhooks), set
  *    `env_vars.ZVELTIO_PUBLIC = "true"` in the function configuration.
  */
-export async function mountEdgeFunctions(app: Hono, ctx: ExtensionContext): Promise<void> {
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+export async function mountEdgeFunctions(ctx: ExtensionContext): Promise<void> {
   const { db, auth } = ctx;
   const { runEdgeFunction: runFunction } = ctx.internals;
 
@@ -232,12 +234,14 @@ export async function mountEdgeFunctions(app: Hono, ctx: ExtensionContext): Prom
   }
 
   for (const fn of fns) {
-    const method = fn.http_method === 'ANY' ? ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] : [fn.http_method];
+    const methods: HttpMethod[] = fn.http_method === 'ANY'
+      ? ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
+      : [fn.http_method as HttpMethod];
     const env = typeof fn.env_vars === 'string' ? JSON.parse(fn.env_vars) : fn.env_vars;
     // Functions are private unless explicitly marked public via env_vars
     const isPublic = env.ZVELTIO_PUBLIC === 'true';
 
-    app.on(method, fn.path, async (c: any) => {
+    const handler = async (c: any) => {
       if (!fn.is_active) return c.json({ error: 'Function is inactive' }, 503);
 
       // N5: require auth for non-public functions
@@ -260,7 +264,16 @@ export async function mountEdgeFunctions(app: Hono, ctx: ExtensionContext): Prom
         status: result.status,
         headers: { 'Content-Type': 'application/json' },
       });
-    });
+    };
+
+    // S3-01: each method registered on the engine's global app via the
+    // sub-app extension's escape hatch. User-deployed function paths
+    // (e.g. /api/fn/my-webhook, /webhooks/stripe) stay at their chosen
+    // root-relative URLs even though the extension's own routes live
+    // under /ext/developer/edge-functions/.
+    for (const method of methods) {
+      ctx.registerPublicRoute({ method, path: fn.path, handler });
+    }
   }
 
   console.log(`  Edge functions mounted: ${fns.length}`);
