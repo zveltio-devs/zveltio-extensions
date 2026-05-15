@@ -35,7 +35,7 @@
         collections_count: number;
         estimated_fields: number;
         confirm_token: string;
-      }>('/api/ai/preview-schema', { description });
+      }>('/ext/ai/preview-schema', { description });
       preview = res.preview;
       confirmToken = res.confirm_token;
       collectionsCount = res.collections_count;
@@ -59,7 +59,7 @@
         skipped: string[];
         job_ids: string[];
         message: string;
-      }>('/api/ai/generate-schema', { confirm_token: confirmToken });
+      }>('/ext/ai/generate-schema', { confirm_token: confirmToken });
       createdCollections = res.collections;
       skippedCollections = res.skipped;
       step = 'done';

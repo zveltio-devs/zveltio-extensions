@@ -1,9 +1,9 @@
 /**
  * Zveltio AI Agent Routes
  *
- * POST   /api/zveltio-ai/chat                  — send a natural-language request
- * GET    /api/zveltio-ai/conversations/:id      — get conversation history
- * DELETE /api/zveltio-ai/conversations/:id      — clear a conversation
+ * POST   /ext/ai/zveltio/chat                  — send a natural-language request
+ * GET    /ext/ai/zveltio/conversations/:id      — get conversation history
+ * DELETE /ext/ai/zveltio/conversations/:id      — clear a conversation
  */
 
 import { Hono } from 'hono';

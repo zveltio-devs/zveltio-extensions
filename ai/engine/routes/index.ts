@@ -9,21 +9,21 @@ import { aiAnalyticsRoutes } from './ai-analytics.js';
 import { zveltioAIRoutes } from './zveltio-ai.js';
 
 /**
- * Mount points (relative to extension root):
- *   /api/ai             — providers, embeddings, search, chat, schema-gen
- *   /api/ai/alchemist   — Data Alchemist (unstructured doc → schema)
- *   /api/ai/query       — Text-to-SQL natural language queries
- *   /api/ai-analytics   — usage analytics, cost recommendations
- *   /api/zveltio-ai     — agentic ReAct loop / tool use
+ * Mount points under /ext/ai (engine prefixes the namespace):
+ *   /              — providers, embeddings, search, chat, schema-gen
+ *   /alchemist     — Data Alchemist (unstructured doc → schema)
+ *   /query         — Text-to-SQL natural language queries
+ *   /analytics     — usage analytics, cost recommendations
+ *   /zveltio       — agentic ReAct loop / tool use
  */
 export function buildAIRoutes(ctx: ExtensionContext): Hono {
   const app = new Hono();
-  app.route('/api/ai', aiRoutes(ctx));
-  app.route('/api/ai', aiChatsRoutes(ctx));
-  app.route('/api/ai', aiSchemaGenRoutes(ctx));
-  app.route('/api/ai/alchemist', aiAlchemistRoutes(ctx));
-  app.route('/api/ai/query', aiQueryRoutes(ctx));
-  app.route('/api/ai-analytics', aiAnalyticsRoutes(ctx));
-  app.route('/api/zveltio-ai', zveltioAIRoutes(ctx));
+  app.route('/', aiRoutes(ctx));
+  app.route('/', aiChatsRoutes(ctx));
+  app.route('/', aiSchemaGenRoutes(ctx));
+  app.route('/alchemist', aiAlchemistRoutes(ctx));
+  app.route('/query', aiQueryRoutes(ctx));
+  app.route('/analytics', aiAnalyticsRoutes(ctx));
+  app.route('/zveltio', zveltioAIRoutes(ctx));
   return app;
 }

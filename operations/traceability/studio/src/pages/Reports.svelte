@@ -1,5 +1,5 @@
 <script lang="ts">
-  const API = '/api/trace';
+  const API = '/ext/operations/traceability';
 
   type ReportType = 'ansvsa' | 'reception' | 'consumption' | 'stock' | 'haccp';
 

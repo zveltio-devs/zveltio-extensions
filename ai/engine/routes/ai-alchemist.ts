@@ -14,7 +14,7 @@ import { aiProviderManager } from '../lib/ai-provider.js';
  *   Step 1 POST /analyze  — upload files, AI extracts text + proposes schema + sample data
  *   Step 2 POST /execute  — user confirms schema, Ghost DDL creates tables + inserts data
  *
- * Mounted at /api/ai/alchemist
+ * Mounted at /ext/ai/alchemist
  */
 export function aiAlchemistRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission, DDLManager, fieldTypeRegistry, internals } = ctx;
@@ -31,7 +31,7 @@ export function aiAlchemistRoutes(ctx: ExtensionContext): Hono {
     await next();
   });
 
-  // POST /api/ai/alchemist/analyze — Step 1
+  // POST /ext/ai/alchemist/analyze — Step 1
   app.post('/analyze', async (c) => {
     const formData = await c.req.formData();
     const files = formData.getAll('files') as File[];
@@ -183,7 +183,7 @@ RESPONSE FORMAT (JSON only):
     return c.json({ session_id: sessionId, ...proposal });
   });
 
-  // POST /api/ai/alchemist/execute — Step 2
+  // POST /ext/ai/alchemist/execute — Step 2
   app.post(
     '/execute',
     zValidator(
@@ -332,7 +332,7 @@ RESPONSE FORMAT (JSON only):
     },
   );
 
-  // GET /api/ai/alchemist/sessions/:id — Retrieve cached proposal
+  // GET /ext/ai/alchemist/sessions/:id — Retrieve cached proposal
   app.get('/sessions/:id', async (c) => {
     try {
       const { getCache } = await import('../lib/cache.js');

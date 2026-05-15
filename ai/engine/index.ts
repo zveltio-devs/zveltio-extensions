@@ -21,6 +21,10 @@ import { ZveltioAIEngine } from './lib/zveltio-ai/engine.js';
 const extension: ZveltioExtension = {
   name: 'ai',
   category: 'intelligence',
+  // S3-01: sub-app mounted at /ext/ai by the engine. Sub-routers inside
+  // buildAIRoutes() are exposed under /, /alchemist, /query, /analytics,
+  // /zveltio (see engine/routes/index.ts).
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [

@@ -6,6 +6,8 @@ import { traceRoutes } from './routes/index.js';
 const extension: ZveltioExtension = {
   name: 'operations/traceability',
   category: 'operations',
+  // S3-01: sub-app mounted at /ext/operations/traceability by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [
@@ -23,7 +25,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/trace', traceRoutes(ctx));
+    app.route('/', traceRoutes(ctx));
 
     // Listen for invoices created by the invoicing extension.
     // invoicing emits 'record.created' with collection='zvd_invoices' — it does not know
