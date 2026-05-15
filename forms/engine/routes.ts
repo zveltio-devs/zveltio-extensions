@@ -64,16 +64,21 @@ export function formsRoutes(
 
   const app = new Hono<{ Variables: { user: any } }>();
 
-  // Admin middleware
-  app.use('/forms*', async (c, next) => {
+  // Admin middleware — applies to everything except /public/*
+  // Under the new sub-app mount (/ext/forms), routes are relative:
+  //   GET /          → list forms (admin)
+  //   GET /:id       → single form (admin)
+  //   GET /public/X  → public submit (no auth)
+  app.use('*', async (c, next) => {
+    if (c.req.path.startsWith('/public/')) return next();
     const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', user);
     await next();
   });
 
-  // GET /forms — list forms with submission counts
-  app.get('/forms', async (c) => {
+  // GET / — list forms with submission counts
+  app.get('/', async (c) => {
     const forms = await (db as any)
       .selectFrom('zv_forms as f')
       .leftJoin(
@@ -106,8 +111,8 @@ export function formsRoutes(
     return c.json({ forms });
   });
 
-  // POST /forms — create form
-  app.post('/forms', zValidator('json', formSchema), async (c) => {
+  // POST / — create form
+  app.post('/', zValidator('json', formSchema), async (c) => {
     const data = c.req.valid('json');
     const form = await (db as any)
       .insertInto('zv_forms')
@@ -124,8 +129,8 @@ export function formsRoutes(
     return c.json({ form }, 201);
   });
 
-  // GET /forms/:id — get form with fields
-  app.get('/forms/:id', async (c) => {
+  // GET /:id — get form with fields
+  app.get('/:id', async (c) => {
     const form = await (db as any)
       .selectFrom('zv_forms')
       .selectAll()
@@ -135,9 +140,9 @@ export function formsRoutes(
     return c.json({ form });
   });
 
-  // PATCH /forms/:id — update form
+  // PATCH /:id — update form
   app.patch(
-    '/forms/:id',
+    '/:id',
     zValidator('json', formSchema.partial()),
     async (c) => {
       const data = c.req.valid('json');
@@ -163,8 +168,8 @@ export function formsRoutes(
     },
   );
 
-  // DELETE /forms/:id — delete form
-  app.delete('/forms/:id', async (c) => {
+  // DELETE /:id — delete form
+  app.delete('/:id', async (c) => {
     await (db as any)
       .deleteFrom('zv_forms')
       .where('id', '=', c.req.param('id'))
@@ -172,8 +177,8 @@ export function formsRoutes(
     return c.json({ success: true });
   });
 
-  // GET /forms/:id/responses — list submissions
-  app.get('/forms/:id/responses', async (c) => {
+  // GET /:id/responses — list submissions
+  app.get('/:id/responses', async (c) => {
     const { page = '1', limit = '50' } = c.req.query();
     const parsedLimit = Math.min(parseInt(limit) || 50, 200);
     const offset = (parseInt(page) - 1) * parsedLimit;
