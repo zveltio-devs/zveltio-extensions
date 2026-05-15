@@ -37,7 +37,7 @@
     } catch (e: any) { error = e.message; }
   }
   async function loadContacts() {
-    try { const r = await api('/api/contacts?limit=200'); contacts = (r.data ?? []).map((c: any) => ({ id: c.id, label: `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() })); } catch { contacts = []; }
+    try { const r = await api('/ext/crm/contacts?limit=200'); contacts = (r.data ?? []).map((c: any) => ({ id: c.id, label: `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() })); } catch { contacts = []; }
   }
 
   function addLine() { form.lines = [...form.lines, { description: '', quantity: 1, unit_price: 0, tax_rate: 19 }]; }

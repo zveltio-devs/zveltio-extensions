@@ -1,5 +1,5 @@
 <script lang="ts">
-  const API = '/api/trace';
+  const API = '/ext/operations/traceability';
 
   let items = $state<any[]>([]);
   let suppliers = $state<any[]>([]);
@@ -97,7 +97,7 @@
         <div class="text-sm">Statusul inițial: carantină. Eliberați lotul după verificare.</div>
         <div class="mt-2 flex gap-2">
           <a href="/admin/trace/lots/{saved.id}" class="btn btn-sm btn-success">Detalii lot</a>
-          <a href="/api/trace/labels/{saved.id}" target="_blank" class="btn btn-sm btn-outline">🖨 Printează etichetă</a>
+          <a href="/ext/operations/traceability/labels/{saved.id}" target="_blank" class="btn btn-sm btn-outline">🖨 Printează etichetă</a>
         </div>
       </div>
     </div>

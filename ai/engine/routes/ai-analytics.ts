@@ -1,12 +1,12 @@
 /**
  * AI Analytics Routes
  *
- * GET  /api/ai-analytics/summary         — overall stats for a time range
- * GET  /api/ai-analytics/by-provider     — breakdown by provider
- * GET  /api/ai-analytics/daily           — daily token/request trends
- * GET  /api/ai-analytics/by-operation    — breakdown by operation type (chat, embed…)
- * GET  /api/ai-analytics/top-users       — top users by token consumption
- * GET  /api/ai-analytics/recommendations — cost/reliability recommendations
+ * GET  /ext/ai/analytics/summary         — overall stats for a time range
+ * GET  /ext/ai/analytics/by-provider     — breakdown by provider
+ * GET  /ext/ai/analytics/daily           — daily token/request trends
+ * GET  /ext/ai/analytics/by-operation    — breakdown by operation type (chat, embed…)
+ * GET  /ext/ai/analytics/top-users       — top users by token consumption
+ * GET  /ext/ai/analytics/recommendations — cost/reliability recommendations
  *
  * All endpoints: authenticated users; top-users + recommendations require admin.
  */

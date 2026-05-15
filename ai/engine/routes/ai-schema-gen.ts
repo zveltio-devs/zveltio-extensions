@@ -1,8 +1,8 @@
 /**
  * AI Prompt-to-Backend (P5)
  *
- * POST /api/ai/preview-schema  — Generate schema preview (no DDL executed), returns confirm_token
- * POST /api/ai/generate-schema — Execute DDL; accepts confirm_token to skip re-generation
+ * POST /ext/ai/preview-schema  — Generate schema preview (no DDL executed), returns confirm_token
+ * POST /ext/ai/generate-schema — Execute DDL; accepts confirm_token to skip re-generation
  */
 
 import { Hono } from 'hono';

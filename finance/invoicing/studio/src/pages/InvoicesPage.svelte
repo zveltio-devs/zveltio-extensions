@@ -54,7 +54,7 @@
 
   async function loadContacts() {
     try {
-      const res = await api('/api/contacts?limit=200');
+      const res = await api('/ext/crm/contacts?limit=200');
       contactsOptions = (res.data ?? []).map((c: any) => ({
         id: c.id,
         label: `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() + (c.email ? ` <${c.email}>` : ''),

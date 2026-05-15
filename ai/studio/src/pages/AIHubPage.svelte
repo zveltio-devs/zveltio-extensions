@@ -52,9 +52,9 @@
 
  async function loadAll() {
  const [pRes, cRes, tRes] = await Promise.allSettled([
- api.get<{ providers: any[] }>('/api/ai/providers'),
- api.get<{ chats: any[] }>('/api/ai/chats'),
- api.get<{ templates: any[] }>('/api/ai/templates'),
+ api.get<{ providers: any[] }>('/ext/ai/providers'),
+ api.get<{ chats: any[] }>('/ext/ai/chats'),
+ api.get<{ templates: any[] }>('/ext/ai/templates'),
  ]);
  if (pRes.status === 'fulfilled') providers = pRes.value.providers || [];
  if (cRes.status === 'fulfilled') chats = cRes.value.chats || [];
@@ -62,13 +62,13 @@
  }
 
  async function newChat() {
- const res = await api.post<{ chat: any }>('/api/ai/chats', { title: 'New Chat' });
+ const res = await api.post<{ chat: any }>('/ext/ai/chats', { title: 'New Chat' });
  chats = [res.chat, ...chats];
  await openChat(res.chat);
  }
 
  async function openChat(chat: any) {
- const res = await api.get<{ chat: any }>(`/api/ai/chats/${chat.id}`);
+ const res = await api.get<{ chat: any }>(`/ext/ai/chats/${chat.id}`);
  activeChat = res.chat;
  messages = res.chat.messages || [];
  }
@@ -83,7 +83,7 @@
  messages = [...messages, { role: 'user', content: userMsg }];
 
  try {
- const res = await api.post<{ message: any }>(`/api/ai/chats/${activeChat.id}/messages`, { content: userMsg });
+ const res = await api.post<{ message: any }>(`/ext/ai/chats/${activeChat.id}/messages`, { content: userMsg });
  messages = [...messages, res.message];
 
  // Update chat title in list
@@ -98,7 +98,7 @@
  }
 
  async function deleteChat(id: string) {
- await api.delete(`/api/ai/chats/${id}`);
+ await api.delete(`/ext/ai/chats/${id}`);
  chats = chats.filter((c) => c.id !== id);
  if (activeChat?.id === id) { activeChat = null; messages = []; }
  }
@@ -106,7 +106,7 @@
  async function saveProvider() {
  savingProvider = true;
  try {
- await api.post('/api/ai/admin/providers', providerForm);
+ await api.post('/ext/ai/admin/providers', providerForm);
  await loadAll();
  showProviderForm = false;
  providerForm = { name: 'openai', label: 'OpenAI', api_key: '', base_url: '', default_model: '', is_default: false };
@@ -123,7 +123,7 @@
  searchError = '';
  searchResults = [];
  try {
- const res = await api.post<{ results: any[]; total: number }>('/api/ai/search', {
+ const res = await api.post<{ results: any[]; total: number }>('/ext/ai/search', {
  collection: searchCollection.trim(),
  query: searchQuery.trim(),
  limit: 10,
@@ -141,7 +141,7 @@
  queryRunning = true;
  queryResult = null;
  try {
-  const res = await api.post<{ sql: string; data: any[]; columns: string[] }>('/api/ai/query', { prompt: queryPrompt.trim() });
+  const res = await api.post<{ sql: string; data: any[]; columns: string[] }>('/ext/ai/query', { prompt: queryPrompt.trim() });
   queryResult = res;
  } catch (err: any) {
   toast.error(err.message ?? 'Query failed');
@@ -155,7 +155,7 @@
  schemaGenerating = true;
  schemaResult = null;
  try {
-  const res = await api.post<{ schema: any }>('/api/ai/schema-gen', { description: schemaDescription.trim() });
+  const res = await api.post<{ schema: any }>('/ext/ai/schema-gen', { description: schemaDescription.trim() });
   schemaResult = res.schema;
  } catch (err: any) {
   toast.error(err.message ?? 'Schema generation failed');
@@ -187,7 +187,7 @@
  if (val !== null) vars[v.name] = val;
  }
 
- const res = await api.post<{ result: any }>(`/api/ai/templates/${template.id}/run`, { variables: vars });
+ const res = await api.post<{ result: any }>(`/ext/ai/templates/${template.id}/run`, { variables: vars });
  // Open a chat with the result
  messages = [
  { role: 'user', content: `[Template: ${template.name}]\n${Object.entries(vars).map(([k, v]) => `${k}: ${v}`).join('\n')}` },

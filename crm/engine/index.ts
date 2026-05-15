@@ -25,6 +25,9 @@ import { crmRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'crm',
   category: 'business',
+  // S3-01: sub-app mounted at /ext/crm by the engine. Internal routes
+  // (/contacts, /organizations, /transactions) are exposed under that prefix.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [
@@ -36,7 +39,7 @@ const extension: ZveltioExtension = {
 
   async register(app, ctx) {
     const routes = crmRoutes(ctx);
-    app.route('/api', routes);
+    app.route('/', routes);
 
     // ── Service registry — canonical contacts/organizations API ─────────────
     ctx.services.register('crm.contacts.lookup', async (idOrEmail: string) => {

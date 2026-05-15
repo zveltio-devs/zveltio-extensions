@@ -14,7 +14,7 @@ const QuerySchema = z.object({
 
 /**
  * Text-to-SQL: natural language → PostgreSQL SELECT → optional AI analysis.
- * Mounted at /api/ai/query
+ * Mounted at /ext/ai/query
  */
 export function aiQueryRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission, DDLManager } = ctx;
@@ -27,7 +27,7 @@ export function aiQueryRoutes(ctx: ExtensionContext): Hono {
     await next();
   });
 
-  // POST /api/ai/query
+  // POST /ext/ai/query
   app.post('/', zValidator('json', QuerySchema), async (c) => {
     const user = c.get('user') as any;
     const { prompt, analyze, chart, limit } = c.req.valid('json');
@@ -162,7 +162,7 @@ Respond in the same language as the user's question.`,
     }
   });
 
-  // GET /api/ai/query/history
+  // GET /ext/ai/query/history
   app.get('/history', async (c) => {
     const user = c.get('user') as any;
     const { saved_only } = c.req.query();
@@ -177,7 +177,7 @@ Respond in the same language as the user's question.`,
     return c.json({ queries: rows.rows });
   });
 
-  // PATCH /api/ai/query/:id/save
+  // PATCH /ext/ai/query/:id/save
   app.patch('/:id/save', zValidator('json', z.object({ title: z.string().min(1) })), async (c) => {
     const user = c.get('user') as any;
     await sql`
@@ -187,14 +187,14 @@ Respond in the same language as the user's question.`,
     return c.json({ success: true });
   });
 
-  // DELETE /api/ai/query/:id
+  // DELETE /ext/ai/query/:id
   app.delete('/:id', async (c) => {
     const user = c.get('user') as any;
     await sql`DELETE FROM zv_ai_queries WHERE id = ${c.req.param('id')} AND user_id = ${user.id}`.execute(db);
     return c.json({ success: true });
   });
 
-  // POST /api/ai/query/:id/rerun
+  // POST /ext/ai/query/:id/rerun
   app.post('/:id/rerun', async (c) => {
     const user = c.get('user') as any;
     const saved = await sql`
