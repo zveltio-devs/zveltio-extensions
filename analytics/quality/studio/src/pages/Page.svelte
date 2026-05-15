@@ -19,7 +19,7 @@
 
   async function loadAll() {
     try {
-      const [s, c] = await Promise.all([api('/api/quality/scans'), api('/api/collections').catch(() => ({ collections: [] }))]);
+      const [s, c] = await Promise.all([api('/ext/analytics/quality/scans'), api('/api/collections').catch(() => ({ collections: [] }))]);
       scans = s.data ?? [];
       collections = c.collections ?? [];
     } catch (e: any) { error = e.message; }
@@ -29,7 +29,7 @@
     if (!selectedCollection) return;
     scanning = true; error = '';
     try {
-      const r = await api('/api/quality/scans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ collection: selectedCollection }) });
+      const r = await api('/ext/analytics/quality/scans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ collection: selectedCollection }) });
       issues = r.issues ?? [];
       await loadAll();
     } catch (e: any) { error = e.message; }
@@ -37,7 +37,7 @@
   }
 
   async function viewIssues(scanId: string) {
-    try { const r = await api(`/api/quality/scans/${scanId}/issues`); issues = r.data ?? []; } catch (e: any) { error = e.message; }
+    try { const r = await api(`/ext/analytics/quality/scans/${scanId}/issues`); issues = r.data ?? []; } catch (e: any) { error = e.message; }
   }
 
   onMount(loadAll);

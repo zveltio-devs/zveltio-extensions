@@ -31,7 +31,7 @@
  loading = true;
  try {
  const qs = filter !== 'all' ? `?status=${filter}` : '';
- const res = await fetch(`${engineUrl}/api/efactura${qs}`, { credentials: 'include' });
+ const res = await fetch(`${engineUrl}/ext/compliance/ro/efactura${qs}`, { credentials: 'include' });
  const data = await res.json();
  invoices = data.invoices || [];
  } finally {
@@ -65,7 +65,7 @@
  if (!form.invoice_number || !form.seller_name || !form.buyer_name) return;
  creating = true;
  try {
- const res = await fetch(`${engineUrl}/api/efactura`, {
+ const res = await fetch(`${engineUrl}/ext/compliance/ro/efactura`, {
  method: 'POST',
  credentials: 'include',
  headers: { 'Content-Type': 'application/json' },
@@ -82,7 +82,7 @@
  }
 
  async function generateXML(id: string) {
- const res = await fetch(`${engineUrl}/api/efactura/${id}/generate-xml`, {
+ const res = await fetch(`${engineUrl}/ext/compliance/ro/efactura/${id}/generate-xml`, {
  method: 'POST',
  credentials: 'include',
  });
@@ -93,7 +93,7 @@
  }
 
  async function downloadXML(id: string, number: string) {
- const res = await fetch(`${engineUrl}/api/efactura/${id}/xml`, { credentials: 'include' });
+ const res = await fetch(`${engineUrl}/ext/compliance/ro/efactura/${id}/xml`, { credentials: 'include' });
  if (!res.ok) { alert('Generate XML first'); return; }
  const blob = await res.blob();
  const url = URL.createObjectURL(blob);
@@ -106,7 +106,7 @@
 
  async function submitToANAF(id: string) {
  if (!confirm('Submit this invoice to ANAF e-Factura?')) return;
- const res = await fetch(`${engineUrl}/api/efactura/${id}/submit`, {
+ const res = await fetch(`${engineUrl}/ext/compliance/ro/efactura/${id}/submit`, {
  method: 'POST',
  credentials: 'include',
  });
@@ -121,7 +121,7 @@
 
  async function deleteInvoice(id: string) {
  if (!confirm('Delete this invoice?')) return;
- await fetch(`${engineUrl}/api/efactura/${id}`, { method: 'DELETE', credentials: 'include' });
+ await fetch(`${engineUrl}/ext/compliance/ro/efactura/${id}`, { method: 'DELETE', credentials: 'include' });
  await loadInvoices();
  }
 

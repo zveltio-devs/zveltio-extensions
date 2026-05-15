@@ -23,9 +23,9 @@
   let metadataUrl = $state('');
 
   onMount(async () => {
-    metadataUrl = `${ENGINE_URL}/api/auth/saml/metadata`;
+    metadataUrl = `${ENGINE_URL}/ext/auth/saml/metadata`;
     try {
-      const res = await fetch(`${ENGINE_URL}/api/auth/saml/config`, { credentials: 'include' });
+      const res = await fetch(`${ENGINE_URL}/ext/auth/saml/config`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         if (data.config) Object.assign(config, data.config);
@@ -39,7 +39,7 @@
     error = '';
     success = '';
     try {
-      const res = await fetch(`${ENGINE_URL}/api/auth/saml/config`, {
+      const res = await fetch(`${ENGINE_URL}/ext/auth/saml/config`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -128,7 +128,7 @@
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">ACS Callback URL <span class="text-red-500">*</span></label>
           <input bind:value={config.callbackUrl} type="url" required
-            placeholder="https://your-zveltio-instance.com/api/auth/saml/callback"
+            placeholder="https://your-zveltio-instance.com/ext/auth/saml/callback"
             class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
         </div>
 

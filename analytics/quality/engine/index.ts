@@ -5,6 +5,8 @@ import { qualityRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'analytics/quality',
   category: 'analytics',
+  // S3-01: sub-app mounted at /ext/analytics/quality by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [
@@ -14,7 +16,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/quality', qualityRoutes(ctx));
+    app.route('/', qualityRoutes(ctx));
   },
 };
 

@@ -5,6 +5,8 @@ import { roDocumentsRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'compliance/ro/documents',
   category: 'compliance',
+  // S3-01: sub-app mounted at /ext/compliance/ro/documents by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [
@@ -14,7 +16,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/ro-documents', roDocumentsRoutes(ctx));
+    app.route('/', roDocumentsRoutes(ctx));
   },
 };
 

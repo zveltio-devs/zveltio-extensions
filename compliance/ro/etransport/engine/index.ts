@@ -5,13 +5,15 @@ import { etransportRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'compliance/ro/etransport',
   category: 'compliance',
+  // S3-01: sub-app mounted at /ext/compliance/ro/etransport by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [join(import.meta.dir, 'migrations/001_etransport.sql')];
   },
 
   async register(app, ctx) {
-    app.route('/api/etransport', etransportRoutes(ctx));
+    app.route('/', etransportRoutes(ctx));
   },
 };
 

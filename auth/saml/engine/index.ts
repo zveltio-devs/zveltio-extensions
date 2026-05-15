@@ -5,6 +5,8 @@ import { samlRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'auth/saml',
   category: 'auth',
+  // S3-01: sub-app mounted at /ext/auth/saml by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [
@@ -14,7 +16,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/auth/saml', samlRoutes(ctx));
+    app.route('/', samlRoutes(ctx));
   },
 };
 

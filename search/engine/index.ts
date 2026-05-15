@@ -5,13 +5,15 @@ import { searchRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'search',
   category: 'search',
+  // S3-01: sub-app mounted at /ext/search by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [join(import.meta.dir, 'migrations/001_search.sql')];
   },
 
   async register(app, ctx) {
-    app.route('/api/search', searchRoutes(ctx));
+    app.route('/', searchRoutes(ctx));
   },
 };
 

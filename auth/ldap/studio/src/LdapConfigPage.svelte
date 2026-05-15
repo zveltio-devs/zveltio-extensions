@@ -27,7 +27,7 @@
 
   onMount(async () => {
     try {
-      const res = await fetch(`${ENGINE_URL}/api/auth/ldap/config`, { credentials: 'include' });
+      const res = await fetch(`${ENGINE_URL}/ext/auth/ldap/config`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         if (data.config) Object.assign(config, data.config);
@@ -41,7 +41,7 @@
     error = '';
     success = '';
     try {
-      const res = await fetch(`${ENGINE_URL}/api/auth/ldap/config`, {
+      const res = await fetch(`${ENGINE_URL}/ext/auth/ldap/config`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -62,7 +62,7 @@
     testing = true;
     testResult = null;
     try {
-      const res = await fetch(`${ENGINE_URL}/api/auth/ldap/test`, {
+      const res = await fetch(`${ENGINE_URL}/ext/auth/ldap/test`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

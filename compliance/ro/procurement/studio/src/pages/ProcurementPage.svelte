@@ -34,9 +34,9 @@
  async function loadAll() {
  loading = true;
  const [ord, sup, bud] = await Promise.all([
- fetch(`${engineUrl}/api/ro-procurement/orders`, { credentials: 'include' }).then((r) => r.json()),
- fetch(`${engineUrl}/api/ro-procurement/suppliers`, { credentials: 'include' }).then((r) => r.json()),
- fetch(`${engineUrl}/api/ro-procurement/budget?year=${new Date().getFullYear()}`, { credentials: 'include' }).then((r) => r.json()),
+ fetch(`${engineUrl}/ext/compliance/ro/procurement/orders`, { credentials: 'include' }).then((r) => r.json()),
+ fetch(`${engineUrl}/ext/compliance/ro/procurement/suppliers`, { credentials: 'include' }).then((r) => r.json()),
+ fetch(`${engineUrl}/ext/compliance/ro/procurement/budget?year=${new Date().getFullYear()}`, { credentials: 'include' }).then((r) => r.json()),
  ]);
  orders = ord.orders || [];
  suppliers = sup.suppliers || [];
@@ -55,7 +55,7 @@
  if (!orderForm.number || !orderForm.supplier_name) return;
  creating = true;
  try {
- await fetch(`${engineUrl}/api/ro-procurement/orders`, {
+ await fetch(`${engineUrl}/ext/compliance/ro/procurement/orders`, {
  method: 'POST', credentials: 'include',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify(orderForm),
@@ -71,7 +71,7 @@
  if (!supplierForm.name || !supplierForm.cui) return;
  creating = true;
  try {
- await fetch(`${engineUrl}/api/ro-procurement/suppliers`, {
+ await fetch(`${engineUrl}/ext/compliance/ro/procurement/suppliers`, {
  method: 'POST', credentials: 'include',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify(supplierForm),
@@ -85,12 +85,12 @@
  }
 
  async function approveOrder(id: string) {
- await fetch(`${engineUrl}/api/ro-procurement/orders/${id}/approve`, { method: 'POST', credentials: 'include' });
+ await fetch(`${engineUrl}/ext/compliance/ro/procurement/orders/${id}/approve`, { method: 'POST', credentials: 'include' });
  await loadAll();
  }
 
  async function receiveOrder(id: string) {
- await fetch(`${engineUrl}/api/ro-procurement/orders/${id}/receive`, { method: 'POST', credentials: 'include' });
+ await fetch(`${engineUrl}/ext/compliance/ro/procurement/orders/${id}/receive`, { method: 'POST', credentials: 'include' });
  await loadAll();
  }
 

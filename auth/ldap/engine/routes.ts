@@ -1,10 +1,10 @@
 /**
  * LDAP / Active Directory auth routes
  *
- * POST /api/auth/ldap/login    — Authenticate with LDAP credentials
- * GET  /api/auth/ldap/config   — Get LDAP config (admin)
- * POST /api/auth/ldap/config   — Save LDAP config (admin)
- * POST /api/auth/ldap/test     — Test LDAP connection (admin)
+ * POST /ext/auth/ldap/login    — Authenticate with LDAP credentials
+ * GET  /ext/auth/ldap/config   — Get LDAP config (admin)
+ * POST /ext/auth/ldap/config   — Save LDAP config (admin)
+ * POST /ext/auth/ldap/test     — Test LDAP connection (admin)
  */
 
 import { Hono } from 'hono';

@@ -18,14 +18,14 @@
   }
 
   $effect(() => {
-    if (tab === 'requests') api('/api/gdpr/access-requests').then((r) => requests = r.data ?? []).catch((e) => error = e.message);
-    else if (tab === 'breaches') api('/api/gdpr/breach-incidents').then((r) => breaches = r.data ?? []).catch((e) => error = e.message);
-    else if (tab === 'consents') api('/api/gdpr/consents').then((r) => consents = r.data ?? []).catch((e) => error = e.message);
-    else if (tab === 'records') api('/api/gdpr/processing-records').then((r) => records = r.data ?? []).catch((e) => error = e.message);
+    if (tab === 'requests') api('/ext/compliance/gdpr/access-requests').then((r) => requests = r.data ?? []).catch((e) => error = e.message);
+    else if (tab === 'breaches') api('/ext/compliance/gdpr/breach-incidents').then((r) => breaches = r.data ?? []).catch((e) => error = e.message);
+    else if (tab === 'consents') api('/ext/compliance/gdpr/consents').then((r) => consents = r.data ?? []).catch((e) => error = e.message);
+    else if (tab === 'records') api('/ext/compliance/gdpr/processing-records').then((r) => records = r.data ?? []).catch((e) => error = e.message);
   });
 
-  async function fulfill(id: string) { try { await api(`/api/gdpr/access-requests/${id}/fulfill`, { method: 'POST' }); requests = (await api('/api/gdpr/access-requests')).data ?? []; } catch (e: any) { error = e.message; } }
-  async function reject(id: string) { try { await api(`/api/gdpr/access-requests/${id}/reject`, { method: 'POST' }); requests = (await api('/api/gdpr/access-requests')).data ?? []; } catch (e: any) { error = e.message; } }
+  async function fulfill(id: string) { try { await api(`/ext/compliance/gdpr/access-requests/${id}/fulfill`, { method: 'POST' }); requests = (await api('/ext/compliance/gdpr/access-requests')).data ?? []; } catch (e: any) { error = e.message; } }
+  async function reject(id: string) { try { await api(`/ext/compliance/gdpr/access-requests/${id}/reject`, { method: 'POST' }); requests = (await api('/ext/compliance/gdpr/access-requests')).data ?? []; } catch (e: any) { error = e.message; } }
 </script>
 
 <div class="p-6 space-y-4">

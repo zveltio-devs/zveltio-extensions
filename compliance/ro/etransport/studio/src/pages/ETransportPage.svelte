@@ -34,7 +34,7 @@
     loading = true;
     try {
       const qs = filter !== 'all' ? `?status=${filter}` : '';
-      const res = await fetch(`${engineUrl}/api/etransport${qs}`, { credentials: 'include' });
+      const res = await fetch(`${engineUrl}/ext/compliance/ro/etransport${qs}`, { credentials: 'include' });
       const data = await res.json();
       declarations = data.declarations || [];
     } finally {
@@ -73,7 +73,7 @@
     recalcWeight();
     submitting = true;
     try {
-      const url = editId ? `${engineUrl}/api/etransport/${editId}` : `${engineUrl}/api/etransport`;
+      const url = editId ? `${engineUrl}/ext/compliance/ro/etransport/${editId}` : `${engineUrl}/ext/compliance/ro/etransport`;
       const method = editId ? 'PATCH' : 'POST';
       const res = await fetch(url, {
         method,
@@ -91,7 +91,7 @@
 
   async function declare(id: string) {
     if (!confirm('Submit this declaration to ANAF e-Transport?')) return;
-    const res = await fetch(`${engineUrl}/api/etransport/${id}/declare`, {
+    const res = await fetch(`${engineUrl}/ext/compliance/ro/etransport/${id}/declare`, {
       method: 'POST', credentials: 'include',
     });
     const data = await res.json();
@@ -104,19 +104,19 @@
   }
 
   async function complete(id: string) {
-    await fetch(`${engineUrl}/api/etransport/${id}/complete`, { method: 'POST', credentials: 'include' });
+    await fetch(`${engineUrl}/ext/compliance/ro/etransport/${id}/complete`, { method: 'POST', credentials: 'include' });
     await loadDeclarations();
   }
 
   async function cancel(id: string) {
     if (!confirm('Cancel this declaration?')) return;
-    await fetch(`${engineUrl}/api/etransport/${id}/cancel`, { method: 'POST', credentials: 'include' });
+    await fetch(`${engineUrl}/ext/compliance/ro/etransport/${id}/cancel`, { method: 'POST', credentials: 'include' });
     await loadDeclarations();
   }
 
   async function deleteDecl(id: string) {
     if (!confirm('Delete this declaration?')) return;
-    await fetch(`${engineUrl}/api/etransport/${id}`, { method: 'DELETE', credentials: 'include' });
+    await fetch(`${engineUrl}/ext/compliance/ro/etransport/${id}`, { method: 'DELETE', credentials: 'include' });
     await loadDeclarations();
   }
 

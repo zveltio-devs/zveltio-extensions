@@ -5,6 +5,8 @@ import { gdprRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'compliance/gdpr',
   category: 'compliance',
+  // S3-01: sub-app mounted at /ext/compliance/gdpr by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [
@@ -14,7 +16,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/gdpr', gdprRoutes(ctx));
+    app.route('/', gdprRoutes(ctx));
   },
 };
 

@@ -1,11 +1,11 @@
 /**
  * SAML 2.0 SSO routes
  *
- * GET  /api/auth/saml/login          — Redirect to IdP login page
- * POST /api/auth/saml/callback       — ACS endpoint; processes SAMLResponse
- * GET  /api/auth/saml/metadata       — SP metadata XML (register in IdP)
- * GET  /api/auth/saml/config         — Get current IdP config (admin)
- * POST /api/auth/saml/config         — Save IdP config (admin)
+ * GET  /ext/auth/saml/login          — Redirect to IdP login page
+ * POST /ext/auth/saml/callback       — ACS endpoint; processes SAMLResponse
+ * GET  /ext/auth/saml/metadata       — SP metadata XML (register in IdP)
+ * GET  /ext/auth/saml/config         — Get current IdP config (admin)
+ * POST /ext/auth/saml/config         — Save IdP config (admin)
  */
 
 import { Hono } from 'hono';
