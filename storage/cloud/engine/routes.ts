@@ -622,12 +622,14 @@ async function logAccess(
  * Public-only router for share link access — no auth required.
  * Mounted at /share so links are clean: https://app.com/share/<token>
  */
-export function publicShareRouter(ctx: ExtensionContext, s3: S3Client): Hono {
+/**
+ * Public share handler — registered on the engine's global app at
+ * `/share/:token` via `ctx.registerPublicRoute()`. Exported as a free function
+ * so the engine can mount it directly without spinning up a Hono sub-router.
+ */
+export function makePublicShareHandler(ctx: ExtensionContext, s3: S3Client) {
   const { db } = ctx;
-
-  const app = new Hono();
-
-  app.get('/:token', async (c) => {
+  return async (c: any) => {
     const password = c.req.query('password');
     const token = c.req.param('token');
     const result = await validateShareToken(db, token, password || undefined);
@@ -684,8 +686,17 @@ export function publicShareRouter(ctx: ExtensionContext, s3: S3Client): Hono {
       } : null,
       share_type: result.share.share_type,
     });
-  });
+  };
+}
 
+/**
+ * @deprecated Kept for the import in engine/index.ts during the S3-01
+ * migration. Removed once that import is dropped — use
+ * `makePublicShareHandler(ctx, s3)` with `ctx.registerPublicRoute()`.
+ */
+export function publicShareRouter(ctx: ExtensionContext, s3: S3Client): Hono {
+  const app = new Hono();
+  app.get('/:token', makePublicShareHandler(ctx, s3));
   return app;
 }
 
