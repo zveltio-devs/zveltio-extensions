@@ -5,6 +5,8 @@ import { apiConnectorRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'integrations/api-connector',
   category: 'integrations',
+  // S3-01: sub-app mounted at /ext/integrations/api-connector by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [
@@ -14,7 +16,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/api-connector', apiConnectorRoutes(ctx));
+    app.route('/', apiConnectorRoutes(ctx));
   },
 };
 

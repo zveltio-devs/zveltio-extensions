@@ -5,6 +5,8 @@ import { translationsRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'i18n/translations',
   category: 'i18n',
+  // S3-01: sub-app mounted at /ext/i18n/translations by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [
@@ -14,7 +16,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/translations', translationsRoutes(ctx));
+    app.route('/', translationsRoutes(ctx));
   },
 };
 

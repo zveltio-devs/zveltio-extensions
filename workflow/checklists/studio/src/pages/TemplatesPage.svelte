@@ -31,7 +31,7 @@
  async function loadTemplates() {
  loading = true;
  try {
- const res = await fetch(`${engineUrl}/api/checklists/templates`, { credentials: 'include' });
+ const res = await fetch(`${engineUrl}/ext/workflow/checklists/templates`, { credentials: 'include' });
  const data = await res.json();
  templates = data.templates || [];
  } finally {
@@ -56,7 +56,7 @@
  }
 
  async function openEdit(tpl: any) {
- const res = await fetch(`${engineUrl}/api/checklists/templates/${tpl.id}`, { credentials: 'include' });
+ const res = await fetch(`${engineUrl}/ext/workflow/checklists/templates/${tpl.id}`, { credentials: 'include' });
  if (!res.ok) return;
  const data = await res.json();
  editTemplate = data.template;
@@ -76,7 +76,7 @@
  if (!editForm.name || editForm.items.some((i) => !i.label)) return;
  saving = true;
  try {
- const res = await fetch(`${engineUrl}/api/checklists/templates/${editTemplate.id}`, {
+ const res = await fetch(`${engineUrl}/ext/workflow/checklists/templates/${editTemplate.id}`, {
  method: 'PATCH',
  credentials: 'include',
  headers: { 'Content-Type': 'application/json' },
@@ -99,7 +99,7 @@
  if (!form.name || form.items.some((i) => !i.label)) return;
  creating = true;
  try {
- const res = await fetch(`${engineUrl}/api/checklists/templates`, {
+ const res = await fetch(`${engineUrl}/ext/workflow/checklists/templates`, {
  method: 'POST',
  credentials: 'include',
  headers: { 'Content-Type': 'application/json' },
@@ -116,7 +116,7 @@
 
  async function deleteTemplate(id: string) {
  if (!confirm('Delete this template?')) return;
- await fetch(`${engineUrl}/api/checklists/templates/${id}`, {
+ await fetch(`${engineUrl}/ext/workflow/checklists/templates/${id}`, {
  method: 'DELETE',
  credentials: 'include',
  });

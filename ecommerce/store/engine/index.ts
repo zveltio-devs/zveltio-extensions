@@ -5,6 +5,8 @@ import { ecommerceRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'ecommerce/store',
   category: 'ecommerce',
+  // S3-01: sub-app mounted at /ext/ecommerce/store by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [
@@ -15,7 +17,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/ecommerce', ecommerceRoutes(ctx));
+    app.route('/', ecommerceRoutes(ctx));
   },
 };
 

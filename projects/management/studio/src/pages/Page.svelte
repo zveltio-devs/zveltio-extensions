@@ -32,18 +32,18 @@
   }
 
   async function loadProjects() {
-    try { const r = await api('/api/projects'); projects = r.data ?? []; if (!activeProject && projects[0]) activeProject = projects[0]; }
+    try { const r = await api('/ext/projects/management'); projects = r.data ?? []; if (!activeProject && projects[0]) activeProject = projects[0]; }
     catch (e: any) { error = e.message; }
   }
   async function loadTasks() {
     if (!activeProject) { tasks = []; return; }
-    try { const r = await api(`/api/projects/${activeProject.id}/tasks`); tasks = r.data ?? []; }
+    try { const r = await api(`/ext/projects/management/${activeProject.id}/tasks`); tasks = r.data ?? []; }
     catch (e: any) { error = e.message; }
   }
   async function createProject() {
     saving = true; error = '';
     try {
-      await api('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(projectForm) });
+      await api('/ext/projects/management', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(projectForm) });
       showProjectForm = false;
       projectForm = { name: '', description: '', start_date: '', end_date: '' };
       await loadProjects();
@@ -53,7 +53,7 @@
     if (!activeProject) return;
     saving = true; error = '';
     try {
-      await api(`/api/projects/${activeProject.id}/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(taskForm) });
+      await api(`/ext/projects/management/${activeProject.id}/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(taskForm) });
       showTaskForm = false;
       taskForm = { title: '', description: '', status: 'todo', priority: 'medium', assignee_id: '', due_date: '' };
       await loadTasks();
@@ -61,7 +61,7 @@
   }
   async function moveTask(taskId: string, status: string) {
     try {
-      await api(`/api/projects/tasks/${taskId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+      await api(`/ext/projects/management/tasks/${taskId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
       await loadTasks();
     } catch (e: any) { error = e.message; }
   }

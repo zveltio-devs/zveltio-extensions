@@ -24,6 +24,8 @@ import { inventoryRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'operations/inventory',
   category: 'operations',
+  // S3-01: sub-app mounted at /ext/operations/inventory by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [
@@ -33,7 +35,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/inventory', inventoryRoutes(ctx));
+    app.route('/', inventoryRoutes(ctx));
 
     ctx.services.register('inventory.products.lookup', async (idOrSku: string) => {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSku);

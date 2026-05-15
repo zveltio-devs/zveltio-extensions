@@ -30,7 +30,7 @@
     try {
       const params = new URLSearchParams();
       if (statusFilter !== 'all') params.set('status', statusFilter);
-      const r = await api(`/api/expenses?${params}`);
+      const r = await api(`/ext/finance/expenses?${params}`);
       expenses = r.data ?? [];
     } catch (e: any) { error = e.message; }
   }
@@ -38,14 +38,14 @@
   async function createExpense() {
     saving = true; error = '';
     try {
-      await api('/api/expenses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      await api('/ext/finance/expenses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
       showForm = false;
       form = { expense_date: new Date().toISOString().slice(0, 10), category: 'travel', description: '', amount: 0, currency: 'RON', vendor: '', receipt_url: '' };
       await load();
     } catch (e: any) { error = e.message; } finally { saving = false; }
   }
 
-  async function approve(id: string) { try { await api(`/api/expenses/${id}/approve`, { method: 'POST' }); await load(); } catch (e: any) { error = e.message; } }
+  async function approve(id: string) { try { await api(`/ext/finance/expenses/${id}/approve`, { method: 'POST' }); await load(); } catch (e: any) { error = e.message; } }
 
   $effect(() => { statusFilter; load(); });
   onMount(load);

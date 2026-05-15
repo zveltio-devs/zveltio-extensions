@@ -15,8 +15,8 @@
     return json as T;
   }
 
-  async function load() { try { const r = await api('/api/media'); assets = r.data ?? r.items ?? []; } catch (e: any) { error = e.message; } }
-  async function deleteAsset(id: string) { if (!confirm('Delete asset?')) return; try { await api(`/api/media/${id}`, { method: 'DELETE' }); await load(); } catch (e: any) { error = e.message; } }
+  async function load() { try { const r = await api('/ext/content/media'); assets = r.data ?? r.items ?? []; } catch (e: any) { error = e.message; } }
+  async function deleteAsset(id: string) { if (!confirm('Delete asset?')) return; try { await api(`/ext/content/media/${id}`, { method: 'DELETE' }); await load(); } catch (e: any) { error = e.message; } }
 
   async function uploadFiles(files: FileList | null) {
     if (!files || !files.length) return;
@@ -68,7 +68,7 @@
       <div class="bg-base-100 rounded-lg shadow overflow-hidden group relative">
         <div class="aspect-square bg-base-200 flex items-center justify-center overflow-hidden">
           {#if isImage(a)}
-            <img src={a.url ?? `${engineUrl}/api/media/${a.id}/raw`} alt={a.filename ?? a.name} class="w-full h-full object-cover" />
+            <img src={a.url ?? `${engineUrl}/ext/content/media/${a.id}/raw`} alt={a.filename ?? a.name} class="w-full h-full object-cover" />
           {:else}
             <Images class="h-10 w-10 text-base-content/40" />
           {/if}

@@ -23,7 +23,7 @@
   async function runQuery() {
     running = true; error = ''; queryResult = '';
     try {
-      const res = await fetch(`${engineUrl}/api/graphql`, {
+      const res = await fetch(`${engineUrl}/ext/developer/graphql`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -35,9 +35,9 @@
     finally { running = false; }
   }
 
-  async function loadLogs() { try { const r = await api('/api/graphql/operations?limit=100'); logs = r.data ?? []; } catch (e: any) { error = e.message; } }
-  async function loadPersisted() { try { const r = await api('/api/graphql/persisted'); persisted = r.data ?? []; } catch (e: any) { error = e.message; } }
-  async function loadPolicies() { try { const r = await api('/api/graphql/field-policies'); policies = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadLogs() { try { const r = await api('/ext/developer/graphql/operations?limit=100'); logs = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadPersisted() { try { const r = await api('/ext/developer/graphql/persisted'); persisted = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadPolicies() { try { const r = await api('/ext/developer/graphql/field-policies'); policies = r.data ?? []; } catch (e: any) { error = e.message; } }
 
   $effect(() => {
     if (tab === 'logs') loadLogs();

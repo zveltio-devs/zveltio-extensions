@@ -25,7 +25,7 @@
  async function loadGeofences() {
  loading = true;
  try {
- const res = await fetch(`${engineUrl}/api/geo/geofences`, { credentials: 'include' });
+ const res = await fetch(`${engineUrl}/ext/geospatial/postgis/geofences`, { credentials: 'include' });
  const data = await res.json();
  geofences = data.geofences || [];
  } finally {
@@ -37,7 +37,7 @@
  if (!nearForm.collection) return;
  searching = true;
  try {
- const res = await fetch(`${engineUrl}/api/geo/near`, {
+ const res = await fetch(`${engineUrl}/ext/geospatial/postgis/near`, {
  method: 'POST',
  credentials: 'include',
  headers: { 'Content-Type': 'application/json' },
@@ -55,7 +55,7 @@
  creating = true;
  try {
  const coordinates = JSON.parse(coordinatesJson);
- await fetch(`${engineUrl}/api/geo/geofences`, {
+ await fetch(`${engineUrl}/ext/geospatial/postgis/geofences`, {
  method: 'POST',
  credentials: 'include',
  headers: { 'Content-Type': 'application/json' },
@@ -73,7 +73,7 @@
 
  async function deleteGeofence(id: string) {
  if (!confirm('Delete this geofence?')) return;
- await fetch(`${engineUrl}/api/geo/geofences/${id}`, { method: 'DELETE', credentials: 'include' });
+ await fetch(`${engineUrl}/ext/geospatial/postgis/geofences/${id}`, { method: 'DELETE', credentials: 'include' });
  await loadGeofences();
  }
 </script>
@@ -206,7 +206,7 @@ bind:value={coordinatesJson}
  <div class="card-body">
  <h2 class="card-title text-base">Point Clustering (DBSCAN)</h2>
  <p class="text-sm text-base-content/60">
- Use the API endpoint <code class="font-mono">POST /api/geo/cluster</code> with parameters:
+ Use the API endpoint <code class="font-mono">POST /ext/geospatial/postgis/cluster</code> with parameters:
  </p>
  <pre class="bg-base-300 rounded p-3 text-xs font-mono mt-2">{JSON.stringify({
  collection: "your_collection",

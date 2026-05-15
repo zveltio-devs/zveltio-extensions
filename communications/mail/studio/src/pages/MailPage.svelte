@@ -105,7 +105,7 @@
   async function loadAll() {
     loading = true;
     try {
-      const r = await apiFetch('/api/mail/accounts');
+      const r = await apiFetch('/ext/communications/mail/accounts');
       accounts = r.accounts ?? [];
       if (accounts.length > 0 && !selectedAccount) {
         await selectAccount(accounts.find((a: any) => a.is_default) ?? accounts[0]);
@@ -116,7 +116,7 @@
   }
 
   async function loadStats() {
-    try { const r = await apiFetch('/api/mail/stats'); stats = r.stats ?? {}; } catch { /* ignore */ }
+    try { const r = await apiFetch('/ext/communications/mail/stats'); stats = r.stats ?? {}; } catch { /* ignore */ }
   }
 
   async function selectAccount(account: any) {
@@ -124,7 +124,7 @@
     messages = []; folders = []; summary = '';
     loading = true;
     try {
-      const r = await apiFetch(`/api/mail/accounts/${account.id}/folders`);
+      const r = await apiFetch(`/ext/communications/mail/accounts/${account.id}/folders`);
       folders = r.folders ?? [];
       const inbox = folders.find((f: any) => f.type === 'inbox') ?? folders[0];
       if (inbox) await selectFolder(inbox);
@@ -137,7 +137,7 @@
     selectedIds = new Set();
     messages = []; loading = true;
     try {
-      const r = await apiFetch(`/api/mail/folders/${folder.id}/messages?limit=50`);
+      const r = await apiFetch(`/ext/communications/mail/folders/${folder.id}/messages?limit=50`);
       messages = r.messages ?? [];
     } catch (e: any) { toast.error(e.message ?? 'Operation failed'); }
     finally { loading = false; }
@@ -146,7 +146,7 @@
   async function selectMessage(msg: any) {
     summary = ''; loading = true;
     try {
-      const r = await apiFetch(`/api/mail/messages/${msg.id}`);
+      const r = await apiFetch(`/ext/communications/mail/messages/${msg.id}`);
       selectedMessage = r.message;
       messages = messages.map((m: any) => m.id === msg.id ? { ...m, is_read: true } : m);
     } catch (e: any) { toast.error(e.message ?? 'Operation failed'); }
@@ -157,7 +157,7 @@
     if (!selectedAccount) return;
     syncing = true;
     try {
-      await apiFetch(`/api/mail/accounts/${selectedAccount.id}/sync`, { method: 'POST' });
+      await apiFetch(`/ext/communications/mail/accounts/${selectedAccount.id}/sync`, { method: 'POST' });
       if (selectedFolder) await selectFolder(selectedFolder);
       await loadStats();
     } catch (e: any) { toast.error(e.message ?? 'Operation failed'); }
@@ -166,7 +166,7 @@
 
   // ── Message actions ───────────────────────────────────────────────────────
   async function toggleStar(msg: any) {
-    await apiFetch(`/api/mail/messages/${msg.id}`, {
+    await apiFetch(`/ext/communications/mail/messages/${msg.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ is_starred: !msg.is_starred }),
     });
@@ -174,14 +174,14 @@
   }
 
   async function deleteMessage(msg: any) {
-    await apiFetch(`/api/mail/messages/${msg.id}`, { method: 'DELETE' });
+    await apiFetch(`/ext/communications/mail/messages/${msg.id}`, { method: 'DELETE' });
     messages = messages.filter((m: any) => m.id !== msg.id);
     if (selectedMessage?.id === msg.id) selectedMessage = null;
   }
 
   async function downloadEml() {
     if (!selectedMessage) return;
-    const res = await fetch(`${ENGINE_URL}/api/mail/messages/${selectedMessage.id}/eml`, { credentials: 'include' });
+    const res = await fetch(`${ENGINE_URL}/ext/communications/mail/messages/${selectedMessage.id}/eml`, { credentials: 'include' });
     const blob = await res.blob();
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     a.download = `${selectedMessage.subject || 'message'}.eml`; a.click();
@@ -190,7 +190,7 @@
   // Bulk
   async function bulkAction(action: string, targetFolderId?: string) {
     if (selectedIds.size === 0) return;
-    await apiFetch('/api/mail/bulk', {
+    await apiFetch('/ext/communications/mail/bulk', {
       method: 'POST',
       body: JSON.stringify({
         message_ids: [...selectedIds],
@@ -235,7 +235,7 @@
   async function openReplyContext(type: 'reply' | 'reply_all' | 'forward') {
     if (!selectedMessage) return;
     try {
-      const ctx = await apiFetch(`/api/mail/messages/${selectedMessage.id}/reply-context`, {
+      const ctx = await apiFetch(`/ext/communications/mail/messages/${selectedMessage.id}/reply-context`, {
         method: 'POST', body: JSON.stringify({ type }),
       });
       composeTo = (ctx.to ?? []).map((a: any) => a.address).join(', ');
@@ -251,7 +251,7 @@
   async function autoSaveDraft() {
     if (!selectedAccount || !showCompose) return;
     try {
-      const r = await apiFetch('/api/mail/drafts', {
+      const r = await apiFetch('/ext/communications/mail/drafts', {
         method: 'POST',
         body: JSON.stringify({
           draft_id: draftId,
@@ -279,9 +279,9 @@
       if (draftId) {
         // Update draft then send it
         await autoSaveDraft();
-        await apiFetch(`/api/mail/drafts/${draftId}/send`, { method: 'POST' });
+        await apiFetch(`/ext/communications/mail/drafts/${draftId}/send`, { method: 'POST' });
       } else {
-        await apiFetch('/api/mail/send', {
+        await apiFetch('/ext/communications/mail/send', {
           method: 'POST',
           body: JSON.stringify({
             account_id: selectedAccount.id,
@@ -306,7 +306,7 @@
   async function fetchSuggestions(q: string) {
     if (q.length < 2) { toSuggestions = []; return; }
     try {
-      const r = await apiFetch(`/api/mail/contacts?q=${encodeURIComponent(q)}&limit=8`);
+      const r = await apiFetch(`/ext/communications/mail/contacts?q=${encodeURIComponent(q)}&limit=8`);
       toSuggestions = r.contacts ?? [];
     } catch { toSuggestions = []; }
   }
@@ -324,7 +324,7 @@
     if (!selectedMessage) return;
     summarizing = true; summary = '';
     try {
-      const r = await apiFetch(`/api/mail/messages/${selectedMessage.id}/summarize`, { method: 'POST' });
+      const r = await apiFetch(`/ext/communications/mail/messages/${selectedMessage.id}/summarize`, { method: 'POST' });
       summary = r.summary ?? '';
     } catch (e: any) { toast.error(e.message ?? 'Operation failed'); }
     finally { summarizing = false; }
@@ -334,7 +334,7 @@
     if (!selectedMessage) return;
     aiDraftLoading = true;
     try {
-      const r = await apiFetch(`/api/mail/messages/${selectedMessage.id}/reply-draft`, { method: 'POST' });
+      const r = await apiFetch(`/ext/communications/mail/messages/${selectedMessage.id}/reply-draft`, { method: 'POST' });
       if (r.draft) openReplyContext('reply').then(() => { composeBody = r.draft; });
     } catch (e: any) { toast.error(e.message ?? 'Operation failed'); }
     finally { aiDraftLoading = false; }
@@ -342,16 +342,16 @@
 
   // ── Drafts tab ────────────────────────────────────────────────────────────
   async function loadDrafts() {
-    try { const r = await apiFetch('/api/mail/drafts'); drafts = r.drafts ?? []; } catch { /* ignore */ }
+    try { const r = await apiFetch('/ext/communications/mail/drafts'); drafts = r.drafts ?? []; } catch { /* ignore */ }
   }
 
   async function deleteDraft(id: string) {
-    await apiFetch(`/api/mail/drafts/${id}`, { method: 'DELETE' });
+    await apiFetch(`/ext/communications/mail/drafts/${id}`, { method: 'DELETE' });
     drafts = drafts.filter((d: any) => d.id !== id);
   }
 
   async function openDraft(draft: any) {
-    const r = await apiFetch(`/api/mail/drafts/${draft.id}`);
+    const r = await apiFetch(`/ext/communications/mail/drafts/${draft.id}`);
     const d = r.draft;
     const parseAddrs = (v: any) => {
       try { return (Array.isArray(v) ? v : JSON.parse(v)).map((a: any) => a.address).join(', '); }
@@ -369,37 +369,37 @@
 
   // ── Contacts tab ──────────────────────────────────────────────────────────
   async function loadContacts() {
-    try { const r = await apiFetch(`/api/mail/contacts?q=${encodeURIComponent(contactSearch)}&limit=50`); contacts = r.contacts ?? []; } catch { /* ignore */ }
+    try { const r = await apiFetch(`/ext/communications/mail/contacts?q=${encodeURIComponent(contactSearch)}&limit=50`); contacts = r.contacts ?? []; } catch { /* ignore */ }
   }
 
   // ── Signatures tab ────────────────────────────────────────────────────────
   async function loadSignatures() {
-    try { const r = await apiFetch('/api/mail/signatures'); signatures = r.signatures ?? []; } catch { /* ignore */ }
+    try { const r = await apiFetch('/ext/communications/mail/signatures'); signatures = r.signatures ?? []; } catch { /* ignore */ }
   }
 
   async function saveSignature() {
     if (!sigName.trim()) return;
     const method = editSig ? 'PUT' : 'POST';
-    const path = editSig ? `/api/mail/signatures/${editSig.id}` : '/api/mail/signatures';
+    const path = editSig ? `/ext/communications/mail/signatures/${editSig.id}` : '/ext/communications/mail/signatures';
     await apiFetch(path, { method, body: JSON.stringify({ name: sigName, body_html: sigHtml, is_default: sigDefault }) });
     editSig = null; sigName = ''; sigHtml = ''; sigDefault = false;
     await loadSignatures();
   }
 
   async function deleteSignature(id: string) {
-    await apiFetch(`/api/mail/signatures/${id}`, { method: 'DELETE' });
+    await apiFetch(`/ext/communications/mail/signatures/${id}`, { method: 'DELETE' });
     await loadSignatures();
   }
 
   // ── Filters tab ───────────────────────────────────────────────────────────
   async function loadFilters() {
     if (!selectedAccount) return;
-    try { const r = await apiFetch(`/api/mail/accounts/${selectedAccount.id}/filters`); filters = r.filters ?? []; } catch { /* ignore */ }
+    try { const r = await apiFetch(`/ext/communications/mail/accounts/${selectedAccount.id}/filters`); filters = r.filters ?? []; } catch { /* ignore */ }
   }
 
   async function saveFilter() {
     if (!selectedAccount || !newFilter.name) return;
-    await apiFetch(`/api/mail/accounts/${selectedAccount.id}/filters`, {
+    await apiFetch(`/ext/communications/mail/accounts/${selectedAccount.id}/filters`, {
       method: 'POST', body: JSON.stringify(newFilter),
     });
     showFilterModal = false;
@@ -408,14 +408,14 @@
   }
 
   async function toggleFilter(filter: any) {
-    await apiFetch(`/api/mail/accounts/${selectedAccount.id}/filters/${filter.id}`, {
+    await apiFetch(`/ext/communications/mail/accounts/${selectedAccount.id}/filters/${filter.id}`, {
       method: 'PATCH', body: JSON.stringify({ is_active: !filter.is_active }),
     });
     await loadFilters();
   }
 
   async function deleteFilter(id: string) {
-    await apiFetch(`/api/mail/accounts/${selectedAccount.id}/filters/${id}`, { method: 'DELETE' });
+    await apiFetch(`/ext/communications/mail/accounts/${selectedAccount.id}/filters/${id}`, { method: 'DELETE' });
     filters = filters.filter((f: any) => f.id !== id);
   }
 
@@ -548,8 +548,8 @@
         <div class="p-2 border-b border-base-300 space-y-1">
           <div class="join w-full">
             <input class="input input-bordered input-sm join-item flex-1" placeholder="Search..." bind:value={searchQuery}
-              onkeydown={(e) => e.key === 'Enter' && apiFetch(`/api/mail/search?q=${encodeURIComponent(searchQuery)}`).then(r => messages = r.messages)}/>
-            <button class="btn btn-sm join-item" onclick={() => apiFetch(`/api/mail/search?q=${encodeURIComponent(searchQuery)}`).then(r => messages = r.messages)}>
+              onkeydown={(e) => e.key === 'Enter' && apiFetch(`/ext/communications/mail/search?q=${encodeURIComponent(searchQuery)}`).then(r => messages = r.messages)}/>
+            <button class="btn btn-sm join-item" onclick={() => apiFetch(`/ext/communications/mail/search?q=${encodeURIComponent(searchQuery)}`).then(r => messages = r.messages)}>
               <Search class="w-3 h-3"/>
             </button>
           </div>
@@ -1020,7 +1020,7 @@
           onclick={async () => {
             addingAccount = true;
             try {
-              await apiFetch('/api/mail/accounts', { method: 'POST', body: JSON.stringify(newAccount) });
+              await apiFetch('/ext/communications/mail/accounts', { method: 'POST', body: JSON.stringify(newAccount) });
               showAddAccount = false;
               newAccount = { name: '', email_address: '', display_name: '', imap_host: '', imap_port: 993, imap_secure: true, imap_user: '', imap_password: '', smtp_host: '', smtp_port: 587, smtp_secure: true, smtp_user: '', smtp_password: '', is_default: false };
               await loadAll();

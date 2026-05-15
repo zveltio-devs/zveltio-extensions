@@ -5,6 +5,8 @@ import { timeTrackingRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'hr/time-tracking',
   category: 'hr',
+  // S3-01: sub-app mounted at /ext/hr/time-tracking by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [
@@ -14,7 +16,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/time', timeTrackingRoutes(ctx));
+    app.route('/', timeTrackingRoutes(ctx));
   },
 };
 

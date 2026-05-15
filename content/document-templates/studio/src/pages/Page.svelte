@@ -16,14 +16,14 @@
     if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
     return json as T;
   }
-  async function load() { try { const r = await api('/api/document-templates'); templates = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function load() { try { const r = await api('/ext/content/document-templates'); templates = r.data ?? []; } catch (e: any) { error = e.message; } }
   function openCreate() { editing = null; form = { name: '', description: '', format: 'html', body: '<h1>{{title}}</h1>\n<p>Hello {{client_name}}</p>' }; showForm = true; }
   function openEdit(t: any) { editing = t; form = { name: t.name, description: t.description ?? '', format: t.format, body: t.body }; showForm = true; }
   async function save() {
     saving = true; error = '';
     try {
-      if (editing) await api(`/api/document-templates/${editing.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
-      else await api('/api/document-templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      if (editing) await api(`/ext/content/document-templates/${editing.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      else await api('/ext/content/document-templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
       showForm = false;
       await load();
     } catch (e: any) { error = e.message; } finally { saving = false; }

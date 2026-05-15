@@ -5,6 +5,8 @@ import { introspectRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'developer/byod',
   category: 'developer',
+  // S3-01: sub-app mounted at /ext/developer/byod by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [
@@ -14,7 +16,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/introspect', introspectRoutes(ctx));
+    app.route('/', introspectRoutes(ctx));
   },
 };
 

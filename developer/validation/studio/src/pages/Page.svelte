@@ -36,7 +36,7 @@
     try {
       const params = new URLSearchParams();
       if (selectedCollection) params.set('collection', selectedCollection);
-      const r = await api(`/api/validation/rules?${params}`);
+      const r = await api(`/ext/developer/validation/rules?${params}`);
       rules = r.data ?? [];
     } catch (e: any) { error = e.message; }
   }
@@ -50,7 +50,7 @@
     try {
       let cfg: any = {};
       try { cfg = JSON.parse(form.config); } catch { throw new Error('Invalid JSON in config'); }
-      await api('/api/validation/rules', {
+      await api('/ext/developer/validation/rules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, config: cfg }),
@@ -66,7 +66,7 @@
     if (!aiPrompt.trim() || !form.field_name) return;
     aiGenerating = true; error = '';
     try {
-      const r = await api('/api/validation/ai-generate', {
+      const r = await api('/ext/developer/validation/ai-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ field_name: form.field_name, field_type: form.field_type, description: aiPrompt }),
@@ -81,7 +81,7 @@
 
   async function deleteRule(id: string) {
     if (!confirm('Delete rule?')) return;
-    try { await api(`/api/validation/rules/${id}`, { method: 'DELETE' }); await loadRules(); }
+    try { await api(`/ext/developer/validation/rules/${id}`, { method: 'DELETE' }); await loadRules(); }
     catch (e: any) { error = e.message; }
   }
 

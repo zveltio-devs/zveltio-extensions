@@ -33,7 +33,7 @@
     try {
       const params = new URLSearchParams();
       if (q) params.set('q', q);
-      const res = await api(`/api/inventory/products?${params}`);
+      const res = await api(`/ext/operations/inventory/products?${params}`);
       products = res.data ?? [];
     } catch (e: any) { error = e.message; }
     finally { loading = false; }
@@ -41,14 +41,14 @@
 
   async function loadWarehouses() {
     try {
-      const res = await api('/api/inventory/warehouses');
+      const res = await api('/ext/operations/inventory/warehouses');
       warehouses = res.data ?? [];
     } catch (e: any) { error = e.message; }
   }
 
   async function loadStock() {
     try {
-      const res = await api('/api/inventory/stock-levels');
+      const res = await api('/ext/operations/inventory/stock-levels');
       stock = res.data ?? [];
     } catch (e: any) { error = e.message; }
   }
@@ -56,7 +56,7 @@
   async function createProduct() {
     saving = true; error = '';
     try {
-      await api('/api/inventory/products', {
+      await api('/ext/operations/inventory/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(productForm),
@@ -71,7 +71,7 @@
   async function createWarehouse() {
     saving = true; error = '';
     try {
-      await api('/api/inventory/warehouses', {
+      await api('/ext/operations/inventory/warehouses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(warehouseForm),

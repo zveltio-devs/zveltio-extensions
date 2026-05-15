@@ -35,9 +35,9 @@
       if (q) params.set('q', q);
       if (statusFilter !== 'all') params.set('status', statusFilter);
       const [emps, depts, posList] = await Promise.all([
-        api(`/api/hr?${params}`),
-        api('/api/hr/departments'),
-        api('/api/hr/positions'),
+        api(`/ext/hr/employees?${params}`),
+        api('/ext/hr/employees/departments'),
+        api('/ext/hr/employees/positions'),
       ]);
       employees = emps.data ?? [];
       departments = depts.data ?? [];
@@ -49,7 +49,7 @@
   async function createEmployee() {
     saving = true; error = '';
     try {
-      await api('/api/hr', {
+      await api('/ext/hr/employees', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -18,9 +18,9 @@
     return json as T;
   }
 
-  async function loadOrders() { try { const r = await api('/api/ecommerce/orders?limit=50'); orders = r.data ?? []; } catch (e: any) { error = e.message; } }
-  async function loadProducts() { try { const r = await api('/api/ecommerce/products?limit=100'); products = r.data ?? []; } catch (e: any) { error = e.message; } }
-  async function loadCategories() { try { const r = await api('/api/ecommerce/categories'); categories = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadOrders() { try { const r = await api('/ext/ecommerce/store/orders?limit=50'); orders = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadProducts() { try { const r = await api('/ext/ecommerce/store/products?limit=100'); products = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadCategories() { try { const r = await api('/ext/ecommerce/store/categories'); categories = r.data ?? []; } catch (e: any) { error = e.message; } }
 
   $effect(() => {
     if (tab === 'orders') loadOrders();

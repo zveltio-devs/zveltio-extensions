@@ -23,9 +23,9 @@
     loading = true; error = '';
     try {
       const [ent, projs, timer] = await Promise.all([
-        api('/api/time/entries?limit=50'),
-        api('/api/time/projects'),
-        api('/api/time/timer/active').catch(() => ({ data: null })),
+        api('/ext/hr/time-tracking/entries?limit=50'),
+        api('/ext/hr/time-tracking/projects'),
+        api('/ext/hr/time-tracking/timer/active').catch(() => ({ data: null })),
       ]);
       entries = ent.data ?? [];
       projects = projs.data ?? [];
@@ -36,7 +36,7 @@
 
   async function startTimer() {
     try {
-      await api('/api/time/timer/start', {
+      await api('/ext/hr/time-tracking/timer/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(timerForm),
@@ -48,7 +48,7 @@
 
   async function stopTimer() {
     try {
-      await api('/api/time/timer/stop', { method: 'POST' });
+      await api('/ext/hr/time-tracking/timer/stop', { method: 'POST' });
       await loadAll();
     } catch (e: any) { error = e.message; }
   }

@@ -36,7 +36,7 @@
   async function loadConfig() {
     loading = true; error = '';
     try {
-      const res = await fetch(`${ENGINE_URL}/api/mail/admin/config`, { credentials: 'include' });
+      const res = await fetch(`${ENGINE_URL}/ext/communications/mail/admin/config`, { credentials: 'include' });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       config = { ...config, ...data.config };
@@ -57,7 +57,7 @@
         allowed_domains: allowedDomainsText.split('\n').map((s: string) => s.trim()).filter(Boolean),
         blocked_domains: blockedDomainsText.split('\n').map((s: string) => s.trim()).filter(Boolean),
       };
-      const res = await fetch(`${ENGINE_URL}/api/mail/admin/config`, {
+      const res = await fetch(`${ENGINE_URL}/ext/communications/mail/admin/config`, {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

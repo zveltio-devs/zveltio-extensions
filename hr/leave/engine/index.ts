@@ -5,6 +5,8 @@ import { leaveRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'hr/leave',
   category: 'hr',
+  // S3-01: sub-app mounted at /ext/hr/leave by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [
@@ -14,7 +16,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/leave', leaveRoutes(ctx));
+    app.route('/', leaveRoutes(ctx));
   },
 };
 

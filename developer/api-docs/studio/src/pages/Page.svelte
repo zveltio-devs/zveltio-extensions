@@ -19,22 +19,22 @@
     if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
     return json as T;
   }
-  async function loadChangelog() { try { const r = await api('/api/api-docs/changelogs'); changelogs = r.data ?? []; } catch (e: any) { error = e.message; } }
-  async function loadCustom() { try { const r = await api('/api/api-docs/custom'); customDocs = r.data ?? []; } catch (e: any) { error = e.message; } }
-  async function loadTokens() { try { const r = await api('/api/api-docs/access-tokens'); tokens = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadChangelog() { try { const r = await api('/ext/developer/api-docs/changelogs'); changelogs = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadCustom() { try { const r = await api('/ext/developer/api-docs/custom'); customDocs = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function loadTokens() { try { const r = await api('/ext/developer/api-docs/access-tokens'); tokens = r.data ?? []; } catch (e: any) { error = e.message; } }
 
   async function createCustom() {
     saving = true; error = '';
     try {
-      await api('/api/api-docs/custom', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(customForm) });
+      await api('/ext/developer/api-docs/custom', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(customForm) });
       showCustomForm = false;
       customForm = { slug: '', title: '', body: '# New documentation page\n\nWrite content in Markdown.', is_public: false };
       await loadCustom();
     } catch (e: any) { error = e.message; } finally { saving = false; }
   }
 
-  async function generateToken() { try { await api('/api/api-docs/access-tokens', { method: 'POST' }); await loadTokens(); } catch (e: any) { error = e.message; } }
-  async function revokeToken(id: string) { if (!confirm('Revoke token?')) return; try { await api(`/api/api-docs/access-tokens/${id}`, { method: 'DELETE' }); await loadTokens(); } catch (e: any) { error = e.message; } }
+  async function generateToken() { try { await api('/ext/developer/api-docs/access-tokens', { method: 'POST' }); await loadTokens(); } catch (e: any) { error = e.message; } }
+  async function revokeToken(id: string) { if (!confirm('Revoke token?')) return; try { await api(`/ext/developer/api-docs/access-tokens/${id}`, { method: 'DELETE' }); await loadTokens(); } catch (e: any) { error = e.message; } }
 
   $effect(() => {
     if (tab === 'changelog') loadChangelog();
