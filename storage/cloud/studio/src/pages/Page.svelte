@@ -23,7 +23,7 @@
 
   async function load() {
     try {
-      const r = await api(`/api/cloud/files?path=${encodeURIComponent(path)}`);
+      const r = await api(`/ext/storage/cloud/files?path=${encodeURIComponent(path)}`);
       entries = r.data ?? r.entries ?? [];
     } catch (e: any) { error = e.message; }
   }
@@ -39,7 +39,7 @@
         const fd = new FormData();
         fd.append('file', f);
         fd.append('path', path);
-        await fetch(`${engineUrl}/api/cloud/upload`, { method: 'POST', credentials: 'include', body: fd })
+        await fetch(`${engineUrl}/ext/storage/cloud/upload`, { method: 'POST', credentials: 'include', body: fd })
           .then(async (r) => { if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Upload failed'); });
       }
       await load();
@@ -50,7 +50,7 @@
   async function deleteEntry(e: any) {
     if (!confirm(`Delete ${e.name}?`)) return;
     try {
-      await api(`/api/cloud/files/${encodeURIComponent(e.id ?? e.path)}`, { method: 'DELETE' });
+      await api(`/ext/storage/cloud/files/${encodeURIComponent(e.id ?? e.path)}`, { method: 'DELETE' });
       await load();
     } catch (err: any) { error = err.message; }
   }
@@ -65,7 +65,7 @@
   async function createShare() {
     if (!selected) return;
     try {
-      const r = await api('/api/cloud/shares', {
+      const r = await api('/ext/storage/cloud/shares', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ file_id: selected.id, ...shareForm }),
@@ -124,7 +124,7 @@
                 {#if e.is_folder ?? e.type === 'folder'}
                   <button class="link" onclick={() => navigate(`${path === '/' ? '' : path}/${e.name}`)}>{e.name}</button>
                 {:else}
-                  <a class="link" href="{engineUrl}/api/cloud/files/{e.id ?? encodeURIComponent(e.path)}/download" target="_blank">{e.name}</a>
+                  <a class="link" href="{engineUrl}/ext/storage/cloud/files/{e.id ?? encodeURIComponent(e.path)}/download" target="_blank">{e.name}</a>
                 {/if}
               </td>
               <td class="text-right">{e.is_folder ? '—' : fmtBytes(Number(e.size_bytes ?? e.size ?? 0))}</td>
