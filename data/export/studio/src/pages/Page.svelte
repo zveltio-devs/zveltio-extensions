@@ -17,14 +17,14 @@
     if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
     return json as T;
   }
-  async function load() { try { const r = await api('/api/export/jobs'); jobs = r.data ?? r.audit ?? []; } catch (e: any) { error = e.message; } }
+  async function load() { try { const r = await api('/ext/data/export/jobs'); jobs = r.data ?? r.audit ?? []; } catch (e: any) { error = e.message; } }
   async function loadCollections() { try { const r = await api('/api/collections'); collections = r.collections ?? r.data ?? []; } catch {} }
 
   function downloadUrl(): string {
     const params = new URLSearchParams({ format: form.format });
     if (form.filter) params.set('filter', form.filter);
     if (form.limit > 0) params.set('limit', String(form.limit));
-    return `${engineUrl}/api/export/${encodeURIComponent(form.collection)}?${params}`;
+    return `${engineUrl}/ext/data/export/${encodeURIComponent(form.collection)}?${params}`;
   }
 
   function startExport() {

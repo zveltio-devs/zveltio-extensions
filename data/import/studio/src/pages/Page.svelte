@@ -26,7 +26,7 @@
     if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
     return json as T;
   }
-  async function load() { try { const r = await api('/api/import/logs?limit=50'); jobs = r.data ?? []; } catch (e: any) { error = e.message; } }
+  async function load() { try { const r = await api('/ext/data/import/logs?limit=50'); jobs = r.data ?? []; } catch (e: any) { error = e.message; } }
   async function loadCollections() { try { const r = await api('/api/collections'); collections = r.collections ?? r.data ?? []; } catch {} }
 
   function setFile(f: File | null) {
@@ -49,7 +49,7 @@
       fd.append('format', form.format);
       if (form.upsert_on) fd.append('upsert_on', form.upsert_on);
       fd.append('create_missing_columns', String(form.create_missing_columns));
-      const res = await fetch(`${engineUrl}/api/import/${encodeURIComponent(form.collection)}`, {
+      const res = await fetch(`${engineUrl}/ext/data/import/${encodeURIComponent(form.collection)}`, {
         method: 'POST', credentials: 'include', body: fd,
       });
       const json = await res.json();

@@ -26,8 +26,8 @@ export function searchRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
     await next();
   });
 
-  // GET /search — search via configured provider
-  app.get('/search', async (c) => {
+  // GET / — search via configured provider
+  app.get('/', async (c) => {
     const { q = '', collection, limit = '20', filters } = c.req.query();
 
     if (!collection)

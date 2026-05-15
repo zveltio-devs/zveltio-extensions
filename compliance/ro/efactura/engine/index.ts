@@ -15,12 +15,14 @@ import { generateUBL } from './ubl-generator.js';
  * Two integration paths:
  *   1. invoicing extension is installed → on `invoice.created` we automatically
  *      create a draft submission. User reviews and clicks "submit to ANAF".
- *   2. Standalone (no invoicing) → caller posts /api/efactura/invoices with
+ *   2. Standalone (no invoicing) → caller posts /ext/compliance/ro/efactura/invoices with
  *      invoice fields directly; legacy denormalised columns are populated.
  */
 const extension: ZveltioExtension = {
   name: 'compliance/ro/efactura',
   category: 'compliance',
+  // S3-01: sub-app mounted at /ext/compliance/ro/efactura by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [
@@ -31,7 +33,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/efactura', efacturaRoutes(ctx));
+    app.route('/', efacturaRoutes(ctx));
 
     // ── Auto-draft submissions on invoice creation ──────────────────────────
     // When invoicing emits invoice.created, materialise a draft e-Factura row

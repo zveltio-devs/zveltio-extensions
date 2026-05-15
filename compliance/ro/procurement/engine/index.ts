@@ -5,6 +5,8 @@ import { roProcurementRoutes } from './routes.js';
 const extension: ZveltioExtension = {
   name: 'compliance/ro/procurement',
   category: 'compliance',
+  // S3-01: sub-app mounted at /ext/compliance/ro/procurement by the engine.
+  mountStrategy: 'subapp',
 
   getMigrations() {
     return [
@@ -14,7 +16,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    app.route('/api/ro-procurement', roProcurementRoutes(ctx));
+    app.route('/', roProcurementRoutes(ctx));
   },
 };
 

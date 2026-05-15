@@ -42,19 +42,19 @@
   }
 
   async function loadExports() {
-    const res = await fetch(`${engineUrl}/api/saft`, { credentials: 'include' });
+    const res = await fetch(`${engineUrl}/ext/compliance/ro/saft`, { credentials: 'include' });
     const data = await res.json();
     exports_ = data.exports || [];
   }
 
   async function loadAccounts() {
-    const res = await fetch(`${engineUrl}/api/saft/accounts`, { credentials: 'include' });
+    const res = await fetch(`${engineUrl}/ext/compliance/ro/saft/accounts`, { credentials: 'include' });
     const data = await res.json();
     accounts = data.accounts || [];
   }
 
   async function loadEntries() {
-    const res = await fetch(`${engineUrl}/api/saft/entries`, { credentials: 'include' });
+    const res = await fetch(`${engineUrl}/ext/compliance/ro/saft/entries`, { credentials: 'include' });
     const data = await res.json();
     entries = data.entries || [];
   }
@@ -63,7 +63,7 @@
     if (!exportForm.company_name || !exportForm.company_cui) return;
     creating = true;
     try {
-      const res = await fetch(`${engineUrl}/api/saft`, {
+      const res = await fetch(`${engineUrl}/ext/compliance/ro/saft`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -78,7 +78,7 @@
   }
 
   async function generateXML(id: string) {
-    const res = await fetch(`${engineUrl}/api/saft/${id}/generate`, {
+    const res = await fetch(`${engineUrl}/ext/compliance/ro/saft/${id}/generate`, {
       method: 'POST',
       credentials: 'include',
     });
@@ -92,7 +92,7 @@
   }
 
   async function downloadXML(id: string, start: string, end: string) {
-    const res = await fetch(`${engineUrl}/api/saft/${id}/xml`, { credentials: 'include' });
+    const res = await fetch(`${engineUrl}/ext/compliance/ro/saft/${id}/xml`, { credentials: 'include' });
     if (!res.ok) { alert('Generate XML first'); return; }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
@@ -105,7 +105,7 @@
 
   async function submitToANAF(id: string) {
     if (!confirm('Submit this SAF-T export to ANAF?')) return;
-    const res = await fetch(`${engineUrl}/api/saft/${id}/submit`, {
+    const res = await fetch(`${engineUrl}/ext/compliance/ro/saft/${id}/submit`, {
       method: 'POST',
       credentials: 'include',
     });
@@ -120,7 +120,7 @@
 
   async function deleteExport(id: string) {
     if (!confirm('Delete this export?')) return;
-    await fetch(`${engineUrl}/api/saft/${id}`, { method: 'DELETE', credentials: 'include' });
+    await fetch(`${engineUrl}/ext/compliance/ro/saft/${id}`, { method: 'DELETE', credentials: 'include' });
     await loadExports();
   }
 
@@ -128,7 +128,7 @@
     if (!accountForm.code || !accountForm.description) return;
     creating = true;
     try {
-      await fetch(`${engineUrl}/api/saft/accounts`, {
+      await fetch(`${engineUrl}/ext/compliance/ro/saft/accounts`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -144,7 +144,7 @@
 
   async function deleteAccount(id: string) {
     if (!confirm('Delete this account?')) return;
-    await fetch(`${engineUrl}/api/saft/accounts/${id}`, { method: 'DELETE', credentials: 'include' });
+    await fetch(`${engineUrl}/ext/compliance/ro/saft/accounts/${id}`, { method: 'DELETE', credentials: 'include' });
     await loadAccounts();
   }
 
@@ -152,7 +152,7 @@
     if (!entryForm.account_code || !entryForm.description) return;
     creating = true;
     try {
-      await fetch(`${engineUrl}/api/saft/entries`, {
+      await fetch(`${engineUrl}/ext/compliance/ro/saft/entries`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -168,7 +168,7 @@
 
   async function deleteEntry(id: string) {
     if (!confirm('Delete this entry?')) return;
-    await fetch(`${engineUrl}/api/saft/entries/${id}`, { method: 'DELETE', credentials: 'include' });
+    await fetch(`${engineUrl}/ext/compliance/ro/saft/entries/${id}`, { method: 'DELETE', credentials: 'include' });
     await loadEntries();
   }
 

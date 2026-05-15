@@ -36,7 +36,7 @@
  loading = true;
  try {
  const qs = filter !== 'all' ? `?type=${filter}` : '';
- const res = await fetch(`${engineUrl}/api/ro-documents${qs}`, { credentials: 'include' });
+ const res = await fetch(`${engineUrl}/ext/compliance/ro/documents${qs}`, { credentials: 'include' });
  const data = await res.json();
  documents = data.documents || [];
  } finally {
@@ -50,7 +50,7 @@
  if (!form.title || !form.number) return;
  creating = true;
  try {
- const res = await fetch(`${engineUrl}/api/ro-documents`, {
+ const res = await fetch(`${engineUrl}/ext/compliance/ro/documents`, {
  method: 'POST',
  credentials: 'include',
  headers: { 'Content-Type': 'application/json' },
@@ -66,7 +66,7 @@
 
  async function signDocument(id: string) {
  if (!confirm('Mark this document as signed?')) return;
- await fetch(`${engineUrl}/api/ro-documents/${id}/sign`, {
+ await fetch(`${engineUrl}/ext/compliance/ro/documents/${id}/sign`, {
  method: 'PATCH',
  credentials: 'include',
  });
@@ -75,7 +75,7 @@
 
  async function deleteDocument(id: string) {
  if (!confirm('Delete this draft?')) return;
- await fetch(`${engineUrl}/api/ro-documents/${id}`, { method: 'DELETE', credentials: 'include' });
+ await fetch(`${engineUrl}/ext/compliance/ro/documents/${id}`, { method: 'DELETE', credentials: 'include' });
  await loadDocuments();
  }
 
