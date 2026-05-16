@@ -1,24 +1,33 @@
 import "svelte/internal/disclose-version";
-import * as t from "svelte/internal/client";
-var a = t.from_html('<iframe class="w-full rounded border border-base-300" style="height: 65vh; min-height: 400px;"></iframe>');
-function s(i, e) {
-  t.push(e, !0);
-  var r = a();
-  t.template_effect(() => {
-    t.set_attribute(r, "src", e.asset.url), t.set_attribute(r, "title", e.asset.name ?? "PDF Document");
-  }), t.append(i, r), t.pop();
+import * as i from "svelte/internal/client";
+function r() {
+  if (typeof window > "u")
+    return null;
+  const e = window.__zveltio;
+  return e || (console.warn("[zveltio/sdk/studio] window.__zveltio is not installed. Is the bundle running inside Studio?"), null);
 }
-function n() {
-  const i = window.__zveltio;
-  i && i.registerAssetPreview({
+function o(e) {
+  var t;
+  (t = r()) == null || t.registerAssetPreview(e);
+}
+var s = i.from_html('<iframe class="w-full rounded border border-base-300" style="height: 65vh; min-height: 400px;"></iframe>');
+function u(e, t) {
+  i.push(t, !0);
+  var n = s();
+  i.template_effect(() => {
+    i.set_attribute(n, "src", t.asset.url), i.set_attribute(n, "title", t.asset.name ?? "PDF Document");
+  }), i.append(e, n), i.pop();
+}
+function a() {
+  o({
     match: (e) => {
-      var r, o;
-      return e.mimeType === "application/pdf" || ((r = e.name) == null ? void 0 : r.toLowerCase().endsWith(".pdf")) || ((o = e.url) == null ? void 0 : o.toLowerCase().endsWith(".pdf"));
+      var t, n;
+      return e.mimeType === "application/pdf" || ((t = e.name) == null ? void 0 : t.toLowerCase().endsWith(".pdf")) || ((n = e.url) == null ? void 0 : n.toLowerCase().endsWith(".pdf"));
     },
-    component: s
+    component: u
   });
 }
-n();
+a();
 export {
-  n as default
+  a as default
 };

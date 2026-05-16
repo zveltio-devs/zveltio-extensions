@@ -1,10 +1,9 @@
+import { registerRoute } from '@zveltio/sdk/studio';
 import SmsPage from './pages/SmsPage.svelte';
 
 export default function register() {
-  const zveltio = (window as any).__zveltio;
-  if (!zveltio) return;
 
-  zveltio.registerRoute({
+  registerRoute({
     path: 'sms',
     component: SmsPage,
     label: 'SMS',

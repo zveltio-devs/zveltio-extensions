@@ -1,10 +1,9 @@
+import { registerRoute } from '@zveltio/sdk/studio';
 import CRMPage from './pages/CRMPage.svelte';
 
 export default function register() {
-  const zveltio = (window as any).__zveltio;
-  if (!zveltio) return;
 
-  zveltio.registerRoute({
+  registerRoute({
     path: 'crm',
     component: CRMPage,
     label: 'CRM',

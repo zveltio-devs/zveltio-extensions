@@ -1,10 +1,9 @@
+import { registerRoute } from '@zveltio/sdk/studio';
 import GeospatialPage from './pages/GeospatialPage.svelte';
 
-export default function register() {
-  const zveltio = (window as any).__zveltio;
-  if (!zveltio) return;
+export default function register() {
 
-  zveltio.registerRoute({
+  registerRoute({
     path: 'geo',
     component: GeospatialPage,
     label: 'Geospatial',

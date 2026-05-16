@@ -1,14 +1,10 @@
+import { registerRoute } from '@zveltio/sdk/studio';
 import ChecklistsPage from './pages/ChecklistsPage.svelte';
 import TemplatesPage from './pages/TemplatesPage.svelte';
 
-export default function register() {
-  const zveltio = (window as any).__zveltio;
-  if (!zveltio) {
-    console.error('Zveltio Studio API not available');
-    return;
-  }
+export default function register() {
 
-  zveltio.registerRoute({
+  registerRoute({
     path: 'checklists',
     component: ChecklistsPage,
     label: 'Checklists',

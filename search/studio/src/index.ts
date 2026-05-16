@@ -1,10 +1,9 @@
+import { registerRoute } from '@zveltio/sdk/studio';
 import SearchPage from './pages/SearchPage.svelte';
 
 export default function register() {
-  const zveltio = (window as any).__zveltio;
-  if (!zveltio) return;
 
-  zveltio.registerRoute({
+  registerRoute({
     path: 'search',
     component: SearchPage,
     label: 'Search',

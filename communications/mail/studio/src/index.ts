@@ -1,11 +1,10 @@
+import { registerRoute } from '@zveltio/sdk/studio';
 import MailPage from './pages/MailPage.svelte';
 import MailSettingsPage from './pages/MailSettingsPage.svelte';
 
 export default function register() {
-  const zveltio = (window as any).__zveltio;
-  if (!zveltio) return;
 
-  zveltio.registerRoute({
+  registerRoute({
     path: 'mail',
     component: MailPage,
     label: 'Mail',

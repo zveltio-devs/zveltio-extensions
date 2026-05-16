@@ -10,7 +10,7 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "baseUrl": ".",
-    "ignoreDeprecations": "6.0",
+    "ignoreDeprecations": "5.0",
     "paths": {
       "@zveltio/sdk": ["../zveltio/packages/sdk/src/index.ts"],
       "@zveltio/sdk/*": ["../zveltio/packages/sdk/src/*"],
