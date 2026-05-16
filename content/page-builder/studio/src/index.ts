@@ -1,11 +1,10 @@
+import { registerRoute } from '@zveltio/sdk/studio';
 import PagesListPage from './pages/PagesListPage.svelte';
 import PageEditorPage from './pages/PageEditorPage.svelte';
 
-export default function register() {
-  const zveltio = (window as any).__zveltio;
-  if (!zveltio) return;
+export default function register() {
 
-  zveltio.registerRoute({
+  registerRoute({
     path: 'pages',
     component: PagesListPage,
     label: 'Pages',

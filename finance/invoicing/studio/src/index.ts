@@ -1,15 +1,9 @@
+import { registerRoute } from '@zveltio/sdk/studio';
 import InvoicesPage from './pages/InvoicesPage.svelte';
 
-declare global {
-  interface Window {
-    __zveltio?: { registerRoute: (route: any) => void; engineUrl: string };
-  }
-}
-
 function register(): void {
-  const z = window.__zveltio;
-  if (!z) return;
-  z.registerRoute({
+
+  registerRoute({
     path: 'invoicing',
     component: InvoicesPage,
     label: 'Invoicing',

@@ -1,15 +1,9 @@
+import { registerRoute } from '@zveltio/sdk/studio';
 import PayrollPage from './pages/PayrollPage.svelte';
 
-declare global {
-  interface Window {
-    __zveltio?: { registerRoute: (route: any) => void; engineUrl: string };
-  }
-}
-
 function register(): void {
-  const z = window.__zveltio;
-  if (!z) return;
-  z.registerRoute({
+
+  registerRoute({
     path: 'hr-payroll',
     component: PayrollPage,
     label: 'Payroll',

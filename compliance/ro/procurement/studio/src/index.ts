@@ -1,10 +1,9 @@
+import { registerRoute } from '@zveltio/sdk/studio';
 import ProcurementPage from './pages/ProcurementPage.svelte';
 
-export default function register() {
-  const zveltio = (window as any).__zveltio;
-  if (!zveltio) return;
+export default function register() {
 
-  zveltio.registerRoute({
+  registerRoute({
     path: 'ro-procurement',
     component: ProcurementPage,
     label: 'Achizitii RO',

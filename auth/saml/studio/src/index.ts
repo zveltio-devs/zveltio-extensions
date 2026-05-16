@@ -1,10 +1,9 @@
+import { registerRoute } from '@zveltio/sdk/studio';
 import SamlConfigPage from './SamlConfigPage.svelte';
 
 export default function register() {
-  const zveltio = (window as any).__zveltio;
-  if (!zveltio) return;
 
-  zveltio.registerRoute({
+  registerRoute({
     path: 'auth/saml',
     component: SamlConfigPage,
     label: 'SAML SSO',

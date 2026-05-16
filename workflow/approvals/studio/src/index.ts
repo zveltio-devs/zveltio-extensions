@@ -1,14 +1,10 @@
+import { registerRoute } from '@zveltio/sdk/studio';
 import ApprovalsPage from './pages/ApprovalsPage.svelte';
 import WorkflowsPage from './pages/WorkflowsPage.svelte';
 
-export default function register() {
-  const zveltio = (window as any).__zveltio;
-  if (!zveltio) {
-    console.error('[approvals] Zveltio Studio API not available');
-    return;
-  }
+export default function register() {
 
-  zveltio.registerRoute({
+  registerRoute({
     path: 'approvals',
     component: ApprovalsPage,
     label: 'Approvals',

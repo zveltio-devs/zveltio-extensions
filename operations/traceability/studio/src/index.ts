@@ -1,3 +1,4 @@
+import { registerRoute } from '@zveltio/sdk/studio';
 import LotList from './pages/LotList.svelte';
 import Dispatches from './pages/Dispatches.svelte';
 import LotDetail from './pages/LotDetail.svelte';
@@ -7,9 +8,8 @@ import RecallSimulator from './pages/RecallSimulator.svelte';
 import Reports from './pages/Reports.svelte';
 
 export default function register() {
-  const zveltio = (window as any).__zveltio;
 
-  zveltio.registerRoute({
+  registerRoute({
     path: 'trace/lots',
     component: LotList,
     label: 'Loturi',
@@ -18,13 +18,13 @@ export default function register() {
     parent: 'Trasabilitate',
   });
 
-  zveltio.registerRoute({
+  registerRoute({
     path: 'trace/lots/:id',
     component: LotDetail,
     hidden: true,
   });
 
-  zveltio.registerRoute({
+  registerRoute({
     path: 'trace/reception',
     component: NewReception,
     label: 'Recepție',
@@ -33,7 +33,7 @@ export default function register() {
     parent: 'Trasabilitate',
   });
 
-  zveltio.registerRoute({
+  registerRoute({
     path: 'trace/production',
     component: ProductionOrder,
     label: 'Producție',
@@ -42,7 +42,7 @@ export default function register() {
     parent: 'Trasabilitate',
   });
 
-  zveltio.registerRoute({
+  registerRoute({
     path: 'trace/recalls',
     component: RecallSimulator,
     label: 'Recall / Retragere',
@@ -51,7 +51,7 @@ export default function register() {
     parent: 'Trasabilitate',
   });
 
-  zveltio.registerRoute({
+  registerRoute({
     path: 'trace/dispatches',
     component: Dispatches,
     label: 'Expedieri',
@@ -60,7 +60,7 @@ export default function register() {
     parent: 'Trasabilitate',
   });
 
-  zveltio.registerRoute({
+  registerRoute({
     path: 'trace/reports',
     component: Reports,
     label: 'Rapoarte ANSVSA',

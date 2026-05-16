@@ -1,12 +1,11 @@
+import { registerRoute } from '@zveltio/sdk/studio';
 import FormsPage from './pages/FormsPage.svelte';
 import FormBuilderPage from './pages/FormBuilderPage.svelte';
 import FormResponsesPage from './pages/FormResponsesPage.svelte';
 
 export default function register() {
-  const zveltio = (window as any).__zveltio;
-  if (!zveltio) return;
 
-  zveltio.registerRoute({
+  registerRoute({
     path: 'forms',
     component: FormsPage,
     label: 'Forms',
