@@ -47,6 +47,9 @@
       "@zveltio/engine-permissions": [
         "../zveltio/packages/engine/src/lib/permissions.js"
       ],
+      // Legacy alias — kept for backward-compat with extensions that
+      // haven't migrated yet. New code should import types from
+      // `@zveltio/sdk/ddl` (resolved by the `@zveltio/sdk/*` alias above).
       "@zveltio/engine-ddl": [
         "../zveltio/packages/engine/src/lib/ddl-manager.js"
       ]

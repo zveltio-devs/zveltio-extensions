@@ -277,11 +277,12 @@ export function formsRoutes(
       .returningAll()
       .executeTakeFirst();
 
-    // If target_collection is set, insert record via DDLManager
+    // If target_collection is set, insert record via DDLManager (S4-08:
+    // use the typed instance from ctx instead of dynamic-importing engine
+    // internals).
     if (form.target_collection) {
       try {
-        const { DDLManager } = await import('@zveltio/engine-ddl');
-        const col = await DDLManager.getCollection(db, form.target_collection);
+        const col = await ctx.DDLManager.getCollection(db, form.target_collection);
         if (col) {
           await (db as any)
             .insertInto(form.target_collection)
