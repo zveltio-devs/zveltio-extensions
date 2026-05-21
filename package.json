@@ -9,7 +9,6 @@
   },
   "dependencies": {
     "@hono/zod-validator": "^0.7.6",
-    "@zveltio/sdk": "file:../zveltio/packages/sdk",
     "hono": "^4.4.0",
     "kysely": "^0.27.6",
     "zod": "^4.3.6"
