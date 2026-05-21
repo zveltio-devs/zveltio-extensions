@@ -14,6 +14,11 @@
   "peerDependencies": {
     "@aws-sdk/client-s3": "^3.0.0"
   },
+  "studio": {
+    "pages": [
+      { "path": "/admin/media", "label": "Media Library", "icon": "Image" }
+    ]
+  },
   "contributes": {
     "engine": true,
     "studio": true
