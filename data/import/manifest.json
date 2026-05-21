@@ -10,6 +10,11 @@
   "permissions": [
     "database"
   ],
+  "studio": {
+    "pages": [
+      { "path": "/admin/data/import", "label": "Import", "icon": "Upload" }
+    ]
+  },
   "contributes": {
     "engine": true,
     "studio": true

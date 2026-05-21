@@ -1,3 +1,0 @@
-$ vite build
-bun: command not found: vite
-error: script "build" exited with code 1

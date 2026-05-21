@@ -10,6 +10,11 @@
   "permissions": [
     "database"
   ],
+  "studio": {
+    "pages": [
+      { "path": "/admin/data/export", "label": "Export", "icon": "Download" }
+    ]
+  },
   "contributes": {
     "engine": true,
     "studio": true

@@ -47,17 +47,20 @@
       "@zveltio/engine-permissions": [
         "../zveltio/packages/engine/src/lib/permissions.js"
       ],
-      // Legacy alias — kept for backward-compat with extensions that
-      // haven't migrated yet. New code should import types from
-      // `@zveltio/sdk/ddl` (resolved by the `@zveltio/sdk/*` alias above).
       "@zveltio/engine-ddl": [
         "../zveltio/packages/engine/src/lib/ddl-manager.js"
       ]
     },
+    /* S4-08: extensions now import DDL types from `@zveltio/sdk/ddl` which
+     * the `@zveltio/sdk/*` alias above resolves to
+     * `../zveltio/packages/sdk/src/ddl/index.ts`. The legacy
+     * `@zveltio/engine-ddl` alias is kept for backward-compat with
+     * extensions that haven't been migrated yet.
+     */
     "typeRoots": [
       "../zveltio/packages/studio/node_modules/@types",
       "../zveltio/packages/engine/node_modules/@types"
-    ],
+    ]
   },
   "include": ["**/*.svelte", "**/*.ts", "**/*.d.ts"],
   "exclude": ["**/node_modules", "**/dist"]
