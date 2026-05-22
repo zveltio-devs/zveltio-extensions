@@ -1,0 +1,44 @@
+# Dependency updates for the official extensions repo.
+#
+# Each extension has its own peerDependencies declared in manifest.json
+# (e.g. SAML pulls @node-saml/node-saml, LDAP pulls ldapts, communications/mail
+# pulls nodemailer). Dependabot watches the root package.json — the
+# extension loader auto-installs peerDeps at runtime, so the root lockfile
+# remains the source of truth.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Bucharest
+    open-pull-requests-limit: 10
+    versioning-strategy: increase
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      auth-providers:
+        patterns:
+          - "ldapts"
+          - "@node-saml/*"
+          - "node-saml"
+          - "openid-client"
+      communications:
+        patterns:
+          - "nodemailer"
+          - "@types/nodemailer"
+      compliance:
+        patterns:
+          - "xml*"
+          - "xmldom*"
+          - "fast-xml-parser"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5

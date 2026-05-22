@@ -36,7 +36,15 @@ const TestSchema = z.object({
   password: z.string().min(1),
 });
 
-async function getLdapConfig(db: any): Promise<z.infer<typeof LdapConfigSchema> | null> {
+/**
+ * Read the LDAP config, decrypting bindPassword if it was stored encrypted.
+ * Older configs persisted before the encryption rollout are still readable —
+ * decryptSecret returns the value untouched when there is no `enc:v1:` prefix.
+ */
+async function getLdapConfig(
+  db: any,
+  decryptSecret: (v: string) => Promise<string>,
+): Promise<z.infer<typeof LdapConfigSchema> | null> {
   try {
     const row = await db
       .selectFrom('zv_settings')
@@ -45,14 +53,28 @@ async function getLdapConfig(db: any): Promise<z.infer<typeof LdapConfigSchema> 
       .executeTakeFirst();
     if (!row) return null;
     const raw = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
-    return LdapConfigSchema.parse(raw);
+    const parsed = LdapConfigSchema.parse(raw);
+    if (parsed.bindPassword) {
+      parsed.bindPassword = await decryptSecret(parsed.bindPassword);
+    }
+    return parsed;
   } catch {
     return null;
   }
 }
 
-async function upsertLdapConfig(db: any, config: z.infer<typeof LdapConfigSchema>) {
-  const value = JSON.stringify(config);
+/**
+ * Store the LDAP config with bindPassword encrypted via the engine's AES key.
+ * Previously this column held plaintext JSON — anyone with `SELECT *` on
+ * zv_settings could read the directory bind credential.
+ */
+async function upsertLdapConfig(
+  db: any,
+  config: z.infer<typeof LdapConfigSchema>,
+  encryptSecret: (v: string) => Promise<string>,
+) {
+  const toStore = { ...config, bindPassword: await encryptSecret(config.bindPassword) };
+  const value = JSON.stringify(toStore);
   const existing = await db
     .selectFrom('zv_settings')
     .select('key')
@@ -74,35 +96,54 @@ async function findOrCreateSsoUser(db: any, email: string, displayName: string):
     .executeTakeFirst();
   if (existing) return existing;
 
+  // Better-Auth's `user` table uses camelCase columns ("emailVerified",
+  // "createdAt", "updatedAt"). Raw SQL keeps the casing literal so a
+  // snake_case typo doesn't silently fail.
   const id = crypto.randomUUID();
-  await db.insertInto('user').values({
-    id,
-    email,
-    name: displayName || email.split('@')[0],
-    email_verified: true,
-    created_at: new Date(),
-    updated_at: new Date(),
-  }).execute();
+  const now = new Date();
+  await sql`
+    INSERT INTO "user" (id, email, name, "emailVerified", "createdAt", "updatedAt")
+    VALUES (${id}, ${email}, ${displayName || email.split('@')[0]}, true, ${now}, ${now})
+  `.execute(db);
 
   return db.selectFrom('user').selectAll().where('id', '=', id).executeTakeFirstOrThrow();
 }
 
-async function createSession(db: any, userId: string): Promise<string> {
-  const token = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  await db.insertInto('session').values({
-    id: crypto.randomUUID(),
-    token,
-    user_id: userId,
-    expires_at: expiresAt,
-    created_at: new Date(),
-    updated_at: new Date(),
-  }).execute();
-  return token;
-}
-
 export function ldapRoutes(ctx: ExtensionContext): Hono {
-  const { db, auth, checkPermission } = ctx;
+  const { db, auth, checkPermission, internals } = ctx;
+  // ctx.internals.createBetterAuthSession produces a session row + signed
+  // cookie matching Better-Auth's exact shape (camelCase columns + Hono
+  // HMAC signature) so the engine's `auth.api.getSession({ headers })`
+  // recognises our SSO cookie. Inlining an insert here used to fail at
+  // runtime — the `session` table uses camelCase columns and the cookie
+  // value must be signed, neither of which the old code respected.
+  if (!internals?.createBetterAuthSession) {
+    throw new Error('[ldap] engine internals missing createBetterAuthSession — Zveltio version mismatch');
+  }
+  if (!internals.encryptSecret || !internals.decryptSecret) {
+    throw new Error('[ldap] engine internals missing encryptSecret/decryptSecret — Zveltio version mismatch');
+  }
+  const crossDomain = process.env.CROSS_DOMAIN_AUTH === 'true';
+
+  // In production, refuse non-TLS LDAP URLs. ldap:// on port 389 carries
+  // both the bind password and user credentials in cleartext over the
+  // wire — fine for dev against a local container, never acceptable in
+  // prod. Operators who really need ldap:// can set
+  // ALLOW_INSECURE_LDAP=true to opt out.
+  function assertLdapTransportSafe(url: string): void {
+    const inProd = process.env.NODE_ENV === 'production';
+    const allowInsecure = process.env.ALLOW_INSECURE_LDAP === 'true';
+    if (!inProd || allowInsecure) return;
+    const lower = url.toLowerCase().trim();
+    if (!lower.startsWith('ldaps://')) {
+      throw new Error(
+        `LDAP URL "${url}" is not using ldaps:// — refusing the connection ` +
+        `in production. Set ALLOW_INSECURE_LDAP=true to override (NOT ` +
+        `recommended; bind credentials and user passwords cross the wire ` +
+        `in cleartext over ldap://).`,
+      );
+    }
+  }
 
   async function requireAdmin(c: any): Promise<any> {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -115,8 +156,11 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
 
   // POST /login — authenticate user via LDAP
   router.post('/login', zValidator('json', LoginSchema), async (c) => {
-    const config = await getLdapConfig(db);
+    const config = await getLdapConfig(db, internals.decryptSecret);
     if (!config?.enabled) return c.json({ error: 'LDAP authentication is not configured or disabled' }, 503);
+    try { assertLdapTransportSafe(config.url); } catch (err) {
+      return c.json({ error: (err as Error).message }, 503);
+    }
 
     const { username, password } = c.req.valid('json');
     const remoteIp = c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? 'unknown';
@@ -153,7 +197,20 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
     }
 
     const user = await findOrCreateSsoUser(db, ldapUser.email, ldapUser.displayName);
-    const token = await createSession(db, user.id);
+
+    // Invalidate prior sessions for this user — limits the blast radius of
+    // a credential leak and matches the "one active SSO session per user"
+    // expectation most ops teams have. Without this, every successful
+    // sign-in leaves the previous token live until its TTL expires.
+    await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(db).catch((err: Error) => {
+      console.warn('[ldap] could not invalidate previous sessions:', err.message);
+    });
+
+    const { token, setCookie } = await internals.createBetterAuthSession(db, user.id, {
+      ipAddress: remoteIp === 'unknown' ? undefined : remoteIp,
+      userAgent: userAgent ?? undefined,
+      crossDomain,
+    });
 
     try {
       await sql`
@@ -166,6 +223,7 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
       console.warn('[ldap] success audit write failed:', (auditErr as Error).message);
     }
 
+    c.header('Set-Cookie', setCookie);
     return c.json({
       token,
       user: { id: user.id, email: user.email, name: user.name },
@@ -177,7 +235,7 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
     const admin = await requireAdmin(c);
     if (!admin) return c.json({ error: 'Unauthorized' }, 401);
 
-    const config = await getLdapConfig(db);
+    const config = await getLdapConfig(db, internals.decryptSecret);
     if (config) {
       // Never expose bind password to client
       const { bindPassword: _bp, ...safe } = config;
@@ -192,7 +250,16 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
     if (!admin) return c.json({ error: 'Unauthorized' }, 401);
 
     const data = c.req.valid('json');
-    await upsertLdapConfig(db, data);
+    try { assertLdapTransportSafe(data.url); } catch (err) {
+      return c.json({ error: (err as Error).message }, 400);
+    }
+    try {
+      await upsertLdapConfig(db, data, internals.encryptSecret);
+    } catch (err: any) {
+      // upsert may throw if FIELD_ENCRYPTION_KEY isn't set —
+      // surface that explicitly rather than persisting plaintext.
+      return c.json({ error: `Cannot store bindPassword: ${err.message}` }, 500);
+    }
     return c.json({ success: true });
   });
 
@@ -201,8 +268,11 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
     const admin = await requireAdmin(c);
     if (!admin) return c.json({ error: 'Unauthorized' }, 401);
 
-    const config = await getLdapConfig(db);
+    const config = await getLdapConfig(db, internals.decryptSecret);
     if (!config) return c.json({ error: 'LDAP not configured' }, 503);
+    try { assertLdapTransportSafe(config.url); } catch (err) {
+      return c.json({ error: (err as Error).message }, 503);
+    }
 
     const { username, password } = c.req.valid('json');
 
