@@ -10,6 +10,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
+import { sql } from 'kysely';
 import { ldapAuthenticate, type LdapConfig } from './ldap-provider.js';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 const LdapConfigSchema = z.object({
@@ -118,20 +119,52 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
     if (!config?.enabled) return c.json({ error: 'LDAP authentication is not configured or disabled' }, 503);
 
     const { username, password } = c.req.valid('json');
+    const remoteIp = c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? 'unknown';
+    const userAgent = c.req.header('user-agent') ?? null;
 
     let ldapUser: any;
+    // zv_audit_log column names — match the engine's auditLog() helper
+    // (`event_type` + jsonb metadata) since we can't import it from the
+    // engine module across the extension boundary. Reused for both the
+    // failure path below and the success path further down.
+    const auditFailure = async (err: any) => {
+      try {
+        await sql`
+          INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, ip, created_at)
+          VALUES ('auth.login_failed', NULL, 'session',
+                  ${JSON.stringify({ provider: 'ldap', username, user_agent: userAgent, error: err?.message })}::jsonb,
+                  ${remoteIp}, NOW())
+        `.execute(db);
+      } catch (auditErr) {
+        console.warn('[ldap] failed-login audit write failed:', (auditErr as Error).message);
+      }
+    };
+
     try {
       ldapUser = await ldapAuthenticate(config as LdapConfig, username, password);
     } catch (err: any) {
+      await auditFailure(err);
       return c.json({ error: `Authentication failed: ${err.message}` }, 401);
     }
 
     if (!ldapUser.email) {
+      await auditFailure({ message: 'no email attribute' });
       return c.json({ error: 'LDAP user does not have an email address configured' }, 400);
     }
 
     const user = await findOrCreateSsoUser(db, ldapUser.email, ldapUser.displayName);
     const token = await createSession(db, user.id);
+
+    try {
+      await sql`
+        INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, ip, created_at)
+        VALUES ('auth.login_success', ${user.id}, 'session',
+                ${JSON.stringify({ provider: 'ldap', username, user_agent: userAgent })}::jsonb,
+                ${remoteIp}, NOW())
+      `.execute(db);
+    } catch (auditErr) {
+      console.warn('[ldap] success audit write failed:', (auditErr as Error).message);
+    }
 
     return c.json({
       token,

@@ -160,8 +160,20 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
       ? rawRedirect
       : '/admin';
 
+    // Cookie flags:
+    //  - HttpOnly: JS can't read the token (mitigates XSS)
+    //  - SameSite=Lax: CSRF protection on cross-site requests; Lax (not
+    //    Strict) so the IdP redirect still attaches the cookie.
+    //  - Secure: only sent over HTTPS in production. We gate on
+    //    NODE_ENV so local dev (which hits http://localhost) still works.
+    //    On any deployment serving SAML over HTTPS this MUST be set;
+    //    without it the cookie is exposed to MITM downgrade attacks.
+    const secureFlag = process.env.NODE_ENV === 'production' ? '; Secure' : '';
     const response = c.redirect(redirectTo, 302);
-    response.headers.set('Set-Cookie', `better-auth.session_token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 3600}`);
+    response.headers.set(
+      'Set-Cookie',
+      `better-auth.session_token=${token}; Path=/; HttpOnly; SameSite=Lax${secureFlag}; Max-Age=${7 * 24 * 3600}`,
+    );
     return response;
   });
 
