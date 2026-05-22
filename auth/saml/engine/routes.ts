@@ -11,6 +11,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
+import { sql } from 'kysely';
 import { createSamlInstance, validateSamlResponse } from './saml-provider.js';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 // Config schema stored in zv_settings key "saml_config"
@@ -27,7 +28,15 @@ const SamlConfigSchema = z.object({
   mapName: z.string().default('displayName'),
 });
 
-async function getSamlConfig(db: any): Promise<z.infer<typeof SamlConfigSchema> | null> {
+/**
+ * Read the SAML config, decrypting privateKey if it was stored encrypted.
+ * Legacy configs without the `enc:v1:` prefix pass through unchanged so
+ * a rolling encryption migration doesn't break existing tenants.
+ */
+async function getSamlConfig(
+  db: any,
+  decryptSecret: (v: string) => Promise<string>,
+): Promise<z.infer<typeof SamlConfigSchema> | null> {
   try {
     const row = await db
       .selectFrom('zv_settings')
@@ -36,14 +45,32 @@ async function getSamlConfig(db: any): Promise<z.infer<typeof SamlConfigSchema> 
       .executeTakeFirst();
     if (!row) return null;
     const raw = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
-    return SamlConfigSchema.parse(raw);
+    const parsed = SamlConfigSchema.parse(raw);
+    if (parsed.privateKey) {
+      parsed.privateKey = await decryptSecret(parsed.privateKey);
+    }
+    return parsed;
   } catch {
     return null;
   }
 }
 
-async function upsertSamlConfig(db: any, config: z.infer<typeof SamlConfigSchema>) {
-  const value = JSON.stringify(config);
+/**
+ * Store the SAML config with privateKey encrypted via the engine's AES key.
+ * The SP private key is used to sign SAML AuthnRequests to the IdP — any
+ * leak lets an attacker impersonate this SP, which is why we don't accept
+ * plaintext storage.
+ */
+async function upsertSamlConfig(
+  db: any,
+  config: z.infer<typeof SamlConfigSchema>,
+  encryptSecret: (v: string) => Promise<string>,
+) {
+  const toStore = {
+    ...config,
+    privateKey: config.privateKey ? await encryptSecret(config.privateKey) : undefined,
+  };
+  const value = JSON.stringify(toStore);
   // Try update first, then insert
   const existing = await db
     .selectFrom('zv_settings')
@@ -58,7 +85,10 @@ async function upsertSamlConfig(db: any, config: z.infer<typeof SamlConfigSchema
   }
 }
 
-// Find or create a user by email (for SSO sign-in)
+// Find or create a user by email (for SSO sign-in).
+// Better-Auth's `user` table uses camelCase columns ("emailVerified",
+// "createdAt", "updatedAt"). Raw SQL keeps the casing literal so a
+// snake_case typo doesn't silently fail.
 async function findOrCreateSsoUser(db: any, email: string, displayName: string): Promise<any> {
   const existing = await db
     .selectFrom('user')
@@ -67,36 +97,29 @@ async function findOrCreateSsoUser(db: any, email: string, displayName: string):
     .executeTakeFirst();
   if (existing) return existing;
 
-  // Create new user with random password (SSO users don't use password login)
   const id = crypto.randomUUID();
-  await db.insertInto('user').values({
-    id,
-    email,
-    name: displayName || email.split('@')[0],
-    email_verified: true,
-    created_at: new Date(),
-    updated_at: new Date(),
-  }).execute();
+  const now = new Date();
+  await sql`
+    INSERT INTO "user" (id, email, name, "emailVerified", "createdAt", "updatedAt")
+    VALUES (${id}, ${email}, ${displayName || email.split('@')[0]}, true, ${now}, ${now})
+  `.execute(db);
 
   return db.selectFrom('user').selectAll().where('id', '=', id).executeTakeFirstOrThrow();
 }
 
-async function createSession(db: any, userId: string): Promise<string> {
-  const token = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-  await db.insertInto('session').values({
-    id: crypto.randomUUID(),
-    token,
-    user_id: userId,
-    expires_at: expiresAt,
-    created_at: new Date(),
-    updated_at: new Date(),
-  }).execute();
-  return token;
-}
-
 export function samlRoutes(ctx: ExtensionContext): Hono {
-  const { db, auth, checkPermission } = ctx;
+  const { db, auth, checkPermission, internals } = ctx;
+  // See ctx.internals.createBetterAuthSession docs — it's the only way to
+  // produce a session row + signed cookie that the engine's
+  // `auth.api.getSession` will accept (camelCase columns + Hono HMAC
+  // signature). Inlining an insert + plain cookie used to fail at runtime.
+  if (!internals?.createBetterAuthSession) {
+    throw new Error('[saml] engine internals missing createBetterAuthSession — Zveltio version mismatch');
+  }
+  if (!internals.encryptSecret || !internals.decryptSecret) {
+    throw new Error('[saml] engine internals missing encryptSecret/decryptSecret — Zveltio version mismatch');
+  }
+  const crossDomain = process.env.CROSS_DOMAIN_AUTH === 'true';
 
   async function requireAdmin(c: any): Promise<any> {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -109,7 +132,7 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
 
   // GET /login — redirect user to IdP
   router.get('/login', async (c) => {
-    const config = await getSamlConfig(db);
+    const config = await getSamlConfig(db, internals.decryptSecret);
     if (!config?.enabled) return c.json({ error: 'SAML SSO is not configured or disabled' }, 503);
 
     const saml = await createSamlInstance(config);
@@ -123,7 +146,7 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
 
   // POST /callback — ACS endpoint (IdP posts here)
   router.post('/callback', async (c) => {
-    const config = await getSamlConfig(db);
+    const config = await getSamlConfig(db, internals.decryptSecret);
     if (!config?.enabled) return c.json({ error: 'SAML SSO is not configured or disabled' }, 503);
 
     let body: Record<string, string>;
@@ -150,7 +173,20 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
     if (!email) return c.json({ error: 'IdP did not return an email address' }, 400);
 
     const user = await findOrCreateSsoUser(db, email, name);
-    const token = await createSession(db, user.id);
+
+    // Invalidate prior sessions so each SAML login produces exactly one
+    // active session — limits blast radius if a previous token leaks.
+    await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(db).catch((err: Error) => {
+      console.warn('[saml] could not invalidate previous sessions:', err.message);
+    });
+
+    const remoteIp = c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? undefined;
+    const userAgent = c.req.header('user-agent') ?? undefined;
+    const { setCookie } = await internals.createBetterAuthSession(db, user.id, {
+      ipAddress: remoteIp,
+      userAgent,
+      crossDomain,
+    });
 
     // Validare open redirect: permite doar path-uri relative (încep cu /)
     const rawRedirect = body.RelayState ?? '/admin';
@@ -160,26 +196,14 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
       ? rawRedirect
       : '/admin';
 
-    // Cookie flags:
-    //  - HttpOnly: JS can't read the token (mitigates XSS)
-    //  - SameSite=Lax: CSRF protection on cross-site requests; Lax (not
-    //    Strict) so the IdP redirect still attaches the cookie.
-    //  - Secure: only sent over HTTPS in production. We gate on
-    //    NODE_ENV so local dev (which hits http://localhost) still works.
-    //    On any deployment serving SAML over HTTPS this MUST be set;
-    //    without it the cookie is exposed to MITM downgrade attacks.
-    const secureFlag = process.env.NODE_ENV === 'production' ? '; Secure' : '';
     const response = c.redirect(redirectTo, 302);
-    response.headers.set(
-      'Set-Cookie',
-      `better-auth.session_token=${token}; Path=/; HttpOnly; SameSite=Lax${secureFlag}; Max-Age=${7 * 24 * 3600}`,
-    );
+    response.headers.set('Set-Cookie', setCookie);
     return response;
   });
 
   // GET /metadata — SP metadata XML for IdP registration
   router.get('/metadata', async (c) => {
-    const config = await getSamlConfig(db);
+    const config = await getSamlConfig(db, internals.decryptSecret);
     if (!config) return c.json({ error: 'SAML not configured' }, 503);
 
     const saml = await createSamlInstance(config);
@@ -197,7 +221,7 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
     const admin = await requireAdmin(c);
     if (!admin) return c.json({ error: 'Unauthorized' }, 401);
 
-    const config = await getSamlConfig(db);
+    const config = await getSamlConfig(db, internals.decryptSecret);
     // Never return private key to client
     if (config) {
       const { privateKey: _pk, ...safe } = config;
@@ -212,7 +236,11 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
     if (!admin) return c.json({ error: 'Unauthorized' }, 401);
 
     const data = c.req.valid('json');
-    await upsertSamlConfig(db, data);
+    try {
+      await upsertSamlConfig(db, data, internals.encryptSecret);
+    } catch (err: any) {
+      return c.json({ error: `Cannot store privateKey: ${err.message}` }, 500);
+    }
     return c.json({ success: true });
   });
 
