@@ -54,12 +54,20 @@ function extractText(
 /**
  * Triggers embedding generation for a record.
  * Non-blocking — failure does not affect the main operation.
+ *
+ * `tenantId` must be passed explicitly when running in multi-tenant
+ * mode: this hook fires from the event bus on the GLOBAL pool (NOT
+ * inside the request transaction), so the `zveltio.current_tenant`
+ * session GUC is unset and the column DEFAULT in migration 009 would
+ * resolve to NULL — making the embedding visible to every tenant.
+ * `null` is correct for single-tenant deployments.
  */
 export async function triggerEmbedding(
   db: Database,
   collection: string,
   recordId: string,
   record: Record<string, any>,
+  tenantId: string | null = null,
 ): Promise<void> {
   // Check if AI Search is enabled on the collection
   const collMeta = await (db as any)
@@ -94,7 +102,7 @@ export async function triggerEmbedding(
 
   await sql`
     INSERT INTO zvd_ai_embeddings
-      (collection, record_id, field, text_content, embedding, model, updated_at)
+      (collection, record_id, field, text_content, embedding, model, tenant_id, updated_at)
     VALUES (
       ${collection},
       ${recordId},
@@ -102,6 +110,7 @@ export async function triggerEmbedding(
       ${rawText.slice(0, 2000)},
       ${vectorLiteral}::vector,
       ${model},
+      ${tenantId},
       NOW()
     )
     ON CONFLICT (collection, record_id, field)
@@ -109,6 +118,7 @@ export async function triggerEmbedding(
       text_content = EXCLUDED.text_content,
       embedding    = EXCLUDED.embedding,
       model        = EXCLUDED.model,
+      tenant_id    = EXCLUDED.tenant_id,
       updated_at   = NOW()
   `.execute(db);
 }

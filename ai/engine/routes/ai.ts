@@ -16,6 +16,19 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
   const validatePublicUrl = internals.validatePublicUrl;
   const app = new Hono();
 
+  /**
+   * Returns the per-request tenant transaction if multi-tenant
+   * middleware is active, else the global pool. Critical for
+   * `zvd_ai_embeddings`: that table has FORCE RLS keyed on the
+   * `zveltio.current_tenant` GUC (set by `SET LOCAL` inside the
+   * tenant transaction). Querying via the raw pool inside a
+   * multi-tenant deployment yields cross-tenant rows (or zero rows,
+   * depending on the row's `tenant_id`). Always use this.
+   */
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   async function requireAuth(c: any) {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     return session?.user ?? null;
@@ -325,6 +338,11 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
           }, 403);
         }
         const vectorLiteral = JSON.stringify(embeddings[0]);
+        // tenant_id intentionally omitted from the INSERT — the column
+        // has DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid
+        // (see migration 009), so running this INSERT inside the tenant
+        // transaction tags the row with the active tenant automatically.
+        // FORCE RLS on the table then prevents cross-tenant reads.
         await sql`
           INSERT INTO zvd_ai_embeddings (collection, record_id, field, text_content, embedding, model, updated_at)
           VALUES (
@@ -340,7 +358,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
             model        = EXCLUDED.model,
             updated_at   = NOW()
         `
-          .execute(db)
+          .execute(reqDb(c))
           .catch((err: Error) => {
             console.warn('[ai.embed] embedding persist failed:', err.message);
           });
@@ -387,6 +405,12 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
       // Falls back to pg_trgm on stored text_content when no embedder
       // is available — both paths target the canonical zvd_ai_embeddings
       // table from ai/engine/migrations/002_embeddings.sql.
+      // reqDb(c) routes the query through the tenant transaction, so
+      // FORCE RLS on zvd_ai_embeddings (migration 009) restricts the
+      // result set to rows tagged with this tenant. Without it a user
+      // in tenant A could pull semantic-search hits — including the
+      // raw `text_content` column — from tenant B's records.
+      const tdb = reqDb(c);
       const provider = aiProviderManager.getDefault();
       if (provider?.embed) {
         try {
@@ -401,7 +425,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
             ORDER BY embedding <=> ${queryVec}::vector
             LIMIT ${limit}
           `
-            .execute(db)
+            .execute(tdb)
             .then((r) => r.rows)
             .catch(() => []);
 
@@ -427,7 +451,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
         ORDER BY score DESC
         LIMIT ${limit}
       `
-        .execute(db)
+        .execute(tdb)
         .then((r) => r.rows)
         .catch(() => []);
 
