@@ -102,10 +102,46 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
     }
 
     const userId = user.id;
-    await sql`INSERT INTO zv_audit_log (user_id, action, collection, metadata) VALUES (${userId}, 'gdpr.account_deleted', 'user', '{"gdpr": true}'::jsonb)`.execute(db);
-    await sql`DELETE FROM zv_api_keys WHERE created_by = ${userId}`.execute(db);
-    await sql`DELETE FROM zv_notifications WHERE user_id = ${userId}`.execute(db);
-    await sql`DELETE FROM "user" WHERE id = ${userId}`.execute(db);
+
+    // Erasure under GDPR Article 17 must be COMPLETE — a half-deleted
+    // user leaves orphan rows that still tie back to them (e.g. an
+    // active `session` row keeps the user logged in until cookie TTL,
+    // a `twoFactor` row leaks the email via TOTP secrets, an `account`
+    // row keeps the password hash). Wrap in a transaction so a partial
+    // failure rolls back cleanly instead of leaving fragments.
+    //
+    // Audit row is written BEFORE the delete so the audit survives —
+    // event_type matches the engine's auditLog() schema (not the
+    // legacy `action` column the older code used).
+    try {
+      await (db as any).transaction().execute(async (trx: any) => {
+        await sql`
+          INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, created_at)
+          VALUES ('gdpr.account_deleted', ${userId}, 'user', ${JSON.stringify({ gdpr: true, requested_at: new Date().toISOString() })}::jsonb, NOW())
+        `.execute(trx);
+        // Better-Auth tables — ON DELETE CASCADE in 001_auth.sql
+        // covers session/account/twoFactor from user, but be explicit
+        // for defence in depth in case the cascade isn't set on a
+        // specific column.
+        await sql`DELETE FROM session WHERE "userId" = ${userId}`.execute(trx).catch(() => {});
+        await sql`DELETE FROM account WHERE "userId" = ${userId}`.execute(trx).catch(() => {});
+        await sql`DELETE FROM "twoFactor" WHERE "userId" = ${userId}`.execute(trx).catch(() => {});
+        // Zveltio user-owned rows
+        await sql`DELETE FROM zv_api_keys WHERE created_by = ${userId}`.execute(trx).catch(() => {});
+        await sql`DELETE FROM zv_notifications WHERE user_id = ${userId}`.execute(trx).catch(() => {});
+        // GDPR-specific user data
+        await sql`DELETE FROM zvd_gdpr_consents WHERE user_id = ${userId}`.execute(trx).catch(() => {});
+        // Finally the user row itself — anything still FK-referencing
+        // it will fail loudly here, which is what we want (better an
+        // error to the caller than a silently incomplete erasure).
+        await sql`DELETE FROM "user" WHERE id = ${userId}`.execute(trx);
+      });
+    } catch (err) {
+      return c.json({
+        error: 'Account deletion failed — referential integrity. Contact support to complete erasure.',
+        detail: (err as Error).message,
+      }, 500);
+    }
 
     return c.json({ success: true, message: 'Account and all associated data has been deleted' });
   });
