@@ -71,9 +71,14 @@ const extension: ZveltioExtension = {
 
     // Subscribe to record lifecycle for auto-embedding (when collection has
     // ai_search_enabled = true). Failures are swallowed so a bad embedding
-    // request never blocks data writes.
-    const onWrite = async (evt: { collection: string; id: string; record: Record<string, any> }) => {
-      try { await triggerEmbedding(ctx.db, evt.collection, evt.id, evt.record); } catch { /* non-fatal */ }
+    // request never blocks data writes. `tenantId` is plumbed through from
+    // `engineEvents.emit` in data.ts; we pass it explicitly to
+    // `triggerEmbedding` because the hook runs on the GLOBAL pool (NOT
+    // inside the request's tenant transaction), so the
+    // `zveltio.current_tenant` GUC is unset and the column DEFAULT would
+    // tag the embedding row with NULL tenant_id, leaking it cross-tenant.
+    const onWrite = async (evt: { collection: string; id: string; record: Record<string, any>; tenantId?: string | null }) => {
+      try { await triggerEmbedding(ctx.db, evt.collection, evt.id, evt.record, evt.tenantId ?? null); } catch { /* non-fatal */ }
     };
     ctx.events.on('record.created', onWrite);
     ctx.events.on('record.updated', onWrite);
