@@ -117,6 +117,20 @@ async function getRelations(db: any): Promise<RelationInfo[]> {
 }
 
 // ── Schema builder ────────────────────────────────────────────────────────────
+//
+// IMPORTANT: every resolver below uses the *request-scoped* context
+//   ({ user, db, loaders, checkPermission })
+// instead of the closure-captured ctx.db. That lets us:
+//   - use the tenant-isolated transaction (`tenantTrx`) when the
+//     extension is mounted in a multi-tenant deployment, so RLS
+//     policies see the right `zveltio.current_tenant` GUC;
+//   - call `checkPermission(userId, collection, action)` so the
+//     GraphQL surface honours the same RBAC as `routes/data.ts`.
+//
+// Without this every authenticated user could `query { list_users { ... } }`
+// and bypass every tenant isolation and RBAC policy the rest of the engine
+// enforces — GraphQL was a hidden door past the entire `data.ts` security
+// layer.
 
 async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema> {
   const { db, DDLManager } = ctx;
@@ -184,64 +198,81 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
         filter_id:     { type: GraphQLID },
         filter_id_in:  { type: new GraphQLList(GraphQLID) },
       },
-      resolve: async (_: any, { limit, offset, filter_id, filter_id_in }: any) => {
+      resolve: async (_: any, { limit, offset, filter_id, filter_id_in }: any, context: any) => {
+        if (!(await context.checkPermission(context.user.id, col.name, 'read'))) {
+          throw new Error(`Forbidden: no read permission on "${col.name}"`);
+        }
         try {
-          let q = (db as any).selectFrom(tableName).selectAll();
+          const trx = context.tenantTrx ?? context.db ?? db;
+          let q = (trx as any).selectFrom(tableName).selectAll();
           if (filter_id)               q = q.where('id', '=', filter_id);
           if (filter_id_in?.length)    q = q.where('id', 'in', filter_id_in);
-          return await q.limit(limit).offset(offset).execute();
-        } catch { return []; }
+          // Clamp limit to 500 so a single GraphQL query can't pull
+          // arbitrary amounts of data — matches the `routes/data.ts`
+          // QuerySchema cap.
+          const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 500));
+          const safeOffset = Math.max(0, Number(offset) || 0);
+          return await q.limit(safeLimit).offset(safeOffset).execute();
+        } catch (err) { throw err; }
       },
     };
 
     queryFields[`get_${col.name}`] = {
       type: colType,
       args: { id: { type: new GraphQLNonNull(GraphQLID) } },
-      resolve: async (_: any, { id }: any) => {
-        try {
-          return await (db as any)
-            .selectFrom(tableName).selectAll()
-            .where('id', '=', id)
-            .executeTakeFirst();
-        } catch { return null; }
+      resolve: async (_: any, { id }: any, context: any) => {
+        if (!(await context.checkPermission(context.user.id, col.name, 'read'))) {
+          throw new Error(`Forbidden: no read permission on "${col.name}"`);
+        }
+        const trx = context.tenantTrx ?? context.db ?? db;
+        return await (trx as any)
+          .selectFrom(tableName).selectAll()
+          .where('id', '=', id)
+          .executeTakeFirst();
       },
     };
 
     mutationFields[`create_${col.name}`] = {
       type: colType,
       args: inputFields,
-      resolve: async (_: any, args: any) => {
-        try {
-          return await (db as any)
-            .insertInto(tableName).values(args)
-            .returningAll().executeTakeFirst();
-        } catch { return null; }
+      resolve: async (_: any, args: any, context: any) => {
+        if (!(await context.checkPermission(context.user.id, col.name, 'create'))) {
+          throw new Error(`Forbidden: no create permission on "${col.name}"`);
+        }
+        const trx = context.tenantTrx ?? context.db ?? db;
+        return await (trx as any)
+          .insertInto(tableName).values(args)
+          .returningAll().executeTakeFirst();
       },
     };
 
     mutationFields[`update_${col.name}`] = {
       type: colType,
       args: { id: { type: new GraphQLNonNull(GraphQLID) }, ...inputFields },
-      resolve: async (_: any, { id, ...data }: any) => {
-        try {
-          return await (db as any)
-            .updateTable(tableName)
-            .set({ ...data, updated_at: new Date() })
-            .where('id', '=', id)
-            .returningAll().executeTakeFirst();
-        } catch { return null; }
+      resolve: async (_: any, { id, ...data }: any, context: any) => {
+        if (!(await context.checkPermission(context.user.id, col.name, 'update'))) {
+          throw new Error(`Forbidden: no update permission on "${col.name}"`);
+        }
+        const trx = context.tenantTrx ?? context.db ?? db;
+        return await (trx as any)
+          .updateTable(tableName)
+          .set({ ...data, updated_at: new Date() })
+          .where('id', '=', id)
+          .returningAll().executeTakeFirst();
       },
     };
 
     mutationFields[`delete_${col.name}`] = {
       type: GraphQLBoolean,
       args: { id: { type: new GraphQLNonNull(GraphQLID) } },
-      resolve: async (_: any, { id }: any) => {
-        try {
-          const res = await (db as any)
-            .deleteFrom(tableName).where('id', '=', id).executeTakeFirst();
-          return (res?.numDeletedRows ?? 0n) > 0n;
-        } catch { return false; }
+      resolve: async (_: any, { id }: any, context: any) => {
+        if (!(await context.checkPermission(context.user.id, col.name, 'delete'))) {
+          throw new Error(`Forbidden: no delete permission on "${col.name}"`);
+        }
+        const trx = context.tenantTrx ?? context.db ?? db;
+        const res = await (trx as any)
+          .deleteFrom(tableName).where('id', '=', id).executeTakeFirst();
+        return (res?.numDeletedRows ?? 0n) > 0n;
       },
     };
 
@@ -387,8 +418,20 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
 
   const app = new Hono();
 
-  // ── GET / — GraphiQL ──────────────────────────────────────────────────────
-  app.get('/', (c) => c.html(PLAYGROUND_HTML));
+  // ── GET / — GraphiQL playground ───────────────────────────────────────────
+  // In production we gate the playground behind admin auth because
+  // (a) it exposes the entire schema via introspection and
+  // (b) it loads scripts from cdnjs that can't satisfy a strict CSP.
+  // In dev/staging it stays open so developers can explore.
+  app.get('/', async (c) => {
+    if (process.env.NODE_ENV === 'production') {
+      const session = await auth.api.getSession({ headers: c.req.raw.headers });
+      if (!session) return c.json({ error: 'Unauthorized' }, 401);
+      const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+      if (!isAdmin) return c.json({ error: 'GraphiQL is admin-only in production' }, 403);
+    }
+    return c.html(PLAYGROUND_HTML);
+  });
 
   // ── POST / — Execute GraphQL operation ───────────────────────────────────
   app.post('/', async (c) => {
@@ -418,13 +461,24 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
 
     try {
       const schema = await getSchema(ctx);
-      const loaders = new DataLoaderRegistry(db);
+      // Route handler is mounted inside the engine's tenantMiddleware →
+      // c.get('tenantTrx') exposes the per-request transaction with
+      // `SET LOCAL "zveltio.current_tenant"` already applied. Resolvers
+      // use this in preference to the raw pool so RLS policies fire.
+      const tenantTrx = (c.get as any)?.('tenantTrx') ?? null;
+      const loaders = new DataLoaderRegistry(tenantTrx ?? db);
       result = await graphql({
         schema,
         source: query,
         variableValues: variables,
         operationName,
-        contextValue: { user: session.user, db, loaders },
+        contextValue: {
+          user: session.user,
+          db,
+          tenantTrx,
+          loaders,
+          checkPermission,
+        },
       });
       errorCount = result.errors?.length ?? 0;
     } catch (err) {
@@ -559,12 +613,19 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
 
     try {
       const schema = await getSchema(ctx);
-      const loaders = new DataLoaderRegistry(db);
+      const tenantTrx = (c.get as any)?.('tenantTrx') ?? null;
+      const loaders = new DataLoaderRegistry(tenantTrx ?? db);
       const result = await graphql({
         schema,
         source: pq.query,
         variableValues: variables,
-        contextValue: { user: session.user, db, loaders },
+        contextValue: {
+          user: session.user,
+          db,
+          tenantTrx,
+          loaders,
+          checkPermission,
+        },
       });
 
       // Update use stats

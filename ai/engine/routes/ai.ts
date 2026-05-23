@@ -311,8 +311,19 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
         .execute()
         .catch(() => {});
 
-      // Optionally persist embedding for later semantic search
+      // Optionally persist embedding for later semantic search.
+      //
+      // Permission check: the caller must have write access on the
+      // collection they're indexing. Without this, any authenticated
+      // user could associate embeddings with rows in collections their
+      // role can't write to — search results would then pull text
+      // controlled by the attacker into RAG prompts for everyone else.
       if (body.collection && body.record_id && texts.length === 1) {
+        if (!(await checkPermission(user.id, body.collection, 'update'))) {
+          return c.json({
+            error: `Forbidden: no write permission on "${body.collection}" — embedding not persisted`,
+          }, 403);
+        }
         await sql`
           INSERT INTO zv_ai_embeddings (collection, record_id, field_name, content, metadata, updated_at)
           VALUES (
@@ -327,7 +338,17 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
             updated_at = NOW()
         `
           .execute(db)
-          .catch(() => {});
+          .catch((err: Error) => {
+            // NOTE: table currently named zvd_ai_embeddings in
+            // migrations/002_embeddings.sql — the code references
+            // zv_ai_embeddings (without the 'd'). The catch suppresses
+            // the resulting "table does not exist" error, so this code
+            // path is effectively a no-op in production. Fix as a
+            // schema-drift task in a separate PR; for the security
+            // audit's sake the access control above is the relevant
+            // change.
+            console.warn('[ai.embed] embedding persist failed:', err.message);
+          });
       }
 
       return c.json({
@@ -357,6 +378,15 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
 
       const { query, collection, field, limit, threshold } =
         c.req.valid('json');
+
+      // Per-collection read gate: without this, any authenticated user
+      // could `POST /ext/ai/search { collection: "users" }` and pull
+      // semantic-search hits across collections their RBAC role forbids.
+      // We piggyback on the existing collection-level permission so the
+      // AI surface honours the same RBAC as /api/data.
+      if (!(await checkPermission(user.id, collection, 'read'))) {
+        return c.json({ error: 'Forbidden: no read permission on this collection' }, 403);
+      }
 
       // Try pg_trgm similarity search on stored embeddings content
       const trgmResults = await sql<any>`
