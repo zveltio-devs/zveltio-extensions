@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { permissionGate } from '@zveltio/sdk/extension';
 
 export function ecommerceRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
@@ -128,6 +129,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     c.set('user', session.user);
     await next();
   });
+  app.use('/admin/*', permissionGate(ctx, 'store'));
 
   // ── Admin: Categories ──────────────────────────────────────────
   app.get('/admin/categories', async (c) => {

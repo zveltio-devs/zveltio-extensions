@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { permissionGate } from '@zveltio/sdk/extension';
 
 // Minimal MT940 parser — handles :60F:, :61:, :86: tags
 function parseMT940(text: string): Array<{date: string, type: 'credit'|'debit', amount: number, description: string, reference: string}> {
@@ -70,6 +71,8 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     c.set('user', session.user);
     await next();
   });
+
+  app.use('*', permissionGate(ctx, 'banking'));
 
   // ── Bank Accounts ─────────────────────────────────────────────
   app.get('/accounts', async (c) => {

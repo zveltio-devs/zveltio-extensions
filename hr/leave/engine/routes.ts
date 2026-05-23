@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { permissionGate } from '@zveltio/sdk/extension';
 
 async function countWorkingDays(db: any, startDate: string, endDate: string, isHalfDay = false): Promise<number> {
   if (isHalfDay) return 0.5;
@@ -33,6 +34,8 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
     c.set('user', session.user);
     await next();
   });
+
+  app.use('*', permissionGate(ctx, 'leave'));
 
   // ── Public Holidays ────────────────────────────────────────────
   app.get('/holidays', async (c) => {

@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { permissionGate } from '@zveltio/sdk/extension';
 
 export function projectsRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
@@ -14,6 +15,8 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
     c.set('user', session.user);
     await next();
   });
+
+  app.use('*', permissionGate(ctx, 'projects'));
 
   // ── Projects ───────────────────────────────────────────────────
   app.get('/', async (c) => {

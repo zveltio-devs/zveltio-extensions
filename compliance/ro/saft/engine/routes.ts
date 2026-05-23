@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { generateSAFTXML } from './saft-generator.js';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { permissionGate } from '@zveltio/sdk/extension';
 
 async function getUser(c: any, auth: any) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -35,6 +36,14 @@ const entrySchema = z.object({
 export function saftRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
   const app = new Hono();
+
+  app.use('*', async (c, next) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    c.set('user', session.user);
+    await next();
+  });
+  app.use('*', permissionGate(ctx, 'saft'));
 
   // --- Exports ---
 

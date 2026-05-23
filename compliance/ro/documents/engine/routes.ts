@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { permissionGate } from '@zveltio/sdk/extension';
 
 async function getUser(c: any, auth: any) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -14,6 +15,14 @@ const DOC_TYPES = ['contract', 'pv', 'nir', 'dispozitie_plata', 'proces_verbal',
 export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
   const app = new Hono();
+
+  app.use('*', async (c, next) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    c.set('user', session.user);
+    await next();
+  });
+  app.use('*', permissionGate(ctx, 'ro-documents'));
 
   // GET /templates
   app.get('/templates', async (c) => {
