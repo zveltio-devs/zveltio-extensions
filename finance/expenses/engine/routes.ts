@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { permissionGate } from '@zveltio/sdk/extension';
 
 async function recalcReportTotals(db: any, reportId: string) {
   await sql`
@@ -30,6 +31,8 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
     c.set('user', session.user);
     await next();
   });
+
+  app.use('*', permissionGate(ctx, 'expenses'));
 
   // ── Reports ───────────────────────────────────────────────────
   app.get('/reports', async (c) => {

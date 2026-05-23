@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import { generateUBLXML } from './ubl-generator.js';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { permissionGate } from '@zveltio/sdk/extension';
 
 const lineSchema = z.object({
   description: z.string().min(1),
@@ -54,6 +55,15 @@ async function logStatusChange(db: any, invoiceId: string, oldStatus: string, ne
 export function efacturaRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
   const app = new Hono();
+
+  // Auth + RBAC gate — populate c.user then check `efactura` permission.
+  app.use('*', async (c, next) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    c.set('user', session.user);
+    await next();
+  });
+  app.use('*', permissionGate(ctx, 'efactura'));
 
   // GET / — list invoices
   app.get('/', async (c) => {

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { permissionGate } from '@zveltio/sdk/extension';
 // @ts-ignore — cloud/trash is an optional extension
 const s3 = new S3Client({
   region: process.env.S3_REGION || 'us-east-1',
@@ -28,6 +29,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     c.set('user', session.user);
     await next();
   });
+  router.use('*', permissionGate(ctx, 'media'));
 
   // ==========================================
   // FOLDERS

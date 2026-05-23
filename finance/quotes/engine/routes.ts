@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { permissionGate } from '@zveltio/sdk/extension';
 
 async function nextQuoteNumber(db: any): Promise<string> {
   const row = await sql`SELECT COUNT(*) as cnt FROM zvd_quotes`.execute(db);
@@ -51,6 +52,8 @@ export function quotesRoutes(ctx: ExtensionContext): Hono {
     c.set('user', session.user);
     await next();
   });
+
+  app.use('*', permissionGate(ctx, 'quotes'));
 
   app.get('/', async (c) => {
     const { limit = '50', page = '1', status } = c.req.query();

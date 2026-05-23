@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { permissionGate } from '@zveltio/sdk/extension';
 type Bindings = { db: any; user: any };
 
 function buildListQuery(table: string, allowed: string[]) {
@@ -28,6 +29,12 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
     c.set('user', session.user);
     await next();
   });
+
+  // ── RBAC gate ─────────────────────────────────────────────────────────────
+  // All CRM endpoints require the caller to hold the matching permission on
+  // the `crm` resource (read/create/update/delete). Operators grant access via
+  // a Casbin policy in `zvd_permissions`; the god role bypasses.
+  app.use('*', permissionGate(ctx, 'crm'));
 
   // ═══════════════════════════════════════════════════════
   // CONTACTS

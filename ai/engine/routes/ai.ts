@@ -324,29 +324,24 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
             error: `Forbidden: no write permission on "${body.collection}" — embedding not persisted`,
           }, 403);
         }
+        const vectorLiteral = JSON.stringify(embeddings[0]);
         await sql`
-          INSERT INTO zv_ai_embeddings (collection, record_id, field_name, content, metadata, updated_at)
+          INSERT INTO zvd_ai_embeddings (collection, record_id, field, text_content, embedding, model, updated_at)
           VALUES (
             ${body.collection}, ${body.record_id}, ${body.field_name || 'content'},
-            ${texts[0]},
-            ${JSON.stringify({ embedding: embeddings[0], model: body.model || 'embedding', provider: provider.name })}::jsonb,
+            ${texts[0].slice(0, 2000)},
+            ${vectorLiteral}::vector,
+            ${body.model || 'embedding'},
             NOW()
           )
-          ON CONFLICT (collection, record_id, field_name) DO UPDATE SET
-            content = EXCLUDED.content,
-            metadata = EXCLUDED.metadata,
-            updated_at = NOW()
+          ON CONFLICT (collection, record_id, field) DO UPDATE SET
+            text_content = EXCLUDED.text_content,
+            embedding    = EXCLUDED.embedding,
+            model        = EXCLUDED.model,
+            updated_at   = NOW()
         `
           .execute(db)
           .catch((err: Error) => {
-            // NOTE: table currently named zvd_ai_embeddings in
-            // migrations/002_embeddings.sql — the code references
-            // zv_ai_embeddings (without the 'd'). The catch suppresses
-            // the resulting "table does not exist" error, so this code
-            // path is effectively a no-op in production. Fix as a
-            // schema-drift task in a separate PR; for the security
-            // audit's sake the access control above is the relevant
-            // change.
             console.warn('[ai.embed] embedding persist failed:', err.message);
           });
       }
@@ -388,12 +383,47 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
         return c.json({ error: 'Forbidden: no read permission on this collection' }, 403);
       }
 
-      // Try pg_trgm similarity search on stored embeddings content
+      // Try pgvector semantic search if we can embed the query.
+      // Falls back to pg_trgm on stored text_content when no embedder
+      // is available — both paths target the canonical zvd_ai_embeddings
+      // table from ai/engine/migrations/002_embeddings.sql.
+      const provider = aiProviderManager.getDefault();
+      if (provider?.embed) {
+        try {
+          const { embedding } = await provider.embed(query);
+          const queryVec = JSON.stringify(embedding);
+          const vecResults = await sql<any>`
+            SELECT record_id, text_content AS content,
+                   1 - (embedding <=> ${queryVec}::vector) AS score
+            FROM zvd_ai_embeddings
+            WHERE collection = ${collection}
+              AND (1 - (embedding <=> ${queryVec}::vector)) > ${threshold}
+            ORDER BY embedding <=> ${queryVec}::vector
+            LIMIT ${limit}
+          `
+            .execute(db)
+            .then((r) => r.rows)
+            .catch(() => []);
+
+          if (vecResults.length > 0) {
+            return c.json({
+              results: vecResults,
+              query,
+              collection,
+              count: vecResults.length,
+              method: 'pgvector',
+            });
+          }
+        } catch (err) {
+          console.warn('[ai.search] embed-query failed, falling back:', (err as Error).message);
+        }
+      }
+
       const trgmResults = await sql<any>`
-        SELECT record_id, content, similarity(content, ${query}) AS score
-        FROM zv_ai_embeddings
+        SELECT record_id, text_content AS content, similarity(text_content, ${query}) AS score
+        FROM zvd_ai_embeddings
         WHERE collection = ${collection}
-          AND similarity(content, ${query}) > ${threshold}
+          AND similarity(text_content, ${query}) > ${threshold}
         ORDER BY score DESC
         LIMIT ${limit}
       `

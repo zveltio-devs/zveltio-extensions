@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { permissionGate } from '@zveltio/sdk/extension';
 
 const POINTS_PER_CURRENCY_UNIT = 1; // 1 RON = 1 point
 const POINT_VALUE = 0.01; // 1 point = 0.01 RON
@@ -17,6 +18,8 @@ export function posRoutes(ctx: ExtensionContext): Hono {
     c.set('user', session.user);
     await next();
   });
+
+  app.use('*', permissionGate(ctx, 'pos'));
 
   // ── Customers & Loyalty ───────────────────────────────────────
   app.get('/customers', async (c) => {

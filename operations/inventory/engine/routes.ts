@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { permissionGate } from '@zveltio/sdk/extension';
 
 let poCounter = 0;
 async function nextPONumber(db: any): Promise<string> {
@@ -35,6 +36,8 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
     c.set('user', session.user);
     await next();
   });
+
+  app.use('*', permissionGate(ctx, 'inventory'));
 
   // ── Warehouses ────────────────────────────────────────────────
   app.get('/warehouses', async (c) => {
