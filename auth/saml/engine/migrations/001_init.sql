@@ -1,2 +1,0 @@
--- SAML auth extension — config stored in zv_settings under key 'saml_config'
--- No extension-specific tables in init

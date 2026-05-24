@@ -1,2 +1,0 @@
--- Data Export extension — uses core zv_collections, zv_fields tables
--- No extension-specific tables in init
