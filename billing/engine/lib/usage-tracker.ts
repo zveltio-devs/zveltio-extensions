@@ -1,4 +1,4 @@
-import type { Database } from '../../../../packages/engine/src/db/index.js';
+import type { Database } from '@zveltio/engine-db';
 
 let _db: Database | null = null;
 

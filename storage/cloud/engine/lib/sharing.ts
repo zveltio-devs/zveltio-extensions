@@ -1,6 +1,6 @@
 import { sql } from 'kysely';
 import { nanoid } from 'nanoid';
-import type { Database } from '../../db/index.js';
+import type { Database } from '@zveltio/engine-db';
 
 /**
  * Creates a public share link for a file or folder.

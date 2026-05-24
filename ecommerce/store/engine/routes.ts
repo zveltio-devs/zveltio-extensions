@@ -300,7 +300,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
   app.post('/admin/products/:id/variants', zValidator('json', z.object({
     sku: z.string().min(1),
     name: z.string().min(1),
-    attributes: z.record(z.string()).default({}),
+    attributes: z.record(z.string(), z.string()).default({}),
     price: z.number().optional(),
     compare_price: z.number().optional(),
     cost: z.number().optional(),

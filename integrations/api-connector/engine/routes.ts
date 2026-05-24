@@ -129,7 +129,7 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
     base_url: z.string().url(),
     auth_type: z.enum(['none','api_key','bearer','basic','oauth2']).default('none'),
     auth_config: z.record(z.string(), z.any()).default({}),
-    default_headers: z.record(z.string()).default({}),
+    default_headers: z.record(z.string(), z.string()).default({}),
     retry_count: z.number().int().min(0).max(5).default(3),
     timeout_ms: z.number().int().min(1000).max(120000).default(30000),
   })), async (c) => {
@@ -149,7 +149,7 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
   app.patch('/connections/:id', zValidator('json', z.object({
     name: z.string().optional(),
     auth_config: z.record(z.string(), z.any()).optional(),
-    default_headers: z.record(z.string()).optional(),
+    default_headers: z.record(z.string(), z.string()).optional(),
     is_active: z.boolean().optional(),
     retry_count: z.number().int().min(0).max(5).optional(),
     timeout_ms: z.number().int().optional(),
@@ -205,8 +205,8 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
     path: z.string().min(1),
     description: z.string().optional(),
     default_body: z.string().optional(),
-    default_headers: z.record(z.string()).default({}),
-    response_mapping: z.record(z.string()).default({}),
+    default_headers: z.record(z.string(), z.string()).default({}),
+    response_mapping: z.record(z.string(), z.string()).default({}),
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
@@ -248,10 +248,10 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
 
   // ── Execute with retry + OAuth2 ────────────────────────────────
   app.post('/endpoints/:id/execute', zValidator('json', z.object({
-    path_params: z.record(z.string()).default({}),
-    query_params: z.record(z.string()).default({}),
+    path_params: z.record(z.string(), z.string()).default({}),
+    query_params: z.record(z.string(), z.string()).default({}),
     body: z.any().optional(),
-    headers: z.record(z.string()).default({}),
+    headers: z.record(z.string(), z.string()).default({}),
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');

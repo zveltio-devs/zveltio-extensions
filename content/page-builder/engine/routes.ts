@@ -183,7 +183,7 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
       by_status: byStatus.rows,
       avg_seo_score: avgSeo.rows[0]?.avg_score ? parseFloat(avgSeo.rows[0].avg_score).toFixed(1) : null,
       views_last_30_days: parseInt(viewsMonth.rows[0]?.total || '0'),
-      redirect_count: parseInt(redirectCount?.count || '0'),
+      redirect_count: parseInt((redirectCount as any)?.count || '0'),
     });
   });
 

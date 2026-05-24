@@ -1,4 +1,4 @@
-import type { Database } from '../../../../packages/engine/src/db/index.js';
+import type { Database } from '@zveltio/engine-db';
 import { MeiliSearchClient } from './providers/meilisearch.js';
 import { TypesenseClient } from './providers/typesense.js';
 

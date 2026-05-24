@@ -13,7 +13,7 @@ import { simpleParser } from 'mailparser';
 import nodemailer from 'nodemailer';
 
 import { sql } from 'kysely';
-import type { Database } from '../../db/index.js';
+import type { Database } from '@zveltio/engine-db';
 import { decryptPassword } from './crypto.js';
 
 export interface MailAccountConfig {

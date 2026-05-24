@@ -183,7 +183,11 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     if (!invoice) return c.json({ error: 'Invoice not found' }, 404);
 
     const lines = typeof invoice.lines === 'string' ? JSON.parse(invoice.lines) : invoice.lines;
-    const xml = generateUBLXML({ ...invoice, lines });
+    // `invoice` is selectAll() so it's loosely typed; the UBL generator
+    // expects an InvoiceData shape but at this point we've validated
+    // upstream that all required fields are present. Cast to any to
+    // bridge the loose row → strict InvoiceData boundary.
+    const xml = generateUBLXML({ ...(invoice as any), lines });
 
     await db
       .updateTable('zv_efactura_invoices')

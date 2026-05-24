@@ -31,7 +31,7 @@ export function labelsRouter(ctx: ExtensionContext): Hono {
     if (!lot) return c.json({ error: 'Lot negăsit / Lot not found' }, 404);
 
     const pdf = await LabelService.generateLabel(lot);
-    return new Response(pdf, {
+    return new Response(new Uint8Array(pdf), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `inline; filename="eticheta-${lot.lot_number}.pdf"`,
@@ -49,7 +49,7 @@ export function labelsRouter(ctx: ExtensionContext): Hono {
     if (!validLots.length) return c.json({ error: 'Niciun lot valid / No valid lots' }, 404);
 
     const pdf = await LabelService.generateBatchLabels(validLots);
-    return new Response(pdf, {
+    return new Response(new Uint8Array(pdf), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': 'inline; filename="etichete-batch.pdf"',
@@ -63,7 +63,7 @@ export function labelsRouter(ctx: ExtensionContext): Hono {
     if (!exists.rows.length) return c.json({ error: 'Lot negăsit / Lot not found' }, 404);
 
     const buffer = await QRService.generateQRBuffer(c.req.param('lot_id'));
-    return new Response(buffer, {
+    return new Response(new Uint8Array(buffer), {
       headers: { 'Content-Type': 'image/png' },
     });
   });

@@ -158,16 +158,10 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
       )
     `.execute(db);
 
-    // Optional notification — ignore if module not present
-    try {
-      const { notifyRole } = await import('../lib/notifications.js');
-      await notifyRole('admin', {
-        title: 'New form submission',
-        message: `New submission on page "${slug}"`,
-        type: 'info',
-        source: 'form',
-      });
-    } catch {}
+    // Optional notification — the page-builder extension never shipped
+    // its own `lib/notifications.ts`, so this used to fail at runtime
+    // (silently caught) AND fail typecheck. Skip entirely until the
+    // notifications-via-services lookup is wired in.
 
     return c.json({ success: true, message: 'Form submitted successfully' });
   });

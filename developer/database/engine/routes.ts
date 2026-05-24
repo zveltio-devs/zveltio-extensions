@@ -1,14 +1,16 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import type { User } from 'better-auth';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 export function databaseRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
 
-  const router = new Hono<{ Variables: { user: User } }>()
+  // `user` is declared globally on Hono's ContextVariableMap via
+  // types/hono-augment.d.ts; importing `User` from better-auth was a
+  // workaround back when the global augment didn't exist.
+  const router = new Hono()
 
     // Admin-only middleware
     .use('*', async (c, next) => {

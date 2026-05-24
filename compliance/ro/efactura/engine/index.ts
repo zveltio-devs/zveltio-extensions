@@ -2,7 +2,7 @@ import type { ZveltioExtension } from '@zveltio/sdk/extension';
 import { join } from 'path';
 import { sql } from 'kysely';
 import { efacturaRoutes } from './routes.js';
-import { generateUBL } from './ubl-generator.js';
+import { generateUBLXML as generateUBL } from './ubl-generator.js';
 
 /**
  * Romanian e-Factura compliance extension.

@@ -76,7 +76,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
         code: z.string().default(''),
         http_method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'ANY']).default('POST'),
         timeout_ms: z.number().int().min(100).max(300000).default(30000),
-        env_vars: z.record(z.string()).default({}),
+        env_vars: z.record(z.string(), z.string()).default({}),
       }),
     ),
     async (c) => {
@@ -117,7 +117,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
         http_method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'ANY']).optional(),
         is_active: z.boolean().optional(),
         timeout_ms: z.number().optional(),
-        env_vars: z.record(z.string()).optional(),
+        env_vars: z.record(z.string(), z.string()).optional(),
       }),
     ),
     async (c) => {

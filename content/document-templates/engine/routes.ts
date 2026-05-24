@@ -76,7 +76,9 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
   const { generatePDFAsync } = ctx.internals;
 
-  const app = new Hono<{ Variables: { user: any } }>();
+  // `user` is declared globally on Hono's ContextVariableMap via
+  // types/hono-augment.d.ts; no per-app generic needed.
+  const app = new Hono();
 
   // Admin-only middleware
   app.use('*', async (c, next) => {

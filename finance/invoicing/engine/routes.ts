@@ -110,7 +110,7 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
       unit_price: z.number().default(0),
       tax_rate: z.number().default(19),
       sort_order: z.number().default(0),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     })).min(1),
   })), async (c) => {
     const user = c.get('user') as any;
