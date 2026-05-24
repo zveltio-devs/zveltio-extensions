@@ -1,0 +1,9 @@
+{
+  "hr.leave.empty": "No data yet.",
+  "hr.leave.emptyRequests": "No leave requests yet.",
+  "hr.leave.form.new": "New leave request",
+  "hr.leave.form.submit": "Submit request",
+  "hr.leave.new": "New request",
+  "hr.leave.subtitle": "Manage leave requests and approvals",
+  "hr.leave.title": "Leave"
+}

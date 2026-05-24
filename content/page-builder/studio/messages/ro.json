@@ -1,0 +1,9 @@
+{
+  "content.page-builder.empty": "No data yet.",
+  "content.page-builder.section.settings": "Setări pagină",
+  "content.page-builder.subtitle": "/{selected.slug}",
+  "content.page-builder.title": "Page Builder",
+  "content.page-builder.ui.meta_description": "Meta description",
+  "content.page-builder.ui.meta_title": "Meta title",
+  "content.page-builder.ui.slug": "Slug"
+}

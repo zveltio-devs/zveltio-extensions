@@ -18,8 +18,13 @@
   },
   "studio": {
     "pages": [
-      { "path": "/admin/storage/cloud", "label": "Cloud Storage", "icon": "Cloud" }
-    ]
+      {
+        "path": "/admin/storage/cloud",
+        "label": "Cloud Storage",
+        "icon": "Cloud"
+      }
+    ],
+    "navGroup": "other"
   },
   "contributes": {
     "engine": true,

@@ -1,0 +1,16 @@
+{
+  "developer.views.btn.newView": "New view",
+  "developer.views.confirmDelete": "Delete view?",
+  "developer.views.empty": "No saved views yet.",
+  "developer.views.error.invalidJson": "Invalid JSON in config",
+  "developer.views.subtitle": "Saved views for collections",
+  "developer.views.title": "Custom Views",
+  "developer.views.toast.created": "View created.",
+  "developer.views.ui.calendar": "Calendar",
+  "developer.views.ui.card_grid": "Card grid",
+  "developer.views.ui.kanban_board": "Kanban board",
+  "developer.views.ui.list": "List",
+  "developer.views.ui.map_requires_postgis": "Map (requires PostGIS)",
+  "developer.views.ui.new_view": "New view",
+  "developer.views.ui.view_type": "View type"
+}

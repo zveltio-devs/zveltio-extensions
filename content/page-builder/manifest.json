@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/page-builder", "label": "Pages", "icon": "Layout" }
-    ]
+      {
+        "path": "/admin/page-builder",
+        "label": "Pages",
+        "icon": "Layout"
+      }
+    ],
+    "navGroup": "content"
   },
   "contributes": {
     "engine": true,

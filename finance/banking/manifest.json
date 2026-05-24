@@ -11,12 +11,20 @@
     "database"
   ],
   "dependencies": [
-    { "name": "finance/invoicing", "minVersion": "1.0.0" }
+    {
+      "name": "finance/invoicing",
+      "minVersion": "1.0.0"
+    }
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/finance/banking", "label": "Banking Sync", "icon": "Landmark" }
-    ]
+      {
+        "path": "/admin/finance/banking",
+        "label": "Banking Sync",
+        "icon": "Landmark"
+      }
+    ],
+    "navGroup": "finance"
   },
   "contributes": {
     "engine": true,

@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/data/import", "label": "Import", "icon": "Upload" }
-    ]
+      {
+        "path": "/admin/data/import",
+        "label": "Import",
+        "icon": "Upload"
+      }
+    ],
+    "navGroup": "developer"
   },
   "contributes": {
     "engine": true,

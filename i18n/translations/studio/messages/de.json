@@ -1,0 +1,19 @@
+{
+  "i18n.translations.btn.search": "Search",
+  "i18n.translations.col.context": "Context",
+  "i18n.translations.col.localeCode": "Code (e.g. ro, en, de)",
+  "i18n.translations.col.localeName": "Name",
+  "i18n.translations.col.term": "Term",
+  "i18n.translations.col.translation": "Translation",
+  "i18n.translations.empty": "No data yet.",
+  "i18n.translations.subtitle": "Internationalization: manage locales, translation keys and per-locale string values",
+  "i18n.translations.tab.glossary": "Glossary",
+  "i18n.translations.tab.keys": "Keys",
+  "i18n.translations.tab.locales": "Locales",
+  "i18n.translations.title": "Translations",
+  "i18n.translations.ui.glossary_empty": "Glossary empty.",
+  "i18n.translations.ui.new_locale": "New locale",
+  "i18n.translations.ui.no_keys": "No keys.",
+  "i18n.translations.ui.no_locales": "No locales.",
+  "i18n.translations.ui.search_keys": "Search keys..."
+}

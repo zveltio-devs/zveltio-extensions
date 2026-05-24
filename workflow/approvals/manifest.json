@@ -17,5 +17,8 @@
       "WorkflowActions"
     ],
     "fieldTypes": []
+  },
+  "studio": {
+    "navGroup": "other"
   }
 }

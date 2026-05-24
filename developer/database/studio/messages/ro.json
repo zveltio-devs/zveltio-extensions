@@ -1,0 +1,21 @@
+{
+  "developer.database.col.column": "Coloană",
+  "developer.database.col.default": "Implicit",
+  "developer.database.col.nullable": "Nullable",
+  "developer.database.columns": "coloane",
+  "developer.database.empty": "No data yet.",
+  "developer.database.loading": "Se încarcă…",
+  "developer.database.no": "nu",
+  "developer.database.noRows": "Niciun rând.",
+  "developer.database.noTables": "Nicio tabelă.",
+  "developer.database.rows": "rânduri",
+  "developer.database.section.sampleRows": "Rânduri eșantion",
+  "developer.database.section.schema": "Schemă",
+  "developer.database.selectTable": "Selectează o tabelă pentru inspecție.",
+  "developer.database.showingRows": "Primele 50 din {n}.",
+  "developer.database.subtitle": "Inspect tables, schemas, and sample rows",
+  "developer.database.tables": "Tabele",
+  "developer.database.title": "Database",
+  "developer.database.ui.filter": "Filter…",
+  "developer.database.yes": "da"
+}

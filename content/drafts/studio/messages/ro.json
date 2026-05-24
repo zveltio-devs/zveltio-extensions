@@ -1,0 +1,13 @@
+{
+  "content.drafts.btn.publish": "Publică",
+  "content.drafts.col.author": "Autor",
+  "content.drafts.col.record": "Înregistrare",
+  "content.drafts.col.updated": "Actualizat",
+  "content.drafts.confirmDiscard": "Renunți la ciornă?",
+  "content.drafts.empty": "No data yet.",
+  "content.drafts.subtitle": "Pending drafts across all collections. Publish promotes the draft to the live record.",
+  "content.drafts.title": "Drafts",
+  "content.drafts.toast.discarded": "Renunțat.",
+  "content.drafts.toast.published": "Ciornă publicată.",
+  "content.drafts.ui.no_pending_drafts": "No pending drafts."
+}

@@ -1,0 +1,20 @@
+{
+  "hr.payroll.btn.generate": "Generează",
+  "hr.payroll.btn.newPeriod": "Perioadă nouă",
+  "hr.payroll.btn.revisal": "XML Revisal",
+  "hr.payroll.col.gross": "Brut",
+  "hr.payroll.col.net": "Net",
+  "hr.payroll.empty": "No data yet.",
+  "hr.payroll.empty.periods": "Nicio perioadă încă.",
+  "hr.payroll.selectPeriod": "Selectează o perioadă pentru înregistrări salarizare.",
+  "hr.payroll.subtitle": "Manage payroll periods and generate payslips",
+  "hr.payroll.tab.periods": "Perioade",
+  "hr.payroll.title": "Payroll",
+  "hr.payroll.toast.entriesGenerated": "Înregistrări generate.",
+  "hr.payroll.toast.periodCreated": "Perioadă creată.",
+  "hr.payroll.ui.entries": "Entries",
+  "hr.payroll.ui.name_e_g_november_2026": "Name (e.g. November 2026)",
+  "hr.payroll.ui.new_payroll_period": "payroll period",
+  "hr.payroll.ui.no_entries_click_generate": "No entries — click Generate.",
+  "hr.payroll.ui.pay_date": "Pay date"
+}

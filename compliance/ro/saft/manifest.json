@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/compliance/ro/saft", "label": "SAF-T RO", "icon": "FileSpreadsheet" }
-    ]
+      {
+        "path": "/admin/compliance/ro/saft",
+        "label": "SAF-T RO",
+        "icon": "FileSpreadsheet"
+      }
+    ],
+    "navGroup": "compliance"
   },
   "contributes": {
     "engine": true,

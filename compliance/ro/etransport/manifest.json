@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/compliance/ro/etransport", "label": "e-Transport RO", "icon": "Truck" }
-    ]
+      {
+        "path": "/admin/compliance/ro/etransport",
+        "label": "e-Transport RO",
+        "icon": "Truck"
+      }
+    ],
+    "navGroup": "compliance"
   },
   "contributes": {
     "engine": true,

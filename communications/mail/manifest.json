@@ -12,7 +12,10 @@
     "settings"
   ],
   "dependencies": [
-    { "name": "ai", "minVersion": "1.0.0" }
+    {
+      "name": "ai",
+      "minVersion": "1.0.0"
+    }
   ],
   "peerDependencies": {
     "imapflow": "^1.0.0",
@@ -21,8 +24,13 @@
   },
   "studio": {
     "pages": [
-      { "path": "/admin/mail", "label": "Mail", "icon": "Mail" }
-    ]
+      {
+        "path": "/admin/mail",
+        "label": "Mail",
+        "icon": "Mail"
+      }
+    ],
+    "navGroup": "communications"
   },
   "contributes": {
     "engine": true,

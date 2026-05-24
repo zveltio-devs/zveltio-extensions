@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/integrations/api-connector", "label": "API Connector", "icon": "Plug" }
-    ]
+      {
+        "path": "/admin/integrations/api-connector",
+        "label": "API Connector",
+        "icon": "Plug"
+      }
+    ],
+    "navGroup": "developer"
   },
   "contributes": {
     "engine": true,

@@ -1,0 +1,13 @@
+{
+  "content.drafts.btn.publish": "Publish",
+  "content.drafts.col.author": "Author",
+  "content.drafts.col.record": "Record",
+  "content.drafts.col.updated": "Updated",
+  "content.drafts.confirmDiscard": "Discard draft?",
+  "content.drafts.empty": "No data yet.",
+  "content.drafts.subtitle": "Pending drafts across all collections. Publish promotes the draft to the live record.",
+  "content.drafts.title": "Drafts",
+  "content.drafts.toast.discarded": "Discarded.",
+  "content.drafts.toast.published": "Draft published.",
+  "content.drafts.ui.no_pending_drafts": "No pending drafts."
+}

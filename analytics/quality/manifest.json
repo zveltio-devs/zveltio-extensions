@@ -13,5 +13,8 @@
   "contributes": {
     "engine": true,
     "studio": true
+  },
+  "studio": {
+    "navGroup": "developer"
   }
 }

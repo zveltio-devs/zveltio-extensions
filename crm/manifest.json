@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/crm", "label": "CRM", "icon": "Users" }
-    ]
+      {
+        "path": "/admin/crm",
+        "label": "CRM",
+        "icon": "Users"
+      }
+    ],
+    "navGroup": "business"
   },
   "contributes": {
     "engine": true,

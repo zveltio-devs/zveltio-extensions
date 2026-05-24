@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/content/document-templates", "label": "Document Templates", "icon": "FileType" }
-    ]
+      {
+        "path": "/admin/content/document-templates",
+        "label": "Document Templates",
+        "icon": "FileType"
+      }
+    ],
+    "navGroup": "content"
   },
   "contributes": {
     "engine": true,

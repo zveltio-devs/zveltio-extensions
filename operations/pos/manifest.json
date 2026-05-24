@@ -11,12 +11,20 @@
     "database"
   ],
   "dependencies": [
-    { "name": "operations/inventory", "minVersion": "1.0.0" }
+    {
+      "name": "operations/inventory",
+      "minVersion": "1.0.0"
+    }
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/pos", "label": "POS", "icon": "ScanLine" }
-    ]
+      {
+        "path": "/admin/pos",
+        "label": "POS",
+        "icon": "ScanLine"
+      }
+    ],
+    "navGroup": "operations"
   },
   "contributes": {
     "engine": true,

@@ -1,0 +1,21 @@
+{
+  "operations.pos.closeSession": "Close session",
+  "operations.pos.col.orderCount": "Orders",
+  "operations.pos.col.sales": "Sales",
+  "operations.pos.col.time": "Time",
+  "operations.pos.empty": "No data yet.",
+  "operations.pos.openSession": "Open session",
+  "operations.pos.recentOrders": "Recent orders",
+  "operations.pos.session.noOpen": "No open session.",
+  "operations.pos.session.open": "Session open",
+  "operations.pos.session.openingFloat": "Opening float:",
+  "operations.pos.subtitle": "Session management and order history",
+  "operations.pos.title": "Point of Sale",
+  "operations.pos.toast.sessionClosed": "Session closed.",
+  "operations.pos.toast.sessionOpened": "Session opened.",
+  "operations.pos.ui.closing_float": "Closing float",
+  "operations.pos.ui.no_orders_yet": "No orders yet.",
+  "operations.pos.ui.no_reports": "No reports.",
+  "operations.pos.ui.opening_float": "Opening float",
+  "operations.pos.zReports": "Recent Z-reports"
+}

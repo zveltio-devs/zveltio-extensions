@@ -11,12 +11,20 @@
     "database"
   ],
   "dependencies": [
-    { "name": "ai", "minVersion": "1.0.0" }
+    {
+      "name": "ai",
+      "minVersion": "1.0.0"
+    }
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/developer/validation", "label": "Validation Rules", "icon": "ShieldCheck" }
-    ]
+      {
+        "path": "/admin/developer/validation",
+        "label": "Validation Rules",
+        "icon": "ShieldCheck"
+      }
+    ],
+    "navGroup": "developer"
   },
   "contributes": {
     "engine": true,

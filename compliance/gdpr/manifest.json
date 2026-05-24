@@ -13,5 +13,8 @@
   "contributes": {
     "engine": true,
     "studio": false
+  },
+  "studio": {
+    "navGroup": "compliance"
   }
 }

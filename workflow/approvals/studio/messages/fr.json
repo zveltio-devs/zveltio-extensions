@@ -1,0 +1,12 @@
+{
+  "workflow.approvals.confirmCancel": "Cancel this approval request?",
+  "workflow.approvals.empty": "No data yet.",
+  "workflow.approvals.empty.requests": "No approval requests found.",
+  "workflow.approvals.empty.workflows": "No workflows configured.",
+  "workflow.approvals.subtitle": "Manage approval requests and workflow definitions",
+  "workflow.approvals.tab.requests": "Requests",
+  "workflow.approvals.tab.workflows": "Workflows",
+  "workflow.approvals.tab.workflowsLabel": "Workflows",
+  "workflow.approvals.title": "Approvals",
+  "workflow.approvals.toast.cancelled": "Cancelled."
+}

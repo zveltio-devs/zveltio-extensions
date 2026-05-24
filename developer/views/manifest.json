@@ -10,8 +10,13 @@
   "permissions": [],
   "studio": {
     "pages": [
-      { "path": "/admin/developer/views", "label": "Custom Views", "icon": "LayoutGrid" }
-    ]
+      {
+        "path": "/admin/developer/views",
+        "label": "Custom Views",
+        "icon": "LayoutGrid"
+      }
+    ],
+    "navGroup": "developer"
   },
   "contributes": {
     "engine": false,

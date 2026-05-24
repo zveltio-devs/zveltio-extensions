@@ -14,5 +14,8 @@
     "engine": true,
     "studio": true,
     "fieldTypes": []
+  },
+  "studio": {
+    "navGroup": "finance"
   }
 }
