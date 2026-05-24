@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { permissionGate } from '@zveltio/sdk/extension';
 // ─── Serialization helpers ────────────────────────────────────────────────────
 
 function toCSV(rows: any[]): string {
@@ -136,6 +137,8 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
     c.set('user', session.user);
     await next();
   });
+
+  app.use('*', permissionGate(ctx, 'export'));
 
   // ── GET /stats ───────────────────────────────────────────────────────────────
   app.get('/stats', async (c) => {
