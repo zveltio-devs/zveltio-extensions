@@ -425,8 +425,8 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
       GROUP BY a.code, a.name, a.type
       ORDER BY a.type, a.code
     `.execute(db);
-    const revenue = rows.rows.filter((r: any) => r.type === 'revenue').reduce((s: number, r: any) => s + +r.amount, 0);
-    const expense = rows.rows.filter((r: any) => r.type === 'expense').reduce((s: number, r: any) => s + +r.amount, 0);
+    const revenue: number = (rows.rows.filter((r: any) => r.type === 'revenue') as any[]).reduce((s: number, r: any) => s + +r.amount, 0);
+    const expense: number = (rows.rows.filter((r: any) => r.type === 'expense') as any[]).reduce((s: number, r: any) => s + +r.amount, 0);
     return c.json({ data: { from: fromDate, to: toDate, revenue, expenses: expense, net: revenue - expense, breakdown: rows.rows } });
   });
 

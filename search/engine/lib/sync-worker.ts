@@ -1,4 +1,4 @@
-import type { Database } from '../../../../packages/engine/src/db/index.js';
+import type { Database } from '@zveltio/engine-db';
 import { SearchManager } from './search-manager.js';
 
 export function startSyncWorker(db: Database, eventBus: any): void {

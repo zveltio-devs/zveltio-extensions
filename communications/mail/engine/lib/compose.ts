@@ -3,7 +3,7 @@
  */
 
 import { sql } from 'kysely';
-import type { Database } from '../../db/index.js';
+import type { Database } from '@zveltio/engine-db';
 import { sendMail } from './imap-client.js';
 
 // ═══ REPLY / FORWARD CONTEXT ═════════════════════════════════════════════════

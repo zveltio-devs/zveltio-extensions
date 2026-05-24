@@ -152,7 +152,7 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
     variants: z.array(z.object({
       name: z.string().min(1),
       sku: z.string().optional(),
-      attributes: z.record(z.string()).default({}),
+      attributes: z.record(z.string(), z.string()).default({}),
       unit_price: z.number().optional(),
     })).default([]),
   })), async (c) => {
@@ -197,7 +197,7 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
   app.post('/products/:id/variants', zValidator('json', z.object({
     name: z.string().min(1),
     sku: z.string().optional(),
-    attributes: z.record(z.string()).default({}),
+    attributes: z.record(z.string(), z.string()).default({}),
     unit_price: z.number().optional(),
     unit_cost: z.number().optional(),
     barcode: z.string().optional(),

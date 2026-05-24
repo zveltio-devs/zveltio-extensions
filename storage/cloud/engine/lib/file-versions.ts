@@ -1,7 +1,7 @@
 import { sql } from 'kysely';
 import { nanoid } from 'nanoid';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import type { Database } from '../../db/index.js';
+import type { Database } from '@zveltio/engine-db';
 
 const MAX_VERSIONS = 20;
 

@@ -62,6 +62,6 @@
       "../zveltio/packages/engine/node_modules/@types"
     ]
   },
-  "include": ["**/*.svelte", "**/*.ts", "**/*.d.ts"],
+  "include": ["**/*.svelte", "**/*.ts", "**/*.d.ts", "types/**/*.d.ts"],
   "exclude": ["**/node_modules", "**/dist"]
 }

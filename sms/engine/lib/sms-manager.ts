@@ -1,4 +1,4 @@
-import type { Database } from '../../../../packages/engine/src/db/index.js';
+import type { Database } from '@zveltio/engine-db';
 import { sendViaTwilio } from './providers/twilio.js';
 import { sendViaVonage } from './providers/vonage.js';
 

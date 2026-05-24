@@ -229,12 +229,12 @@ export function aiSchemaGenRoutes(ctx: ExtensionContext): Hono {
           continue;
         }
 
-        const jobId = await enqueueDDLJob(db, 'create_collection', {
+        const jobId = (await enqueueDDLJob(db, 'create_collection', {
           name: col.name,
           displayName: col.displayName || col.name,
           description: col.description,
           fields: validFields,
-        });
+        })) as string;
         jobIds.push(jobId);
         created.push(col.name);
       } catch (err) {

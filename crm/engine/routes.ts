@@ -98,7 +98,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       tags: z.array(z.string()).optional(),
       notes: z.string().optional(),
       source: z.string().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     })),
     async (c) => {
       const user = c.get('user') as any;
@@ -132,7 +132,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       tags: z.array(z.string()).optional(),
       notes: z.string().optional(),
       source: z.string().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     })),
     async (c) => {
       const d = c.req.valid('json');
@@ -227,7 +227,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       logo_url: z.string().url().optional(),
       tags: z.array(z.string()).optional(),
       notes: z.string().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     })),
     async (c) => {
       const user = c.get('user') as any;
@@ -263,7 +263,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       logo_url: z.string().url().optional(),
       is_active: z.boolean().optional(),
       tags: z.array(z.string()).optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     })),
     async (c) => {
       const d = c.req.valid('json');
@@ -365,10 +365,10 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       total_amount: z.number().default(0),
       due_date: z.string().optional(),
       paid_date: z.string().optional(),
-      line_items: z.array(z.record(z.unknown())).optional(),
+      line_items: z.array(z.record(z.string(), z.unknown())).optional(),
       notes: z.string().optional(),
       reference: z.string().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     })),
     async (c) => {
       const user = c.get('user') as any;
@@ -404,7 +404,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       paid_date: z.string().optional(),
       notes: z.string().optional(),
       reference: z.string().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     })),
     async (c) => {
       const d = c.req.valid('json');

@@ -204,7 +204,14 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     `;
     params.push(limitNum);
 
-    const messages = await sql.raw(query, params).execute(db);
+    // CompiledQuery is the right hook for parameterised raw SQL — the
+    // legacy `sql.raw(query, params)` signature was dropped in
+    // Kysely ≥ 0.25 and now takes a single string argument.
+    const messages = await db.executeQuery({
+      sql: query,
+      parameters: params,
+      query: { kind: 'RawNode', sqlFragments: [query], parameters: params },
+    } as any);
     return c.json({ messages: messages.rows });
   });
 
@@ -279,11 +286,16 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     params.push(c.req.param('id'));
     params.push(user.id);
 
-    await sql.raw(`
+    const updateSql = `
       UPDATE zv_mail_messages SET ${sets.join(', ')}
       WHERE id = $${params.length - 1}
       AND account_id IN (SELECT id FROM zv_mail_accounts WHERE user_id = $${params.length})
-    `, params).execute(db);
+    `;
+    await db.executeQuery({
+      sql: updateSql,
+      parameters: params,
+      query: { kind: 'RawNode', sqlFragments: [updateSql], parameters: params },
+    } as any);
 
     return c.json({ success: true });
   });

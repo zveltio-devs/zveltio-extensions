@@ -13,7 +13,7 @@ import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { ZveltioAIEngine } from '../lib/zveltio-ai/engine.js';
 
 export function zveltioAIRoutes(ctx: ExtensionContext): Hono {
-  const { auth } = ctx;
+  const { db, auth } = ctx;
   const app = new Hono();
   const engine = new ZveltioAIEngine(ctx);
 

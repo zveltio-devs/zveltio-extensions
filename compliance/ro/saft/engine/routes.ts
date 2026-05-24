@@ -164,8 +164,11 @@ export function saftRoutes(ctx: ExtensionContext): Hono {
       company_address: exp.company_address,
       period_start: exp.period_start,
       period_end: exp.period_end,
-      accounts,
-      entries,
+      // selectAll() rows are loosely typed; SAFTAccount / SAFTJournalEntry
+      // are the strict shapes the generator expects. Schema columns
+      // match — only the type system disagrees with the runtime.
+      accounts: accounts as any,
+      entries: entries as any,
     });
 
     await db
