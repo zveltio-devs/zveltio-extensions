@@ -11,12 +11,20 @@
     "database"
   ],
   "dependencies": [
-    { "name": "finance/invoicing", "minVersion": "1.0.0" }
+    {
+      "name": "finance/invoicing",
+      "minVersion": "1.0.0"
+    }
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/finance/quotes", "label": "Quotes", "icon": "FileText" }
-    ]
+      {
+        "path": "/admin/finance/quotes",
+        "label": "Quotes",
+        "icon": "FileText"
+      }
+    ],
+    "navGroup": "finance"
   },
   "contributes": {
     "engine": true,

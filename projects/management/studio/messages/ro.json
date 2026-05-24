@@ -1,0 +1,23 @@
+{
+  "projects.management.btn.newProject": "Proiect nou",
+  "projects.management.btn.newTask": "Task nou",
+  "projects.management.col.assignee": "Responsabil",
+  "projects.management.col.dueDate": "Termen",
+  "projects.management.col.priority": "Prioritate",
+  "projects.management.col.status": "Status",
+  "projects.management.empty": "No data yet.",
+  "projects.management.empty.projects": "Niciun proiect încă.",
+  "projects.management.form.name": "Nume *",
+  "projects.management.form.title": "Titlu *",
+  "projects.management.priority.high": "Ridicată",
+  "projects.management.priority.low": "Scăzută",
+  "projects.management.priority.medium": "Medie",
+  "projects.management.priority.urgent": "Urgent",
+  "projects.management.subtitle": "Kanban board and task management",
+  "projects.management.title": "Proiecte",
+  "projects.management.ui.end_date": "End date",
+  "projects.management.ui.new_project": "project",
+  "projects.management.ui.new_task": "task",
+  "projects.management.ui.no_tasks": "No tasks.",
+  "projects.management.ui.start_date": "Start date"
+}

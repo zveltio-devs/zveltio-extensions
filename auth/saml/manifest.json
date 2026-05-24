@@ -15,8 +15,13 @@
   },
   "studio": {
     "pages": [
-      { "path": "/admin/auth/saml", "label": "SAML SSO", "icon": "Lock" }
-    ]
+      {
+        "path": "/admin/auth/saml",
+        "label": "SAML SSO",
+        "icon": "Lock"
+      }
+    ],
+    "navGroup": "other"
   },
   "contributes": {
     "engine": true,

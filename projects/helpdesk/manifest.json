@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/projects/helpdesk", "label": "Helpdesk", "icon": "LifeBuoy" }
-    ]
+      {
+        "path": "/admin/projects/helpdesk",
+        "label": "Helpdesk",
+        "icon": "LifeBuoy"
+      }
+    ],
+    "navGroup": "projects"
   },
   "contributes": {
     "engine": true,

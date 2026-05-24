@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/i18n", "label": "Translations", "icon": "Languages" }
-    ]
+      {
+        "path": "/admin/i18n",
+        "label": "Translations",
+        "icon": "Languages"
+      }
+    ],
+    "navGroup": "other"
   },
   "contributes": {
     "engine": true,

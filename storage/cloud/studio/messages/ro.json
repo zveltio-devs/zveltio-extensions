@@ -1,0 +1,18 @@
+{
+  "storage.cloud.btn.share": "Partajează",
+  "storage.cloud.col.modified": "Modificat",
+  "storage.cloud.col.size": "Dimensiune",
+  "storage.cloud.confirmDeleteFile": "Ștergi acest fișier?",
+  "storage.cloud.copyClose": "Copiază și închide",
+  "storage.cloud.empty": "No data yet.",
+  "storage.cloud.empty.folder": "Folder gol. Trage fișiere sau apasă Încarcă.",
+  "storage.cloud.generateLink": "Generează link",
+  "storage.cloud.root": "Rădăcină",
+  "storage.cloud.share": "Partajează",
+  "storage.cloud.shareTitle": "Partajează {name}",
+  "storage.cloud.subtitle": "Files and folders",
+  "storage.cloud.title": "Cloud Storage",
+  "storage.cloud.toast.uploaded": "Încărcat.",
+  "storage.cloud.ui.expires_hours": "Expires (hours)",
+  "storage.cloud.ui.password_optional": "Password (optional)"
+}

@@ -17,7 +17,8 @@
         "label": "e-Factura RO",
         "icon": "receipt"
       }
-    ]
+    ],
+    "navGroup": "compliance"
   },
   "contributes": {
     "engine": true,

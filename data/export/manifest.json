@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/data/export", "label": "Export", "icon": "Download" }
-    ]
+      {
+        "path": "/admin/data/export",
+        "label": "Export",
+        "icon": "Download"
+      }
+    ],
+    "navGroup": "developer"
   },
   "contributes": {
     "engine": true,

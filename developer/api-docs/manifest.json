@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/developer/api-docs", "label": "API Docs", "icon": "BookOpen" }
-    ]
+      {
+        "path": "/admin/developer/api-docs",
+        "label": "API Docs",
+        "icon": "BookOpen"
+      }
+    ],
+    "navGroup": "developer"
   },
   "contributes": {
     "engine": true,

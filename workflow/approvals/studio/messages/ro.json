@@ -1,0 +1,12 @@
+{
+  "workflow.approvals.confirmCancel": "Anulezi cererea de aprobare?",
+  "workflow.approvals.empty": "No data yet.",
+  "workflow.approvals.empty.requests": "Nicio cerere de aprobare.",
+  "workflow.approvals.empty.workflows": "Niciun flux configurat.",
+  "workflow.approvals.subtitle": "Manage approval requests and workflow definitions",
+  "workflow.approvals.tab.requests": "Cereri",
+  "workflow.approvals.tab.workflows": "Fluxuri",
+  "workflow.approvals.tab.workflowsLabel": "Fluxuri",
+  "workflow.approvals.title": "Approvals",
+  "workflow.approvals.toast.cancelled": "Anulat."
+}

@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/byod", "label": "Bring Your Own Database", "icon": "Database" }
-    ]
+      {
+        "path": "/admin/byod",
+        "label": "Bring Your Own Database",
+        "icon": "Database"
+      }
+    ],
+    "navGroup": "developer"
   },
   "contributes": {
     "engine": true,

@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/developer/database", "label": "Database", "icon": "Database" }
-    ]
+      {
+        "path": "/admin/developer/database",
+        "label": "Database",
+        "icon": "Database"
+      }
+    ],
+    "navGroup": "developer"
   },
   "contributes": {
     "engine": true,

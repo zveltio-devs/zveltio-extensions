@@ -17,7 +17,8 @@
         "label": "RO Documents",
         "icon": "file-text"
       }
-    ]
+    ],
+    "navGroup": "compliance"
   },
   "contributes": {
     "engine": true,

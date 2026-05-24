@@ -16,5 +16,8 @@
       "PdfViewer",
       "PdfBlock"
     ]
+  },
+  "studio": {
+    "navGroup": "content"
   }
 }

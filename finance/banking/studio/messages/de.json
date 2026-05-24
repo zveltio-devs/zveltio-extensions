@@ -1,0 +1,20 @@
+{
+  "finance.banking.empty": "No data yet.",
+  "finance.banking.empty.accounts": "No bank accounts yet.",
+  "finance.banking.empty.transactions": "No transactions yet.",
+  "finance.banking.empty.unreconciled": "No unreconciled transactions.",
+  "finance.banking.newAccount": "New account",
+  "finance.banking.section.openInvoices": "Open invoices (sent)",
+  "finance.banking.section.unreconciled": "Unreconciled transactions",
+  "finance.banking.status.pending": "Pending",
+  "finance.banking.status.reconciled": "Reconciled",
+  "finance.banking.subtitle": "Bank accounts, transactions, and reconciliation",
+  "finance.banking.tab.accounts": "Accounts",
+  "finance.banking.tab.reconciliation": "Reconciliation",
+  "finance.banking.tab.transactions": "Transactions",
+  "finance.banking.title": "Banking",
+  "finance.banking.ui.internal_name": "Internal name",
+  "finance.banking.ui.new_bank_account": "New bank account",
+  "finance.banking.ui.no_open_invoices": "No open invoices.",
+  "finance.banking.ui.opening_balance": "Opening balance"
+}

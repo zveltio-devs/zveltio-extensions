@@ -11,13 +11,24 @@
     "database"
   ],
   "dependencies": [
-    { "name": "hr/employees",      "minVersion": "1.0.0" },
-    { "name": "finance/invoicing", "minVersion": "1.0.0" }
+    {
+      "name": "hr/employees",
+      "minVersion": "1.0.0"
+    },
+    {
+      "name": "finance/invoicing",
+      "minVersion": "1.0.0"
+    }
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/hr/time-tracking", "label": "Time Tracking", "icon": "Clock" }
-    ]
+      {
+        "path": "/admin/hr/time-tracking",
+        "label": "Time Tracking",
+        "icon": "Clock"
+      }
+    ],
+    "navGroup": "hr"
   },
   "contributes": {
     "engine": true,

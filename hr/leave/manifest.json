@@ -11,11 +11,17 @@
     "database"
   ],
   "dependencies": [
-    { "name": "hr/employees", "minVersion": "1.0.0" }
+    {
+      "name": "hr/employees",
+      "minVersion": "1.0.0"
+    }
   ],
   "contributes": {
     "engine": true,
     "studio": true,
     "fieldTypes": []
+  },
+  "studio": {
+    "navGroup": "hr"
   }
 }

@@ -28,7 +28,8 @@
         "label": "Usage",
         "icon": "bar-chart"
       }
-    ]
+    ],
+    "navGroup": "finance"
   },
   "contributes": {
     "engine": true,

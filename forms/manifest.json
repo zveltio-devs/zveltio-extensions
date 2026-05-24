@@ -34,7 +34,8 @@
         "label": "Form Responses",
         "icon": "inbox"
       }
-    ]
+    ],
+    "navGroup": "content"
   },
   "contributes": {
     "engine": true,

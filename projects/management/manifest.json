@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/projects/management", "label": "Projects", "icon": "Kanban" }
-    ]
+      {
+        "path": "/admin/projects/management",
+        "label": "Projects",
+        "icon": "Kanban"
+      }
+    ],
+    "navGroup": "projects"
   },
   "contributes": {
     "engine": true,

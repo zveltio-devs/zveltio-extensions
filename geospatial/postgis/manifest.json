@@ -17,8 +17,13 @@
   },
   "studio": {
     "pages": [
-      { "path": "/admin/geospatial/postgis", "label": "PostGIS", "icon": "Map" }
-    ]
+      {
+        "path": "/admin/geospatial/postgis",
+        "label": "PostGIS",
+        "icon": "Map"
+      }
+    ],
+    "navGroup": "developer"
   },
   "contributes": {
     "engine": true,

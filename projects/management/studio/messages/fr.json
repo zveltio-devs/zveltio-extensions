@@ -1,0 +1,23 @@
+{
+  "projects.management.btn.newProject": "New project",
+  "projects.management.btn.newTask": "New task",
+  "projects.management.col.assignee": "Assignee",
+  "projects.management.col.dueDate": "Due date",
+  "projects.management.col.priority": "Priority",
+  "projects.management.col.status": "Status",
+  "projects.management.empty": "No data yet.",
+  "projects.management.empty.projects": "No projects yet.",
+  "projects.management.form.name": "Name *",
+  "projects.management.form.title": "Title *",
+  "projects.management.priority.high": "High",
+  "projects.management.priority.low": "Low",
+  "projects.management.priority.medium": "Medium",
+  "projects.management.priority.urgent": "Urgent",
+  "projects.management.subtitle": "Kanban board and task management",
+  "projects.management.title": "Projects",
+  "projects.management.ui.end_date": "End date",
+  "projects.management.ui.new_project": "New project",
+  "projects.management.ui.new_task": "New task",
+  "projects.management.ui.no_tasks": "No tasks.",
+  "projects.management.ui.start_date": "Start date"
+}

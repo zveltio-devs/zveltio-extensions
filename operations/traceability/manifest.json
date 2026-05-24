@@ -11,7 +11,10 @@
     "database"
   ],
   "dependencies": [
-    { "name": "finance/invoicing", "minVersion": "1.0.0" }
+    {
+      "name": "finance/invoicing",
+      "minVersion": "1.0.0"
+    }
   ],
   "peerDependencies": {
     "qrcode": "^1.5.3",
@@ -24,7 +27,8 @@
         "label": "Traceability",
         "icon": "scan-search"
       }
-    ]
+    ],
+    "navGroup": "operations"
   },
   "contributes": {
     "engine": true,

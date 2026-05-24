@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/checklists", "label": "Checklists", "icon": "CheckSquare" }
-    ]
+      {
+        "path": "/admin/checklists",
+        "label": "Checklists",
+        "icon": "CheckSquare"
+      }
+    ],
+    "navGroup": "other"
   },
   "contributes": {
     "engine": true,

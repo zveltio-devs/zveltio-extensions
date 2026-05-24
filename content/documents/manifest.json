@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/content/documents", "label": "Documents", "icon": "FileText" }
-    ]
+      {
+        "path": "/admin/content/documents",
+        "label": "Documents",
+        "icon": "FileText"
+      }
+    ],
+    "navGroup": "content"
   },
   "contributes": {
     "engine": true,

@@ -11,12 +11,20 @@
     "database"
   ],
   "dependencies": [
-    { "name": "finance/accounting", "minVersion": "1.0.0" }
+    {
+      "name": "finance/accounting",
+      "minVersion": "1.0.0"
+    }
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/operations/assets", "label": "Fixed Assets", "icon": "Package" }
-    ]
+      {
+        "path": "/admin/operations/assets",
+        "label": "Fixed Assets",
+        "icon": "Package"
+      }
+    ],
+    "navGroup": "operations"
   },
   "contributes": {
     "engine": true,

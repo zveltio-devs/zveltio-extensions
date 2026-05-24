@@ -1,0 +1,13 @@
+{
+  "analytics.quality.col.severity": "Severitate",
+  "analytics.quality.empty": "No data yet.",
+  "analytics.quality.subtitle": "Scan collections for data quality issues",
+  "analytics.quality.tab.history": "Istoric scanări",
+  "analytics.quality.tab.issues": "Probleme",
+  "analytics.quality.title": "Data Quality",
+  "analytics.quality.ui.collection": "Collection",
+  "analytics.quality.ui.no_issues_to_show_run_a_scan": "No issues to show. Run a scan.",
+  "analytics.quality.ui.no_scans_yet": "No scans yet.",
+  "analytics.quality.ui.select_collection": "— Select collection —",
+  "analytics.quality.ui.viewissues_s_id_view": "viewIssues(s.id)}>View"
+}

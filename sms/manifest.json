@@ -22,7 +22,8 @@
         "label": "SMS",
         "icon": "message-square"
       }
-    ]
+    ],
+    "navGroup": "communications"
   },
   "contributes": {
     "engine": true,

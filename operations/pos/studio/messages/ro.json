@@ -1,0 +1,21 @@
+{
+  "operations.pos.closeSession": "Închide sesiunea",
+  "operations.pos.col.orderCount": "Comenzi",
+  "operations.pos.col.sales": "Vânzări",
+  "operations.pos.col.time": "Ora",
+  "operations.pos.empty": "No data yet.",
+  "operations.pos.openSession": "Deschide sesiunea",
+  "operations.pos.recentOrders": "Comenzi recente",
+  "operations.pos.session.noOpen": "Nicio sesiune deschisă.",
+  "operations.pos.session.open": "Sesiune deschisă",
+  "operations.pos.session.openingFloat": "Fund inițial:",
+  "operations.pos.subtitle": "Session management and order history",
+  "operations.pos.title": "Point of Sale",
+  "operations.pos.toast.sessionClosed": "Sesiune închisă.",
+  "operations.pos.toast.sessionOpened": "Sesiune deschisă.",
+  "operations.pos.ui.closing_float": "Closing float",
+  "operations.pos.ui.no_orders_yet": "No orders yet.",
+  "operations.pos.ui.no_reports": "No reports.",
+  "operations.pos.ui.opening_float": "Opening float",
+  "operations.pos.zReports": "Rapoarte Z recente"
+}

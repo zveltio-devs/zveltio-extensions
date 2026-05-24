@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/developer/edge-functions", "label": "Edge Functions", "icon": "Code" }
-    ]
+      {
+        "path": "/admin/developer/edge-functions",
+        "label": "Edge Functions",
+        "icon": "Code"
+      }
+    ],
+    "navGroup": "developer"
   },
   "contributes": {
     "engine": true,

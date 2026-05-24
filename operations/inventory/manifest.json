@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/inventory", "label": "Inventory", "icon": "Boxes" }
-    ]
+      {
+        "path": "/admin/inventory",
+        "label": "Inventory",
+        "icon": "Boxes"
+      }
+    ],
+    "navGroup": "operations"
   },
   "contributes": {
     "engine": true,

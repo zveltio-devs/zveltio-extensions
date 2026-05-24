@@ -1,0 +1,20 @@
+{
+  "finance.banking.empty": "No data yet.",
+  "finance.banking.empty.accounts": "Niciun cont bancar încă.",
+  "finance.banking.empty.transactions": "Nicio tranzacție încă.",
+  "finance.banking.empty.unreconciled": "Nicio tranzacție nereconciliată.",
+  "finance.banking.newAccount": "Cont nou",
+  "finance.banking.section.openInvoices": "Facturi deschise (trimise)",
+  "finance.banking.section.unreconciled": "Tranzacții nereconciliate",
+  "finance.banking.status.pending": "În așteptare",
+  "finance.banking.status.reconciled": "Reconciliat",
+  "finance.banking.subtitle": "Bank accounts, transactions, and reconciliation",
+  "finance.banking.tab.accounts": "Conturi",
+  "finance.banking.tab.reconciliation": "Reconciliere",
+  "finance.banking.tab.transactions": "Tranzacții",
+  "finance.banking.title": "Banking",
+  "finance.banking.ui.internal_name": "Internal name",
+  "finance.banking.ui.new_bank_account": "bank account",
+  "finance.banking.ui.no_open_invoices": "No open invoices.",
+  "finance.banking.ui.opening_balance": "Opening balance"
+}

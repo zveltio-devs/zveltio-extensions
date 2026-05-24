@@ -1,0 +1,9 @@
+{
+  "hr.leave.empty": "No data yet.",
+  "hr.leave.emptyRequests": "Nicio cerere de concediu.",
+  "hr.leave.form.new": "Cerere concediu nouă",
+  "hr.leave.form.submit": "Trimite cererea",
+  "hr.leave.new": "Cerere nouă",
+  "hr.leave.subtitle": "Manage leave requests and approvals",
+  "hr.leave.title": "Leave"
+}

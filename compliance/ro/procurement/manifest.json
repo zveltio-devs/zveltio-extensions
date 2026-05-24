@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/compliance/ro/procurement", "label": "Achizitii Publice RO", "icon": "Package" }
-    ]
+      {
+        "path": "/admin/compliance/ro/procurement",
+        "label": "Achizitii Publice RO",
+        "icon": "Package"
+      }
+    ],
+    "navGroup": "compliance"
   },
   "contributes": {
     "engine": true,

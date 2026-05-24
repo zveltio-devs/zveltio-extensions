@@ -16,8 +16,13 @@
   },
   "studio": {
     "pages": [
-      { "path": "/admin/media", "label": "Media Library", "icon": "Image" }
-    ]
+      {
+        "path": "/admin/media",
+        "label": "Media Library",
+        "icon": "Image"
+      }
+    ],
+    "navGroup": "content"
   },
   "contributes": {
     "engine": true,

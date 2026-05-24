@@ -12,8 +12,13 @@
   ],
   "studio": {
     "pages": [
-      { "path": "/admin/finance/invoicing", "label": "Invoicing", "icon": "DollarSign" }
-    ]
+      {
+        "path": "/admin/finance/invoicing",
+        "label": "Invoicing",
+        "icon": "DollarSign"
+      }
+    ],
+    "navGroup": "finance"
   },
   "contributes": {
     "engine": true,
