@@ -1,2 +1,0 @@
--- BYOD / Schema Introspection — uses core tables
--- No extension-specific tables in init

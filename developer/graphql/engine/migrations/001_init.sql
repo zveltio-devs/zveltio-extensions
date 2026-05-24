@@ -1,2 +1,0 @@
--- GraphQL extension — uses core collection tables
--- No extension-specific tables in init
