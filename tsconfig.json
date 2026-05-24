@@ -9,8 +9,14 @@
     "noEmit": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
-    "baseUrl": ".",
-    "ignoreDeprecations": "5.0",
+    /* `baseUrl` removed: it's deprecated in TS 5.5 and slated for
+     * removal in 7.0. Since TS 5.0, `paths` resolves relative to the
+     * tsconfig's own location, so we don't need it — and no code in
+     * this repo uses baseUrl-style bare-specifier imports
+     * (everything goes through an explicit `paths` alias or a
+     * relative path). The previous `ignoreDeprecations: "5.0"`
+     * was already at end-of-life; bumping it would just defer the
+     * fix one more release. */
     "paths": {
       "@zveltio/sdk": ["../zveltio/packages/sdk/src/index.ts"],
       "@zveltio/sdk/*": ["../zveltio/packages/sdk/src/*"],
