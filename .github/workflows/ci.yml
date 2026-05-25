@@ -30,18 +30,24 @@ jobs:
         with:
           bun-version: latest
 
-      # The extensions repo's tsconfig path-resolves @zveltio/sdk via
-      # `../zveltio/packages/sdk/src/...` — so the engine repo must
-      # sit as a sibling on disk. actions/checkout refuses any path
-      # outside $GITHUB_WORKSPACE, so we git-clone the sibling
-      # directly. Only the SDK source is needed for typecheck, and
-      # depth=1 keeps the clone tiny (~5s).
-      - name: Clone engine repo as sibling (needed for @zveltio/sdk paths)
-        run: |
-          git clone --depth=1 https://github.com/zveltio-devs/zveltio.git ../zveltio
+      # The extensions repo's tsconfig path-resolves `@zveltio/sdk` via
+      # `../zveltio/packages/sdk/src/...`. That file in turn imports
+      # `kysely`, `hono`, and the rest of the engine's peer deps —
+      # which only resolve through the ENGINE repo's `node_modules/`.
+      # So we need both: the engine repo as a sibling AND its deps
+      # installed. actions/checkout refuses paths outside the
+      # workspace, so the sibling clone uses plain `git clone`.
+      - name: Clone engine repo as sibling
+        run: git clone --depth=1 https://github.com/zveltio-devs/zveltio.git ../zveltio
 
-      - name: Install dependencies
+      - name: Install extension deps
         run: bun install --frozen-lockfile
+
+      - name: Install engine deps (so SDK source types resolve kysely/hono/etc.)
+        # No --frozen-lockfile here: this is a transient clone, the
+        # extensions repo doesn't own zveltio's bun.lock, and the
+        # engine repo's own CI already enforces lockfile freshness.
+        run: cd ../zveltio && bun install
 
       - name: Typecheck
         run: bun run typecheck
