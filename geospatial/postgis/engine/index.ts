@@ -9,7 +9,10 @@ const extension: ZveltioExtension = {
   mountStrategy: 'subapp',
 
   getMigrations() {
-    return [join(import.meta.dir, 'migrations/001_postgis.sql')];
+    return [
+      join(import.meta.dir, 'migrations/001_initial.sql'),
+      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
+    ];
   },
 
   registerFieldTypes(registry) {

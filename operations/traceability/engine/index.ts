@@ -11,16 +11,8 @@ const extension: ZveltioExtension = {
 
   getMigrations() {
     return [
-      join(import.meta.dir, 'migrations/001_trace_suppliers.sql'),
-      join(import.meta.dir, 'migrations/002_trace_items.sql'),
-      join(import.meta.dir, 'migrations/003_trace_locations.sql'),
-      join(import.meta.dir, 'migrations/004_trace_lots.sql'),
-      join(import.meta.dir, 'migrations/005_trace_recipes.sql'),
-      join(import.meta.dir, 'migrations/006_trace_production_orders.sql'),
-      join(import.meta.dir, 'migrations/007_trace_lot_consumptions.sql'),
-      join(import.meta.dir, 'migrations/008_trace_movements.sql'),
-      join(import.meta.dir, 'migrations/009_trace_recalls.sql'),
-      join(import.meta.dir, 'migrations/010_trace_dispatches.sql'),
+      join(import.meta.dir, 'migrations/001_initial.sql'),
+      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
     ];
   },
 

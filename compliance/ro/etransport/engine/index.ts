@@ -9,7 +9,10 @@ const extension: ZveltioExtension = {
   mountStrategy: 'subapp',
 
   getMigrations() {
-    return [join(import.meta.dir, 'migrations/001_etransport.sql')];
+    return [
+      join(import.meta.dir, 'migrations/001_etransport.sql'),
+      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
+    ];
   },
 
   async register(app, ctx) {

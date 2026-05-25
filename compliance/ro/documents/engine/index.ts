@@ -10,8 +10,8 @@ const extension: ZveltioExtension = {
 
   getMigrations() {
     return [
-      join(import.meta.dir, 'migrations/001_documents.sql'),
-      join(import.meta.dir, 'migrations/002_documents_extend.sql'),
+      join(import.meta.dir, 'migrations/001_initial.sql'),
+      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
     ];
   },
 

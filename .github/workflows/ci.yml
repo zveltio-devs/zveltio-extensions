@@ -1,0 +1,53 @@
+name: CI
+
+# Catches regressions in extension wiring before they hit production:
+#   1. typecheck — every engine/index.ts must compile against the SDK
+#   2. validate-migrations — getMigrations() return list must match
+#      the *.sql files actually present in migrations/ on disk.
+#      A mismatch means RLS / schema changes silently skipped at install.
+#
+# Triggered on every PR + push so a broken-link migration list can't
+# land on main.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Typecheck + validate migrations
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # The extensions repo's tsconfig path-resolves @zveltio/sdk via
+      # ../zveltio/packages/sdk/src/... — so we need the engine repo
+      # checked out as a sibling for typecheck to resolve.
+      - name: Checkout engine repo (sibling for SDK paths)
+        uses: actions/checkout@v4
+        with:
+          repository: zveltio-devs/zveltio
+          path: ../zveltio
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Validate migration paths
+        # Every engine/index.ts's getMigrations() must return paths
+        # that actually exist on disk. A drift here means migrations
+        # silently skipped at extension install / enable.
+        run: bun scripts/validate-migration-paths.ts
