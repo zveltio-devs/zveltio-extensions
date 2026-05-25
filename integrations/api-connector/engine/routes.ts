@@ -100,6 +100,15 @@ async function resolveOAuth2Token(db: any, connectionId: string, authConfig: any
 
 export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const app = new Hono();
 
   app.use('*', async (c, next) => {
@@ -113,14 +122,14 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
 
   // ── Connections ────────────────────────────────────────────────
   app.get('/connections', async (c) => {
-    const rows = await sql`SELECT id, name, base_url, auth_type, is_active, retry_count, timeout_ms, created_at FROM zvd_api_connections ORDER BY name`.execute(db);
+    const rows = await sql`SELECT id, name, base_url, auth_type, is_active, retry_count, timeout_ms, created_at FROM zvd_api_connections ORDER BY name`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
   app.get('/connections/:id', async (c) => {
-    const row = await sql`SELECT id, name, base_url, auth_type, is_active, retry_count, timeout_ms, created_at FROM zvd_api_connections WHERE id = ${c.req.param('id')}`.execute(db);
+    const row = await sql`SELECT id, name, base_url, auth_type, is_active, retry_count, timeout_ms, created_at FROM zvd_api_connections WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
-    const endpoints = await sql`SELECT id, name, method, path, is_active FROM zvd_api_endpoints WHERE connection_id = ${c.req.param('id')} ORDER BY name`.execute(db);
+    const endpoints = await sql`SELECT id, name, method, path, is_active FROM zvd_api_endpoints WHERE connection_id = ${c.req.param('id')} ORDER BY name`.execute(reqDb(c));
     return c.json({ data: { ...(row.rows[0] as any), endpoints: endpoints.rows } });
   });
 
@@ -142,7 +151,7 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_api_connections (name, base_url, auth_type, auth_config, headers, default_headers, retry_count, timeout_ms, created_by)
       VALUES (${d.name}, ${d.base_url}, ${d.auth_type}, ${JSON.stringify(d.auth_config)}, ${JSON.stringify(d.default_headers)}, ${JSON.stringify(d.default_headers)}, ${d.retry_count}, ${d.timeout_ms}, ${user.id})
       RETURNING id, name, base_url, auth_type, is_active, retry_count, timeout_ms, created_at
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -165,19 +174,19 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
         timeout_ms = COALESCE(${d.timeout_ms ?? null}, timeout_ms),
         updated_at = NOW()
       WHERE id = ${c.req.param('id')} RETURNING id, name, base_url, auth_type, is_active
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
 
   app.delete('/connections/:id', async (c) => {
-    await sql`DELETE FROM zvd_api_connections WHERE id = ${c.req.param('id')}`.execute(db);
+    await sql`DELETE FROM zvd_api_connections WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
     return c.json({ success: true });
   });
 
   // Health check
   app.post('/connections/:id/health-check', async (c) => {
-    const conn = await sql`SELECT * FROM zvd_api_connections WHERE id = ${c.req.param('id')}`.execute(db);
+    const conn = await sql`SELECT * FROM zvd_api_connections WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
     if (!conn.rows.length) return c.json({ error: 'Not found' }, 404);
     const connection = conn.rows[0] as any;
     const startedAt = Date.now();
@@ -195,7 +204,7 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
 
   // ── Endpoints ──────────────────────────────────────────────────
   app.get('/connections/:id/endpoints', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_api_endpoints WHERE connection_id = ${c.req.param('id')} ORDER BY name`.execute(db);
+    const rows = await sql`SELECT * FROM zvd_api_endpoints WHERE connection_id = ${c.req.param('id')} ORDER BY name`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -215,7 +224,7 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
       VALUES (${c.req.param('id')}, ${d.name}, ${d.method}, ${d.path}, ${d.description ?? null},
         ${d.default_body ?? null}, ${JSON.stringify(d.default_headers)}, ${JSON.stringify(d.response_mapping)}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -236,13 +245,13 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
         is_active = COALESCE(${d.is_active ?? null}, is_active),
         updated_at = NOW()
       WHERE id = ${c.req.param('id')} RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
 
   app.delete('/endpoints/:id', async (c) => {
-    await sql`DELETE FROM zvd_api_endpoints WHERE id = ${c.req.param('id')}`.execute(db);
+    await sql`DELETE FROM zvd_api_endpoints WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
     return c.json({ success: true });
   });
 
@@ -261,7 +270,7 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
       FROM zvd_api_endpoints e
       JOIN zvd_api_connections conn ON conn.id = e.connection_id
       WHERE e.id = ${c.req.param('id')} AND conn.is_active = true AND e.is_active = true
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!ep.rows.length) return c.json({ error: 'Endpoint not found or connection inactive' }, 404);
     const endpoint = ep.rows[0] as any;
     // Build URL
@@ -285,7 +294,7 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
       headers['Authorization'] = `Basic ${btoa(`${authConfig.username}:${authConfig.password}`)}`;
     } else if (endpoint.auth_type === 'oauth2') {
       try {
-        const token = await resolveOAuth2Token(db, endpoint.connection_id, authConfig);
+        const token = await resolveOAuth2Token(reqDb(c), endpoint.connection_id, authConfig);
         headers['Authorization'] = `Bearer ${token}`;
       } catch (e: any) {
         return c.json({ error: 'OAuth2 token error: ' + e.message }, 502);
@@ -308,7 +317,7 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
       VALUES (${endpoint.id}, ${user.id}, ${url}, ${endpoint.method},
         ${d.body ? JSON.stringify(d.body) : null}, ${status_code},
         ${response_body.slice(0, 10000)}, ${duration_ms}, ${fetchError}, ${retries})
-    `.execute(db);
+    `.execute(reqDb(c));
 
     if (fetchError) return c.json({ error: fetchError }, 502);
     let parsed: any = response_body;
@@ -327,13 +336,13 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
       JOIN zvd_api_endpoints e ON e.id = l.endpoint_id
       WHERE e.connection_id = ${c.req.param('id')}
       ORDER BY l.created_at DESC LIMIT ${lim} OFFSET ${offset}
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
   // ── Incoming Webhooks ──────────────────────────────────────────
   app.get('/webhooks', async (c) => {
-    const rows = await sql`SELECT w.*, COUNT(e.id) as event_count FROM zvd_incoming_webhooks w LEFT JOIN zvd_webhook_events e ON e.webhook_id = w.id GROUP BY w.id ORDER BY w.name`.execute(db);
+    const rows = await sql`SELECT w.*, COUNT(e.id) as event_count FROM zvd_incoming_webhooks w LEFT JOIN zvd_webhook_events e ON e.webhook_id = w.id GROUP BY w.id ORDER BY w.name`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -350,19 +359,19 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_incoming_webhooks (name, endpoint_path, description, secret, connection_id, created_by)
       VALUES (${d.name}, ${d.endpoint_path}, ${d.description ?? null}, ${d.secret ?? null}, ${d.connection_id ?? null}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
   app.delete('/webhooks/:id', async (c) => {
-    await sql`DELETE FROM zvd_incoming_webhooks WHERE id = ${c.req.param('id')}`.execute(db);
+    await sql`DELETE FROM zvd_incoming_webhooks WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
     return c.json({ success: true });
   });
 
   // Receive incoming webhook (public endpoint - no auth)
   app.post('/webhooks/receive/:path{.+}', async (c) => {
     const path = '/' + c.req.param('path');
-    const webhook = await sql`SELECT * FROM zvd_incoming_webhooks WHERE endpoint_path = ${path} AND is_active = true`.execute(db);
+    const webhook = await sql`SELECT * FROM zvd_incoming_webhooks WHERE endpoint_path = ${path} AND is_active = true`.execute(reqDb(c));
     if (!webhook.rows.length) return c.json({ error: 'Webhook not found' }, 404);
     const w = webhook.rows[0] as any;
     // Verify HMAC secret if set
@@ -377,8 +386,8 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
     await sql`
       INSERT INTO zvd_webhook_events (webhook_id, payload, headers, source_ip)
       VALUES (${w.id}, ${JSON.stringify(payload)}, ${JSON.stringify(headers)}, ${c.req.header('x-forwarded-for') ?? null})
-    `.execute(db);
-    await sql`UPDATE zvd_incoming_webhooks SET last_received_at = NOW() WHERE id = ${w.id}`.execute(db);
+    `.execute(reqDb(c));
+    await sql`UPDATE zvd_incoming_webhooks SET last_received_at = NOW() WHERE id = ${w.id}`.execute(reqDb(c));
     return c.json({ received: true });
   });
 
@@ -387,7 +396,7 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
     const lim = Math.min(+limit, 200);
     const rows = await sql`
       SELECT * FROM zvd_webhook_events WHERE webhook_id = ${c.req.param('id')} ORDER BY received_at DESC LIMIT ${lim}
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 

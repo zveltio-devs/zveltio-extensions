@@ -11,6 +11,15 @@ export function billingRoutes(
 ): Hono<{ Variables: { user: any } }> {
   const { db, auth, checkPermission } = ctx;
 
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
+
   async function requireAdmin(c: any): Promise<any | null> {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return null;
@@ -58,7 +67,7 @@ export function billingRoutes(
       WHERE created_at >= ${since}
       GROUP BY event_type, DATE_TRUNC('day', created_at)
       ORDER BY day DESC, event_type
-    `.execute(db);
+    `.execute(reqDb(c));
 
     return c.json({ usage: rows.rows });
   });

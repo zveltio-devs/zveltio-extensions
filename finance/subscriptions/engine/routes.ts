@@ -23,6 +23,15 @@ const DUNNING_DAYS = [1, 3, 7, 14];
 
 export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const app = new Hono();
 
   app.use('*', async (c, next) => {
@@ -36,7 +45,7 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
 
   // ── Plans ─────────────────────────────────────────────────────
   app.get('/plans', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_subscription_plans ORDER BY price ASC`.execute(db);
+    const rows = await sql`SELECT * FROM zvd_subscription_plans ORDER BY price ASC`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -61,7 +70,7 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
         ${d.trial_days}, ${JSON.stringify(d.features)}, ${d.usage_billing}, ${d.usage_metric ?? null},
         ${d.usage_unit_price}, ${d.max_usage ?? null}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -82,15 +91,15 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
         features = COALESCE(${d.features ? JSON.stringify(d.features) : null}, features),
         updated_at = NOW()
       WHERE id = ${c.req.param('id')} RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
 
   app.delete('/plans/:id', async (c) => {
-    const used = await sql`SELECT COUNT(*) as cnt FROM zvd_subscribers WHERE plan_id = ${c.req.param('id')} AND status = 'active'`.execute(db);
+    const used = await sql`SELECT COUNT(*) as cnt FROM zvd_subscribers WHERE plan_id = ${c.req.param('id')} AND status = 'active'`.execute(reqDb(c));
     if (+(used.rows[0] as any).cnt > 0) return c.json({ error: 'Plan has active subscribers' }, 400);
-    await sql`DELETE FROM zvd_subscription_plans WHERE id = ${c.req.param('id')}`.execute(db);
+    await sql`DELETE FROM zvd_subscription_plans WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
     return c.json({ success: true });
   });
 
@@ -107,7 +116,7 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
         AND (${plan_id ? sql`s.plan_id = ${plan_id}` : sql`TRUE`})
       ORDER BY s.created_at DESC
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -116,16 +125,16 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
       SELECT s.*, p.name as plan_name, p.price, p.interval, p.currency, p.usage_billing
       FROM zvd_subscribers s JOIN zvd_subscription_plans p ON p.id = s.plan_id
       WHERE s.id = ${c.req.param('id')}
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
-    const invoices = await sql`SELECT * FROM zvd_subscription_invoices WHERE subscriber_id = ${c.req.param('id')} ORDER BY period_start DESC LIMIT 12`.execute(db);
+    const invoices = await sql`SELECT * FROM zvd_subscription_invoices WHERE subscriber_id = ${c.req.param('id')} ORDER BY period_start DESC LIMIT 12`.execute(reqDb(c));
     const planChanges = await sql`
       SELECT pc.*, fp.name as from_plan_name, tp.name as to_plan_name
       FROM zvd_plan_changes pc
       LEFT JOIN zvd_subscription_plans fp ON fp.id = pc.from_plan_id
       JOIN zvd_subscription_plans tp ON tp.id = pc.to_plan_id
       WHERE pc.subscriber_id = ${c.req.param('id')} ORDER BY pc.created_at DESC
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: { ...(row.rows[0] as any), invoices: invoices.rows, plan_changes: planChanges.rows } });
   });
 
@@ -140,7 +149,7 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
-    const plan = await sql`SELECT * FROM zvd_subscription_plans WHERE id = ${d.plan_id} AND is_active = true`.execute(db);
+    const plan = await sql`SELECT * FROM zvd_subscription_plans WHERE id = ${d.plan_id} AND is_active = true`.execute(reqDb(c));
     if (!plan.rows.length) return c.json({ error: 'Plan not found or inactive' }, 400);
     const p = plan.rows[0] as any;
     const startDate = d.start_date ?? new Date().toISOString().slice(0, 10);
@@ -154,7 +163,7 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
         ${d.client_name}, ${d.client_email}, ${startDate}, ${trialEnd},
         ${trialEnd ? 'trialing' : 'active'}, ${d.notes ?? null}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -170,10 +179,10 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
       SELECT s.*, p.price as old_price, p.interval as old_interval
       FROM zvd_subscribers s JOIN zvd_subscription_plans p ON p.id = s.plan_id
       WHERE s.id = ${c.req.param('id')} AND s.status IN ('active','trialing')
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!sub.rows.length) return c.json({ error: 'Subscriber not found or not active' }, 400);
     const s = sub.rows[0] as any;
-    const newPlan = await sql`SELECT * FROM zvd_subscription_plans WHERE id = ${d.new_plan_id} AND is_active = true`.execute(db);
+    const newPlan = await sql`SELECT * FROM zvd_subscription_plans WHERE id = ${d.new_plan_id} AND is_active = true`.execute(reqDb(c));
     if (!newPlan.rows.length) return c.json({ error: 'New plan not found' }, 400);
     const np = newPlan.rows[0] as any;
     const effectiveDate = d.effective_date ?? new Date().toISOString().slice(0, 10);
@@ -185,8 +194,8 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
     await sql`
       INSERT INTO zvd_plan_changes (subscriber_id, from_plan_id, to_plan_id, effective_date, proration_amount, reason, created_by)
       VALUES (${s.id}, ${s.plan_id}, ${d.new_plan_id}, ${effectiveDate}, ${prorationAmount}, ${d.reason ?? null}, ${user.id})
-    `.execute(db);
-    const row = await sql`UPDATE zvd_subscribers SET plan_id = ${d.new_plan_id}, updated_at = NOW() WHERE id = ${s.id} RETURNING *`.execute(db);
+    `.execute(reqDb(c));
+    const row = await sql`UPDATE zvd_subscribers SET plan_id = ${d.new_plan_id}, updated_at = NOW() WHERE id = ${s.id} RETURNING *`.execute(reqDb(c));
     return c.json({ data: { subscriber: row.rows[0], proration_amount: prorationAmount } });
   });
 
@@ -199,7 +208,7 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
       UPDATE zvd_subscribers SET status = 'paused', paused_at = NOW(),
         paused_until = ${resume_date ?? null}, updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND status = 'active' RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Subscriber not found or not active' }, 400);
     return c.json({ data: row.rows[0] });
   });
@@ -208,7 +217,7 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       UPDATE zvd_subscribers SET status = 'active', paused_at = NULL, paused_until = NULL, updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND status = 'paused' RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Subscriber not found or not paused' }, 400);
     return c.json({ data: row.rows[0] });
   });
@@ -224,7 +233,7 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
         cancelled_at = ${cancel_at_period_end ? null : sql`NOW()`}, updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND status IN ('active','trialing','cancel_scheduled','paused')
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Subscriber not found or already cancelled' }, 400);
     return c.json({ data: row.rows[0] });
   });
@@ -233,7 +242,7 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       UPDATE zvd_subscribers SET status = 'active', cancellation_reason = NULL, cancelled_at = NULL, dunning_count = 0, updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND status IN ('cancelled','cancel_scheduled') RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Subscriber not found or not cancelled' }, 400);
     return c.json({ data: row.rows[0] });
   });
@@ -250,20 +259,20 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
       SELECT s.*, p.usage_unit_price FROM zvd_subscribers s
       JOIN zvd_subscription_plans p ON p.id = s.plan_id
       WHERE s.id = ${c.req.param('id')} AND p.usage_billing = true
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!sub.rows.length) return c.json({ error: 'Subscriber not found or plan does not support usage billing' }, 400);
     const row = await sql`
       INSERT INTO zvd_subscription_usage (subscriber_id, metric_name, quantity, unit_price, billing_period_start, billing_period_end)
       VALUES (${c.req.param('id')}, ${d.metric_name}, ${d.quantity}, ${(sub.rows[0] as any).usage_unit_price},
         ${d.billing_period_start ?? null}, ${d.billing_period_end ?? null})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
   // ── Invoices ──────────────────────────────────────────────────
   app.get('/subscribers/:id/invoices', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_subscription_invoices WHERE subscriber_id = ${c.req.param('id')} ORDER BY period_start DESC`.execute(db);
+    const rows = await sql`SELECT * FROM zvd_subscription_invoices WHERE subscriber_id = ${c.req.param('id')} ORDER BY period_start DESC`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -273,7 +282,7 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
       SELECT s.*, p.price, p.currency, p.usage_billing, p.usage_unit_price
       FROM zvd_subscribers s JOIN zvd_subscription_plans p ON p.id = s.plan_id
       WHERE s.id = ${c.req.param('id')} AND s.status = 'active'
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!sub.rows.length) return c.json({ error: 'Subscriber not found or not active' }, 400);
     const s = sub.rows[0] as any;
     const periodStart = new Date().toISOString().slice(0, 10);
@@ -285,16 +294,16 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
         SELECT COALESCE(SUM(quantity * unit_price), 0) as total
         FROM zvd_subscription_usage
         WHERE subscriber_id = ${s.id} AND is_billed = false
-      `.execute(db);
+      `.execute(reqDb(c));
       usageAmount = +(usage.rows[0] as any).total;
-      await sql`UPDATE zvd_subscription_usage SET is_billed = true WHERE subscriber_id = ${s.id} AND is_billed = false`.execute(db);
+      await sql`UPDATE zvd_subscription_usage SET is_billed = true WHERE subscriber_id = ${s.id} AND is_billed = false`.execute(reqDb(c));
     }
     const totalAmount = s.price + usageAmount;
     const row = await sql`
       INSERT INTO zvd_subscription_invoices (subscriber_id, amount, usage_amount, total_amount, currency, period_start, due_date, created_by)
       VALUES (${s.id}, ${s.price}, ${usageAmount}, ${totalAmount}, ${s.currency}, ${periodStart}, ${dueDate}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -302,29 +311,29 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       UPDATE zvd_subscription_invoices SET status = 'paid', paid_at = NOW(), updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND status = 'open' RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Invoice not found or not open' }, 400);
     return c.json({ data: row.rows[0] });
   });
 
   app.post('/invoices/:id/fail', async (c) => {
-    const inv = await sql`SELECT * FROM zvd_subscription_invoices WHERE id = ${c.req.param('id')}`.execute(db);
+    const inv = await sql`SELECT * FROM zvd_subscription_invoices WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
     if (!inv.rows.length) return c.json({ error: 'Not found' }, 404);
     const invoice = inv.rows[0] as any;
     // Record dunning attempt
-    const attempts = await sql`SELECT COUNT(*) as cnt FROM zvd_dunning_attempts WHERE invoice_id = ${invoice.id}`.execute(db);
+    const attempts = await sql`SELECT COUNT(*) as cnt FROM zvd_dunning_attempts WHERE invoice_id = ${invoice.id}`.execute(reqDb(c));
     const attemptNum = +(attempts.rows[0] as any).cnt + 1;
     const nextDays = DUNNING_DAYS[attemptNum - 1];
     const nextAttempt = nextDays ? new Date(Date.now() + nextDays * 86400000).toISOString() : null;
     await sql`
       INSERT INTO zvd_dunning_attempts (subscriber_id, invoice_id, attempt_number, status, next_attempt_at)
       VALUES (${invoice.subscriber_id}, ${invoice.id}, ${attemptNum}, 'failed', ${nextAttempt})
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!nextAttempt) {
       // Max attempts reached — suspend subscription
-      await sql`UPDATE zvd_subscribers SET status = 'past_due', dunning_count = ${attemptNum}, payment_failure_at = NOW(), updated_at = NOW() WHERE id = ${invoice.subscriber_id}`.execute(db);
+      await sql`UPDATE zvd_subscribers SET status = 'past_due', dunning_count = ${attemptNum}, payment_failure_at = NOW(), updated_at = NOW() WHERE id = ${invoice.subscriber_id}`.execute(reqDb(c));
     } else {
-      await sql`UPDATE zvd_subscribers SET dunning_count = ${attemptNum}, payment_failure_at = NOW(), updated_at = NOW() WHERE id = ${invoice.subscriber_id}`.execute(db);
+      await sql`UPDATE zvd_subscribers SET dunning_count = ${attemptNum}, payment_failure_at = NOW(), updated_at = NOW() WHERE id = ${invoice.subscriber_id}`.execute(reqDb(c));
     }
     return c.json({ data: { attempt: attemptNum, next_attempt_at: nextAttempt } });
   });
@@ -342,7 +351,7 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
         COUNT(*) FILTER (WHERE s.cancelled_at >= date_trunc('month', NOW())) as churned_this_month
       FROM zvd_subscribers s
       JOIN zvd_subscription_plans p ON p.id = s.plan_id
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] });
   });
 

@@ -111,6 +111,15 @@ async function findOrCreateSsoUser(db: any, email: string, displayName: string):
 
 export function ldapRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission, internals } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   // ctx.internals.createBetterAuthSession produces a session row + signed
   // cookie matching Better-Auth's exact shape (camelCase columns + Hono
   // HMAC signature) so the engine's `auth.api.getSession({ headers })`
@@ -178,7 +187,7 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
           VALUES ('auth.login_failed', NULL, 'session',
                   ${JSON.stringify({ provider: 'ldap', username, user_agent: userAgent, error: err?.message })}::jsonb,
                   ${remoteIp}, NOW())
-        `.execute(db);
+        `.execute(reqDb(c));
       } catch (auditErr) {
         console.warn('[ldap] failed-login audit write failed:', (auditErr as Error).message);
       }
@@ -202,7 +211,7 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
     // a credential leak and matches the "one active SSO session per user"
     // expectation most ops teams have. Without this, every successful
     // sign-in leaves the previous token live until its TTL expires.
-    await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(db).catch((err: Error) => {
+    await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(reqDb(c)).catch((err: Error) => {
       console.warn('[ldap] could not invalidate previous sessions:', err.message);
     });
 
@@ -218,7 +227,7 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
         VALUES ('auth.login_success', ${user.id}, 'session',
                 ${JSON.stringify({ provider: 'ldap', username, user_agent: userAgent })}::jsonb,
                 ${remoteIp}, NOW())
-      `.execute(db);
+      `.execute(reqDb(c));
     } catch (auditErr) {
       console.warn('[ldap] success audit write failed:', (auditErr as Error).message);
     }

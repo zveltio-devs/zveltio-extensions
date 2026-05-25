@@ -26,6 +26,15 @@ async function countWorkingDays(db: any, startDate: string, endDate: string, isH
 
 export function leaveRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const app = new Hono();
 
   app.use('*', async (c, next) => {
@@ -41,7 +50,7 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
   app.get('/holidays', async (c) => {
     const { year } = c.req.query();
     const yr = year ?? new Date().getFullYear().toString();
-    const rows = await sql`SELECT * FROM zvd_public_holidays WHERE year = ${yr} ORDER BY date`.execute(db);
+    const rows = await sql`SELECT * FROM zvd_public_holidays WHERE year = ${yr} ORDER BY date`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -55,18 +64,18 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_public_holidays (date, name, year) VALUES (${d.date}, ${d.name}, ${d.year})
       ON CONFLICT (date) DO UPDATE SET name = EXCLUDED.name
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
   app.delete('/holidays/:id', async (c) => {
-    await sql`DELETE FROM zvd_public_holidays WHERE id = ${c.req.param('id')}`.execute(db);
+    await sql`DELETE FROM zvd_public_holidays WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
     return c.json({ success: true });
   });
 
   // ── Leave Types ────────────────────────────────────────────────
   app.get('/types', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_leave_types ORDER BY name`.execute(db);
+    const rows = await sql`SELECT * FROM zvd_leave_types ORDER BY name`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -86,14 +95,14 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_leave_types (code, name, days_per_year, is_paid, requires_approval, color, created_by)
       VALUES (${d.code}, ${d.name}, ${d.days_per_year}, ${d.is_paid}, ${d.requires_approval}, ${d.color}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     const typeId = (row.rows[0] as any).id;
     if (d.max_carry_days > 0) {
       await sql`
         INSERT INTO zvd_leave_carryover_rules (leave_type_id, max_carry_days, expiry_months)
         VALUES (${typeId}, ${d.max_carry_days}, ${d.carryover_expiry_months})
         ON CONFLICT (leave_type_id) DO UPDATE SET max_carry_days = EXCLUDED.max_carry_days
-      `.execute(db);
+      `.execute(reqDb(c));
     }
     return c.json({ data: row.rows[0] }, 201);
   });
@@ -112,7 +121,7 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
       WHERE b.year = ${yr}
         AND (${employee_id ? sql`b.employee_id = ${employee_id}` : sql`TRUE`})
       ORDER BY e.last_name, t.name
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -124,8 +133,8 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
     const empQuery = d.employee_ids?.length
       ? sql`WHERE id IN (${sql.join(d.employee_ids.map(id => sql`${id}`), sql`, `)}) AND status = 'active'`
       : sql`WHERE status = 'active'`;
-    const employees = await sql`SELECT id FROM zvd_employees ${empQuery}`.execute(db);
-    const types = await sql`SELECT id, days_per_year FROM zvd_leave_types`.execute(db);
+    const employees = await sql`SELECT id FROM zvd_employees ${empQuery}`.execute(reqDb(c));
+    const types = await sql`SELECT id, days_per_year FROM zvd_leave_types`.execute(reqDb(c));
     let created = 0;
     for (const emp of employees.rows as any[]) {
       for (const type of types.rows as any[]) {
@@ -133,7 +142,7 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
           INSERT INTO zvd_leave_balances (employee_id, leave_type_id, year, allocated_days)
           VALUES (${emp.id}, ${type.id}, ${d.year}, ${type.days_per_year})
           ON CONFLICT (employee_id, leave_type_id, year) DO NOTHING
-        `.execute(db);
+        `.execute(reqDb(c));
         created++;
       }
     }
@@ -147,7 +156,7 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const d = c.req.valid('json');
     const toYear = d.from_year + 1;
-    const rules = await sql`SELECT * FROM zvd_leave_carryover_rules`.execute(db);
+    const rules = await sql`SELECT * FROM zvd_leave_carryover_rules`.execute(reqDb(c));
     const ruleMap = new Map((rules.rows as any[]).map(r => [r.leave_type_id, r]));
 
     const balances = await sql`
@@ -155,7 +164,7 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
       JOIN zvd_employees e ON e.id = b.employee_id
       WHERE b.year = ${d.from_year} AND e.status = 'active'
         AND (${d.employee_ids?.length ? sql`b.employee_id IN (${sql.join(d.employee_ids.map(id => sql`${id}`), sql`, `)})` : sql`TRUE`})
-    `.execute(db);
+    `.execute(reqDb(c));
 
     let processed = 0;
     for (const b of balances.rows as any[]) {
@@ -171,11 +180,11 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
         VALUES (${b.employee_id}, ${b.leave_type_id}, ${toYear}, 0, ${carryDays}, ${expiresAt.toISOString().slice(0, 10)})
         ON CONFLICT (employee_id, leave_type_id, year) DO UPDATE
           SET carried_over_days = EXCLUDED.carried_over_days, carryover_expires_at = EXCLUDED.carryover_expires_at
-      `.execute(db);
+      `.execute(reqDb(c));
       await sql`
         INSERT INTO zvd_leave_carryover_log (employee_id, leave_type_id, from_year, to_year, days_carried, expires_at)
         VALUES (${b.employee_id}, ${b.leave_type_id}, ${d.from_year}, ${toYear}, ${carryDays}, ${expiresAt.toISOString().slice(0, 10)})
-      `.execute(db);
+      `.execute(reqDb(c));
       processed++;
     }
     return c.json({ data: { processed } });
@@ -199,20 +208,20 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
         AND (${to ? sql`r.start_date <= ${to}` : sql`TRUE`})
       ORDER BY r.created_at DESC
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
   app.get('/requests/my', async (c) => {
     const user = c.get('user') as any;
-    const emp = await sql`SELECT id FROM zvd_employees WHERE email = ${user.email} OR work_email = ${user.email}`.execute(db);
+    const emp = await sql`SELECT id FROM zvd_employees WHERE email = ${user.email} OR work_email = ${user.email}`.execute(reqDb(c));
     if (!emp.rows.length) return c.json({ data: [] });
     const rows = await sql`
       SELECT r.*, t.name as leave_type_name, t.code, t.color
       FROM zvd_leave_requests r JOIN zvd_leave_types t ON t.id = r.leave_type_id
       WHERE r.employee_id = ${(emp.rows[0] as any).id}
       ORDER BY r.created_at DESC
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -239,7 +248,7 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
         AND status IN ('pending','approved')
         AND start_date <= ${d.end_date} AND end_date >= ${d.start_date}
       LIMIT 1
-    `.execute(db);
+    `.execute(reqDb(c));
     if (overlap.rows.length) return c.json({ error: 'Overlapping leave request exists' }, 400);
 
     const workingDays = await countWorkingDays(db, d.start_date, d.end_date, d.is_half_day);
@@ -250,11 +259,11 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
       SELECT *, (allocated_days + carried_over_days - used_days - pending_days) as remaining
       FROM zvd_leave_balances
       WHERE employee_id = ${d.employee_id} AND leave_type_id = ${d.leave_type_id} AND year = ${year}
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!balance.rows.length) return c.json({ error: 'No leave balance for this type/year' }, 400);
     if ((balance.rows[0] as any).remaining < workingDays) return c.json({ error: 'Insufficient leave balance' }, 400);
 
-    const type = await sql`SELECT requires_approval FROM zvd_leave_types WHERE id = ${d.leave_type_id}`.execute(db);
+    const type = await sql`SELECT requires_approval FROM zvd_leave_types WHERE id = ${d.leave_type_id}`.execute(reqDb(c));
     const status = (type.rows[0] as any)?.requires_approval ? 'pending' : 'approved';
 
     const row = await sql`
@@ -262,69 +271,69 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
       VALUES (${d.employee_id}, ${d.leave_type_id}, ${d.start_date}, ${d.end_date}, ${workingDays},
         ${d.is_half_day}, ${d.half_day_period ?? null}, ${d.cover_employee_id ?? null}, ${d.reason ?? null}, ${status})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
 
     if (status === 'approved') {
       await sql`
         UPDATE zvd_leave_balances SET used_days = used_days + ${workingDays}, updated_at = NOW()
         WHERE employee_id = ${d.employee_id} AND leave_type_id = ${d.leave_type_id} AND year = ${year}
-      `.execute(db);
+      `.execute(reqDb(c));
     } else {
       await sql`
         UPDATE zvd_leave_balances SET pending_days = pending_days + ${workingDays}, updated_at = NOW()
         WHERE employee_id = ${d.employee_id} AND leave_type_id = ${d.leave_type_id} AND year = ${year}
-      `.execute(db);
+      `.execute(reqDb(c));
     }
     return c.json({ data: row.rows[0] }, 201);
   });
 
   app.post('/requests/:id/approve', async (c) => {
     const user = c.get('user') as any;
-    const req = await sql`SELECT * FROM zvd_leave_requests WHERE id = ${c.req.param('id')} AND status = 'pending'`.execute(db);
+    const req = await sql`SELECT * FROM zvd_leave_requests WHERE id = ${c.req.param('id')} AND status = 'pending'`.execute(reqDb(c));
     if (!req.rows.length) return c.json({ error: 'Request not found or not pending' }, 400);
     const r = req.rows[0] as any;
     const year = new Date(r.start_date).getFullYear();
-    await sql`UPDATE zvd_leave_requests SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW() WHERE id = ${r.id}`.execute(db);
+    await sql`UPDATE zvd_leave_requests SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW() WHERE id = ${r.id}`.execute(reqDb(c));
     await sql`
       UPDATE zvd_leave_balances SET
         used_days = used_days + ${r.working_days},
         pending_days = GREATEST(0, pending_days - ${r.working_days}),
         updated_at = NOW()
       WHERE employee_id = ${r.employee_id} AND leave_type_id = ${r.leave_type_id} AND year = ${year}
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ success: true });
   });
 
   app.post('/requests/:id/reject', zValidator('json', z.object({ reason: z.string().min(1) })), async (c) => {
     const { reason } = c.req.valid('json');
-    const req = await sql`SELECT * FROM zvd_leave_requests WHERE id = ${c.req.param('id')} AND status = 'pending'`.execute(db);
+    const req = await sql`SELECT * FROM zvd_leave_requests WHERE id = ${c.req.param('id')} AND status = 'pending'`.execute(reqDb(c));
     if (!req.rows.length) return c.json({ error: 'Request not found or not pending' }, 400);
     const r = req.rows[0] as any;
     const year = new Date(r.start_date).getFullYear();
-    await sql`UPDATE zvd_leave_requests SET status = 'rejected', rejection_reason = ${reason}, updated_at = NOW() WHERE id = ${r.id}`.execute(db);
+    await sql`UPDATE zvd_leave_requests SET status = 'rejected', rejection_reason = ${reason}, updated_at = NOW() WHERE id = ${r.id}`.execute(reqDb(c));
     await sql`
       UPDATE zvd_leave_balances SET pending_days = GREATEST(0, pending_days - ${r.working_days}), updated_at = NOW()
       WHERE employee_id = ${r.employee_id} AND leave_type_id = ${r.leave_type_id} AND year = ${year}
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ success: true });
   });
 
   app.post('/requests/:id/cancel', async (c) => {
-    const req = await sql`SELECT * FROM zvd_leave_requests WHERE id = ${c.req.param('id')} AND status IN ('pending','approved')`.execute(db);
+    const req = await sql`SELECT * FROM zvd_leave_requests WHERE id = ${c.req.param('id')} AND status IN ('pending','approved')`.execute(reqDb(c));
     if (!req.rows.length) return c.json({ error: 'Request not found or cannot be cancelled' }, 400);
     const r = req.rows[0] as any;
     const year = new Date(r.start_date).getFullYear();
-    await sql`UPDATE zvd_leave_requests SET status = 'cancelled', updated_at = NOW() WHERE id = ${r.id}`.execute(db);
+    await sql`UPDATE zvd_leave_requests SET status = 'cancelled', updated_at = NOW() WHERE id = ${r.id}`.execute(reqDb(c));
     if (r.status === 'approved') {
       await sql`
         UPDATE zvd_leave_balances SET used_days = GREATEST(0, used_days - ${r.working_days}), updated_at = NOW()
         WHERE employee_id = ${r.employee_id} AND leave_type_id = ${r.leave_type_id} AND year = ${year}
-      `.execute(db);
+      `.execute(reqDb(c));
     } else {
       await sql`
         UPDATE zvd_leave_balances SET pending_days = GREATEST(0, pending_days - ${r.working_days}), updated_at = NOW()
         WHERE employee_id = ${r.employee_id} AND leave_type_id = ${r.leave_type_id} AND year = ${year}
-      `.execute(db);
+      `.execute(reqDb(c));
     }
     return c.json({ success: true });
   });
@@ -346,10 +355,10 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
         AND r.start_date <= ${toDate} AND r.end_date >= ${fromDate}
         AND (${department_id ? sql`e.department_id = ${department_id}` : sql`TRUE`})
       ORDER BY r.start_date
-    `.execute(db);
+    `.execute(reqDb(c));
     const holidays = await sql`
       SELECT * FROM zvd_public_holidays WHERE date BETWEEN ${fromDate} AND ${toDate} ORDER BY date
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: { requests: rows.rows, holidays: holidays.rows } });
   });
 
@@ -364,14 +373,14 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
         COUNT(*) as total_this_year
       FROM zvd_leave_requests
       WHERE EXTRACT(YEAR FROM start_date) = ${yr}
-    `.execute(db);
+    `.execute(reqDb(c));
     const byType = await sql`
       SELECT t.name, t.code, t.color, COALESCE(SUM(r.working_days), 0) as total_days
       FROM zvd_leave_types t
       LEFT JOIN zvd_leave_requests r ON r.leave_type_id = t.id
         AND r.status = 'approved' AND EXTRACT(YEAR FROM r.start_date) = ${yr}
       GROUP BY t.id, t.name, t.code, t.color ORDER BY total_days DESC
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: { ...(row.rows[0] as any), by_type: byType.rows } });
   });
 

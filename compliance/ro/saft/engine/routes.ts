@@ -35,6 +35,15 @@ const entrySchema = z.object({
 
 export function saftRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const app = new Hono();
 
   app.use('*', async (c, next) => {
@@ -82,7 +91,7 @@ export function saftRoutes(ctx: ExtensionContext): Hono {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const { from, to, account_code } = c.req.query();
-    let query = db.selectFrom('zv_saft_journal_entries').selectAll();
+    let query = reqDb(c).selectFrom('zv_saft_journal_entries').selectAll();
     if (from) query = query.where('entry_date', '>=', from);
     if (to) query = query.where('entry_date', '<=', to);
     if (account_code) query = query.where('account_code', '=', account_code);
@@ -248,7 +257,7 @@ export function saftRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    await db.deleteFrom('zv_saft_accounts').where('id', '=', c.req.param('id')).execute();
+    await reqDb(c).deleteFrom('zv_saft_accounts').where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
   });
 
@@ -272,7 +281,7 @@ export function saftRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    await db.deleteFrom('zv_saft_journal_entries').where('id', '=', c.req.param('id')).execute();
+    await reqDb(c).deleteFrom('zv_saft_journal_entries').where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
   });
 

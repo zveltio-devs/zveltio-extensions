@@ -63,6 +63,15 @@ async function applyRules(db: any, accountId: string, tx: any): Promise<string |
 
 export function bankingRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const app = new Hono();
 
   app.use('*', async (c, next) => {
@@ -76,7 +85,7 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
 
   // ── Bank Accounts ─────────────────────────────────────────────
   app.get('/accounts', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_bank_accounts ORDER BY created_at DESC`.execute(db);
+    const rows = await sql`SELECT * FROM zvd_bank_accounts ORDER BY created_at DESC`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -96,7 +105,7 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
       VALUES (${d.name}, ${d.bank_name}, ${d.iban ?? null}, ${d.currency}, ${d.account_type},
         ${d.opening_balance}, ${d.opening_balance}, ${d.notes ?? null}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -113,7 +122,7 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
         is_active = COALESCE(${d.is_active ?? null}, is_active),
         updated_at = NOW()
       WHERE id = ${c.req.param('id')} RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
@@ -133,7 +142,7 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
         AND (${reconciled === 'true' ? sql`is_reconciled = true` : reconciled === 'false' ? sql`is_reconciled = false` : sql`TRUE`})
       ORDER BY date DESC, created_at DESC
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -155,9 +164,9 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
       VALUES (${accountId}, ${d.date}, ${d.type}, ${d.amount}, ${d.description},
         ${d.reference ?? null}, ${d.counterparty_name ?? null}, ${autoCategory ?? null}, ${!d.category && !!autoCategory}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     const delta = d.type === 'credit' ? d.amount : -d.amount;
-    await sql`UPDATE zvd_bank_accounts SET balance = balance + ${delta}, updated_at = NOW() WHERE id = ${accountId}`.execute(db);
+    await sql`UPDATE zvd_bank_accounts SET balance = balance + ${delta}, updated_at = NOW() WHERE id = ${accountId}`.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -173,7 +182,7 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     const importRow = await sql`
       INSERT INTO zvd_bank_imports (account_id, source, row_count, created_by)
       VALUES (${accountId}, 'mt940', ${transactions.length}, ${user.id}) RETURNING id
-    `.execute(db);
+    `.execute(reqDb(c));
     const importId = (importRow.rows[0] as any).id;
     let imported = 0;
     let balance_delta = 0;
@@ -183,13 +192,13 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
         INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, category, auto_categorized, created_by)
         VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description}, ${t.reference}, ${autoCategory}, ${!!autoCategory}, ${user.id})
         ON CONFLICT DO NOTHING RETURNING id
-      `.execute(db);
+      `.execute(reqDb(c));
       if (result.rows.length) {
         balance_delta += t.type === 'credit' ? t.amount : -t.amount;
         imported++;
       }
     }
-    await sql`UPDATE zvd_bank_accounts SET balance = balance + ${balance_delta}, updated_at = NOW() WHERE id = ${accountId}`.execute(db);
+    await sql`UPDATE zvd_bank_accounts SET balance = balance + ${balance_delta}, updated_at = NOW() WHERE id = ${accountId}`.execute(reqDb(c));
     return c.json({ data: { import_id: importId, total: transactions.length, imported, skipped: transactions.length - imported } }, 201);
   });
 
@@ -211,7 +220,7 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     const importRow = await sql`
       INSERT INTO zvd_bank_imports (account_id, source, row_count, created_by)
       VALUES (${accountId}, ${d.source}, ${d.transactions.length}, ${user.id}) RETURNING id
-    `.execute(db);
+    `.execute(reqDb(c));
     const importId = (importRow.rows[0] as any).id;
     let balance_delta = 0;
     let imported = 0;
@@ -222,19 +231,19 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
         VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description},
           ${t.reference ?? null}, ${t.counterparty_name ?? null}, ${autoCategory}, ${!!autoCategory}, ${user.id})
         ON CONFLICT DO NOTHING RETURNING id
-      `.execute(db);
+      `.execute(reqDb(c));
       if (result.rows.length) {
         balance_delta += t.type === 'credit' ? t.amount : -t.amount;
         imported++;
       }
     }
-    await sql`UPDATE zvd_bank_accounts SET balance = balance + ${balance_delta}, updated_at = NOW() WHERE id = ${accountId}`.execute(db);
+    await sql`UPDATE zvd_bank_accounts SET balance = balance + ${balance_delta}, updated_at = NOW() WHERE id = ${accountId}`.execute(reqDb(c));
     return c.json({ data: { import_id: importId, imported } }, 201);
   });
 
   // ── Categorization Rules ──────────────────────────────────────
   app.get('/accounts/:id/rules', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_bank_rules WHERE account_id = ${c.req.param('id')} OR account_id IS NULL ORDER BY priority DESC, created_at`.execute(db);
+    const rows = await sql`SELECT * FROM zvd_bank_rules WHERE account_id = ${c.req.param('id')} OR account_id IS NULL ORDER BY priority DESC, created_at`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -254,23 +263,23 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
       VALUES (${c.req.param('id')}, ${d.name}, ${d.match_field}, ${d.match_operator}, ${d.match_value},
         ${d.category}, ${d.type_override ?? null}, ${d.priority}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
   app.delete('/rules/:id', async (c) => {
-    await sql`DELETE FROM zvd_bank_rules WHERE id = ${c.req.param('id')}`.execute(db);
+    await sql`DELETE FROM zvd_bank_rules WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
     return c.json({ success: true });
   });
 
   // Re-apply rules to all unreconciled transactions
   app.post('/accounts/:id/re-categorize', async (c) => {
-    const txns = await sql`SELECT * FROM zvd_bank_transactions WHERE account_id = ${c.req.param('id')} AND is_reconciled = false`.execute(db);
+    const txns = await sql`SELECT * FROM zvd_bank_transactions WHERE account_id = ${c.req.param('id')} AND is_reconciled = false`.execute(reqDb(c));
     let updated = 0;
     for (const tx of txns.rows as any[]) {
       const cat = await applyRules(db, c.req.param('id'), tx);
       if (cat && cat !== tx.category) {
-        await sql`UPDATE zvd_bank_transactions SET category = ${cat}, auto_categorized = true WHERE id = ${tx.id}`.execute(db);
+        await sql`UPDATE zvd_bank_transactions SET category = ${cat}, auto_categorized = true WHERE id = ${tx.id}`.execute(reqDb(c));
         updated++;
       }
     }
@@ -285,15 +294,15 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
-    const tx = await sql`SELECT * FROM zvd_bank_transactions WHERE id = ${c.req.param('txId')} AND account_id = ${c.req.param('id')}`.execute(db);
+    const tx = await sql`SELECT * FROM zvd_bank_transactions WHERE id = ${c.req.param('txId')} AND account_id = ${c.req.param('id')}`.execute(reqDb(c));
     if (!tx.rows.length) return c.json({ error: 'Not found' }, 404);
-    await sql`UPDATE zvd_bank_transactions SET is_reconciled = true, updated_at = NOW() WHERE id = ${c.req.param('txId')}`.execute(db);
+    await sql`UPDATE zvd_bank_transactions SET is_reconciled = true, updated_at = NOW() WHERE id = ${c.req.param('txId')}`.execute(reqDb(c));
     const rec = await sql`
       INSERT INTO zvd_bank_reconciliations (transaction_id, linked_type, linked_id, matched_amount, notes, created_by)
       VALUES (${c.req.param('txId')}, ${d.linked_type}, ${d.linked_id ?? null}, ${(tx.rows[0] as any).amount}, ${d.notes ?? null}, ${user.id})
       ON CONFLICT (transaction_id) DO UPDATE SET linked_type = EXCLUDED.linked_type, linked_id = EXCLUDED.linked_id, notes = EXCLUDED.notes
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rec.rows[0] });
   });
 
@@ -305,7 +314,7 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
       JOIN zvd_invoices i ON ABS(i.total - t.amount) < 0.01 AND i.status IN ('sent','overdue')
       WHERE t.account_id = ${c.req.param('id')} AND t.is_reconciled = false AND t.type = 'credit'
       ORDER BY t.date DESC LIMIT 50
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
     return c.json({ data: txns.rows });
   });
 
@@ -318,12 +327,12 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
       SELECT * FROM zvd_cash_flow_entries
       WHERE expected_date BETWEEN ${fromDate} AND ${toDate}
       ORDER BY expected_date
-    `.execute(db);
+    `.execute(reqDb(c));
     // Also include expected payments from open invoices
     const invoices = await sql`
       SELECT due_date as expected_date, 'inflow' as type, total - amount_paid as amount, 'Invoice ' || number as description, 'accounts_receivable' as category
       FROM zvd_invoices WHERE status IN ('sent','overdue') AND due_date BETWEEN ${fromDate} AND ${toDate}
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
     return c.json({ data: [...forecast.rows, ...invoices.rows].sort((a: any, b: any) => a.expected_date.localeCompare(b.expected_date)) });
   });
 
@@ -342,25 +351,25 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_cash_flow_entries (account_id, expected_date, type, amount, description, category, probability, created_by)
       VALUES (${d.account_id ?? null}, ${d.expected_date}, ${d.type}, ${d.amount}, ${d.description}, ${d.category ?? null}, ${d.probability}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
   // ── Balance history snapshot ──────────────────────────────────
   app.post('/accounts/:id/snapshot', async (c) => {
-    const acc = await sql`SELECT balance FROM zvd_bank_accounts WHERE id = ${c.req.param('id')}`.execute(db);
+    const acc = await sql`SELECT balance FROM zvd_bank_accounts WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
     if (!acc.rows.length) return c.json({ error: 'Not found' }, 404);
     const today = new Date().toISOString().slice(0, 10);
     await sql`
       INSERT INTO zvd_bank_balance_history (account_id, snapshot_date, balance)
       VALUES (${c.req.param('id')}, ${today}, ${(acc.rows[0] as any).balance})
       ON CONFLICT (account_id, snapshot_date) DO UPDATE SET balance = EXCLUDED.balance
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ success: true });
   });
 
   app.get('/accounts/:id/balance-history', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_bank_balance_history WHERE account_id = ${c.req.param('id')} ORDER BY snapshot_date DESC LIMIT 365`.execute(db);
+    const rows = await sql`SELECT * FROM zvd_bank_balance_history WHERE account_id = ${c.req.param('id')} ORDER BY snapshot_date DESC LIMIT 365`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -369,14 +378,14 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     const accounts = await sql`
       SELECT COUNT(*) as count, COALESCE(SUM(balance), 0) as total_balance
       FROM zvd_bank_accounts WHERE is_active = true
-    `.execute(db);
+    `.execute(reqDb(c));
     const monthly = await sql`
       SELECT
         COALESCE(SUM(amount) FILTER (WHERE type = 'credit' AND date >= date_trunc('month', NOW())), 0) as income_mtd,
         COALESCE(SUM(amount) FILTER (WHERE type = 'debit'  AND date >= date_trunc('month', NOW())), 0) as expenses_mtd,
         COUNT(*) FILTER (WHERE is_reconciled = false) as unreconciled_count
       FROM zvd_bank_transactions
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: { ...(accounts.rows[0] as any), ...(monthly.rows[0] as any) } });
   });
 

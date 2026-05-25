@@ -34,6 +34,15 @@ const receptionSchema = z.object({
 
 export function lotsRouter(ctx: ExtensionContext): Hono {
   const { db } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const stockService = new StockService(db);
   const app = new Hono();
 
@@ -61,13 +70,13 @@ export function lotsRouter(ctx: ExtensionContext): Hono {
         AND (${expiry_to ? sql`l.best_before_date <= ${expiry_to}` : sql`TRUE`})
       ORDER BY l.created_at DESC
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(db);
+    `.execute(reqDb(c));
 
     const total = await sql<{ count: string }>`
       SELECT COUNT(*) as count FROM trace_lots l
       WHERE (${status ? sql`l.status = ${status}` : sql`TRUE`})
         AND (${item_id ? sql`l.item_id = ${item_id}` : sql`TRUE`})
-    `.execute(db);
+    `.execute(reqDb(c));
 
     return c.json({
       data: rows.rows,
@@ -101,7 +110,7 @@ export function lotsRouter(ctx: ExtensionContext): Hono {
       LEFT JOIN trace_suppliers s ON s.id = l.supplier_id
       LEFT JOIN trace_locations loc ON loc.id = l.location_id
       WHERE l.id = ${c.req.param('id')}
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Lot negăsit / Lot not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
@@ -129,7 +138,7 @@ export function lotsRouter(ctx: ExtensionContext): Hono {
         ${d.sscc ?? null}, ${d.gtin_scanned ?? null}, ${user.id}, ${d.notes ?? null}
       )
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
 
     const lot = row.rows[0] as any;
 
@@ -137,7 +146,7 @@ export function lotsRouter(ctx: ExtensionContext): Hono {
     await sql`
       INSERT INTO trace_movements (lot_id, type, quantity, unit, reference_type, reference_number, to_location_id, performed_by, performed_at)
       VALUES (${lot.id}, 'reception', ${d.quantity_initial}, ${d.unit}, 'reception', ${lotNumber}, ${d.location_id ?? null}, ${user.id}, now())
-    `.execute(db);
+    `.execute(reqDb(c));
 
     return c.json({ data: lot }, 201);
   });
@@ -152,7 +161,7 @@ export function lotsRouter(ctx: ExtensionContext): Hono {
       SET status = 'available', released_by = ${user.id}, released_at = now()
       WHERE id = ${id} AND status = 'quarantine'
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
 
     if (!row.rows.length) return c.json({ error: 'Lot nu este în carantină / Lot not in quarantine' }, 400);
     return c.json({ data: row.rows[0] });
@@ -167,7 +176,7 @@ export function lotsRouter(ctx: ExtensionContext): Hono {
     const id = c.req.param('id');
     const row = await sql`
       UPDATE trace_lots SET status = ${d.status}, notes = COALESCE(${d.notes ?? null}, notes) WHERE id = ${id} RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Lot negăsit / Lot not found' }, 404);
     return c.json({ data: row.rows[0] });
   });

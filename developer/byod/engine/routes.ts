@@ -25,6 +25,15 @@ const ImportBodySchema = z.object({
 
 export function introspectRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const { introspectSchema } = ctx.internals;
 
   const router = new Hono();
@@ -75,7 +84,7 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
         VALUES
           (${schema}, ${tables.length}, ${imported}, ${updated},
            ${skipped}, 'completed', 'manual', ${user.id})
-      `.execute(db);
+      `.execute(reqDb(c));
 
       return c.json({ imported, updated, tables });
     } catch (err: any) {
@@ -87,7 +96,7 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
         VALUES
           (${schema}, 0, 0, 0, 0, 'failed', ${err.message || 'Unknown error'},
            'manual', ${user.id})
-      `.execute(db).catch(() => {});
+      `.execute(reqDb(c)).catch(() => {});
       return c.json({ error: err.message || 'Introspection failed' }, 500);
     }
   });
@@ -98,7 +107,7 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
     const rows = await sql<any>`
       SELECT * FROM zvd_byod_scan_profiles
       ORDER BY created_at DESC
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ profiles: rows.rows });
   });
 
@@ -121,7 +130,7 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
          ${body.exclude_patterns as any}, ${body.auto_sync},
          ${body.sync_interval_hours}, ${nextSync}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ profile: row.rows[0] }, 201);
   });
 
@@ -131,7 +140,7 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
     const id = c.req.param('id');
     const row = await sql<any>`
       SELECT * FROM zvd_byod_scan_profiles WHERE id = ${id}
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows[0]) return c.json({ error: 'Not found' }, 404);
     return c.json({ profile: row.rows[0] });
   });
@@ -151,7 +160,7 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
     if (updates.auto_sync === true || updates.sync_interval_hours !== undefined) {
       const profile = await sql<any>`
         SELECT auto_sync, sync_interval_hours FROM zvd_byod_scan_profiles WHERE id = ${id}
-      `.execute(db);
+      `.execute(reqDb(c));
       const existing = profile.rows[0];
       if (existing) {
         const autoSync = updates.auto_sync ?? existing.auto_sync;
@@ -195,7 +204,7 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
 
     const profileRes = await sql<any>`
       SELECT * FROM zvd_byod_scan_profiles WHERE id = ${id} AND is_active = true
-    `.execute(db);
+    `.execute(reqDb(c));
 
     const profile = profileRes.rows[0];
     if (!profile) return c.json({ error: 'Profile not found or inactive' }, 404);
@@ -218,7 +227,7 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
         UPDATE zvd_byod_scan_profiles
         SET last_sync_at = ${now}, next_sync_at = ${nextSync}, updated_at = ${now}
         WHERE id = ${id}
-      `.execute(db);
+      `.execute(reqDb(c));
 
       // Insert history
       const histRow = await sql<any>`
@@ -229,7 +238,7 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
           (${id}, ${schema}, ${tables.length}, ${imported}, ${updated},
            0, 'completed', 'profile', ${user.id})
         RETURNING *
-      `.execute(db);
+      `.execute(reqDb(c));
 
       return c.json({ imported, updated, tables, history: histRow.rows[0] });
     } catch (err: any) {
@@ -240,7 +249,7 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
         VALUES
           (${id}, ${schema}, 0, 0, 0, 0, 'failed',
            ${err.message || 'Unknown error'}, 'profile', ${user.id})
-      `.execute(db).catch(() => {});
+      `.execute(reqDb(c)).catch(() => {});
       return c.json({ error: err.message || 'Scan failed' }, 500);
     }
   });
@@ -258,14 +267,14 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
           WHERE h.profile_id = ${profileId}
           ORDER BY h.created_at DESC
           LIMIT 50
-        `.execute(db)
+        `.execute(reqDb(c))
       : await sql<any>`
           SELECT h.*, p.name AS profile_name
           FROM zvd_byod_scan_history h
           LEFT JOIN zvd_byod_scan_profiles p ON p.id = h.profile_id
           ORDER BY h.created_at DESC
           LIMIT 50
-        `.execute(db);
+        `.execute(reqDb(c));
 
     return c.json({ history: rows.rows });
   });
@@ -278,14 +287,14 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
         SELECT COUNT(*)::int AS total
         FROM zv_collections
         WHERE is_managed = false
-      `.execute(db).catch(() => ({ rows: [{ total: 0 }] })),
+      `.execute(reqDb(c)).catch(() => ({ rows: [{ total: 0 }] })),
       sql<any>`
         SELECT created_at FROM zvd_byod_scan_history
         ORDER BY created_at DESC LIMIT 1
-      `.execute(db).catch(() => ({ rows: [] })),
+      `.execute(reqDb(c)).catch(() => ({ rows: [] })),
       sql<any>`
         SELECT COUNT(*)::int AS total FROM zvd_byod_scan_profiles
-      `.execute(db).catch(() => ({ rows: [{ total: 0 }] })),
+      `.execute(reqDb(c)).catch(() => ({ rows: [{ total: 0 }] })),
     ]);
 
     return c.json({

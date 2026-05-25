@@ -54,6 +54,15 @@ const CreateRequestSchema = z.object({
 export function approvalsRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission, getUserRoles } = ctx;
 
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
+
   const app = new Hono();
 
   // Auth middleware
@@ -226,28 +235,28 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
 
     const pendingResult = await sql<{ count: string }>`
       SELECT COUNT(*) as count FROM zv_approval_requests WHERE status = 'pending'
-    `.execute(db);
+    `.execute(reqDb(c));
 
     const approvedThisMonthResult = await sql<{ count: string }>`
       SELECT COUNT(*) as count FROM zv_approval_requests
       WHERE status = 'approved' AND completed_at >= ${startOfMonth}
-    `.execute(db);
+    `.execute(reqDb(c));
 
     const rejectedThisMonthResult = await sql<{ count: string }>`
       SELECT COUNT(*) as count FROM zv_approval_requests
       WHERE status = 'rejected' AND completed_at >= ${startOfMonth}
-    `.execute(db);
+    `.execute(reqDb(c));
 
     const avgHoursResult = await sql<{ avg_hours: string | null }>`
       SELECT AVG(EXTRACT(EPOCH FROM (completed_at - requested_at)) / 3600) as avg_hours
       FROM zv_approval_requests
       WHERE status IN ('approved', 'rejected') AND completed_at IS NOT NULL
-    `.execute(db);
+    `.execute(reqDb(c));
 
     const overdueResult = await sql<{ count: string }>`
       SELECT COUNT(*) as count FROM zv_approval_requests
       WHERE status = 'pending' AND sla_due_at IS NOT NULL AND sla_due_at < NOW()
-    `.execute(db);
+    `.execute(reqDb(c));
 
     const byCollectionResult = await sql<{ collection: string; count: string }>`
       SELECT collection, COUNT(*) as count
@@ -255,7 +264,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
       WHERE status = 'pending'
       GROUP BY collection
       ORDER BY count DESC
-    `.execute(db);
+    `.execute(reqDb(c));
 
     return c.json({
       total_pending: parseInt(pendingResult.rows[0]?.count || '0'),
@@ -638,7 +647,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
         AND sla_due_at < NOW()
         AND sla_breached = false
       RETURNING id
-    `.execute(db);
+    `.execute(reqDb(c));
 
     const count = result.rows.length;
 
@@ -719,7 +728,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
     if (!workflow) return c.json({ error: 'Workflow not found' }, 404);
 
     if (steps) {
-      await (db as any).deleteFrom('zv_approval_steps').where('workflow_id', '=', id).execute();
+      await (reqDb(c) as any).deleteFrom('zv_approval_steps').where('workflow_id', '=', id).execute();
       for (let i = 0; i < steps.length; i++) {
         await (db as any)
           .insertInto('zv_approval_steps')
@@ -738,7 +747,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'Admin access required' }, 403);
     }
 
-    await (db as any).deleteFrom('zv_approval_workflows').where('id', '=', c.req.param('id')).execute();
+    await (reqDb(c) as any).deleteFrom('zv_approval_workflows').where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
   });
 

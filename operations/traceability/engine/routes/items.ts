@@ -22,6 +22,15 @@ const itemSchema = z.object({
 
 export function itemsRouter(ctx: ExtensionContext): Hono {
   const { db } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const app = new Hono();
 
   app.get('/', async (c) => {
@@ -33,12 +42,12 @@ export function itemsRouter(ctx: ExtensionContext): Hono {
         AND (${category ? sql`category = ${category}` : sql`TRUE`})
         AND is_active = true
       ORDER BY name
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
   app.get('/:id', async (c) => {
-    const row = await sql`SELECT * FROM trace_items WHERE id = ${c.req.param('id')}`.execute(db);
+    const row = await sql`SELECT * FROM trace_items WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Articol negăsit / Item not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
@@ -54,7 +63,7 @@ export function itemsRouter(ctx: ExtensionContext): Hono {
         ${d.gtin ?? null}, ${d.min_stock_alert ?? null}
       )
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -79,7 +88,7 @@ export function itemsRouter(ctx: ExtensionContext): Hono {
         is_active = COALESCE(${d.is_active ?? null}, is_active)
       WHERE id = ${id}
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Articol negăsit / Item not found' }, 404);
     return c.json({ data: row.rows[0] });
   });

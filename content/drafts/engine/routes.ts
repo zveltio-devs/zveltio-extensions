@@ -42,6 +42,15 @@ const CommentSchema = z.object({
 export function draftsRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
 
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
+
   const app = new Hono();
 
   // Auth middleware
@@ -175,7 +184,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
           .executeTakeFirst();
 
         if (settings?.require_review && item.status !== 'approved') {
-          await (db as any).updateTable('zv_publish_schedule').set({ status: 'failed' }).where('id', '=', item.schedule_id).execute();
+          await (reqDb(c) as any).updateTable('zv_publish_schedule').set({ status: 'failed' }).where('id', '=', item.schedule_id).execute();
           errors.push(`Draft ${item.draft_id} not approved`);
           failed++;
           continue;
@@ -183,13 +192,13 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
 
         const tableName = `zvd_${item.collection}`;
         const draftData = typeof item.draft_data === 'string' ? JSON.parse(item.draft_data) : item.draft_data;
-        await (db as any).updateTable(tableName).set({ ...draftData, updated_at: new Date() }).where('id', '=', item.record_id).execute();
-        await (db as any).updateTable('zv_content_drafts').set({ status: 'approved', published_at: new Date() }).where('id', '=', item.draft_id).execute();
-        await (db as any).updateTable('zv_publish_schedule').set({ status: 'published', published_at: new Date() }).where('id', '=', item.schedule_id).execute();
+        await (reqDb(c) as any).updateTable(tableName).set({ ...draftData, updated_at: new Date() }).where('id', '=', item.record_id).execute();
+        await (reqDb(c) as any).updateTable('zv_content_drafts').set({ status: 'approved', published_at: new Date() }).where('id', '=', item.draft_id).execute();
+        await (reqDb(c) as any).updateTable('zv_publish_schedule').set({ status: 'published', published_at: new Date() }).where('id', '=', item.schedule_id).execute();
         published++;
       } catch (err: any) {
         errors.push(`Draft ${item.draft_id}: ${err.message}`);
-        await (db as any).updateTable('zv_publish_schedule').set({ status: 'failed' }).where('id', '=', item.schedule_id).execute();
+        await (reqDb(c) as any).updateTable('zv_publish_schedule').set({ status: 'failed' }).where('id', '=', item.schedule_id).execute();
         failed++;
       }
     }
@@ -217,11 +226,11 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
 
     for (const draftId of draft_ids) {
       try {
-        const draft = await (db as any).selectFrom('zv_content_drafts').selectAll().where('id', '=', draftId).executeTakeFirst();
+        const draft = await (reqDb(c) as any).selectFrom('zv_content_drafts').selectAll().where('id', '=', draftId).executeTakeFirst();
         if (!draft || draft.status !== 'approved') { failedCount++; jobErrors.push(`${draftId}: not approved`); continue; }
         const draftData = typeof draft.draft_data === 'string' ? JSON.parse(draft.draft_data) : draft.draft_data;
-        await (db as any).updateTable(`zvd_${draft.collection}`).set({ ...draftData, updated_at: new Date() }).where('id', '=', draft.record_id).execute();
-        await (db as any).updateTable('zv_content_drafts').set({ status: 'approved', published_at: new Date() }).where('id', '=', draftId).execute();
+        await (reqDb(c) as any).updateTable(`zvd_${draft.collection}`).set({ ...draftData, updated_at: new Date() }).where('id', '=', draft.record_id).execute();
+        await (reqDb(c) as any).updateTable('zv_content_drafts').set({ status: 'approved', published_at: new Date() }).where('id', '=', draftId).execute();
         published++;
       } catch (err: any) {
         failedCount++;
@@ -229,7 +238,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
       }
     }
 
-    await (db as any).updateTable('zv_draft_publish_jobs').set({
+    await (reqDb(c) as any).updateTable('zv_draft_publish_jobs').set({
       status: failedCount === draft_ids.length ? 'failed' : 'completed',
       published_count: published, failed_count: failedCount,
       errors: JSON.stringify(jobErrors), completed_at: new Date(),
@@ -246,14 +255,14 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     }
     const byStatus = await sql<{ status: string; count: string }>`
       SELECT status, COUNT(*)::text AS count FROM zv_content_drafts GROUP BY status
-    `.execute(db);
+    `.execute(reqDb(c));
     const pendingScheduled = await sql<{ count: string }>`
       SELECT COUNT(*)::text AS count FROM zv_publish_schedule WHERE status = 'pending'
-    `.execute(db);
+    `.execute(reqDb(c));
     const avgReview = await sql<{ avg_hours: string | null }>`
       SELECT AVG(EXTRACT(EPOCH FROM (reviewed_at - created_at))/3600)::text AS avg_hours
       FROM zv_content_drafts WHERE reviewed_at IS NOT NULL
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({
       by_status: byStatus.rows,
       scheduled_count: parseInt(pendingScheduled.rows[0]?.count || '0'),
@@ -398,8 +407,8 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     const tableName = `zvd_${draft.collection}`;
     const draftData = typeof draft.draft_data === 'string' ? JSON.parse(draft.draft_data) : draft.draft_data;
 
-    await (db as any).updateTable(tableName).set({ ...draftData, updated_at: new Date() }).where('id', '=', draft.record_id).execute();
-    await (db as any).updateTable('zv_content_drafts').set({ status: 'approved', published_at: new Date() }).where('id', '=', id).execute();
+    await (reqDb(c) as any).updateTable(tableName).set({ ...draftData, updated_at: new Date() }).where('id', '=', draft.record_id).execute();
+    await (reqDb(c) as any).updateTable('zv_content_drafts').set({ status: 'approved', published_at: new Date() }).where('id', '=', id).execute();
 
     // WebSocket broadcast skipped — ctx.internals will expose broadcastEvent in a future release
 
@@ -422,7 +431,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     const isAdmin = await checkPermission(user.id, 'admin', '*');
     if (draft.created_by !== user.id && !isAdmin) return c.json({ error: 'Forbidden' }, 403);
 
-    await (db as any).deleteFrom('zv_content_drafts').where('id', '=', id).execute();
+    await (reqDb(c) as any).deleteFrom('zv_content_drafts').where('id', '=', id).execute();
     return c.json({ success: true });
   });
 
@@ -433,12 +442,12 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const id = c.req.param('id');
 
-    const draft = await (db as any).selectFrom('zv_content_drafts').select(['id', 'collection']).where('id', '=', id).executeTakeFirst();
+    const draft = await (reqDb(c) as any).selectFrom('zv_content_drafts').select(['id', 'collection']).where('id', '=', id).executeTakeFirst();
     if (!draft) return c.json({ error: 'Draft not found' }, 404);
     const canRead = await checkPermission(user.id, draft.collection, 'read');
     if (!canRead) return c.json({ error: 'Forbidden' }, 403);
 
-    const comments = await (db as any).selectFrom('zv_draft_review_comments').selectAll().where('draft_id', '=', id).orderBy('created_at', 'asc').execute();
+    const comments = await (reqDb(c) as any).selectFrom('zv_draft_review_comments').selectAll().where('draft_id', '=', id).orderBy('created_at', 'asc').execute();
     return c.json({ comments });
   });
 
@@ -448,7 +457,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     const id = c.req.param('id');
     const data = c.req.valid('json');
 
-    const draft = await (db as any).selectFrom('zv_content_drafts').select(['id', 'collection']).where('id', '=', id).executeTakeFirst();
+    const draft = await (reqDb(c) as any).selectFrom('zv_content_drafts').select(['id', 'collection']).where('id', '=', id).executeTakeFirst();
     if (!draft) return c.json({ error: 'Draft not found' }, 404);
 
     const comment = await (db as any)
@@ -494,7 +503,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     const id = c.req.param('id');
     const { description } = c.req.valid('json');
 
-    const draft = await (db as any).selectFrom('zv_content_drafts').selectAll().where('id', '=', id).executeTakeFirst();
+    const draft = await (reqDb(c) as any).selectFrom('zv_content_drafts').selectAll().where('id', '=', id).executeTakeFirst();
     if (!draft) return c.json({ error: 'Draft not found' }, 404);
 
     const lastSnap = await (db as any)
@@ -519,7 +528,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
   app.get('/:id/snapshots/:version', async (c) => {
     const id = c.req.param('id');
     const version = parseInt(c.req.param('version'));
-    const snap = await (db as any).selectFrom('zv_draft_snapshots').selectAll().where('draft_id', '=', id).where('version', '=', version).executeTakeFirst();
+    const snap = await (reqDb(c) as any).selectFrom('zv_draft_snapshots').selectAll().where('draft_id', '=', id).where('version', '=', version).executeTakeFirst();
     if (!snap) return c.json({ error: 'Snapshot not found' }, 404);
     return c.json({ snapshot: snap });
   });

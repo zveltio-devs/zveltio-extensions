@@ -95,6 +95,15 @@ async function getNextDocNumber(db: any, templateId: string, prefix: string): Pr
 
 export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any } }> {
   const { db, auth, checkPermission } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const { renderTemplate, generatePDF } = ctx.internals;
 
   const app = new Hono<{ Variables: { user: any } }>();
@@ -114,7 +123,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
     const token = c.req.param('token');
     const ip = c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || 'unknown';
 
-    const signReq = await (db as any)
+    const signReq = await (reqDb(c) as any)
       .selectFrom('zv_document_sign_requests')
       .selectAll()
       .where('sign_token', '=', token)
@@ -123,7 +132,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
     if (!signReq) return c.json({ error: 'Invalid or expired sign token' }, 404);
     if (signReq.status !== 'pending') return c.json({ error: `Request already ${signReq.status}` }, 400);
     if (new Date(signReq.expires_at) < new Date()) {
-      await (db as any)
+      await (reqDb(c) as any)
         .updateTable('zv_document_sign_requests')
         .set({ status: 'expired' })
         .where('id', '=', signReq.id)
@@ -131,21 +140,21 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
       return c.json({ error: 'Sign token has expired' }, 410);
     }
 
-    await (db as any)
+    await (reqDb(c) as any)
       .updateTable('zv_document_sign_requests')
       .set({ status: 'signed', signed_at: new Date(), ip_address: ip })
       .where('id', '=', signReq.id)
       .execute();
 
     // Update document is_signed flag
-    await (db as any)
+    await (reqDb(c) as any)
       .updateTable('zv_generated_docs')
       .set({ is_signed: true })
       .where('id', '=', signReq.document_id)
       .execute();
 
     // Log access
-    await (db as any)
+    await (reqDb(c) as any)
       .insertInto('zv_document_access_log')
       .values({ document_id: signReq.document_id, ip, action: 'sign' })
       .execute();
@@ -158,7 +167,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
     const token = c.req.param('token');
     const ip = c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || 'unknown';
 
-    const doc = await (db as any)
+    const doc = await (reqDb(c) as any)
       .selectFrom('zv_generated_docs')
       .select(['id', 'template_name', 'document_number', 'output_format', 'generated_at', 'status', 'is_signed', 'expires_at'])
       .where('share_token', '=', token)
@@ -172,7 +181,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
     }
 
     // Log access
-    await (db as any)
+    await (reqDb(c) as any)
       .insertInto('zv_document_access_log')
       .values({ document_id: doc.id, ip, action: 'view' })
       .execute();
@@ -193,7 +202,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
 
   // GET /templates — list active templates
   app.get('/templates', async (c) => {
-    const templates = await (db as any)
+    const templates = await (reqDb(c) as any)
       .selectFrom('zv_document_templates')
       .select(['id', 'name', 'description', 'category', 'variables', 'pdf_options'])
       .where('is_active', '=', true)
@@ -208,7 +217,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
     const templateId = c.req.param('templateId');
     const data = c.req.valid('json');
 
-    const template = await (db as any)
+    const template = await (reqDb(c) as any)
       .selectFrom('zv_document_templates')
       .selectAll()
       .where('id', '=', templateId)
@@ -218,14 +227,14 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
     if (!template) return c.json({ error: 'Template not found or inactive' }, 404);
 
     // Generate document number via sequence
-    const seqData = await (db as any)
+    const seqData = await (reqDb(c) as any)
       .selectFrom('zv_document_number_sequences')
       .selectAll()
       .where('template_id', '=', templateId)
       .executeTakeFirst();
 
     const prefix = seqData?.prefix || template.category || 'DOC';
-    const docNumber = await getNextDocNumber(db, templateId, prefix);
+    const docNumber = await getNextDocNumber(reqDb(c), templateId, prefix);
 
     const allVariables = {
       ...data.variables_data,
@@ -242,7 +251,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
       ? new Date(Date.now() + data.expires_hours * 3600 * 1000)
       : null;
 
-    const doc = await (db as any)
+    const doc = await (reqDb(c) as any)
       .insertInto('zv_generated_docs')
       .values({
         template_id: templateId,
@@ -260,7 +269,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
       .executeTakeFirst();
 
     // Increment template usage
-    await (db as any)
+    await (reqDb(c) as any)
       .updateTable('zv_document_templates')
       .set({
         usage_count: sql`usage_count + 1`,
@@ -285,7 +294,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
   app.get('/generated', async (c) => {
     const { template_id, source_collection, source_record_id, status, limit = '50', offset = '0' } = c.req.query();
 
-    let query = (db as any)
+    let query = (reqDb(c) as any)
       .selectFrom('zv_generated_docs')
       .selectAll()
       .orderBy('generated_at', 'desc');
@@ -297,7 +306,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
 
     const docs = await query.limit(Number(limit)).offset(Number(offset)).execute();
 
-    const countResult = await (db as any)
+    const countResult = await (reqDb(c) as any)
       .selectFrom('zv_generated_docs')
       .select((eb: any) => eb.fn.count('id').as('count'))
       .executeTakeFirst();
@@ -312,7 +321,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
   app.get('/generated/:id', async (c) => {
     const id = c.req.param('id');
 
-    const doc = await (db as any)
+    const doc = await (reqDb(c) as any)
       .selectFrom('zv_generated_docs')
       .selectAll()
       .where('id', '=', id)
@@ -320,7 +329,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
 
     if (!doc) return c.json({ error: 'Document not found' }, 404);
 
-    const signRequests = await (db as any)
+    const signRequests = await (reqDb(c) as any)
       .selectFrom('zv_document_sign_requests')
       .select(['id', 'signer_email', 'signer_name', 'status', 'signed_at', 'expires_at', 'created_at'])
       .where('document_id', '=', id)
@@ -338,7 +347,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
     const isAdmin = await checkPermission(user.id, 'admin', '*');
     if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
 
-    const doc = await (db as any)
+    const doc = await (reqDb(c) as any)
       .selectFrom('zv_generated_docs')
       .select('id')
       .where('id', '=', id)
@@ -346,7 +355,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
 
     if (!doc) return c.json({ error: 'Document not found' }, 404);
 
-    await (db as any)
+    await (reqDb(c) as any)
       .updateTable('zv_generated_docs')
       .set({ status: 'revoked' })
       .where('id', '=', id)
@@ -361,7 +370,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
     const id = c.req.param('id');
     const data = c.req.valid('json');
 
-    const doc = await (db as any)
+    const doc = await (reqDb(c) as any)
       .selectFrom('zv_generated_docs')
       .select(['id', 'status'])
       .where('id', '=', id)
@@ -372,7 +381,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
 
     const expiresAt = new Date(Date.now() + data.expires_hours * 3600 * 1000);
 
-    const signReq = await (db as any)
+    const signReq = await (reqDb(c) as any)
       .insertInto('zv_document_sign_requests')
       .values({
         document_id: id,
@@ -392,7 +401,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
   app.get('/generated/:id/sign-requests', async (c) => {
     const id = c.req.param('id');
 
-    const signRequests = await (db as any)
+    const signRequests = await (reqDb(c) as any)
       .selectFrom('zv_document_sign_requests')
       .selectAll()
       .where('document_id', '=', id)
@@ -408,7 +417,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
     const isAdmin = await checkPermission(user.id, 'admin', '*');
     if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
 
-    const sequences = await (db as any)
+    const sequences = await (reqDb(c) as any)
       .selectFrom('zv_document_number_sequences')
       .selectAll()
       .orderBy('updated_at', 'desc')
@@ -433,7 +442,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
             year_reset = EXCLUDED.year_reset,
             updated_at = NOW()
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
 
     return c.json({ sequence: result.rows[0] }, 201);
   });
@@ -444,21 +453,21 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
     const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const [totalDocs, docsThisMonth, pendingSigs, byTemplate] = await Promise.all([
-      (db as any)
+      (reqDb(c) as any)
         .selectFrom('zv_generated_docs')
         .select((eb: any) => eb.fn.count('id').as('count'))
         .executeTakeFirst(),
-      (db as any)
+      (reqDb(c) as any)
         .selectFrom('zv_generated_docs')
         .select((eb: any) => eb.fn.count('id').as('count'))
         .where('generated_at', '>=', firstOfMonth)
         .executeTakeFirst(),
-      (db as any)
+      (reqDb(c) as any)
         .selectFrom('zv_document_sign_requests')
         .select((eb: any) => eb.fn.count('id').as('count'))
         .where('status', '=', 'pending')
         .executeTakeFirst(),
-      (db as any)
+      (reqDb(c) as any)
         .selectFrom('zv_generated_docs')
         .select(['template_name', (eb: any) => eb.fn.count('id').as('count')])
         .groupBy('template_name')

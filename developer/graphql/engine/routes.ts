@@ -134,6 +134,15 @@ async function getRelations(db: any): Promise<RelationInfo[]> {
 
 async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema> {
   const { db, DDLManager } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   let collections: any[] = [];
   let relations: RelationInfo[] = [];
 
@@ -416,6 +425,11 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
   const { db, DDLManager, auth, checkPermission } = ctx;
   const { DataLoaderRegistry, checkQueryDepth } = ctx.internals;
 
+  // Per-request DB handle.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const app = new Hono();
 
   // ── GET / — GraphiQL playground ───────────────────────────────────────────
@@ -500,7 +514,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
          ${variables ? JSON.stringify(variables) : null}::jsonb,
          ${durationMs}, ${resultSizeBytes}, ${errorCount},
          ${session.user.id}, ${ip})
-    `.execute(db).catch(() => {});
+    `.execute(reqDb(c)).catch(() => {});
 
     if (errorCount > 0 && !result.data) {
       return c.json(result, 400);
@@ -533,7 +547,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
         FROM zvd_graphql_persisted_queries
         WHERE is_public = true
         ORDER BY name ASC
-      `.execute(db);
+      `.execute(reqDb(c));
       return c.json({ queries: rows.rows });
     }
 
@@ -542,7 +556,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
              is_public, allowed_roles, use_count, last_used_at, created_at
       FROM zvd_graphql_persisted_queries
       ORDER BY name ASC
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ queries: rows.rows });
   });
 
@@ -562,7 +576,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
          ${body.variables_schema ? JSON.stringify(body.variables_schema) : null}::jsonb,
          ${body.is_public}, ${body.allowed_roles as any}, ${session.user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ query: row.rows[0] }, 201);
   });
 
@@ -574,7 +588,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
     if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
 
     const id = c.req.param('id');
-    const res = await (db as any)
+    const res = await (reqDb(c) as any)
       .deleteFrom('zvd_graphql_persisted_queries')
       .where('id', '=', id)
       .executeTakeFirst();
@@ -591,7 +605,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
     const name = c.req.param('name');
     const pqRes = await sql<any>`
       SELECT * FROM zvd_graphql_persisted_queries WHERE name = ${name}
-    `.execute(db);
+    `.execute(reqDb(c));
 
     const pq = pqRes.rows[0];
     if (!pq) return c.json({ errors: [{ message: 'Persisted query not found' }] }, 404);
@@ -633,7 +647,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
         UPDATE zvd_graphql_persisted_queries
         SET use_count = use_count + 1, last_used_at = NOW(), updated_at = NOW()
         WHERE name = ${name}
-      `.execute(db).catch(() => {});
+      `.execute(reqDb(c)).catch(() => {});
 
       return c.json(result);
     } catch (err) {
@@ -654,7 +668,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
       FROM zvd_graphql_operation_logs
       ORDER BY created_at DESC
       LIMIT 100
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ logs: rows.rows });
   });
 
@@ -668,7 +682,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
     const res = await sql<any>`
       DELETE FROM zvd_graphql_operation_logs
       WHERE created_at < NOW() - INTERVAL '30 days'
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ deleted: Number(res.numAffectedRows ?? 0) });
   });
 
@@ -687,7 +701,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
           ROUND(AVG(duration_ms))::int AS avg_duration_ms,
           COUNT(*) FILTER (WHERE error_count > 0)::int AS total_errors
         FROM zvd_graphql_operation_logs
-      `.execute(db),
+      `.execute(reqDb(c)),
       sql<any>`
         SELECT operation_name, COUNT(*)::int AS count,
                ROUND(AVG(duration_ms))::int AS avg_duration_ms
@@ -696,7 +710,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
         GROUP BY operation_name
         ORDER BY count DESC
         LIMIT 10
-      `.execute(db),
+      `.execute(reqDb(c)),
     ]);
 
     return c.json({
@@ -714,7 +728,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
 
     const rows = await sql<any>`
       SELECT * FROM zvd_graphql_field_policies ORDER BY collection ASC, field ASC
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ policies: rows.rows });
   });
 
@@ -737,7 +751,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
         SET allowed_roles = EXCLUDED.allowed_roles,
             deny_roles = EXCLUDED.deny_roles
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ policy: row.rows[0] }, 201);
   });
 
@@ -749,7 +763,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
     if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
 
     const id = c.req.param('id');
-    const res = await (db as any)
+    const res = await (reqDb(c) as any)
       .deleteFrom('zvd_graphql_field_policies')
       .where('id', '=', id)
       .executeTakeFirst();

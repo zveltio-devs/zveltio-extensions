@@ -16,6 +16,15 @@ const supplierSchema = z.object({
 
 export function suppliersRouter(ctx: ExtensionContext): Hono {
   const { db } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const app = new Hono();
 
   app.get('/', async (c) => {
@@ -25,12 +34,12 @@ export function suppliersRouter(ctx: ExtensionContext): Hono {
       WHERE (${q ? sql`name ILIKE ${'%' + q + '%'} OR cui ILIKE ${'%' + q + '%'}` : sql`TRUE`})
         AND (${active !== undefined ? sql`is_active = ${active === 'true'}` : sql`TRUE`})
       ORDER BY name
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
   app.get('/:id', async (c) => {
-    const row = await sql`SELECT * FROM trace_suppliers WHERE id = ${c.req.param('id')}`.execute(db);
+    const row = await sql`SELECT * FROM trace_suppliers WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Furnizor negăsit / Supplier not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
@@ -41,7 +50,7 @@ export function suppliersRouter(ctx: ExtensionContext): Hono {
       INSERT INTO trace_suppliers (name, cui, contact_person, phone, email, address)
       VALUES (${d.name}, ${d.cui ?? null}, ${d.contact_person ?? null}, ${d.phone ?? null}, ${d.email ?? null}, ${d.address ?? null})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -59,7 +68,7 @@ export function suppliersRouter(ctx: ExtensionContext): Hono {
         is_active = COALESCE(${d.is_active ?? null}, is_active)
       WHERE id = ${id}
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Furnizor negăsit / Supplier not found' }, 404);
     return c.json({ data: row.rows[0] });
   });

@@ -74,6 +74,15 @@ function populatePlaceholders(template: string, variables: Record<string, any>):
 
 export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const { generatePDFAsync } = ctx.internals;
 
   // `user` is declared globally on Hono's ContextVariableMap via
@@ -203,7 +212,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
               ${data.content}, ${JSON.stringify(data.variables)}::jsonb, ${JSON.stringify(data.style_config)}::jsonb,
               ${data.is_active}, ${data.tags as any}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ template: result.rows[0] }, 201);
   });
 
@@ -241,7 +250,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
   // DELETE /:id
   app.delete('/:id', async (c) => {
     const id = c.req.param('id');
-    const result = await sql`DELETE FROM zv_document_templates WHERE id = ${id} RETURNING id`.execute(db);
+    const result = await sql`DELETE FROM zv_document_templates WHERE id = ${id} RETURNING id`.execute(reqDb(c));
     if (result.rows.length === 0) return c.json({ error: 'Template not found' }, 404);
     return c.json({ success: true });
   });

@@ -7,6 +7,15 @@ import { permissionGate } from '@zveltio/sdk/extension';
 
 export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const app = new Hono();
 
   app.use('*', async (c, next) => {
@@ -31,12 +40,12 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
       LEFT JOIN zvd_time_entries e ON e.project_id = p.id
       WHERE (${status ? sql`p.status = ${status}` : sql`p.status = 'active'`})
       GROUP BY p.id ORDER BY p.name
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
   app.get('/projects/:id', async (c) => {
-    const row = await sql`SELECT * FROM zvd_time_projects WHERE id = ${c.req.param('id')}`.execute(db);
+    const row = await sql`SELECT * FROM zvd_time_projects WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     const burn = await sql`
       SELECT
@@ -44,7 +53,7 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
         COALESCE(SUM(amount), 0) as used_amount,
         COALESCE(SUM(duration_minutes) FILTER (WHERE is_billable AND NOT is_billed), 0) as unbilled_minutes
       FROM zvd_time_entries WHERE project_id = ${c.req.param('id')}
-    `.execute(db);
+    `.execute(reqDb(c));
     const p = row.rows[0] as any;
     const b = burn.rows[0] as any;
     p.burn = {
@@ -78,7 +87,7 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
       VALUES (${d.name}, ${d.code ?? null}, ${d.client_name ?? null}, ${d.client_id ?? null}, ${d.description ?? null},
         ${d.is_billable}, ${d.hourly_rate}, ${d.currency}, ${d.budget_hours ?? null}, ${d.budget_amount ?? null}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -103,7 +112,7 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
         status = COALESCE(${d.status ?? null}, status),
         updated_at = NOW()
       WHERE id = ${c.req.param('id')} RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
@@ -111,14 +120,14 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
   // ── Active Timer ───────────────────────────────────────────────
   app.get('/timer', async (c) => {
     const user = c.get('user') as any;
-    const emp = await sql`SELECT id FROM zvd_employees WHERE email = ${user.email} OR work_email = ${user.email} LIMIT 1`.execute(db);
+    const emp = await sql`SELECT id FROM zvd_employees WHERE email = ${user.email} OR work_email = ${user.email} LIMIT 1`.execute(reqDb(c));
     if (!emp.rows.length) return c.json({ data: null });
     const timer = await sql`
       SELECT t.*, p.name as project_name, p.hourly_rate,
         EXTRACT(EPOCH FROM (NOW() - t.started_at)) / 60 as elapsed_minutes
       FROM zvd_active_timers t JOIN zvd_time_projects p ON p.id = t.project_id
       WHERE t.employee_id = ${(emp.rows[0] as any).id}
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: timer.rows[0] ?? null });
   });
 
@@ -133,7 +142,7 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     let employeeId = d.employee_id;
     if (!employeeId) {
-      const emp = await sql`SELECT id FROM zvd_employees WHERE email = ${user.email} OR work_email = ${user.email} LIMIT 1`.execute(db);
+      const emp = await sql`SELECT id FROM zvd_employees WHERE email = ${user.email} OR work_email = ${user.email} LIMIT 1`.execute(reqDb(c));
       if (!emp.rows.length) return c.json({ error: 'Employee record not found' }, 400);
       employeeId = (emp.rows[0] as any).id;
     }
@@ -144,25 +153,25 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
         project_id = EXCLUDED.project_id, task_description = EXCLUDED.task_description,
         is_billable = EXCLUDED.is_billable, notes = EXCLUDED.notes, started_at = NOW()
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
   app.post('/timer/stop', async (c) => {
     const user = c.get('user') as any;
-    const emp = await sql`SELECT id FROM zvd_employees WHERE email = ${user.email} OR work_email = ${user.email} LIMIT 1`.execute(db);
+    const emp = await sql`SELECT id FROM zvd_employees WHERE email = ${user.email} OR work_email = ${user.email} LIMIT 1`.execute(reqDb(c));
     if (!emp.rows.length) return c.json({ error: 'Employee record not found' }, 400);
     const employeeId = (emp.rows[0] as any).id;
     const timer = await sql`
       SELECT t.*, p.hourly_rate, EXTRACT(EPOCH FROM (NOW() - t.started_at)) / 60 as elapsed_minutes
       FROM zvd_active_timers t JOIN zvd_time_projects p ON p.id = t.project_id
       WHERE t.employee_id = ${employeeId}
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!timer.rows.length) return c.json({ error: 'No active timer' }, 400);
     const t = timer.rows[0] as any;
     const durationMinutes = Math.round(+t.elapsed_minutes);
     if (durationMinutes < 1) {
-      await sql`DELETE FROM zvd_active_timers WHERE employee_id = ${employeeId}`.execute(db);
+      await sql`DELETE FROM zvd_active_timers WHERE employee_id = ${employeeId}`.execute(reqDb(c));
       return c.json({ error: 'Timer too short (< 1 minute), discarded' }, 400);
     }
     const amount = t.is_billable ? (durationMinutes / 60) * +t.hourly_rate : 0;
@@ -171,8 +180,8 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
       VALUES (${employeeId}, ${t.project_id}, ${t.task_description}, NOW()::DATE, ${t.started_at}, NOW(), ${durationMinutes},
         ${t.is_billable}, ${t.hourly_rate}, ${amount}, ${t.notes ?? null}, ${user.id})
       RETURNING *
-    `.execute(db);
-    await sql`DELETE FROM zvd_active_timers WHERE employee_id = ${employeeId}`.execute(db);
+    `.execute(reqDb(c));
+    await sql`DELETE FROM zvd_active_timers WHERE employee_id = ${employeeId}`.execute(reqDb(c));
     return c.json({ data: row.rows[0] });
   });
 
@@ -194,7 +203,7 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
         AND (${is_billed !== undefined ? sql`e.is_billed = ${is_billed === 'true'}` : sql`TRUE`})
       ORDER BY e.date DESC, e.created_at DESC
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -211,7 +220,7 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
-    const project = await sql`SELECT hourly_rate FROM zvd_time_projects WHERE id = ${d.project_id}`.execute(db);
+    const project = await sql`SELECT hourly_rate FROM zvd_time_projects WHERE id = ${d.project_id}`.execute(reqDb(c));
     const rate = project.rows.length ? +(project.rows[0] as any).hourly_rate : 0;
     const amount = d.is_billable ? (d.duration_minutes / 60) * rate : 0;
     const row = await sql`
@@ -220,7 +229,7 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
         ${d.start_time ?? null}, ${d.end_time ?? null}, ${d.duration_minutes},
         ${d.is_billable}, ${rate}, ${amount}, ${d.notes ?? null}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -243,13 +252,13 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
           ELSE amount END,
         updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND is_billed = false RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found or already billed' }, 400);
     return c.json({ data: row.rows[0] });
   });
 
   app.delete('/entries/:id', async (c) => {
-    const row = await sql`DELETE FROM zvd_time_entries WHERE id = ${c.req.param('id')} AND is_billed = false RETURNING id`.execute(db);
+    const row = await sql`DELETE FROM zvd_time_entries WHERE id = ${c.req.param('id')} AND is_billed = false RETURNING id`.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found or already billed' }, 400);
     return c.json({ success: true });
   });
@@ -269,10 +278,10 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
       SELECT * FROM zvd_time_entries
       WHERE id IN (${sql.join(d.entry_ids.map(id => sql`${id}`), sql`, `)})
         AND project_id = ${d.project_id} AND is_billable = true AND is_billed = false
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!entries.rows.length) return c.json({ error: 'No billable unbilled entries found' }, 400);
     const total = (entries.rows as any[]).reduce((s, e) => s + +e.amount, 0);
-    const project = await sql`SELECT * FROM zvd_time_projects WHERE id = ${d.project_id}`.execute(db);
+    const project = await sql`SELECT * FROM zvd_time_projects WHERE id = ${d.project_id}`.execute(reqDb(c));
     const p = project.rows[0] as any;
     const dueDate = new Date(d.invoice_date);
     dueDate.setDate(dueDate.getDate() + d.due_days);
@@ -285,20 +294,20 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
         ${d.invoice_date}, ${dueDate.toISOString().slice(0, 10)},
         ${total}, ${total}, ${p.currency}, ${d.notes ?? null}, 'draft', ${user.id}
       ) RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     const invId = (inv.rows[0] as any).id;
     for (const e of entries.rows as any[]) {
       const hours = e.duration_minutes / 60;
       await sql`
         INSERT INTO zvd_invoice_lines (invoice_id, description, quantity, unit_price, total)
         VALUES (${invId}, ${e.task_description || 'Time entry'}, ${hours}, ${e.hourly_rate}, ${e.amount})
-      `.execute(db);
+      `.execute(reqDb(c));
     }
     // Mark entries as billed
     await sql`
       UPDATE zvd_time_entries SET is_billed = true, invoice_id = ${invId}, updated_at = NOW()
       WHERE id IN (${sql.join(d.entry_ids.map(id => sql`${id}`), sql`, `)})
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: inv.rows[0] }, 201);
   });
 
@@ -312,7 +321,7 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
       WHERE (${employee_id ? sql`t.employee_id = ${employee_id}` : sql`TRUE`})
         AND (${status ? sql`t.status = ${status}` : sql`TRUE`})
       ORDER BY t.week_start DESC
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -327,13 +336,13 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
       SELECT COALESCE(SUM(duration_minutes), 0) as total
       FROM zvd_time_entries
       WHERE employee_id = ${d.employee_id} AND date BETWEEN ${d.week_start} AND ${weekEnd.toISOString().slice(0, 10)}
-    `.execute(db);
+    `.execute(reqDb(c));
     const row = await sql`
       INSERT INTO zvd_timesheets (employee_id, week_start, week_end, total_hours)
       VALUES (${d.employee_id}, ${d.week_start}, ${weekEnd.toISOString().slice(0, 10)}, ${+(total.rows[0] as any).total / 60})
       ON CONFLICT (employee_id, week_start) DO UPDATE SET total_hours = EXCLUDED.total_hours
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -341,7 +350,7 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       UPDATE zvd_timesheets SET status = 'submitted', submitted_at = NOW()
       WHERE id = ${c.req.param('id')} AND status = 'draft' RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Timesheet not found or not in draft' }, 400);
     return c.json({ data: row.rows[0] });
   });
@@ -351,7 +360,7 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       UPDATE zvd_timesheets SET status = 'approved', approved_by = ${user.id}, approved_at = NOW()
       WHERE id = ${c.req.param('id')} AND status = 'submitted' RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Timesheet not found or not submitted' }, 400);
     return c.json({ data: row.rows[0] });
   });
@@ -361,7 +370,7 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       UPDATE zvd_timesheets SET status = 'rejected', rejection_reason = ${reason}
       WHERE id = ${c.req.param('id')} AND status = 'submitted' RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Timesheet not found or not submitted' }, 400);
     return c.json({ data: row.rows[0] });
   });
@@ -380,13 +389,13 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
         COUNT(DISTINCT employee_id) as active_employees,
         COUNT(DISTINCT project_id) as active_projects
       FROM zvd_time_entries WHERE date BETWEEN ${fromDate} AND ${toDate}
-    `.execute(db);
+    `.execute(reqDb(c));
     const byProject = await sql`
       SELECT p.name, COALESCE(SUM(e.duration_minutes), 0) as minutes, COALESCE(SUM(e.amount), 0) as amount
       FROM zvd_time_projects p
       LEFT JOIN zvd_time_entries e ON e.project_id = p.id AND e.date BETWEEN ${fromDate} AND ${toDate}
       GROUP BY p.id, p.name ORDER BY minutes DESC LIMIT 10
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: { ...(row.rows[0] as any), by_project: byProject.rows } });
   });
 

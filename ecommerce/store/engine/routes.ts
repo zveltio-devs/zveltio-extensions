@@ -7,11 +7,20 @@ import { permissionGate } from '@zveltio/sdk/extension';
 
 export function ecommerceRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const app = new Hono();
 
   // ── Storefront (public, no auth) ───────────────────────────────
   app.get('/public/categories', async (c) => {
-    const rows = await sql`SELECT id, name, slug, description, image_url, parent_id FROM zvd_ec_categories WHERE is_active = true ORDER BY sort_order, name`.execute(db);
+    const rows = await sql`SELECT id, name, slug, description, image_url, parent_id FROM zvd_ec_categories WHERE is_active = true ORDER BY sort_order, name`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -32,7 +41,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
         AND (${max_price ? sql`p.price <= ${max_price}` : sql`TRUE`})
       ORDER BY ${orderClause}
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -45,14 +54,14 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
       LEFT JOIN zvd_ec_product_variants v ON v.product_id = p.id
       WHERE p.slug = ${c.req.param('slug')} AND p.status = 'active'
       GROUP BY p.id, cat.name
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     // Approved reviews
     const reviews = await sql`
       SELECT id, customer_name, rating, title, body, is_verified_purchase, created_at
       FROM zvd_ec_product_reviews WHERE product_id = ${(row.rows[0] as any).id} AND status = 'approved'
       ORDER BY created_at DESC LIMIT 10
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: { ...(row.rows[0] as any), reviews: reviews.rows } });
   });
 
@@ -66,7 +75,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
       WHERE z.is_active = true AND r.is_active = true
         AND (${country} = ANY(z.countries) OR array_length(z.countries, 1) = 0 OR z.countries = '{}')
       ORDER BY r.price
-    `.execute(db);
+    `.execute(reqDb(c));
     // Filter free-above-amount
     const filtered = (rows.rows as any[]).filter(r =>
       r.type !== 'free_above' || !order_total || +order_total >= +r.free_above_amount
@@ -91,14 +100,14 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
         SELECT o.id FROM zvd_ec_orders o JOIN zvd_ec_order_items i ON i.order_id = o.id
         WHERE o.id = ${d.order_id} AND o.customer_email = ${d.customer_email}
           AND i.product_id = ${c.req.param('id')} AND o.status NOT IN ('cancelled','refunded')
-      `.execute(db);
+      `.execute(reqDb(c));
       isVerified = ord.rows.length > 0;
     }
     const row = await sql`
       INSERT INTO zvd_ec_product_reviews (product_id, customer_name, customer_email, rating, title, body, order_id, is_verified_purchase)
       VALUES (${c.req.param('id')}, ${d.customer_name}, ${d.customer_email}, ${d.rating}, ${d.title ?? null}, ${d.body ?? null}, ${d.order_id ?? null}, ${isVerified})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -118,7 +127,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
         customer_email = COALESCE(EXCLUDED.customer_email, zvd_ec_abandoned_carts.customer_email),
         updated_at = NOW()
       RETURNING id, recovery_token
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] });
   });
 
@@ -133,7 +142,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
 
   // ── Admin: Categories ──────────────────────────────────────────
   app.get('/admin/categories', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_ec_categories ORDER BY sort_order, name`.execute(db);
+    const rows = await sql`SELECT * FROM zvd_ec_categories ORDER BY sort_order, name`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -151,7 +160,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_ec_categories (name, slug, description, image_url, parent_id, sort_order, created_by)
       VALUES (${d.name}, ${d.slug}, ${d.description ?? null}, ${d.image_url ?? null}, ${d.parent_id ?? null}, ${d.sort_order}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -169,7 +178,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
         is_active = COALESCE(${d.is_active ?? null}, is_active),
         sort_order = COALESCE(${d.sort_order ?? null}, sort_order)
       WHERE id = ${c.req.param('id')} RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
@@ -187,7 +196,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
       WHERE (${status ? sql`p.status = ${status}` : sql`TRUE`})
         AND (${q ? sql`(p.name ILIKE ${'%' + q + '%'} OR p.sku ILIKE ${'%' + q + '%'})` : sql`TRUE`})
       GROUP BY p.id, cat.name ORDER BY p.created_at DESC LIMIT ${lim} OFFSET ${offset}
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -233,7 +242,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
             VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === 'active'})
             ON CONFLICT (sku) DO UPDATE SET name = EXCLUDED.name
             RETURNING id
-          `.execute(db).catch(() => null);
+          `.execute(reqDb(c)).catch(() => null);
           canonicalProductId = create?.rows[0]?.id ?? null;
         }
       } catch { /* inventory may be unavailable; storefront-only product is fine */ }
@@ -248,7 +257,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
         ${JSON.stringify(d.images)}, ${JSON.stringify(d.tags)}, '{}', ${d.status}, ${d.is_featured},
         ${d.digital_file_url ?? null}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -281,19 +290,19 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
         tax_rate = COALESCE(${d.tax_rate ?? null}, tax_rate),
         updated_at = NOW()
       WHERE id = ${c.req.param('id')} RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
 
   app.delete('/admin/products/:id', async (c) => {
-    await sql`UPDATE zvd_ec_products SET status = 'archived', updated_at = NOW() WHERE id = ${c.req.param('id')}`.execute(db);
+    await sql`UPDATE zvd_ec_products SET status = 'archived', updated_at = NOW() WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
     return c.json({ success: true });
   });
 
   // ── Product Variants ───────────────────────────────────────────
   app.get('/admin/products/:id/variants', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_ec_product_variants WHERE product_id = ${c.req.param('id')} ORDER BY sort_order`.execute(db);
+    const rows = await sql`SELECT * FROM zvd_ec_product_variants WHERE product_id = ${c.req.param('id')} ORDER BY sort_order`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -316,7 +325,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
         ${d.price ?? null}, ${d.compare_price ?? null}, ${d.cost ?? null}, ${d.stock_qty},
         ${d.weight ?? null}, ${d.image_url ?? null}, ${d.sort_order})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -334,13 +343,13 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
         stock_qty = COALESCE(${d.stock_qty ?? null}, stock_qty),
         is_active = COALESCE(${d.is_active ?? null}, is_active)
       WHERE id = ${c.req.param('id')} RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
 
   app.delete('/admin/variants/:id', async (c) => {
-    await sql`UPDATE zvd_ec_product_variants SET is_active = false WHERE id = ${c.req.param('id')}`.execute(db);
+    await sql`UPDATE zvd_ec_product_variants SET is_active = false WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
     return c.json({ success: true });
   });
 
@@ -350,7 +359,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
       SELECT z.*, COUNT(r.id) as rate_count FROM zvd_ec_shipping_zones z
       LEFT JOIN zvd_ec_shipping_rates r ON r.zone_id = z.id AND r.is_active = true
       GROUP BY z.id ORDER BY z.sort_order
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -366,7 +375,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_ec_shipping_zones (name, countries, regions, sort_order, created_by)
       VALUES (${d.name}, ${JSON.stringify(d.countries)}, ${JSON.stringify(d.regions)}, ${d.sort_order}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -384,13 +393,13 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
       VALUES (${c.req.param('id')}, ${d.name}, ${d.type}, ${d.price}, ${d.free_above_amount ?? null},
         ${d.estimated_days_min ?? null}, ${d.estimated_days_max ?? null})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
   // ── Tax Rules ──────────────────────────────────────────────────
   app.get('/admin/tax-rules', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_ec_tax_rules WHERE is_active = true ORDER BY country, region`.execute(db);
+    const rows = await sql`SELECT * FROM zvd_ec_tax_rules WHERE is_active = true ORDER BY country, region`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -407,7 +416,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
       VALUES (${d.name}, ${d.country}, ${d.region ?? null}, ${d.rate}, ${d.applies_to})
       ON CONFLICT (country, region, applies_to) DO UPDATE SET rate = ${d.rate}, name = ${d.name}
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -433,14 +442,14 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     let subtotal = 0;
     const lineData: any[] = [];
     for (const line of d.lines) {
-      const prod = await sql`SELECT * FROM zvd_ec_products WHERE id = ${line.product_id} AND status = 'active'`.execute(db);
+      const prod = await sql`SELECT * FROM zvd_ec_products WHERE id = ${line.product_id} AND status = 'active'`.execute(reqDb(c));
       if (!prod.rows.length) return c.json({ error: `Product ${line.product_id} not found` }, 400);
       const p = prod.rows[0] as any;
       let price = +p.price;
       let sku = p.sku;
       let variantId = line.variant_id ?? null;
       if (line.variant_id) {
-        const v = await sql`SELECT * FROM zvd_ec_product_variants WHERE id = ${line.variant_id} AND product_id = ${line.product_id} AND is_active = true`.execute(db);
+        const v = await sql`SELECT * FROM zvd_ec_product_variants WHERE id = ${line.variant_id} AND product_id = ${line.product_id} AND is_active = true`.execute(reqDb(c));
         if (!v.rows.length) return c.json({ error: 'Variant not found' }, 400);
         const variant = v.rows[0] as any;
         if (variant.price !== null) price = +variant.price;
@@ -464,18 +473,18 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
           AND (valid_until IS NULL OR valid_until > NOW())
           AND (max_uses IS NULL OR used_count < max_uses)
           AND (min_order_amount IS NULL OR ${subtotal} >= min_order_amount)
-      `.execute(db);
+      `.execute(reqDb(c));
       if (coupon.rows.length) {
         const cp = coupon.rows[0] as any;
         discount = cp.type === 'percent' ? subtotal * +cp.value / 100 : Math.min(+cp.value, subtotal);
-        await sql`UPDATE zvd_ec_coupons SET used_count = used_count + 1 WHERE id = ${cp.id}`.execute(db);
+        await sql`UPDATE zvd_ec_coupons SET used_count = used_count + 1 WHERE id = ${cp.id}`.execute(reqDb(c));
       }
     }
     // Shipping cost
     let shippingCost = 0;
     let shippingZoneId = null;
     if (d.shipping_rate_id) {
-      const rate = await sql`SELECT r.*, z.id as zone_id FROM zvd_ec_shipping_rates r JOIN zvd_ec_shipping_zones z ON z.id = r.zone_id WHERE r.id = ${d.shipping_rate_id} AND r.is_active = true`.execute(db);
+      const rate = await sql`SELECT r.*, z.id as zone_id FROM zvd_ec_shipping_rates r JOIN zvd_ec_shipping_zones z ON z.id = r.zone_id WHERE r.id = ${d.shipping_rate_id} AND r.is_active = true`.execute(reqDb(c));
       if (rate.rows.length) {
         shippingCost = +(rate.rows[0] as any).price;
         shippingZoneId = (rate.rows[0] as any).zone_id;
@@ -483,7 +492,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     }
     const taxAmount = lineData.reduce((s, l) => s + l.total * l.tax_rate / 100, 0);
     const total = Math.max(0, subtotal - discount + taxAmount + shippingCost);
-    const cnt = await sql`SELECT COUNT(*) as cnt FROM zvd_ec_orders`.execute(db);
+    const cnt = await sql`SELECT COUNT(*) as cnt FROM zvd_ec_orders`.execute(reqDb(c));
     const orderNumber = `ORD-${String(+(cnt.rows[0] as any).cnt + 1).padStart(6, '0')}`;
 
     // If CRM is active, find or create a canonical contact for this order's email.
@@ -519,23 +528,23 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
         ${subtotal}, ${shippingCost}, ${discount}, ${taxAmount}, ${total},
         ${couponCode}, ${shippingZoneId}, ${d.notes ?? null}, 'guest')
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     const orderId = (order.rows[0] as any).id;
     for (const line of lineData) {
       await sql`
         INSERT INTO zvd_ec_order_items (order_id, product_id, variant_id, product_name, sku, quantity, unit_price, tax_rate, total)
         VALUES (${orderId}, ${line.product_id}, ${line.variant_id}, ${line.product_name}, ${line.sku ?? null},
           ${line.quantity}, ${line.unit_price}, ${line.tax_rate}, ${line.total})
-      `.execute(db);
+      `.execute(reqDb(c));
       if (line.variant_id) {
-        await sql`UPDATE zvd_ec_product_variants SET stock_qty = stock_qty - ${line.quantity} WHERE id = ${line.variant_id}`.execute(db);
+        await sql`UPDATE zvd_ec_product_variants SET stock_qty = stock_qty - ${line.quantity} WHERE id = ${line.variant_id}`.execute(reqDb(c));
       } else {
-        await sql`UPDATE zvd_ec_products SET stock_qty = stock_qty - ${line.quantity}, updated_at = NOW() WHERE id = ${line.product_id}`.execute(db);
+        await sql`UPDATE zvd_ec_products SET stock_qty = stock_qty - ${line.quantity}, updated_at = NOW() WHERE id = ${line.product_id}`.execute(reqDb(c));
       }
     }
     // Mark cart as recovered
     if (d.session_id) {
-      await sql`UPDATE zvd_ec_abandoned_carts SET recovered_at = NOW() WHERE session_id = ${d.session_id}`.execute(db);
+      await sql`UPDATE zvd_ec_abandoned_carts SET recovered_at = NOW() WHERE session_id = ${d.session_id}`.execute(reqDb(c));
     }
     return c.json({ data: order.rows[0] }, 201);
   });
@@ -552,14 +561,14 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
       WHERE (${status ? sql`o.status = ${status}` : sql`TRUE`})
         AND (${payment_status ? sql`o.payment_status = ${payment_status}` : sql`TRUE`})
       GROUP BY o.id ORDER BY o.created_at DESC LIMIT ${lim} OFFSET ${offset}
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
   app.get('/admin/orders/:id', async (c) => {
-    const row = await sql`SELECT * FROM zvd_ec_orders WHERE id = ${c.req.param('id')}`.execute(db);
+    const row = await sql`SELECT * FROM zvd_ec_orders WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
-    const items = await sql`SELECT * FROM zvd_ec_order_items WHERE order_id = ${c.req.param('id')}`.execute(db);
+    const items = await sql`SELECT * FROM zvd_ec_order_items WHERE order_id = ${c.req.param('id')}`.execute(reqDb(c));
     return c.json({ data: { ...(row.rows[0] as any), items: items.rows } });
   });
 
@@ -579,14 +588,14 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
         shipping_tracking = COALESCE(${d.tracking_number ?? null}, shipping_tracking),
         updated_at = NOW()
       WHERE id = ${c.req.param('id')} RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
 
   // ── Admin: Coupons ─────────────────────────────────────────────
   app.get('/admin/coupons', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_ec_coupons ORDER BY created_at DESC`.execute(db);
+    const rows = await sql`SELECT * FROM zvd_ec_coupons ORDER BY created_at DESC`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -604,7 +613,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_ec_coupons (code, type, value, min_order_amount, max_uses, valid_until, created_by)
       VALUES (${d.code}, ${d.type}, ${d.value}, ${d.min_order_amount ?? null}, ${d.max_uses ?? null}, ${d.valid_until ?? null}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -620,7 +629,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
         max_uses = COALESCE(${d.max_uses ?? null}, max_uses),
         valid_until = COALESCE(${d.valid_until ?? null}, valid_until)
       WHERE id = ${c.req.param('id')} RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
@@ -632,7 +641,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
       SELECT r.*, p.name as product_name
       FROM zvd_ec_product_reviews r JOIN zvd_ec_products p ON p.id = r.product_id
       WHERE r.status = ${status} ORDER BY r.created_at DESC
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -640,7 +649,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     status: z.enum(['approved','rejected']),
   })), async (c) => {
     const { status } = c.req.valid('json');
-    const row = await sql`UPDATE zvd_ec_product_reviews SET status = ${status} WHERE id = ${c.req.param('id')} RETURNING *`.execute(db);
+    const row = await sql`UPDATE zvd_ec_product_reviews SET status = ${status} WHERE id = ${c.req.param('id')} RETURNING *`.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     // Update product avg_rating
     const productId = (row.rows[0] as any).product_id;
@@ -649,7 +658,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
         avg_rating = (SELECT ROUND(AVG(rating), 2) FROM zvd_ec_product_reviews WHERE product_id = ${productId} AND status = 'approved'),
         review_count = (SELECT COUNT(*) FROM zvd_ec_product_reviews WHERE product_id = ${productId} AND status = 'approved')
       WHERE id = ${productId}
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] });
   });
 
@@ -658,7 +667,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     const { limit = '50' } = c.req.query();
     const rows = await sql`
       SELECT * FROM zvd_ec_abandoned_carts WHERE recovered_at IS NULL ORDER BY updated_at DESC LIMIT ${Math.min(+limit, 200)}
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -677,15 +686,15 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
         COALESCE(AVG(total) FILTER (WHERE status NOT IN ('cancelled','refunded')), 0) as avg_order_value,
         COUNT(DISTINCT customer_email) as unique_customers
       FROM zvd_ec_orders WHERE created_at::date BETWEEN ${fromDate} AND ${toDate}
-    `.execute(db);
+    `.execute(reqDb(c));
     const topProducts = await sql`
       SELECT i.product_name, SUM(i.quantity) as units_sold, SUM(i.total) as revenue
       FROM zvd_ec_order_items i
       JOIN zvd_ec_orders o ON o.id = i.order_id
       WHERE o.status NOT IN ('cancelled','refunded') AND o.created_at::date BETWEEN ${fromDate} AND ${toDate}
       GROUP BY i.product_name ORDER BY units_sold DESC LIMIT 10
-    `.execute(db);
-    const abandoned = await sql`SELECT COUNT(*) as count, COALESCE(SUM(subtotal), 0) as value FROM zvd_ec_abandoned_carts WHERE recovered_at IS NULL AND created_at::date BETWEEN ${fromDate} AND ${toDate}`.execute(db);
+    `.execute(reqDb(c));
+    const abandoned = await sql`SELECT COUNT(*) as count, COALESCE(SUM(subtotal), 0) as value FROM zvd_ec_abandoned_carts WHERE recovered_at IS NULL AND created_at::date BETWEEN ${fromDate} AND ${toDate}`.execute(reqDb(c));
     return c.json({ data: {
       ...(row.rows[0] as any),
       top_products: topProducts.rows,

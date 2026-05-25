@@ -16,6 +16,15 @@ function invalidateCache() {
 export function translationsRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
 
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
+
   async function requireAdmin(c: any): Promise<any | null> {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return null;
@@ -39,7 +48,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
       FROM zvd_translations t
       JOIN zvd_translation_keys tk ON tk.id = t.key_id
       WHERE t.locale = ${locale}
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
 
     const map = new Map<string, string>();
     for (const row of rows.rows as any[]) {
@@ -47,7 +56,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
     }
 
     if (rows.rows.length === 0) {
-      const allKeys = await sql`SELECT key, default_value FROM zvd_translation_keys`.execute(db).catch(() => ({ rows: [] }));
+      const allKeys = await sql`SELECT key, default_value FROM zvd_translation_keys`.execute(reqDb(c)).catch(() => ({ rows: [] }));
       for (const row of allKeys.rows as any[]) {
         if (row.default_value) map.set(row.key, row.default_value);
       }
@@ -80,15 +89,15 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const { code, name, is_default } = c.req.valid('json');
       if (is_default) {
-        await (db as any).updateTable('zvd_locales').set({ is_default: false }).where('is_default', '=', true).execute();
+        await (reqDb(c) as any).updateTable('zvd_locales').set({ is_default: false }).where('is_default', '=', true).execute();
       }
-      const locale = await (db as any).insertInto('zvd_locales').values({ code, name, is_default }).returningAll().executeTakeFirst();
+      const locale = await (reqDb(c) as any).insertInto('zvd_locales').values({ code, name, is_default }).returningAll().executeTakeFirst();
       return c.json({ locale }, 201);
     },
   );
 
   app.delete('/locales/:code', async (c) => {
-    await (db as any).deleteFrom('zvd_locales').where('code', '=', c.req.param('code')).execute();
+    await (reqDb(c) as any).deleteFrom('zvd_locales').where('code', '=', c.req.param('code')).execute();
     invalidateCache();
     return c.json({ success: true });
   });
@@ -124,14 +133,14 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
       GROUP BY tk.id
       ORDER BY tk.key ASC
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(db);
+    `.execute(reqDb(c));
 
     const total = await sql<{ count: string }>`
       SELECT COUNT(*)::int AS count FROM zvd_translation_keys
       WHERE 1=1
         ${context ? sql`AND context = ${context}` : sql``}
         ${search ? sql`AND (key ILIKE ${'%' + search + '%'} OR default_value ILIKE ${'%' + search + '%'})` : sql``}
-    `.execute(db);
+    `.execute(reqDb(c));
 
     return c.json({
       keys: rows.rows,
@@ -152,9 +161,9 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
     })),
     async (c) => {
       const data = c.req.valid('json');
-      const existing = await (db as any).selectFrom('zvd_translation_keys').where('key', '=', data.key).executeTakeFirst();
+      const existing = await (reqDb(c) as any).selectFrom('zvd_translation_keys').where('key', '=', data.key).executeTakeFirst();
       if (existing) return c.json({ error: `Key '${data.key}' already exists` }, 409);
-      const key = await (db as any).insertInto('zvd_translation_keys').values(data).returningAll().executeTakeFirst();
+      const key = await (reqDb(c) as any).insertInto('zvd_translation_keys').values(data).returningAll().executeTakeFirst();
       return c.json({ key }, 201);
     },
   );
@@ -167,13 +176,13 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
       LEFT JOIN zvd_translations t ON t.key_id = tk.id
       WHERE tk.id = ${c.req.param('keyId')}
       GROUP BY tk.id
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!rows.rows[0]) return c.json({ error: 'Key not found' }, 404);
     return c.json({ key: rows.rows[0] });
   });
 
   app.delete('/:keyId', async (c) => {
-    await (db as any).deleteFrom('zvd_translation_keys').where('id', '=', c.req.param('keyId')).execute();
+    await (reqDb(c) as any).deleteFrom('zvd_translation_keys').where('id', '=', c.req.param('keyId')).execute();
     invalidateCache();
     return c.json({ success: true });
   });
@@ -190,7 +199,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
       const { keyId, locale } = c.req.param();
       const data = c.req.valid('json');
 
-      const key = await (db as any).selectFrom('zvd_translation_keys').where('id', '=', keyId).executeTakeFirst();
+      const key = await (reqDb(c) as any).selectFrom('zvd_translation_keys').where('id', '=', keyId).executeTakeFirst();
       if (!key) return c.json({ error: 'Translation key not found' }, 404);
 
       const translation = await sql`
@@ -200,7 +209,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
         DO UPDATE SET value = EXCLUDED.value, is_machine_translated = EXCLUDED.is_machine_translated,
                       reviewed = EXCLUDED.reviewed, updated_by = EXCLUDED.updated_by, updated_at = NOW()
         RETURNING *
-      `.execute(db);
+      `.execute(reqDb(c));
 
       invalidateCache();
       return c.json({ translation: translation.rows[0] });
@@ -217,7 +226,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
       SET reviewed = true, approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
       WHERE key_id = ${keyId}::uuid AND locale = ${locale}
       RETURNING id
-    `.execute(db);
+    `.execute(reqDb(c));
 
     if (!result.rows[0]) return c.json({ error: 'Translation not found' }, 404);
     invalidateCache();
@@ -225,7 +234,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.delete('/:keyId/:locale', async (c) => {
-    await (db as any).deleteFrom('zvd_translations').where('key_id', '=', c.req.param('keyId')).where('locale', '=', c.req.param('locale')).execute();
+    await (reqDb(c) as any).deleteFrom('zvd_translations').where('key_id', '=', c.req.param('keyId')).where('locale', '=', c.req.param('locale')).execute();
     invalidateCache();
     return c.json({ success: true });
   });
@@ -246,7 +255,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
       CROSS JOIN zvd_translation_keys tk
       LEFT JOIN zvd_translations t ON t.key_id = tk.id AND t.locale = l.code
       GROUP BY l.code, l.name ORDER BY l.code
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
 
     return c.json({ coverage: stats.rows });
   });
@@ -262,7 +271,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
       )
       ORDER BY tk.key
       LIMIT 200
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
 
     return c.json({ locale, missing_keys: missing.rows, count: missing.rows.length });
   });
@@ -271,7 +280,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
 
   app.get('/glossary', async (c) => {
     const { locale } = c.req.query();
-    let query = (db as any).selectFrom('zvd_translation_glossary').selectAll().orderBy('term', 'asc');
+    let query = (reqDb(c) as any).selectFrom('zvd_translation_glossary').selectAll().orderBy('term', 'asc');
     if (locale) query = query.where('locale', '=', locale);
     return c.json({ glossary: await query.execute() });
   });
@@ -293,7 +302,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
                 ${c.req.valid('json').definition ?? null}, ${c.req.valid('json').forbidden}, ${user.id})
         ON CONFLICT (term, locale) DO UPDATE SET translation = EXCLUDED.translation, definition = EXCLUDED.definition
         RETURNING *
-      `.execute(db);
+      `.execute(reqDb(c));
       return c.json({ term: term.rows[0] }, 201);
     },
   );

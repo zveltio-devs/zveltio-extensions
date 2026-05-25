@@ -5,6 +5,15 @@ import { TraceTreeService } from '../services/TraceTreeService.js';
 
 export function traceRouter(ctx: ExtensionContext): Hono {
   const { db } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const traceTree = new TraceTreeService(db);
   const app = new Hono();
 
@@ -13,7 +22,7 @@ export function traceRouter(ctx: ExtensionContext): Hono {
     const lotId = c.req.param('lot_id');
 
     // Verify lot exists
-    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${lotId}`.execute(db);
+    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${lotId}`.execute(reqDb(c));
     if (!exists.rows.length) return c.json({ error: 'Lot negăsit / Lot not found' }, 404);
 
     const tree = await traceTree.traceUpstream(lotId);
@@ -24,7 +33,7 @@ export function traceRouter(ctx: ExtensionContext): Hono {
   app.get('/:lot_id/downstream', async (c) => {
     const lotId = c.req.param('lot_id');
 
-    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${lotId}`.execute(db);
+    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${lotId}`.execute(reqDb(c));
     if (!exists.rows.length) return c.json({ error: 'Lot negăsit / Lot not found' }, 404);
 
     const result = await traceTree.traceDownstream(lotId);
@@ -35,7 +44,7 @@ export function traceRouter(ctx: ExtensionContext): Hono {
   app.get('/:lot_id/timeline', async (c) => {
     const lotId = c.req.param('lot_id');
 
-    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${lotId}`.execute(db);
+    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${lotId}`.execute(reqDb(c));
     if (!exists.rows.length) return c.json({ error: 'Lot negăsit / Lot not found' }, 404);
 
     const timeline = await traceTree.getLotTimeline(lotId);

@@ -21,6 +21,15 @@ function generateLotNumber(type: string): string {
 
 export function productionRouter(ctx: ExtensionContext): Hono {
   const { db } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const stockService = new StockService(db);
   const app = new Hono();
 
@@ -43,7 +52,7 @@ export function productionRouter(ctx: ExtensionContext): Hono {
       WHERE (${status ? sql`po.status = ${status}` : sql`TRUE`})
       ORDER BY po.created_at DESC
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(db);
+    `.execute(reqDb(c));
 
     return c.json({ data: rows.rows });
   });
@@ -65,7 +74,7 @@ export function productionRouter(ctx: ExtensionContext): Hono {
         AND (${item_id ? sql`r.output_item_id = ${item_id}` : sql`TRUE`})
       GROUP BY r.id, i.name
       ORDER BY r.name
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -81,7 +90,7 @@ export function productionRouter(ctx: ExtensionContext): Hono {
       LEFT JOIN trace_recipes r ON r.id = po.recipe_id
       LEFT JOIN trace_lots l ON l.id = po.output_lot_id
       WHERE po.id = ${id}
-    `.execute(db);
+    `.execute(reqDb(c));
 
     if (!orderResult.rows.length) return c.json({ error: 'Ordin negăsit / Order not found' }, 404);
 
@@ -94,7 +103,7 @@ export function productionRouter(ctx: ExtensionContext): Hono {
       INNER JOIN trace_items i ON i.id = l.item_id
       WHERE c.production_order_id = ${id}
       ORDER BY c.scanned_at
-    `.execute(db);
+    `.execute(reqDb(c));
 
     return c.json({
       data: { ...(orderResult.rows[0] as any), consumptions: consumptions.rows },
@@ -119,14 +128,14 @@ export function productionRouter(ctx: ExtensionContext): Hono {
       INSERT INTO trace_lots (item_id, lot_type, lot_number, status, quantity_initial, quantity_remaining, unit, received_by)
       VALUES (${d.output_item_id}, 'internal', ${lotNumber}, 'quarantine', ${d.planned_quantity}, ${d.planned_quantity}, ${d.unit}, ${user.id})
       RETURNING id
-    `.execute(db);
+    `.execute(reqDb(c));
     const outputLotId = (lotResult.rows[0] as any).id;
 
     const row = await sql`
       INSERT INTO trace_production_orders (order_number, recipe_id, output_lot_id, status, planned_quantity, unit, operator_id, notes)
       VALUES (${orderNumber}, ${d.recipe_id ?? null}, ${outputLotId}, 'draft', ${d.planned_quantity}, ${d.unit}, ${user.id}, ${d.notes ?? null})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
 
     return c.json({ data: row.rows[0] }, 201);
   });
@@ -139,7 +148,7 @@ export function productionRouter(ctx: ExtensionContext): Hono {
       SET status = 'in_progress', started_at = now()
       WHERE id = ${id} AND status = 'draft'
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Ordinul nu poate fi pornit / Order cannot be started' }, 400);
     return c.json({ data: row.rows[0] });
   });
@@ -162,7 +171,7 @@ export function productionRouter(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     const id = c.req.param('id');
 
-    const orderResult = await sql`SELECT * FROM trace_production_orders WHERE id = ${id} AND status = 'in_progress'`.execute(db);
+    const orderResult = await sql`SELECT * FROM trace_production_orders WHERE id = ${id} AND status = 'in_progress'`.execute(reqDb(c));
     if (!orderResult.rows.length) return c.json({ error: 'Ordinul nu este în execuție / Order not in progress' }, 400);
 
     const order = orderResult.rows[0] as any;
@@ -172,13 +181,13 @@ export function productionRouter(ctx: ExtensionContext): Hono {
       UPDATE trace_lots
       SET quantity_initial = ${d.actual_quantity}, quantity_remaining = ${d.actual_quantity}, status = 'available'
       WHERE id = ${order.output_lot_id}
-    `.execute(db);
+    `.execute(reqDb(c));
 
     // Record production movement
     await sql`
       INSERT INTO trace_movements (lot_id, type, quantity, unit, reference_type, reference_id, performed_by, performed_at)
       VALUES (${order.output_lot_id}, 'reception', ${d.actual_quantity}, ${order.unit}, 'production_order', ${id}, ${user.id}, now())
-    `.execute(db);
+    `.execute(reqDb(c));
 
     const row = await sql`
       UPDATE trace_production_orders
@@ -186,7 +195,7 @@ export function productionRouter(ctx: ExtensionContext): Hono {
           completed_at = now(), haccp_checks = ${JSON.stringify(d.haccp_checks)}::jsonb
       WHERE id = ${id}
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
 
     return c.json({ data: row.rows[0] });
   });
@@ -200,7 +209,7 @@ export function productionRouter(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     const id = c.req.param('id');
 
-    const orderResult = await sql`SELECT status FROM trace_production_orders WHERE id = ${id}`.execute(db);
+    const orderResult = await sql`SELECT status FROM trace_production_orders WHERE id = ${id}`.execute(reqDb(c));
     if (!orderResult.rows.length) return c.json({ error: 'Ordin negăsit / Order not found' }, 404);
     if ((orderResult.rows[0] as any).status !== 'in_progress') {
       return c.json({ error: 'Ordinul trebuie să fie în execuție / Order must be in progress' }, 400);
@@ -237,7 +246,7 @@ export function productionRouter(ctx: ExtensionContext): Hono {
       SET haccp_checks = haccp_checks || ${JSON.stringify({ ...check, checked_by: user.id })}::jsonb
       WHERE id = ${id}
       RETURNING haccp_checks
-    `.execute(db);
+    `.execute(reqDb(c));
 
     if (!row.rows.length) return c.json({ error: 'Ordin negăsit / Order not found' }, 404);
     return c.json({ data: row.rows[0] });

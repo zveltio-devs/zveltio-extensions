@@ -7,6 +7,15 @@ import { RecallService } from '../services/RecallService.js';
 
 export function recallsRouter(ctx: ExtensionContext): Hono {
   const { db } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const recallService = new RecallService(db);
   const app = new Hono();
 
@@ -14,7 +23,7 @@ export function recallsRouter(ctx: ExtensionContext): Hono {
   app.post('/simulate/:lot_id', async (c) => {
     const lotId = c.req.param('lot_id');
 
-    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${lotId}`.execute(db);
+    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${lotId}`.execute(reqDb(c));
     if (!exists.rows.length) return c.json({ error: 'Lot negăsit / Lot not found' }, 404);
 
     const simulation = await recallService.simulateRecall(lotId);
@@ -30,7 +39,7 @@ export function recallsRouter(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
 
-    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${d.lot_id}`.execute(db);
+    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${d.lot_id}`.execute(reqDb(c));
     if (!exists.rows.length) return c.json({ error: 'Lot negăsit / Lot not found' }, 404);
 
     const recall = await recallService.initiateRecall({
@@ -55,7 +64,7 @@ export function recallsRouter(ctx: ExtensionContext): Hono {
       INNER JOIN trace_items i ON i.id = l.item_id
       WHERE (${status ? sql`r.status = ${status}` : sql`TRUE`})
       ORDER BY r.initiated_at DESC
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -69,7 +78,7 @@ export function recallsRouter(ctx: ExtensionContext): Hono {
       INNER JOIN trace_lots l ON l.id = r.lot_id
       INNER JOIN trace_items i ON i.id = l.item_id
       WHERE r.id = ${c.req.param('id')}
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Recall negăsit / Recall not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
