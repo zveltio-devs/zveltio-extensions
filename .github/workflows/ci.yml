@@ -31,14 +31,14 @@ jobs:
           bun-version: latest
 
       # The extensions repo's tsconfig path-resolves @zveltio/sdk via
-      # ../zveltio/packages/sdk/src/... — so we need the engine repo
-      # checked out as a sibling for typecheck to resolve.
-      - name: Checkout engine repo (sibling for SDK paths)
-        uses: actions/checkout@v4
-        with:
-          repository: zveltio-devs/zveltio
-          path: ../zveltio
-          fetch-depth: 1
+      # `../zveltio/packages/sdk/src/...` — so the engine repo must
+      # sit as a sibling on disk. actions/checkout refuses any path
+      # outside $GITHUB_WORKSPACE, so we git-clone the sibling
+      # directly. Only the SDK source is needed for typecheck, and
+      # depth=1 keeps the clone tiny (~5s).
+      - name: Clone engine repo as sibling (needed for @zveltio/sdk paths)
+        run: |
+          git clone --depth=1 https://github.com/zveltio-devs/zveltio.git ../zveltio
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
