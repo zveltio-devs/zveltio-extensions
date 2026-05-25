@@ -41,23 +41,37 @@ for end-user applications. Import them directly:
 
 ## Categories
 
-> **Note:** AI, Flows, and Multi-tenancy are **core engine features** — they are built into Zveltio and not available as separate extensions.
+> **Note:** AI, Flows, and Multi-tenancy are **core engine features** — they are built into Zveltio and not available as separate extensions. The `ai` extension here exposes the public API surface only.
 
 | Category | Extensions |
 |---|---|
-| `analytics` | `insights`, `quality` |
+| `ai` | `ai` (public API for the built-in AI engine) |
+| `analytics` | `quality` |
 | `auth` | `ldap`, `saml` |
+| `billing` | `billing` |
 | `communications` | `mail` |
-| `compliance` | `gdpr`, `ro/*` |
-| `content` | `document-templates`, `documents`, `drafts`, `media`, `page-builder` |
+| `compliance` | `gdpr`, `ro/documents`, `ro/efactura`, `ro/etransport`, `ro/procurement`, `ro/saft` |
+| `content` | `document-templates`, `documents`, `drafts`, `media`, `page-builder`, `pdf-viewer` |
 | `crm` | CRM module |
 | `data` | `export`, `import` |
-| `developer` | `api-docs`, `byod`, `database`, `edge-functions`, `graphql`, `saved-queries`, `schema-branches`, `validation`, `views` |
+| `developer` | `api-docs`, `byod`, `database`, `edge-functions`, `graphql`, `validation`, `views` |
+| `ecommerce` | `store` |
+| `finance` | `accounting`, `banking`, `expenses`, `invoicing`, `quotes`, `subscriptions` |
+| `forms` | `forms` |
 | `geospatial` | `postgis` |
+| `hr` | `employees`, `leave`, `payroll`, `time-tracking` |
 | `i18n` | `translations` |
-| `operations` | `backup` |
+| `integrations` | `api-connector` |
+| `operations` | `assets`, `inventory`, `pos`, `traceability` |
+| `projects` | `helpdesk`, `management` |
+| `search` | `search` |
+| `sms` | `sms` |
 | `storage` | `cloud` |
 | `workflow` | `approvals`, `checklists` |
+
+**Catalog size:** 54 official extensions across 23 categories
+(51 with database migrations + tenant RLS, 3 stateless / API-only:
+`content/pdf-viewer`, `developer/edge-functions`, `developer/views`).
 
 ## Using in Zveltio
 

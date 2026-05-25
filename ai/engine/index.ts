@@ -28,14 +28,7 @@ const extension: ZveltioExtension = {
 
   getMigrations() {
     return [
-      join(import.meta.dir, 'migrations/001_ai_init.sql'),
-      join(import.meta.dir, 'migrations/002_embeddings.sql'),
-      join(import.meta.dir, 'migrations/003_search_config.sql'),
-      join(import.meta.dir, 'migrations/004_decision_step.sql'),
-      join(import.meta.dir, 'migrations/005_task_trigger.sql'),
-      join(import.meta.dir, 'migrations/006_query.sql'),
-      join(import.meta.dir, 'migrations/007_embed_excluded.sql'),
-      join(import.meta.dir, 'migrations/008_memory.sql'),
+      join(import.meta.dir, 'migrations/001_initial.sql'),
     ];
   },
 
