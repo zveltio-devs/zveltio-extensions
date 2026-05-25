@@ -7,6 +7,15 @@ import { permissionGate } from '@zveltio/sdk/extension';
 
 export function employeesRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, events } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const app = new Hono();
 
   app.use('*', async (c, next) => {
@@ -26,7 +35,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
       FROM zvd_departments d
       LEFT JOIN zvd_employees e ON e.department_id = d.id AND e.status = 'active'
       GROUP BY d.id ORDER BY d.name
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -42,7 +51,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_departments (name, description, manager_id, parent_id, created_by)
       VALUES (${d.name}, ${d.description ?? null}, ${d.manager_id ?? null}, ${d.parent_id ?? null}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -59,14 +68,14 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
         manager_id = COALESCE(${d.manager_id ?? null}, manager_id),
         updated_at = NOW()
       WHERE id = ${c.req.param('id')} RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
 
   // ── Job Positions ──────────────────────────────────────────────
   app.get('/positions', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_job_positions WHERE is_active = true ORDER BY title`.execute(db);
+    const rows = await sql`SELECT * FROM zvd_job_positions WHERE is_active = true ORDER BY title`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -83,7 +92,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_job_positions (title, department_id, level, description, min_salary, max_salary)
       VALUES (${d.title}, ${d.department_id ?? null}, ${d.level}, ${d.description ?? null}, ${d.min_salary ?? null}, ${d.max_salary ?? null})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -103,7 +112,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
         min_salary = COALESCE(${d.min_salary ?? null}, min_salary),
         max_salary = COALESCE(${d.max_salary ?? null}, max_salary)
       WHERE id = ${c.req.param('id')} RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
@@ -127,7 +136,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
       LEFT JOIN zvd_job_positions p ON p.id = org.position_id
       LEFT JOIN zvd_departments d ON d.id = org.department_id
       ORDER BY depth, last_name
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -150,12 +159,12 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
         SELECT MIN(d.expires_at) as expires_at_docs
         FROM zvd_employee_documents d WHERE d.employee_id = e.id AND d.expires_at IS NOT NULL
       ) docs ON true
-    `.execute(db);
+    `.execute(reqDb(c));
     const byDept = await sql`
       SELECT d.name as department, COUNT(e.id) as count
       FROM zvd_departments d LEFT JOIN zvd_employees e ON e.department_id = d.id AND e.status = 'active'
       GROUP BY d.id, d.name ORDER BY count DESC
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: { ...(row.rows[0] as any), by_department: byDept.rows } });
   });
 
@@ -176,7 +185,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
         AND (${q ? sql`(e.first_name ILIKE ${'%' + q + '%'} OR e.last_name ILIKE ${'%' + q + '%'} OR e.email ILIKE ${'%' + q + '%'} OR e.employee_number ILIKE ${'%' + q + '%'})` : sql`TRUE`})
       ORDER BY e.last_name, e.first_name
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -196,9 +205,9 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
       LEFT JOIN zvd_employee_benefits ben ON ben.employee_id = e.id
       WHERE e.id = ${c.req.param('id')}
       GROUP BY e.id, d.name, p.title, m.first_name, m.last_name
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
-    const salary = await sql`SELECT * FROM zvd_salary_history WHERE employee_id = ${c.req.param('id')} ORDER BY effective_date DESC LIMIT 1`.execute(db);
+    const salary = await sql`SELECT * FROM zvd_salary_history WHERE employee_id = ${c.req.param('id')} ORDER BY effective_date DESC LIMIT 1`.execute(reqDb(c));
     const emp = row.rows[0] as any;
     emp.current_salary = salary.rows[0] ?? null;
     return c.json({ data: emp });
@@ -231,7 +240,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
     // Auto-generate employee number
-    const counter = await sql`SELECT COUNT(*) as cnt FROM zvd_employees`.execute(db);
+    const counter = await sql`SELECT COUNT(*) as cnt FROM zvd_employees`.execute(reqDb(c));
     const empNum = 'EMP-' + String(+(counter.rows[0] as any).cnt + 1).padStart(4, '0');
     const row = await sql`
       INSERT INTO zvd_employees (employee_number, first_name, last_name, email, work_email, phone, birth_date, gender,
@@ -245,13 +254,13 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
         ${d.salary ?? null}, ${d.currency}, ${d.iban ?? null}, ${d.bank_name ?? null},
         ${d.address ?? null}, ${d.notes ?? null}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     const emp = row.rows[0] as any;
     if (d.salary) {
       await sql`
         INSERT INTO zvd_salary_history (employee_id, effective_date, salary, salary_type, currency, reason, changed_by)
         VALUES (${emp.id}, ${d.hire_date}, ${d.salary}, ${d.salary_type}, ${d.currency}, 'Initial salary', ${user.id})
-      `.execute(db);
+      `.execute(reqDb(c));
     }
     events.emit('employee.created', { id: emp.id, employee: emp });
     return c.json({ data: emp }, 201);
@@ -296,7 +305,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
         notes = COALESCE(${d.notes ?? null}, notes),
         updated_at = NOW()
       WHERE id = ${c.req.param('id')} RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     const emp = row.rows[0] as any;
     events.emit('employee.updated', { id: emp.id, employee: emp });
@@ -311,7 +320,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       UPDATE zvd_employees SET status = 'terminated', end_date = ${d.end_date}, notes = COALESCE(${d.reason ?? null}, notes), updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND status != 'terminated' RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Employee not found or already terminated' }, 400);
     const emp = row.rows[0] as any;
     events.emit('employee.terminated', { id: emp.id, employee: emp, end_date: d.end_date });
@@ -320,7 +329,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
 
   // ── Emergency contacts ─────────────────────────────────────────
   app.get('/:id/emergency-contacts', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_employee_emergency_contacts WHERE employee_id = ${c.req.param('id')} ORDER BY is_primary DESC, name`.execute(db);
+    const rows = await sql`SELECT * FROM zvd_employee_emergency_contacts WHERE employee_id = ${c.req.param('id')} ORDER BY is_primary DESC, name`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -333,24 +342,24 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const d = c.req.valid('json');
     if (d.is_primary) {
-      await sql`UPDATE zvd_employee_emergency_contacts SET is_primary = false WHERE employee_id = ${c.req.param('id')}`.execute(db);
+      await sql`UPDATE zvd_employee_emergency_contacts SET is_primary = false WHERE employee_id = ${c.req.param('id')}`.execute(reqDb(c));
     }
     const row = await sql`
       INSERT INTO zvd_employee_emergency_contacts (employee_id, name, relationship, phone, email, is_primary)
       VALUES (${c.req.param('id')}, ${d.name}, ${d.relationship}, ${d.phone}, ${d.email ?? null}, ${d.is_primary})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
   app.delete('/:id/emergency-contacts/:contactId', async (c) => {
-    await sql`DELETE FROM zvd_employee_emergency_contacts WHERE id = ${c.req.param('contactId')} AND employee_id = ${c.req.param('id')}`.execute(db);
+    await sql`DELETE FROM zvd_employee_emergency_contacts WHERE id = ${c.req.param('contactId')} AND employee_id = ${c.req.param('id')}`.execute(reqDb(c));
     return c.json({ success: true });
   });
 
   // ── Salary history ─────────────────────────────────────────────
   app.get('/:id/salary-history', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_salary_history WHERE employee_id = ${c.req.param('id')} ORDER BY effective_date DESC`.execute(db);
+    const rows = await sql`SELECT * FROM zvd_salary_history WHERE employee_id = ${c.req.param('id')} ORDER BY effective_date DESC`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -367,15 +376,15 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_salary_history (employee_id, effective_date, salary, salary_type, currency, reason, changed_by)
       VALUES (${c.req.param('id')}, ${d.effective_date}, ${d.salary}, ${d.salary_type}, ${d.currency}, ${d.reason ?? null}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     // Update current salary on employee record
-    await sql`UPDATE zvd_employees SET salary = ${d.salary}, currency = ${d.currency}, updated_at = NOW() WHERE id = ${c.req.param('id')}`.execute(db);
+    await sql`UPDATE zvd_employees SET salary = ${d.salary}, currency = ${d.currency}, updated_at = NOW() WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
   // ── Documents ──────────────────────────────────────────────────
   app.get('/:id/documents', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_employee_documents WHERE employee_id = ${c.req.param('id')} ORDER BY created_at DESC`.execute(db);
+    const rows = await sql`SELECT * FROM zvd_employee_documents WHERE employee_id = ${c.req.param('id')} ORDER BY created_at DESC`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -391,18 +400,18 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_employee_documents (employee_id, type, name, file_url, expires_at, created_by)
       VALUES (${c.req.param('id')}, ${d.type}, ${d.name}, ${d.file_url}, ${d.expires_at ?? null}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
   app.delete('/:id/documents/:docId', async (c) => {
-    await sql`DELETE FROM zvd_employee_documents WHERE id = ${c.req.param('docId')} AND employee_id = ${c.req.param('id')}`.execute(db);
+    await sql`DELETE FROM zvd_employee_documents WHERE id = ${c.req.param('docId')} AND employee_id = ${c.req.param('id')}`.execute(reqDb(c));
     return c.json({ success: true });
   });
 
   // ── Benefits ───────────────────────────────────────────────────
   app.get('/:id/benefits', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_employee_benefits WHERE employee_id = ${c.req.param('id')} ORDER BY start_date DESC`.execute(db);
+    const rows = await sql`SELECT * FROM zvd_employee_benefits WHERE employee_id = ${c.req.param('id')} ORDER BY start_date DESC`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -418,13 +427,13 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_employee_benefits (employee_id, type, description, value, start_date, end_date)
       VALUES (${c.req.param('id')}, ${d.type}, ${d.description ?? null}, ${d.value ?? null}, ${d.start_date}, ${d.end_date ?? null})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
   // ── Onboarding ────────────────────────────────────────────────
   app.get('/:id/onboarding', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_onboarding_tasks WHERE employee_id = ${c.req.param('id')} ORDER BY created_at`.execute(db);
+    const rows = await sql`SELECT * FROM zvd_onboarding_tasks WHERE employee_id = ${c.req.param('id')} ORDER BY created_at`.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -440,7 +449,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_onboarding_tasks (employee_id, title, description, assigned_to, due_date, created_by)
       VALUES (${c.req.param('id')}, ${d.title}, ${d.description ?? null}, ${d.assigned_to ?? null}, ${d.due_date ?? null}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -453,7 +462,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
       UPDATE zvd_onboarding_tasks SET
         completed_at = CASE WHEN ${d.is_completed ?? null} = true THEN NOW() ELSE completed_at END
       WHERE id = ${c.req.param('taskId')} RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
@@ -466,7 +475,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
       FROM zvd_performance_cycles c
       LEFT JOIN zvd_performance_reviews r ON r.cycle_id = c.id
       GROUP BY c.id ORDER BY c.start_date DESC
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -479,12 +488,12 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       INSERT INTO zvd_performance_cycles (name, start_date, end_date)
       VALUES (${d.name}, ${d.start_date}, ${d.end_date}) RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
   app.post('/performance/cycles/:id/close', async (c) => {
-    const row = await sql`UPDATE zvd_performance_cycles SET status = 'closed' WHERE id = ${c.req.param('id')} RETURNING *`.execute(db);
+    const row = await sql`UPDATE zvd_performance_cycles SET status = 'closed' WHERE id = ${c.req.param('id')} RETURNING *`.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
@@ -497,7 +506,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
       JOIN zvd_employees e ON e.id = r.employee_id
       LEFT JOIN zvd_departments d ON d.id = e.department_id
       WHERE r.cycle_id = ${c.req.param('cycleId')} ORDER BY e.last_name
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -511,7 +520,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_performance_reviews (cycle_id, employee_id, reviewer_id)
       VALUES (${c.req.param('cycleId')}, ${d.employee_id}, ${d.reviewer_id ?? user.id})
       ON CONFLICT (cycle_id, employee_id) DO NOTHING RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -537,7 +546,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
         submitted_at = CASE WHEN ${d.status ?? null} = 'submitted' AND submitted_at IS NULL THEN NOW() ELSE submitted_at END,
         acknowledged_at = CASE WHEN ${d.status ?? null} = 'acknowledged' AND acknowledged_at IS NULL THEN NOW() ELSE acknowledged_at END
       WHERE id = ${c.req.param('id')} RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });

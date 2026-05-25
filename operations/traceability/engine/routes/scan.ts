@@ -14,6 +14,15 @@ const consumeSchema = z.object({
 
 export function scanRouter(ctx: ExtensionContext): Hono {
   const { db } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const stockService = new StockService(db);
   const app = new Hono();
 
@@ -34,7 +43,7 @@ export function scanRouter(ctx: ExtensionContext): Hono {
       LEFT JOIN trace_suppliers s ON s.id = l.supplier_id
       LEFT JOIN trace_locations loc ON loc.id = l.location_id
       WHERE l.id = ${id}
-    `.execute(db);
+    `.execute(reqDb(c));
 
     if (!row.rows.length) {
       return c.json({ error: 'Lot negăsit / Lot not found' }, 404);

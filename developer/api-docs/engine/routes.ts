@@ -50,6 +50,9 @@ async function getSettingValue(db: any, key: string): Promise<any> {
 
 async function generateOpenAPISpec(ctx: ExtensionContext, baseUrl: string): Promise<Record<string, any>> {
   const { db, DDLManager } = ctx;
+
+  // Not a request handler — `c` not in scope. Queries use bare `db`.
+
   const collections = await DDLManager.getCollections(db).catch(() => []);
   const paths: Record<string, any> = {};
   const schemas: Record<string, any> = {};
@@ -296,6 +299,11 @@ async function checkDocsAccess(ctx: ExtensionContext, c: any): Promise<boolean> 
 export function apiDocsRoutes(ctx: ExtensionContext): Hono {
   const { db, DDLManager, auth, checkPermission } = ctx;
 
+  // Per-request DB handle (CRM PR #1 pattern).
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const router = new Hono();
 
   // ── GET / — Swagger UI ────────────────────────────────────────────────────
@@ -398,7 +406,7 @@ export function apiDocsRoutes(ctx: ExtensionContext): Hono {
       FROM zvd_api_changelogs
       WHERE is_published = true
       ORDER BY published_at DESC NULLS LAST, created_at DESC
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ changelogs: rows.rows });
   });
 
@@ -418,7 +426,7 @@ export function apiDocsRoutes(ctx: ExtensionContext): Hono {
          ${body.breaking_changes ?? null}, ${body.migration_guide ?? null},
          ${session.user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ changelog: row.rows[0] }, 201);
   });
 
@@ -443,7 +451,7 @@ export function apiDocsRoutes(ctx: ExtensionContext): Hono {
 
     if (setClauses.length === 0) return c.json({ error: 'No fields to update' }, 400);
 
-    const row = await (db as any)
+    const row = await (reqDb(c) as any)
       .updateTable('zvd_api_changelogs')
       .set(Object.fromEntries(
         Object.entries(body).filter(([, v]) => v !== undefined),
@@ -464,7 +472,7 @@ export function apiDocsRoutes(ctx: ExtensionContext): Hono {
     if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
 
     const id = c.req.param('id');
-    const res = await (db as any)
+    const res = await (reqDb(c) as any)
       .deleteFrom('zvd_api_changelogs')
       .where('id', '=', id)
       .executeTakeFirst();
@@ -481,7 +489,7 @@ export function apiDocsRoutes(ctx: ExtensionContext): Hono {
     if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
 
     const id = c.req.param('id');
-    const row = await (db as any)
+    const row = await (reqDb(c) as any)
       .updateTable('zvd_api_changelogs')
       .set({ is_published: true, published_at: new Date() })
       .where('id', '=', id)
@@ -506,7 +514,7 @@ export function apiDocsRoutes(ctx: ExtensionContext): Hono {
       WHERE created_by = ${session.user.id}
         AND revoked_at IS NULL
       ORDER BY created_at DESC
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ tokens: rows.rows });
   });
 
@@ -528,7 +536,7 @@ export function apiDocsRoutes(ctx: ExtensionContext): Hono {
          ${body.scopes as any}, ${body.expires_at ? new Date(body.expires_at) : null},
          ${session.user.id})
       RETURNING id, name, token_prefix, scopes, expires_at, created_at
-    `.execute(db);
+    `.execute(reqDb(c));
 
     return c.json({
       token: row.rows[0],
@@ -543,7 +551,7 @@ export function apiDocsRoutes(ctx: ExtensionContext): Hono {
     if (!session) return c.json({ error: 'Unauthorized' }, 401);
 
     const id = c.req.param('id');
-    const row = await (db as any)
+    const row = await (reqDb(c) as any)
       .updateTable('zvd_api_access_tokens')
       .set({ revoked_at: new Date() })
       .where('id', '=', id)
@@ -565,7 +573,7 @@ export function apiDocsRoutes(ctx: ExtensionContext): Hono {
       FROM zvd_api_custom_docs
       WHERE is_published = true
       ORDER BY sort_order ASC, created_at ASC
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ docs: rows.rows });
   });
 
@@ -584,7 +592,7 @@ export function apiDocsRoutes(ctx: ExtensionContext): Hono {
         (${body.title}, ${body.slug}, ${body.body},
          ${body.sort_order}, ${body.is_published}, ${session.user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ doc: row.rows[0] }, 201);
   });
 
@@ -602,7 +610,7 @@ export function apiDocsRoutes(ctx: ExtensionContext): Hono {
       updated_at: new Date(),
     };
 
-    const row = await (db as any)
+    const row = await (reqDb(c) as any)
       .updateTable('zvd_api_custom_docs')
       .set(updates)
       .where('id', '=', id)
@@ -621,7 +629,7 @@ export function apiDocsRoutes(ctx: ExtensionContext): Hono {
     if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
 
     const id = c.req.param('id');
-    const res = await (db as any)
+    const res = await (reqDb(c) as any)
       .deleteFrom('zvd_api_custom_docs')
       .where('id', '=', id)
       .executeTakeFirst();

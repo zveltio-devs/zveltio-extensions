@@ -6,6 +6,7 @@ import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { LabelService } from '../services/LabelService.js';
 import { QRService } from '../services/QRService.js';
 
+// Top-level helper: keeps `db: any` parameter; callers pass reqDb(c).
 async function fetchLotDetails(db: any, lotId: string) {
   const row = await sql`
     SELECT l.id, l.lot_number, l.quantity_remaining, l.unit, l.best_before_date,
@@ -23,11 +24,20 @@ async function fetchLotDetails(db: any, lotId: string) {
 
 export function labelsRouter(ctx: ExtensionContext): Hono {
   const { db } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const app = new Hono();
 
   // GET /labels/:lot_id — single PDF label
   app.get('/:lot_id', async (c) => {
-    const lot = await fetchLotDetails(db, c.req.param('lot_id'));
+    const lot = await fetchLotDetails(reqDb(c), c.req.param('lot_id'));
     if (!lot) return c.json({ error: 'Lot negăsit / Lot not found' }, 404);
 
     const pdf = await LabelService.generateLabel(lot);
@@ -43,7 +53,7 @@ export function labelsRouter(ctx: ExtensionContext): Hono {
   app.post('/batch', zValidator('json', z.object({ lot_ids: z.array(z.string().uuid()).min(1).max(50) })), async (c) => {
     const { lot_ids } = c.req.valid('json');
 
-    const lots = await Promise.all(lot_ids.map(id => fetchLotDetails(db, id)));
+    const lots = await Promise.all(lot_ids.map(id => fetchLotDetails(reqDb(c), id)));
     const validLots = lots.filter(Boolean);
 
     if (!validLots.length) return c.json({ error: 'Niciun lot valid / No valid lots' }, 404);
@@ -59,7 +69,7 @@ export function labelsRouter(ctx: ExtensionContext): Hono {
 
   // GET /labels/:lot_id/qr-png — QR PNG for preview
   app.get('/:lot_id/qr-png', async (c) => {
-    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${c.req.param('lot_id')}`.execute(db);
+    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${c.req.param('lot_id')}`.execute(reqDb(c));
     if (!exists.rows.length) return c.json({ error: 'Lot negăsit / Lot not found' }, 404);
 
     const buffer = await QRService.generateQRBuffer(c.req.param('lot_id'));
@@ -70,7 +80,7 @@ export function labelsRouter(ctx: ExtensionContext): Hono {
 
   // GET /labels/:lot_id/qr-dataurl — QR as base64 data URL (for browser preview)
   app.get('/:lot_id/qr-dataurl', async (c) => {
-    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${c.req.param('lot_id')}`.execute(db);
+    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${c.req.param('lot_id')}`.execute(reqDb(c));
     if (!exists.rows.length) return c.json({ error: 'Lot negăsit / Lot not found' }, 404);
 
     const dataUrl = await QRService.generateQRDataURL(c.req.param('lot_id'));

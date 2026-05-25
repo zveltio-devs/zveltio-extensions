@@ -23,6 +23,15 @@ async function recalcReportTotals(db: any, reportId: string) {
 
 export function expensesRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const app = new Hono();
 
   app.use('*', async (c, next) => {
@@ -48,7 +57,7 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
       GROUP BY r.id
       ORDER BY r.created_at DESC
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -60,7 +69,7 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
       LEFT JOIN zvd_expenses e ON e.report_id = r.id
       WHERE r.employee_id = ${user.id}
       GROUP BY r.id ORDER BY r.created_at DESC
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
@@ -72,11 +81,11 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
       LEFT JOIN zvd_expenses e ON e.report_id = r.id
       WHERE r.id = ${c.req.param('id')}
       GROUP BY r.id
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
-    const mileage = await sql`SELECT * FROM zvd_mileage_entries WHERE report_id = ${c.req.param('id')} ORDER BY date`.execute(db);
-    const perDiem = await sql`SELECT * FROM zvd_per_diem_entries WHERE report_id = ${c.req.param('id')} ORDER BY date`.execute(db);
-    const reimbursements = await sql`SELECT * FROM zvd_expense_reimbursements WHERE report_id = ${c.req.param('id')} ORDER BY payment_date`.execute(db);
+    const mileage = await sql`SELECT * FROM zvd_mileage_entries WHERE report_id = ${c.req.param('id')} ORDER BY date`.execute(reqDb(c));
+    const perDiem = await sql`SELECT * FROM zvd_per_diem_entries WHERE report_id = ${c.req.param('id')} ORDER BY date`.execute(reqDb(c));
+    const reimbursements = await sql`SELECT * FROM zvd_expense_reimbursements WHERE report_id = ${c.req.param('id')} ORDER BY payment_date`.execute(reqDb(c));
     return c.json({ data: { ...(row.rows[0] as any), mileage: mileage.rows, per_diem: perDiem.rows, reimbursements: reimbursements.rows } });
   });
 
@@ -91,7 +100,7 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_expense_reports (title, employee_id, currency, notes, created_by)
       VALUES (${d.title}, ${user.id}, ${d.currency}, ${d.notes ?? null}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -115,7 +124,7 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_expenses (report_id, date, category, description, amount, currency, exchange_rate, amount_local, tax_amount, receipt_url, is_reimbursable, created_by)
       VALUES (${id}, ${d.date}, ${d.category}, ${d.description}, ${d.amount}, ${d.currency}, ${d.exchange_rate}, ${amount_local}, ${d.tax_amount}, ${d.receipt_url ?? null}, ${d.is_reimbursable}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     await recalcReportTotals(db, id);
     return c.json({ data: item.rows[0] }, 201);
   });
@@ -134,7 +143,7 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
         category = COALESCE(${d.category ?? null}, category),
         receipt_url = COALESCE(${d.receipt_url ?? null}, receipt_url)
       WHERE id = ${c.req.param('itemId')} AND report_id = ${c.req.param('id')} RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     await recalcReportTotals(db, c.req.param('id'));
     return c.json({ data: row.rows[0] });
@@ -142,7 +151,7 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
 
   app.delete('/reports/:id/items/:itemId', async (c) => {
     const id = c.req.param('id');
-    await sql`DELETE FROM zvd_expenses WHERE id = ${c.req.param('itemId')} AND report_id = ${id}`.execute(db);
+    await sql`DELETE FROM zvd_expenses WHERE id = ${c.req.param('itemId')} AND report_id = ${id}`.execute(reqDb(c));
     await recalcReportTotals(db, id);
     return c.json({ success: true });
   });
@@ -164,13 +173,13 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_mileage_entries (report_id, employee_id, date, from_location, to_location, distance_km, rate_per_km, purpose, vehicle_type, created_by)
       VALUES (${id}, ${user.id}, ${d.date}, ${d.from_location}, ${d.to_location}, ${d.distance_km}, ${d.rate_per_km}, ${d.purpose ?? null}, ${d.vehicle_type}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     await recalcReportTotals(db, id);
     return c.json({ data: row.rows[0] }, 201);
   });
 
   app.delete('/reports/:id/mileage/:mId', async (c) => {
-    await sql`DELETE FROM zvd_mileage_entries WHERE id = ${c.req.param('mId')} AND report_id = ${c.req.param('id')}`.execute(db);
+    await sql`DELETE FROM zvd_mileage_entries WHERE id = ${c.req.param('mId')} AND report_id = ${c.req.param('id')}`.execute(reqDb(c));
     await recalcReportTotals(db, c.req.param('id'));
     return c.json({ success: true });
   });
@@ -192,7 +201,7 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_per_diem_entries (report_id, employee_id, date, destination, rate, currency, is_domestic, partial_day, meals_deducted, created_by)
       VALUES (${id}, ${user.id}, ${d.date}, ${d.destination}, ${d.rate}, ${d.currency}, ${d.is_domestic}, ${d.partial_day}, ${d.meals_deducted}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     await recalcReportTotals(db, id);
     return c.json({ data: row.rows[0] }, 201);
   });
@@ -202,7 +211,7 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       UPDATE zvd_expense_reports SET status = 'submitted', submitted_at = NOW(), updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND status = 'draft' RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Report not found or not in draft' }, 400);
     return c.json({ data: row.rows[0] });
   });
@@ -212,7 +221,7 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       UPDATE zvd_expense_reports SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND status = 'submitted' RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Report not found or not submitted' }, 400);
     return c.json({ data: row.rows[0] });
   });
@@ -222,7 +231,7 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       UPDATE zvd_expense_reports SET status = 'rejected', rejection_reason = ${reason}, updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND status = 'submitted' RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Report not found or not submitted' }, 400);
     return c.json({ data: row.rows[0] });
   });
@@ -237,14 +246,14 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
-    const report = await sql`SELECT * FROM zvd_expense_reports WHERE id = ${c.req.param('id')} AND status = 'approved'`.execute(db);
+    const report = await sql`SELECT * FROM zvd_expense_reports WHERE id = ${c.req.param('id')} AND status = 'approved'`.execute(reqDb(c));
     if (!report.rows.length) return c.json({ error: 'Report not found or not approved' }, 400);
     const r = report.rows[0] as any;
     const row = await sql`
       INSERT INTO zvd_expense_reimbursements (report_id, amount, payment_date, payment_method, reference, notes, created_by)
       VALUES (${r.id}, ${d.amount}, ${d.payment_date}, ${d.payment_method}, ${d.reference ?? null}, ${d.notes ?? null}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     const newReimbursed = +r.reimbursed_amount + d.amount;
     const fullyReimbursed = newReimbursed >= r.grand_total;
     await sql`
@@ -254,7 +263,7 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
         reimbursed_at = ${fullyReimbursed ? sql`NOW()` : sql`reimbursed_at`},
         updated_at = NOW()
       WHERE id = ${r.id}
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -269,12 +278,12 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
         COALESCE(SUM(grand_total) FILTER (WHERE status = 'approved'), 0) as total_approved,
         COALESCE(SUM(reimbursed_amount), 0) as total_reimbursed
       FROM zvd_expense_reports
-    `.execute(db);
+    `.execute(reqDb(c));
     const byCategory = await sql`
       SELECT category, COALESCE(SUM(amount), 0) as total
       FROM zvd_expenses GROUP BY category ORDER BY total DESC
-    `.execute(db);
-    const mileageTotal = await sql`SELECT COALESCE(SUM(amount), 0) as total FROM zvd_mileage_entries`.execute(db);
+    `.execute(reqDb(c));
+    const mileageTotal = await sql`SELECT COALESCE(SUM(amount), 0) as total FROM zvd_mileage_entries`.execute(reqDb(c));
     return c.json({ data: {
       ...(row.rows[0] as any),
       by_category: byCategory.rows,

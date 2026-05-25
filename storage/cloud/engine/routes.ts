@@ -12,6 +12,15 @@ import type { ExtensionContext } from '@zveltio/sdk/extension';
 export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
   const { db, auth, checkPermission } = ctx;
 
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
+
   const app = new Hono();
 
   // Auth middleware — all cloud routes require auth except /share/:token
@@ -49,7 +58,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
       const result = await createFileVersion(db, s3, fileId, buffer, file.type, file.size, user.id);
 
       // Log access
-      await logAccess(db, fileId, user.id, 'version', c.req.header('user-agent'), null, null);
+      await logAccess(reqDb(c), fileId, user.id, 'version', c.req.header('user-agent'), null, null);
 
       return c.json({ version: result.versionNum, message: 'New version uploaded' }, 201);
     } catch (err: any) {
@@ -134,7 +143,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
 
       // Log share action
       if (data.file_id) {
-        await logAccess(db, data.file_id, user.id, 'share', c.req.header('user-agent'), null, null);
+        await logAccess(reqDb(c), data.file_id, user.id, 'share', c.req.header('user-agent'), null, null);
       }
 
       return c.json(result, 201);
@@ -179,7 +188,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
 
       // Log download access
       await logAccess(
-        db,
+        reqDb(c),
         result.file.id,
         null,
         'download',
@@ -194,7 +203,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
     // Log view access
     if (result.file) {
       await logAccess(
-        db,
+        reqDb(c),
         result.file.id,
         null,
         'view',
@@ -226,7 +235,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
     const user = c.get('user') as any;
     const fileId = c.req.param('fileId');
 
-    const existing = await (db as any)
+    const existing = await (reqDb(c) as any)
       .selectFrom('zv_media_favorites')
       .select('user_id')
       .where('user_id', '=', user.id)
@@ -234,14 +243,14 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
       .executeTakeFirst();
 
     if (existing) {
-      await (db as any).deleteFrom('zv_media_favorites')
+      await (reqDb(c) as any).deleteFrom('zv_media_favorites')
         .where('user_id', '=', user.id)
         .where('file_id', '=', fileId)
         .execute();
       return c.json({ favorited: false });
     }
 
-    await (db as any).insertInto('zv_media_favorites')
+    await (reqDb(c) as any).insertInto('zv_media_favorites')
       .values({ user_id: user.id, file_id: fileId, created_at: new Date() })
       .execute();
     return c.json({ favorited: true });
@@ -255,7 +264,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
       INNER JOIN zv_media_files f ON f.id = fav.file_id
       WHERE fav.user_id = ${user.id} AND f.deleted_at IS NULL
       ORDER BY fav.created_at DESC
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ files: files.rows });
   });
 
@@ -270,9 +279,9 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
       SELECT COALESCE(SUM(size_bytes), 0) AS total
       FROM zv_media_files
       WHERE uploaded_by = ${user.id} AND deleted_at IS NULL
-    `.execute(db);
+    `.execute(reqDb(c));
 
-    const quota = await (db as any)
+    const quota = await (reqDb(c) as any)
       .selectFrom('zv_storage_quotas')
       .selectAll()
       .where('user_id', '=', user.id)
@@ -305,7 +314,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
 
   // GET /admin/quotas — list all quota settings (admin only)
   app.get('/admin/quotas', requireAdmin, async (c) => {
-    const quotas = await (db as any)
+    const quotas = await (reqDb(c) as any)
       .selectFrom('zv_storage_quotas')
       .selectAll()
       .orderBy('created_at', 'desc')
@@ -321,11 +330,11 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
 
     // Upsert: if quota for this user/role exists, update it
     const existing = data.user_id
-      ? await (db as any).selectFrom('zv_storage_quotas').select('id').where('user_id', '=', data.user_id).executeTakeFirst()
-      : await (db as any).selectFrom('zv_storage_quotas').select('id').where('role_name', '=', data.role_name).executeTakeFirst();
+      ? await (reqDb(c) as any).selectFrom('zv_storage_quotas').select('id').where('user_id', '=', data.user_id).executeTakeFirst()
+      : await (reqDb(c) as any).selectFrom('zv_storage_quotas').select('id').where('role_name', '=', data.role_name).executeTakeFirst();
 
     if (existing) {
-      await (db as any)
+      await (reqDb(c) as any)
         .updateTable('zv_storage_quotas')
         .set({
           quota_bytes: data.quota_bytes,
@@ -339,7 +348,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
       return c.json({ success: true, quota_id: existing.id });
     }
 
-    const quota = await (db as any)
+    const quota = await (reqDb(c) as any)
       .insertInto('zv_storage_quotas')
       .values({
         user_id: data.user_id ?? null,
@@ -357,7 +366,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
 
   // DELETE /admin/quotas/:id — delete quota rule (admin only)
   app.delete('/admin/quotas/:id', requireAdmin, async (c) => {
-    await (db as any)
+    await (reqDb(c) as any)
       .deleteFrom('zv_storage_quotas')
       .where('id', '=', c.req.param('id'))
       .execute();
@@ -380,7 +389,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
       // Check file ownership
       const file = await sql<{ uploaded_by: string }>`
         SELECT uploaded_by FROM zv_media_files WHERE id = ${fileId}
-      `.execute(db);
+      `.execute(reqDb(c));
 
       if (!file.rows[0]) return c.json({ error: 'File not found' }, 404);
       if (file.rows[0].uploaded_by !== user.id) {
@@ -394,7 +403,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
       WHERE file_id = ${fileId}
       ORDER BY created_at DESC
       LIMIT 100
-    `.execute(db);
+    `.execute(reqDb(c));
 
     return c.json({ file_id: fileId, logs: logs.rows });
   });
@@ -415,7 +424,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
 
   // GET /retention-policies — list retention policies (admin only)
   app.get('/retention-policies', requireAdmin, async (c) => {
-    const policies = await (db as any)
+    const policies = await (reqDb(c) as any)
       .selectFrom('zv_cloud_retention_policies')
       .selectAll()
       .where('is_active', '=', true)
@@ -430,7 +439,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
     const user = c.get('user') as any;
     const data = c.req.valid('json');
 
-    const policy = await (db as any)
+    const policy = await (reqDb(c) as any)
       .insertInto('zv_cloud_retention_policies')
       .values({
         name: data.name,
@@ -450,7 +459,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
 
   // DELETE /retention-policies/:id — delete retention policy (admin only)
   app.delete('/retention-policies/:id', requireAdmin, async (c) => {
-    await (db as any)
+    await (reqDb(c) as any)
       .deleteFrom('zv_cloud_retention_policies')
       .where('id', '=', c.req.param('id'))
       .execute();
@@ -466,7 +475,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
     async (c) => {
       const { dry_run } = c.req.valid('json');
 
-      const policies = await (db as any)
+      const policies = await (reqDb(c) as any)
         .selectFrom('zv_cloud_retention_policies')
         .selectAll()
         .where('is_active', '=', true)
@@ -483,7 +492,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
             ${policy.folder_path ? sql`WHERE file_id IN (SELECT id FROM zv_media_files WHERE folder_path LIKE ${policy.folder_path + '%'})` : sql``}
             GROUP BY file_id
             HAVING COUNT(*) > ${policy.max_versions}
-          `.execute(db);
+          `.execute(reqDb(c));
 
           for (const row of filesWithExcessVersions.rows) {
             // Get versions to delete (oldest ones beyond max_versions)
@@ -493,7 +502,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
               WHERE file_id = ${row.file_id}
               ORDER BY version_number ASC
               LIMIT ${parseInt(row.version_count) - policy.max_versions}
-            `.execute(db);
+            `.execute(reqDb(c));
 
             for (const ver of versionsToDelete.rows) {
               actions.push({
@@ -503,7 +512,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
               });
 
               if (!dry_run) {
-                await sql`DELETE FROM zv_cloud_file_versions WHERE id = ${ver.id}`.execute(db);
+                await sql`DELETE FROM zv_cloud_file_versions WHERE id = ${ver.id}`.execute(reqDb(c));
               }
             }
           }
@@ -520,7 +529,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
             ${policy.file_extension ? sql`AND original_filename ILIKE ${'%.' + policy.file_extension}` : sql``}
           `;
 
-          const oldFiles = await filesQuery.execute(db);
+          const oldFiles = await filesQuery.execute(reqDb(c));
 
           for (const file of oldFiles.rows) {
             actions.push({
@@ -553,7 +562,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
     const totalFilesResult = await sql<{ count: string; total_size: string | null }>`
       SELECT COUNT(*) as count, SUM(size_bytes)::text as total_size
       FROM zv_media_files WHERE deleted_at IS NULL
-    `.execute(db);
+    `.execute(reqDb(c));
 
     const byTypeResult = await sql<{ mime_type: string; count: string; total_size: string }>`
       SELECT
@@ -564,11 +573,11 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
       GROUP BY SPLIT_PART(mime_type, '/', 1)
       ORDER BY count DESC
       LIMIT 10
-    `.execute(db);
+    `.execute(reqDb(c));
 
     const shareCountResult = await sql<{ count: string }>`
       SELECT COUNT(*) as count FROM zv_cloud_shares WHERE (expires_at IS NULL OR expires_at > NOW())
-    `.execute(db);
+    `.execute(reqDb(c));
 
     const quotaViolationsResult = await sql<{ count: string }>`
       SELECT COUNT(DISTINCT uploaded_by) as count
@@ -579,7 +588,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
       ) usage
       INNER JOIN zv_storage_quotas q ON q.user_id = usage.uploaded_by
       WHERE usage.used_bytes > q.quota_bytes
-    `.execute(db);
+    `.execute(reqDb(c));
 
     return c.json({
       total_files: parseInt(totalFilesResult.rows[0]?.count || '0'),
@@ -629,6 +638,9 @@ async function logAccess(
  */
 export function makePublicShareHandler(ctx: ExtensionContext, s3: S3Client) {
   const { db } = ctx;
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
   return async (c: any) => {
     const password = c.req.query('password');
     const token = c.req.param('token');
@@ -649,7 +661,7 @@ export function makePublicShareHandler(ctx: ExtensionContext, s3: S3Client) {
 
       // Log download access
       await logAccess(
-        db,
+        reqDb(c),
         result.file.id,
         null,
         'download',
@@ -664,7 +676,7 @@ export function makePublicShareHandler(ctx: ExtensionContext, s3: S3Client) {
     // Log view access
     if (result.file) {
       await logAccess(
-        db,
+        reqDb(c),
         result.file.id,
         null,
         'view',

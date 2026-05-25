@@ -8,6 +8,15 @@ const UNITS = ['kg', 'g', 'l', 'ml', 'buc', 'cutie', 'sac', 'palet'] as const;
 
 export function dispatchesRouter(ctx: ExtensionContext): Hono {
   const { db } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const app = new Hono();
 
   // GET /dispatches — list with status / lot_id filter
@@ -27,12 +36,12 @@ export function dispatchesRouter(ctx: ExtensionContext): Hono {
         AND (${lot_id ? sql`d.lot_id = ${lot_id}` : sql`TRUE`})
       ORDER BY d.created_at DESC
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(db);
+    `.execute(reqDb(c));
 
     const total = await sql<{ count: string }>`
       SELECT COUNT(*) as count FROM trace_dispatches
       WHERE (${status ? sql`status = ${status}` : sql`TRUE`})
-    `.execute(db);
+    `.execute(reqDb(c));
 
     return c.json({
       data: rows.rows,
@@ -53,7 +62,7 @@ export function dispatchesRouter(ctx: ExtensionContext): Hono {
       LEFT JOIN trace_items i ON i.id = l.item_id
       LEFT JOIN trace_suppliers s ON s.id = l.supplier_id
       WHERE d.id = ${c.req.param('id')}
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Expediere negăsită / Dispatch not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
@@ -69,7 +78,7 @@ export function dispatchesRouter(ctx: ExtensionContext): Hono {
 
     const dispatchResult = await sql`
       SELECT * FROM trace_dispatches WHERE id = ${id} AND status = 'pending'
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!dispatchResult.rows.length) {
       return c.json({ error: 'Expediere negăsită sau deja confirmată / Dispatch not found or already confirmed' }, 400);
     }
@@ -83,7 +92,7 @@ export function dispatchesRouter(ctx: ExtensionContext): Hono {
     const lotResult = await sql`
       SELECT id, quantity_remaining, unit, status FROM trace_lots
       WHERE id = ${dispatch.lot_id} AND status = 'available'
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!lotResult.rows.length) {
       return c.json({ error: 'Lotul nu este disponibil / Lot not available' }, 400);
     }
@@ -103,7 +112,7 @@ export function dispatchesRouter(ctx: ExtensionContext): Hono {
       SET quantity_remaining = ${newQty},
           status = ${newQty === 0 ? 'exhausted' : 'available'}
       WHERE id = ${dispatch.lot_id}
-    `.execute(db);
+    `.execute(reqDb(c));
 
     // Record dispatch movement
     await sql`
@@ -116,7 +125,7 @@ export function dispatchesRouter(ctx: ExtensionContext): Hono {
         'invoice', ${dispatch.invoice_id ?? null}, ${dispatch.invoice_number ?? null},
         ${dispatch.customer_id ?? null}, ${d.notes ?? null}, ${user.id}, now()
       )
-    `.execute(db);
+    `.execute(reqDb(c));
 
     // Mark dispatch confirmed
     const updated = await sql`
@@ -128,7 +137,7 @@ export function dispatchesRouter(ctx: ExtensionContext): Hono {
           notes = COALESCE(${d.notes ?? null}, notes)
       WHERE id = ${id}
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
 
     return c.json({ data: updated.rows[0] });
   });
@@ -141,12 +150,12 @@ export function dispatchesRouter(ctx: ExtensionContext): Hono {
     const { lot_id } = c.req.valid('json');
     const id = c.req.param('id');
 
-    const lotCheck = await sql`SELECT id FROM trace_lots WHERE id = ${lot_id} AND status = 'available'`.execute(db);
+    const lotCheck = await sql`SELECT id FROM trace_lots WHERE id = ${lot_id} AND status = 'available'`.execute(reqDb(c));
     if (!lotCheck.rows.length) return c.json({ error: 'Lot indisponibil / Lot not available' }, 400);
 
     const row = await sql`
       UPDATE trace_dispatches SET lot_id = ${lot_id} WHERE id = ${id} AND status = 'pending' RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Expediere negăsită / Dispatch not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
@@ -161,7 +170,7 @@ export function dispatchesRouter(ctx: ExtensionContext): Hono {
       SET status = 'cancelled', notes = COALESCE(${d.notes ?? null}, notes)
       WHERE id = ${c.req.param('id')} AND status = 'pending'
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Expediere negăsită sau nu poate fi anulată' }, 400);
     return c.json({ data: row.rows[0] });
   });
@@ -182,7 +191,7 @@ export function dispatchesRouter(ctx: ExtensionContext): Hono {
     const lotResult = await sql`
       SELECT id, quantity_remaining, unit, status FROM trace_lots
       WHERE id = ${d.lot_id} AND status = 'available'
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!lotResult.rows.length) return c.json({ error: 'Lot indisponibil / Lot not available' }, 400);
     const lot = lotResult.rows[0] as any;
 
@@ -198,7 +207,7 @@ export function dispatchesRouter(ctx: ExtensionContext): Hono {
       UPDATE trace_lots
       SET quantity_remaining = ${newQty}, status = ${newQty === 0 ? 'exhausted' : 'available'}
       WHERE id = ${d.lot_id}
-    `.execute(db);
+    `.execute(reqDb(c));
 
     await sql`
       INSERT INTO trace_movements (
@@ -210,7 +219,7 @@ export function dispatchesRouter(ctx: ExtensionContext): Hono {
         'manual', ${d.invoice_number ?? null},
         ${d.customer_id ?? null}, ${d.notes ?? null}, ${user.id}, now()
       )
-    `.execute(db);
+    `.execute(reqDb(c));
 
     const dispatch = await sql`
       INSERT INTO trace_dispatches (
@@ -223,7 +232,7 @@ export function dispatchesRouter(ctx: ExtensionContext): Hono {
         'confirmed', now(), ${user.id}, ${d.notes ?? null}
       )
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
 
     return c.json({ data: dispatch.rows[0] }, 201);
   });

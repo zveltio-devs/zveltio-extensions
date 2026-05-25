@@ -14,6 +14,15 @@ const locationSchema = z.object({
 
 export function locationsRouter(ctx: ExtensionContext): Hono {
   const { db } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const app = new Hono();
 
   app.get('/', async (c) => {
@@ -23,12 +32,12 @@ export function locationsRouter(ctx: ExtensionContext): Hono {
       WHERE (${warehouse ? sql`warehouse ILIKE ${'%' + warehouse + '%'}` : sql`TRUE`})
         AND (${zone ? sql`temperature_zone = ${zone}` : sql`TRUE`})
       ORDER BY warehouse, row, shelf
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
   app.get('/:id', async (c) => {
-    const row = await sql`SELECT * FROM trace_locations WHERE id = ${c.req.param('id')}`.execute(db);
+    const row = await sql`SELECT * FROM trace_locations WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Locație negăsită / Location not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
@@ -39,7 +48,7 @@ export function locationsRouter(ctx: ExtensionContext): Hono {
       INSERT INTO trace_locations (warehouse, row, shelf, description, temperature_zone)
       VALUES (${d.warehouse}, ${d.row ?? null}, ${d.shelf ?? null}, ${d.description ?? null}, ${d.temperature_zone ?? null})
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -55,16 +64,16 @@ export function locationsRouter(ctx: ExtensionContext): Hono {
         temperature_zone = COALESCE(${d.temperature_zone ?? null}, temperature_zone)
       WHERE id = ${id}
       RETURNING *
-    `.execute(db);
+    `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Locație negăsită / Location not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
 
   app.delete('/:id', async (c) => {
     const id = c.req.param('id');
-    const inUse = await sql`SELECT id FROM trace_lots WHERE location_id = ${id} LIMIT 1`.execute(db);
+    const inUse = await sql`SELECT id FROM trace_lots WHERE location_id = ${id} LIMIT 1`.execute(reqDb(c));
     if (inUse.rows.length) return c.json({ error: 'Locația are loturi asociate / Location has associated lots' }, 409);
-    await sql`DELETE FROM trace_locations WHERE id = ${id}`.execute(db);
+    await sql`DELETE FROM trace_locations WHERE id = ${id}`.execute(reqDb(c));
     return c.json({ success: true });
   });
 

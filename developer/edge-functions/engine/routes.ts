@@ -25,6 +25,15 @@ export default async function handler(ctx) {
 
 export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
+
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const { runEdgeFunction: runFunction } = ctx.internals;
 
   async function requireAdmin(c: any) {
@@ -42,7 +51,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
     const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const fns = await db
+    const fns = await reqDb(c)
       .selectFrom('zv_edge_functions')
       .select(['id', 'name', 'display_name', 'description', 'http_method', 'path', 'is_active', 'runtime', 'created_at'])
       .orderBy('name', 'asc')
@@ -55,7 +64,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
     const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const fn = await db
+    const fn = await reqDb(c)
       .selectFrom('zv_edge_functions')
       .selectAll()
       .where('id', '=', c.req.param('id'))
@@ -86,7 +95,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
       const body = c.req.valid('json');
       const path = `/api/fn/${body.name}`;
 
-      const fn = await db
+      const fn = await reqDb(c)
         .insertInto('zv_edge_functions')
         .values({
           name: body.name,
@@ -132,7 +141,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
         }
       }
 
-      const fn = await db
+      const fn = await reqDb(c)
         .updateTable('zv_edge_functions')
         .set(updates)
         .where('id', '=', c.req.param('id'))
@@ -148,7 +157,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
     const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    await db.deleteFrom('zv_edge_functions').where('id', '=', c.req.param('id')).execute();
+    await reqDb(c).deleteFrom('zv_edge_functions').where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
   });
 
@@ -157,7 +166,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
     const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const logs = await db
+    const logs = await reqDb(c)
       .selectFrom('zv_edge_function_logs')
       .select(['id', 'status', 'duration_ms', 'error', 'created_at'])
       .where('function_id', '=', c.req.param('id'))
@@ -173,7 +182,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
     const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const fn = await db
+    const fn = await reqDb(c)
       .selectFrom('zv_edge_functions')
       .selectAll()
       .where('id', '=', c.req.param('id'))
@@ -192,7 +201,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
     const result = await runFunction(fn.code, testRequest, env, fn.timeout_ms) as any;
 
     // Log invocation
-    await db.insertInto('zv_edge_function_logs').values({
+    await reqDb(c).insertInto('zv_edge_function_logs').values({
       function_id: fn.id,
       status: result.status,
       duration_ms: result.duration_ms,
@@ -222,8 +231,17 @@ export async function mountEdgeFunctions(ctx: ExtensionContext): Promise<void> {
   const { db, auth } = ctx;
   const { runEdgeFunction: runFunction } = ctx.internals;
 
+  // Per-request DB handle, used inside each registered handler.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   let fns: any[];
   try {
+    // Boot-time path (mountEdgeFunctions runs at startup) — no request
+    // context, so we use the bare pool. Multi-tenant deployments need
+    // to surface tenant_id explicitly here once edge functions become
+    // tenant-scoped (follow-up).
     fns = await db
       .selectFrom('zv_edge_functions')
       .selectAll()
@@ -253,7 +271,7 @@ export async function mountEdgeFunctions(ctx: ExtensionContext): Promise<void> {
       const result = await runFunction(fn.code, c.req.raw, env, fn.timeout_ms) as any;
 
       // Log async
-      db.insertInto('zv_edge_function_logs').values({
+      reqDb(c).insertInto('zv_edge_function_logs').values({
         function_id: fn.id,
         status: result.status,
         duration_ms: result.duration_ms,

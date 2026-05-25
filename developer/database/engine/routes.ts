@@ -7,6 +7,15 @@ import type { ExtensionContext } from '@zveltio/sdk/extension';
 export function databaseRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
 
+  // Per-request DB handle (CRM PR #1 pattern). After
+  // migration 002_tenant_rls.sql, this extension's tables have FORCE
+  // RLS keyed on `zveltio.current_tenant`; routes must run through
+  // this handle so the GUC is active inside the transaction.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
+
   // `user` is declared globally on Hono's ContextVariableMap via
   // types/hono-augment.d.ts; importing `User` from better-auth was a
   // workaround back when the global augment didn't exist.
@@ -47,7 +56,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
           WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
             AND p.prokind = 'f'
           ORDER BY n.nspname, p.proname
-        `.execute(db);
+        `.execute(reqDb(c));
         return c.json({ functions: result.rows });
       } catch (error) {
         console.error('Failed to list functions:', error);
@@ -61,7 +70,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
         return c.json({ error: 'Definition must contain CREATE [OR REPLACE] FUNCTION' }, 400);
       }
       try {
-        await sql.raw(definition).execute(db);
+        await sql.raw(definition).execute(reqDb(c));
         return c.json({ success: true }, 201);
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to create function' }, 400);
@@ -76,7 +85,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
         return c.json({ error: 'Cannot drop system functions' }, 403);
       }
       try {
-        await sql.raw(`DROP FUNCTION IF EXISTS "${schema}"."${name}" ${cascade ? 'CASCADE' : 'RESTRICT'}`).execute(db);
+        await sql.raw(`DROP FUNCTION IF EXISTS "${schema}"."${name}" ${cascade ? 'CASCADE' : 'RESTRICT'}`).execute(reqDb(c));
         return c.json({ success: true });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to drop function' }, 400);
@@ -107,7 +116,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
           WHERE t.trigger_schema NOT IN ('pg_catalog', 'information_schema')
             AND NOT pt.tgisinternal
           ORDER BY t.event_object_table, t.trigger_name
-        `.execute(db);
+        `.execute(reqDb(c));
         return c.json({ triggers: result.rows });
       } catch (error) {
         console.error('Failed to list triggers:', error);
@@ -121,7 +130,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
         return c.json({ error: 'Definition must contain CREATE TRIGGER' }, 400);
       }
       try {
-        await sql.raw(definition).execute(db);
+        await sql.raw(definition).execute(reqDb(c));
         return c.json({ success: true }, 201);
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to create trigger' }, 400);
@@ -133,7 +142,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const name  = c.req.param('name');
       const { enabled } = c.req.valid('json');
       try {
-        await sql.raw(`ALTER TABLE "${table}" ${enabled ? 'ENABLE' : 'DISABLE'} TRIGGER "${name}"`).execute(db);
+        await sql.raw(`ALTER TABLE "${table}" ${enabled ? 'ENABLE' : 'DISABLE'} TRIGGER "${name}"`).execute(reqDb(c));
         return c.json({ success: true });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to toggle trigger' }, 400);
@@ -145,7 +154,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const name    = c.req.param('name');
       const cascade = c.req.query('cascade') === 'true';
       try {
-        await sql.raw(`DROP TRIGGER IF EXISTS "${name}" ON "${table}" ${cascade ? 'CASCADE' : 'RESTRICT'}`).execute(db);
+        await sql.raw(`DROP TRIGGER IF EXISTS "${name}" ON "${table}" ${cascade ? 'CASCADE' : 'RESTRICT'}`).execute(reqDb(c));
         return c.json({ success: true });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to drop trigger' }, 400);
@@ -176,7 +185,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
           WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
           GROUP BY n.nspname, t.typname
           ORDER BY n.nspname, t.typname
-        `.execute(db);
+        `.execute(reqDb(c));
         return c.json({ enums: result.rows });
       } catch (error) {
         console.error('Failed to list enums:', error);
@@ -192,7 +201,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const { name, values, schema } = c.req.valid('json');
       const valuesSQL = values.map(v => `'${v.replace(/'/g, "''")}'`).join(', ');
       try {
-        await sql.raw(`CREATE TYPE "${schema}"."${name}" AS ENUM (${valuesSQL})`).execute(db);
+        await sql.raw(`CREATE TYPE "${schema}"."${name}" AS ENUM (${valuesSQL})`).execute(reqDb(c));
         return c.json({ success: true }, 201);
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to create enum' }, 400);
@@ -204,7 +213,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const name   = c.req.param('name');
       const { value } = c.req.valid('json');
       try {
-        await sql.raw(`ALTER TYPE "${schema}"."${name}" ADD VALUE IF NOT EXISTS '${value.replace(/'/g, "''")}'`).execute(db);
+        await sql.raw(`ALTER TYPE "${schema}"."${name}" ADD VALUE IF NOT EXISTS '${value.replace(/'/g, "''")}'`).execute(reqDb(c));
         return c.json({ success: true });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to add enum value' }, 400);
@@ -216,7 +225,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const name   = c.req.param('name');
       if (schema === 'pg_catalog') return c.json({ error: 'Cannot drop system enums' }, 403);
       try {
-        await sql.raw(`DROP TYPE IF EXISTS "${schema}"."${name}" CASCADE`).execute(db);
+        await sql.raw(`DROP TYPE IF EXISTS "${schema}"."${name}" CASCADE`).execute(reqDb(c));
         return c.json({ success: true });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to drop enum' }, 400);
@@ -242,7 +251,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
           LEFT JOIN pg_extension ie ON ie.extname = ae.name
           LEFT JOIN pg_namespace n ON n.oid = ie.extnamespace
           ORDER BY ae.name
-        `.execute(db);
+        `.execute(reqDb(c));
         return c.json({ extensions: result.rows });
       } catch (error) {
         console.error('Failed to list extensions:', error);
@@ -260,7 +269,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       ];
       if (!ALLOWED.includes(name)) return c.json({ error: `Extension "${name}" not in allowed list` }, 403);
       try {
-        await sql.raw(`CREATE EXTENSION IF NOT EXISTS "${name}"`).execute(db);
+        await sql.raw(`CREATE EXTENSION IF NOT EXISTS "${name}"`).execute(reqDb(c));
         return c.json({ success: true });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to enable extension' }, 400);
@@ -272,7 +281,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const PROTECTED = ['pgvector', 'uuid-ossp'];
       if (PROTECTED.includes(name)) return c.json({ error: `Extension "${name}" is protected and cannot be disabled` }, 403);
       try {
-        await sql.raw(`DROP EXTENSION IF EXISTS "${name}" CASCADE`).execute(db);
+        await sql.raw(`DROP EXTENSION IF EXISTS "${name}" CASCADE`).execute(reqDb(c));
         return c.json({ success: true });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to disable extension' }, 400);
@@ -307,7 +316,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
           GROUP BY r.rolname, r.rolsuper, r.rolcreatedb, r.rolcreaterole,
                    r.rolcanlogin, r.rolconnlimit, r.rolvaliduntil
           ORDER BY r.rolname
-        `.execute(db);
+        `.execute(reqDb(c));
         return c.json({ roles: result.rows });
       } catch (error) {
         console.error('Failed to list roles:', error);
@@ -333,7 +342,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       if (data.valid_until) attrs.push(`VALID UNTIL '${data.valid_until}'`);
       if (attrs.length > 0) parts.push('WITH', attrs.join(' '));
       try {
-        await sql.raw(parts.join(' ')).execute(db);
+        await sql.raw(parts.join(' ')).execute(reqDb(c));
         return c.json({ success: true }, 201);
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to create role' }, 400);
@@ -345,7 +354,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const PROTECTED = ['postgres', 'pg_monitor', 'pg_read_all_settings'];
       if (PROTECTED.includes(name) || name.startsWith('pg_')) return c.json({ error: 'Cannot drop system role' }, 403);
       try {
-        await sql.raw(`DROP ROLE IF EXISTS "${name}"`).execute(db);
+        await sql.raw(`DROP ROLE IF EXISTS "${name}"`).execute(reqDb(c));
         return c.json({ success: true });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to drop role' }, 400);
@@ -384,7 +393,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
           WHERE c.relkind = 'r'
             AND n.nspname NOT IN ('pg_catalog', 'information_schema')
           ORDER BY n.nspname, c.relname, p.polname
-        `.execute(db);
+        `.execute(reqDb(c));
         return c.json({ policies: result.rows });
       } catch (error) {
         console.error('Failed to list RLS policies:', error);
@@ -399,9 +408,9 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const table = c.req.param('table');
       const { enabled, forced } = c.req.valid('json');
       try {
-        await sql.raw(`ALTER TABLE "${table}" ${enabled ? 'ENABLE' : 'DISABLE'} ROW LEVEL SECURITY`).execute(db);
+        await sql.raw(`ALTER TABLE "${table}" ${enabled ? 'ENABLE' : 'DISABLE'} ROW LEVEL SECURITY`).execute(reqDb(c));
         if (forced !== undefined) {
-          await sql.raw(`ALTER TABLE "${table}" ${forced ? 'FORCE' : 'NO FORCE'} ROW LEVEL SECURITY`).execute(db);
+          await sql.raw(`ALTER TABLE "${table}" ${forced ? 'FORCE' : 'NO FORCE'} ROW LEVEL SECURITY`).execute(reqDb(c));
         }
         return c.json({ success: true });
       } catch (error) {
@@ -424,7 +433,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       if (data.using)      sql_str += ` USING (${data.using})`;
       if (data.with_check) sql_str += ` WITH CHECK (${data.with_check})`;
       try {
-        await sql.raw(sql_str).execute(db);
+        await sql.raw(sql_str).execute(reqDb(c));
         return c.json({ success: true }, 201);
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to create policy' }, 400);
@@ -435,7 +444,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const table  = c.req.param('table');
       const policy = c.req.param('policy');
       try {
-        await sql.raw(`DROP POLICY IF EXISTS "${policy}" ON "${table}"`).execute(db);
+        await sql.raw(`DROP POLICY IF EXISTS "${policy}" ON "${table}"`).execute(reqDb(c));
         return c.json({ success: true });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to drop policy' }, 400);
@@ -452,7 +461,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
         }>`
           SELECT id, name, description, query, created_by, created_at, updated_at
           FROM zv_saved_queries ORDER BY name
-        `.execute(db);
+        `.execute(reqDb(c));
         return c.json({ queries: result.rows });
       } catch {
         return c.json({ error: 'Failed to list saved queries' }, 500);
@@ -471,7 +480,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
           INSERT INTO zv_saved_queries (name, description, query, created_by)
           VALUES (${data.name}, ${data.description || null}, ${data.query}, ${user.id})
           RETURNING id
-        `.execute(db);
+        `.execute(reqDb(c));
         return c.json({ id: result.rows[0].id }, 201);
       } catch {
         return c.json({ error: 'Failed to save query' }, 500);
@@ -500,7 +509,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
     .delete('/saved-queries/:id', async (c) => {
       const id = c.req.param('id');
       try {
-        await (db as any).deleteFrom('zv_saved_queries').where('id', '=', id).execute();
+        await (reqDb(c) as any).deleteFrom('zv_saved_queries').where('id', '=', id).execute();
         return c.json({ success: true });
       } catch {
         return c.json({ error: 'Failed to delete query' }, 500);

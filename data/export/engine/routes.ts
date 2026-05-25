@@ -45,6 +45,14 @@ async function runExportJob(
   sortOrder: string,
 ): Promise<void> {
   const { db, DDLManager, fieldTypeRegistry } = ctx;
+
+  // NOTE: this is a background-task path (not a request handler), so
+  // there's no `c` context with `tenantTrx`. Queries run on the bare
+  // `db`; in multi-tenant mode the FORCE RLS returns zero rows unless
+  // the tenant id is plumbed through the job-queue payload — tracked
+  // as follow-up. The request handler that ENQUEUES the job is
+  // tenant-scoped via `reqDb(c)` below.
+
   try {
     await (db as any)
       .updateTable('zvd_export_jobs')
@@ -125,6 +133,14 @@ async function runExportJob(
 export function exportRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission, DDLManager, fieldTypeRegistry } = ctx;
 
+  // Per-request DB handle (CRM PR #1 pattern). The exportRoutes
+  // handlers run inside the request transaction; reqDb pulls the
+  // active tenantTrx so FORCE RLS on zvd_export_jobs / zvd_export_logs
+  // sees the right tenant.
+  function reqDb(c: any): any {
+    return c.get('tenantTrx') ?? db;
+  }
+
   const app = new Hono();
 
   // Auth + admin guard on all routes
@@ -149,24 +165,24 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
       sql<{ count: string }>`
         SELECT COUNT(*) AS count FROM zvd_export_audit_log
         WHERE created_at >= ${startOfMonth.toISOString()}
-      `.execute(db),
+      `.execute(reqDb(c)),
       sql<{ total: string }>`
         SELECT COALESCE(SUM(record_count), 0) AS total FROM zvd_export_audit_log
         WHERE created_at >= ${startOfMonth.toISOString()}
-      `.execute(db),
+      `.execute(reqDb(c)),
       sql<{ collection: string; exports: string }>`
         SELECT collection, COUNT(*) AS exports
         FROM zvd_export_audit_log
         GROUP BY collection
         ORDER BY exports DESC
         LIMIT 5
-      `.execute(db),
+      `.execute(reqDb(c)),
       sql<{ format: string; count: string }>`
         SELECT format, COUNT(*) AS count
         FROM zvd_export_audit_log
         GROUP BY format
         ORDER BY count DESC
-      `.execute(db),
+      `.execute(reqDb(c)),
     ]);
 
     return c.json({
@@ -189,7 +205,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const { collection } = c.req.valid('query');
 
-      let query = (db as any)
+      let query = (reqDb(c) as any)
         .selectFrom('zvd_export_audit_log')
         .selectAll()
         .orderBy('created_at', 'desc')
@@ -214,7 +230,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const { collection } = c.req.valid('query');
 
-      let query = (db as any)
+      let query = (reqDb(c) as any)
         .selectFrom('zvd_export_jobs')
         .selectAll()
         .orderBy('created_at', 'desc')
@@ -245,7 +261,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
       const user = c.get('user') as any;
       const body = c.req.valid('json');
 
-      const job = await (db as any)
+      const job = await (reqDb(c) as any)
         .insertInto('zvd_export_jobs')
         .values({
           collection: body.collection,
@@ -276,7 +292,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
 
   // ── GET /jobs/:id ────────────────────────────────────────────────────────────
   app.get('/jobs/:id', async (c) => {
-    const job = await (db as any)
+    const job = await (reqDb(c) as any)
       .selectFrom('zvd_export_jobs')
       .selectAll()
       .where('id', '=', c.req.param('id'))
@@ -288,7 +304,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
 
   // ── DELETE /jobs/:id ─────────────────────────────────────────────────────────
   app.delete('/jobs/:id', async (c) => {
-    const deleted = await (db as any)
+    const deleted = await (reqDb(c) as any)
       .deleteFrom('zvd_export_jobs')
       .where('id', '=', c.req.param('id'))
       .returningAll()
@@ -302,7 +318,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
   app.get('/templates', async (c) => {
     const user = c.get('user') as any;
 
-    const templates = await (db as any)
+    const templates = await (reqDb(c) as any)
       .selectFrom('zvd_export_templates')
       .selectAll()
       .where((eb: any) =>
@@ -338,7 +354,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
       const user = c.get('user') as any;
       const body = c.req.valid('json');
 
-      const template = await (db as any)
+      const template = await (reqDb(c) as any)
         .insertInto('zvd_export_templates')
         .values({
           name: body.name,
@@ -380,7 +396,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
       const id = c.req.param('id');
       const body = c.req.valid('json');
 
-      const existing = await (db as any)
+      const existing = await (reqDb(c) as any)
         .selectFrom('zvd_export_templates')
         .select(['id', 'created_by'])
         .where('id', '=', id)
@@ -401,7 +417,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
       if (body.description !== undefined) updates.description = body.description;
       if (body.is_public !== undefined) updates.is_public = body.is_public;
 
-      const template = await (db as any)
+      const template = await (reqDb(c) as any)
         .updateTable('zvd_export_templates')
         .set(updates)
         .where('id', '=', id)
@@ -417,7 +433,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const id = c.req.param('id');
 
-    const existing = await (db as any)
+    const existing = await (reqDb(c) as any)
       .selectFrom('zvd_export_templates')
       .select(['id', 'created_by'])
       .where('id', '=', id)
@@ -428,7 +444,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'Forbidden' }, 403);
     }
 
-    await (db as any).deleteFrom('zvd_export_templates').where('id', '=', id).execute();
+    await (reqDb(c) as any).deleteFrom('zvd_export_templates').where('id', '=', id).execute();
     return c.json({ success: true });
   });
 
@@ -474,10 +490,10 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
           .filter((f) => allowedFields.has(f));
         query =
           requestedFields.length > 0
-            ? (db as any).selectFrom(tableName).select(requestedFields)
-            : (db as any).selectFrom(tableName).selectAll();
+            ? (reqDb(c) as any).selectFrom(tableName).select(requestedFields)
+            : (reqDb(c) as any).selectFrom(tableName).selectAll();
       } else {
-        query = (db as any).selectFrom(tableName).selectAll();
+        query = (reqDb(c) as any).selectFrom(tableName).selectAll();
       }
 
       query = query.limit(limit);
@@ -525,7 +541,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
               .filter((f) => allowedFields.has(f))
           : Array.from(allowedFields);
 
-      await (db as any)
+      await (reqDb(c) as any)
         .insertInto('zvd_export_audit_log')
         .values({
           collection,
