@@ -4,7 +4,7 @@
  * Adapted for new monorepo architecture:
  * - `db` injected via constructor (no module-level singleton)
  * - Uses extension-local aiProviderManager from ../ai-provider.js
- * - DDLManager calls replaced with direct DB queries on zv_collections
+ * - DDLManager calls replaced with direct DB queries on zvd_collections
  * - DDL mutations go through zv_ddl_jobs queue table
  * - Admin check via casbin_rule table
  */
@@ -375,7 +375,7 @@ export class ZveltioAIEngine {
     let collectionCount = 0;
     try {
       const result = (await this.db
-        .selectFrom('zv_collections')
+        .selectFrom('zvd_collections')
         .select(this.db.fn.count('name').as('cnt'))
         .executeTakeFirst()) as any;
       collectionCount = parseInt(result?.cnt ?? '0');
@@ -815,8 +815,8 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
 
   private async toolListCollections() {
     const collections = await this.db
-      .selectFrom('zv_collections')
-      .select(['name', 'display_name', 'schema'])
+      .selectFrom('zvd_collections')
+      .select(['name', 'display_name', 'fields'])
       .orderBy('display_name', 'asc')
       .execute()
       .catch(() => []);
@@ -824,9 +824,10 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
     const mapped = collections.map((c: any) => {
       let fieldCount = 0;
       try {
-        const schema =
-          typeof c.schema === 'string' ? JSON.parse(c.schema) : c.schema;
-        fieldCount = schema?.fields?.length ?? 0;
+        // `fields` is JSONB: either a parsed array (most adapters) or a JSON
+        // string (some pg drivers return it raw). Handle both.
+        const fields = typeof c.fields === 'string' ? JSON.parse(c.fields) : c.fields;
+        fieldCount = Array.isArray(fields) ? fields.length : 0;
       } catch {
         /* ignore */
       }
@@ -847,7 +848,7 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
   private async toolGetCollectionSchema(args: any) {
     const { collection } = args;
     const colDef = await this.db
-      .selectFrom('zv_collections')
+      .selectFrom('zvd_collections')
       .selectAll()
       .where('name', '=', collection)
       .executeTakeFirst()
@@ -857,11 +858,11 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
 
     let fields: any[] = [];
     try {
-      const schema =
-        typeof colDef.schema === 'string'
-          ? JSON.parse(colDef.schema)
-          : colDef.schema;
-      fields = schema?.fields ?? [];
+      // `fields` is the JSONB column on zvd_collections (was previously read
+      // as `schema` against a non-existent column).
+      const parsed =
+        typeof colDef.fields === 'string' ? JSON.parse(colDef.fields) : colDef.fields;
+      fields = Array.isArray(parsed) ? parsed : [];
     } catch {
       /* ignore */
     }
@@ -1006,12 +1007,12 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
   private async toolGetSystemStats() {
     const [collections, users, recentActivity] = await Promise.all([
       this.db
-        .selectFrom('zv_collections')
+        .selectFrom('zvd_collections')
         .select(this.db.fn.count('name').as('count'))
         .executeTakeFirst()
         .catch(() => ({ count: 0 })),
       this.db
-        .selectFrom('zv_users')
+        .selectFrom('user')
         .select(this.db.fn.count('id').as('count'))
         .executeTakeFirst()
         .catch(() => ({ count: 0 })),
@@ -1195,24 +1196,25 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
       const collections =
         collections_hint.length > 0
           ? await (this.db as any)
-              .selectFrom('zv_collections')
+              .selectFrom('zvd_collections')
               .selectAll()
               .where('name', 'in', collections_hint)
               .execute()
           : await (this.db as any)
-              .selectFrom('zv_collections')
+              .selectFrom('zvd_collections')
               .selectAll()
               .limit(10)
               .execute();
 
       schemaContext = collections
         .map((c: any) => {
-          const schema =
-            typeof c.schema === 'string' ? JSON.parse(c.schema) : c.schema;
-          const fields = (schema?.fields ?? [])
+          // `fields` is the canonical JSONB column on zvd_collections.
+          const parsed = typeof c.fields === 'string' ? JSON.parse(c.fields) : c.fields;
+          const fields = (Array.isArray(parsed) ? parsed : [])
             .map((f: any) => `${f.name} ${f.type}`)
             .join(', ');
-          return `Table zv_${c.name}: (${fields})`;
+          // Concrete tables are named `zvd_<collection>` by DDLManager.
+          return `Table zvd_${c.name}: (${fields})`;
         })
         .join('\n');
     } catch {
