@@ -136,13 +136,13 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
       .orderBy('created_at', 'desc');
 
     if (folder_id) query = query.where('folder_id', '=', folder_id);
-    if (mime_type) query = query.where('mime_type', 'ilike', `${mime_type}%`);
+    if (mime_type) query = query.where('mimetype', 'ilike', `${mime_type}%`);
 
     if (search) {
       query = query.where(({ or, cmpr }: any) =>
         or([
           cmpr('filename', 'ilike', `%${search}%`),
-          cmpr('original_filename', 'ilike', `%${search}%`),
+          cmpr('original_name', 'ilike', `%${search}%`),
           cmpr('title', 'ilike', `%${search}%`),
           cmpr('description', 'ilike', `%${search}%`),
         ]),
@@ -174,12 +174,12 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
       .where('deleted_at', 'is', null);
 
     if (folder_id) countQuery = countQuery.where('folder_id', '=', folder_id);
-    if (mime_type) countQuery = countQuery.where('mime_type', 'ilike', `${mime_type}%`);
+    if (mime_type) countQuery = countQuery.where('mimetype', 'ilike', `${mime_type}%`);
     if (search) {
       countQuery = countQuery.where(({ or, cmpr }: any) =>
         or([
           cmpr('filename', 'ilike', `%${search}%`),
-          cmpr('original_filename', 'ilike', `%${search}%`),
+          cmpr('original_name', 'ilike', `%${search}%`),
           cmpr('title', 'ilike', `%${search}%`),
           cmpr('description', 'ilike', `%${search}%`),
         ]),
@@ -228,8 +228,8 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     // Check storage quota
     const usageResult = await (reqDb(c) as any)
       .selectFrom('zv_media_files')
-      .select(({ fn }: any) => fn.sum('size_bytes').as('total'))
-      .where('uploaded_by', '=', user.id)
+      .select(({ fn }: any) => fn.sum('size').as('total'))
+      .where('created_by', '=', user.id)
       .where('deleted_at', 'is', null)
       .executeTakeFirst();
     const quotaRecord = await (reqDb(c) as any)
@@ -296,15 +296,15 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
       id: fileId,
       folder_id: folderId || null,
       filename,
-      original_filename: file.name,
-      mime_type: file.type,
-      size_bytes: file.size,
+      original_name: file.name,
+      mimetype: file.type,
+      size: file.size,
       width,
       height,
       url,
       thumbnail_url: thumbnailUrl,
       storage_path: key,
-      uploaded_by: user.id,
+      created_by: user.id,
       title: title || null,
       description: description || null,
       alt_text: altText || null,
@@ -463,14 +463,14 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
         .executeTakeFirst(),
       (reqDb(c) as any)
         .selectFrom('zv_media_files')
-        .select(({ fn }: any) => fn.sum('size_bytes').as('total'))
+        .select(({ fn }: any) => fn.sum('size').as('total'))
         .where('deleted_at', 'is', null)
         .executeTakeFirst(),
       (reqDb(c) as any)
         .selectFrom('zv_media_files')
-        .select(['mime_type', (eb: any) => eb.fn.count('id').as('count')])
+        .select(['mimetype', (eb: any) => eb.fn.count('id').as('count')])
         .where('deleted_at', 'is', null)
-        .groupBy('mime_type')
+        .groupBy('mimetype')
         .orderBy('count', 'desc')
         .limit(10)
         .execute(),
@@ -557,7 +557,15 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     const files = await (reqDb(c) as any)
       .selectFrom('zv_media_collection_files as cf')
       .innerJoin('zv_media_files as f', 'f.id', 'cf.file_id')
-      .select(['f.id', 'f.original_filename', 'f.mime_type', 'f.size_bytes', 'f.thumbnail_url', 'f.title', 'cf.sort_order'])
+      .select([
+        'f.id',
+        'f.original_name',
+        'f.mimetype',
+        'f.size',
+        'f.thumbnail_url',
+        'f.title',
+        'cf.sort_order',
+      ])
       .where('cf.collection_id', '=', c.req.param('id'))
       .where('f.deleted_at', 'is', null)
       .orderBy('cf.sort_order', 'asc')
