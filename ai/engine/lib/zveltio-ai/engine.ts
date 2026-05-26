@@ -414,8 +414,8 @@ export class ZveltioAIEngine {
     let recentActivity: any[] = [];
     try {
       recentActivity = await this.db
-        .selectFrom('zv_audit_logs')
-        .select(['action', 'collection', 'created_at'])
+        .selectFrom('zv_audit_log')
+        .select(['event_type', 'resource_type', 'created_at'])
         .where('user_id', '=', request.userId)
         .orderBy('created_at', 'desc')
         .limit(10)
@@ -1016,7 +1016,7 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
         .executeTakeFirst()
         .catch(() => ({ count: 0 })),
       this.db
-        .selectFrom('zv_audit_logs')
+        .selectFrom('zv_audit_log')
         .select(this.db.fn.count('id').as('count'))
         .executeTakeFirst()
         .catch(() => ({ count: 0 })),

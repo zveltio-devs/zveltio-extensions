@@ -35,14 +35,17 @@ export async function createFileVersion(
 
   // First version = snapshot of the original file
   if (nextVer === 1) {
+    // The source row lives in zv_media_files (columns: size, mimetype, created_by)
+    // but the destination zv_media_versions uses the legacy naming
+    // (size_bytes, mime_type, uploaded_by). Translate explicitly.
     await (db as any).insertInto('zv_media_versions').values({
       id: nanoid(21),
       file_id: fileId,
       version_num: 1,
       storage_path: currentFile.storage_path,
-      size_bytes: currentFile.size_bytes,
-      mime_type: currentFile.mime_type,
-      uploaded_by: currentFile.uploaded_by,
+      size_bytes: currentFile.size,
+      mime_type: currentFile.mimetype,
+      uploaded_by: currentFile.created_by,
       created_at: currentFile.created_at,
     }).execute();
   }
