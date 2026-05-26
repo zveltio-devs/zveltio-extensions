@@ -510,7 +510,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const prompts = await db
-      .selectFrom('zv_ai_prompts')
+      .selectFrom('zv_prompt_templates')
       .selectAll()
       .where('is_active', '=', true)
       .orderBy('name', 'asc')
@@ -546,7 +546,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
 
       const body = c.req.valid('json');
       const prompt = await db
-        .insertInto('zv_ai_prompts')
+        .insertInto('zv_prompt_templates')
         .values({ ...body, variables: JSON.stringify(body.variables) })
         .returningAll()
         .executeTakeFirst();
@@ -560,7 +560,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     await db
-      .updateTable('zv_ai_prompts')
+      .updateTable('zv_prompt_templates')
       .set({ is_active: false })
       .where('id', '=', c.req.param('id'))
       .execute();
@@ -577,7 +577,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
       const prompt = await db
-        .selectFrom('zv_ai_prompts')
+        .selectFrom('zv_prompt_templates')
         .selectAll()
         .where('id', '=', c.req.param('id'))
         .where('is_active', '=', true)

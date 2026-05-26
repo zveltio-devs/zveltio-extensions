@@ -59,7 +59,7 @@ export function zveltioAIRoutes(ctx: ExtensionContext): Hono {
     const limit = parseInt(c.req.query('limit') || '50');
 
     const messages = await db
-      .selectFrom('zv_ai_chat_history')
+      .selectFrom('zv_ai_messages')
       .selectAll()
       .where('conversation_id', '=', conversationId)
       .where('user_id', '=', user.id)
@@ -77,7 +77,7 @@ export function zveltioAIRoutes(ctx: ExtensionContext): Hono {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const conversations = await db
-      .selectFrom('zv_ai_chat_history')
+      .selectFrom('zv_ai_messages')
       .select(['conversation_id'])
       .select(db.fn.max('created_at').as('last_message_at'))
       .select(db.fn.count('id').as('message_count'))
@@ -99,7 +99,7 @@ export function zveltioAIRoutes(ctx: ExtensionContext): Hono {
     const conversationId = c.req.param('id');
 
     await db
-      .deleteFrom('zv_ai_chat_history')
+      .deleteFrom('zv_ai_messages')
       .where('conversation_id', '=', conversationId)
       .where('user_id', '=', user.id)
       .execute()
