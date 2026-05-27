@@ -36,6 +36,22 @@ export function assetsRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: rows.rows });
   });
 
+  // GET /stats — MUST precede /:id, else the param route captures "stats"
+  // as :id and the UUID cast on zvd_assets.id 500s.
+  app.get('/stats', async (c) => {
+    const row = await sql`
+      SELECT COUNT(*) as total_assets, COUNT(*) FILTER (WHERE status = 'active') as active,
+        COUNT(*) FILTER (WHERE status = 'disposed') as disposed,
+        COALESCE(SUM(purchase_cost), 0) as total_purchase_cost,
+        COALESCE(SUM(current_value), 0) as total_current_value,
+        COALESCE(SUM(accumulated_depreciation), 0) as total_depreciation,
+        COUNT(*) FILTER (WHERE warranty_expiry < CURRENT_DATE) as warranty_expired,
+        COUNT(*) FILTER (WHERE next_maintenance_date <= CURRENT_DATE + 30) as maintenance_due
+      FROM zvd_assets
+    `.execute(reqDb(c));
+    return c.json({ data: row.rows[0] });
+  });
+
   app.get('/:id', async (c) => {
     const row = await sql`
       SELECT a.*,
@@ -247,20 +263,6 @@ export function assetsRoutes(ctx: ExtensionContext): Hono {
       await sql`UPDATE zvd_assets SET next_maintenance_date = ${d.next_maintenance_date}, updated_at = NOW() WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
     }
     return c.json({ data: row.rows[0] }, 201);
-  });
-
-  app.get('/stats', async (c) => {
-    const row = await sql`
-      SELECT COUNT(*) as total_assets, COUNT(*) FILTER (WHERE status = 'active') as active,
-        COUNT(*) FILTER (WHERE status = 'disposed') as disposed,
-        COALESCE(SUM(purchase_cost), 0) as total_purchase_cost,
-        COALESCE(SUM(current_value), 0) as total_current_value,
-        COALESCE(SUM(accumulated_depreciation), 0) as total_depreciation,
-        COUNT(*) FILTER (WHERE warranty_expiry < CURRENT_DATE) as warranty_expired,
-        COUNT(*) FILTER (WHERE next_maintenance_date <= CURRENT_DATE + 30) as maintenance_due
-      FROM zvd_assets
-    `.execute(reqDb(c));
-    return c.json({ data: row.rows[0] });
   });
 
   return app;
