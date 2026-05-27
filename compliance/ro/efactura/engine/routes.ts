@@ -93,6 +93,36 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     return c.json({ invoices });
   });
 
+  // GET /stats — MUST precede /:id, else the param route captures "stats"
+  // as :id and the UUID cast on the invoice id 500s.
+  app.get('/stats', async (c) => {
+    const user = await getUser(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { seller_cui, year } = c.req.query();
+    const currentYear = year ? parseInt(year, 10) : new Date().getFullYear();
+
+    const [statusStats, monthlyStats] = await Promise.all([
+      sql<any>`
+        SELECT status, COUNT(*)::int AS count, SUM(total) AS total_amount
+        FROM zv_efactura_invoices
+        WHERE EXTRACT(YEAR FROM invoice_date) = ${currentYear}
+          ${seller_cui ? sql`AND seller_cui = ${seller_cui}` : sql``}
+        GROUP BY status
+      `.execute(reqDb(c)).catch(() => ({ rows: [] })),
+      sql<any>`
+        SELECT TO_CHAR(invoice_date, 'YYYY-MM') AS month,
+               COUNT(*)::int AS count, SUM(total) AS total, SUM(vat_total) AS vat
+        FROM zv_efactura_invoices
+        WHERE EXTRACT(YEAR FROM invoice_date) = ${currentYear}
+          ${seller_cui ? sql`AND seller_cui = ${seller_cui}` : sql``}
+        GROUP BY month ORDER BY month
+      `.execute(reqDb(c)).catch(() => ({ rows: [] })),
+    ]);
+
+    return c.json({ year: currentYear, by_status: statusStats.rows, by_month: monthlyStats.rows });
+  });
+
   // GET /:id — get invoice
   app.get('/:id', async (c) => {
     const user = await getUser(c, auth);
@@ -346,33 +376,5 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
   );
 
   // GET /stats
-  app.get('/stats', async (c) => {
-    const user = await getUser(c, auth);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
-
-    const { seller_cui, year } = c.req.query();
-    const currentYear = year ? parseInt(year, 10) : new Date().getFullYear();
-
-    const [statusStats, monthlyStats] = await Promise.all([
-      sql<any>`
-        SELECT status, COUNT(*)::int AS count, SUM(total) AS total_amount
-        FROM zv_efactura_invoices
-        WHERE EXTRACT(YEAR FROM invoice_date) = ${currentYear}
-          ${seller_cui ? sql`AND seller_cui = ${seller_cui}` : sql``}
-        GROUP BY status
-      `.execute(reqDb(c)).catch(() => ({ rows: [] })),
-      sql<any>`
-        SELECT TO_CHAR(invoice_date, 'YYYY-MM') AS month,
-               COUNT(*)::int AS count, SUM(total) AS total, SUM(vat_total) AS vat
-        FROM zv_efactura_invoices
-        WHERE EXTRACT(YEAR FROM invoice_date) = ${currentYear}
-          ${seller_cui ? sql`AND seller_cui = ${seller_cui}` : sql``}
-        GROUP BY month ORDER BY month
-      `.execute(reqDb(c)).catch(() => ({ rows: [] })),
-    ]);
-
-    return c.json({ year: currentYear, by_status: statusStats.rows, by_month: monthlyStats.rows });
-  });
-
   return app;
 }
