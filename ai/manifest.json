@@ -28,5 +28,16 @@
       }
     ],
     "navGroup": "developer"
+  },
+  "engine": {
+    "entry": "engine/index.js",
+    "format": "esm",
+    "target": "bun",
+    "bundled": true,
+    "bundlePeers": false
+  },
+  "integrity": {
+    "engineSha256": "4efbea7a1d10434dfffc68c743e766b118a23f7ea809e564a75165bd42e77df2",
+    "archiveSha256": ""
   }
 }
