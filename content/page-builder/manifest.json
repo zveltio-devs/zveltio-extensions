@@ -31,5 +31,15 @@
       "TextSection"
     ],
     "fieldTypes": []
+  },
+  "engine": {
+    "entry": "engine/index.js",
+    "format": "esm",
+    "target": "bun",
+    "bundled": true,
+    "bundlePeers": false
+  },
+  "integrity": {
+    "engineSha256": "90ae24b7704a5be07423acba5cfe03e8d2fd873cf0fc8d0da11b706613f63b4b"
   }
 }

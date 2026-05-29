@@ -17,5 +17,15 @@
   },
   "studio": {
     "navGroup": "finance"
+  },
+  "engine": {
+    "entry": "engine/index.js",
+    "format": "esm",
+    "target": "bun",
+    "bundled": true,
+    "bundlePeers": false
+  },
+  "integrity": {
+    "engineSha256": "77ae133e704cfc89639f857f5430fee58cd55cb081f32a5acd18fb3ba318a7f4"
   }
 }

@@ -11,8 +11,11 @@
     "database"
   ],
   "engine": {
-    "routes": "./engine/routes.ts",
-    "mountPath": "/extensions/search"
+    "entry": "engine/index.js",
+    "format": "esm",
+    "target": "bun",
+    "bundled": true,
+    "bundlePeers": false
   },
   "studio": {
     "pages": [
@@ -29,5 +32,8 @@
     "engine": true,
     "studio": false,
     "fieldTypes": []
+  },
+  "integrity": {
+    "engineSha256": "efcd033f71e45e2965bcaf95794f4f40be0939bb2383315c905bbbce853d0432"
   }
 }

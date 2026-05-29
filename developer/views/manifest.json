@@ -27,5 +27,15 @@
       "CardView",
       "ListView"
     ]
+  },
+  "engine": {
+    "entry": "engine/index.js",
+    "format": "esm",
+    "target": "bun",
+    "bundled": true,
+    "bundlePeers": false
+  },
+  "integrity": {
+    "engineSha256": "e33306aa124c23b322b90c499f70c3c411046df17613520ce2806df27f3bf1a9"
   }
 }
