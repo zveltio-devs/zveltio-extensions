@@ -42,5 +42,15 @@
       "polygon",
       "linestring"
     ]
+  },
+  "engine": {
+    "entry": "engine/index.js",
+    "format": "esm",
+    "target": "bun",
+    "bundled": true,
+    "bundlePeers": false
+  },
+  "integrity": {
+    "engineSha256": "636ccb65e3294c45c5ff0b09337014692d8ffc30ba9957bb4ab9897242a62933"
   }
 }

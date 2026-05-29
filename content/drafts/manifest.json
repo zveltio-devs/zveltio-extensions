@@ -16,5 +16,15 @@
   },
   "studio": {
     "navGroup": "content"
+  },
+  "engine": {
+    "entry": "engine/index.js",
+    "format": "esm",
+    "target": "bun",
+    "bundled": true,
+    "bundlePeers": false
+  },
+  "integrity": {
+    "engineSha256": "b45a19187d406f697a099fbba8ee43b1031de8a0f290930524ed9e27ae23b8fa"
   }
 }

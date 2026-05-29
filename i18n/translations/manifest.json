@@ -23,5 +23,15 @@
   "contributes": {
     "engine": true,
     "studio": true
+  },
+  "engine": {
+    "entry": "engine/index.js",
+    "format": "esm",
+    "target": "bun",
+    "bundled": true,
+    "bundlePeers": false
+  },
+  "integrity": {
+    "engineSha256": "aa5c90fe0f982d2cc2fdb78c2edcd1660f0df68708140affd3dcc4e2a0db954d"
   }
 }

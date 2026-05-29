@@ -24,5 +24,15 @@
     "engine": true,
     "studio": true,
     "fieldTypes": []
+  },
+  "engine": {
+    "entry": "engine/index.js",
+    "format": "esm",
+    "target": "bun",
+    "bundled": true,
+    "bundlePeers": false
+  },
+  "integrity": {
+    "engineSha256": "5cb70403837dd9646240326b5c7fa747f3d999caa4dc420bde1f144cd39a719b"
   }
 }

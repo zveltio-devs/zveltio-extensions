@@ -38,5 +38,15 @@
       "FileUpload"
     ],
     "fieldTypes": []
+  },
+  "engine": {
+    "entry": "engine/index.js",
+    "format": "esm",
+    "target": "bun",
+    "bundled": true,
+    "bundlePeers": true
+  },
+  "integrity": {
+    "engineSha256": "e3edae293243971fd350ec732bc9097b0c576cc943fccd3140a71afa14655643"
   }
 }
