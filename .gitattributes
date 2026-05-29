@@ -1,0 +1,7 @@
+* text=auto eol=lf
+
+# Packed extension bundles are byte-identical artifacts whose SHA-256 is
+# committed in manifest.json. Auto line-ending conversion would change
+# the bytes between Windows/Linux checkouts and invalidate the hash.
+**/engine/index.js binary
+**/engine/index.js.map binary
