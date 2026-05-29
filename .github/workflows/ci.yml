@@ -57,3 +57,42 @@ jobs:
         # that actually exist on disk. A drift here means migrations
         # silently skipped at extension install / enable.
         run: bun scripts/validate-migration-paths.ts
+
+      - name: Verify packed bundles match manifest engineSha256
+        # Drift between manifest.integrity.engineSha256 and the committed
+        # engine/index.js bytes is what tripped the marketplace pipeline
+        # repeatedly during the alpha cycle (autocrlf, biome format,
+        # sync-time re-bundles, etc). Refuse PRs that contain a packed
+        # extension whose bundle hash doesn't match the manifest.
+        # Engine-less extensions are skipped (engine/index.ts absent).
+        run: |
+          set -e
+          DRIFT=0
+          for m in $(find . -name manifest.json -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/scripts/*'); do
+            d=$(dirname "$m")
+            bundle="$d/engine/index.js"
+            entry="$d/engine/index.ts"
+            [ -f "$entry" ] || continue
+            if [ ! -f "$bundle" ]; then
+              name=$(node -e "console.log(require('./$m').name)")
+              echo "::error::$name: engine/index.ts exists but engine/index.js is missing — run \`zveltio extension pack --dir $d\`"
+              DRIFT=1
+              continue
+            fi
+            actual=$(sha256sum "$bundle" | awk '{print $1}')
+            declared=$(node -e "const m=require('./$m'); console.log(m.integrity?.engineSha256 ?? '')")
+            if [ -z "$declared" ]; then
+              echo "::error::$m: bundle present but manifest.integrity.engineSha256 not declared"
+              DRIFT=1
+              continue
+            fi
+            if [ "$actual" != "$declared" ]; then
+              echo "::error::$m: bundle hash $actual does not match manifest engineSha256 $declared — re-pack required"
+              DRIFT=1
+            fi
+          done
+          if [ $DRIFT -ne 0 ]; then
+            echo "::error::Hash drift detected. Run \`bun /path/to/zveltio/packages/cli/src/index.ts extension pack --dir <ext>\` for each affected extension and commit the result."
+            exit 1
+          fi
+          echo "All committed bundles match their declared engineSha256."

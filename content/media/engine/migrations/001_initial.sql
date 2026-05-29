@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS zv_media_files (
   original_filename TEXT NOT NULL,
   filename TEXT NOT NULL,
   storage_path TEXT NOT NULL,
-  mime_type TEXT NOT NULL,
+  mimetype TEXT NOT NULL,
   size_bytes BIGINT NOT NULL DEFAULT 0,
   width INT,
   height INT,
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS zv_media_favorites (
 );
 
 CREATE INDEX IF NOT EXISTS idx_media_files_folder ON zv_media_files(folder_id) WHERE deleted_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_media_files_mime ON zv_media_files(mime_type) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_media_files_mime ON zv_media_files(mimetype) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_media_files_uploaded ON zv_media_files(uploaded_by) WHERE deleted_at IS NULL;
 
 -- ── from 002_enterprise.sql ──
