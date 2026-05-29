@@ -10,10 +10,14 @@
  * Without phase 2, extensions appear in the marketplace catalog but Install/Enable
  * fail because the engine has nothing to download.
  *
- * Before zipping, each extension's engine/index.ts is compiled to a self-contained
- * engine/index.js bundle (bun build --bundle). This eliminates runtime module
- * resolution issues in Bun compiled binaries — hono/zod/kysely are inlined into
- * the bundle, no external node_modules lookup needed at activation time.
+ * The script ships the engine/index.js bundle THAT IS COMMITTED in this repo.
+ * It does NOT re-bundle here. Reason: a plain `bun build --bundle --minify
+ * --target=bun` resolves hono/zod-style packages to their `.d.ts` exports
+ * condition (Bun bug), producing a broken bundle that hashes differently from
+ * the committed one and trips engine-side integrity.engineSha256 verification.
+ * The canonical packer (@zveltio/cli `extension pack`) uses a custom Bun.build
+ * plugin to work around that. Run it locally before pushing instead of
+ * re-doing the work here without the plugin.
  *
  * Usage:
  *   node scripts/sync-to-registry.mjs --version 1.1.0 [--no-upload] [--only=name1,name2]
@@ -24,10 +28,9 @@
  *
  * Tools required:
  *   - `zip` command on PATH (or set ZIP=path/to/zip)
- *   - `bun` command on PATH for engine bundling (or set BUN=path/to/bun)
  */
 
-import { readFileSync, readdirSync, statSync, existsSync, mkdtempSync, rmSync, unlinkSync } from 'fs';
+import { readFileSync, readdirSync, statSync, existsSync, mkdtempSync, rmSync } from 'fs';
 import { join, dirname, relative } from 'path';
 import { tmpdir } from 'os';
 import { spawnSync } from 'child_process';
@@ -41,7 +44,6 @@ const args = process.argv.slice(2);
 const versionArg = args.find((a) => a.startsWith('--version='))?.split('=')[1]
   ?? args[args.indexOf('--version') + 1];
 const noUpload = args.includes('--no-upload');
-const noBuild = args.includes('--no-build');
 const onlyArg = args.find((a) => a.startsWith('--only='))?.split('=')[1] ?? '';
 const onlySet = onlyArg ? new Set(onlyArg.split(',').map((s) => s.trim()).filter(Boolean)) : null;
 
@@ -56,7 +58,6 @@ if (!registryUrl) { console.error('ERROR: REGISTRY_URL env var is required'); pr
 if (!syncToken)   { console.error('ERROR: REGISTRY_SYNC_TOKEN env var is required'); process.exit(1); }
 
 const ZIP = process.env.ZIP || 'zip';
-const BUN = process.env.BUN || 'bun';
 
 // ── Discover manifests ───────────────────────────────────────────────────────
 function findManifests(dir, depth = 0) {
@@ -156,82 +157,46 @@ if (which.status !== 0) {
   process.exit(1);
 }
 
-// Check if bun is available for bundling
-const hasBun = spawnSync(process.platform === 'win32' ? 'where' : 'which', [BUN], { encoding: 'utf8' }).status === 0;
-if (!hasBun && !noBuild) {
-  console.warn(`[warn] '${BUN}' not found on PATH — engine bundles will not be compiled (extensions will use TypeScript source). Set BUN= or pass --no-build to suppress this warning.`);
-}
-
-/**
- * Bundle engine/index.ts → engine/index.js using bun build --bundle.
- * Bundles hono/zod/kysely INTO the output so no module resolution is needed
- * at runtime in the Bun compiled binary. peerDependencies are left external
- * (the engine installs them at activation time via installNpmDependencies).
- *
- * Returns the path to the bundle on success, null on skip/failure.
- */
-function buildEngineBundle(ext) {
-  if (noBuild || !hasBun) return null;
-  if (ext.contributes.engine === false) return null; // UI-only extension
-
-  const entryTs = join(ext.dir, 'engine', 'index.ts');
-  if (!existsSync(entryTs)) return null;
-
-  const outFile = join(ext.dir, 'engine', 'index.js');
-
-  // Mark peerDependencies as external — the engine installs them at runtime.
-  const externals = [];
-  for (const pkg of Object.keys(ext.peerDependencies)) {
-    externals.push('--external', pkg);
-  }
-
-  const buildArgs = [
-    'build', entryTs,
-    `--outfile=${outFile}`,
-    '--bundle',
-    '--minify',
-    '--format=esm',
-    '--target=bun',
-    ...externals,
-  ];
-
-  const result = spawnSync(BUN, buildArgs, { cwd: ext.dir, encoding: 'utf8' });
-  if (result.status !== 0) {
-    const msg = (result.stderr || result.stdout || '').trim().slice(0, 400);
-    console.warn(`  ! ${ext.name}: bun build failed — engine/index.js not included\n    ${msg}`);
-    return null;
-  }
-
-  return outFile;
-}
-
 let uploaded = 0;
 const uploadErrors = [];
 
 for (const ext of extensions) {
-  // Build self-contained JS bundle before zipping
-  const bundlePath = buildEngineBundle(ext);
-  if (bundlePath) {
-    const sizeKB = (statSync(bundlePath).size / 1024).toFixed(1);
-    process.stdout.write(`  [build] ${ext.name} → engine/index.js (${sizeKB} KB)\n`);
+  // Sanity-check the committed bundle matches the committed
+  // manifest.integrity.engineSha256 BEFORE uploading. If they disagree,
+  // the engine will reject the extension at enable-time with a hash
+  // mismatch — fail here with a clear message instead.
+  if (ext.contributes.engine !== false) {
+    const bundlePath = join(ext.dir, 'engine', 'index.js');
+    const manifestPath = join(ext.dir, 'manifest.json');
+    if (!existsSync(bundlePath)) {
+      console.error(`  ✗ ${ext.name}: engine/index.js missing — run \`bunx @zveltio/cli extension pack --dir ${ext.dir}\` before sync`);
+      uploadErrors.push(`${ext.name}: missing bundle`);
+      continue;
+    }
+    const { createHash } = await import('node:crypto');
+    const actualHash = createHash('sha256').update(readFileSync(bundlePath)).digest('hex');
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    const declared = manifest?.integrity?.engineSha256;
+    if (declared && declared !== actualHash) {
+      console.error(
+        `  ✗ ${ext.name}: manifest engineSha256 (${declared.slice(0, 12)}…) ≠ bundle hash (${actualHash.slice(0, 12)}…) — re-pack before sync`,
+      );
+      uploadErrors.push(`${ext.name}: hash drift`);
+      continue;
+    }
   }
 
   const tmp = mkdtempSync(join(tmpdir(), 'zveltio-pkg-'));
   const zipPath = join(tmp, 'package.zip');
 
   // Build a clean ZIP of the extension dir contents (NO top-level folder),
-  // excluding node_modules, .git, dist, *.log, etc.
-  // engine/index.js (the bundle) IS included if it was just built.
+  // excluding node_modules, .git, dist, *.log, etc. engine/index.js — the
+  // canonical committed bundle whose hash matches the manifest — is included.
   const zipArgs = [
     '-r', '-q', zipPath, '.',
     '-x', 'node_modules/*', '-x', '.git/*', '-x', 'dist/*', '-x', '*.log', '-x', '.DS_Store',
   ];
   const zr = spawnSync(ZIP, zipArgs, { cwd: ext.dir, encoding: 'utf8' });
-
-  // Clean up the bundle AFTER zipping so it isn't left in the working tree
-  if (bundlePath && existsSync(bundlePath)) {
-    try { unlinkSync(bundlePath); } catch { /* ignore */ }
-  }
 
   if (zr.status !== 0) {
     const msg = (zr.stderr || zr.stdout || '').trim();
