@@ -42,9 +42,9 @@
     "format": "esm",
     "target": "bun",
     "bundled": true,
-    "bundlePeers": false
+    "bundlePeers": true
   },
   "integrity": {
-    "engineSha256": "b688937cc168c7f16bf45edd7fc408053afd4d39b3311db04d943454c75a5737"
+    "engineSha256": "33c2af3d1c8aff16044d7e1fade47fce48b4b1a2928d61261a0046f11bd2352f"
   }
 }
