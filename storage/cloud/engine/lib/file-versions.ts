@@ -78,8 +78,10 @@ export async function createFileVersion(
   }));
 
   await (db as any).updateTable('zv_media_files').set({
-    size_bytes: newSize,
-    mime_type: newMimeType,
+    // zv_media_files uses mimetype / size (no _bytes suffix); only the
+    // versions table follows the legacy mime_type / size_bytes naming.
+    size: newSize,
+    mimetype: newMimeType,
     updated_at: new Date(),
   }).where('id', '=', fileId).execute();
 
@@ -158,8 +160,10 @@ export async function restoreFileVersion(
   }
 
   await (db as any).updateTable('zv_media_files').set({
-    size_bytes: version.size_bytes,
-    mime_type: version.mime_type,
+    // Match zv_media_files actual column names; translate from versions'
+    // legacy naming (size_bytes, mime_type) into mimetype / size.
+    size: version.size_bytes,
+    mimetype: version.mime_type,
     updated_at: new Date(),
   }).where('id', '=', fileId).execute();
 }
