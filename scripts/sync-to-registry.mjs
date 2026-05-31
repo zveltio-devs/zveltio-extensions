@@ -216,10 +216,20 @@ for (const ext of extensions) {
   const bytes = readFileSync(zipPath);
   rmSync(tmp, { recursive: true, force: true });
 
+  // Trust-chain header (alpha.124): send the publisher-computed
+  // archive hash so the registry verifies the upload bytes match
+  // before accepting. Mismatch = MITM/proxy mutation in transit.
+  const { createHash } = await import('node:crypto');
+  const publisherArchiveSha = createHash('sha256').update(bytes).digest('hex');
+
   const url = `${registryUrl}/api/admin/upload-package/${encodeURIComponent(ext.name)}`;
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/zip', 'Authorization': `Bearer ${syncToken}` },
+    headers: {
+      'Content-Type': 'application/zip',
+      'Authorization': `Bearer ${syncToken}`,
+      'X-Manifest-Archive-Sha256': publisherArchiveSha,
+    },
     body: bytes,
   });
   if (!res.ok) {
