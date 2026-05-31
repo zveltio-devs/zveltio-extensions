@@ -63145,8 +63145,8 @@ async function createFileVersion(db, s3, fileId, newBuffer, newMimeType, newSize
     ContentType: newMimeType
   }));
   await db.updateTable("zv_media_files").set({
-    size_bytes: newSize,
-    mime_type: newMimeType,
+    size: newSize,
+    mimetype: newMimeType,
     updated_at: new Date
   }).where("id", "=", fileId).execute();
   const oldVersions = await sql`
@@ -63194,8 +63194,8 @@ async function restoreFileVersion(db, s3, fileId, versionNum, userId) {
     }));
   }
   await db.updateTable("zv_media_files").set({
-    size_bytes: version3.size_bytes,
-    mime_type: version3.mime_type,
+    size: version3.size_bytes,
+    mimetype: version3.mime_type,
     updated_at: new Date
   }).where("id", "=", fileId).execute();
 }
