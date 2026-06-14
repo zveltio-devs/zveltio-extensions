@@ -5,7 +5,7 @@
   "description": "Support ticket management with SLA timers, priorities, assignments and message threads",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
-  "zveltioMaxVersion": "2.0.0",
+  "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-helpdesk",
   "permissions": [
     "database"

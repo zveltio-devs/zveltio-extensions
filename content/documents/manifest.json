@@ -5,7 +5,7 @@
   "description": "Generate PDF documents from templates with data binding",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
-  "zveltioMaxVersion": "2.0.0",
+  "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-documents",
   "permissions": [
     "database"
