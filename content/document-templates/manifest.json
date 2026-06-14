@@ -5,7 +5,7 @@
   "description": "Admin-managed HTML/PDF templates with variable interpolation and async generation",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
-  "zveltioMaxVersion": "2.0.0",
+  "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-document-templates",
   "permissions": [
     "database"

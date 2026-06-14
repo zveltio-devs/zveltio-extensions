@@ -5,7 +5,7 @@
   "description": "File versioning, trash bin, public share links, and storage quotas",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
-  "zveltioMaxVersion": "2.0.0",
+  "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-cloud",
   "permissions": [
     "database",

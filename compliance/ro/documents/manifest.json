@@ -5,7 +5,7 @@
   "description": "Romanian compliance document management — contracts, PVs, NIRs, dispozitii de plata",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
-  "zveltioMaxVersion": "2.0.0",
+  "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ro-documents",
   "permissions": [
     "database"

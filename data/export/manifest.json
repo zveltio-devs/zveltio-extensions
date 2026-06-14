@@ -5,7 +5,7 @@
   "description": "Export collection data as JSON, CSV or NDJSON with filtering support",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
-  "zveltioMaxVersion": "2.0.0",
+  "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-export",
   "permissions": [
     "database"

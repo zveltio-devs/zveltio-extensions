@@ -5,7 +5,7 @@
   "description": "Write and deploy serverless functions that run inside the Zveltio engine",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
-  "zveltioMaxVersion": "2.0.0",
+  "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-edge-functions",
   "permissions": [
     "database"

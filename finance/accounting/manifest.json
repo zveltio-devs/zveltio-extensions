@@ -5,7 +5,7 @@
   "description": "Double-entry bookkeeping, chart of accounts, journal entries, P&L and balance sheet reports",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
-  "zveltioMaxVersion": "2.0.0",
+  "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-accounting",
   "permissions": [
     "database"

@@ -5,7 +5,7 @@
   "description": "Romanian e-Transport monitoring system — declare and track road transport of goods via ANAF",
   "version": "1.0.0",
   "zveltioMinVersion": "1.0.0",
-  "zveltioMaxVersion": "2.0.0",
+  "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ro-etransport",
   "permissions": [
     "database"
