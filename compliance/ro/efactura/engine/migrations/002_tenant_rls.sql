@@ -21,7 +21,7 @@ ALTER TABLE zv_efactura_storno      ALTER COLUMN tenant_id SET DEFAULT NULLIF(cu
 ALTER TABLE zv_efactura_daily_stats ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
 
 CREATE INDEX IF NOT EXISTS idx_zv_efactura_invoices_tenant    ON zv_efactura_invoices    (tenant_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_zv_efactura_status_log_tenant  ON zv_efactura_status_log  (tenant_id, changed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_zv_efactura_status_log_tenant  ON zv_efactura_status_log  (tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_zv_efactura_storno_tenant      ON zv_efactura_storno      (tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_zv_efactura_daily_stats_tenant ON zv_efactura_daily_stats (tenant_id, date DESC);
 
