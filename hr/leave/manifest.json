@@ -22,7 +22,15 @@
     "fieldTypes": []
   },
   "studio": {
-    "navGroup": "hr"
+    "navGroup": "hr",
+    "pages": [
+      {
+        "path": "/admin/hr/leave",
+        "label": "Leave Management",
+        "icon": "CalendarDays",
+        "schema": "schemas/leave.json"
+      }
+    ]
   },
   "engine": {
     "entry": "engine/index.js",
