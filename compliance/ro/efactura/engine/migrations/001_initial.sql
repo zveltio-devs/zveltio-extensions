@@ -131,6 +131,8 @@ CREATE INDEX IF NOT EXISTS idx_zv_efactura_source ON zv_efactura_invoices(source
 -- Relax NOT NULL constraints on the denormalised mirror columns. Existing rows
 -- keep their data; new rows can populate just source_invoice_id.
 DO $$
+DECLARE
+  col text;
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns
              WHERE table_name = 'zv_efactura_invoices' AND column_name = 'invoice_number'
