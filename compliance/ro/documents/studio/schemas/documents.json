@@ -1,0 +1,109 @@
+{
+  "sduiSchema": 1,
+  "title": "compliance.ro.documents.title",
+  "subtitle": "compliance.ro.documents.subtitle",
+  "newLabel": "compliance.ro.documents.btn.new",
+  "resources": [
+    {
+      "id": "documents",
+      "dataSource": "/ext/compliance/ro/documents",
+      "dataPath": "documents",
+      "filters": [
+        {
+          "param": "type",
+          "options": [
+            { "value": "all", "label": "common.filter.all" },
+            { "value": "contract", "label": "Contract" },
+            { "value": "pv", "label": "Proces Verbal" },
+            { "value": "nir", "label": "NIR" },
+            { "value": "dispozitie_plata", "label": "Dispozitie Plata" },
+            { "value": "proces_verbal", "label": "Proces Verbal" },
+            { "value": "notificare", "label": "Notificare" },
+            { "value": "other", "label": "Altele" }
+          ]
+        }
+      ],
+      "columns": [
+        {
+          "key": "type",
+          "label": "compliance.ro.documents.col.type",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "contract": "badge-outline", "pv": "badge-outline", "nir": "badge-outline",
+              "dispozitie_plata": "badge-outline", "proces_verbal": "badge-outline",
+              "notificare": "badge-outline", "other": "badge-outline"
+            },
+            "labels": {
+              "contract": "Contract", "pv": "Proces Verbal", "nir": "NIR",
+              "dispozitie_plata": "Dispozitie Plata", "proces_verbal": "Proces Verbal",
+              "notificare": "Notificare", "other": "Altele"
+            }
+          }
+        },
+        { "key": "number", "label": "compliance.ro.documents.ui.num_r", "type": "mono" },
+        { "key": "date", "label": "compliance.ro.documents.col.data", "type": "date" },
+        { "key": "title", "label": "compliance.ro.documents.col.title" },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": { "draft": "badge-warning", "signed": "badge-success", "archived": "badge-ghost" }
+          }
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "sign",
+          "label": "compliance.ro.documents.col.signed",
+          "icon": "CheckCircle",
+          "method": "PATCH",
+          "endpoint": "/ext/compliance/ro/documents/{id}/sign",
+          "visibleWhen": { "field": "status", "equals": "draft" },
+          "confirm": "compliance.ro.documents.confirmSign"
+        },
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "method": "DELETE",
+          "endpoint": "/ext/compliance/ro/documents/{id}",
+          "visibleWhen": { "field": "status", "equals": "draft" },
+          "confirm": "compliance.ro.documents.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/compliance/ro/documents",
+        "fields": [
+          {
+            "name": "type", "label": "compliance.ro.documents.ui.tip_document", "type": "select", "colSpan": 1, "default": "contract",
+            "options": [
+              { "value": "contract", "label": "Contract" },
+              { "value": "pv", "label": "Proces Verbal" },
+              { "value": "nir", "label": "NIR" },
+              { "value": "dispozitie_plata", "label": "Dispozitie Plata" },
+              { "value": "proces_verbal", "label": "Proces Verbal" },
+              { "value": "notificare", "label": "Notificare" },
+              { "value": "other", "label": "Altele" }
+            ]
+          },
+          { "name": "number", "label": "compliance.ro.documents.ui.num_r", "colSpan": 1, "mono": true, "required": true },
+          { "name": "date", "label": "compliance.ro.documents.ui.data", "type": "date", "colSpan": 1, "default": "today" },
+          { "name": "title", "label": "compliance.ro.documents.ui.titlu", "colSpan": 2, "required": true }
+        ],
+        "repeatable": {
+          "name": "parties",
+          "label": "compliance.ro.documents.ui.parties",
+          "addLabel": "compliance.ro.documents.ui.denumire",
+          "min": 1,
+          "columns": [
+            { "name": "name", "label": "compliance.ro.documents.ui.denumire" },
+            { "name": "cui", "label": "compliance.ro.documents.ui.cui", "mono": true },
+            { "name": "role", "label": "compliance.ro.documents.ui.rol" }
+          ]
+        }
+      }
+    }
+  ]
+}

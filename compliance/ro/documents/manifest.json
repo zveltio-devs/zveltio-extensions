@@ -15,7 +15,8 @@
       {
         "path": "/admin/compliance/ro/documents",
         "label": "RO Documents",
-        "icon": "file-text"
+        "icon": "file-text",
+        "schema": "schemas/documents.json"
       }
     ],
     "navGroup": "compliance"
