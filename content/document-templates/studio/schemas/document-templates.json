@@ -1,0 +1,37 @@
+{
+  "sduiSchema": 1,
+  "title": "content.document-templates.title",
+  "subtitle": "content.document-templates.subtitle",
+  "newLabel": "content.document-templates.btn.new",
+  "resources": [
+    {
+      "id": "templates",
+      "dataSource": "/ext/content/document-templates",
+      "dataPath": "data",
+      "columns": [
+        { "key": "name", "label": "common.col.name" },
+        { "key": "format", "label": "content.document-templates.col.format", "type": "badge", "badge": { "colors": {} } },
+        { "key": "description", "label": "common.col.description" }
+      ],
+      "rowActions": [
+        { "id": "edit", "kind": "edit", "label": "common.edit" }
+      ],
+      "form": {
+        "endpoint": "/ext/content/document-templates",
+        "fields": [
+          { "name": "name", "label": "content.document-templates.ui.name", "colSpan": 1, "required": true },
+          {
+            "name": "format", "label": "content.document-templates.ui.format", "type": "select", "colSpan": 1, "default": "html",
+            "options": [
+              { "value": "html", "label": "content.document-templates.ui.html_pdf" },
+              { "value": "docx", "label": "content.document-templates.format.docx" },
+              { "value": "markdown", "label": "content.document-templates.ui.markdown" }
+            ]
+          },
+          { "name": "description", "label": "content.document-templates.col.description", "colSpan": 2 },
+          { "name": "body", "label": "content.document-templates.bodyHint", "type": "textarea", "rows": 12, "mono": true, "colSpan": 2, "default": "<h1>{{title}}</h1>\n<p>Hello {{client_name}}</p>" }
+        ]
+      }
+    }
+  ]
+}

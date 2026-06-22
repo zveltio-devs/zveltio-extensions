@@ -15,7 +15,15 @@
     "studio": true
   },
   "studio": {
-    "navGroup": "content"
+    "navGroup": "content",
+    "pages": [
+      {
+        "path": "/admin/content/drafts",
+        "label": "Content Drafts",
+        "icon": "FileEdit",
+        "schema": "schemas/drafts.json"
+      }
+    ]
   },
   "engine": {
     "entry": "engine/index.js",
