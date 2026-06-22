@@ -30,7 +30,7 @@ CREATE INDEX IF NOT EXISTS idx_zvd_payroll_adjustments_tenant   ON zvd_payroll_a
 CREATE INDEX IF NOT EXISTS idx_zvd_payroll_sick_leave_tenant    ON zvd_payroll_sick_leave    (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_zvd_payroll_meal_vouchers_tenant ON zvd_payroll_meal_vouchers (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_zvd_payroll_overtime_tenant      ON zvd_payroll_overtime      (tenant_id);
-CREATE INDEX IF NOT EXISTS idx_zvd_payroll_exports_tenant       ON zvd_payroll_exports       (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_zvd_payroll_exports_tenant       ON zvd_payroll_exports       (tenant_id, generated_at DESC);
 
 ALTER TABLE zvd_payroll_periods       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE zvd_payroll_periods       FORCE  ROW LEVEL SECURITY;
