@@ -1,0 +1,36 @@
+{
+  "sduiSchema": 1,
+  "title": "content.drafts.title",
+  "subtitle": "content.drafts.subtitle",
+  "resources": [
+    {
+      "id": "drafts",
+      "dataSource": "/ext/content/drafts",
+      "dataPath": "data",
+      "columns": [
+        { "key": "collection", "label": "common.col.collection", "type": "badge", "badge": { "colors": {} } },
+        { "key": "record_id", "label": "content.drafts.col.record", "type": "mono" },
+        { "key": "author_name", "label": "content.drafts.col.author" },
+        { "key": "updated_at", "label": "content.drafts.col.updated", "type": "date" }
+      ],
+      "rowActions": [
+        {
+          "id": "publish",
+          "label": "content.drafts.btn.publish",
+          "icon": "Send",
+          "variant": "text-success",
+          "method": "POST",
+          "endpoint": "/ext/content/drafts/{id}/publish"
+        },
+        {
+          "id": "discard",
+          "label": "common.discard",
+          "variant": "text-error",
+          "method": "DELETE",
+          "endpoint": "/ext/content/drafts/{id}",
+          "confirm": "content.drafts.confirmDiscard"
+        }
+      ]
+    }
+  ]
+}

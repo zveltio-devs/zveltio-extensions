@@ -15,7 +15,8 @@
       {
         "path": "/admin/content/document-templates",
         "label": "Document Templates",
-        "icon": "FileType"
+        "icon": "FileType",
+        "schema": "schemas/document-templates.json"
       }
     ],
     "navGroup": "content"
