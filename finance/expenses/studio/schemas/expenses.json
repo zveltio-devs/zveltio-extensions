@@ -1,0 +1,72 @@
+{
+  "sduiSchema": 1,
+  "title": "finance.expenses.title",
+  "subtitle": "finance.expenses.subtitle",
+  "newLabel": "finance.expenses.new",
+  "resources": [
+    {
+      "id": "expenses",
+      "dataSource": "/ext/finance/expenses",
+      "dataPath": "data",
+      "filters": [
+        {
+          "param": "status",
+          "options": [
+            { "value": "all", "label": "finance.expenses.filter.all" },
+            { "value": "draft", "label": "finance.expenses.filter.draft" },
+            { "value": "submitted", "label": "finance.expenses.filter.submitted" },
+            { "value": "approved", "label": "finance.expenses.filter.approved" },
+            { "value": "reimbursed", "label": "finance.expenses.filter.reimbursed" }
+          ]
+        }
+      ],
+      "columns": [
+        { "key": "expense_date", "label": "finance.expenses.col.date", "type": "date" },
+        { "key": "category", "label": "finance.expenses.col.category", "type": "badge", "badge": { "colors": {} } },
+        { "key": "vendor", "label": "finance.expenses.col.vendor" },
+        { "key": "description", "label": "finance.expenses.col.description" },
+        { "key": "amount", "label": "finance.expenses.col.amount", "type": "currency", "currency": { "codeKey": "currency" } },
+        {
+          "key": "status",
+          "label": "finance.expenses.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": { "draft": "badge-ghost", "submitted": "badge-warning", "approved": "badge-success", "reimbursed": "badge-info", "rejected": "badge-error" }
+          }
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "approve",
+          "label": "finance.expenses.action.approve",
+          "icon": "CheckCircle",
+          "variant": "text-success",
+          "method": "POST",
+          "endpoint": "/ext/finance/expenses/{id}/approve",
+          "visibleWhen": { "field": "status", "equals": "submitted" }
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/finance/expenses",
+        "fields": [
+          { "name": "expense_date", "label": "finance.expenses.col.date", "type": "date", "colSpan": 1, "default": "today" },
+          {
+            "name": "category", "label": "finance.expenses.col.category", "type": "select", "colSpan": 1, "default": "travel",
+            "options": [
+              { "value": "travel", "label": "finance.expenses.category.travel" },
+              { "value": "meals", "label": "finance.expenses.category.meals" },
+              { "value": "office", "label": "finance.expenses.category.office" },
+              { "value": "software", "label": "finance.expenses.category.software" },
+              { "value": "other", "label": "finance.expenses.category.other" }
+            ]
+          },
+          { "name": "vendor", "label": "finance.expenses.col.vendor", "colSpan": 2 },
+          { "name": "description", "label": "finance.expenses.col.description", "colSpan": 2, "required": true },
+          { "name": "amount", "label": "finance.expenses.col.amount", "type": "number", "colSpan": 1 },
+          { "name": "currency", "label": "crm.form.currency", "colSpan": 1, "default": "RON" },
+          { "name": "receipt_url", "label": "finance.expenses.form.receiptUrl", "colSpan": 2 }
+        ]
+      }
+    }
+  ]
+}

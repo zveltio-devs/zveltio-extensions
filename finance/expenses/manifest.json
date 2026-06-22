@@ -16,7 +16,15 @@
     "fieldTypes": []
   },
   "studio": {
-    "navGroup": "finance"
+    "navGroup": "finance",
+    "pages": [
+      {
+        "path": "/admin/finance/expenses",
+        "label": "Expenses",
+        "icon": "Receipt",
+        "schema": "schemas/expenses.json"
+      }
+    ]
   },
   "engine": {
     "entry": "engine/index.js",

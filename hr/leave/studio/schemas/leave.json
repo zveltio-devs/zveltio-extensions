@@ -1,0 +1,73 @@
+{
+  "sduiSchema": 1,
+  "title": "hr.leave.title",
+  "subtitle": "hr.leave.subtitle",
+  "newLabel": "hr.leave.new",
+  "resources": [
+    {
+      "id": "requests",
+      "dataSource": "/ext/hr/leave/requests",
+      "dataPath": "data",
+      "filters": [
+        {
+          "param": "status",
+          "options": [
+            { "value": "all", "label": "common.filter.all" },
+            { "value": "pending", "label": "common.status.pending" },
+            { "value": "approved", "label": "common.status.approved" },
+            { "value": "rejected", "label": "common.status.rejected" }
+          ]
+        }
+      ],
+      "columns": [
+        { "key": "employee_name", "label": "common.col.employee" },
+        { "key": "leave_type_name", "label": "common.col.type" },
+        { "key": "start_date", "label": "common.col.from", "type": "date" },
+        { "key": "end_date", "label": "common.col.to", "type": "date" },
+        { "key": "working_days", "label": "common.col.days", "type": "mono" },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": { "pending": "badge-warning", "approved": "badge-success", "rejected": "badge-error", "cancelled": "badge-ghost" }
+          }
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "approve",
+          "icon": "CheckCircle",
+          "variant": "text-success",
+          "method": "POST",
+          "endpoint": "/ext/hr/leave/requests/{id}/approve",
+          "visibleWhen": { "field": "status", "equals": "pending" }
+        },
+        {
+          "id": "reject",
+          "icon": "XCircle",
+          "variant": "text-error",
+          "method": "POST",
+          "endpoint": "/ext/hr/leave/requests/{id}/reject",
+          "visibleWhen": { "field": "status", "equals": "pending" }
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/hr/leave/requests",
+        "fields": [
+          {
+            "name": "employee_id", "label": "common.col.employee", "type": "relation", "colSpan": 2, "required": true,
+            "relation": { "dataSource": "/ext/hr/employees?limit=200", "dataPath": "data", "valueKey": "id", "labelKey": ["first_name", "last_name"] }
+          },
+          {
+            "name": "leave_type_id", "label": "common.col.leaveType", "type": "relation", "colSpan": 2,
+            "relation": { "dataSource": "/ext/hr/leave/types", "dataPath": "data", "valueKey": "id", "labelKey": "name" }
+          },
+          { "name": "start_date", "label": "common.col.from", "type": "date", "colSpan": 1, "required": true },
+          { "name": "end_date", "label": "common.col.to", "type": "date", "colSpan": 1, "required": true },
+          { "name": "reason", "label": "common.col.reason", "type": "textarea", "colSpan": 2 }
+        ]
+      }
+    }
+  ]
+}
