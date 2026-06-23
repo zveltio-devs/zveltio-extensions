@@ -1,0 +1,36 @@
+{
+  "sduiSchema": 1,
+  "kind": "settings",
+  "title": "auth.ldap.title",
+  "subtitle": "auth.ldap.subtitle",
+  "dataSource": "/ext/auth/ldap/config",
+  "dataPath": "config",
+  "saveEndpoint": "/ext/auth/ldap/config",
+  "fields": [
+    { "name": "enabled", "label": "auth.ldap.section.enable", "type": "boolean" }
+  ],
+  "sections": [
+    {
+      "title": "auth.ldap.section.server",
+      "fields": [
+        { "name": "url", "label": "auth.ldap.ui.ldap_url", "mono": true, "colSpan": 2, "placeholder": "auth.ldap.ui.ldap_ldap_example_com_389" },
+        { "name": "bindDN", "label": "auth.ldap.ui.bind_dn", "mono": true, "colSpan": 1 },
+        { "name": "bindPassword", "label": "auth.ldap.ui.bind_password", "type": "password", "colSpan": 1 },
+        { "name": "tlsVerify", "label": "auth.ldap.section.tls", "type": "boolean", "colSpan": 2 }
+      ]
+    },
+    {
+      "title": "auth.ldap.section.search",
+      "fields": [
+        { "name": "searchBase", "label": "auth.ldap.ui.search_base", "mono": true, "colSpan": 2 },
+        { "name": "searchFilter", "label": "auth.ldap.ui.search_filter", "mono": true, "colSpan": 2 },
+        { "name": "usernameAttribute", "label": "auth.ldap.ui.username_attr", "colSpan": 1 },
+        { "name": "emailAttribute", "label": "auth.ldap.ui.email_attr", "colSpan": 1 },
+        { "name": "nameAttribute", "label": "auth.ldap.ui.name_attr", "colSpan": 1 }
+      ]
+    }
+  ],
+  "actions": [
+    { "id": "test", "label": "auth.ldap.btn.test", "icon": "Play", "method": "POST", "endpoint": "/ext/auth/ldap/test" }
+  ]
+}
