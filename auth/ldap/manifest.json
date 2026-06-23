@@ -18,7 +18,8 @@
       {
         "path": "/admin/auth/ldap",
         "label": "LDAP / AD",
-        "icon": "Globe"
+        "icon": "Globe",
+        "schema": "schemas/ldap.json"
       }
     ],
     "navGroup": "other"
