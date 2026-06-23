@@ -16,7 +16,15 @@
     "fieldTypes": []
   },
   "studio": {
-    "navGroup": "hr"
+    "navGroup": "hr",
+    "pages": [
+      {
+        "path": "/admin/hr/employees",
+        "label": "HR",
+        "icon": "Users",
+        "schema": "schemas/employees.json"
+      }
+    ]
   },
   "engine": {
     "entry": "engine/index.js",

@@ -1,0 +1,70 @@
+{
+  "sduiSchema": 1,
+  "title": "hr.employees.title",
+  "subtitle": "hr.employees.subtitle",
+  "newLabel": "hr.employees.new",
+  "resources": [
+    {
+      "id": "employees",
+      "dataSource": "/ext/hr/employees",
+      "dataPath": "data",
+      "search": { "param": "q", "placeholder": "hr.employees.searchPlaceholder" },
+      "filters": [
+        {
+          "param": "status",
+          "options": [
+            { "value": "all", "label": "hr.employees.filter.all" },
+            { "value": "active", "label": "hr.employees.filter.active" },
+            { "value": "on_leave", "label": "hr.employees.filter.onLeave" },
+            { "value": "terminated", "label": "hr.employees.filter.terminated" }
+          ]
+        }
+      ],
+      "columns": [
+        { "key": "employee_number", "label": "hr.employees.col.number", "type": "mono" },
+        { "key": "first_name", "label": "hr.employees.col.name", "join": { "keys": ["first_name", "last_name"], "sep": " " } },
+        { "key": "email", "label": "hr.employees.col.email" },
+        { "key": "department_name", "label": "hr.employees.col.department" },
+        { "key": "position_title", "label": "hr.employees.col.position" },
+        { "key": "hire_date", "label": "hr.employees.col.hireDate", "type": "date" },
+        {
+          "key": "status",
+          "label": "hr.employees.col.status",
+          "type": "badge",
+          "badge": { "colors": { "active": "badge-success", "on_leave": "badge-warning", "terminated": "badge-ghost" } }
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/hr/employees",
+        "fields": [
+          { "name": "first_name", "label": "hr.employees.form.firstName", "colSpan": 1, "required": true },
+          { "name": "last_name", "label": "hr.employees.form.lastName", "colSpan": 1, "required": true },
+          { "name": "email", "label": "hr.employees.form.email", "type": "email", "colSpan": 1, "required": true },
+          { "name": "work_email", "label": "hr.employees.form.workEmail", "type": "email", "colSpan": 1 },
+          { "name": "phone", "label": "hr.employees.form.phone", "type": "tel", "colSpan": 1 },
+          { "name": "hire_date", "label": "hr.employees.form.hireDate", "type": "date", "colSpan": 1, "default": "today" },
+          {
+            "name": "department_id", "label": "hr.employees.form.department", "type": "relation", "colSpan": 1,
+            "relation": { "dataSource": "/ext/hr/employees/departments", "dataPath": "data", "valueKey": "id", "labelKey": "name" }
+          },
+          {
+            "name": "position_id", "label": "hr.employees.form.position", "type": "relation", "colSpan": 1,
+            "relation": { "dataSource": "/ext/hr/employees/positions", "dataPath": "data", "valueKey": "id", "labelKey": "title" }
+          },
+          {
+            "name": "employment_type", "label": "hr.employees.form.employmentType", "type": "select", "colSpan": 1, "default": "full_time",
+            "options": [
+              { "value": "full_time", "label": "hr.employees.employment.fullTime" },
+              { "value": "part_time", "label": "hr.employees.employment.partTime" },
+              { "value": "contractor", "label": "hr.employees.employment.contractor" },
+              { "value": "intern", "label": "hr.employees.employment.intern" }
+            ]
+          },
+          { "name": "salary", "label": "hr.employees.form.salary", "type": "number", "colSpan": 1 },
+          { "name": "currency", "label": "hr.employees.form.currency", "colSpan": 1, "default": "RON" },
+          { "name": "address", "label": "hr.employees.form.address", "colSpan": 2 }
+        ]
+      }
+    }
+  ]
+}
