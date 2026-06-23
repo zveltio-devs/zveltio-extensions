@@ -1,0 +1,63 @@
+{
+  "sduiSchema": 1,
+  "title": "compliance.gdpr.title",
+  "subtitle": "compliance.gdpr.subtitle",
+  "resources": [
+    {
+      "id": "requests",
+      "label": "compliance.gdpr.tab.requests",
+      "icon": "Users",
+      "dataSource": "/ext/compliance/gdpr/access-requests",
+      "dataPath": "data",
+      "columns": [
+        { "key": "request_type", "label": "common.col.type", "type": "badge", "badge": { "colors": {} } },
+        { "key": "subject_email", "label": "common.col.subject" },
+        { "key": "created_at", "label": "compliance.gdpr.col.requested", "type": "date" },
+        { "key": "status", "label": "common.col.status", "type": "badge", "badge": { "colors": { "pending": "badge-warning", "fulfilled": "badge-success", "rejected": "badge-error" } } }
+      ],
+      "rowActions": [
+        { "id": "fulfill", "label": "compliance.gdpr.btn.fulfill", "method": "POST", "endpoint": "/ext/compliance/gdpr/access-requests/{id}/fulfill", "visibleWhen": { "field": "status", "equals": "pending" } },
+        { "id": "reject", "label": "common.reject", "variant": "text-error", "method": "POST", "endpoint": "/ext/compliance/gdpr/access-requests/{id}/reject", "visibleWhen": { "field": "status", "equals": "pending" } }
+      ]
+    },
+    {
+      "id": "breaches",
+      "label": "compliance.gdpr.tab.breaches",
+      "icon": "XCircle",
+      "dataSource": "/ext/compliance/gdpr/breach-incidents",
+      "dataPath": "data",
+      "columns": [
+        { "key": "detected_at", "label": "common.col.date", "type": "date" },
+        { "key": "description", "label": "common.col.description" },
+        { "key": "severity", "label": "compliance.gdpr.col.severity", "type": "badge", "badge": { "colors": { "low": "badge-info", "medium": "badge-warning", "high": "badge-error", "critical": "badge-error" } } },
+        { "key": "affected_count", "label": "compliance.gdpr.col.affected" },
+        { "key": "notified_dpa_at", "label": "compliance.gdpr.col.notifiedDpa", "type": "boolean" }
+      ]
+    },
+    {
+      "id": "consents",
+      "label": "compliance.gdpr.tab.consents",
+      "dataSource": "/ext/compliance/gdpr/consents",
+      "dataPath": "data",
+      "columns": [
+        { "key": "subject_id", "label": "common.col.subject" },
+        { "key": "purpose", "label": "compliance.gdpr.col.purpose" },
+        { "key": "granted_at", "label": "compliance.gdpr.col.granted", "type": "date" },
+        { "key": "withdrawn_at", "label": "compliance.gdpr.col.withdrawn", "type": "date" }
+      ]
+    },
+    {
+      "id": "records",
+      "label": "compliance.gdpr.tab.records",
+      "icon": "Boxes",
+      "dataSource": "/ext/compliance/gdpr/processing-records",
+      "dataPath": "data",
+      "columns": [
+        { "key": "activity_name", "label": "compliance.gdpr.col.activity" },
+        { "key": "lawful_basis", "label": "compliance.gdpr.col.lawfulBasis" },
+        { "key": "data_categories", "label": "compliance.gdpr.col.categories" },
+        { "key": "retention_period", "label": "compliance.gdpr.col.retention" }
+      ]
+    }
+  ]
+}

@@ -16,7 +16,15 @@
     "fieldTypes": []
   },
   "studio": {
-    "navGroup": "finance"
+    "navGroup": "finance",
+    "pages": [
+      {
+        "path": "/admin/finance/subscriptions",
+        "label": "Subscriptions",
+        "icon": "Repeat",
+        "schema": "schemas/subscriptions.json"
+      }
+    ]
   },
   "engine": {
     "entry": "engine/index.js",
