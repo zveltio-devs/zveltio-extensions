@@ -1,0 +1,59 @@
+{
+  "sduiSchema": 1,
+  "title": "finance.subscriptions.title",
+  "subtitle": "finance.subscriptions.subtitle",
+  "newLabel": "finance.subscriptions.btn.newPlan",
+  "resources": [
+    {
+      "id": "subscribers",
+      "label": "finance.subscriptions.tab.subscribers",
+      "dataSource": "/ext/finance/subscriptions/subscribers",
+      "dataPath": "data",
+      "columns": [
+        { "key": "subscriber_email", "label": "finance.subscriptions.col.subscriber" },
+        { "key": "plan_name", "label": "finance.subscriptions.col.plan" },
+        { "key": "started_at", "label": "finance.subscriptions.col.started", "type": "date" },
+        { "key": "next_billing_date", "label": "finance.subscriptions.col.nextBill", "type": "date" },
+        { "key": "mrr", "label": "finance.subscriptions.col.mrr", "type": "currency", "currency": { "codeKey": "currency" } },
+        { "key": "status", "label": "common.col.status", "type": "badge", "badge": { "colors": { "active": "badge-success", "trialing": "badge-info", "past_due": "badge-warning", "cancelled": "badge-error" } } }
+      ]
+    },
+    {
+      "id": "plans",
+      "label": "finance.subscriptions.tab.plans",
+      "dataSource": "/ext/finance/subscriptions/plans",
+      "dataPath": "data",
+      "columns": [
+        { "key": "code", "label": "common.col.code", "type": "mono" },
+        { "key": "name", "label": "common.col.name" },
+        { "key": "interval", "label": "finance.subscriptions.ui.interval" },
+        { "key": "price", "label": "common.col.price", "type": "currency", "currency": { "codeKey": "currency" } },
+        { "key": "trial_days", "label": "finance.subscriptions.ui.trial_days" }
+      ],
+      "form": {
+        "endpoint": "/ext/finance/subscriptions/plans",
+        "fields": [
+          { "name": "code", "label": "finance.subscriptions.col.code", "colSpan": 2, "mono": true, "required": true },
+          { "name": "name", "label": "finance.subscriptions.col.name", "colSpan": 2, "required": true },
+          { "name": "price", "label": "inventory.col.price", "type": "number", "colSpan": 1 },
+          { "name": "currency", "label": "crm.form.currency", "colSpan": 1, "default": "RON" },
+          { "name": "interval", "label": "finance.subscriptions.ui.interval", "type": "select", "colSpan": 1, "default": "monthly", "options": [{ "value": "monthly", "label": "finance.subscriptions.ui.monthly" }, { "value": "quarterly", "label": "finance.subscriptions.ui.quarterly" }, { "value": "yearly", "label": "finance.subscriptions.ui.yearly" }] },
+          { "name": "trial_days", "label": "finance.subscriptions.ui.trial_days", "type": "number", "colSpan": 1 }
+        ]
+      }
+    },
+    {
+      "id": "dunning",
+      "label": "finance.subscriptions.tab.dunning",
+      "dataSource": "/ext/finance/subscriptions/dunning",
+      "dataPath": "data",
+      "columns": [
+        { "key": "subscriber_email", "label": "finance.subscriptions.col.subscriber" },
+        { "key": "attempt_count", "label": "finance.subscriptions.col.attempt" },
+        { "key": "last_attempt_at", "label": "finance.subscriptions.col.lastAttempt", "type": "date" },
+        { "key": "amount", "label": "common.col.amount", "type": "currency" },
+        { "key": "status", "label": "common.col.status", "type": "badge", "badge": { "colors": {} } }
+      ]
+    }
+  ]
+}

@@ -15,7 +15,15 @@
     "studio": false
   },
   "studio": {
-    "navGroup": "compliance"
+    "navGroup": "compliance",
+    "pages": [
+      {
+        "path": "/admin/compliance/gdpr",
+        "label": "GDPR",
+        "icon": "Shield",
+        "schema": "schemas/gdpr.json"
+      }
+    ]
   },
   "engine": {
     "entry": "engine/index.js",
