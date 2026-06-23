@@ -1,0 +1,54 @@
+{
+  "sduiSchema": 1,
+  "title": "finance.quotes.title",
+  "subtitle": "finance.quotes.subtitle",
+  "newLabel": "finance.quotes.btn.new",
+  "resources": [
+    {
+      "id": "quotes",
+      "dataSource": "/ext/finance/quotes",
+      "dataPath": "data",
+      "columns": [
+        { "key": "quote_number", "label": "common.col.number", "type": "mono" },
+        { "key": "client_name", "label": "common.col.client", "secondary": "client_email" },
+        { "key": "total", "label": "common.col.total", "type": "currency", "currency": { "codeKey": "currency" } },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": { "colors": { "draft": "badge-ghost", "sent": "badge-info", "accepted": "badge-success", "rejected": "badge-error", "expired": "badge-warning" } }
+        },
+        { "key": "valid_until", "label": "common.col.validUntil", "type": "date" },
+        { "key": "created_at", "label": "common.col.created", "type": "date" }
+      ],
+      "rowActions": [
+        { "id": "send", "icon": "Send", "method": "POST", "endpoint": "/ext/finance/quotes/{id}/send", "visibleWhen": { "field": "status", "equals": "draft" } },
+        { "id": "accept", "icon": "CheckCircle", "variant": "text-success", "method": "POST", "endpoint": "/ext/finance/quotes/{id}/accept", "visibleWhen": { "field": "status", "equals": "sent" } },
+        { "id": "delete", "icon": "Trash2", "variant": "text-error", "method": "DELETE", "endpoint": "/ext/finance/quotes/{id}", "confirm": "finance.quotes.deleteConfirm" }
+      ],
+      "form": {
+        "endpoint": "/ext/finance/quotes",
+        "fields": [
+          { "name": "client_name", "label": "finance.quotes.ui.client_name", "colSpan": 1, "required": true },
+          { "name": "client_email", "label": "finance.quotes.ui.client_email", "type": "email", "colSpan": 1 },
+          { "name": "currency", "label": "crm.form.currency", "type": "select", "colSpan": 1, "default": "RON", "options": [{ "value": "RON", "label": "RON" }, { "value": "EUR", "label": "EUR" }, { "value": "USD", "label": "USD" }] },
+          { "name": "valid_days", "label": "finance.quotes.ui.valid_days", "type": "number", "colSpan": 1, "default": 30 },
+          { "name": "notes", "label": "common.col.notes", "type": "textarea", "colSpan": 2 }
+        ],
+        "repeatable": {
+          "name": "lines",
+          "label": "finance.quotes.section.lines",
+          "addLabel": "finance.quotes.btn.addLine",
+          "min": 1,
+          "columns": [
+            { "name": "description", "label": "common.col.description" },
+            { "name": "quantity", "label": "invoicing.form.qty", "type": "number" },
+            { "name": "unit_price", "label": "finance.quotes.ui.unit_price", "type": "number" },
+            { "name": "tax_rate", "label": "invoicing.form.taxPercent", "type": "number" },
+            { "name": "discount", "label": "finance.quotes.ui.disc", "type": "number" }
+          ]
+        }
+      }
+    }
+  ]
+}
