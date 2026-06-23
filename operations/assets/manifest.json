@@ -21,7 +21,8 @@
       {
         "path": "/admin/operations/assets",
         "label": "Fixed Assets",
-        "icon": "Package"
+        "icon": "Package",
+        "schema": "schemas/assets.json"
       }
     ],
     "navGroup": "operations"

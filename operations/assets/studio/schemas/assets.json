@@ -1,0 +1,63 @@
+{
+  "sduiSchema": 1,
+  "title": "operations.assets.title",
+  "subtitle": "operations.assets.subtitle",
+  "newLabel": "operations.assets.btn.new",
+  "resources": [
+    {
+      "id": "assets",
+      "dataSource": "/ext/operations/assets",
+      "dataPath": "data",
+      "columns": [
+        { "key": "name", "label": "common.col.name" },
+        { "key": "code", "label": "common.col.code", "type": "mono" },
+        { "key": "category", "label": "common.col.category" },
+        { "key": "location", "label": "operations.assets.col.location" },
+        { "key": "acquisition_cost", "label": "operations.assets.col.cost", "type": "currency", "currency": { "codeKey": "currency" } },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": { "active": "badge-success", "inactive": "badge-ghost", "disposed": "badge-error", "under_maintenance": "badge-warning" }
+          }
+        }
+      ],
+      "rowActions": [
+        { "id": "delete", "icon": "Trash2", "variant": "text-error", "method": "DELETE", "endpoint": "/ext/operations/assets/{id}", "confirm": "operations.assets.confirmDelete" }
+      ],
+      "form": {
+        "endpoint": "/ext/operations/assets",
+        "fields": [
+          { "name": "name", "label": "content.document-templates.ui.name", "colSpan": 2, "required": true },
+          { "name": "code", "label": "operations.assets.ui.code_tag", "colSpan": 1 },
+          { "name": "serial_number", "label": "operations.assets.ui.serial_number", "colSpan": 1 },
+          {
+            "name": "category", "label": "finance.expenses.col.category", "type": "select", "colSpan": 1,
+            "options": [
+              { "value": "IT Equipment", "label": "IT Equipment" },
+              { "value": "Furniture", "label": "Furniture" },
+              { "value": "Vehicles", "label": "Vehicles" },
+              { "value": "Machinery", "label": "Machinery" },
+              { "value": "Buildings", "label": "Buildings" },
+              { "value": "Other", "label": "Other" }
+            ]
+          },
+          {
+            "name": "status", "label": "common.col.status", "type": "select", "colSpan": 1, "default": "active",
+            "options": [
+              { "value": "active", "label": "active" },
+              { "value": "inactive", "label": "inactive" },
+              { "value": "disposed", "label": "disposed" },
+              { "value": "under_maintenance", "label": "under maintenance" }
+            ]
+          },
+          { "name": "acquisition_cost", "label": "operations.assets.ui.acquisition_cost", "type": "number", "colSpan": 1 },
+          { "name": "currency", "label": "crm.form.currency", "colSpan": 1, "default": "RON" },
+          { "name": "acquisition_date", "label": "operations.assets.ui.acquisition_date", "type": "date", "colSpan": 1 },
+          { "name": "location", "label": "operations.assets.ui.location", "colSpan": 1 }
+        ]
+      }
+    }
+  ]
+}
