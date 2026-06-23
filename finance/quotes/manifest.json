@@ -21,7 +21,8 @@
       {
         "path": "/admin/finance/quotes",
         "label": "Quotes",
-        "icon": "FileText"
+        "icon": "FileText",
+        "schema": "schemas/quotes.json"
       }
     ],
     "navGroup": "finance"
