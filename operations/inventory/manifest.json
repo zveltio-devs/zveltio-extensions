@@ -15,7 +15,8 @@
       {
         "path": "/admin/inventory",
         "label": "Inventory",
-        "icon": "Boxes"
+        "icon": "Boxes",
+        "schema": "schemas/inventory.json"
       }
     ],
     "navGroup": "operations"

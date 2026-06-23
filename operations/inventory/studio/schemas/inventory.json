@@ -1,0 +1,67 @@
+{
+  "sduiSchema": 1,
+  "title": "inventory.title",
+  "subtitle": "inventory.subtitle",
+  "newLabel": "common.new",
+  "resources": [
+    {
+      "id": "products",
+      "label": "inventory.tab.products",
+      "icon": "Package",
+      "dataSource": "/ext/operations/inventory/products",
+      "dataPath": "data",
+      "search": { "param": "q", "placeholder": "inventory.searchPlaceholder" },
+      "columns": [
+        { "key": "sku", "label": "inventory.col.sku", "type": "mono" },
+        { "key": "name", "label": "inventory.col.name" },
+        { "key": "price", "label": "inventory.col.price", "type": "currency", "currency": { "codeKey": "currency" } },
+        { "key": "tax_rate", "label": "inventory.col.vat" },
+        { "key": "is_active", "label": "inventory.col.active", "type": "boolean" }
+      ],
+      "form": {
+        "endpoint": "/ext/operations/inventory/products",
+        "fields": [
+          { "name": "sku", "label": "inventory.form.sku", "colSpan": 1, "mono": true },
+          { "name": "currency", "label": "crm.form.currency", "colSpan": 1, "default": "RON" },
+          { "name": "name", "label": "inventory.col.name", "colSpan": 2, "required": true },
+          { "name": "description", "label": "common.col.description", "type": "textarea", "colSpan": 2 },
+          { "name": "price", "label": "inventory.col.price", "type": "number", "colSpan": 1 },
+          { "name": "tax_rate", "label": "inventory.col.vat", "type": "number", "colSpan": 1, "default": 19 },
+          { "name": "is_active", "label": "inventory.col.active", "type": "boolean", "colSpan": 2, "default": true }
+        ]
+      }
+    },
+    {
+      "id": "warehouses",
+      "label": "inventory.tab.warehouses",
+      "icon": "Warehouse",
+      "dataSource": "/ext/operations/inventory/warehouses",
+      "dataPath": "data",
+      "columns": [
+        { "key": "code", "label": "inventory.col.code", "type": "mono" },
+        { "key": "name", "label": "inventory.col.name" },
+        { "key": "address", "label": "inventory.col.address" }
+      ],
+      "form": {
+        "endpoint": "/ext/operations/inventory/warehouses",
+        "fields": [
+          { "name": "name", "label": "inventory.col.name", "colSpan": 2, "required": true },
+          { "name": "code", "label": "inventory.col.code", "colSpan": 1, "mono": true },
+          { "name": "address", "label": "inventory.col.address", "colSpan": 1 }
+        ]
+      }
+    },
+    {
+      "id": "stock",
+      "label": "inventory.tab.stock",
+      "icon": "Boxes",
+      "dataSource": "/ext/operations/inventory/stock-levels",
+      "dataPath": "data",
+      "columns": [
+        { "key": "product_name", "label": "inventory.col.product" },
+        { "key": "warehouse_name", "label": "inventory.col.warehouse" },
+        { "key": "quantity", "label": "inventory.col.quantity", "type": "mono" }
+      ]
+    }
+  ]
+}
