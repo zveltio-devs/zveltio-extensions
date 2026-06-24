@@ -1,0 +1,31 @@
+{
+  "sduiSchema": 1,
+  "title": "data.export.title",
+  "subtitle": "data.export.subtitle",
+  "newLabel": "data.export.ui.export_collection",
+  "resources": [
+    {
+      "id": "jobs",
+      "dataSource": "/ext/data/export/jobs",
+      "dataPath": "data",
+      "columns": [
+        { "key": "created_at", "label": "data.export.col.time", "type": "date" },
+        { "key": "collection", "label": "common.col.collection" },
+        { "key": "format", "label": "data.export.col.format", "type": "badge", "badge": { "colors": {} } },
+        { "key": "row_count", "label": "data.export.col.rows" },
+        { "key": "size_bytes", "label": "data.export.col.size" },
+        { "key": "user_id", "label": "data.export.col.user", "type": "mono" }
+      ],
+      "form": {
+        "endpoint": "/ext/data/export/{collection}",
+        "submit": { "kind": "download" },
+        "fields": [
+          { "name": "collection", "label": "data.export.col.collection", "type": "relation", "required": true, "colSpan": 2, "relation": { "dataSource": "/api/collections", "dataPath": "collections", "valueKey": "name", "labelKey": "name" } },
+          { "name": "format", "label": "data.export.col.format", "type": "select", "default": "csv", "colSpan": 1, "options": [{ "value": "csv", "label": "CSV" }, { "value": "json", "label": "JSON" }, { "value": "ndjson", "label": "NDJSON" }, { "value": "xlsx", "label": "data.export.ui.excel_xlsx" }] },
+          { "name": "limit", "label": "Row limit (0 = all)", "type": "number", "colSpan": 1, "default": 0 },
+          { "name": "filter", "label": "data.export.filterHint", "mono": true, "colSpan": 2, "placeholder": "status=active" }
+        ]
+      }
+    }
+  ]
+}

@@ -15,7 +15,8 @@
       {
         "path": "/admin/data/import",
         "label": "Import",
-        "icon": "Upload"
+        "icon": "Upload",
+        "schema": "schemas/import.json"
       }
     ],
     "navGroup": "developer"

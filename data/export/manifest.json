@@ -15,7 +15,8 @@
       {
         "path": "/admin/data/export",
         "label": "Export",
-        "icon": "Download"
+        "icon": "Download",
+        "schema": "schemas/export.json"
       }
     ],
     "navGroup": "developer"
