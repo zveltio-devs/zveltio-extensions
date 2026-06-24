@@ -15,7 +15,8 @@
       {
         "path": "/admin/compliance/ro/saft",
         "label": "SAF-T RO",
-        "icon": "FileSpreadsheet"
+        "icon": "FileSpreadsheet",
+        "schema": "schemas/saft.json"
       }
     ],
     "navGroup": "compliance"
