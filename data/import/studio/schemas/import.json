@@ -1,0 +1,32 @@
+{
+  "sduiSchema": 1,
+  "title": "data.import.title",
+  "subtitle": "data.import.subtitle",
+  "newLabel": "data.import.action.import",
+  "resources": [
+    {
+      "id": "logs",
+      "dataSource": "/ext/data/import/logs",
+      "dataPath": "data",
+      "columns": [
+        { "key": "created_at", "label": "data.import.col.time", "type": "date" },
+        { "key": "collection", "label": "common.col.collection" },
+        { "key": "format", "label": "data.import.col.format", "type": "badge", "badge": { "colors": {} } },
+        { "key": "rows_imported", "label": "data.import.col.rows" },
+        { "key": "error_count", "label": "data.import.col.errors" },
+        { "key": "status", "label": "common.col.status", "type": "badge", "badge": { "colors": { "completed": "badge-success", "failed": "badge-error", "running": "badge-warning", "pending": "badge-warning" } } }
+      ],
+      "form": {
+        "endpoint": "/ext/data/import/{collection}",
+        "submit": { "kind": "upload" },
+        "fields": [
+          { "name": "collection", "label": "data.import.form.collection", "type": "relation", "required": true, "colSpan": 2, "relation": { "dataSource": "/api/collections", "dataPath": "collections", "valueKey": "name", "labelKey": "name" } },
+          { "name": "file", "label": "File", "type": "file", "accept": ".csv,.json,.ndjson,.jsonl", "required": true, "colSpan": 2 },
+          { "name": "format", "label": "data.import.label.format", "type": "select", "default": "csv", "colSpan": 1, "options": [{ "value": "csv", "label": "CSV" }, { "value": "json", "label": "JSON" }, { "value": "ndjson", "label": "NDJSON" }] },
+          { "name": "upsert_on", "label": "data.import.label.upsertHtml", "mono": true, "colSpan": 1 },
+          { "name": "create_missing_columns", "label": "data.import.ui.create_missing_columns_automatically", "type": "boolean", "colSpan": 2 }
+        ]
+      }
+    }
+  ]
+}
