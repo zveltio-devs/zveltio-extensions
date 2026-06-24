@@ -1,0 +1,89 @@
+{
+  "sduiSchema": 1,
+  "title": "compliance.ro.saft.title",
+  "subtitle": "compliance.ro.saft.subtitle",
+  "newLabel": "common.create",
+  "resources": [
+    {
+      "id": "exports",
+      "label": "compliance.ro.saft.tab.exports",
+      "icon": "FolderOpen",
+      "dataSource": "/ext/compliance/ro/saft",
+      "dataPath": "exports",
+      "columns": [
+        { "key": "period_start", "label": "compliance.ro.saft.col.period", "type": "mono", "join": { "keys": ["period_start", "period_end"], "sep": " → " } },
+        { "key": "company_name", "label": "compliance.ro.saft.col.company" },
+        { "key": "company_cui", "label": "compliance.ro.saft.col.cui", "type": "mono" },
+        { "key": "status", "label": "common.col.status", "type": "badge", "badge": { "colors": { "draft": "badge-warning", "generated": "badge-info", "submitted": "badge-success" } } }
+      ],
+      "rowActions": [
+        { "id": "generate", "label": "compliance.ro.saft.btn.generateXml", "method": "POST", "endpoint": "/ext/compliance/ro/saft/{id}/generate", "visibleWhen": { "field": "status", "equals": "draft" } },
+        { "id": "download", "kind": "download", "icon": "Download", "label": "common.download", "endpoint": "/ext/compliance/ro/saft/{id}/xml", "visibleWhen": { "field": "status", "in": ["generated", "submitted"] } },
+        { "id": "submit", "kind": "call", "icon": "Send", "variant": "text-primary", "label": "Send to ANAF", "method": "POST", "endpoint": "/ext/compliance/ro/saft/{id}/submit", "confirm": "compliance.ro.saft.confirmSend", "visibleWhen": { "field": "status", "equals": "generated" } },
+        { "id": "delete", "icon": "Trash2", "variant": "text-error", "label": "common.delete", "method": "DELETE", "endpoint": "/ext/compliance/ro/saft/{id}", "confirm": "compliance.ro.saft.confirmDeleteExport", "visibleWhen": { "field": "status", "equals": "draft" } }
+      ],
+      "form": {
+        "endpoint": "/ext/compliance/ro/saft",
+        "fields": [
+          { "name": "period_start", "label": "compliance.ro.saft.ui.period_start", "type": "date", "default": "today", "colSpan": 1 },
+          { "name": "period_end", "label": "compliance.ro.saft.ui.period_end", "type": "date", "default": "today", "colSpan": 1 },
+          { "name": "company_name", "label": "compliance.ro.efactura.ui.company_name", "required": true, "colSpan": 2 },
+          { "name": "company_cui", "label": "compliance.ro.efactura.ui.cui_cif", "required": true, "mono": true, "colSpan": 2 },
+          { "name": "company_address", "label": "compliance.ro.saft.ui.address_optional", "colSpan": 2 }
+        ]
+      }
+    },
+    {
+      "id": "accounts",
+      "label": "compliance.ro.saft.tab.accounts",
+      "icon": "Boxes",
+      "dataSource": "/ext/compliance/ro/saft/accounts",
+      "dataPath": "accounts",
+      "columns": [
+        { "key": "code", "label": "common.col.code", "type": "mono" },
+        { "key": "description", "label": "common.col.description" },
+        { "key": "account_type", "label": "common.col.type", "type": "badge", "badge": { "colors": {} } }
+      ],
+      "rowActions": [
+        { "id": "delete", "icon": "Trash2", "variant": "text-error", "label": "common.delete", "method": "DELETE", "endpoint": "/ext/compliance/ro/saft/accounts/{id}", "confirm": "compliance.ro.saft.confirmDeleteAccount" }
+      ],
+      "form": {
+        "endpoint": "/ext/compliance/ro/saft/accounts",
+        "fields": [
+          { "name": "code", "label": "compliance.ro.saft.ui.account_code", "required": true, "mono": true, "colSpan": 1 },
+          { "name": "account_type", "label": "common.col.type", "type": "select", "default": "balance", "colSpan": 1, "options": [{ "value": "balance", "label": "common.col.balance" }, { "value": "income", "label": "compliance.ro.saft.ui.income" }, { "value": "expense", "label": "compliance.ro.saft.ui.expense" }] },
+          { "name": "description", "label": "common.col.description", "required": true, "colSpan": 2 }
+        ]
+      }
+    },
+    {
+      "id": "entries",
+      "label": "compliance.ro.saft.tab.entries",
+      "icon": "Clock",
+      "dataSource": "/ext/compliance/ro/saft/entries",
+      "dataPath": "entries",
+      "columns": [
+        { "key": "entry_date", "label": "common.col.date", "type": "date" },
+        { "key": "account_code", "label": "common.col.account", "type": "mono" },
+        { "key": "description", "label": "common.col.description" },
+        { "key": "document_number", "label": "compliance.ro.saft.col.document", "type": "mono" },
+        { "key": "debit", "label": "common.col.debit", "type": "mono" },
+        { "key": "credit", "label": "common.col.credit", "type": "mono" }
+      ],
+      "rowActions": [
+        { "id": "delete", "icon": "Trash2", "variant": "text-error", "label": "common.delete", "method": "DELETE", "endpoint": "/ext/compliance/ro/saft/entries/{id}", "confirm": "compliance.ro.saft.confirmDeleteEntry" }
+      ],
+      "form": {
+        "endpoint": "/ext/compliance/ro/saft/entries",
+        "fields": [
+          { "name": "entry_date", "label": "common.col.date", "type": "date", "default": "today", "colSpan": 1 },
+          { "name": "account_code", "label": "compliance.ro.saft.ui.account_code", "required": true, "mono": true, "colSpan": 1 },
+          { "name": "description", "label": "common.col.description", "required": true, "colSpan": 2 },
+          { "name": "document_number", "label": "compliance.ro.saft.ui.document_number_optional", "mono": true, "colSpan": 2 },
+          { "name": "debit", "label": "compliance.ro.saft.ui.debit_ron", "type": "number", "colSpan": 1 },
+          { "name": "credit", "label": "compliance.ro.saft.ui.credit_ron", "type": "number", "colSpan": 1 }
+        ]
+      }
+    }
+  ]
+}
