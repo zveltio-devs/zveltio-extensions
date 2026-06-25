@@ -1,0 +1,57 @@
+{
+  "sduiSchema": 1,
+  "title": "invoicing.title",
+  "subtitle": "invoicing.subtitle",
+  "newLabel": "invoicing.newInvoice",
+  "resources": [
+    {
+      "id": "invoices",
+      "dataSource": "/ext/finance/invoicing/invoices",
+      "dataPath": "data",
+      "stats": {
+        "dataSource": "/ext/finance/invoicing/invoices/stats",
+        "dataPath": "stats",
+        "cards": [
+          { "label": "invoicing.stat.invoiced", "key": "total_invoiced", "format": "number" },
+          { "label": "invoicing.stat.collected", "key": "total_paid", "format": "number", "color": "text-success" },
+          { "label": "invoicing.stat.overdue", "key": "total_overdue", "format": "number", "color": "text-error" },
+          { "label": "invoicing.stat.drafts", "key": "count_draft", "format": "number" }
+        ]
+      },
+      "columns": [
+        { "key": "invoice_number", "label": "invoicing.col.number", "type": "mono" },
+        { "key": "client_name", "label": "invoicing.col.client", "secondary": "client_email" },
+        { "key": "total", "label": "invoicing.col.total", "type": "currency", "currency": { "codeKey": "currency" } },
+        { "key": "amount_paid", "label": "invoicing.col.paid", "type": "currency", "currency": { "codeKey": "currency" } },
+        { "key": "status", "label": "invoicing.col.status", "type": "badge", "badge": { "colors": { "draft": "badge-ghost", "sent": "badge-info", "partial": "badge-warning", "paid": "badge-success", "overdue": "badge-error", "cancelled": "badge-ghost" }, "labels": { "draft": "invoicing.status.draft", "sent": "invoicing.status.sent", "partial": "invoicing.status.partial", "paid": "invoicing.status.paid", "overdue": "invoicing.status.overdue", "cancelled": "invoicing.status.cancelled" } } },
+        { "key": "due_date", "label": "invoicing.col.dueDate", "type": "date", "classWhen": [{ "field": "status", "equals": "overdue", "class": "text-error font-medium" }] }
+      ],
+      "rowActions": [
+        { "id": "send", "icon": "Send", "label": "invoicing.action.send", "method": "POST", "endpoint": "/ext/finance/invoicing/invoices/{id}/send", "visibleWhen": { "field": "status", "equals": "draft" } },
+        { "id": "markPaid", "icon": "DollarSign", "label": "invoicing.action.markPaid", "method": "POST", "endpoint": "/ext/finance/invoicing/invoices/{id}/pay", "body": { "amount": "{total-amount_paid}" }, "visibleWhen": { "field": "status", "in": ["sent", "partial", "overdue"] } },
+        { "id": "delete", "icon": "Trash2", "variant": "text-error", "label": "common.delete", "method": "DELETE", "endpoint": "/ext/finance/invoicing/invoices/{id}", "confirm": "invoicing.deleteConfirm" }
+      ],
+      "form": {
+        "endpoint": "/ext/finance/invoicing/invoices",
+        "fields": [
+          { "name": "client_name", "label": "invoicing.form.clientName", "required": true, "colSpan": 1 },
+          { "name": "client_email", "label": "invoicing.form.clientEmail", "type": "email", "colSpan": 1 },
+          { "name": "currency", "label": "crm.form.currency", "type": "select", "default": "RON", "colSpan": 1, "options": [{ "value": "RON", "label": "RON" }, { "value": "EUR", "label": "EUR" }, { "value": "USD", "label": "USD" }] },
+          { "name": "due_days", "label": "invoicing.form.dueDays", "type": "number", "default": 30, "colSpan": 1 }
+        ],
+        "repeatable": {
+          "name": "lines",
+          "label": "invoicing.form.lines",
+          "addLabel": "invoicing.form.addLine",
+          "min": 1,
+          "columns": [
+            { "name": "description", "label": "invoicing.form.description" },
+            { "name": "quantity", "label": "invoicing.form.qty", "type": "number", "default": 1 },
+            { "name": "unit_price", "label": "invoicing.form.unitPrice", "type": "number", "default": 0 },
+            { "name": "tax_rate", "label": "invoicing.form.taxPercent", "type": "number", "default": 19 }
+          ]
+        }
+      }
+    }
+  ]
+}

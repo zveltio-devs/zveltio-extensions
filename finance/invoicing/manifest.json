@@ -15,7 +15,8 @@
       {
         "path": "/admin/finance/invoicing",
         "label": "Invoicing",
-        "icon": "DollarSign"
+        "icon": "DollarSign",
+        "schema": "schemas/invoicing.json"
       }
     ],
     "navGroup": "finance"
