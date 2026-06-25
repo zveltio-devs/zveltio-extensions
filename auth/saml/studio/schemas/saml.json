@@ -1,0 +1,28 @@
+{
+  "kind": "settings",
+  "sduiSchema": 1,
+  "title": "auth.saml.title",
+  "subtitle": "auth.saml.subtitle",
+  "dataSource": "/ext/auth/saml/config",
+  "dataPath": "config",
+  "saveEndpoint": "/ext/auth/saml/config",
+  "info": [
+    { "label": "auth.saml.ui.sp_metadata_url", "value": "{ENGINE_URL}/ext/auth/saml/metadata" },
+    { "label": "auth.saml.ui.acs_callback_url", "value": "{ENGINE_URL}/ext/auth/saml/callback" }
+  ],
+  "sections": [
+    {
+      "title": "auth.saml.section.idp",
+      "fields": [
+        { "name": "enabled", "label": "auth.saml.enable", "type": "boolean", "colSpan": 2 },
+        { "name": "entryPoint", "label": "auth.saml.ui.idp_entry_point_url", "mono": true, "colSpan": 2, "placeholder": "auth.saml.ui.https_your_idp_com_sso_saml" },
+        { "name": "issuer", "label": "auth.saml.ui.idp_issuer_entity_id", "colSpan": 2 },
+        { "name": "cert", "label": "auth.saml.ui.idp_certificate_pem", "type": "textarea", "rows": 5, "mono": true, "colSpan": 2, "placeholder": "auth.saml.ui.begin_certificate_10_10_end_certificate" },
+        { "name": "mapEmail", "label": "auth.saml.ui.email_attribute", "colSpan": 1 },
+        { "name": "mapName", "label": "auth.saml.ui.name_attribute", "colSpan": 1 },
+        { "name": "signatureAlgorithm", "label": "auth.saml.ui.signature_algorithm", "type": "select", "default": "sha256", "colSpan": 1, "options": [{ "value": "sha1", "label": "auth.saml.ui.sha_1" }, { "value": "sha256", "label": "auth.saml.ui.sha_256" }, { "value": "sha512", "label": "auth.saml.ui.sha_512" }] },
+        { "name": "wantAuthnResponseSigned", "label": "auth.saml.ui.require_signed_response", "type": "boolean", "colSpan": 1 }
+      ]
+    }
+  ]
+}

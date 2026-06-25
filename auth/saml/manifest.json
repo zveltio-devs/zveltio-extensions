@@ -18,7 +18,8 @@
       {
         "path": "/admin/auth/saml",
         "label": "SAML SSO",
-        "icon": "Lock"
+        "icon": "Lock",
+        "schema": "schemas/saml.json"
       }
     ],
     "navGroup": "other"
