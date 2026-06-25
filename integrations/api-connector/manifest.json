@@ -15,7 +15,8 @@
       {
         "path": "/admin/integrations/api-connector",
         "label": "API Connector",
-        "icon": "Plug"
+        "icon": "Plug",
+        "schema": "schemas/api-connector.json"
       }
     ],
     "navGroup": "developer"

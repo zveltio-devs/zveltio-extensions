@@ -1,0 +1,58 @@
+{
+  "sduiSchema": 1,
+  "title": "integrations.api-connector.title",
+  "subtitle": "integrations.api-connector.subtitle",
+  "newLabel": "integrations.api-connector.btn.new",
+  "resources": [
+    {
+      "id": "connections",
+      "label": "integrations.api-connector.tab.connections",
+      "dataSource": "/ext/integrations/api-connector/connections",
+      "dataPath": "data",
+      "layout": "cards",
+      "card": { "title": "name", "badge": "auth_type", "subtitle": "base_url" },
+      "columns": [{ "key": "name", "label": "common.col.name" }],
+      "rowActions": [
+        { "id": "delete", "label": "common.delete", "variant": "text-error", "method": "DELETE", "endpoint": "/ext/integrations/api-connector/connections/{id}", "confirm": "integrations.apiConnector.confirmDelete" }
+      ],
+      "form": {
+        "endpoint": "/ext/integrations/api-connector/connections",
+        "fields": [
+          { "name": "name", "label": "common.col.name", "required": true, "colSpan": 2 },
+          { "name": "base_url", "label": "integrations.api-connector.ui.base_url", "mono": true, "required": true, "colSpan": 2, "placeholder": "integrations.api-connector.ui.https_api_example_com" },
+          { "name": "auth_type", "label": "integrations.api-connector.ui.auth", "type": "select", "default": "none", "colSpan": 2, "options": [{ "value": "none", "label": "integrations.api-connector.ui.none" }, { "value": "bearer", "label": "integrations.api-connector.ui.bearer_token" }, { "value": "basic", "label": "integrations.api-connector.ui.basic_auth" }, { "value": "oauth2", "label": "integrations.api-connector.ui.oauth_2_0" }] },
+          { "name": "auth_token", "label": "integrations.api-connector.ui.token", "type": "password", "mono": true, "colSpan": 2, "visibleWhen": { "field": "auth_type", "equals": "bearer" } },
+          { "name": "auth_username", "label": "integrations.api-connector.ui.username", "colSpan": 1, "visibleWhen": { "field": "auth_type", "equals": "basic" } },
+          { "name": "auth_password", "label": "auth.password", "type": "password", "colSpan": 1, "visibleWhen": { "field": "auth_type", "equals": "basic" } },
+          { "name": "headers", "label": "integrations.api-connector.ui.extra_headers_json", "type": "json", "default": "{}", "colSpan": 2 }
+        ]
+      }
+    },
+    {
+      "id": "webhooks",
+      "label": "integrations.api-connector.tab.webhooks",
+      "dataSource": "/ext/integrations/api-connector/incoming-webhooks",
+      "dataPath": "data",
+      "columns": [
+        { "key": "name", "label": "common.col.name" },
+        { "key": "slug", "label": "integrations.api-connector.col.url", "type": "mono", "template": "{ENGINE_URL}/api/webhook/{slug}" },
+        { "key": "created_at", "label": "common.col.created", "type": "date" },
+        { "key": "last_received_at", "label": "integrations.api-connector.col.lastReceived", "type": "date" }
+      ]
+    },
+    {
+      "id": "logs",
+      "label": "integrations.api-connector.tab.logs",
+      "dataSource": "/ext/integrations/api-connector/logs?limit=100",
+      "dataPath": "data",
+      "columns": [
+        { "key": "created_at", "label": "integrations.api-connector.col.time", "type": "date" },
+        { "key": "connection_name", "label": "integrations.api-connector.col.connection" },
+        { "key": "method", "label": "common.col.method", "type": "badge", "badge": { "colors": {} } },
+        { "key": "url", "label": "integrations.api-connector.col.url", "type": "mono" },
+        { "key": "status_code", "label": "common.col.status", "type": "mono" },
+        { "key": "duration_ms", "label": "common.col.duration" }
+      ]
+    }
+  ]
+}
