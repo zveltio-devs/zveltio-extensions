@@ -22,7 +22,15 @@
     "fieldTypes": []
   },
   "studio": {
-    "navGroup": "hr"
+    "navGroup": "hr",
+    "pages": [
+      {
+        "path": "/admin/hr/payroll",
+        "label": "Payroll RO",
+        "icon": "Wallet",
+        "schema": "schemas/payroll.json"
+      }
+    ]
   },
   "engine": {
     "entry": "engine/index.js",
