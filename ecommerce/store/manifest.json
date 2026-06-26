@@ -21,7 +21,8 @@
       {
         "path": "/admin/ecommerce/store",
         "label": "eCommerce",
-        "icon": "ShoppingBag"
+        "icon": "ShoppingBag",
+        "schema": "schemas/store.json"
       }
     ],
     "navGroup": "business"
