@@ -1,0 +1,59 @@
+{
+  "sduiSchema": 1,
+  "title": "ecommerce.store.title",
+  "subtitle": "ecommerce.store.subtitle",
+  "newLabel": "ecommerce.store.btn.newProduct",
+  "resources": [
+    {
+      "id": "products",
+      "label": "ecommerce.store.tab.products",
+      "dataSource": "/ext/ecommerce/store/admin/products",
+      "dataPath": "data",
+      "stats": {
+        "dataSource": "/ext/ecommerce/store/admin/stats",
+        "dataPath": "stats",
+        "cards": [
+          { "label": "ecommerce.store.stat.orders", "key": "total_orders", "format": "number" },
+          { "label": "ecommerce.store.stat.revenue", "key": "total_revenue", "format": "number" },
+          { "label": "ecommerce.store.stat.products", "key": "total_products", "format": "number" },
+          { "label": "common.status.pending", "key": "pending_orders", "format": "number", "color": "text-warning" }
+        ]
+      },
+      "columns": [
+        { "key": "name", "label": "common.col.name" },
+        { "key": "category_name", "label": "common.col.category" },
+        { "key": "price", "label": "common.col.price", "type": "currency", "currency": { "codeKey": "currency" } },
+        { "key": "stock_qty", "label": "ecommerce.store.col.stock", "classWhen": [{ "equals": 0, "class": "text-error" }] },
+        { "key": "is_active", "label": "common.col.status", "type": "badge", "badge": { "colors": { "true": "badge-success", "false": "badge-ghost" }, "labels": { "true": "common.col.active", "false": "ecommerce.store.status.inactive" } } }
+      ],
+      "rowActions": [
+        { "id": "delete", "icon": "Trash2", "variant": "text-error", "label": "common.delete", "method": "DELETE", "endpoint": "/ext/ecommerce/store/admin/products/{id}", "confirm": "ecommerce.store.confirmDeleteProduct" }
+      ],
+      "form": {
+        "endpoint": "/ext/ecommerce/store/admin/products",
+        "fields": [
+          { "name": "name", "label": "content.document-templates.ui.name", "required": true, "colSpan": 2 },
+          { "name": "slug", "label": "common.col.slug", "mono": true, "colSpan": 2 },
+          { "name": "short_description", "label": "ecommerce.store.ui.short_description", "colSpan": 2 },
+          { "name": "price", "label": "inventory.col.price", "type": "number", "colSpan": 1 },
+          { "name": "currency", "label": "crm.form.currency", "type": "select", "default": "RON", "colSpan": 1, "options": [{ "value": "RON", "label": "RON" }, { "value": "EUR", "label": "EUR" }, { "value": "USD", "label": "USD" }] },
+          { "name": "stock_qty", "label": "ecommerce.store.ui.stock_qty", "type": "number", "default": 0, "colSpan": 1 },
+          { "name": "is_active", "label": "common.col.active", "type": "boolean", "default": true, "colSpan": 1 }
+        ]
+      }
+    },
+    {
+      "id": "orders",
+      "label": "ecommerce.store.tab.orders",
+      "dataSource": "/ext/ecommerce/store/admin/orders",
+      "dataPath": "data",
+      "columns": [
+        { "key": "order_number", "label": "ecommerce.store.col.orderNumber", "type": "mono" },
+        { "key": "customer_name", "label": "ecommerce.store.col.customer", "secondary": "customer_email" },
+        { "key": "total", "label": "common.col.total", "type": "currency", "currency": { "codeKey": "currency" } },
+        { "key": "created_at", "label": "common.col.date", "type": "date" },
+        { "key": "status", "label": "common.col.status", "editable": { "endpoint": "/ext/ecommerce/store/admin/orders/{id}", "method": "PATCH", "field": "status", "options": [{ "value": "pending", "label": "common.status.pending" }, { "value": "processing", "label": "ecommerce.store.ui.processing" }, { "value": "shipped", "label": "ecommerce.store.ui.shipped" }, { "value": "delivered", "label": "ecommerce.store.ui.delivered" }, { "value": "cancelled", "label": "invoicing.status.cancelled" }] } }
+      ]
+    }
+  ]
+}
