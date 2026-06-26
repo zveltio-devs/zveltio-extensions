@@ -1,0 +1,94 @@
+{
+  "sduiSchema": 1,
+  "title": "crm.title",
+  "subtitle": "crm.subtitle",
+  "newLabel": "common.new",
+  "resources": [
+    {
+      "id": "contacts",
+      "label": "crm.tab.contacts",
+      "icon": "Users",
+      "dataSource": "/ext/crm/contacts",
+      "dataPath": "data",
+      "search": { "fields": ["first_name", "last_name", "email", "company"], "placeholder": "common.search" },
+      "columns": [
+        { "key": "first_name", "label": "crm.col.name", "join": { "keys": ["first_name", "last_name"], "sep": " " } },
+        { "key": "email", "label": "crm.col.email" },
+        { "key": "phone", "label": "crm.col.phone" },
+        { "key": "company", "label": "crm.col.company" },
+        { "key": "created_at", "label": "common.added", "type": "date" }
+      ],
+      "rowActions": [
+        { "id": "delete", "icon": "Trash2", "variant": "text-error", "label": "common.delete", "method": "DELETE", "endpoint": "/ext/crm/contacts/{id}", "confirm": "ext.confirmDelete" }
+      ],
+      "form": {
+        "endpoint": "/ext/crm/contacts",
+        "fields": [
+          { "name": "first_name", "label": "crm.form.firstName", "required": true, "colSpan": 1 },
+          { "name": "last_name", "label": "crm.form.lastName", "colSpan": 1 },
+          { "name": "email", "label": "crm.col.email", "type": "email", "colSpan": 1 },
+          { "name": "phone", "label": "crm.col.phone", "colSpan": 1 },
+          { "name": "company", "label": "crm.col.company", "colSpan": 1 },
+          { "name": "job_title", "label": "crm.form.jobTitle", "colSpan": 1 }
+        ]
+      }
+    },
+    {
+      "id": "organizations",
+      "label": "crm.tab.organizations",
+      "icon": "Building2",
+      "dataSource": "/ext/crm/organizations",
+      "dataPath": "data",
+      "search": { "fields": ["name"], "placeholder": "common.search" },
+      "columns": [
+        { "key": "name", "label": "crm.col.name" },
+        { "key": "industry", "label": "crm.col.industry" },
+        { "key": "email", "label": "crm.col.email" },
+        { "key": "city", "label": "crm.col.city" },
+        { "key": "created_at", "label": "common.added", "type": "date" }
+      ],
+      "rowActions": [
+        { "id": "delete", "icon": "Trash2", "variant": "text-error", "label": "common.delete", "method": "DELETE", "endpoint": "/ext/crm/organizations/{id}", "confirm": "ext.confirmDelete" }
+      ],
+      "form": {
+        "endpoint": "/ext/crm/organizations",
+        "fields": [
+          { "name": "name", "label": "crm.col.name", "required": true, "colSpan": 2 },
+          { "name": "industry", "label": "crm.col.industry", "colSpan": 1 },
+          { "name": "city", "label": "crm.col.city", "colSpan": 1 },
+          { "name": "email", "label": "crm.col.email", "type": "email", "colSpan": 1 },
+          { "name": "phone", "label": "crm.col.phone", "colSpan": 1 },
+          { "name": "website", "label": "crm.form.website", "colSpan": 2 }
+        ]
+      }
+    },
+    {
+      "id": "deals",
+      "label": "crm.tab.deals",
+      "icon": "TrendingUp",
+      "dataSource": "/ext/crm/transactions",
+      "dataPath": "data",
+      "search": { "fields": ["title"], "placeholder": "common.search" },
+      "columns": [
+        { "key": "title", "label": "crm.col.title" },
+        { "key": "stage", "label": "crm.col.stage", "type": "badge", "badge": { "colors": { "prospecting": "badge-ghost", "qualification": "badge-info", "proposal": "badge-warning", "negotiation": "badge-warning", "closed_won": "badge-success", "closed_lost": "badge-error" }, "labels": { "prospecting": "crm.stage.prospecting", "qualification": "crm.stage.qualification", "proposal": "crm.stage.proposal", "negotiation": "crm.stage.negotiation", "closed_won": "crm.stage.closed_won", "closed_lost": "crm.stage.closed_lost" } } },
+        { "key": "value", "label": "crm.col.value", "type": "currency", "currency": { "codeKey": "currency" } },
+        { "key": "expected_close_date", "label": "crm.col.closeDate", "type": "date" },
+        { "key": "created_at", "label": "common.added", "type": "date" }
+      ],
+      "rowActions": [
+        { "id": "delete", "icon": "Trash2", "variant": "text-error", "label": "common.delete", "method": "DELETE", "endpoint": "/ext/crm/transactions/{id}", "confirm": "ext.confirmDelete" }
+      ],
+      "form": {
+        "endpoint": "/ext/crm/transactions",
+        "fields": [
+          { "name": "title", "label": "crm.col.title", "required": true, "colSpan": 2 },
+          { "name": "stage", "label": "crm.form.stage", "type": "select", "default": "prospecting", "colSpan": 1, "options": [{ "value": "prospecting", "label": "crm.stage.prospecting" }, { "value": "qualification", "label": "crm.stage.qualification" }, { "value": "proposal", "label": "crm.stage.proposal" }, { "value": "negotiation", "label": "crm.stage.negotiation" }, { "value": "closed_won", "label": "crm.stage.closed_won" }, { "value": "closed_lost", "label": "crm.stage.closed_lost" }] },
+          { "name": "value", "label": "crm.col.value", "type": "number", "colSpan": 1 },
+          { "name": "currency", "label": "crm.form.currency", "default": "RON", "colSpan": 1 },
+          { "name": "expected_close_date", "label": "crm.col.closeDate", "type": "date", "colSpan": 1 }
+        ]
+      }
+    }
+  ]
+}

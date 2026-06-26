@@ -15,7 +15,8 @@
       {
         "path": "/admin/crm",
         "label": "CRM",
-        "icon": "Users"
+        "icon": "Users",
+        "schema": "schemas/crm.json"
       }
     ],
     "navGroup": "business"
