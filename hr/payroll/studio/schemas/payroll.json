@@ -1,0 +1,42 @@
+{
+  "sduiSchema": 1,
+  "title": "hr.payroll.title",
+  "subtitle": "hr.payroll.subtitle",
+  "newLabel": "hr.payroll.btn.newPeriod",
+  "resources": [
+    {
+      "id": "periods",
+      "dataSource": "/ext/hr/payroll/periods/{masterId}/entries",
+      "dataPath": "data",
+      "master": {
+        "dataSource": "/ext/hr/payroll/periods",
+        "dataPath": "data",
+        "idKey": "id",
+        "titleKey": "name",
+        "subtitle": { "keys": ["period_start", "period_end"], "sep": " → " },
+        "badgeKey": "status"
+      },
+      "detailActions": [
+        { "id": "generate", "icon": "Plus", "label": "hr.payroll.btn.generate", "method": "POST", "endpoint": "/ext/hr/payroll/periods/{id}/generate" },
+        { "id": "revisal", "kind": "download", "icon": "Download", "label": "hr.payroll.btn.revisal", "endpoint": "/ext/hr/payroll/periods/{id}/revisal-export" }
+      ],
+      "columns": [
+        { "key": "employee_name", "label": "common.col.employee" },
+        { "key": "gross_salary", "label": "hr.payroll.col.gross", "type": "currency", "currency": { "code": "RON" } },
+        { "key": "cas", "label": "CAS 25%", "type": "currency", "currency": { "code": "RON" } },
+        { "key": "cass", "label": "CASS 10%", "type": "currency", "currency": { "code": "RON" } },
+        { "key": "income_tax", "label": "Tax 10%", "type": "currency", "currency": { "code": "RON" } },
+        { "key": "net_salary", "label": "hr.payroll.col.net", "type": "currency", "currency": { "code": "RON" } }
+      ],
+      "form": {
+        "endpoint": "/ext/hr/payroll/periods",
+        "fields": [
+          { "name": "name", "label": "hr.payroll.ui.name_e_g_november_2026", "required": true, "colSpan": 2 },
+          { "name": "period_start", "label": "compliance.ro.saft.ui.period_start", "type": "date", "colSpan": 1 },
+          { "name": "period_end", "label": "compliance.ro.saft.ui.period_end", "type": "date", "colSpan": 1 },
+          { "name": "pay_date", "label": "hr.payroll.ui.pay_date", "type": "date", "colSpan": 2 }
+        ]
+      }
+    }
+  ]
+}
