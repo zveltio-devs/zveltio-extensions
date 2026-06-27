@@ -7,7 +7,7 @@
     {
       "id": "templates",
       "dataSource": "/ext/content/document-templates",
-      "dataPath": "data",
+      "dataPath": "templates",
       "columns": [
         { "key": "name", "label": "common.col.name" },
         { "key": "format", "label": "content.document-templates.col.format", "type": "badge", "badge": { "colors": {} } },

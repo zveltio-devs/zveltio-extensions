@@ -6,7 +6,7 @@
     {
       "id": "drafts",
       "dataSource": "/ext/content/drafts",
-      "dataPath": "data",
+      "dataPath": "drafts",
       "columns": [
         { "key": "collection", "label": "common.col.collection", "type": "badge", "badge": { "colors": {} } },
         { "key": "record_id", "label": "content.drafts.col.record", "type": "mono" },

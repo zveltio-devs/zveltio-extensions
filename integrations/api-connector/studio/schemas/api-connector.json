@@ -31,27 +31,13 @@
     {
       "id": "webhooks",
       "label": "integrations.api-connector.tab.webhooks",
-      "dataSource": "/ext/integrations/api-connector/incoming-webhooks",
+      "dataSource": "/ext/integrations/api-connector/webhooks",
       "dataPath": "data",
       "columns": [
         { "key": "name", "label": "common.col.name" },
         { "key": "slug", "label": "integrations.api-connector.col.url", "type": "mono", "template": "{ENGINE_URL}/api/webhook/{slug}" },
         { "key": "created_at", "label": "common.col.created", "type": "date" },
         { "key": "last_received_at", "label": "integrations.api-connector.col.lastReceived", "type": "date" }
-      ]
-    },
-    {
-      "id": "logs",
-      "label": "integrations.api-connector.tab.logs",
-      "dataSource": "/ext/integrations/api-connector/logs?limit=100",
-      "dataPath": "data",
-      "columns": [
-        { "key": "created_at", "label": "integrations.api-connector.col.time", "type": "date" },
-        { "key": "connection_name", "label": "integrations.api-connector.col.connection" },
-        { "key": "method", "label": "common.col.method", "type": "badge", "badge": { "colors": {} } },
-        { "key": "url", "label": "integrations.api-connector.col.url", "type": "mono" },
-        { "key": "status_code", "label": "common.col.status", "type": "mono" },
-        { "key": "duration_ms", "label": "common.col.duration" }
       ]
     }
   ]
