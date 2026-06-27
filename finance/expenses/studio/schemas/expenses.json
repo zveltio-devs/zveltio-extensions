@@ -6,7 +6,7 @@
   "resources": [
     {
       "id": "expenses",
-      "dataSource": "/ext/finance/expenses",
+      "dataSource": "/ext/finance/expenses/reports",
       "dataPath": "data",
       "filters": [
         {

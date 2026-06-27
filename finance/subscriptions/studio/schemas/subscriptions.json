@@ -41,19 +41,6 @@
           { "name": "trial_days", "label": "finance.subscriptions.ui.trial_days", "type": "number", "colSpan": 1 }
         ]
       }
-    },
-    {
-      "id": "dunning",
-      "label": "finance.subscriptions.tab.dunning",
-      "dataSource": "/ext/finance/subscriptions/dunning",
-      "dataPath": "data",
-      "columns": [
-        { "key": "subscriber_email", "label": "finance.subscriptions.col.subscriber" },
-        { "key": "attempt_count", "label": "finance.subscriptions.col.attempt" },
-        { "key": "last_attempt_at", "label": "finance.subscriptions.col.lastAttempt", "type": "date" },
-        { "key": "amount", "label": "common.col.amount", "type": "currency" },
-        { "key": "status", "label": "common.col.status", "type": "badge", "badge": { "colors": {} } }
-      ]
     }
   ]
 }

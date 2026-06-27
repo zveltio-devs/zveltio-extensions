@@ -55,7 +55,7 @@
       "id": "stock",
       "label": "inventory.tab.stock",
       "icon": "Boxes",
-      "dataSource": "/ext/operations/inventory/stock-levels",
+      "dataSource": "/ext/operations/inventory/low-stock",
       "dataPath": "data",
       "columns": [
         { "key": "product_name", "label": "inventory.col.product" },

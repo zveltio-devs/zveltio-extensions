@@ -7,7 +7,7 @@
     {
       "id": "jobs",
       "dataSource": "/ext/data/export/jobs",
-      "dataPath": "data",
+      "dataPath": "jobs",
       "columns": [
         { "key": "created_at", "label": "data.export.col.time", "type": "date" },
         { "key": "collection", "label": "common.col.collection" },

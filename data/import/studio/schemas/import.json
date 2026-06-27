@@ -6,8 +6,8 @@
   "resources": [
     {
       "id": "logs",
-      "dataSource": "/ext/data/import/logs",
-      "dataPath": "data",
+      "dataSource": "/ext/data/import/jobs",
+      "dataPath": "jobs",
       "columns": [
         { "key": "created_at", "label": "data.import.col.time", "type": "date" },
         { "key": "collection", "label": "common.col.collection" },

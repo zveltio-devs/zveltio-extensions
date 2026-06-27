@@ -8,7 +8,7 @@
       "label": "compliance.gdpr.tab.requests",
       "icon": "Users",
       "dataSource": "/ext/compliance/gdpr/access-requests",
-      "dataPath": "data",
+      "dataPath": "access_requests",
       "columns": [
         { "key": "request_type", "label": "common.col.type", "type": "badge", "badge": { "colors": {} } },
         { "key": "subject_email", "label": "common.col.subject" },
@@ -24,8 +24,8 @@
       "id": "breaches",
       "label": "compliance.gdpr.tab.breaches",
       "icon": "XCircle",
-      "dataSource": "/ext/compliance/gdpr/breach-incidents",
-      "dataPath": "data",
+      "dataSource": "/ext/compliance/gdpr/breaches",
+      "dataPath": "breaches",
       "columns": [
         { "key": "detected_at", "label": "common.col.date", "type": "date" },
         { "key": "description", "label": "common.col.description" },
@@ -37,8 +37,8 @@
     {
       "id": "consents",
       "label": "compliance.gdpr.tab.consents",
-      "dataSource": "/ext/compliance/gdpr/consents",
-      "dataPath": "data",
+      "dataSource": "/ext/compliance/gdpr/consents/me",
+      "dataPath": "consents",
       "columns": [
         { "key": "subject_id", "label": "common.col.subject" },
         { "key": "purpose", "label": "compliance.gdpr.col.purpose" },
@@ -51,7 +51,7 @@
       "label": "compliance.gdpr.tab.records",
       "icon": "Boxes",
       "dataSource": "/ext/compliance/gdpr/processing-records",
-      "dataPath": "data",
+      "dataPath": "processing_records",
       "columns": [
         { "key": "activity_name", "label": "compliance.gdpr.col.activity" },
         { "key": "lawful_basis", "label": "compliance.gdpr.col.lawfulBasis" },
