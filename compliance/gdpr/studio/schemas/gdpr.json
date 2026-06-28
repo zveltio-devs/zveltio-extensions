@@ -13,11 +13,11 @@
         { "key": "request_type", "label": "common.col.type", "type": "badge", "badge": { "colors": {} } },
         { "key": "subject_email", "label": "common.col.subject" },
         { "key": "created_at", "label": "compliance.gdpr.col.requested", "type": "date" },
-        { "key": "status", "label": "common.col.status", "type": "badge", "badge": { "colors": { "pending": "badge-warning", "fulfilled": "badge-success", "rejected": "badge-error" } } }
+        { "key": "status", "label": "common.col.status", "type": "badge", "badge": { "colors": { "pending": "badge-warning", "in_progress": "badge-info", "completed": "badge-success", "rejected": "badge-error", "withdrawn": "badge-ghost" } } }
       ],
       "rowActions": [
-        { "id": "fulfill", "label": "compliance.gdpr.btn.fulfill", "method": "POST", "endpoint": "/ext/compliance/gdpr/access-requests/{id}/fulfill", "visibleWhen": { "field": "status", "equals": "pending" } },
-        { "id": "reject", "label": "common.reject", "variant": "text-error", "method": "POST", "endpoint": "/ext/compliance/gdpr/access-requests/{id}/reject", "visibleWhen": { "field": "status", "equals": "pending" } }
+        { "id": "fulfill", "label": "compliance.gdpr.btn.fulfill", "method": "PATCH", "endpoint": "/ext/compliance/gdpr/access-requests/{id}", "body": { "status": "completed" }, "visibleWhen": { "field": "status", "equals": "pending" } },
+        { "id": "reject", "label": "common.reject", "variant": "text-error", "method": "PATCH", "endpoint": "/ext/compliance/gdpr/access-requests/{id}", "body": { "status": "rejected" }, "visibleWhen": { "field": "status", "equals": "pending" } }
       ]
     },
     {
