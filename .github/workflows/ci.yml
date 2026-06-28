@@ -106,6 +106,10 @@ jobs:
         # dataSource/endpoint shipped and rendered an empty table.
         run: |
           set -e
+          # The CLI imports @zveltio/sdk/{validate,publish,codegen} via the SDK's
+          # package.json exports → dist/. The sibling clone isn't built, so build
+          # the SDK first.
+          (cd ../zveltio/packages/sdk && bun run build)
           CLI=../zveltio/packages/cli/src/index.ts
           FAIL=0
           for m in $(find . -name manifest.json -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/scripts/*'); do
