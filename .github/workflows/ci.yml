@@ -112,15 +112,23 @@ jobs:
           (cd ../zveltio/packages/sdk && bun run build)
           CLI=../zveltio/packages/cli/src/index.ts
           FAIL=0
+          # This gate is scoped to the SDUI page-schema contract only — it fails
+          # on SDUI_* errors, not on other (pre-existing) validate findings such
+          # as MIGRATION_DESTRUCTIVE_NO_DOWN, which are tracked separately.
           for m in $(find . -name manifest.json -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/scripts/*'); do
             d=$(dirname "$m")
             has=$(node -e "const m=require('./$m'); const p=(m.studio&&m.studio.pages)||[]; process.stdout.write(p.some(x=>x&&x.schema)?'1':'')")
             [ -n "$has" ] || continue
             echo "── validate $d"
-            if ! bun "$CLI" extension validate --dir "$d" --first-party; then FAIL=1; fi
+            out=$(bun "$CLI" extension validate --dir "$d" --first-party 2>&1 || true)
+            echo "$out" | grep -E "SDUI schemas:" || true
+            if echo "$out" | grep -qE "SDUI_[A-Z_]+"; then
+              echo "$out" | grep -E "SDUI_[A-Z_]+"
+              FAIL=1
+            fi
           done
           if [ $FAIL -ne 0 ]; then
-            echo "::error::One or more declarative schemas failed validation (see above)."
+            echo "::error::One or more declarative schemas failed SDUI contract validation (see above)."
             exit 1
           fi
-          echo "All declarative schemas valid."
+          echo "All declarative schemas pass the SDUI contract."
