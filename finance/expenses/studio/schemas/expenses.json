@@ -42,12 +42,12 @@
           "icon": "CheckCircle",
           "variant": "text-success",
           "method": "POST",
-          "endpoint": "/ext/finance/expenses/{id}/approve",
+          "endpoint": "/ext/finance/expenses/reports/{id}/approve",
           "visibleWhen": { "field": "status", "equals": "submitted" }
         }
       ],
       "form": {
-        "endpoint": "/ext/finance/expenses",
+        "endpoint": "/ext/finance/expenses/reports",
         "fields": [
           { "name": "expense_date", "label": "finance.expenses.col.date", "type": "date", "colSpan": 1, "default": "today" },
           {

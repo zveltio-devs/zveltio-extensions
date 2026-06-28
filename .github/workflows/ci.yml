@@ -96,3 +96,27 @@ jobs:
             exit 1
           fi
           echo "All committed bundles match their declared engineSha256."
+
+      - name: Validate declarative (SDUI) page schemas
+        # Every extension that ships studio/pages[].schema is run through
+        # `zveltio extension validate`, which checks the schema's endpoints
+        # resolve to routes the engine actually serves and stay inside the
+        # extension's own (or a declared dependency's) /ext/<name>/ namespace.
+        # This is the gate that catches the beta.11 class where a wrong
+        # dataSource/endpoint shipped and rendered an empty table.
+        run: |
+          set -e
+          CLI=../zveltio/packages/cli/src/index.ts
+          FAIL=0
+          for m in $(find . -name manifest.json -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/scripts/*'); do
+            d=$(dirname "$m")
+            has=$(node -e "const m=require('./$m'); const p=(m.studio&&m.studio.pages)||[]; process.stdout.write(p.some(x=>x&&x.schema)?'1':'')")
+            [ -n "$has" ] || continue
+            echo "── validate $d"
+            if ! bun "$CLI" extension validate --dir "$d" --first-party; then FAIL=1; fi
+          done
+          if [ $FAIL -ne 0 ]; then
+            echo "::error::One or more declarative schemas failed validation (see above)."
+            exit 1
+          fi
+          echo "All declarative schemas valid."

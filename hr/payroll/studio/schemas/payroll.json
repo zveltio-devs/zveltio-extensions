@@ -18,7 +18,7 @@
       },
       "detailActions": [
         { "id": "generate", "icon": "Plus", "label": "hr.payroll.btn.generate", "method": "POST", "endpoint": "/ext/hr/payroll/periods/{id}/generate" },
-        { "id": "revisal", "kind": "download", "icon": "Download", "label": "hr.payroll.btn.revisal", "endpoint": "/ext/hr/payroll/periods/{id}/revisal-export" }
+        { "id": "revisal", "kind": "download", "icon": "Download", "label": "hr.payroll.btn.revisal", "endpoint": "/ext/hr/payroll/revisal" }
       ],
       "columns": [
         { "key": "employee_name", "label": "common.col.employee" },
