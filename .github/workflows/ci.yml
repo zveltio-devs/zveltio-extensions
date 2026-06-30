@@ -140,3 +140,78 @@ jobs:
         # and extends the validate gate to non-SDUI extensions. Exits non-zero on
         # any validate / SDUI / hash failure. The SDK was built by the prior step.
         run: bun ../zveltio/scripts/validate-all-extensions.ts "$GITHUB_WORKSPACE"
+
+  # Runtime contract gate: boots a real engine (from the cloned source) against a
+  # real Postgres with EXTENSIONS_DIR pointing at this repo, enables every SDUI
+  # extension, and asserts each one's primary dataSource serves and its declared
+  # dataPath resolves. This is the check static validation cannot do — it catches
+  # the "200 OK but wrong dataPath KEY → empty table" class on a LIVE engine, so
+  # the "54 extensions work" claim is guaranteed by CI, not by a laptop. Enable
+  # failures (e.g. a Postgres extension the image lacks) are SOFT; only an
+  # enabled-but-broken contract HARD-fails.
+  runtime-probe:
+    name: Runtime SDUI contract probe (live engine)
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: zveltio_probe
+          POSTGRES_USER: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Clone engine repo as sibling
+        run: git clone --depth=1 https://github.com/zveltio-devs/zveltio.git ../zveltio
+      - name: Install extension deps
+        run: bun install --frozen-lockfile
+      - name: Install engine deps
+        run: cd ../zveltio && bun install
+
+      - name: Boot engine + create god + probe SDUI contract
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/zveltio_probe
+          BETTER_AUTH_SECRET: probe-secret-32-chars-long-zzzzzzzz
+          BETTER_AUTH_URL: http://localhost:3000
+          ENCRYPTION_KEY: probe-encryption-key-32-bytes-aaaaaaaa
+          EXTENSIONS_DIR: ${{ github.workspace }}
+          PORT: '3000'
+          NODE_ENV: production
+          BASE_URL: http://127.0.0.1:3000
+          TEST_EMAIL: probe@test.invalid
+          TEST_PASS: ProbePass123!
+        run: |
+          set -e
+          cd ../zveltio
+          # Boot (auto-migrates + serves) in the background.
+          bun packages/engine/src/index.ts > /tmp/engine.log 2>&1 &
+          ENGINE_PID=$!
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:3000/api/health/ready >/dev/null 2>&1; then
+              echo "✓ Engine booted"; break
+            fi
+            sleep 1
+            if [ "$i" -eq 90 ]; then
+              echo "::error::Engine did not become ready in 90s"; tail -50 /tmp/engine.log
+              kill $ENGINE_PID 2>/dev/null || true; exit 1
+            fi
+          done
+          # God user so the probe can enable + read privileged endpoints.
+          bun packages/engine/src/index.ts create-god \
+            --email "$TEST_EMAIL" --password "$TEST_PASS" --name "Probe Bot" || true
+          # Run the live contract probe against this repo's extensions. Its exit
+          # code becomes this step's (the background engine is torn down with the
+          # runner). HARD failures (broken contract) fail the job; SOFT (enable
+          # env issues) only warn.
+          bun scripts/probe-sdui-endpoints.ts "$GITHUB_WORKSPACE"
