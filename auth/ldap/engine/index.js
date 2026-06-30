@@ -17700,7 +17700,7 @@ function finalize(ctx, schema) {
     result.$schema = "http://json-schema.org/draft-07/schema#";
   } else if (ctx.target === "draft-04") {
     result.$schema = "http://json-schema.org/draft-04/schema#";
-  } else if (ctx.target === "openapi-3.0") {} else {}
+  } else if (ctx.target === "openapi-3.0") {}
   if (ctx.external?.uri) {
     const id = ctx.external.registry.get(schema)?.id;
     if (!id)
@@ -17944,7 +17944,7 @@ var literalProcessor = (schema, ctx, json, _params) => {
     if (val === undefined) {
       if (ctx.unrepresentable === "throw") {
         throw new Error("Literal `undefined` cannot be represented in JSON Schema");
-      } else {}
+      }
     } else if (typeof val === "bigint") {
       if (ctx.unrepresentable === "throw") {
         throw new Error("BigInt literals cannot be represented in JSON Schema");
@@ -34772,7 +34772,7 @@ async function findOrCreateSsoUser(db, email3, displayName) {
 function ldapRoutes(ctx) {
   const { db, auth, checkPermission, internals } = ctx;
   function reqDb(c) {
-    return c.get("tenantTrx") ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
   }
   if (!internals?.createBetterAuthSession) {
     throw new Error("[ldap] engine internals missing createBetterAuthSession \u2014 Zveltio version mismatch");

@@ -30,7 +30,7 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
   // by SET LOCAL inside the tenant middleware's transaction. Routes
   // must use this handle for queries to see the right rows.
   function reqDb(c: any): any {
-    return c.get('tenantTrx') ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
   }
 
   app.use('*', async (c, next) => {

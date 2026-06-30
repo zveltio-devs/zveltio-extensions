@@ -31,7 +31,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
   // RLS keyed on `zveltio.current_tenant`; routes must run through
   // this handle so the GUC is active inside the transaction.
   function reqDb(c: any): any {
-    return c.get('tenantTrx') ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
   }
 
   const { runEdgeFunction: runFunction } = ctx.internals;
@@ -233,7 +233,7 @@ export async function mountEdgeFunctions(ctx: ExtensionContext): Promise<void> {
 
   // Per-request DB handle, used inside each registered handler.
   function reqDb(c: any): any {
-    return c.get('tenantTrx') ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
   }
 
   let fns: any[];

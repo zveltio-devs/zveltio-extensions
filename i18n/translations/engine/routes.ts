@@ -21,7 +21,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
   // RLS keyed on `zveltio.current_tenant`; routes must run through
   // this handle so the GUC is active inside the transaction.
   function reqDb(c: any): any {
-    return c.get('tenantTrx') ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
   }
 
 

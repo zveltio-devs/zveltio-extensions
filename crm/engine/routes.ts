@@ -30,16 +30,16 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
    * After migration 002_tenant_rls.sql, every `zvd_*` table in CRM
    * has FORCE ROW LEVEL SECURITY keyed on
    * `current_setting('zveltio.current_tenant')` — and that GUC is
-   * set via `SET LOCAL` only on the transaction the middleware
-   * issues. Running through the bare pool returns zero rows in
-   * multi-tenant deployments because the GUC is empty there.
+   * set via `set_config` only on the transaction the middleware
+   * issues. Running through the bare pool returns zero rows under
+   * FORCE RLS because the GUC is empty there.
    *
-   * Single-tenant deployments are unaffected: no middleware →
-   * no `tenantTrx` → fallback to `db`; rows have `tenant_id IS NULL`
-   * and the policy's NULL-OR-match arm passes.
+   * Prefers `ctx.reqDb(c)` (engine ≥ beta.20): the tenant transaction
+   * wrapped in the RestrictedDb table guard. Single-tenant runs as the
+   * default tenant, so rows carry that tenant_id and the policy matches.
    */
   function reqDb(c: any): any {
-    return c.get('tenantTrx') ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
   }
 
   // ── Auth guard ────────────────────────────────────────────────────────────
