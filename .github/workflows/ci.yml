@@ -132,3 +132,11 @@ jobs:
             exit 1
           fi
           echo "All declarative schemas pass the SDUI contract."
+
+      - name: Validate ALL extensions (consolidated report)
+        # Runs `extension validate --first-party` for EVERY extension (not just
+        # SDUI ones), plus SDUI schemas and committed-bundle hash, and prints a
+        # per-extension table. Subsumes the granular gates above into one report
+        # and extends the validate gate to non-SDUI extensions. Exits non-zero on
+        # any validate / SDUI / hash failure. The SDK was built by the prior step.
+        run: bun ../zveltio/scripts/validate-all-extensions.ts "$GITHUB_WORKSPACE"
