@@ -301,7 +301,7 @@ export function apiDocsRoutes(ctx: ExtensionContext): Hono {
 
   // Per-request DB handle (CRM PR #1 pattern).
   function reqDb(c: any): any {
-    return c.get('tenantTrx') ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
   }
 
   const router = new Hono();

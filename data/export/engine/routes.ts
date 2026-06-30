@@ -138,7 +138,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
   // active tenantTrx so FORCE RLS on zvd_export_jobs / zvd_export_logs
   // sees the right tenant.
   function reqDb(c: any): any {
-    return c.get('tenantTrx') ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
   }
 
   const app = new Hono();

@@ -11559,7 +11559,7 @@ var require_dbcs_codec = __commonJS((exports) => {
           if (resCode !== undefined) {
             dbcsCode = resCode;
             nextChar = uCode;
-          } else {}
+          }
         }
         seqObj = undefined;
       } else if (uCode >= 0) {
@@ -11624,7 +11624,7 @@ var require_dbcs_codec = __commonJS((exports) => {
           newBuf[j++] = dbcsCode >> 8;
           newBuf[j++] = dbcsCode & 255;
         }
-      } else {}
+      }
       this.seqObj = undefined;
     }
     if (this.leadSurrogate !== -1) {
@@ -169218,7 +169218,7 @@ function finalize(ctx, schema2) {
     result.$schema = "http://json-schema.org/draft-07/schema#";
   } else if (ctx.target === "draft-04") {
     result.$schema = "http://json-schema.org/draft-04/schema#";
-  } else if (ctx.target === "openapi-3.0") {} else {}
+  } else if (ctx.target === "openapi-3.0") {}
   if (ctx.external?.uri) {
     const id = ctx.external.registry.get(schema2)?.id;
     if (!id)
@@ -169462,7 +169462,7 @@ var literalProcessor = (schema2, ctx, json, _params) => {
     if (val === undefined) {
       if (ctx.unrepresentable === "throw") {
         throw new Error("Literal `undefined` cannot be represented in JSON Schema");
-      } else {}
+      }
     } else if (typeof val === "bigint") {
       if (ctx.unrepresentable === "throw") {
         throw new Error("BigInt literals cannot be represented in JSON Schema");
@@ -172126,7 +172126,7 @@ var receptionSchema = exports_external.object({
 function lotsRouter(ctx) {
   const { db } = ctx;
   function reqDb(c) {
-    return c.get("tenantTrx") ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
   }
   const stockService = new StockService(db);
   const app = new Hono2;
@@ -172252,7 +172252,7 @@ var UNITS2 = ["kg", "g", "l", "ml", "buc", "cutie", "sac", "palet"];
 function dispatchesRouter(ctx) {
   const { db } = ctx;
   function reqDb(c) {
-    return c.get("tenantTrx") ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
   }
   const app = new Hono2;
   app.get("/", async (c) => {
@@ -172498,7 +172498,7 @@ var consumeSchema = exports_external.object({
 function scanRouter(ctx) {
   const { db } = ctx;
   function reqDb(c) {
-    return c.get("tenantTrx") ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
   }
   const stockService = new StockService(db);
   const app = new Hono2;
@@ -172564,7 +172564,7 @@ function generateLotNumber2(type) {
 function productionRouter(ctx) {
   const { db } = ctx;
   function reqDb(c) {
-    return c.get("tenantTrx") ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
   }
   const stockService = new StockService(db);
   const app = new Hono2;
@@ -172868,7 +172868,7 @@ class TraceTreeService {
 function traceRouter(ctx) {
   const { db } = ctx;
   function reqDb(c) {
-    return c.get("tenantTrx") ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
   }
   const traceTree = new TraceTreeService(db);
   const app = new Hono2;
@@ -172962,7 +172962,7 @@ class RecallService {
 function recallsRouter(ctx) {
   const { db } = ctx;
   function reqDb(c) {
-    return c.get("tenantTrx") ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
   }
   const recallService = new RecallService(db);
   const app = new Hono2;
@@ -187312,7 +187312,7 @@ class PNG {
 }
 
 // node_modules/pdfkit/js/pdfkit.es.js
-var __dirname = "C:\\Users\\Liviu\\zveltio-ecosystem\\zveltio-extensions\\node_modules\\pdfkit\\js";
+var __dirname = "/mnt/c/Users/Liviu/zveltio-ecosystem/zveltio-extensions/node_modules/pdfkit/js";
 
 class PDFAbstractReference {
   toString() {
@@ -192629,7 +192629,7 @@ async function fetchLotDetails(db, lotId) {
 function labelsRouter(ctx) {
   const { db } = ctx;
   function reqDb(c) {
-    return c.get("tenantTrx") ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
   }
   const app = new Hono2;
   app.get("/:lot_id", async (c) => {
@@ -192694,7 +192694,7 @@ function acceptsCsv(c) {
 function reportsRouter(ctx) {
   const { db } = ctx;
   function reqDb(c) {
-    return c.get("tenantTrx") ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
   }
   const app = new Hono2;
   app.get("/ansvsa-traceability", async (c) => {
@@ -192880,7 +192880,7 @@ var supplierSchema = exports_external.object({
 function suppliersRouter(ctx) {
   const { db } = ctx;
   function reqDb(c) {
-    return c.get("tenantTrx") ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
   }
   const app = new Hono2;
   app.get("/", async (c) => {
@@ -192948,7 +192948,7 @@ var itemSchema = exports_external.object({
 function itemsRouter(ctx) {
   const { db } = ctx;
   function reqDb(c) {
-    return c.get("tenantTrx") ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
   }
   const app = new Hono2;
   app.get("/", async (c) => {
@@ -193021,7 +193021,7 @@ var locationSchema = exports_external.object({
 function locationsRouter(ctx) {
   const { db } = ctx;
   function reqDb(c) {
-    return c.get("tenantTrx") ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
   }
   const app = new Hono2;
   app.get("/", async (c) => {

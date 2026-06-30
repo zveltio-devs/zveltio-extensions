@@ -24161,7 +24161,7 @@ function finalize(ctx, schema2) {
     result.$schema = "http://json-schema.org/draft-07/schema#";
   } else if (ctx.target === "draft-04") {
     result.$schema = "http://json-schema.org/draft-04/schema#";
-  } else if (ctx.target === "openapi-3.0") {} else {}
+  } else if (ctx.target === "openapi-3.0") {}
   if (ctx.external?.uri) {
     const id = ctx.external.registry.get(schema2)?.id;
     if (!id)
@@ -24405,7 +24405,7 @@ var literalProcessor = (schema2, ctx, json, _params) => {
     if (val === undefined) {
       if (ctx.unrepresentable === "throw") {
         throw new Error("Literal `undefined` cannot be represented in JSON Schema");
-      } else {}
+      }
     } else if (typeof val === "bigint") {
       if (ctx.unrepresentable === "throw") {
         throw new Error("BigInt literals cannot be represented in JSON Schema");
@@ -27024,7 +27024,7 @@ function permissionGate(ctx, resource, opts = {}) {
 function employeesRoutes(ctx) {
   const { db, auth, events } = ctx;
   function reqDb(c) {
-    return c.get("tenantTrx") ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
   }
   const app = new Hono2;
   app.use("*", async (c, next) => {

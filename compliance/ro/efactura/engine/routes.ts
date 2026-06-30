@@ -61,7 +61,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
   // FORCE RLS keyed on `zveltio.current_tenant`; routes must run
   // through this handle so the GUC is active.
   function reqDb(c: any): any {
-    return c.get('tenantTrx') ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
   }
 
   // Auth + RBAC gate — populate c.user then check `efactura` permission.

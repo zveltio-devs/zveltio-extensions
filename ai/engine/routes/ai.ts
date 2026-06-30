@@ -26,7 +26,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
    * depending on the row's `tenant_id`). Always use this.
    */
   function reqDb(c: any): any {
-    return c.get('tenantTrx') ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
   }
 
   async function requireAuth(c: any) {

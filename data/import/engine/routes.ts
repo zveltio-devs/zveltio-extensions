@@ -158,7 +158,7 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
   // request transaction; reqDb pulls tenantTrx so FORCE RLS on
   // zv_import_logs / zvd_import_profiles sees the right tenant.
   function reqDb(c: any): any {
-    return c.get('tenantTrx') ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
   }
 
   const app = new Hono<{ Variables: { user: any } }>();

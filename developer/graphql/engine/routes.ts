@@ -140,7 +140,7 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
   // RLS keyed on `zveltio.current_tenant`; routes must run through
   // this handle so the GUC is active inside the transaction.
   function reqDb(c: any): any {
-    return c.get('tenantTrx') ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
   }
 
   let collections: any[] = [];
@@ -427,7 +427,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
 
   // Per-request DB handle.
   function reqDb(c: any): any {
-    return c.get('tenantTrx') ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
   }
 
   const app = new Hono();

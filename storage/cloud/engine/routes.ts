@@ -17,7 +17,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
   // RLS keyed on `zveltio.current_tenant`; routes must run through
   // this handle so the GUC is active inside the transaction.
   function reqDb(c: any): any {
-    return c.get('tenantTrx') ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
   }
 
 
@@ -639,7 +639,7 @@ async function logAccess(
 export function makePublicShareHandler(ctx: ExtensionContext, s3: S3Client) {
   const { db } = ctx;
   function reqDb(c: any): any {
-    return c.get('tenantTrx') ?? db;
+    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
   }
   return async (c: any) => {
     const password = c.req.query('password');
