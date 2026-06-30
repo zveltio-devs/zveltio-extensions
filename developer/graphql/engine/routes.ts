@@ -212,7 +212,7 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
           throw new Error(`Forbidden: no read permission on "${col.name}"`);
         }
         try {
-          const trx = context.tenantTrx ?? context.db ?? db;
+          const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
           let q = (trx as any).selectFrom(tableName).selectAll();
           if (filter_id)               q = q.where('id', '=', filter_id);
           if (filter_id_in?.length)    q = q.where('id', 'in', filter_id_in);
@@ -233,7 +233,7 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
         if (!(await context.checkPermission(context.user.id, col.name, 'read'))) {
           throw new Error(`Forbidden: no read permission on "${col.name}"`);
         }
-        const trx = context.tenantTrx ?? context.db ?? db;
+        const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
         return await (trx as any)
           .selectFrom(tableName).selectAll()
           .where('id', '=', id)
@@ -248,7 +248,7 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
         if (!(await context.checkPermission(context.user.id, col.name, 'create'))) {
           throw new Error(`Forbidden: no create permission on "${col.name}"`);
         }
-        const trx = context.tenantTrx ?? context.db ?? db;
+        const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
         return await (trx as any)
           .insertInto(tableName).values(args)
           .returningAll().executeTakeFirst();
@@ -262,7 +262,7 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
         if (!(await context.checkPermission(context.user.id, col.name, 'update'))) {
           throw new Error(`Forbidden: no update permission on "${col.name}"`);
         }
-        const trx = context.tenantTrx ?? context.db ?? db;
+        const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
         return await (trx as any)
           .updateTable(tableName)
           .set({ ...data, updated_at: new Date() })
@@ -278,7 +278,7 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
         if (!(await context.checkPermission(context.user.id, col.name, 'delete'))) {
           throw new Error(`Forbidden: no delete permission on "${col.name}"`);
         }
-        const trx = context.tenantTrx ?? context.db ?? db;
+        const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
         const res = await (trx as any)
           .deleteFrom(tableName).where('id', '=', id).executeTakeFirst();
         return (res?.numDeletedRows ?? 0n) > 0n;
@@ -490,6 +490,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
           user: session.user,
           db,
           tenantTrx,
+          reqDb: reqDb(c),
           loaders,
           checkPermission,
         },
@@ -637,6 +638,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
           user: session.user,
           db,
           tenantTrx,
+          reqDb: reqDb(c),
           loaders,
           checkPermission,
         },

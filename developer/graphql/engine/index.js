@@ -14,10 +14,10 @@ var __export = (target, all) => {
     });
 };
 
-// developer/graphql/engine/index.ts
+// ../../../../zveltio-extensions/developer/graphql/engine/index.ts
 import { join as join2 } from "path";
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/compose.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
     let index = -1;
@@ -61,7 +61,7 @@ var compose = (middleware, onError, onNotFound) => {
   };
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/http-exception.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/http-exception.js
 var HTTPException = class extends Error {
   res;
   status;
@@ -84,10 +84,10 @@ var HTTPException = class extends Error {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/request/constants.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/request/constants.js
 var GET_MATCH_RESULT = /* @__PURE__ */ Symbol();
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/body.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/body.js
 var parseBody = async (request, options = /* @__PURE__ */ Object.create(null)) => {
   const { all = false, dot = false } = options;
   const headers = request instanceof HonoRequest ? request.raw.headers : request.headers;
@@ -158,7 +158,7 @@ var handleParsingNestedValues = (form, key, value) => {
   });
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/url.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/url.js
 var splitPath = (path) => {
   const paths = path.split("/");
   if (paths[0] === "") {
@@ -358,7 +358,7 @@ var getQueryParams = (url, key) => {
 };
 var decodeURIComponent_ = decodeURIComponent;
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/request.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/request.js
 var tryDecodeURIComponent = (str) => tryDecode(str, decodeURIComponent_);
 var HonoRequest = class {
   raw;
@@ -472,7 +472,7 @@ var HonoRequest = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/html.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/html.js
 var HtmlEscapedCallbackPhase = {
   Stringify: 1,
   BeforeStream: 2,
@@ -510,7 +510,7 @@ var resolveCallback = async (str, phase, preserveCallbacks, context, buffer) => 
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/context.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/context.js
 var TEXT_PLAIN = "text/plain; charset=UTF-8";
 var setDefaultContentType = (contentType, headers) => {
   return {
@@ -677,7 +677,7 @@ var Context = class {
   };
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router.js
 var METHOD_NAME_ALL = "ALL";
 var METHOD_NAME_ALL_LOWERCASE = "all";
 var METHODS = ["get", "post", "put", "delete", "options", "patch"];
@@ -685,10 +685,10 @@ var MESSAGE_MATCHER_IS_ALREADY_BUILT = "Can not add a route since the matcher is
 var UnsupportedPathError = class extends Error {
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/constants.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/constants.js
 var COMPOSED_HANDLER = "__COMPOSED_HANDLER";
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/hono-base.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/hono-base.js
 var notFoundHandler = (c) => {
   return c.text("404 Not Found", 404);
 };
@@ -912,7 +912,7 @@ var Hono = class _Hono {
   };
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/matcher.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/matcher.js
 var emptyParam = [];
 function match(method, path) {
   const matchers = this.buildAllMatchers();
@@ -933,7 +933,7 @@ function match(method, path) {
   return match2(method, path);
 }
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/node.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/node.js
 var LABEL_REG_EXP_STR = "[^/]+";
 var ONLY_WILDCARD_REG_EXP_STR = ".*";
 var TAIL_WILDCARD_REG_EXP_STR = "(?:|/.*)";
@@ -1037,7 +1037,7 @@ var Node = class _Node {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/trie.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/trie.js
 var Trie = class {
   #context = { varIndex: 0 };
   #root = new Node;
@@ -1093,7 +1093,7 @@ var Trie = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/router.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/router.js
 var nullMatcher = [/^$/, [], /* @__PURE__ */ Object.create(null)];
 var wildcardRegExpCache = /* @__PURE__ */ Object.create(null);
 function buildWildcardRegExp(path) {
@@ -1258,7 +1258,7 @@ var RegExpRouter = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/prepared-router.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/prepared-router.js
 var PreparedRegExpRouter = class {
   name = "PreparedRegExpRouter";
   #matchers;
@@ -1330,7 +1330,7 @@ var PreparedRegExpRouter = class {
   match = match;
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/smart-router/router.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/smart-router/router.js
 var SmartRouter = class {
   name = "SmartRouter";
   #routers = [];
@@ -1385,7 +1385,7 @@ var SmartRouter = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/trie-router/node.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/trie-router/node.js
 var emptyParams = /* @__PURE__ */ Object.create(null);
 var hasChildren = (children) => {
   for (const _ in children) {
@@ -1554,7 +1554,7 @@ var Node2 = class _Node2 {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/trie-router/router.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/trie-router/router.js
 var TrieRouter = class {
   name = "TrieRouter";
   #node;
@@ -1576,7 +1576,7 @@ var TrieRouter = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/hono.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/hono.js
 var Hono2 = class extends Hono {
   constructor(options = {}) {
     super(options);
@@ -1586,7 +1586,7 @@ var Hono2 = class extends Hono {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/cookie.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/cookie.js
 var validCookieNameRegEx = /^[\w!#$%&'*.^`|~+-]+$/;
 var validCookieValueRegEx = /^[ !#-:<-[\]-~]*$/;
 var trimCookieWhitespace = (value) => {
@@ -1637,7 +1637,7 @@ var parse = (cookie, name) => {
   return parsedCookie;
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/helper/cookie/index.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/helper/cookie/index.js
 var getCookie = (c, key, prefix) => {
   const cookie = c.req.raw.headers.get("Cookie");
   if (typeof key === "string") {
@@ -1660,7 +1660,7 @@ var getCookie = (c, key, prefix) => {
   return obj;
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/buffer.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/buffer.js
 var bufferToFormData = (arrayBuffer, contentType) => {
   const response = new Response(arrayBuffer, {
     headers: {
@@ -1670,7 +1670,7 @@ var bufferToFormData = (arrayBuffer, contentType) => {
   return response.formData();
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/validator/validator.js
+// ../../../node_modules/.bun/hono@4.12.23/node_modules/hono/dist/validator/validator.js
 var jsonRegex = /^application\/([a-z-\.]+\+)?json(;\s*[a-zA-Z0-9\-]+\=([^;]+))*$/;
 var multipartRegex = /^multipart\/form-data(;\s?boundary=[a-zA-Z0-9'"()+_,\-./:=?]+)?$/;
 var urlencodedRegex = /^application\/x-www-form-urlencoded(;\s*[a-zA-Z0-9\-]+\=([^;]+))*$/;
@@ -1747,7 +1747,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+727162ed4002934e/node_modules/@hono/zod-validator/dist/index.js
+// ../../../node_modules/.bun/@hono+zod-validator@0.7.6+727162ed4002934e/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -1777,7 +1777,7 @@ function zValidatorFunction(target, schema, hook, options) {
 }
 var zValidator = zValidatorFunction;
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
 var exports_external = {};
 __export(exports_external, {
   xor: () => xor,
@@ -2020,7 +2020,7 @@ __export(exports_external, {
   $brand: () => $brand
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/index.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/index.js
 var exports_core2 = {};
 __export(exports_core2, {
   version: () => version,
@@ -2299,7 +2299,7 @@ __export(exports_core2, {
   $ZodAny: () => $ZodAny
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/core.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/core.js
 var _a;
 var NEVER = /* @__PURE__ */ Object.freeze({
   status: "aborted"
@@ -2377,7 +2377,7 @@ function config(newConfig) {
     Object.assign(globalConfig, newConfig);
   return globalConfig;
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/util.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/util.js
 var exports_util = {};
 __export(exports_util, {
   unwrapMessage: () => unwrapMessage,
@@ -3069,7 +3069,7 @@ class Class {
   constructor(..._args) {}
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/errors.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/errors.js
 var initializer = (inst, def) => {
   inst.name = "$ZodError";
   Object.defineProperty(inst, "_zod", {
@@ -3209,7 +3209,7 @@ function prettifyError(error) {
 `);
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/parse.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/parse.js
 var _parse = (_Err) => (schema, value, _ctx, _params) => {
   const ctx = _ctx ? { ..._ctx, async: false } : { async: false };
   const result = schema._zod.run({ value, issues: [] }, ctx);
@@ -3296,7 +3296,7 @@ var _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
   return _safeParseAsync(_Err)(schema, value, _ctx);
 };
 var safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync($ZodRealError);
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/regexes.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/regexes.js
 var exports_regexes = {};
 __export(exports_regexes, {
   xid: () => xid,
@@ -3455,7 +3455,7 @@ var sha512_hex = /^[0-9a-fA-F]{128}$/;
 var sha512_base64 = /* @__PURE__ */ fixedBase64(86, "==");
 var sha512_base64url = /* @__PURE__ */ fixedBase64url(86);
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/checks.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a2;
   inst._zod ?? (inst._zod = {});
@@ -4002,7 +4002,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/doc.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/doc.js
 class Doc {
   constructor(args = []) {
     this.content = [];
@@ -4040,14 +4040,14 @@ class Doc {
   }
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/versions.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 4,
   patch: 3
 };
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/schemas.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a2;
   inst ?? (inst = {});
@@ -6131,7 +6131,7 @@ function handleRefineResult(result, payload, input, inst) {
     payload.issues.push(issue(_iss));
   }
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/index.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/index.js
 var exports_locales = {};
 __export(exports_locales, {
   zhTW: () => zh_TW_default,
@@ -6188,7 +6188,7 @@ __export(exports_locales, {
   ar: () => ar_default
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ar.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ar.js
 var error = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0641", verb: "\u0623\u0646 \u064A\u062D\u0648\u064A" },
@@ -6294,7 +6294,7 @@ function ar_default() {
     localeError: error()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/az.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/az.js
 var error2 = () => {
   const Sizable = {
     string: { unit: "simvol", verb: "olmal\u0131d\u0131r" },
@@ -6399,7 +6399,7 @@ function az_default() {
     localeError: error2()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/be.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/be.js
 function getBelarusianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -6555,7 +6555,7 @@ function be_default() {
     localeError: error3()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/bg.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/bg.js
 var error4 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0430", verb: "\u0434\u0430 \u0441\u044A\u0434\u044A\u0440\u0436\u0430" },
@@ -6675,7 +6675,7 @@ function bg_default() {
     localeError: error4()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ca.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ca.js
 var error5 = () => {
   const Sizable = {
     string: { unit: "car\xE0cters", verb: "contenir" },
@@ -6782,7 +6782,7 @@ function ca_default() {
     localeError: error5()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/cs.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/cs.js
 var error6 = () => {
   const Sizable = {
     string: { unit: "znak\u016F", verb: "m\xEDt" },
@@ -6893,7 +6893,7 @@ function cs_default() {
     localeError: error6()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/da.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/da.js
 var error7 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "havde" },
@@ -7008,7 +7008,7 @@ function da_default() {
     localeError: error7()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/de.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/de.js
 var error8 = () => {
   const Sizable = {
     string: { unit: "Zeichen", verb: "zu haben" },
@@ -7116,7 +7116,7 @@ function de_default() {
     localeError: error8()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/el.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/el.js
 var error9 = () => {
   const Sizable = {
     string: { unit: "\u03C7\u03B1\u03C1\u03B1\u03BA\u03C4\u03AE\u03C1\u03B5\u03C2", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" },
@@ -7225,7 +7225,7 @@ function el_default() {
     localeError: error9()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/en.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/en.js
 var error10 = () => {
   const Sizable = {
     string: { unit: "characters", verb: "to have" },
@@ -7335,7 +7335,7 @@ function en_default() {
     localeError: error10()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/eo.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/eo.js
 var error11 = () => {
   const Sizable = {
     string: { unit: "karaktrojn", verb: "havi" },
@@ -7444,7 +7444,7 @@ function eo_default() {
     localeError: error11()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/es.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/es.js
 var error12 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "tener" },
@@ -7576,7 +7576,7 @@ function es_default() {
     localeError: error12()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fa.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fa.js
 var error13 = () => {
   const Sizable = {
     string: { unit: "\u06A9\u0627\u0631\u0627\u06A9\u062A\u0631", verb: "\u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F" },
@@ -7690,7 +7690,7 @@ function fa_default() {
     localeError: error13()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fi.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fi.js
 var error14 = () => {
   const Sizable = {
     string: { unit: "merkki\xE4", subject: "merkkijonon" },
@@ -7802,7 +7802,7 @@ function fi_default() {
     localeError: error14()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr.js
 var error15 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -7927,7 +7927,7 @@ function fr_default() {
     localeError: error15()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr-CA.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr-CA.js
 var error16 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -8034,7 +8034,7 @@ function fr_CA_default() {
     localeError: error16()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/he.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/he.js
 var error17 = () => {
   const TypeNames = {
     string: { label: "\u05DE\u05D7\u05E8\u05D5\u05D6\u05EA", gender: "f" },
@@ -8227,7 +8227,7 @@ function he_default() {
     localeError: error17()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hr.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hr.js
 var error18 = () => {
   const Sizable = {
     string: { unit: "znakova", verb: "imati" },
@@ -8349,7 +8349,7 @@ function hr_default() {
     localeError: error18()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hu.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hu.js
 var error19 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "legyen" },
@@ -8457,7 +8457,7 @@ function hu_default() {
     localeError: error19()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hy.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hy.js
 function getArmenianPlural(count, one, many) {
   return Math.abs(count) === 1 ? one : many;
 }
@@ -8604,7 +8604,7 @@ function hy_default() {
     localeError: error20()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/id.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/id.js
 var error21 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "memiliki" },
@@ -8710,7 +8710,7 @@ function id_default() {
     localeError: error21()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/is.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/is.js
 var error22 = () => {
   const Sizable = {
     string: { unit: "stafi", verb: "a\xF0 hafa" },
@@ -8819,7 +8819,7 @@ function is_default() {
     localeError: error22()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/it.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/it.js
 var error23 = () => {
   const Sizable = {
     string: { unit: "caratteri", verb: "avere" },
@@ -8927,7 +8927,7 @@ function it_default() {
     localeError: error23()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ja.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ja.js
 var error24 = () => {
   const Sizable = {
     string: { unit: "\u6587\u5B57", verb: "\u3067\u3042\u308B" },
@@ -9034,7 +9034,7 @@ function ja_default() {
     localeError: error24()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ka.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ka.js
 var error25 = () => {
   const Sizable = {
     string: { unit: "\u10E1\u10D8\u10DB\u10D1\u10DD\u10DA\u10DD", verb: "\u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1" },
@@ -9146,7 +9146,7 @@ function ka_default() {
     localeError: error25()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/km.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/km.js
 var error26 = () => {
   const Sizable = {
     string: { unit: "\u178F\u17BD\u17A2\u1780\u17D2\u179F\u179A", verb: "\u1782\u17BD\u179A\u1798\u17B6\u1793" },
@@ -9257,11 +9257,11 @@ function km_default() {
   };
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/kh.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/kh.js
 function kh_default() {
   return km_default();
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ko.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ko.js
 var error27 = () => {
   const Sizable = {
     string: { unit: "\uBB38\uC790", verb: "to have" },
@@ -9372,7 +9372,7 @@ function ko_default() {
     localeError: error27()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/lt.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/lt.js
 var capitalizeFirstCharacter = (text) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
@@ -9575,7 +9575,7 @@ function lt_default() {
     localeError: error28()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/mk.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/mk.js
 var error29 = () => {
   const Sizable = {
     string: { unit: "\u0437\u043D\u0430\u0446\u0438", verb: "\u0434\u0430 \u0438\u043C\u0430\u0430\u0442" },
@@ -9684,7 +9684,7 @@ function mk_default() {
     localeError: error29()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ms.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ms.js
 var error30 = () => {
   const Sizable = {
     string: { unit: "aksara", verb: "mempunyai" },
@@ -9791,7 +9791,7 @@ function ms_default() {
     localeError: error30()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/nl.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/nl.js
 var error31 = () => {
   const Sizable = {
     string: { unit: "tekens", verb: "heeft" },
@@ -9901,7 +9901,7 @@ function nl_default() {
     localeError: error31()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/no.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/no.js
 var error32 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "\xE5 ha" },
@@ -10009,7 +10009,7 @@ function no_default() {
     localeError: error32()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ota.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ota.js
 var error33 = () => {
   const Sizable = {
     string: { unit: "harf", verb: "olmal\u0131d\u0131r" },
@@ -10118,7 +10118,7 @@ function ota_default() {
     localeError: error33()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ps.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ps.js
 var error34 = () => {
   const Sizable = {
     string: { unit: "\u062A\u0648\u06A9\u064A", verb: "\u0648\u0644\u0631\u064A" },
@@ -10232,7 +10232,7 @@ function ps_default() {
     localeError: error34()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pl.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pl.js
 var error35 = () => {
   const Sizable = {
     string: { unit: "znak\xF3w", verb: "mie\u0107" },
@@ -10341,7 +10341,7 @@ function pl_default() {
     localeError: error35()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pt.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pt.js
 var error36 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "ter" },
@@ -10449,7 +10449,7 @@ function pt_default() {
     localeError: error36()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ro.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ro.js
 var error37 = () => {
   const Sizable = {
     string: { unit: "caractere", verb: "s\u0103 aib\u0103" },
@@ -10568,7 +10568,7 @@ function ro_default() {
     localeError: error37()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ru.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ru.js
 function getRussianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -10724,7 +10724,7 @@ function ru_default() {
     localeError: error38()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sl.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sl.js
 var error39 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "imeti" },
@@ -10833,7 +10833,7 @@ function sl_default() {
     localeError: error39()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sv.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sv.js
 var error40 = () => {
   const Sizable = {
     string: { unit: "tecken", verb: "att ha" },
@@ -10943,7 +10943,7 @@ function sv_default() {
     localeError: error40()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ta.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ta.js
 var error41 = () => {
   const Sizable = {
     string: { unit: "\u0B8E\u0BB4\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1\u0B95\u0BCD\u0B95\u0BB3\u0BCD", verb: "\u0B95\u0BCA\u0BA3\u0BCD\u0B9F\u0BBF\u0BB0\u0BC1\u0B95\u0BCD\u0B95 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD" },
@@ -11053,7 +11053,7 @@ function ta_default() {
     localeError: error41()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/th.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/th.js
 var error42 = () => {
   const Sizable = {
     string: { unit: "\u0E15\u0E31\u0E27\u0E2D\u0E31\u0E01\u0E29\u0E23", verb: "\u0E04\u0E27\u0E23\u0E21\u0E35" },
@@ -11163,7 +11163,7 @@ function th_default() {
     localeError: error42()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/tr.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/tr.js
 var error43 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "olmal\u0131" },
@@ -11268,7 +11268,7 @@ function tr_default() {
     localeError: error43()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uk.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uk.js
 var error44 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0456\u0432", verb: "\u043C\u0430\u0442\u0438\u043C\u0435" },
@@ -11377,11 +11377,11 @@ function uk_default() {
   };
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ua.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ua.js
 function ua_default() {
   return uk_default();
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ur.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ur.js
 var error45 = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0648\u0641", verb: "\u06C1\u0648\u0646\u0627" },
@@ -11491,7 +11491,7 @@ function ur_default() {
     localeError: error45()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uz.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uz.js
 var error46 = () => {
   const Sizable = {
     string: { unit: "belgi", verb: "bo\u2018lishi kerak" },
@@ -11601,7 +11601,7 @@ function uz_default() {
     localeError: error46()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/vi.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/vi.js
 var error47 = () => {
   const Sizable = {
     string: { unit: "k\xFD t\u1EF1", verb: "c\xF3" },
@@ -11709,7 +11709,7 @@ function vi_default() {
     localeError: error47()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-CN.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-CN.js
 var error48 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u7B26", verb: "\u5305\u542B" },
@@ -11818,7 +11818,7 @@ function zh_CN_default() {
     localeError: error48()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-TW.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-TW.js
 var error49 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u5143", verb: "\u64C1\u6709" },
@@ -11925,7 +11925,7 @@ function zh_TW_default() {
     localeError: error49()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/yo.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/yo.js
 var error50 = () => {
   const Sizable = {
     string: { unit: "\xE0mi", verb: "n\xED" },
@@ -12032,7 +12032,7 @@ function yo_default() {
     localeError: error50()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/registries.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/registries.js
 var _a2;
 var $output = Symbol("ZodOutput");
 var $input = Symbol("ZodInput");
@@ -12082,7 +12082,7 @@ function registry() {
 }
 (_a2 = globalThis).__zod_globalRegistry ?? (_a2.__zod_globalRegistry = registry());
 var globalRegistry = globalThis.__zod_globalRegistry;
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/api.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/api.js
 function _string(Class2, params) {
   return new Class2({
     type: "string",
@@ -13002,7 +13002,7 @@ function _stringFormat(Class2, format, fnOrRegex, _params = {}) {
   const inst = new Class2(def);
   return inst;
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/to-json-schema.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/to-json-schema.js
 function initializeContext(params) {
   let target = params?.target ?? "draft-2020-12";
   if (target === "draft-4")
@@ -13354,7 +13354,7 @@ var createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params) =
   extractDefs(ctx, schema);
   return finalize(ctx, schema);
 };
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-processors.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-processors.js
 var formatMap = {
   guid: "uuid",
   url: "uri",
@@ -13892,7 +13892,7 @@ function toJSONSchema(input, params) {
   extractDefs(ctx, input);
   return finalize(ctx, input);
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-generator.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-generator.js
 class JSONSchemaGenerator {
   get metadataRegistry() {
     return this.ctx.metadataRegistry;
@@ -13951,9 +13951,9 @@ class JSONSchemaGenerator {
     return plainResult;
   }
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema.js
 var exports_json_schema = {};
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
 var exports_schemas2 = {};
 __export(exports_schemas2, {
   xor: () => xor,
@@ -14124,7 +14124,7 @@ __export(exports_schemas2, {
   ZodAny: () => ZodAny
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/checks.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/checks.js
 var exports_checks2 = {};
 __export(exports_checks2, {
   uppercase: () => _uppercase,
@@ -14158,7 +14158,7 @@ __export(exports_checks2, {
   endsWith: () => _endsWith
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/iso.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/iso.js
 var exports_iso = {};
 __export(exports_iso, {
   time: () => time2,
@@ -14199,7 +14199,7 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/errors.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/errors.js
 var initializer2 = (inst, issues) => {
   $ZodError.init(inst, issues);
   inst.name = "ZodError";
@@ -14234,7 +14234,7 @@ var ZodRealError = /* @__PURE__ */ $constructor("ZodError", initializer2, {
   Parent: Error
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/parse.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/parse.js
 var parse4 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse2 = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -14248,7 +14248,7 @@ var safeDecode2 = /* @__PURE__ */ _safeDecode(ZodRealError);
 var safeEncodeAsync2 = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 var safeDecodeAsync2 = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
 var _installedGroups = /* @__PURE__ */ new WeakMap;
 function _installLazyMethods(inst, group, methods) {
   const proto = Object.getPrototypeOf(inst);
@@ -15535,7 +15535,7 @@ function preprocess(fn, schema) {
     out: schema
   });
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/compat.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/compat.js
 var ZodIssueCode = {
   invalid_type: "invalid_type",
   too_big: "too_big",
@@ -15559,7 +15559,7 @@ function getErrorMap() {
 }
 var ZodFirstPartyTypeKind;
 (function(ZodFirstPartyTypeKind2) {})(ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {}));
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/from-json-schema.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/from-json-schema.js
 var z = {
   ...exports_schemas2,
   ...exports_checks2,
@@ -16026,7 +16026,7 @@ function fromJSONSchema(schema, params) {
   };
   return convertSchema(normalized, ctx);
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/coerce.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/coerce.js
 var exports_coerce = {};
 __export(exports_coerce, {
   string: () => string3,
@@ -16051,11 +16051,11 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
+// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
 config(en_default());
-// developer/graphql/engine/routes.ts
+// ../../../../zveltio-extensions/developer/graphql/engine/routes.ts
 import * as crypto2 from "crypto";
-// node_modules/graphql/jsutils/devAssert.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/devAssert.mjs
 function devAssert(condition, message) {
   const booleanCondition = Boolean(condition);
   if (!booleanCondition) {
@@ -16063,17 +16063,17 @@ function devAssert(condition, message) {
   }
 }
 
-// node_modules/graphql/jsutils/isPromise.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/isPromise.mjs
 function isPromise(value) {
   return typeof (value === null || value === undefined ? undefined : value.then) === "function";
 }
 
-// node_modules/graphql/jsutils/isObjectLike.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/isObjectLike.mjs
 function isObjectLike(value) {
   return typeof value == "object" && value !== null;
 }
 
-// node_modules/graphql/jsutils/invariant.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/invariant.mjs
 function invariant(condition, message) {
   const booleanCondition = Boolean(condition);
   if (!booleanCondition) {
@@ -16081,7 +16081,7 @@ function invariant(condition, message) {
   }
 }
 
-// node_modules/graphql/language/location.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/language/location.mjs
 var LineRegExp = /\r\n|[\n\r]/g;
 function getLocation(source, position) {
   let lastLineStart = 0;
@@ -16100,7 +16100,7 @@ function getLocation(source, position) {
   };
 }
 
-// node_modules/graphql/language/printLocation.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/language/printLocation.mjs
 function printLocation(location) {
   return printSourceLocation(location.source, getLocation(location.source, location.start));
 }
@@ -16144,7 +16144,7 @@ function printPrefixedLines(lines) {
 `);
 }
 
-// node_modules/graphql/error/GraphQLError.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/error/GraphQLError.mjs
 function toNormalizedOptions(args) {
   const firstArg = args[0];
   if (firstArg == null || "kind" in firstArg || "length" in firstArg) {
@@ -16254,7 +16254,7 @@ function undefinedIfEmpty(array2) {
   return array2 === undefined || array2.length === 0 ? undefined : array2;
 }
 
-// node_modules/graphql/error/syntaxError.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/error/syntaxError.mjs
 function syntaxError(source, position, description) {
   return new GraphQLError(`Syntax Error: ${description}`, {
     source,
@@ -16262,7 +16262,7 @@ function syntaxError(source, position, description) {
   });
 }
 
-// node_modules/graphql/language/ast.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/language/ast.mjs
 class Location {
   constructor(startToken, endToken, source) {
     this.start = startToken.start;
@@ -16411,7 +16411,7 @@ var OperationTypeNode;
   OperationTypeNode2["SUBSCRIPTION"] = "subscription";
 })(OperationTypeNode || (OperationTypeNode = {}));
 
-// node_modules/graphql/language/directiveLocation.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/language/directiveLocation.mjs
 var DirectiveLocation;
 (function(DirectiveLocation2) {
   DirectiveLocation2["QUERY"] = "QUERY";
@@ -16436,7 +16436,7 @@ var DirectiveLocation;
   DirectiveLocation2["DIRECTIVE_DEFINITION"] = "DIRECTIVE_DEFINITION";
 })(DirectiveLocation || (DirectiveLocation = {}));
 
-// node_modules/graphql/language/kinds.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/language/kinds.mjs
 var Kind;
 (function(Kind2) {
   Kind2["NAME"] = "Name";
@@ -16490,7 +16490,7 @@ var Kind;
   Kind2["DIRECTIVE_ARGUMENT_COORDINATE"] = "DirectiveArgumentCoordinate";
 })(Kind || (Kind = {}));
 
-// node_modules/graphql/language/characterClasses.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/language/characterClasses.mjs
 function isWhiteSpace(code) {
   return code === 9 || code === 32;
 }
@@ -16507,7 +16507,7 @@ function isNameContinue(code) {
   return isLetter(code) || isDigit(code) || code === 95;
 }
 
-// node_modules/graphql/language/blockString.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/language/blockString.mjs
 function dedentBlockStringLines(lines) {
   var _firstNonEmptyLine2;
   let commonIndent = Number.MAX_SAFE_INTEGER;
@@ -16559,7 +16559,7 @@ function printBlockString(value, options) {
   return '"""' + result + '"""';
 }
 
-// node_modules/graphql/language/tokenKind.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/language/tokenKind.mjs
 var TokenKind;
 (function(TokenKind2) {
   TokenKind2["SOF"] = "<SOF>";
@@ -16587,7 +16587,7 @@ var TokenKind;
   TokenKind2["COMMENT"] = "Comment";
 })(TokenKind || (TokenKind = {}));
 
-// node_modules/graphql/language/lexer.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/language/lexer.mjs
 class Lexer {
   constructor(source) {
     const startOfFileToken = new Token(TokenKind.SOF, 0, 0, 0, 0);
@@ -16989,7 +16989,7 @@ function readName(lexer, start) {
   return createToken(lexer, TokenKind.NAME, start, position, body.slice(start, position));
 }
 
-// node_modules/graphql/jsutils/inspect.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/inspect.mjs
 var MAX_ARRAY_LENGTH = 10;
 var MAX_RECURSIVE_DEPTH = 2;
 function inspect(value) {
@@ -17070,7 +17070,7 @@ function getObjectTag(object2) {
   return tag;
 }
 
-// node_modules/graphql/jsutils/instanceOf.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/instanceOf.mjs
 var isProduction = globalThis.process && false;
 var instanceOf = isProduction ? function instanceOf2(value, constructor) {
   return value instanceof constructor;
@@ -17101,7 +17101,7 @@ spurious results.`);
   return false;
 };
 
-// node_modules/graphql/language/source.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/language/source.mjs
 class Source {
   constructor(body, name = "GraphQL request", locationOffset = {
     line: 1,
@@ -17122,7 +17122,7 @@ function isSource(source) {
   return instanceOf(source, Source);
 }
 
-// node_modules/graphql/language/parser.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/language/parser.mjs
 function parse6(source, options) {
   const parser = new Parser(source, options);
   const document = parser.parseDocument();
@@ -18039,7 +18039,7 @@ function getTokenKindDesc(kind) {
   return isPunctuatorTokenKind(kind) ? `"${kind}"` : kind;
 }
 
-// node_modules/graphql/jsutils/didYouMean.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/didYouMean.mjs
 var MAX_SUGGESTIONS = 5;
 function didYouMean(firstArg, secondArg) {
   const [subMessage, suggestionsArg] = secondArg ? [firstArg, secondArg] : [undefined, firstArg];
@@ -18061,12 +18061,12 @@ function didYouMean(firstArg, secondArg) {
   return message + selected.join(", ") + ", or " + lastItem + "?";
 }
 
-// node_modules/graphql/jsutils/identityFunc.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/identityFunc.mjs
 function identityFunc(x) {
   return x;
 }
 
-// node_modules/graphql/jsutils/keyMap.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/keyMap.mjs
 function keyMap(list, keyFn) {
   const result = Object.create(null);
   for (const item of list) {
@@ -18075,7 +18075,7 @@ function keyMap(list, keyFn) {
   return result;
 }
 
-// node_modules/graphql/jsutils/keyValMap.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/keyValMap.mjs
 function keyValMap(list, keyFn, valFn) {
   const result = Object.create(null);
   for (const item of list) {
@@ -18084,7 +18084,7 @@ function keyValMap(list, keyFn, valFn) {
   return result;
 }
 
-// node_modules/graphql/jsutils/mapValue.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/mapValue.mjs
 function mapValue(map2, fn) {
   const result = Object.create(null);
   for (const key of Object.keys(map2)) {
@@ -18093,7 +18093,7 @@ function mapValue(map2, fn) {
   return result;
 }
 
-// node_modules/graphql/jsutils/naturalCompare.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/naturalCompare.mjs
 function naturalCompare(aStr, bStr) {
   let aIndex = 0;
   let bIndex = 0;
@@ -18138,7 +18138,7 @@ function isDigit2(code) {
   return !isNaN(code) && DIGIT_0 <= code && code <= DIGIT_9;
 }
 
-// node_modules/graphql/jsutils/suggestionList.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/suggestionList.mjs
 function suggestionList(input, options) {
   const optionsByDistance = Object.create(null);
   const lexicalDistance = new LexicalDistance(input);
@@ -18223,7 +18223,7 @@ function stringToArray(str) {
   return array2;
 }
 
-// node_modules/graphql/jsutils/toObjMap.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/toObjMap.mjs
 function toObjMap(obj) {
   if (obj == null) {
     return Object.create(null);
@@ -18238,7 +18238,7 @@ function toObjMap(obj) {
   return map2;
 }
 
-// node_modules/graphql/language/printString.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/language/printString.mjs
 function printString(str) {
   return `"${str.replace(escapedRegExp, escapedReplacer)}"`;
 }
@@ -18409,7 +18409,7 @@ var escapeSequences = [
   "\\u009F"
 ];
 
-// node_modules/graphql/language/visitor.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/language/visitor.mjs
 var BREAK = Object.freeze({});
 function visit(root, visitor, visitorKeys = QueryDocumentKeys) {
   const enterLeaveMap = new Map;
@@ -18592,7 +18592,7 @@ function getEnterLeaveForKind(visitor, kind) {
   };
 }
 
-// node_modules/graphql/language/printer.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/language/printer.mjs
 function print(ast) {
   return visit(ast, printDocASTReducer);
 }
@@ -18860,7 +18860,7 @@ function hasMultilineItems(maybeArray) {
 `))) !== null && _maybeArray$some !== undefined ? _maybeArray$some : false;
 }
 
-// node_modules/graphql/utilities/valueFromASTUntyped.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/utilities/valueFromASTUntyped.mjs
 function valueFromASTUntyped(valueNode, variables) {
   switch (valueNode.kind) {
     case Kind.NULL:
@@ -18882,7 +18882,7 @@ function valueFromASTUntyped(valueNode, variables) {
   }
 }
 
-// node_modules/graphql/type/assertName.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/type/assertName.mjs
 function assertName(name) {
   name != null || devAssert(false, "Must provide name.");
   typeof name === "string" || devAssert(false, "Expected name to be a string.");
@@ -18906,7 +18906,7 @@ function assertEnumValueName(name) {
   return assertName(name);
 }
 
-// node_modules/graphql/type/definition.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/type/definition.mjs
 function isType(type) {
   return isScalarType(type) || isObjectType(type) || isInterfaceType(type) || isUnionType(type) || isEnumType(type) || isInputObjectType(type) || isListType(type) || isNonNullType(type);
 }
@@ -19435,7 +19435,7 @@ function isRequiredInputField(field) {
   return isNonNullType(field.type) && field.defaultValue === undefined;
 }
 
-// node_modules/graphql/utilities/typeComparators.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/utilities/typeComparators.mjs
 function isEqualType(typeA, typeB) {
   if (typeA === typeB) {
     return true;
@@ -19488,7 +19488,7 @@ function doTypesOverlap(schema, typeA, typeB) {
   return false;
 }
 
-// node_modules/graphql/type/scalars.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/type/scalars.mjs
 var GRAPHQL_MAX_INT = 2147483647;
 var GRAPHQL_MIN_INT = -2147483648;
 var GraphQLInt = new GraphQLScalarType({
@@ -19677,7 +19677,7 @@ function serializeObject(outputValue) {
   return outputValue;
 }
 
-// node_modules/graphql/type/directives.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/type/directives.mjs
 function isDirective(directive) {
   return instanceOf(directive, GraphQLDirective);
 }
@@ -19794,12 +19794,12 @@ var specifiedDirectives = Object.freeze([
   GraphQLOneOfDirective
 ]);
 
-// node_modules/graphql/jsutils/isIterableObject.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/isIterableObject.mjs
 function isIterableObject(maybeIterable) {
   return typeof maybeIterable === "object" && typeof (maybeIterable === null || maybeIterable === undefined ? undefined : maybeIterable[Symbol.iterator]) === "function";
 }
 
-// node_modules/graphql/utilities/astFromValue.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/utilities/astFromValue.mjs
 function astFromValue(value, type) {
   if (isNonNullType(type)) {
     const astValue = astFromValue(value, type.ofType);
@@ -19901,7 +19901,7 @@ function astFromValue(value, type) {
 }
 var integerStringRegExp = /^-?(?:0|[1-9][0-9]*)$/;
 
-// node_modules/graphql/type/introspection.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/type/introspection.mjs
 var __Schema = new GraphQLObjectType({
   name: "__Schema",
   description: "A GraphQL Schema defines the capabilities of a GraphQL server. It exposes all available types and directives on the server, as well as the entry points for query, mutation, and subscription operations.",
@@ -20394,7 +20394,7 @@ function isIntrospectionType(type) {
   return introspectionTypes.some(({ name }) => type.name === name);
 }
 
-// node_modules/graphql/type/schema.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/type/schema.mjs
 function isSchema(schema) {
   return instanceOf(schema, GraphQLSchema);
 }
@@ -20593,7 +20593,7 @@ function collectReferencedTypes(type, typeSet) {
   return typeSet;
 }
 
-// node_modules/graphql/type/validate.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/type/validate.mjs
 function validateSchema(schema) {
   assertSchema(schema);
   if (schema.__validationErrors) {
@@ -20926,7 +20926,7 @@ function getDeprecatedDirectiveNode(definitionNode) {
   return definitionNode === null || definitionNode === undefined ? undefined : (_definitionNode$direc = definitionNode.directives) === null || _definitionNode$direc === undefined ? undefined : _definitionNode$direc.find((node) => node.name.value === GraphQLDeprecatedDirective.name);
 }
 
-// node_modules/graphql/utilities/typeFromAST.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/utilities/typeFromAST.mjs
 function typeFromAST(schema, typeNode) {
   switch (typeNode.kind) {
     case Kind.LIST_TYPE: {
@@ -20942,7 +20942,7 @@ function typeFromAST(schema, typeNode) {
   }
 }
 
-// node_modules/graphql/utilities/TypeInfo.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/utilities/TypeInfo.mjs
 class TypeInfo {
   constructor(schema, initialType, getFieldDefFn) {
     this._schema = schema;
@@ -21182,7 +21182,7 @@ function visitWithTypeInfo(typeInfo, visitor) {
   };
 }
 
-// node_modules/graphql/language/predicates.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/language/predicates.mjs
 function isExecutableDefinitionNode(node) {
   return node.kind === Kind.OPERATION_DEFINITION || node.kind === Kind.FRAGMENT_DEFINITION;
 }
@@ -21199,7 +21199,7 @@ function isTypeExtensionNode(node) {
   return node.kind === Kind.SCALAR_TYPE_EXTENSION || node.kind === Kind.OBJECT_TYPE_EXTENSION || node.kind === Kind.INTERFACE_TYPE_EXTENSION || node.kind === Kind.UNION_TYPE_EXTENSION || node.kind === Kind.ENUM_TYPE_EXTENSION || node.kind === Kind.INPUT_OBJECT_TYPE_EXTENSION;
 }
 
-// node_modules/graphql/validation/rules/ExecutableDefinitionsRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/ExecutableDefinitionsRule.mjs
 function ExecutableDefinitionsRule(context) {
   return {
     Document(node) {
@@ -21216,7 +21216,7 @@ function ExecutableDefinitionsRule(context) {
   };
 }
 
-// node_modules/graphql/validation/rules/FieldsOnCorrectTypeRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/FieldsOnCorrectTypeRule.mjs
 function FieldsOnCorrectTypeRule(context) {
   return {
     Field(node) {
@@ -21281,7 +21281,7 @@ function getSuggestedFieldNames(type, fieldName) {
   return [];
 }
 
-// node_modules/graphql/validation/rules/FragmentsOnCompositeTypesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/FragmentsOnCompositeTypesRule.mjs
 function FragmentsOnCompositeTypesRule(context) {
   return {
     InlineFragment(node) {
@@ -21308,7 +21308,7 @@ function FragmentsOnCompositeTypesRule(context) {
   };
 }
 
-// node_modules/graphql/validation/rules/KnownArgumentNamesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/KnownArgumentNamesRule.mjs
 function KnownArgumentNamesRule(context) {
   return {
     ...KnownArgumentNamesOnDirectivesRule(context),
@@ -21362,7 +21362,7 @@ function KnownArgumentNamesOnDirectivesRule(context) {
   };
 }
 
-// node_modules/graphql/validation/rules/KnownDirectivesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/KnownDirectivesRule.mjs
 function KnownDirectivesRule(context) {
   const locationsMap = Object.create(null);
   const schema = context.getSchema();
@@ -21459,7 +21459,7 @@ function getDirectiveLocationForOperation(operation) {
   }
 }
 
-// node_modules/graphql/validation/rules/KnownFragmentNamesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/KnownFragmentNamesRule.mjs
 function KnownFragmentNamesRule(context) {
   return {
     FragmentSpread(node) {
@@ -21474,7 +21474,7 @@ function KnownFragmentNamesRule(context) {
   };
 }
 
-// node_modules/graphql/validation/rules/KnownTypeNamesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/KnownTypeNamesRule.mjs
 function KnownTypeNamesRule(context) {
   const schema = context.getSchema();
   const existingTypesMap = schema ? schema.getTypeMap() : Object.create(null);
@@ -21511,7 +21511,7 @@ function isSDLNode(value) {
   return "kind" in value && (isTypeSystemDefinitionNode(value) || isTypeSystemExtensionNode(value));
 }
 
-// node_modules/graphql/validation/rules/LoneAnonymousOperationRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/LoneAnonymousOperationRule.mjs
 function LoneAnonymousOperationRule(context) {
   let operationCount = 0;
   return {
@@ -21528,7 +21528,7 @@ function LoneAnonymousOperationRule(context) {
   };
 }
 
-// node_modules/graphql/validation/rules/LoneSchemaDefinitionRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/LoneSchemaDefinitionRule.mjs
 function LoneSchemaDefinitionRule(context) {
   var _ref, _ref2, _oldSchema$astNode;
   const oldSchema = context.getSchema();
@@ -21552,7 +21552,7 @@ function LoneSchemaDefinitionRule(context) {
   };
 }
 
-// node_modules/graphql/validation/rules/MaxIntrospectionDepthRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/MaxIntrospectionDepthRule.mjs
 var MAX_LISTS_DEPTH = 3;
 function MaxIntrospectionDepthRule(context) {
   function checkDepth(node, visitedFragments = Object.create(null), depth = 0) {
@@ -21601,7 +21601,7 @@ function MaxIntrospectionDepthRule(context) {
   };
 }
 
-// node_modules/graphql/validation/rules/NoFragmentCyclesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/NoFragmentCyclesRule.mjs
 function NoFragmentCyclesRule(context) {
   const visitedFrags = Object.create(null);
   const spreadPath = [];
@@ -21646,7 +21646,7 @@ function NoFragmentCyclesRule(context) {
   }
 }
 
-// node_modules/graphql/validation/rules/NoUndefinedVariablesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/NoUndefinedVariablesRule.mjs
 function NoUndefinedVariablesRule(context) {
   let variableNameDefined = Object.create(null);
   return {
@@ -21672,7 +21672,7 @@ function NoUndefinedVariablesRule(context) {
   };
 }
 
-// node_modules/graphql/validation/rules/NoUnusedFragmentsRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/NoUnusedFragmentsRule.mjs
 function NoUnusedFragmentsRule(context) {
   const operationDefs = [];
   const fragmentDefs = [];
@@ -21706,7 +21706,7 @@ function NoUnusedFragmentsRule(context) {
   };
 }
 
-// node_modules/graphql/validation/rules/NoUnusedVariablesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/NoUnusedVariablesRule.mjs
 function NoUnusedVariablesRule(context) {
   let variableDefs = [];
   return {
@@ -21736,7 +21736,7 @@ function NoUnusedVariablesRule(context) {
   };
 }
 
-// node_modules/graphql/utilities/sortValueNode.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/utilities/sortValueNode.mjs
 function sortValueNode(valueNode) {
   switch (valueNode.kind) {
     case Kind.OBJECT:
@@ -21760,7 +21760,7 @@ function sortFields(fields) {
   })).sort((fieldA, fieldB) => naturalCompare(fieldA.name.value, fieldB.name.value));
 }
 
-// node_modules/graphql/validation/rules/OverlappingFieldsCanBeMergedRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/OverlappingFieldsCanBeMergedRule.mjs
 function reasonMessage(reason) {
   if (Array.isArray(reason)) {
     return reason.map(([responseName, subReason]) => `subfields "${responseName}" conflict because ` + reasonMessage(subReason)).join(" and ");
@@ -22065,7 +22065,7 @@ class PairSet {
   }
 }
 
-// node_modules/graphql/validation/rules/PossibleFragmentSpreadsRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/PossibleFragmentSpreadsRule.mjs
 function PossibleFragmentSpreadsRule(context) {
   return {
     InlineFragment(node) {
@@ -22103,7 +22103,7 @@ function getFragmentType(context, name) {
   }
 }
 
-// node_modules/graphql/validation/rules/PossibleTypeExtensionsRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/PossibleTypeExtensionsRule.mjs
 function PossibleTypeExtensionsRule(context) {
   const schema = context.getSchema();
   const definedTypes = Object.create(null);
@@ -22197,7 +22197,7 @@ function extensionKindToTypeName(kind) {
   }
 }
 
-// node_modules/graphql/validation/rules/ProvidedRequiredArgumentsRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/ProvidedRequiredArgumentsRule.mjs
 function ProvidedRequiredArgumentsRule(context) {
   return {
     ...ProvidedRequiredArgumentsOnDirectivesRule(context),
@@ -22263,7 +22263,7 @@ function isRequiredArgumentNode(arg) {
   return arg.type.kind === Kind.NON_NULL_TYPE && arg.defaultValue == null;
 }
 
-// node_modules/graphql/validation/rules/ScalarLeafsRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/ScalarLeafsRule.mjs
 function ScalarLeafsRule(context) {
   return {
     Field(node) {
@@ -22296,12 +22296,12 @@ function ScalarLeafsRule(context) {
   };
 }
 
-// node_modules/graphql/jsutils/printPathArray.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/printPathArray.mjs
 function printPathArray(path) {
   return path.map((key) => typeof key === "number" ? "[" + key.toString() + "]" : "." + key).join("");
 }
 
-// node_modules/graphql/jsutils/Path.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/Path.mjs
 function addPath(prev, key, typename) {
   return {
     prev,
@@ -22319,7 +22319,7 @@ function pathToArray(path) {
   return flattened.reverse();
 }
 
-// node_modules/graphql/utilities/coerceInputValue.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/utilities/coerceInputValue.mjs
 function coerceInputValue(inputValue, type, onError = defaultOnError) {
   return coerceInputValueImpl(inputValue, type, onError, undefined);
 }
@@ -22413,7 +22413,7 @@ function coerceInputValueImpl(inputValue, type, onError, path) {
   invariant(false, "Unexpected input type: " + inspect(type));
 }
 
-// node_modules/graphql/utilities/valueFromAST.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/utilities/valueFromAST.mjs
 function valueFromAST(valueNode, type, variables) {
   if (!valueNode) {
     return;
@@ -22518,7 +22518,7 @@ function hasOwnProperty(obj, prop) {
   return Object.prototype.hasOwnProperty.call(obj, prop);
 }
 
-// node_modules/graphql/execution/values.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/execution/values.mjs
 function getVariableValues(schema, varDefNodes, inputs, options) {
   const errors3 = [];
   const maxErrors = options === null || options === undefined ? undefined : options.maxErrors;
@@ -22646,7 +22646,7 @@ function hasOwnProperty2(obj, prop) {
   return Object.prototype.hasOwnProperty.call(obj, prop);
 }
 
-// node_modules/graphql/execution/collectFields.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/execution/collectFields.mjs
 function collectFields(schema, fragments, variableValues, runtimeType, selectionSet) {
   const fields = new Map;
   collectFieldsImpl(schema, fragments, variableValues, runtimeType, selectionSet, fields, new Set);
@@ -22730,7 +22730,7 @@ function getFieldEntryKey(node) {
   return node.alias ? node.alias.value : node.name.value;
 }
 
-// node_modules/graphql/validation/rules/SingleFieldSubscriptionsRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/SingleFieldSubscriptionsRule.mjs
 function SingleFieldSubscriptionsRule(context) {
   return {
     OperationDefinition(node) {
@@ -22771,7 +22771,7 @@ function SingleFieldSubscriptionsRule(context) {
   };
 }
 
-// node_modules/graphql/jsutils/groupBy.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/groupBy.mjs
 function groupBy(list, keyFn) {
   const result = new Map;
   for (const item of list) {
@@ -22786,7 +22786,7 @@ function groupBy(list, keyFn) {
   return result;
 }
 
-// node_modules/graphql/validation/rules/UniqueArgumentDefinitionNamesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/UniqueArgumentDefinitionNamesRule.mjs
 function UniqueArgumentDefinitionNamesRule(context) {
   return {
     DirectiveDefinition(directiveNode) {
@@ -22824,7 +22824,7 @@ function UniqueArgumentDefinitionNamesRule(context) {
   }
 }
 
-// node_modules/graphql/validation/rules/UniqueArgumentNamesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/UniqueArgumentNamesRule.mjs
 function UniqueArgumentNamesRule(context) {
   return {
     Field: checkArgUniqueness,
@@ -22844,7 +22844,7 @@ function UniqueArgumentNamesRule(context) {
   }
 }
 
-// node_modules/graphql/validation/rules/UniqueDirectiveNamesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/UniqueDirectiveNamesRule.mjs
 function UniqueDirectiveNamesRule(context) {
   const knownDirectiveNames = Object.create(null);
   const schema = context.getSchema();
@@ -22869,7 +22869,7 @@ function UniqueDirectiveNamesRule(context) {
   };
 }
 
-// node_modules/graphql/validation/rules/UniqueDirectivesPerLocationRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/UniqueDirectivesPerLocationRule.mjs
 function UniqueDirectivesPerLocationRule(context) {
   const uniqueDirectiveMap = Object.create(null);
   const schema = context.getSchema();
@@ -22925,7 +22925,7 @@ function UniqueDirectivesPerLocationRule(context) {
   };
 }
 
-// node_modules/graphql/validation/rules/UniqueEnumValueNamesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/UniqueEnumValueNamesRule.mjs
 function UniqueEnumValueNamesRule(context) {
   const schema = context.getSchema();
   const existingTypeMap = schema ? schema.getTypeMap() : Object.create(null);
@@ -22961,7 +22961,7 @@ function UniqueEnumValueNamesRule(context) {
   }
 }
 
-// node_modules/graphql/validation/rules/UniqueFieldDefinitionNamesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/UniqueFieldDefinitionNamesRule.mjs
 function UniqueFieldDefinitionNamesRule(context) {
   const schema = context.getSchema();
   const existingTypeMap = schema ? schema.getTypeMap() : Object.create(null);
@@ -23006,7 +23006,7 @@ function hasField(type, fieldName) {
   return false;
 }
 
-// node_modules/graphql/validation/rules/UniqueFragmentNamesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/UniqueFragmentNamesRule.mjs
 function UniqueFragmentNamesRule(context) {
   const knownFragmentNames = Object.create(null);
   return {
@@ -23025,7 +23025,7 @@ function UniqueFragmentNamesRule(context) {
   };
 }
 
-// node_modules/graphql/validation/rules/UniqueInputFieldNamesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/UniqueInputFieldNamesRule.mjs
 function UniqueInputFieldNamesRule(context) {
   const knownNameStack = [];
   let knownNames = Object.create(null);
@@ -23054,7 +23054,7 @@ function UniqueInputFieldNamesRule(context) {
   };
 }
 
-// node_modules/graphql/validation/rules/UniqueOperationNamesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/UniqueOperationNamesRule.mjs
 function UniqueOperationNamesRule(context) {
   const knownOperationNames = Object.create(null);
   return {
@@ -23078,7 +23078,7 @@ function UniqueOperationNamesRule(context) {
   };
 }
 
-// node_modules/graphql/validation/rules/UniqueOperationTypesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/UniqueOperationTypesRule.mjs
 function UniqueOperationTypesRule(context) {
   const schema = context.getSchema();
   const definedOperationTypes = Object.create(null);
@@ -23113,7 +23113,7 @@ function UniqueOperationTypesRule(context) {
   }
 }
 
-// node_modules/graphql/validation/rules/UniqueTypeNamesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/UniqueTypeNamesRule.mjs
 function UniqueTypeNamesRule(context) {
   const knownTypeNames = Object.create(null);
   const schema = context.getSchema();
@@ -23144,7 +23144,7 @@ function UniqueTypeNamesRule(context) {
   }
 }
 
-// node_modules/graphql/validation/rules/UniqueVariableNamesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/UniqueVariableNamesRule.mjs
 function UniqueVariableNamesRule(context) {
   return {
     OperationDefinition(operationNode) {
@@ -23162,7 +23162,7 @@ function UniqueVariableNamesRule(context) {
   };
 }
 
-// node_modules/graphql/validation/rules/ValuesOfCorrectTypeRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/ValuesOfCorrectTypeRule.mjs
 function ValuesOfCorrectTypeRule(context) {
   return {
     ListValue(node) {
@@ -23269,7 +23269,7 @@ function validateOneOfInputObject(context, node, type, fieldNodeMap) {
   }
 }
 
-// node_modules/graphql/validation/rules/VariablesAreInputTypesRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/VariablesAreInputTypesRule.mjs
 function VariablesAreInputTypesRule(context) {
   return {
     VariableDefinition(node) {
@@ -23285,7 +23285,7 @@ function VariablesAreInputTypesRule(context) {
   };
 }
 
-// node_modules/graphql/validation/rules/VariablesInAllowedPositionRule.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/rules/VariablesInAllowedPositionRule.mjs
 function VariablesInAllowedPositionRule(context) {
   let varDefMap = Object.create(null);
   return {
@@ -23335,7 +23335,7 @@ function allowedVariableUsage(schema, varType, varDefaultValue, locationType, lo
   return isTypeSubTypeOf(schema, varType, locationType);
 }
 
-// node_modules/graphql/validation/specifiedRules.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/specifiedRules.mjs
 var recommendedRules = Object.freeze([MaxIntrospectionDepthRule]);
 var specifiedRules = Object.freeze([
   ExecutableDefinitionsRule,
@@ -23384,7 +23384,7 @@ var specifiedSDLRules = Object.freeze([
   ProvidedRequiredArgumentsOnDirectivesRule
 ]);
 
-// node_modules/graphql/validation/ValidationContext.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/ValidationContext.mjs
 class ASTValidationContext {
   constructor(ast, onError) {
     this._ast = ast;
@@ -23533,7 +23533,7 @@ class ValidationContext extends ASTValidationContext {
   }
 }
 
-// node_modules/graphql/validation/validate.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/validation/validate.mjs
 var QueryDocumentKeysToValidate = mapValue(QueryDocumentKeys, (keys) => keys.filter((key) => key !== "description"));
 function validate(schema, documentAST, rules = specifiedRules, options, typeInfo = new TypeInfo(schema)) {
   var _options$maxErrors;
@@ -23560,7 +23560,7 @@ function validate(schema, documentAST, rules = specifiedRules, options, typeInfo
   return errors3;
 }
 
-// node_modules/graphql/jsutils/memoize3.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/memoize3.mjs
 function memoize3(fn) {
   let cache0;
   return function memoized(a1, a2, a3) {
@@ -23586,7 +23586,7 @@ function memoize3(fn) {
   };
 }
 
-// node_modules/graphql/jsutils/promiseForObject.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/promiseForObject.mjs
 function promiseForObject(object2) {
   return Promise.all(Object.values(object2)).then((resolvedValues) => {
     const resolvedObject = Object.create(null);
@@ -23597,7 +23597,7 @@ function promiseForObject(object2) {
   });
 }
 
-// node_modules/graphql/jsutils/promiseReduce.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/promiseReduce.mjs
 function promiseReduce(values, callbackFn, initialValue) {
   let accumulator = initialValue;
   for (const value of values) {
@@ -23606,7 +23606,7 @@ function promiseReduce(values, callbackFn, initialValue) {
   return accumulator;
 }
 
-// node_modules/graphql/jsutils/toError.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/jsutils/toError.mjs
 function toError(thrownValue) {
   return thrownValue instanceof Error ? thrownValue : new NonErrorThrown(thrownValue);
 }
@@ -23619,7 +23619,7 @@ class NonErrorThrown extends Error {
   }
 }
 
-// node_modules/graphql/error/locatedError.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/error/locatedError.mjs
 function locatedError(rawOriginalError, nodes, path) {
   var _nodes;
   const originalError = toError(rawOriginalError);
@@ -23638,7 +23638,7 @@ function isLocatedGraphQLError(error51) {
   return Array.isArray(error51.path);
 }
 
-// node_modules/graphql/execution/execute.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/execution/execute.mjs
 var collectSubfields2 = memoize3((exeContext, returnType, fieldNodes) => collectSubfields(exeContext.schema, exeContext.fragments, exeContext.variableValues, returnType, fieldNodes));
 
 class CollectedErrors {
@@ -24058,7 +24058,7 @@ function getFieldDef2(schema, parentType, fieldNode) {
   return parentType.getFields()[fieldName];
 }
 
-// node_modules/graphql/graphql.mjs
+// ../../../../zveltio-extensions/node_modules/graphql/graphql.mjs
 function graphql(args) {
   return new Promise((resolve) => resolve(graphqlImpl(args)));
 }
@@ -24105,7 +24105,7 @@ function graphqlImpl(args) {
     typeResolver
   });
 }
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/object-utils.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/object-utils.js
 function isUndefined(obj) {
   return typeof obj === "undefined" || obj === undefined;
 }
@@ -24222,7 +24222,7 @@ function getTag(value) {
   return toString.call(value);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/alter-table-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/alter-table-node.js
 var AlterTableNode = freeze({
   is(node) {
     return node.kind === "AlterTableNode";
@@ -24247,7 +24247,7 @@ var AlterTableNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/identifier-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/identifier-node.js
 var IdentifierNode = freeze({
   is(node) {
     return node.kind === "IdentifierNode";
@@ -24260,7 +24260,7 @@ var IdentifierNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/create-index-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/create-index-node.js
 var CreateIndexNode = freeze({
   is(node) {
     return node.kind === "CreateIndexNode";
@@ -24285,7 +24285,7 @@ var CreateIndexNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/create-schema-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/create-schema-node.js
 var CreateSchemaNode = freeze({
   is(node) {
     return node.kind === "CreateSchemaNode";
@@ -24305,7 +24305,7 @@ var CreateSchemaNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/create-table-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/create-table-node.js
 var ON_COMMIT_ACTIONS = ["preserve rows", "delete rows", "drop"];
 var CreateTableNode = freeze({
   is(node) {
@@ -24350,7 +24350,7 @@ var CreateTableNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/schemable-identifier-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/schemable-identifier-node.js
 var SchemableIdentifierNode = freeze({
   is(node) {
     return node.kind === "SchemableIdentifierNode";
@@ -24370,7 +24370,7 @@ var SchemableIdentifierNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-index-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-index-node.js
 var DropIndexNode = freeze({
   is(node) {
     return node.kind === "DropIndexNode";
@@ -24390,7 +24390,7 @@ var DropIndexNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-schema-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-schema-node.js
 var DropSchemaNode = freeze({
   is(node) {
     return node.kind === "DropSchemaNode";
@@ -24410,7 +24410,7 @@ var DropSchemaNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-table-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-table-node.js
 var DropTableNode = freeze({
   is(node) {
     return node.kind === "DropTableNode";
@@ -24430,7 +24430,7 @@ var DropTableNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/alias-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/alias-node.js
 var AliasNode = freeze({
   is(node) {
     return node.kind === "AliasNode";
@@ -24444,7 +24444,7 @@ var AliasNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/table-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/table-node.js
 var TableNode = freeze({
   is(node) {
     return node.kind === "TableNode";
@@ -24463,12 +24463,12 @@ var TableNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/operation-node-source.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/operation-node-source.js
 function isOperationNodeSource(obj) {
   return isObject2(obj) && isFunction(obj.toOperationNode);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/expression/expression.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/expression/expression.js
 function isExpression(obj) {
   return isObject2(obj) && "expressionType" in obj && isOperationNodeSource(obj);
 }
@@ -24476,7 +24476,7 @@ function isAliasedExpression(obj) {
   return isObject2(obj) && "expression" in obj && isString(obj.alias) && isOperationNodeSource(obj);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/select-modifier-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/select-modifier-node.js
 var SelectModifierNode = freeze({
   is(node) {
     return node.kind === "SelectModifierNode";
@@ -24496,7 +24496,7 @@ var SelectModifierNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/and-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/and-node.js
 var AndNode = freeze({
   is(node) {
     return node.kind === "AndNode";
@@ -24510,7 +24510,7 @@ var AndNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/or-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/or-node.js
 var OrNode = freeze({
   is(node) {
     return node.kind === "OrNode";
@@ -24524,7 +24524,7 @@ var OrNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/on-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/on-node.js
 var OnNode = freeze({
   is(node) {
     return node.kind === "OnNode";
@@ -24543,7 +24543,7 @@ var OnNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/join-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/join-node.js
 var JoinNode = freeze({
   is(node) {
     return node.kind === "JoinNode";
@@ -24572,7 +24572,7 @@ var JoinNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/binary-operation-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/binary-operation-node.js
 var BinaryOperationNode = freeze({
   is(node) {
     return node.kind === "BinaryOperationNode";
@@ -24587,7 +24587,7 @@ var BinaryOperationNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/operator-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/operator-node.js
 var COMPARISON_OPERATORS = [
   "=",
   "==",
@@ -24672,7 +24672,7 @@ function isJSONOperator(op) {
   return isString(op) && JSON_OPERATORS.includes(op);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/column-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/column-node.js
 var ColumnNode = freeze({
   is(node) {
     return node.kind === "ColumnNode";
@@ -24685,7 +24685,7 @@ var ColumnNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/select-all-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/select-all-node.js
 var SelectAllNode = freeze({
   is(node) {
     return node.kind === "SelectAllNode";
@@ -24697,7 +24697,7 @@ var SelectAllNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/reference-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/reference-node.js
 var ReferenceNode = freeze({
   is(node) {
     return node.kind === "ReferenceNode";
@@ -24718,7 +24718,7 @@ var ReferenceNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dynamic/dynamic-reference-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dynamic/dynamic-reference-builder.js
 class DynamicReferenceBuilder {
   #dynamicReference;
   get dynamicReference() {
@@ -24738,7 +24738,7 @@ function isDynamicReferenceBuilder(obj) {
   return isObject2(obj) && isOperationNodeSource(obj) && isString(obj.dynamicReference);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/order-by-item-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/order-by-item-node.js
 var OrderByItemNode = freeze({
   is(node) {
     return node.kind === "OrderByItemNode";
@@ -24752,7 +24752,7 @@ var OrderByItemNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/raw-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/raw-node.js
 var RawNode = freeze({
   is(node) {
     return node.kind === "RawNode";
@@ -24775,7 +24775,7 @@ var RawNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/order-by-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/order-by-parser.js
 function isOrderByDirection(thing) {
   return thing === "asc" || thing === "desc";
 }
@@ -24828,7 +24828,7 @@ function parseOrderByDirectionExpression(expr) {
   return expr.toOperationNode();
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/json-reference-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/json-reference-node.js
 var JSONReferenceNode = freeze({
   is(node) {
     return node.kind === "JSONReferenceNode";
@@ -24848,7 +24848,7 @@ var JSONReferenceNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/json-operator-chain-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/json-operator-chain-node.js
 var JSONOperatorChainNode = freeze({
   is(node) {
     return node.kind === "JSONOperatorChainNode";
@@ -24868,7 +24868,7 @@ var JSONOperatorChainNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/json-path-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/json-path-node.js
 var JSONPathNode = freeze({
   is(node) {
     return node.kind === "JSONPathNode";
@@ -24888,7 +24888,7 @@ var JSONPathNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/reference-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/reference-parser.js
 function parseSimpleReferenceExpression(exp) {
   if (isString(exp)) {
     return parseStringReference(exp);
@@ -24969,7 +24969,7 @@ function trim(str) {
   return str.trim();
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/primitive-value-list-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/primitive-value-list-node.js
 var PrimitiveValueListNode = freeze({
   is(node) {
     return node.kind === "PrimitiveValueListNode";
@@ -24982,7 +24982,7 @@ var PrimitiveValueListNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/value-list-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/value-list-node.js
 var ValueListNode = freeze({
   is(node) {
     return node.kind === "ValueListNode";
@@ -24995,7 +24995,7 @@ var ValueListNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/value-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/value-node.js
 var ValueNode = freeze({
   is(node) {
     return node.kind === "ValueNode";
@@ -25015,7 +25015,7 @@ var ValueNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/value-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/value-parser.js
 function parseValueExpressionOrList(arg) {
   if (isReadonlyArray(arg)) {
     return parseValueExpressionList(arg);
@@ -25044,7 +25044,7 @@ function parseValueExpressionList(arg) {
   return PrimitiveValueListNode.create(arg);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/parens-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/parens-node.js
 var ParensNode = freeze({
   is(node) {
     return node.kind === "ParensNode";
@@ -25057,7 +25057,7 @@ var ParensNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/binary-operation-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/binary-operation-parser.js
 function parseValueBinaryOperationOrExpression(args) {
   if (args.length === 3) {
     return parseValueBinaryOperation(args[0], args[1], args[2]);
@@ -25111,7 +25111,7 @@ function toOperationNode(nodeOrSource) {
   return isOperationNodeSource(nodeOrSource) ? nodeOrSource.toOperationNode() : nodeOrSource;
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/order-by-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/order-by-node.js
 var OrderByNode = freeze({
   is(node) {
     return node.kind === "OrderByNode";
@@ -25130,7 +25130,7 @@ var OrderByNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/partition-by-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/partition-by-node.js
 var PartitionByNode = freeze({
   is(node) {
     return node.kind === "PartitionByNode";
@@ -25149,7 +25149,7 @@ var PartitionByNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/over-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/over-node.js
 var OverNode = freeze({
   is(node) {
     return node.kind === "OverNode";
@@ -25173,7 +25173,7 @@ var OverNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/from-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/from-node.js
 var FromNode = freeze({
   is(node) {
     return node.kind === "FromNode";
@@ -25192,7 +25192,7 @@ var FromNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/group-by-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/group-by-node.js
 var GroupByNode = freeze({
   is(node) {
     return node.kind === "GroupByNode";
@@ -25211,7 +25211,7 @@ var GroupByNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/having-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/having-node.js
 var HavingNode = freeze({
   is(node) {
     return node.kind === "HavingNode";
@@ -25230,7 +25230,7 @@ var HavingNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/select-query-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/select-query-node.js
 var SelectQueryNode = freeze({
   is(node) {
     return node.kind === "SelectQueryNode";
@@ -25340,7 +25340,7 @@ var SelectQueryNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/prevent-await.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/prevent-await.js
 function preventAwait(clazz, message) {
   Object.defineProperties(clazz.prototype, {
     then: {
@@ -25352,7 +25352,7 @@ function preventAwait(clazz, message) {
   });
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/join-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/join-builder.js
 class JoinBuilder {
   #props;
   constructor(props) {
@@ -25385,7 +25385,7 @@ class JoinBuilder {
 }
 preventAwait(JoinBuilder, "don't await JoinBuilder instances. They are never executed directly and are always just a part of a query.");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/partition-by-item-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/partition-by-item-node.js
 var PartitionByItemNode = freeze({
   is(node) {
     return node.kind === "PartitionByItemNode";
@@ -25398,12 +25398,12 @@ var PartitionByItemNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/partition-by-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/partition-by-parser.js
 function parsePartitionBy(partitionBy) {
   return parseReferenceExpressionOrList(partitionBy).map(PartitionByItemNode.create);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/over-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/over-builder.js
 class OverBuilder {
   #props;
   constructor(props) {
@@ -25428,7 +25428,7 @@ class OverBuilder {
 }
 preventAwait(OverBuilder, "don't await OverBuilder instances. They are never executed directly and are always just a part of a query.");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/selection-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/selection-node.js
 var SelectionNode = freeze({
   is(node) {
     return node.kind === "SelectionNode";
@@ -25453,7 +25453,7 @@ var SelectionNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/select-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/select-parser.js
 function parseSelectArg(selection) {
   if (isFunction(selection)) {
     return parseSelectArg(selection(expressionBuilder()));
@@ -25488,7 +25488,7 @@ function parseSelectAllArg(table) {
   throw new Error(`invalid value selectAll expression: ${JSON.stringify(table)}`);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/values-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/values-node.js
 var ValuesNode = freeze({
   is(node) {
     return node.kind === "ValuesNode";
@@ -25501,7 +25501,7 @@ var ValuesNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/default-insert-value-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/default-insert-value-node.js
 var DefaultInsertValueNode = freeze({
   is(node) {
     return node.kind === "DefaultInsertValueNode";
@@ -25513,7 +25513,7 @@ var DefaultInsertValueNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/insert-values-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/insert-values-parser.js
 function parseInsertExpression(arg) {
   const objectOrList = isFunction(arg) ? arg(expressionBuilder()) : arg;
   const list = isReadonlyArray(objectOrList) ? objectOrList : freeze([objectOrList]);
@@ -25565,7 +25565,7 @@ function parseRowValues(row, columns) {
   return PrimitiveValueListNode.create(rowValues);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/insert-query-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/insert-query-node.js
 var InsertQueryNode = freeze({
   is(node) {
     return node.kind === "InsertQueryNode";
@@ -25591,7 +25591,7 @@ var InsertQueryNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/update-query-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/update-query-node.js
 var UpdateQueryNode = freeze({
   is(node) {
     return node.kind === "UpdateQueryNode";
@@ -25628,7 +25628,7 @@ var UpdateQueryNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/using-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/using-node.js
 var UsingNode = freeze({
   is(node) {
     return node.kind === "UsingNode";
@@ -25647,7 +25647,7 @@ var UsingNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/delete-query-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/delete-query-node.js
 var DeleteQueryNode = freeze({
   is(node) {
     return node.kind === "DeleteQueryNode";
@@ -25691,7 +25691,7 @@ var DeleteQueryNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/where-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/where-node.js
 var WhereNode = freeze({
   is(node) {
     return node.kind === "WhereNode";
@@ -25710,7 +25710,7 @@ var WhereNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/returning-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/returning-node.js
 var ReturningNode = freeze({
   is(node) {
     return node.kind === "ReturningNode";
@@ -25729,7 +25729,7 @@ var ReturningNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/explain-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/explain-node.js
 var ExplainNode = freeze({
   is(node) {
     return node.kind === "ExplainNode";
@@ -25743,7 +25743,7 @@ var ExplainNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/when-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/when-node.js
 var WhenNode = freeze({
   is(node) {
     return node.kind === "WhenNode";
@@ -25762,7 +25762,7 @@ var WhenNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/merge-query-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/merge-query-node.js
 var MergeQueryNode = freeze({
   is(node) {
     return node.kind === "MergeQueryNode";
@@ -25797,7 +25797,7 @@ var MergeQueryNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/output-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/output-node.js
 var OutputNode = freeze({
   is(node) {
     return node.kind === "OutputNode";
@@ -25816,7 +25816,7 @@ var OutputNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/query-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/query-node.js
 var QueryNode = freeze({
   is(node) {
     return SelectQueryNode.is(node) || InsertQueryNode.is(node) || UpdateQueryNode.is(node) || DeleteQueryNode.is(node) || MergeQueryNode.is(node);
@@ -25877,7 +25877,7 @@ var QueryNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/column-update-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/column-update-node.js
 var ColumnUpdateNode = freeze({
   is(node) {
     return node.kind === "ColumnUpdateNode";
@@ -25891,7 +25891,7 @@ var ColumnUpdateNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/update-set-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/update-set-parser.js
 function parseUpdate(...args) {
   if (args.length === 2) {
     return [
@@ -25907,7 +25907,7 @@ function parseUpdateObjectExpression(update) {
   });
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/on-duplicate-key-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/on-duplicate-key-node.js
 var OnDuplicateKeyNode = freeze({
   is(node) {
     return node.kind === "OnDuplicateKeyNode";
@@ -25920,7 +25920,7 @@ var OnDuplicateKeyNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/insert-result.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/insert-result.js
 class InsertResult {
   insertId;
   numInsertedOrUpdatedRows;
@@ -25930,7 +25930,7 @@ class InsertResult {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/no-result-error.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/no-result-error.js
 class NoResultError extends Error {
   node;
   constructor(node) {
@@ -25942,7 +25942,7 @@ function isNoResultErrorConstructor(fn) {
   return Object.prototype.hasOwnProperty.call(fn, "prototype");
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/on-conflict-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/on-conflict-node.js
 var OnConflictNode = freeze({
   is(node) {
     return node.kind === "OnConflictNode";
@@ -25996,7 +25996,7 @@ var OnConflictNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/on-conflict-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/on-conflict-builder.js
 class OnConflictBuilder {
   #props;
   constructor(props) {
@@ -26119,7 +26119,7 @@ class OnConflictUpdateBuilder {
 }
 preventAwait(OnConflictUpdateBuilder, "don't await OnConflictUpdateBuilder instances.");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/top-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/top-node.js
 var TopNode = freeze({
   is(node) {
     return node.kind === "TopNode";
@@ -26133,7 +26133,7 @@ var TopNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/top-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/top-parser.js
 function parseTop(expression, modifiers) {
   if (!isNumber(expression) && !isBigInt(expression)) {
     throw new Error(`Invalid top expression: ${expression}`);
@@ -26147,7 +26147,7 @@ function isTopModifiers(modifiers) {
   return modifiers === "percent" || modifiers === "with ties" || modifiers === "percent with ties";
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/insert-query-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/insert-query-builder.js
 class InsertQueryBuilder {
   #props;
   constructor(props) {
@@ -26328,7 +26328,7 @@ class InsertQueryBuilder {
 }
 preventAwait(InsertQueryBuilder, "don't await InsertQueryBuilder instances directly. To execute the query you need to call `execute` or `executeTakeFirst`.");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/delete-result.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/delete-result.js
 class DeleteResult {
   numDeletedRows;
   constructor(numDeletedRows) {
@@ -26336,7 +26336,7 @@ class DeleteResult {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/limit-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/limit-node.js
 var LimitNode = freeze({
   is(node) {
     return node.kind === "LimitNode";
@@ -26349,7 +26349,7 @@ var LimitNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/delete-query-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/delete-query-builder.js
 class DeleteQueryBuilder {
   #props;
   constructor(props) {
@@ -26542,7 +26542,7 @@ class DeleteQueryBuilder {
 }
 preventAwait(DeleteQueryBuilder, "don't await DeleteQueryBuilder instances directly. To execute the query you need to call `execute` or `executeTakeFirst`.");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/update-result.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/update-result.js
 class UpdateResult {
   numUpdatedRows;
   numChangedRows;
@@ -26552,7 +26552,7 @@ class UpdateResult {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/update-query-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/update-query-builder.js
 class UpdateQueryBuilder {
   #props;
   constructor(props) {
@@ -26733,7 +26733,7 @@ class UpdateQueryBuilder {
 }
 preventAwait(UpdateQueryBuilder, "don't await UpdateQueryBuilder instances directly. To execute the query you need to call `execute` or `executeTakeFirst`.");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/common-table-expression-name-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/common-table-expression-name-node.js
 var CommonTableExpressionNameNode = freeze({
   is(node) {
     return node.kind === "CommonTableExpressionNameNode";
@@ -26747,7 +26747,7 @@ var CommonTableExpressionNameNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/common-table-expression-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/common-table-expression-node.js
 var CommonTableExpressionNode = freeze({
   is(node) {
     return node.kind === "CommonTableExpressionNode";
@@ -26767,7 +26767,7 @@ var CommonTableExpressionNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/cte-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/cte-builder.js
 class CTEBuilder {
   #props;
   constructor(props) {
@@ -26795,7 +26795,7 @@ class CTEBuilder {
 }
 preventAwait(CTEBuilder, "don't await CTEBuilder instances. They are never executed directly and are always just a part of a query.");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/with-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/with-parser.js
 function parseCommonTableExpression(nameOrBuilderCallback, expression) {
   const expressionNode = expression(createQueryCreator()).toOperationNode();
   if (isFunction(nameOrBuilderCallback)) {
@@ -26821,7 +26821,7 @@ function parseCommonTableExpressionName(name) {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/with-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/with-node.js
 var WithNode = freeze({
   is(node) {
     return node.kind === "WithNode";
@@ -26841,7 +26841,7 @@ var WithNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/random-string.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/random-string.js
 var CHARS = [
   "A",
   "B",
@@ -26917,7 +26917,7 @@ function randomChar() {
   return CHARS[~~(Math.random() * CHARS.length)];
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/query-id.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/query-id.js
 function createQueryId() {
   return new LazyQueryId;
 }
@@ -26932,12 +26932,12 @@ class LazyQueryId {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/require-all-props.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/require-all-props.js
 function requireAllProps(obj) {
   return obj;
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/operation-node-transformer.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/operation-node-transformer.js
 class OperationNodeTransformer {
   nodeStack = [];
   #transformers = freeze({
@@ -27780,7 +27780,7 @@ class OperationNodeTransformer {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/with-schema/with-schema-transformer.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/with-schema/with-schema-transformer.js
 var ROOT_OPERATION_NODES = freeze({
   AlterTableNode: true,
   CreateIndexNode: true,
@@ -27930,7 +27930,7 @@ class WithSchemaTransformer extends OperationNodeTransformer {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/with-schema/with-schema-plugin.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/with-schema/with-schema-plugin.js
 class WithSchemaPlugin {
   #transformer;
   constructor(schema) {
@@ -27944,7 +27944,7 @@ class WithSchemaPlugin {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/matched-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/matched-node.js
 var MatchedNode = freeze({
   is(node) {
     return node.kind === "MatchedNode";
@@ -27958,7 +27958,7 @@ var MatchedNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/merge-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/merge-parser.js
 function parseMergeWhen(type, args, refRight) {
   return WhenNode.create(parseFilterList([
     MatchedNode.create(!type.isMatched, type.bySource),
@@ -27977,7 +27977,7 @@ function parseMergeThen(result) {
   return result;
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/deferred.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/deferred.js
 class Deferred {
   #promise;
   #resolve;
@@ -28003,7 +28003,7 @@ class Deferred {
   };
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/log-once.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/log-once.js
 var LOGGED_MESSAGES = new Set;
 function logOnce(message) {
   if (LOGGED_MESSAGES.has(message)) {
@@ -28013,7 +28013,7 @@ function logOnce(message) {
   console.log(message);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-executor/query-executor-base.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-executor/query-executor-base.js
 var NO_PLUGINS = freeze([]);
 
 class QueryExecutorBase {
@@ -28079,7 +28079,7 @@ function warnOfOutdatedDriverOrPlugins(result, transformedResult) {
   logOnce("kysely:warning: outdated driver/plugin detected! QueryResult.numUpdatedOrDeletedRows is deprecated and will be removed in a future release.");
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-executor/noop-query-executor.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-executor/noop-query-executor.js
 class NoopQueryExecutor extends QueryExecutorBase {
   get adapter() {
     throw new Error("this query cannot be compiled to SQL");
@@ -28108,7 +28108,7 @@ class NoopQueryExecutor extends QueryExecutorBase {
 }
 var NOOP_QUERY_EXECUTOR = new NoopQueryExecutor;
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/merge-result.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/merge-result.js
 class MergeResult {
   numChangedRows;
   constructor(numChangedRows) {
@@ -28116,7 +28116,7 @@ class MergeResult {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/merge-query-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/merge-query-builder.js
 class MergeQueryBuilder {
   #props;
   constructor(props) {
@@ -28322,7 +28322,7 @@ class NotMatchedThenableMergeQueryBuilder {
 }
 preventAwait(NotMatchedThenableMergeQueryBuilder, "don't await NotMatchedThenableMergeQueryBuilder instances directly. To execute the query you need to call `execute` when available.");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-creator.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-creator.js
 class QueryCreator {
   #props;
   constructor(props) {
@@ -28411,7 +28411,7 @@ class QueryCreator {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/parse-utils.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/parse-utils.js
 function createQueryCreator() {
   return new QueryCreator({
     executor: NOOP_QUERY_EXECUTOR
@@ -28428,7 +28428,7 @@ function createOverBuilder() {
   });
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/join-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/join-parser.js
 function parseJoin(joinType, args) {
   if (args.length === 3) {
     return parseSingleOnJoin(joinType, args[0], args[1], args[2]);
@@ -28445,7 +28445,7 @@ function parseSingleOnJoin(joinType, from, lhsColumn, rhsColumn) {
   return JoinNode.createWithOn(joinType, parseTableExpression(from), parseReferentialBinaryOperation(lhsColumn, "=", rhsColumn));
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/offset-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/offset-node.js
 var OffsetNode = freeze({
   is(node) {
     return node.kind === "OffsetNode";
@@ -28458,7 +28458,7 @@ var OffsetNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/group-by-item-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/group-by-item-node.js
 var GroupByItemNode = freeze({
   is(node) {
     return node.kind === "GroupByItemNode";
@@ -28471,13 +28471,13 @@ var GroupByItemNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/group-by-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/group-by-parser.js
 function parseGroupBy(groupBy2) {
   groupBy2 = isFunction(groupBy2) ? groupBy2(expressionBuilder()) : groupBy2;
   return parseReferenceExpressionOrList(groupBy2).map(GroupByItemNode.create);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/set-operation-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/set-operation-node.js
 var SetOperationNode = freeze({
   is(node) {
     return node.kind === "SetOperationNode";
@@ -28492,7 +28492,7 @@ var SetOperationNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/set-operation-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/set-operation-parser.js
 function parseSetOperations(operator, expression, all) {
   if (isFunction(expression)) {
     expression = expression(createExpressionBuilder());
@@ -28503,7 +28503,7 @@ function parseSetOperations(operator, expression, all) {
   return expression.map((expr) => SetOperationNode.create(operator, parseExpression(expr), all));
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/expression/expression-wrapper.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/expression/expression-wrapper.js
 class ExpressionWrapper {
   #node;
   constructor(node) {
@@ -28594,7 +28594,7 @@ class AndWrapper {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/fetch-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/fetch-node.js
 var FetchNode = {
   is(node) {
     return node.kind === "FetchNode";
@@ -28608,7 +28608,7 @@ var FetchNode = {
   }
 };
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/fetch-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/fetch-parser.js
 function parseFetch(rowCount, modifier) {
   if (!isNumber(rowCount) && !isBigInt(rowCount)) {
     throw new Error(`Invalid fetch row count: ${rowCount}`);
@@ -28622,7 +28622,7 @@ function isFetchModifier(value) {
   return value === "only" || value === "with ties";
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/select-query-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/select-query-builder.js
 class SelectQueryBuilderImpl {
   #props;
   constructor(props) {
@@ -28971,7 +28971,7 @@ class AliasedSelectQueryBuilderImpl {
 }
 preventAwait(AliasedSelectQueryBuilderImpl, "don't await AliasedSelectQueryBuilder instances directly. AliasedSelectQueryBuilder should never be executed directly since it's always a part of another query.");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/aggregate-function-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/aggregate-function-node.js
 var AggregateFunctionNode = freeze({
   is(node) {
     return node.kind === "AggregateFunctionNode";
@@ -29015,7 +29015,7 @@ var AggregateFunctionNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/function-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/function-node.js
 var FunctionNode = freeze({
   is(node) {
     return node.kind === "FunctionNode";
@@ -29029,7 +29029,7 @@ var FunctionNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/aggregate-function-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/aggregate-function-builder.js
 class AggregateFunctionBuilder {
   #props;
   constructor(props) {
@@ -29105,7 +29105,7 @@ class AliasedAggregateFunctionBuilder {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/function-module.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/function-module.js
 function createFunctionModule() {
   const fn = (name, args) => {
     return new ExpressionWrapper(FunctionNode.create(name, parseReferenceExpressionOrList(args ?? [])));
@@ -29158,7 +29158,7 @@ function createFunctionModule() {
   });
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/unary-operation-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/unary-operation-node.js
 var UnaryOperationNode = freeze({
   is(node) {
     return node.kind === "UnaryOperationNode";
@@ -29172,12 +29172,12 @@ var UnaryOperationNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/unary-operation-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/unary-operation-parser.js
 function parseUnaryOperation(operator, operand) {
   return UnaryOperationNode.create(OperatorNode.create(operator), parseReferenceExpression(operand));
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/case-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/case-node.js
 var CaseNode = freeze({
   is(node) {
     return node.kind === "CaseNode";
@@ -29211,7 +29211,7 @@ var CaseNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/case-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/case-builder.js
 class CaseBuilder {
   #props;
   constructor(props) {
@@ -29278,7 +29278,7 @@ class CaseEndBuilder {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/json-path-leg-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/json-path-leg-node.js
 var JSONPathLegNode = freeze({
   is(node) {
     return node.kind === "JSONPathLegNode";
@@ -29292,7 +29292,7 @@ var JSONPathLegNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/json-path-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/json-path-builder.js
 class JSONPathBuilder {
   #node;
   constructor(node) {
@@ -29353,7 +29353,7 @@ class AliasedJSONPathBuilder {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/tuple-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/tuple-node.js
 var TupleNode = freeze({
   is(node) {
     return node.kind === "TupleNode";
@@ -29366,7 +29366,7 @@ var TupleNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/data-type-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/data-type-node.js
 var SIMPLE_COLUMN_DATA_TYPES = [
   "varchar",
   "char",
@@ -29446,7 +29446,7 @@ function isColumnDataType(dataType) {
   return false;
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/data-type-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/data-type-parser.js
 function parseDataTypeExpression(dataType) {
   if (isOperationNodeSource(dataType)) {
     return dataType.toOperationNode();
@@ -29457,7 +29457,7 @@ function parseDataTypeExpression(dataType) {
   throw new Error(`invalid column data type ${JSON.stringify(dataType)}`);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/cast-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/cast-node.js
 var CastNode = freeze({
   is(node) {
     return node.kind === "CastNode";
@@ -29471,7 +29471,7 @@ var CastNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/expression/expression-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/expression/expression-builder.js
 function createExpressionBuilder(executor = NOOP_QUERY_EXECUTOR) {
   function binary(lhs, op, rhs) {
     return new ExpressionWrapper(parseValueBinaryOperation(lhs, op, rhs));
@@ -29569,7 +29569,7 @@ function expressionBuilder(_) {
   return createExpressionBuilder();
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/expression-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/expression-parser.js
 function parseExpression(exp) {
   if (isOperationNodeSource(exp)) {
     return exp.toOperationNode();
@@ -29590,7 +29590,7 @@ function isExpressionOrFactory(obj) {
   return isExpression(obj) || isAliasedExpression(obj) || isFunction(obj);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/table-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/table-parser.js
 function parseTableExpressionOrList(table) {
   if (isReadonlyArray(table)) {
     return table.map((it) => parseTableExpression(it));
@@ -29627,7 +29627,7 @@ function trim2(str) {
   return str.trim();
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/add-column-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/add-column-node.js
 var AddColumnNode = freeze({
   is(node) {
     return node.kind === "AddColumnNode";
@@ -29640,7 +29640,7 @@ var AddColumnNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/column-definition-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/column-definition-node.js
 var ColumnDefinitionNode = freeze({
   is(node) {
     return node.kind === "ColumnDefinitionNode";
@@ -29672,7 +29672,7 @@ var ColumnDefinitionNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-column-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-column-node.js
 var DropColumnNode = freeze({
   is(node) {
     return node.kind === "DropColumnNode";
@@ -29685,7 +29685,7 @@ var DropColumnNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/rename-column-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/rename-column-node.js
 var RenameColumnNode = freeze({
   is(node) {
     return node.kind === "RenameColumnNode";
@@ -29699,7 +29699,7 @@ var RenameColumnNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/check-constraint-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/check-constraint-node.js
 var CheckConstraintNode = freeze({
   is(node) {
     return node.kind === "CheckConstraintNode";
@@ -29713,7 +29713,7 @@ var CheckConstraintNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/references-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/references-node.js
 var ON_MODIFY_FOREIGN_ACTIONS = [
   "no action",
   "restrict",
@@ -29746,12 +29746,12 @@ var ReferencesNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/default-value-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/default-value-parser.js
 function parseDefaultValueExpression(value) {
   return isOperationNodeSource(value) ? value.toOperationNode() : ValueNode.createImmediate(value);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/generated-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/generated-node.js
 var GeneratedNode = freeze({
   is(node) {
     return node.kind === "GeneratedNode";
@@ -29777,7 +29777,7 @@ var GeneratedNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/default-value-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/default-value-node.js
 var DefaultValueNode = freeze({
   is(node) {
     return node.kind === "DefaultValueNode";
@@ -29790,7 +29790,7 @@ var DefaultValueNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/on-modify-action-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/on-modify-action-parser.js
 function parseOnModifyForeignAction(action) {
   if (ON_MODIFY_FOREIGN_ACTIONS.includes(action)) {
     return action;
@@ -29798,7 +29798,7 @@ function parseOnModifyForeignAction(action) {
   throw new Error(`invalid OnModifyForeignAction ${action}`);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/column-definition-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/column-definition-builder.js
 class ColumnDefinitionBuilder {
   #node;
   constructor(node) {
@@ -29905,7 +29905,7 @@ class ColumnDefinitionBuilder {
 }
 preventAwait(ColumnDefinitionBuilder, "don't await ColumnDefinitionBuilder instances directly.");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/modify-column-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/modify-column-node.js
 var ModifyColumnNode = freeze({
   is(node) {
     return node.kind === "ModifyColumnNode";
@@ -29918,7 +29918,7 @@ var ModifyColumnNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/foreign-key-constraint-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/foreign-key-constraint-node.js
 var ForeignKeyConstraintNode = freeze({
   is(node) {
     return node.kind === "ForeignKeyConstraintNode";
@@ -29939,7 +29939,7 @@ var ForeignKeyConstraintNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/foreign-key-constraint-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/foreign-key-constraint-builder.js
 class ForeignKeyConstraintBuilder {
   #node;
   constructor(node) {
@@ -29964,7 +29964,7 @@ class ForeignKeyConstraintBuilder {
 }
 preventAwait(ForeignKeyConstraintBuilder, "don't await ForeignKeyConstraintBuilder instances directly.");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/add-constraint-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/add-constraint-node.js
 var AddConstraintNode = freeze({
   is(node) {
     return node.kind === "AddConstraintNode";
@@ -29977,7 +29977,7 @@ var AddConstraintNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/unique-constraint-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/unique-constraint-node.js
 var UniqueConstraintNode = freeze({
   is(node) {
     return node.kind === "UniqueConstraintNode";
@@ -29998,7 +29998,7 @@ var UniqueConstraintNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-constraint-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-constraint-node.js
 var DropConstraintNode = freeze({
   is(node) {
     return node.kind === "DropConstraintNode";
@@ -30017,7 +30017,7 @@ var DropConstraintNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/alter-column-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/alter-column-node.js
 var AlterColumnNode = freeze({
   is(node) {
     return node.kind === "AlterColumnNode";
@@ -30031,7 +30031,7 @@ var AlterColumnNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/alter-column-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/alter-column-builder.js
 class AlterColumnBuilder {
   #column;
   constructor(column) {
@@ -30069,7 +30069,7 @@ class AlteredColumnBuilder {
 }
 preventAwait(AlteredColumnBuilder, "don't await AlteredColumnBuilder instances");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/alter-table-executor.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/alter-table-executor.js
 class AlterTableExecutor {
   #props;
   constructor(props) {
@@ -30087,7 +30087,7 @@ class AlterTableExecutor {
 }
 preventAwait(AlterTableExecutor, "don't await AlterTableExecutor instances directly. To execute the query you need to call `execute`");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/alter-table-add-foreign-key-constraint-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/alter-table-add-foreign-key-constraint-builder.js
 class AlterTableAddForeignKeyConstraintBuilder {
   #props;
   constructor(props) {
@@ -30122,7 +30122,7 @@ class AlterTableAddForeignKeyConstraintBuilder {
 }
 preventAwait(AlterTableAddForeignKeyConstraintBuilder, "don't await AlterTableAddForeignKeyConstraintBuilder instances directly. To execute the query you need to call `execute`");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/alter-table-drop-constraint-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/alter-table-drop-constraint-builder.js
 class AlterTableDropConstraintBuilder {
   #props;
   constructor(props) {
@@ -30173,7 +30173,7 @@ class AlterTableDropConstraintBuilder {
 }
 preventAwait(AlterTableDropConstraintBuilder, "don't await AlterTableDropConstraintBuilder instances directly. To execute the query you need to call `execute`");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/primary-constraint-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/primary-constraint-node.js
 var PrimaryConstraintNode = freeze({
   is(node) {
     return node.kind === "PrimaryKeyConstraintNode";
@@ -30187,7 +30187,7 @@ var PrimaryConstraintNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/add-index-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/add-index-node.js
 var AddIndexNode = freeze({
   is(node) {
     return node.kind === "AddIndexNode";
@@ -30212,7 +30212,7 @@ var AddIndexNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/alter-table-add-index-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/alter-table-add-index-builder.js
 class AlterTableAddIndexBuilder {
   #props;
   constructor(props) {
@@ -30281,7 +30281,7 @@ class AlterTableAddIndexBuilder {
 }
 preventAwait(AlterTableAddIndexBuilder, "don't await AlterTableAddIndexBuilder instances directly. To execute the query you need to call `execute`");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/unique-constraint-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/unique-constraint-builder.js
 class UniqueConstraintNodeBuilder {
   #node;
   constructor(node) {
@@ -30296,7 +30296,7 @@ class UniqueConstraintNodeBuilder {
 }
 preventAwait(UniqueConstraintNodeBuilder, "don't await UniqueConstraintNodeBuilder instances directly.");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/alter-table-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/alter-table-builder.js
 class AlterTableBuilder {
   #props;
   constructor(props) {
@@ -30462,7 +30462,7 @@ class AlterTableColumnAlteringBuilder {
 }
 preventAwait(AlterTableColumnAlteringBuilder, "don't await AlterTableColumnAlteringBuilder instances directly. To execute the query you need to call `execute`");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/immediate-value/immediate-value-transformer.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/immediate-value/immediate-value-transformer.js
 class ImmediateValueTransformer extends OperationNodeTransformer {
   transformValue(node) {
     return {
@@ -30472,7 +30472,7 @@ class ImmediateValueTransformer extends OperationNodeTransformer {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/create-index-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/create-index-builder.js
 class CreateIndexBuilder {
   #props;
   constructor(props) {
@@ -30562,7 +30562,7 @@ class CreateIndexBuilder {
 }
 preventAwait(CreateIndexBuilder, "don't await CreateIndexBuilder instances directly. To execute the query you need to call `execute`");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/create-schema-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/create-schema-builder.js
 class CreateSchemaBuilder {
   #props;
   constructor(props) {
@@ -30589,7 +30589,7 @@ class CreateSchemaBuilder {
 }
 preventAwait(CreateSchemaBuilder, "don't await CreateSchemaBuilder instances directly. To execute the query you need to call `execute`");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/on-commit-action-parse.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/on-commit-action-parse.js
 function parseOnCommitAction(action) {
   if (ON_COMMIT_ACTIONS.includes(action)) {
     return action;
@@ -30597,7 +30597,7 @@ function parseOnCommitAction(action) {
   throw new Error(`invalid OnCommitAction ${action}`);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/create-table-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/create-table-builder.js
 class CreateTableBuilder {
   #props;
   constructor(props) {
@@ -30695,7 +30695,7 @@ class CreateTableBuilder {
 }
 preventAwait(CreateTableBuilder, "don't await CreateTableBuilder instances directly. To execute the query you need to call `execute`");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/drop-index-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/drop-index-builder.js
 class DropIndexBuilder {
   #props;
   constructor(props) {
@@ -30740,7 +30740,7 @@ class DropIndexBuilder {
 }
 preventAwait(DropIndexBuilder, "don't await DropIndexBuilder instances directly. To execute the query you need to call `execute`");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/drop-schema-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/drop-schema-builder.js
 class DropSchemaBuilder {
   #props;
   constructor(props) {
@@ -30777,7 +30777,7 @@ class DropSchemaBuilder {
 }
 preventAwait(DropSchemaBuilder, "don't await DropSchemaBuilder instances directly. To execute the query you need to call `execute`");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/drop-table-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/drop-table-builder.js
 class DropTableBuilder {
   #props;
   constructor(props) {
@@ -30814,7 +30814,7 @@ class DropTableBuilder {
 }
 preventAwait(DropTableBuilder, "don't await DropTableBuilder instances directly. To execute the query you need to call `execute`");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/create-view-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/create-view-node.js
 var CreateViewNode = freeze({
   is(node) {
     return node.kind === "CreateViewNode";
@@ -30833,7 +30833,7 @@ var CreateViewNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/immediate-value/immediate-value-plugin.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/immediate-value/immediate-value-plugin.js
 class ImmediateValuePlugin {
   #transformer = new ImmediateValueTransformer;
   transformQuery(args) {
@@ -30844,7 +30844,7 @@ class ImmediateValuePlugin {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/create-view-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/create-view-builder.js
 class CreateViewBuilder {
   #props;
   constructor(props) {
@@ -30914,7 +30914,7 @@ class CreateViewBuilder {
 }
 preventAwait(CreateViewBuilder, "don't await CreateViewBuilder instances directly. To execute the query you need to call `execute`");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-view-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-view-node.js
 var DropViewNode = freeze({
   is(node) {
     return node.kind === "DropViewNode";
@@ -30933,7 +30933,7 @@ var DropViewNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/drop-view-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/drop-view-builder.js
 class DropViewBuilder {
   #props;
   constructor(props) {
@@ -30978,7 +30978,7 @@ class DropViewBuilder {
 }
 preventAwait(DropViewBuilder, "don't await DropViewBuilder instances directly. To execute the query you need to call `execute`");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/create-type-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/create-type-node.js
 var CreateTypeNode = freeze({
   is(node) {
     return node.kind === "CreateTypeNode";
@@ -30997,7 +30997,7 @@ var CreateTypeNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/create-type-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/create-type-builder.js
 class CreateTypeBuilder {
   #props;
   constructor(props) {
@@ -31024,7 +31024,7 @@ class CreateTypeBuilder {
 }
 preventAwait(CreateTypeBuilder, "don't await CreateTypeBuilder instances directly. To execute the query you need to call `execute`");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-type-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-type-node.js
 var DropTypeNode = freeze({
   is(node) {
     return node.kind === "DropTypeNode";
@@ -31043,7 +31043,7 @@ var DropTypeNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/drop-type-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/drop-type-builder.js
 class DropTypeBuilder {
   #props;
   constructor(props) {
@@ -31072,7 +31072,7 @@ class DropTypeBuilder {
 }
 preventAwait(DropTypeBuilder, "don't await DropTypeBuilder instances directly. To execute the query you need to call `execute`");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/identifier-parser.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/identifier-parser.js
 function parseSchemableIdentifier(id) {
   const SCHEMA_SEPARATOR = ".";
   if (id.includes(SCHEMA_SEPARATOR)) {
@@ -31090,7 +31090,7 @@ function trim3(str) {
   return str.trim();
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/schema.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/schema.js
 class SchemaModule {
   #executor;
   constructor(executor) {
@@ -31184,14 +31184,14 @@ class SchemaModule {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dynamic/dynamic.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dynamic/dynamic.js
 class DynamicModule {
   ref(reference) {
     return new DynamicReferenceBuilder(reference);
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/driver/default-connection-provider.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/driver/default-connection-provider.js
 class DefaultConnectionProvider {
   #driver;
   constructor(driver) {
@@ -31207,7 +31207,7 @@ class DefaultConnectionProvider {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-executor/default-query-executor.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-executor/default-query-executor.js
 class DefaultQueryExecutor extends QueryExecutorBase {
   #compiler;
   #adapter;
@@ -31244,7 +31244,7 @@ class DefaultQueryExecutor extends QueryExecutorBase {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/performance-now.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/performance-now.js
 function performanceNow() {
   if (typeof performance !== "undefined" && isFunction(performance.now)) {
     return performance.now();
@@ -31253,7 +31253,7 @@ function performanceNow() {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/driver/runtime-driver.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/driver/runtime-driver.js
 class RuntimeDriver {
   #driver;
   #log;
@@ -31362,7 +31362,7 @@ class RuntimeDriver {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/driver/single-connection-provider.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/driver/single-connection-provider.js
 var ignoreError = () => {};
 
 class SingleConnectionProvider {
@@ -31385,7 +31385,7 @@ class SingleConnectionProvider {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/driver/driver.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/driver/driver.js
 var TRANSACTION_ISOLATION_LEVELS = [
   "read uncommitted",
   "read committed",
@@ -31394,7 +31394,7 @@ var TRANSACTION_ISOLATION_LEVELS = [
   "snapshot"
 ];
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/log.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/log.js
 var LOG_LEVELS = freeze(["query", "error"]);
 
 class Log {
@@ -31446,12 +31446,12 @@ function defaultLogger(event) {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/compilable.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/compilable.js
 function isCompilable(value) {
   return isObject2(value) && isFunction(value.compile);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/kysely.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/kysely.js
 class Kysely extends QueryCreator {
   #props;
   constructor(args) {
@@ -31640,7 +31640,7 @@ function validateTransactionSettings(settings) {
     throw new Error(`invalid transaction isolation level ${settings.isolationLevel}`);
   }
 }
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/raw-builder/raw-builder.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/raw-builder/raw-builder.js
 class RawBuilderImpl {
   #props;
   constructor(props) {
@@ -31714,7 +31714,7 @@ class AliasedRawBuilderImpl {
   }
 }
 preventAwait(AliasedRawBuilderImpl, "don't await AliasedRawBuilder instances directly. AliasedRawBuilder should never be executed directly since it's always a part of another query.");
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/raw-builder/sql.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/raw-builder/sql.js
 var sql = Object.assign((sqlFragments, ...parameters) => {
   return createRawBuilder({
     queryId: createQueryId(),
@@ -31787,7 +31787,7 @@ function parseParameter(param) {
   }
   return parseValueExpression(param);
 }
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/operation-node-visitor.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/operation-node-visitor.js
 class OperationNodeVisitor {
   nodeStack = [];
   get parentNode() {
@@ -31895,7 +31895,7 @@ class OperationNodeVisitor {
   };
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-compiler/default-query-compiler.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-compiler/default-query-compiler.js
 class DefaultQueryCompiler extends OperationNodeVisitor {
   #sql = "";
   #parameters = [];
@@ -33154,7 +33154,7 @@ var JOIN_TYPE_SQL = freeze({
   LateralLeftJoin: "left join lateral",
   Using: "using"
 });
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-compiler/compiled-query.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-compiler/compiled-query.js
 var CompiledQuery = freeze({
   raw(sql2, parameters = []) {
     return freeze({
@@ -33164,7 +33164,7 @@ var CompiledQuery = freeze({
     });
   }
 });
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/dialect-adapter-base.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/dialect-adapter-base.js
 class DialectAdapterBase {
   get supportsCreateIfNotExists() {
     return true;
@@ -33179,7 +33179,7 @@ class DialectAdapterBase {
     return false;
   }
 }
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/sqlite/sqlite-driver.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/sqlite/sqlite-driver.js
 class SqliteDriver {
   #config;
   #connectionMutex = new ConnectionMutex;
@@ -33274,7 +33274,7 @@ class ConnectionMutex {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/sqlite/sqlite-query-compiler.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/sqlite/sqlite-query-compiler.js
 var ID_WRAP_REGEX = /"/g;
 
 class SqliteQueryCompiler extends DefaultQueryCompiler {
@@ -33304,7 +33304,7 @@ class SqliteQueryCompiler extends DefaultQueryCompiler {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/noop-plugin.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/noop-plugin.js
 class NoopPlugin {
   transformQuery(args) {
     return args.node;
@@ -33314,7 +33314,7 @@ class NoopPlugin {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/migration/migrator.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/migration/migrator.js
 var DEFAULT_MIGRATION_TABLE = "kysely_migration";
 var DEFAULT_MIGRATION_LOCK_TABLE = "kysely_migration_lock";
 var DEFAULT_ALLOW_UNORDERED_MIGRATIONS = false;
@@ -33646,7 +33646,7 @@ class MigrationResultSetError extends Error {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/sqlite/sqlite-introspector.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/sqlite/sqlite-introspector.js
 class SqliteIntrospector {
   #db;
   constructor(db) {
@@ -33714,7 +33714,7 @@ class SqliteIntrospector {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/sqlite/sqlite-adapter.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/sqlite/sqlite-adapter.js
 class SqliteAdapter extends DialectAdapterBase {
   get supportsTransactionalDdl() {
     return false;
@@ -33726,7 +33726,7 @@ class SqliteAdapter extends DialectAdapterBase {
   async releaseMigrationLock(_db, _opt) {}
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/sqlite/sqlite-dialect.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/sqlite/sqlite-dialect.js
 class SqliteDialect {
   #config;
   constructor(config2) {
@@ -33745,7 +33745,7 @@ class SqliteDialect {
     return new SqliteIntrospector(db);
   }
 }
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/postgres/postgres-query-compiler.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/postgres/postgres-query-compiler.js
 var ID_WRAP_REGEX2 = /"/g;
 
 class PostgresQueryCompiler extends DefaultQueryCompiler {
@@ -33753,7 +33753,7 @@ class PostgresQueryCompiler extends DefaultQueryCompiler {
     return identifier.replace(ID_WRAP_REGEX2, '""');
   }
 }
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/postgres/postgres-introspector.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/postgres/postgres-introspector.js
 class PostgresIntrospector {
   #db;
   constructor(db) {
@@ -33816,7 +33816,7 @@ class PostgresIntrospector {
     }, []);
   }
 }
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/postgres/postgres-adapter.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/postgres/postgres-adapter.js
 var LOCK_ID = BigInt("3853314791062309107");
 
 class PostgresAdapter extends DialectAdapterBase {
@@ -33831,7 +33831,7 @@ class PostgresAdapter extends DialectAdapterBase {
   }
   async releaseMigrationLock(_db, _opt) {}
 }
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/stack-trace-utils.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/stack-trace-utils.js
 function extendStackTrace(err, stackError) {
   if (isStackHolder(err) && stackError.stack) {
     const stackExtension = stackError.stack.split(`
@@ -33847,7 +33847,7 @@ function isStackHolder(obj) {
   return isObject2(obj) && isString(obj.stack);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mysql/mysql-driver.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mysql/mysql-driver.js
 var PRIVATE_RELEASE_METHOD = Symbol();
 
 class MysqlDriver {
@@ -33981,7 +33981,7 @@ class MysqlConnection {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mysql/mysql-query-compiler.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mysql/mysql-query-compiler.js
 var ID_WRAP_REGEX3 = /`/g;
 
 class MysqlQueryCompiler extends DefaultQueryCompiler {
@@ -34039,7 +34039,7 @@ class MysqlQueryCompiler extends DefaultQueryCompiler {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mysql/mysql-introspector.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mysql/mysql-introspector.js
 class MysqlIntrospector {
   #db;
   constructor(db) {
@@ -34097,7 +34097,7 @@ class MysqlIntrospector {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mysql/mysql-adapter.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mysql/mysql-adapter.js
 var LOCK_ID2 = "ea586330-2c93-47c8-908d-981d9d270f9d";
 var LOCK_TIMEOUT_SECONDS = 60 * 60;
 
@@ -34116,7 +34116,7 @@ class MysqlAdapter extends DialectAdapterBase {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mysql/mysql-dialect.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mysql/mysql-dialect.js
 class MysqlDialect {
   #config;
   constructor(config2) {
@@ -34135,7 +34135,7 @@ class MysqlDialect {
     return new MysqlIntrospector(db);
   }
 }
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/postgres/postgres-driver.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/postgres/postgres-driver.js
 var PRIVATE_RELEASE_METHOD2 = Symbol();
 
 class PostgresDriver {
@@ -34243,7 +34243,7 @@ class PostgresConnection {
     this.#client.release();
   }
 }
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/postgres/postgres-dialect.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/postgres/postgres-dialect.js
 class PostgresDialect {
   #config;
   constructor(config2) {
@@ -34262,7 +34262,7 @@ class PostgresDialect {
     return new PostgresIntrospector(db);
   }
 }
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mssql/mssql-adapter.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mssql/mssql-adapter.js
 class MssqlAdapter extends DialectAdapterBase {
   get supportsCreateIfNotExists() {
     return false;
@@ -34278,7 +34278,7 @@ class MssqlAdapter extends DialectAdapterBase {
   }
   async releaseMigrationLock() {}
 }
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mssql/mssql-driver.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mssql/mssql-driver.js
 var PRIVATE_RELEASE_METHOD3 = Symbol();
 var PRIVATE_DESTROY_METHOD = Symbol();
 
@@ -34589,7 +34589,7 @@ class MssqlRequest {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mssql/mssql-introspector.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mssql/mssql-introspector.js
 class MssqlIntrospector {
   #db;
   constructor(db) {
@@ -34658,7 +34658,7 @@ class MssqlIntrospector {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mssql/mssql-query-compiler.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mssql/mssql-query-compiler.js
 class MssqlQueryCompiler extends DefaultQueryCompiler {
   getCurrentParameterPlaceholder() {
     return `@${this.numParameters}`;
@@ -34718,7 +34718,7 @@ class MssqlQueryCompiler extends DefaultQueryCompiler {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mssql/mssql-dialect.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mssql/mssql-dialect.js
 class MssqlDialect {
   #config;
   constructor(config2) {
@@ -34737,7 +34737,7 @@ class MssqlDialect {
     return new MssqlIntrospector(db);
   }
 }
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/migration/file-migration-provider.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/migration/file-migration-provider.js
 class FileMigrationProvider {
   #props;
   constructor(props) {
@@ -34763,7 +34763,7 @@ class FileMigrationProvider {
 function isMigration(obj) {
   return isObject2(obj) && isFunction(obj.up);
 }
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/camel-case/camel-case-transformer.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/camel-case/camel-case-transformer.js
 class SnakeCaseTransformer extends OperationNodeTransformer {
   #snakeCase;
   constructor(snakeCase) {
@@ -34779,7 +34779,7 @@ class SnakeCaseTransformer extends OperationNodeTransformer {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/camel-case/camel-case.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/camel-case/camel-case.js
 function createSnakeCaseMapper({ upperCase = false, underscoreBeforeDigits = false, underscoreBetweenUppercaseLetters = false } = {}) {
   return memoize((str) => {
     if (str.length === 0) {
@@ -34864,7 +34864,7 @@ function memoize(func) {
   };
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/camel-case/camel-case-plugin.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/camel-case/camel-case-plugin.js
 class CamelCasePlugin {
   opt;
   #camelCase;
@@ -34910,7 +34910,7 @@ class CamelCasePlugin {
 function canMap(obj, opt) {
   return isPlainObject2(obj) && !opt?.maintainNestedObjectKeys;
 }
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/deduplicate-joins/deduplicate-joins-transformer.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/deduplicate-joins/deduplicate-joins-transformer.js
 class DeduplicateJoinsTransformer extends OperationNodeTransformer {
   transformSelectQuery(node) {
     return this.#transformQuery(super.transformSelectQuery(node));
@@ -34948,7 +34948,7 @@ class DeduplicateJoinsTransformer extends OperationNodeTransformer {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/deduplicate-joins/deduplicate-joins-plugin.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/deduplicate-joins/deduplicate-joins-plugin.js
 class DeduplicateJoinsPlugin {
   #transformer = new DeduplicateJoinsTransformer;
   transformQuery(args) {
@@ -34958,7 +34958,7 @@ class DeduplicateJoinsPlugin {
     return Promise.resolve(args.result);
   }
 }
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/parse-json-results/parse-json-results-plugin.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/parse-json-results/parse-json-results-plugin.js
 class ParseJSONResultsPlugin {
   opt;
   #objectStrategy;
@@ -35013,7 +35013,7 @@ function parseObject(obj, objectStrategy) {
   }
   return target;
 }
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/list-node.js
+// ../../../node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/list-node.js
 var ListNode = freeze({
   is(node) {
     return node.kind === "ListNode";
@@ -35025,7 +35025,7 @@ var ListNode = freeze({
     });
   }
 });
-// developer/graphql/engine/routes.ts
+// ../../../../zveltio-extensions/developer/graphql/engine/routes.ts
 var PersistedQueryCreateSchema = exports_external.object({
   name: exports_external.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/, "Name must be alphanumeric with underscores/hyphens"),
   description: exports_external.string().optional(),
@@ -35146,7 +35146,7 @@ async function buildDynamicSchema(ctx) {
           throw new Error(`Forbidden: no read permission on "${col.name}"`);
         }
         try {
-          const trx = context.tenantTrx ?? context.db ?? db;
+          const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
           let q = trx.selectFrom(tableName).selectAll();
           if (filter_id)
             q = q.where("id", "=", filter_id);
@@ -35167,7 +35167,7 @@ async function buildDynamicSchema(ctx) {
         if (!await context.checkPermission(context.user.id, col.name, "read")) {
           throw new Error(`Forbidden: no read permission on "${col.name}"`);
         }
-        const trx = context.tenantTrx ?? context.db ?? db;
+        const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
         return await trx.selectFrom(tableName).selectAll().where("id", "=", id).executeTakeFirst();
       }
     };
@@ -35178,7 +35178,7 @@ async function buildDynamicSchema(ctx) {
         if (!await context.checkPermission(context.user.id, col.name, "create")) {
           throw new Error(`Forbidden: no create permission on "${col.name}"`);
         }
-        const trx = context.tenantTrx ?? context.db ?? db;
+        const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
         return await trx.insertInto(tableName).values(args).returningAll().executeTakeFirst();
       }
     };
@@ -35189,7 +35189,7 @@ async function buildDynamicSchema(ctx) {
         if (!await context.checkPermission(context.user.id, col.name, "update")) {
           throw new Error(`Forbidden: no update permission on "${col.name}"`);
         }
-        const trx = context.tenantTrx ?? context.db ?? db;
+        const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
         return await trx.updateTable(tableName).set({ ...data, updated_at: new Date }).where("id", "=", id).returningAll().executeTakeFirst();
       }
     };
@@ -35200,7 +35200,7 @@ async function buildDynamicSchema(ctx) {
         if (!await context.checkPermission(context.user.id, col.name, "delete")) {
           throw new Error(`Forbidden: no delete permission on "${col.name}"`);
         }
-        const trx = context.tenantTrx ?? context.db ?? db;
+        const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
         const res = await trx.deleteFrom(tableName).where("id", "=", id).executeTakeFirst();
         return (res?.numDeletedRows ?? 0n) > 0n;
       }
@@ -35363,6 +35363,7 @@ function graphqlRoutes(ctx) {
           user: session.user,
           db,
           tenantTrx,
+          reqDb: reqDb(c),
           loaders,
           checkPermission
         }
@@ -35490,6 +35491,7 @@ function graphqlRoutes(ctx) {
           user: session.user,
           db,
           tenantTrx,
+          reqDb: reqDb(c),
           loaders,
           checkPermission
         }
@@ -35614,7 +35616,7 @@ function graphqlRoutes(ctx) {
   return app;
 }
 
-// developer/graphql/engine/index.ts
+// ../../../../zveltio-extensions/developer/graphql/engine/index.ts
 var extension = {
   name: "developer/graphql",
   category: "developer",
