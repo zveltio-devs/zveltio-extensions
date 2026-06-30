@@ -35353,7 +35353,7 @@ function graphqlRoutes(ctx) {
     try {
       const schema2 = await getSchema(ctx);
       const tenantTrx = c.get?.("tenantTrx") ?? null;
-      const loaders = new DataLoaderRegistry(tenantTrx ?? db);
+      const loaders = new DataLoaderRegistry(reqDb(c));
       result = await graphql({
         schema: schema2,
         source: query,
@@ -35482,7 +35482,7 @@ function graphqlRoutes(ctx) {
     try {
       const schema2 = await getSchema(ctx);
       const tenantTrx = c.get?.("tenantTrx") ?? null;
-      const loaders = new DataLoaderRegistry(tenantTrx ?? db);
+      const loaders = new DataLoaderRegistry(reqDb(c));
       const result = await graphql({
         schema: schema2,
         source: pq.query,

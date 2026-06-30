@@ -480,7 +480,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
       // `SET LOCAL "zveltio.current_tenant"` already applied. Resolvers
       // use this in preference to the raw pool so RLS policies fire.
       const tenantTrx = (c.get as any)?.('tenantTrx') ?? null;
-      const loaders = new DataLoaderRegistry(tenantTrx ?? db);
+      const loaders = new DataLoaderRegistry(reqDb(c));
       result = await graphql({
         schema,
         source: query,
@@ -629,7 +629,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
     try {
       const schema = await getSchema(ctx);
       const tenantTrx = (c.get as any)?.('tenantTrx') ?? null;
-      const loaders = new DataLoaderRegistry(tenantTrx ?? db);
+      const loaders = new DataLoaderRegistry(reqDb(c));
       const result = await graphql({
         schema,
         source: pq.query,
