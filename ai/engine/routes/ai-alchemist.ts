@@ -169,7 +169,7 @@ RESPONSE FORMAT (JSON only):
     // via the absolute engine path alias instead of a sibling import.
     const sessionId = generateId(16);
     try {
-      const { getCache } = await import('@zveltio/engine/lib/cache.js');
+      const { getCache } = await import('@zveltio/engine/lib/runtime/cache.js');
       const cache = getCache();
       if (cache) {
         await (cache as any).setex(
@@ -319,7 +319,7 @@ RESPONSE FORMAT (JSON only):
 
       // Clean up cache session
       try {
-        const { getCache } = await import('@zveltio/engine/lib/cache.js');
+        const { getCache } = await import('@zveltio/engine/lib/runtime/cache.js');
         const cache = getCache();
         if (cache) await (cache as any).del(`alchemist:${session_id}`);
       } catch {
@@ -337,7 +337,7 @@ RESPONSE FORMAT (JSON only):
   // GET /ext/ai/alchemist/sessions/:id — Retrieve cached proposal
   app.get('/sessions/:id', async (c) => {
     try {
-      const { getCache } = await import('@zveltio/engine/lib/cache.js');
+      const { getCache } = await import('@zveltio/engine/lib/runtime/cache.js');
       const cache = getCache();
       if (!cache) return c.json({ error: 'Cache not available' }, 503);
       const data = await (cache as any).get(`alchemist:${c.req.param('id')}`);
