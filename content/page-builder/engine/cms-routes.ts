@@ -5,254 +5,105 @@ import type { ExtensionContext } from '@zveltio/sdk/extension';
 // PUBLIC ROUTES — No auth required (serve the website)
 // =========================================================
 export function publicPagesRoutes(ctx: ExtensionContext): Hono {
-  const { db, checkPermission, DDLManager } = ctx;
+  const { db } = ctx;
 
   const router = new Hono();
 
-  // GET /api/pages — list active pages
+  // Hydrate a data-backed block (`collection_list`) with its rows. Mirrors the
+  // admin editor's resolution (routes.ts `/:id/resolved`) so the public render
+  // matches what an author previews. Static blocks pass through unchanged.
+  // biome-ignore lint/suspicious/noExplicitAny: block content is untyped JSON
+  async function hydrateBlock(block: any): Promise<any> {
+    if (block?.type !== 'collection_list') return block;
+    const {
+      collection,
+      limit = 10,
+      sort_field = 'created_at',
+      sort_dir = 'desc',
+      filters = [],
+      display_fields = '',
+    } = block.content ?? {};
+
+    if (!collection || typeof collection !== 'string' || !/^[a-zA-Z0-9_]+$/.test(collection)) {
+      return { ...block, content: { ...block.content, _data: [], _error: 'Invalid or missing collection name' } };
+    }
+
+    try {
+      const fields =
+        typeof display_fields === 'string'
+          ? display_fields.split(',').map((s: string) => s.trim()).filter(Boolean)
+          : [];
+      // biome-ignore lint/suspicious/noExplicitAny: dynamic collection table
+      let q: any =
+        fields.length > 0
+          ? (db as any).selectFrom(collection).select(fields)
+          : (db as any).selectFrom(collection).selectAll();
+
+      for (const f of filters as any[]) {
+        if (!f.field || !f.op) continue;
+        if (f.op === 'is_null') { q = q.where(f.field, 'is', null); continue; }
+        if (f.op === 'is_not_null') { q = q.where(f.field, 'is not', null); continue; }
+        const opMap: Record<string, string> = { eq: '=', neq: '!=', like: 'ilike', gt: '>', gte: '>=', lt: '<', lte: '<=' };
+        const sqlOp = opMap[f.op];
+        if (!sqlOp) continue;
+        q = q.where(f.field, sqlOp, f.op === 'like' ? `%${f.value}%` : f.value);
+      }
+
+      const data = await q
+        .orderBy(sort_field, sort_dir === 'asc' ? 'asc' : 'desc')
+        .limit(Math.min(Number(limit) || 10, 100))
+        .execute();
+      return { ...block, content: { ...block.content, _data: data } };
+    } catch (err: any) {
+      return { ...block, content: { ...block.content, _data: [], _error: err?.message ?? String(err) } };
+    }
+  }
+
+  // biome-ignore lint/suspicious/noExplicitAny: page row is untyped
+  function metaOf(page: any): Record<string, any> {
+    const m = typeof page.meta === 'string' ? JSON.parse(page.meta || '{}') : (page.meta ?? {});
+    return {
+      meta_title: m.title ?? page.title,
+      meta_description: m.description ?? null,
+      og_image: m.og_image ?? null,
+    };
+  }
+
+  // GET /cms — list published pages. Homepage is the page with slug `home`.
   router.get('/', async (c) => {
     const result = await sql<any>`
-      SELECT id::text, title, slug, description, meta_title, meta_description,
-             og_image, layout, is_homepage
-      FROM zv_pages
-      WHERE is_active = true
-      ORDER BY is_homepage DESC, title ASC
+      SELECT id::text, title, slug FROM zv_pages
+      WHERE status = 'published'
+      ORDER BY (slug = 'home') DESC, title ASC
     `.execute(db);
-    return c.json({ pages: result.rows });
+    return c.json({
+      pages: result.rows.map((p: any) => ({ ...p, is_homepage: p.slug === 'home' })),
+    });
   });
 
-  // GET /api/pages/:slug — page with hydrated sections
+  // GET /cms/:slug — one published page + its hydrated blocks.
   router.get('/:slug', async (c) => {
     const slug = c.req.param('slug');
-
     const pageResult = await sql<any>`
-      SELECT id::text, title, slug, description, meta_title, meta_description,
-             og_image, layout, is_homepage, is_active
-      FROM zv_pages
-      WHERE slug = ${slug} AND is_active = true
+      SELECT id::text, title, slug, meta, blocks FROM zv_pages
+      WHERE slug = ${slug} AND status = 'published'
     `.execute(db);
 
     if (pageResult.rows.length === 0) return c.json({ error: 'Page not found' }, 404);
-
     const page = pageResult.rows[0];
 
-    const sectionsResult = await sql<any>`
-      SELECT id::text, name, type, sort_order, collection, filter_config,
-             sort_config, limit_count, fields, slug_field, static_content, style_config
-      FROM zv_page_sections
-      WHERE page_id = ${page.id} AND is_visible = true
-      ORDER BY sort_order ASC
-    `.execute(db);
-
-    const hydratedSections = await Promise.all(
-      sectionsResult.rows.map(async (section: any) => {
-        if (!section.collection) {
-          return {
-            id: section.id,
-            name: section.name,
-            type: section.type,
-            order: section.sort_order,
-            style: section.style_config || {},
-            data: section.static_content || {},
-          };
-        }
-
-        try {
-          const collectionExists = await DDLManager.tableExists(db, section.collection);
-          if (!collectionExists) {
-            return { id: section.id, type: section.type, order: section.sort_order, data: [], error: 'Collection not found' };
-          }
-
-          const tableName = DDLManager.getTableName(section.collection);
-          let query = (db as any).selectFrom(tableName);
-
-          if (section.fields && section.fields.length > 0) {
-            query = query.select(section.fields);
-          } else {
-            query = query.selectAll();
-          }
-
-          const filters = section.filter_config || {};
-          for (const [field, value] of Object.entries(filters)) {
-            if (typeof value === 'object' && value !== null) {
-              const f = value as any;
-              if (f.eq !== undefined) query = query.where(field, '=', f.eq);
-              if (f.gte !== undefined) query = query.where(field, '>=', f.gte);
-              if (f.lte !== undefined) query = query.where(field, '<=', f.lte);
-              if (f.like !== undefined) query = query.where(field, 'like', `%${f.like}%`);
-              if (f.ne !== undefined) query = query.where(field, '!=', f.ne);
-              if (f.in !== undefined && Array.isArray(f.in)) query = query.where(field, 'in', f.in);
-            } else {
-              query = query.where(field, '=', value);
-            }
-          }
-
-          for (const sort of (section.sort_config || [])) {
-            query = query.orderBy(sort.field, sort.direction || 'asc');
-          }
-
-          query = query.limit(Math.min(section.limit_count || 10, 100));
-          const data = await query.execute();
-
-          return {
-            id: section.id,
-            name: section.name,
-            type: section.type,
-            order: section.sort_order,
-            collection: section.collection,
-            style: section.style_config || {},
-            data,
-            count: data.length,
-          };
-        } catch (error) {
-          console.error(`Failed to hydrate section ${section.id}:`, error);
-          return { id: section.id, type: section.type, order: section.sort_order, data: [], error: 'Failed to load section data' };
-        }
-      }),
-    );
+    const rawBlocks: any[] = typeof page.blocks === 'string' ? JSON.parse(page.blocks) : (page.blocks ?? []);
+    const blocks = await Promise.all(rawBlocks.map(hydrateBlock));
 
     return c.json({
       page: {
         id: page.id,
         title: page.title,
         slug: page.slug,
-        description: page.description,
-        meta_title: page.meta_title || page.title,
-        meta_description: page.meta_description || page.description,
-        og_image: page.og_image,
-        layout: page.layout,
-        is_homepage: page.is_homepage,
+        is_homepage: page.slug === 'home',
+        ...metaOf(page),
       },
-      sections: hydratedSections,
-    });
-  });
-
-  // POST /api/pages/:slug/forms/:sectionId — form submission
-  router.post('/:slug/forms/:sectionId', async (c) => {
-    const slug = c.req.param('slug');
-    const sectionId = c.req.param('sectionId');
-    const body = await c.req.json().catch(() => ({}));
-
-    const pageResult = await sql<any>`
-      SELECT id::text FROM zv_pages WHERE slug = ${slug} AND is_active = true
-    `.execute(db);
-    if (pageResult.rows.length === 0) return c.json({ error: 'Page not found' }, 404);
-
-    const sectionResult = await sql<any>`
-      SELECT id::text FROM zv_page_sections
-      WHERE id = ${sectionId} AND page_id = ${pageResult.rows[0].id} AND type = 'form'
-    `.execute(db);
-    if (sectionResult.rows.length === 0) return c.json({ error: 'Form section not found' }, 404);
-
-    const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
-    const submitterEmail = typeof body.email === 'string' ? body.email : null;
-
-    await sql`
-      INSERT INTO zv_form_submissions (page_id, section_id, data, submitter_ip, submitter_email)
-      VALUES (
-        ${pageResult.rows[0].id},
-        ${sectionId},
-        ${JSON.stringify(body)}::jsonb,
-        ${ip},
-        ${submitterEmail}
-      )
-    `.execute(db);
-
-    // Optional notification — the page-builder extension never shipped
-    // its own `lib/notifications.ts`, so this used to fail at runtime
-    // (silently caught) AND fail typecheck. Skip entirely until the
-    // notifications-via-services lookup is wired in.
-
-    return c.json({ success: true, message: 'Form submitted successfully' });
-  });
-
-  // GET /api/pages/:slug/:itemSlug — dynamic detail page
-  router.get('/:slug/:itemSlug', async (c) => {
-    const slug = c.req.param('slug');
-    const itemSlug = c.req.param('itemSlug');
-
-    const pageResult = await sql<any>`
-      SELECT p.id::text, p.title, p.slug, p.description, p.meta_title, p.meta_description,
-             p.og_image, p.layout, p.is_homepage,
-             ps.collection, ps.slug_field, ps.fields, ps.filter_config, ps.style_config
-      FROM zv_pages p
-      JOIN zv_page_sections ps ON ps.page_id = p.id
-      WHERE p.slug = ${slug} AND p.is_active = true
-        AND ps.slug_field IS NOT NULL
-      LIMIT 1
-    `.execute(db);
-
-    if (pageResult.rows.length === 0) return c.json({ error: 'Page not found' }, 404);
-
-    const pageConfig = pageResult.rows[0];
-    const collectionExists = await DDLManager.tableExists(db, pageConfig.collection);
-    if (!collectionExists) return c.json({ error: 'Collection not found' }, 404);
-
-    const tableName = DDLManager.getTableName(pageConfig.collection);
-    const itemResult = await (db as any)
-      .selectFrom(tableName)
-      .selectAll()
-      .where(pageConfig.slug_field, '=', itemSlug)
-      .executeTakeFirst();
-
-    if (!itemResult) return c.json({ error: 'Item not found' }, 404);
-
-    const otherSections = await sql<any>`
-      SELECT id::text, name, type, sort_order, collection, filter_config,
-             sort_config, limit_count, fields, static_content, style_config
-      FROM zv_page_sections
-      WHERE page_id = ${pageConfig.id} AND slug_field IS NULL AND is_visible = true
-      ORDER BY sort_order
-    `.execute(db);
-
-    const hydratedSections = await Promise.all(
-      otherSections.rows.map(async (section: any) => {
-        if (!section.collection) {
-          return { id: section.id, name: section.name, type: section.type, order: section.sort_order, style: section.style_config || {}, data: section.static_content || {} };
-        }
-        try {
-          const exists = await DDLManager.tableExists(db, section.collection);
-          if (!exists) return { id: section.id, type: section.type, order: section.sort_order, data: [] };
-          const secTable = DDLManager.getTableName(section.collection);
-          let query = (db as any).selectFrom(secTable);
-          if (section.fields?.length > 0) query = query.select(section.fields);
-          else query = query.selectAll();
-          const filters = section.filter_config || {};
-          for (const [field, value] of Object.entries(filters)) {
-            if (typeof value === 'object' && value !== null) {
-              const f = value as any;
-              if (f.eq !== undefined) query = query.where(field, '=', f.eq);
-              if (f.gte !== undefined) query = query.where(field, '>=', f.gte);
-              if (f.lte !== undefined) query = query.where(field, '<=', f.lte);
-            } else {
-              query = query.where(field, '=', value);
-            }
-          }
-          for (const sort of (section.sort_config || [])) {
-            query = query.orderBy(sort.field, sort.direction || 'asc');
-          }
-          const data = await query.limit(Math.min(section.limit_count || 10, 100)).execute();
-          return { id: section.id, name: section.name, type: section.type, order: section.sort_order, collection: section.collection, style: section.style_config || {}, data };
-        } catch {
-          return { id: section.id, type: section.type, order: section.sort_order, data: [] };
-        }
-      }),
-    );
-
-    return c.json({
-      page: {
-        id: pageConfig.id,
-        title: itemResult[pageConfig.slug_field] || pageConfig.title,
-        slug: `${slug}/${itemSlug}`,
-        description: pageConfig.description,
-        meta_title: itemResult.meta_title || itemResult[pageConfig.slug_field] || pageConfig.title,
-        meta_description: itemResult.meta_description || pageConfig.meta_description,
-        og_image: itemResult.og_image || pageConfig.og_image,
-        layout: pageConfig.layout,
-        is_homepage: false,
-      },
-      item: itemResult,
-      sections: hydratedSections,
+      blocks,
     });
   });
 
