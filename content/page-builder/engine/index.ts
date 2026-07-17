@@ -1,7 +1,7 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
 import { join } from 'path';
 import { pageBuilderRoutes } from './routes.js';
-import { publicPagesRoutes, adminPagesRoutes } from './cms-routes.js';
+import { publicPagesRoutes } from './cms-routes.js';
 
 const extension: ZveltioExtension = {
   name: 'content/page-builder',
@@ -24,8 +24,6 @@ const extension: ZveltioExtension = {
     app.route('/blocks', pageBuilderRoutes(ctx));
     // CMS public read            → /ext/content/page-builder/cms
     app.route('/cms', publicPagesRoutes(ctx));
-    // CMS admin CRUD             → /ext/content/page-builder/admin/cms
-    app.route('/admin/cms', adminPagesRoutes(ctx));
   },
 };
 
