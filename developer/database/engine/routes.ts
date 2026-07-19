@@ -459,7 +459,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
           id: string; name: string; description: string | null;
           query: string; created_by: string; created_at: string; updated_at: string;
         }>`
-          SELECT id, name, description, query, created_by, created_at, updated_at
+          SELECT id, name, description, config::text AS query, created_by, created_at, created_at AS updated_at
           FROM zv_saved_queries ORDER BY name
         `.execute(reqDb(c));
         return c.json({ queries: result.rows });

@@ -125,7 +125,7 @@ export async function incrementDownloadCount(db: Database, shareId: string): Pro
 export async function listUserShares(db: Database, userId: string) {
   return sql`
     SELECT s.*,
-      f.original_filename AS file_name, f.mime_type AS file_mime,
+      f.original_name AS file_name, f.mimetype AS file_mime,
       fo.name AS folder_name
     FROM zv_media_shares s
     LEFT JOIN zv_media_files f ON f.id = s.file_id
