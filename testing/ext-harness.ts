@@ -45,6 +45,16 @@ async function getDb(): Promise<any> {
   const pg = (await import('pg')) as any;
   _pool = new (pg.Pool ?? pg.default.Pool)({ connectionString: DB_URL, max: 4 });
   _db = new Kysely({ dialect: new PostgresDialect({ pool: _pool }) });
+  // Seed the mock session's user as a REAL row: extension tables commonly carry
+  // FK constraints to "user"(id), so writes from route tests would otherwise
+  // fail on a foreign-key violation that has nothing to do with the extension.
+  await _pool
+    .query(
+      `INSERT INTO "user" (id, name, email, "emailVerified", role, "createdAt", "updatedAt", "twoFactorEnabled")
+       VALUES ('ext-harness-user', 'Ext Harness', 'ext-harness@test.local', true, 'god', NOW(), NOW(), false)
+       ON CONFLICT (id) DO NOTHING`,
+    )
+    .catch(() => undefined);
   return _db;
 }
 afterAll(async () => {
@@ -144,6 +154,19 @@ async function applyMigrations(ext: any): Promise<boolean> {
     }
   }
   return true;
+}
+
+/**
+ * Mount an extension's packed engine on a fresh app with an authed-admin mock
+ * ctx — for bespoke per-extension regression tests beyond the uniform contract.
+ */
+export async function mountForTest(engineDir: string): Promise<{ app: any }> {
+  const { Hono } = (await honoP) as any;
+  const db = await getDb();
+  const mod = await import(join(engineDir, 'index.js'));
+  const app = new Hono();
+  await mod.default.register(app, makeCtx(db, { authed: true, admin: true }));
+  return { app };
 }
 
 /** Run the uniform extension contract. `engineDir` = `<ext>/engine`. */
