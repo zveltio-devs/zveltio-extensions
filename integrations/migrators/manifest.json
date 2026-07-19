@@ -13,7 +13,7 @@
   ],
   "contributes": {
     "engine": true,
-    "studio": false
+    "studio": true
   },
   "engine": {
     "entry": "engine/index.js",
@@ -24,5 +24,16 @@
   },
   "integrity": {
     "engineSha256": "2476c6c8f044d506077a0fa4288ffa97abd36798b82ef52a09e353dab5f4c559"
+  },
+  "studio": {
+    "navGroup": "developer",
+    "pages": [
+      {
+        "path": "/admin/integrations/migrators",
+        "label": "Data Migrators",
+        "icon": "Import",
+        "schema": "schemas/migrators.json"
+      }
+    ]
   }
 }
