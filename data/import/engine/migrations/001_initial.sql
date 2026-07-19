@@ -85,3 +85,8 @@ ALTER TABLE zv_import_logs ADD COLUMN IF NOT EXISTS dry_run BOOLEAN NOT NULL DEF
 CREATE INDEX IF NOT EXISTS idx_import_mappings_collection ON zvd_import_mappings(collection);
 CREATE INDEX IF NOT EXISTS idx_import_rollbacks_job ON zvd_import_rollbacks(job_id);
 
+
+-- Schema enrichment (same pattern as content/media 001): the CORE engine also
+-- creates zv_import_logs, so the CREATE above is skipped there and the core
+-- shape lacks imported_rows which /stats and the import writer use.
+ALTER TABLE zv_import_logs ADD COLUMN IF NOT EXISTS imported_rows INT NOT NULL DEFAULT 0;
