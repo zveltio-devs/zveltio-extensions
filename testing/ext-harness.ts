@@ -51,7 +51,7 @@ async function getDb(): Promise<any> {
   await _pool
     .query(
       `INSERT INTO "user" (id, name, email, "emailVerified", role, "createdAt", "updatedAt", "twoFactorEnabled")
-       VALUES ('ext-harness-user', 'Ext Harness', 'ext-harness@test.local', true, 'god', NOW(), NOW(), false)
+       VALUES ('00000000-0000-4000-8000-00000000e001', 'Ext Harness', 'ext-harness-uuid@test.local', true, 'god', NOW(), NOW(), false)
        ON CONFLICT (id) DO NOTHING`,
     )
     .catch(() => undefined);
@@ -69,12 +69,12 @@ afterAll(async () => {
 type Session = { user: { id: string; role: string; email: string; name: string } } | null;
 
 /** Tolerant ctx mock covering every member the 48 extensions actually use. */
-function makeCtx(db: any, opts: { authed: boolean; admin: boolean }): any {
+function makeCtx(db: any, opts: { authed: boolean; admin: boolean }, publicRoutes?: any[]): any {
   const services = new Map<string, unknown>();
   const session: Session = opts.authed
     ? {
         user: {
-          id: 'ext-harness-user',
+          id: '00000000-0000-4000-8000-00000000e001',
           role: opts.admin ? 'god' : 'user',
           email: 'ext-harness@test.local',
           name: 'Ext Harness',
@@ -109,7 +109,9 @@ function makeCtx(db: any, opts: { authed: boolean; admin: boolean }): any {
     // routes that need a REAL internal may 500 at request time — surfaced
     // per-route, not at mount.
     internals: anyStub(),
-    registerPublicRoute() {},
+    registerPublicRoute(spec: any) {
+      publicRoutes?.push(spec);
+    },
     onHealthCheck() {},
     entityAccess: { register() {} },
     queryAlter: { register() {} },
@@ -160,13 +162,19 @@ async function applyMigrations(ext: any): Promise<boolean> {
  * Mount an extension's packed engine on a fresh app with an authed-admin mock
  * ctx — for bespoke per-extension regression tests beyond the uniform contract.
  */
-export async function mountForTest(engineDir: string): Promise<{ app: any }> {
+export async function mountForTest(
+  engineDir: string,
+): Promise<{ app: any; publicRoutes: any[] }> {
   const { Hono } = (await honoP) as any;
   const db = await getDb();
   const mod = await import(join(engineDir, 'index.js'));
   const app = new Hono();
-  await mod.default.register(app, makeCtx(db, { authed: true, admin: true }));
-  return { app };
+  const publicRoutes: any[] = [];
+  await mod.default.register(app, makeCtx(db, { authed: true, admin: true }, publicRoutes));
+  // Mount collected root-level public routes on the same app so tests can hit
+  // them at their absolute paths (mirrors the engine mounting them globally).
+  for (const spec of publicRoutes) app.on(spec.method, spec.path, spec.handler);
+  return { app, publicRoutes };
 }
 
 /** Run the uniform extension contract. `engineDir` = `<ext>/engine`. */
