@@ -1,0 +1,10 @@
+{
+  "auth.scim.title": "Provisionnement SCIM",
+  "auth.scim.subtitle": "Jetons bearer utilisés par votre fournisseur d'identité pour le provisionnement sur /scim/v2",
+  "auth.scim.btn.newToken": "Nouveau jeton",
+  "auth.scim.tab.tokens": "Jetons",
+  "auth.scim.col.lastUsed": "Dernière utilisation",
+  "auth.scim.confirm.revoke": "Révoquer ce jeton ? L'IdP qui l'utilise cessera immédiatement le provisionnement.",
+  "auth.scim.reveal.title": "Jeton bearer SCIM",
+  "auth.scim.reveal.note": "Affiché une seule fois — collez-le maintenant dans les réglages de provisionnement de l'IdP."
+}
