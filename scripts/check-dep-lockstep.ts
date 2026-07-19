@@ -21,8 +21,15 @@ import { join, dirname } from 'path';
 const ROOT = dirname(import.meta.dir); // scripts/ -> repo root
 const ENGINE_LOCK = join(ROOT, '..', 'zveltio', 'bun.lock');
 
-/** Deps whose TYPES cross the extensions↔engine boundary and must match. */
-const LOCKSTEP_DEPS = ['kysely'];
+/**
+ * Deps shared with the engine that must match its locked versions:
+ *  - kysely / hono / zod / @hono/zod-validator — their TYPES cross the
+ *    extensions↔engine boundary (the 07-08 and 07-17 incidents);
+ *  - aws4fetch / pg — runtime parity with the engine's storage/db drivers;
+ *  - typescript — the compiler running the gate itself; a floating range here
+ *    means local-green/CI-red nondeterminism whenever a new TS ships.
+ */
+const LOCKSTEP_DEPS = ['kysely', 'hono', 'zod', '@hono/zod-validator', 'aws4fetch', 'pg', 'typescript'];
 
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as {
   dependencies?: Record<string, string>;
