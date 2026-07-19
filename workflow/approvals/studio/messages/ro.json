@@ -1,4 +1,6 @@
 {
+  "workflow.approvals.col.requestedBy": "Solicitat de",
+  "workflow.approvals.col.workflow": "Flux",
   "workflow.approvals.confirmCancel": "Anulezi cererea de aprobare?",
   "workflow.approvals.empty": "No data yet.",
   "workflow.approvals.empty.requests": "Nicio cerere de aprobare.",
