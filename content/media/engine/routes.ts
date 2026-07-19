@@ -2,19 +2,34 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { AwsClient } from 'aws4fetch';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
-// @ts-ignore — cloud/trash is an optional extension
-const s3 = new S3Client({
-  region: process.env.S3_REGION || 'us-east-1',
-  endpoint: process.env.S3_ENDPOINT,
-  credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY || '',
-    secretAccessKey: process.env.S3_SECRET_KEY || '',
-  },
-  forcePathStyle: true,
-});
+
+// Lazy aws4fetch client — mirrors the CORE media routes exactly
+// (packages/engine/src/routes/media.ts). Returns null when S3_ENDPOINT is not
+// configured, so uploads on a bare self-hosted install skip object storage
+// instead of crashing (the previous eager @aws-sdk client made every upload
+// 500 without S3).
+let _aws: AwsClient | null = null;
+function getAws(): AwsClient | null {
+  if (!process.env.S3_ENDPOINT) return null;
+  if (!_aws) {
+    _aws = new AwsClient({
+      accessKeyId: process.env.S3_ACCESS_KEY || '',
+      secretAccessKey: process.env.S3_SECRET_KEY || '',
+      region: process.env.S3_REGION || 'us-east-1',
+      service: 's3',
+    });
+  }
+  return _aws;
+}
+
+function s3Url(key: string): string {
+  const endpoint = (process.env.S3_ENDPOINT || '').replace(/\/$/, '');
+  const bucket = process.env.S3_BUCKET || 'zveltio';
+  return `${endpoint}/${bucket}/${key}`;
+}
 
 export function mediaRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
@@ -269,12 +284,17 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
             .toBuffer();
 
           const thumbnailKey = `thumbnails/${fileId}.webp`;
-          await s3.send(new PutObjectCommand({
-            Bucket: process.env.S3_BUCKET || 'zveltio',
-            Key: thumbnailKey,
-            Body: thumbnailBuffer,
-            ContentType: 'image/webp',
-          }));
+          const awsClient = getAws();
+          if (awsClient) {
+            await awsClient.fetch(s3Url(thumbnailKey), {
+              method: 'PUT',
+              body: thumbnailBuffer,
+              headers: {
+                'Content-Type': 'image/webp',
+                'Content-Length': String(thumbnailBuffer.length),
+              },
+            });
+          }
           thumbnailUrl = `${process.env.S3_PUBLIC_URL}/${thumbnailKey}`;
         }
       } catch (error) {
@@ -283,12 +303,20 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     }
 
     const key = `media/${filename}`;
-    await s3.send(new PutObjectCommand({
-      Bucket: process.env.S3_BUCKET || 'zveltio',
-      Key: key,
-      Body: buffer,
-      ContentType: file.type,
-    }));
+    const awsClient = getAws();
+    if (awsClient) {
+      const uploadRes = await awsClient.fetch(s3Url(key), {
+        method: 'PUT',
+        body: buffer,
+        headers: {
+          'Content-Type': file.type,
+          'Content-Length': String(buffer.length),
+        },
+      });
+      if (!uploadRes.ok) {
+        return c.json({ error: `Storage upload failed: ${uploadRes.status}` }, 502);
+      }
+    }
 
     const url = `${process.env.S3_PUBLIC_URL}/${key}`;
 
