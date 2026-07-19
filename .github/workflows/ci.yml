@@ -251,6 +251,17 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
+      - name: Install PostGIS into the Postgres service
+        # The pgvector image (needed for the engine's vector columns) doesn't
+        # ship postgis, which the geospatial/postgis extension needs. Without
+        # it that suite env-skips — installing it here makes CI exercise the
+        # extension for real instead of skipping. The image is based on the
+        # official postgres image, so the PGDG apt repo is pre-configured.
+        run: |
+          docker exec ${{ job.services.postgres.id }} bash -c \
+            "apt-get update -qq && apt-get install -y -qq postgresql-18-postgis-3 postgresql-18-postgis-3-scripts"
+
       - name: Clone engine repo as sibling
         run: git clone --depth=1 https://github.com/zveltio-devs/zveltio.git ../zveltio
       - name: Install extension deps
