@@ -49,6 +49,12 @@ jobs:
         # engine repo's own CI already enforces lockfile freshness.
         run: cd ../zveltio && bun install
 
+      - name: Dependency lockstep (kysely == engine)
+        # Fails with ONE actionable line instead of ~77 cryptic TS2345 errors
+        # when our exact-pinned kysely drifts from the engine's locked version
+        # (this repo has no committed lockfile, so ranges float to npm-latest).
+        run: bun scripts/check-dep-lockstep.ts
+
       - name: Typecheck
         run: bun run typecheck
 
@@ -215,3 +221,55 @@ jobs:
           # runner). HARD failures (broken contract) fail the job; SOFT (enable
           # env issues) only warn.
           bun scripts/probe-sdui-endpoints.ts "$GITHUB_WORKSPACE"
+
+  # Per-extension contract suite (testing/ext-harness.ts + one index.test.ts per
+  # extension): loads each PACKED engine/index.js, applies its migrations on a
+  # real Postgres carrying the engine core schema, mounts register(), and
+  # smoke-tests every parameterless GET route. This is the gate that catches the
+  # fresh-install bug class (route SQL vs squashed/core-created table shapes)
+  # fixed in bulk on 2026-07-19 — any recurrence fails here, not in production.
+  contract-tests:
+    name: Extension contract tests (packed engine + real Postgres)
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: zveltio_ext_test
+          POSTGRES_USER: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Clone engine repo as sibling
+        run: git clone --depth=1 https://github.com/zveltio-devs/zveltio.git ../zveltio
+      - name: Install extension deps
+        run: bun install --frozen-lockfile
+      - name: Install engine deps
+        run: cd ../zveltio && bun install
+
+      - name: Migrate engine core schema (in-process harness boot)
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/zveltio_ext_test
+          BETTER_AUTH_SECRET: test-secret-000000000000000000000000
+          FIELD_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+          NODE_ENV: test
+          SLOW_QUERY_THRESHOLD_MS: '0'
+          ZVELTIO_REGISTRATION_ENABLED: '1'
+        run: cd ../zveltio/packages/engine && bun test src/tests/harness/app-harness.test.ts
+
+      - name: Run extension contract suite
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/zveltio_ext_test
+          FIELD_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+        run: bun test --timeout 20000
