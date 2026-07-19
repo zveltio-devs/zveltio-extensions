@@ -95,7 +95,22 @@ function makeCtx(db: any, opts: { authed: boolean; admin: boolean }, publicRoute
     db,
     adminDb: db,
     reqDb: () => db,
-    auth: { api: { getSession: async () => session } },
+    auth: {
+      api: {
+        getSession: async () => session,
+        // In-process signup mirror (real INSERT) so provisioning-style
+        // extensions (SCIM) exercise their create path against the real DB.
+        signUpEmail: async (args: { body: { email: string; name?: string } }) => {
+          const id = crypto.randomUUID();
+          await _pool.query(
+            `INSERT INTO "user" (id, name, email, "emailVerified", role, "createdAt", "updatedAt", "twoFactorEnabled")
+             VALUES ($1, $2, $3, true, 'member', NOW(), NOW(), false)`,
+            [id, args.body.name ?? args.body.email, args.body.email],
+          );
+          return { user: { id, email: args.body.email } };
+        },
+      },
+    },
     checkPermission: async () => opts.admin,
     getUserRoles: async () => (opts.admin ? ['god'] : []),
     events: { on() {}, off() {}, emit: asyncNoop },
