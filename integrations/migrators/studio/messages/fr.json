@@ -1,0 +1,15 @@
+{
+  "integrations.migrators.title": "Migrateurs de données",
+  "integrations.migrators.subtitle": "Importez vos données depuis HubSpot, Notion ou Airtable",
+  "integrations.migrators.tab.connections": "Connexions",
+  "integrations.migrators.tab.runs": "Imports",
+  "integrations.migrators.col.source": "Source",
+  "integrations.migrators.col.object": "Objet",
+  "integrations.migrators.col.rows": "Lignes",
+  "integrations.migrators.field.token": "Jeton API",
+  "integrations.migrators.field.connection": "Connexion",
+  "integrations.migrators.field.object": "Objet source",
+  "integrations.migrators.field.target": "Collection cible",
+  "integrations.migrators.field.limit": "Limite de lignes",
+  "integrations.migrators.confirm.deleteConnection": "Supprimer cette connexion ? Le jeton stocké sera détruit."
+}

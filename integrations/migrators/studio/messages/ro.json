@@ -1,0 +1,15 @@
+{
+  "integrations.migrators.title": "Migratoare de date",
+  "integrations.migrators.subtitle": "Adu-ți datele din HubSpot, Notion sau Airtable",
+  "integrations.migrators.tab.connections": "Conexiuni",
+  "integrations.migrators.tab.runs": "Importuri",
+  "integrations.migrators.col.source": "Sursă",
+  "integrations.migrators.col.object": "Obiect",
+  "integrations.migrators.col.rows": "Rânduri",
+  "integrations.migrators.field.token": "Token API",
+  "integrations.migrators.field.connection": "Conexiune",
+  "integrations.migrators.field.object": "Obiect sursă",
+  "integrations.migrators.field.target": "Colecție țintă",
+  "integrations.migrators.field.limit": "Limită de rânduri",
+  "integrations.migrators.confirm.deleteConnection": "Ștergi această conexiune? Token-ul stocat va fi distrus."
+}

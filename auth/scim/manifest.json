@@ -12,7 +12,7 @@
   ],
   "contributes": {
     "engine": true,
-    "studio": false
+    "studio": true
   },
   "engine": {
     "entry": "engine/index.js",
@@ -23,5 +23,16 @@
   },
   "integrity": {
     "engineSha256": "216dee6795609d0d6c7bb73a992e918134b79761d953ce42ba539e88f5edb0f7"
+  },
+  "studio": {
+    "navGroup": "other",
+    "pages": [
+      {
+        "path": "/admin/auth/scim",
+        "label": "SCIM Provisioning",
+        "icon": "KeyRound",
+        "schema": "schemas/scim.json"
+      }
+    ]
   }
 }
