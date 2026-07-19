@@ -276,9 +276,9 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
     const user = c.get('user') as any;
 
     const usage = await sql<{ total: string }>`
-      SELECT COALESCE(SUM(size_bytes), 0) AS total
+      SELECT COALESCE(SUM(size), 0) AS total
       FROM zv_media_files
-      WHERE uploaded_by = ${user.id} AND deleted_at IS NULL
+      WHERE created_by = ${user.id} AND deleted_at IS NULL
     `.execute(reqDb(c));
 
     const quota = await (reqDb(c) as any)
@@ -489,7 +489,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
           const filesWithExcessVersions = await sql<{ file_id: string; version_count: string }>`
             SELECT file_id, COUNT(*) as version_count
             FROM zv_cloud_file_versions
-            ${policy.folder_path ? sql`WHERE file_id IN (SELECT id FROM zv_media_files WHERE folder_path LIKE ${policy.folder_path + '%'})` : sql``}
+            ${policy.folder_path ? sql`WHERE file_id IN (SELECT id FROM zv_media_files WHERE folder_id IN (SELECT id FROM zv_media_folders WHERE name LIKE ${policy.folder_path + '%'}))` : sql``}
             GROUP BY file_id
             HAVING COUNT(*) > ${policy.max_versions}
           `.execute(reqDb(c));
@@ -525,8 +525,8 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
           let filesQuery = sql<{ id: string }>`
             SELECT id::text FROM zv_media_files
             WHERE created_at < ${cutoff} AND deleted_at IS NULL
-            ${policy.folder_path ? sql`AND folder_path LIKE ${policy.folder_path + '%'}` : sql``}
-            ${policy.file_extension ? sql`AND original_filename ILIKE ${'%.' + policy.file_extension}` : sql``}
+            ${policy.folder_path ? sql`AND folder_id IN (SELECT id FROM zv_media_folders WHERE name LIKE ${policy.folder_path + '%'}) ` : sql``}
+            ${policy.file_extension ? sql`AND original_name ILIKE ${'%.' + policy.file_extension}` : sql``}
           `;
 
           const oldFiles = await filesQuery.execute(reqDb(c));
@@ -560,17 +560,17 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
   // GET /admin/stats — admin storage statistics
   app.get('/admin/stats', requireAdmin, async (c) => {
     const totalFilesResult = await sql<{ count: string; total_size: string | null }>`
-      SELECT COUNT(*) as count, SUM(size_bytes)::text as total_size
+      SELECT COUNT(*) as count, SUM(size)::text as total_size
       FROM zv_media_files WHERE deleted_at IS NULL
     `.execute(reqDb(c));
 
     const byTypeResult = await sql<{ mime_type: string; count: string; total_size: string }>`
       SELECT
-        SPLIT_PART(mime_type, '/', 1) as mime_type,
+        SPLIT_PART(mimetype, '/', 1) as mime_type,
         COUNT(*) as count,
-        COALESCE(SUM(size_bytes), 0)::text as total_size
+        COALESCE(SUM(size), 0)::text as total_size
       FROM zv_media_files WHERE deleted_at IS NULL
-      GROUP BY SPLIT_PART(mime_type, '/', 1)
+      GROUP BY SPLIT_PART(mimetype, '/', 1)
       ORDER BY count DESC
       LIMIT 10
     `.execute(reqDb(c));
@@ -580,13 +580,13 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
     `.execute(reqDb(c));
 
     const quotaViolationsResult = await sql<{ count: string }>`
-      SELECT COUNT(DISTINCT uploaded_by) as count
+      SELECT COUNT(DISTINCT usage.created_by) as count
       FROM (
-        SELECT uploaded_by, SUM(size_bytes) as used_bytes
+        SELECT created_by, SUM(size) as used_bytes
         FROM zv_media_files WHERE deleted_at IS NULL
-        GROUP BY uploaded_by
+        GROUP BY created_by
       ) usage
-      INNER JOIN zv_storage_quotas q ON q.user_id = usage.uploaded_by
+      INNER JOIN zv_storage_quotas q ON q.user_id = usage.created_by
       WHERE usage.used_bytes > q.quota_bytes
     `.execute(reqDb(c));
 

@@ -23,8 +23,10 @@ CREATE TABLE IF NOT EXISTS zvd_bank_accounts (
   bank_name TEXT NOT NULL,
   iban TEXT,
   currency TEXT NOT NULL DEFAULT 'RON',
-  current_balance NUMERIC(15,2) NOT NULL DEFAULT 0,
-  type TEXT NOT NULL DEFAULT 'checking' CHECK (type IN ('checking','savings','credit','cash')),
+  balance NUMERIC(15,2) NOT NULL DEFAULT 0,
+  opening_balance NUMERIC(15,2) NOT NULL DEFAULT 0,
+  notes TEXT,
+  account_type TEXT NOT NULL DEFAULT 'checking' CHECK (account_type IN ('checking','savings','credit','cash')),
   is_active BOOLEAN NOT NULL DEFAULT true,
   color TEXT DEFAULT '#069494',
   created_by TEXT NOT NULL,
@@ -126,3 +128,11 @@ ALTER TABLE zvd_bank_transactions ADD COLUMN IF NOT EXISTS matched_invoice_id UU
 ALTER TABLE zvd_bank_transactions ADD COLUMN IF NOT EXISTS matched_expense_id UUID;
 ALTER TABLE zvd_bank_transactions ADD COLUMN IF NOT EXISTS auto_categorized BOOLEAN NOT NULL DEFAULT false;
 
+
+-- Defensive enrichment for tables created by a pre-fix version of this file
+-- (routes use balance / opening_balance / account_type / notes).
+ALTER TABLE zvd_bank_accounts ADD COLUMN IF NOT EXISTS balance NUMERIC(15,2) NOT NULL DEFAULT 0;
+ALTER TABLE zvd_bank_accounts ADD COLUMN IF NOT EXISTS opening_balance NUMERIC(15,2) NOT NULL DEFAULT 0;
+ALTER TABLE zvd_bank_accounts ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'checking';
+ALTER TABLE zvd_bank_accounts ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE zvd_bank_transactions ADD COLUMN IF NOT EXISTS is_reconciled BOOLEAN NOT NULL DEFAULT false;
