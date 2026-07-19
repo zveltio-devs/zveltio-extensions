@@ -61,7 +61,7 @@ export class StockService {
       INNER JOIN trace_items i ON i.id = l.item_id
       LEFT JOIN trace_locations loc ON loc.id = l.location_id
       WHERE l.status = 'available'
-        AND l.best_before_date <= CURRENT_DATE + ${daysAhead}
+        AND l.best_before_date <= CURRENT_DATE + ${daysAhead}::int
       ORDER BY l.best_before_date ASC
     `.execute(this.db);
     return rows.rows;
