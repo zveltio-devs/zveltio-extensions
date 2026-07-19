@@ -122,9 +122,14 @@ export interface ContractOptions {
   dependsOn?: string[];
 }
 
-/** Apply an extension's UP migrations (splitting at `-- DOWN`). */
-async function applyMigrations(ext: any): Promise<void> {
-  if (typeof ext?.getMigrations !== 'function') return;
+/**
+ * Apply an extension's UP migrations (splitting at `-- DOWN`).
+ * Returns false when the ENVIRONMENT can't support them (a server-side PG
+ * extension like postgis isn't installed) — callers must then skip the route
+ * smoke too, since the extension's tables never materialized.
+ */
+async function applyMigrations(ext: any): Promise<boolean> {
+  if (typeof ext?.getMigrations !== 'function') return true;
   for (const f of ext.getMigrations() as string[]) {
     const up = readFileSync(f, 'utf8').split(/^-- DOWN$/m)[0]!;
     try {
@@ -133,11 +138,12 @@ async function applyMigrations(ext: any): Promise<void> {
       const msg = e instanceof Error ? e.message : String(e);
       if (/extension .* is not available|could not open extension control file/i.test(msg)) {
         console.warn(`  [skip] ${basename(f)}: ${msg.split('\n')[0]}`);
-        return;
+        return false;
       }
       throw new Error(`migration ${basename(f)} failed: ${msg}`);
     }
   }
+  return true;
 }
 
 /** Run the uniform extension contract. `engineDir` = `<ext>/engine`. */
@@ -150,6 +156,9 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
   d(`extension contract: ${name}`, () => {
     let ext: any;
     let manifest: any;
+    // True when the DB server can't support this extension's migrations (e.g.
+    // postgis not installed in the CI image) — route smoke must skip too.
+    let envUnsupported = false;
 
     it('packed engine/index.js loads and matches manifest.json', async () => {
       manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'));
@@ -173,7 +182,7 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
       const files: string[] = ext.getMigrations();
       expect(files.length).toBeGreaterThan(0);
       for (const f of files) expect(existsSync(f)).toBe(true);
-      await applyMigrations(ext);
+      envUnsupported = !(await applyMigrations(ext));
     });
 
     it('register(app, ctx) mounts without throwing', async () => {
@@ -185,6 +194,7 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
     });
 
     it('no parameterless GET route crashes (authed admin)', async () => {
+      if (envUnsupported) return; // migrations env-skipped → tables absent by design
       const { Hono } = (await honoP) as any;
       const db = await getDb();
       const app = new Hono();
@@ -207,6 +217,7 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
     });
 
     it('unauthenticated request does not crash', async () => {
+      if (envUnsupported) return; // migrations env-skipped → tables absent by design
       const { Hono } = (await honoP) as any;
       const db = await getDb();
       const app = new Hono();
