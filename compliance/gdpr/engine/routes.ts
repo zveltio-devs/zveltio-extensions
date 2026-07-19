@@ -60,8 +60,8 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
 
     const [userRow, auditRows, notifRows, apiKeyRows, approvalRows, consentRows] =
       await Promise.all([
-        sql<any>`SELECT id::text, name, email, created_at FROM "user" WHERE id = ${userId}`.execute(reqDb(c)),
-        sql<any>`SELECT action, collection, record_id, created_at FROM zv_audit_log WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 1000`.execute(reqDb(c)),
+        sql<any>`SELECT id::text, name, email, "createdAt" AS created_at FROM "user" WHERE id = ${userId}`.execute(reqDb(c)),
+        sql<any>`SELECT event_type AS action, resource_type AS collection, resource_id AS record_id, created_at FROM zv_audit_log WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 1000`.execute(reqDb(c)),
         sql<any>`SELECT title, message, type, is_read, created_at FROM zv_notifications WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 500`.execute(reqDb(c)),
         sql<any>`SELECT name, key_prefix, scopes, created_at FROM zv_api_keys WHERE created_by = ${userId}`.execute(reqDb(c)),
         sql<any>`SELECT id::text, collection, record_id, status, requested_at FROM zv_approval_requests WHERE requested_by = ${userId} ORDER BY requested_at DESC`.execute(reqDb(c)).catch(() => ({ rows: [] })),

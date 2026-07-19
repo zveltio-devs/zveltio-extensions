@@ -396,7 +396,7 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
     const rows = await sql`
       SELECT b.*, p.name as product_name, p.sku, w.name as warehouse_name
       FROM zvd_product_batches b JOIN zvd_products p ON p.id = b.product_id JOIN zvd_warehouses w ON w.id = b.warehouse_id
-      WHERE b.expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + ${parseInt(days)}
+      WHERE b.expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + ${parseInt(days)}::int
         AND b.quantity > 0
       ORDER BY b.expiry_date
     `.execute(reqDb(c));

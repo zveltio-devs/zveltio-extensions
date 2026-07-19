@@ -59,13 +59,19 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
     }
   }
 
+  // SEO block for the public payload. The editor writes the DEDICATED columns
+  // (meta_title / meta_description / og_image / is_noindex — see routes.ts
+  // update path), while older pages may only carry the `meta` JSONB — so the
+  // columns win and the JSONB is the fallback. Reading only the JSONB (the
+  // previous behavior) meant an editor-set og_image never reached the public page.
   // biome-ignore lint/suspicious/noExplicitAny: page row is untyped
   function metaOf(page: any): Record<string, any> {
     const m = typeof page.meta === 'string' ? JSON.parse(page.meta || '{}') : (page.meta ?? {});
     return {
-      meta_title: m.title ?? page.title,
-      meta_description: m.description ?? null,
-      og_image: m.og_image ?? null,
+      meta_title: page.meta_title ?? m.title ?? page.title,
+      meta_description: page.meta_description ?? m.description ?? null,
+      og_image: page.og_image ?? m.og_image ?? null,
+      noindex: page.is_noindex === true,
     };
   }
 
@@ -81,11 +87,29 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
     });
   });
 
+  // GET /cms/nav — the public site's navigation menus. Always returns both
+  // keys ('main', 'footer'); a menu that was never configured is [].
+  router.get('/nav', async (c) => {
+    const result = await sql<{ menu_key: string; items: unknown }>`
+      SELECT menu_key, items FROM zv_page_menus WHERE menu_key IN ('main', 'footer')
+    `
+      .execute(db)
+      .catch(() => ({ rows: [] as Array<{ menu_key: string; items: unknown }> }));
+    const menus: Record<string, unknown[]> = { main: [], footer: [] };
+    for (const row of result.rows) {
+      const items = typeof row.items === 'string' ? JSON.parse(row.items) : row.items;
+      if (Array.isArray(items)) menus[row.menu_key] = items;
+    }
+    return c.json({ menus });
+  });
+
   // GET /cms/:slug — one published page + its hydrated blocks.
   router.get('/:slug', async (c) => {
     const slug = c.req.param('slug');
     const pageResult = await sql<any>`
-      SELECT id::text, title, slug, meta, blocks FROM zv_pages
+      SELECT id::text, title, slug, meta, blocks,
+             meta_title, meta_description, og_image, is_noindex
+      FROM zv_pages
       WHERE slug = ${slug} AND status = 'published'
     `.execute(db);
 
