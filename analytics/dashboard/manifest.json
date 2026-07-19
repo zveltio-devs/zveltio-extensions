@@ -1,0 +1,30 @@
+{
+  "name": "analytics/dashboard",
+  "displayName": "Dashboards",
+  "category": "analytics",
+  "description": "Role-aware, per-user home dashboards — IT sets a default layout per role, each user personalizes within their permissions",
+  "version": "1.0.0",
+  "zveltioMinVersion": "1.0.0",
+  "zveltioMaxVersion": "4.0.0",
+  "package": "@zveltio/ext-dashboard",
+  "permissions": [
+    "database"
+  ],
+  "contributes": {
+    "engine": true,
+    "studio": true
+  },
+  "studio": {
+    "navGroup": "developer"
+  },
+  "engine": {
+    "entry": "engine/index.js",
+    "format": "esm",
+    "target": "bun",
+    "bundled": true,
+    "bundlePeers": false
+  },
+  "integrity": {
+    "engineSha256": "ac5133ee78d43a8f4055124b62df15f5e56d6fc3aa463509f2bce6bd7885ec20"
+  }
+}

@@ -27,10 +27,10 @@ CREATE TABLE IF NOT EXISTS zvd_assets (
   purchase_date DATE NOT NULL,
   purchase_cost NUMERIC(15,2) NOT NULL,
   residual_value NUMERIC(15,2) NOT NULL DEFAULT 0,
-  useful_life_months INT NOT NULL DEFAULT 60,
+  useful_life_years INT NOT NULL DEFAULT 5,
   depreciation_method TEXT NOT NULL DEFAULT 'straight_line' CHECK (depreciation_method IN ('straight_line','declining_balance','none')),
   accumulated_depreciation NUMERIC(18,2) NOT NULL DEFAULT 0,
-  current_book_value NUMERIC(15,2) NOT NULL,
+  current_value NUMERIC(15,2) NOT NULL DEFAULT 0,
   location TEXT,
   serial_number TEXT,
   supplier TEXT,
@@ -125,3 +125,9 @@ ALTER TABLE zvd_asset_depreciation ADD COLUMN IF NOT EXISTS is_posted BOOLEAN NO
 ALTER TABLE zvd_assets ADD COLUMN IF NOT EXISTS depreciation_account_id UUID;
 ALTER TABLE zvd_assets ADD COLUMN IF NOT EXISTS accumulated_dep_account_id UUID;
 
+
+-- Defensive enrichment for tables created by a pre-fix version of this file
+-- (routes use current_value / useful_life_years).
+ALTER TABLE zvd_assets ADD COLUMN IF NOT EXISTS current_value NUMERIC(15,2) NOT NULL DEFAULT 0;
+ALTER TABLE zvd_assets ADD COLUMN IF NOT EXISTS useful_life_years INT NOT NULL DEFAULT 5;
+ALTER TABLE zvd_assets ADD COLUMN IF NOT EXISTS next_maintenance_date DATE;

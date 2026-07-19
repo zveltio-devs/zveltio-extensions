@@ -108,3 +108,11 @@ CREATE TABLE IF NOT EXISTS zvd_quality_remediations (
 CREATE INDEX IF NOT EXISTS idx_quality_scores_collection ON zvd_quality_scores(collection, calculated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_quality_rules_collection ON zvd_quality_rules(collection);
 
+
+-- Schema enrichment (same pattern as content/media 001): the CORE engine also
+-- creates zv_quality_scans / zv_quality_issues (packages/engine 001_initial.sql),
+-- so the CREATEs above are skipped there and the core shape lacks columns these
+-- routes use. Add them defensively.
+ALTER TABLE zv_quality_scans ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE zv_quality_issues ADD COLUMN IF NOT EXISTS dismissed_by TEXT;
+ALTER TABLE zv_quality_issues ADD COLUMN IF NOT EXISTS dismissed_at TIMESTAMPTZ;

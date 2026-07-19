@@ -112,3 +112,13 @@ CREATE TABLE IF NOT EXISTS zv_cloud_retention_policies (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+
+-- The CORE engine also creates zv_storage_quotas (old shape: user_id /
+-- quota_bytes / used_bytes only), so the CREATE above is skipped there.
+-- Enrich it with the columns these routes use.
+ALTER TABLE zv_storage_quotas ADD COLUMN IF NOT EXISTS id UUID DEFAULT gen_random_uuid();
+ALTER TABLE zv_storage_quotas ADD COLUMN IF NOT EXISTS role_name TEXT;
+ALTER TABLE zv_storage_quotas ADD COLUMN IF NOT EXISTS max_file_size_bytes BIGINT NOT NULL DEFAULT 104857600;
+ALTER TABLE zv_storage_quotas ADD COLUMN IF NOT EXISTS allowed_extensions TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE zv_storage_quotas ADD COLUMN IF NOT EXISTS created_by TEXT;
+ALTER TABLE zv_storage_quotas ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
