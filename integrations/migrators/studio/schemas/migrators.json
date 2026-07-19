@@ -1,0 +1,115 @@
+{
+  "sduiSchema": 1,
+  "title": "integrations.migrators.title",
+  "subtitle": "integrations.migrators.subtitle",
+  "resources": [
+    {
+      "id": "connections",
+      "label": "integrations.migrators.tab.connections",
+      "dataSource": "/ext/integrations/migrators/connections",
+      "dataPath": "connections",
+      "columns": [
+        { "key": "name", "label": "common.col.name" },
+        {
+          "key": "source",
+          "label": "integrations.migrators.col.source",
+          "type": "badge",
+          "badge": {
+            "colors": { "hubspot": "badge-warning", "notion": "badge-neutral", "airtable": "badge-info" }
+          }
+        },
+        { "key": "created_at", "label": "common.col.created", "type": "date" }
+      ],
+      "rowActions": [
+        {
+          "id": "delete",
+          "label": "common.delete",
+          "kind": "call",
+          "method": "DELETE",
+          "endpoint": "/ext/integrations/migrators/connections/{id}",
+          "variant": "btn-error btn-outline",
+          "confirm": "integrations.migrators.confirm.deleteConnection"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/integrations/migrators/connections",
+        "fields": [
+          {
+            "name": "source",
+            "label": "integrations.migrators.col.source",
+            "type": "select",
+            "required": true,
+            "options": [
+              { "value": "hubspot", "label": "HubSpot" },
+              { "value": "notion", "label": "Notion" },
+              { "value": "airtable", "label": "Airtable" }
+            ]
+          },
+          { "name": "name", "label": "common.col.name", "required": true },
+          {
+            "name": "token",
+            "label": "integrations.migrators.field.token",
+            "type": "password",
+            "required": true,
+            "placeholder": "pat-… / secret_… / private app token"
+          }
+        ]
+      }
+    },
+    {
+      "id": "runs",
+      "label": "integrations.migrators.tab.runs",
+      "dataSource": "/ext/integrations/migrators/runs",
+      "dataPath": "runs",
+      "columns": [
+        { "key": "source", "label": "integrations.migrators.col.source", "type": "mono" },
+        { "key": "source_object", "label": "integrations.migrators.col.object", "type": "mono" },
+        { "key": "target_collection", "label": "common.col.collection", "type": "mono" },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": { "running": "badge-info", "completed": "badge-success", "failed": "badge-error" }
+          }
+        },
+        {
+          "key": "imported_rows",
+          "label": "integrations.migrators.col.rows",
+          "join": { "keys": ["imported_rows", "total_rows"], "sep": " / " }
+        },
+        { "key": "created_at", "label": "common.col.created", "type": "date" }
+      ],
+      "form": {
+        "endpoint": "/ext/integrations/migrators/run",
+        "fields": [
+          {
+            "name": "connection_id",
+            "label": "integrations.migrators.field.connection",
+            "type": "relation",
+            "required": true,
+            "relation": {
+              "dataSource": "/ext/integrations/migrators/connections",
+              "dataPath": "connections",
+              "valueKey": "id",
+              "labelKey": ["name", "source"]
+            }
+          },
+          {
+            "name": "object",
+            "label": "integrations.migrators.field.object",
+            "required": true,
+            "placeholder": "contacts · notion database id · baseId/tableId"
+          },
+          {
+            "name": "target_collection",
+            "label": "integrations.migrators.field.target",
+            "required": true,
+            "placeholder": "zvd_leads"
+          },
+          { "name": "limit", "label": "integrations.migrators.field.limit", "type": "number", "default": 1000 }
+        ]
+      }
+    }
+  ]
+}
