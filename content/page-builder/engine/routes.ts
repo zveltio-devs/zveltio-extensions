@@ -22,6 +22,8 @@ const PageSchema = z.object({
   blocks: z.array(z.any()).default([]),
   meta: z.record(z.string(), z.any()).default({}),
   locale: z.string().default('ro'),
+  meta_title: z.string().max(200).optional(),
+  meta_description: z.string().max(500).optional(),
   og_image: z.string().url().optional(),
   is_noindex: z.boolean().default(false),
   status: z.enum(['draft', 'published', 'archived']).default('draft'),
@@ -92,6 +94,60 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     await reqDb(c).deleteFrom('zv_page_redirects').where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
+  });
+
+  // ─── Navigation menus (public site header/footer) ─────────────────────────
+
+  const MenuItemsSchema = z.object({
+    items: z
+      .array(
+        z.object({
+          label: z.string().min(1).max(120),
+          slug: z.string().max(200).optional(),
+          url: z.string().max(2048).optional(),
+          external: z.boolean().optional(),
+        }),
+      )
+      .max(50),
+  });
+
+  app.get('/menus', async (c) => {
+    const user = await requireAuth(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const rows = await reqDb(c)
+      .selectFrom('zv_page_menus')
+      .select(['menu_key', 'items', 'updated_at'])
+      .execute()
+      .catch(() => []);
+    // biome-ignore lint/suspicious/noExplicitAny: JSONB row
+    const menus: Record<string, unknown> = { main: [], footer: [] };
+    for (const r of rows as any[]) {
+      menus[r.menu_key] = typeof r.items === 'string' ? JSON.parse(r.items) : r.items;
+    }
+    return c.json({ menus });
+  });
+
+  app.put('/menus/:key', zValidator('json', MenuItemsSchema), async (c) => {
+    const user = await requireAuth(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const key = c.req.param('key');
+    if (!['main', 'footer'].includes(key)) {
+      return c.json({ error: "menu key must be 'main' or 'footer'" }, 400);
+    }
+    const items = JSON.stringify(c.req.valid('json').items);
+    // Update-then-insert (no ON CONFLICT): under RLS the UPDATE only touches
+    // this tenant's row, and the INSERT stamps tenant_id via column DEFAULT.
+    const updated = await sql<{ id: string }>`
+      UPDATE zv_page_menus SET items = ${items}::jsonb, updated_by = ${user.id}, updated_at = NOW()
+      WHERE menu_key = ${key} RETURNING id
+    `.execute(reqDb(c));
+    if (updated.rows.length === 0) {
+      await sql`
+        INSERT INTO zv_page_menus (menu_key, items, updated_by)
+        VALUES (${key}, ${items}::jsonb, ${user.id})
+      `.execute(reqDb(c));
+    }
+    return c.json({ menu_key: key, items: c.req.valid('json').items });
   });
 
   // ─── Sitemap ──────────────────────────────────────────────────────────────
@@ -280,7 +336,12 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
 
     const current = await reqDb(c).selectFrom('zv_pages').select(['blocks', 'meta']).where('id', '=', id).executeTakeFirst();
     if (current) {
-      await reqDb(c).insertInto('zv_page_revisions').values({ page_id: id, blocks: current.blocks, meta: current.meta, created_by: user.id }).execute();
+      // pg serializes JS ARRAYS as Postgres array literals (`{...}`), not JSON —
+      // inserting the parsed `blocks` array raw makes EVERY update 500 with
+      // `invalid input syntax for type json`. Stringify explicitly.
+      const snapBlocks = typeof current.blocks === 'string' ? current.blocks : JSON.stringify(current.blocks ?? []);
+      const snapMeta = typeof current.meta === 'string' ? current.meta : JSON.stringify(current.meta ?? {});
+      await reqDb(c).insertInto('zv_page_revisions').values({ page_id: id, blocks: snapBlocks, meta: snapMeta, created_by: user.id }).execute();
     }
 
     const updates: any = { updated_at: now, updated_by: user.id };
@@ -291,6 +352,8 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
     if (body.blocks !== undefined) updates.blocks = JSON.stringify(body.blocks);
     if (body.meta !== undefined) updates.meta = JSON.stringify(body.meta);
     if (body.locale !== undefined) updates.locale = body.locale;
+    if (body.meta_title !== undefined) updates.meta_title = body.meta_title;
+    if (body.meta_description !== undefined) updates.meta_description = body.meta_description;
     if (body.og_image !== undefined) updates.og_image = body.og_image;
     if (body.is_noindex !== undefined) updates.is_noindex = body.is_noindex;
     if (body.status !== undefined) {

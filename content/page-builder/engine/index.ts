@@ -2,6 +2,7 @@ import type { ZveltioExtension } from '@zveltio/sdk/extension';
 import { join } from 'path';
 import { pageBuilderRoutes } from './routes.js';
 import { publicPagesRoutes } from './cms-routes.js';
+import { registerPublicSeoRoutes } from './public-seo.js';
 
 const extension: ZveltioExtension = {
   name: 'content/page-builder',
@@ -16,6 +17,7 @@ const extension: ZveltioExtension = {
       join(import.meta.dir, 'migrations/001_initial.sql'),
       join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
       join(import.meta.dir, 'migrations/003_seed_home_page.sql'),
+      join(import.meta.dir, 'migrations/004_cms_nav.sql'),
     ];
   },
 
@@ -24,6 +26,8 @@ const extension: ZveltioExtension = {
     app.route('/blocks', pageBuilderRoutes(ctx));
     // CMS public read            → /ext/content/page-builder/cms
     app.route('/cms', publicPagesRoutes(ctx));
+    // Root-level crawler endpoints → /sitemap.xml + /robots.txt on the global app
+    if (typeof ctx.registerPublicRoute === 'function') registerPublicSeoRoutes(ctx);
   },
 };
 
