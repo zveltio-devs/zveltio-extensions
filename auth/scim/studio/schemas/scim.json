@@ -1,0 +1,37 @@
+{
+  "sduiSchema": 1,
+  "title": "auth.scim.title",
+  "subtitle": "auth.scim.subtitle",
+  "newLabel": "auth.scim.btn.newToken",
+  "resources": [
+    {
+      "id": "tokens",
+      "label": "auth.scim.tab.tokens",
+      "dataSource": "/ext/auth/scim/tokens",
+      "dataPath": "tokens",
+      "columns": [
+        { "key": "name", "label": "common.col.name" },
+        { "key": "created_at", "label": "common.col.created", "type": "date" },
+        { "key": "last_used_at", "label": "auth.scim.col.lastUsed", "type": "date" }
+      ],
+      "rowActions": [
+        {
+          "id": "revoke",
+          "label": "common.revoke",
+          "kind": "call",
+          "method": "DELETE",
+          "endpoint": "/ext/auth/scim/tokens/{id}",
+          "variant": "btn-error btn-outline",
+          "confirm": "auth.scim.confirm.revoke"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/auth/scim/tokens",
+        "reveal": { "key": "token", "title": "auth.scim.reveal.title", "note": "auth.scim.reveal.note" },
+        "fields": [
+          { "name": "name", "label": "common.col.name", "required": true, "placeholder": "Entra ID / Okta" }
+        ]
+      }
+    }
+  ]
+}

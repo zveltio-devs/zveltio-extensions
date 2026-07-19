@@ -1,0 +1,10 @@
+{
+  "auth.scim.title": "SCIM-Provisionierung",
+  "auth.scim.subtitle": "Bearer-Tokens, mit denen Ihr Identity Provider Benutzer über /scim/v2 provisioniert",
+  "auth.scim.btn.newToken": "Neues Token",
+  "auth.scim.tab.tokens": "Tokens",
+  "auth.scim.col.lastUsed": "Zuletzt verwendet",
+  "auth.scim.confirm.revoke": "Dieses Token widerrufen? Der IdP kann dann sofort nicht mehr provisionieren.",
+  "auth.scim.reveal.title": "SCIM-Bearer-Token",
+  "auth.scim.reveal.note": "Wird nur einmal angezeigt — jetzt in die Provisionierungs-Einstellungen des IdP einfügen."
+}
