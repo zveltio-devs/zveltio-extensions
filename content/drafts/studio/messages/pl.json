@@ -1,0 +1,13 @@
+{
+  "content.drafts.btn.publish": "Opublikuj",
+  "content.drafts.col.author": "Autor",
+  "content.drafts.col.record": "Rekord",
+  "content.drafts.col.updated": "Zaktualizowano",
+  "content.drafts.confirmDiscard": "Odrzucić wersję roboczą?",
+  "content.drafts.empty": "Brak danych.",
+  "content.drafts.subtitle": "Pending drafts across all collections. Publish promotes the draft to the live record.",
+  "content.drafts.title": "Wersje robocze",
+  "content.drafts.toast.discarded": "Odrzucono.",
+  "content.drafts.toast.published": "Opublikowano wersję roboczą.",
+  "content.drafts.ui.no_pending_drafts": "Brak oczekujących wersji roboczych."
+}

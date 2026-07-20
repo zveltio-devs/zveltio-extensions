@@ -1,0 +1,19 @@
+{
+  "content.document-templates.bodyHint": "Body — use {{var}} for substitution",
+  "content.document-templates.bodyHintRich": "Body — use {var} for substitution",
+  "content.document-templates.btn.new": "Nieuw sjabloon",
+  "content.document-templates.col.description": "Beschrijving",
+  "content.document-templates.col.format": "Formaat",
+  "content.document-templates.empty": "Nog geen gegevens.",
+  "content.document-templates.format.docx": "DOCX",
+  "content.document-templates.modal.edit": "Sjabloon bewerken",
+  "content.document-templates.modal.new": "Nieuw sjabloon",
+  "content.document-templates.placeholder.template": "sjabloon",
+  "content.document-templates.subtitle": "Herbruikbare sjablonen met variabelevervanging",
+  "content.document-templates.title": "{{title}}",
+  "content.document-templates.ui.format": "Formaat",
+  "content.document-templates.ui.html_pdf": "HTML (PDF)",
+  "content.document-templates.ui.markdown": "Markdown",
+  "content.document-templates.ui.name": "Naam *",
+  "content.document-templates.ui.no_templates_yet": "Nog geen sjablonen."
+}

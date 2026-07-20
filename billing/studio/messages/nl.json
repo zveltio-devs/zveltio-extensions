@@ -1,0 +1,16 @@
+{
+  "billing.badge.current": "Huidig",
+  "billing.btn.upgradeTo": "Upgraden naar",
+  "billing.empty": "Nog geen gegevens.",
+  "billing.empty.noSubscription": "Geen actief abonnement. Kies hieronder een abonnement.",
+  "billing.metric.apiCalls": "API-aanroepen",
+  "billing.metric.recordsCreated": "Aangemaakte records",
+  "billing.metric.storageWrites": "Storage Writes",
+  "billing.subtitle": "Abonnementen, abonnement en gebruik",
+  "billing.tab.subscription": "Abonnement",
+  "billing.tab.usage": "Gebruik",
+  "billing.title": "Facturering",
+  "billing.ui.available_plans": "Beschikbare abonnementen",
+  "billing.ui.usage_this_period": "Usage This Period",
+  "billing.usage.percentUsed": "{pct}% used"
+}

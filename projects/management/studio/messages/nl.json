@@ -1,0 +1,23 @@
+{
+  "projects.management.btn.newProject": "Nieuw project",
+  "projects.management.btn.newTask": "Nieuwe taak",
+  "projects.management.col.assignee": "Toegewezen aan",
+  "projects.management.col.dueDate": "Vervaldatum",
+  "projects.management.col.priority": "Prioriteit",
+  "projects.management.col.status": "Status",
+  "projects.management.empty": "Nog geen gegevens.",
+  "projects.management.empty.projects": "Nog geen projecten.",
+  "projects.management.form.name": "Naam *",
+  "projects.management.form.title": "Titel *",
+  "projects.management.priority.high": "Hoog",
+  "projects.management.priority.low": "Laag",
+  "projects.management.priority.medium": "Gemiddeld",
+  "projects.management.priority.urgent": "Urgent",
+  "projects.management.subtitle": "Kanban-bord en taakbeheer",
+  "projects.management.title": "Projecten",
+  "projects.management.ui.end_date": "Einddatum",
+  "projects.management.ui.new_project": "Nieuw project",
+  "projects.management.ui.new_task": "Nieuwe taak",
+  "projects.management.ui.no_tasks": "Geen taken.",
+  "projects.management.ui.start_date": "Startdatum"
+}

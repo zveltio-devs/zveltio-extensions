@@ -1,0 +1,21 @@
+{
+  "operations.pos.closeSession": "Sessie sluiten",
+  "operations.pos.col.orderCount": "Bestellingen",
+  "operations.pos.col.sales": "Verkoop",
+  "operations.pos.col.time": "Tijd",
+  "operations.pos.empty": "Nog geen gegevens.",
+  "operations.pos.openSession": "Sessie openen",
+  "operations.pos.recentOrders": "Recent orders",
+  "operations.pos.session.noOpen": "Geen open sessie.",
+  "operations.pos.session.open": "Sessie open",
+  "operations.pos.session.openingFloat": "Opening float:",
+  "operations.pos.subtitle": "Sessiebeheer en bestelgeschiedenis",
+  "operations.pos.title": "Kassa",
+  "operations.pos.toast.sessionClosed": "Sessie gesloten.",
+  "operations.pos.toast.sessionOpened": "Sessie geopend.",
+  "operations.pos.ui.closing_float": "Slotkassaldo",
+  "operations.pos.ui.no_orders_yet": "Nog geen bestellingen.",
+  "operations.pos.ui.no_reports": "Geen rapporten.",
+  "operations.pos.ui.opening_float": "Beginkassaldo",
+  "operations.pos.zReports": "Recent Z-reports"
+}

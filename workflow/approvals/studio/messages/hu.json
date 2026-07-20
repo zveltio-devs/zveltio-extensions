@@ -1,0 +1,14 @@
+{
+  "workflow.approvals.col.requestedBy": "Kérte",
+  "workflow.approvals.col.workflow": "Munkafolyamat",
+  "workflow.approvals.confirmCancel": "Törli ezt a jóváhagyási kérelmet?",
+  "workflow.approvals.empty": "Még nincsenek adatok.",
+  "workflow.approvals.empty.requests": "Nem található jóváhagyási kérelem.",
+  "workflow.approvals.empty.workflows": "Nincsenek konfigurált munkafolyamatok.",
+  "workflow.approvals.subtitle": "Jóváhagyási kérelmek és munkafolyamat-definíciók kezelése",
+  "workflow.approvals.tab.requests": "Kérések",
+  "workflow.approvals.tab.workflows": "Munkafolyamatok",
+  "workflow.approvals.tab.workflowsLabel": "Munkafolyamatok",
+  "workflow.approvals.title": "Jóváhagyások",
+  "workflow.approvals.toast.cancelled": "Törölve."
+}

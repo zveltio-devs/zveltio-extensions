@@ -4,16 +4,16 @@
   "content.document-templates.btn.new": "Șablon nou",
   "content.document-templates.col.description": "Descriere",
   "content.document-templates.col.format": "Format",
-  "content.document-templates.empty": "No data yet.",
+  "content.document-templates.empty": "Niciun date încă.",
   "content.document-templates.format.docx": "DOCX",
-  "content.document-templates.modal.edit": "Editează șablon",
+  "content.document-templates.modal.edit": "Editează șablonul",
   "content.document-templates.modal.new": "Șablon nou",
   "content.document-templates.placeholder.template": "șablon",
-  "content.document-templates.subtitle": "Reusable templates with variable substitution",
+  "content.document-templates.subtitle": "Șabloane reutilizabile cu substituție de variabile",
   "content.document-templates.title": "{{title}}",
   "content.document-templates.ui.format": "Format",
   "content.document-templates.ui.html_pdf": "HTML (PDF)",
   "content.document-templates.ui.markdown": "Markdown",
-  "content.document-templates.ui.name": "Name *",
-  "content.document-templates.ui.no_templates_yet": "No templates yet."
+  "content.document-templates.ui.name": "Nume *",
+  "content.document-templates.ui.no_templates_yet": "Niciun șablon încă."
 }

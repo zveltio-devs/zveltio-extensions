@@ -1,0 +1,23 @@
+{
+  "projects.management.btn.newProject": "Nowy projekt",
+  "projects.management.btn.newTask": "Nowe zadanie",
+  "projects.management.col.assignee": "Przypisany",
+  "projects.management.col.dueDate": "Termin",
+  "projects.management.col.priority": "Priorytet",
+  "projects.management.col.status": "Status",
+  "projects.management.empty": "Brak danych.",
+  "projects.management.empty.projects": "Brak projektów.",
+  "projects.management.form.name": "Nazwa *",
+  "projects.management.form.title": "Tytuł *",
+  "projects.management.priority.high": "Wysoki",
+  "projects.management.priority.low": "Niski",
+  "projects.management.priority.medium": "Średni",
+  "projects.management.priority.urgent": "Pilne",
+  "projects.management.subtitle": "Tablica Kanban i zarządzanie zadaniami",
+  "projects.management.title": "Projekty",
+  "projects.management.ui.end_date": "Data zakończenia",
+  "projects.management.ui.new_project": "Nowy projekt",
+  "projects.management.ui.new_task": "Nowe zadanie",
+  "projects.management.ui.no_tasks": "Brak zadań.",
+  "projects.management.ui.start_date": "Data rozpoczęcia"
+}

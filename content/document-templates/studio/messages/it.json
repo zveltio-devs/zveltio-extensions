@@ -1,0 +1,19 @@
+{
+  "content.document-templates.bodyHint": "Body — use {{var}} for substitution",
+  "content.document-templates.bodyHintRich": "Body — use {var} for substitution",
+  "content.document-templates.btn.new": "Nuovo modello",
+  "content.document-templates.col.description": "Descrizione",
+  "content.document-templates.col.format": "Formato",
+  "content.document-templates.empty": "Ancora nessun dato.",
+  "content.document-templates.format.docx": "DOCX",
+  "content.document-templates.modal.edit": "Modifica modello",
+  "content.document-templates.modal.new": "Nuovo modello",
+  "content.document-templates.placeholder.template": "modello",
+  "content.document-templates.subtitle": "Modelli riutilizzabili con sostituzione di variabili",
+  "content.document-templates.title": "{{title}}",
+  "content.document-templates.ui.format": "Formato",
+  "content.document-templates.ui.html_pdf": "HTML (PDF)",
+  "content.document-templates.ui.markdown": "Markdown",
+  "content.document-templates.ui.name": "Nome *",
+  "content.document-templates.ui.no_templates_yet": "Ancora nessun modello."
+}

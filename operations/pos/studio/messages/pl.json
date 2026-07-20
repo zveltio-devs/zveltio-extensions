@@ -1,0 +1,21 @@
+{
+  "operations.pos.closeSession": "Zamknij sesję",
+  "operations.pos.col.orderCount": "Zamówienia",
+  "operations.pos.col.sales": "Sprzedaż",
+  "operations.pos.col.time": "Czas",
+  "operations.pos.empty": "Brak danych.",
+  "operations.pos.openSession": "Otwórz sesję",
+  "operations.pos.recentOrders": "Recent orders",
+  "operations.pos.session.noOpen": "Brak otwartej sesji.",
+  "operations.pos.session.open": "Sesja otwarta",
+  "operations.pos.session.openingFloat": "Opening float:",
+  "operations.pos.subtitle": "Zarządzanie sesjami i historia zamówień",
+  "operations.pos.title": "Punkt sprzedaży",
+  "operations.pos.toast.sessionClosed": "Sesja zamknięta.",
+  "operations.pos.toast.sessionOpened": "Sesja otwarta.",
+  "operations.pos.ui.closing_float": "Stan kasy na zamknięcie",
+  "operations.pos.ui.no_orders_yet": "Brak zamówień.",
+  "operations.pos.ui.no_reports": "Brak raportów.",
+  "operations.pos.ui.opening_float": "Stan kasy na otwarcie",
+  "operations.pos.zReports": "Recent Z-reports"
+}

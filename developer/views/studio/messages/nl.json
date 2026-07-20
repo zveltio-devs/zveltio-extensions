@@ -1,0 +1,16 @@
+{
+  "developer.views.btn.newView": "Nieuwe weergave",
+  "developer.views.confirmDelete": "Weergave verwijderen?",
+  "developer.views.empty": "Nog geen opgeslagen weergaven.",
+  "developer.views.error.invalidJson": "Ongeldige JSON in configuratie",
+  "developer.views.subtitle": "Opgeslagen weergaven voor collecties",
+  "developer.views.title": "Aangepaste weergaven",
+  "developer.views.toast.created": "Weergave aangemaakt.",
+  "developer.views.ui.calendar": "Kalender",
+  "developer.views.ui.card_grid": "Kaartenraster",
+  "developer.views.ui.kanban_board": "Kanban-bord",
+  "developer.views.ui.list": "Lijst",
+  "developer.views.ui.map_requires_postgis": "Map (requires PostGIS)",
+  "developer.views.ui.new_view": "Nieuwe weergave",
+  "developer.views.ui.view_type": "Weergavetype"
+}

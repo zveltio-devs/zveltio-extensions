@@ -1,0 +1,20 @@
+{
+  "hr.payroll.btn.generate": "Genera",
+  "hr.payroll.btn.newPeriod": "Nuovo periodo",
+  "hr.payroll.btn.revisal": "Revisal XML",
+  "hr.payroll.col.gross": "Lordo",
+  "hr.payroll.col.net": "Netto",
+  "hr.payroll.empty": "Ancora nessun dato.",
+  "hr.payroll.empty.periods": "Ancora nessun periodo.",
+  "hr.payroll.selectPeriod": "Select a period to view payroll entries.",
+  "hr.payroll.subtitle": "Gestisci i periodi di paga e genera le buste paga",
+  "hr.payroll.tab.periods": "Periodi",
+  "hr.payroll.title": "Buste paga",
+  "hr.payroll.toast.entriesGenerated": "Voci generate.",
+  "hr.payroll.toast.periodCreated": "Periodo creato.",
+  "hr.payroll.ui.entries": "Voci",
+  "hr.payroll.ui.name_e_g_november_2026": "Name (e.g. November 2026)",
+  "hr.payroll.ui.new_payroll_period": "Nuovo periodo di paga",
+  "hr.payroll.ui.no_entries_click_generate": "Nessuna voce — clicca su Genera.",
+  "hr.payroll.ui.pay_date": "Pay date"
+}

@@ -1,0 +1,18 @@
+{
+  "storage.cloud.btn.share": "Udostępnij",
+  "storage.cloud.col.modified": "Zmodyfikowano",
+  "storage.cloud.col.size": "Rozmiar",
+  "storage.cloud.confirmDeleteFile": "Usunąć ten plik?",
+  "storage.cloud.copyClose": "Kopiuj i zamknij",
+  "storage.cloud.empty": "Brak danych.",
+  "storage.cloud.empty.folder": "Pusty folder. Przeciągnij pliki tutaj lub kliknij Prześlij.",
+  "storage.cloud.generateLink": "Generuj link",
+  "storage.cloud.root": "Katalog główny",
+  "storage.cloud.share": "Udostępnij",
+  "storage.cloud.shareTitle": "Udostępnij {name}",
+  "storage.cloud.subtitle": "Pliki i foldery",
+  "storage.cloud.title": "Magazyn w chmurze",
+  "storage.cloud.toast.uploaded": "Przesłano.",
+  "storage.cloud.ui.expires_hours": "Wygasa (godziny)",
+  "storage.cloud.ui.password_optional": "Hasło (opcjonalnie)"
+}

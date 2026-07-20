@@ -1,9 +1,9 @@
 {
-  "hr.leave.empty": "No data yet.",
-  "hr.leave.emptyRequests": "Nicio cerere de concediu.",
-  "hr.leave.form.new": "Cerere concediu nouă",
+  "hr.leave.empty": "Niciun date încă.",
+  "hr.leave.emptyRequests": "Nicio cerere de concediu încă.",
+  "hr.leave.form.new": "Cerere de concediu nouă",
   "hr.leave.form.submit": "Trimite cererea",
   "hr.leave.new": "Cerere nouă",
-  "hr.leave.subtitle": "Manage leave requests and approvals",
-  "hr.leave.title": "Leave"
+  "hr.leave.subtitle": "Gestionează cererile de concediu și aprobările",
+  "hr.leave.title": "Concediu"
 }
