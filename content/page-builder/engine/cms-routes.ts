@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { sanitizeBlocks } from './sanitize.js';
 // =========================================================
 // PUBLIC ROUTES — No auth required (serve the website)
 // =========================================================
@@ -117,7 +118,10 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
     const page = pageResult.rows[0];
 
     const rawBlocks: any[] = typeof page.blocks === 'string' ? JSON.parse(page.blocks) : (page.blocks ?? []);
-    const blocks = await Promise.all(rawBlocks.map(hydrateBlock));
+    // Scrub on the way OUT as well as on write: this is the payload the public
+    // browser executes via {@html}, and it also covers rows that were authored
+    // before write-time scrubbing existed.
+    const blocks = sanitizeBlocks(await Promise.all(rawBlocks.map(hydrateBlock)));
 
     return c.json({
       page: {

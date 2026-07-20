@@ -174,18 +174,24 @@ async function applyMigrations(ext: any): Promise<boolean> {
 }
 
 /**
- * Mount an extension's packed engine on a fresh app with an authed-admin mock
- * ctx — for bespoke per-extension regression tests beyond the uniform contract.
+ * Mount an extension's packed engine on a fresh app with a mock ctx — for
+ * bespoke per-extension regression tests beyond the uniform contract.
+ *
+ * Defaults to an authed ADMIN. Pass `{ admin: false }` / `{ authed: false }` to
+ * assert authorization gates (e.g. that a non-admin cannot publish content that
+ * lands on the public website).
  */
 export async function mountForTest(
   engineDir: string,
+  opts: { authed?: boolean; admin?: boolean } = {},
 ): Promise<{ app: any; publicRoutes: any[] }> {
+  const { authed = true, admin = true } = opts;
   const { Hono } = (await honoP) as any;
   const db = await getDb();
   const mod = await import(join(engineDir, 'index.js'));
   const app = new Hono();
   const publicRoutes: any[] = [];
-  await mod.default.register(app, makeCtx(db, { authed: true, admin: true }, publicRoutes));
+  await mod.default.register(app, makeCtx(db, { authed, admin }, publicRoutes));
   // Mount collected root-level public routes on the same app so tests can hit
   // them at their absolute paths (mirrors the engine mounting them globally).
   for (const spec of publicRoutes) app.on(spec.method, spec.path, spec.handler);
