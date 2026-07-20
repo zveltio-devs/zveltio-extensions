@@ -12,7 +12,6 @@
     "storage"
   ],
   "peerDependencies": {
-    "aws4fetch": "1.0.20",
     "nanoid": "^5.0.0"
   },
   "studio": {
