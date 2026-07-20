@@ -82,6 +82,7 @@
       <div class="card bg-base-200 border border-base-300">
         <div class="card-body p-0">
           <div class="p-3 font-medium text-sm border-b border-base-300">{m['analytics.quality.tab.history']()}</div>
+          <div class="overflow-x-auto">
           <table class="table table-sm">
             <thead><tr><th>{m['common.col.collection']()}</th><th>{m['common.col.date']()}</th><th>{m['analytics.quality.tab.issues']()}</th><th></th></tr></thead>
             <tbody>
@@ -99,12 +100,14 @@
               {/if}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
       <div class="card bg-base-200 border border-base-300">
         <div class="card-body p-0">
           <div class="p-3 font-medium text-sm border-b border-base-300 flex items-center gap-2"><AlertTriangle size={14} /> {m['analytics.quality.tab.issues']()}</div>
+          <div class="overflow-x-auto">
           <table class="table table-sm">
             <thead><tr><th>{m['analytics.quality.col.severity']()}</th><th>{m['common.col.type']()}</th><th>{m['common.col.field']()}</th><th>{m['common.col.description']()}</th></tr></thead>
             <tbody>
@@ -122,6 +125,7 @@
               {/if}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>

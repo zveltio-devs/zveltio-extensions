@@ -4,6 +4,29 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { sanitizeBlocks } from './sanitize.js';
+
+// Fixed-window per-IP limiter for the UNauthenticated tracking writes
+// (/metrics/track, ab-variant conversions). In-memory on purpose: it only
+// has to blunt scripted metric inflation, not survive restarts. IP comes
+// from the proxy headers; with no proxy all callers share one bucket, so
+// the window is sized to stay invisible to legitimate traffic even then.
+// biome-ignore lint/suspicious/noExplicitAny: Hono context in self-contained extension
+function rateLimit(max: number, windowMs: number): (c: any, next: () => Promise<unknown>) => Promise<unknown> {
+  const hits = new Map<string, { n: number; reset: number }>();
+  return async (c, next) => {
+    const now = Date.now();
+    const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || c.req.header('x-real-ip') || 'local';
+    const entry = hits.get(ip);
+    if (!entry || entry.reset <= now) {
+      if (hits.size > 10_000) hits.clear();
+      hits.set(ip, { n: 1, reset: now + windowMs });
+    } else if (++entry.n > max) {
+      return c.json({ error: 'Too many requests' }, 429);
+    }
+    return next();
+  };
+}
+
 async function getUser(c: any, auth: any) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   return session?.user ?? null;
@@ -217,7 +240,7 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
 
   // ─── Metrics tracking ─────────────────────────────────────────────────────
 
-  app.post('/metrics/track', zValidator('json', z.object({
+  app.post('/metrics/track', rateLimit(120, 60_000), zValidator('json', z.object({
     page_id: z.string().uuid(),
     time_on_page_seconds: z.number().int().min(0).default(0),
   })), async (c) => {
@@ -491,7 +514,7 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
     return c.json({ success: true });
   });
 
-  app.post('/:id/ab-variants/:variantId/track', async (c) => {
+  app.post('/:id/ab-variants/:variantId/track', rateLimit(60, 60_000), async (c) => {
     await reqDb(c).updateTable('zv_page_ab_variants').set({ conversions: sql`conversions + 1` }).where('id', '=', c.req.param('variantId')).execute();
     return c.json({ success: true });
   });

@@ -183,6 +183,7 @@
             <div class="card bg-base-200 border border-base-300">
               <div class="card-body p-0">
                 <div class="p-3 font-medium text-sm border-b border-base-300">{m['finance.banking.section.unreconciled']()}</div>
+                <div class="overflow-x-auto">
                 <table class="table table-sm">
                   <thead>
                     <tr>
@@ -205,11 +206,13 @@
                     {/if}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
             <div class="card bg-base-200 border border-base-300">
               <div class="card-body p-0">
                 <div class="p-3 font-medium text-sm border-b border-base-300">{m['finance.banking.section.openInvoices']()}</div>
+                <div class="overflow-x-auto">
                 <table class="table table-sm">
                   <thead>
                     <tr>
@@ -232,6 +235,7 @@
                     {/if}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           </div>
