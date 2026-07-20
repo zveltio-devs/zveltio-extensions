@@ -1,0 +1,92 @@
+{
+  "sduiSchema": 1,
+  "title": "finance.accounting.title",
+  "subtitle": "finance.accounting.subtitle",
+  "newLabel": "finance.accounting.newEntry",
+  "resources": [
+    {
+      "id": "entries",
+      "label": "finance.accounting.tab.entries",
+      "icon": "BookOpen",
+      "dataSource": "/ext/finance/accounting/journal-entries",
+      "dataPath": "data",
+      "pagination": { "limit": 100 },
+      "columns": [
+        { "key": "entry_date", "label": "common.col.date", "type": "date" },
+        { "key": "document_number", "label": "common.col.docNumber", "type": "mono" },
+        { "key": "description", "label": "common.col.description" },
+        { "key": "total_debit", "label": "common.col.debit", "type": "currency", "currency": { "code": "RON" } },
+        { "key": "total_credit", "label": "common.col.credit", "type": "currency", "currency": { "code": "RON" } },
+        { "key": "status", "label": "common.col.status", "type": "badge", "badge": { "colors": { "posted": "badge-success", "draft": "badge-ghost" } } }
+      ],
+      "form": {
+        "endpoint": "/ext/finance/accounting/journal-entries",
+        "fields": [
+          { "name": "entry_date", "label": "common.col.date", "type": "date", "default": "today", "required": true },
+          { "name": "document_number", "label": "finance.accounting.ui.document" },
+          { "name": "description", "label": "common.col.description", "required": true, "colSpan": 2 }
+        ],
+        "repeatable": {
+          "name": "lines",
+          "label": "finance.accounting.ui.lines",
+          "addLabel": "finance.accounting.ui.addLine",
+          "min": 2,
+          "columns": [
+            { "name": "account_code", "label": "common.col.account", "type": "relation", "relation": { "dataSource": "/ext/finance/accounting/accounts", "dataPath": "data", "valueKey": "code", "labelKey": ["code", "name"] } },
+            { "name": "description", "label": "common.col.description" },
+            { "name": "debit", "label": "common.col.debit", "type": "number", "mono": true },
+            { "name": "credit", "label": "common.col.credit", "type": "number", "mono": true }
+          ]
+        },
+        "computed": [
+          { "name": "_debit_total", "label": "common.col.debit", "sumOf": { "group": "lines", "field": "debit" } },
+          { "name": "_credit_total", "label": "common.col.credit", "sumOf": { "group": "lines", "field": "credit" } }
+        ]
+      }
+    },
+    {
+      "id": "accounts",
+      "label": "finance.accounting.tab.accounts",
+      "icon": "Coins",
+      "dataSource": "/ext/finance/accounting/accounts",
+      "dataPath": "data",
+      "columns": [
+        { "key": "code", "label": "common.col.code", "type": "mono" },
+        { "key": "name", "label": "common.col.name" },
+        { "key": "account_type", "label": "common.col.type", "type": "badge", "badge": { "colors": { "asset": "badge-info", "liability": "badge-warning", "equity": "badge-primary", "revenue": "badge-success", "expense": "badge-error" } } },
+        { "key": "parent_code", "label": "common.col.parent", "type": "mono" }
+      ],
+      "form": {
+        "endpoint": "/ext/finance/accounting/accounts",
+        "fields": [
+          { "name": "code", "label": "common.col.code", "required": true, "mono": true },
+          { "name": "name", "label": "common.col.name", "required": true },
+          {
+            "name": "account_type", "label": "common.col.type", "type": "select", "default": "asset",
+            "options": [
+              { "value": "asset", "label": "finance.accounting.ui.asset" },
+              { "value": "liability", "label": "finance.accounting.ui.liability" },
+              { "value": "equity", "label": "finance.accounting.ui.equity" },
+              { "value": "revenue", "label": "finance.accounting.ui.revenue" },
+              { "value": "expense", "label": "compliance.ro.saft.ui.expense" }
+            ]
+          },
+          { "name": "parent_code", "label": "common.col.parent", "mono": true }
+        ]
+      }
+    },
+    {
+      "id": "fiscal",
+      "label": "finance.accounting.tab.fiscal",
+      "icon": "TrendingUp",
+      "dataSource": "/ext/finance/accounting/fiscal-years",
+      "dataPath": "data",
+      "columns": [
+        { "key": "name", "label": "common.col.year" },
+        { "key": "start_date", "label": "common.col.start", "type": "date" },
+        { "key": "end_date", "label": "common.col.end", "type": "date" },
+        { "key": "is_closed", "label": "common.col.status", "type": "badge", "badge": { "colors": { "true": "badge-ghost", "false": "badge-success" }, "labels": { "true": "finance.accounting.status.closed", "false": "finance.accounting.status.open" } } }
+      ]
+    }
+  ]
+}
