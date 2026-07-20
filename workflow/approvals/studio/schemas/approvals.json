@@ -1,0 +1,61 @@
+{
+  "sduiSchema": 1,
+  "title": "workflow.approvals.title",
+  "subtitle": "workflow.approvals.subtitle",
+  "resources": [
+    {
+      "id": "requests",
+      "label": "workflow.approvals.tab.requests",
+      "icon": "CheckSquare",
+      "dataSource": "/ext/workflow/approvals",
+      "dataPath": "requests",
+      "filters": [
+        {
+          "param": "status",
+          "options": [
+            { "value": "all", "label": "common.filter.all" },
+            { "value": "pending", "label": "common.status.pending" },
+            { "value": "approved", "label": "common.status.approved" },
+            { "value": "rejected", "label": "common.status.rejected" }
+          ]
+        }
+      ],
+      "columns": [
+        { "key": "workflow_name", "label": "workflow.approvals.col.workflow" },
+        { "key": "collection", "label": "common.col.collection", "type": "mono", "join": { "keys": ["collection", "record_id"], "sep": " / " } },
+        { "key": "requested_by_name", "label": "workflow.approvals.col.requestedBy", "secondary": "requested_at" },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": { "pending": "badge-warning", "approved": "badge-success", "rejected": "badge-error", "cancelled": "badge-ghost" },
+            "labels": { "pending": "common.status.pending", "approved": "common.status.approved", "rejected": "common.status.rejected" }
+          }
+        }
+      ],
+      "rowActions": [
+        { "id": "approve", "label": "common.approve", "kind": "call", "method": "POST", "endpoint": "/ext/workflow/approvals/{id}/decide", "body": { "decision": "approved" }, "variant": "btn-success", "visibleWhen": { "field": "status", "equals": "pending" } },
+        { "id": "reject", "label": "common.reject", "kind": "call", "method": "POST", "endpoint": "/ext/workflow/approvals/{id}/decide", "body": { "decision": "rejected" }, "variant": "btn-error btn-outline", "visibleWhen": { "field": "status", "equals": "pending" } },
+        { "id": "cancel", "label": "common.cancel", "kind": "call", "method": "POST", "endpoint": "/ext/workflow/approvals/{id}/cancel", "variant": "btn-ghost", "confirm": "workflow.approvals.confirmCancel", "visibleWhen": { "field": "status", "equals": "pending" } }
+      ]
+    },
+    {
+      "id": "workflows",
+      "label": "workflow.approvals.tab.workflowsLabel",
+      "icon": "Workflow",
+      "dataSource": "/ext/workflow/approvals/workflows",
+      "dataPath": "workflows",
+      "columns": [
+        { "key": "name", "label": "common.col.name" },
+        { "key": "collection", "label": "common.col.collection", "type": "mono" },
+        {
+          "key": "is_active",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": { "colors": { "true": "badge-success", "false": "badge-ghost" } }
+        }
+      ]
+    }
+  ]
+}

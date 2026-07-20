@@ -19,7 +19,15 @@
     "fieldTypes": []
   },
   "studio": {
-    "navGroup": "other"
+    "navGroup": "other",
+    "pages": [
+      {
+        "path": "/admin/workflow/approvals",
+        "label": "Approvals",
+        "icon": "CheckSquare",
+        "schema": "schemas/approvals.json"
+      }
+    ]
   },
   "engine": {
     "entry": "engine/index.js",
