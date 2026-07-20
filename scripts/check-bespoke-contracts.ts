@@ -165,7 +165,12 @@ function routeMatches(routePath: string, callPath: string): boolean {
 function extractCalls(src: string): Call[] {
   const calls: Call[] = [];
   src.split('\n').forEach((line, i) => {
-    for (const m of line.matchAll(/['"`](\/ext\/[^'"`\s]*)['"`]/g)) {
+    // `${...}` interpolations may contain spaces (`${a ?? b}`), so the path
+    // body allows whitespace INSIDE a placeholder but nowhere else — a plain
+    // `[^\s]*` would silently skip those calls entirely.
+    // The opening delimiter may also be `}` — a URL built on a base variable,
+    // e.g. href="{ENGINE_URL}/ext/...". Those are real calls too.
+    for (const m of line.matchAll(/['"`}](\/ext\/(?:\$\{[^}]*\}|[^'"`\s])*)['"`]/g)) {
       const at = m.index ?? 0;
       const before = line.slice(0, at);
       const after = line.slice(at);
@@ -183,10 +188,13 @@ function extractCalls(src: string): Call[] {
       // Anything else (e.g. the URL assigned to a variable first) stays
       // UNKNOWN, and only its path is checked.
 
-      let p = m[1].split('?')[0];
+      let p = m[1];
       // Placeholders -> a sentinel matching any single segment: JS template
       // literals (`${id}`) and Svelte attribute interpolation (href="…/{id}").
       p = p.replace(/\$\{[^}]*\}/g, ' ').replace(/\{[^}]*\}/g, ' ');
+      // Strip the querystring only AFTER placeholders are gone: `??` inside an
+      // interpolation would otherwise truncate the path at the nullish operator.
+      p = p.split('?')[0];
       calls.push({ path: p, line: i + 1, method });
     }
   });
@@ -214,12 +222,6 @@ const KNOWN_BROKEN = new Map<string, string>([
     // Same page, the by-id update: PUT /ext/workflow/checklists/<id>.
     'workflow/checklists|/ext/workflow/checklists/',
     'See above — same page, same model mismatch (edit path).',
-  ],
-  [
-    'storage/cloud|/ext/storage/cloud/upload',
-    'The extension has no upload route and no file-listing route at all ' +
-      '(GET /files only appears to resolve because GET /:token swallows any ' +
-      'single segment). Browsing and uploading are genuinely unimplemented.',
   ],
 ]);
 
