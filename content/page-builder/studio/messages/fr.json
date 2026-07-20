@@ -5,5 +5,19 @@
   "content.page-builder.title": "Page Builder",
   "content.page-builder.ui.meta_description": "Meta description",
   "content.page-builder.ui.meta_title": "Meta title",
-  "content.page-builder.ui.slug": "Slug"
+  "content.page-builder.ui.slug": "Slug",
+  "content.pageBuilder.confirmDelete": "Supprimer cette page ?",
+  "content.pageBuilder.empty.blocks": "Aucun bloc. Ajoutez-en un ci-dessus.",
+  "content.pageBuilder.empty.pages": "Aucune page. Créez la première.",
+  "content.pageBuilder.menus.addItem": "Ajouter un lien",
+  "content.pageBuilder.menus.empty": "Aucun lien.",
+  "content.pageBuilder.menus.external": "externe",
+  "content.pageBuilder.menus.footer": "Menu pied de page",
+  "content.pageBuilder.menus.label": "Libellé",
+  "content.pageBuilder.menus.main": "Menu principal (en-tête)",
+  "content.pageBuilder.menus.title": "Menus",
+  "content.pageBuilder.newPage": "Nouvelle page",
+  "content.pageBuilder.toast.saved": "Enregistré.",
+  "content.pageBuilder.ui.ogImage": "URL image OG",
+  "content.pageBuilder.unpublish": "Dépublier"
 }
