@@ -33,7 +33,7 @@
     try { const r = await api.get<{ data: any[] }>('/ext/projects/helpdesk/categories'); categories = r.data ?? []; } catch {}
   }
   async function loadMessages(id: string) {
-    try { const r = await api.get<{ data: any[] }>(`/ext/projects/helpdesk/tickets/${id}/messages`); messages = r.data ?? []; }
+    try { const r = await api.get<{ data: { messages: any[] } }>(`/ext/projects/helpdesk/tickets/${id}`); messages = r.data?.messages ?? []; }
     catch (e: any) { toast.error(e instanceof Error ? e.message : m['ext.saveFailed']()); }
   }
 
@@ -60,7 +60,7 @@
 
   async function resolve(id: string) {
     try {
-      await api.post(`/ext/projects/helpdesk/tickets/${id}/resolve`, {});
+      await api.patch(`/ext/projects/helpdesk/tickets/${id}`, { status: 'resolved' });
       await loadTickets();
       if (activeTicket?.id === id) activeTicket = null;
       toast.success(m['projects.helpdesk.toast.resolved']());

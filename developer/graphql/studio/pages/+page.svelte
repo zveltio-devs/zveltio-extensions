@@ -27,7 +27,7 @@
 
   async function loadLogs() {
     loading = true;
-    try { const r = await api.get<{ data: any[] }>('/ext/developer/graphql/operations?limit=100'); logs = r.data ?? []; }
+    try { const r = await api.get<{ logs: any[] }>('/ext/developer/graphql/logs?limit=100'); logs = r.logs ?? []; }
     catch (e: any) { toast.error(e instanceof Error ? e.message : m['ext.loadFailed']()); }
     finally { loading = false; }
   }
