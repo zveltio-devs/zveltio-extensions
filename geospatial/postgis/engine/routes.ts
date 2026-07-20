@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { permissionGate } from '@zveltio/sdk/extension';
 
 async function getUser(c: any, auth: any) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -53,6 +54,24 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
   }
 
   const app = new Hono();
+
+  // RBAC on the extension-owned resources (geofences, location history,
+  // saved routes): these tables are not collections, so resolveCollection's
+  // per-collection `data:read` check never covers them — before this gate,
+  // ANY authenticated user could create/disable geofences and read every
+  // entity's location history. The collection-backed endpoints (/near,
+  // /within, /clusters, …) stay outside the gate: they already enforce
+  // per-collection permission through resolveCollection.
+  const requireSession = async (c: any, next: () => Promise<unknown>) => {
+    const user = await getUser(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    c.set('user', user);
+    await next();
+  };
+  for (const path of ['/geofences', '/geofences/*', '/location-history', '/location-history/*', '/routes', '/routes/*']) {
+    app.use(path, requireSession);
+    app.use(path, permissionGate(ctx, 'postgis'));
+  }
 
   // ─── Proximity search ─────────────────────────────────────────
 
