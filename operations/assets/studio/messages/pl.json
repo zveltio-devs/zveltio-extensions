@@ -1,0 +1,17 @@
+{
+  "operations.assets.btn.create": "Utwórz",
+  "operations.assets.btn.new": "Nowy środek trwały",
+  "operations.assets.col.cost": "Koszt",
+  "operations.assets.col.location": "Lokalizacja",
+  "operations.assets.confirmDelete": "Usunąć ten środek trwały?",
+  "operations.assets.empty": "Nie zarejestrowano jeszcze środków trwałych.",
+  "operations.assets.subtitle": "Zarządzaj środkami trwałymi i amortyzacją firmy",
+  "operations.assets.title": "Środki trwałe",
+  "operations.assets.toast.created": "Utworzono środek trwały.",
+  "operations.assets.ui.acquisition_cost": "Koszt nabycia",
+  "operations.assets.ui.acquisition_date": "Data nabycia",
+  "operations.assets.ui.code_tag": "Kod / Tag",
+  "operations.assets.ui.location": "Lokalizacja",
+  "operations.assets.ui.new_asset": "Nowy środek trwały",
+  "operations.assets.ui.serial_number": "Numer seryjny"
+}

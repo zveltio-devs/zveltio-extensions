@@ -1,0 +1,13 @@
+{
+  "content.drafts.btn.publish": "Közzététel",
+  "content.drafts.col.author": "Szerző",
+  "content.drafts.col.record": "Rekord",
+  "content.drafts.col.updated": "Frissítve",
+  "content.drafts.confirmDiscard": "Elveti a piszkozatot?",
+  "content.drafts.empty": "Még nincsenek adatok.",
+  "content.drafts.subtitle": "Pending drafts across all collections. Publish promotes the draft to the live record.",
+  "content.drafts.title": "Piszkozatok",
+  "content.drafts.toast.discarded": "Elvetve.",
+  "content.drafts.toast.published": "Piszkozat közzétéve.",
+  "content.drafts.ui.no_pending_drafts": "Nincsenek függőben lévő piszkozatok."
+}

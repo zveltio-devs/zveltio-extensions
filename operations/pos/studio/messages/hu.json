@@ -1,0 +1,21 @@
+{
+  "operations.pos.closeSession": "Munkamenet lezárása",
+  "operations.pos.col.orderCount": "Rendelések",
+  "operations.pos.col.sales": "Értékesítés",
+  "operations.pos.col.time": "Idő",
+  "operations.pos.empty": "Még nincsenek adatok.",
+  "operations.pos.openSession": "Munkamenet megnyitása",
+  "operations.pos.recentOrders": "Recent orders",
+  "operations.pos.session.noOpen": "Nincs nyitott munkamenet.",
+  "operations.pos.session.open": "Munkamenet nyitva",
+  "operations.pos.session.openingFloat": "Opening float:",
+  "operations.pos.subtitle": "Munkamenet-kezelés és rendelési előzmények",
+  "operations.pos.title": "Értékesítési pont",
+  "operations.pos.toast.sessionClosed": "Munkamenet lezárva.",
+  "operations.pos.toast.sessionOpened": "Munkamenet megnyitva.",
+  "operations.pos.ui.closing_float": "Záró készpénz",
+  "operations.pos.ui.no_orders_yet": "Még nincsenek rendelések.",
+  "operations.pos.ui.no_reports": "Nincsenek jelentések.",
+  "operations.pos.ui.opening_float": "Nyitó készpénz",
+  "operations.pos.zReports": "Recent Z-reports"
+}

@@ -13,11 +13,12 @@ var __export = (target, all) => {
       set: __exportSetter.bind(all, name)
     });
 };
+var __require = import.meta.require;
 
 // sms/engine/index.ts
 import { join } from "path";
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/compose.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
     let index = -1;
@@ -61,7 +62,7 @@ var compose = (middleware, onError, onNotFound) => {
   };
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/http-exception.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/http-exception.js
 var HTTPException = class extends Error {
   res;
   status;
@@ -84,21 +85,39 @@ var HTTPException = class extends Error {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/request/constants.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/request/constants.js
 var GET_MATCH_RESULT = /* @__PURE__ */ Symbol();
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/body.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/buffer.js
+var bufferToFormData = (arrayBuffer, contentType) => {
+  const response = new Response(arrayBuffer, {
+    headers: {
+      "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase())
+    }
+  });
+  return response.formData();
+};
+
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/body.js
+var isRawRequest = (request) => ("headers" in request);
 var parseBody = async (request, options = /* @__PURE__ */ Object.create(null)) => {
   const { all = false, dot = false } = options;
-  const headers = request instanceof HonoRequest ? request.raw.headers : request.headers;
+  const headers = isRawRequest(request) ? request.headers : request.raw.headers;
   const contentType = headers.get("Content-Type");
-  if (contentType?.startsWith("multipart/form-data") || contentType?.startsWith("application/x-www-form-urlencoded")) {
+  const mediaType = contentType?.split(";")[0].trim().toLowerCase();
+  if (mediaType === "multipart/form-data" || mediaType === "application/x-www-form-urlencoded") {
     return parseFormData(request, { all, dot });
   }
   return {};
 };
 async function parseFormData(request, options) {
-  const formData = await request.formData();
+  const headers = isRawRequest(request) ? request.headers : request.raw.headers;
+  const arrayBuffer = await request.arrayBuffer();
+  const formDataPromise = bufferToFormData(arrayBuffer, headers.get("Content-Type") || "");
+  if (!isRawRequest(request)) {
+    request.bodyCache.formData = formDataPromise;
+  }
+  const formData = await formDataPromise;
   if (formData) {
     return convertFormDataToBodyData(formData, options);
   }
@@ -158,7 +177,7 @@ var handleParsingNestedValues = (form, key, value) => {
   });
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/url.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/url.js
 var splitPath = (path) => {
   const paths = path.split("/");
   if (paths[0] === "") {
@@ -358,7 +377,7 @@ var getQueryParams = (url, key) => {
 };
 var decodeURIComponent_ = decodeURIComponent;
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/request.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/request.js
 var tryDecodeURIComponent = (str) => tryDecode(str, decodeURIComponent_);
 var HonoRequest = class {
   raw;
@@ -472,7 +491,7 @@ var HonoRequest = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/html.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/html.js
 var HtmlEscapedCallbackPhase = {
   Stringify: 1,
   BeforeStream: 2,
@@ -510,7 +529,7 @@ var resolveCallback = async (str, phase, preserveCallbacks, context, buffer) => 
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/context.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/context.js
 var TEXT_PLAIN = "text/plain; charset=UTF-8";
 var setDefaultContentType = (contentType, headers) => {
   return {
@@ -677,7 +696,7 @@ var Context = class {
   };
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router.js
 var METHOD_NAME_ALL = "ALL";
 var METHOD_NAME_ALL_LOWERCASE = "all";
 var METHODS = ["get", "post", "put", "delete", "options", "patch"];
@@ -685,10 +704,10 @@ var MESSAGE_MATCHER_IS_ALREADY_BUILT = "Can not add a route since the matcher is
 var UnsupportedPathError = class extends Error {
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/constants.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/constants.js
 var COMPOSED_HANDLER = "__COMPOSED_HANDLER";
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/hono-base.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/hono-base.js
 var notFoundHandler = (c) => {
   return c.text("404 Not Found", 404);
 };
@@ -912,7 +931,7 @@ var Hono = class _Hono {
   };
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/matcher.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/matcher.js
 var emptyParam = [];
 function match(method, path) {
   const matchers = this.buildAllMatchers();
@@ -933,7 +952,7 @@ function match(method, path) {
   return match2(method, path);
 }
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/node.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/node.js
 var LABEL_REG_EXP_STR = "[^/]+";
 var ONLY_WILDCARD_REG_EXP_STR = ".*";
 var TAIL_WILDCARD_REG_EXP_STR = "(?:|/.*)";
@@ -1037,7 +1056,7 @@ var Node = class _Node {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/trie.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/trie.js
 var Trie = class {
   #context = { varIndex: 0 };
   #root = new Node;
@@ -1093,7 +1112,7 @@ var Trie = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/router.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/router.js
 var nullMatcher = [/^$/, [], /* @__PURE__ */ Object.create(null)];
 var wildcardRegExpCache = /* @__PURE__ */ Object.create(null);
 function buildWildcardRegExp(path) {
@@ -1258,7 +1277,7 @@ var RegExpRouter = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/prepared-router.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/prepared-router.js
 var PreparedRegExpRouter = class {
   name = "PreparedRegExpRouter";
   #matchers;
@@ -1330,7 +1349,7 @@ var PreparedRegExpRouter = class {
   match = match;
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/smart-router/router.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/smart-router/router.js
 var SmartRouter = class {
   name = "SmartRouter";
   #routers = [];
@@ -1385,7 +1404,7 @@ var SmartRouter = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/trie-router/node.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/trie-router/node.js
 var emptyParams = /* @__PURE__ */ Object.create(null);
 var hasChildren = (children) => {
   for (const _ in children) {
@@ -1554,7 +1573,7 @@ var Node2 = class _Node2 {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/trie-router/router.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/trie-router/router.js
 var TrieRouter = class {
   name = "TrieRouter";
   #node;
@@ -1576,7 +1595,7 @@ var TrieRouter = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/hono.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/hono.js
 var Hono2 = class extends Hono {
   constructor(options = {}) {
     super(options);
@@ -1586,7 +1605,7 @@ var Hono2 = class extends Hono {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/cookie.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/cookie.js
 var validCookieNameRegEx = /^[\w!#$%&'*.^`|~+-]+$/;
 var validCookieValueRegEx = /^[ !#-:<-[\]-~]*$/;
 var trimCookieWhitespace = (value) => {
@@ -1637,7 +1656,7 @@ var parse = (cookie, name) => {
   return parsedCookie;
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/helper/cookie/index.js
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/helper/cookie/index.js
 var getCookie = (c, key, prefix) => {
   const cookie = c.req.raw.headers.get("Cookie");
   if (typeof key === "string") {
@@ -1660,20 +1679,10 @@ var getCookie = (c, key, prefix) => {
   return obj;
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/buffer.js
-var bufferToFormData = (arrayBuffer, contentType) => {
-  const response = new Response(arrayBuffer, {
-    headers: {
-      "Content-Type": contentType
-    }
-  });
-  return response.formData();
-};
-
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/validator/validator.js
-var jsonRegex = /^application\/([a-z-\.]+\+)?json(;\s*[a-zA-Z0-9\-]+\=([^;]+))*$/;
-var multipartRegex = /^multipart\/form-data(;\s?boundary=[a-zA-Z0-9'"()+_,\-./:=?]+)?$/;
-var urlencodedRegex = /^application\/x-www-form-urlencoded(;\s*[a-zA-Z0-9\-]+\=([^;]+))*$/;
+// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/validator/validator.js
+var jsonRegex = /^application\/([a-z-\.]+\+)?json(;\s*[a-zA-Z0-9\-]+\=([^;]+))*$/i;
+var multipartRegex = /^multipart\/form-data(;\s?boundary=[a-zA-Z0-9'"()+_,\-./:=?]+)?$/i;
+var urlencodedRegex = /^application\/x-www-form-urlencoded(;\s*[a-zA-Z0-9\-]+\=([^;]+))*$/i;
 var validator = (target, validationFunc) => {
   return async (c, next) => {
     let value = {};
@@ -1747,7 +1756,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+727162ed4002934e/node_modules/@hono/zod-validator/dist/index.js
+// ../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+4bef6e9a69915e20/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -16270,9 +16279,27 @@ function smsRoutes(ctx) {
     return c.json({ template }, 201);
   });
   app.post("/webhook/twilio", async (c) => {
+    const authToken = process.env.TWILIO_AUTH_TOKEN ?? "";
+    if (!authToken) {
+      return c.json({ error: "Webhook not configured" }, 500);
+    }
     const body = await c.req.formData().catch(() => null);
     if (!body)
       return c.json({ error: "Invalid form data" }, 400);
+    const url2 = process.env.TWILIO_WEBHOOK_URL ?? c.req.url;
+    const params = [];
+    body.forEach((v, k) => {
+      if (typeof v === "string")
+        params.push([k, v]);
+    });
+    params.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+    const payload = url2 + params.map(([k, v]) => k + v).join("");
+    const { createHmac, timingSafeEqual } = await import("crypto");
+    const expected = createHmac("sha1", authToken).update(payload).digest();
+    const given = Buffer.from(c.req.header("x-twilio-signature") ?? "", "base64");
+    if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
+      return c.json({ error: "Invalid signature" }, 403);
+    }
     const messageSid = body.get("MessageSid");
     const messageStatus = body.get("MessageStatus");
     if (!messageSid || !messageStatus) {
@@ -16287,7 +16314,7 @@ function smsRoutes(ctx) {
       sending: "pending"
     };
     const mappedStatus = statusMap[messageStatus] ?? messageStatus;
-    await db.updateTable("zv_sms_messages").set({ status: mappedStatus }).where("provider_message_id", "=", messageSid).execute();
+    await reqDb(c).updateTable("zv_sms_messages").set({ status: mappedStatus }).where("provider_message_id", "=", messageSid).execute();
     return c.text("OK");
   });
   app.get("/stats", async (c) => {

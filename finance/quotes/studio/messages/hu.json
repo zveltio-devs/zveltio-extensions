@@ -1,0 +1,20 @@
+{
+  "finance.quotes.btn.accept": "Elfogadottként jelölés",
+  "finance.quotes.btn.addLine": "Sor hozzáadása",
+  "finance.quotes.btn.create": "Árajánlat létrehozása",
+  "finance.quotes.btn.new": "Új árajánlat",
+  "finance.quotes.btn.send": "Küldés",
+  "finance.quotes.deleteConfirm": "Törli ezt az árajánlatot?",
+  "finance.quotes.empty": "Még nincsenek árajánlatok. Hozd létre az elsőt.",
+  "finance.quotes.section.lines": "Sorok",
+  "finance.quotes.subtitle": "Ügyfél-árajánlatok és javaslatok kezelése",
+  "finance.quotes.title": "Árajánlatok és javaslatok",
+  "finance.quotes.toast.created": "Árajánlat létrehozva.",
+  "finance.quotes.ui.client_email": "Ügyfél e-mail",
+  "finance.quotes.ui.client_name": "Ügyfél neve *",
+  "finance.quotes.ui.disc": "Disc %",
+  "finance.quotes.ui.service_or_product": "Szolgáltatás vagy termék",
+  "finance.quotes.ui.unit_price": "Egységár",
+  "finance.quotes.ui.valid_days": "Érvényességi napok",
+  "quotes.new": "Új árajánlat"
+}

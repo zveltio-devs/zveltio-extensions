@@ -1,0 +1,22 @@
+{
+  "projects.helpdesk.btn.create": "Létrehozás",
+  "projects.helpdesk.btn.new": "Új jegy",
+  "projects.helpdesk.btn.resolve": "Megoldás",
+  "projects.helpdesk.col.category": "Kategória",
+  "projects.helpdesk.empty": "Még nincsenek adatok.",
+  "projects.helpdesk.empty.select": "Select a ticket to view the conversation.",
+  "projects.helpdesk.priority.high": "Magas",
+  "projects.helpdesk.priority.low": "Alacsony",
+  "projects.helpdesk.subtitle": "Ügyfélszolgálati jegyek kezelése",
+  "projects.helpdesk.title": "Ügyfélszolgálat",
+  "projects.helpdesk.toast.resolved": "Jegy megoldva.",
+  "projects.helpdesk.ui.description": "Leírás *",
+  "projects.helpdesk.ui.medium": "Közepes",
+  "projects.helpdesk.ui.new_ticket": "Új jegy",
+  "projects.helpdesk.ui.priority": "Prioritás",
+  "projects.helpdesk.ui.reply": "Reply…",
+  "projects.helpdesk.ui.requester_email": "Kérelmező e-mail",
+  "projects.helpdesk.ui.resolve_activeticket_id_mark_resolved": "resolve(activeTicket.id)}>Mark resolved",
+  "projects.helpdesk.ui.subject": "Tárgy *",
+  "projects.helpdesk.ui.urgent": "Sürgős"
+}

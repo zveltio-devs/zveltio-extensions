@@ -1,0 +1,20 @@
+{
+  "finance.quotes.btn.accept": "Oznacz jako zaakceptowane",
+  "finance.quotes.btn.addLine": "Dodaj wiersz",
+  "finance.quotes.btn.create": "Utwórz ofertę",
+  "finance.quotes.btn.new": "Nowa oferta",
+  "finance.quotes.btn.send": "Wyślij",
+  "finance.quotes.deleteConfirm": "Usunąć tę ofertę?",
+  "finance.quotes.empty": "Brak ofert. Utwórz pierwszą ofertę.",
+  "finance.quotes.section.lines": "Wiersze",
+  "finance.quotes.subtitle": "Zarządzaj ofertami i propozycjami klientów",
+  "finance.quotes.title": "Oferty i propozycje",
+  "finance.quotes.toast.created": "Utworzono ofertę.",
+  "finance.quotes.ui.client_email": "E-mail klienta",
+  "finance.quotes.ui.client_name": "Nazwa klienta *",
+  "finance.quotes.ui.disc": "Disc %",
+  "finance.quotes.ui.service_or_product": "Usługa lub produkt",
+  "finance.quotes.ui.unit_price": "Cena jednostkowa",
+  "finance.quotes.ui.valid_days": "Dni ważności",
+  "quotes.new": "Nowa oferta"
+}

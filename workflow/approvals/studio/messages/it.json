@@ -1,0 +1,14 @@
+{
+  "workflow.approvals.col.requestedBy": "Richiesto da",
+  "workflow.approvals.col.workflow": "Flusso di lavoro",
+  "workflow.approvals.confirmCancel": "Annullare questa richiesta di approvazione?",
+  "workflow.approvals.empty": "Ancora nessun dato.",
+  "workflow.approvals.empty.requests": "Nessuna richiesta di approvazione trovata.",
+  "workflow.approvals.empty.workflows": "Nessun flusso di lavoro configurato.",
+  "workflow.approvals.subtitle": "Gestisci richieste di approvazione e definizioni di flusso",
+  "workflow.approvals.tab.requests": "Richieste",
+  "workflow.approvals.tab.workflows": "Flussi di lavoro",
+  "workflow.approvals.tab.workflowsLabel": "Flussi di lavoro",
+  "workflow.approvals.title": "Approvazioni",
+  "workflow.approvals.toast.cancelled": "Annullato."
+}

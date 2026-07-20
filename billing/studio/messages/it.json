@@ -1,0 +1,16 @@
+{
+  "billing.badge.current": "Attuale",
+  "billing.btn.upgradeTo": "Passa a",
+  "billing.empty": "Ancora nessun dato.",
+  "billing.empty.noSubscription": "Nessun abbonamento attivo. Scegli un piano qui sotto.",
+  "billing.metric.apiCalls": "Chiamate API",
+  "billing.metric.recordsCreated": "Record creati",
+  "billing.metric.storageWrites": "Storage Writes",
+  "billing.subtitle": "Piani, abbonamento e utilizzo",
+  "billing.tab.subscription": "Abbonamento",
+  "billing.tab.usage": "Utilizzo",
+  "billing.title": "Fatturazione",
+  "billing.ui.available_plans": "Piani disponibili",
+  "billing.ui.usage_this_period": "Usage This Period",
+  "billing.usage.percentUsed": "{pct}% used"
+}

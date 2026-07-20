@@ -1,0 +1,20 @@
+{
+  "finance.banking.empty": "Még nincsenek adatok.",
+  "finance.banking.empty.accounts": "Még nincsenek bankszámlák.",
+  "finance.banking.empty.transactions": "Még nincsenek tranzakciók.",
+  "finance.banking.empty.unreconciled": "Nincsenek nem egyeztetett tranzakciók.",
+  "finance.banking.newAccount": "Új fiók",
+  "finance.banking.section.openInvoices": "Nyitott számlák (elküldve)",
+  "finance.banking.section.unreconciled": "Nem egyeztetett tranzakciók",
+  "finance.banking.status.pending": "Függőben",
+  "finance.banking.status.reconciled": "Egyeztetve",
+  "finance.banking.subtitle": "Bankszámlák, tranzakciók és egyeztetés",
+  "finance.banking.tab.accounts": "Fiókok",
+  "finance.banking.tab.reconciliation": "Egyeztetés",
+  "finance.banking.tab.transactions": "Tranzakciók",
+  "finance.banking.title": "Banki ügyek",
+  "finance.banking.ui.internal_name": "Belső név",
+  "finance.banking.ui.new_bank_account": "Új bankszámla",
+  "finance.banking.ui.no_open_invoices": "Nincsenek nyitott számlák.",
+  "finance.banking.ui.opening_balance": "Nyitó egyenleg"
+}

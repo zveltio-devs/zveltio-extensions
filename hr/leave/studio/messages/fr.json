@@ -1,9 +1,9 @@
 {
-  "hr.leave.empty": "No data yet.",
-  "hr.leave.emptyRequests": "No leave requests yet.",
-  "hr.leave.form.new": "New leave request",
-  "hr.leave.form.submit": "Submit request",
-  "hr.leave.new": "New request",
-  "hr.leave.subtitle": "Manage leave requests and approvals",
-  "hr.leave.title": "Leave"
+  "hr.leave.empty": "Aucune donnée pour l'instant.",
+  "hr.leave.emptyRequests": "Aucune demande de congé pour l'instant.",
+  "hr.leave.form.new": "Nouvelle demande de congé",
+  "hr.leave.form.submit": "Soumettre la demande",
+  "hr.leave.new": "Nouvelle demande",
+  "hr.leave.subtitle": "Gérer les demandes de congé et les approbations",
+  "hr.leave.title": "Congé"
 }

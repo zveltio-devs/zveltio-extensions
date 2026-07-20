@@ -129,10 +129,34 @@ export function smsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any 
     },
   );
 
-  // POST /webhook/twilio — receive delivery status from Twilio
+  // POST /webhook/twilio — receive delivery status from Twilio (no session
+  // auth by design; authenticity comes from the X-Twilio-Signature HMAC,
+  // mirroring the Stripe webhook's HMAC check in billing).
   app.post('/webhook/twilio', async (c) => {
+    const authToken = process.env.TWILIO_AUTH_TOKEN ?? '';
+    if (!authToken) {
+      return c.json({ error: 'Webhook not configured' }, 500);
+    }
+
     const body = await c.req.formData().catch(() => null);
     if (!body) return c.json({ error: 'Invalid form data' }, 400);
+
+    // Twilio signs HMAC-SHA1(authToken, url + concat(sorted params as key+value)),
+    // base64. The URL must be the PUBLIC one Twilio requested; behind a proxy
+    // the Host header differs, so operators can pin it with TWILIO_WEBHOOK_URL.
+    const url = process.env.TWILIO_WEBHOOK_URL ?? c.req.url;
+    const params: [string, string][] = [];
+    body.forEach((v, k) => {
+      if (typeof v === 'string') params.push([k, v]);
+    });
+    params.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    const payload = url + params.map(([k, v]) => k + v).join('');
+    const { createHmac, timingSafeEqual } = await import('node:crypto');
+    const expected = createHmac('sha1', authToken).update(payload).digest();
+    const given = Buffer.from(c.req.header('x-twilio-signature') ?? '', 'base64');
+    if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
+      return c.json({ error: 'Invalid signature' }, 403);
+    }
 
     const messageSid = body.get('MessageSid') as string | null;
     const messageStatus = body.get('MessageStatus') as string | null;
@@ -152,7 +176,7 @@ export function smsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any 
     };
     const mappedStatus = statusMap[messageStatus] ?? messageStatus;
 
-    await (db as any)
+    await reqDb(c)
       .updateTable('zv_sms_messages')
       .set({ status: mappedStatus })
       .where('provider_message_id', '=', messageSid)

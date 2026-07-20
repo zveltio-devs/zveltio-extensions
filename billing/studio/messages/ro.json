@@ -1,7 +1,7 @@
 {
   "billing.badge.current": "Curent",
-  "billing.btn.upgradeTo": "Upgrade la",
-  "billing.empty": "No data yet.",
+  "billing.btn.upgradeTo": "Fă upgrade la",
+  "billing.empty": "Niciun date încă.",
   "billing.empty.noSubscription": "Niciun abonament activ. Alege un plan mai jos.",
   "billing.metric.apiCalls": "Apeluri API",
   "billing.metric.recordsCreated": "Înregistrări create",
@@ -9,8 +9,8 @@
   "billing.subtitle": "Planuri, abonament și utilizare",
   "billing.tab.subscription": "Abonament",
   "billing.tab.usage": "Utilizare",
-  "billing.title": "Billing",
-  "billing.ui.available_plans": "Available Plans",
+  "billing.title": "Facturare",
+  "billing.ui.available_plans": "Planuri disponibile",
   "billing.ui.usage_this_period": "Usage This Period",
   "billing.usage.percentUsed": "{pct}% utilizat"
 }

@@ -1,0 +1,17 @@
+{
+  "operations.assets.btn.create": "Létrehozás",
+  "operations.assets.btn.new": "Új eszköz",
+  "operations.assets.col.cost": "Költség",
+  "operations.assets.col.location": "Hely",
+  "operations.assets.confirmDelete": "Törli ezt az eszközt?",
+  "operations.assets.empty": "Még nincs regisztrált eszköz.",
+  "operations.assets.subtitle": "A cég tárgyi eszközeinek és értékcsökkenésének kezelése",
+  "operations.assets.title": "Tárgyi eszközök",
+  "operations.assets.toast.created": "Eszköz létrehozva.",
+  "operations.assets.ui.acquisition_cost": "Beszerzési költség",
+  "operations.assets.ui.acquisition_date": "Beszerzés dátuma",
+  "operations.assets.ui.code_tag": "Kód / Címke",
+  "operations.assets.ui.location": "Hely",
+  "operations.assets.ui.new_asset": "Új eszköz",
+  "operations.assets.ui.serial_number": "Sorozatszám"
+}
