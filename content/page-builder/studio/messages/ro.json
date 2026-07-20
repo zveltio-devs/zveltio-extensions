@@ -5,5 +5,19 @@
   "content.page-builder.title": "Page Builder",
   "content.page-builder.ui.meta_description": "Meta description",
   "content.page-builder.ui.meta_title": "Meta title",
-  "content.page-builder.ui.slug": "Slug"
+  "content.page-builder.ui.slug": "Slug",
+  "content.pageBuilder.confirmDelete": "Ștergi această pagină?",
+  "content.pageBuilder.empty.blocks": "Niciun bloc încă. Adaugă unul mai sus.",
+  "content.pageBuilder.empty.pages": "Nicio pagină încă. Creează prima.",
+  "content.pageBuilder.menus.addItem": "Adaugă link",
+  "content.pageBuilder.menus.empty": "Niciun link încă.",
+  "content.pageBuilder.menus.external": "extern",
+  "content.pageBuilder.menus.footer": "Meniu footer",
+  "content.pageBuilder.menus.label": "Etichetă",
+  "content.pageBuilder.menus.main": "Meniu principal (header)",
+  "content.pageBuilder.menus.title": "Meniuri",
+  "content.pageBuilder.newPage": "Pagină nouă",
+  "content.pageBuilder.toast.saved": "Salvat.",
+  "content.pageBuilder.ui.ogImage": "URL imagine OG",
+  "content.pageBuilder.unpublish": "Retrage"
 }
