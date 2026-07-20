@@ -1,4 +1,6 @@
 {
+  "workflow.approvals.col.requestedBy": "Angefordert von",
+  "workflow.approvals.col.workflow": "Workflow",
   "workflow.approvals.confirmCancel": "Cancel this approval request?",
   "workflow.approvals.empty": "No data yet.",
   "workflow.approvals.empty.requests": "No approval requests found.",
