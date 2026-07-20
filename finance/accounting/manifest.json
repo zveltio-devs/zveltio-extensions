@@ -16,7 +16,15 @@
     "fieldTypes": []
   },
   "studio": {
-    "navGroup": "finance"
+    "navGroup": "finance",
+    "pages": [
+      {
+        "path": "/admin/finance/accounting",
+        "label": "Accounting",
+        "icon": "Calculator",
+        "schema": "schemas/accounting.json"
+      }
+    ]
   },
   "engine": {
     "entry": "engine/index.js",
@@ -26,6 +34,6 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "2e4c007d6bd5cc6a51d3ed5cdc63d0424b1e5ce987315fc0d748c2bb34bb963c"
+    "engineSha256": "2da144d0abd9f67773c81f14e1bbed24ef1239b6c2955e2000ecb411fda879b2"
   }
 }
