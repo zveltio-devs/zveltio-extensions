@@ -18,10 +18,10 @@
     loading = true;
     try {
       const [s, c] = await Promise.all([
-        api.get<{ data: any[] }>('/ext/analytics/quality/scans'),
+        api.get<{ scans: any[] }>('/ext/analytics/quality/scans'),
         api.get<{ collections: any[] }>('/api/collections').catch(() => ({ collections: [] })),
       ]);
-      scans = s.data ?? [];
+      scans = s.scans ?? [];
       collections = c.collections ?? [];
     } catch (e: any) { toast.error(e instanceof Error ? e.message : m['ext.loadFailed']()); }
     finally { loading = false; }
@@ -31,17 +31,21 @@
     if (!selectedCollection) return;
     scanning = true;
     try {
-      const r = await api.post<{ issues: any[] }>('/ext/analytics/quality/scans', { collection: selectedCollection });
-      issues = r.issues ?? [];
+      // The scan runs asynchronously server-side (202 + scan_id); give it a
+      // moment to complete, then surface its issues.
+      const r = await api.post<{ scan_id: string }>('/ext/analytics/quality/scan', { collection: selectedCollection, scan_type: 'full' });
+      await new Promise((res) => setTimeout(res, 2500));
+      if (r.scan_id) await viewIssues(r.scan_id);
       await loadAll();
+      toast.success('Scan complete');
     } catch (e: any) { toast.error(e?.message ?? 'Scan failed'); }
     finally { scanning = false; }
   }
 
   async function viewIssues(scanId: string) {
     try {
-      const r = await api.get<{ data: any[] }>(`/ext/analytics/quality/scans/${scanId}/issues`);
-      issues = r.data ?? [];
+      const r = await api.get<{ issues: any[] }>(`/ext/analytics/quality/scan/${scanId}/issues`);
+      issues = r.issues ?? [];
     } catch (e: any) { toast.error(e instanceof Error ? e.message : m['ext.saveFailed']()); }
   }
 
@@ -88,7 +92,7 @@
                   <tr class="hover">
                     <td class="text-sm">{s.collection}</td>
                     <td class="text-xs text-base-content/50">{s.created_at?.slice(0, 16).replace('T', ' ')}</td>
-                    <td><span class="badge badge-sm">{s.issue_count ?? 0}</span></td>
+                    <td><span class="badge badge-sm">{s.issues_found ?? 0}</span></td>
                     <td><button class="btn btn-ghost btn-xs" onclick={() => viewIssues(s.id)}>{m['common.view']()}</button></td>
                   </tr>
                 {/each}
