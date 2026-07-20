@@ -1,0 +1,9 @@
+{
+  "forms.col.fields": "Velden",
+  "forms.col.submissions": "Inzendingen",
+  "forms.empty": "No forms yet. Use the Forms API to create embeddable forms.",
+  "forms.error.updatePrefix": "Failed to update form: ",
+  "forms.subtitle": "Beheer insluitbare formulieren en hun inzendingen",
+  "forms.title": "Formulieren",
+  "forms.toast.deleted": "Formulier verwijderd."
+}

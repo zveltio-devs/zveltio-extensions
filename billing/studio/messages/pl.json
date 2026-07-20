@@ -1,0 +1,16 @@
+{
+  "billing.badge.current": "Bieżący",
+  "billing.btn.upgradeTo": "Przejdź na",
+  "billing.empty": "Brak danych.",
+  "billing.empty.noSubscription": "Brak aktywnej subskrypcji. Wybierz plan poniżej.",
+  "billing.metric.apiCalls": "Wywołania API",
+  "billing.metric.recordsCreated": "Utworzone rekordy",
+  "billing.metric.storageWrites": "Storage Writes",
+  "billing.subtitle": "Plany, subskrypcja i wykorzystanie",
+  "billing.tab.subscription": "Subskrypcja",
+  "billing.tab.usage": "Wykorzystanie",
+  "billing.title": "Rozliczenia",
+  "billing.ui.available_plans": "Dostępne plany",
+  "billing.ui.usage_this_period": "Usage This Period",
+  "billing.usage.percentUsed": "{pct}% used"
+}

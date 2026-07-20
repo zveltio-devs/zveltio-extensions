@@ -1,0 +1,23 @@
+{
+  "content.page-builder.empty": "Nog geen gegevens.",
+  "content.page-builder.section.settings": "Pagina-instellingen",
+  "content.page-builder.subtitle": "/{selected.slug}",
+  "content.page-builder.title": "Paginabouwer",
+  "content.page-builder.ui.meta_description": "Metabeschrijving",
+  "content.page-builder.ui.meta_title": "Metatitel",
+  "content.page-builder.ui.slug": "Slug",
+  "content.pageBuilder.confirmDelete": "Deze pagina verwijderen?",
+  "content.pageBuilder.empty.blocks": "Nog geen blokken. Voeg er hierboven een toe.",
+  "content.pageBuilder.empty.pages": "Nog geen pagina's. Maak de eerste.",
+  "content.pageBuilder.menus.addItem": "Link toevoegen",
+  "content.pageBuilder.menus.empty": "Nog geen links.",
+  "content.pageBuilder.menus.external": "external",
+  "content.pageBuilder.menus.footer": "Voettekstmenu",
+  "content.pageBuilder.menus.label": "Label",
+  "content.pageBuilder.menus.main": "Hoofdmenu (koptekst)",
+  "content.pageBuilder.menus.title": "Menu's",
+  "content.pageBuilder.newPage": "Nieuwe pagina",
+  "content.pageBuilder.toast.saved": "Opgeslagen.",
+  "content.pageBuilder.ui.ogImage": "OG image URL",
+  "content.pageBuilder.unpublish": "Publicatie ongedaan maken"
+}

@@ -1,0 +1,13 @@
+{
+  "analytics.quality.col.severity": "Súlyosság",
+  "analytics.quality.empty": "Még nincsenek adatok.",
+  "analytics.quality.subtitle": "Gyűjtemények vizsgálata adatminőségi problémákra",
+  "analytics.quality.tab.history": "Vizsgálati előzmények",
+  "analytics.quality.tab.issues": "Problémák",
+  "analytics.quality.title": "Adatminőség",
+  "analytics.quality.ui.collection": "Gyűjtemény",
+  "analytics.quality.ui.no_issues_to_show_run_a_scan": "Nincs megjeleníthető probléma. Futtass egy vizsgálatot.",
+  "analytics.quality.ui.no_scans_yet": "Még nincsenek vizsgálatok.",
+  "analytics.quality.ui.select_collection": "— Select collection —",
+  "analytics.quality.ui.viewissues_s_id_view": "viewIssues(s.id)}>View"
+}

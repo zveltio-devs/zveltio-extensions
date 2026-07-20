@@ -1,0 +1,23 @@
+{
+  "content.page-builder.empty": "Ancora nessun dato.",
+  "content.page-builder.section.settings": "Impostazioni pagina",
+  "content.page-builder.subtitle": "/{selected.slug}",
+  "content.page-builder.title": "Costruttore di pagine",
+  "content.page-builder.ui.meta_description": "Meta descrizione",
+  "content.page-builder.ui.meta_title": "Meta titolo",
+  "content.page-builder.ui.slug": "Slug",
+  "content.pageBuilder.confirmDelete": "Eliminare questa pagina?",
+  "content.pageBuilder.empty.blocks": "Ancora nessun blocco. Aggiungine uno sopra.",
+  "content.pageBuilder.empty.pages": "Ancora nessuna pagina. Crea la prima.",
+  "content.pageBuilder.menus.addItem": "Aggiungi link",
+  "content.pageBuilder.menus.empty": "Ancora nessun link.",
+  "content.pageBuilder.menus.external": "external",
+  "content.pageBuilder.menus.footer": "Menu a piè di pagina",
+  "content.pageBuilder.menus.label": "Etichetta",
+  "content.pageBuilder.menus.main": "Menu principale (intestazione)",
+  "content.pageBuilder.menus.title": "Menu",
+  "content.pageBuilder.newPage": "Nuova pagina",
+  "content.pageBuilder.toast.saved": "Salvato.",
+  "content.pageBuilder.ui.ogImage": "OG image URL",
+  "content.pageBuilder.unpublish": "Annulla pubblicazione"
+}

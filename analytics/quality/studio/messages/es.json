@@ -1,0 +1,13 @@
+{
+  "analytics.quality.col.severity": "Gravedad",
+  "analytics.quality.empty": "Aún no hay datos.",
+  "analytics.quality.subtitle": "Analiza las colecciones en busca de problemas de calidad de datos",
+  "analytics.quality.tab.history": "Historial de análisis",
+  "analytics.quality.tab.issues": "Problemas",
+  "analytics.quality.title": "Calidad de datos",
+  "analytics.quality.ui.collection": "Colección",
+  "analytics.quality.ui.no_issues_to_show_run_a_scan": "No hay problemas que mostrar. Ejecuta un análisis.",
+  "analytics.quality.ui.no_scans_yet": "Aún no hay análisis.",
+  "analytics.quality.ui.select_collection": "— Select collection —",
+  "analytics.quality.ui.viewissues_s_id_view": "viewIssues(s.id)}>View"
+}

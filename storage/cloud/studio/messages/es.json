@@ -1,0 +1,18 @@
+{
+  "storage.cloud.btn.share": "Compartir",
+  "storage.cloud.col.modified": "Modificado",
+  "storage.cloud.col.size": "Tamaño",
+  "storage.cloud.confirmDeleteFile": "¿Eliminar este archivo?",
+  "storage.cloud.copyClose": "Copiar y cerrar",
+  "storage.cloud.empty": "Aún no hay datos.",
+  "storage.cloud.empty.folder": "Carpeta vacía. Arrastra archivos aquí o haz clic en Subir.",
+  "storage.cloud.generateLink": "Generar enlace",
+  "storage.cloud.root": "Raíz",
+  "storage.cloud.share": "Compartir",
+  "storage.cloud.shareTitle": "Compartir {name}",
+  "storage.cloud.subtitle": "Archivos y carpetas",
+  "storage.cloud.title": "Almacenamiento en la nube",
+  "storage.cloud.toast.uploaded": "Subido.",
+  "storage.cloud.ui.expires_hours": "Caduca (horas)",
+  "storage.cloud.ui.password_optional": "Contraseña (opcional)"
+}

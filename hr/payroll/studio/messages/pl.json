@@ -1,0 +1,20 @@
+{
+  "hr.payroll.btn.generate": "Generuj",
+  "hr.payroll.btn.newPeriod": "Nowy okres",
+  "hr.payroll.btn.revisal": "Revisal XML",
+  "hr.payroll.col.gross": "Brutto",
+  "hr.payroll.col.net": "Netto",
+  "hr.payroll.empty": "Brak danych.",
+  "hr.payroll.empty.periods": "Brak okresów.",
+  "hr.payroll.selectPeriod": "Select a period to view payroll entries.",
+  "hr.payroll.subtitle": "Zarządzaj okresami płacowymi i generuj paski wynagrodzeń",
+  "hr.payroll.tab.periods": "Okresy",
+  "hr.payroll.title": "Lista płac",
+  "hr.payroll.toast.entriesGenerated": "Wygenerowano wpisy.",
+  "hr.payroll.toast.periodCreated": "Utworzono okres.",
+  "hr.payroll.ui.entries": "Wpisy",
+  "hr.payroll.ui.name_e_g_november_2026": "Name (e.g. November 2026)",
+  "hr.payroll.ui.new_payroll_period": "Nowy okres płacowy",
+  "hr.payroll.ui.no_entries_click_generate": "Brak wpisów — kliknij Generuj.",
+  "hr.payroll.ui.pay_date": "Pay date"
+}

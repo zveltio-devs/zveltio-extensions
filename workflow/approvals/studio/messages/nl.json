@@ -1,0 +1,14 @@
+{
+  "workflow.approvals.col.requestedBy": "Aangevraagd door",
+  "workflow.approvals.col.workflow": "Werkstroom",
+  "workflow.approvals.confirmCancel": "Dit goedkeuringsverzoek annuleren?",
+  "workflow.approvals.empty": "Nog geen gegevens.",
+  "workflow.approvals.empty.requests": "Geen goedkeuringsverzoeken gevonden.",
+  "workflow.approvals.empty.workflows": "Geen werkstromen geconfigureerd.",
+  "workflow.approvals.subtitle": "Beheer goedkeuringsverzoeken en werkstroomdefinities",
+  "workflow.approvals.tab.requests": "Aanvragen",
+  "workflow.approvals.tab.workflows": "Werkstromen",
+  "workflow.approvals.tab.workflowsLabel": "Werkstromen",
+  "workflow.approvals.title": "Goedkeuringen",
+  "workflow.approvals.toast.cancelled": "Geannuleerd."
+}

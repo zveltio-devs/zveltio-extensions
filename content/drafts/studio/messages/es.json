@@ -1,0 +1,13 @@
+{
+  "content.drafts.btn.publish": "Publicar",
+  "content.drafts.col.author": "Autor",
+  "content.drafts.col.record": "Registro",
+  "content.drafts.col.updated": "Actualizado",
+  "content.drafts.confirmDiscard": "¿Descartar el borrador?",
+  "content.drafts.empty": "Aún no hay datos.",
+  "content.drafts.subtitle": "Pending drafts across all collections. Publish promotes the draft to the live record.",
+  "content.drafts.title": "Borradores",
+  "content.drafts.toast.discarded": "Descartado.",
+  "content.drafts.toast.published": "Borrador publicado.",
+  "content.drafts.ui.no_pending_drafts": "No hay borradores pendientes."
+}

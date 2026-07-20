@@ -1,19 +1,19 @@
 {
   "content.document-templates.bodyHint": "Body — use {{var}} for substitution",
   "content.document-templates.bodyHintRich": "Body — use {var} for substitution",
-  "content.document-templates.btn.new": "New template",
-  "content.document-templates.col.description": "Description",
+  "content.document-templates.btn.new": "Neue Vorlage",
+  "content.document-templates.col.description": "Beschreibung",
   "content.document-templates.col.format": "Format",
-  "content.document-templates.empty": "No data yet.",
+  "content.document-templates.empty": "Noch keine Daten.",
   "content.document-templates.format.docx": "DOCX",
-  "content.document-templates.modal.edit": "Edit template",
-  "content.document-templates.modal.new": "New template",
-  "content.document-templates.placeholder.template": "template",
-  "content.document-templates.subtitle": "Reusable templates with variable substitution",
+  "content.document-templates.modal.edit": "Vorlage bearbeiten",
+  "content.document-templates.modal.new": "Neue Vorlage",
+  "content.document-templates.placeholder.template": "Vorlage",
+  "content.document-templates.subtitle": "Wiederverwendbare Vorlagen mit Variablenersetzung",
   "content.document-templates.title": "{{title}}",
   "content.document-templates.ui.format": "Format",
   "content.document-templates.ui.html_pdf": "HTML (PDF)",
   "content.document-templates.ui.markdown": "Markdown",
   "content.document-templates.ui.name": "Name *",
-  "content.document-templates.ui.no_templates_yet": "No templates yet."
+  "content.document-templates.ui.no_templates_yet": "Noch keine Vorlagen."
 }

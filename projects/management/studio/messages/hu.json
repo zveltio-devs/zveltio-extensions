@@ -1,0 +1,23 @@
+{
+  "projects.management.btn.newProject": "Új projekt",
+  "projects.management.btn.newTask": "Új feladat",
+  "projects.management.col.assignee": "Felelős",
+  "projects.management.col.dueDate": "Határidő",
+  "projects.management.col.priority": "Prioritás",
+  "projects.management.col.status": "Állapot",
+  "projects.management.empty": "Még nincsenek adatok.",
+  "projects.management.empty.projects": "Még nincsenek projektek.",
+  "projects.management.form.name": "Név *",
+  "projects.management.form.title": "Cím *",
+  "projects.management.priority.high": "Magas",
+  "projects.management.priority.low": "Alacsony",
+  "projects.management.priority.medium": "Közepes",
+  "projects.management.priority.urgent": "Sürgős",
+  "projects.management.subtitle": "Kanban-tábla és feladatkezelés",
+  "projects.management.title": "Projektek",
+  "projects.management.ui.end_date": "Befejezés dátuma",
+  "projects.management.ui.new_project": "Új projekt",
+  "projects.management.ui.new_task": "Új feladat",
+  "projects.management.ui.no_tasks": "Nincsenek feladatok.",
+  "projects.management.ui.start_date": "Kezdés dátuma"
+}

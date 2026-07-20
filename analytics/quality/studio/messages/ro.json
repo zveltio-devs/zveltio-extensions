@@ -1,13 +1,13 @@
 {
   "analytics.quality.col.severity": "Severitate",
-  "analytics.quality.empty": "No data yet.",
-  "analytics.quality.subtitle": "Scan collections for data quality issues",
+  "analytics.quality.empty": "Niciun date încă.",
+  "analytics.quality.subtitle": "Scanează colecțiile pentru probleme de calitate a datelor",
   "analytics.quality.tab.history": "Istoric scanări",
   "analytics.quality.tab.issues": "Probleme",
-  "analytics.quality.title": "Data Quality",
-  "analytics.quality.ui.collection": "Collection",
-  "analytics.quality.ui.no_issues_to_show_run_a_scan": "No issues to show. Run a scan.",
-  "analytics.quality.ui.no_scans_yet": "No scans yet.",
+  "analytics.quality.title": "Calitatea datelor",
+  "analytics.quality.ui.collection": "Colecție",
+  "analytics.quality.ui.no_issues_to_show_run_a_scan": "Nicio problemă de afișat. Rulează o scanare.",
+  "analytics.quality.ui.no_scans_yet": "Nicio scanare încă.",
   "analytics.quality.ui.select_collection": "— Select collection —",
   "analytics.quality.ui.viewissues_s_id_view": "viewIssues(s.id)}>View"
 }

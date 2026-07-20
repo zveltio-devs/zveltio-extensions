@@ -1,0 +1,23 @@
+{
+  "projects.management.btn.newProject": "Nuovo progetto",
+  "projects.management.btn.newTask": "Nuova attività",
+  "projects.management.col.assignee": "Assegnatario",
+  "projects.management.col.dueDate": "Scadenza",
+  "projects.management.col.priority": "Priorità",
+  "projects.management.col.status": "Stato",
+  "projects.management.empty": "Ancora nessun dato.",
+  "projects.management.empty.projects": "Ancora nessun progetto.",
+  "projects.management.form.name": "Nome *",
+  "projects.management.form.title": "Titolo *",
+  "projects.management.priority.high": "Alto",
+  "projects.management.priority.low": "Basso",
+  "projects.management.priority.medium": "Medio",
+  "projects.management.priority.urgent": "Urgente",
+  "projects.management.subtitle": "Bacheca Kanban e gestione delle attività",
+  "projects.management.title": "Progetti",
+  "projects.management.ui.end_date": "Data di fine",
+  "projects.management.ui.new_project": "Nuovo progetto",
+  "projects.management.ui.new_task": "Nuova attività",
+  "projects.management.ui.no_tasks": "Nessuna attività.",
+  "projects.management.ui.start_date": "Data di inizio"
+}

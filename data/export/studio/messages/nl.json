@@ -1,0 +1,17 @@
+{
+  "data.export.btn.download": "Downloaden",
+  "data.export.col.collection": "Collectie",
+  "data.export.col.format": "Formaat",
+  "data.export.col.rows": "Rijen",
+  "data.export.col.size": "Grootte",
+  "data.export.col.time": "Tijd",
+  "data.export.col.user": "Gebruiker",
+  "data.export.empty": "Nog geen exports.",
+  "data.export.filterHint": "Filter (Zveltio query, optional)",
+  "data.export.subtitle": "Export collection data as JSON, CSV or NDJSON with filtering support",
+  "data.export.title": "Gegevensexport",
+  "data.export.ui.excel_xlsx": "Excel (xlsx)",
+  "data.export.ui.export_collection": "Collectie exporteren",
+  "data.export.ui.no_exports_recorded": "Geen exports geregistreerd.",
+  "data.export.ui.select": "— Select —"
+}

@@ -1,0 +1,13 @@
+{
+  "analytics.quality.col.severity": "Ważność",
+  "analytics.quality.empty": "Brak danych.",
+  "analytics.quality.subtitle": "Skanuj kolekcje pod kątem problemów z jakością danych",
+  "analytics.quality.tab.history": "Historia skanowania",
+  "analytics.quality.tab.issues": "Problemy",
+  "analytics.quality.title": "Jakość danych",
+  "analytics.quality.ui.collection": "Kolekcja",
+  "analytics.quality.ui.no_issues_to_show_run_a_scan": "Brak problemów do wyświetlenia. Uruchom skanowanie.",
+  "analytics.quality.ui.no_scans_yet": "Brak skanowań.",
+  "analytics.quality.ui.select_collection": "— Select collection —",
+  "analytics.quality.ui.viewissues_s_id_view": "viewIssues(s.id)}>View"
+}

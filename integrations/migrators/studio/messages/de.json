@@ -1,5 +1,5 @@
 {
-  "integrations.migrators.title": "Daten-Migratoren",
+  "integrations.migrators.title": "Datenmigrationen",
   "integrations.migrators.subtitle": "Daten aus HubSpot, Notion oder Airtable übernehmen",
   "integrations.migrators.tab.connections": "Verbindungen",
   "integrations.migrators.tab.runs": "Importe",

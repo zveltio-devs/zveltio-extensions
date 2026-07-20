@@ -1,0 +1,21 @@
+{
+  "developer.database.col.column": "Colonna",
+  "developer.database.col.default": "Predefinito",
+  "developer.database.col.nullable": "Ammette null",
+  "developer.database.columns": "colonne",
+  "developer.database.empty": "Ancora nessun dato.",
+  "developer.database.loading": "Caricamento…",
+  "developer.database.no": "no",
+  "developer.database.noRows": "Nessuna riga.",
+  "developer.database.noTables": "Nessuna tabella.",
+  "developer.database.rows": "righe",
+  "developer.database.section.sampleRows": "Righe di esempio",
+  "developer.database.section.schema": "Schema",
+  "developer.database.selectTable": "Seleziona una tabella da ispezionare.",
+  "developer.database.showingRows": "Visualizzazione dei primi 50 di {n}.",
+  "developer.database.subtitle": "Inspect tables, schemas, and sample rows",
+  "developer.database.tables": "Tabelle",
+  "developer.database.title": "Database",
+  "developer.database.ui.filter": "Filter…",
+  "developer.database.yes": "sì"
+}

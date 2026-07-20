@@ -3,7 +3,7 @@
   "forms.col.submissions": "Trimiteri",
   "forms.empty": "Nicio formular încă. Folosește API Forms pentru formulare embed.",
   "forms.error.updatePrefix": "Actualizarea formularului a eșuat: ",
-  "forms.subtitle": "Manage embeddable forms and their submissions",
-  "forms.title": "Forms",
+  "forms.subtitle": "Gestionează formularele încorporabile și trimiterile lor",
+  "forms.title": "Formulare",
   "forms.toast.deleted": "Formular șters."
 }

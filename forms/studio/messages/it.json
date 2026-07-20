@@ -1,0 +1,9 @@
+{
+  "forms.col.fields": "Campi",
+  "forms.col.submissions": "Invii",
+  "forms.empty": "No forms yet. Use the Forms API to create embeddable forms.",
+  "forms.error.updatePrefix": "Failed to update form: ",
+  "forms.subtitle": "Gestisci i moduli incorporabili e i relativi invii",
+  "forms.title": "Moduli",
+  "forms.toast.deleted": "Modulo eliminato."
+}
