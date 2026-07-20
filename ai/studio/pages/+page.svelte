@@ -95,7 +95,11 @@
   async function saveProvider() {
     savingProvider = true;
     try {
-      await api.post('/ext/ai/admin/providers', providerForm);
+      // Providers are upserted with PUT /providers/:name — the name is the
+      // path, and empty optionals must be omitted (base_url is url-validated).
+      const { name, ...rest } = providerForm;
+      const body = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== '' && v !== null));
+      await api.put(`/ext/ai/providers/${encodeURIComponent(name)}`, body);
       await loadAll();
       showProviderForm = false;
       providerForm = { name: 'openai', label: 'OpenAI', api_key: '', base_url: '', default_model: '', is_default: false };
@@ -129,7 +133,7 @@
     if (!schemaDescription.trim() || schemaGenerating) return;
     schemaGenerating = true; schemaResult = null;
     try {
-      const res = await api.post<{ schema: any }>('/ext/ai/schema-gen', { description: schemaDescription.trim() });
+      const res = await api.post<{ schema: any }>('/ext/ai/preview-schema', { description: schemaDescription.trim() });
       schemaResult = res.schema;
     } catch (err: any) { toast.error(err.message ?? 'Schema generation failed'); }
     finally { schemaGenerating = false; }

@@ -28,8 +28,15 @@
 
   async function loadTransactions() {
     try {
-      const r = await api.get<{ data: any[] }>('/ext/finance/banking/transactions?limit=100');
-      transactions = r.data ?? [];
+      if (!accounts.length) await loadAccounts();
+      const per = await Promise.all(
+        accounts.map((a) =>
+          api
+            .get<{ data: any[] }>(`/ext/finance/banking/accounts/${a.id}/transactions?limit=100`)
+            .catch(() => ({ data: [] })),
+        ),
+      );
+      transactions = per.flatMap((r) => r.data ?? []);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : m['ext.saveFailed']());
     }
@@ -38,7 +45,19 @@
   async function loadReconciliation() {
     try {
       const [u, inv] = await Promise.all([
-        api.get<{ data: any[] }>('/ext/finance/banking/transactions?reconciled=false&limit=100'),
+        (async () => {
+          if (!accounts.length) await loadAccounts();
+          const per = await Promise.all(
+            accounts.map((a) =>
+              api
+                .get<{ data: any[] }>(
+                  `/ext/finance/banking/accounts/${a.id}/transactions?reconciled=false&limit=100`,
+                )
+                .catch(() => ({ data: [] })),
+            ),
+          );
+          return { data: per.flatMap((r) => r.data ?? []) };
+        })(),
         api.get<{ data: any[] }>('/ext/finance/invoicing/invoices?status=sent&limit=100').catch(() => ({ data: [] })),
       ]);
       unreconciled = u.data ?? [];

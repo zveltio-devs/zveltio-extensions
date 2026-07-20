@@ -64,6 +64,15 @@ jobs:
         # silently skipped at extension install / enable.
         run: bun scripts/validate-migration-paths.ts
 
+      - name: Validate bespoke page → engine contracts
+        # The SDUI probe only checks DECLARATIVE schema dataPaths, and the
+        # contract tests only exercise engine routes. Nothing tied a
+        # hand-written studio page to the routes its extension registers, so
+        # accounting (/journal-entries) and quality (/scans) both shipped
+        # calling endpoints that never existed — pages rendering empty while
+        # every gate stayed green.
+        run: bun scripts/check-bespoke-contracts.ts
+
       - name: Verify packed bundles match manifest engineSha256
         # Drift between manifest.integrity.engineSha256 and the committed
         # engine/index.js bytes is what tripped the marketplace pipeline
