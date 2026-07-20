@@ -7,7 +7,7 @@
       "id": "requests",
       "label": "workflow.approvals.tab.requests",
       "icon": "CheckSquare",
-      "dataSource": "/api/approvals",
+      "dataSource": "/ext/workflow/approvals",
       "dataPath": "requests",
       "filters": [
         {
