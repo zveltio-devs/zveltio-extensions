@@ -12,8 +12,7 @@
     "storage"
   ],
   "peerDependencies": {
-    "@aws-sdk/client-s3": "^3.0.0",
-    "@aws-sdk/s3-request-presigner": "^3.0.0",
+    "aws4fetch": "1.0.20",
     "nanoid": "^5.0.0"
   },
   "studio": {
@@ -47,6 +46,6 @@
     "bundlePeers": true
   },
   "integrity": {
-    "engineSha256": "1ea310508e108f9543607a217f5aa078b30645bceb3ad13871724bd1502ca29b"
+    "engineSha256": "3199abd66f84975c545f016f42cbcdf3bcf68c1445c4169f1114b0f143a47e44"
   }
 }
