@@ -1,0 +1,22 @@
+{
+  "projects.helpdesk.btn.create": "Utwórz",
+  "projects.helpdesk.btn.new": "Nowe zgłoszenie",
+  "projects.helpdesk.btn.resolve": "Rozwiąż",
+  "projects.helpdesk.col.category": "Kategoria",
+  "projects.helpdesk.empty": "Brak danych.",
+  "projects.helpdesk.empty.select": "Select a ticket to view the conversation.",
+  "projects.helpdesk.priority.high": "Wysoki",
+  "projects.helpdesk.priority.low": "Niski",
+  "projects.helpdesk.subtitle": "Zarządzaj zgłoszeniami pomocy technicznej",
+  "projects.helpdesk.title": "Pomoc techniczna",
+  "projects.helpdesk.toast.resolved": "Zgłoszenie rozwiązane.",
+  "projects.helpdesk.ui.description": "Opis *",
+  "projects.helpdesk.ui.medium": "Średni",
+  "projects.helpdesk.ui.new_ticket": "Nowe zgłoszenie",
+  "projects.helpdesk.ui.priority": "Priorytet",
+  "projects.helpdesk.ui.reply": "Reply…",
+  "projects.helpdesk.ui.requester_email": "E-mail wnioskodawcy",
+  "projects.helpdesk.ui.resolve_activeticket_id_mark_resolved": "resolve(activeTicket.id)}>Mark resolved",
+  "projects.helpdesk.ui.subject": "Temat *",
+  "projects.helpdesk.ui.urgent": "Pilne"
+}

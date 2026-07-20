@@ -1,0 +1,21 @@
+{
+  "developer.database.col.column": "Oszlop",
+  "developer.database.col.default": "Alapértelmezett",
+  "developer.database.col.nullable": "Nullázható",
+  "developer.database.columns": "oszlopok",
+  "developer.database.empty": "Még nincsenek adatok.",
+  "developer.database.loading": "Betöltés…",
+  "developer.database.no": "nem",
+  "developer.database.noRows": "Nincsenek sorok.",
+  "developer.database.noTables": "Nincsenek táblák.",
+  "developer.database.rows": "sorok",
+  "developer.database.section.sampleRows": "Mintasorok",
+  "developer.database.section.schema": "Séma",
+  "developer.database.selectTable": "Válassz egy táblát a vizsgálathoz.",
+  "developer.database.showingRows": "Az első 50 megjelenítése ({n} közül).",
+  "developer.database.subtitle": "Inspect tables, schemas, and sample rows",
+  "developer.database.tables": "Táblák",
+  "developer.database.title": "Adatbázis",
+  "developer.database.ui.filter": "Filter…",
+  "developer.database.yes": "igen"
+}

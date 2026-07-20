@@ -1,0 +1,23 @@
+{
+  "content.page-builder.empty": "Brak danych.",
+  "content.page-builder.section.settings": "Ustawienia strony",
+  "content.page-builder.subtitle": "/{selected.slug}",
+  "content.page-builder.title": "Kreator stron",
+  "content.page-builder.ui.meta_description": "Meta opis",
+  "content.page-builder.ui.meta_title": "Meta tytuł",
+  "content.page-builder.ui.slug": "Slug",
+  "content.pageBuilder.confirmDelete": "Usunąć tę stronę?",
+  "content.pageBuilder.empty.blocks": "Brak bloków. Dodaj jeden powyżej.",
+  "content.pageBuilder.empty.pages": "Brak stron. Utwórz pierwszą.",
+  "content.pageBuilder.menus.addItem": "Dodaj link",
+  "content.pageBuilder.menus.empty": "Brak linków.",
+  "content.pageBuilder.menus.external": "external",
+  "content.pageBuilder.menus.footer": "Menu stopki",
+  "content.pageBuilder.menus.label": "Etykieta",
+  "content.pageBuilder.menus.main": "Menu główne (nagłówek)",
+  "content.pageBuilder.menus.title": "Menu",
+  "content.pageBuilder.newPage": "Nowa strona",
+  "content.pageBuilder.toast.saved": "Zapisano.",
+  "content.pageBuilder.ui.ogImage": "OG image URL",
+  "content.pageBuilder.unpublish": "Cofnij publikację"
+}

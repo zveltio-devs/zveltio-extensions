@@ -1,0 +1,19 @@
+{
+  "content.document-templates.bodyHint": "Body — use {{var}} for substitution",
+  "content.document-templates.bodyHintRich": "Body — use {var} for substitution",
+  "content.document-templates.btn.new": "Új sablon",
+  "content.document-templates.col.description": "Leírás",
+  "content.document-templates.col.format": "Formátum",
+  "content.document-templates.empty": "Még nincsenek adatok.",
+  "content.document-templates.format.docx": "DOCX",
+  "content.document-templates.modal.edit": "Sablon szerkesztése",
+  "content.document-templates.modal.new": "Új sablon",
+  "content.document-templates.placeholder.template": "sablon",
+  "content.document-templates.subtitle": "Újrafelhasználható sablonok változóhelyettesítéssel",
+  "content.document-templates.title": "{{title}}",
+  "content.document-templates.ui.format": "Formátum",
+  "content.document-templates.ui.html_pdf": "HTML (PDF)",
+  "content.document-templates.ui.markdown": "Markdown",
+  "content.document-templates.ui.name": "Név *",
+  "content.document-templates.ui.no_templates_yet": "Még nincsenek sablonok."
+}

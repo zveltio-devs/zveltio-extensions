@@ -1,0 +1,19 @@
+{
+  "i18n.translations.btn.search": "Keresés",
+  "i18n.translations.col.context": "Kontextus",
+  "i18n.translations.col.localeCode": "Code (e.g. ro, en, de)",
+  "i18n.translations.col.localeName": "Név",
+  "i18n.translations.col.term": "Kifejezés",
+  "i18n.translations.col.translation": "Fordítás",
+  "i18n.translations.empty": "Még nincsenek adatok.",
+  "i18n.translations.subtitle": "Internationalization: manage locales, translation keys and per-locale string values",
+  "i18n.translations.tab.glossary": "Szójegyzék",
+  "i18n.translations.tab.keys": "Kulcsok",
+  "i18n.translations.tab.locales": "Területi beállítások",
+  "i18n.translations.title": "Fordítások",
+  "i18n.translations.ui.glossary_empty": "A szójegyzék üres.",
+  "i18n.translations.ui.new_locale": "Új területi beállítás",
+  "i18n.translations.ui.no_keys": "Nincsenek kulcsok.",
+  "i18n.translations.ui.no_locales": "Nincsenek területi beállítások.",
+  "i18n.translations.ui.search_keys": "Kulcsok keresése..."
+}

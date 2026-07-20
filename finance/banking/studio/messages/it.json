@@ -1,0 +1,20 @@
+{
+  "finance.banking.empty": "Ancora nessun dato.",
+  "finance.banking.empty.accounts": "Ancora nessun conto bancario.",
+  "finance.banking.empty.transactions": "Ancora nessuna transazione.",
+  "finance.banking.empty.unreconciled": "Nessuna transazione non riconciliata.",
+  "finance.banking.newAccount": "Nuovo account",
+  "finance.banking.section.openInvoices": "Fatture aperte (inviate)",
+  "finance.banking.section.unreconciled": "Transazioni non riconciliate",
+  "finance.banking.status.pending": "In attesa",
+  "finance.banking.status.reconciled": "Riconciliato",
+  "finance.banking.subtitle": "Conti bancari, transazioni e riconciliazione",
+  "finance.banking.tab.accounts": "Account",
+  "finance.banking.tab.reconciliation": "Riconciliazione",
+  "finance.banking.tab.transactions": "Transazioni",
+  "finance.banking.title": "Banca",
+  "finance.banking.ui.internal_name": "Nome interno",
+  "finance.banking.ui.new_bank_account": "Nuovo conto bancario",
+  "finance.banking.ui.no_open_invoices": "Nessuna fattura aperta.",
+  "finance.banking.ui.opening_balance": "Saldo iniziale"
+}

@@ -1,0 +1,22 @@
+{
+  "projects.helpdesk.btn.create": "Crear",
+  "projects.helpdesk.btn.new": "Nuevo ticket",
+  "projects.helpdesk.btn.resolve": "Resolver",
+  "projects.helpdesk.col.category": "Categoría",
+  "projects.helpdesk.empty": "Aún no hay datos.",
+  "projects.helpdesk.empty.select": "Select a ticket to view the conversation.",
+  "projects.helpdesk.priority.high": "Alto",
+  "projects.helpdesk.priority.low": "Bajo",
+  "projects.helpdesk.subtitle": "Gestiona tickets de soporte",
+  "projects.helpdesk.title": "Soporte",
+  "projects.helpdesk.toast.resolved": "Ticket resuelto.",
+  "projects.helpdesk.ui.description": "Descripción *",
+  "projects.helpdesk.ui.medium": "Medio",
+  "projects.helpdesk.ui.new_ticket": "Nuevo ticket",
+  "projects.helpdesk.ui.priority": "Prioridad",
+  "projects.helpdesk.ui.reply": "Reply…",
+  "projects.helpdesk.ui.requester_email": "Correo del solicitante",
+  "projects.helpdesk.ui.resolve_activeticket_id_mark_resolved": "resolve(activeTicket.id)}>Mark resolved",
+  "projects.helpdesk.ui.subject": "Asunto *",
+  "projects.helpdesk.ui.urgent": "Urgente"
+}

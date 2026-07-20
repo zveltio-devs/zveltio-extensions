@@ -1,0 +1,15 @@
+{
+  "integrations.migrators.title": "Gegevensmigraties",
+  "integrations.migrators.subtitle": "Bring your data in from HubSpot, Notion or Airtable",
+  "integrations.migrators.tab.connections": "Verbindingen",
+  "integrations.migrators.tab.runs": "Imports",
+  "integrations.migrators.col.source": "Bron",
+  "integrations.migrators.col.object": "Object",
+  "integrations.migrators.col.rows": "Rijen",
+  "integrations.migrators.field.token": "API-token",
+  "integrations.migrators.field.connection": "Verbinding",
+  "integrations.migrators.field.object": "Bronobject",
+  "integrations.migrators.field.target": "Doelcollectie",
+  "integrations.migrators.field.limit": "Rijlimiet",
+  "integrations.migrators.confirm.deleteConnection": "Deze verbinding verwijderen? Het opgeslagen token wordt vernietigd."
+}

@@ -1,0 +1,9 @@
+{
+  "forms.col.fields": "Pola",
+  "forms.col.submissions": "Zgłoszenia",
+  "forms.empty": "No forms yet. Use the Forms API to create embeddable forms.",
+  "forms.error.updatePrefix": "Failed to update form: ",
+  "forms.subtitle": "Zarządzaj formularzami osadzalnymi i ich zgłoszeniami",
+  "forms.title": "Formularze",
+  "forms.toast.deleted": "Usunięto formularz."
+}

@@ -1,0 +1,14 @@
+{
+  "workflow.approvals.col.requestedBy": "Zażądane przez",
+  "workflow.approvals.col.workflow": "Przepływ pracy",
+  "workflow.approvals.confirmCancel": "Anulować to żądanie zatwierdzenia?",
+  "workflow.approvals.empty": "Brak danych.",
+  "workflow.approvals.empty.requests": "Nie znaleziono żądań zatwierdzenia.",
+  "workflow.approvals.empty.workflows": "Brak skonfigurowanych przepływów pracy.",
+  "workflow.approvals.subtitle": "Zarządzaj żądaniami zatwierdzenia i definicjami przepływów",
+  "workflow.approvals.tab.requests": "Żądania",
+  "workflow.approvals.tab.workflows": "Przepływy pracy",
+  "workflow.approvals.tab.workflowsLabel": "Przepływy pracy",
+  "workflow.approvals.title": "Zatwierdzenia",
+  "workflow.approvals.toast.cancelled": "Anulowano."
+}

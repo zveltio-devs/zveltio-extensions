@@ -10,7 +10,7 @@
   "inventory.col.vat": "TVA %",
   "inventory.col.warehouse": "Depozit",
   "inventory.empty.products": "Niciun produs încă.",
-  "inventory.empty.stock": "Nu există date de stoc.",
+  "inventory.empty.stock": "Niciun date de stoc încă.",
   "inventory.empty.warehouses": "Niciun depozit încă.",
   "inventory.form.description": "Descriere",
   "inventory.form.newProduct": "Produs nou",
@@ -21,14 +21,14 @@
   "inventory.new.product": "Produs nou",
   "inventory.new.warehouse": "Depozit nou",
   "inventory.searchPlaceholder": "Caută SKU sau nume…",
-  "inventory.subtitle": "Produse, depozite și stocuri",
+  "inventory.subtitle": "Produse, depozite și niveluri de stoc",
   "inventory.tab.products": "Produse",
-  "inventory.tab.stock": "Niveluri stoc",
+  "inventory.tab.stock": "Niveluri de stoc",
   "inventory.tab.warehouses": "Depozite",
   "inventory.title": "Inventar",
   "inventory.toast.productCreated": "Produs creat",
   "inventory.toast.warehouseCreated": "Depozit creat",
-  "operations.inventory.empty": "No data yet.",
+  "operations.inventory.empty": "Niciun date încă.",
   "operations.inventory.subtitle": "Warehouses, SKUs, stock movements, reorder alerts and barcode support",
-  "operations.inventory.title": "Inventory"
+  "operations.inventory.title": "Inventar"
 }

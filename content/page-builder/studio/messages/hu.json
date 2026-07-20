@@ -1,0 +1,23 @@
+{
+  "content.page-builder.empty": "Még nincsenek adatok.",
+  "content.page-builder.section.settings": "Oldalbeállítások",
+  "content.page-builder.subtitle": "/{selected.slug}",
+  "content.page-builder.title": "Oldalszerkesztő",
+  "content.page-builder.ui.meta_description": "Meta leírás",
+  "content.page-builder.ui.meta_title": "Meta cím",
+  "content.page-builder.ui.slug": "Slug",
+  "content.pageBuilder.confirmDelete": "Törli ezt az oldalt?",
+  "content.pageBuilder.empty.blocks": "Még nincsenek blokkok. Adj hozzá egyet fentebb.",
+  "content.pageBuilder.empty.pages": "Még nincsenek oldalak. Hozd létre az elsőt.",
+  "content.pageBuilder.menus.addItem": "Hivatkozás hozzáadása",
+  "content.pageBuilder.menus.empty": "Még nincsenek hivatkozások.",
+  "content.pageBuilder.menus.external": "external",
+  "content.pageBuilder.menus.footer": "Lábléc menü",
+  "content.pageBuilder.menus.label": "Címke",
+  "content.pageBuilder.menus.main": "Főmenü (fejléc)",
+  "content.pageBuilder.menus.title": "Menük",
+  "content.pageBuilder.newPage": "Új oldal",
+  "content.pageBuilder.toast.saved": "Mentve.",
+  "content.pageBuilder.ui.ogImage": "OG image URL",
+  "content.pageBuilder.unpublish": "Közzététel visszavonása"
+}

@@ -1,0 +1,15 @@
+{
+  "integrations.migrators.title": "Migradores de datos",
+  "integrations.migrators.subtitle": "Bring your data in from HubSpot, Notion or Airtable",
+  "integrations.migrators.tab.connections": "Conexiones",
+  "integrations.migrators.tab.runs": "Importaciones",
+  "integrations.migrators.col.source": "Origen",
+  "integrations.migrators.col.object": "Object",
+  "integrations.migrators.col.rows": "Filas",
+  "integrations.migrators.field.token": "Token de API",
+  "integrations.migrators.field.connection": "Conexión",
+  "integrations.migrators.field.object": "Objeto de origen",
+  "integrations.migrators.field.target": "Colección de destino",
+  "integrations.migrators.field.limit": "Límite de filas",
+  "integrations.migrators.confirm.deleteConnection": "¿Eliminar esta conexión? Su token almacenado se destruirá."
+}

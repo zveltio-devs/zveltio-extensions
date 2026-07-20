@@ -1,0 +1,16 @@
+{
+  "billing.badge.current": "Actual",
+  "billing.btn.upgradeTo": "Cambiar a",
+  "billing.empty": "Aún no hay datos.",
+  "billing.empty.noSubscription": "No hay suscripción activa. Elige un plan a continuación.",
+  "billing.metric.apiCalls": "Llamadas a la API",
+  "billing.metric.recordsCreated": "Registros creados",
+  "billing.metric.storageWrites": "Storage Writes",
+  "billing.subtitle": "Planes, suscripción y uso",
+  "billing.tab.subscription": "Suscripción",
+  "billing.tab.usage": "Uso",
+  "billing.title": "Facturación",
+  "billing.ui.available_plans": "Planes disponibles",
+  "billing.ui.usage_this_period": "Usage This Period",
+  "billing.usage.percentUsed": "{pct}% used"
+}

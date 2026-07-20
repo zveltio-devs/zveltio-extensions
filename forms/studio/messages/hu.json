@@ -1,0 +1,9 @@
+{
+  "forms.col.fields": "Mezők",
+  "forms.col.submissions": "Beküldések",
+  "forms.empty": "No forms yet. Use the Forms API to create embeddable forms.",
+  "forms.error.updatePrefix": "Failed to update form: ",
+  "forms.subtitle": "Beágyazható űrlapok és beküldéseik kezelése",
+  "forms.title": "Űrlapok",
+  "forms.toast.deleted": "Űrlap törölve."
+}

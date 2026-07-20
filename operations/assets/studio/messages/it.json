@@ -1,0 +1,17 @@
+{
+  "operations.assets.btn.create": "Crea",
+  "operations.assets.btn.new": "Nuovo cespite",
+  "operations.assets.col.cost": "Costo",
+  "operations.assets.col.location": "Posizione",
+  "operations.assets.confirmDelete": "Eliminare questo cespite?",
+  "operations.assets.empty": "Nessun cespite ancora registrato.",
+  "operations.assets.subtitle": "Gestisci le immobilizzazioni e l'ammortamento aziendale",
+  "operations.assets.title": "Immobilizzazioni",
+  "operations.assets.toast.created": "Cespite creato.",
+  "operations.assets.ui.acquisition_cost": "Costo di acquisizione",
+  "operations.assets.ui.acquisition_date": "Data di acquisizione",
+  "operations.assets.ui.code_tag": "Codice / Tag",
+  "operations.assets.ui.location": "Posizione",
+  "operations.assets.ui.new_asset": "Nuovo cespite",
+  "operations.assets.ui.serial_number": "Numero di serie"
+}

@@ -1,9 +1,9 @@
 {
-  "hr.leave.empty": "No data yet.",
-  "hr.leave.emptyRequests": "No leave requests yet.",
-  "hr.leave.form.new": "New leave request",
-  "hr.leave.form.submit": "Submit request",
-  "hr.leave.new": "New request",
-  "hr.leave.subtitle": "Manage leave requests and approvals",
-  "hr.leave.title": "Leave"
+  "hr.leave.empty": "Noch keine Daten.",
+  "hr.leave.emptyRequests": "Noch keine Urlaubsanträge.",
+  "hr.leave.form.new": "Neuer Urlaubsantrag",
+  "hr.leave.form.submit": "Anfrage einreichen",
+  "hr.leave.new": "Neue Anfrage",
+  "hr.leave.subtitle": "Urlaubsanträge und Genehmigungen verwalten",
+  "hr.leave.title": "Urlaub"
 }

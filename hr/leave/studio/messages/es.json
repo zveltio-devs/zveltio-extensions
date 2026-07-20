@@ -1,0 +1,9 @@
+{
+  "hr.leave.empty": "Aún no hay datos.",
+  "hr.leave.emptyRequests": "Aún no hay solicitudes de ausencia.",
+  "hr.leave.form.new": "Nueva solicitud de ausencia",
+  "hr.leave.form.submit": "Enviar solicitud",
+  "hr.leave.new": "Nueva solicitud",
+  "hr.leave.subtitle": "Gestiona solicitudes de ausencia y aprobaciones",
+  "hr.leave.title": "Ausencia"
+}

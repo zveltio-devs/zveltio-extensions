@@ -1,0 +1,20 @@
+{
+  "finance.quotes.btn.accept": "Markeren als geaccepteerd",
+  "finance.quotes.btn.addLine": "Regel toevoegen",
+  "finance.quotes.btn.create": "Offerte aanmaken",
+  "finance.quotes.btn.new": "Nieuwe offerte",
+  "finance.quotes.btn.send": "Verzenden",
+  "finance.quotes.deleteConfirm": "Deze offerte verwijderen?",
+  "finance.quotes.empty": "Nog geen offertes. Maak je eerste offerte.",
+  "finance.quotes.section.lines": "Regels",
+  "finance.quotes.subtitle": "Beheer klantoffertes en voorstellen",
+  "finance.quotes.title": "Offertes en voorstellen",
+  "finance.quotes.toast.created": "Offerte aangemaakt.",
+  "finance.quotes.ui.client_email": "Klant-e-mail",
+  "finance.quotes.ui.client_name": "Klantnaam *",
+  "finance.quotes.ui.disc": "Disc %",
+  "finance.quotes.ui.service_or_product": "Dienst of product",
+  "finance.quotes.ui.unit_price": "Stukprijs",
+  "finance.quotes.ui.valid_days": "Geldige dagen",
+  "quotes.new": "Nieuwe offerte"
+}

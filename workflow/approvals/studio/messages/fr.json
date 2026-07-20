@@ -1,14 +1,14 @@
 {
   "workflow.approvals.col.requestedBy": "Demandé par",
-  "workflow.approvals.col.workflow": "Flux",
-  "workflow.approvals.confirmCancel": "Cancel this approval request?",
-  "workflow.approvals.empty": "No data yet.",
-  "workflow.approvals.empty.requests": "No approval requests found.",
-  "workflow.approvals.empty.workflows": "No workflows configured.",
-  "workflow.approvals.subtitle": "Manage approval requests and workflow definitions",
-  "workflow.approvals.tab.requests": "Requests",
-  "workflow.approvals.tab.workflows": "Workflows",
-  "workflow.approvals.tab.workflowsLabel": "Workflows",
-  "workflow.approvals.title": "Approvals",
-  "workflow.approvals.toast.cancelled": "Cancelled."
+  "workflow.approvals.col.workflow": "Flux de travail",
+  "workflow.approvals.confirmCancel": "Annuler cette demande d'approbation ?",
+  "workflow.approvals.empty": "Aucune donnée pour l'instant.",
+  "workflow.approvals.empty.requests": "Aucune demande d'approbation trouvée.",
+  "workflow.approvals.empty.workflows": "Aucun flux de travail configuré.",
+  "workflow.approvals.subtitle": "Gérer les demandes d'approbation et les définitions de flux",
+  "workflow.approvals.tab.requests": "Demandes",
+  "workflow.approvals.tab.workflows": "Flux de travail",
+  "workflow.approvals.tab.workflowsLabel": "Flux de travail",
+  "workflow.approvals.title": "Approbations",
+  "workflow.approvals.toast.cancelled": "Annulé."
 }
