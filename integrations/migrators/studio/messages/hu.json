@@ -1,0 +1,15 @@
+{
+  "integrations.migrators.title": "Adatmigrálók",
+  "integrations.migrators.subtitle": "Bring your data in from HubSpot, Notion or Airtable",
+  "integrations.migrators.tab.connections": "Kapcsolatok",
+  "integrations.migrators.tab.runs": "Importok",
+  "integrations.migrators.col.source": "Forrás",
+  "integrations.migrators.col.object": "Object",
+  "integrations.migrators.col.rows": "Sorok",
+  "integrations.migrators.field.token": "API-token",
+  "integrations.migrators.field.connection": "Kapcsolat",
+  "integrations.migrators.field.object": "Forrásobjektum",
+  "integrations.migrators.field.target": "Célgyűjtemény",
+  "integrations.migrators.field.limit": "Sorkorlát",
+  "integrations.migrators.confirm.deleteConnection": "Törli ezt a kapcsolatot? A tárolt token megsemmisül."
+}

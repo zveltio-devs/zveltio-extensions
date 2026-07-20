@@ -17,14 +17,16 @@
   async function loadAll() {
     loading = true;
     try {
-      const [active, orders, reports] = await Promise.all([
-        api.get<{ data: any }>('/ext/operations/pos/sessions/active').catch(() => ({ data: null })),
-        api.get<{ data: any[] }>('/ext/operations/pos/orders?limit=20'),
-        api.get<{ data: any[] }>('/ext/operations/pos/z-reports?limit=10').catch(() => ({ data: [] })),
+      const [open, closed] = await Promise.all([
+        api.get<{ data: any[] }>('/ext/operations/pos/sessions?status=open&limit=1'),
+        api.get<{ data: any[] }>('/ext/operations/pos/sessions?status=closed&limit=10').catch(() => ({ data: [] })),
       ]);
-      activeSession = active.data;
-      recentOrders = orders.data ?? [];
-      zReports = reports.data ?? [];
+      activeSession = open.data?.[0] ?? null;
+      zReports = closed.data ?? [];
+      // Orders are scoped to a session; without an open one there are none.
+      recentOrders = activeSession
+        ? (await api.get<{ data: any[] }>(`/ext/operations/pos/sessions/${activeSession.id}/orders?limit=20`)).data ?? []
+        : [];
     } catch (e: any) { toast.error(e instanceof Error ? e.message : m['ext.loadFailed']()); }
     finally { loading = false; }
   }
@@ -108,7 +110,7 @@
               <tbody>
                 {#if zReports.length === 0}<tr><td colspan="3" class="text-center py-6 text-base-content/50 text-sm">{m['operations.pos.ui.no_reports']()}</td></tr>
                 {:else}{#each zReports as z (z.id)}
-                  <tr class="hover"><td class="text-xs">{new Date(z.created_at).toLocaleDateString()}</td><td class="text-right text-sm">{fmtMoney(Number(z.total_sales))}</td><td class="text-right text-sm">{z.order_count}</td></tr>
+                  <tr class="hover"><td class="text-xs">{new Date(z.closed_at).toLocaleDateString()}</td><td class="text-right text-sm">{fmtMoney(Number(z.total_sales))}</td><td class="text-right text-sm">{z.order_count}</td></tr>
                 {/each}{/if}
               </tbody>
             </table>

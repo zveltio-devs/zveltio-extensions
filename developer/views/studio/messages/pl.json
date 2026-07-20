@@ -1,0 +1,16 @@
+{
+  "developer.views.btn.newView": "Nowy widok",
+  "developer.views.confirmDelete": "Usunąć widok?",
+  "developer.views.empty": "Brak zapisanych widoków.",
+  "developer.views.error.invalidJson": "Nieprawidłowy JSON w konfiguracji",
+  "developer.views.subtitle": "Zapisane widoki dla kolekcji",
+  "developer.views.title": "Widoki niestandardowe",
+  "developer.views.toast.created": "Utworzono widok.",
+  "developer.views.ui.calendar": "Kalendarz",
+  "developer.views.ui.card_grid": "Siatka kart",
+  "developer.views.ui.kanban_board": "Tablica Kanban",
+  "developer.views.ui.list": "Lista",
+  "developer.views.ui.map_requires_postgis": "Map (requires PostGIS)",
+  "developer.views.ui.new_view": "Nowy widok",
+  "developer.views.ui.view_type": "Typ widoku"
+}

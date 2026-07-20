@@ -1,11 +1,11 @@
 {
   "developer.graphql.btn.run": "Rulează",
   "developer.graphql.col.mode": "Mod",
-  "developer.graphql.col.operation": "Operație",
+  "developer.graphql.col.operation": "Operațiune",
   "developer.graphql.col.roles": "Roluri",
-  "developer.graphql.col.time": "Ora",
+  "developer.graphql.col.time": "Timp",
   "developer.graphql.col.user": "Utilizator",
-  "developer.graphql.empty": "No data yet.",
+  "developer.graphql.empty": "Niciun date încă.",
   "developer.graphql.error.queryFailed": "Interogarea a eșuat",
   "developer.graphql.panel.query": "Interogare",
   "developer.graphql.panel.response": "Răspuns",
@@ -13,12 +13,12 @@
   "developer.graphql.status.error": "eroare",
   "developer.graphql.status.ok": "ok",
   "developer.graphql.subtitle": "Playground, operation logs, and field policies",
-  "developer.graphql.tab.logs": "Jurnal operații",
-  "developer.graphql.tab.persisted": "Interogări persistate",
+  "developer.graphql.tab.logs": "Jurnale de operațiuni",
+  "developer.graphql.tab.persisted": "Interogări persistente",
   "developer.graphql.tab.playground": "Playground",
-  "developer.graphql.tab.policies": "Politici câmpuri",
+  "developer.graphql.tab.policies": "Politici de câmp",
   "developer.graphql.title": "GraphQL",
-  "developer.graphql.ui.no_field_policies_all_fields_readable": "No field policies — all fields readable.",
-  "developer.graphql.ui.no_operations_logged": "No operations logged.",
-  "developer.graphql.ui.no_persisted_queries": "No persisted queries."
+  "developer.graphql.ui.no_field_policies_all_fields_readable": "Nicio politică de câmp — toate câmpurile sunt lizibile.",
+  "developer.graphql.ui.no_operations_logged": "Nicio operațiune înregistrată.",
+  "developer.graphql.ui.no_persisted_queries": "Nicio interogare persistentă."
 }

@@ -5,6 +5,28 @@ import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
 
+// Fixed-window per-IP limiter for the UNauthenticated storefront writes.
+// In-memory on purpose: it only has to blunt scripted spam on a public
+// endpoint, not survive restarts or coordinate replicas. IP comes from the
+// proxy headers; with no proxy in front all callers share one bucket, so
+// windows are sized to stay invisible to legitimate traffic even then.
+// biome-ignore lint/suspicious/noExplicitAny: Hono context in self-contained extension
+function rateLimit(max: number, windowMs: number): (c: any, next: () => Promise<unknown>) => Promise<unknown> {
+  const hits = new Map<string, { n: number; reset: number }>();
+  return async (c, next) => {
+    const now = Date.now();
+    const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || c.req.header('x-real-ip') || 'local';
+    const entry = hits.get(ip);
+    if (!entry || entry.reset <= now) {
+      if (hits.size > 10_000) hits.clear();
+      hits.set(ip, { n: 1, reset: now + windowMs });
+    } else if (++entry.n > max) {
+      return c.json({ error: 'Too many requests' }, 429);
+    }
+    return next();
+  };
+}
+
 export function ecommerceRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
@@ -84,7 +106,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
   });
 
   // Submit product review (public)
-  app.post('/public/products/:id/reviews', zValidator('json', z.object({
+  app.post('/public/products/:id/reviews', rateLimit(10, 3_600_000), zValidator('json', z.object({
     customer_name: z.string().min(1),
     customer_email: z.string().email(),
     rating: z.number().int().min(1).max(5),

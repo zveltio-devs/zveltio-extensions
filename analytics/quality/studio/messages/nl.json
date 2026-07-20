@@ -1,0 +1,13 @@
+{
+  "analytics.quality.col.severity": "Ernst",
+  "analytics.quality.empty": "Nog geen gegevens.",
+  "analytics.quality.subtitle": "Collecties scannen op gegevenskwaliteitsproblemen",
+  "analytics.quality.tab.history": "Scangeschiedenis",
+  "analytics.quality.tab.issues": "Problemen",
+  "analytics.quality.title": "Gegevenskwaliteit",
+  "analytics.quality.ui.collection": "Collectie",
+  "analytics.quality.ui.no_issues_to_show_run_a_scan": "Geen problemen om weer te geven. Voer een scan uit.",
+  "analytics.quality.ui.no_scans_yet": "Nog geen scans.",
+  "analytics.quality.ui.select_collection": "— Select collection —",
+  "analytics.quality.ui.viewissues_s_id_view": "viewIssues(s.id)}>View"
+}

@@ -1,0 +1,9 @@
+{
+  "forms.col.fields": "Campos",
+  "forms.col.submissions": "Envíos",
+  "forms.empty": "No forms yet. Use the Forms API to create embeddable forms.",
+  "forms.error.updatePrefix": "Failed to update form: ",
+  "forms.subtitle": "Gestiona formularios integrables y sus envíos",
+  "forms.title": "Formularios",
+  "forms.toast.deleted": "Formulario eliminado."
+}

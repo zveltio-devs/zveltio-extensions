@@ -1,0 +1,16 @@
+{
+  "developer.views.btn.newView": "Új nézet",
+  "developer.views.confirmDelete": "Törli a nézetet?",
+  "developer.views.empty": "Még nincsenek mentett nézetek.",
+  "developer.views.error.invalidJson": "Érvénytelen JSON a konfigurációban",
+  "developer.views.subtitle": "Mentett nézetek gyűjteményekhez",
+  "developer.views.title": "Egyéni nézetek",
+  "developer.views.toast.created": "Nézet létrehozva.",
+  "developer.views.ui.calendar": "Naptár",
+  "developer.views.ui.card_grid": "Kártyarács",
+  "developer.views.ui.kanban_board": "Kanban-tábla",
+  "developer.views.ui.list": "Lista",
+  "developer.views.ui.map_requires_postgis": "Map (requires PostGIS)",
+  "developer.views.ui.new_view": "Új nézet",
+  "developer.views.ui.view_type": "Nézet típusa"
+}

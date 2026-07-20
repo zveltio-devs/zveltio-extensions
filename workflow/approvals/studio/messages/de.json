@@ -1,14 +1,14 @@
 {
   "workflow.approvals.col.requestedBy": "Angefordert von",
   "workflow.approvals.col.workflow": "Workflow",
-  "workflow.approvals.confirmCancel": "Cancel this approval request?",
-  "workflow.approvals.empty": "No data yet.",
-  "workflow.approvals.empty.requests": "No approval requests found.",
-  "workflow.approvals.empty.workflows": "No workflows configured.",
-  "workflow.approvals.subtitle": "Manage approval requests and workflow definitions",
-  "workflow.approvals.tab.requests": "Requests",
+  "workflow.approvals.confirmCancel": "Diese Genehmigungsanfrage abbrechen?",
+  "workflow.approvals.empty": "Noch keine Daten.",
+  "workflow.approvals.empty.requests": "Keine Genehmigungsanfragen gefunden.",
+  "workflow.approvals.empty.workflows": "Keine Workflows konfiguriert.",
+  "workflow.approvals.subtitle": "Genehmigungsanfragen und Workflow-Definitionen verwalten",
+  "workflow.approvals.tab.requests": "Anfragen",
   "workflow.approvals.tab.workflows": "Workflows",
   "workflow.approvals.tab.workflowsLabel": "Workflows",
-  "workflow.approvals.title": "Approvals",
-  "workflow.approvals.toast.cancelled": "Cancelled."
+  "workflow.approvals.title": "Genehmigungen",
+  "workflow.approvals.toast.cancelled": "Storniert."
 }

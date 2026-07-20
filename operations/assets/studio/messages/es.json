@@ -1,0 +1,17 @@
+{
+  "operations.assets.btn.create": "Crear",
+  "operations.assets.btn.new": "Nuevo activo",
+  "operations.assets.col.cost": "Coste",
+  "operations.assets.col.location": "Ubicación",
+  "operations.assets.confirmDelete": "¿Eliminar este activo?",
+  "operations.assets.empty": "Aún no hay activos registrados.",
+  "operations.assets.subtitle": "Gestiona los activos fijos y la depreciación de la empresa",
+  "operations.assets.title": "Activos fijos",
+  "operations.assets.toast.created": "Activo creado.",
+  "operations.assets.ui.acquisition_cost": "Coste de adquisición",
+  "operations.assets.ui.acquisition_date": "Fecha de adquisición",
+  "operations.assets.ui.code_tag": "Código / Etiqueta",
+  "operations.assets.ui.location": "Ubicación",
+  "operations.assets.ui.new_asset": "Nuevo activo",
+  "operations.assets.ui.serial_number": "Número de serie"
+}

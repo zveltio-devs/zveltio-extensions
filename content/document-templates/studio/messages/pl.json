@@ -1,0 +1,19 @@
+{
+  "content.document-templates.bodyHint": "Body — use {{var}} for substitution",
+  "content.document-templates.bodyHintRich": "Body — use {var} for substitution",
+  "content.document-templates.btn.new": "Nowy szablon",
+  "content.document-templates.col.description": "Opis",
+  "content.document-templates.col.format": "Format",
+  "content.document-templates.empty": "Brak danych.",
+  "content.document-templates.format.docx": "DOCX",
+  "content.document-templates.modal.edit": "Edytuj szablon",
+  "content.document-templates.modal.new": "Nowy szablon",
+  "content.document-templates.placeholder.template": "szablon",
+  "content.document-templates.subtitle": "Szablony wielokrotnego użytku z podstawianiem zmiennych",
+  "content.document-templates.title": "{{title}}",
+  "content.document-templates.ui.format": "Format",
+  "content.document-templates.ui.html_pdf": "HTML (PDF)",
+  "content.document-templates.ui.markdown": "Markdown",
+  "content.document-templates.ui.name": "Nazwa *",
+  "content.document-templates.ui.no_templates_yet": "Brak szablonów."
+}

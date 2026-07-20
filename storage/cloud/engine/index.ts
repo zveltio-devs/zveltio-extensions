@@ -1,6 +1,6 @@
 import type { ZveltioExtension, ExtensionContext } from '@zveltio/sdk/extension';
 import { join } from 'path';
-import { cloudRoutes, makePublicShareHandler, createCloudS3Client } from './routes.js';
+import { cloudRoutes, makePublicShareHandler } from './routes.js';
 import { purgeExpiredTrash } from './lib/trash.js';
 const extension: ZveltioExtension = {
   name: 'storage/cloud',
@@ -18,9 +18,8 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    const s3 = createCloudS3Client();
     // Sub-app: cloud admin/file CRUD lives under /ext/storage/cloud/...
-    app.route('/', cloudRoutes(ctx, s3));
+    app.route('/', cloudRoutes(ctx));
 
     // Public CDN-style download endpoint. Lives on the engine's global app
     // so existing share links (e.g. /share/abc123 sent to recipients) keep
@@ -28,12 +27,12 @@ const extension: ZveltioExtension = {
     ctx.registerPublicRoute({
       method: 'GET',
       path: '/share/:token',
-      handler: makePublicShareHandler(ctx, s3),
+      handler: makePublicShareHandler(ctx),
     });
 
     // Register trash purge so flow-scheduler can call it daily at 03:30
     ctx.internals.extensionRegistry.registerTrashPurgeHandler(async (db: any) => {
-      await purgeExpiredTrash(db, s3);
+      await purgeExpiredTrash(db);
     });
   },
 };

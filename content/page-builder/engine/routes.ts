@@ -3,6 +3,30 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { sanitizeBlocks } from './sanitize.js';
+
+// Fixed-window per-IP limiter for the UNauthenticated tracking writes
+// (/metrics/track, ab-variant conversions). In-memory on purpose: it only
+// has to blunt scripted metric inflation, not survive restarts. IP comes
+// from the proxy headers; with no proxy all callers share one bucket, so
+// the window is sized to stay invisible to legitimate traffic even then.
+// biome-ignore lint/suspicious/noExplicitAny: Hono context in self-contained extension
+function rateLimit(max: number, windowMs: number): (c: any, next: () => Promise<unknown>) => Promise<unknown> {
+  const hits = new Map<string, { n: number; reset: number }>();
+  return async (c, next) => {
+    const now = Date.now();
+    const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || c.req.header('x-real-ip') || 'local';
+    const entry = hits.get(ip);
+    if (!entry || entry.reset <= now) {
+      if (hits.size > 10_000) hits.clear();
+      hits.set(ip, { n: 1, reset: now + windowMs });
+    } else if (++entry.n > max) {
+      return c.json({ error: 'Too many requests' }, 429);
+    }
+    return next();
+  };
+}
+
 async function getUser(c: any, auth: any) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   return session?.user ?? null;
@@ -13,6 +37,24 @@ async function requireAuth(c: any, auth: any) {
   if (!user) return null;
   return user;
 }
+
+/**
+ * Authoring blocks land on the PUBLIC website, and `html`/`text` blocks are
+ * rendered with {@html} by the public client. Authoring is therefore an
+ * admin-only capability — the same call WordPress makes with `unfiltered_html`.
+ * Without this, ANY authenticated user (not just an admin) could publish
+ * arbitrary JavaScript to every visitor, including admins: privilege
+ * escalation, not self-XSS.
+ */
+async function requireAdmin(c: any, auth: any, checkPermission: any) {
+  const user = await getUser(c, auth);
+  if (!user) return { user: null, res: c.json({ error: 'Unauthorized' }, 401) };
+  if (!(await checkPermission(user.id, 'admin', '*'))) {
+    return { user: null, res: c.json({ error: 'Admin access required' }, 403) };
+  }
+  return { user, res: null };
+}
+
 
 const PageSchema = z.object({
   title: z.string().min(1),
@@ -50,7 +92,7 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
   // ─── Block types ──────────────────────────────────────────────────────────
 
   app.get('/block-types', async (c) => {
-    const types = await db
+    const types = await reqDb(c)
       .selectFrom('zv_page_block_types')
       .selectAll()
       .where('is_active', '=', true)
@@ -82,16 +124,16 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
     to_path: z.string().min(1),
     redirect_type: z.literal(301).or(z.literal(302)).default(301),
   })), async (c) => {
-    const user = await requireAuth(c, auth);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    if (!user) return res;
     const data = c.req.valid('json');
     const redirect = await reqDb(c).insertInto('zv_page_redirects').values({ ...data, created_by: user.id }).returningAll().executeTakeFirst();
     return c.json({ redirect }, 201);
   });
 
   app.delete('/redirects/:id', async (c) => {
-    const user = await requireAuth(c, auth);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    if (!user) return res;
     await reqDb(c).deleteFrom('zv_page_redirects').where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
   });
@@ -128,8 +170,8 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.put('/menus/:key', zValidator('json', MenuItemsSchema), async (c) => {
-    const user = await requireAuth(c, auth);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    if (!user) return res;
     const key = c.req.param('key');
     if (!['main', 'footer'].includes(key)) {
       return c.json({ error: "menu key must be 'main' or 'footer'" }, 400);
@@ -153,7 +195,7 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
   // ─── Sitemap ──────────────────────────────────────────────────────────────
 
   app.get('/sitemap.xml', async (c) => {
-    const pages = await db
+    const pages = await reqDb(c)
       .selectFrom('zv_pages as p')
       .leftJoin('zv_page_sitemap_config as sc', 'sc.page_id', 'p.id')
       .select(['p.slug', 'p.updated_at', 'sc.change_freq', 'sc.priority'])
@@ -185,8 +227,8 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
     change_freq: z.enum(['always','hourly','daily','weekly','monthly','yearly','never']).default('weekly'),
     priority: z.number().min(0).max(1).default(0.5),
   })), async (c) => {
-    const user = await requireAuth(c, auth);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    if (!user) return res;
     const data = c.req.valid('json');
     const config = await reqDb(c).insertInto('zv_page_sitemap_config')
       .values(data)
@@ -198,7 +240,7 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
 
   // ─── Metrics tracking ─────────────────────────────────────────────────────
 
-  app.post('/metrics/track', zValidator('json', z.object({
+  app.post('/metrics/track', rateLimit(120, 60_000), zValidator('json', z.object({
     page_id: z.string().uuid(),
     time_on_page_seconds: z.number().int().min(0).default(0),
   })), async (c) => {
@@ -252,7 +294,12 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
     });
   });
 
+  // Authenticated: this resolves `collection_list` blocks by querying the named
+  // collection directly, so it must never be reachable anonymously. The public
+  // surface is `/public/:slug` (published-only) and cms-routes.ts.
   app.get('/:id/resolved', async (c) => {
+    const user = await requireAuth(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
     const page = await reqDb(c).selectFrom('zv_pages').selectAll().where('id', '=', c.req.param('id')).executeTakeFirst();
     if (!page) return c.json({ error: 'Page not found' }, 404);
 
@@ -306,20 +353,23 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
     return c.json({ page: { ...page, blocks } });
   });
 
+  // Authenticated: returns pages in ANY status, drafts included.
   app.get('/:id', async (c) => {
+    const user = await requireAuth(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
     const page = await reqDb(c).selectFrom('zv_pages').selectAll().where('id', '=', c.req.param('id')).executeTakeFirst();
     if (!page) return c.json({ error: 'Page not found' }, 404);
     return c.json({ page });
   });
 
   app.post('/', zValidator('json', PageSchema), async (c) => {
-    const user = await requireAuth(c, auth);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    if (!user) return res;
 
     const body = c.req.valid('json');
-    const page = await db
+    const page = await reqDb(c)
       .insertInto('zv_pages')
-      .values({ ...body, blocks: JSON.stringify(body.blocks), meta: JSON.stringify(body.meta), created_by: user.id, updated_by: user.id })
+      .values({ ...body, blocks: JSON.stringify(sanitizeBlocks(body.blocks)), meta: JSON.stringify(body.meta), created_by: user.id, updated_by: user.id })
       .returningAll()
       .executeTakeFirst();
 
@@ -327,8 +377,8 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.on(['PUT', 'PATCH'], '/:id', zValidator('json', UpdatePageSchema), async (c) => {
-    const user = await requireAuth(c, auth);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    if (!user) return res;
 
     const id = c.req.param('id');
     const body = c.req.valid('json');
@@ -349,7 +399,7 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
     if (body.slug !== undefined) updates.slug = body.slug;
     if (body.description !== undefined) updates.description = body.description;
     if (body.template !== undefined) updates.template = body.template;
-    if (body.blocks !== undefined) updates.blocks = JSON.stringify(body.blocks);
+    if (body.blocks !== undefined) updates.blocks = JSON.stringify(sanitizeBlocks(body.blocks));
     if (body.meta !== undefined) updates.meta = JSON.stringify(body.meta);
     if (body.locale !== undefined) updates.locale = body.locale;
     if (body.meta_title !== undefined) updates.meta_title = body.meta_title;
@@ -367,8 +417,8 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.delete('/:id', async (c) => {
-    const user = await requireAuth(c, auth);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    if (!user) return res;
     await reqDb(c).deleteFrom('zv_pages').where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
   });
@@ -390,8 +440,8 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/:id/seo/analyze', async (c) => {
-    const user = await requireAuth(c, auth);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    if (!user) return res;
 
     const id = c.req.param('id');
     const page = await reqDb(c).selectFrom('zv_pages').selectAll().where('id', '=', id).executeTakeFirst();
@@ -447,24 +497,24 @@ export function pageBuilderRoutes(ctx: ExtensionContext): Hono {
     blocks: z.array(z.any()).default([]),
     traffic_pct: z.number().int().min(1).max(99).default(50),
   })), async (c) => {
-    const user = await requireAuth(c, auth);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    if (!user) return res;
     const data = c.req.valid('json');
     const variant = await reqDb(c).insertInto('zv_page_ab_variants')
-      .values({ page_id: c.req.param('id'), ...data, blocks: JSON.stringify(data.blocks), created_by: user.id })
+      .values({ page_id: c.req.param('id'), ...data, blocks: JSON.stringify(sanitizeBlocks(data.blocks)), created_by: user.id })
       .returningAll()
       .executeTakeFirst();
     return c.json({ variant }, 201);
   });
 
   app.delete('/:id/ab-variants/:variantId', async (c) => {
-    const user = await requireAuth(c, auth);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    if (!user) return res;
     await reqDb(c).deleteFrom('zv_page_ab_variants').where('id', '=', c.req.param('variantId')).where('page_id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
   });
 
-  app.post('/:id/ab-variants/:variantId/track', async (c) => {
+  app.post('/:id/ab-variants/:variantId/track', rateLimit(60, 60_000), async (c) => {
     await reqDb(c).updateTable('zv_page_ab_variants').set({ conversions: sql`conversions + 1` }).where('id', '=', c.req.param('variantId')).execute();
     return c.json({ success: true });
   });

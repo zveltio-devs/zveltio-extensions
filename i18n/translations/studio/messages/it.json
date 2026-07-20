@@ -1,0 +1,19 @@
+{
+  "i18n.translations.btn.search": "Cerca",
+  "i18n.translations.col.context": "Contesto",
+  "i18n.translations.col.localeCode": "Code (e.g. ro, en, de)",
+  "i18n.translations.col.localeName": "Nome",
+  "i18n.translations.col.term": "Termine",
+  "i18n.translations.col.translation": "Traduzione",
+  "i18n.translations.empty": "Ancora nessun dato.",
+  "i18n.translations.subtitle": "Internationalization: manage locales, translation keys and per-locale string values",
+  "i18n.translations.tab.glossary": "Glossario",
+  "i18n.translations.tab.keys": "Chiavi",
+  "i18n.translations.tab.locales": "Impostazioni locali",
+  "i18n.translations.title": "Traduzioni",
+  "i18n.translations.ui.glossary_empty": "Glossario vuoto.",
+  "i18n.translations.ui.new_locale": "Nuove impostazioni locali",
+  "i18n.translations.ui.no_keys": "Nessuna chiave.",
+  "i18n.translations.ui.no_locales": "Nessuna impostazione locale.",
+  "i18n.translations.ui.search_keys": "Cerca chiavi..."
+}

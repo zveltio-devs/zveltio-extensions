@@ -1,0 +1,19 @@
+{
+  "i18n.translations.btn.search": "Zoeken",
+  "i18n.translations.col.context": "Context",
+  "i18n.translations.col.localeCode": "Code (e.g. ro, en, de)",
+  "i18n.translations.col.localeName": "Naam",
+  "i18n.translations.col.term": "Term",
+  "i18n.translations.col.translation": "Vertaling",
+  "i18n.translations.empty": "Nog geen gegevens.",
+  "i18n.translations.subtitle": "Internationalization: manage locales, translation keys and per-locale string values",
+  "i18n.translations.tab.glossary": "Woordenlijst",
+  "i18n.translations.tab.keys": "Sleutels",
+  "i18n.translations.tab.locales": "Landinstellingen",
+  "i18n.translations.title": "Vertalingen",
+  "i18n.translations.ui.glossary_empty": "Woordenlijst leeg.",
+  "i18n.translations.ui.new_locale": "Nieuwe landinstelling",
+  "i18n.translations.ui.no_keys": "Geen sleutels.",
+  "i18n.translations.ui.no_locales": "Geen landinstellingen.",
+  "i18n.translations.ui.search_keys": "Sleutels zoeken..."
+}

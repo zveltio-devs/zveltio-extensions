@@ -6,10 +6,10 @@
   "integrations.migrators.col.source": "Source",
   "integrations.migrators.col.object": "Objet",
   "integrations.migrators.col.rows": "Lignes",
-  "integrations.migrators.field.token": "Jeton API",
+  "integrations.migrators.field.token": "Jeton d'API",
   "integrations.migrators.field.connection": "Connexion",
   "integrations.migrators.field.object": "Objet source",
   "integrations.migrators.field.target": "Collection cible",
   "integrations.migrators.field.limit": "Limite de lignes",
-  "integrations.migrators.confirm.deleteConnection": "Supprimer cette connexion ? Le jeton stocké sera détruit."
+  "integrations.migrators.confirm.deleteConnection": "Supprimer cette connexion ? Son jeton stocké sera détruit."
 }

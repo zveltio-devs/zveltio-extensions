@@ -1,0 +1,21 @@
+{
+  "developer.database.col.column": "Kolom",
+  "developer.database.col.default": "Standaard",
+  "developer.database.col.nullable": "Nullbaar",
+  "developer.database.columns": "kolommen",
+  "developer.database.empty": "Nog geen gegevens.",
+  "developer.database.loading": "Laden…",
+  "developer.database.no": "nee",
+  "developer.database.noRows": "Geen rijen.",
+  "developer.database.noTables": "Geen tabellen.",
+  "developer.database.rows": "rijen",
+  "developer.database.section.sampleRows": "Voorbeeldrijen",
+  "developer.database.section.schema": "Schema",
+  "developer.database.selectTable": "Selecteer een tabel om te inspecteren.",
+  "developer.database.showingRows": "De eerste 50 van {n} worden weergegeven.",
+  "developer.database.subtitle": "Inspect tables, schemas, and sample rows",
+  "developer.database.tables": "Tabellen",
+  "developer.database.title": "Database",
+  "developer.database.ui.filter": "Filter…",
+  "developer.database.yes": "ja"
+}

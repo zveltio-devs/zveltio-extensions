@@ -1,0 +1,19 @@
+{
+  "content.document-templates.bodyHint": "Body — use {{var}} for substitution",
+  "content.document-templates.bodyHintRich": "Body — use {var} for substitution",
+  "content.document-templates.btn.new": "Nueva plantilla",
+  "content.document-templates.col.description": "Descripción",
+  "content.document-templates.col.format": "Formato",
+  "content.document-templates.empty": "Aún no hay datos.",
+  "content.document-templates.format.docx": "DOCX",
+  "content.document-templates.modal.edit": "Editar plantilla",
+  "content.document-templates.modal.new": "Nueva plantilla",
+  "content.document-templates.placeholder.template": "plantilla",
+  "content.document-templates.subtitle": "Plantillas reutilizables con sustitución de variables",
+  "content.document-templates.title": "{{title}}",
+  "content.document-templates.ui.format": "Formato",
+  "content.document-templates.ui.html_pdf": "HTML (PDF)",
+  "content.document-templates.ui.markdown": "Markdown",
+  "content.document-templates.ui.name": "Nombre *",
+  "content.document-templates.ui.no_templates_yet": "Aún no hay plantillas."
+}
