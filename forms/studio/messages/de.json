@@ -1,9 +1,9 @@
 {
-  "forms.col.fields": "Fields",
-  "forms.col.submissions": "Submissions",
+  "forms.col.fields": "Felder",
+  "forms.col.submissions": "Einreichungen",
   "forms.empty": "No forms yet. Use the Forms API to create embeddable forms.",
   "forms.error.updatePrefix": "Failed to update form: ",
-  "forms.subtitle": "Manage embeddable forms and their submissions",
-  "forms.title": "Forms",
-  "forms.toast.deleted": "Form deleted."
+  "forms.subtitle": "Einbettbare Formulare und deren Einreichungen verwalten",
+  "forms.title": "Formulare",
+  "forms.toast.deleted": "Formular gelöscht."
 }

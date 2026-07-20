@@ -1,0 +1,16 @@
+{
+  "developer.views.btn.newView": "Nuova vista",
+  "developer.views.confirmDelete": "Eliminare la vista?",
+  "developer.views.empty": "Ancora nessuna vista salvata.",
+  "developer.views.error.invalidJson": "JSON non valido nella configurazione",
+  "developer.views.subtitle": "Viste salvate per le collezioni",
+  "developer.views.title": "Viste personalizzate",
+  "developer.views.toast.created": "Vista creata.",
+  "developer.views.ui.calendar": "Calendario",
+  "developer.views.ui.card_grid": "Griglia di schede",
+  "developer.views.ui.kanban_board": "Bacheca Kanban",
+  "developer.views.ui.list": "Elenco",
+  "developer.views.ui.map_requires_postgis": "Map (requires PostGIS)",
+  "developer.views.ui.new_view": "Nuova vista",
+  "developer.views.ui.view_type": "Tipo di vista"
+}

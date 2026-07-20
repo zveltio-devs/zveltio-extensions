@@ -1,0 +1,18 @@
+{
+  "storage.cloud.btn.share": "Delen",
+  "storage.cloud.col.modified": "Gewijzigd",
+  "storage.cloud.col.size": "Grootte",
+  "storage.cloud.confirmDeleteFile": "Dit bestand verwijderen?",
+  "storage.cloud.copyClose": "Kopiëren en sluiten",
+  "storage.cloud.empty": "Nog geen gegevens.",
+  "storage.cloud.empty.folder": "Lege map. Sleep bestanden hierheen of klik op Uploaden.",
+  "storage.cloud.generateLink": "Link genereren",
+  "storage.cloud.root": "Hoofdmap",
+  "storage.cloud.share": "Delen",
+  "storage.cloud.shareTitle": "{name} delen",
+  "storage.cloud.subtitle": "Bestanden en mappen",
+  "storage.cloud.title": "Cloudopslag",
+  "storage.cloud.toast.uploaded": "Geüpload.",
+  "storage.cloud.ui.expires_hours": "Verloopt (uren)",
+  "storage.cloud.ui.password_optional": "Wachtwoord (optioneel)"
+}

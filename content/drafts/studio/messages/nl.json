@@ -1,0 +1,13 @@
+{
+  "content.drafts.btn.publish": "Publiceren",
+  "content.drafts.col.author": "Auteur",
+  "content.drafts.col.record": "Record",
+  "content.drafts.col.updated": "Bijgewerkt",
+  "content.drafts.confirmDiscard": "Concept verwijderen?",
+  "content.drafts.empty": "Nog geen gegevens.",
+  "content.drafts.subtitle": "Pending drafts across all collections. Publish promotes the draft to the live record.",
+  "content.drafts.title": "Concepten",
+  "content.drafts.toast.discarded": "Verwijderd.",
+  "content.drafts.toast.published": "Concept gepubliceerd.",
+  "content.drafts.ui.no_pending_drafts": "Geen concepten in behandeling."
+}

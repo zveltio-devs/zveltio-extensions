@@ -1,0 +1,13 @@
+{
+  "content.drafts.btn.publish": "Pubblica",
+  "content.drafts.col.author": "Autore",
+  "content.drafts.col.record": "Record",
+  "content.drafts.col.updated": "Aggiornato",
+  "content.drafts.confirmDiscard": "Scartare la bozza?",
+  "content.drafts.empty": "Ancora nessun dato.",
+  "content.drafts.subtitle": "Pending drafts across all collections. Publish promotes the draft to the live record.",
+  "content.drafts.title": "Bozze",
+  "content.drafts.toast.discarded": "Scartato.",
+  "content.drafts.toast.published": "Bozza pubblicata.",
+  "content.drafts.ui.no_pending_drafts": "Nessuna bozza in sospeso."
+}

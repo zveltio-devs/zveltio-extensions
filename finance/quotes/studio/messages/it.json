@@ -1,0 +1,20 @@
+{
+  "finance.quotes.btn.accept": "Segna come accettato",
+  "finance.quotes.btn.addLine": "Aggiungi riga",
+  "finance.quotes.btn.create": "Crea preventivo",
+  "finance.quotes.btn.new": "Nuovo preventivo",
+  "finance.quotes.btn.send": "Invia",
+  "finance.quotes.deleteConfirm": "Eliminare questo preventivo?",
+  "finance.quotes.empty": "Ancora nessun preventivo. Crea il tuo primo preventivo.",
+  "finance.quotes.section.lines": "Righe",
+  "finance.quotes.subtitle": "Gestisci preventivi e proposte per i clienti",
+  "finance.quotes.title": "Preventivi e proposte",
+  "finance.quotes.toast.created": "Preventivo creato.",
+  "finance.quotes.ui.client_email": "E-mail cliente",
+  "finance.quotes.ui.client_name": "Nome cliente *",
+  "finance.quotes.ui.disc": "Disc %",
+  "finance.quotes.ui.service_or_product": "Servizio o prodotto",
+  "finance.quotes.ui.unit_price": "Prezzo unitario",
+  "finance.quotes.ui.valid_days": "Giorni di validità",
+  "quotes.new": "Nuovo preventivo"
+}

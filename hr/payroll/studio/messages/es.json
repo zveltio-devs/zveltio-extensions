@@ -1,0 +1,20 @@
+{
+  "hr.payroll.btn.generate": "Generar",
+  "hr.payroll.btn.newPeriod": "Nuevo período",
+  "hr.payroll.btn.revisal": "Revisal XML",
+  "hr.payroll.col.gross": "Bruto",
+  "hr.payroll.col.net": "Neto",
+  "hr.payroll.empty": "Aún no hay datos.",
+  "hr.payroll.empty.periods": "Aún no hay períodos.",
+  "hr.payroll.selectPeriod": "Select a period to view payroll entries.",
+  "hr.payroll.subtitle": "Gestiona períodos de nómina y genera nóminas",
+  "hr.payroll.tab.periods": "Períodos",
+  "hr.payroll.title": "Nómina",
+  "hr.payroll.toast.entriesGenerated": "Entradas generadas.",
+  "hr.payroll.toast.periodCreated": "Período creado.",
+  "hr.payroll.ui.entries": "Entradas",
+  "hr.payroll.ui.name_e_g_november_2026": "Name (e.g. November 2026)",
+  "hr.payroll.ui.new_payroll_period": "Nuevo período de nómina",
+  "hr.payroll.ui.no_entries_click_generate": "Sin entradas: haz clic en Generar.",
+  "hr.payroll.ui.pay_date": "Pay date"
+}

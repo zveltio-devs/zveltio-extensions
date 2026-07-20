@@ -1,0 +1,16 @@
+{
+  "developer.views.btn.newView": "Nueva vista",
+  "developer.views.confirmDelete": "¿Eliminar la vista?",
+  "developer.views.empty": "Aún no hay vistas guardadas.",
+  "developer.views.error.invalidJson": "JSON no válido en la configuración",
+  "developer.views.subtitle": "Vistas guardadas para colecciones",
+  "developer.views.title": "Vistas personalizadas",
+  "developer.views.toast.created": "Vista creada.",
+  "developer.views.ui.calendar": "Calendario",
+  "developer.views.ui.card_grid": "Cuadrícula de tarjetas",
+  "developer.views.ui.kanban_board": "Tablero Kanban",
+  "developer.views.ui.list": "Lista",
+  "developer.views.ui.map_requires_postgis": "Map (requires PostGIS)",
+  "developer.views.ui.new_view": "Nueva vista",
+  "developer.views.ui.view_type": "Tipo de vista"
+}

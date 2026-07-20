@@ -1,5 +1,5 @@
 import { sql } from 'kysely';
-import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { deleteObject } from './s3.js';
 import type { Database } from '@zveltio/engine-db';
 
 const TRASH_RETENTION_DAYS = 30;
@@ -85,10 +85,7 @@ export async function listTrash(db: Database, userId?: string) {
  * Permanently deletes expired files from trash.
  * Called by a daily cron job.
  */
-export async function purgeExpiredTrash(
-  db: Database,
-  s3: S3Client,
-): Promise<number> {
+export async function purgeExpiredTrash(db: Database): Promise<number> {
   const expired = await sql<{ id: string; storage_path: string; thumbnail_url: string | null }>`
     SELECT id, storage_path, thumbnail_url FROM zv_media_files
     WHERE deleted_at IS NOT NULL
@@ -96,19 +93,18 @@ export async function purgeExpiredTrash(
   `.execute(db);
 
   let purged = 0;
-  const bucket = process.env.S3_BUCKET || 'zveltio';
 
   for (const file of expired.rows) {
-    await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: file.storage_path })).catch(() => {});
+    await deleteObject(file.storage_path);
     if (file.thumbnail_url) {
-      await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: `thumbnails/${file.id}.webp` })).catch(() => {});
+      await deleteObject(`thumbnails/${file.id}.webp`);
     }
 
     const versions = await sql<{ storage_path: string }>`
       SELECT storage_path FROM zv_media_versions WHERE file_id = ${file.id}
     `.execute(db);
     for (const v of versions.rows) {
-      await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: v.storage_path })).catch(() => {});
+      await deleteObject(v.storage_path);
     }
 
     await sql`DELETE FROM zv_media_files WHERE id = ${file.id}`.execute(db);

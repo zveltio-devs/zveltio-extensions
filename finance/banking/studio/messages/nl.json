@@ -1,0 +1,20 @@
+{
+  "finance.banking.empty": "Nog geen gegevens.",
+  "finance.banking.empty.accounts": "Nog geen bankrekeningen.",
+  "finance.banking.empty.transactions": "Nog geen transacties.",
+  "finance.banking.empty.unreconciled": "Geen niet-afgeletterde transacties.",
+  "finance.banking.newAccount": "Nieuw account",
+  "finance.banking.section.openInvoices": "Openstaande facturen (verzonden)",
+  "finance.banking.section.unreconciled": "Niet-afgeletterde transacties",
+  "finance.banking.status.pending": "In behandeling",
+  "finance.banking.status.reconciled": "Afgeletterd",
+  "finance.banking.subtitle": "Bankrekeningen, transacties en afletteren",
+  "finance.banking.tab.accounts": "Accounts",
+  "finance.banking.tab.reconciliation": "Afletteren",
+  "finance.banking.tab.transactions": "Transacties",
+  "finance.banking.title": "Bankieren",
+  "finance.banking.ui.internal_name": "Interne naam",
+  "finance.banking.ui.new_bank_account": "Nieuwe bankrekening",
+  "finance.banking.ui.no_open_invoices": "Geen openstaande facturen.",
+  "finance.banking.ui.opening_balance": "Beginsaldo"
+}

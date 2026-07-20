@@ -1,0 +1,17 @@
+{
+  "operations.assets.btn.create": "Aanmaken",
+  "operations.assets.btn.new": "Nieuw activum",
+  "operations.assets.col.cost": "Kosten",
+  "operations.assets.col.location": "Locatie",
+  "operations.assets.confirmDelete": "Dit activum verwijderen?",
+  "operations.assets.empty": "Nog geen activa geregistreerd.",
+  "operations.assets.subtitle": "Beheer vaste activa en afschrijving van het bedrijf",
+  "operations.assets.title": "Vaste activa",
+  "operations.assets.toast.created": "Activum aangemaakt.",
+  "operations.assets.ui.acquisition_cost": "Aanschafkosten",
+  "operations.assets.ui.acquisition_date": "Aanschafdatum",
+  "operations.assets.ui.code_tag": "Code / Tag",
+  "operations.assets.ui.location": "Locatie",
+  "operations.assets.ui.new_asset": "Nieuw activum",
+  "operations.assets.ui.serial_number": "Serienummer"
+}

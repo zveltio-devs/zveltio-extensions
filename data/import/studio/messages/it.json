@@ -1,0 +1,21 @@
+{
+  "data.import.action.import": "Importa",
+  "data.import.col.errors": "Errori",
+  "data.import.col.format": "Formato",
+  "data.import.col.rows": "Righe",
+  "data.import.col.time": "Tempo",
+  "data.import.dropHint": "Drag a CSV / JSON / NDJSON file, or click to browse",
+  "data.import.empty": "Ancora nessuna importazione.",
+  "data.import.errorsHint": "{n} errors — see job log",
+  "data.import.form.collection": "Collezione di destinazione",
+  "data.import.form.title": "Importa dati",
+  "data.import.label.format": "Formato",
+  "data.import.label.upsertHtml": "Upsert on field (optional, e.g. email)",
+  "data.import.new": "Nuova importazione",
+  "data.import.selectPlaceholder": "— Select —",
+  "data.import.subtitle": "Import collection data from CSV or JSON files with column mapping and background processing",
+  "data.import.title": "Importazione dati",
+  "data.import.toast.imported": "Importate {n} righe",
+  "data.import.ui.create_missing_columns_automatically": "Crea automaticamente le colonne mancanti",
+  "data.import.upsertHint": "Upsert on field (optional, e.g. email)"
+}

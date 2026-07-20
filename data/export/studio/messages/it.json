@@ -1,0 +1,17 @@
+{
+  "data.export.btn.download": "Scarica",
+  "data.export.col.collection": "Collezione",
+  "data.export.col.format": "Formato",
+  "data.export.col.rows": "Righe",
+  "data.export.col.size": "Dimensione",
+  "data.export.col.time": "Tempo",
+  "data.export.col.user": "Utente",
+  "data.export.empty": "Ancora nessuna esportazione.",
+  "data.export.filterHint": "Filter (Zveltio query, optional)",
+  "data.export.subtitle": "Export collection data as JSON, CSV or NDJSON with filtering support",
+  "data.export.title": "Esportazione dati",
+  "data.export.ui.excel_xlsx": "Excel (xlsx)",
+  "data.export.ui.export_collection": "Esporta collezione",
+  "data.export.ui.no_exports_recorded": "Nessuna esportazione registrata.",
+  "data.export.ui.select": "— Select —"
+}

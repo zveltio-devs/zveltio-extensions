@@ -1,6 +1,6 @@
 import { sql } from 'kysely';
 import { nanoid } from 'nanoid';
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { putObject, getObject, deleteObject } from './s3.js';
 import type { Database } from '@zveltio/engine-db';
 
 const MAX_VERSIONS = 20;
@@ -11,7 +11,6 @@ const MAX_VERSIONS = 20;
  */
 export async function createFileVersion(
   db: Database,
-  s3: S3Client,
   fileId: string,
   newBuffer: Buffer,
   newMimeType: string,
@@ -52,12 +51,9 @@ export async function createFileVersion(
 
   // Upload new file to S3 with unique version key
   const versionKey = `media/versions/${fileId}/v${nextVer + 1}`;
-  await s3.send(new PutObjectCommand({
-    Bucket: process.env.S3_BUCKET || 'zveltio',
-    Key: versionKey,
-    Body: newBuffer,
-    ContentType: newMimeType,
-  }));
+  // Without object storage configured this is a no-op: the version row is
+  // still recorded so history stays consistent once storage is wired up.
+  await putObject(versionKey, newBuffer, newMimeType);
 
   await (db as any).insertInto('zv_media_versions').values({
     id: nanoid(21),
@@ -70,12 +66,7 @@ export async function createFileVersion(
   }).execute();
 
   // Update main file record with new content
-  await s3.send(new PutObjectCommand({
-    Bucket: process.env.S3_BUCKET || 'zveltio',
-    Key: currentFile.storage_path,
-    Body: newBuffer,
-    ContentType: newMimeType,
-  }));
+  await putObject(currentFile.storage_path, newBuffer, newMimeType);
 
   await (db as any).updateTable('zv_media_files').set({
     // zv_media_files uses mimetype / size (no _bytes suffix); only the
@@ -94,10 +85,7 @@ export async function createFileVersion(
   `.execute(db);
 
   for (const old of oldVersions.rows) {
-    await s3.send(new DeleteObjectCommand({
-      Bucket: process.env.S3_BUCKET || 'zveltio',
-      Key: old.storage_path,
-    })).catch(() => {});
+    await deleteObject(old.storage_path);
     await sql`DELETE FROM zv_media_versions WHERE id = ${old.id}`.execute(db);
   }
 
@@ -122,7 +110,6 @@ export async function listFileVersions(db: Database, fileId: string) {
  */
 export async function restoreFileVersion(
   db: Database,
-  s3: S3Client,
   fileId: string,
   versionNum: number,
   userId: string,
@@ -136,10 +123,7 @@ export async function restoreFileVersion(
 
   if (!version) throw new Error('Version not found');
 
-  const sourceObj = await s3.send(new GetObjectCommand({
-    Bucket: process.env.S3_BUCKET || 'zveltio',
-    Key: version.storage_path,
-  }));
+  const sourceBytes = await getObject(version.storage_path);
 
   const file = await (db as any)
     .selectFrom('zv_media_files')
@@ -149,14 +133,10 @@ export async function restoreFileVersion(
 
   if (!file) throw new Error('File not found');
 
-  const bodyBytes = await sourceObj.Body?.transformToByteArray();
-  if (bodyBytes) {
-    await s3.send(new PutObjectCommand({
-      Bucket: process.env.S3_BUCKET || 'zveltio',
-      Key: file.storage_path,
-      Body: bodyBytes,
-      ContentType: version.mime_type,
-    }));
+  // No bytes when object storage is unconfigured (or the object is gone) —
+  // the metadata rollback below still applies.
+  if (sourceBytes) {
+    await putObject(file.storage_path, Buffer.from(sourceBytes), version.mime_type);
   }
 
   await (db as any).updateTable('zv_media_files').set({

@@ -1,0 +1,22 @@
+{
+  "projects.helpdesk.btn.create": "Aanmaken",
+  "projects.helpdesk.btn.new": "Nieuw ticket",
+  "projects.helpdesk.btn.resolve": "Oplossen",
+  "projects.helpdesk.col.category": "Categorie",
+  "projects.helpdesk.empty": "Nog geen gegevens.",
+  "projects.helpdesk.empty.select": "Select a ticket to view the conversation.",
+  "projects.helpdesk.priority.high": "Hoog",
+  "projects.helpdesk.priority.low": "Laag",
+  "projects.helpdesk.subtitle": "Beheer supporttickets",
+  "projects.helpdesk.title": "Helpdesk",
+  "projects.helpdesk.toast.resolved": "Ticket opgelost.",
+  "projects.helpdesk.ui.description": "Beschrijving *",
+  "projects.helpdesk.ui.medium": "Gemiddeld",
+  "projects.helpdesk.ui.new_ticket": "Nieuw ticket",
+  "projects.helpdesk.ui.priority": "Prioriteit",
+  "projects.helpdesk.ui.reply": "Reply…",
+  "projects.helpdesk.ui.requester_email": "E-mail aanvrager",
+  "projects.helpdesk.ui.resolve_activeticket_id_mark_resolved": "resolve(activeTicket.id)}>Mark resolved",
+  "projects.helpdesk.ui.subject": "Onderwerp *",
+  "projects.helpdesk.ui.urgent": "Urgent"
+}

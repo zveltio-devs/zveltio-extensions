@@ -1,0 +1,21 @@
+{
+  "data.import.action.import": "Importeren",
+  "data.import.col.errors": "Fouten",
+  "data.import.col.format": "Formaat",
+  "data.import.col.rows": "Rijen",
+  "data.import.col.time": "Tijd",
+  "data.import.dropHint": "Drag a CSV / JSON / NDJSON file, or click to browse",
+  "data.import.empty": "Nog geen imports.",
+  "data.import.errorsHint": "{n} errors — see job log",
+  "data.import.form.collection": "Doelcollectie",
+  "data.import.form.title": "Gegevens importeren",
+  "data.import.label.format": "Formaat",
+  "data.import.label.upsertHtml": "Upsert on field (optional, e.g. email)",
+  "data.import.new": "Nieuwe import",
+  "data.import.selectPlaceholder": "— Select —",
+  "data.import.subtitle": "Import collection data from CSV or JSON files with column mapping and background processing",
+  "data.import.title": "Gegevensimport",
+  "data.import.toast.imported": "{n} rijen geïmporteerd",
+  "data.import.ui.create_missing_columns_automatically": "Ontbrekende kolommen automatisch aanmaken",
+  "data.import.upsertHint": "Upsert on field (optional, e.g. email)"
+}

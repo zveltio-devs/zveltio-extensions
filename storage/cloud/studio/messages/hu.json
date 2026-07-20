@@ -1,0 +1,18 @@
+{
+  "storage.cloud.btn.share": "Megosztás",
+  "storage.cloud.col.modified": "Módosítva",
+  "storage.cloud.col.size": "Méret",
+  "storage.cloud.confirmDeleteFile": "Törli ezt a fájlt?",
+  "storage.cloud.copyClose": "Másolás és bezárás",
+  "storage.cloud.empty": "Még nincsenek adatok.",
+  "storage.cloud.empty.folder": "Üres mappa. Húzd ide a fájlokat, vagy kattints a Feltöltésre.",
+  "storage.cloud.generateLink": "Hivatkozás létrehozása",
+  "storage.cloud.root": "Gyökér",
+  "storage.cloud.share": "Megosztás",
+  "storage.cloud.shareTitle": "{name} megosztása",
+  "storage.cloud.subtitle": "Fájlok és mappák",
+  "storage.cloud.title": "Felhőtárhely",
+  "storage.cloud.toast.uploaded": "Feltöltve.",
+  "storage.cloud.ui.expires_hours": "Lejár (óra)",
+  "storage.cloud.ui.password_optional": "Jelszó (opcionális)"
+}

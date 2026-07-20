@@ -10,6 +10,6 @@
   "integrations.migrators.field.connection": "Conexiune",
   "integrations.migrators.field.object": "Obiect sursă",
   "integrations.migrators.field.target": "Colecție țintă",
-  "integrations.migrators.field.limit": "Limită de rânduri",
-  "integrations.migrators.confirm.deleteConnection": "Ștergi această conexiune? Token-ul stocat va fi distrus."
+  "integrations.migrators.field.limit": "Limită rânduri",
+  "integrations.migrators.confirm.deleteConnection": "Ștergeți această conexiune? Tokenul stocat va fi distrus."
 }

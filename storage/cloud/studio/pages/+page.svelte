@@ -65,7 +65,7 @@
   async function createShare() {
     if (!selected) return;
     try {
-      const r = await api.post<{ share_url?: string; token?: string }>('/ext/storage/cloud/shares', { file_id: selected.id, ...shareForm });
+      const r = await api.post<{ share_url?: string; token?: string }>('/ext/storage/cloud/share', { file_id: selected.id, ...shareForm });
       shareUrl = r.share_url ?? `${ENGINE_URL}/share/${r.token}`;
     } catch (e: any) { toast.error(e instanceof Error ? e.message : m['ext.saveFailed']()); }
   }

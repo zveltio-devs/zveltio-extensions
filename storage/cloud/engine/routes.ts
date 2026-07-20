@@ -5,11 +5,10 @@ import { sql } from 'kysely';
 import { createFileVersion, listFileVersions, restoreFileVersion } from './lib/file-versions.js';
 import { moveToTrash, restoreFromTrash, listTrash, purgeExpiredTrash } from './lib/trash.js';
 import { createShareLink, validateShareToken, incrementDownloadCount, listUserShares, revokeShare } from './lib/sharing.js';
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { getAws, presignedGetUrl, putObject, getObject, s3Url } from './lib/s3.js';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 
-export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
+export function cloudRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
 
   // Per-request DB handle (CRM PR #1 pattern). After
@@ -55,7 +54,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
 
     try {
       const buffer = Buffer.from(await file.arrayBuffer());
-      const result = await createFileVersion(db, s3, fileId, buffer, file.type, file.size, user.id);
+      const result = await createFileVersion(db, fileId, buffer, file.type, file.size, user.id);
 
       // Log access
       await logAccess(reqDb(c), fileId, user.id, 'version', c.req.header('user-agent'), null, null);
@@ -74,7 +73,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
   app.post('/files/:id/versions/:num/restore', requireAuth, async (c) => {
     const user = c.get('user') as any;
     try {
-      await restoreFileVersion(db, s3, c.req.param('id'), parseInt(c.req.param('num')), user.id);
+      await restoreFileVersion(db, c.req.param('id'), parseInt(c.req.param('num')), user.id);
       return c.json({ success: true, message: 'Version restored' });
     } catch (err: any) {
       return c.json({ error: err.message }, 400);
@@ -111,7 +110,7 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
   });
 
   app.delete('/trash/purge', requireAuth, async (c) => {
-    const purged = await purgeExpiredTrash(db, s3);
+    const purged = await purgeExpiredTrash(db);
     return c.json({ purged, message: `${purged} files permanently deleted` });
   });
 
@@ -178,11 +177,10 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
     }
 
     if (result.file && result.share.share_type === 'download') {
-      const presigned = await getSignedUrl(s3, new GetObjectCommand({
-        Bucket: process.env.S3_BUCKET || 'zveltio',
-        Key: result.file.storage_path,
-        ResponseContentDisposition: `attachment; filename="${result.file.original_filename}"`,
-      }), { expiresIn: 3600 });
+      const presigned = await presignedGetUrl(result.file.storage_path);
+      if (!presigned) {
+        return c.json({ error: 'Object storage is not configured' }, 503);
+      }
 
       await incrementDownloadCount(db, result.share.id);
 
@@ -266,6 +264,184 @@ export function cloudRoutes(ctx: ExtensionContext, s3: S3Client): Hono {
       ORDER BY fav.created_at DESC
     `.execute(reqDb(c));
     return c.json({ files: files.rows });
+  });
+
+  // =============================================
+  // DRIVE — browse / upload / delete / download
+  // =============================================
+  //
+  // The drive is a view over the core `zv_media_files` table — the same table
+  // trash, versions, shares and quotas here already operate on. Folders come
+  // from `zv_media_folders`, whose {id, name, parent_id} tree is walked to turn
+  // the UI's "/a/b" path into a folder id, so the extension does not have to
+  // ALTER a core table to add a path column.
+
+  /** Resolve "/a/b" to a folder id. `create` builds missing segments. */
+  async function resolveFolder(
+    c: any,
+    path: string,
+    create = false,
+  ): Promise<{ id: string | null } | null> {
+    const parts = path.split('/').filter(Boolean);
+    let parentId: string | null = null;
+    for (const name of parts) {
+      const existing: any = await (reqDb(c) as any)
+        .selectFrom('zv_media_folders')
+        .select(['id'])
+        .where('name', '=', name)
+        .where('deleted_at', 'is', null)
+        .where((eb: any) =>
+          parentId === null ? eb('parent_id', 'is', null) : eb('parent_id', '=', parentId),
+        )
+        .executeTakeFirst();
+      if (existing) {
+        parentId = existing.id;
+        continue;
+      }
+      if (!create) return null;
+      const created: any = await (reqDb(c) as any)
+        .insertInto('zv_media_folders')
+        .values({ name, parent_id: parentId, created_by: (c.get('user') as any)?.id ?? null })
+        .returning(['id'])
+        .executeTakeFirst();
+      parentId = created?.id ?? null;
+    }
+    return { id: parentId };
+  }
+
+  // GET /files?path=/a/b — one directory level: sub-folders, then files.
+  app.get('/files', requireAuth, async (c) => {
+    const path = c.req.query('path') || '/';
+    const folder = await resolveFolder(c, path);
+    if (!folder) return c.json({ error: 'Folder not found' }, 404);
+
+    const folders = await (reqDb(c) as any)
+      .selectFrom('zv_media_folders')
+      .select(['id', 'name', 'updated_at'])
+      .where('deleted_at', 'is', null)
+      .where((eb: any) =>
+        folder.id === null ? eb('parent_id', 'is', null) : eb('parent_id', '=', folder.id),
+      )
+      .orderBy('name', 'asc')
+      .execute();
+
+    const files = await (reqDb(c) as any)
+      .selectFrom('zv_media_files')
+      .select(['id', 'original_name', 'filename', 'size', 'mimetype', 'updated_at'])
+      .where('deleted_at', 'is', null)
+      .where((eb: any) =>
+        folder.id === null ? eb('folder_id', 'is', null) : eb('folder_id', '=', folder.id),
+      )
+      .orderBy('original_name', 'asc')
+      .execute();
+
+    const base = path === '/' ? '' : path.replace(/\/$/, '');
+    return c.json({
+      path,
+      data: [
+        ...folders.map((f: any) => ({
+          id: f.id,
+          name: f.name,
+          is_folder: true,
+          path: `${base}/${f.name}`,
+          updated_at: f.updated_at,
+        })),
+        ...files.map((f: any) => ({
+          id: f.id,
+          name: f.original_name ?? f.filename,
+          is_folder: false,
+          size: Number(f.size ?? 0),
+          mimetype: f.mimetype,
+          path: `${base}/${f.original_name ?? f.filename}`,
+          updated_at: f.updated_at,
+        })),
+      ],
+    });
+  });
+
+  // POST /upload — multipart { file, path }
+  app.post('/upload', requireAuth, async (c) => {
+    const user = c.get('user') as any;
+    const form = await c.req.formData();
+    const file = form.get('file') as File | null;
+    if (!file) return c.json({ error: 'No file provided' }, 400);
+    const path = (form.get('path') as string | null) || '/';
+
+    // Quota check mirrors GET /quota, so the two can never disagree.
+    const usage = await sql<{ total: string }>`
+      SELECT COALESCE(SUM(size), 0) AS total
+      FROM zv_media_files
+      WHERE created_by = ${user.id} AND deleted_at IS NULL
+    `.execute(reqDb(c));
+    const quotaRow = await (reqDb(c) as any)
+      .selectFrom('zv_storage_quotas')
+      .selectAll()
+      .where('user_id', '=', user.id)
+      .executeTakeFirst();
+    const usedBytes = parseInt(usage.rows[0]?.total || '0');
+    const quotaBytes = quotaRow?.quota_bytes ?? 5368709120;
+    if (usedBytes + file.size > quotaBytes) {
+      return c.json({ error: 'Storage quota exceeded' }, 413);
+    }
+
+    const folder = await resolveFolder(c, path, true);
+    const ext = file.name.includes('.') ? `.${file.name.split('.').pop()}` : '';
+    const id = crypto.randomUUID();
+    const filename = `${id.replace(/-/g, '')}${ext}`;
+    const key = `media/${filename}`;
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    // Storage may legitimately be unconfigured; only a CONFIGURED backend that
+    // then fails is an error worth surfacing.
+    if (getAws()) {
+      const ok = await putObject(key, buffer, file.type || 'application/octet-stream');
+      if (!ok) return c.json({ error: 'Object storage upload failed' }, 502);
+    }
+
+    const record = {
+      id,
+      folder_id: folder?.id ?? null,
+      filename,
+      original_name: file.name,
+      mimetype: file.type || 'application/octet-stream',
+      size: file.size,
+      storage_path: key,
+      url: `${process.env.S3_PUBLIC_URL ?? ''}/${key}`,
+      created_by: user.id,
+    };
+    await (reqDb(c) as any).insertInto('zv_media_files').values(record).execute();
+
+    await logAccess(reqDb(c), id, user.id, 'upload', c.req.header('user-agent'), null, null);
+    return c.json({ file: record }, 201);
+  });
+
+  // DELETE /files/:id — soft delete, so trash/restore keep working.
+  app.delete('/files/:id', requireAuth, async (c) => {
+    const user = c.get('user') as any;
+    try {
+      await moveToTrash(db, c.req.param('id'), user.id);
+      return c.json({ success: true });
+    } catch (err: any) {
+      return c.json({ error: err?.message ?? 'Delete failed' }, 400);
+    }
+  });
+
+  // GET /files/:id/download — redirect to a presigned URL.
+  app.get('/files/:id/download', requireAuth, async (c) => {
+    const user = c.get('user') as any;
+    const file = await (reqDb(c) as any)
+      .selectFrom('zv_media_files')
+      .select(['id', 'storage_path', 'original_name'])
+      .where('id', '=', c.req.param('id'))
+      .where('deleted_at', 'is', null)
+      .executeTakeFirst();
+    if (!file) return c.json({ error: 'File not found' }, 404);
+
+    const url = await presignedGetUrl(file.storage_path);
+    if (!url) return c.json({ error: 'Object storage is not configured' }, 503);
+
+    await logAccess(reqDb(c), file.id, user.id, 'download', c.req.header('user-agent'), null, null);
+    return c.redirect(url, 302);
   });
 
   // =============================================
@@ -636,7 +812,7 @@ async function logAccess(
  * `/share/:token` via `ctx.registerPublicRoute()`. Exported as a free function
  * so the engine can mount it directly without spinning up a Hono sub-router.
  */
-export function makePublicShareHandler(ctx: ExtensionContext, s3: S3Client) {
+export function makePublicShareHandler(ctx: ExtensionContext) {
   const { db } = ctx;
   function reqDb(c: any): any {
     return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
@@ -651,11 +827,10 @@ export function makePublicShareHandler(ctx: ExtensionContext, s3: S3Client) {
     }
 
     if (result.file && result.share.share_type === 'download') {
-      const presigned = await getSignedUrl(s3, new GetObjectCommand({
-        Bucket: process.env.S3_BUCKET || 'zveltio',
-        Key: result.file.storage_path,
-        ResponseContentDisposition: `attachment; filename="${result.file.original_filename}"`,
-      }), { expiresIn: 3600 });
+      const presigned = await presignedGetUrl(result.file.storage_path);
+      if (!presigned) {
+        return c.json({ error: 'Object storage is not configured' }, 503);
+      }
 
       await incrementDownloadCount(db, result.share.id);
 
@@ -702,28 +877,12 @@ export function makePublicShareHandler(ctx: ExtensionContext, s3: S3Client) {
 }
 
 /**
- * @deprecated Kept for the import in engine/index.ts during the S3-01
- * migration. Removed once that import is dropped — use
- * `makePublicShareHandler(ctx, s3)` with `ctx.registerPublicRoute()`.
+ * @deprecated Superseded by `makePublicShareHandler(ctx)` +
+ * `ctx.registerPublicRoute()`. Kept only for out-of-tree importers.
  */
-export function publicShareRouter(ctx: ExtensionContext, s3: S3Client): Hono {
+export function publicShareRouter(ctx: ExtensionContext): Hono {
   const app = new Hono();
-  app.get('/:token', makePublicShareHandler(ctx, s3));
+  app.get('/:token', makePublicShareHandler(ctx));
   return app;
 }
 
-/**
- * Creates an S3 client from environment variables.
- * Exported so routes/index.ts can pass the same instance to cloudRoutes.
- */
-export function createCloudS3Client(): S3Client {
-  return new S3Client({
-    region: process.env.S3_REGION || 'us-east-1',
-    endpoint: process.env.S3_ENDPOINT,
-    credentials: {
-      accessKeyId: process.env.S3_ACCESS_KEY || '',
-      secretAccessKey: process.env.S3_SECRET_KEY || '',
-    },
-    forcePathStyle: true,
-  });
-}

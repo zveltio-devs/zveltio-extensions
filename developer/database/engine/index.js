@@ -19456,6 +19456,55 @@ function databaseRoutes(ctx) {
     if (!hasAdmin)
       return c.json({ error: "Admin access required" }, 403);
     await next();
+  }).get("/tables", async (c) => {
+    const result = await sql`
+        SELECT
+          t.table_schema                                    AS schema,
+          t.table_name                                      AS name,
+          COALESCE(cl.reltuples, 0)::bigint::text           AS row_estimate,
+          COALESCE(pg_total_relation_size(cl.oid), 0)::text AS size_bytes
+        FROM information_schema.tables t
+        LEFT JOIN pg_namespace ns ON ns.nspname = t.table_schema
+        LEFT JOIN pg_class cl ON cl.relname = t.table_name AND cl.relnamespace = ns.oid
+        WHERE t.table_type = 'BASE TABLE'
+          AND t.table_schema NOT IN ('pg_catalog', 'information_schema')
+        ORDER BY t.table_schema, t.table_name
+      `.execute(reqDb(c));
+    return c.json({
+      tables: result.rows.map((r) => ({ ...r, is_data: r.name.startsWith("zvd_") }))
+    });
+  }).get("/tables/:name", async (c) => {
+    const found = await sql`
+        SELECT table_schema AS schema, table_name AS name
+        FROM information_schema.tables
+        WHERE table_name = ${c.req.param("name")}
+          AND table_type = 'BASE TABLE'
+          AND table_schema NOT IN ('pg_catalog', 'information_schema')
+        ORDER BY table_schema
+        LIMIT 1
+      `.execute(reqDb(c));
+    if (!found.rows.length)
+      return c.json({ error: "Table not found" }, 404);
+    const { schema, name } = found.rows[0];
+    const columns = await sql`
+        SELECT column_name AS name, data_type, is_nullable, column_default
+        FROM information_schema.columns
+        WHERE table_schema = ${schema} AND table_name = ${name}
+        ORDER BY ordinal_position
+      `.execute(reqDb(c));
+    const limit = Math.min(Math.max(Number(c.req.query("limit")) || 100, 1), 500);
+    const q = (s) => `"${s.replace(/"/g, '""')}"`;
+    const ref = sql.raw(`${q(schema)}.${q(name)}`);
+    const rows = await sql`SELECT * FROM ${ref} LIMIT ${limit}`.execute(reqDb(c));
+    const total = await sql`
+        SELECT COUNT(*)::text AS count FROM ${ref}
+      `.execute(reqDb(c));
+    return c.json({
+      table: { schema, name },
+      columns: columns.rows,
+      rows: rows.rows,
+      row_count: Number(total.rows[0]?.count ?? 0)
+    });
   }).get("/functions", async (c) => {
     try {
       const result = await sql`

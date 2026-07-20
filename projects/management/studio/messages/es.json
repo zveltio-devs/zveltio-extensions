@@ -1,0 +1,23 @@
+{
+  "projects.management.btn.newProject": "Nuevo proyecto",
+  "projects.management.btn.newTask": "Nueva tarea",
+  "projects.management.col.assignee": "Asignado a",
+  "projects.management.col.dueDate": "Fecha de vencimiento",
+  "projects.management.col.priority": "Prioridad",
+  "projects.management.col.status": "Estado",
+  "projects.management.empty": "Aún no hay datos.",
+  "projects.management.empty.projects": "Aún no hay proyectos.",
+  "projects.management.form.name": "Nombre *",
+  "projects.management.form.title": "Título *",
+  "projects.management.priority.high": "Alto",
+  "projects.management.priority.low": "Bajo",
+  "projects.management.priority.medium": "Medio",
+  "projects.management.priority.urgent": "Urgente",
+  "projects.management.subtitle": "Tablero Kanban y gestión de tareas",
+  "projects.management.title": "Proyectos",
+  "projects.management.ui.end_date": "Fecha de fin",
+  "projects.management.ui.new_project": "Nuevo proyecto",
+  "projects.management.ui.new_task": "Nueva tarea",
+  "projects.management.ui.no_tasks": "Sin tareas.",
+  "projects.management.ui.start_date": "Fecha de inicio"
+}
