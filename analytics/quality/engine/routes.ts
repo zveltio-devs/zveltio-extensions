@@ -92,6 +92,17 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     return c.json({ scan_id: scanId, message: 'Scan started' }, 202);
   });
 
+  // GET /scans — recent scans across all collections (dashboard history)
+  app.get('/scans', async (c) => {
+    const scans = await (reqDb(c) as any)
+      .selectFrom('zv_quality_scans')
+      .selectAll()
+      .orderBy('created_at', 'desc')
+      .limit(50)
+      .execute();
+    return c.json({ scans });
+  });
+
   // GET /scans/:collection — list recent scans
   app.get('/scans/:collection', async (c) => {
     const collection = c.req.param('collection');
