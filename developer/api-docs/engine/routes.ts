@@ -53,7 +53,19 @@ async function generateOpenAPISpec(ctx: ExtensionContext, baseUrl: string): Prom
 
   // Not a request handler — `c` not in scope. Queries use bare `db`.
 
-  const collections = await DDLManager.getCollections(db).catch(() => []);
+  // Guard the collections lookup: on a partial context (e.g. a probe/boot
+  // context, or the contract harness that stubs ctx.internals) DDLManager can be
+  // absent OR getCollections can RESOLVE to undefined — neither of which the old
+  // `.catch(() => [])` handled, so `for (const col of collections)` threw
+  // "undefined is not an object". Coerce anything non-array to an empty spec
+  // surface instead of crashing.
+  let collections: any[] = [];
+  try {
+    const resolved = db && DDLManager ? await DDLManager.getCollections(db) : [];
+    if (Array.isArray(resolved)) collections = resolved;
+  } catch {
+    collections = [];
+  }
   const paths: Record<string, any> = {};
   const schemas: Record<string, any> = {};
 
