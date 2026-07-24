@@ -11,6 +11,9 @@
     "database",
     "storage"
   ],
+  "publicRoutes": [
+    "/share/*"
+  ],
   "peerDependencies": {
     "nanoid": "^5.0.0"
   },

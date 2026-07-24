@@ -10,6 +10,9 @@
   "permissions": [
     "database"
   ],
+  "publicRoutes": [
+    "/webhooks/receive/*"
+  ],
   "studio": {
     "pages": [
       {
@@ -34,6 +37,6 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "ed4fe3217b85af59aaa1671298dd99dcdd4c5c6baf45ef16d1885d63a2b7dd35"
+    "engineSha256": "c2b363cfba45af35115063ba9f9fb00e37abb76ed87e77b8e82b27390c39cb83"
   }
 }

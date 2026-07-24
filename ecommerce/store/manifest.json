@@ -10,6 +10,9 @@
   "permissions": [
     "database"
   ],
+  "publicRoutes": [
+    "/public/*"
+  ],
   "dependencies": [
     {
       "name": "operations/inventory",
