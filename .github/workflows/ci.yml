@@ -231,6 +231,13 @@ jobs:
           # env issues) only warn.
           bun scripts/probe-sdui-endpoints.ts "$GITHUB_WORKSPACE"
 
+          # Fail-closed /ext/* auth-gate contract (same live engine): every
+          # manifest-declared publicRoutes entry must be reachable anonymously,
+          # and a non-declared path under the same extension must be 401 (the
+          # gate is enforcing). Catches the "forgot to guard an /ext route"
+          # regression class and keeps publicRoutes declarations honest.
+          bun scripts/probe-ext-auth.ts "$GITHUB_WORKSPACE"
+
   # Per-extension contract suite (testing/ext-harness.ts + one index.test.ts per
   # extension): loads each PACKED engine/index.js, applies its migrations on a
   # real Postgres carrying the engine core schema, mounts register(), and
