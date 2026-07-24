@@ -55,7 +55,12 @@ export function quotesRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.use('*', async (c, next) => {
-    if (c.req.path.startsWith('/public/')) return next();
+    // `c.req.path` is the FULL path under the /ext/finance/quotes mount, so a
+    // `startsWith('/public/')` check never matches — use the `/public/` segment
+    // anywhere instead. (The public token route above is registered before this
+    // guard so it was already reachable; this hardens the guard against any
+    // future public route added after it.)
+    if (c.req.path.includes('/public/')) return next();
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', session.user);

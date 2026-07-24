@@ -10,6 +10,9 @@
   "permissions": [
     "database"
   ],
+  "publicRoutes": [
+    "/public/*"
+  ],
   "dependencies": [
     {
       "name": "finance/invoicing",
@@ -40,6 +43,6 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "508d54dd3690a1ae43580b51dd595dcf0a7b5eb01124b59b22f59244fcd8895b"
+    "engineSha256": "579acfcb2fbdf191f07161669d0b375526c38f47d2bfa3de672dc4fb24613770"
   }
 }
