@@ -10,6 +10,9 @@
   "permissions": [
     "database"
   ],
+  "publicRoutes": [
+    "/public/*"
+  ],
   "engine": {
     "entry": "engine/index.js",
     "format": "esm",
@@ -46,6 +49,6 @@
     "fieldTypes": []
   },
   "integrity": {
-    "engineSha256": "92aa4679cf239b7529e1e9f89b494c0e2f3dd426ef5083ffac11207e2c2a1b41"
+    "engineSha256": "b7a5380da2e62a2953379a480602179a113af86678e058c54723119d85f3d90d"
   }
 }

@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
@@ -111,14 +112,28 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
 
   const app = new Hono();
 
+  // The incoming-webhook RECEIVER (`POST /webhooks/receive/:path`) is a public
+  // endpoint IdPs/third parties call with no session — its authenticity comes
+  // from the per-webhook HMAC verified in the handler. It must bypass BOTH the
+  // session guard and the RBAC gate below (which are `app.use('*')` and would
+  // otherwise 401/403 every external delivery). `c.req.path` is the FULL path
+  // under the /ext/integrations/api-connector mount, so match the segment
+  // anywhere. (The engine's fail-closed /ext gate also allows it via the
+  // manifest `publicRoutes` declaration.)
+  const isPublicWebhook = (c: Context) => c.req.path.includes('/webhooks/receive/');
+
   app.use('*', async (c, next) => {
+    if (isPublicWebhook(c)) return next();
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', session.user);
     await next();
   });
 
-  app.use('*', permissionGate(ctx, 'api-connector'));
+  app.use('*', async (c, next) => {
+    if (isPublicWebhook(c)) return next();
+    return permissionGate(ctx, 'api-connector')(c, next);
+  });
 
   // ── Connections ────────────────────────────────────────────────
   app.get('/connections', async (c) => {
