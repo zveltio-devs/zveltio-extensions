@@ -73,13 +73,16 @@ export function formsRoutes(
 
   const app = new Hono<{ Variables: { user: any } }>();
 
-  // Admin middleware — applies to everything except /public/*
-  // Under the new sub-app mount (/ext/forms), routes are relative:
-  //   GET /          → list forms (admin)
-  //   GET /:id       → single form (admin)
-  //   GET /public/X  → public submit (no auth)
+  // Admin middleware — applies to everything except the public submit routes.
+  // The sub-app is mounted at /ext/forms, so `c.req.path` is the FULL path
+  // (/ext/forms/public/…), NOT the mount-relative one the original
+  // `startsWith('/public/')` assumed — so that check never fired and every
+  // public submission silently 401'd. Match the `/public/` segment anywhere in
+  // the path instead. (The engine's fail-closed /ext gate already allows these
+  // anonymously via the manifest `publicRoutes` declaration; this keeps the
+  // extension's own admin guard from re-blocking them.)
   app.use('*', async (c, next) => {
-    if (c.req.path.startsWith('/public/')) return next();
+    if (c.req.path.includes('/public/')) return next();
     const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', user);
