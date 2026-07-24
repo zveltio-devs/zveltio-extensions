@@ -21,6 +21,7 @@
     "@aws-sdk/s3-request-presigner": "^3.0.0",
     "@types/sanitize-html": "^2.16.1",
     "bun-types": "latest",
+    "dompurify": "3.4.11",
     "graphql": "^16.0.0",
     "imapflow": "^1.0.0",
     "ldapts": "^7.0.0",

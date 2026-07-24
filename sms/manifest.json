@@ -10,6 +10,9 @@
   "permissions": [
     "database"
   ],
+  "publicRoutes": [
+    "/webhook/twilio"
+  ],
   "engine": {
     "entry": "engine/index.js",
     "format": "esm",
