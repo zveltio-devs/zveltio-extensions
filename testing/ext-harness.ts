@@ -184,18 +184,27 @@ async function applyMigrations(ext: any): Promise<boolean> {
 export async function mountForTest(
   engineDir: string,
   opts: { authed?: boolean; admin?: boolean } = {},
-): Promise<{ app: any; publicRoutes: any[] }> {
+): Promise<{ app: any; publicRoutes: any[]; migrated: boolean }> {
   const { authed = true, admin = true } = opts;
   const { Hono } = (await honoP) as any;
   const db = await getDb();
   const mod = await import(join(engineDir, 'index.js'));
+  // Apply the extension's OWN migrations so DB-backed routes have their tables,
+  // mirroring a real mount. Needed for bespoke tests that live in a SEPARATE
+  // file from the extension's index.test.ts (whose extensionContract applies
+  // them) — e.g. geospatial/postgis/authz.test.ts, which bun runs before
+  // index.test.ts, so without this its /geofences query hit a missing table.
+  // Idempotent (CREATE ... IF NOT EXISTS). `migrated=false` means the DB server
+  // can't support them (e.g. postgis not installed) → the extension's tables
+  // never materialised and DB-backed assertions must be skipped by the caller.
+  const migrated = await applyMigrations(mod.default);
   const app = new Hono();
   const publicRoutes: any[] = [];
   await mod.default.register(app, makeCtx(db, { authed, admin }, publicRoutes));
   // Mount collected root-level public routes on the same app so tests can hit
   // them at their absolute paths (mirrors the engine mounting them globally).
   for (const spec of publicRoutes) app.on(spec.method, spec.path, spec.handler);
-  return { app, publicRoutes };
+  return { app, publicRoutes, migrated };
 }
 
 /** Run the uniform extension contract. `engineDir` = `<ext>/engine`. */

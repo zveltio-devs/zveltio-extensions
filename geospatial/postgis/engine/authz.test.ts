@@ -27,7 +27,10 @@ d('postgis authz gate', () => {
   });
 
   it('lets an admin through to geofences', async () => {
-    const { app } = await mountForTest(import.meta.dir, { authed: true, admin: true });
+    const { app, migrated } = await mountForTest(import.meta.dir, { authed: true, admin: true });
+    // The 200 path reads zv_geofences; skip where the DB server has no postgis
+    // (migrations env-skipped → table absent). CI installs postgis so it runs.
+    if (!migrated) return;
     const res = await app.request('/geofences');
     expect(res.status).toBe(200);
   });
