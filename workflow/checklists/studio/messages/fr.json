@@ -1,6 +1,6 @@
 {
   "workflow.checklists.btn.add": "Ajouter",
-  "workflow.checklists.btn.back": "← Back",
+  "workflow.checklists.btn.back": "← Retour",
   "workflow.checklists.btn.create": "Créer",
   "workflow.checklists.btn.edit": "Modifier",
   "workflow.checklists.btn.new": "Nouvelle liste de contrôle",
@@ -14,7 +14,7 @@
   "workflow.checklists.empty": "Aucune donnée pour l'instant.",
   "workflow.checklists.empty.items": "Aucun élément pour l'instant. Ajoutez-en ci-dessous.",
   "workflow.checklists.empty.list": "Aucune liste de contrôle pour l'instant",
-  "workflow.checklists.empty.listHint": "Create your first checklist to get started.",
+  "workflow.checklists.empty.listHint": "Créez votre première liste de contrôle pour commencer.",
   "workflow.checklists.empty.responses": "Aucune réponse pour l'instant",
   "workflow.checklists.itemsCount": "{n} item(s)",
   "workflow.checklists.section.new": "Nouvelle liste de contrôle",

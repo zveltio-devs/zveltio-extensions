@@ -20,7 +20,7 @@
   "hr.time-tracking.ui.new_project": "Neues Projekt",
   "hr.time-tracking.ui.project": "Projekt *",
   "hr.time-tracking.ui.project_name": "Projektname *",
-  "hr.time-tracking.ui.select_project": "— Select project —",
+  "hr.time-tracking.ui.select_project": "— Projekt auswählen —",
   "hr.time-tracking.ui.startTimerBtn": "Timer starten",
   "hr.time-tracking.ui.start_timer": "Timer starten",
   "hr.time-tracking.ui.stopTimer": "Timer stoppen"

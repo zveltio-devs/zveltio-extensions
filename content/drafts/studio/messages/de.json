@@ -5,7 +5,7 @@
   "content.drafts.col.updated": "Aktualisiert",
   "content.drafts.confirmDiscard": "Entwurf verwerfen?",
   "content.drafts.empty": "Noch keine Daten.",
-  "content.drafts.subtitle": "Pending drafts across all collections. Publish promotes the draft to the live record.",
+  "content.drafts.subtitle": "Ausstehende Entwürfe in allen Sammlungen. Veröffentlichen übernimmt den Entwurf in den Live-Datensatz.",
   "content.drafts.title": "Entwürfe",
   "content.drafts.toast.discarded": "Verworfen.",
   "content.drafts.toast.published": "Entwurf veröffentlicht.",

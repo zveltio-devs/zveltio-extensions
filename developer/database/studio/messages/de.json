@@ -13,7 +13,7 @@
   "developer.database.section.schema": "Schema",
   "developer.database.selectTable": "Wählen Sie eine Tabelle zum Untersuchen.",
   "developer.database.showingRows": "Zeige die ersten 50 von {n}.",
-  "developer.database.subtitle": "Inspect tables, schemas, and sample rows",
+  "developer.database.subtitle": "Tabellen, Schemas und Beispielzeilen untersuchen",
   "developer.database.tables": "Tabellen",
   "developer.database.title": "Datenbank",
   "developer.database.ui.filter": "Filter…",
