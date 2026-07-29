@@ -21,6 +21,5 @@
   "content.documents.ui.request_signature": "Aláírás kérése",
   "content.documents.ui.signer_email": "Aláíró e-mail *",
   "content.documents.ui.signer_name": "Aláíró neve",
-  "content.documents.ui.tab_templates_view_templates": "(tab = 'templates')}>View Templates",
   "content.documents.variablesCount": "{n} variable(s)"
 }

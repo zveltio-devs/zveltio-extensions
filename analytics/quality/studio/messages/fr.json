@@ -8,6 +8,5 @@
   "analytics.quality.ui.collection": "Collection",
   "analytics.quality.ui.no_issues_to_show_run_a_scan": "Aucun problème à afficher. Lancez une analyse.",
   "analytics.quality.ui.no_scans_yet": "Aucune analyse pour l'instant.",
-  "analytics.quality.ui.select_collection": "— Sélectionner une collection —",
-  "analytics.quality.ui.viewissues_s_id_view": "viewIssues(s.id)}>View"
+  "analytics.quality.ui.select_collection": "— Sélectionner une collection —"
 }
