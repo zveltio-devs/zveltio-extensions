@@ -4,18 +4,18 @@
   "data.import.col.format": "Format",
   "data.import.col.rows": "Zeilen",
   "data.import.col.time": "Zeit",
-  "data.import.dropHint": "Drag a CSV / JSON / NDJSON file, or click to browse",
+  "data.import.dropHint": "CSV-/JSON-/NDJSON-Datei ziehen oder zum Durchsuchen klicken",
   "data.import.empty": "Noch keine Importe.",
   "data.import.errorsHint": "{n} errors — see job log",
   "data.import.form.collection": "Zielsammlung",
   "data.import.form.title": "Daten importieren",
   "data.import.label.format": "Format",
-  "data.import.label.upsertHtml": "Upsert on field (optional, e.g. email)",
+  "data.import.label.upsertHtml": "Upsert für Feld (optional, z. B. E-Mail)",
   "data.import.new": "Neuer Import",
-  "data.import.selectPlaceholder": "— Select —",
-  "data.import.subtitle": "Import collection data from CSV or JSON files with column mapping and background processing",
+  "data.import.selectPlaceholder": "— Auswählen —",
+  "data.import.subtitle": "Importieren Sie Sammlungsdaten aus CSV- oder JSON-Dateien mit Spaltenzuordnung und Hintergrundverarbeitung",
   "data.import.title": "Datenimport",
   "data.import.toast.imported": "{n} Zeilen importiert",
   "data.import.ui.create_missing_columns_automatically": "Fehlende Spalten automatisch erstellen",
-  "data.import.upsertHint": "Upsert on field (optional, e.g. email)"
+  "data.import.upsertHint": "Upsert für Feld (optional, z. B. E-Mail)"
 }

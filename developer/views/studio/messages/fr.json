@@ -10,7 +10,7 @@
   "developer.views.ui.card_grid": "Grille de cartes",
   "developer.views.ui.kanban_board": "Tableau Kanban",
   "developer.views.ui.list": "Liste",
-  "developer.views.ui.map_requires_postgis": "Map (requires PostGIS)",
+  "developer.views.ui.map_requires_postgis": "Carte (nécessite PostGIS)",
   "developer.views.ui.new_view": "Nouvelle vue",
   "developer.views.ui.view_type": "Type de vue"
 }

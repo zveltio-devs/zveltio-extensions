@@ -18,7 +18,7 @@
   "finance.expenses.filter.reimbursed": "Erstattet",
   "finance.expenses.filter.submitted": "Eingereicht",
   "finance.expenses.form.new": "Neue Ausgabe",
-  "finance.expenses.form.receiptUrl": "Receipt URL (optional)",
+  "finance.expenses.form.receiptUrl": "Beleg-URL (optional)",
   "finance.expenses.form.submit": "Absenden",
   "finance.expenses.new": "Neue Ausgabe",
   "finance.expenses.subtitle": "Mitarbeiterausgaben verfolgen und genehmigen",
