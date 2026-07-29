@@ -12,7 +12,7 @@
   "finance.quotes.toast.created": "Angebot erstellt.",
   "finance.quotes.ui.client_email": "Kunden-E-Mail",
   "finance.quotes.ui.client_name": "Kundenname *",
-  "finance.quotes.ui.disc": "Disc %",
+  "finance.quotes.ui.disc": "Rabatt %",
   "finance.quotes.ui.service_or_product": "Dienstleistung oder Produkt",
   "finance.quotes.ui.unit_price": "Stückpreis",
   "finance.quotes.ui.valid_days": "Gültigkeitstage",

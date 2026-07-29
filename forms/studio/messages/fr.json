@@ -1,8 +1,8 @@
 {
   "forms.col.fields": "Champs",
   "forms.col.submissions": "Soumissions",
-  "forms.empty": "No forms yet. Use the Forms API to create embeddable forms.",
-  "forms.error.updatePrefix": "Failed to update form: ",
+  "forms.empty": "Aucun formulaire pour l'instant. Utilisez l'API Forms pour créer des formulaires intégrables.",
+  "forms.error.updatePrefix": "Échec de la mise à jour du formulaire : ",
   "forms.subtitle": "Gérer les formulaires intégrables et leurs soumissions",
   "forms.title": "Formulaires",
   "forms.toast.deleted": "Formulaire supprimé."

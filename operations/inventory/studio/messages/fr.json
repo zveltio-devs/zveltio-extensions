@@ -29,6 +29,6 @@
   "inventory.toast.productCreated": "Produit créé",
   "inventory.toast.warehouseCreated": "Entrepôt créé",
   "operations.inventory.empty": "Aucune donnée pour l'instant.",
-  "operations.inventory.subtitle": "Warehouses, SKUs, stock movements, reorder alerts and barcode support",
+  "operations.inventory.subtitle": "Entrepôts, SKU, mouvements de stock, alertes de réapprovisionnement et prise en charge des codes-barres",
   "operations.inventory.title": "Inventaire"
 }

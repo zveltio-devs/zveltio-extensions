@@ -1,6 +1,6 @@
 {
   "workflow.checklists.btn.add": "Hinzufügen",
-  "workflow.checklists.btn.back": "← Back",
+  "workflow.checklists.btn.back": "← Zurück",
   "workflow.checklists.btn.create": "Erstellen",
   "workflow.checklists.btn.edit": "Bearbeiten",
   "workflow.checklists.btn.new": "Neue Checkliste",
@@ -14,7 +14,7 @@
   "workflow.checklists.empty": "Noch keine Daten.",
   "workflow.checklists.empty.items": "Noch keine Elemente. Fügen Sie unten welche hinzu.",
   "workflow.checklists.empty.list": "Noch keine Checklisten",
-  "workflow.checklists.empty.listHint": "Create your first checklist to get started.",
+  "workflow.checklists.empty.listHint": "Erstellen Sie Ihre erste Checkliste, um zu beginnen.",
   "workflow.checklists.empty.responses": "Noch keine Antworten",
   "workflow.checklists.itemsCount": "{n} item(s)",
   "workflow.checklists.section.new": "Neue Checkliste",
