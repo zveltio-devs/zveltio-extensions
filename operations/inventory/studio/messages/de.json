@@ -29,6 +29,6 @@
   "inventory.toast.productCreated": "Produkt erstellt",
   "inventory.toast.warehouseCreated": "Lager erstellt",
   "operations.inventory.empty": "Noch keine Daten.",
-  "operations.inventory.subtitle": "Warehouses, SKUs, stock movements, reorder alerts and barcode support",
+  "operations.inventory.subtitle": "Lager, SKUs, Bestandsbewegungen, Nachbestellwarnungen und Barcode-Unterstützung",
   "operations.inventory.title": "Bestand"
 }

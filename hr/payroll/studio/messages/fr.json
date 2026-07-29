@@ -6,15 +6,15 @@
   "hr.payroll.col.net": "Net",
   "hr.payroll.empty": "Aucune donnée pour l'instant.",
   "hr.payroll.empty.periods": "Aucune période pour l'instant.",
-  "hr.payroll.selectPeriod": "Select a period to view payroll entries.",
+  "hr.payroll.selectPeriod": "Sélectionnez une période pour afficher les entrées de paie.",
   "hr.payroll.subtitle": "Gérer les périodes de paie et générer les bulletins",
   "hr.payroll.tab.periods": "Périodes",
   "hr.payroll.title": "Paie",
   "hr.payroll.toast.entriesGenerated": "Entrées générées.",
   "hr.payroll.toast.periodCreated": "Période créée.",
   "hr.payroll.ui.entries": "Entrées",
-  "hr.payroll.ui.name_e_g_november_2026": "Name (e.g. November 2026)",
+  "hr.payroll.ui.name_e_g_november_2026": "Nom (ex. novembre 2026)",
   "hr.payroll.ui.new_payroll_period": "Nouvelle période de paie",
   "hr.payroll.ui.no_entries_click_generate": "Aucune entrée — cliquez sur Générer.",
-  "hr.payroll.ui.pay_date": "Pay date"
+  "hr.payroll.ui.pay_date": "Date de paiement"
 }
