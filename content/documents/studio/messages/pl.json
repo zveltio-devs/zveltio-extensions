@@ -21,6 +21,5 @@
   "content.documents.ui.request_signature": "Poproś o podpis",
   "content.documents.ui.signer_email": "E-mail podpisującego *",
   "content.documents.ui.signer_name": "Imię podpisującego",
-  "content.documents.ui.tab_templates_view_templates": "(tab = 'templates')}>View Templates",
   "content.documents.variablesCount": "{n} variable(s)"
 }

@@ -21,6 +21,5 @@
   "content.documents.ui.request_signature": "Demander une signature",
   "content.documents.ui.signer_email": "E-mail du signataire *",
   "content.documents.ui.signer_name": "Nom du signataire",
-  "content.documents.ui.tab_templates_view_templates": "(tab = 'templates')}>View Templates",
   "content.documents.variablesCount": "{n} variable(s)"
 }
