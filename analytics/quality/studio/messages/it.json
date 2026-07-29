@@ -8,6 +8,5 @@
   "analytics.quality.ui.collection": "Collezione",
   "analytics.quality.ui.no_issues_to_show_run_a_scan": "Nessun problema da mostrare. Esegui una scansione.",
   "analytics.quality.ui.no_scans_yet": "Ancora nessuna scansione.",
-  "analytics.quality.ui.select_collection": "— Select collection —",
-  "analytics.quality.ui.viewissues_s_id_view": "viewIssues(s.id)}>View"
+  "analytics.quality.ui.select_collection": "— Select collection —"
 }

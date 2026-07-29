@@ -20,7 +20,6 @@
   "search.ui.meilisearch": "MeiliSearch",
   "search.ui.my_collection": "my_collection",
   "search.ui.name_description_title": "name, description, title",
-  "search.ui.openconfigmodal_configure_your_first_index": "openConfigModal()}>Configure your first index",
   "search.ui.provider": "Proveedor",
   "search.ui.search": "Buscar",
   "search.ui.search_indexes": "Índices de búsqueda",

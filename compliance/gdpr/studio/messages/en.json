@@ -20,7 +20,6 @@
   "compliance.gdpr.title": "GDPR Compliance",
   "compliance.gdpr.toast.fulfilled": "Request fulfilled.",
   "compliance.gdpr.toast.rejected": "Request rejected.",
-  "compliance.gdpr.ui.fulfill_r_id_fulfill": "fulfill(r.id)}>Fulfill",
   "compliance.gdpr.ui.no_breach_incidents_recorded": "No breach incidents recorded.",
   "compliance.gdpr.ui.no_consents_recorded": "No consents recorded.",
   "compliance.gdpr.ui.no_records_of_processing_yet": "No records of processing yet."

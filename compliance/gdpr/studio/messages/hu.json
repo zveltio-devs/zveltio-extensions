@@ -20,7 +20,6 @@
   "compliance.gdpr.title": "GDPR-megfelelőség",
   "compliance.gdpr.toast.fulfilled": "Kérés teljesítve.",
   "compliance.gdpr.toast.rejected": "Kérés elutasítva.",
-  "compliance.gdpr.ui.fulfill_r_id_fulfill": "fulfill(r.id)}>Fulfill",
   "compliance.gdpr.ui.no_breach_incidents_recorded": "Nincs rögzített incidens.",
   "compliance.gdpr.ui.no_consents_recorded": "Nincsenek rögzített hozzájárulások.",
   "compliance.gdpr.ui.no_records_of_processing_yet": "Még nincsenek adatkezelési nyilvántartások."

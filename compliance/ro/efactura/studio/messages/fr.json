@@ -34,7 +34,6 @@
   "compliance.ro.efactura.ui.cui_cif": "CUI/CIF",
   "compliance.ro.efactura.ui.cui_cif_optional": "CUI/CIF (optional)",
   "compliance.ro.efactura.ui.fac_2026_001": "FAC-2026-001",
-  "compliance.ro.efactura.ui.generatexml_inv_id_xml": "generateXML(inv.id)}>XML",
   "compliance.ro.efactura.ui.invoice_date": "Date de la facture",
   "compliance.ro.efactura.ui.invoice_number": "Numéro de facture",
   "compliance.ro.efactura.ui.new_invoice": "Nouvelle facture"

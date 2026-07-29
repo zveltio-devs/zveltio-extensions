@@ -39,7 +39,6 @@
   "compliance.ro.saft.ui.document_number_optional": "Număr document (opțional)",
   "compliance.ro.saft.ui.entry_description": "Descrierea înregistrării",
   "compliance.ro.saft.ui.expense": "Cheltuială",
-  "compliance.ro.saft.ui.generatexml_exp_id_xml": "generateXML(exp.id)}>XML",
   "compliance.ro.saft.ui.income": "Venit",
   "compliance.ro.saft.ui.new_saf_t_export": "Export SAF-T nou",
   "compliance.ro.saft.ui.no_accounts_defined": "Niciun cont definit.",
