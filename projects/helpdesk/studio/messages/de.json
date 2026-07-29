@@ -16,7 +16,6 @@
   "projects.helpdesk.ui.priority": "Priorität",
   "projects.helpdesk.ui.reply": "Reply…",
   "projects.helpdesk.ui.requester_email": "E-Mail des Antragstellers",
-  "projects.helpdesk.ui.resolve_activeticket_id_mark_resolved": "resolve(activeTicket.id)}>Mark resolved",
   "projects.helpdesk.ui.subject": "Betreff *",
   "projects.helpdesk.ui.urgent": "Dringend"
 }

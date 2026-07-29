@@ -20,7 +20,6 @@
   "compliance.gdpr.title": "Conformité RGPD",
   "compliance.gdpr.toast.fulfilled": "Demande satisfaite.",
   "compliance.gdpr.toast.rejected": "Demande rejetée.",
-  "compliance.gdpr.ui.fulfill_r_id_fulfill": "fulfill(r.id)}>Fulfill",
   "compliance.gdpr.ui.no_breach_incidents_recorded": "Aucune violation enregistrée.",
   "compliance.gdpr.ui.no_consents_recorded": "Aucun consentement enregistré.",
   "compliance.gdpr.ui.no_records_of_processing_yet": "Aucun registre de traitement pour l'instant."

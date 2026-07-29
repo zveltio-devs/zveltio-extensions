@@ -8,6 +8,5 @@
   "analytics.quality.ui.collection": "Colecție",
   "analytics.quality.ui.no_issues_to_show_run_a_scan": "Nicio problemă de afișat. Rulează o scanare.",
   "analytics.quality.ui.no_scans_yet": "Nicio scanare încă.",
-  "analytics.quality.ui.select_collection": "— Select collection —",
-  "analytics.quality.ui.viewissues_s_id_view": "viewIssues(s.id)}>View"
+  "analytics.quality.ui.select_collection": "— Select collection —"
 }

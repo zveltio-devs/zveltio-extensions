@@ -20,7 +20,6 @@
   "compliance.gdpr.title": "DSGVO-Konformität",
   "compliance.gdpr.toast.fulfilled": "Anfrage erfüllt.",
   "compliance.gdpr.toast.rejected": "Anfrage abgelehnt.",
-  "compliance.gdpr.ui.fulfill_r_id_fulfill": "fulfill(r.id)}>Fulfill",
   "compliance.gdpr.ui.no_breach_incidents_recorded": "Keine Verstöße erfasst.",
   "compliance.gdpr.ui.no_consents_recorded": "Keine Einwilligungen erfasst.",
   "compliance.gdpr.ui.no_records_of_processing_yet": "Noch keine Verarbeitungsverzeichnisse."
