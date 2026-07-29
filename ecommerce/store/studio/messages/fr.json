@@ -2,7 +2,7 @@
   "ecommerce.store.btn.create": "Créer",
   "ecommerce.store.btn.newProduct": "Nouveau produit",
   "ecommerce.store.col.customer": "Client",
-  "ecommerce.store.col.orderNumber": "Order #",
+  "ecommerce.store.col.orderNumber": "Commande n°",
   "ecommerce.store.col.stock": "Stock",
   "ecommerce.store.confirmDeleteProduct": "Supprimer ce produit ?",
   "ecommerce.store.empty": "Aucune donnée pour l'instant.",

@@ -12,10 +12,10 @@
   "developer.byod.empty.scans": "Noch keine Scans.",
   "developer.byod.form.connectionString": "Verbindungszeichenfolge",
   "developer.byod.form.excludePatterns": "Ausschlussmuster",
-  "developer.byod.form.includePatterns": "Include patterns (comma-separated)",
+  "developer.byod.form.includePatterns": "Einschlussmuster (kommagetrennt)",
   "developer.byod.form.name": "Name",
   "developer.byod.form.schema": "Schema",
-  "developer.byod.intro": "Connect to an external PostgreSQL database, scan its schema, and surface tables as virtual collections in Zveltio.",
+  "developer.byod.intro": "Verbinden Sie sich mit einer externen PostgreSQL-Datenbank, scannen Sie ihr Schema und stellen Sie Tabellen als virtuelle Sammlungen in Zveltio bereit.",
   "developer.byod.never": "nie",
   "developer.byod.saving": "Wird gespeichert…",
   "developer.byod.subtitle": "Introspektion und Import externer Datenbankschemata",
@@ -23,7 +23,7 @@
   "developer.byod.tab.profiles": "Verbindungsprofile",
   "developer.byod.title": "Eigene Datenbank verwenden",
   "developer.byod.ui.new_connection_profile": "Neues Verbindungsprofil",
-  "developer.byod.ui.no_profiles_create_one_to_scan_an_external_db": "No profiles. Create one to scan an external DB.",
+  "developer.byod.ui.no_profiles_create_one_to_scan_an_external_db": "Keine Profile. Erstellen Sie eines, um eine externe DB zu scannen.",
   "developer.byod.ui.postgresql_user_pass_host_5432_db": "postgresql://user:pass@host:5432/db",
   "developer.byod.ui.public_users_public_orders": "public.users, public.orders*"
 }

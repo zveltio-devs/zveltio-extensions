@@ -7,11 +7,11 @@
   "data.export.col.time": "Temps",
   "data.export.col.user": "Utilisateur",
   "data.export.empty": "Aucun export pour l'instant.",
-  "data.export.filterHint": "Filter (Zveltio query, optional)",
-  "data.export.subtitle": "Export collection data as JSON, CSV or NDJSON with filtering support",
+  "data.export.filterHint": "Filtre (requête Zveltio, facultatif)",
+  "data.export.subtitle": "Exportez les données de collection au format JSON, CSV ou NDJSON avec prise en charge du filtrage",
   "data.export.title": "Export de données",
   "data.export.ui.excel_xlsx": "Excel (xlsx)",
   "data.export.ui.export_collection": "Exporter la collection",
   "data.export.ui.no_exports_recorded": "Aucun export enregistré.",
-  "data.export.ui.select": "— Select —"
+  "data.export.ui.select": "— Sélectionner —"
 }

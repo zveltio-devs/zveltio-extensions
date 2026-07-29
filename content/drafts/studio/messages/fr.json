@@ -5,7 +5,7 @@
   "content.drafts.col.updated": "Mis à jour",
   "content.drafts.confirmDiscard": "Abandonner le brouillon ?",
   "content.drafts.empty": "Aucune donnée pour l'instant.",
-  "content.drafts.subtitle": "Pending drafts across all collections. Publish promotes the draft to the live record.",
+  "content.drafts.subtitle": "Brouillons en attente dans toutes les collections. Publier promeut le brouillon vers l'enregistrement en direct.",
   "content.drafts.title": "Brouillons",
   "content.drafts.toast.discarded": "Abandonné.",
   "content.drafts.toast.published": "Brouillon publié.",

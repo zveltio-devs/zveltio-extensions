@@ -6,15 +6,15 @@
   "hr.payroll.col.net": "Netto",
   "hr.payroll.empty": "Noch keine Daten.",
   "hr.payroll.empty.periods": "Noch keine Zeiträume.",
-  "hr.payroll.selectPeriod": "Select a period to view payroll entries.",
+  "hr.payroll.selectPeriod": "Wählen Sie einen Zeitraum, um Lohnbuchungen anzuzeigen.",
   "hr.payroll.subtitle": "Abrechnungszeiträume verwalten und Gehaltsabrechnungen erstellen",
   "hr.payroll.tab.periods": "Zeiträume",
   "hr.payroll.title": "Lohnabrechnung",
   "hr.payroll.toast.entriesGenerated": "Einträge generiert.",
   "hr.payroll.toast.periodCreated": "Periode erstellt.",
   "hr.payroll.ui.entries": "Einträge",
-  "hr.payroll.ui.name_e_g_november_2026": "Name (e.g. November 2026)",
+  "hr.payroll.ui.name_e_g_november_2026": "Name (z. B. November 2026)",
   "hr.payroll.ui.new_payroll_period": "Neuer Abrechnungszeitraum",
   "hr.payroll.ui.no_entries_click_generate": "Keine Einträge — auf Generieren klicken.",
-  "hr.payroll.ui.pay_date": "Pay date"
+  "hr.payroll.ui.pay_date": "Zahlungsdatum"
 }
