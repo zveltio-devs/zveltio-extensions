@@ -1,6 +1,6 @@
 {
   "finance.subscriptions.btn.newPlan": "Neuer Tarif",
-  "finance.subscriptions.col.attempt": "Attempt #",
+  "finance.subscriptions.col.attempt": "Versuch Nr.",
   "finance.subscriptions.col.code": "Code",
   "finance.subscriptions.col.lastAttempt": "Letzter Versuch",
   "finance.subscriptions.col.mrr": "MRR",

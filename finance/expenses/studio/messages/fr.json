@@ -18,7 +18,7 @@
   "finance.expenses.filter.reimbursed": "Remboursé",
   "finance.expenses.filter.submitted": "Soumis",
   "finance.expenses.form.new": "Nouvelle dépense",
-  "finance.expenses.form.receiptUrl": "Receipt URL (optional)",
+  "finance.expenses.form.receiptUrl": "URL du reçu (facultatif)",
   "finance.expenses.form.submit": "Soumettre",
   "finance.expenses.new": "Nouvelle dépense",
   "finance.expenses.subtitle": "Suivre et approuver les dépenses des employés",

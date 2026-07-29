@@ -4,7 +4,7 @@
   "projects.helpdesk.btn.resolve": "Lösen",
   "projects.helpdesk.col.category": "Kategorie",
   "projects.helpdesk.empty": "Noch keine Daten.",
-  "projects.helpdesk.empty.select": "Select a ticket to view the conversation.",
+  "projects.helpdesk.empty.select": "Wählen Sie ein Ticket, um die Konversation anzuzeigen.",
   "projects.helpdesk.priority.high": "Hoch",
   "projects.helpdesk.priority.low": "Niedrig",
   "projects.helpdesk.subtitle": "Support-Tickets verwalten",
