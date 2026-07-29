@@ -21,6 +21,5 @@
   "content.documents.ui.request_signature": "Solicită semnătura",
   "content.documents.ui.signer_email": "Email semnatar *",
   "content.documents.ui.signer_name": "Nume semnatar",
-  "content.documents.ui.tab_templates_view_templates": "(tab = 'templates')}>View Șablons",
   "content.documents.variablesCount": "{n} variabilă(e)"
 }

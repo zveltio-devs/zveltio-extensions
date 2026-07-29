@@ -8,6 +8,5 @@
   "analytics.quality.ui.collection": "Collectie",
   "analytics.quality.ui.no_issues_to_show_run_a_scan": "Geen problemen om weer te geven. Voer een scan uit.",
   "analytics.quality.ui.no_scans_yet": "Nog geen scans.",
-  "analytics.quality.ui.select_collection": "— Select collection —",
-  "analytics.quality.ui.viewissues_s_id_view": "viewIssues(s.id)}>View"
+  "analytics.quality.ui.select_collection": "— Select collection —"
 }
