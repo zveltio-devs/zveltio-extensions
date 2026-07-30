@@ -142,7 +142,7 @@ export function formsRoutes(
   });
 
   // GET /:id — get form with fields
-  app.get('/:id', async (c) => {
+  app.get('/:id', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const form = await (db as any)
       .selectFrom('zv_forms')
       .selectAll()
@@ -155,7 +155,7 @@ export function formsRoutes(
   // PATCH /:id — update form
   app.patch(
     '/:id',
-    zValidator('json', formSchema.partial()),
+    zValidator('param', z.object({ id: z.string().uuid() })), zValidator('json', formSchema.partial()),
     async (c) => {
       const data = c.req.valid('json');
       const updates: Record<string, unknown> = { updated_at: new Date() };
@@ -181,7 +181,7 @@ export function formsRoutes(
   );
 
   // DELETE /:id — delete form
-  app.delete('/:id', async (c) => {
+  app.delete('/:id', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     await (db as any)
       .deleteFrom('zv_forms')
       .where('id', '=', c.req.param('id'))
@@ -190,7 +190,7 @@ export function formsRoutes(
   });
 
   // GET /:id/responses — list submissions
-  app.get('/:id/responses', async (c) => {
+  app.get('/:id/responses', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const { page = '1', limit = '50' } = c.req.query();
     const parsedLimit = Math.min(parseInt(limit) || 50, 200);
     const offset = (parseInt(page) - 1) * parsedLimit;
