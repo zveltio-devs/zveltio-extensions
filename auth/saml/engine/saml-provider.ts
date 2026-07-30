@@ -15,6 +15,13 @@ export interface SamlIdpConfig {
   signatureAlgorithm?: 'sha1' | 'sha256' | 'sha512';
   wantAuthnResponseSigned?: boolean;
   acceptedClockSkewMs?: number;
+  /**
+   * Expected `<AudienceRestriction>` value — our own SP entityID. Defaults to
+   * `issuer`, which is what an IdP is required to put there for us. Override
+   * only if your IdP is configured with a different audience string; setting it
+   * to `false` disables the check and is strongly discouraged (see below).
+   */
+  audience?: string | false;
 }
 
 export function createSamlInstance(config: SamlIdpConfig): any {
@@ -29,6 +36,15 @@ export function createSamlInstance(config: SamlIdpConfig): any {
     acceptedClockSkewMs: config.acceptedClockSkewMs ?? 5000,
     validateInResponseTo: 'ifPresent' as const,
     disableRequestedAuthnContext: true,
+    // node-saml only checks AudienceRestriction when `audience` is truthy
+    // (`if (this.options.audience)`), so LEAVING THIS UNSET SILENTLY DISABLES
+    // the check — which is what it used to do here. Without it we accept any
+    // correctly-signed assertion from the trusted IdP, including one the IdP
+    // minted for a DIFFERENT service provider. In an enterprise where one IdP
+    // fronts many SPs, an assertion issued for some low-trust internal app
+    // could then be replayed here to log in. Defaulting to our own entityID
+    // (`issuer`) is the value the SAML spec expects in AudienceRestriction.
+    audience: config.audience ?? config.issuer,
   });
 }
 
