@@ -10,10 +10,10 @@ import {
   OllamaProvider,
 } from '../lib/ai-provider.js';
 import { encryptApiKey, decryptApiKey, maskApiKey } from '../lib/ai-crypto.js';
+import { assertNonMetadataUrl } from '../lib/endpoint-guard.js';
 
 export function aiRoutes(ctx: ExtensionContext): Hono {
-  const { db, auth, checkPermission, internals } = ctx;
-  const validatePublicUrl = internals.validatePublicUrl;
+  const { db, auth, checkPermission } = ctx;
   const app = new Hono();
 
   /**
@@ -88,11 +88,15 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
           .superRefine((url, ctx) => {
             if (!url) return;
             try {
-              validatePublicUrl(url);
+              // NOT validatePublicUrl: that rejects private ranges, which made
+              // it impossible to configure the self-hosted providers this field
+              // exists for (Ollama defaults to http://localhost:11434). Guard
+              // the thing that is never legitimate instead — cloud metadata.
+              assertNonMetadataUrl(url, 'base_url');
             } catch (e) {
               ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: `base_url points to a private/internal address: ${(e as Error).message}`,
+                message: (e as Error).message,
               });
             }
           }),

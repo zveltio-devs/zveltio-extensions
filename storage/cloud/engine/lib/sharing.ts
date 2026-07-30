@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { sql } from 'kysely';
 import { nanoid } from 'nanoid';
 import type { Database } from '@zveltio/engine-db';
@@ -21,12 +22,14 @@ export async function createShareLink(
 
   const token = nanoid(32);
 
-  let passwordHash: string | null = null;
-  if (opts.password) {
-    const hasher = new Bun.CryptoHasher('sha256');
-    hasher.update(opts.password);
-    passwordHash = hasher.digest('hex');
-  }
+  // argon2id, not a bare SHA-256. A share password is a short, human-chosen
+  // string; hashing it with a single unsalted fast hash means anyone who ever
+  // reads `zv_media_shares` (a DB dump, an old backup, a read-only compromise)
+  // recovers the plaintext with a rainbow table. Bun.password salts per row and
+  // is deliberately slow. See verifySharePassword for the legacy-hash upgrade.
+  const passwordHash: string | null = opts.password
+    ? await Bun.password.hash(opts.password)
+    : null;
 
   await (db as any).insertInto('zv_media_shares').values({
     id: nanoid(21),
@@ -42,6 +45,43 @@ export async function createShareLink(
 
   const baseUrl = process.env.PUBLIC_URL || 'http://localhost:3000';
   return { token, shareUrl: `${baseUrl}/share/${token}` };
+}
+
+/**
+ * Check a share password against the stored hash.
+ *
+ * Handles both formats so existing links keep working: anything Bun.password
+ * recognises (`$argon2…`, `$2b$…`) is verified with the real KDF, while a bare
+ * 64-hex string is a legacy unsalted SHA-256. Legacy hashes are compared in
+ * constant time and, on success, transparently re-hashed with argon2id so the
+ * weak digest disappears from the table the first time each link is used.
+ */
+async function verifySharePassword(
+  db: Database,
+  share: { id: string; password_hash: string },
+  password: string,
+): Promise<boolean> {
+  const stored = share.password_hash;
+  const isLegacy = /^[a-f0-9]{64}$/i.test(stored);
+
+  if (!isLegacy) {
+    return Bun.password.verify(password, stored).catch(() => false);
+  }
+
+  const hasher = new Bun.CryptoHasher('sha256');
+  hasher.update(password);
+  const candidate = hasher.digest();
+  const expected = Buffer.from(stored, 'hex');
+  const ok = candidate.length === expected.length && timingSafeEqual(candidate, expected);
+  if (!ok) return false;
+
+  await (db as any)
+    .updateTable('zv_media_shares')
+    .set({ password_hash: await Bun.password.hash(password) })
+    .where('id', '=', share.id)
+    .execute()
+    .catch(() => undefined);
+  return true;
 }
 
 /**
@@ -77,9 +117,7 @@ export async function validateShareToken(
 
   if (share.password_hash) {
     if (!password) return { valid: false, error: 'Password required' };
-    const hasher = new Bun.CryptoHasher('sha256');
-    hasher.update(password);
-    if (hasher.digest('hex') !== share.password_hash) {
+    if (!(await verifySharePassword(db, share, password))) {
       return { valid: false, error: 'Invalid password' };
     }
   }
