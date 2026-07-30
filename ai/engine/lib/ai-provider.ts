@@ -6,6 +6,8 @@
  * (or via OPENAI_API_KEY / ANTHROPIC_API_KEY env vars as fallback).
  */
 
+import { assertNonMetadataUrl } from './endpoint-guard.js';
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
@@ -320,6 +322,19 @@ export async function initAIProviders(db: any): Promise<void> {
 
   for (const row of rows as any[]) {
     let provider: AIProvider | null = null;
+
+    // A provider base URL may legitimately be private (self-hosted Ollama /
+    // gateway), but must never be cloud metadata — that would turn this config
+    // field into instance-credential exfiltration. Skip the row rather than
+    // throw: one bad row must not stop the whole provider init at boot.
+    if (row.base_url) {
+      try {
+        assertNonMetadataUrl(row.base_url, `AI provider "${row.name}" base_url`);
+      } catch (err) {
+        console.error(`[ai] refusing provider "${row.name}":`, (err as Error).message);
+        continue;
+      }
+    }
 
     switch (row.name) {
       case 'openai':
