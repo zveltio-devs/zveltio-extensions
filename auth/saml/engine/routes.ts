@@ -24,6 +24,13 @@ const SamlConfigSchema = z.object({
   privateKey: z.string().optional(),
   signatureAlgorithm: z.enum(['sha1', 'sha256', 'sha512']).default('sha256'),
   wantAuthnResponseSigned: z.boolean().default(true),
+  /**
+   * Expected AudienceRestriction. Left unset it defaults to `issuer` (our SP
+   * entityID), which is what the check should compare against. Exposed only so
+   * an operator whose IdP sends a different audience string can align it —
+   * `false` turns the check off and should be a last resort.
+   */
+  audience: z.union([z.string().min(1), z.literal(false)]).optional(),
   mapEmail: z.string().default('email'),
   mapName: z.string().default('displayName'),
 });
