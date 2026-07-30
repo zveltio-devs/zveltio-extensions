@@ -74,7 +74,7 @@ export function etransportRoutes(ctx: ExtensionContext): Hono {
     return c.json({ declarations });
   });
 
-  app.get('/:id', async (c) => {
+  app.get('/:id', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
@@ -103,7 +103,7 @@ export function etransportRoutes(ctx: ExtensionContext): Hono {
     return c.json({ declaration: decl }, 201);
   });
 
-  app.patch('/:id', zValidator('json', declarationSchema.partial()), async (c) => {
+  app.patch('/:id', zValidator('param', z.object({ id: z.string().uuid() })), zValidator('json', declarationSchema.partial()), async (c) => {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
@@ -125,7 +125,7 @@ export function etransportRoutes(ctx: ExtensionContext): Hono {
     return c.json({ declaration: decl });
   });
 
-  app.delete('/:id', async (c) => {
+  app.delete('/:id', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
@@ -138,7 +138,7 @@ export function etransportRoutes(ctx: ExtensionContext): Hono {
     return c.json({ success: true });
   });
 
-  app.post('/:id/declare', async (c) => {
+  app.post('/:id/declare', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
@@ -168,7 +168,7 @@ export function etransportRoutes(ctx: ExtensionContext): Hono {
     return c.json({ message: 'Declaration submitted to ANAF', uit, response: anafResponse });
   });
 
-  app.post('/:id/complete', async (c) => {
+  app.post('/:id/complete', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
@@ -182,7 +182,7 @@ export function etransportRoutes(ctx: ExtensionContext): Hono {
     return c.json({ success: true });
   });
 
-  app.post('/:id/cancel', async (c) => {
+  app.post('/:id/cancel', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 

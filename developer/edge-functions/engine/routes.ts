@@ -60,7 +60,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
     return c.json({ functions: fns });
   });
 
-  app.get('/:id', async (c) => {
+  app.get('/:id', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
@@ -117,7 +117,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
 
   app.patch(
     '/:id',
-    zValidator(
+    zValidator('param', z.object({ id: z.string().uuid() })), zValidator(
       'json',
       z.object({
         display_name: z.string().optional(),
@@ -153,7 +153,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
     },
   );
 
-  app.delete('/:id', async (c) => {
+  app.delete('/:id', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
@@ -162,7 +162,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
   });
 
   // GET /:id/logs — invocation history
-  app.get('/:id/logs', async (c) => {
+  app.get('/:id/logs', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
@@ -178,7 +178,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
   });
 
   // POST /:id/invoke — test invoke from Studio
-  app.post('/:id/invoke', async (c) => {
+  app.post('/:id/invoke', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
