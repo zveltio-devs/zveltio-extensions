@@ -103,7 +103,7 @@ export function quotesRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: row.rows[0] });
   });
 
-  app.get('/:id', async (c) => {
+  app.get('/:id', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const row = await sql`
       SELECT q.*, COALESCE(json_agg(l.* ORDER BY l.sort_order) FILTER (WHERE l.id IS NOT NULL), '[]') as lines
       FROM zvd_quotes q LEFT JOIN zvd_quote_lines l ON l.quote_id = q.id
@@ -166,7 +166,7 @@ export function quotesRoutes(ctx: ExtensionContext): Hono {
   });
 
   // Edit quote (creates revision)
-  app.patch('/:id', zValidator('json', z.object({
+  app.patch('/:id', zValidator('param', z.object({ id: z.string().uuid() })), zValidator('json', z.object({
     title: z.string().optional(),
     client_name: z.string().optional(),
     client_email: z.string().email().optional(),
@@ -198,7 +198,7 @@ export function quotesRoutes(ctx: ExtensionContext): Hono {
   });
 
   // ── Lifecycle ─────────────────────────────────────────────────
-  app.post('/:id/request-approval', async (c) => {
+  app.post('/:id/request-approval', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const user = c.get('user') as any;
     const row = await sql`UPDATE zvd_quotes SET approval_status = 'pending', updated_at = NOW() WHERE id = ${c.req.param('id')} AND status = 'draft' RETURNING *`.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Quote not found or not draft' }, 400);
@@ -206,33 +206,33 @@ export function quotesRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: row.rows[0] });
   });
 
-  app.post('/:id/approve-internal', async (c) => {
+  app.post('/:id/approve-internal', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const user = c.get('user') as any;
     await sql`UPDATE zvd_quote_approvals SET status = 'approved', approved_by = ${user.id}, approved_at = NOW() WHERE quote_id = ${c.req.param('id')} AND status = 'pending'`.execute(reqDb(c));
     const row = await sql`UPDATE zvd_quotes SET approval_status = 'approved', updated_at = NOW() WHERE id = ${c.req.param('id')} RETURNING *`.execute(reqDb(c));
     return c.json({ data: row.rows[0] });
   });
 
-  app.post('/:id/send', async (c) => {
+  app.post('/:id/send', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const row = await sql`UPDATE zvd_quotes SET status='sent', updated_at=NOW() WHERE id=${c.req.param('id')} AND status='draft' RETURNING *`.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Quote not found or not in draft' }, 400);
     return c.json({ data: row.rows[0] });
   });
 
-  app.post('/:id/accept', async (c) => {
+  app.post('/:id/accept', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const row = await sql`UPDATE zvd_quotes SET status='accepted', updated_at=NOW() WHERE id=${c.req.param('id')} AND status='sent' RETURNING *`.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Quote not found or not sent' }, 400);
     return c.json({ data: row.rows[0] });
   });
 
-  app.post('/:id/reject', async (c) => {
+  app.post('/:id/reject', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const row = await sql`UPDATE zvd_quotes SET status='rejected', updated_at=NOW() WHERE id=${c.req.param('id')} RETURNING *`.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
 
   // ── Public token ──────────────────────────────────────────────
-  app.post('/:id/generate-link', zValidator('json', z.object({
+  app.post('/:id/generate-link', zValidator('param', z.object({ id: z.string().uuid() })), zValidator('json', z.object({
     expires_days: z.number().int().positive().default(30),
   })), async (c) => {
     const { expires_days } = c.req.valid('json');
@@ -246,19 +246,19 @@ export function quotesRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: row.rows[0] });
   });
 
-  app.post('/:id/revoke-link', async (c) => {
+  app.post('/:id/revoke-link', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     await sql`DELETE FROM zvd_quote_tokens WHERE quote_id = ${c.req.param('id')}`.execute(reqDb(c));
     return c.json({ success: true });
   });
 
-  app.get('/:id/revisions', async (c) => {
+  app.get('/:id/revisions', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const rows = await sql`
       SELECT * FROM zvd_quote_revisions WHERE quote_id = ${c.req.param('id')} ORDER BY revision_number DESC
     `.execute(reqDb(c));
     return c.json({ data: rows.rows });
   });
 
-  app.post('/:id/convert-to-invoice', async (c) => {
+  app.post('/:id/convert-to-invoice', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const quote = await sql`SELECT * FROM zvd_quotes WHERE id=${c.req.param('id')} AND status='accepted'`.execute(reqDb(c));
     if (!quote.rows.length) return c.json({ error: 'Quote not found or not accepted' }, 400);
     const q = quote.rows[0] as any;
@@ -281,7 +281,7 @@ export function quotesRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: inv.rows[0] }, 201);
   });
 
-  app.delete('/:id', async (c) => {
+  app.delete('/:id', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const row = await sql`DELETE FROM zvd_quotes WHERE id=${c.req.param('id')} AND status NOT IN ('accepted') RETURNING id`.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Cannot delete an accepted quote' }, 400);
     return c.json({ success: true });

@@ -100,7 +100,7 @@ export function saftRoutes(ctx: ExtensionContext): Hono {
     return c.json({ entries });
   });
 
-  app.get('/:id', async (c) => {
+  app.get('/:id', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
@@ -128,7 +128,7 @@ export function saftRoutes(ctx: ExtensionContext): Hono {
     return c.json({ export: exp }, 201);
   });
 
-  app.delete('/:id', async (c) => {
+  app.delete('/:id', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
@@ -141,7 +141,7 @@ export function saftRoutes(ctx: ExtensionContext): Hono {
     return c.json({ success: true });
   });
 
-  app.post('/:id/generate', async (c) => {
+  app.post('/:id/generate', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
@@ -189,7 +189,7 @@ export function saftRoutes(ctx: ExtensionContext): Hono {
     return c.json({ message: 'SAF-T XML generated', entries_count: entries.length });
   });
 
-  app.get('/:id/xml', async (c) => {
+  app.get('/:id/xml', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
@@ -209,7 +209,7 @@ export function saftRoutes(ctx: ExtensionContext): Hono {
     });
   });
 
-  app.post('/:id/submit', async (c) => {
+  app.post('/:id/submit', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 

@@ -16155,13 +16155,13 @@ function formsRoutes(ctx) {
     }).returningAll().executeTakeFirst();
     return c.json({ form }, 201);
   });
-  app.get("/:id", async (c) => {
+  app.get("/:id", zValidator("param", exports_external.object({ id: exports_external.string().uuid() })), async (c) => {
     const form = await db.selectFrom("zv_forms").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
     if (!form)
       return c.json({ error: "Form not found" }, 404);
     return c.json({ form });
   });
-  app.patch("/:id", zValidator("json", formSchema.partial()), async (c) => {
+  app.patch("/:id", zValidator("param", exports_external.object({ id: exports_external.string().uuid() })), zValidator("json", formSchema.partial()), async (c) => {
     const data = c.req.valid("json");
     const updates = { updated_at: new Date };
     if (data.name !== undefined)
@@ -16181,11 +16181,11 @@ function formsRoutes(ctx) {
       return c.json({ error: "Form not found" }, 404);
     return c.json({ form });
   });
-  app.delete("/:id", async (c) => {
+  app.delete("/:id", zValidator("param", exports_external.object({ id: exports_external.string().uuid() })), async (c) => {
     await db.deleteFrom("zv_forms").where("id", "=", c.req.param("id")).execute();
     return c.json({ success: true });
   });
-  app.get("/:id/responses", async (c) => {
+  app.get("/:id/responses", zValidator("param", exports_external.object({ id: exports_external.string().uuid() })), async (c) => {
     const { page = "1", limit = "50" } = c.req.query();
     const parsedLimit = Math.min(parseInt(limit) || 50, 200);
     const offset = (parseInt(page) - 1) * parsedLimit;
