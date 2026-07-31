@@ -8,7 +8,8 @@
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-scim",
   "permissions": [
-    "database"
+    "database",
+    "secrets"
   ],
   "contributes": {
     "engine": true,
@@ -22,7 +23,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "216dee6795609d0d6c7bb73a992e918134b79761d953ce42ba539e88f5edb0f7"
+    "engineSha256": "def523c9cf9996a613568372f4684b96a8722fa8a06b1e5381243d95d1bb10f9"
   },
   "studio": {
     "navGroup": "other",

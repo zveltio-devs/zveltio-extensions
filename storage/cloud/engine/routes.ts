@@ -6,6 +6,7 @@ import { createFileVersion, listFileVersions, restoreFileVersion } from './lib/f
 import { moveToTrash, restoreFromTrash, listTrash, purgeExpiredTrash } from './lib/trash.js';
 import { createShareLink, validateShareToken, incrementDownloadCount, listUserShares, revokeShare } from './lib/sharing.js';
 import { getAws, presignedGetUrl, putObject, getObject, s3Url } from './lib/s3.js';
+import { objectStorage } from './lib/config.js';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 export function cloudRoutes(ctx: ExtensionContext): Hono {
@@ -406,7 +407,7 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
       mimetype: file.type || 'application/octet-stream',
       size: file.size,
       storage_path: key,
-      url: `${process.env.S3_PUBLIC_URL ?? ''}/${key}`,
+      url: `${objectStorage()?.publicUrl ?? ''}/${key}`,
       created_by: user.id,
     };
     await (reqDb(c) as any).insertInto('zv_media_files').values(record).execute();

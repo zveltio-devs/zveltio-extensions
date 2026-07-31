@@ -2,6 +2,7 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
 import { join } from 'path';
 import { mailRoutes } from './routes.js';
+import { setInternals } from './lib/crypto.js';
 
 const extension: ZveltioExtension = {
   name: 'communications/mail',
@@ -17,6 +18,8 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
+    // Host-held mail key before any route can read or write a password.
+    setInternals(ctx.internals);
     app.route('/', mailRoutes(ctx));
   },
 };

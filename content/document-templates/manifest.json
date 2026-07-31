@@ -8,7 +8,8 @@
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-document-templates",
   "permissions": [
-    "database"
+    "database",
+    "documents"
   ],
   "studio": {
     "pages": [

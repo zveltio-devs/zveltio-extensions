@@ -14,7 +14,8 @@
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-documents",
   "permissions": [
-    "database"
+    "database",
+    "documents"
   ],
   "publicRoutes": [
     "/sign/*"
