@@ -7,35 +7,48 @@
  * an install that has no S3 configured, and @aws-sdk dominates the packed
  * bundle for what amounts to three signed HTTP calls.
  *
- * `getAws()` returns null when S3_ENDPOINT is unset. Callers MUST treat that as
- * "object storage is not configured" and degrade gracefully — metadata still
- * works, bytes just aren't stored remotely — instead of throwing.
+ * Settings come from `ctx.config.objectStorage` (the `storage` capability), not
+ * from `process.env`. That is a bug fix, not only tidiness: storage settings
+ * have an admin-editable overlay on top of the environment, so an administrator
+ * who configured object storage from the Studio never reached this file — it
+ * saw an unset `S3_ENDPOINT` and silently took the "not configured" path below,
+ * keeping metadata while quietly dropping the bytes.
+ *
+ * `getAws()` returns null when storage is unconfigured. Callers MUST treat that
+ * as "object storage is not configured" and degrade gracefully instead of
+ * throwing.
  */
 
 import { AwsClient } from 'aws4fetch';
+import { objectStorage as storage } from './config.js';
 
 let _aws: AwsClient | null = null;
+let _awsKey = '';
 
 export function getAws(): AwsClient | null {
-  if (!process.env.S3_ENDPOINT) return null;
-  if (!_aws) {
+  const s = storage();
+  if (!s) return null;
+  // Rebuild when the credentials change: the previous cache was keyed on
+  // nothing at all, so a settings change kept signing with the old key.
+  const key = `${s.endpoint}|${s.region}|${s.accessKeyId}`;
+  if (!_aws || _awsKey !== key) {
     _aws = new AwsClient({
-      accessKeyId: process.env.S3_ACCESS_KEY || '',
-      secretAccessKey: process.env.S3_SECRET_KEY || '',
-      region: process.env.S3_REGION || 'us-east-1',
+      accessKeyId: s.accessKeyId,
+      secretAccessKey: s.secretAccessKey,
+      region: s.region,
       service: 's3',
     });
+    _awsKey = key;
   }
   return _aws;
 }
 
 export function s3Bucket(): string {
-  return process.env.S3_BUCKET || 'zveltio';
+  return storage()?.bucket ?? 'zveltio';
 }
 
 export function s3Url(key: string): string {
-  const endpoint = (process.env.S3_ENDPOINT || '').replace(/\/$/, '');
-  return `${endpoint}/${s3Bucket()}/${key}`;
+  return `${storage()?.endpoint ?? ''}/${s3Bucket()}/${key}`;
 }
 
 /** PUT an object. Returns false when storage is unconfigured or the PUT failed. */

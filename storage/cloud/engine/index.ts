@@ -2,6 +2,7 @@ import type { ZveltioExtension, ExtensionContext } from '@zveltio/sdk/extension'
 import { join } from 'path';
 import { cloudRoutes, makePublicShareHandler } from './routes.js';
 import { purgeExpiredTrash } from './lib/trash.js';
+import { setConfig } from './lib/config.js';
 const extension: ZveltioExtension = {
   name: 'storage/cloud',
   category: 'storage',
@@ -18,6 +19,9 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
+    // Host-resolved config (S3 settings + public URL) before anything reads it.
+    setConfig(ctx.config);
+
     // Sub-app: cloud admin/file CRUD lives under /ext/storage/cloud/...
     app.route('/', cloudRoutes(ctx));
 

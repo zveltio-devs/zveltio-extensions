@@ -135,7 +135,7 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
   if (!internals.encryptSecret || !internals.decryptSecret) {
     throw new Error('[saml] engine internals missing encryptSecret/decryptSecret — Zveltio version mismatch');
   }
-  const crossDomain = process.env.CROSS_DOMAIN_AUTH === 'true';
+  const crossDomain = ctx.config?.crossDomainAuth ?? false;
 
   async function requireAdmin(c: any): Promise<any> {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
