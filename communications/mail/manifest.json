@@ -9,6 +9,7 @@
   "package": "@zveltio/ext-mail",
   "permissions": [
     "database",
+    "secrets",
     "settings"
   ],
   "dependencies": [
@@ -45,6 +46,6 @@
     "bundlePeers": true
   },
   "integrity": {
-    "engineSha256": "0e7f40366e7760065c022c94c7f65093502ea67a4d71246d2b869613038d0f8a"
+    "engineSha256": "86b9818ef06e259988eb8ef570cf03b9294af0ede2dcbd233e8a6fdbf229a916"
   }
 }
