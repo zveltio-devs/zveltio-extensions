@@ -1,3 +1,4 @@
+import { publicBaseUrl } from './config.js';
 import { timingSafeEqual } from 'node:crypto';
 import { sql } from 'kysely';
 import { nanoid } from 'nanoid';
@@ -43,7 +44,7 @@ export async function createShareLink(
     created_by: opts.createdBy,
   }).execute();
 
-  const baseUrl = process.env.PUBLIC_URL || 'http://localhost:3000';
+  const baseUrl = publicBaseUrl();
   return { token, shareUrl: `${baseUrl}/share/${token}` };
 }
 

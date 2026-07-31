@@ -58,6 +58,15 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      - name: No ambient authority (process.env / authority-bearing node:*)
+        # Extensions read configuration from ctx.config and do privileged work
+        # through ctx.internals, both capability-gated. Reading process.env
+        # in-process exposes the ENGINE's whole environment (DATABASE_URL,
+        # BETTER_AUTH_SECRET, FIELD_ENCRYPTION_KEY) and routes around that gate.
+        # Keeping this true is also what keeps a stricter extension runtime on
+        # the table — the property erodes one convenience at a time.
+        run: bun ../zveltio/scripts/check-ambient-authority.ts "$GITHUB_WORKSPACE"
+
       - name: Validate migration paths
         # Every engine/index.ts's getMigrations() must return paths
         # that actually exist on disk. A drift here means migrations
