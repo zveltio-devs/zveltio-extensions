@@ -68,7 +68,12 @@ d('integrations/migrators bespoke (mocked vendor API)', () => {
       const stored = (await pool.query(
         `SELECT token_enc FROM zv_migrator_connections WHERE id = '${connection.id}'`,
       )) as { rows: Array<{ token_enc: string }> };
-      expect(stored.rows[0]!.token_enc.startsWith('enc1:')).toBe(true);
+      // The host's standard envelope. This asserted `enc1:` while the
+      // extension held FIELD_ENCRYPTION_KEY and did its own AES-GCM; the crypto
+      // moved to ctx.internals, so new writes carry the engine's format. Old
+      // `enc1:` rows are still READ (the host keeps that envelope decrypt-only),
+      // which is what makes the change safe for existing installs.
+      expect(stored.rows[0]!.token_enc.startsWith('enc:v1:')).toBe(true);
       expect(stored.rows[0]!.token_enc).not.toContain('pat-test-token-123');
 
       const objects = await app.request(`/connections/${connection.id}/objects`);

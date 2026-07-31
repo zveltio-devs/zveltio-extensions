@@ -132,7 +132,7 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
   if (!internals.encryptSecret || !internals.decryptSecret) {
     throw new Error('[ldap] engine internals missing encryptSecret/decryptSecret — Zveltio version mismatch');
   }
-  const crossDomain = process.env.CROSS_DOMAIN_AUTH === 'true';
+  const crossDomain = ctx.config?.crossDomainAuth ?? false;
 
   // In production, refuse non-TLS LDAP URLs. ldap:// on port 389 carries
   // both the bind password and user credentials in cleartext over the
@@ -140,8 +140,8 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
   // prod. Operators who really need ldap:// can set
   // ALLOW_INSECURE_LDAP=true to opt out.
   function assertLdapTransportSafe(url: string): void {
-    const inProd = process.env.NODE_ENV === 'production';
-    const allowInsecure = process.env.ALLOW_INSECURE_LDAP === 'true';
+    const inProd = ctx.config?.isProduction ?? false;
+    const allowInsecure = ctx.config?.allowInsecureLdap ?? false;
     if (!inProd || allowInsecure) return;
     const lower = url.toLowerCase().trim();
     if (!lower.startsWith('ldaps://')) {

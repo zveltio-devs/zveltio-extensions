@@ -438,7 +438,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
   // (b) it loads scripts from cdnjs that can't satisfy a strict CSP.
   // In dev/staging it stays open so developers can explore.
   app.get('/', async (c) => {
-    if (process.env.NODE_ENV === 'production') {
+    if (ctx.config?.isProduction) {
       const session = await auth.api.getSession({ headers: c.req.raw.headers });
       if (!session) return c.json({ error: 'Unauthorized' }, 401);
       const isAdmin = await checkPermission(session.user.id, 'admin', '*');
