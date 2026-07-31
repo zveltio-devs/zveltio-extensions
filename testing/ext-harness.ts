@@ -24,8 +24,100 @@
  */
 
 import { afterAll, describe, expect, it } from 'bun:test';
+import { createHmac } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
 import { basename, dirname, join, relative } from 'path';
+
+// ── Host crypto, reproduced for the harness ──────────────────────────────────
+// Kept byte-identical to packages/engine/src/lib/security/keyring.ts so a
+// contract test exercises what production does. If those envelopes change,
+// the engine's keyring-compat tests fail first and point here.
+
+function harnessKeyHex(keyring: 'field' | 'mail'): string {
+  const raw = keyring === 'mail' ? process.env.MAIL_ENCRYPTION_KEY : process.env.FIELD_ENCRYPTION_KEY;
+  return (raw ?? '').trim().slice(0, 64);
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  const pairs = hex.match(/../g) ?? [];
+  const out = new Uint8Array(pairs.length);
+  for (let i = 0; i < pairs.length; i++) out[i] = Number.parseInt(pairs[i], 16);
+  return out;
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function harnessKey(keyring: 'field' | 'mail', usage: KeyUsage[]): Promise<CryptoKey> {
+  const hex = harnessKeyHex(keyring);
+  if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
+    throw new Error(
+      `${keyring === 'mail' ? 'MAIL' : 'FIELD'}_ENCRYPTION_KEY must be 64 hex chars for the harness`,
+    );
+  }
+  return crypto.subtle.importKey('raw', hexToBytes(hex), { name: 'AES-GCM' }, false, usage);
+}
+
+async function harnessEncrypt(plaintext: string, keyring: 'field' | 'mail'): Promise<string> {
+  const key = await harnessKey(keyring, ['encrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(
+    await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plaintext)),
+  );
+  if (keyring === 'mail') return `aes256gcm:${bytesToHex(iv)}:${bytesToHex(ct)}`;
+  const combined = new Uint8Array(iv.length + ct.length);
+  combined.set(iv, 0);
+  combined.set(ct, iv.length);
+  return `enc:v1:${btoa(String.fromCharCode(...combined))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '')}`;
+}
+
+async function harnessDecrypt(value: string, keyring: 'field' | 'mail'): Promise<string> {
+  if (typeof value !== 'string') return value;
+  if (value.startsWith('aes256gcm:')) {
+    const [, ivHex, ctHex] = value.split(':');
+    const key = await harnessKey('mail', ['decrypt']);
+    return new TextDecoder().decode(
+      await crypto.subtle.decrypt({ name: 'AES-GCM', iv: hexToBytes(ivHex) }, key, hexToBytes(ctHex)),
+    );
+  }
+  if (value.startsWith('enc:v1:')) {
+    const b64 = value.slice(7).replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(b64);
+    const combined = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) combined[i] = bin.charCodeAt(i);
+    const key = await harnessKey(keyring, ['decrypt']);
+    return new TextDecoder().decode(
+      await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: new Uint8Array(combined.slice(0, 12)) },
+        key,
+        new Uint8Array(combined.slice(12)),
+      ),
+    );
+  }
+  // Unknown envelope (or plaintext predating encryption) passes through.
+  return value;
+}
+
+const FORMULA_START = /^[=+\-@\t\r]/;
+const NUMERIC = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+
+function harnessCsvCell(value: unknown): string {
+  if (value === null || value === undefined) return '""';
+  const raw =
+    value instanceof Date
+      ? value.toISOString()
+      : typeof value === 'object'
+        ? JSON.stringify(value)
+        : String(value);
+  const safe = FORMULA_START.test(raw) && !NUMERIC.test(raw) ? `'${raw}` : raw;
+  return `"${safe.replace(/"/g, '""')}"`;
+}
+
+
 
 const REPO = dirname(import.meta.dir); // testing/ -> repo root
 
@@ -84,6 +176,19 @@ function makeCtx(db: any, opts: { authed: boolean; admin: boolean }, publicRoute
   const asyncNoop = async () => undefined;
   // Recursive callable stub: any property access yields another stub, and
   // calling it resolves to undefined — survives arbitrary `a.b.c(...)` chains.
+  /**
+   * An internals bag where the named members are REAL and everything else is a
+   * tolerant stub. Wrapping rather than assigning matters: anyStub()'s `get`
+   * trap never consults its target, so properties assigned onto it are never
+   * seen.
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: mock ctx surface
+  function realInternals(real: Record<string, any>): any {
+    return new Proxy(real, {
+      get: (t, p) => (p in t ? (t as Record<string | symbol, unknown>)[p] : anyStub()),
+    });
+  }
+
   function anyStub(): any {
     return new Proxy(function stub() {}, {
       get: (_t, p) => (p === 'then' ? undefined : anyStub()),
@@ -123,7 +228,38 @@ function makeCtx(db: any, opts: { authed: boolean; admin: boolean }, publicRoute
     // property-accessible, e.g. `internals.extensionRegistry.registerX(...)`);
     // routes that need a REAL internal may 500 at request time — surfaced
     // per-route, not at mount.
-    internals: anyStub(),
+    // Crypto internals get REAL implementations, not stubs. Extensions that
+    // used to hold key material now delegate here, and a stub returning
+    // undefined turns "encrypt this token" into a NULL insert that fails far
+    // from the cause. These reproduce the host's envelopes exactly — see
+    // packages/engine/src/lib/security/keyring.ts and its compatibility tests.
+    // NOTE: anyStub()'s `get` trap ignores its target, so Object.assign onto it
+    // is invisible. The real members have to be consulted BEFORE falling back.
+    internals: realInternals({
+      encryptSecret: async (plaintext: string, o?: { keyring?: string }) =>
+        harnessEncrypt(plaintext, o?.keyring === 'mail' ? 'mail' : 'field'),
+      decryptSecret: async (value: string, o?: { keyring?: string }) =>
+        harnessDecrypt(value, o?.keyring === 'mail' ? 'mail' : 'field'),
+      deriveTokenHash: async (raw: string) =>
+        createHmac('sha256', process.env.BETTER_AUTH_SECRET ?? '').update(raw).digest('hex'),
+      csvCell: harnessCsvCell,
+      recordsToCsv: (records: Record<string, unknown>[]) => {
+        if (records.length === 0) return '';
+        const keys: string[] = [];
+        const seen = new Set<string>();
+        for (const r of records) {
+          for (const k of Object.keys(r)) {
+            if (!seen.has(k)) {
+              seen.add(k);
+              keys.push(k);
+            }
+          }
+        }
+        const header = keys.map(harnessCsvCell).join(',');
+        const rows = records.map((r) => keys.map((k) => harnessCsvCell(r[k])).join(','));
+        return [header, ...rows].join('\r\n');
+      },
+    }),
     registerPublicRoute(spec: any) {
       publicRoutes?.push(spec);
     },
