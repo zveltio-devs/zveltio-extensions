@@ -2,16 +2,13 @@ import { Hono } from 'hono';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 
-function toCSV(rows: any[], columns: string[]): string {
-  const header = columns.join(',');
-  const lines = rows.map(r =>
-    columns.map(c => {
-      const v = r[c] ?? '';
-      return typeof v === 'string' && (v.includes(',') || v.includes('"') || v.includes('\n'))
-        ? `"${v.replace(/"/g, '""')}"`
-        : String(v);
-    }).join(',')
-  );
+// Cells are rendered by the host (`ctx.internals.csvCell`), which quotes AND
+// neutralises leading =,+,-,@ — a spreadsheet evaluates those as formulas, so
+// exported data would execute in the reader's Excel.
+// biome-ignore lint/suspicious/noExplicitAny: ctx.internals is engine-typed
+function toCSV(internals: any, rows: any[], columns: string[]): string {
+  const header = columns.map((c) => internals.csvCell(c)).join(',');
+  const lines = rows.map((r) => columns.map((c) => internals.csvCell(r[c] ?? '')).join(','));
   return [header, ...lines].join('\r\n');
 }
 
@@ -69,7 +66,7 @@ export function reportsRouter(ctx: ExtensionContext): Hono {
 
     if (acceptsCsv(c)) {
       const cols = rows.rows.length > 0 ? Object.keys(rows.rows[0] as object) : [];
-      return new Response(toCSV(rows.rows as any[], cols), {
+      return new Response(toCSV(ctx.internals, rows.rows as any[], cols), {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
           'Content-Disposition': `attachment; filename="trasabilitate-ansvsa-${from}-${to}.csv"`,
@@ -108,7 +105,7 @@ export function reportsRouter(ctx: ExtensionContext): Hono {
 
     if (acceptsCsv(c)) {
       const cols = rows.rows.length > 0 ? Object.keys(rows.rows[0] as object) : [];
-      return new Response(toCSV(rows.rows as any[], cols), {
+      return new Response(toCSV(ctx.internals, rows.rows as any[], cols), {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
           'Content-Disposition': `attachment; filename="receptii-${from ?? 'all'}-${to ?? 'all'}.csv"`,
@@ -145,7 +142,7 @@ export function reportsRouter(ctx: ExtensionContext): Hono {
 
     if (acceptsCsv(c)) {
       const cols = rows.rows.length > 0 ? Object.keys(rows.rows[0] as object) : [];
-      return new Response(toCSV(rows.rows as any[], cols), {
+      return new Response(toCSV(ctx.internals, rows.rows as any[], cols), {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
           'Content-Disposition': `attachment; filename="consumuri-${from ?? 'all'}-${to ?? 'all'}.csv"`,
@@ -182,7 +179,7 @@ export function reportsRouter(ctx: ExtensionContext): Hono {
 
     if (acceptsCsv(c)) {
       const cols = rows.rows.length > 0 ? Object.keys(rows.rows[0] as object) : [];
-      return new Response(toCSV(rows.rows as any[], cols), {
+      return new Response(toCSV(ctx.internals, rows.rows as any[], cols), {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
           'Content-Disposition': `attachment; filename="stoc-${new Date().toISOString().slice(0, 10)}.csv"`,
