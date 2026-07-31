@@ -9,8 +9,12 @@
   "package": "@zveltio/ext-ai",
   "permissions": [
     "database",
-    "settings",
-    "network"
+    "ddl",
+    "documents",
+    "files",
+    "network",
+    "notifications",
+    "settings"
   ],
   "contributes": {
     "engine": true,
