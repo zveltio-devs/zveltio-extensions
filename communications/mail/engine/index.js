@@ -64,7 +64,7 @@ var __export = (target, all) => {
 var __esm = (fn, res) => () => (fn && (res = fn(fn = 0)), res);
 var __require = import.meta.require;
 
-// node_modules/pino-std-serializers/lib/err-helpers.js
+// ../zveltio-extensions/node_modules/pino-std-serializers/lib/err-helpers.js
 var require_err_helpers = __commonJS((exports, module) => {
   var isErrorLike = (err) => {
     return err && typeof err.message === "string";
@@ -123,7 +123,7 @@ caused by: ` + _stackWithCauses(cause, seen);
   };
 });
 
-// node_modules/pino-std-serializers/lib/err-proto.js
+// ../zveltio-extensions/node_modules/pino-std-serializers/lib/err-proto.js
 var require_err_proto = __commonJS((exports, module) => {
   var seen = Symbol("circular-ref-tag");
   var rawSymbol = Symbol("pino-raw-err-ref");
@@ -171,20 +171,20 @@ var require_err_proto = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/pino-std-serializers/lib/err.js
+// ../zveltio-extensions/node_modules/pino-std-serializers/lib/err.js
 var require_err = __commonJS((exports, module) => {
   module.exports = errSerializer;
   var { messageWithCauses, stackWithCauses, isErrorLike } = require_err_helpers();
   var { pinoErrProto, pinoErrorSymbols } = require_err_proto();
   var { seen } = pinoErrorSymbols;
-  var { toString: toString2 } = Object.prototype;
+  var { toString } = Object.prototype;
   function errSerializer(err) {
     if (!isErrorLike(err)) {
       return err;
     }
     err[seen] = undefined;
     const _err = Object.create(pinoErrProto);
-    _err.type = toString2.call(err.constructor) === "[object Function]" ? err.constructor.name : err.name;
+    _err.type = toString.call(err.constructor) === "[object Function]" ? err.constructor.name : err.name;
     _err.message = messageWithCauses(err);
     _err.stack = stackWithCauses(err);
     if (Array.isArray(err.errors)) {
@@ -208,20 +208,20 @@ var require_err = __commonJS((exports, module) => {
   }
 });
 
-// node_modules/pino-std-serializers/lib/err-with-cause.js
+// ../zveltio-extensions/node_modules/pino-std-serializers/lib/err-with-cause.js
 var require_err_with_cause = __commonJS((exports, module) => {
   module.exports = errWithCauseSerializer;
   var { isErrorLike } = require_err_helpers();
   var { pinoErrProto, pinoErrorSymbols } = require_err_proto();
   var { seen } = pinoErrorSymbols;
-  var { toString: toString2 } = Object.prototype;
+  var { toString } = Object.prototype;
   function errWithCauseSerializer(err) {
     if (!isErrorLike(err)) {
       return err;
     }
     err[seen] = undefined;
     const _err = Object.create(pinoErrProto);
-    _err.type = toString2.call(err.constructor) === "[object Function]" ? err.constructor.name : err.name;
+    _err.type = toString.call(err.constructor) === "[object Function]" ? err.constructor.name : err.name;
     _err.message = err.message;
     _err.stack = err.stack;
     if (Array.isArray(err.errors)) {
@@ -248,7 +248,7 @@ var require_err_with_cause = __commonJS((exports, module) => {
   }
 });
 
-// node_modules/pino-std-serializers/lib/req.js
+// ../zveltio-extensions/node_modules/pino-std-serializers/lib/req.js
 var require_req = __commonJS((exports, module) => {
   module.exports = {
     mapHttpRequest,
@@ -340,7 +340,7 @@ var require_req = __commonJS((exports, module) => {
   }
 });
 
-// node_modules/pino-std-serializers/lib/res.js
+// ../zveltio-extensions/node_modules/pino-std-serializers/lib/res.js
 var require_res = __commonJS((exports, module) => {
   module.exports = {
     mapHttpResponse,
@@ -386,7 +386,7 @@ var require_res = __commonJS((exports, module) => {
   }
 });
 
-// node_modules/pino-std-serializers/index.js
+// ../zveltio-extensions/node_modules/pino-std-serializers/index.js
 var require_pino_std_serializers = __commonJS((exports, module) => {
   var errSerializer = require_err();
   var errWithCauseSerializer = require_err_with_cause();
@@ -423,7 +423,7 @@ var require_pino_std_serializers = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/pino/lib/caller.js
+// ../zveltio-extensions/node_modules/pino/lib/caller.js
 var require_caller = __commonJS((exports, module) => {
   function noOpPrepareStackTrace(_, stack) {
     return stack;
@@ -448,7 +448,7 @@ var require_caller = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/@pinojs/redact/index.js
+// ../zveltio-extensions/node_modules/@pinojs/redact/index.js
 var require_redact = __commonJS((exports, module) => {
   function deepClone(obj) {
     if (obj === null || typeof obj !== "object") {
@@ -882,7 +882,7 @@ var require_redact = __commonJS((exports, module) => {
   module.exports = slowRedact;
 });
 
-// node_modules/pino/lib/symbols.js
+// ../zveltio-extensions/node_modules/pino/lib/symbols.js
 var require_symbols = __commonJS((exports, module) => {
   var setLevelSym = Symbol("pino.setLevel");
   var getLevelSym = Symbol("pino.getLevel");
@@ -950,7 +950,7 @@ var require_symbols = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/pino/lib/redaction.js
+// ../zveltio-extensions/node_modules/pino/lib/redaction.js
 var require_redaction = __commonJS((exports, module) => {
   var Redact = require_redact();
   var { redactFmtSym, wildcardFirstSym } = require_symbols();
@@ -1030,7 +1030,7 @@ var require_redaction = __commonJS((exports, module) => {
   module.exports = redaction;
 });
 
-// node_modules/pino/lib/time.js
+// ../zveltio-extensions/node_modules/pino/lib/time.js
 var require_time = __commonJS((exports, module) => {
   var nullTime = () => "";
   var epochTime = () => `,"time":${Date.now()}`;
@@ -1058,7 +1058,7 @@ var require_time = __commonJS((exports, module) => {
   module.exports = { nullTime, epochTime, unixTime, isoTime, isoTimeNano };
 });
 
-// node_modules/quick-format-unescaped/index.js
+// ../zveltio-extensions/node_modules/quick-format-unescaped/index.js
 var require_quick_format_unescaped = __commonJS((exports, module) => {
   function tryStringify(o) {
     try {
@@ -1176,7 +1176,7 @@ var require_quick_format_unescaped = __commonJS((exports, module) => {
   }
 });
 
-// node_modules/atomic-sleep/index.js
+// ../zveltio-extensions/node_modules/atomic-sleep/index.js
 var require_atomic_sleep = __commonJS((exports, module) => {
   if (typeof SharedArrayBuffer !== "undefined" && typeof Atomics !== "undefined") {
     let sleep = function(ms) {
@@ -1207,7 +1207,7 @@ var require_atomic_sleep = __commonJS((exports, module) => {
   }
 });
 
-// node_modules/sonic-boom/index.js
+// ../zveltio-extensions/node_modules/sonic-boom/index.js
 var require_sonic_boom = __commonJS((exports, module) => {
   var fs = __require("fs");
   var EventEmitter = __require("events");
@@ -1792,7 +1792,7 @@ var require_sonic_boom = __commonJS((exports, module) => {
   module.exports = SonicBoom;
 });
 
-// node_modules/on-exit-leak-free/index.js
+// ../zveltio-extensions/node_modules/on-exit-leak-free/index.js
 var require_on_exit_leak_free = __commonJS((exports, module) => {
   var refs = {
     exit: [],
@@ -1883,7 +1883,7 @@ var require_on_exit_leak_free = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/thread-stream/package.json
+// ../zveltio-extensions/node_modules/thread-stream/package.json
 var require_package = __commonJS((exports, module) => {
   module.exports = {
     name: "thread-stream",
@@ -1937,7 +1937,7 @@ var require_package = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/thread-stream/lib/wait.js
+// ../zveltio-extensions/node_modules/thread-stream/lib/wait.js
 var require_wait = __commonJS((exports, module) => {
   var WAIT_MS = 1e4;
   function wait(state, index, expected, timeout, done) {
@@ -1993,7 +1993,7 @@ var require_wait = __commonJS((exports, module) => {
   module.exports = { wait, waitDiff };
 });
 
-// node_modules/thread-stream/lib/indexes.js
+// ../zveltio-extensions/node_modules/thread-stream/lib/indexes.js
 var require_indexes = __commonJS((exports, module) => {
   var SEQ_INDEX = 2;
   var WRITE_INDEX = 4;
@@ -2005,9 +2005,9 @@ var require_indexes = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/thread-stream/index.js
+// ../zveltio-extensions/node_modules/thread-stream/index.js
 var require_thread_stream = __commonJS((exports, module) => {
-  var __dirname = "/mnt/c/Users/Liviu/zveltio-ecosystem/zveltio-extensions/node_modules/thread-stream";
+  var __dirname = "/home/liviu/zveltio-extensions/node_modules/thread-stream";
   var { version: version2 } = require_package();
   var { EventEmitter } = __require("events");
   var { Worker } = __require("worker_threads");
@@ -2023,7 +2023,7 @@ var require_thread_stream = __commonJS((exports, module) => {
   var assert2 = __require("assert");
   var kImpl = Symbol("kImpl");
   var MAX_STRING = buffer.constants.MAX_STRING_LENGTH;
-  function noop2() {}
+  function noop() {}
   function updateState(stream, fn) {
     Atomics.add(stream[kImpl].state, SEQ_INDEX, 1);
     fn();
@@ -2105,7 +2105,7 @@ var require_thread_stream = __commonJS((exports, module) => {
           }
           return;
         }
-        write(stream, leftover, noop2);
+        write(stream, leftover, noop);
         continue;
       }
       if (leftover === 0) {
@@ -2259,7 +2259,7 @@ var require_thread_stream = __commonJS((exports, module) => {
       end(this);
     }
     flush(cb) {
-      cb = typeof cb === "function" ? cb : noop2;
+      cb = typeof cb === "function" ? cb : noop;
       flushBuffer(this, (err) => {
         if (err) {
           process.nextTick(cb, err);
@@ -2521,9 +2521,9 @@ var require_thread_stream = __commonJS((exports, module) => {
   module.exports = ThreadStream;
 });
 
-// node_modules/pino/lib/transport.js
+// ../zveltio-extensions/node_modules/pino/lib/transport.js
 var require_transport = __commonJS((exports, module) => {
-  var __dirname = "/mnt/c/Users/Liviu/zveltio-ecosystem/zveltio-extensions/node_modules/pino/lib";
+  var __dirname = "/home/liviu/zveltio-extensions/node_modules/pino/lib";
   var { createRequire } = __require("module");
   var { existsSync } = __require("fs");
   var getCallers = require_caller();
@@ -2741,7 +2741,7 @@ var require_transport = __commonJS((exports, module) => {
   module.exports = transport;
 });
 
-// node_modules/pino/lib/tools.js
+// ../zveltio-extensions/node_modules/pino/lib/tools.js
 var require_tools = __commonJS((exports, module) => {
   var diagChan = __require("diagnostics_channel");
   var format = require_quick_format_unescaped();
@@ -2771,7 +2771,7 @@ var require_tools = __commonJS((exports, module) => {
   var [nodeMajor] = process.versions.node.split(".").map((v) => Number(v));
   var asJsonChan = diagChan.tracingChannel("pino_asJson");
   var asString = nodeMajor >= 25 ? (str) => JSON.stringify(str) : _asString;
-  function noop2() {}
+  function noop() {}
   function genLog(level, hook) {
     if (!hook)
       return LOG;
@@ -2959,10 +2959,10 @@ var require_tools = __commonJS((exports, module) => {
     return stream;
     function filterBrokenPipe(err) {
       if (err.code === "EPIPE") {
-        stream.write = noop2;
-        stream.end = noop2;
-        stream.flushSync = noop2;
-        stream.destroy = noop2;
+        stream.write = noop;
+        stream.end = noop;
+        stream.flushSync = noop;
+        stream.destroy = noop;
         return;
       }
       stream.removeListener("error", filterBrokenPipe);
@@ -3018,7 +3018,7 @@ var require_tools = __commonJS((exports, module) => {
       if (enabled === false)
         opts.level = "silent";
       if (!onChild)
-        opts.onChild = noop2;
+        opts.onChild = noop;
       if (!stream) {
         if (!hasBeenTampered(process.stdout)) {
           stream = buildSafeSonicBoom({ fd: process.stdout.fd || 1 });
@@ -3059,7 +3059,7 @@ var require_tools = __commonJS((exports, module) => {
     return destination;
   }
   module.exports = {
-    noop: noop2,
+    noop,
     buildSafeSonicBoom,
     asChindings,
     asJson,
@@ -3071,7 +3071,7 @@ var require_tools = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/pino/lib/constants.js
+// ../zveltio-extensions/node_modules/pino/lib/constants.js
 var require_constants = __commonJS((exports, module) => {
   var DEFAULT_LEVELS = {
     trace: 10,
@@ -3091,7 +3091,7 @@ var require_constants = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/pino/lib/levels.js
+// ../zveltio-extensions/node_modules/pino/lib/levels.js
 var require_levels = __commonJS((exports, module) => {
   var {
     lsCacheSym,
@@ -3102,7 +3102,7 @@ var require_levels = __commonJS((exports, module) => {
     hooksSym,
     levelCompSym
   } = require_symbols();
-  var { noop: noop2, genLog } = require_tools();
+  var { noop, genLog } = require_tools();
   var { DEFAULT_LEVELS, SORTING_ORDER } = require_constants();
   var levelMethods = {
     fatal: (hook) => {
@@ -3174,7 +3174,7 @@ var require_levels = __commonJS((exports, module) => {
     const hook = this[hooksSym].logMethod;
     for (const key in values) {
       if (levelComparison(values[key], levelVal) === false) {
-        this[key] = noop2;
+        this[key] = noop;
         continue;
       }
       this[key] = isStandardLevel(key, useOnlyCustomLevelsVal) ? levelMethods[key](hook) : genLog(values[key], hook);
@@ -3259,12 +3259,12 @@ var require_levels = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/pino/lib/meta.js
+// ../zveltio-extensions/node_modules/pino/lib/meta.js
 var require_meta = __commonJS((exports, module) => {
   module.exports = { version: "10.3.1" };
 });
 
-// node_modules/pino/lib/proto.js
+// ../zveltio-extensions/node_modules/pino/lib/proto.js
 var require_proto = __commonJS((exports, module) => {
   var { EventEmitter } = __require("events");
   var {
@@ -3307,7 +3307,7 @@ var require_proto = __commonJS((exports, module) => {
     asJson,
     buildFormatters,
     stringify,
-    noop: noop2
+    noop
   } = require_tools();
   var {
     version: version2
@@ -3364,7 +3364,7 @@ var require_proto = __commonJS((exports, module) => {
         instance[formattersSym] = buildFormatters(formatters.level, resetChildingsFormatter, formatters.log);
       }
       instance[chindingsSym] = asChindings(instance, bindings2);
-      if (this.onChild !== noop2) {
+      if (this.onChild !== noop) {
         this.onChild(instance);
       }
       return instance;
@@ -3475,13 +3475,13 @@ var require_proto = __commonJS((exports, module) => {
     }
     const stream = this[streamSym];
     if (typeof stream.flush === "function") {
-      stream.flush(cb || noop2);
+      stream.flush(cb || noop);
     } else if (cb)
       cb();
   }
 });
 
-// node_modules/safe-stable-stringify/index.js
+// ../zveltio-extensions/node_modules/safe-stable-stringify/index.js
 var require_safe_stable_stringify = __commonJS((exports, module) => {
   var { hasOwnProperty } = Object.prototype;
   var stringify = configure();
@@ -4064,7 +4064,7 @@ ${originalIndentation}`;
   }
 });
 
-// node_modules/pino/lib/multistream.js
+// ../zveltio-extensions/node_modules/pino/lib/multistream.js
 var require_multistream = __commonJS((exports, module) => {
   var metadata = Symbol.for("pino.metadata");
   var { DEFAULT_LEVELS } = require_constants();
@@ -4229,7 +4229,7 @@ var require_multistream = __commonJS((exports, module) => {
   module.exports = multistream;
 });
 
-// node_modules/pino/pino.js
+// ../zveltio-extensions/node_modules/pino/pino.js
 var require_pino = __commonJS((exports, module) => {
   var os = __require("os");
   var stdSerializers = require_pino_std_serializers();
@@ -4248,7 +4248,7 @@ var require_pino = __commonJS((exports, module) => {
     buildFormatters,
     stringify,
     normalizeDestFileDescriptor,
-    noop: noop2
+    noop
   } = require_tools();
   var { version: version2 } = require_meta();
   var {
@@ -4408,7 +4408,7 @@ var require_pino = __commonJS((exports, module) => {
       [chindingsSym]: chindings,
       [formattersSym]: allFormatters,
       [hooksSym]: hooks,
-      silent: noop2,
+      silent: noop,
       onChild,
       [msgPrefixSym]: msgPrefix
     });
@@ -4437,14 +4437,14 @@ var require_pino = __commonJS((exports, module) => {
   module.exports.pino = pino;
 });
 
-// node_modules/imapflow/lib/logger.js
+// ../zveltio-extensions/node_modules/imapflow/lib/logger.js
 var require_logger = __commonJS((exports, module) => {
   var logger = require_pino()();
   logger.level = "trace";
   module.exports = logger;
 });
 
-// node_modules/safer-buffer/safer.js
+// ../zveltio-extensions/node_modules/safer-buffer/safer.js
 var require_safer = __commonJS((exports, module) => {
   var buffer = __require("buffer");
   var Buffer2 = buffer.Buffer;
@@ -4512,7 +4512,7 @@ var require_safer = __commonJS((exports, module) => {
   module.exports = safer;
 });
 
-// node_modules/iconv-lite/lib/bom-handling.js
+// ../zveltio-extensions/node_modules/iconv-lite/lib/bom-handling.js
 var require_bom_handling = __commonJS((exports) => {
   var BOMChar = "\uFEFF";
   exports.PrependBOM = PrependBOMWrapper;
@@ -4555,7 +4555,7 @@ var require_bom_handling = __commonJS((exports) => {
   };
 });
 
-// node_modules/iconv-lite/lib/helpers/merge-exports.js
+// ../zveltio-extensions/node_modules/iconv-lite/lib/helpers/merge-exports.js
 var require_merge_exports = __commonJS((exports, module) => {
   var hasOwn = typeof Object.hasOwn === "undefined" ? Function.call.bind(Object.prototype.hasOwnProperty) : Object.hasOwn;
   function mergeModules(target, module2) {
@@ -4568,7 +4568,7 @@ var require_merge_exports = __commonJS((exports, module) => {
   module.exports = mergeModules;
 });
 
-// node_modules/iconv-lite/encodings/internal.js
+// ../zveltio-extensions/node_modules/iconv-lite/encodings/internal.js
 var require_internal = __commonJS((exports, module) => {
   var Buffer2 = require_safer().Buffer;
   module.exports = {
@@ -4741,7 +4741,7 @@ var require_internal = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/iconv-lite/encodings/utf32.js
+// ../zveltio-extensions/node_modules/iconv-lite/encodings/utf32.js
 var require_utf32 = __commonJS((exports) => {
   var Buffer2 = require_safer().Buffer;
   exports._utf32 = Utf32Codec;
@@ -4762,7 +4762,7 @@ var require_utf32 = __commonJS((exports) => {
   }
   Utf32Encoder.prototype.write = function(str) {
     var src = Buffer2.from(str, "ucs2");
-    var dst = Buffer2.alloc(src.length * 2);
+    var dst = Buffer2.alloc(src.length * 2 + 4);
     var write32 = this.isLE ? dst.writeUInt32LE : dst.writeUInt32BE;
     var offset = 0;
     for (var i = 0;i < src.length; i += 2) {
@@ -4829,9 +4829,9 @@ var require_utf32 = __commonJS((exports) => {
       }
       if (overflow.length === 4) {
         if (isLE) {
-          codepoint = overflow[i] | overflow[i + 1] << 8 | overflow[i + 2] << 16 | overflow[i + 3] << 24;
+          codepoint = overflow[0] | overflow[1] << 8 | overflow[2] << 16 | overflow[3] << 24;
         } else {
-          codepoint = overflow[i + 3] | overflow[i + 2] << 8 | overflow[i + 1] << 16 | overflow[i] << 24;
+          codepoint = overflow[3] | overflow[2] << 8 | overflow[1] << 16 | overflow[0] << 24;
         }
         overflow.length = 0;
         offset = _writeCodepoint(dst, offset, codepoint, badChar);
@@ -4866,7 +4866,11 @@ var require_utf32 = __commonJS((exports) => {
     return offset;
   }
   Utf32Decoder.prototype.end = function() {
+    if (this.overflow.length === 0) {
+      return;
+    }
     this.overflow.length = 0;
+    return String.fromCharCode(this.badChar);
   };
   exports.utf32 = Utf32AutoCodec;
   exports.ucs4 = "utf32";
@@ -4975,7 +4979,7 @@ var require_utf32 = __commonJS((exports) => {
   }
 });
 
-// node_modules/iconv-lite/encodings/utf16.js
+// ../zveltio-extensions/node_modules/iconv-lite/encodings/utf16.js
 var require_utf16 = __commonJS((exports) => {
   var Buffer2 = require_safer().Buffer;
   exports.utf16be = Utf16BECodec;
@@ -5118,7 +5122,7 @@ var require_utf16 = __commonJS((exports) => {
   }
 });
 
-// node_modules/iconv-lite/encodings/utf7.js
+// ../zveltio-extensions/node_modules/iconv-lite/encodings/utf7.js
 var require_utf7 = __commonJS((exports) => {
   var Buffer2 = require_safer().Buffer;
   exports.utf7 = Utf7Codec;
@@ -5332,7 +5336,7 @@ var require_utf7 = __commonJS((exports) => {
   };
 });
 
-// node_modules/iconv-lite/encodings/sbcs-codec.js
+// ../zveltio-extensions/node_modules/iconv-lite/encodings/sbcs-codec.js
 var require_sbcs_codec = __commonJS((exports) => {
   var Buffer2 = require_safer().Buffer;
   exports._sbcs = SBCSCodec;
@@ -5389,7 +5393,7 @@ var require_sbcs_codec = __commonJS((exports) => {
   SBCSDecoder.prototype.end = function() {};
 });
 
-// node_modules/iconv-lite/encodings/sbcs-data.js
+// ../zveltio-extensions/node_modules/iconv-lite/encodings/sbcs-data.js
 var require_sbcs_data = __commonJS((exports, module) => {
   module.exports = {
     10029: "maccenteuro",
@@ -5483,6 +5487,8 @@ var require_sbcs_data = __commonJS((exports, module) => {
     elot928: "iso88597",
     hebrew: "iso88598",
     hebrew8: "iso88598",
+    iso88598i: "iso88598",
+    iso88598e: "iso88598",
     turkish: "iso88599",
     turkish8: "iso88599",
     thai: "iso885911",
@@ -5537,7 +5543,7 @@ var require_sbcs_data = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/iconv-lite/encodings/sbcs-data-generated.js
+// ../zveltio-extensions/node_modules/iconv-lite/encodings/sbcs-data-generated.js
 var require_sbcs_data_generated = __commonJS((exports, module) => {
   module.exports = {
     "437": "cp437",
@@ -5994,7 +6000,7 @@ var require_sbcs_data_generated = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/iconv-lite/encodings/dbcs-codec.js
+// ../zveltio-extensions/node_modules/iconv-lite/encodings/dbcs-codec.js
 var require_dbcs_codec = __commonJS((exports) => {
   var Buffer2 = require_safer().Buffer;
   exports._dbcs = DBCSCodec;
@@ -6452,7 +6458,7 @@ var require_dbcs_codec = __commonJS((exports) => {
   }
 });
 
-// node_modules/iconv-lite/encodings/tables/shiftjis.json
+// ../zveltio-extensions/node_modules/iconv-lite/encodings/tables/shiftjis.json
 var require_shiftjis = __commonJS((exports, module) => {
   module.exports = [
     ["0", "\x00", 128],
@@ -6581,7 +6587,7 @@ var require_shiftjis = __commonJS((exports, module) => {
   ];
 });
 
-// node_modules/iconv-lite/encodings/tables/eucjp.json
+// ../zveltio-extensions/node_modules/iconv-lite/encodings/tables/eucjp.json
 var require_eucjp = __commonJS((exports, module) => {
   module.exports = [
     ["0", "\x00", 127],
@@ -6767,7 +6773,7 @@ var require_eucjp = __commonJS((exports, module) => {
   ];
 });
 
-// node_modules/iconv-lite/encodings/tables/cp936.json
+// ../zveltio-extensions/node_modules/iconv-lite/encodings/tables/cp936.json
 var require_cp936 = __commonJS((exports, module) => {
   module.exports = [
     ["0", "\x00", 127, "\u20AC"],
@@ -7035,7 +7041,7 @@ var require_cp936 = __commonJS((exports, module) => {
   ];
 });
 
-// node_modules/iconv-lite/encodings/tables/gbk-added.json
+// ../zveltio-extensions/node_modules/iconv-lite/encodings/tables/gbk-added.json
 var require_gbk_added = __commonJS((exports, module) => {
   module.exports = [
     ["a140", "\uE4C6", 62],
@@ -7095,12 +7101,12 @@ var require_gbk_added = __commonJS((exports, module) => {
   ];
 });
 
-// node_modules/iconv-lite/encodings/tables/gb18030-ranges.json
+// ../zveltio-extensions/node_modules/iconv-lite/encodings/tables/gb18030-ranges.json
 var require_gb18030_ranges = __commonJS((exports, module) => {
   module.exports = { uChars: [128, 165, 169, 178, 184, 216, 226, 235, 238, 244, 248, 251, 253, 258, 276, 284, 300, 325, 329, 334, 364, 463, 465, 467, 469, 471, 473, 475, 477, 506, 594, 610, 712, 716, 730, 930, 938, 962, 970, 1026, 1104, 1106, 8209, 8215, 8218, 8222, 8231, 8241, 8244, 8246, 8252, 8365, 8452, 8454, 8458, 8471, 8482, 8556, 8570, 8596, 8602, 8713, 8720, 8722, 8726, 8731, 8737, 8740, 8742, 8748, 8751, 8760, 8766, 8777, 8781, 8787, 8802, 8808, 8816, 8854, 8858, 8870, 8896, 8979, 9322, 9372, 9548, 9588, 9616, 9622, 9634, 9652, 9662, 9672, 9676, 9680, 9702, 9735, 9738, 9793, 9795, 11906, 11909, 11913, 11917, 11928, 11944, 11947, 11951, 11956, 11960, 11964, 11979, 12284, 12292, 12312, 12319, 12330, 12351, 12436, 12447, 12535, 12543, 12586, 12842, 12850, 12964, 13200, 13215, 13218, 13253, 13263, 13267, 13270, 13384, 13428, 13727, 13839, 13851, 14617, 14703, 14801, 14816, 14964, 15183, 15471, 15585, 16471, 16736, 17208, 17325, 17330, 17374, 17623, 17997, 18018, 18212, 18218, 18301, 18318, 18760, 18811, 18814, 18820, 18823, 18844, 18848, 18872, 19576, 19620, 19738, 19887, 40870, 59244, 59336, 59367, 59413, 59417, 59423, 59431, 59437, 59443, 59452, 59460, 59478, 59493, 63789, 63866, 63894, 63976, 63986, 64016, 64018, 64021, 64025, 64034, 64037, 64042, 65074, 65093, 65107, 65112, 65127, 65132, 65375, 65510, 65536], gbChars: [0, 36, 38, 45, 50, 81, 89, 95, 96, 100, 103, 104, 105, 109, 126, 133, 148, 172, 175, 179, 208, 306, 307, 308, 309, 310, 311, 312, 313, 341, 428, 443, 544, 545, 558, 741, 742, 749, 750, 805, 819, 820, 7922, 7924, 7925, 7927, 7934, 7943, 7944, 7945, 7950, 8062, 8148, 8149, 8152, 8164, 8174, 8236, 8240, 8262, 8264, 8374, 8380, 8381, 8384, 8388, 8390, 8392, 8393, 8394, 8396, 8401, 8406, 8416, 8419, 8424, 8437, 8439, 8445, 8482, 8485, 8496, 8521, 8603, 8936, 8946, 9046, 9050, 9063, 9066, 9076, 9092, 9100, 9108, 9111, 9113, 9131, 9162, 9164, 9218, 9219, 11329, 11331, 11334, 11336, 11346, 11361, 11363, 11366, 11370, 11372, 11375, 11389, 11682, 11686, 11687, 11692, 11694, 11714, 11716, 11723, 11725, 11730, 11736, 11982, 11989, 12102, 12336, 12348, 12350, 12384, 12393, 12395, 12397, 12510, 12553, 12851, 12962, 12973, 13738, 13823, 13919, 13933, 14080, 14298, 14585, 14698, 15583, 15847, 16318, 16434, 16438, 16481, 16729, 17102, 17122, 17315, 17320, 17402, 17418, 17859, 17909, 17911, 17915, 17916, 17936, 17939, 17961, 18664, 18703, 18814, 18962, 19043, 33469, 33470, 33471, 33484, 33485, 33490, 33497, 33501, 33505, 33513, 33520, 33536, 33550, 37845, 37921, 37948, 38029, 38038, 38064, 38065, 38066, 38069, 38075, 38076, 38078, 39108, 39109, 39113, 39114, 39115, 39116, 39265, 39394, 189000] };
 });
 
-// node_modules/iconv-lite/encodings/tables/cp949.json
+// ../zveltio-extensions/node_modules/iconv-lite/encodings/tables/cp949.json
 var require_cp949 = __commonJS((exports, module) => {
   module.exports = [
     ["0", "\x00", 127],
@@ -7377,7 +7383,7 @@ var require_cp949 = __commonJS((exports, module) => {
   ];
 });
 
-// node_modules/iconv-lite/encodings/tables/cp950.json
+// ../zveltio-extensions/node_modules/iconv-lite/encodings/tables/cp950.json
 var require_cp950 = __commonJS((exports, module) => {
   module.exports = [
     ["0", "\x00", 127],
@@ -7558,7 +7564,7 @@ var require_cp950 = __commonJS((exports, module) => {
   ];
 });
 
-// node_modules/iconv-lite/encodings/tables/big5-added.json
+// ../zveltio-extensions/node_modules/iconv-lite/encodings/tables/big5-added.json
 var require_big5_added = __commonJS((exports, module) => {
   module.exports = [
     ["8740", "\u43F0\u4C32\u4603\u45A6\u4578\uD85C\uDE67\u4D77\u45B3\uD85F\uDCB1\u4CE2\uD85F\uDCC5\u3B95\u4736\u4744\u4C47\u4C40\uD850\uDEBF\uD84D\uDE17\uD85C\uDF52\uD85B\uDE8B\uD85C\uDCD2\u4C57\uD868\uDF51\u474F\u45DA\u4C85\uD85F\uDC6C\u4D07\u4AA4\u46A1\uD85A\uDF23\u7225\uD856\uDE54\uD846\uDE63\uD84F\uDE06\uD84F\uDF61\u664D\u56FB"],
@@ -7684,7 +7690,7 @@ var require_big5_added = __commonJS((exports, module) => {
   ];
 });
 
-// node_modules/iconv-lite/encodings/dbcs-data.js
+// ../zveltio-extensions/node_modules/iconv-lite/encodings/dbcs-data.js
 var require_dbcs_data = __commonJS((exports, module) => {
   module.exports = {
     shiftjis: {
@@ -7855,7 +7861,7 @@ var require_dbcs_data = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/iconv-lite/encodings/index.js
+// ../zveltio-extensions/node_modules/iconv-lite/encodings/index.js
 var require_encodings = __commonJS((exports, module) => {
   var mergeModules = require_merge_exports();
   var modules = [
@@ -7877,7 +7883,7 @@ var require_encodings = __commonJS((exports, module) => {
   var i;
 });
 
-// node_modules/iconv-lite/lib/streams.js
+// ../zveltio-extensions/node_modules/iconv-lite/lib/streams.js
 var require_streams = __commonJS((exports, module) => {
   var Buffer2 = require_safer().Buffer;
   module.exports = function(streamModule) {
@@ -7975,7 +7981,7 @@ var require_streams = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/iconv-lite/lib/index.js
+// ../zveltio-extensions/node_modules/iconv-lite/lib/index.js
 var require_lib = __commonJS((exports, module) => {
   var Buffer2 = require_safer().Buffer;
   var bomHandling = require_bom_handling();
@@ -8101,12 +8107,12 @@ var require_lib = __commonJS((exports, module) => {
   if (false) {}
 });
 
-// node_modules/encoding-japanese/src/util.js
+// ../zveltio-extensions/node_modules/encoding-japanese/src/util.js
 var require_util = __commonJS((exports) => {
   var config2 = require_config();
   var fromCharCode = String.fromCharCode;
   var slice = Array.prototype.slice;
-  var toString2 = Object.prototype.toString;
+  var toString = Object.prototype.toString;
   var hasOwnProperty = Object.prototype.hasOwnProperty;
   var nativeIsArray = Array.isArray;
   var nativeObjectKeys = Object.keys;
@@ -8116,11 +8122,11 @@ var require_util = __commonJS((exports) => {
   }
   exports.isObject = isObject3;
   function isArray(x) {
-    return nativeIsArray ? nativeIsArray(x) : toString2.call(x) === "[object Array]";
+    return nativeIsArray ? nativeIsArray(x) : toString.call(x) === "[object Array]";
   }
   exports.isArray = isArray;
   function isString2(x) {
-    return typeof x === "string" || toString2.call(x) === "[object String]";
+    return typeof x === "string" || toString.call(x) === "[object String]";
   }
   exports.isString = isString2;
   function objectKeys(object2) {
@@ -8554,7 +8560,7 @@ var require_util = __commonJS((exports) => {
   exports.base64decode = base64decode;
 });
 
-// node_modules/encoding-japanese/src/utf8-to-jis-table.js
+// ../zveltio-extensions/node_modules/encoding-japanese/src/utf8-to-jis-table.js
 var require_utf8_to_jis_table = __commonJS((exports, module) => {
   module.exports = {
     15711649: 33,
@@ -15952,7 +15958,7 @@ var require_utf8_to_jis_table = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/encoding-japanese/src/utf8-to-jisx0212-table.js
+// ../zveltio-extensions/node_modules/encoding-japanese/src/utf8-to-jisx0212-table.js
 var require_utf8_to_jisx0212_table = __commonJS((exports, module) => {
   module.exports = {
     52120: 8751,
@@ -22026,19 +22032,19 @@ var require_utf8_to_jisx0212_table = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/encoding-japanese/src/jis-to-utf8-table.js
+// ../zveltio-extensions/node_modules/encoding-japanese/src/jis-to-utf8-table.js
 var require_jis_to_utf8_table = __commonJS((exports, module) => {
   var JIS_TO_UTF8_TABLE = null;
   module.exports = JIS_TO_UTF8_TABLE;
 });
 
-// node_modules/encoding-japanese/src/jisx0212-to-utf8-table.js
+// ../zveltio-extensions/node_modules/encoding-japanese/src/jisx0212-to-utf8-table.js
 var require_jisx0212_to_utf8_table = __commonJS((exports, module) => {
   var JISX0212_TO_UTF8_TABLE = null;
   module.exports = JISX0212_TO_UTF8_TABLE;
 });
 
-// node_modules/encoding-japanese/src/encoding-table.js
+// ../zveltio-extensions/node_modules/encoding-japanese/src/encoding-table.js
 var require_encoding_table = __commonJS((exports) => {
   exports.UTF8_TO_JIS_TABLE = require_utf8_to_jis_table();
   exports.UTF8_TO_JISX0212_TABLE = require_utf8_to_jisx0212_table();
@@ -22046,7 +22052,7 @@ var require_encoding_table = __commonJS((exports) => {
   exports.JISX0212_TO_UTF8_TABLE = require_jisx0212_to_utf8_table();
 });
 
-// node_modules/encoding-japanese/src/config.js
+// ../zveltio-extensions/node_modules/encoding-japanese/src/config.js
 var require_config = __commonJS((exports) => {
   var util = require_util();
   var EncodingTable = require_encoding_table();
@@ -22164,7 +22170,7 @@ var require_config = __commonJS((exports) => {
   exports.init_JIS_TO_UTF8_TABLE = init_JIS_TO_UTF8_TABLE;
 });
 
-// node_modules/encoding-japanese/src/encoding-detect.js
+// ../zveltio-extensions/node_modules/encoding-japanese/src/encoding-detect.js
 var require_encoding_detect = __commonJS((exports) => {
   function isBINARY(data) {
     var i = 0;
@@ -22520,7 +22526,7 @@ var require_encoding_detect = __commonJS((exports) => {
   exports.isUNICODE = isUNICODE;
 });
 
-// node_modules/encoding-japanese/src/encoding-convert.js
+// ../zveltio-extensions/node_modules/encoding-japanese/src/encoding-convert.js
 var require_encoding_convert = __commonJS((exports) => {
   var config2 = require_config();
   var util = require_util();
@@ -23779,7 +23785,7 @@ var require_encoding_convert = __commonJS((exports) => {
   }
 });
 
-// node_modules/encoding-japanese/src/kana-case-table.js
+// ../zveltio-extensions/node_modules/encoding-japanese/src/kana-case-table.js
 var require_kana_case_table = __commonJS((exports) => {
   exports.HANKANA_TABLE = {
     12289: 65380,
@@ -23919,7 +23925,7 @@ var require_kana_case_table = __commonJS((exports) => {
   ];
 });
 
-// node_modules/encoding-japanese/package.json
+// ../zveltio-extensions/node_modules/encoding-japanese/package.json
 var require_package2 = __commonJS((exports, module) => {
   module.exports = {
     name: "encoding-japanese",
@@ -23992,7 +23998,7 @@ var require_package2 = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/encoding-japanese/src/index.js
+// ../zveltio-extensions/node_modules/encoding-japanese/src/index.js
 var require_src = __commonJS((exports, module) => {
   var config2 = require_config();
   var util = require_util();
@@ -24341,7 +24347,7 @@ var require_src = __commonJS((exports, module) => {
   module.exports = Encoding;
 });
 
-// node_modules/libmime/lib/charsets.js
+// ../zveltio-extensions/node_modules/libmime/lib/charsets.js
 var require_charsets = __commonJS((exports, module) => {
   module.exports = {
     "866": "IBM866",
@@ -24553,7 +24559,7 @@ var require_charsets = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/libmime/lib/charset.js
+// ../zveltio-extensions/node_modules/libmime/lib/charset.js
 var require_charset = __commonJS((exports, module) => {
   var { Buffer: Buffer2 } = __require("buffer");
   var iconv = require_lib();
@@ -24602,7 +24608,7 @@ var require_charset = __commonJS((exports, module) => {
       return charset.encode(data);
     },
     normalizeCharset(charset2) {
-      charset2 = charset2.toLowerCase().trim();
+      charset2 = (charset2 || "UTF-8").toString().toLowerCase().trim();
       if (charsets.hasOwnProperty(charset2) && charsets[charset2]) {
         return charsets[charset2];
       }
@@ -24615,7 +24621,7 @@ var require_charset = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/libbase64/lib/libbase64.js
+// ../zveltio-extensions/node_modules/libbase64/lib/libbase64.js
 var require_libbase64 = __commonJS((exports, module) => {
   var { Buffer: Buffer2 } = __require("buffer");
   var stream = __require("stream");
@@ -24792,7 +24798,7 @@ var require_libbase64 = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/libqp/lib/libqp.js
+// ../zveltio-extensions/node_modules/libqp/lib/libqp.js
 var require_libqp = __commonJS((exports, module) => {
   var { Buffer: Buffer2 } = __require("buffer");
   var stream = __require("stream");
@@ -24995,7 +25001,7 @@ var require_libqp = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/libmime/lib/mimetypes.js
+// ../zveltio-extensions/node_modules/libmime/lib/mimetypes.js
 var require_mimetypes = __commonJS((exports, module) => {
   module.exports = {
     list: {
@@ -27043,7 +27049,7 @@ var require_mimetypes = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/libmime/lib/libmime.js
+// ../zveltio-extensions/node_modules/libmime/lib/libmime.js
 var require_libmime = __commonJS((exports, module) => {
   var { Buffer: Buffer2 } = __require("buffer");
   var libcharset = require_charset();
@@ -27154,6 +27160,9 @@ var require_libmime = __commonJS((exports, module) => {
         encodedStr = libbase64.encode(data);
       }
       return "=?" + toCharset + "?" + mimeWordEncoding + "?" + encodedStr + (encodedStr.substr(-2) === "?=" ? "" : "?=");
+    }
+    normalizeCharset(charset) {
+      return libcharset.normalizeCharset(charset);
     }
     decodeWord(charset, encoding, str) {
       let splitPos = charset.indexOf("*");
@@ -27594,7 +27603,7 @@ var require_libmime = __commonJS((exports, module) => {
   module.exports.Libmime = Libmime;
 });
 
-// node_modules/@zone-eu/mailsplit/lib/headers.js
+// ../zveltio-extensions/node_modules/@zone-eu/mailsplit/lib/headers.js
 var require_headers = __commonJS((exports, module) => {
   var libmime = require_libmime();
   var Libmime = libmime.Libmime;
@@ -27821,7 +27830,7 @@ var require_headers = __commonJS((exports, module) => {
   module.exports = Headers2;
 });
 
-// node_modules/@zone-eu/mailsplit/lib/mime-node.js
+// ../zveltio-extensions/node_modules/@zone-eu/mailsplit/lib/mime-node.js
 var require_mime_node = __commonJS((exports, module) => {
   var Headers2 = require_headers();
   var libmime = require_libmime();
@@ -28042,7 +28051,7 @@ var require_mime_node = __commonJS((exports, module) => {
   module.exports = MimeNode;
 });
 
-// node_modules/@zone-eu/mailsplit/lib/message-splitter.js
+// ../zveltio-extensions/node_modules/@zone-eu/mailsplit/lib/message-splitter.js
 var require_message_splitter = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
   var MimeNode = require_mime_node();
@@ -28379,7 +28388,7 @@ var require_message_splitter = __commonJS((exports, module) => {
   module.exports = MessageSplitter;
 });
 
-// node_modules/@zone-eu/mailsplit/lib/message-joiner.js
+// ../zveltio-extensions/node_modules/@zone-eu/mailsplit/lib/message-joiner.js
 var require_message_joiner = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
 
@@ -28408,7 +28417,7 @@ var require_message_joiner = __commonJS((exports, module) => {
   module.exports = MessageJoiner;
 });
 
-// node_modules/@zone-eu/mailsplit/lib/flowed-decoder.js
+// ../zveltio-extensions/node_modules/@zone-eu/mailsplit/lib/flowed-decoder.js
 var require_flowed_decoder = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
   var libmime = require_libmime();
@@ -28448,7 +28457,7 @@ var require_flowed_decoder = __commonJS((exports, module) => {
   module.exports = FlowedDecoder;
 });
 
-// node_modules/@zone-eu/mailsplit/lib/node-rewriter.js
+// ../zveltio-extensions/node_modules/@zone-eu/mailsplit/lib/node-rewriter.js
 var require_node_rewriter = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
   var FlowedDecoder = require_flowed_decoder();
@@ -28592,7 +28601,7 @@ var require_node_rewriter = __commonJS((exports, module) => {
   module.exports = NodeRewriter;
 });
 
-// node_modules/@zone-eu/mailsplit/lib/node-streamer.js
+// ../zveltio-extensions/node_modules/@zone-eu/mailsplit/lib/node-streamer.js
 var require_node_streamer = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
   var FlowedDecoder = require_flowed_decoder();
@@ -28682,7 +28691,7 @@ var require_node_streamer = __commonJS((exports, module) => {
   module.exports = NodeStreamer;
 });
 
-// node_modules/@zone-eu/mailsplit/lib/chunked-passthrough.js
+// ../zveltio-extensions/node_modules/@zone-eu/mailsplit/lib/chunked-passthrough.js
 var require_chunked_passthrough = __commonJS((exports, module) => {
   var { Transform } = __require("stream");
 
@@ -28715,7 +28724,7 @@ var require_chunked_passthrough = __commonJS((exports, module) => {
   module.exports = ChunkedPassthrough;
 });
 
-// node_modules/@zone-eu/mailsplit/index.js
+// ../zveltio-extensions/node_modules/@zone-eu/mailsplit/index.js
 var require_mailsplit = __commonJS((exports, module) => {
   var MessageSplitter = require_message_splitter();
   var MessageJoiner = require_message_joiner();
@@ -28735,7 +28744,7 @@ var require_mailsplit = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/limited-passthrough.js
+// ../zveltio-extensions/node_modules/imapflow/lib/limited-passthrough.js
 var require_limited_passthrough = __commonJS((exports, module) => {
   var { Transform } = __require("stream");
 
@@ -28769,7 +28778,7 @@ var require_limited_passthrough = __commonJS((exports, module) => {
   exports.LimitedPassthrough = LimitedPassthrough;
 });
 
-// node_modules/imapflow/lib/handler/imap-stream.js
+// ../zveltio-extensions/node_modules/imapflow/lib/handler/imap-stream.js
 var require_imap_stream = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
   var logger = require_logger();
@@ -28782,6 +28791,7 @@ var require_imap_stream = __commonJS((exports, module) => {
   var CURLY_OPEN = 123;
   var CURLY_CLOSE = 125;
   var MAX_LITERAL_SIZE = 1024 * 1024 * 1024;
+  var MAX_LINE_SIZE = MAX_LITERAL_SIZE;
 
   class ImapStream extends Transform {
     constructor(options) {
@@ -28796,10 +28806,13 @@ var require_imap_stream = __commonJS((exports, module) => {
         cid: this.cid
       });
       this.readBytesCounter = 0;
+      this.maxLineLength = Number.isInteger(this.options.maxLineLength) && this.options.maxLineLength >= 0 ? this.options.maxLineLength : MAX_LINE_SIZE;
+      this.maxLiteralSize = Number.isInteger(this.options.maxLiteralSize) && this.options.maxLiteralSize >= 0 ? this.options.maxLiteralSize : MAX_LITERAL_SIZE;
       this.state = LINE;
       this.literalWaiting = 0;
       this.inputBuffer = [];
       this.lineBuffer = [];
+      this.lineBytes = 0;
       this.literalBuffer = [];
       this.literals = [];
       this.compress = false;
@@ -28824,7 +28837,7 @@ var require_imap_stream = __commonJS((exports, module) => {
       }
       pos--;
       let numBytes = [];
-      for (;pos > 0; pos--) {
+      for (;pos >= 0; pos--) {
         let c = line[pos];
         if (c >= NUM_0 && c <= NUM_9) {
           numBytes.unshift(c);
@@ -28832,11 +28845,11 @@ var require_imap_stream = __commonJS((exports, module) => {
         }
         if (c === CURLY_OPEN && numBytes.length) {
           const literalSize = Number(Buffer.from(numBytes).toString());
-          if (literalSize > MAX_LITERAL_SIZE) {
-            const err = new Error(`Literal size ${literalSize} exceeds maximum allowed size of ${MAX_LITERAL_SIZE} bytes`);
+          if (literalSize > this.maxLiteralSize) {
+            const err = new Error(`Literal size ${literalSize} exceeds maximum allowed size of ${this.maxLiteralSize} bytes`);
             err.code = "LiteralTooLarge";
             err.literalSize = literalSize;
-            err.maxSize = MAX_LITERAL_SIZE;
+            err.maxSize = this.maxLiteralSize;
             this.emit("error", err);
             return false;
           }
@@ -28863,6 +28876,7 @@ var require_imap_stream = __commonJS((exports, module) => {
               let line = Buffer.concat(this.lineBuffer);
               this.inputBuffer.push(line);
               this.lineBuffer = [];
+              this.lineBytes = 0;
               if (this.checkLiteralMarker(line)) {
                 return await this.processInputChunk(chunk, lineStart);
               }
@@ -28879,15 +28893,27 @@ var require_imap_stream = __commonJS((exports, module) => {
                   payload = payload.slice(0, end);
                 }
                 if (payload.length) {
+                  let trailingAfterLine = lineStart < chunk.length || this.inputQueue.length > 0;
                   await new Promise((resolve) => {
-                    this.push({ payload, literals, next: resolve });
+                    this.push({ payload, literals, next: resolve, trailingAfterLine });
                   });
                 }
               }
             }
           }
           if (lineStart < chunk.length) {
-            this.lineBuffer.push(chunk.slice(lineStart));
+            let tail = chunk.slice(lineStart);
+            let lineLength = this.lineBytes + tail.length;
+            if (lineLength > this.maxLineLength) {
+              const err = new Error(`Line length ${lineLength} exceeds maximum allowed size of ${this.maxLineLength} bytes`);
+              err.code = "LineTooLarge";
+              err.lineLength = lineLength;
+              err.maxSize = this.maxLineLength;
+              this.emit("error", err);
+              return;
+            }
+            this.lineBytes = lineLength;
+            this.lineBuffer.push(tail);
           }
           break;
         }
@@ -28951,6 +28977,7 @@ var require_imap_stream = __commonJS((exports, module) => {
     _destroy(err, callback) {
       this.inputBuffer = [];
       this.lineBuffer = [];
+      this.lineBytes = 0;
       this.literalBuffer = [];
       this.literals = [];
       while (this.inputQueue.length) {
@@ -28965,7 +28992,7 @@ var require_imap_stream = __commonJS((exports, module) => {
   exports.ImapStream = ImapStream;
 });
 
-// node_modules/imapflow/lib/handler/imap-formal-syntax.js
+// ../zveltio-extensions/node_modules/imapflow/lib/handler/imap-formal-syntax.js
 var require_imap_formal_syntax = __commonJS((exports, module) => {
   function expandRange(start, end) {
     let chars = [];
@@ -29086,7 +29113,7 @@ var require_imap_formal_syntax = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/handler/token-parser.js
+// ../zveltio-extensions/node_modules/imapflow/lib/handler/token-parser.js
 var require_token_parser = __commonJS((exports, module) => {
   var imapFormalSyntax = require_imap_formal_syntax();
   var STATE_ATOM = 1;
@@ -29095,7 +29122,6 @@ var require_token_parser = __commonJS((exports, module) => {
   var STATE_PARTIAL = 4;
   var STATE_SEQUENCE = 5;
   var STATE_STRING = 6;
-  var STATE_TEXT = 7;
   var RE_DIGITS = /^\d+$/;
   var RE_SINGLE_DIGIT = /^\d$/;
   var MAX_NODE_DEPTH = 25;
@@ -29311,6 +29337,9 @@ var require_token_parser = __commonJS((exports, module) => {
                     this.currentNode = this.createNode(this.currentNode, this.pos + i + 10);
                     this.currentNode.type = "ATOM";
                     i = this.str.indexOf("]", i + 10);
+                    if (i < 0) {
+                      i = this.str.length;
+                    }
                     this.currentNode.endPos = this.pos + i - 1;
                     this.currentNode.value = this.str.substring(this.currentNode.startPos - this.pos, this.currentNode.endPos - this.pos + 1);
                     this.currentNode = this.currentNode.parentNode;
@@ -29576,9 +29605,6 @@ var require_token_parser = __commonJS((exports, module) => {
             }
             this.currentNode.value += chr;
             break;
-          case STATE_TEXT:
-            this.currentNode.value += chr;
-            break;
         }
       }
     }
@@ -29586,7 +29612,7 @@ var require_token_parser = __commonJS((exports, module) => {
   exports.TokenParser = TokenParser;
 });
 
-// node_modules/imapflow/lib/handler/parser-instance.js
+// ../zveltio-extensions/node_modules/imapflow/lib/handler/parser-instance.js
 var require_parser_instance = __commonJS((exports, module) => {
   var imapFormalSyntax = require_imap_formal_syntax();
   var { TokenParser } = require_token_parser();
@@ -29725,7 +29751,7 @@ var require_parser_instance = __commonJS((exports, module) => {
   exports.ParserInstance = ParserInstance;
 });
 
-// node_modules/imapflow/lib/handler/imap-parser.js
+// ../zveltio-extensions/node_modules/imapflow/lib/handler/imap-parser.js
 var require_imap_parser = __commonJS((exports, module) => {
   var imapFormalSyntax = require_imap_formal_syntax();
   var { ParserInstance } = require_parser_instance();
@@ -29779,7 +29805,7 @@ var require_imap_parser = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/handler/imap-compiler.js
+// ../zveltio-extensions/node_modules/imapflow/lib/handler/imap-compiler.js
 var require_imap_compiler = __commonJS((exports, module) => {
   var imapFormalSyntax = require_imap_formal_syntax();
   var formatRespEntry = (entry, returnEmpty) => {
@@ -29926,7 +29952,7 @@ var require_imap_compiler = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/handler/imap-handler.js
+// ../zveltio-extensions/node_modules/imapflow/lib/handler/imap-handler.js
 var require_imap_handler = __commonJS((exports, module) => {
   var parser = require_imap_parser();
   var compiler = require_imap_compiler();
@@ -29936,11 +29962,11 @@ var require_imap_handler = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/package.json
+// ../zveltio-extensions/node_modules/imapflow/package.json
 var require_package3 = __commonJS((exports, module) => {
   module.exports = {
     name: "imapflow",
-    version: "1.3.4",
+    version: "1.4.7",
     description: "IMAP Client for Node",
     main: "lib/imap-flow.js",
     types: "lib/imap-flow.d.ts",
@@ -29968,34 +29994,342 @@ var require_package3 = __commonJS((exports, module) => {
     homepage: "https://imapflow.com/",
     devDependencies: {
       "@eslint/js": "10.0.1",
-      "@types/node": "25.9.1",
+      "@types/node": "26.1.0",
       c8: "11.0.0",
-      eslint: "10.4.0",
+      eslint: "10.6.0",
       "eslint-config-nodemailer": "1.2.0",
       "eslint-config-prettier": "10.1.8",
       grunt: "1.6.2",
       "grunt-cli": "1.5.0",
       "grunt-contrib-nodeunit": "5.0.0",
       "grunt-eslint": "26.0.0",
-      prettier: "3.8.3",
+      prettier: "3.9.4",
       proxyquire: "^2.1.3",
       typescript: "6.0.3"
     },
     dependencies: {
-      "@zone-eu/mailsplit": "5.4.12",
+      "@zone-eu/mailsplit": "5.4.14",
       "encoding-japanese": "2.2.0",
-      "iconv-lite": "0.7.2",
+      "iconv-lite": "0.7.3",
       libbase64: "1.3.0",
-      libmime: "5.3.8",
+      libmime: "5.4.1",
       libqp: "2.1.1",
-      nodemailer: "8.0.10",
+      nodemailer: "9.0.3",
       pino: "10.3.1",
       socks: "2.8.9"
     }
   };
 });
 
-// node_modules/imapflow/node_modules/nodemailer/lib/errors.js
+// ../zveltio-extensions/node_modules/imapflow/node_modules/nodemailer/lib/punycode/index.js
+var require_punycode = __commonJS((exports, module) => {
+  var maxInt = 2147483647;
+  var base = 36;
+  var tMin = 1;
+  var tMax = 26;
+  var skew = 38;
+  var damp = 700;
+  var initialBias = 72;
+  var initialN = 128;
+  var delimiter = "-";
+  var regexPunycode = /^xn--/;
+  var regexNonASCII = /[^\0-\x7F]/;
+  var regexSeparators = /[\x2E\u3002\uFF0E\uFF61]/g;
+  var errors3 = {
+    overflow: "Overflow: input needs wider integers to process",
+    "not-basic": "Illegal input >= 0x80 (not a basic code point)",
+    "invalid-input": "Invalid input"
+  };
+  var baseMinusTMin = base - tMin;
+  var floor = Math.floor;
+  var stringFromCharCode = String.fromCharCode;
+  function error51(type) {
+    throw new RangeError(errors3[type]);
+  }
+  function map2(array2, callback) {
+    const result = [];
+    let length = array2.length;
+    while (length--) {
+      result[length] = callback(array2[length]);
+    }
+    return result;
+  }
+  function mapDomain(domain2, callback) {
+    const parts = domain2.split("@");
+    let result = "";
+    if (parts.length > 1) {
+      result = parts[0] + "@";
+      domain2 = parts[1];
+    }
+    domain2 = domain2.replace(regexSeparators, ".");
+    const labels = domain2.split(".");
+    const encoded = map2(labels, callback).join(".");
+    return result + encoded;
+  }
+  function ucs2decode(string4) {
+    const output = [];
+    let counter = 0;
+    const length = string4.length;
+    while (counter < length) {
+      const value = string4.charCodeAt(counter++);
+      if (value >= 55296 && value <= 56319 && counter < length) {
+        const extra = string4.charCodeAt(counter++);
+        if ((extra & 64512) == 56320) {
+          output.push(((value & 1023) << 10) + (extra & 1023) + 65536);
+        } else {
+          output.push(value);
+          counter--;
+        }
+      } else {
+        output.push(value);
+      }
+    }
+    return output;
+  }
+  var ucs2encode = (codePoints) => String.fromCodePoint(...codePoints);
+  var basicToDigit = function(codePoint) {
+    if (codePoint >= 48 && codePoint < 58) {
+      return 26 + (codePoint - 48);
+    }
+    if (codePoint >= 65 && codePoint < 91) {
+      return codePoint - 65;
+    }
+    if (codePoint >= 97 && codePoint < 123) {
+      return codePoint - 97;
+    }
+    return base;
+  };
+  var digitToBasic = function(digit, flag) {
+    return digit + 22 + 75 * (digit < 26) - ((flag != 0) << 5);
+  };
+  var adapt = function(delta, numPoints, firstTime) {
+    let k = 0;
+    delta = firstTime ? floor(delta / damp) : delta >> 1;
+    delta += floor(delta / numPoints);
+    for (;delta > baseMinusTMin * tMax >> 1; k += base) {
+      delta = floor(delta / baseMinusTMin);
+    }
+    return floor(k + (baseMinusTMin + 1) * delta / (delta + skew));
+  };
+  var decode3 = function(input) {
+    const output = [];
+    const inputLength = input.length;
+    let i = 0;
+    let n = initialN;
+    let bias = initialBias;
+    let basic = input.lastIndexOf(delimiter);
+    if (basic < 0) {
+      basic = 0;
+    }
+    for (let j = 0;j < basic; ++j) {
+      if (input.charCodeAt(j) >= 128) {
+        error51("not-basic");
+      }
+      output.push(input.charCodeAt(j));
+    }
+    for (let index = basic > 0 ? basic + 1 : 0;index < inputLength; ) {
+      const oldi = i;
+      for (let w = 1, k = base;; k += base) {
+        if (index >= inputLength) {
+          error51("invalid-input");
+        }
+        const digit = basicToDigit(input.charCodeAt(index++));
+        if (digit >= base) {
+          error51("invalid-input");
+        }
+        if (digit > floor((maxInt - i) / w)) {
+          error51("overflow");
+        }
+        i += digit * w;
+        const t = k <= bias ? tMin : k >= bias + tMax ? tMax : k - bias;
+        if (digit < t) {
+          break;
+        }
+        const baseMinusT = base - t;
+        if (w > floor(maxInt / baseMinusT)) {
+          error51("overflow");
+        }
+        w *= baseMinusT;
+      }
+      const out = output.length + 1;
+      bias = adapt(i - oldi, out, oldi == 0);
+      if (floor(i / out) > maxInt - n) {
+        error51("overflow");
+      }
+      n += floor(i / out);
+      i %= out;
+      output.splice(i++, 0, n);
+    }
+    return String.fromCodePoint(...output);
+  };
+  var encode3 = function(input) {
+    const output = [];
+    input = ucs2decode(input);
+    const inputLength = input.length;
+    let n = initialN;
+    let delta = 0;
+    let bias = initialBias;
+    for (const currentValue of input) {
+      if (currentValue < 128) {
+        output.push(stringFromCharCode(currentValue));
+      }
+    }
+    const basicLength = output.length;
+    let handledCPCount = basicLength;
+    if (basicLength) {
+      output.push(delimiter);
+    }
+    while (handledCPCount < inputLength) {
+      let m = maxInt;
+      for (const currentValue of input) {
+        if (currentValue >= n && currentValue < m) {
+          m = currentValue;
+        }
+      }
+      const handledCPCountPlusOne = handledCPCount + 1;
+      if (m - n > floor((maxInt - delta) / handledCPCountPlusOne)) {
+        error51("overflow");
+      }
+      delta += (m - n) * handledCPCountPlusOne;
+      n = m;
+      for (const currentValue of input) {
+        if (currentValue < n && ++delta > maxInt) {
+          error51("overflow");
+        }
+        if (currentValue === n) {
+          let q = delta;
+          for (let k = base;; k += base) {
+            const t = k <= bias ? tMin : k >= bias + tMax ? tMax : k - bias;
+            if (q < t) {
+              break;
+            }
+            const qMinusT = q - t;
+            const baseMinusT = base - t;
+            output.push(stringFromCharCode(digitToBasic(t + qMinusT % baseMinusT, 0)));
+            q = floor(qMinusT / baseMinusT);
+          }
+          output.push(stringFromCharCode(digitToBasic(q, 0)));
+          bias = adapt(delta, handledCPCountPlusOne, handledCPCount === basicLength);
+          delta = 0;
+          ++handledCPCount;
+        }
+      }
+      ++delta;
+      ++n;
+    }
+    return output.join("");
+  };
+  var toUnicode = function(input) {
+    return mapDomain(input, function(string4) {
+      return regexPunycode.test(string4) ? decode3(string4.slice(4).toLowerCase()) : string4;
+    });
+  };
+  var toASCII = function(input) {
+    return mapDomain(input, function(string4) {
+      return regexNonASCII.test(string4) ? "xn--" + encode3(string4) : string4;
+    });
+  };
+  var punycode = {
+    version: "2.3.1",
+    ucs2: {
+      decode: ucs2decode,
+      encode: ucs2encode
+    },
+    decode: decode3,
+    encode: encode3,
+    toASCII,
+    toUnicode
+  };
+  module.exports = punycode;
+});
+
+// ../zveltio-extensions/node_modules/imapflow/node_modules/nodemailer/lib/shared/url.js
+var require_url = __commonJS((exports, module) => {
+  var urllib = __require("url");
+  var punycode = require_punycode();
+  var URLImpl = typeof URL !== "undefined" && URL || urllib.URL;
+  var SLASHLESS_AUTHORITY = /^([a-zA-Z][a-zA-Z0-9+.-]*:)(?!\/\/)(.+)$/;
+  function safeDecode3(str) {
+    try {
+      return decodeURIComponent(str);
+    } catch (_err) {
+      return str;
+    }
+  }
+  function normalizeHostname(raw2) {
+    let hostname3 = raw2 || "";
+    if (!hostname3) {
+      return "";
+    }
+    if (hostname3.charAt(0) === "[" && hostname3.charAt(hostname3.length - 1) === "]") {
+      return hostname3.slice(1, -1);
+    }
+    return punycode.toASCII(safeDecode3(hostname3));
+  }
+  exports.parse = (input, parseQueryString) => {
+    input = input || "";
+    if (!URLImpl) {
+      return urllib.parse(input, parseQueryString);
+    }
+    const slashless = SLASHLESS_AUTHORITY.exec(input);
+    const normalized = slashless ? slashless[1] + "//" + slashless[2] : input;
+    let u;
+    try {
+      u = new URLImpl(normalized);
+    } catch (_err) {
+      return urllib.parse(input, parseQueryString);
+    }
+    const hostname3 = normalizeHostname(u.hostname);
+    const port = u.port || null;
+    const pathname = u.pathname || null;
+    const search = u.search || null;
+    let auth = null;
+    if (u.username || u.password) {
+      auth = safeDecode3(u.username) + (u.password ? ":" + safeDecode3(u.password) : "");
+    }
+    let query;
+    if (parseQueryString) {
+      query = Object.create(null);
+      u.searchParams.forEach((value, key) => {
+        if (Object.prototype.hasOwnProperty.call(query, key)) {
+          if (Array.isArray(query[key])) {
+            query[key].push(value);
+          } else {
+            query[key] = [query[key], value];
+          }
+        } else {
+          query[key] = value;
+        }
+      });
+    } else {
+      query = search ? search.slice(1) : null;
+    }
+    return {
+      protocol: u.protocol || null,
+      host: u.host || null,
+      hostname: hostname3,
+      port,
+      pathname,
+      search,
+      path: (pathname || "") + (search || "") || null,
+      href: u.href,
+      auth,
+      query
+    };
+  };
+  exports.resolve = (from, to) => {
+    if (!URLImpl) {
+      return urllib.resolve(from, to);
+    }
+    try {
+      return new URLImpl(to, from).href;
+    } catch (_err) {
+      return urllib.resolve(from, to);
+    }
+  };
+});
+
+// ../zveltio-extensions/node_modules/imapflow/node_modules/nodemailer/lib/errors.js
 var require_errors = __commonJS((exports, module) => {
   var ERROR_CODES = {
     ECONNECTION: "Connection closed unexpectedly",
@@ -30026,21 +30360,33 @@ var require_errors = __commonJS((exports, module) => {
   }
 });
 
-// node_modules/imapflow/node_modules/nodemailer/lib/smtp-connection/http-proxy-client.js
+// ../zveltio-extensions/node_modules/imapflow/node_modules/nodemailer/lib/smtp-connection/http-proxy-client.js
 var require_http_proxy_client = __commonJS((exports, module) => {
   var net = __require("net");
   var tls = __require("tls");
-  var urllib = __require("url");
+  var urllib = require_url();
   var errors3 = require_errors();
-  function httpProxyClient(proxyUrl, destinationPort, destinationHost, callback) {
+  var MAX_RESPONSE_HEADER_BYTES = 64 * 1024;
+  function httpProxyClient(proxyUrl, destinationPort, destinationHost, tlsOptions, callback) {
+    if (typeof tlsOptions === "function") {
+      callback = tlsOptions;
+      tlsOptions = {};
+    }
+    tlsOptions = tlsOptions || {};
+    destinationPort = Number(destinationPort) || 0;
+    if (!destinationPort || /[\r\n]/.test(destinationHost)) {
+      const err = new Error("Invalid proxy destination");
+      err.code = errors3.EPROXY;
+      return setImmediate(() => callback(err));
+    }
     const proxy = urllib.parse(proxyUrl);
-    const options = {
+    const connectOptions = {
       host: proxy.hostname,
       port: Number(proxy.port) ? Number(proxy.port) : proxy.protocol === "https:" ? 443 : 80
     };
     let connect;
     if (proxy.protocol === "https:") {
-      options.rejectUnauthorized = false;
+      connectOptions.rejectUnauthorized = tlsOptions.rejectUnauthorized !== false;
       connect = tls.connect.bind(tls);
     } else {
       connect = net.connect.bind(net);
@@ -30062,7 +30408,7 @@ var require_http_proxy_client = __commonJS((exports, module) => {
       err.code = "ETIMEDOUT";
       tempSocketErr(err);
     };
-    socket = connect(options, () => {
+    socket = connect(connectOptions, () => {
       if (finished) {
         return;
       }
@@ -30108,6 +30454,12 @@ var require_http_proxy_client = __commonJS((exports, module) => {
           socket.setTimeout(0);
           return callback(null, socket);
         }
+        if (headers.length > MAX_RESPONSE_HEADER_BYTES) {
+          socket.removeListener("data", onSocketData);
+          const err = new Error("Proxy response headers too large");
+          err.code = errors3.EPROXY;
+          return tempSocketErr(err);
+        }
       };
       socket.on("data", onSocketData);
     });
@@ -30118,7 +30470,7 @@ var require_http_proxy_client = __commonJS((exports, module) => {
   module.exports = httpProxyClient;
 });
 
-// node_modules/smart-buffer/build/utils.js
+// ../zveltio-extensions/node_modules/smart-buffer/build/utils.js
 var require_utils = __commonJS((exports) => {
   Object.defineProperty(exports, "__esModule", { value: true });
   var buffer_1 = __require("buffer");
@@ -30184,7 +30536,7 @@ var require_utils = __commonJS((exports) => {
   exports.bigIntAndBufferInt64Check = bigIntAndBufferInt64Check;
 });
 
-// node_modules/smart-buffer/build/smartbuffer.js
+// ../zveltio-extensions/node_modules/smart-buffer/build/smartbuffer.js
 var require_smartbuffer = __commonJS((exports) => {
   Object.defineProperty(exports, "__esModule", { value: true });
   var utils_1 = require_utils();
@@ -30685,7 +31037,7 @@ var require_smartbuffer = __commonJS((exports) => {
   exports.SmartBuffer = SmartBuffer;
 });
 
-// node_modules/socks/build/common/constants.js
+// ../zveltio-extensions/node_modules/socks/build/common/constants.js
 var require_constants2 = __commonJS((exports) => {
   Object.defineProperty(exports, "__esModule", { value: true });
   exports.SOCKS5_NO_ACCEPTABLE_AUTH = exports.SOCKS5_CUSTOM_AUTH_END = exports.SOCKS5_CUSTOM_AUTH_START = exports.SOCKS_INCOMING_PACKET_SIZES = exports.SocksClientState = exports.Socks5Response = exports.Socks5HostType = exports.Socks5Auth = exports.Socks4Response = exports.SocksCommand = exports.ERRORS = exports.DEFAULT_TIMEOUT = undefined;
@@ -30792,7 +31144,7 @@ var require_constants2 = __commonJS((exports) => {
   })(SocksClientState || (exports.SocksClientState = SocksClientState = {}));
 });
 
-// node_modules/socks/build/common/util.js
+// ../zveltio-extensions/node_modules/socks/build/common/util.js
 var require_util2 = __commonJS((exports) => {
   Object.defineProperty(exports, "__esModule", { value: true });
   exports.shuffleArray = exports.SocksClientError = undefined;
@@ -30813,7 +31165,7 @@ var require_util2 = __commonJS((exports) => {
   exports.shuffleArray = shuffleArray;
 });
 
-// node_modules/ip-address/dist/address-error.js
+// ../zveltio-extensions/node_modules/ip-address/dist/address-error.js
 var require_address_error = __commonJS((exports) => {
   Object.defineProperty(exports, "__esModule", { value: true });
   exports.AddressError = undefined;
@@ -30828,7 +31180,7 @@ var require_address_error = __commonJS((exports) => {
   exports.AddressError = AddressError;
 });
 
-// node_modules/ip-address/dist/common.js
+// ../zveltio-extensions/node_modules/ip-address/dist/common.js
 var require_common = __commonJS((exports) => {
   Object.defineProperty(exports, "__esModule", { value: true });
   exports.isInSubnet = isInSubnet;
@@ -30888,7 +31240,7 @@ var require_common = __commonJS((exports) => {
   }
 });
 
-// node_modules/ip-address/dist/v4/constants.js
+// ../zveltio-extensions/node_modules/ip-address/dist/v4/constants.js
 var require_constants3 = __commonJS((exports) => {
   Object.defineProperty(exports, "__esModule", { value: true });
   exports.RE_SUBNET_STRING = exports.RE_ADDRESS = exports.GROUPS = exports.BITS = undefined;
@@ -30898,7 +31250,7 @@ var require_constants3 = __commonJS((exports) => {
   exports.RE_SUBNET_STRING = /\/\d{1,2}$/;
 });
 
-// node_modules/ip-address/dist/ipv4.js
+// ../zveltio-extensions/node_modules/ip-address/dist/ipv4.js
 var require_ipv4 = __commonJS((exports) => {
   var __createBinding = exports && exports.__createBinding || (Object.create ? function(o, m, k, k2) {
     if (k2 === undefined)
@@ -31169,7 +31521,7 @@ var require_ipv4 = __commonJS((exports) => {
   var CGNAT_V4 = new Address4("100.64.0.0/10");
 });
 
-// node_modules/ip-address/dist/v6/constants.js
+// ../zveltio-extensions/node_modules/ip-address/dist/v6/constants.js
 var require_constants4 = __commonJS((exports) => {
   Object.defineProperty(exports, "__esModule", { value: true });
   exports.RE_URL_WITH_PORT = exports.RE_URL = exports.RE_ZONE_STRING = exports.RE_SUBNET_STRING = exports.RE_BAD_ADDRESS = exports.RE_BAD_CHARACTERS = exports.TYPES = exports.SCOPES = exports.GROUPS = exports.BITS = undefined;
@@ -31222,7 +31574,7 @@ var require_constants4 = __commonJS((exports) => {
   exports.RE_URL_WITH_PORT = /\[([0-9a-f:]+)\]:([0-9]{1,5})/;
 });
 
-// node_modules/ip-address/dist/v6/helpers.js
+// ../zveltio-extensions/node_modules/ip-address/dist/v6/helpers.js
 var require_helpers = __commonJS((exports) => {
   Object.defineProperty(exports, "__esModule", { value: true });
   exports.escapeHtml = escapeHtml;
@@ -31258,7 +31610,7 @@ var require_helpers = __commonJS((exports) => {
   }
 });
 
-// node_modules/ip-address/dist/v6/regular-expressions.js
+// ../zveltio-extensions/node_modules/ip-address/dist/v6/regular-expressions.js
 var require_regular_expressions = __commonJS((exports) => {
   var __createBinding = exports && exports.__createBinding || (Object.create ? function(o, m, k, k2) {
     if (k2 === undefined)
@@ -31352,7 +31704,7 @@ var require_regular_expressions = __commonJS((exports) => {
   }
 });
 
-// node_modules/ip-address/dist/ipv6.js
+// ../zveltio-extensions/node_modules/ip-address/dist/ipv6.js
 var require_ipv6 = __commonJS((exports) => {
   var __createBinding = exports && exports.__createBinding || (Object.create ? function(o, m, k, k2) {
     if (k2 === undefined)
@@ -32105,7 +32457,7 @@ var require_ipv6 = __commonJS((exports) => {
   var IPV4_MAPPED_SUBNET = new Address6("::ffff:0:0/96");
 });
 
-// node_modules/ip-address/dist/ip-address.js
+// ../zveltio-extensions/node_modules/ip-address/dist/ip-address.js
 var require_ip_address = __commonJS((exports) => {
   var __createBinding = exports && exports.__createBinding || (Object.create ? function(o, m, k, k2) {
     if (k2 === undefined)
@@ -32157,7 +32509,7 @@ var require_ip_address = __commonJS((exports) => {
   exports.v6 = { helpers };
 });
 
-// node_modules/socks/build/common/helpers.js
+// ../zveltio-extensions/node_modules/socks/build/common/helpers.js
 var require_helpers2 = __commonJS((exports) => {
   Object.defineProperty(exports, "__esModule", { value: true });
   exports.ipToBuffer = exports.int32ToIpv4 = exports.ipv4ToInt32 = exports.validateSocksClientChainOptions = exports.validateSocksClientOptions = undefined;
@@ -32261,7 +32613,7 @@ var require_helpers2 = __commonJS((exports) => {
   exports.ipToBuffer = ipToBuffer;
 });
 
-// node_modules/socks/build/common/receivebuffer.js
+// ../zveltio-extensions/node_modules/socks/build/common/receivebuffer.js
 var require_receivebuffer = __commonJS((exports) => {
   Object.defineProperty(exports, "__esModule", { value: true });
   exports.ReceiveBuffer = undefined;
@@ -32307,7 +32659,7 @@ var require_receivebuffer = __commonJS((exports) => {
   exports.ReceiveBuffer = ReceiveBuffer;
 });
 
-// node_modules/socks/build/client/socksclient.js
+// ../zveltio-extensions/node_modules/socks/build/client/socksclient.js
 var require_socksclient = __commonJS((exports) => {
   var __awaiter = exports && exports.__awaiter || function(thisArg, _arguments, P, generator) {
     function adopt(value) {
@@ -32885,7 +33237,7 @@ var require_socksclient = __commonJS((exports) => {
   exports.SocksClient = SocksClient;
 });
 
-// node_modules/socks/build/index.js
+// ../zveltio-extensions/node_modules/socks/build/index.js
 var require_build = __commonJS((exports) => {
   var __createBinding = exports && exports.__createBinding || (Object.create ? function(o, m, k, k2) {
     if (k2 === undefined)
@@ -32911,7 +33263,7 @@ var require_build = __commonJS((exports) => {
   __exportStar(require_socksclient(), exports);
 });
 
-// node_modules/imapflow/lib/proxy-connection.js
+// ../zveltio-extensions/node_modules/imapflow/lib/proxy-connection.js
 var require_proxy_connection = __commonJS((exports, module) => {
   var httpProxyClient = require_http_proxy_client();
   var { SocksClient } = require_build();
@@ -32922,6 +33274,21 @@ var require_proxy_connection = __commonJS((exports, module) => {
   var hidePassword = (proxyUrl) => {
     if (proxyUrl.password) {
       proxyUrl.password = "(hidden)";
+    }
+  };
+  var attachEarlyErrorHandler = (logger, socket) => {
+    if (!socket || typeof socket.on !== "function") {
+      return;
+    }
+    socket._earlyErrorHandler = (err) => {
+      logger.error({ msg: "Proxy socket error before connection setup", err });
+    };
+    socket.on("error", socket._earlyErrorHandler);
+  };
+  var detachEarlyErrorHandler = (socket) => {
+    if (socket && socket._earlyErrorHandler) {
+      socket.removeListener("error", socket._earlyErrorHandler);
+      socket._earlyErrorHandler = null;
     }
   };
   var proxyConnection = async (logger, connectionUrl, host, port) => {
@@ -32946,6 +33313,7 @@ var require_proxy_connection = __commonJS((exports, module) => {
               port,
               host
             });
+            attachEarlyErrorHandler(logger, socket);
           }
           return socket;
         } catch (err) {
@@ -32999,6 +33367,7 @@ var require_proxy_connection = __commonJS((exports, module) => {
               port,
               host
             });
+            attachEarlyErrorHandler(logger, info.socket);
           }
           return info.socket;
         } catch (err) {
@@ -33015,10 +33384,10 @@ var require_proxy_connection = __commonJS((exports, module) => {
       }
     }
   };
-  module.exports = { proxyConnection };
+  module.exports = { proxyConnection, detachEarlyErrorHandler };
 });
 
-// node_modules/imapflow/lib/charsets.js
+// ../zveltio-extensions/node_modules/imapflow/lib/charsets.js
 var require_charsets2 = __commonJS((exports, module) => {
   var CHARACTER_SETS = [
     "US-ASCII",
@@ -33294,7 +33663,7 @@ var require_charsets2 = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/jp-decoder.js
+// ../zveltio-extensions/node_modules/imapflow/lib/jp-decoder.js
 var require_jp_decoder = __commonJS((exports, module) => {
   var { Transform } = __require("stream");
   var encodingJapanese = require_src();
@@ -33340,7 +33709,7 @@ var require_jp_decoder = __commonJS((exports, module) => {
   exports.JPDecoder = JPDecoder;
 });
 
-// node_modules/imapflow/lib/tools.js
+// ../zveltio-extensions/node_modules/imapflow/lib/tools.js
 var require_tools2 = __commonJS((exports, module) => {
   var libmime = require_libmime();
   var { resolveCharset } = require_charsets2();
@@ -33642,7 +34011,7 @@ var require_tools2 = __commonJS((exports, module) => {
       }
       if (map2.emailId || map2.uid) {
         let path = mailbox.path;
-        if (/[0x80-0xff]/.test(path)) {
+        if (/[\u0080-\uffff]/.test(path)) {
           try {
             path = iconv.encode(path, "utf-7-imap").toString();
           } catch {}
@@ -33972,7 +34341,7 @@ var require_tools2 = __commonJS((exports, module) => {
       if (!list.length) {
         return "";
       }
-      list.sort((a, b) => a - b);
+      list = Array.from(new Set(list)).sort((a, b) => a - b);
       let last = list[list.length - 1];
       let result = [[last]];
       for (let i = list.length - 2;i >= 0; i--) {
@@ -33994,7 +34363,7 @@ var require_tools2 = __commonJS((exports, module) => {
   module.exports = tools;
 });
 
-// node_modules/imapflow/lib/commands/id.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/id.js
 var require_id = __commonJS((exports, module) => {
   var { formatDateTime } = require_tools2();
   module.exports = async (connection, clientInfo) => {
@@ -34041,7 +34410,7 @@ var require_id = __commonJS((exports, module) => {
   }
 });
 
-// node_modules/imapflow/lib/commands/capability.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/capability.js
 var require_capability = __commonJS((exports, module) => {
   module.exports = async (connection) => {
     if (connection.capabilities.size && !connection.expectCapabilityUpdate) {
@@ -34059,7 +34428,7 @@ var require_capability = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/namespace.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/namespace.js
 var require_namespace = __commonJS((exports, module) => {
   module.exports = async (connection) => {
     if (![connection.states.AUTHENTICATED, connection.states.SELECTED].includes(connection.state)) {
@@ -34152,7 +34521,7 @@ var require_namespace = __commonJS((exports, module) => {
   }
 });
 
-// node_modules/imapflow/lib/commands/login.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/login.js
 var require_login = __commonJS((exports, module) => {
   var { getStatusCode, getErrorText } = require_tools2();
   module.exports = async (connection, username, password) => {
@@ -34179,7 +34548,7 @@ var require_login = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/logout.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/logout.js
 var require_logout = __commonJS((exports, module) => {
   module.exports = async (connection) => {
     if (connection.state === connection.states.LOGOUT) {
@@ -34210,7 +34579,7 @@ var require_logout = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/starttls.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/starttls.js
 var require_starttls = __commonJS((exports, module) => {
   module.exports = async (connection) => {
     if (!connection.capabilities.has("STARTTLS") || connection.secureConnection) {
@@ -34219,6 +34588,7 @@ var require_starttls = __commonJS((exports, module) => {
     let response;
     try {
       response = await connection.exec("STARTTLS");
+      connection._starttlsHadTrailingData = !!(response && response.hasTrailingData);
       response.next();
       return true;
     } catch (err) {
@@ -34228,7 +34598,7 @@ var require_starttls = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/special-use.js
+// ../zveltio-extensions/node_modules/imapflow/lib/special-use.js
 var require_special_use = __commonJS((exports, module) => {
   module.exports = {
     flags: ["\\All", "\\Archive", "\\Drafts", "\\Flagged", "\\Junk", "\\Sent", "\\Trash"],
@@ -34525,7 +34895,7 @@ var require_special_use = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/list.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/list.js
 var require_list = __commonJS((exports, module) => {
   var { decodePath, encodePath, normalizePath } = require_tools2();
   var { specialUse } = require_special_use();
@@ -34574,6 +34944,11 @@ var require_list = __commonJS((exports, module) => {
         }
         specialUseMatches[type].push({ entry, source });
       };
+      let normalizeFlags = (entry) => {
+        if (entry.flags.has("\\NonExistent")) {
+          entry.flags.add("\\Noselect");
+        }
+      };
       let specialUseHints = {};
       if (options.specialUseHints && typeof options.specialUseHints === "object") {
         for (let type of Object.keys(options.specialUseHints)) {
@@ -34600,6 +34975,7 @@ var require_list = __commonJS((exports, module) => {
                 delimiter: untagged.attributes[1] && untagged.attributes[1].value,
                 listed: true
               };
+              normalizeFlags(entry);
               if (specialUseHints[entry.path]) {
                 addSpecialUseMatch(entry, specialUseHints[entry.path], "user");
               }
@@ -34713,6 +35089,7 @@ var require_list = __commonJS((exports, module) => {
             if (existing) {
               existing.subscribed = true;
               entry.flags.forEach((flag) => existing.flags.add(flag));
+              normalizeFlags(existing);
             }
           }
         }
@@ -34764,7 +35141,7 @@ var require_list = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/enable.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/enable.js
 var require_enable = __commonJS((exports, module) => {
   module.exports = async (connection, extensionList) => {
     if (!connection.capabilities.has("ENABLE") || connection.state !== connection.states.AUTHENTICATED) {
@@ -34801,7 +35178,7 @@ var require_enable = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/select.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/select.js
 var require_select = __commonJS((exports, module) => {
   var { encodePath, normalizePath, enhanceCommandError } = require_tools2();
   module.exports = async (connection, path, options) => {
@@ -34902,7 +35279,7 @@ var require_select = __commonJS((exports, module) => {
             }
           },
           FLAGS: async (untagged) => {
-            if (!untagged.attributes || !untagged.attributes.length && Array.isArray(untagged.attributes[0])) {
+            if (!untagged.attributes || !untagged.attributes.length || !Array.isArray(untagged.attributes[0])) {
               return;
             }
             let flags = untagged.attributes[0].map((flag) => typeof flag.value === "string" ? flag.value : false).filter((flag) => flag);
@@ -34960,7 +35337,7 @@ var require_select = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/fetch.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/fetch.js
 var require_fetch = __commonJS((exports, module) => {
   var { formatMessageResponse } = require_tools2();
   module.exports = async (connection, range, query, options) => {
@@ -35142,7 +35519,7 @@ var require_fetch = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/create.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/create.js
 var require_create = __commonJS((exports, module) => {
   var { encodePath, normalizePath, getStatusCode, enhanceCommandError } = require_tools2();
   module.exports = async (connection, path) => {
@@ -35198,7 +35575,7 @@ var require_create = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/delete.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/delete.js
 var require_delete = __commonJS((exports, module) => {
   var { encodePath, normalizePath, enhanceCommandError } = require_tools2();
   module.exports = async (connection, path) => {
@@ -35225,7 +35602,7 @@ var require_delete = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/rename.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/rename.js
 var require_rename = __commonJS((exports, module) => {
   var { encodePath, normalizePath, enhanceCommandError } = require_tools2();
   module.exports = async (connection, path, newPath) => {
@@ -35257,7 +35634,7 @@ var require_rename = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/close.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/close.js
 var require_close = __commonJS((exports, module) => {
   module.exports = async (connection) => {
     if (connection.state !== connection.states.SELECTED) {
@@ -35282,7 +35659,7 @@ var require_close = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/subscribe.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/subscribe.js
 var require_subscribe = __commonJS((exports, module) => {
   var { encodePath, normalizePath, enhanceCommandError } = require_tools2();
   module.exports = async (connection, path) => {
@@ -35303,7 +35680,7 @@ var require_subscribe = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/unsubscribe.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/unsubscribe.js
 var require_unsubscribe = __commonJS((exports, module) => {
   var { encodePath, normalizePath, enhanceCommandError } = require_tools2();
   module.exports = async (connection, path) => {
@@ -35324,7 +35701,7 @@ var require_unsubscribe = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/store.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/store.js
 var require_store = __commonJS((exports, module) => {
   var { formatFlag, canUseFlag, enhanceCommandError } = require_tools2();
   module.exports = async (connection, range, flags, options) => {
@@ -35351,7 +35728,7 @@ var require_store = __commonJS((exports, module) => {
     }
     flags = (Array.isArray(flags) ? flags : [].concat(flags || [])).map((flag) => {
       flag = formatFlag(flag);
-      if (!canUseFlag(connection.mailbox, flag) && operation !== "remove") {
+      if (!canUseFlag(connection.mailbox, flag) && options.operation !== "remove") {
         return false;
       }
       return flag;
@@ -35385,9 +35762,9 @@ var require_store = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/search-compiler.js
+// ../zveltio-extensions/node_modules/imapflow/lib/search-compiler.js
 var require_search_compiler = __commonJS((exports, module) => {
-  var { formatDate, formatFlag, canUseFlag, isDate: isDate2 } = require_tools2();
+  var { formatDate, formatFlag, canUseFlag, isDate } = require_tools2();
   var setBoolOpt = (attributes, term, value) => {
     if (!value) {
       if (/^un/i.test(term)) {
@@ -35411,7 +35788,7 @@ var require_search_compiler = __commonJS((exports, module) => {
     }
   };
   var processDateField = (attributes, term, value) => {
-    if (["BEFORE", "SENTBEFORE"].includes(term.toUpperCase()) && isDate2(value) && value.toISOString().substring(11) !== "00:00:00.000Z") {
+    if (["BEFORE", "SENTBEFORE"].includes(term.toUpperCase()) && isDate(value) && value.toISOString().substring(11) !== "00:00:00.000Z") {
       value = new Date(value.getTime() + 24 * 3600 * 1000);
     }
     let date5 = formatDate(value);
@@ -35524,10 +35901,45 @@ var require_search_compiler = __commonJS((exports, module) => {
               throw error51;
             }
             break;
+          case "LABELS": {
+            let labelQuery = params[term];
+            if (!labelQuery || typeof labelQuery !== "object") {
+              break;
+            }
+            let formatLabel = (name) => {
+              name = (name || "").toString().replace(/[\s"]+/g, " ").trim();
+              return name.indexOf(" ") >= 0 ? `"${name}"` : name;
+            };
+            let rawParts = [];
+            for (let name of [].concat(labelQuery.has || [])) {
+              if (name) {
+                rawParts.push(`label:${formatLabel(name)}`);
+              }
+            }
+            for (let name of [].concat(labelQuery.not || [])) {
+              if (name) {
+                rawParts.push(`-label:${formatLabel(name)}`);
+              }
+            }
+            if (!rawParts.length) {
+              break;
+            }
+            if (!connection.capabilities.has("X-GM-EXT-1")) {
+              let error51 = new Error("Server does not support X-GM-EXT-1 extension required for label search");
+              error51.code = "MissingServerExtension";
+              throw error51;
+            }
+            let rawQuery = rawParts.join(" ");
+            if (isUnicodeString(rawQuery)) {
+              hasUnicode = true;
+            }
+            setOpt(attributes, "X-GM-RAW", rawQuery);
+            break;
+          }
           case "BEFORE":
           case "SINCE":
             {
-              if (connection.capabilities.has("WITHIN") && isDate2(params[term])) {
+              if (connection.capabilities.has("WITHIN") && isDate(params[term])) {
                 const now = Date.now();
                 const withinSeconds = Math.round(Math.max(0, now - params[term].getTime()) / 1000);
                 const withinKeyword = term.toUpperCase() === "BEFORE" ? "OLDER" : "YOUNGER";
@@ -35647,7 +36059,7 @@ var require_search_compiler = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/search.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/search.js
 var require_search = __commonJS((exports, module) => {
   var { enhanceCommandError } = require_tools2();
   var { searchCompiler } = require_search_compiler();
@@ -35790,7 +36202,7 @@ var require_search = __commonJS((exports, module) => {
   module.exports.parseEsearchResponse = parseEsearchResponse;
 });
 
-// node_modules/imapflow/lib/commands/noop.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/noop.js
 var require_noop = __commonJS((exports, module) => {
   module.exports = async (connection) => {
     try {
@@ -35804,7 +36216,7 @@ var require_noop = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/expunge.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/expunge.js
 var require_expunge = __commonJS((exports, module) => {
   var { enhanceCommandError } = require_tools2();
   module.exports = async (connection, range, options) => {
@@ -35837,7 +36249,7 @@ var require_expunge = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/append.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/append.js
 var require_append = __commonJS((exports, module) => {
   var { formatFlag, canUseFlag, formatDateTime, normalizePath, encodePath, comparePaths, enhanceCommandError } = require_tools2();
   module.exports = async (connection, destination, content, flags, idate) => {
@@ -35935,7 +36347,7 @@ var require_append = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/status.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/status.js
 var require_status = __commonJS((exports, module) => {
   var { encodePath, normalizePath } = require_tools2();
   module.exports = async (connection, path, query) => {
@@ -36053,7 +36465,7 @@ var require_status = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/copyuid-parser.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/copyuid-parser.js
 var require_copyuid_parser = __commonJS((exports, module) => {
   var { expandRange } = require_tools2();
   function parseCopyUid(response, map2) {
@@ -36075,7 +36487,7 @@ var require_copyuid_parser = __commonJS((exports, module) => {
   module.exports = { parseCopyUid };
 });
 
-// node_modules/imapflow/lib/commands/copy.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/copy.js
 var require_copy = __commonJS((exports, module) => {
   var { normalizePath, encodePath, enhanceCommandError } = require_tools2();
   var { parseCopyUid } = require_copyuid_parser();
@@ -36104,7 +36516,7 @@ var require_copy = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/move.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/move.js
 var require_move = __commonJS((exports, module) => {
   var { normalizePath, encodePath, enhanceCommandError } = require_tools2();
   var { parseCopyUid } = require_copyuid_parser();
@@ -36144,7 +36556,7 @@ var require_move = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/compress.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/compress.js
 var require_compress = __commonJS((exports, module) => {
   module.exports = async (connection) => {
     if (!connection.capabilities.has("COMPRESS=DEFLATE") || connection._inflate) {
@@ -36162,7 +36574,7 @@ var require_compress = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/quota.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/quota.js
 var require_quota = __commonJS((exports, module) => {
   var { encodePath, normalizePath, enhanceCommandError } = require_tools2();
   module.exports = async (connection, path) => {
@@ -36243,7 +36655,7 @@ var require_quota = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/idle.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/idle.js
 var require_idle = __commonJS((exports, module) => {
   var NOOP_INTERVAL = 2 * 60 * 1000;
   async function runIdle(connection) {
@@ -36419,7 +36831,7 @@ var require_idle = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/commands/authenticate.js
+// ../zveltio-extensions/node_modules/imapflow/lib/commands/authenticate.js
 var require_authenticate = __commonJS((exports, module) => {
   var { getStatusCode, getErrorText } = require_tools2();
   async function handleAuthError(err, errorResponse) {
@@ -36432,7 +36844,7 @@ var require_authenticate = __commonJS((exports, module) => {
     if (errorResponse) {
       err.oauthError = errorResponse;
     }
-    throw err;
+    return err;
   }
   async function authOauth(connection, username, accessToken) {
     let oauthbearer;
@@ -36469,7 +36881,7 @@ var require_authenticate = __commonJS((exports, module) => {
       connection.authCapabilities.set(`AUTH=${command}`, true);
       return username;
     } catch (err) {
-      await handleAuthError(err, errorResponse);
+      throw await handleAuthError(err, errorResponse);
     }
   }
   async function authLogin(connection, username, password) {
@@ -36496,7 +36908,7 @@ var require_authenticate = __commonJS((exports, module) => {
       connection.authCapabilities.set(`AUTH=LOGIN`, true);
       return username;
     } catch (err) {
-      await handleAuthError(err, errorResponse);
+      throw await handleAuthError(err, errorResponse);
     }
   }
   async function authPlain(connection, username, password, authzid) {
@@ -36515,7 +36927,7 @@ var require_authenticate = __commonJS((exports, module) => {
       connection.authCapabilities.set(`AUTH=PLAIN`, true);
       return authzid || username;
     } catch (err) {
-      await handleAuthError(err, errorResponse);
+      throw await handleAuthError(err, errorResponse);
     }
   }
   module.exports = async (connection, username, { accessToken, password, loginMethod, authzid }) => {
@@ -36539,7 +36951,7 @@ var require_authenticate = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/imapflow/lib/imap-commands.js
+// ../zveltio-extensions/node_modules/imapflow/lib/imap-commands.js
 var require_imap_commands = __commonJS((exports, module) => {
   module.exports = new Map([
     ["ID", require_id()],
@@ -36573,7 +36985,7 @@ var require_imap_commands = __commonJS((exports, module) => {
   ]);
 });
 
-// node_modules/imapflow/lib/imap-flow.js
+// ../zveltio-extensions/node_modules/imapflow/lib/imap-flow.js
 var require_imap_flow = __commonJS((exports, module) => {
   var tls = __require("tls");
   var net = __require("net");
@@ -36591,7 +37003,7 @@ var require_imap_flow = __commonJS((exports, module) => {
   var libbase64 = require_libbase64();
   var FlowedDecoder = require_flowed_decoder();
   var { PassThrough } = __require("stream");
-  var { proxyConnection } = require_proxy_connection();
+  var { proxyConnection, detachEarlyErrorHandler } = require_proxy_connection();
   var {
     comparePaths,
     updateCapabilities,
@@ -36605,7 +37017,7 @@ var require_imap_flow = __commonJS((exports, module) => {
     getColorFlags
   } = require_tools2();
   var imapCommands = require_imap_commands();
-  var noop2 = () => {};
+  var noop = () => {};
   var CONNECT_TIMEOUT = 90 * 1000;
   var GREETING_TIMEOUT = 16 * 1000;
   var UPGRADE_TIMEOUT = 10 * 1000;
@@ -36649,11 +37061,16 @@ var require_imap_flow = __commonJS((exports, module) => {
         logger: this.log,
         cid: this.id,
         logRaw: this.logRaw,
-        secureConnection: this.secureConnection
+        secureConnection: this.secureConnection,
+        maxLineLength: this.options.maxLineLength,
+        maxLiteralSize: this.options.maxLiteralSize
       });
       this.reading = false;
       this.socket = false;
       this.writeSocket = false;
+      this._throttleTimer = null;
+      this._throttleAbort = null;
+      this._upgradeReject = null;
       this.isClosed = false;
       this.states = states;
       this.state = this.states.NOT_AUTHENTICATED;
@@ -36668,6 +37085,7 @@ var require_imap_flow = __commonJS((exports, module) => {
       this.authCapabilities = new Map;
       this.rawCapabilities = null;
       this.expectCapabilityUpdate = false;
+      this._starttlsHadTrailingData = false;
       this.enabled = new Set;
       this.usable = false;
       this.authenticated = false;
@@ -36702,6 +37120,24 @@ var require_imap_flow = __commonJS((exports, module) => {
         return;
       }
       err._connId = err._connId || this.id;
+      if (this.upgrading) {
+        this.upgrading = false;
+        this.closeAfter();
+        if (typeof this._upgradeReject === "function") {
+          let reject = this._upgradeReject;
+          this._upgradeReject = null;
+          reject(err);
+        }
+        return;
+      }
+      if (typeof this.initialReject === "function") {
+        let reject = this.initialReject;
+        this.initialResolve = false;
+        this.initialReject = false;
+        this.closeAfter();
+        reject(err);
+        return;
+      }
       this.closeAfter();
       this.emit("error", err);
     }
@@ -36817,14 +37253,14 @@ var require_imap_flow = __commonJS((exports, module) => {
         const error51 = new Error("Connection not available");
         error51.code = "NoConnection";
         let p = Promise.reject(error51);
-        p.catch(noop2);
+        p.catch(noop);
         return p;
       }
       if (!this.socket || this.socket.destroyed) {
         let error51 = new Error("Connection closed");
         error51.code = "EConnectionClosed";
         let p = Promise.reject(error51);
-        p.catch(noop2);
+        p.catch(noop);
         return p;
       }
       let tag = (++this.tagCounter).toString(16).toUpperCase();
@@ -36837,7 +37273,7 @@ var require_imap_flow = __commonJS((exports, module) => {
           reject(err);
         });
       });
-      promise2.catch(noop2);
+      promise2.catch(noop);
       return promise2;
     }
     getUntaggedHandler(command, attributes) {
@@ -36898,8 +37334,12 @@ var require_imap_flow = __commonJS((exports, module) => {
         }
         if (parsed.tag === "+" && this.commandParts.length) {
           let content = this.commandParts.shift();
-          this.write(content);
-          this.log.debug({ src: "c", msg: `(* ${content.length}B continuation *)`, cid: this.id });
+          try {
+            this.write(content);
+            this.log.debug({ src: "c", msg: `(* ${content.length}B continuation *)`, cid: this.id });
+          } catch (err) {
+            this.log.warn({ err, cid: this.id });
+          }
           data.next();
           continue;
         }
@@ -36931,12 +37371,16 @@ var require_imap_flow = __commonJS((exports, module) => {
           this.requestTagMap.delete(parsed.tag);
           if (this.currentRequest && this.currentRequest.tag === parsed.tag) {
             this.currentRequest = false;
-            await this.trySend();
+            try {
+              await this.trySend();
+            } catch (err) {
+              this.log.warn({ err, cid: this.id });
+            }
           }
           switch (parsed.command.toUpperCase()) {
             case "OK":
             case "BYE":
-              await new Promise((resolve) => request.resolve({ response: parsed, next: resolve }));
+              await new Promise((resolve) => request.resolve({ response: parsed, next: resolve, hasTrailingData: !!data.trailingAfterLine }));
               break;
             case "NO":
             case "BAD": {
@@ -36971,7 +37415,19 @@ var require_imap_flow = __commonJS((exports, module) => {
                     delayResponse = 5 * 60 * 1000;
                   }
                   this.log.warn({ msg: "Throttling detected", cid: this.id, throttleDelay, delayResponse, err });
-                  await new Promise((r) => setTimeout(r, delayResponse));
+                  let aborted2 = await new Promise((resolve) => {
+                    this._throttleAbort = resolve;
+                    this._throttleTimer = setTimeout(() => resolve(false), delayResponse);
+                    if (typeof this._throttleTimer.unref === "function") {
+                      this._throttleTimer.unref();
+                    }
+                  });
+                  this._throttleTimer = null;
+                  this._throttleAbort = null;
+                  if (aborted2) {
+                    request.reject(this.createNoConnectionError(this.byeReason));
+                    break;
+                  }
                 }
               }
               request.reject(err);
@@ -37006,10 +37462,6 @@ var require_imap_flow = __commonJS((exports, module) => {
     }
     setSocketHandlers() {
       this.clearSocketHandlers();
-      if (this._connectErrorHandler && this.socket) {
-        this.socket.removeListener("error", this._connectErrorHandler);
-        this._connectErrorHandler = null;
-      }
       this._socketError = this._socketError || ((err) => {
         this.log.error({ err, cid: this.id });
         this.emitError(err);
@@ -37118,7 +37570,9 @@ var require_imap_flow = __commonJS((exports, module) => {
       this.streamer.compress = true;
       this.socket.pipe(this._inflate).pipe(this.streamer);
       this._inflate.on("error", (err) => {
-        this.streamer.emit("error", err);
+        if (!this.streamer.destroyed && this.streamer.listenerCount("error")) {
+          this.streamer.emit("error", err);
+        }
       });
       this.writeSocket = new PassThrough({
         highWaterMark: 64 * 1024
@@ -37207,8 +37661,23 @@ var require_imap_flow = __commonJS((exports, module) => {
       if (!canUpgrade) {
         return this._failSTARTTLS();
       }
+      const failSTARTTLSInjection = () => {
+        let err = new Error("Server sent data after the STARTTLS response and before the TLS handshake; possible plaintext-injection attack");
+        err.code = "STARTTLS_INJECTION";
+        err.tlsFailed = true;
+        this.closeAfter();
+        return err;
+      };
+      if (this._starttlsHadTrailingData) {
+        throw failSTARTTLSInjection();
+      }
       this.socket.unpipe(this.streamer);
+      let injectedTail = typeof this.socket.read === "function" ? this.socket.read() : null;
+      if (injectedTail && injectedTail.length) {
+        throw failSTARTTLSInjection();
+      }
       let upgraded = await new Promise((resolve, reject) => {
+        this._upgradeReject = reject;
         let socketPlain = this.socket;
         let opts = Object.assign({
           socket: this.socket,
@@ -37238,6 +37707,18 @@ var require_imap_flow = __commonJS((exports, module) => {
           err.code = "UPGRADE_TIMEOUT";
           reject(err);
         }, UPGRADE_TIMEOUT);
+        const tlsSocketErrorHandler = (err) => {
+          clearTimeout(this.connectTimeout);
+          clearTimeout(this.upgradeTimeout);
+          if (!this.upgrading) {
+            return;
+          }
+          this.upgrading = false;
+          err.tlsFailed = true;
+          this.clearSocketHandlers();
+          this.closeAfter();
+          reject(err);
+        };
         this.upgrading = true;
         this.socket = tls.connect(opts, () => {
           try {
@@ -37262,13 +37743,16 @@ var require_imap_flow = __commonJS((exports, module) => {
               });
             }
             socketPlain.removeListener("error", socketPlainErrorHandler);
+            this.socket.removeListener("error", tlsSocketErrorHandler);
+            this.setSocketHandlers();
+            this._upgradeReject = null;
             return resolve(true);
           } catch (ex) {
             this.emitError(ex);
           }
         });
+        this.socket.once("error", tlsSocketErrorHandler);
         this.writeSocket = this.socket;
-        this.setSocketHandlers();
       });
       if (upgraded && this.expectCapabilityUpdate) {
         this.capabilities.clear();
@@ -37597,6 +38081,7 @@ var require_imap_flow = __commonJS((exports, module) => {
         let onConnect = () => {
           try {
             clearTimeout(this.connectTimeout);
+            detachEarlyErrorHandler(socket);
             this.socket.setKeepAlive(true, 5 * 1000);
             this.socket.setTimeout(this.options.socketTimeout || SOCKET_TIMEOUT);
             this.greetingTimeout = setTimeout(() => {
@@ -37658,7 +38143,7 @@ var require_imap_flow = __commonJS((exports, module) => {
         };
         this.socket.on("error", this._connectErrorHandler);
       });
-      connectPromise.catch(noop2);
+      connectPromise.catch(noop);
       await connectPromise;
     }
     async logout() {
@@ -37667,12 +38152,26 @@ var require_imap_flow = __commonJS((exports, module) => {
     closeAfter() {
       setImmediate(() => this.close());
     }
+    createNoConnectionError(byeReason) {
+      const error51 = new Error("Connection not available");
+      error51.code = "NoConnection";
+      if (byeReason) {
+        error51.reason = byeReason;
+      }
+      return error51;
+    }
     close() {
       try {
         clearTimeout(this.idleStartTimer);
         clearTimeout(this.upgradeTimeout);
         clearTimeout(this.connectTimeout);
         clearTimeout(this.greetingTimeout);
+        clearTimeout(this._throttleTimer);
+        this._throttleTimer = null;
+        if (typeof this._throttleAbort === "function") {
+          this._throttleAbort(true);
+          this._throttleAbort = null;
+        }
         this.usable = false;
         this.idling = false;
         if (typeof this.initialReject === "function" && !this.options.verifyOnly) {
@@ -37682,6 +38181,9 @@ var require_imap_flow = __commonJS((exports, module) => {
           this.initialReject = false;
           let err = new Error("Unexpected close");
           err.code = `ClosedAfterConnect${this.secureConnection ? "TLS" : "Text"}`;
+          if (this.byeReason) {
+            err.reason = this.byeReason;
+          }
           reject(err);
         }
         if (typeof this.preCheck === "function") {
@@ -37707,14 +38209,7 @@ var require_imap_flow = __commonJS((exports, module) => {
             }
           }
         }
-        const createNoConnectionError = (byeReason2) => {
-          const error51 = new Error("Connection not available");
-          error51.code = "NoConnection";
-          if (byeReason2) {
-            error51.reason = byeReason2;
-          }
-          return error51;
-        };
+        const createNoConnectionError = (byeReason2) => this.createNoConnectionError(byeReason2);
         let byeReason = this.byeReason;
         for (let request of pendingRequests) {
           request.reject(createNoConnectionError(byeReason));
@@ -38637,7 +39132,7 @@ var require_imap_flow = __commonJS((exports, module) => {
         }
         this.processLocks().catch((err) => reject(err));
       });
-      lockPromise.catch(noop2);
+      lockPromise.catch(noop);
       return lockPromise;
     }
     getLogger() {
@@ -38680,21 +39175,25 @@ var require_imap_flow = __commonJS((exports, module) => {
       if (this._inflate) {
         this._inflate.unpipe(this.streamer);
       }
-      this.socket.removeListener("error", this._socketError);
-      this.socket.removeListener("close", this._socketClose);
-      this.socket.removeListener("end", this._socketEnd);
-      this.socket.removeListener("tlsClientError", this._socketError);
-      this.socket.removeListener("timeout", this._socketTimeout);
+      this.clearSocketHandlers();
+      const readSocket = this._inflate || this.socket;
+      const writeSocket = this.writeSocket || this.socket;
+      if (this.socket !== readSocket && this.socket !== writeSocket) {
+        this.socket.on("error", (err) => {
+          this.log.debug({ msg: "Suppressed error on unbound socket", err, cid: this.id });
+        });
+      }
       return {
-        readSocket: this._inflate || this.socket,
-        writeSocket: this.writeSocket || this.socket
+        readSocket,
+        writeSocket,
+        socket: this.socket
       };
     }
   }
   exports.ImapFlow = ImapFlow;
 });
 
-// node_modules/mailparser/node_modules/nodemailer/lib/addressparser/index.js
+// ../zveltio-extensions/node_modules/mailparser/node_modules/nodemailer/lib/addressparser/index.js
 var require_addressparser = __commonJS((exports, module) => {
   function _handleAddress(tokens, depth) {
     let isGroup = false;
@@ -38833,6 +39332,7 @@ var require_addressparser = __commonJS((exports, module) => {
       this.operatorExpecting = "";
       this.node = null;
       this.escaped = false;
+      this.inDomainLiteral = false;
       this.list = [];
       this.operators = {
         '"': '"',
@@ -38859,6 +39359,13 @@ var require_addressparser = __commonJS((exports, module) => {
       return list;
     }
     checkChar(chr, nextChr) {
+      if (!this.escaped && !this.operatorExpecting) {
+        if (!this.inDomainLiteral && chr === "[") {
+          this.inDomainLiteral = true;
+        } else if (this.inDomainLiteral && (chr === "]" || chr === "," || chr === ";")) {
+          this.inDomainLiteral = false;
+        }
+      }
       if (this.escaped) {} else if (chr === this.operatorExpecting) {
         this.node = {
           type: "operator",
@@ -38873,7 +39380,7 @@ var require_addressparser = __commonJS((exports, module) => {
         this.operatorExpecting = "";
         this.escaped = false;
         return;
-      } else if (!this.operatorExpecting && chr in this.operators) {
+      } else if (!this.operatorExpecting && !this.inDomainLiteral && chr in this.operators) {
         this.node = {
           type: "operator",
           value: chr
@@ -38961,8 +39468,8 @@ var require_addressparser = __commonJS((exports, module) => {
   module.exports = addressparser;
 });
 
-// node_modules/punycode.js/punycode.js
-var require_punycode = __commonJS((exports, module) => {
+// ../zveltio-extensions/node_modules/punycode.js/punycode.js
+var require_punycode2 = __commonJS((exports, module) => {
   var maxInt = 2147483647;
   var base = 36;
   var tMin = 1;
@@ -39183,7 +39690,7 @@ var require_punycode = __commonJS((exports, module) => {
   module.exports = punycode;
 });
 
-// node_modules/mailparser/lib/stream-hash.js
+// ../zveltio-extensions/node_modules/mailparser/lib/stream-hash.js
 var require_stream_hash = __commonJS((exports, module) => {
   var crypto2 = __require("crypto");
   var Transform = __require("stream").Transform;
@@ -39210,7 +39717,7 @@ var require_stream_hash = __commonJS((exports, module) => {
   module.exports = StreamHash;
 });
 
-// node_modules/domelementtype/lib/esm/index.js
+// ../zveltio-extensions/node_modules/domelementtype/lib/esm/index.js
 function isTag(elem) {
   return elem.type === ElementType.Tag || elem.type === ElementType.Script || elem.type === ElementType.Style;
 }
@@ -39238,7 +39745,7 @@ var init_esm = __esm(() => {
   Doctype = ElementType.Doctype;
 });
 
-// node_modules/domhandler/lib/esm/node.js
+// ../zveltio-extensions/node_modules/domhandler/lib/esm/node.js
 class Node3 {
   constructor() {
     this.parent = null;
@@ -39395,8 +39902,8 @@ var init_node = __esm(() => {
       this.children = children;
     }
     get firstChild() {
-      var _a3;
-      return (_a3 = this.children[0]) !== null && _a3 !== undefined ? _a3 : null;
+      var _a4;
+      return (_a4 = this.children[0]) !== null && _a4 !== undefined ? _a4 : null;
     }
     get lastChild() {
       return this.children.length > 0 ? this.children[this.children.length - 1] : null;
@@ -39444,11 +39951,11 @@ var init_node = __esm(() => {
     }
     get attributes() {
       return Object.keys(this.attribs).map((name) => {
-        var _a3, _b;
+        var _a4, _b;
         return {
           name,
           value: this.attribs[name],
-          namespace: (_a3 = this["x-attribsNamespace"]) === null || _a3 === undefined ? undefined : _a3[name],
+          namespace: (_a4 = this["x-attribsNamespace"]) === null || _a4 === undefined ? undefined : _a4[name],
           prefix: (_b = this["x-attribsPrefix"]) === null || _b === undefined ? undefined : _b[name]
         };
       });
@@ -39456,7 +39963,7 @@ var init_node = __esm(() => {
   };
 });
 
-// node_modules/domhandler/lib/esm/index.js
+// ../zveltio-extensions/node_modules/domhandler/lib/esm/index.js
 class DomHandler {
   constructor(callback, options, elementCB) {
     this.dom = [];
@@ -39589,7 +40096,7 @@ var init_esm2 = __esm(() => {
   };
 });
 
-// node_modules/leac/lib/leac.mjs
+// ../zveltio-extensions/node_modules/leac/lib/leac.mjs
 function createPositionQuery(str) {
   const offsets = [...str.matchAll(linebreaksRe)].map((m) => m.index || 0);
   offsets.unshift(-1);
@@ -39714,7 +40221,7 @@ var init_leac = __esm(() => {
   linebreaksRe = /\n/g;
 });
 
-// node_modules/peberminta/lib/core.mjs
+// ../zveltio-extensions/node_modules/peberminta/lib/core.mjs
 function mapInner(r, f) {
   return r.matched ? {
     matched: true,
@@ -39903,7 +40410,7 @@ function filter(p, test) {
 }
 var init_core = () => {};
 
-// node_modules/parseley/lib/parseley.mjs
+// ../zveltio-extensions/node_modules/parseley/lib/parseley.mjs
 function sumSpec([a0, a1, a2], [b0, b1, b2]) {
   return [a0 + b0, a1 + b1, a2 + b2];
 }
@@ -40274,7 +40781,7 @@ var init_parseley = __esm(() => {
   listSelector_ = leftAssoc2(map2(complexSelector_, (s) => ({ type: "list", list: [s] })), map2(optionallySpaced(literal2(",")), () => (acc, next) => ({ type: "list", list: [...acc.list, next] })), complexSelector_);
 });
 
-// node_modules/selderee/lib/selderee.mjs
+// ../zveltio-extensions/node_modules/selderee/lib/selderee.mjs
 class DecisionTree {
   branches;
   constructor(input, options = {}) {
@@ -40655,7 +41162,7 @@ var init_selderee = __esm(() => {
   init_parseley();
 });
 
-// node_modules/@selderee/plugin-htmlparser2/lib/hp2-builder.mjs
+// ../zveltio-extensions/node_modules/@selderee/plugin-htmlparser2/lib/hp2-builder.mjs
 function hp2Builder(nodes) {
   return new Picker(handleArray(nodes));
 }
@@ -40786,15 +41293,15 @@ var init_hp2_builder = __esm(() => {
   };
 });
 
-// node_modules/htmlparser2/node_modules/entities/dist/esm/decode-codepoint.js
+// ../zveltio-extensions/node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/decode-codepoint.js
 function replaceCodePoint(codePoint) {
-  var _a4;
+  var _a5;
   if (codePoint >= 55296 && codePoint <= 57343 || codePoint > 1114111) {
     return 65533;
   }
-  return (_a4 = decodeMap.get(codePoint)) !== null && _a4 !== undefined ? _a4 : codePoint;
+  return (_a5 = decodeMap.get(codePoint)) !== null && _a5 !== undefined ? _a5 : codePoint;
 }
-var _a3, decodeMap, fromCodePoint;
+var _a4, decodeMap, fromCodePoint;
 var init_decode_codepoint = __esm(() => {
   decodeMap = new Map([
     [0, 65533],
@@ -40826,7 +41333,7 @@ var init_decode_codepoint = __esm(() => {
     [158, 382],
     [159, 376]
   ]);
-  fromCodePoint = (_a3 = String.fromCodePoint) !== null && _a3 !== undefined ? _a3 : (codePoint) => {
+  fromCodePoint = (_a4 = String.fromCodePoint) !== null && _a4 !== undefined ? _a4 : (codePoint) => {
     let output = "";
     if (codePoint > 65535) {
       codePoint -= 65536;
@@ -40838,7 +41345,7 @@ var init_decode_codepoint = __esm(() => {
   };
 });
 
-// node_modules/htmlparser2/node_modules/entities/dist/esm/internal/decode-shared.js
+// ../zveltio-extensions/node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/internal/decode-shared.js
 function decodeBase64(input) {
   const binary = typeof atob === "function" ? atob(input) : typeof Buffer.from === "function" ? Buffer.from(input, "base64").toString("binary") : new Buffer(input, "base64").toString("binary");
   const evenLength = binary.length & ~1;
@@ -40851,19 +41358,19 @@ function decodeBase64(input) {
   return out;
 }
 
-// node_modules/htmlparser2/node_modules/entities/dist/esm/generated/decode-data-html.js
+// ../zveltio-extensions/node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/generated/decode-data-html.js
 var htmlDecodeTree;
 var init_decode_data_html = __esm(() => {
   htmlDecodeTree = /* @__PURE__ */ decodeBase64("QR08ALkAAgH6AYsDNQR2BO0EPgXZBQEGLAbdBxMISQrvCmQLfQurDKQNLw4fD4YPpA+6D/IPAAAAAAAAAAAAAAAAKhBMEY8TmxUWF2EYLBkxGuAa3RsJHDscWR8YIC8jSCSIJcMl6ie3Ku8rEC0CLjoupS7kLgAIRU1hYmNmZ2xtbm9wcnN0dVQAWgBeAGUAaQBzAHcAfgCBAIQAhwCSAJoAoACsALMAbABpAGcAO4DGAMZAUAA7gCYAJkBjAHUAdABlADuAwQDBQHIiZXZlAAJhAAFpeW0AcgByAGMAO4DCAMJAEGRyAADgNdgE3XIAYQB2AGUAO4DAAMBA8CFoYZFj4SFjcgBhZAAAoFMqAAFncIsAjgBvAG4ABGFmAADgNdg43fAlbHlGdW5jdGlvbgCgYSBpAG4AZwA7gMUAxUAAAWNzpACoAHIAAOA12Jzc6SFnbgCgVCJpAGwAZABlADuAwwDDQG0AbAA7gMQAxEAABGFjZWZvcnN1xQDYANoA7QDxAPYA+QD8AAABY3LJAM8AayNzbGFzaAAAoBYidgHTANUAAKDnKmUAZAAAoAYjeQARZIABY3J0AOAA5QDrAGEidXNlAACgNSLuI291bGxpcwCgLCFhAJJjcgAA4DXYBd1wAGYAAOA12Dnd5SF2ZdhiYwDyAOoAbSJwZXEAAKBOIgAHSE9hY2RlZmhpbG9yc3UXARoBHwE6AVIBVQFiAWQBZgGCAakB6QHtAfIBYwB5ACdkUABZADuAqQCpQIABY3B5ACUBKAE1AfUhdGUGYWmg0iJ0KGFsRGlmZmVyZW50aWFsRAAAoEUhbCJleXMAAKAtIQACYWVpb0EBRAFKAU0B8iFvbgxhZABpAGwAO4DHAMdAcgBjAAhhbiJpbnQAAKAwIm8AdAAKYQABZG5ZAV0BaSJsbGEAuGB0I2VyRG90ALdg8gA5AWkAp2NyImNsZQAAAkRNUFRwAXQBeQF9AW8AdAAAoJkiaSJudXMAAKCWIuwhdXMAoJUiaSJtZXMAAKCXIm8AAAFjc4cBlAFrKndpc2VDb250b3VySW50ZWdyYWwAAKAyImUjQ3VybHkAAAFEUZwBpAFvJXVibGVRdW90ZQAAoB0gdSJvdGUAAKAZIAACbG5wdbABtgHNAdgBbwBuAGWgNyIAoHQqgAFnaXQAvAHBAcUB8iJ1ZW50AKBhIm4AdAAAoC8i7yV1ckludGVncmFsAKAuIgABZnLRAdMBAKACIe8iZHVjdACgECJuLnRlckNsb2Nrd2lzZUNvbnRvdXJJbnRlZ3JhbAAAoDMi7yFzcwCgLypjAHIAAOA12J7ccABDoNMiYQBwAACgTSKABURKU1phY2VmaW9zAAsCEgIVAhgCGwIsAjQCOQI9AnMCfwNvoEUh9CJyYWhkAKARKWMAeQACZGMAeQAFZGMAeQAPZIABZ3JzACECJQIoAuchZXIAoCEgcgAAoKEhaAB2AACg5CoAAWF5MAIzAvIhb24OYRRkbAB0oAciYQCUY3IAAOA12AfdAAFhZkECawIAAWNtRQJnAvIjaXRpY2FsAAJBREdUUAJUAl8CYwJjInV0ZQC0YG8AdAFZAloC2WJiJGxlQWN1dGUA3WJyImF2ZQBgYGkibGRlANxi7yFuZACgxCJmJWVyZW50aWFsRAAAoEYhcAR9AgAAAAAAAIECjgIAABoDZgAA4DXYO91EoagAhQKJAm8AdAAAoNwgcSJ1YWwAAKBQIuIhbGUAA0NETFJVVpkCqAK1Au8C/wIRA28AbgB0AG8AdQByAEkAbgB0AGUAZwByAGEA7ADEAW8AdAKvAgAAAACwAqhgbiNBcnJvdwAAoNMhAAFlb7kC0AJmAHQAgAFBUlQAwQLGAs0CciJyb3cAAKDQIekkZ2h0QXJyb3cAoNQhZQDlACsCbgBnAAABTFLWAugC5SFmdAABQVLcAuECciJyb3cAAKD4J+kkZ2h0QXJyb3cAoPon6SRnaHRBcnJvdwCg+SdpImdodAAAAUFU9gL7AnIicm93AACg0iFlAGUAAKCoInAAQQIGAwAAAAALA3Iicm93AACg0SFvJHduQXJyb3cAAKDVIWUlcnRpY2FsQmFyAACgJSJuAAADQUJMUlRhJAM2AzoDWgNxA3oDciJyb3cAAKGTIUJVLAMwA2EAcgAAoBMpcCNBcnJvdwAAoPUhciJldmUAEWPlIWZ00gJDAwAASwMAAFIDaSVnaHRWZWN0b3IAAKBQKWUkZVZlY3RvcgAAoF4p5SJjdG9yQqC9IWEAcgAAoFYpaSJnaHQA1AFiAwAAaQNlJGVWZWN0b3IAAKBfKeUiY3RvckKgwSFhAHIAAKBXKWUAZQBBoKQiciJyb3cAAKCnIXIAcgBvAPcAtAIAAWN0gwOHA3IAAOA12J/c8iFvaxBhAAhOVGFjZGZnbG1vcHFzdHV4owOlA6kDsAO/A8IDxgPNA9ID8gP9AwEEFAQeBCAEJQRHAEphSAA7gNAA0EBjAHUAdABlADuAyQDJQIABYWl5ALYDuQO+A/Ihb24aYXIAYwA7gMoAykAtZG8AdAAWYXIAAOA12AjdcgBhAHYAZQA7gMgAyEDlIm1lbnQAoAgiAAFhcNYD2QNjAHIAEmF0AHkAUwLhAwAAAADpA20lYWxsU3F1YXJlAACg+yVlJ3J5U21hbGxTcXVhcmUAAKCrJQABZ3D2A/kDbwBuABhhZgAA4DXYPN3zImlsb26VY3UAAAFhaQYEDgRsAFSgdSppImxkZQAAoEIi7CNpYnJpdW0AoMwhAAFjaRgEGwRyAACgMCFtAACgcyphAJdjbQBsADuAywDLQAABaXApBC0E8yF0cwCgAyLvJG5lbnRpYWxFAKBHIYACY2Zpb3MAPQQ/BEMEXQRyBHkAJGRyAADgNdgJ3WwibGVkAFMCTAQAAAAAVARtJWFsbFNxdWFyZQAAoPwlZSdyeVNtYWxsU3F1YXJlAACgqiVwA2UEAABpBAAAAABtBGYAAOA12D3dwSFsbACgACLyI2llcnRyZgCgMSFjAPIAcQQABkpUYWJjZGZnb3JzdIgEiwSOBJMElwSkBKcEqwStBLIE5QTqBGMAeQADZDuAPgA+QO0hbWFkoJMD3GNyImV2ZQAeYYABZWl5AJ0EoASjBOQhaWwiYXIAYwAcYRNkbwB0ACBhcgAA4DXYCt0AoNkicABmAADgNdg+3eUiYXRlcgADRUZHTFNUvwTIBM8E1QTZBOAEcSJ1YWwATKBlIuUhc3MAoNsidSRsbEVxdWFsAACgZyJyI2VhdGVyAACgoirlIXNzAKB3IuwkYW50RXF1YWwAoH4qaSJsZGUAAKBzImMAcgAA4DXYotwAoGsiAARBYWNmaW9zdfkE/QQFBQgFCwUTBSIFKwVSIkRjeQAqZAABY3QBBQQFZQBrAMdiXmDpIXJjJGFyAACgDCFsJWJlcnRTcGFjZQAAoAsh8AEYBQAAGwVmAACgDSHpJXpvbnRhbExpbmUAoAAlAAFjdCYFKAXyABIF8iFvayZhbQBwAEQBMQU5BW8AdwBuAEgAdQBtAPAAAAFxInVhbAAAoE8iAAdFSk9hY2RmZ21ub3N0dVMFVgVZBVwFYwVtBXAFcwV6BZAFtgXFBckFzQVjAHkAFWTsIWlnMmFjAHkAAWRjAHUAdABlADuAzQDNQAABaXlnBWwFcgBjADuAzgDOQBhkbwB0ADBhcgAAoBEhcgBhAHYAZQA7gMwAzEAAoREhYXB/BYsFAAFjZ4MFhQVyACphaSNuYXJ5SQAAoEghbABpAGUA8wD6AvQBlQUAAKUFZaAsIgABZ3KaBZ4F8iFhbACgKyLzI2VjdGlvbgCgwiJpI3NpYmxlAAABQ1SsBbEFbyJtbWEAAKBjIGkibWVzAACgYiCAAWdwdAC8Bb8FwwVvAG4ALmFmAADgNdhA3WEAmWNjAHIAAKAQIWkibGRlAChh6wHSBQAA1QVjAHkABmRsADuAzwDPQIACY2Zvc3UA4QXpBe0F8gX9BQABaXnlBegFcgBjADRhGWRyAADgNdgN3XAAZgAA4DXYQd3jAfcFAAD7BXIAAOA12KXc8iFjeQhk6yFjeQRkgANISmFjZm9zAAwGDwYSBhUGHQYhBiYGYwB5ACVkYwB5AAxk8CFwYZpjAAFleRkGHAbkIWlsNmEaZHIAAOA12A7dcABmAADgNdhC3WMAcgAA4DXYptyABUpUYWNlZmxtb3N0AD0GQAZDBl4GawZkB2gHcAd0B80H2gdjAHkACWQ7gDwAPECAAmNtbnByAEwGTwZSBlUGWwb1IXRlOWHiIWRhm2NnAACg6ifsI2FjZXRyZgCgEiFyAACgniGAAWFleQBkBmcGagbyIW9uPWHkIWlsO2EbZAABZnNvBjQHdAAABUFDREZSVFVWYXKABp4GpAbGBssG3AYDByEHwQIqBwABbnKEBowGZyVsZUJyYWNrZXQAAKDoJ/Ihb3cAoZAhQlKTBpcGYQByAACg5CHpJGdodEFycm93AKDGIWUjaWxpbmcAAKAII28A9QGqBgAAsgZiJWxlQnJhY2tldAAAoOYnbgDUAbcGAAC+BmUkZVZlY3RvcgAAoGEp5SJjdG9yQqDDIWEAcgAAoFkpbCJvb3IAAKAKI2kiZ2h0AAABQVbSBtcGciJyb3cAAKCUIeUiY3RvcgCgTikAAWVy4AbwBmUAAKGjIkFW5gbrBnIicm93AACgpCHlImN0b3IAoFopaSNhbmdsZQBCorIi+wYAAAAA/wZhAHIAAKDPKXEidWFsAACgtCJwAIABRFRWAAoHEQcYB+8kd25WZWN0b3IAoFEpZSRlVmVjdG9yAACgYCnlImN0b3JCoL8hYQByAACgWCnlImN0b3JCoLwhYQByAACgUilpAGcAaAB0AGEAcgByAG8A9wDMAnMAAANFRkdMU1Q/B0cHTgdUB1gHXwfxJXVhbEdyZWF0ZXIAoNoidSRsbEVxdWFsAACgZiJyI2VhdGVyAACgdiLlIXNzAKChKuwkYW50RXF1YWwAoH0qaSJsZGUAAKByInIAAOA12A/dZaDYIuYjdGFycm93AKDaIWkiZG90AD9hgAFucHcAege1B7kHZwAAAkxSbHKCB5QHmwerB+UhZnQAAUFSiAeNB3Iicm93AACg9SfpJGdodEFycm93AKD3J+kkZ2h0QXJyb3cAoPYn5SFmdAABYXLcAqEHaQBnAGgAdABhAHIAcgBvAPcA5wJpAGcAaAB0AGEAcgByAG8A9wDuAmYAAOA12EPdZQByAAABTFK/B8YHZSRmdEFycm93AACgmSHpJGdodEFycm93AKCYIYABY2h0ANMH1QfXB/IAWgYAoLAh8iFva0FhAKBqIgAEYWNlZmlvc3XpB+wH7gf/BwMICQgOCBEIcAAAoAUpeQAcZAABZGzyB/kHaSR1bVNwYWNlAACgXyBsI2ludHJmAACgMyFyAADgNdgQ3e4jdXNQbHVzAKATInAAZgAA4DXYRN1jAPIA/gecY4AESmFjZWZvc3R1ACEIJAgoCDUIgQiFCDsKQApHCmMAeQAKZGMidXRlAENhgAFhZXkALggxCDQI8iFvbkdh5CFpbEVhHWSAAWdzdwA7CGEIfQjhInRpdmWAAU1UVgBECEwIWQhlJWRpdW1TcGFjZQAAoAsgaABpAAABY25SCFMIawBTAHAAYQBjAOUASwhlAHIAeQBUAGgAaQDuAFQI9CFlZAABR0xnCHUIcgBlAGEAdABlAHIARwByAGUAYQB0AGUA8gDrBGUAcwBzAEwAZQBzAPMA2wdMImluZQAKYHIAAOA12BHdAAJCbnB0jAiRCJkInAhyImVhawAAoGAgwiZyZWFraW5nU3BhY2WgYGYAAKAVIUOq7CqzCMIIzQgAAOcIGwkAAAAAAAAtCQAAbwkAAIcJAACdCcAJGQoAADQKAAFvdbYIvAjuI2dydWVudACgYiJwIkNhcAAAoG0ibyh1YmxlVmVydGljYWxCYXIAAKAmIoABbHF4ANII1wjhCOUibWVudACgCSL1IWFsVKBgImkibGRlAADgQiI4A2kic3RzAACgBCJyI2VhdGVyAACjbyJFRkdMU1T1CPoIAgkJCQ0JFQlxInVhbAAAoHEidSRsbEVxdWFsAADgZyI4A3IjZWF0ZXIAAOBrIjgD5SFzcwCgeSLsJGFudEVxdWFsAOB+KjgDaSJsZGUAAKB1IvUhbXBEASAJJwnvI3duSHVtcADgTiI4A3EidWFsAADgTyI4A2UAAAFmczEJRgn0JFRyaWFuZ2xlQqLqIj0JAAAAAEIJYQByAADgzyk4A3EidWFsAACg7CJzAICibiJFR0xTVABRCVYJXAlhCWkJcSJ1YWwAAKBwInIjZWF0ZXIAAKB4IuUhc3MA4GoiOAPsJGFudEVxdWFsAOB9KjgDaSJsZGUAAKB0IuUic3RlZAABR0x1CX8J8iZlYXRlckdyZWF0ZXIA4KIqOAPlI3NzTGVzcwDgoSo4A/IjZWNlZGVzAKGAIkVTjwmVCXEidWFsAADgryo4A+wkYW50RXF1YWwAoOAiAAFlaaAJqQl2JmVyc2VFbGVtZW50AACgDCLnJWh0VHJpYW5nbGVCousitgkAAAAAuwlhAHIAAODQKTgDcSJ1YWwAAKDtIgABcXXDCeAJdSNhcmVTdQAAAWJwywnVCfMhZXRF4I8iOANxInVhbAAAoOIi5SJyc2V0ReCQIjgDcSJ1YWwAAKDjIoABYmNwAOYJ8AkNCvMhZXRF4IIi0iBxInVhbAAAoIgi4yJlZWRzgKGBIkVTVAD6CQAKBwpxInVhbAAA4LAqOAPsJGFudEVxdWFsAKDhImkibGRlAADgfyI4A+UicnNldEXggyLSIHEidWFsAACgiSJpImxkZQCAoUEiRUZUACIKJwouCnEidWFsAACgRCJ1JGxsRXF1YWwAAKBHImkibGRlAACgSSJlJXJ0aWNhbEJhcgAAoCQiYwByAADgNdip3GkAbABkAGUAO4DRANFAnWMAB0VhY2RmZ21vcHJzdHV2XgphCmgKcgp2CnoKgQqRCpYKqwqtCrsKyArNCuwhaWdSYWMAdQB0AGUAO4DTANNAAAFpeWwKcQpyAGMAO4DUANRAHmRiImxhYwBQYXIAAOA12BLdcgBhAHYAZQA7gNIA0kCAAWFlaQCHCooKjQpjAHIATGFnAGEAqWNjInJvbgCfY3AAZgAA4DXYRt3lI25DdXJseQABRFGeCqYKbyV1YmxlUXVvdGUAAKAcIHUib3RlAACgGCAAoFQqAAFjbLEKtQpyAADgNdiq3GEAcwBoADuA2ADYQGkAbAHACsUKZABlADuA1QDVQGUAcwAAoDcqbQBsADuA1gDWQGUAcgAAAUJQ0wrmCgABYXLXCtoKcgAAoD4gYQBjAAABZWvgCuIKAKDeI2UAdAAAoLQjYSVyZW50aGVzaXMAAKDcI4AEYWNmaGlsb3JzAP0KAwsFCwkLCwsMCxELIwtaC3IjdGlhbEQAAKACInkAH2RyAADgNdgT3WkApmOgY/Ujc01pbnVzsWAAAWlwFQsgC24AYwBhAHIAZQBwAGwAYQBuAOUACgVmAACgGSGAobsqZWlvACoLRQtJC+MiZWRlc4CheiJFU1QANAs5C0ALcSJ1YWwAAKCvKuwkYW50RXF1YWwAoHwiaSJsZGUAAKB+Im0AZQAAoDMgAAFkcE0LUQv1IWN0AKAPIm8jcnRpb24AYaA3ImwAAKAdIgABY2leC2ILcgAA4DXYq9yoYwACVWZvc2oLbwtzC3cLTwBUADuAIgAiQHIAAOA12BTdcABmAACgGiFjAHIAAOA12KzcAAZCRWFjZWZoaW9yc3WPC5MLlwupC7YL2AvbC90LhQyTDJoMowzhIXJyAKAQKUcAO4CuAK5AgAFjbnIAnQugC6ML9SF0ZVRhZwAAoOsncgB0oKAhbAAAoBYpgAFhZXkArwuyC7UL8iFvblhh5CFpbFZhIGR2oBwhZSJyc2UAAAFFVb8LzwsAAWxxwwvIC+UibWVudACgCyL1JGlsaWJyaXVtAKDLIXAmRXF1aWxpYnJpdW0AAKBvKXIAAKAcIW8AoWPnIWh0AARBQ0RGVFVWYewLCgwQDDIMNwxeDHwM9gIAAW5y8Av4C2clbGVCcmFja2V0AACg6SfyIW93AKGSIUJM/wsDDGEAcgAAoOUhZSRmdEFycm93AACgxCFlI2lsaW5nAACgCSNvAPUBFgwAAB4MYiVsZUJyYWNrZXQAAKDnJ24A1AEjDAAAKgxlJGVWZWN0b3IAAKBdKeUiY3RvckKgwiFhAHIAAKBVKWwib29yAACgCyMAAWVyOwxLDGUAAKGiIkFWQQxGDHIicm93AACgpiHlImN0b3IAoFspaSNhbmdsZQBCorMiVgwAAAAAWgxhAHIAAKDQKXEidWFsAACgtSJwAIABRFRWAGUMbAxzDO8kd25WZWN0b3IAoE8pZSRlVmVjdG9yAACgXCnlImN0b3JCoL4hYQByAACgVCnlImN0b3JCoMAhYQByAACgUykAAXB1iQyMDGYAAKAdIe4kZEltcGxpZXMAoHAp6SRnaHRhcnJvdwCg2yEAAWNongyhDHIAAKAbIQCgsSHsJGVEZWxheWVkAKD0KYAGSE9hY2ZoaW1vcXN0dQC/DMgMzAzQDOIM5gwKDQ0NFA0ZDU8NVA1YDQABQ2PDDMYMyCFjeSlkeQAoZEYiVGN5ACxkYyJ1dGUAWmEAorwqYWVpedgM2wzeDOEM8iFvbmBh5CFpbF5hcgBjAFxhIWRyAADgNdgW3e8hcnQAAkRMUlXvDPYM/QwEDW8kd25BcnJvdwAAoJMhZSRmdEFycm93AACgkCHpJGdodEFycm93AKCSIXAjQXJyb3cAAKCRIechbWGjY+EkbGxDaXJjbGUAoBgicABmAADgNdhK3XICHw0AAAAAIg10AACgGiLhIXJlgKGhJUlTVQAqDTINSg3uJXRlcnNlY3Rpb24AoJMidQAAAWJwNw1ADfMhZXRFoI8icSJ1YWwAAKCRIuUicnNldEWgkCJxInVhbAAAoJIibiJpb24AAKCUImMAcgAA4DXYrtxhAHIAAKDGIgACYmNtcF8Nag2ODZANc6DQImUAdABFoNAicSJ1YWwAAKCGIgABY2huDYkNZSJlZHMAgKF7IkVTVAB4DX0NhA1xInVhbAAAoLAq7CRhbnRFcXVhbACgfSJpImxkZQAAoH8iVABoAGEA9ADHCwCgESIAodEiZXOVDZ8NciJzZXQARaCDInEidWFsAACghyJlAHQAAKDRIoAFSFJTYWNmaGlvcnMAtQ27Db8NyA3ODdsN3w3+DRgOHQ4jDk8AUgBOADuA3gDeQMEhREUAoCIhAAFIY8MNxg1jAHkAC2R5ACZkAAFidcwNzQ0JYKRjgAFhZXkA1A3XDdoN8iFvbmRh5CFpbGJhImRyAADgNdgX3QABZWnjDe4N8gHoDQAA7Q3lImZvcmUAoDQiYQCYYwABY27yDfkNayNTcGFjZQAA4F8gCiDTInBhY2UAoAkg7CFkZYChPCJFRlQABw4MDhMOcSJ1YWwAAKBDInUkbGxFcXVhbAAAoEUiaSJsZGUAAKBIInAAZgAA4DXYS93pI3BsZURvdACg2yAAAWN0Jw4rDnIAAOA12K/c8iFva2Zh4QpFDlYOYA5qDgAAbg5yDgAAAAAAAAAAAAB5DnwOqA6zDgAADg8RDxYPGg8AAWNySA5ODnUAdABlADuA2gDaQHIAb6CfIeMhaXIAoEkpcgDjAVsOAABdDnkADmR2AGUAbGEAAWl5Yw5oDnIAYwA7gNsA20AjZGIibGFjAHBhcgAA4DXYGN1yAGEAdgBlADuA2QDZQOEhY3JqYQABZGl/Dp8OZQByAAABQlCFDpcOAAFhcokOiw5yAF9gYQBjAAABZWuRDpMOAKDfI2UAdAAAoLUjYSVyZW50aGVzaXMAAKDdI28AbgBQoMMi7CF1cwCgjiIAAWdwqw6uDm8AbgByYWYAAOA12EzdAARBREVUYWRwc78O0g7ZDuEOBQPqDvMOBw9yInJvdwDCoZEhyA4AAMwOYQByAACgEilvJHduQXJyb3cAAKDFIW8kd25BcnJvdwAAoJUhcSV1aWxpYnJpdW0AAKBuKWUAZQBBoKUiciJyb3cAAKClIW8AdwBuAGEAcgByAG8A9wAQA2UAcgAAAUxS+Q4AD2UkZnRBcnJvdwAAoJYh6SRnaHRBcnJvdwCglyFpAGyg0gNvAG4ApWPpIW5nbmFjAHIAAOA12LDcaSJsZGUAaGFtAGwAO4DcANxAgAREYmNkZWZvc3YALQ8xDzUPNw89D3IPdg97D4AP4SFzaACgqyJhAHIAAKDrKnkAEmThIXNobKCpIgCg5ioAAWVyQQ9DDwCgwSKAAWJ0eQBJD00Paw9hAHIAAKAWIGmgFiDjIWFsAAJCTFNUWA9cD18PZg9hAHIAAKAjIukhbmV8YGUkcGFyYXRvcgAAoFgnaSJsZGUAAKBAItQkaGluU3BhY2UAoAogcgAA4DXYGd1wAGYAAOA12E3dYwByAADgNdix3GQiYXNoAACgqiKAAmNlZm9zAI4PkQ+VD5kPng/pIXJjdGHkIWdlAKDAInIAAOA12BrdcABmAADgNdhO3WMAcgAA4DXYstwAAmZpb3OqD64Prw+0D3IAAOA12BvdnmNwAGYAAOA12E/dYwByAADgNdiz3IAEQUlVYWNmb3N1AMgPyw/OD9EP2A/gD+QP6Q/uD2MAeQAvZGMAeQAHZGMAeQAuZGMAdQB0AGUAO4DdAN1AAAFpedwP3w9yAGMAdmErZHIAAOA12BzdcABmAADgNdhQ3WMAcgAA4DXYtNxtAGwAeGEABEhhY2RlZm9z/g8BEAUQDRAQEB0QIBAkEGMAeQAWZGMidXRlAHlhAAFheQkQDBDyIW9ufWEXZG8AdAB7YfIBFRAAABwQbwBXAGkAZAB0AOgAVAhhAJZjcgAAoCghcABmAACgJCFjAHIAAOA12LXc4QtCEEkQTRAAAGcQbRByEAAAAAAAAAAAeRCKEJcQ8hD9EAAAGxEhETIROREAAD4RYwB1AHQAZQA7gOEA4UByImV2ZQADYYCiPiJFZGl1eQBWEFkQWxBgEGUQAOA+IjMDAKA/InIAYwA7gOIA4kB0AGUAO4C0ALRAMGRsAGkAZwA7gOYA5kByoGEgAOA12B7dcgBhAHYAZQA7gOAA4EAAAWVwfBCGEAABZnCAEIQQ8yF5bQCgNSHoAIMQaABhALFjAAFhcI0QWwAAAWNskRCTEHIAAWFnAACgPypkApwQAAAAALEQAKInImFkc3ajEKcQqRCuEG4AZAAAoFUqAKBcKmwib3BlAACgWCoAoFoqAKMgImVsbXJzersQvRDAEN0Q5RDtEACgpCllAACgICJzAGQAYaAhImEEzhDQENIQ1BDWENgQ2hDcEACgqCkAoKkpAKCqKQCgqykAoKwpAKCtKQCgrikAoK8pdAB2oB8iYgBkoL4iAKCdKQABcHTpEOwQaAAAoCIixWDhIXJyAKB8IwABZ3D1EPgQbwBuAAVhZgAA4DXYUt0Ao0giRWFlaW9wBxEJEQ0RDxESERQRAKBwKuMhaXIAoG8qAKBKImQAAKBLInMAJ2DyIW94ZaBIIvEADhFpAG4AZwA7gOUA5UCAAWN0eQAmESoRKxFyAADgNdi23CpgbQBwAGWgSCLxAPgBaQBsAGQAZQA7gOMA40BtAGwAO4DkAORAAAFjaUERRxFvAG4AaQBuAPQA6AFuAHQAAKARKgAITmFiY2RlZmlrbG5vcHJzdWQRaBGXEZ8RpxGrEdIR1hErEjASexKKEn0RThNbE3oTbwB0AACg7SoAAWNybBGJEWsAAAJjZXBzdBF4EX0RghHvIW5nAKBMInAjc2lsb24A9mNyImltZQAAoDUgaQBtAGWgPSJxAACgzSJ2AY0RkRFlAGUAAKC9ImUAZABnoAUjZQAAoAUjcgBrAHSgtSPiIXJrAKC2IwABb3mjEaYRbgDnAHcRMWTxIXVvAKAeIIACY21wcnQAtBG5Eb4RwRHFEeEhdXPloDUi5ABwInR5dgAAoLApcwDpAH0RbgBvAPUA6gCAAWFodwDLEcwRzhGyYwCgNiHlIWVuAKBsInIAAOA12B/dZwCAA2Nvc3R1dncA4xHyEQUSEhIhEiYSKRKAAWFpdQDpEesR7xHwAKMFcgBjAACg7yVwAACgwyKAAWRwdAD4EfwRABJvAHQAAKAAKuwhdXMAoAEqaSJtZXMAAKACKnECCxIAAAAADxLjIXVwAKAGKmEAcgAAoAUm8iNpYW5nbGUAAWR1GhIeEu8hd24AoL0lcAAAoLMlcCJsdXMAAKAEKmUA5QBCD+UAkg9hInJvdwAAoA0pgAFha28ANhJoEncSAAFjbjoSZRJrAIABbHN0AEESRxJNEm8jemVuZ2UAAKDrKXEAdQBhAHIA5QBcBPIjaWFuZ2xlgKG0JWRscgBYElwSYBLvIXduAKC+JeUhZnQAoMIlaSJnaHQAAKC4JWsAAKAjJLEBbRIAAHUSsgFxEgAAcxIAoJIlAKCRJTQAAKCTJWMAawAAoIglAAFlb38ShxJx4D0A5SD1IWl2AOBhIuUgdAAAoBAjAAJwdHd4kRKVEpsSnxJmAADgNdhT3XSgpSJvAG0AAKClIvQhaWUAoMgiAAZESFVWYmRobXB0dXayEsES0RLgEvcS+xIKExoTHxMjEygTNxMAAkxSbHK5ErsSvRK/EgCgVyUAoFQlAKBWJQCgUyUAolAlRFVkdckSyxLNEs8SAKBmJQCgaSUAoGQlAKBnJQACTFJsctgS2hLcEt4SAKBdJQCgWiUAoFwlAKBZJQCjUSVITFJobHLrEu0S7xLxEvMS9RIAoGwlAKBjJQCgYCUAoGslAKBiJQCgXyVvAHgAAKDJKQACTFJscgITBBMGEwgTAKBVJQCgUiUAoBAlAKAMJQCiACVEVWR1EhMUExYTGBMAoGUlAKBoJQCgLCUAoDQlaSJudXMAAKCfIuwhdXMAoJ4iaSJtZXMAAKCgIgACTFJsci8TMRMzEzUTAKBbJQCgWCUAoBglAKAUJQCjAiVITFJobHJCE0QTRhNIE0oTTBMAoGolAKBhJQCgXiUAoDwlAKAkJQCgHCUAAWV2UhNVE3YA5QD5AGIAYQByADuApgCmQAACY2Vpb2ITZhNqE24TcgAA4DXYt9xtAGkAAKBPIG0A5aA9IogRbAAAoVwAYmh0E3YTAKDFKfMhdWIAoMgnbAF+E4QTbABloCIgdAAAoCIgcAAAoU4iRWWJE4sTAKCuKvGgTyI8BeEMqRMAAN8TABQDFB8UAAAjFDQUAAAAAIUUAAAAAI0UAAAAANcU4xT3FPsUAACIFQAAlhWAAWNwcgCuE7ET1RP1IXRlB2GAoikiYWJjZHMAuxO/E8QTzhPSE24AZAAAoEQqciJjdXAAAKBJKgABYXXIE8sTcAAAoEsqcAAAoEcqbwB0AACgQCoA4CkiAP4AAWVv2RPcE3QAAKBBIO4ABAUAAmFlaXXlE+8T9RP4E/AB6hMAAO0TcwAAoE0qbwBuAA1hZABpAGwAO4DnAOdAcgBjAAlhcABzAHOgTCptAACgUCpvAHQAC2GAAWRtbgAIFA0UEhRpAGwAO4C4ALhAcCJ0eXYAAKCyKXQAAIGiADtlGBQZFKJAcgBkAG8A9ABiAXIAAOA12CDdgAFjZWkAKBQqFDIUeQBHZGMAawBtoBMn4SFyawCgEyfHY3IAAKPLJUVjZWZtcz8UQRRHFHcUfBSAFACgwykAocYCZWxGFEkUcQAAoFciZQBhAlAUAAAAAGAUciJyb3cAAAFsclYUWhTlIWZ0AKC6IWkiZ2h0AACguyGAAlJTYWNkAGgUaRRrFG8UcxSuYACgyCRzAHQAAKCbIukhcmMAoJoi4SFzaACgnSJuImludAAAoBAqaQBkAACg7yrjIWlyAKDCKfUhYnN1oGMmaQB0AACgYybsApMUmhS2FAAAwxRvAG4AZaA6APGgVCKrAG0CnxQAAAAAoxRhAHSgLABAYAChASJmbKcUqRTuABMNZQAAAW14rhSyFOUhbnQAoAEiZQDzANIB5wG6FAAAwBRkoEUibwB0AACgbSpuAPQAzAGAAWZyeQDIFMsUzhQA4DXYVN1vAOQA1wEAgakAO3MeAdMUcgAAoBchAAFhb9oU3hRyAHIAAKC1IXMAcwAAoBcnAAFjdeYU6hRyAADgNdi43AABYnDuFPIUZaDPKgCg0SploNAqAKDSKuQhb3QAoO8igANkZWxwcnZ3AAYVEBUbFSEVRBVlFYQV4SFycgABbHIMFQ4VAKA4KQCgNSlwAhYVAAAAABkVcgAAoN4iYwAAoN8i4SFycnCgtiEAoD0pgKIqImJjZG9zACsVMBU6FT4VQRVyImNhcAAAoEgqAAFhdTQVNxVwAACgRipwAACgSipvAHQAAKCNInIAAKBFKgDgKiIA/gACYWxydksVURVuFXMVcgByAG2gtyEAoDwpeQCAAWV2dwBYFWUVaRVxAHACXxUAAAAAYxVyAGUA4wAXFXUA4wAZFWUAZQAAoM4iZSJkZ2UAAKDPImUAbgA7gKQApEBlI2Fycm93AAABbHJ7FX8V5SFmdACgtiFpImdodAAAoLchZQDkAG0VAAFjaYsVkRVvAG4AaQBuAPQAkwFuAHQAAKAxImwiY3R5AACgLSOACUFIYWJjZGVmaGlqbG9yc3R1d3oAuBW7Fb8V1RXgFegV+RUKFhUWHxZUFlcWZRbFFtsW7xb7FgUXChdyAPIAtAJhAHIAAKBlKQACZ2xyc8YVyhXOFdAV5yFlcgCgICDlIXRoAKA4IfIA9QxoAHagECAAoKMiawHZFd4VYSJyb3cAAKAPKWEA4wBfAgABYXnkFecV8iFvbg9hNGQAoUYhYW/tFfQVAAFnciEC8RVyAACgyiF0InNlcQAAoHcqgAFnbG0A/xUCFgUWO4CwALBAdABhALRjcCJ0eXYAAKCxKQABaXIOFhIW8yFodACgfykA4DXYId1hAHIAAAFschsWHRYAoMMhAKDCIYACYWVnc3YAKBauAjYWOhY+Fm0AAKHEIm9zLhY0Fm4AZABzoMQi9SFpdACgZiZhIm1tYQDdY2kAbgAAoPIiAKH3AGlvQxZRFmQAZQAAgfcAO29KFksW90BuI3RpbWVzAACgxyJuAPgAUBZjAHkAUmRjAG8CXhYAAAAAYhZyAG4AAKAeI28AcAAAoA0jgAJscHR1dwBuFnEWdRaSFp4W7CFhciRgZgAA4DXYVd0AotkCZW1wc30WhBaJFo0WcQBkoFAibwB0AACgUSJpIm51cwAAoDgi7CF1cwCgFCLxInVhcmUAoKEiYgBsAGUAYgBhAHIAdwBlAGQAZwDlANcAbgCAAWFkaAClFqoWtBZyAHIAbwD3APUMbwB3AG4AYQByAHIAbwB3APMA8xVhI3Jwb29uAAABbHK8FsAWZQBmAPQAHBZpAGcAaAD0AB4WYgHJFs8WawBhAHIAbwD3AJILbwLUFgAAAADYFnIAbgAAoB8jbwBwAACgDCOAAWNvdADhFukW7BYAAXJ55RboFgDgNdi53FVkbAAAoPYp8iFvaxFhAAFkcvMW9xZvAHQAAKDxImkA5qC/JVsSAAFhaP8WAhdyAPIANQNhAPIA1wvhIm5nbGUAoKYpAAFjaQ4XEBd5AF9k5yJyYXJyAKD/JwAJRGFjZGVmZ2xtbm9wcXJzdHV4MRc4F0YXWxcyBF4XaRd5F40XrBe0F78X2RcVGCEYLRg1GEAYAAFEbzUXgRZvAPQA+BUAAWNzPBdCF3UAdABlADuA6QDpQPQhZXIAoG4qAAJhaW95TRdQF1YXWhfyIW9uG2FyAGOgViI7gOoA6kDsIW9uAKBVIk1kbwB0ABdhAAFEcmIXZhdvAHQAAKBSIgDgNdgi3XKhmipuF3QXYQB2AGUAO4DoAOhAZKCWKm8AdAAAoJgqgKGZKmlscwCAF4UXhxfuInRlcnMAoOcjAKATIWSglSpvAHQAAKCXKoABYXBzAJMXlheiF2MAcgATYXQAeQBzogUinxcAAAAAoRdlAHQAAKAFInAAMaADIDMBqRerFwCgBCAAoAUgAAFnc7AXsRdLYXAAAKACIAABZ3C4F7sXbwBuABlhZgAA4DXYVt2AAWFscwDFF8sXzxdyAHOg1SJsAACg4yl1AHMAAKBxKmkAAKG1A2x21RfYF28AbgC1Y/VjAAJjc3V24BfoF/0XEBgAAWlv5BdWF3IAYwAAoFYiaQLuFwAAAADwF+0ADQThIW50AAFnbPUX+Rd0AHIAAKCWKuUhc3MAoJUqgAFhZWkAAxgGGAoYbABzAD1gcwB0AACgXyJ2AESgYSJEAACgeCrwImFyc2wAoOUpAAFEYRkYHRhvAHQAAKBTInIAcgAAoHEpgAFjZGkAJxgqGO0XcgAAoC8hbwD0AIwCAAFhaDEYMhi3YzuA8ADwQAABbXI5GD0YbAA7gOsA60BvAACgrCCAAWNpcABGGEgYSxhsACFgcwD0ACwEAAFlb08YVxhjAHQAYQB0AGkAbwDuABoEbgBlAG4AdABpAGEAbADlADME4Ql1GAAAgRgAAIMYiBgAAAAAoRilGAAAqhgAALsYvhjRGAAA1xgnGWwAbABpAG4AZwBkAG8AdABzAGUA8QBlF3kARGRtImFsZQAAoEAmgAFpbHIAjRiRGJ0Y7CFpZwCgA/tpApcYAAAAAJoYZwAAoAD7aQBnAACgBPsA4DXYI93sIWlnAKAB++whaWcA4GYAagCAAWFsdACvGLIYthh0AACgbSZpAGcAAKAC+24AcwAAoLElbwBmAJJh8AHCGAAAxhhmAADgNdhX3QABYWvJGMwYbADsAGsEdqDUIgCg2SphI3J0aW50AACgDSoAAWFv2hgiGQABY3PeGB8ZsQPnGP0YBRkSGRUZAAAdGbID7xjyGPQY9xj5GAAA+xg7gL0AvUAAoFMhO4C8ALxAAKBVIQCgWSEAoFshswEBGQAAAxkAoFQhAKBWIbQCCxkOGQAAAAAQGTuAvgC+QACgVyEAoFwhNQAAoFghtgEZGQAAGxkAoFohAKBdITgAAKBeIWwAAKBEIHcAbgAAoCIjYwByAADgNdi73IAIRWFiY2RlZmdpamxub3JzdHYARhlKGVoZXhlmGWkZkhmWGZkZnRmgGa0ZxhnLGc8Z4BkjGmygZyIAoIwqgAFjbXAAUBlTGVgZ9SF0ZfVhbQBhAOSgswM6FgCghipyImV2ZQAfYQABaXliGWUZcgBjAB1hM2RvAHQAIWGAoWUibHFzAMYEcBl6GfGhZSLOBAAAdhlsAGEAbgD0AN8EgKF+KmNkbACBGYQZjBljAACgqSpvAHQAb6CAKmyggioAoIQqZeDbIgD+cwAAoJQqcgAA4DXYJN3noGsirATtIWVsAKA3IWMAeQBTZIChdyJFYWoApxmpGasZAKCSKgCgpSoAoKQqAAJFYWVztBm2Gb0ZwhkAoGkicABwoIoq8iFveACgiipxoIgq8aCIKrUZaQBtAACg5yJwAGYAAOA12FjdYQB2AOUAYwIAAWNp0xnWGXIAAKAKIW0AAKFzImVs3BneGQCgjioAoJAqAIM+ADtjZGxxco0E6xn0GfgZ/BkBGgABY2nvGfEZAKCnKnIAAKB6Km8AdAAAoNci0CFhcgCglSl1ImVzdAAAoHwqgAJhZGVscwAKGvQZFhrVBCAa8AEPGgAAFBpwAHIAbwD4AFkZcgAAoHgpcQAAAWxxxAQbGmwAZQBzAPMASRlpAO0A5AQAAWVuJxouGnIjdG5lcXEAAOBpIgD+xQAsGgAFQWFiY2Vma29zeUAaQxpmGmoabRqDGocalhrCGtMacgDyAMwCAAJpbG1yShpOGlAaVBpyAHMA8ABxD2YAvWBpAGwA9AASBQABZHJYGlsaYwB5AEpkAKGUIWN3YBpkGmkAcgAAoEgpAKCtIWEAcgAAoA8h6SFyYyVhgAFhbHIAcxp7Gn8a8iF0c3WgZSZpAHQAAKBlJuwhaXAAoCYg4yFvbgCguSJyAADgNdgl3XMAAAFld4wakRphInJvdwAAoCUpYSJyb3cAAKAmKYACYW1vcHIAnxqjGqcauhq+GnIAcgAAoP8h9CFodACgOyJrAAABbHKsGrMaZSRmdGFycm93AACgqSHpJGdodGFycm93AKCqIWYAAOA12Fnd4iFhcgCgFSCAAWNsdADIGswa0BpyAADgNdi93GEAcwDoAGka8iFvaydhAAFicNca2xr1IWxsAKBDIOghZW4AoBAg4Qr2GgAA/RoAAAgbExsaGwAAIRs7GwAAAAA+G2IbmRuVG6sbAACyG80b0htjAHUAdABlADuA7QDtQAChYyBpeQEbBhtyAGMAO4DuAO5AOGQAAWN4CxsNG3kANWRjAGwAO4ChAKFAAAFmcssCFhsA4DXYJt1yAGEAdgBlADuA7ADsQIChSCFpbm8AJxsyGzYbAAFpbisbLxtuAHQAAKAMKnQAAKAtIuYhaW4AoNwpdABhAACgKSHsIWlnM2GAAWFvcABDG1sbXhuAAWNndABJG0sbWRtyACthgAFlbHAAcQVRG1UbaQBuAOUAyAVhAHIA9AByBWgAMWFmAACgtyJlAGQAtWEAoggiY2ZvdGkbbRt1G3kb4SFyZQCgBSFpAG4AdKAeImkAZQAAoN0pZABvAPQAWxsAoisiY2VscIEbhRuPG5QbYQBsAACguiIAAWdyiRuNG2UAcgDzACMQ4wCCG2EicmhrAACgFyryIW9kAKA8KgACY2dwdJ8boRukG6gbeQBRZG8AbgAvYWYAAOA12FrdYQC5Y3UAZQBzAHQAO4C/AL9AAAFjabUbuRtyAADgNdi+3G4AAKIIIkVkc3bCG8QbyBvQAwCg+SJvAHQAAKD1Inag9CIAoPMiaaBiIOwhZGUpYesB1hsAANkbYwB5AFZkbAA7gO8A70AAA2NmbW9zdeYb7hvyG/Ub+hsFHAABaXnqG+0bcgBjADVhOWRyAADgNdgn3eEhdGg3YnAAZgAA4DXYW93jAf8bAAADHHIAAOA12L/c8iFjeVhk6yFjeVRkAARhY2ZnaGpvcxUcGhwiHCYcKhwtHDAcNRzwIXBhdqC6A/BjAAFleR4cIRzkIWlsN2E6ZHIAAOA12CjdciJlZW4AOGFjAHkARWRjAHkAXGRwAGYAAOA12FzdYwByAADgNdjA3IALQUJFSGFiY2RlZmdoamxtbm9wcnN0dXYAXhxtHHEcdRx5HN8cBx0dHTwd3B3tHfEdAR4EHh0eLB5FHrwewx7hHgkfPR9LH4ABYXJ0AGQcZxxpHHIA8gBvB/IAxQLhIWlsAKAbKeEhcnIAoA4pZ6BmIgCgiyphAHIAAKBiKWMJjRwAAJAcAACVHAAAAAAAAAAAAACZHJwcAACmHKgcrRwAANIc9SF0ZTph7SJwdHl2AKC0KXIAYQDuAFoG4iFkYbtjZwAAoegnZGyhHKMcAKCRKeUAiwYAoIUqdQBvADuAqwCrQHIAgKOQIWJmaGxwc3QAuhy/HMIcxBzHHMoczhxmoOQhcwAAoB8pcwAAoB0p6wCyGnAAAKCrIWwAAKA5KWkAbQAAoHMpbAAAoKIhAKGrKmFl1hzaHGkAbAAAoBkpc6CtKgDgrSoA/oABYWJyAOUc6RztHHIAcgAAoAwpcgBrAACgcicAAWFr8Rz4HGMAAAFla/Yc9xx7YFtgAAFlc/wc/hwAoIspbAAAAWR1Ax0FHQCgjykAoI0pAAJhZXV5Dh0RHRodHB3yIW9uPmEAAWRpFR0YHWkAbAA8YewAowbiAPccO2QAAmNxcnMkHScdLB05HWEAAKA2KXUAbwDyoBwgqhEAAWR1MB00HeghYXIAoGcpcyJoYXIAAKBLKWgAAKCyIQCiZCJmZ3FzRB1FB5Qdnh10AIACYWhscnQATh1WHWUdbB2NHXIicm93AHSgkCFhAOkAzxxhI3Jwb29uAAABZHVeHWId7yF3bgCgvSFwAACgvCHlJGZ0YXJyb3dzAKDHIWkiZ2h0AIABYWhzAHUdex2DHXIicm93APOglCGdBmEAcgBwAG8AbwBuAPMAzgtxAHUAaQBnAGEAcgByAG8A9wBlGugkcmVldGltZXMAoMsi8aFkIk0HAACaHWwAYQBuAPQAXgcAon0qY2Rnc6YdqR2xHbcdYwAAoKgqbwB0AG+gfypyoIEqAKCDKmXg2iIA/nMAAKCTKoACYWRlZ3MAwB3GHcod1h3ZHXAAcAByAG8A+ACmHG8AdAAAoNYicQAAAWdxzx3SHXQA8gBGB2cAdADyAHQcdADyAFMHaQDtAGMHgAFpbHIA4h3mHeod8yFodACgfClvAG8A8gDKBgDgNdgp3UWgdiIAoJEqYQH1Hf4dcgAAAWR1YB35HWygvCEAoGopbABrAACghCVjAHkAWWQAomoiYWNodAweDx4VHhkecgDyAGsdbwByAG4AZQDyAGAW4SFyZACgaylyAGkAAKD6JQABaW8hHiQe5CFvdEBh9SFzdGGgsCPjIWhlAKCwIwACRWFlczMeNR48HkEeAKBoInAAcKCJKvIhb3gAoIkqcaCHKvGghyo0HmkAbQAAoOYiAARhYm5vcHR3elIeXB5fHoUelh6mHqsetB4AAW5yVh5ZHmcAAKDsJ3IAAKD9IXIA6wCwBmcAgAFsbXIAZh52Hnse5SFmdAABYXKIB2weaQBnAGgAdABhAHIAcgBvAPcAkwfhInBzdG8AoPwnaQBnAGgAdABhAHIAcgBvAPcAmgdwI2Fycm93AAABbHKNHpEeZQBmAPQAxhxpImdodAAAoKwhgAFhZmwAnB6fHqIecgAAoIUpAOA12F3ddQBzAACgLSppIm1lcwAAoDQqYQGvHrMecwB0AACgFyLhAIoOZaHKJbkeRhLuIWdlAKDKJWEAcgBsoCgAdAAAoJMpgAJhY2htdADMHs8e1R7bHt0ecgDyAJ0GbwByAG4AZQDyANYWYQByAGSgyyEAoG0pAKAOIHIAaQAAoL8iAANhY2hpcXTrHu8e1QfzHv0eBh/xIXVvAKA5IHIAAOA12MHcbQDloXIi+h4AAPweAKCNKgCgjyoAAWJ19xwBH28AcqAYIACgGiDyIW9rQmEAhDwAO2NkaGlscXJCBhcfxh0gHyQfKB8sHzEfAAFjaRsfHR8AoKYqcgAAoHkqcgBlAOUAkx3tIWVzAKDJIuEhcnIAoHYpdSJlc3QAAKB7KgABUGk1HzkfYQByAACglillocMlAgdfEnIAAAFkdUIfRx9zImhhcgAAoEop6CFhcgCgZikAAWVuTx9WH3IjdG5lcXEAAOBoIgD+xQBUHwAHRGFjZGVmaGlsbm9wc3VuH3Ifoh+rH68ftx+7H74f5h/uH/MfBwj/HwsgxCFvdACgOiIAAmNscHJ5H30fiR+eH3IAO4CvAK9AAAFldIEfgx8AoEImZaAgJ3MAZQAAoCAnc6CmIXQAbwCAoaYhZGx1AJQfmB+cH28AdwDuAHkDZQBmAPQA6gbwAOkO6yFlcgCgriUAAW95ph+qH+0hbWEAoCkqPGThIXNoAKAUIOElc3VyZWRhbmdsZQCgISJyAADgNdgq3W8AAKAnIYABY2RuAMQfyR/bH3IAbwA7gLUAtUBhoiMi0B8AANMf1x9zAPQAKxFpAHIAAKDwKm8AdAA7gLcAt0B1AHMA4qESIh4TAADjH3WgOCIAoCoqYwHqH+0fcAAAoNsq8gB+GnAAbAB1APMACAgAAWRw9x/7H+UhbHMAoKciZgAA4DXYXt0AAWN0AyAHIHIAAOA12MLc8CFvcwCgPiJsobwDECAVIPQiaW1hcACguCJhAPAAEyAADEdMUlZhYmNkZWZnaGlqbG1vcHJzdHV2dzwgRyBmIG0geSCqILgg2iDeIBEhFSEyIUMhTSFQIZwhnyHSIQAiIyKLIrEivyIUIwABZ3RAIEMgAODZIjgD9uBrItIgBwmAAWVsdABNIF8gYiBmAHQAAAFhclMgWCByInJvdwAAoM0h6SRnaHRhcnJvdwCgziEA4NgiOAP24Goi0iBfCekkZ2h0YXJyb3cAoM8hAAFEZHEgdSDhIXNoAKCvIuEhc2gAoK4igAJiY25wdACCIIYgiSCNIKIgbABhAACgByL1IXRlRGFnAADgICLSIACiSSJFaW9wlSCYIJwgniAA4HAqOANkAADgSyI4A3MASWFyAG8A+AAyCnUAcgBhoG4mbADzoG4mmwjzAa8gAACzIHAAO4CgAKBAbQBwAOXgTiI4AyoJgAJhZW91eQDBIMogzSDWINkg8AHGIAAAyCAAoEMqbwBuAEhh5CFpbEZhbgBnAGSgRyJvAHQAAOBtKjgDcAAAoEIqPWThIXNoAKATIACjYCJBYWRxc3jpIO0g+SD+IAIhDCFyAHIAAKDXIXIAAAFocvIg9SBrAACgJClvoJch9wAGD28AdAAA4FAiOAN1AGkA9gC7CAABZWkGIQohYQByAACgKCntAN8I6SFzdPOgBCLlCHIAAOA12CvdAAJFZXN0/wgcISshLiHxoXEiIiEAABMJ8aFxIgAJAAAnIWwAYQBuAPQAEwlpAO0AGQlyoG8iAKBvIoABQWFwADghOyE/IXIA8gBeIHIAcgAAoK4hYQByAACg8ipzogsiSiEAAAAAxwtkoPwiAKD6ImMAeQBaZIADQUVhZGVzdABcIV8hYiFmIWkhkyGWIXIA8gBXIADgZiI4A3IAcgAAoJohcgAAoCUggKFwImZxcwBwIYQhjiF0AAABYXJ1IXohcgByAG8A9wBlIWkAZwBoAHQAYQByAHIAbwD3AD4h8aFwImAhAACKIWwAYQBuAPQAZwlz4H0qOAMAoG4iaQDtAG0JcqBuImkA5aDqIkUJaQDkADoKAAFwdKMhpyFmAADgNdhf3YCBrAA7aW4AriGvIcchrEBuAIChCSJFZHYAtyG6Ib8hAOD5IjgDbwB0AADg9SI4A+EB1gjEIcYhAKD3IgCg9iJpAHagDCLhAagJzyHRIQCg/iIAoP0igAFhb3IA2CHsIfEhcgCAoSYiYXN0AOAh5SHpIWwAbABlAOwAywhsAADg/SrlIADgAiI4A2wiaW50AACgFCrjoYAi9yEAAPohdQDlAJsJY+CvKjgDZaCAIvEAkwkAAkFhaXQHIgoiFyIeInIA8gBsIHIAcgAAoZshY3cRIhQiAOAzKTgDAOCdITgDZyRodGFycm93AACgmyFyAGkA5aDrIr4JgANjaGltcHF1AC8iPCJHIpwhTSJQIloigKGBImNlcgA2Iv0JOSJ1AOUABgoA4DXYw9zvIXJ0bQKdIQAAAABEImEAcgDhAOEhbQBloEEi8aBEIiYKYQDyAMsIcwB1AAABYnBWIlgi5QDUCeUA3wmAAWJjcABgInMieCKAoYQiRWVzAGci7glqIgDgxSo4A2UAdABl4IIi0iBxAPGgiCJoImMAZaCBIvEA/gmAoYUiRWVzAH8iFgqCIgDgxio4A2UAdABl4IMi0iBxAPGgiSKAIgACZ2lscpIilCKaIpwi7AAMCWwAZABlADuA8QDxQOcAWwlpI2FuZ2xlAAABbHKkIqoi5SFmdGWg6iLxAEUJaSJnaHQAZaDrIvEAvgltoL0DAKEjAGVzuCK8InIAbwAAoBYhcAAAoAcggARESGFkZ2lscnMAziLSItYi2iLeIugi7SICIw8j4SFzaACgrSLhIXJyAKAEKXAAAOBNItIg4SFzaACgrCIAAWV04iLlIgDgZSLSIADgPgDSIG4iZmluAACg3imAAUFldADzIvci+iJyAHIAAKACKQDgZCLSIHLgPADSIGkAZQAA4LQi0iAAAUF0BiMKI3IAcgAAoAMp8iFpZQDgtSLSIGkAbQAA4Dwi0iCAAUFhbgAaIx4jKiNyAHIAAKDWIXIAAAFociMjJiNrAACgIylvoJYh9wD/DuUhYXIAoCcpUxJqFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVCMAAF4jaSN/I4IjjSOeI8AUAAAAAKYjwCMAANoj3yMAAO8jHiQvJD8kRCQAAWNzVyNsFHUAdABlADuA8wDzQAABaXlhI2cjcgBjoJoiO4D0APRAPmSAAmFiaW9zAHEjdCN3I3EBeiNzAOgAdhTsIWFjUWF2AACgOCrvIWxkAKC8KewhaWdTYQABY3KFI4kjaQByAACgvykA4DXYLN1vA5QjAAAAAJYjAACcI24A22JhAHYAZQA7gPIA8kAAoMEpAAFibaEjjAphAHIAAKC1KQACYWNpdKwjryO6I70jcgDyAFkUAAFpcrMjtiNyAACgvinvIXNzAKC7KW4A5QDZCgCgwCmAAWFlaQDFI8gjyyNjAHIATWFnAGEAyWOAAWNkbgDRI9Qj1iPyIW9uv2MAoLYpdQDzAHgBcABmAADgNdhg3YABYWVsAOQj5yPrI3IAAKC3KXIAcAAAoLkpdQDzAHwBAKMoImFkaW9zdvkj/CMPJBMkFiQbJHIA8gBeFIChXSplZm0AAyQJJAwkcgBvoDQhZgAAoDQhO4CqAKpAO4C6ALpA5yFvZgCgtiJyAACgVipsIm9wZQAAoFcqAKBbKoABY2xvACMkJSQrJPIACCRhAHMAaAA7gPgA+EBsAACgmCJpAGwBMyQ4JGQAZQA7gPUA9UBlAHMAYaCXInMAAKA2Km0AbAA7gPYA9kDiIWFyAKA9I+EKXiQAAHokAAB8JJQkAACYJKkkAAAAALUkEQsAAPAkAAAAAAQleiUAAIMlcgCAoSUiYXN0AGUkbyQBCwCBtgA7bGokayS2QGwAZQDsABgDaQJ1JAAAAAB4JG0AAKDzKgCg/Sp5AD9kcgCAAmNpbXB0AIUkiCSLJJkSjyRuAHQAJWBvAGQALmBpAGwAAKAwIOUhbmsAoDEgcgAA4DXYLd2AAWltbwCdJKAkpCR2oMYD1WNtAGEA9AD+B24AZQAAoA4m9KHAA64kAAC0JGMjaGZvcmsAAKDUItZjAAFhdbgkxCRuAAABY2u9JMIkawBooA8hAKAOIfYAaRpzAACkKwBhYmNkZW1zdNMkIRPXJNsk4STjJOck6yTjIWlyAKAjKmkAcgAAoCIqAAFvdYsW3yQAoCUqAKByKm4AO4CxALFAaQBtAACgJip3AG8AAKAnKoABaXB1APUk+iT+JO4idGludACgFSpmAADgNdhh3W4AZAA7gKMAo0CApHoiRWFjZWlub3N1ABMlFSUYJRslTCVRJVklSSV1JQCgsypwAACgtyp1AOUAPwtjoK8qgKJ6ImFjZW5zACclLSU0JTYlSSVwAHAAcgBvAPgAFyV1AHIAbAB5AGUA8QA/C/EAOAuAAWFlcwA8JUElRSXwInByb3gAoLkqcQBxAACgtSppAG0AAKDoImkA7QBEC20AZQDzoDIgIguAAUVhcwBDJVclRSXwAEAlgAFkZnAATwtfJXElgAFhbHMAZSVpJW0l7CFhcgCgLiPpIW5lAKASI/UhcmYAoBMjdKAdIu8AWQvyIWVsAKCwIgABY2l9JYElcgAA4DXYxdzIY24iY3NwAACgCCAAA2Zpb3BzdZElKxuVJZolnyWkJXIAAOA12C7dcABmAADgNdhi3XIiaW1lAACgVyBjAHIAAOA12MbcgAFhZW8AqiW6JcAldAAAAWVpryW2JXIAbgBpAG8AbgDzABkFbgB0AACgFipzAHQAZaA/APEACRj0AG0LgApBQkhhYmNkZWZoaWxtbm9wcnN0dXgA4yXyJfYl+iVpJpAmpia9JtUm5ib4JlonaCdxJ3UnnietJ7EnyCfiJ+cngAFhcnQA6SXsJe4lcgDyAJkM8gD6AuEhaWwAoBwpYQByAPIA3BVhAHIAAKBkKYADY2RlbnFydAAGJhAmEyYYJiYmKyZaJgABZXUKJg0mAOA9IjEDdABlAFVhaQDjACAN7SJwdHl2AKCzKWcAgKHpJ2RlbAAgJiImJCYAoJIpAKClKeUA9wt1AG8AO4C7ALtAcgAApZIhYWJjZmhscHN0dz0mQCZFJkcmSiZMJk4mUSZVJlgmcAAAoHUpZqDlIXMAAKAgKQCgMylzAACgHinrALka8ACVHmwAAKBFKWkAbQAAoHQpbAAAoKMhAKCdIQABYWleJmImaQBsAACgGilvAG6gNiJhAGwA8wB2C4ABYWJyAG8mciZ2JnIA8gAvEnIAawAAoHMnAAFha3omgSZjAAABZWt/JoAmfWBdYAABZXOFJocmAKCMKWwAAAFkdYwmjiYAoI4pAKCQKQACYWV1eZcmmiajJqUm8iFvbllhAAFkaZ4moSZpAGwAV2HsAA8M4gCAJkBkAAJjbHFzrSawJrUmuiZhAACgNylkImhhcgAAoGkpdQBvAPKgHSCjAWgAAKCzIYABYWNnAMMm0iaUC2wAgKEcIWlwcwDLJs4migxuAOUAoAxhAHIA9ADaC3QAAKCtJYABaWxyANsm3ybjJvMhaHQAoH0pbwBvAPIANgwA4DXYL90AAWFv6ib1JnIAAAFkde8m8SYAoMEhbKDAIQCgbCl2oMED8WOAAWducwD+Jk4nUCdoAHQAAANhaGxyc3QKJxInISc1Jz0nRydyInJvdwB0oJIhYQDpAFYmYSNycG9vbgAAAWR1GiceJ28AdwDuAPAmcAAAoMAh5SFmdAABYWgnJy0ncgByAG8AdwDzAAkMYQByAHAAbwBvAG4A8wATBGklZ2h0YXJyb3dzAACgySFxAHUAaQBnAGEAcgByAG8A9wBZJugkcmVldGltZXMAoMwiZwDaYmkAbgBnAGQAbwB0AHMAZQDxABwYgAFhaG0AYCdjJ2YncgDyAAkMYQDyABMEAKAPIG8idXN0AGGgsSPjIWhlAKCxI+0haWQAoO4qAAJhYnB0fCeGJ4knmScAAW5ygCeDJ2cAAKDtJ3IAAKD+IXIA6wAcDIABYWZsAI8nkieVJ3IAAKCGKQDgNdhj3XUAcwAAoC4qaSJtZXMAAKA1KgABYXCiJ6gncgBnoCkAdAAAoJQp7yJsaW50AKASKmEAcgDyADwnAAJhY2hxuCe8J6EMwCfxIXVvAKA6IHIAAOA12MfcAAFidYAmxCdvAPKgGSCoAYABaGlyAM4n0ifWJ3IAZQDlAE0n7SFlcwCgyiJpAIChuSVlZmwAXAxjEt4n9CFyaQCgzinsInVoYXIAoGgpAKAeIWENBSgJKA0oSyhVKIYoAACLKLAoAAAAAOMo5ygAABApJCkxKW0pcSmHKaYpAACYKgAAAACxKmMidXRlAFthcQB1AO8ABR+ApHsiRWFjZWlucHN5ABwoHignKCooLygyKEEoRihJKACgtCrwASMoAAAlKACguCpvAG4AYWF1AOUAgw1koLAqaQBsAF9hcgBjAF1hgAFFYXMAOCg6KD0oAKC2KnAAAKC6KmkAbQAAoOki7yJsaW50AKATKmkA7QCIDUFkbwB0AGKixSKRFgAAAABTKACgZiqAA0FhY21zdHgAYChkKG8ocyh1KHkogihyAHIAAKDYIXIAAAFocmkoayjrAJAab6CYIfcAzAd0ADuApwCnQGkAO2D3IWFyAKApKW0AAAFpbn4ozQBuAHUA8wDOAHQAAKA2J3IA7+A12DDdIxkAAmFjb3mRKJUonSisKHIAcAAAoG8mAAFoeZkonChjAHkASWRIZHIAdABtAqUoAAAAAKgoaQDkAFsPYQByAGEA7ABsJDuArQCtQAABZ22zKLsobQBhAAChwwNmdroouijCY4CjPCJkZWdsbnByAMgozCjPKNMo1yjaKN4obwB0AACgairxoEMiCw5FoJ4qAKCgKkWgnSoAoJ8qZQAAoEYi7CF1cwCgJCrhIXJyAKByKWEAcgDyAPwMAAJhZWl07Sj8KAEpCCkAAWxz8Sj4KGwAcwBlAHQAbQDpAH8oaABwAACgMyrwImFyc2wAoOQpAAFkbFoPBSllAACgIyNloKoqc6CsKgDgrCoA/oABZmxwABUpGCkfKfQhY3lMZGKgLwBhoMQpcgAAoD8jZgAA4DXYZN1hAAABZHIoKRcDZQBzAHWgYCZpAHQAAKBgJoABY3N1ADYpRilhKQABYXU6KUApcABzoJMiAOCTIgD+cABzoJQiAOCUIgD+dQAAAWJwSylWKQChjyJlcz4NUCllAHQAZaCPIvEAPw0AoZAiZXNIDVspZQB0AGWgkCLxAEkNAKGhJWFmZilbBHIAZQFrKVwEAKChJWEAcgDyAAMNAAJjZW10dyl7KX8pgilyAADgNdjI3HQAbQDuAM4AaQDsAAYpYQByAOYAVw0AAWFyiimOKXIA5qAGJhESAAFhbpIpoylpImdodAAAAWVwmSmgKXAAcwBpAGwAbwDuANkXaADpAKAkcwCvYIACYmNtbnAArin8KY4NJSooKgCkgiJFZGVtbnByc7wpvinCKcgpzCnUKdgp3CkAoMUqbwB0AACgvSpkoIYibwB0AACgwyr1IWx0AKDBKgABRWXQKdIpAKDLKgCgiiLsIXVzAKC/KuEhcnIAoHkpgAFlaXUA4inxKfQpdAAAoYIiZW7oKewpcQDxoIYivSllAHEA8aCKItEpbQAAoMcqAAFicPgp+ikAoNUqAKDTKmMAgKJ7ImFjZW5zAAcqDSoUKhYqRihwAHAAcgBvAPgAIyh1AHIAbAB5AGUA8QCDDfEAfA2AAWFlcwAcKiIqPShwAHAAcgBvAPgAPChxAPEAOShnAACgaiYApoMiMTIzRWRlaGxtbnBzPCo/KkIqRSpHKlIqWCpjKmcqaypzKncqO4C5ALlAO4CyALJAO4CzALNAAKDGKgABb3NLKk4qdAAAoL4qdQBiAACg2CpkoIcibwB0AACgxCpzAAABb3VdKmAqbAAAoMknYgAAoNcq4SFycgCgeyn1IWx0AKDCKgABRWVvKnEqAKDMKgCgiyLsIXVzAKDAKoABZWl1AH0qjCqPKnQAAKGDImVugyqHKnEA8aCHIkYqZQBxAPGgiyJwKm0AAKDIKgABYnCTKpUqAKDUKgCg1iqAAUFhbgCdKqEqrCpyAHIAAKDZIXIAAAFocqYqqCrrAJUab6CZIfcAxQf3IWFyAKAqKWwAaQBnADuA3wDfQOELzyrZKtwq6SrsKvEqAAD1KjQrAAAAAAAAAAAAAEwrbCsAAHErvSsAAAAAAADRK3IC1CoAAAAA2CrnIWV0AKAWI8RjcgDrAOUKgAFhZXkA4SrkKucq8iFvbmVh5CFpbGNhQmRvAPQAIg5sInJlYwAAoBUjcgAA4DXYMd0AAmVpa2/7KhIrKCsuK/IBACsAAAkrZQAAATRm6g0EK28AcgDlAOsNYQBzorgDECsAAAAAEit5AG0A0WMAAWNuFislK2sAAAFhcxsrIStwAHAAcgBvAPgAFw5pAG0AAKA8InMA8AD9DQABYXMsKyEr8AAXDnIAbgA7gP4A/kDsATgrOyswG2QA5QBnAmUAcwCAgdcAO2JkAEMrRCtJK9dAYaCgInIAAKAxKgCgMCqAAWVwcwBRK1MraSvhAAkh4qKkIlsrXysAAAAAYytvAHQAAKA2I2kAcgAAoPEqb+A12GXdcgBrAACg2irhAHgociJpbWUAAKA0IIABYWlwAHYreSu3K2QA5QC+DYADYWRlbXBzdACFK6MrmiunK6wrsCuzK24iZ2xlAACitSVkbHFykCuUK5ornCvvIXduAKC/JeUhZnRloMMl8QACBwCgXCJpImdodABloLkl8QBdDG8AdAAAoOwlaSJudXMAAKA6KuwhdXMAoDkqYgAAoM0p6SFtZQCgOyrlInppdW0AoOIjgAFjaHQAwivKK80rAAFyecYrySsA4DXYydxGZGMAeQBbZPIhb2tnYQABaW/UK9creAD0ANERaCJlYWQAAAFsct4r5ytlAGYAdABhAHIAcgBvAPcAXQbpJGdodGFycm93AKCgIQAJQUhhYmNkZmdobG1vcHJzdHV3CiwNLBEsHSwnLDEsQCxLLFIsYix6LIQsjyzLLOgs7Sz/LAotcgDyAAkDYQByAACgYykAAWNyFSwbLHUAdABlADuA+gD6QPIACQ1yAOMBIywAACUseQBeZHYAZQBtYQABaXkrLDAscgBjADuA+wD7QENkgAFhYmgANyw6LD0scgDyANEO7CFhY3FhYQDyAOAOAAFpckQsSCzzIWh0AKB+KQDgNdgy3XIAYQB2AGUAO4D5APlAYQFWLF8scgAAAWxyWixcLACgvyEAoL4hbABrAACggCUAAWN0Zix2LG8CbCwAAAAAcyxyAG4AZaAcI3IAAKAcI28AcAAAoA8jcgBpAACg+CUAAWFsfiyBLGMAcgBrYTuAqACoQAABZ3CILIssbwBuAHNhZgAA4DXYZt0AA2FkaGxzdZksniynLLgsuyzFLHIAcgBvAPcACQ1vAHcAbgBhAHIAcgBvAPcA2A5hI3Jwb29uAAABbHKvLLMsZQBmAPQAWyxpAGcAaAD0AF0sdQDzAKYOaQAAocUDaGzBLMIs0mNvAG4AxWPwI2Fycm93cwCgyCGAAWNpdADRLOEs5CxvAtcsAAAAAN4scgBuAGWgHSNyAACgHSNvAHAAAKAOI24AZwBvYXIAaQAAoPklYwByAADgNdjK3IABZGlyAPMs9yz6LG8AdAAAoPAi7CFkZWlhaQBmoLUlAKC0JQABYW0DLQYtcgDyAMosbAA7gPwA/EDhIm5nbGUAoKcpgAdBQkRhY2RlZmxub3Byc3oAJy0qLTAtNC2bLZ0toS2/LcMtxy3TLdgt3C3gLfwtcgDyABADYQByAHag6CoAoOkqYQBzAOgA/gIAAW5yOC08LechcnQAoJwpgANla25wcnN0AJkpSC1NLVQtXi1iLYItYQBwAHAA4QAaHG8AdABoAGkAbgDnAKEXgAFoaXIAoSmzJFotbwBwAPQAdCVooJUh7wD4JgABaXVmLWotZwBtAOEAuygAAWJwbi14LXMjZXRuZXEAceCKIgD+AODLKgD+cyNldG5lcQBx4IsiAP4A4MwqAP4AAWhyhi2KLWUAdADhABIraSNhbmdsZQAAAWxyki2WLeUhZnQAoLIiaSJnaHQAAKCzInkAMmThIXNoAKCiIoABZWxyAKcttC24LWKiKCKuLQAAAACyLWEAcgAAoLsicQAAoFoi7CFpcACg7iIAAWJ0vC1eD2EA8gBfD3IAAOA12DPddAByAOkAlS1zAHUAAAFicM0t0C0A4IIi0iAA4IMi0iBwAGYAAOA12GfdcgBvAPAAWQt0AHIA6QCaLQABY3XkLegtcgAA4DXYy9wAAWJw7C30LW4AAAFFZXUt8S0A4IoiAP5uAAABRWV/LfktAOCLIgD+6SJnemFnAKCaKYADY2Vmb3BycwANLhAuJS4pLiMuLi40LukhcmN1YQABZGkULiEuAAFiZxguHC5hAHIAAKBfKmUAcaAnIgCgWSLlIXJwAKAYIXIAAOA12DTdcABmAADgNdho3WWgQCJhAHQA6ABqD2MAcgAA4DXYzNzjCuQRUC4AAFQuAABYLmIuAAAAAGMubS5wLnQuAAAAAIguki4AAJouJxIqEnQAcgDpAB0ScgAA4DXYNd0AAUFhWy5eLnIA8gDnAnIA8gCTB75jAAFBYWYuaS5yAPIA4AJyAPIAjAdhAPAAeh5pAHMAAKD7IoABZHB0APgReS6DLgABZmx9LoAuAOA12GnddQDzAP8RaQBtAOUABBIAAUFhiy6OLnIA8gDuAnIA8gCaBwABY3GVLgoScgAA4DXYzdwAAXB0nS6hLmwAdQDzACUScgDpACASAARhY2VmaW9zdbEuvC7ELsguzC7PLtQu2S5jAAABdXm2LrsudABlADuA/QD9QE9kAAFpecAuwy5yAGMAd2FLZG4AO4ClAKVAcgAA4DXYNt1jAHkAV2RwAGYAAOA12GrdYwByAADgNdjO3AABY23dLt8ueQBOZGwAO4D/AP9AAAVhY2RlZmhpb3N38y73Lv8uAi8MLxAvEy8YLx0vIi9jInV0ZQB6YQABYXn7Lv4u8iFvbn5hN2RvAHQAfGEAAWV0Bi8KL3QAcgDmAB8QYQC2Y3IAAOA12DfdYwB5ADZk5yJyYXJyAKDdIXAAZgAA4DXYa91jAHIAAOA12M/cAAFqbiYvKC8AoA0gagAAoAwg");
 });
 
-// node_modules/htmlparser2/node_modules/entities/dist/esm/generated/decode-data-xml.js
+// ../zveltio-extensions/node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/generated/decode-data-xml.js
 var xmlDecodeTree;
 var init_decode_data_xml = __esm(() => {
   xmlDecodeTree = /* @__PURE__ */ decodeBase64("AAJhZ2xxBwARABMAFQBtAg0AAAAAAA8AcAAmYG8AcwAnYHQAPmB0ADxg9SFvdCJg");
 });
 
-// node_modules/htmlparser2/node_modules/entities/dist/esm/internal/bin-trie-flags.js
+// ../zveltio-extensions/node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/internal/bin-trie-flags.js
 var BinTrieFlags;
 var init_bin_trie_flags = __esm(() => {
   (function(BinTrieFlags2) {
@@ -40874,7 +41381,7 @@ var init_bin_trie_flags = __esm(() => {
   })(BinTrieFlags || (BinTrieFlags = {}));
 });
 
-// node_modules/htmlparser2/node_modules/entities/dist/esm/decode.js
+// ../zveltio-extensions/node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/decode.js
 function isNumber2(code) {
   return code >= CharCodes.ZERO && code <= CharCodes.NINE;
 }
@@ -40975,9 +41482,9 @@ class EntityDecoder {
     return -1;
   }
   emitNumericEntity(lastCp, expectedLength) {
-    var _a4;
+    var _a5;
     if (this.consumed <= expectedLength) {
-      (_a4 = this.errors) === null || _a4 === undefined || _a4.absenceOfDigitsInNumericCharacterReference(this.consumed);
+      (_a5 = this.errors) === null || _a5 === undefined || _a5.absenceOfDigitsInNumericCharacterReference(this.consumed);
       return 0;
     }
     if (lastCp === CharCodes.SEMI) {
@@ -41058,11 +41565,11 @@ class EntityDecoder {
     return -1;
   }
   emitNotTerminatedNamedEntity() {
-    var _a4;
+    var _a5;
     const { result, decodeTree } = this;
     const valueLength = (decodeTree[result] & BinTrieFlags.VALUE_LENGTH) >> 14;
     this.emitNamedEntityData(result, valueLength, this.consumed);
-    (_a4 = this.errors) === null || _a4 === undefined || _a4.missingSemicolonAfterCharacterReference();
+    (_a5 = this.errors) === null || _a5 === undefined || _a5.missingSemicolonAfterCharacterReference();
     return this.consumed;
   }
   emitNamedEntityData(result, valueLength, consumed) {
@@ -41074,7 +41581,7 @@ class EntityDecoder {
     return consumed;
   }
   end() {
-    var _a4;
+    var _a5;
     switch (this.state) {
       case EntityDecoderState.NamedEntity: {
         return this.result !== 0 && (this.decodeMode !== DecodingMode.Attribute || this.result === this.treeIndex) ? this.emitNotTerminatedNamedEntity() : 0;
@@ -41086,7 +41593,7 @@ class EntityDecoder {
         return this.emitNumericEntity(0, 3);
       }
       case EntityDecoderState.NumericStart: {
-        (_a4 = this.errors) === null || _a4 === undefined || _a4.absenceOfDigitsInNumericCharacterReference(this.consumed);
+        (_a5 = this.errors) === null || _a5 === undefined || _a5.absenceOfDigitsInNumericCharacterReference(this.consumed);
         return 0;
       }
       case EntityDecoderState.EntityStart: {
@@ -41158,7 +41665,7 @@ var init_decode = __esm(() => {
   })(DecodingMode || (DecodingMode = {}));
 });
 
-// node_modules/htmlparser2/dist/esm/Tokenizer.js
+// ../zveltio-extensions/node_modules/html-to-text/node_modules/htmlparser2/dist/esm/Tokenizer.js
 function isWhitespace(c) {
   return c === CharCodes2.Space || c === CharCodes2.NewLine || c === CharCodes2.Tab || c === CharCodes2.FormFeed || c === CharCodes2.CarriageReturn;
 }
@@ -41819,10 +42326,10 @@ var init_Tokenizer = __esm(() => {
   };
 });
 
-// node_modules/htmlparser2/dist/esm/Parser.js
+// ../zveltio-extensions/node_modules/html-to-text/node_modules/htmlparser2/dist/esm/Parser.js
 class Parser {
   constructor(cbs, options = {}) {
-    var _a4, _b, _c, _d, _e, _f;
+    var _a5, _b, _c, _d, _e, _f;
     this.options = options;
     this.startIndex = 0;
     this.endIndex = 0;
@@ -41838,7 +42345,7 @@ class Parser {
     this.ended = false;
     this.cbs = cbs !== null && cbs !== undefined ? cbs : {};
     this.htmlMode = !this.options.xmlMode;
-    this.lowerCaseTagNames = (_a4 = options.lowerCaseTags) !== null && _a4 !== undefined ? _a4 : this.htmlMode;
+    this.lowerCaseTagNames = (_a5 = options.lowerCaseTags) !== null && _a5 !== undefined ? _a5 : this.htmlMode;
     this.lowerCaseAttributeNames = (_b = options.lowerCaseAttributeNames) !== null && _b !== undefined ? _b : this.htmlMode;
     this.recognizeSelfClosing = (_c = options.recognizeSelfClosing) !== null && _c !== undefined ? _c : !this.htmlMode;
     this.tokenizer = new ((_d = options.Tokenizer) !== null && _d !== undefined ? _d : Tokenizer)(this.options, this);
@@ -41846,16 +42353,16 @@ class Parser {
     (_f = (_e = this.cbs).onparserinit) === null || _f === undefined || _f.call(_e, this);
   }
   ontext(start, endIndex) {
-    var _a4, _b;
+    var _a5, _b;
     const data = this.getSlice(start, endIndex);
     this.endIndex = endIndex - 1;
-    (_b = (_a4 = this.cbs).ontext) === null || _b === undefined || _b.call(_a4, data);
+    (_b = (_a5 = this.cbs).ontext) === null || _b === undefined || _b.call(_a5, data);
     this.startIndex = endIndex;
   }
   ontextentity(cp, endIndex) {
-    var _a4, _b;
+    var _a5, _b;
     this.endIndex = endIndex - 1;
-    (_b = (_a4 = this.cbs).ontext) === null || _b === undefined || _b.call(_a4, fromCodePoint(cp));
+    (_b = (_a5 = this.cbs).ontext) === null || _b === undefined || _b.call(_a5, fromCodePoint(cp));
     this.startIndex = endIndex;
   }
   isVoidElement(name2) {
@@ -41870,14 +42377,14 @@ class Parser {
     this.emitOpenTag(name2);
   }
   emitOpenTag(name2) {
-    var _a4, _b, _c, _d;
+    var _a5, _b, _c, _d;
     this.openTagStart = this.startIndex;
     this.tagname = name2;
     const impliesClose = this.htmlMode && openImpliesClose.get(name2);
     if (impliesClose) {
       while (this.stack.length > 0 && impliesClose.has(this.stack[0])) {
         const element = this.stack.shift();
-        (_b = (_a4 = this.cbs).onclosetag) === null || _b === undefined || _b.call(_a4, element, true);
+        (_b = (_a5 = this.cbs).onclosetag) === null || _b === undefined || _b.call(_a5, element, true);
       }
     }
     if (!this.isVoidElement(name2)) {
@@ -41895,10 +42402,10 @@ class Parser {
       this.attribs = {};
   }
   endOpenTag(isImplied) {
-    var _a4, _b;
+    var _a5, _b;
     this.startIndex = this.openTagStart;
     if (this.attribs) {
-      (_b = (_a4 = this.cbs).onopentag) === null || _b === undefined || _b.call(_a4, this.tagname, this.attribs, isImplied);
+      (_b = (_a5 = this.cbs).onopentag) === null || _b === undefined || _b.call(_a5, this.tagname, this.attribs, isImplied);
       this.attribs = null;
     }
     if (this.cbs.onclosetag && this.isVoidElement(this.tagname)) {
@@ -41912,7 +42419,7 @@ class Parser {
     this.startIndex = endIndex + 1;
   }
   onclosetag(start, endIndex) {
-    var _a4, _b, _c, _d, _e, _f, _g, _h;
+    var _a5, _b, _c, _d, _e, _f, _g, _h;
     this.endIndex = endIndex;
     let name2 = this.getSlice(start, endIndex);
     if (this.lowerCaseTagNames) {
@@ -41926,7 +42433,7 @@ class Parser {
       if (pos !== -1) {
         for (let index = 0;index <= pos; index++) {
           const element = this.stack.shift();
-          (_b = (_a4 = this.cbs).onclosetag) === null || _b === undefined || _b.call(_a4, element, index !== pos);
+          (_b = (_a5 = this.cbs).onclosetag) === null || _b === undefined || _b.call(_a5, element, index !== pos);
         }
       } else if (this.htmlMode && name2 === "p") {
         this.emitOpenTag("p");
@@ -41949,11 +42456,11 @@ class Parser {
     }
   }
   closeCurrentTag(isOpenImplied) {
-    var _a4, _b;
+    var _a5, _b;
     const name2 = this.tagname;
     this.endOpenTag(isOpenImplied);
     if (this.stack[0] === name2) {
-      (_b = (_a4 = this.cbs).onclosetag) === null || _b === undefined || _b.call(_a4, name2, !isOpenImplied);
+      (_b = (_a5 = this.cbs).onclosetag) === null || _b === undefined || _b.call(_a5, name2, !isOpenImplied);
       this.stack.shift();
     }
   }
@@ -41969,9 +42476,9 @@ class Parser {
     this.attribvalue += fromCodePoint(cp);
   }
   onattribend(quote, endIndex) {
-    var _a4, _b;
+    var _a5, _b;
     this.endIndex = endIndex;
-    (_b = (_a4 = this.cbs).onattribute) === null || _b === undefined || _b.call(_a4, this.attribname, this.attribvalue, quote === QuoteType.Double ? '"' : quote === QuoteType.Single ? "'" : quote === QuoteType.NoValue ? undefined : null);
+    (_b = (_a5 = this.cbs).onattribute) === null || _b === undefined || _b.call(_a5, this.attribname, this.attribvalue, quote === QuoteType.Double ? '"' : quote === QuoteType.Single ? "'" : quote === QuoteType.NoValue ? undefined : null);
     if (this.attribs && !Object.prototype.hasOwnProperty.call(this.attribs, this.attribname)) {
       this.attribs[this.attribname] = this.attribvalue;
     }
@@ -42004,18 +42511,18 @@ class Parser {
     this.startIndex = endIndex + 1;
   }
   oncomment(start, endIndex, offset) {
-    var _a4, _b, _c, _d;
+    var _a5, _b, _c, _d;
     this.endIndex = endIndex;
-    (_b = (_a4 = this.cbs).oncomment) === null || _b === undefined || _b.call(_a4, this.getSlice(start, endIndex - offset));
+    (_b = (_a5 = this.cbs).oncomment) === null || _b === undefined || _b.call(_a5, this.getSlice(start, endIndex - offset));
     (_d = (_c = this.cbs).oncommentend) === null || _d === undefined || _d.call(_c);
     this.startIndex = endIndex + 1;
   }
   oncdata(start, endIndex, offset) {
-    var _a4, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+    var _a5, _b, _c, _d, _e, _f, _g, _h, _j, _k;
     this.endIndex = endIndex;
     const value = this.getSlice(start, endIndex - offset);
     if (!this.htmlMode || this.options.recognizeCDATA) {
-      (_b = (_a4 = this.cbs).oncdatastart) === null || _b === undefined || _b.call(_a4);
+      (_b = (_a5 = this.cbs).oncdatastart) === null || _b === undefined || _b.call(_a5);
       (_d = (_c = this.cbs).ontext) === null || _d === undefined || _d.call(_c, value);
       (_f = (_e = this.cbs).oncdataend) === null || _f === undefined || _f.call(_e);
     } else {
@@ -42025,18 +42532,18 @@ class Parser {
     this.startIndex = endIndex + 1;
   }
   onend() {
-    var _a4, _b;
+    var _a5, _b;
     if (this.cbs.onclosetag) {
       this.endIndex = this.startIndex;
       for (let index = 0;index < this.stack.length; index++) {
         this.cbs.onclosetag(this.stack[index], true);
       }
     }
-    (_b = (_a4 = this.cbs).onend) === null || _b === undefined || _b.call(_a4);
+    (_b = (_a5 = this.cbs).onend) === null || _b === undefined || _b.call(_a5);
   }
   reset() {
-    var _a4, _b, _c, _d;
-    (_b = (_a4 = this.cbs).onreset) === null || _b === undefined || _b.call(_a4);
+    var _a5, _b, _c, _d;
+    (_b = (_a5 = this.cbs).onreset) === null || _b === undefined || _b.call(_a5);
     this.tokenizer.reset();
     this.tagname = "";
     this.attribname = "";
@@ -42073,9 +42580,9 @@ class Parser {
     this.buffers.shift();
   }
   write(chunk) {
-    var _a4, _b;
+    var _a5, _b;
     if (this.ended) {
-      (_b = (_a4 = this.cbs).onerror) === null || _b === undefined || _b.call(_a4, new Error(".write() after done!"));
+      (_b = (_a5 = this.cbs).onerror) === null || _b === undefined || _b.call(_a5, new Error(".write() after done!"));
       return;
     }
     this.buffers.push(chunk);
@@ -42085,9 +42592,9 @@ class Parser {
     }
   }
   end(chunk) {
-    var _a4, _b;
+    var _a5, _b;
     if (this.ended) {
-      (_b = (_a4 = this.cbs).onerror) === null || _b === undefined || _b.call(_a4, new Error(".end() after done!"));
+      (_b = (_a5 = this.cbs).onerror) === null || _b === undefined || _b.call(_a5, new Error(".end() after done!"));
       return;
     }
     if (chunk)
@@ -42215,7 +42722,7 @@ var init_Parser = __esm(() => {
   reNameEnd = /\s|\//;
 });
 
-// node_modules/entities/lib/esm/escape.js
+// ../zveltio-extensions/node_modules/dom-serializer/node_modules/entities/lib/esm/escape.js
 function encodeXML(str) {
   let ret = "";
   let lastIdx = 0;
@@ -42274,7 +42781,7 @@ var init_escape = __esm(() => {
   ]));
 });
 
-// node_modules/entities/lib/esm/index.js
+// ../zveltio-extensions/node_modules/dom-serializer/node_modules/entities/lib/esm/index.js
 var EntityLevel, EncodingMode;
 var init_esm3 = __esm(() => {
   init_escape();
@@ -42291,7 +42798,7 @@ var init_esm3 = __esm(() => {
   })(EncodingMode || (EncodingMode = {}));
 });
 
-// node_modules/dom-serializer/lib/esm/foreignNames.js
+// ../zveltio-extensions/node_modules/dom-serializer/lib/esm/foreignNames.js
 var elementNames, attributeNames;
 var init_foreignNames = __esm(() => {
   elementNames = new Map([
@@ -42396,18 +42903,18 @@ var init_foreignNames = __esm(() => {
   ].map((val) => [val.toLowerCase(), val]));
 });
 
-// node_modules/dom-serializer/lib/esm/index.js
+// ../zveltio-extensions/node_modules/dom-serializer/lib/esm/index.js
 function replaceQuotes(value) {
   return value.replace(/"/g, "&quot;");
 }
 function formatAttributes(attributes, opts) {
-  var _a4;
+  var _a5;
   if (!attributes)
     return;
-  const encode3 = ((_a4 = opts.encodeEntities) !== null && _a4 !== undefined ? _a4 : opts.decodeEntities) === false ? replaceQuotes : opts.xmlMode || opts.encodeEntities !== "utf8" ? encodeXML : escapeAttribute;
+  const encode3 = ((_a5 = opts.encodeEntities) !== null && _a5 !== undefined ? _a5 : opts.decodeEntities) === false ? replaceQuotes : opts.xmlMode || opts.encodeEntities !== "utf8" ? encodeXML : escapeAttribute;
   return Object.keys(attributes).map((key) => {
-    var _a5, _b;
-    const value = (_a5 = attributes[key]) !== null && _a5 !== undefined ? _a5 : "";
+    var _a6, _b;
+    const value = (_a6 = attributes[key]) !== null && _a6 !== undefined ? _a6 : "";
     if (opts.xmlMode === "foreign") {
       key = (_b = attributeNames.get(key)) !== null && _b !== undefined ? _b : key;
     }
@@ -42445,9 +42952,9 @@ function renderNode(node2, options) {
   }
 }
 function renderTag(elem, opts) {
-  var _a4;
+  var _a5;
   if (opts.xmlMode === "foreign") {
-    elem.name = (_a4 = elementNames.get(elem.name)) !== null && _a4 !== undefined ? _a4 : elem.name;
+    elem.name = (_a5 = elementNames.get(elem.name)) !== null && _a5 !== undefined ? _a5 : elem.name;
     if (elem.parent && foreignModeIntegrationPoints.has(elem.parent.name)) {
       opts = { ...opts, xmlMode: false };
     }
@@ -42479,9 +42986,9 @@ function renderDirective(elem) {
   return `<${elem.data}>`;
 }
 function renderText(elem, opts) {
-  var _a4;
+  var _a5;
   let data = elem.data || "";
-  if (((_a4 = opts.encodeEntities) !== null && _a4 !== undefined ? _a4 : opts.decodeEntities) !== false && !(!opts.xmlMode && elem.parent && unencodedElements.has(elem.parent.name))) {
+  if (((_a5 = opts.encodeEntities) !== null && _a5 !== undefined ? _a5 : opts.decodeEntities) !== false && !(!opts.xmlMode && elem.parent && unencodedElements.has(elem.parent.name))) {
     data = opts.xmlMode || opts.encodeEntities !== "utf8" ? encodeXML(data) : escapeText(data);
   }
   return data;
@@ -42542,19 +43049,19 @@ var init_esm4 = __esm(() => {
   foreignElements = new Set(["svg", "math"]);
 });
 
-// node_modules/domutils/lib/esm/stringify.js
+// ../zveltio-extensions/node_modules/domutils/lib/esm/stringify.js
 var init_stringify = () => {};
 
-// node_modules/domutils/lib/esm/traversal.js
+// ../zveltio-extensions/node_modules/domutils/lib/esm/traversal.js
 var init_traversal = () => {};
 
-// node_modules/domutils/lib/esm/querying.js
+// ../zveltio-extensions/node_modules/domutils/lib/esm/querying.js
 var init_querying = () => {};
 
-// node_modules/domutils/lib/esm/legacy.js
+// ../zveltio-extensions/node_modules/domutils/lib/esm/legacy.js
 var init_legacy = () => {};
 
-// node_modules/domutils/lib/esm/helpers.js
+// ../zveltio-extensions/node_modules/domutils/lib/esm/helpers.js
 var DocumentPosition;
 var init_helpers = __esm(() => {
   (function(DocumentPosition2) {
@@ -42566,10 +43073,10 @@ var init_helpers = __esm(() => {
   })(DocumentPosition || (DocumentPosition = {}));
 });
 
-// node_modules/domutils/lib/esm/feeds.js
+// ../zveltio-extensions/node_modules/domutils/lib/esm/feeds.js
 var init_feeds = () => {};
 
-// node_modules/domutils/lib/esm/index.js
+// ../zveltio-extensions/node_modules/domutils/lib/esm/index.js
 var init_esm5 = __esm(() => {
   init_stringify();
   init_traversal();
@@ -42579,7 +43086,7 @@ var init_esm5 = __esm(() => {
   init_feeds();
 });
 
-// node_modules/htmlparser2/dist/esm/index.js
+// ../zveltio-extensions/node_modules/html-to-text/node_modules/htmlparser2/dist/esm/index.js
 function parseDocument(data, options) {
   const handler = new DomHandler(undefined, options);
   new Parser(handler, options).end(data);
@@ -42592,7 +43099,7 @@ var init_esm6 = __esm(() => {
   init_esm5();
 });
 
-// node_modules/deepmerge-ts/dist/index.mjs
+// ../zveltio-extensions/node_modules/deepmerge-ts/dist/index.mjs
 function defaultMetaDataUpdater(previousMeta, metaMeta) {
   return metaMeta;
 }
@@ -42836,7 +43343,7 @@ var init_dist = __esm(() => {
   };
 });
 
-// node_modules/html-to-text/lib/html-to-text.mjs
+// ../zveltio-extensions/node_modules/html-to-text/lib/html-to-text.mjs
 var exports_html_to_text = {};
 __export(exports_html_to_text, {
   htmlToText: () => convert,
@@ -44131,7 +44638,7 @@ var init_html_to_text = __esm(() => {
   };
 });
 
-// node_modules/he/he.js
+// ../zveltio-extensions/node_modules/he/he.js
 var require_he = __commonJS((exports, module) => {
   /*! https://mths.be/he v1.2.0 by @mathias | MIT license */
   (function(root) {
@@ -44369,7 +44876,7 @@ var require_he = __commonJS((exports, module) => {
   })(exports);
 });
 
-// node_modules/uc.micro/build/index.cjs.js
+// ../zveltio-extensions/node_modules/uc.micro/build/index.cjs.js
 var require_index_cjs = __commonJS((exports) => {
   var regex$5 = /[\0-\uD7FF\uE000-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:[^\uD800-\uDBFF]|^)[\uDC00-\uDFFF]/;
   var regex$4 = /[\0-\x1F\x7F-\x9F]/;
@@ -44385,7 +44892,7 @@ var require_index_cjs = __commonJS((exports) => {
   exports.Z = regex;
 });
 
-// node_modules/linkify-it/build/index.cjs.js
+// ../zveltio-extensions/node_modules/linkify-it/build/index.cjs.js
 var require_index_cjs2 = __commonJS((exports, module) => {
   var uc_micro = require_index_cjs();
   function reFactory(opts) {
@@ -44398,28 +44905,28 @@ var require_index_cjs2 = __commonJS((exports, module) => {
     re.src_ZPCc = [re.src_Z, re.src_P, re.src_Cc].join("|");
     re.src_ZCc = [re.src_Z, re.src_Cc].join("|");
     const text_separators = "[><\uFF5C]";
-    re.src_pseudo_letter = "(?:(?!" + text_separators + "|" + re.src_ZPCc + ")" + re.src_Any + ")";
+    re.src_pseudo_letter = `(?:(?!${text_separators}|${re.src_ZPCc})${re.src_Any})`;
     re.src_ip4 = "(?:(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)";
-    re.src_auth = "(?:(?:(?!" + re.src_ZCc + "|[@/\\[\\]()]).)+@)?";
+    re.src_auth = `(?:(?:(?!${re.src_ZCc}|[@/\\[\\]()]).){1,50}@)?`;
     re.src_port = "(?::(?:6(?:[0-4]\\d{3}|5(?:[0-4]\\d{2}|5(?:[0-2]\\d|3[0-5])))|[1-5]?\\d{1,4}))?";
-    re.src_host_terminator = "(?=$|" + text_separators + "|" + re.src_ZPCc + ")" + "(?!" + (opts["---"] ? "-(?!--)|" : "-|") + "_|:\\d|\\.-|\\.(?!$|" + re.src_ZPCc + "))";
-    re.src_path = "(?:" + "[/?#]" + "(?:" + "(?!" + re.src_ZCc + "|" + text_separators + `|[()[\\]{}.,"'?!\\-;]).|` + "\\[(?:(?!" + re.src_ZCc + "|\\]).)*\\]|" + "\\((?:(?!" + re.src_ZCc + "|[)]).)*\\)|" + "\\{(?:(?!" + re.src_ZCc + "|[}]).)*\\}|" + "\\\"(?:(?!" + re.src_ZCc + '|["]).)+\\"|' + "\\'(?:(?!" + re.src_ZCc + "|[']).)+\\'|" + "\\'(?=" + re.src_pseudo_letter + "|[-])|" + "\\.{2,}[a-zA-Z0-9%/&]|" + "\\.(?!" + re.src_ZCc + "|[.]|$)|" + (opts["---"] ? "\\-(?!--(?:[^-]|$))(?:-*)|" : "\\-+|") + ",(?!" + re.src_ZCc + "|$)|" + ";(?!" + re.src_ZCc + "|$)|" + "\\!+(?!" + re.src_ZCc + "|[!]|$)|" + "\\?(?!" + re.src_ZCc + "|[?]|$)" + ")+" + "|\\/" + ")?";
-    re.src_email_name = "[\\-;:&=\\+\\$,\\.a-zA-Z0-9_][\\-;:&=\\+\\$,\\\"\\.a-zA-Z0-9_]*";
+    re.src_host_terminator = `(?=$|${text_separators}|${re.src_ZPCc})` + `(?!${opts["---"] ? "-(?!--)|" : "-|"}_|:\\d|\\.-|\\.(?!$|${re.src_ZPCc}))`;
+    re.src_path = "(?:" + "[/?#]" + "(?:" + `(?!${re.src_ZCc}|${text_separators}|[()[\\]{}.,"'?!\\-;]).|` + `\\[(?:(?!${re.src_ZCc}|\\]).)*\\]|` + `\\((?:(?!${re.src_ZCc}|[)]).)*\\)|` + `\\{(?:(?!${re.src_ZCc}|[}]).)*\\}|` + `\\"(?:(?!${re.src_ZCc}|["]).)+\\"|` + `\\'(?:(?!${re.src_ZCc}|[']).)+\\'|` + `\\'(?=${re.src_pseudo_letter}|[-])|` + "\\.{2,}[a-zA-Z0-9%/&]|" + `\\.(?!${re.src_ZCc}|[.]|$)|` + (opts["---"] ? "\\-(?!--(?:[^-]|$))(?:-*)|" : "\\-+|") + `,(?!${re.src_ZCc}|$)|` + `;(?!${re.src_ZCc}|$)|` + `\\!+(?!${re.src_ZCc}|[!]|$)|` + `\\?(?!${re.src_ZCc}|[?]|$)` + ")+" + "|\\/" + ")?";
+    re.src_email_name = "[\\-;:&=\\+\\$,\\.a-zA-Z0-9_][\\-;:&=\\+\\$,\\\"\\.a-zA-Z0-9_]{0,63}";
     re.src_xn = "xn--[a-z0-9\\-]{1,59}";
-    re.src_domain_root = "(?:" + re.src_xn + "|" + re.src_pseudo_letter + "{1,63}" + ")";
-    re.src_domain = "(?:" + re.src_xn + "|" + "(?:" + re.src_pseudo_letter + ")" + "|" + "(?:" + re.src_pseudo_letter + "(?:-|" + re.src_pseudo_letter + "){0,61}" + re.src_pseudo_letter + ")" + ")";
-    re.src_host = "(?:" + "(?:(?:(?:" + re.src_domain + ")\\.)*" + re.src_domain + ")" + ")";
-    re.tpl_host_fuzzy = "(?:" + re.src_ip4 + "|" + "(?:(?:(?:" + re.src_domain + ")\\.)+(?:%TLDS%))" + ")";
-    re.tpl_host_no_ip_fuzzy = "(?:(?:(?:" + re.src_domain + ")\\.)+(?:%TLDS%))";
+    re.src_domain_root = "(?:" + re.src_xn + "|" + `${re.src_pseudo_letter}{1,63}` + ")";
+    re.src_domain = "(?:" + re.src_xn + "|" + `(?:${re.src_pseudo_letter})` + "|" + `(?:${re.src_pseudo_letter}(?:-|${re.src_pseudo_letter}){0,61}${re.src_pseudo_letter})` + ")";
+    re.src_host = "(?:" + `(?:(?:(?:${re.src_domain})\\.)*${re.src_domain})` + ")";
+    re.tpl_host_fuzzy = "(?:" + re.src_ip4 + "|" + `(?:(?:(?:${re.src_domain})\\.)+(?:%TLDS%))` + ")";
+    re.tpl_host_no_ip_fuzzy = `(?:(?:(?:${re.src_domain})\\.)+(?:%TLDS%))`;
     re.src_host_strict = re.src_host + re.src_host_terminator;
     re.tpl_host_fuzzy_strict = re.tpl_host_fuzzy + re.src_host_terminator;
     re.src_host_port_strict = re.src_host + re.src_port + re.src_host_terminator;
     re.tpl_host_port_fuzzy_strict = re.tpl_host_fuzzy + re.src_port + re.src_host_terminator;
     re.tpl_host_port_no_ip_fuzzy_strict = re.tpl_host_no_ip_fuzzy + re.src_port + re.src_host_terminator;
-    re.tpl_host_fuzzy_test = "localhost|www\\.|\\.\\d{1,3}\\.|(?:\\.(?:%TLDS%)(?:" + re.src_ZPCc + "|>|$))";
-    re.tpl_email_fuzzy = "(^|" + text_separators + '|"|\\(|' + re.src_ZCc + ")" + "(" + re.src_email_name + "@" + re.tpl_host_fuzzy_strict + ")";
-    re.tpl_link_fuzzy = "(^|(?![.:/\\-_@])(?:[$+<=>^`|\uFF5C]|" + re.src_ZPCc + "))" + "((?![$+<=>^`|\uFF5C])" + re.tpl_host_port_fuzzy_strict + re.src_path + ")";
-    re.tpl_link_no_ip_fuzzy = "(^|(?![.:/\\-_@])(?:[$+<=>^`|\uFF5C]|" + re.src_ZPCc + "))" + "((?![$+<=>^`|\uFF5C])" + re.tpl_host_port_no_ip_fuzzy_strict + re.src_path + ")";
+    re.tpl_host_fuzzy_test = `localhost|www\\.|\\.\\d{1,3}\\.|(?:\\.(?:%TLDS%)(?:${re.src_ZPCc}|>|$))`;
+    re.tpl_email_fuzzy = `(^|${text_separators}|"|\\(|${re.src_ZCc})` + `(${re.src_email_name}@${re.tpl_host_fuzzy_strict})`;
+    re.tpl_link_fuzzy = `(^|(?![.:/\\-_@])(?:[$+<=>^\`|\uFF5C]|${re.src_ZPCc}))` + `((?![$+<=>^\`|\uFF5C])${re.tpl_host_port_fuzzy_strict}${re.src_path})`;
+    re.tpl_link_no_ip_fuzzy = `(^|(?![.:/\\-_@])(?:[$+<=>^\`|\uFF5C]|${re.src_ZPCc}))` + `((?![$+<=>^\`|\uFF5C])${re.tpl_host_port_no_ip_fuzzy_strict}${re.src_path})`;
     return re;
   }
   function assign(obj) {
@@ -44467,7 +44974,7 @@ var require_index_cjs2 = __commonJS((exports, module) => {
       validate: function(text, pos, self) {
         const tail = text.slice(pos);
         if (!self.re.http) {
-          self.re.http = new RegExp("^\\/\\/" + self.re.src_auth + self.re.src_host_port_strict + self.re.src_path, "i");
+          self.re.http = new RegExp(`^\\/\\/${self.re.src_auth}${self.re.src_host_port_strict}${self.re.src_path}`, "i");
         }
         if (self.re.http.test(tail)) {
           return tail.match(self.re.http)[0].length;
@@ -44481,7 +44988,7 @@ var require_index_cjs2 = __commonJS((exports, module) => {
       validate: function(text, pos, self) {
         const tail = text.slice(pos);
         if (!self.re.no_http) {
-          self.re.no_http = new RegExp("^" + self.re.src_auth + "(?:localhost|(?:(?:" + self.re.src_domain + ")\\.)+" + self.re.src_domain_root + ")" + self.re.src_port + self.re.src_host_terminator + self.re.src_path, "i");
+          self.re.no_http = new RegExp("^" + self.re.src_auth + `(?:localhost|(?:(?:${self.re.src_domain})\\.)+${self.re.src_domain_root})` + self.re.src_port + self.re.src_host_terminator + self.re.src_path, "i");
         }
         if (self.re.no_http.test(tail)) {
           if (pos >= 3 && text[pos - 3] === ":") {
@@ -44499,7 +45006,7 @@ var require_index_cjs2 = __commonJS((exports, module) => {
       validate: function(text, pos, self) {
         const tail = text.slice(pos);
         if (!self.re.mailto) {
-          self.re.mailto = new RegExp("^" + self.re.src_email_name + "@" + self.re.src_host_strict, "i");
+          self.re.mailto = new RegExp(`^${self.re.src_email_name}@${self.re.src_host_strict}`, "i");
         }
         if (self.re.mailto.test(tail)) {
           return tail.match(self.re.mailto)[0].length;
@@ -44546,7 +45053,7 @@ var require_index_cjs2 = __commonJS((exports, module) => {
     const aliases = [];
     self.__compiled__ = {};
     function schemaError(name2, val) {
-      throw new Error('(LinkifyIt) Invalid schema "' + name2 + '": ' + val);
+      throw new Error(`(LinkifyIt) Invalid schema "${name2}": ${val}`);
     }
     Object.keys(self.__schemas__).forEach(function(name2) {
       const val = self.__schemas__[name2];
@@ -44589,14 +45096,14 @@ var require_index_cjs2 = __commonJS((exports, module) => {
     const slist = Object.keys(self.__compiled__).filter(function(name2) {
       return name2.length > 0 && self.__compiled__[name2];
     }).map(escapeRE).join("|");
-    self.re.schema_test = RegExp("(^|(?!_)(?:[><\uFF5C]|" + re.src_ZPCc + "))(" + slist + ")", "i");
-    self.re.schema_search = RegExp("(^|(?!_)(?:[><\uFF5C]|" + re.src_ZPCc + "))(" + slist + ")", "ig");
-    self.re.schema_at_start = RegExp("^" + self.re.schema_search.source, "i");
-    self.re.pretest = RegExp("(" + self.re.schema_test.source + ")|(" + self.re.host_fuzzy_test.source + ")|@", "i");
+    self.re.schema_test = RegExp(`(^|(?!_)(?:[><\uFF5C]|${re.src_ZPCc}))(${slist})`, "i");
+    self.re.schema_search = RegExp(`(^|(?!_)(?:[><\uFF5C]|${re.src_ZPCc}))(${slist})`, "ig");
+    self.re.schema_at_start = RegExp(`^${self.re.schema_search.source}`, "i");
+    self.re.pretest = RegExp(`(${self.re.schema_test.source})|(${self.re.host_fuzzy_test.source})|@`, "i");
   }
-  function Match(text, schema2, index, lastIndex) {
+  function Match(text, schema, index, lastIndex) {
     const raw2 = text.slice(index, lastIndex);
-    this.schema = schema2.toLowerCase();
+    this.schema = schema.toLowerCase();
     this.index = index;
     this.lastIndex = lastIndex;
     this.raw = raw2;
@@ -44621,8 +45128,8 @@ var require_index_cjs2 = __commonJS((exports, module) => {
     this.re = {};
     compile2(this);
   }
-  LinkifyIt.prototype.add = function add(schema2, definition) {
-    this.__schemas__[schema2] = definition;
+  LinkifyIt.prototype.add = function add(schema, definition) {
+    this.__schemas__[schema] = definition;
     compile2(this);
     return this;
   };
@@ -44663,11 +45170,11 @@ var require_index_cjs2 = __commonJS((exports, module) => {
   LinkifyIt.prototype.pretest = function pretest(text) {
     return this.re.pretest.test(text);
   };
-  LinkifyIt.prototype.testSchemaAt = function testSchemaAt(text, schema2, pos) {
-    if (!this.__compiled__[schema2.toLowerCase()]) {
+  LinkifyIt.prototype.testSchemaAt = function testSchemaAt(text, schema, pos) {
+    if (!this.__compiled__[schema.toLowerCase()]) {
       return 0;
     }
-    return this.__compiled__[schema2.toLowerCase()].validate(text, pos, this);
+    return this.__compiled__[schema.toLowerCase()].validate(text, pos, this);
   };
   LinkifyIt.prototype.match = function match2(text) {
     const result = [];
@@ -44787,17 +45294,17 @@ var require_index_cjs2 = __commonJS((exports, module) => {
   };
   LinkifyIt.prototype.normalize = function normalize2(match2) {
     if (!match2.schema) {
-      match2.url = "http://" + match2.url;
+      match2.url = `http://${match2.url}`;
     }
     if (match2.schema === "mailto:" && !/^mailto:/i.test(match2.url)) {
-      match2.url = "mailto:" + match2.url;
+      match2.url = `mailto:${match2.url}`;
     }
   };
   LinkifyIt.prototype.onCompile = function onCompile() {};
   module.exports = LinkifyIt;
 });
 
-// node_modules/tlds/index.json
+// ../zveltio-extensions/node_modules/tlds/index.json
 var require_tlds = __commonJS((exports, module) => {
   module.exports = [
     "aaa",
@@ -46241,7 +46748,7 @@ var require_tlds = __commonJS((exports, module) => {
   ];
 });
 
-// node_modules/mailparser/lib/mail-parser.js
+// ../zveltio-extensions/node_modules/mailparser/lib/mail-parser.js
 var require_mail_parser = __commonJS((exports, module) => {
   var mailsplit = require_mailsplit();
   var libmime = require_libmime();
@@ -46249,7 +46756,7 @@ var require_mail_parser = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
   var Splitter = mailsplit.Splitter;
   var ChunkedPassthrough = mailsplit.ChunkedPassthrough;
-  var punycode = require_punycode();
+  var punycode = require_punycode2();
   var FlowedDecoder = require_flowed_decoder();
   var StreamHash = require_stream_hash();
   var iconv = require_lib();
@@ -46405,7 +46912,7 @@ var require_mail_parser = __commonJS((exports, module) => {
       } else {
         return {
           decodeStream(charset) {
-            charset = (charset || "ascii").toString().trim().toLowerCase();
+            charset = libmime.normalizeCharset((charset || "ascii").toString());
             if (/^jis|^iso-?2022-?jp|^EUCJP/i.test(charset)) {
               return new JPDecoder(charset);
             }
@@ -47226,7 +47733,7 @@ var require_mail_parser = __commonJS((exports, module) => {
   module.exports = MailParser;
 });
 
-// node_modules/mailparser/lib/simple-parser.js
+// ../zveltio-extensions/node_modules/mailparser/lib/simple-parser.js
 var require_simple_parser = __commonJS((exports, module) => {
   var MailParser = require_mail_parser();
   module.exports = (input, options, callback) => {
@@ -47338,7 +47845,7 @@ var require_simple_parser = __commonJS((exports, module) => {
   }
 });
 
-// node_modules/mailparser/index.js
+// ../zveltio-extensions/node_modules/mailparser/index.js
 var require_mailparser = __commonJS((exports, module) => {
   var MailParser = require_mail_parser();
   var simpleParser = require_simple_parser();
@@ -47348,7 +47855,7 @@ var require_mailparser = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/nodemailer/lib/fetch/cookies.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/fetch/cookies.js
 var require_cookies = __commonJS((exports, module) => {
   var urllib = __require("url");
   var SESSION_TIMEOUT = 1800;
@@ -47499,7 +48006,7 @@ var require_cookies = __commonJS((exports, module) => {
   module.exports = Cookies;
 });
 
-// node_modules/nodemailer/package.json
+// ../zveltio-extensions/node_modules/nodemailer/package.json
 var require_package4 = __commonJS((exports, module) => {
   module.exports = {
     name: "nodemailer",
@@ -47546,7 +48053,7 @@ var require_package4 = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/nodemailer/lib/fetch/index.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/fetch/index.js
 var require_fetch2 = __commonJS((exports, module) => {
   var http = __require("http");
   var https = __require("https");
@@ -47780,7 +48287,7 @@ var require_fetch2 = __commonJS((exports, module) => {
   }
 });
 
-// node_modules/nodemailer/lib/shared/index.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/shared/index.js
 var require_shared = __commonJS((exports, module) => {
   var urllib = __require("url");
   var util = __require("util");
@@ -48252,7 +48759,7 @@ var require_shared = __commonJS((exports, module) => {
   }
 });
 
-// node_modules/nodemailer/lib/mime-funcs/mime-types.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/mime-funcs/mime-types.js
 var require_mime_types = __commonJS((exports, module) => {
   var path = __require("path");
   var defaultMimeType = "application/octet-stream";
@@ -50347,8 +50854,8 @@ var require_mime_types = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/nodemailer/lib/punycode/index.js
-var require_punycode2 = __commonJS((exports, module) => {
+// ../zveltio-extensions/node_modules/nodemailer/lib/punycode/index.js
+var require_punycode3 = __commonJS((exports, module) => {
   var maxInt = 2147483647;
   var base = 36;
   var tMin = 1;
@@ -50569,7 +51076,7 @@ var require_punycode2 = __commonJS((exports, module) => {
   module.exports = punycode;
 });
 
-// node_modules/nodemailer/lib/base64/index.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/base64/index.js
 var require_base64 = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
   function encode3(buffer) {
@@ -50668,7 +51175,7 @@ var require_base64 = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/nodemailer/lib/qp/index.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/qp/index.js
 var require_qp = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
   function encode3(buffer) {
@@ -50825,7 +51332,7 @@ var require_qp = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/nodemailer/lib/mime-funcs/index.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/mime-funcs/index.js
 var require_mime_funcs = __commonJS((exports, module) => {
   var base643 = require_base64();
   var qp = require_qp();
@@ -51215,7 +51722,7 @@ var require_mime_funcs = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/nodemailer/lib/addressparser/index.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/addressparser/index.js
 var require_addressparser2 = __commonJS((exports, module) => {
   function _handleAddress(tokens) {
     let isGroup = false;
@@ -51447,7 +51954,7 @@ var require_addressparser2 = __commonJS((exports, module) => {
   module.exports = addressparser;
 });
 
-// node_modules/nodemailer/lib/mime-node/last-newline.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/mime-node/last-newline.js
 var require_last_newline = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
 
@@ -51480,7 +51987,7 @@ var require_last_newline = __commonJS((exports, module) => {
   module.exports = LastNewline;
 });
 
-// node_modules/nodemailer/lib/mime-node/le-windows.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/mime-node/le-windows.js
 var require_le_windows = __commonJS((exports, module) => {
   var stream = __require("stream");
   var Transform = stream.Transform;
@@ -51520,7 +52027,7 @@ var require_le_windows = __commonJS((exports, module) => {
   module.exports = LeWindows;
 });
 
-// node_modules/nodemailer/lib/mime-node/le-unix.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/mime-node/le-unix.js
 var require_le_unix = __commonJS((exports, module) => {
   var stream = __require("stream");
   var Transform = stream.Transform;
@@ -51552,11 +52059,11 @@ var require_le_unix = __commonJS((exports, module) => {
   module.exports = LeWindows;
 });
 
-// node_modules/nodemailer/lib/mime-node/index.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/mime-node/index.js
 var require_mime_node2 = __commonJS((exports, module) => {
   var crypto2 = __require("crypto");
   var fs = __require("fs");
-  var punycode = require_punycode2();
+  var punycode = require_punycode3();
   var PassThrough = __require("stream").PassThrough;
   var shared = require_shared();
   var mimeFuncs = require_mime_funcs();
@@ -52335,7 +52842,7 @@ var require_mime_node2 = __commonJS((exports, module) => {
   module.exports = MimeNode;
 });
 
-// node_modules/nodemailer/lib/mail-composer/index.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/mail-composer/index.js
 var require_mail_composer = __commonJS((exports, module) => {
   var MimeNode = require_mime_node2();
   var mimeFuncs = require_mime_funcs();
@@ -52726,7 +53233,7 @@ var require_mail_composer = __commonJS((exports, module) => {
   module.exports = MailComposer;
 });
 
-// node_modules/nodemailer/lib/dkim/message-parser.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/dkim/message-parser.js
 var require_message_parser = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
 
@@ -52844,7 +53351,7 @@ var require_message_parser = __commonJS((exports, module) => {
   module.exports = MessageParser;
 });
 
-// node_modules/nodemailer/lib/dkim/relaxed-body.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/dkim/relaxed-body.js
 var require_relaxed_body = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
   var crypto2 = __require("crypto");
@@ -52953,9 +53460,9 @@ var require_relaxed_body = __commonJS((exports, module) => {
   module.exports = RelaxedBody;
 });
 
-// node_modules/nodemailer/lib/dkim/sign.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/dkim/sign.js
 var require_sign = __commonJS((exports, module) => {
-  var punycode = require_punycode2();
+  var punycode = require_punycode3();
   var mimeFuncs = require_mime_funcs();
   var crypto2 = __require("crypto");
   module.exports = (headers, hashAlgo, bodyHash, options) => {
@@ -53027,7 +53534,7 @@ var require_sign = __commonJS((exports, module) => {
   }
 });
 
-// node_modules/nodemailer/lib/dkim/index.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/dkim/index.js
 var require_dkim = __commonJS((exports, module) => {
   var MessageParser = require_message_parser();
   var RelaxedBody = require_relaxed_body();
@@ -53227,7 +53734,7 @@ var require_dkim = __commonJS((exports, module) => {
   module.exports = DKIM;
 });
 
-// node_modules/nodemailer/lib/smtp-connection/http-proxy-client.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/smtp-connection/http-proxy-client.js
 var require_http_proxy_client2 = __commonJS((exports, module) => {
   var net = __require("net");
   var tls = __require("tls");
@@ -53317,7 +53824,7 @@ var require_http_proxy_client2 = __commonJS((exports, module) => {
   module.exports = httpProxyClient;
 });
 
-// node_modules/nodemailer/lib/mailer/mail-message.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/mailer/mail-message.js
 var require_mail_message = __commonJS((exports, module) => {
   var shared = require_shared();
   var MimeNode = require_mime_node2();
@@ -53579,7 +54086,7 @@ var require_mail_message = __commonJS((exports, module) => {
   module.exports = MailMessage;
 });
 
-// node_modules/nodemailer/lib/mailer/index.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/mailer/index.js
 var require_mailer = __commonJS((exports, module) => {
   var EventEmitter = __require("events");
   var shared = require_shared();
@@ -53891,7 +54398,7 @@ var require_mailer = __commonJS((exports, module) => {
   module.exports = Mail;
 });
 
-// node_modules/nodemailer/lib/smtp-connection/data-stream.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/smtp-connection/data-stream.js
 var require_data_stream = __commonJS((exports, module) => {
   var stream = __require("stream");
   var Transform = stream.Transform;
@@ -53978,7 +54485,7 @@ var require_data_stream = __commonJS((exports, module) => {
   module.exports = DataStream;
 });
 
-// node_modules/nodemailer/lib/smtp-connection/index.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/smtp-connection/index.js
 var require_smtp_connection = __commonJS((exports, module) => {
   var packageInfo = require_package4();
   var EventEmitter = __require("events").EventEmitter;
@@ -55098,7 +55605,7 @@ var require_smtp_connection = __commonJS((exports, module) => {
   module.exports = SMTPConnection;
 });
 
-// node_modules/nodemailer/lib/xoauth2/index.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/xoauth2/index.js
 var require_xoauth2 = __commonJS((exports, module) => {
   var Stream = __require("stream").Stream;
   var nmfetch = require_fetch2();
@@ -55329,7 +55836,7 @@ var require_xoauth2 = __commonJS((exports, module) => {
   module.exports = XOAuth2;
 });
 
-// node_modules/nodemailer/lib/smtp-pool/pool-resource.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/smtp-pool/pool-resource.js
 var require_pool_resource = __commonJS((exports, module) => {
   var SMTPConnection = require_smtp_connection();
   var assign = require_shared().assign;
@@ -55520,7 +56027,7 @@ var require_pool_resource = __commonJS((exports, module) => {
   module.exports = PoolResource;
 });
 
-// node_modules/nodemailer/lib/well-known/services.json
+// ../zveltio-extensions/node_modules/nodemailer/lib/well-known/services.json
 var require_services = __commonJS((exports, module) => {
   module.exports = {
     "1und1": {
@@ -55836,7 +56343,7 @@ var require_services = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/nodemailer/lib/well-known/index.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/well-known/index.js
 var require_well_known = __commonJS((exports, module) => {
   var services = require_services();
   var normalized = {};
@@ -55869,7 +56376,7 @@ var require_well_known = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/nodemailer/lib/smtp-pool/index.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/smtp-pool/index.js
 var require_smtp_pool = __commonJS((exports, module) => {
   var EventEmitter = __require("events");
   var PoolResource = require_pool_resource();
@@ -56285,7 +56792,7 @@ var require_smtp_pool = __commonJS((exports, module) => {
   module.exports = SMTPPool;
 });
 
-// node_modules/nodemailer/lib/smtp-transport/index.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/smtp-transport/index.js
 var require_smtp_transport = __commonJS((exports, module) => {
   var EventEmitter = __require("events");
   var SMTPConnection = require_smtp_connection();
@@ -56581,7 +57088,7 @@ var require_smtp_transport = __commonJS((exports, module) => {
   module.exports = SMTPTransport;
 });
 
-// node_modules/nodemailer/lib/sendmail-transport/index.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/sendmail-transport/index.js
 var require_sendmail_transport = __commonJS((exports, module) => {
   var spawn = __require("child_process").spawn;
   var packageData = require_package4();
@@ -56720,7 +57227,7 @@ var require_sendmail_transport = __commonJS((exports, module) => {
   module.exports = SendmailTransport;
 });
 
-// node_modules/nodemailer/lib/stream-transport/index.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/stream-transport/index.js
 var require_stream_transport = __commonJS((exports, module) => {
   var packageData = require_package4();
   var shared = require_shared();
@@ -56803,7 +57310,7 @@ var require_stream_transport = __commonJS((exports, module) => {
   module.exports = StreamTransport;
 });
 
-// node_modules/nodemailer/lib/json-transport/index.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/json-transport/index.js
 var require_json_transport = __commonJS((exports, module) => {
   var packageData = require_package4();
   var shared = require_shared();
@@ -56854,7 +57361,7 @@ var require_json_transport = __commonJS((exports, module) => {
   module.exports = JSONTransport;
 });
 
-// node_modules/nodemailer/lib/ses-transport/index.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/ses-transport/index.js
 var require_ses_transport = __commonJS((exports, module) => {
   var EventEmitter = __require("events");
   var packageData = require_package4();
@@ -57096,7 +57603,7 @@ Invalid`
   module.exports = SESTransport;
 });
 
-// node_modules/nodemailer/lib/nodemailer.js
+// ../zveltio-extensions/node_modules/nodemailer/lib/nodemailer.js
 var require_nodemailer = __commonJS((exports, module) => {
   var Mailer = require_mailer();
   var shared = require_shared();
@@ -57218,10 +57725,10 @@ var require_nodemailer = __commonJS((exports, module) => {
   };
 });
 
-// communications/mail/engine/index.ts
+// ../zveltio-extensions/communications/mail/engine/index.ts
 import { join } from "path";
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/compose.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
     let index = -1;
@@ -57265,7 +57772,7 @@ var compose = (middleware, onError, onNotFound) => {
   };
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/http-exception.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/http-exception.js
 var HTTPException = class extends Error {
   res;
   status;
@@ -57288,21 +57795,39 @@ var HTTPException = class extends Error {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/request/constants.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/request/constants.js
 var GET_MATCH_RESULT = /* @__PURE__ */ Symbol();
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/body.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/buffer.js
+var bufferToFormData = (arrayBuffer, contentType) => {
+  const response = new Response(arrayBuffer, {
+    headers: {
+      "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase())
+    }
+  });
+  return response.formData();
+};
+
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/body.js
+var isRawRequest = (request) => ("headers" in request);
 var parseBody = async (request, options = /* @__PURE__ */ Object.create(null)) => {
   const { all = false, dot = false } = options;
-  const headers = request instanceof HonoRequest ? request.raw.headers : request.headers;
+  const headers = isRawRequest(request) ? request.headers : request.raw.headers;
   const contentType = headers.get("Content-Type");
-  if (contentType?.startsWith("multipart/form-data") || contentType?.startsWith("application/x-www-form-urlencoded")) {
+  const mediaType = contentType?.split(";")[0].trim().toLowerCase();
+  if (mediaType === "multipart/form-data" || mediaType === "application/x-www-form-urlencoded") {
     return parseFormData(request, { all, dot });
   }
   return {};
 };
 async function parseFormData(request, options) {
-  const formData = await request.formData();
+  const headers = isRawRequest(request) ? request.headers : request.raw.headers;
+  const arrayBuffer = await request.arrayBuffer();
+  const formDataPromise = bufferToFormData(arrayBuffer, headers.get("Content-Type") || "");
+  if (!isRawRequest(request)) {
+    request.bodyCache.formData = formDataPromise;
+  }
+  const formData = await formDataPromise;
   if (formData) {
     return convertFormDataToBodyData(formData, options);
   }
@@ -57362,7 +57887,7 @@ var handleParsingNestedValues = (form, key, value) => {
   });
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/url.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/url.js
 var splitPath = (path) => {
   const paths = path.split("/");
   if (paths[0] === "") {
@@ -57562,7 +58087,7 @@ var getQueryParams = (url, key) => {
 };
 var decodeURIComponent_ = decodeURIComponent;
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/request.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/request.js
 var tryDecodeURIComponent = (str) => tryDecode(str, decodeURIComponent_);
 var HonoRequest = class {
   raw;
@@ -57676,7 +58201,7 @@ var HonoRequest = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/html.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/html.js
 var HtmlEscapedCallbackPhase = {
   Stringify: 1,
   BeforeStream: 2,
@@ -57714,7 +58239,7 @@ var resolveCallback = async (str, phase, preserveCallbacks, context, buffer) => 
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/context.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/context.js
 var TEXT_PLAIN = "text/plain; charset=UTF-8";
 var setDefaultContentType = (contentType, headers) => {
   return {
@@ -57881,7 +58406,7 @@ var Context = class {
   };
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router.js
 var METHOD_NAME_ALL = "ALL";
 var METHOD_NAME_ALL_LOWERCASE = "all";
 var METHODS = ["get", "post", "put", "delete", "options", "patch"];
@@ -57889,10 +58414,10 @@ var MESSAGE_MATCHER_IS_ALREADY_BUILT = "Can not add a route since the matcher is
 var UnsupportedPathError = class extends Error {
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/constants.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/constants.js
 var COMPOSED_HANDLER = "__COMPOSED_HANDLER";
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/hono-base.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/hono-base.js
 var notFoundHandler = (c) => {
   return c.text("404 Not Found", 404);
 };
@@ -58116,7 +58641,7 @@ var Hono = class _Hono {
   };
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/matcher.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/matcher.js
 var emptyParam = [];
 function match(method, path) {
   const matchers = this.buildAllMatchers();
@@ -58137,7 +58662,7 @@ function match(method, path) {
   return match2(method, path);
 }
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/node.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/node.js
 var LABEL_REG_EXP_STR = "[^/]+";
 var ONLY_WILDCARD_REG_EXP_STR = ".*";
 var TAIL_WILDCARD_REG_EXP_STR = "(?:|/.*)";
@@ -58241,7 +58766,7 @@ var Node = class _Node {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/trie.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/trie.js
 var Trie = class {
   #context = { varIndex: 0 };
   #root = new Node;
@@ -58297,7 +58822,7 @@ var Trie = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/router.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/router.js
 var nullMatcher = [/^$/, [], /* @__PURE__ */ Object.create(null)];
 var wildcardRegExpCache = /* @__PURE__ */ Object.create(null);
 function buildWildcardRegExp(path) {
@@ -58462,7 +58987,7 @@ var RegExpRouter = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/reg-exp-router/prepared-router.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/prepared-router.js
 var PreparedRegExpRouter = class {
   name = "PreparedRegExpRouter";
   #matchers;
@@ -58534,7 +59059,7 @@ var PreparedRegExpRouter = class {
   match = match;
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/smart-router/router.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/smart-router/router.js
 var SmartRouter = class {
   name = "SmartRouter";
   #routers = [];
@@ -58589,7 +59114,7 @@ var SmartRouter = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/trie-router/node.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/trie-router/node.js
 var emptyParams = /* @__PURE__ */ Object.create(null);
 var hasChildren = (children) => {
   for (const _ in children) {
@@ -58758,7 +59283,7 @@ var Node2 = class _Node2 {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/router/trie-router/router.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/trie-router/router.js
 var TrieRouter = class {
   name = "TrieRouter";
   #node;
@@ -58780,7 +59305,7 @@ var TrieRouter = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/hono.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/hono.js
 var Hono2 = class extends Hono {
   constructor(options = {}) {
     super(options);
@@ -58790,7 +59315,7 @@ var Hono2 = class extends Hono {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/cookie.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/cookie.js
 var validCookieNameRegEx = /^[\w!#$%&'*.^`|~+-]+$/;
 var validCookieValueRegEx = /^[ !#-:<-[\]-~]*$/;
 var trimCookieWhitespace = (value) => {
@@ -58841,7 +59366,7 @@ var parse = (cookie, name) => {
   return parsedCookie;
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/helper/cookie/index.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/helper/cookie/index.js
 var getCookie = (c, key, prefix) => {
   const cookie = c.req.raw.headers.get("Cookie");
   if (typeof key === "string") {
@@ -58864,20 +59389,10 @@ var getCookie = (c, key, prefix) => {
   return obj;
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/utils/buffer.js
-var bufferToFormData = (arrayBuffer, contentType) => {
-  const response = new Response(arrayBuffer, {
-    headers: {
-      "Content-Type": contentType
-    }
-  });
-  return response.formData();
-};
-
-// ../zveltio/node_modules/.bun/hono@4.12.23/node_modules/hono/dist/validator/validator.js
-var jsonRegex = /^application\/([a-z-\.]+\+)?json(;\s*[a-zA-Z0-9\-]+\=([^;]+))*$/;
-var multipartRegex = /^multipart\/form-data(;\s?boundary=[a-zA-Z0-9'"()+_,\-./:=?]+)?$/;
-var urlencodedRegex = /^application\/x-www-form-urlencoded(;\s*[a-zA-Z0-9\-]+\=([^;]+))*$/;
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/validator/validator.js
+var jsonRegex = /^application\/([a-z-\.]+\+)?json(;\s*[a-zA-Z0-9\-]+\=([^;]+))*$/i;
+var multipartRegex = /^multipart\/form-data(;\s?boundary=[a-zA-Z0-9'"()+_,\-./:=?]+)?$/i;
+var urlencodedRegex = /^application\/x-www-form-urlencoded(;\s*[a-zA-Z0-9\-]+\=([^;]+))*$/i;
 var validator = (target, validationFunc) => {
   return async (c, next) => {
     let value = {};
@@ -58951,7 +59466,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+727162ed4002934e/node_modules/@hono/zod-validator/dist/index.js
+// node_modules/.bun/@hono+zod-validator@0.7.6+4bef6e9a69915e20/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -58981,7 +59496,7 @@ function zValidatorFunction(target, schema, hook, options) {
 }
 var zValidator = zValidatorFunction;
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
 var exports_external = {};
 __export(exports_external, {
   xor: () => xor,
@@ -59224,7 +59739,7 @@ __export(exports_external, {
   $brand: () => $brand
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/index.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/index.js
 var exports_core2 = {};
 __export(exports_core2, {
   version: () => version,
@@ -59503,7 +60018,7 @@ __export(exports_core2, {
   $ZodAny: () => $ZodAny
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/core.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/core.js
 var _a;
 var NEVER = /* @__PURE__ */ Object.freeze({
   status: "aborted"
@@ -59581,7 +60096,7 @@ function config(newConfig) {
     Object.assign(globalConfig, newConfig);
   return globalConfig;
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/util.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/util.js
 var exports_util = {};
 __export(exports_util, {
   unwrapMessage: () => unwrapMessage,
@@ -60273,7 +60788,7 @@ class Class {
   constructor(..._args) {}
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/errors.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/errors.js
 var initializer = (inst, def) => {
   inst.name = "$ZodError";
   Object.defineProperty(inst, "_zod", {
@@ -60413,7 +60928,7 @@ function prettifyError(error) {
 `);
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/parse.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/parse.js
 var _parse = (_Err) => (schema, value, _ctx, _params) => {
   const ctx = _ctx ? { ..._ctx, async: false } : { async: false };
   const result = schema._zod.run({ value, issues: [] }, ctx);
@@ -60500,7 +61015,7 @@ var _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
   return _safeParseAsync(_Err)(schema, value, _ctx);
 };
 var safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync($ZodRealError);
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/regexes.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/regexes.js
 var exports_regexes = {};
 __export(exports_regexes, {
   xid: () => xid,
@@ -60659,7 +61174,7 @@ var sha512_hex = /^[0-9a-fA-F]{128}$/;
 var sha512_base64 = /* @__PURE__ */ fixedBase64(86, "==");
 var sha512_base64url = /* @__PURE__ */ fixedBase64url(86);
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/checks.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a2;
   inst._zod ?? (inst._zod = {});
@@ -61206,7 +61721,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/doc.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/doc.js
 class Doc {
   constructor(args = []) {
     this.content = [];
@@ -61244,14 +61759,14 @@ class Doc {
   }
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/versions.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 4,
   patch: 3
 };
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/schemas.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a2;
   inst ?? (inst = {});
@@ -63335,7 +63850,7 @@ function handleRefineResult(result, payload, input, inst) {
     payload.issues.push(issue(_iss));
   }
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/index.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/index.js
 var exports_locales = {};
 __export(exports_locales, {
   zhTW: () => zh_TW_default,
@@ -63392,7 +63907,7 @@ __export(exports_locales, {
   ar: () => ar_default
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ar.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ar.js
 var error = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0641", verb: "\u0623\u0646 \u064A\u062D\u0648\u064A" },
@@ -63498,7 +64013,7 @@ function ar_default() {
     localeError: error()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/az.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/az.js
 var error2 = () => {
   const Sizable = {
     string: { unit: "simvol", verb: "olmal\u0131d\u0131r" },
@@ -63603,7 +64118,7 @@ function az_default() {
     localeError: error2()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/be.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/be.js
 function getBelarusianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -63759,7 +64274,7 @@ function be_default() {
     localeError: error3()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/bg.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/bg.js
 var error4 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0430", verb: "\u0434\u0430 \u0441\u044A\u0434\u044A\u0440\u0436\u0430" },
@@ -63879,7 +64394,7 @@ function bg_default() {
     localeError: error4()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ca.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ca.js
 var error5 = () => {
   const Sizable = {
     string: { unit: "car\xE0cters", verb: "contenir" },
@@ -63986,7 +64501,7 @@ function ca_default() {
     localeError: error5()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/cs.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/cs.js
 var error6 = () => {
   const Sizable = {
     string: { unit: "znak\u016F", verb: "m\xEDt" },
@@ -64097,7 +64612,7 @@ function cs_default() {
     localeError: error6()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/da.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/da.js
 var error7 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "havde" },
@@ -64212,7 +64727,7 @@ function da_default() {
     localeError: error7()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/de.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/de.js
 var error8 = () => {
   const Sizable = {
     string: { unit: "Zeichen", verb: "zu haben" },
@@ -64320,7 +64835,7 @@ function de_default() {
     localeError: error8()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/el.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/el.js
 var error9 = () => {
   const Sizable = {
     string: { unit: "\u03C7\u03B1\u03C1\u03B1\u03BA\u03C4\u03AE\u03C1\u03B5\u03C2", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" },
@@ -64429,7 +64944,7 @@ function el_default() {
     localeError: error9()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/en.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/en.js
 var error10 = () => {
   const Sizable = {
     string: { unit: "characters", verb: "to have" },
@@ -64539,7 +65054,7 @@ function en_default() {
     localeError: error10()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/eo.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/eo.js
 var error11 = () => {
   const Sizable = {
     string: { unit: "karaktrojn", verb: "havi" },
@@ -64648,7 +65163,7 @@ function eo_default() {
     localeError: error11()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/es.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/es.js
 var error12 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "tener" },
@@ -64780,7 +65295,7 @@ function es_default() {
     localeError: error12()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fa.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fa.js
 var error13 = () => {
   const Sizable = {
     string: { unit: "\u06A9\u0627\u0631\u0627\u06A9\u062A\u0631", verb: "\u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F" },
@@ -64894,7 +65409,7 @@ function fa_default() {
     localeError: error13()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fi.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fi.js
 var error14 = () => {
   const Sizable = {
     string: { unit: "merkki\xE4", subject: "merkkijonon" },
@@ -65006,7 +65521,7 @@ function fi_default() {
     localeError: error14()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr.js
 var error15 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -65131,7 +65646,7 @@ function fr_default() {
     localeError: error15()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr-CA.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr-CA.js
 var error16 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -65238,7 +65753,7 @@ function fr_CA_default() {
     localeError: error16()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/he.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/he.js
 var error17 = () => {
   const TypeNames = {
     string: { label: "\u05DE\u05D7\u05E8\u05D5\u05D6\u05EA", gender: "f" },
@@ -65431,7 +65946,7 @@ function he_default() {
     localeError: error17()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hr.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hr.js
 var error18 = () => {
   const Sizable = {
     string: { unit: "znakova", verb: "imati" },
@@ -65553,7 +66068,7 @@ function hr_default() {
     localeError: error18()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hu.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hu.js
 var error19 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "legyen" },
@@ -65661,7 +66176,7 @@ function hu_default() {
     localeError: error19()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hy.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hy.js
 function getArmenianPlural(count, one, many) {
   return Math.abs(count) === 1 ? one : many;
 }
@@ -65808,7 +66323,7 @@ function hy_default() {
     localeError: error20()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/id.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/id.js
 var error21 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "memiliki" },
@@ -65914,7 +66429,7 @@ function id_default() {
     localeError: error21()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/is.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/is.js
 var error22 = () => {
   const Sizable = {
     string: { unit: "stafi", verb: "a\xF0 hafa" },
@@ -66023,7 +66538,7 @@ function is_default() {
     localeError: error22()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/it.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/it.js
 var error23 = () => {
   const Sizable = {
     string: { unit: "caratteri", verb: "avere" },
@@ -66131,7 +66646,7 @@ function it_default() {
     localeError: error23()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ja.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ja.js
 var error24 = () => {
   const Sizable = {
     string: { unit: "\u6587\u5B57", verb: "\u3067\u3042\u308B" },
@@ -66238,7 +66753,7 @@ function ja_default() {
     localeError: error24()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ka.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ka.js
 var error25 = () => {
   const Sizable = {
     string: { unit: "\u10E1\u10D8\u10DB\u10D1\u10DD\u10DA\u10DD", verb: "\u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1" },
@@ -66350,7 +66865,7 @@ function ka_default() {
     localeError: error25()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/km.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/km.js
 var error26 = () => {
   const Sizable = {
     string: { unit: "\u178F\u17BD\u17A2\u1780\u17D2\u179F\u179A", verb: "\u1782\u17BD\u179A\u1798\u17B6\u1793" },
@@ -66461,11 +66976,11 @@ function km_default() {
   };
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/kh.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/kh.js
 function kh_default() {
   return km_default();
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ko.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ko.js
 var error27 = () => {
   const Sizable = {
     string: { unit: "\uBB38\uC790", verb: "to have" },
@@ -66576,7 +67091,7 @@ function ko_default() {
     localeError: error27()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/lt.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/lt.js
 var capitalizeFirstCharacter = (text) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
@@ -66779,7 +67294,7 @@ function lt_default() {
     localeError: error28()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/mk.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/mk.js
 var error29 = () => {
   const Sizable = {
     string: { unit: "\u0437\u043D\u0430\u0446\u0438", verb: "\u0434\u0430 \u0438\u043C\u0430\u0430\u0442" },
@@ -66888,7 +67403,7 @@ function mk_default() {
     localeError: error29()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ms.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ms.js
 var error30 = () => {
   const Sizable = {
     string: { unit: "aksara", verb: "mempunyai" },
@@ -66995,7 +67510,7 @@ function ms_default() {
     localeError: error30()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/nl.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/nl.js
 var error31 = () => {
   const Sizable = {
     string: { unit: "tekens", verb: "heeft" },
@@ -67105,7 +67620,7 @@ function nl_default() {
     localeError: error31()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/no.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/no.js
 var error32 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "\xE5 ha" },
@@ -67213,7 +67728,7 @@ function no_default() {
     localeError: error32()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ota.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ota.js
 var error33 = () => {
   const Sizable = {
     string: { unit: "harf", verb: "olmal\u0131d\u0131r" },
@@ -67322,7 +67837,7 @@ function ota_default() {
     localeError: error33()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ps.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ps.js
 var error34 = () => {
   const Sizable = {
     string: { unit: "\u062A\u0648\u06A9\u064A", verb: "\u0648\u0644\u0631\u064A" },
@@ -67436,7 +67951,7 @@ function ps_default() {
     localeError: error34()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pl.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pl.js
 var error35 = () => {
   const Sizable = {
     string: { unit: "znak\xF3w", verb: "mie\u0107" },
@@ -67545,7 +68060,7 @@ function pl_default() {
     localeError: error35()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pt.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pt.js
 var error36 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "ter" },
@@ -67653,7 +68168,7 @@ function pt_default() {
     localeError: error36()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ro.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ro.js
 var error37 = () => {
   const Sizable = {
     string: { unit: "caractere", verb: "s\u0103 aib\u0103" },
@@ -67772,7 +68287,7 @@ function ro_default() {
     localeError: error37()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ru.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ru.js
 function getRussianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -67928,7 +68443,7 @@ function ru_default() {
     localeError: error38()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sl.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sl.js
 var error39 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "imeti" },
@@ -68037,7 +68552,7 @@ function sl_default() {
     localeError: error39()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sv.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sv.js
 var error40 = () => {
   const Sizable = {
     string: { unit: "tecken", verb: "att ha" },
@@ -68147,7 +68662,7 @@ function sv_default() {
     localeError: error40()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ta.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ta.js
 var error41 = () => {
   const Sizable = {
     string: { unit: "\u0B8E\u0BB4\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1\u0B95\u0BCD\u0B95\u0BB3\u0BCD", verb: "\u0B95\u0BCA\u0BA3\u0BCD\u0B9F\u0BBF\u0BB0\u0BC1\u0B95\u0BCD\u0B95 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD" },
@@ -68257,7 +68772,7 @@ function ta_default() {
     localeError: error41()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/th.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/th.js
 var error42 = () => {
   const Sizable = {
     string: { unit: "\u0E15\u0E31\u0E27\u0E2D\u0E31\u0E01\u0E29\u0E23", verb: "\u0E04\u0E27\u0E23\u0E21\u0E35" },
@@ -68367,7 +68882,7 @@ function th_default() {
     localeError: error42()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/tr.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/tr.js
 var error43 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "olmal\u0131" },
@@ -68472,7 +68987,7 @@ function tr_default() {
     localeError: error43()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uk.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uk.js
 var error44 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0456\u0432", verb: "\u043C\u0430\u0442\u0438\u043C\u0435" },
@@ -68581,11 +69096,11 @@ function uk_default() {
   };
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ua.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ua.js
 function ua_default() {
   return uk_default();
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ur.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ur.js
 var error45 = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0648\u0641", verb: "\u06C1\u0648\u0646\u0627" },
@@ -68695,7 +69210,7 @@ function ur_default() {
     localeError: error45()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uz.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uz.js
 var error46 = () => {
   const Sizable = {
     string: { unit: "belgi", verb: "bo\u2018lishi kerak" },
@@ -68805,7 +69320,7 @@ function uz_default() {
     localeError: error46()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/vi.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/vi.js
 var error47 = () => {
   const Sizable = {
     string: { unit: "k\xFD t\u1EF1", verb: "c\xF3" },
@@ -68913,7 +69428,7 @@ function vi_default() {
     localeError: error47()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-CN.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-CN.js
 var error48 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u7B26", verb: "\u5305\u542B" },
@@ -69022,7 +69537,7 @@ function zh_CN_default() {
     localeError: error48()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-TW.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-TW.js
 var error49 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u5143", verb: "\u64C1\u6709" },
@@ -69129,7 +69644,7 @@ function zh_TW_default() {
     localeError: error49()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/yo.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/yo.js
 var error50 = () => {
   const Sizable = {
     string: { unit: "\xE0mi", verb: "n\xED" },
@@ -69236,7 +69751,7 @@ function yo_default() {
     localeError: error50()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/registries.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/registries.js
 var _a2;
 var $output = Symbol("ZodOutput");
 var $input = Symbol("ZodInput");
@@ -69286,7 +69801,7 @@ function registry() {
 }
 (_a2 = globalThis).__zod_globalRegistry ?? (_a2.__zod_globalRegistry = registry());
 var globalRegistry = globalThis.__zod_globalRegistry;
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/api.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/api.js
 function _string(Class2, params) {
   return new Class2({
     type: "string",
@@ -70206,7 +70721,7 @@ function _stringFormat(Class2, format, fnOrRegex, _params = {}) {
   const inst = new Class2(def);
   return inst;
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/to-json-schema.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/to-json-schema.js
 function initializeContext(params) {
   let target = params?.target ?? "draft-2020-12";
   if (target === "draft-4")
@@ -70558,7 +71073,7 @@ var createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params) =
   extractDefs(ctx, schema);
   return finalize(ctx, schema);
 };
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-processors.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-processors.js
 var formatMap = {
   guid: "uuid",
   url: "uri",
@@ -71096,7 +71611,7 @@ function toJSONSchema(input, params) {
   extractDefs(ctx, input);
   return finalize(ctx, input);
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-generator.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-generator.js
 class JSONSchemaGenerator {
   get metadataRegistry() {
     return this.ctx.metadataRegistry;
@@ -71155,9 +71670,9 @@ class JSONSchemaGenerator {
     return plainResult;
   }
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema.js
 var exports_json_schema = {};
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
 var exports_schemas2 = {};
 __export(exports_schemas2, {
   xor: () => xor,
@@ -71328,7 +71843,7 @@ __export(exports_schemas2, {
   ZodAny: () => ZodAny
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/checks.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/checks.js
 var exports_checks2 = {};
 __export(exports_checks2, {
   uppercase: () => _uppercase,
@@ -71362,7 +71877,7 @@ __export(exports_checks2, {
   endsWith: () => _endsWith
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/iso.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/iso.js
 var exports_iso = {};
 __export(exports_iso, {
   time: () => time2,
@@ -71403,7 +71918,7 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/errors.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/errors.js
 var initializer2 = (inst, issues) => {
   $ZodError.init(inst, issues);
   inst.name = "ZodError";
@@ -71438,7 +71953,7 @@ var ZodRealError = /* @__PURE__ */ $constructor("ZodError", initializer2, {
   Parent: Error
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/parse.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/parse.js
 var parse4 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse2 = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -71452,7 +71967,7 @@ var safeDecode2 = /* @__PURE__ */ _safeDecode(ZodRealError);
 var safeEncodeAsync2 = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 var safeDecodeAsync2 = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
 var _installedGroups = /* @__PURE__ */ new WeakMap;
 function _installLazyMethods(inst, group, methods) {
   const proto = Object.getPrototypeOf(inst);
@@ -72739,7 +73254,7 @@ function preprocess(fn, schema) {
     out: schema
   });
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/compat.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/compat.js
 var ZodIssueCode = {
   invalid_type: "invalid_type",
   too_big: "too_big",
@@ -72763,7 +73278,7 @@ function getErrorMap() {
 }
 var ZodFirstPartyTypeKind;
 (function(ZodFirstPartyTypeKind2) {})(ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {}));
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/from-json-schema.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/from-json-schema.js
 var z = {
   ...exports_schemas2,
   ...exports_checks2,
@@ -73230,7 +73745,7 @@ function fromJSONSchema(schema, params) {
   };
   return convertSchema(normalized, ctx);
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/coerce.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/coerce.js
 var exports_coerce = {};
 __export(exports_coerce, {
   string: () => string3,
@@ -73255,9 +73770,9 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
 config(en_default());
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/object-utils.js
+// ../zveltio-extensions/node_modules/kysely/dist/util/object-utils.js
 function isUndefined(obj) {
   return typeof obj === "undefined" || obj === undefined;
 }
@@ -73273,36 +73788,14 @@ function isBoolean(obj) {
 function isNull(obj) {
   return obj === null;
 }
-function isDate(obj) {
-  return obj instanceof Date;
-}
 function isBigInt(obj) {
   return typeof obj === "bigint";
-}
-function isBuffer(obj) {
-  return typeof Buffer !== "undefined" && Buffer.isBuffer(obj);
 }
 function isFunction(obj) {
   return typeof obj === "function";
 }
 function isObject2(obj) {
   return typeof obj === "object" && obj !== null;
-}
-function isPlainObject2(obj) {
-  if (!isObject2(obj) || getTag(obj) !== "[object Object]") {
-    return false;
-  }
-  if (Object.getPrototypeOf(obj) === null) {
-    return true;
-  }
-  let proto = obj;
-  while (Object.getPrototypeOf(proto) !== null) {
-    proto = Object.getPrototypeOf(proto);
-  }
-  return Object.getPrototypeOf(obj) === proto;
-}
-function getLast(arr) {
-  return arr[arr.length - 1];
 }
 function freeze(obj) {
   return Object.freeze(obj);
@@ -73317,89 +73810,11 @@ function asArray(arg) {
 function isReadonlyArray(arg) {
   return Array.isArray(arg);
 }
-function noop(obj) {
-  return obj;
-}
-function compare(obj1, obj2) {
-  if (isReadonlyArray(obj1) && isReadonlyArray(obj2)) {
-    return compareArrays(obj1, obj2);
-  } else if (isObject2(obj1) && isObject2(obj2)) {
-    return compareObjects(obj1, obj2);
-  }
-  return obj1 === obj2;
-}
-function compareArrays(arr1, arr2) {
-  if (arr1.length !== arr2.length) {
-    return false;
-  }
-  for (let i = 0;i < arr1.length; ++i) {
-    if (!compare(arr1[i], arr2[i])) {
-      return false;
-    }
-  }
-  return true;
-}
-function compareObjects(obj1, obj2) {
-  if (isBuffer(obj1) && isBuffer(obj2)) {
-    return compareBuffers(obj1, obj2);
-  } else if (isDate(obj1) && isDate(obj2)) {
-    return compareDates(obj1, obj2);
-  }
-  return compareGenericObjects(obj1, obj2);
-}
-function compareBuffers(buf1, buf2) {
-  return Buffer.compare(buf1, buf2) === 0;
-}
-function compareDates(date1, date22) {
-  return date1.getTime() === date22.getTime();
-}
-function compareGenericObjects(obj1, obj2) {
-  const keys1 = Object.keys(obj1);
-  const keys2 = Object.keys(obj2);
-  if (keys1.length !== keys2.length) {
-    return false;
-  }
-  for (const key of keys1) {
-    if (!compare(obj1[key], obj2[key])) {
-      return false;
-    }
-  }
-  return true;
-}
-var toString = Object.prototype.toString;
-function getTag(value) {
-  if (value == null) {
-    return value === undefined ? "[object Undefined]" : "[object Null]";
-  }
-  return toString.call(value);
+function getMessage(error51) {
+  return error51 instanceof Error ? error51.message : String(error51);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/alter-table-node.js
-var AlterTableNode = freeze({
-  is(node) {
-    return node.kind === "AlterTableNode";
-  },
-  create(table) {
-    return freeze({
-      kind: "AlterTableNode",
-      table
-    });
-  },
-  cloneWithTableProps(node, props) {
-    return freeze({
-      ...node,
-      ...props
-    });
-  },
-  cloneWithColumnAlteration(node, columnAlteration) {
-    return freeze({
-      ...node,
-      columnAlterations: node.columnAlterations ? [...node.columnAlterations, columnAlteration] : [columnAlteration]
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/identifier-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/identifier-node.js
 var IdentifierNode = freeze({
   is(node) {
     return node.kind === "IdentifierNode";
@@ -73412,97 +73827,7 @@ var IdentifierNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/create-index-node.js
-var CreateIndexNode = freeze({
-  is(node) {
-    return node.kind === "CreateIndexNode";
-  },
-  create(name) {
-    return freeze({
-      kind: "CreateIndexNode",
-      name: IdentifierNode.create(name)
-    });
-  },
-  cloneWith(node, props) {
-    return freeze({
-      ...node,
-      ...props
-    });
-  },
-  cloneWithColumns(node, columns) {
-    return freeze({
-      ...node,
-      columns: [...node.columns || [], ...columns]
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/create-schema-node.js
-var CreateSchemaNode = freeze({
-  is(node) {
-    return node.kind === "CreateSchemaNode";
-  },
-  create(schema, params) {
-    return freeze({
-      kind: "CreateSchemaNode",
-      schema: IdentifierNode.create(schema),
-      ...params
-    });
-  },
-  cloneWith(createSchema, params) {
-    return freeze({
-      ...createSchema,
-      ...params
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/create-table-node.js
-var ON_COMMIT_ACTIONS = ["preserve rows", "delete rows", "drop"];
-var CreateTableNode = freeze({
-  is(node) {
-    return node.kind === "CreateTableNode";
-  },
-  create(table) {
-    return freeze({
-      kind: "CreateTableNode",
-      table,
-      columns: freeze([])
-    });
-  },
-  cloneWithColumn(createTable, column) {
-    return freeze({
-      ...createTable,
-      columns: freeze([...createTable.columns, column])
-    });
-  },
-  cloneWithConstraint(createTable, constraint) {
-    return freeze({
-      ...createTable,
-      constraints: createTable.constraints ? freeze([...createTable.constraints, constraint]) : freeze([constraint])
-    });
-  },
-  cloneWithFrontModifier(createTable, modifier) {
-    return freeze({
-      ...createTable,
-      frontModifiers: createTable.frontModifiers ? freeze([...createTable.frontModifiers, modifier]) : freeze([modifier])
-    });
-  },
-  cloneWithEndModifier(createTable, modifier) {
-    return freeze({
-      ...createTable,
-      endModifiers: createTable.endModifiers ? freeze([...createTable.endModifiers, modifier]) : freeze([modifier])
-    });
-  },
-  cloneWith(createTable, params) {
-    return freeze({
-      ...createTable,
-      ...params
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/schemable-identifier-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/schemable-identifier-node.js
 var SchemableIdentifierNode = freeze({
   is(node) {
     return node.kind === "SchemableIdentifierNode";
@@ -73522,67 +73847,7 @@ var SchemableIdentifierNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-index-node.js
-var DropIndexNode = freeze({
-  is(node) {
-    return node.kind === "DropIndexNode";
-  },
-  create(name, params) {
-    return freeze({
-      kind: "DropIndexNode",
-      name: SchemableIdentifierNode.create(name),
-      ...params
-    });
-  },
-  cloneWith(dropIndex, props) {
-    return freeze({
-      ...dropIndex,
-      ...props
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-schema-node.js
-var DropSchemaNode = freeze({
-  is(node) {
-    return node.kind === "DropSchemaNode";
-  },
-  create(schema, params) {
-    return freeze({
-      kind: "DropSchemaNode",
-      schema: IdentifierNode.create(schema),
-      ...params
-    });
-  },
-  cloneWith(dropSchema, params) {
-    return freeze({
-      ...dropSchema,
-      ...params
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-table-node.js
-var DropTableNode = freeze({
-  is(node) {
-    return node.kind === "DropTableNode";
-  },
-  create(table, params) {
-    return freeze({
-      kind: "DropTableNode",
-      table,
-      ...params
-    });
-  },
-  cloneWith(dropIndex, params) {
-    return freeze({
-      ...dropIndex,
-      ...params
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/alias-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/alias-node.js
 var AliasNode = freeze({
   is(node) {
     return node.kind === "AliasNode";
@@ -73596,7 +73861,7 @@ var AliasNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/table-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/table-node.js
 var TableNode = freeze({
   is(node) {
     return node.kind === "TableNode";
@@ -73615,12 +73880,12 @@ var TableNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/operation-node-source.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/operation-node-source.js
 function isOperationNodeSource(obj) {
   return isObject2(obj) && isFunction(obj.toOperationNode);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/expression/expression.js
+// ../zveltio-extensions/node_modules/kysely/dist/expression/expression.js
 function isExpression(obj) {
   return isObject2(obj) && "expressionType" in obj && isOperationNodeSource(obj);
 }
@@ -73628,7 +73893,7 @@ function isAliasedExpression(obj) {
   return isObject2(obj) && "expression" in obj && isString(obj.alias) && isOperationNodeSource(obj);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/select-modifier-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/select-modifier-node.js
 var SelectModifierNode = freeze({
   is(node) {
     return node.kind === "SelectModifierNode";
@@ -73648,7 +73913,7 @@ var SelectModifierNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/and-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/and-node.js
 var AndNode = freeze({
   is(node) {
     return node.kind === "AndNode";
@@ -73662,7 +73927,7 @@ var AndNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/or-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/or-node.js
 var OrNode = freeze({
   is(node) {
     return node.kind === "OrNode";
@@ -73676,7 +73941,7 @@ var OrNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/on-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/on-node.js
 var OnNode = freeze({
   is(node) {
     return node.kind === "OnNode";
@@ -73695,7 +73960,7 @@ var OnNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/join-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/join-node.js
 var JoinNode = freeze({
   is(node) {
     return node.kind === "JoinNode";
@@ -73724,7 +73989,7 @@ var JoinNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/binary-operation-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/binary-operation-node.js
 var BinaryOperationNode = freeze({
   is(node) {
     return node.kind === "BinaryOperationNode";
@@ -73739,69 +74004,84 @@ var BinaryOperationNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/operator-node.js
-var COMPARISON_OPERATORS = [
-  "=",
-  "==",
-  "!=",
-  "<>",
-  ">",
-  ">=",
-  "<",
-  "<=",
-  "in",
-  "not in",
-  "is",
-  "is not",
-  "like",
-  "not like",
-  "match",
-  "ilike",
-  "not ilike",
-  "@>",
-  "<@",
-  "^@",
-  "&&",
-  "?",
-  "?&",
-  "?|",
-  "!<",
-  "!>",
-  "<=>",
-  "!~",
-  "~",
-  "~*",
-  "!~*",
-  "@@",
-  "@@@",
-  "!!",
-  "<->",
-  "regexp",
-  "is distinct from",
-  "is not distinct from"
-];
-var ARITHMETIC_OPERATORS = [
-  "+",
-  "-",
-  "*",
-  "/",
-  "%",
-  "^",
-  "&",
-  "|",
-  "#",
-  "<<",
-  ">>"
-];
-var JSON_OPERATORS = ["->", "->>"];
-var BINARY_OPERATORS = [
-  ...COMPARISON_OPERATORS,
-  ...ARITHMETIC_OPERATORS,
-  "&&",
-  "||"
-];
-var UNARY_FILTER_OPERATORS = ["exists", "not exists"];
-var UNARY_OPERATORS = ["not", "-", ...UNARY_FILTER_OPERATORS];
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/operator-node.js
+var COMPARISON_OPERATORS_DICTIONARY = freeze({
+  "=": true,
+  "==": true,
+  "!=": true,
+  "<>": true,
+  ">": true,
+  ">=": true,
+  "<": true,
+  "<=": true,
+  in: true,
+  "not in": true,
+  is: true,
+  "is not": true,
+  like: true,
+  "not like": true,
+  match: true,
+  ilike: true,
+  "not ilike": true,
+  "@>": true,
+  "<@": true,
+  "^@": true,
+  "&&": true,
+  "?": true,
+  "?&": true,
+  "?|": true,
+  "!<": true,
+  "!>": true,
+  "<=>": true,
+  "!~": true,
+  "~": true,
+  "~*": true,
+  "!~*": true,
+  "@@": true,
+  "@@@": true,
+  "!!": true,
+  "<->": true,
+  regexp: true,
+  "is distinct from": true,
+  "is not distinct from": true
+});
+var COMPARISON_OPERATORS = Object.keys(COMPARISON_OPERATORS_DICTIONARY);
+var ARITHMETIC_OPERATORS_DICTIONARY = freeze({
+  "+": true,
+  "-": true,
+  "*": true,
+  "/": true,
+  "%": true,
+  "^": true,
+  "&": true,
+  "|": true,
+  "#": true,
+  "<<": true,
+  ">>": true
+});
+var ARITHMETIC_OPERATORS = Object.keys(ARITHMETIC_OPERATORS_DICTIONARY);
+var JSON_OPERATORS_DICTIONARY = freeze({
+  "->": true,
+  "->>": true
+});
+var JSON_OPERATORS = Object.keys(JSON_OPERATORS_DICTIONARY);
+var BINARY_OPERATORS_DICTIONARY = freeze({
+  ...COMPARISON_OPERATORS_DICTIONARY,
+  ...ARITHMETIC_OPERATORS_DICTIONARY,
+  "||": true
+});
+var BINARY_OPERATORS = Object.keys(BINARY_OPERATORS_DICTIONARY);
+var UNARY_FILTER_OPERATORS_DICTIONARY = freeze({
+  exists: true,
+  "not exists": true
+});
+var UNARY_FILTER_OPERATORS = Object.keys(UNARY_FILTER_OPERATORS_DICTIONARY);
+var UNARY_OPERATORS_DICTIONARY = freeze({
+  ...UNARY_FILTER_OPERATORS_DICTIONARY,
+  "-": true,
+  not: true
+});
+var UNARY_OPERATORS = Object.keys(UNARY_OPERATORS_DICTIONARY);
 var OPERATORS = [
   ...BINARY_OPERATORS,
   ...JSON_OPERATORS,
@@ -73820,11 +74100,17 @@ var OperatorNode = freeze({
     });
   }
 });
+function isBinaryOperator(op) {
+  return isString(op) && BINARY_OPERATORS_DICTIONARY[op];
+}
 function isJSONOperator(op) {
-  return isString(op) && JSON_OPERATORS.includes(op);
+  return isString(op) && JSON_OPERATORS_DICTIONARY[op];
+}
+function isUnaryOperator(op) {
+  return isString(op) && UNARY_OPERATORS_DICTIONARY[op];
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/column-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/column-node.js
 var ColumnNode = freeze({
   is(node) {
     return node.kind === "ColumnNode";
@@ -73837,7 +74123,7 @@ var ColumnNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/select-all-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/select-all-node.js
 var SelectAllNode = freeze({
   is(node) {
     return node.kind === "SelectAllNode";
@@ -73849,7 +74135,7 @@ var SelectAllNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/reference-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/reference-node.js
 var ReferenceNode = freeze({
   is(node) {
     return node.kind === "ReferenceNode";
@@ -73870,7 +74156,7 @@ var ReferenceNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dynamic/dynamic-reference-builder.js
+// ../zveltio-extensions/node_modules/kysely/dist/dynamic/dynamic-reference-builder.js
 class DynamicReferenceBuilder {
   #dynamicReference;
   get dynamicReference() {
@@ -73890,7 +74176,7 @@ function isDynamicReferenceBuilder(obj) {
   return isObject2(obj) && isOperationNodeSource(obj) && isString(obj.dynamicReference);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/order-by-item-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/order-by-item-node.js
 var OrderByItemNode = freeze({
   is(node) {
     return node.kind === "OrderByItemNode";
@@ -73901,10 +74187,16 @@ var OrderByItemNode = freeze({
       orderBy,
       direction
     });
+  },
+  cloneWith(node, props) {
+    return freeze({
+      ...node,
+      ...props
+    });
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/raw-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/raw-node.js
 var RawNode = freeze({
   is(node) {
     return node.kind === "RawNode";
@@ -73927,7 +74219,72 @@ var RawNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/order-by-parser.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/collate-node.js
+var CollateNode = freeze({
+  is(node) {
+    return node.kind === "CollateNode";
+  },
+  create(collation) {
+    return freeze({
+      kind: "CollateNode",
+      collation: IdentifierNode.create(collation)
+    });
+  }
+});
+
+// ../zveltio-extensions/node_modules/kysely/dist/query-builder/order-by-item-builder.js
+class OrderByItemBuilder {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  desc() {
+    return new OrderByItemBuilder({
+      node: OrderByItemNode.cloneWith(this.#props.node, {
+        direction: RawNode.createWithSql("desc")
+      })
+    });
+  }
+  asc() {
+    return new OrderByItemBuilder({
+      node: OrderByItemNode.cloneWith(this.#props.node, {
+        direction: RawNode.createWithSql("asc")
+      })
+    });
+  }
+  nullsLast() {
+    return new OrderByItemBuilder({
+      node: OrderByItemNode.cloneWith(this.#props.node, { nulls: "last" })
+    });
+  }
+  nullsFirst() {
+    return new OrderByItemBuilder({
+      node: OrderByItemNode.cloneWith(this.#props.node, { nulls: "first" })
+    });
+  }
+  collate(collation) {
+    return new OrderByItemBuilder({
+      node: OrderByItemNode.cloneWith(this.#props.node, {
+        collation: CollateNode.create(collation)
+      })
+    });
+  }
+  toOperationNode() {
+    return this.#props.node;
+  }
+}
+
+// ../zveltio-extensions/node_modules/kysely/dist/util/log-once.js
+var LOGGED_MESSAGES = new Set;
+function logOnce(message) {
+  if (LOGGED_MESSAGES.has(message)) {
+    return;
+  }
+  LOGGED_MESSAGES.add(message);
+  console.log(message);
+}
+
+// ../zveltio-extensions/node_modules/kysely/dist/parser/order-by-parser.js
 function isOrderByDirection(thing) {
   return thing === "asc" || thing === "desc";
 }
@@ -73938,21 +74295,22 @@ function parseOrderBy(args) {
   if (args.length === 1) {
     const [orderBy] = args;
     if (Array.isArray(orderBy)) {
+      logOnce("orderBy(array) is deprecated, use multiple orderBy calls instead.");
       return orderBy.map((item) => parseOrderByItem(item));
     }
     return [parseOrderByItem(orderBy)];
   }
   throw new Error(`Invalid number of arguments at order by! expected 1-2, received ${args.length}`);
 }
-function parseOrderByItem(ref, direction) {
-  const parsedRef = parseOrderByExpression(ref);
+function parseOrderByItem(expr, modifiers) {
+  const parsedRef = parseOrderByExpression(expr);
   if (OrderByItemNode.is(parsedRef)) {
-    if (direction) {
+    if (modifiers) {
       throw new Error("Cannot specify direction twice!");
     }
     return parsedRef;
   }
-  return OrderByItemNode.create(parsedRef, parseOrderByDirectionExpression(direction));
+  return parseOrderByWithModifiers(parsedRef, modifiers);
 }
 function parseOrderByExpression(expr) {
   if (isExpressionOrFactory(expr)) {
@@ -73963,24 +74321,30 @@ function parseOrderByExpression(expr) {
   }
   const [ref, direction] = expr.split(" ");
   if (direction) {
-    if (!isOrderByDirection(direction)) {
-      throw new Error(`Invalid order by direction: ${direction}`);
-    }
-    return OrderByItemNode.create(parseStringReference(ref), parseOrderByDirectionExpression(direction));
+    logOnce("`orderBy('column asc')` is deprecated. Use `orderBy('column', 'asc')` instead.");
+    return parseOrderByWithModifiers(parseStringReference(ref), direction);
   }
   return parseStringReference(expr);
 }
-function parseOrderByDirectionExpression(expr) {
-  if (!expr) {
-    return;
+function parseOrderByWithModifiers(expr, modifiers) {
+  if (typeof modifiers === "string") {
+    if (!isOrderByDirection(modifiers)) {
+      throw new Error(`Invalid order by direction: ${modifiers}`);
+    }
+    return OrderByItemNode.create(expr, RawNode.createWithSql(modifiers));
   }
-  if (expr === "asc" || expr === "desc") {
-    return RawNode.createWithSql(expr);
+  if (isExpression(modifiers)) {
+    logOnce("`orderBy(..., expr)` is deprecated. Use `orderBy(..., 'asc')` or `orderBy(..., (ob) => ...)` instead.");
+    return OrderByItemNode.create(expr, modifiers.toOperationNode());
   }
-  return expr.toOperationNode();
+  const node = OrderByItemNode.create(expr);
+  if (!modifiers) {
+    return node;
+  }
+  return modifiers(new OrderByItemBuilder({ node })).toOperationNode();
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/json-reference-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/json-reference-node.js
 var JSONReferenceNode = freeze({
   is(node) {
     return node.kind === "JSONReferenceNode";
@@ -74000,7 +74364,7 @@ var JSONReferenceNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/json-operator-chain-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/json-operator-chain-node.js
 var JSONOperatorChainNode = freeze({
   is(node) {
     return node.kind === "JSONOperatorChainNode";
@@ -74020,7 +74384,7 @@ var JSONOperatorChainNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/json-path-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/json-path-node.js
 var JSONPathNode = freeze({
   is(node) {
     return node.kind === "JSONPathNode";
@@ -74040,7 +74404,7 @@ var JSONPathNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/reference-parser.js
+// ../zveltio-extensions/node_modules/kysely/dist/parser/reference-parser.js
 function parseSimpleReferenceExpression(exp) {
   if (isString(exp)) {
     return parseStringReference(exp);
@@ -74061,13 +74425,11 @@ function parseReferenceExpression(exp) {
   return parseSimpleReferenceExpression(exp);
 }
 function parseJSONReference(ref, op) {
-  const referenceNode = parseStringReference(ref);
   if (isJSONOperator(op)) {
-    return JSONReferenceNode.create(referenceNode, JSONOperatorChainNode.create(OperatorNode.create(op)));
+    return JSONReferenceNode.create(parseStringReference(ref), JSONOperatorChainNode.create(OperatorNode.create(op)));
   }
-  const opWithoutLastChar = op.slice(0, -1);
-  if (isJSONOperator(opWithoutLastChar)) {
-    return JSONReferenceNode.create(referenceNode, JSONPathNode.create(OperatorNode.create(opWithoutLastChar)));
+  if (op === "->$" || op === "->>$") {
+    return JSONReferenceNode.create(parseStringReference(ref), JSONPathNode.create(OperatorNode.create(op.slice(0, -1))));
   }
   throw new Error(`Invalid JSON operator: ${op}`);
 }
@@ -74094,21 +74456,6 @@ function parseAliasedStringReference(ref) {
     return parseStringReference(ref);
   }
 }
-function parseColumnName(column) {
-  return ColumnNode.create(column);
-}
-function parseOrderedColumnName(column) {
-  const ORDER_SEPARATOR = " ";
-  if (column.includes(ORDER_SEPARATOR)) {
-    const [columnName, order] = column.split(ORDER_SEPARATOR).map(trim);
-    if (!isOrderByDirection(order)) {
-      throw new Error(`invalid order direction "${order}" next to "${columnName}"`);
-    }
-    return parseOrderBy([columnName, order])[0];
-  } else {
-    return parseColumnName(column);
-  }
-}
 function parseStringReferenceWithTableAndSchema(parts) {
   const [schema, table, column] = parts;
   return ReferenceNode.create(ColumnNode.create(column), TableNode.createWithSchema(schema, table));
@@ -74121,7 +74468,7 @@ function trim(str) {
   return str.trim();
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/primitive-value-list-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/primitive-value-list-node.js
 var PrimitiveValueListNode = freeze({
   is(node) {
     return node.kind === "PrimitiveValueListNode";
@@ -74134,7 +74481,7 @@ var PrimitiveValueListNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/value-list-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/value-list-node.js
 var ValueListNode = freeze({
   is(node) {
     return node.kind === "ValueListNode";
@@ -74147,7 +74494,7 @@ var ValueListNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/value-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/value-node.js
 var ValueNode = freeze({
   is(node) {
     return node.kind === "ValueNode";
@@ -74167,7 +74514,7 @@ var ValueNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/value-parser.js
+// ../zveltio-extensions/node_modules/kysely/dist/parser/value-parser.js
 function parseValueExpressionOrList(arg) {
   if (isReadonlyArray(arg)) {
     return parseValueExpressionList(arg);
@@ -74196,7 +74543,7 @@ function parseValueExpressionList(arg) {
   return PrimitiveValueListNode.create(arg);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/parens-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/parens-node.js
 var ParensNode = freeze({
   is(node) {
     return node.kind === "ParensNode";
@@ -74209,7 +74556,7 @@ var ParensNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/binary-operation-parser.js
+// ../zveltio-extensions/node_modules/kysely/dist/parser/binary-operation-parser.js
 function parseValueBinaryOperationOrExpression(args) {
   if (args.length === 3) {
     return parseValueBinaryOperation(args[0], args[1], args[2]);
@@ -74220,12 +74567,12 @@ function parseValueBinaryOperationOrExpression(args) {
 }
 function parseValueBinaryOperation(left, operator, right) {
   if (isIsOperator(operator) && needsIsOperator(right)) {
-    return BinaryOperationNode.create(parseReferenceExpression(left), parseOperator(operator), ValueNode.createImmediate(right));
+    return BinaryOperationNode.create(parseReferenceExpression(left), parseBinaryOperator(operator), ValueNode.createImmediate(right));
   }
-  return BinaryOperationNode.create(parseReferenceExpression(left), parseOperator(operator), parseValueExpressionOrList(right));
+  return BinaryOperationNode.create(parseReferenceExpression(left), parseBinaryOperator(operator), parseValueExpressionOrList(right));
 }
 function parseReferentialBinaryOperation(left, operator, right) {
-  return BinaryOperationNode.create(parseReferenceExpression(left), parseOperator(operator), parseReferenceExpression(right));
+  return BinaryOperationNode.create(parseReferenceExpression(left), parseBinaryOperator(operator), parseReferenceExpression(right));
 }
 function parseFilterObject(obj, combinator) {
   return parseFilterList(Object.entries(obj).filter(([, v]) => !isUndefined(v)).map(([k, v]) => parseValueBinaryOperation(k, needsIsOperator(v) ? "is" : "=", v)), combinator);
@@ -74250,8 +74597,8 @@ function isIsOperator(operator) {
 function needsIsOperator(value) {
   return isNull(value) || isBoolean(value);
 }
-function parseOperator(operator) {
-  if (isString(operator) && OPERATORS.includes(operator)) {
+function parseBinaryOperator(operator) {
+  if (isBinaryOperator(operator)) {
     return OperatorNode.create(operator);
   }
   if (isOperationNodeSource(operator)) {
@@ -74263,7 +74610,7 @@ function toOperationNode(nodeOrSource) {
   return isOperationNodeSource(nodeOrSource) ? nodeOrSource.toOperationNode() : nodeOrSource;
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/order-by-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/order-by-node.js
 var OrderByNode = freeze({
   is(node) {
     return node.kind === "OrderByNode";
@@ -74282,7 +74629,7 @@ var OrderByNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/partition-by-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/partition-by-node.js
 var PartitionByNode = freeze({
   is(node) {
     return node.kind === "PartitionByNode";
@@ -74301,7 +74648,7 @@ var PartitionByNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/over-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/over-node.js
 var OverNode = freeze({
   is(node) {
     return node.kind === "OverNode";
@@ -74325,7 +74672,7 @@ var OverNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/from-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/from-node.js
 var FromNode = freeze({
   is(node) {
     return node.kind === "FromNode";
@@ -74344,7 +74691,7 @@ var FromNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/group-by-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/group-by-node.js
 var GroupByNode = freeze({
   is(node) {
     return node.kind === "GroupByNode";
@@ -74363,7 +74710,7 @@ var GroupByNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/having-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/having-node.js
 var HavingNode = freeze({
   is(node) {
     return node.kind === "HavingNode";
@@ -74382,342 +74729,7 @@ var HavingNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/select-query-node.js
-var SelectQueryNode = freeze({
-  is(node) {
-    return node.kind === "SelectQueryNode";
-  },
-  create(withNode) {
-    return freeze({
-      kind: "SelectQueryNode",
-      ...withNode && { with: withNode }
-    });
-  },
-  createFrom(fromItems, withNode) {
-    return freeze({
-      kind: "SelectQueryNode",
-      from: FromNode.create(fromItems),
-      ...withNode && { with: withNode }
-    });
-  },
-  cloneWithSelections(select, selections) {
-    return freeze({
-      ...select,
-      selections: select.selections ? freeze([...select.selections, ...selections]) : freeze(selections)
-    });
-  },
-  cloneWithDistinctOn(select, expressions) {
-    return freeze({
-      ...select,
-      distinctOn: select.distinctOn ? freeze([...select.distinctOn, ...expressions]) : freeze(expressions)
-    });
-  },
-  cloneWithFrontModifier(select, modifier) {
-    return freeze({
-      ...select,
-      frontModifiers: select.frontModifiers ? freeze([...select.frontModifiers, modifier]) : freeze([modifier])
-    });
-  },
-  cloneWithOrderByItems(selectNode, items) {
-    return freeze({
-      ...selectNode,
-      orderBy: selectNode.orderBy ? OrderByNode.cloneWithItems(selectNode.orderBy, items) : OrderByNode.create(items)
-    });
-  },
-  cloneWithGroupByItems(selectNode, items) {
-    return freeze({
-      ...selectNode,
-      groupBy: selectNode.groupBy ? GroupByNode.cloneWithItems(selectNode.groupBy, items) : GroupByNode.create(items)
-    });
-  },
-  cloneWithLimit(selectNode, limit) {
-    return freeze({
-      ...selectNode,
-      limit
-    });
-  },
-  cloneWithOffset(selectNode, offset) {
-    return freeze({
-      ...selectNode,
-      offset
-    });
-  },
-  cloneWithFetch(selectNode, fetch) {
-    return freeze({
-      ...selectNode,
-      fetch
-    });
-  },
-  cloneWithHaving(selectNode, operation) {
-    return freeze({
-      ...selectNode,
-      having: selectNode.having ? HavingNode.cloneWithOperation(selectNode.having, "And", operation) : HavingNode.create(operation)
-    });
-  },
-  cloneWithSetOperations(selectNode, setOperations) {
-    return freeze({
-      ...selectNode,
-      setOperations: selectNode.setOperations ? freeze([...selectNode.setOperations, ...setOperations]) : freeze([...setOperations])
-    });
-  },
-  cloneWithoutSelections(select) {
-    return freeze({
-      ...select,
-      selections: []
-    });
-  },
-  cloneWithoutLimit(select) {
-    return freeze({
-      ...select,
-      limit: undefined
-    });
-  },
-  cloneWithoutOffset(select) {
-    return freeze({
-      ...select,
-      offset: undefined
-    });
-  },
-  cloneWithoutOrderBy(select) {
-    return freeze({
-      ...select,
-      orderBy: undefined
-    });
-  },
-  cloneWithoutGroupBy(select) {
-    return freeze({
-      ...select,
-      groupBy: undefined
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/prevent-await.js
-function preventAwait(clazz, message) {
-  Object.defineProperties(clazz.prototype, {
-    then: {
-      enumerable: false,
-      value: () => {
-        throw new Error(message);
-      }
-    }
-  });
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/join-builder.js
-class JoinBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  on(...args) {
-    return new JoinBuilder({
-      ...this.#props,
-      joinNode: JoinNode.cloneWithOn(this.#props.joinNode, parseValueBinaryOperationOrExpression(args))
-    });
-  }
-  onRef(lhs, op, rhs) {
-    return new JoinBuilder({
-      ...this.#props,
-      joinNode: JoinNode.cloneWithOn(this.#props.joinNode, parseReferentialBinaryOperation(lhs, op, rhs))
-    });
-  }
-  onTrue() {
-    return new JoinBuilder({
-      ...this.#props,
-      joinNode: JoinNode.cloneWithOn(this.#props.joinNode, RawNode.createWithSql("true"))
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  toOperationNode() {
-    return this.#props.joinNode;
-  }
-}
-preventAwait(JoinBuilder, "don't await JoinBuilder instances. They are never executed directly and are always just a part of a query.");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/partition-by-item-node.js
-var PartitionByItemNode = freeze({
-  is(node) {
-    return node.kind === "PartitionByItemNode";
-  },
-  create(partitionBy) {
-    return freeze({
-      kind: "PartitionByItemNode",
-      partitionBy
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/partition-by-parser.js
-function parsePartitionBy(partitionBy) {
-  return parseReferenceExpressionOrList(partitionBy).map(PartitionByItemNode.create);
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/over-builder.js
-class OverBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  orderBy(orderBy, direction) {
-    return new OverBuilder({
-      overNode: OverNode.cloneWithOrderByItems(this.#props.overNode, parseOrderBy([orderBy, direction]))
-    });
-  }
-  partitionBy(partitionBy) {
-    return new OverBuilder({
-      overNode: OverNode.cloneWithPartitionByItems(this.#props.overNode, parsePartitionBy(partitionBy))
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  toOperationNode() {
-    return this.#props.overNode;
-  }
-}
-preventAwait(OverBuilder, "don't await OverBuilder instances. They are never executed directly and are always just a part of a query.");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/selection-node.js
-var SelectionNode = freeze({
-  is(node) {
-    return node.kind === "SelectionNode";
-  },
-  create(selection) {
-    return freeze({
-      kind: "SelectionNode",
-      selection
-    });
-  },
-  createSelectAll() {
-    return freeze({
-      kind: "SelectionNode",
-      selection: SelectAllNode.create()
-    });
-  },
-  createSelectAllFromTable(table) {
-    return freeze({
-      kind: "SelectionNode",
-      selection: ReferenceNode.createSelectAll(table)
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/select-parser.js
-function parseSelectArg(selection) {
-  if (isFunction(selection)) {
-    return parseSelectArg(selection(expressionBuilder()));
-  } else if (isReadonlyArray(selection)) {
-    return selection.map((it) => parseSelectExpression(it));
-  } else {
-    return [parseSelectExpression(selection)];
-  }
-}
-function parseSelectExpression(selection) {
-  if (isString(selection)) {
-    return SelectionNode.create(parseAliasedStringReference(selection));
-  } else if (isDynamicReferenceBuilder(selection)) {
-    return SelectionNode.create(selection.toOperationNode());
-  } else {
-    return SelectionNode.create(parseAliasedExpression(selection));
-  }
-}
-function parseSelectAll(table) {
-  if (!table) {
-    return [SelectionNode.createSelectAll()];
-  } else if (Array.isArray(table)) {
-    return table.map(parseSelectAllArg);
-  } else {
-    return [parseSelectAllArg(table)];
-  }
-}
-function parseSelectAllArg(table) {
-  if (isString(table)) {
-    return SelectionNode.createSelectAllFromTable(parseTable(table));
-  }
-  throw new Error(`invalid value selectAll expression: ${JSON.stringify(table)}`);
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/values-node.js
-var ValuesNode = freeze({
-  is(node) {
-    return node.kind === "ValuesNode";
-  },
-  create(values) {
-    return freeze({
-      kind: "ValuesNode",
-      values: freeze(values)
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/default-insert-value-node.js
-var DefaultInsertValueNode = freeze({
-  is(node) {
-    return node.kind === "DefaultInsertValueNode";
-  },
-  create() {
-    return freeze({
-      kind: "DefaultInsertValueNode"
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/insert-values-parser.js
-function parseInsertExpression(arg) {
-  const objectOrList = isFunction(arg) ? arg(expressionBuilder()) : arg;
-  const list = isReadonlyArray(objectOrList) ? objectOrList : freeze([objectOrList]);
-  return parseInsertColumnsAndValues(list);
-}
-function parseInsertColumnsAndValues(rows) {
-  const columns = parseColumnNamesAndIndexes(rows);
-  return [
-    freeze([...columns.keys()].map(ColumnNode.create)),
-    ValuesNode.create(rows.map((row) => parseRowValues(row, columns)))
-  ];
-}
-function parseColumnNamesAndIndexes(rows) {
-  const columns = new Map;
-  for (const row of rows) {
-    const cols = Object.keys(row);
-    for (const col of cols) {
-      if (!columns.has(col) && row[col] !== undefined) {
-        columns.set(col, columns.size);
-      }
-    }
-  }
-  return columns;
-}
-function parseRowValues(row, columns) {
-  const rowColumns = Object.keys(row);
-  const rowValues = Array.from({
-    length: columns.size
-  });
-  let hasUndefinedOrComplexColumns = false;
-  let indexedRowColumns = rowColumns.length;
-  for (const col of rowColumns) {
-    const columnIdx = columns.get(col);
-    if (isUndefined(columnIdx)) {
-      indexedRowColumns--;
-      continue;
-    }
-    const value = row[col];
-    if (isUndefined(value) || isExpressionOrFactory(value)) {
-      hasUndefinedOrComplexColumns = true;
-    }
-    rowValues[columnIdx] = value;
-  }
-  const hasMissingColumns = indexedRowColumns < columns.size;
-  if (hasMissingColumns || hasUndefinedOrComplexColumns) {
-    const defaultValue = DefaultInsertValueNode.create();
-    return ValueListNode.create(rowValues.map((it) => isUndefined(it) ? defaultValue : parseValueExpression(it)));
-  }
-  return PrimitiveValueListNode.create(rowValues);
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/insert-query-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/insert-query-node.js
 var InsertQueryNode = freeze({
   is(node) {
     return node.kind === "InsertQueryNode";
@@ -74743,15 +74755,28 @@ var InsertQueryNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/update-query-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/list-node.js
+var ListNode = freeze({
+  is(node) {
+    return node.kind === "ListNode";
+  },
+  create(items) {
+    return freeze({
+      kind: "ListNode",
+      items: freeze(items)
+    });
+  }
+});
+
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/update-query-node.js
 var UpdateQueryNode = freeze({
   is(node) {
     return node.kind === "UpdateQueryNode";
   },
-  create(table, withNode) {
+  create(tables, withNode) {
     return freeze({
       kind: "UpdateQueryNode",
-      table,
+      table: tables.length === 1 ? tables[0] : ListNode.create(tables),
       ...withNode && { with: withNode }
     });
   },
@@ -74780,7 +74805,7 @@ var UpdateQueryNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/using-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/using-node.js
 var UsingNode = freeze({
   is(node) {
     return node.kind === "UsingNode";
@@ -74799,7 +74824,7 @@ var UsingNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/delete-query-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/delete-query-node.js
 var DeleteQueryNode = freeze({
   is(node) {
     return node.kind === "DeleteQueryNode";
@@ -74811,18 +74836,8 @@ var DeleteQueryNode = freeze({
       ...withNode && { with: withNode }
     });
   },
-  cloneWithOrderByItems(deleteNode, items) {
-    return freeze({
-      ...deleteNode,
-      orderBy: deleteNode.orderBy ? OrderByNode.cloneWithItems(deleteNode.orderBy, items) : OrderByNode.create(items)
-    });
-  },
-  cloneWithoutOrderBy(deleteNode) {
-    return freeze({
-      ...deleteNode,
-      orderBy: undefined
-    });
-  },
+  cloneWithOrderByItems: (node, items) => QueryNode.cloneWithOrderByItems(node, items),
+  cloneWithoutOrderBy: (node) => QueryNode.cloneWithoutOrderBy(node),
   cloneWithLimit(deleteNode, limit) {
     return freeze({
       ...deleteNode,
@@ -74843,7 +74858,7 @@ var DeleteQueryNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/where-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/where-node.js
 var WhereNode = freeze({
   is(node) {
     return node.kind === "WhereNode";
@@ -74862,7 +74877,7 @@ var WhereNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/returning-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/returning-node.js
 var ReturningNode = freeze({
   is(node) {
     return node.kind === "ReturningNode";
@@ -74881,7 +74896,7 @@ var ReturningNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/explain-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/explain-node.js
 var ExplainNode = freeze({
   is(node) {
     return node.kind === "ExplainNode";
@@ -74895,7 +74910,7 @@ var ExplainNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/when-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/when-node.js
 var WhenNode = freeze({
   is(node) {
     return node.kind === "WhenNode";
@@ -74914,7 +74929,7 @@ var WhenNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/merge-query-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/merge-query-node.js
 var MergeQueryNode = freeze({
   is(node) {
     return node.kind === "MergeQueryNode";
@@ -74949,7 +74964,7 @@ var MergeQueryNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/output-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/output-node.js
 var OutputNode = freeze({
   is(node) {
     return node.kind === "OutputNode";
@@ -74968,7 +74983,7 @@ var OutputNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/query-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/query-node.js
 var QueryNode = freeze({
   is(node) {
     return SelectQueryNode.is(node) || InsertQueryNode.is(node) || UpdateQueryNode.is(node) || DeleteQueryNode.is(node) || MergeQueryNode.is(node);
@@ -75026,63 +75041,261 @@ var QueryNode = freeze({
       ...node,
       output: node.output ? OutputNode.cloneWithSelections(node.output, selections) : OutputNode.create(selections)
     });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/column-update-node.js
-var ColumnUpdateNode = freeze({
-  is(node) {
-    return node.kind === "ColumnUpdateNode";
   },
-  create(column, value) {
+  cloneWithOrderByItems(node, items) {
     return freeze({
-      kind: "ColumnUpdateNode",
-      column,
-      value
+      ...node,
+      orderBy: node.orderBy ? OrderByNode.cloneWithItems(node.orderBy, items) : OrderByNode.create(items)
+    });
+  },
+  cloneWithoutOrderBy(node) {
+    return freeze({
+      ...node,
+      orderBy: undefined
     });
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/update-set-parser.js
-function parseUpdate(...args) {
-  if (args.length === 2) {
-    return [
-      ColumnUpdateNode.create(parseReferenceExpression(args[0]), parseValueExpression(args[1]))
-    ];
-  }
-  return parseUpdateObjectExpression(args[0]);
-}
-function parseUpdateObjectExpression(update) {
-  const updateObj = isFunction(update) ? update(expressionBuilder()) : update;
-  return Object.entries(updateObj).filter(([_, value]) => value !== undefined).map(([key, value]) => {
-    return ColumnUpdateNode.create(ColumnNode.create(key), parseValueExpression(value));
-  });
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/on-duplicate-key-node.js
-var OnDuplicateKeyNode = freeze({
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/select-query-node.js
+var SelectQueryNode = freeze({
   is(node) {
-    return node.kind === "OnDuplicateKeyNode";
+    return node.kind === "SelectQueryNode";
   },
-  create(updates) {
+  create(withNode) {
     return freeze({
-      kind: "OnDuplicateKeyNode",
-      updates
+      kind: "SelectQueryNode",
+      ...withNode && { with: withNode }
+    });
+  },
+  createFrom(fromItems, withNode) {
+    return freeze({
+      kind: "SelectQueryNode",
+      from: FromNode.create(fromItems),
+      ...withNode && { with: withNode }
+    });
+  },
+  cloneWithSelections(select, selections) {
+    return freeze({
+      ...select,
+      selections: select.selections ? freeze([...select.selections, ...selections]) : freeze(selections)
+    });
+  },
+  cloneWithDistinctOn(select, expressions) {
+    return freeze({
+      ...select,
+      distinctOn: select.distinctOn ? freeze([...select.distinctOn, ...expressions]) : freeze(expressions)
+    });
+  },
+  cloneWithFrontModifier(select, modifier) {
+    return freeze({
+      ...select,
+      frontModifiers: select.frontModifiers ? freeze([...select.frontModifiers, modifier]) : freeze([modifier])
+    });
+  },
+  cloneWithOrderByItems: (node, items) => QueryNode.cloneWithOrderByItems(node, items),
+  cloneWithGroupByItems(selectNode, items) {
+    return freeze({
+      ...selectNode,
+      groupBy: selectNode.groupBy ? GroupByNode.cloneWithItems(selectNode.groupBy, items) : GroupByNode.create(items)
+    });
+  },
+  cloneWithLimit(selectNode, limit) {
+    return freeze({
+      ...selectNode,
+      limit
+    });
+  },
+  cloneWithOffset(selectNode, offset) {
+    return freeze({
+      ...selectNode,
+      offset
+    });
+  },
+  cloneWithFetch(selectNode, fetch) {
+    return freeze({
+      ...selectNode,
+      fetch
+    });
+  },
+  cloneWithHaving(selectNode, operation) {
+    return freeze({
+      ...selectNode,
+      having: selectNode.having ? HavingNode.cloneWithOperation(selectNode.having, "And", operation) : HavingNode.create(operation)
+    });
+  },
+  cloneWithSetOperations(selectNode, setOperations) {
+    return freeze({
+      ...selectNode,
+      setOperations: selectNode.setOperations ? freeze([...selectNode.setOperations, ...setOperations]) : freeze([...setOperations])
+    });
+  },
+  cloneWithoutSelections(select) {
+    return freeze({
+      ...select,
+      selections: []
+    });
+  },
+  cloneWithoutLimit(select) {
+    return freeze({
+      ...select,
+      limit: undefined
+    });
+  },
+  cloneWithoutOffset(select) {
+    return freeze({
+      ...select,
+      offset: undefined
+    });
+  },
+  cloneWithoutOrderBy: (node) => QueryNode.cloneWithoutOrderBy(node),
+  cloneWithoutGroupBy(select) {
+    return freeze({
+      ...select,
+      groupBy: undefined
     });
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/insert-result.js
-class InsertResult {
-  insertId;
-  numInsertedOrUpdatedRows;
-  constructor(insertId, numInsertedOrUpdatedRows) {
-    this.insertId = insertId;
-    this.numInsertedOrUpdatedRows = numInsertedOrUpdatedRows;
+// ../zveltio-extensions/node_modules/kysely/dist/query-builder/join-builder.js
+class JoinBuilder {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  on(...args) {
+    return new JoinBuilder({
+      ...this.#props,
+      joinNode: JoinNode.cloneWithOn(this.#props.joinNode, parseValueBinaryOperationOrExpression(args))
+    });
+  }
+  onRef(lhs, op, rhs) {
+    return new JoinBuilder({
+      ...this.#props,
+      joinNode: JoinNode.cloneWithOn(this.#props.joinNode, parseReferentialBinaryOperation(lhs, op, rhs))
+    });
+  }
+  onTrue() {
+    return new JoinBuilder({
+      ...this.#props,
+      joinNode: JoinNode.cloneWithOn(this.#props.joinNode, RawNode.createWithSql("true"))
+    });
+  }
+  $call(func) {
+    return func(this);
+  }
+  toOperationNode() {
+    return this.#props.joinNode;
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/no-result-error.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/partition-by-item-node.js
+var PartitionByItemNode = freeze({
+  is(node) {
+    return node.kind === "PartitionByItemNode";
+  },
+  create(partitionBy) {
+    return freeze({
+      kind: "PartitionByItemNode",
+      partitionBy
+    });
+  }
+});
+
+// ../zveltio-extensions/node_modules/kysely/dist/parser/partition-by-parser.js
+function parsePartitionBy(partitionBy) {
+  return parseReferenceExpressionOrList(partitionBy).map(PartitionByItemNode.create);
+}
+
+// ../zveltio-extensions/node_modules/kysely/dist/query-builder/over-builder.js
+class OverBuilder {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  orderBy(...args) {
+    return new OverBuilder({
+      overNode: OverNode.cloneWithOrderByItems(this.#props.overNode, parseOrderBy(args))
+    });
+  }
+  clearOrderBy() {
+    return new OverBuilder({
+      overNode: QueryNode.cloneWithoutOrderBy(this.#props.overNode)
+    });
+  }
+  partitionBy(partitionBy) {
+    return new OverBuilder({
+      overNode: OverNode.cloneWithPartitionByItems(this.#props.overNode, parsePartitionBy(partitionBy))
+    });
+  }
+  $call(func) {
+    return func(this);
+  }
+  toOperationNode() {
+    return this.#props.overNode;
+  }
+}
+
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/selection-node.js
+var SelectionNode = freeze({
+  is(node) {
+    return node.kind === "SelectionNode";
+  },
+  create(selection) {
+    return freeze({
+      kind: "SelectionNode",
+      selection
+    });
+  },
+  createSelectAll() {
+    return freeze({
+      kind: "SelectionNode",
+      selection: SelectAllNode.create()
+    });
+  },
+  createSelectAllFromTable(table) {
+    return freeze({
+      kind: "SelectionNode",
+      selection: ReferenceNode.createSelectAll(table)
+    });
+  }
+});
+
+// ../zveltio-extensions/node_modules/kysely/dist/parser/select-parser.js
+function parseSelectArg(selection) {
+  if (isFunction(selection)) {
+    return parseSelectArg(selection(expressionBuilder()));
+  } else if (isReadonlyArray(selection)) {
+    return selection.map((it) => parseSelectExpression(it));
+  } else {
+    return [parseSelectExpression(selection)];
+  }
+}
+function parseSelectExpression(selection) {
+  if (isString(selection)) {
+    return SelectionNode.create(parseAliasedStringReference(selection));
+  } else if (isDynamicReferenceBuilder(selection)) {
+    return SelectionNode.create(selection.toOperationNode());
+  } else {
+    return SelectionNode.create(parseAliasedExpression(selection));
+  }
+}
+function parseSelectAll(table) {
+  if (!table) {
+    return [SelectionNode.createSelectAll()];
+  } else if (Array.isArray(table)) {
+    return table.map(parseSelectAllArg);
+  } else {
+    return [parseSelectAllArg(table)];
+  }
+}
+function parseSelectAllArg(table) {
+  if (isString(table)) {
+    return SelectionNode.createSelectAllFromTable(parseTable(table));
+  }
+  throw new Error(`invalid value selectAll expression: ${JSON.stringify(table)}`);
+}
+
+// ../zveltio-extensions/node_modules/kysely/dist/query-builder/no-result-error.js
 class NoResultError extends Error {
   node;
   constructor(node) {
@@ -75094,184 +75307,7 @@ function isNoResultErrorConstructor(fn) {
   return Object.prototype.hasOwnProperty.call(fn, "prototype");
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/on-conflict-node.js
-var OnConflictNode = freeze({
-  is(node) {
-    return node.kind === "OnConflictNode";
-  },
-  create() {
-    return freeze({
-      kind: "OnConflictNode"
-    });
-  },
-  cloneWith(node, props) {
-    return freeze({
-      ...node,
-      ...props
-    });
-  },
-  cloneWithIndexWhere(node, operation) {
-    return freeze({
-      ...node,
-      indexWhere: node.indexWhere ? WhereNode.cloneWithOperation(node.indexWhere, "And", operation) : WhereNode.create(operation)
-    });
-  },
-  cloneWithIndexOrWhere(node, operation) {
-    return freeze({
-      ...node,
-      indexWhere: node.indexWhere ? WhereNode.cloneWithOperation(node.indexWhere, "Or", operation) : WhereNode.create(operation)
-    });
-  },
-  cloneWithUpdateWhere(node, operation) {
-    return freeze({
-      ...node,
-      updateWhere: node.updateWhere ? WhereNode.cloneWithOperation(node.updateWhere, "And", operation) : WhereNode.create(operation)
-    });
-  },
-  cloneWithUpdateOrWhere(node, operation) {
-    return freeze({
-      ...node,
-      updateWhere: node.updateWhere ? WhereNode.cloneWithOperation(node.updateWhere, "Or", operation) : WhereNode.create(operation)
-    });
-  },
-  cloneWithoutIndexWhere(node) {
-    return freeze({
-      ...node,
-      indexWhere: undefined
-    });
-  },
-  cloneWithoutUpdateWhere(node) {
-    return freeze({
-      ...node,
-      updateWhere: undefined
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/on-conflict-builder.js
-class OnConflictBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  column(column) {
-    const columnNode = ColumnNode.create(column);
-    return new OnConflictBuilder({
-      ...this.#props,
-      onConflictNode: OnConflictNode.cloneWith(this.#props.onConflictNode, {
-        columns: this.#props.onConflictNode.columns ? freeze([...this.#props.onConflictNode.columns, columnNode]) : freeze([columnNode])
-      })
-    });
-  }
-  columns(columns) {
-    const columnNodes = columns.map(ColumnNode.create);
-    return new OnConflictBuilder({
-      ...this.#props,
-      onConflictNode: OnConflictNode.cloneWith(this.#props.onConflictNode, {
-        columns: this.#props.onConflictNode.columns ? freeze([...this.#props.onConflictNode.columns, ...columnNodes]) : freeze(columnNodes)
-      })
-    });
-  }
-  constraint(constraintName) {
-    return new OnConflictBuilder({
-      ...this.#props,
-      onConflictNode: OnConflictNode.cloneWith(this.#props.onConflictNode, {
-        constraint: IdentifierNode.create(constraintName)
-      })
-    });
-  }
-  expression(expression) {
-    return new OnConflictBuilder({
-      ...this.#props,
-      onConflictNode: OnConflictNode.cloneWith(this.#props.onConflictNode, {
-        indexExpression: expression.toOperationNode()
-      })
-    });
-  }
-  where(...args) {
-    return new OnConflictBuilder({
-      ...this.#props,
-      onConflictNode: OnConflictNode.cloneWithIndexWhere(this.#props.onConflictNode, parseValueBinaryOperationOrExpression(args))
-    });
-  }
-  whereRef(lhs, op, rhs) {
-    return new OnConflictBuilder({
-      ...this.#props,
-      onConflictNode: OnConflictNode.cloneWithIndexWhere(this.#props.onConflictNode, parseReferentialBinaryOperation(lhs, op, rhs))
-    });
-  }
-  clearWhere() {
-    return new OnConflictBuilder({
-      ...this.#props,
-      onConflictNode: OnConflictNode.cloneWithoutIndexWhere(this.#props.onConflictNode)
-    });
-  }
-  doNothing() {
-    return new OnConflictDoNothingBuilder({
-      ...this.#props,
-      onConflictNode: OnConflictNode.cloneWith(this.#props.onConflictNode, {
-        doNothing: true
-      })
-    });
-  }
-  doUpdateSet(update) {
-    return new OnConflictUpdateBuilder({
-      ...this.#props,
-      onConflictNode: OnConflictNode.cloneWith(this.#props.onConflictNode, {
-        updates: parseUpdateObjectExpression(update)
-      })
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-}
-preventAwait(OnConflictBuilder, "don't await OnConflictBuilder instances.");
-
-class OnConflictDoNothingBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  toOperationNode() {
-    return this.#props.onConflictNode;
-  }
-}
-preventAwait(OnConflictDoNothingBuilder, "don't await OnConflictDoNothingBuilder instances.");
-
-class OnConflictUpdateBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  where(...args) {
-    return new OnConflictUpdateBuilder({
-      ...this.#props,
-      onConflictNode: OnConflictNode.cloneWithUpdateWhere(this.#props.onConflictNode, parseValueBinaryOperationOrExpression(args))
-    });
-  }
-  whereRef(lhs, op, rhs) {
-    return new OnConflictUpdateBuilder({
-      ...this.#props,
-      onConflictNode: OnConflictNode.cloneWithUpdateWhere(this.#props.onConflictNode, parseReferentialBinaryOperation(lhs, op, rhs))
-    });
-  }
-  clearWhere() {
-    return new OnConflictUpdateBuilder({
-      ...this.#props,
-      onConflictNode: OnConflictNode.cloneWithoutUpdateWhere(this.#props.onConflictNode)
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  toOperationNode() {
-    return this.#props.onConflictNode;
-  }
-}
-preventAwait(OnConflictUpdateBuilder, "don't await OnConflictUpdateBuilder instances.");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/top-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/top-node.js
 var TopNode = freeze({
   is(node) {
     return node.kind === "TopNode";
@@ -75285,7 +75321,7 @@ var TopNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/top-parser.js
+// ../zveltio-extensions/node_modules/kysely/dist/parser/top-parser.js
 function parseTop(expression, modifiers) {
   if (!isNumber(expression) && !isBigInt(expression)) {
     throw new Error(`Invalid top expression: ${expression}`);
@@ -75299,196 +75335,7 @@ function isTopModifiers(modifiers) {
   return modifiers === "percent" || modifiers === "with ties" || modifiers === "percent with ties";
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/insert-query-builder.js
-class InsertQueryBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  values(insert) {
-    const [columns, values] = parseInsertExpression(insert);
-    return new InsertQueryBuilder({
-      ...this.#props,
-      queryNode: InsertQueryNode.cloneWith(this.#props.queryNode, {
-        columns,
-        values
-      })
-    });
-  }
-  columns(columns) {
-    return new InsertQueryBuilder({
-      ...this.#props,
-      queryNode: InsertQueryNode.cloneWith(this.#props.queryNode, {
-        columns: freeze(columns.map(ColumnNode.create))
-      })
-    });
-  }
-  expression(expression) {
-    return new InsertQueryBuilder({
-      ...this.#props,
-      queryNode: InsertQueryNode.cloneWith(this.#props.queryNode, {
-        values: parseExpression(expression)
-      })
-    });
-  }
-  defaultValues() {
-    return new InsertQueryBuilder({
-      ...this.#props,
-      queryNode: InsertQueryNode.cloneWith(this.#props.queryNode, {
-        defaultValues: true
-      })
-    });
-  }
-  modifyEnd(modifier) {
-    return new InsertQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, modifier.toOperationNode())
-    });
-  }
-  ignore() {
-    return new InsertQueryBuilder({
-      ...this.#props,
-      queryNode: InsertQueryNode.cloneWith(this.#props.queryNode, {
-        ignore: true
-      })
-    });
-  }
-  top(expression, modifiers) {
-    return new InsertQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithTop(this.#props.queryNode, parseTop(expression, modifiers))
-    });
-  }
-  onConflict(callback) {
-    return new InsertQueryBuilder({
-      ...this.#props,
-      queryNode: InsertQueryNode.cloneWith(this.#props.queryNode, {
-        onConflict: callback(new OnConflictBuilder({
-          onConflictNode: OnConflictNode.create()
-        })).toOperationNode()
-      })
-    });
-  }
-  onDuplicateKeyUpdate(update) {
-    return new InsertQueryBuilder({
-      ...this.#props,
-      queryNode: InsertQueryNode.cloneWith(this.#props.queryNode, {
-        onDuplicateKey: OnDuplicateKeyNode.create(parseUpdateObjectExpression(update))
-      })
-    });
-  }
-  returning(selection) {
-    return new InsertQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithReturning(this.#props.queryNode, parseSelectArg(selection))
-    });
-  }
-  returningAll() {
-    return new InsertQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithReturning(this.#props.queryNode, parseSelectAll())
-    });
-  }
-  output(args) {
-    return new InsertQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithOutput(this.#props.queryNode, parseSelectArg(args))
-    });
-  }
-  outputAll(table) {
-    return new InsertQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithOutput(this.#props.queryNode, parseSelectAll(table))
-    });
-  }
-  clearReturning() {
-    return new InsertQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithoutReturning(this.#props.queryNode)
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  $if(condition, func) {
-    if (condition) {
-      return func(this);
-    }
-    return new InsertQueryBuilder({
-      ...this.#props
-    });
-  }
-  $castTo() {
-    return new InsertQueryBuilder(this.#props);
-  }
-  $narrowType() {
-    return new InsertQueryBuilder(this.#props);
-  }
-  $assertType() {
-    return new InsertQueryBuilder(this.#props);
-  }
-  withPlugin(plugin) {
-    return new InsertQueryBuilder({
-      ...this.#props,
-      executor: this.#props.executor.withPlugin(plugin)
-    });
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(this.#props.queryNode, this.#props.queryId);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute() {
-    const compiledQuery = this.compile();
-    const result = await this.#props.executor.executeQuery(compiledQuery, this.#props.queryId);
-    const { adapter } = this.#props.executor;
-    const query = compiledQuery.query;
-    if (query.returning && adapter.supportsReturning || query.output && adapter.supportsOutput) {
-      return result.rows;
-    }
-    return [
-      new InsertResult(result.insertId, result.numAffectedRows ?? result.numUpdatedOrDeletedRows)
-    ];
-  }
-  async executeTakeFirst() {
-    const [result] = await this.execute();
-    return result;
-  }
-  async executeTakeFirstOrThrow(errorConstructor = NoResultError) {
-    const result = await this.executeTakeFirst();
-    if (result === undefined) {
-      const error51 = isNoResultErrorConstructor(errorConstructor) ? new errorConstructor(this.toOperationNode()) : errorConstructor(this.toOperationNode());
-      throw error51;
-    }
-    return result;
-  }
-  async* stream(chunkSize = 100) {
-    const compiledQuery = this.compile();
-    const stream = this.#props.executor.stream(compiledQuery, chunkSize, this.#props.queryId);
-    for await (const item of stream) {
-      yield* item.rows;
-    }
-  }
-  async explain(format, options) {
-    const builder = new InsertQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithExplain(this.#props.queryNode, format, options)
-    });
-    return await builder.execute();
-  }
-}
-preventAwait(InsertQueryBuilder, "don't await InsertQueryBuilder instances directly. To execute the query you need to call `execute` or `executeTakeFirst`.");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/delete-result.js
-class DeleteResult {
-  numDeletedRows;
-  constructor(numDeletedRows) {
-    this.numDeletedRows = numDeletedRows;
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/limit-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/limit-node.js
 var LimitNode = freeze({
   is(node) {
     return node.kind === "LimitNode";
@@ -75501,499 +75348,7 @@ var LimitNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/delete-query-builder.js
-class DeleteQueryBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  where(...args) {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithWhere(this.#props.queryNode, parseValueBinaryOperationOrExpression(args))
-    });
-  }
-  whereRef(lhs, op, rhs) {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithWhere(this.#props.queryNode, parseReferentialBinaryOperation(lhs, op, rhs))
-    });
-  }
-  clearWhere() {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithoutWhere(this.#props.queryNode)
-    });
-  }
-  top(expression, modifiers) {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithTop(this.#props.queryNode, parseTop(expression, modifiers))
-    });
-  }
-  using(tables) {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: DeleteQueryNode.cloneWithUsing(this.#props.queryNode, parseTableExpressionOrList(tables))
-    });
-  }
-  innerJoin(...args) {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithJoin(this.#props.queryNode, parseJoin("InnerJoin", args))
-    });
-  }
-  leftJoin(...args) {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithJoin(this.#props.queryNode, parseJoin("LeftJoin", args))
-    });
-  }
-  rightJoin(...args) {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithJoin(this.#props.queryNode, parseJoin("RightJoin", args))
-    });
-  }
-  fullJoin(...args) {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithJoin(this.#props.queryNode, parseJoin("FullJoin", args))
-    });
-  }
-  returning(selection) {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithReturning(this.#props.queryNode, parseSelectArg(selection))
-    });
-  }
-  returningAll(table) {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithReturning(this.#props.queryNode, parseSelectAll(table))
-    });
-  }
-  output(args) {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithOutput(this.#props.queryNode, parseSelectArg(args))
-    });
-  }
-  outputAll(table) {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithOutput(this.#props.queryNode, parseSelectAll(table))
-    });
-  }
-  clearReturning() {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithoutReturning(this.#props.queryNode)
-    });
-  }
-  clearLimit() {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: DeleteQueryNode.cloneWithoutLimit(this.#props.queryNode)
-    });
-  }
-  clearOrderBy() {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: DeleteQueryNode.cloneWithoutOrderBy(this.#props.queryNode)
-    });
-  }
-  orderBy(orderBy, direction) {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: DeleteQueryNode.cloneWithOrderByItems(this.#props.queryNode, parseOrderBy([orderBy, direction]))
-    });
-  }
-  limit(limit) {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: DeleteQueryNode.cloneWithLimit(this.#props.queryNode, LimitNode.create(parseValueExpression(limit)))
-    });
-  }
-  modifyEnd(modifier) {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, modifier.toOperationNode())
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  $if(condition, func) {
-    if (condition) {
-      return func(this);
-    }
-    return new DeleteQueryBuilder({
-      ...this.#props
-    });
-  }
-  $castTo() {
-    return new DeleteQueryBuilder(this.#props);
-  }
-  $narrowType() {
-    return new DeleteQueryBuilder(this.#props);
-  }
-  $assertType() {
-    return new DeleteQueryBuilder(this.#props);
-  }
-  withPlugin(plugin) {
-    return new DeleteQueryBuilder({
-      ...this.#props,
-      executor: this.#props.executor.withPlugin(plugin)
-    });
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(this.#props.queryNode, this.#props.queryId);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute() {
-    const compiledQuery = this.compile();
-    const result = await this.#props.executor.executeQuery(compiledQuery, this.#props.queryId);
-    const { adapter } = this.#props.executor;
-    const query = compiledQuery.query;
-    if (query.returning && adapter.supportsReturning || query.output && adapter.supportsOutput) {
-      return result.rows;
-    }
-    return [
-      new DeleteResult(result.numAffectedRows ?? result.numUpdatedOrDeletedRows ?? BigInt(0))
-    ];
-  }
-  async executeTakeFirst() {
-    const [result] = await this.execute();
-    return result;
-  }
-  async executeTakeFirstOrThrow(errorConstructor = NoResultError) {
-    const result = await this.executeTakeFirst();
-    if (result === undefined) {
-      const error51 = isNoResultErrorConstructor(errorConstructor) ? new errorConstructor(this.toOperationNode()) : errorConstructor(this.toOperationNode());
-      throw error51;
-    }
-    return result;
-  }
-  async* stream(chunkSize = 100) {
-    const compiledQuery = this.compile();
-    const stream = this.#props.executor.stream(compiledQuery, chunkSize, this.#props.queryId);
-    for await (const item of stream) {
-      yield* item.rows;
-    }
-  }
-  async explain(format, options) {
-    const builder = new DeleteQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithExplain(this.#props.queryNode, format, options)
-    });
-    return await builder.execute();
-  }
-}
-preventAwait(DeleteQueryBuilder, "don't await DeleteQueryBuilder instances directly. To execute the query you need to call `execute` or `executeTakeFirst`.");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/update-result.js
-class UpdateResult {
-  numUpdatedRows;
-  numChangedRows;
-  constructor(numUpdatedRows, numChangedRows) {
-    this.numUpdatedRows = numUpdatedRows;
-    this.numChangedRows = numChangedRows;
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/update-query-builder.js
-class UpdateQueryBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  where(...args) {
-    return new UpdateQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithWhere(this.#props.queryNode, parseValueBinaryOperationOrExpression(args))
-    });
-  }
-  whereRef(lhs, op, rhs) {
-    return new UpdateQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithWhere(this.#props.queryNode, parseReferentialBinaryOperation(lhs, op, rhs))
-    });
-  }
-  clearWhere() {
-    return new UpdateQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithoutWhere(this.#props.queryNode)
-    });
-  }
-  top(expression, modifiers) {
-    return new UpdateQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithTop(this.#props.queryNode, parseTop(expression, modifiers))
-    });
-  }
-  from(from) {
-    return new UpdateQueryBuilder({
-      ...this.#props,
-      queryNode: UpdateQueryNode.cloneWithFromItems(this.#props.queryNode, parseTableExpressionOrList(from))
-    });
-  }
-  innerJoin(...args) {
-    return new UpdateQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithJoin(this.#props.queryNode, parseJoin("InnerJoin", args))
-    });
-  }
-  leftJoin(...args) {
-    return new UpdateQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithJoin(this.#props.queryNode, parseJoin("LeftJoin", args))
-    });
-  }
-  rightJoin(...args) {
-    return new UpdateQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithJoin(this.#props.queryNode, parseJoin("RightJoin", args))
-    });
-  }
-  fullJoin(...args) {
-    return new UpdateQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithJoin(this.#props.queryNode, parseJoin("FullJoin", args))
-    });
-  }
-  limit(limit) {
-    return new UpdateQueryBuilder({
-      ...this.#props,
-      queryNode: UpdateQueryNode.cloneWithLimit(this.#props.queryNode, LimitNode.create(parseValueExpression(limit)))
-    });
-  }
-  set(...args) {
-    return new UpdateQueryBuilder({
-      ...this.#props,
-      queryNode: UpdateQueryNode.cloneWithUpdates(this.#props.queryNode, parseUpdate(...args))
-    });
-  }
-  returning(selection) {
-    return new UpdateQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithReturning(this.#props.queryNode, parseSelectArg(selection))
-    });
-  }
-  returningAll(table) {
-    return new UpdateQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithReturning(this.#props.queryNode, parseSelectAll(table))
-    });
-  }
-  output(args) {
-    return new UpdateQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithOutput(this.#props.queryNode, parseSelectArg(args))
-    });
-  }
-  outputAll(table) {
-    return new UpdateQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithOutput(this.#props.queryNode, parseSelectAll(table))
-    });
-  }
-  modifyEnd(modifier) {
-    return new UpdateQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, modifier.toOperationNode())
-    });
-  }
-  clearReturning() {
-    return new UpdateQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithoutReturning(this.#props.queryNode)
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  $if(condition, func) {
-    if (condition) {
-      return func(this);
-    }
-    return new UpdateQueryBuilder({
-      ...this.#props
-    });
-  }
-  $castTo() {
-    return new UpdateQueryBuilder(this.#props);
-  }
-  $narrowType() {
-    return new UpdateQueryBuilder(this.#props);
-  }
-  $assertType() {
-    return new UpdateQueryBuilder(this.#props);
-  }
-  withPlugin(plugin) {
-    return new UpdateQueryBuilder({
-      ...this.#props,
-      executor: this.#props.executor.withPlugin(plugin)
-    });
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(this.#props.queryNode, this.#props.queryId);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute() {
-    const compiledQuery = this.compile();
-    const result = await this.#props.executor.executeQuery(compiledQuery, this.#props.queryId);
-    const { adapter } = this.#props.executor;
-    const query = compiledQuery.query;
-    if (query.returning && adapter.supportsReturning || query.output && adapter.supportsOutput) {
-      return result.rows;
-    }
-    return [
-      new UpdateResult(result.numAffectedRows ?? result.numUpdatedOrDeletedRows ?? BigInt(0), result.numChangedRows)
-    ];
-  }
-  async executeTakeFirst() {
-    const [result] = await this.execute();
-    return result;
-  }
-  async executeTakeFirstOrThrow(errorConstructor = NoResultError) {
-    const result = await this.executeTakeFirst();
-    if (result === undefined) {
-      const error51 = isNoResultErrorConstructor(errorConstructor) ? new errorConstructor(this.toOperationNode()) : errorConstructor(this.toOperationNode());
-      throw error51;
-    }
-    return result;
-  }
-  async* stream(chunkSize = 100) {
-    const compiledQuery = this.compile();
-    const stream = this.#props.executor.stream(compiledQuery, chunkSize, this.#props.queryId);
-    for await (const item of stream) {
-      yield* item.rows;
-    }
-  }
-  async explain(format, options) {
-    const builder = new UpdateQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithExplain(this.#props.queryNode, format, options)
-    });
-    return await builder.execute();
-  }
-}
-preventAwait(UpdateQueryBuilder, "don't await UpdateQueryBuilder instances directly. To execute the query you need to call `execute` or `executeTakeFirst`.");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/common-table-expression-name-node.js
-var CommonTableExpressionNameNode = freeze({
-  is(node) {
-    return node.kind === "CommonTableExpressionNameNode";
-  },
-  create(tableName, columnNames) {
-    return freeze({
-      kind: "CommonTableExpressionNameNode",
-      table: TableNode.create(tableName),
-      columns: columnNames ? freeze(columnNames.map(ColumnNode.create)) : undefined
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/common-table-expression-node.js
-var CommonTableExpressionNode = freeze({
-  is(node) {
-    return node.kind === "CommonTableExpressionNode";
-  },
-  create(name, expression) {
-    return freeze({
-      kind: "CommonTableExpressionNode",
-      name,
-      expression
-    });
-  },
-  cloneWith(node, props) {
-    return freeze({
-      ...node,
-      ...props
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/cte-builder.js
-class CTEBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  materialized() {
-    return new CTEBuilder({
-      ...this.#props,
-      node: CommonTableExpressionNode.cloneWith(this.#props.node, {
-        materialized: true
-      })
-    });
-  }
-  notMaterialized() {
-    return new CTEBuilder({
-      ...this.#props,
-      node: CommonTableExpressionNode.cloneWith(this.#props.node, {
-        materialized: false
-      })
-    });
-  }
-  toOperationNode() {
-    return this.#props.node;
-  }
-}
-preventAwait(CTEBuilder, "don't await CTEBuilder instances. They are never executed directly and are always just a part of a query.");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/with-parser.js
-function parseCommonTableExpression(nameOrBuilderCallback, expression) {
-  const expressionNode = expression(createQueryCreator()).toOperationNode();
-  if (isFunction(nameOrBuilderCallback)) {
-    return nameOrBuilderCallback(cteBuilderFactory(expressionNode)).toOperationNode();
-  }
-  return CommonTableExpressionNode.create(parseCommonTableExpressionName(nameOrBuilderCallback), expressionNode);
-}
-function cteBuilderFactory(expressionNode) {
-  return (name) => {
-    return new CTEBuilder({
-      node: CommonTableExpressionNode.create(parseCommonTableExpressionName(name), expressionNode)
-    });
-  };
-}
-function parseCommonTableExpressionName(name) {
-  if (name.includes("(")) {
-    const parts = name.split(/[\(\)]/);
-    const table = parts[0];
-    const columns = parts[1].split(",").map((it) => it.trim());
-    return CommonTableExpressionNameNode.create(table, columns);
-  } else {
-    return CommonTableExpressionNameNode.create(name);
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/with-node.js
-var WithNode = freeze({
-  is(node) {
-    return node.kind === "WithNode";
-  },
-  create(expression, params) {
-    return freeze({
-      kind: "WithNode",
-      expressions: freeze([expression]),
-      ...params
-    });
-  },
-  cloneWithExpression(withNode, expression) {
-    return freeze({
-      ...withNode,
-      expressions: freeze([...withNode.expressions, expression])
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/random-string.js
+// ../zveltio-extensions/node_modules/kysely/dist/util/random-string.js
 var CHARS = [
   "A",
   "B",
@@ -76069,7 +75424,7 @@ function randomChar() {
   return CHARS[~~(Math.random() * CHARS.length)];
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/query-id.js
+// ../zveltio-extensions/node_modules/kysely/dist/util/query-id.js
 function createQueryId() {
   return new LazyQueryId;
 }
@@ -76084,1052 +75439,7 @@ class LazyQueryId {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/require-all-props.js
-function requireAllProps(obj) {
-  return obj;
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/operation-node-transformer.js
-class OperationNodeTransformer {
-  nodeStack = [];
-  #transformers = freeze({
-    AliasNode: this.transformAlias.bind(this),
-    ColumnNode: this.transformColumn.bind(this),
-    IdentifierNode: this.transformIdentifier.bind(this),
-    SchemableIdentifierNode: this.transformSchemableIdentifier.bind(this),
-    RawNode: this.transformRaw.bind(this),
-    ReferenceNode: this.transformReference.bind(this),
-    SelectQueryNode: this.transformSelectQuery.bind(this),
-    SelectionNode: this.transformSelection.bind(this),
-    TableNode: this.transformTable.bind(this),
-    FromNode: this.transformFrom.bind(this),
-    SelectAllNode: this.transformSelectAll.bind(this),
-    AndNode: this.transformAnd.bind(this),
-    OrNode: this.transformOr.bind(this),
-    ValueNode: this.transformValue.bind(this),
-    ValueListNode: this.transformValueList.bind(this),
-    PrimitiveValueListNode: this.transformPrimitiveValueList.bind(this),
-    ParensNode: this.transformParens.bind(this),
-    JoinNode: this.transformJoin.bind(this),
-    OperatorNode: this.transformOperator.bind(this),
-    WhereNode: this.transformWhere.bind(this),
-    InsertQueryNode: this.transformInsertQuery.bind(this),
-    DeleteQueryNode: this.transformDeleteQuery.bind(this),
-    ReturningNode: this.transformReturning.bind(this),
-    CreateTableNode: this.transformCreateTable.bind(this),
-    AddColumnNode: this.transformAddColumn.bind(this),
-    ColumnDefinitionNode: this.transformColumnDefinition.bind(this),
-    DropTableNode: this.transformDropTable.bind(this),
-    DataTypeNode: this.transformDataType.bind(this),
-    OrderByNode: this.transformOrderBy.bind(this),
-    OrderByItemNode: this.transformOrderByItem.bind(this),
-    GroupByNode: this.transformGroupBy.bind(this),
-    GroupByItemNode: this.transformGroupByItem.bind(this),
-    UpdateQueryNode: this.transformUpdateQuery.bind(this),
-    ColumnUpdateNode: this.transformColumnUpdate.bind(this),
-    LimitNode: this.transformLimit.bind(this),
-    OffsetNode: this.transformOffset.bind(this),
-    OnConflictNode: this.transformOnConflict.bind(this),
-    OnDuplicateKeyNode: this.transformOnDuplicateKey.bind(this),
-    CreateIndexNode: this.transformCreateIndex.bind(this),
-    DropIndexNode: this.transformDropIndex.bind(this),
-    ListNode: this.transformList.bind(this),
-    PrimaryKeyConstraintNode: this.transformPrimaryKeyConstraint.bind(this),
-    UniqueConstraintNode: this.transformUniqueConstraint.bind(this),
-    ReferencesNode: this.transformReferences.bind(this),
-    CheckConstraintNode: this.transformCheckConstraint.bind(this),
-    WithNode: this.transformWith.bind(this),
-    CommonTableExpressionNode: this.transformCommonTableExpression.bind(this),
-    CommonTableExpressionNameNode: this.transformCommonTableExpressionName.bind(this),
-    HavingNode: this.transformHaving.bind(this),
-    CreateSchemaNode: this.transformCreateSchema.bind(this),
-    DropSchemaNode: this.transformDropSchema.bind(this),
-    AlterTableNode: this.transformAlterTable.bind(this),
-    DropColumnNode: this.transformDropColumn.bind(this),
-    RenameColumnNode: this.transformRenameColumn.bind(this),
-    AlterColumnNode: this.transformAlterColumn.bind(this),
-    ModifyColumnNode: this.transformModifyColumn.bind(this),
-    AddConstraintNode: this.transformAddConstraint.bind(this),
-    DropConstraintNode: this.transformDropConstraint.bind(this),
-    ForeignKeyConstraintNode: this.transformForeignKeyConstraint.bind(this),
-    CreateViewNode: this.transformCreateView.bind(this),
-    DropViewNode: this.transformDropView.bind(this),
-    GeneratedNode: this.transformGenerated.bind(this),
-    DefaultValueNode: this.transformDefaultValue.bind(this),
-    OnNode: this.transformOn.bind(this),
-    ValuesNode: this.transformValues.bind(this),
-    SelectModifierNode: this.transformSelectModifier.bind(this),
-    CreateTypeNode: this.transformCreateType.bind(this),
-    DropTypeNode: this.transformDropType.bind(this),
-    ExplainNode: this.transformExplain.bind(this),
-    DefaultInsertValueNode: this.transformDefaultInsertValue.bind(this),
-    AggregateFunctionNode: this.transformAggregateFunction.bind(this),
-    OverNode: this.transformOver.bind(this),
-    PartitionByNode: this.transformPartitionBy.bind(this),
-    PartitionByItemNode: this.transformPartitionByItem.bind(this),
-    SetOperationNode: this.transformSetOperation.bind(this),
-    BinaryOperationNode: this.transformBinaryOperation.bind(this),
-    UnaryOperationNode: this.transformUnaryOperation.bind(this),
-    UsingNode: this.transformUsing.bind(this),
-    FunctionNode: this.transformFunction.bind(this),
-    CaseNode: this.transformCase.bind(this),
-    WhenNode: this.transformWhen.bind(this),
-    JSONReferenceNode: this.transformJSONReference.bind(this),
-    JSONPathNode: this.transformJSONPath.bind(this),
-    JSONPathLegNode: this.transformJSONPathLeg.bind(this),
-    JSONOperatorChainNode: this.transformJSONOperatorChain.bind(this),
-    TupleNode: this.transformTuple.bind(this),
-    MergeQueryNode: this.transformMergeQuery.bind(this),
-    MatchedNode: this.transformMatched.bind(this),
-    AddIndexNode: this.transformAddIndex.bind(this),
-    CastNode: this.transformCast.bind(this),
-    FetchNode: this.transformFetch.bind(this),
-    TopNode: this.transformTop.bind(this),
-    OutputNode: this.transformOutput.bind(this)
-  });
-  transformNode(node) {
-    if (!node) {
-      return node;
-    }
-    this.nodeStack.push(node);
-    const out = this.transformNodeImpl(node);
-    this.nodeStack.pop();
-    return freeze(out);
-  }
-  transformNodeImpl(node) {
-    return this.#transformers[node.kind](node);
-  }
-  transformNodeList(list) {
-    if (!list) {
-      return list;
-    }
-    return freeze(list.map((node) => this.transformNode(node)));
-  }
-  transformSelectQuery(node) {
-    return requireAllProps({
-      kind: "SelectQueryNode",
-      from: this.transformNode(node.from),
-      selections: this.transformNodeList(node.selections),
-      distinctOn: this.transformNodeList(node.distinctOn),
-      joins: this.transformNodeList(node.joins),
-      groupBy: this.transformNode(node.groupBy),
-      orderBy: this.transformNode(node.orderBy),
-      where: this.transformNode(node.where),
-      frontModifiers: this.transformNodeList(node.frontModifiers),
-      endModifiers: this.transformNodeList(node.endModifiers),
-      limit: this.transformNode(node.limit),
-      offset: this.transformNode(node.offset),
-      with: this.transformNode(node.with),
-      having: this.transformNode(node.having),
-      explain: this.transformNode(node.explain),
-      setOperations: this.transformNodeList(node.setOperations),
-      fetch: this.transformNode(node.fetch),
-      top: this.transformNode(node.top)
-    });
-  }
-  transformSelection(node) {
-    return requireAllProps({
-      kind: "SelectionNode",
-      selection: this.transformNode(node.selection)
-    });
-  }
-  transformColumn(node) {
-    return requireAllProps({
-      kind: "ColumnNode",
-      column: this.transformNode(node.column)
-    });
-  }
-  transformAlias(node) {
-    return requireAllProps({
-      kind: "AliasNode",
-      node: this.transformNode(node.node),
-      alias: this.transformNode(node.alias)
-    });
-  }
-  transformTable(node) {
-    return requireAllProps({
-      kind: "TableNode",
-      table: this.transformNode(node.table)
-    });
-  }
-  transformFrom(node) {
-    return requireAllProps({
-      kind: "FromNode",
-      froms: this.transformNodeList(node.froms)
-    });
-  }
-  transformReference(node) {
-    return requireAllProps({
-      kind: "ReferenceNode",
-      column: this.transformNode(node.column),
-      table: this.transformNode(node.table)
-    });
-  }
-  transformAnd(node) {
-    return requireAllProps({
-      kind: "AndNode",
-      left: this.transformNode(node.left),
-      right: this.transformNode(node.right)
-    });
-  }
-  transformOr(node) {
-    return requireAllProps({
-      kind: "OrNode",
-      left: this.transformNode(node.left),
-      right: this.transformNode(node.right)
-    });
-  }
-  transformValueList(node) {
-    return requireAllProps({
-      kind: "ValueListNode",
-      values: this.transformNodeList(node.values)
-    });
-  }
-  transformParens(node) {
-    return requireAllProps({
-      kind: "ParensNode",
-      node: this.transformNode(node.node)
-    });
-  }
-  transformJoin(node) {
-    return requireAllProps({
-      kind: "JoinNode",
-      joinType: node.joinType,
-      table: this.transformNode(node.table),
-      on: this.transformNode(node.on)
-    });
-  }
-  transformRaw(node) {
-    return requireAllProps({
-      kind: "RawNode",
-      sqlFragments: freeze([...node.sqlFragments]),
-      parameters: this.transformNodeList(node.parameters)
-    });
-  }
-  transformWhere(node) {
-    return requireAllProps({
-      kind: "WhereNode",
-      where: this.transformNode(node.where)
-    });
-  }
-  transformInsertQuery(node) {
-    return requireAllProps({
-      kind: "InsertQueryNode",
-      into: this.transformNode(node.into),
-      columns: this.transformNodeList(node.columns),
-      values: this.transformNode(node.values),
-      returning: this.transformNode(node.returning),
-      onConflict: this.transformNode(node.onConflict),
-      onDuplicateKey: this.transformNode(node.onDuplicateKey),
-      endModifiers: this.transformNodeList(node.endModifiers),
-      with: this.transformNode(node.with),
-      ignore: node.ignore,
-      replace: node.replace,
-      explain: this.transformNode(node.explain),
-      defaultValues: node.defaultValues,
-      top: this.transformNode(node.top),
-      output: this.transformNode(node.output)
-    });
-  }
-  transformValues(node) {
-    return requireAllProps({
-      kind: "ValuesNode",
-      values: this.transformNodeList(node.values)
-    });
-  }
-  transformDeleteQuery(node) {
-    return requireAllProps({
-      kind: "DeleteQueryNode",
-      from: this.transformNode(node.from),
-      using: this.transformNode(node.using),
-      joins: this.transformNodeList(node.joins),
-      where: this.transformNode(node.where),
-      returning: this.transformNode(node.returning),
-      endModifiers: this.transformNodeList(node.endModifiers),
-      with: this.transformNode(node.with),
-      orderBy: this.transformNode(node.orderBy),
-      limit: this.transformNode(node.limit),
-      explain: this.transformNode(node.explain),
-      top: this.transformNode(node.top),
-      output: this.transformNode(node.output)
-    });
-  }
-  transformReturning(node) {
-    return requireAllProps({
-      kind: "ReturningNode",
-      selections: this.transformNodeList(node.selections)
-    });
-  }
-  transformCreateTable(node) {
-    return requireAllProps({
-      kind: "CreateTableNode",
-      table: this.transformNode(node.table),
-      columns: this.transformNodeList(node.columns),
-      constraints: this.transformNodeList(node.constraints),
-      temporary: node.temporary,
-      ifNotExists: node.ifNotExists,
-      onCommit: node.onCommit,
-      frontModifiers: this.transformNodeList(node.frontModifiers),
-      endModifiers: this.transformNodeList(node.endModifiers),
-      selectQuery: this.transformNode(node.selectQuery)
-    });
-  }
-  transformColumnDefinition(node) {
-    return requireAllProps({
-      kind: "ColumnDefinitionNode",
-      column: this.transformNode(node.column),
-      dataType: this.transformNode(node.dataType),
-      references: this.transformNode(node.references),
-      primaryKey: node.primaryKey,
-      autoIncrement: node.autoIncrement,
-      unique: node.unique,
-      notNull: node.notNull,
-      unsigned: node.unsigned,
-      defaultTo: this.transformNode(node.defaultTo),
-      check: this.transformNode(node.check),
-      generated: this.transformNode(node.generated),
-      frontModifiers: this.transformNodeList(node.frontModifiers),
-      endModifiers: this.transformNodeList(node.endModifiers),
-      nullsNotDistinct: node.nullsNotDistinct,
-      identity: node.identity,
-      ifNotExists: node.ifNotExists
-    });
-  }
-  transformAddColumn(node) {
-    return requireAllProps({
-      kind: "AddColumnNode",
-      column: this.transformNode(node.column)
-    });
-  }
-  transformDropTable(node) {
-    return requireAllProps({
-      kind: "DropTableNode",
-      table: this.transformNode(node.table),
-      ifExists: node.ifExists,
-      cascade: node.cascade
-    });
-  }
-  transformOrderBy(node) {
-    return requireAllProps({
-      kind: "OrderByNode",
-      items: this.transformNodeList(node.items)
-    });
-  }
-  transformOrderByItem(node) {
-    return requireAllProps({
-      kind: "OrderByItemNode",
-      orderBy: this.transformNode(node.orderBy),
-      direction: this.transformNode(node.direction)
-    });
-  }
-  transformGroupBy(node) {
-    return requireAllProps({
-      kind: "GroupByNode",
-      items: this.transformNodeList(node.items)
-    });
-  }
-  transformGroupByItem(node) {
-    return requireAllProps({
-      kind: "GroupByItemNode",
-      groupBy: this.transformNode(node.groupBy)
-    });
-  }
-  transformUpdateQuery(node) {
-    return requireAllProps({
-      kind: "UpdateQueryNode",
-      table: this.transformNode(node.table),
-      from: this.transformNode(node.from),
-      joins: this.transformNodeList(node.joins),
-      where: this.transformNode(node.where),
-      updates: this.transformNodeList(node.updates),
-      returning: this.transformNode(node.returning),
-      endModifiers: this.transformNodeList(node.endModifiers),
-      with: this.transformNode(node.with),
-      explain: this.transformNode(node.explain),
-      limit: this.transformNode(node.limit),
-      top: this.transformNode(node.top),
-      output: this.transformNode(node.output)
-    });
-  }
-  transformColumnUpdate(node) {
-    return requireAllProps({
-      kind: "ColumnUpdateNode",
-      column: this.transformNode(node.column),
-      value: this.transformNode(node.value)
-    });
-  }
-  transformLimit(node) {
-    return requireAllProps({
-      kind: "LimitNode",
-      limit: this.transformNode(node.limit)
-    });
-  }
-  transformOffset(node) {
-    return requireAllProps({
-      kind: "OffsetNode",
-      offset: this.transformNode(node.offset)
-    });
-  }
-  transformOnConflict(node) {
-    return requireAllProps({
-      kind: "OnConflictNode",
-      columns: this.transformNodeList(node.columns),
-      constraint: this.transformNode(node.constraint),
-      indexExpression: this.transformNode(node.indexExpression),
-      indexWhere: this.transformNode(node.indexWhere),
-      updates: this.transformNodeList(node.updates),
-      updateWhere: this.transformNode(node.updateWhere),
-      doNothing: node.doNothing
-    });
-  }
-  transformOnDuplicateKey(node) {
-    return requireAllProps({
-      kind: "OnDuplicateKeyNode",
-      updates: this.transformNodeList(node.updates)
-    });
-  }
-  transformCreateIndex(node) {
-    return requireAllProps({
-      kind: "CreateIndexNode",
-      name: this.transformNode(node.name),
-      table: this.transformNode(node.table),
-      columns: this.transformNodeList(node.columns),
-      unique: node.unique,
-      using: this.transformNode(node.using),
-      ifNotExists: node.ifNotExists,
-      where: this.transformNode(node.where),
-      nullsNotDistinct: node.nullsNotDistinct
-    });
-  }
-  transformList(node) {
-    return requireAllProps({
-      kind: "ListNode",
-      items: this.transformNodeList(node.items)
-    });
-  }
-  transformDropIndex(node) {
-    return requireAllProps({
-      kind: "DropIndexNode",
-      name: this.transformNode(node.name),
-      table: this.transformNode(node.table),
-      ifExists: node.ifExists,
-      cascade: node.cascade
-    });
-  }
-  transformPrimaryKeyConstraint(node) {
-    return requireAllProps({
-      kind: "PrimaryKeyConstraintNode",
-      columns: this.transformNodeList(node.columns),
-      name: this.transformNode(node.name)
-    });
-  }
-  transformUniqueConstraint(node) {
-    return requireAllProps({
-      kind: "UniqueConstraintNode",
-      columns: this.transformNodeList(node.columns),
-      name: this.transformNode(node.name),
-      nullsNotDistinct: node.nullsNotDistinct
-    });
-  }
-  transformForeignKeyConstraint(node) {
-    return requireAllProps({
-      kind: "ForeignKeyConstraintNode",
-      columns: this.transformNodeList(node.columns),
-      references: this.transformNode(node.references),
-      name: this.transformNode(node.name),
-      onDelete: node.onDelete,
-      onUpdate: node.onUpdate
-    });
-  }
-  transformSetOperation(node) {
-    return requireAllProps({
-      kind: "SetOperationNode",
-      operator: node.operator,
-      expression: this.transformNode(node.expression),
-      all: node.all
-    });
-  }
-  transformReferences(node) {
-    return requireAllProps({
-      kind: "ReferencesNode",
-      table: this.transformNode(node.table),
-      columns: this.transformNodeList(node.columns),
-      onDelete: node.onDelete,
-      onUpdate: node.onUpdate
-    });
-  }
-  transformCheckConstraint(node) {
-    return requireAllProps({
-      kind: "CheckConstraintNode",
-      expression: this.transformNode(node.expression),
-      name: this.transformNode(node.name)
-    });
-  }
-  transformWith(node) {
-    return requireAllProps({
-      kind: "WithNode",
-      expressions: this.transformNodeList(node.expressions),
-      recursive: node.recursive
-    });
-  }
-  transformCommonTableExpression(node) {
-    return requireAllProps({
-      kind: "CommonTableExpressionNode",
-      name: this.transformNode(node.name),
-      materialized: node.materialized,
-      expression: this.transformNode(node.expression)
-    });
-  }
-  transformCommonTableExpressionName(node) {
-    return requireAllProps({
-      kind: "CommonTableExpressionNameNode",
-      table: this.transformNode(node.table),
-      columns: this.transformNodeList(node.columns)
-    });
-  }
-  transformHaving(node) {
-    return requireAllProps({
-      kind: "HavingNode",
-      having: this.transformNode(node.having)
-    });
-  }
-  transformCreateSchema(node) {
-    return requireAllProps({
-      kind: "CreateSchemaNode",
-      schema: this.transformNode(node.schema),
-      ifNotExists: node.ifNotExists
-    });
-  }
-  transformDropSchema(node) {
-    return requireAllProps({
-      kind: "DropSchemaNode",
-      schema: this.transformNode(node.schema),
-      ifExists: node.ifExists,
-      cascade: node.cascade
-    });
-  }
-  transformAlterTable(node) {
-    return requireAllProps({
-      kind: "AlterTableNode",
-      table: this.transformNode(node.table),
-      renameTo: this.transformNode(node.renameTo),
-      setSchema: this.transformNode(node.setSchema),
-      columnAlterations: this.transformNodeList(node.columnAlterations),
-      addConstraint: this.transformNode(node.addConstraint),
-      dropConstraint: this.transformNode(node.dropConstraint),
-      addIndex: this.transformNode(node.addIndex),
-      dropIndex: this.transformNode(node.dropIndex)
-    });
-  }
-  transformDropColumn(node) {
-    return requireAllProps({
-      kind: "DropColumnNode",
-      column: this.transformNode(node.column)
-    });
-  }
-  transformRenameColumn(node) {
-    return requireAllProps({
-      kind: "RenameColumnNode",
-      column: this.transformNode(node.column),
-      renameTo: this.transformNode(node.renameTo)
-    });
-  }
-  transformAlterColumn(node) {
-    return requireAllProps({
-      kind: "AlterColumnNode",
-      column: this.transformNode(node.column),
-      dataType: this.transformNode(node.dataType),
-      dataTypeExpression: this.transformNode(node.dataTypeExpression),
-      setDefault: this.transformNode(node.setDefault),
-      dropDefault: node.dropDefault,
-      setNotNull: node.setNotNull,
-      dropNotNull: node.dropNotNull
-    });
-  }
-  transformModifyColumn(node) {
-    return requireAllProps({
-      kind: "ModifyColumnNode",
-      column: this.transformNode(node.column)
-    });
-  }
-  transformAddConstraint(node) {
-    return requireAllProps({
-      kind: "AddConstraintNode",
-      constraint: this.transformNode(node.constraint)
-    });
-  }
-  transformDropConstraint(node) {
-    return requireAllProps({
-      kind: "DropConstraintNode",
-      constraintName: this.transformNode(node.constraintName),
-      ifExists: node.ifExists,
-      modifier: node.modifier
-    });
-  }
-  transformCreateView(node) {
-    return requireAllProps({
-      kind: "CreateViewNode",
-      name: this.transformNode(node.name),
-      temporary: node.temporary,
-      orReplace: node.orReplace,
-      ifNotExists: node.ifNotExists,
-      materialized: node.materialized,
-      columns: this.transformNodeList(node.columns),
-      as: this.transformNode(node.as)
-    });
-  }
-  transformDropView(node) {
-    return requireAllProps({
-      kind: "DropViewNode",
-      name: this.transformNode(node.name),
-      ifExists: node.ifExists,
-      materialized: node.materialized,
-      cascade: node.cascade
-    });
-  }
-  transformGenerated(node) {
-    return requireAllProps({
-      kind: "GeneratedNode",
-      byDefault: node.byDefault,
-      always: node.always,
-      identity: node.identity,
-      stored: node.stored,
-      expression: this.transformNode(node.expression)
-    });
-  }
-  transformDefaultValue(node) {
-    return requireAllProps({
-      kind: "DefaultValueNode",
-      defaultValue: this.transformNode(node.defaultValue)
-    });
-  }
-  transformOn(node) {
-    return requireAllProps({
-      kind: "OnNode",
-      on: this.transformNode(node.on)
-    });
-  }
-  transformSelectModifier(node) {
-    return requireAllProps({
-      kind: "SelectModifierNode",
-      modifier: node.modifier,
-      rawModifier: this.transformNode(node.rawModifier),
-      of: this.transformNodeList(node.of)
-    });
-  }
-  transformCreateType(node) {
-    return requireAllProps({
-      kind: "CreateTypeNode",
-      name: this.transformNode(node.name),
-      enum: this.transformNode(node.enum)
-    });
-  }
-  transformDropType(node) {
-    return requireAllProps({
-      kind: "DropTypeNode",
-      name: this.transformNode(node.name),
-      ifExists: node.ifExists
-    });
-  }
-  transformExplain(node) {
-    return requireAllProps({
-      kind: "ExplainNode",
-      format: node.format,
-      options: this.transformNode(node.options)
-    });
-  }
-  transformSchemableIdentifier(node) {
-    return requireAllProps({
-      kind: "SchemableIdentifierNode",
-      schema: this.transformNode(node.schema),
-      identifier: this.transformNode(node.identifier)
-    });
-  }
-  transformAggregateFunction(node) {
-    return requireAllProps({
-      kind: "AggregateFunctionNode",
-      aggregated: this.transformNodeList(node.aggregated),
-      distinct: node.distinct,
-      orderBy: this.transformNode(node.orderBy),
-      filter: this.transformNode(node.filter),
-      func: node.func,
-      over: this.transformNode(node.over)
-    });
-  }
-  transformOver(node) {
-    return requireAllProps({
-      kind: "OverNode",
-      orderBy: this.transformNode(node.orderBy),
-      partitionBy: this.transformNode(node.partitionBy)
-    });
-  }
-  transformPartitionBy(node) {
-    return requireAllProps({
-      kind: "PartitionByNode",
-      items: this.transformNodeList(node.items)
-    });
-  }
-  transformPartitionByItem(node) {
-    return requireAllProps({
-      kind: "PartitionByItemNode",
-      partitionBy: this.transformNode(node.partitionBy)
-    });
-  }
-  transformBinaryOperation(node) {
-    return requireAllProps({
-      kind: "BinaryOperationNode",
-      leftOperand: this.transformNode(node.leftOperand),
-      operator: this.transformNode(node.operator),
-      rightOperand: this.transformNode(node.rightOperand)
-    });
-  }
-  transformUnaryOperation(node) {
-    return requireAllProps({
-      kind: "UnaryOperationNode",
-      operator: this.transformNode(node.operator),
-      operand: this.transformNode(node.operand)
-    });
-  }
-  transformUsing(node) {
-    return requireAllProps({
-      kind: "UsingNode",
-      tables: this.transformNodeList(node.tables)
-    });
-  }
-  transformFunction(node) {
-    return requireAllProps({
-      kind: "FunctionNode",
-      func: node.func,
-      arguments: this.transformNodeList(node.arguments)
-    });
-  }
-  transformCase(node) {
-    return requireAllProps({
-      kind: "CaseNode",
-      value: this.transformNode(node.value),
-      when: this.transformNodeList(node.when),
-      else: this.transformNode(node.else),
-      isStatement: node.isStatement
-    });
-  }
-  transformWhen(node) {
-    return requireAllProps({
-      kind: "WhenNode",
-      condition: this.transformNode(node.condition),
-      result: this.transformNode(node.result)
-    });
-  }
-  transformJSONReference(node) {
-    return requireAllProps({
-      kind: "JSONReferenceNode",
-      reference: this.transformNode(node.reference),
-      traversal: this.transformNode(node.traversal)
-    });
-  }
-  transformJSONPath(node) {
-    return requireAllProps({
-      kind: "JSONPathNode",
-      inOperator: this.transformNode(node.inOperator),
-      pathLegs: this.transformNodeList(node.pathLegs)
-    });
-  }
-  transformJSONPathLeg(node) {
-    return requireAllProps({
-      kind: "JSONPathLegNode",
-      type: node.type,
-      value: node.value
-    });
-  }
-  transformJSONOperatorChain(node) {
-    return requireAllProps({
-      kind: "JSONOperatorChainNode",
-      operator: this.transformNode(node.operator),
-      values: this.transformNodeList(node.values)
-    });
-  }
-  transformTuple(node) {
-    return requireAllProps({
-      kind: "TupleNode",
-      values: this.transformNodeList(node.values)
-    });
-  }
-  transformMergeQuery(node) {
-    return requireAllProps({
-      kind: "MergeQueryNode",
-      into: this.transformNode(node.into),
-      using: this.transformNode(node.using),
-      whens: this.transformNodeList(node.whens),
-      with: this.transformNode(node.with),
-      top: this.transformNode(node.top),
-      endModifiers: this.transformNodeList(node.endModifiers),
-      output: this.transformNode(node.output)
-    });
-  }
-  transformMatched(node) {
-    return requireAllProps({
-      kind: "MatchedNode",
-      not: node.not,
-      bySource: node.bySource
-    });
-  }
-  transformAddIndex(node) {
-    return requireAllProps({
-      kind: "AddIndexNode",
-      name: this.transformNode(node.name),
-      columns: this.transformNodeList(node.columns),
-      unique: node.unique,
-      using: this.transformNode(node.using),
-      ifNotExists: node.ifNotExists
-    });
-  }
-  transformCast(node) {
-    return requireAllProps({
-      kind: "CastNode",
-      expression: this.transformNode(node.expression),
-      dataType: this.transformNode(node.dataType)
-    });
-  }
-  transformFetch(node) {
-    return requireAllProps({
-      kind: "FetchNode",
-      rowCount: this.transformNode(node.rowCount),
-      modifier: node.modifier
-    });
-  }
-  transformTop(node) {
-    return requireAllProps({
-      kind: "TopNode",
-      expression: node.expression,
-      modifiers: node.modifiers
-    });
-  }
-  transformOutput(node) {
-    return requireAllProps({
-      kind: "OutputNode",
-      selections: this.transformNodeList(node.selections)
-    });
-  }
-  transformDataType(node) {
-    return node;
-  }
-  transformSelectAll(node) {
-    return node;
-  }
-  transformIdentifier(node) {
-    return node;
-  }
-  transformValue(node) {
-    return node;
-  }
-  transformPrimitiveValueList(node) {
-    return node;
-  }
-  transformOperator(node) {
-    return node;
-  }
-  transformDefaultInsertValue(node) {
-    return node;
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/with-schema/with-schema-transformer.js
-var ROOT_OPERATION_NODES = freeze({
-  AlterTableNode: true,
-  CreateIndexNode: true,
-  CreateSchemaNode: true,
-  CreateTableNode: true,
-  CreateTypeNode: true,
-  CreateViewNode: true,
-  DeleteQueryNode: true,
-  DropIndexNode: true,
-  DropSchemaNode: true,
-  DropTableNode: true,
-  DropTypeNode: true,
-  DropViewNode: true,
-  InsertQueryNode: true,
-  RawNode: true,
-  SelectQueryNode: true,
-  UpdateQueryNode: true,
-  MergeQueryNode: true
-});
-var SCHEMALESS_FUNCTIONS = {
-  json_agg: true,
-  to_json: true
-};
-
-class WithSchemaTransformer extends OperationNodeTransformer {
-  #schema;
-  #schemableIds = new Set;
-  #ctes = new Set;
-  constructor(schema) {
-    super();
-    this.#schema = schema;
-  }
-  transformNodeImpl(node) {
-    if (!this.#isRootOperationNode(node)) {
-      return super.transformNodeImpl(node);
-    }
-    const ctes = this.#collectCTEs(node);
-    for (const cte of ctes) {
-      this.#ctes.add(cte);
-    }
-    const tables = this.#collectSchemableIds(node);
-    for (const table of tables) {
-      this.#schemableIds.add(table);
-    }
-    const transformed = super.transformNodeImpl(node);
-    for (const table of tables) {
-      this.#schemableIds.delete(table);
-    }
-    for (const cte of ctes) {
-      this.#ctes.delete(cte);
-    }
-    return transformed;
-  }
-  transformSchemableIdentifier(node) {
-    const transformed = super.transformSchemableIdentifier(node);
-    if (transformed.schema || !this.#schemableIds.has(node.identifier.name)) {
-      return transformed;
-    }
-    return {
-      ...transformed,
-      schema: IdentifierNode.create(this.#schema)
-    };
-  }
-  transformReferences(node) {
-    const transformed = super.transformReferences(node);
-    if (transformed.table.table.schema) {
-      return transformed;
-    }
-    return {
-      ...transformed,
-      table: TableNode.createWithSchema(this.#schema, transformed.table.table.identifier.name)
-    };
-  }
-  transformAggregateFunction(node) {
-    return {
-      ...super.transformAggregateFunction({ ...node, aggregated: [] }),
-      aggregated: this.#transformTableArgsWithoutSchemas(node, "aggregated")
-    };
-  }
-  transformFunction(node) {
-    return {
-      ...super.transformFunction({ ...node, arguments: [] }),
-      arguments: this.#transformTableArgsWithoutSchemas(node, "arguments")
-    };
-  }
-  #transformTableArgsWithoutSchemas(node, argsKey) {
-    return SCHEMALESS_FUNCTIONS[node.func] ? node[argsKey].map((arg) => !TableNode.is(arg) || arg.table.schema ? this.transformNode(arg) : {
-      ...arg,
-      table: this.transformIdentifier(arg.table.identifier)
-    }) : this.transformNodeList(node[argsKey]);
-  }
-  #isRootOperationNode(node) {
-    return node.kind in ROOT_OPERATION_NODES;
-  }
-  #collectSchemableIds(node) {
-    const schemableIds = new Set;
-    if ("name" in node && node.name && SchemableIdentifierNode.is(node.name)) {
-      this.#collectSchemableId(node.name, schemableIds);
-    }
-    if ("from" in node && node.from) {
-      for (const from of node.from.froms) {
-        this.#collectSchemableIdsFromTableExpr(from, schemableIds);
-      }
-    }
-    if ("into" in node && node.into) {
-      this.#collectSchemableIdsFromTableExpr(node.into, schemableIds);
-    }
-    if ("table" in node && node.table) {
-      this.#collectSchemableIdsFromTableExpr(node.table, schemableIds);
-    }
-    if ("joins" in node && node.joins) {
-      for (const join of node.joins) {
-        this.#collectSchemableIdsFromTableExpr(join.table, schemableIds);
-      }
-    }
-    if ("using" in node && node.using) {
-      this.#collectSchemableIdsFromTableExpr(node.using, schemableIds);
-    }
-    return schemableIds;
-  }
-  #collectCTEs(node) {
-    const ctes = new Set;
-    if ("with" in node && node.with) {
-      this.#collectCTEIds(node.with, ctes);
-    }
-    return ctes;
-  }
-  #collectSchemableIdsFromTableExpr(node, schemableIds) {
-    const table = TableNode.is(node) ? node : AliasNode.is(node) && TableNode.is(node.node) ? node.node : null;
-    if (table) {
-      this.#collectSchemableId(table.table, schemableIds);
-    }
-  }
-  #collectSchemableId(node, schemableIds) {
-    const id = node.identifier.name;
-    if (!this.#schemableIds.has(id) && !this.#ctes.has(id)) {
-      schemableIds.add(id);
-    }
-  }
-  #collectCTEIds(node, ctes) {
-    for (const expr of node.expressions) {
-      const cteId = expr.name.table.table.identifier.name;
-      if (!this.#ctes.has(cteId)) {
-        ctes.add(cteId);
-      }
-    }
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/with-schema/with-schema-plugin.js
-class WithSchemaPlugin {
-  #transformer;
-  constructor(schema) {
-    this.#transformer = new WithSchemaTransformer(schema);
-  }
-  transformQuery(args) {
-    return this.#transformer.transformNode(args.node);
-  }
-  async transformResult(args) {
-    return args.result;
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/matched-node.js
-var MatchedNode = freeze({
-  is(node) {
-    return node.kind === "MatchedNode";
-  },
-  create(not, bySource = false) {
-    return freeze({
-      kind: "MatchedNode",
-      not,
-      bySource
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/merge-parser.js
-function parseMergeWhen(type, args, refRight) {
-  return WhenNode.create(parseFilterList([
-    MatchedNode.create(!type.isMatched, type.bySource),
-    ...args && args.length > 0 ? [
-      args.length === 3 && refRight ? parseReferentialBinaryOperation(args[0], args[1], args[2]) : parseValueBinaryOperationOrExpression(args)
-    ] : []
-  ], "and", false));
-}
-function parseMergeThen(result) {
-  if (isString(result)) {
-    return RawNode.create([result], []);
-  }
-  if (isOperationNodeSource(result)) {
-    return result.toOperationNode();
-  }
-  return result;
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/deferred.js
+// ../zveltio-extensions/node_modules/kysely/dist/util/deferred.js
 class Deferred {
   #promise;
   #resolve;
@@ -77144,28 +75454,80 @@ class Deferred {
     return this.#promise;
   }
   resolve = (value) => {
-    if (this.#resolve) {
-      this.#resolve(value);
-    }
+    this.#resolve?.(value);
+    this.#resolve = this.#reject = undefined;
   };
   reject = (reason) => {
-    if (this.#reject) {
-      this.#reject(reason);
-    }
+    this.#reject?.(reason);
+    this.#reject = this.#resolve = undefined;
   };
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/log-once.js
-var LOGGED_MESSAGES = new Set;
-function logOnce(message) {
-  if (LOGGED_MESSAGES.has(message)) {
-    return;
-  }
-  LOGGED_MESSAGES.add(message);
-  console.log(message);
+// ../zveltio-extensions/node_modules/kysely/dist/util/provide-controlled-connection.js
+async function provideControlledConnection(connectionProvider, options) {
+  const connectionDefer = new Deferred;
+  const connectionReleaseDefer = new Deferred;
+  connectionProvider.provideConnection(async (connection) => {
+    connectionDefer.resolve(connection);
+    return await connectionReleaseDefer.promise;
+  }, options).catch((ex) => connectionDefer.reject(ex));
+  return freeze({
+    connection: await connectionDefer.promise,
+    release: connectionReleaseDefer.resolve
+  });
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-executor/query-executor-base.js
+// ../zveltio-extensions/node_modules/kysely/dist/util/abort.js
+function getInflightQueryAbortHandler(abortStrategy = "ignore query", connection, beforeThrow) {
+  if (abortStrategy === "ignore query") {
+    return;
+  }
+  if (abortStrategy === "cancel query") {
+    const handler = connection.cancelQuery;
+    if (!handler) {
+      throwUnsupportedInflightQueryAbortStrategyError(abortStrategy, connection.killSession ? "kill session" : undefined);
+    }
+    return handler.bind(connection);
+  }
+  if (abortStrategy === "kill session") {
+    const handler = connection.killSession;
+    if (!handler) {
+      throwUnsupportedInflightQueryAbortStrategyError(abortStrategy, connection.cancelQuery ? "cancel query" : undefined);
+    }
+    return handler.bind(connection);
+  }
+  beforeThrow();
+  throw new Error(`Unexpected \`inflightQueryAbortStrategy\`: "${abortStrategy}"`);
+}
+function throwUnsupportedInflightQueryAbortStrategyError(abortStrategy, alt) {
+  throw new Error(`This dialect doesn't support \`inflightQueryAbortStrategy\` "${abortStrategy}". Use "${"ignore query"}"${alt ? ` or "${alt}"` : ""} instead.`);
+}
+function assertNotAborted(signal, timing, beforeThrow) {
+  if (signal?.aborted) {
+    beforeThrow?.();
+    throwReasonWithTiming(signal.reason, timing);
+  }
+}
+function throwReasonWithTiming(reason, timing) {
+  decorateWithTiming(reason, timing);
+  throw reason;
+}
+var ABORTED = {};
+function printBackgroundFail(name) {
+  return (reason) => console.error(`\`${name}\` failed in the background after abortion: ${getMessage(reason)}`);
+}
+function decorateWithTiming(reason, timing) {
+  if (reason !== null && typeof reason === "object" && !Object.isFrozen(reason)) {
+    Object.defineProperty(reason, "__kysely_timing__", {
+      configurable: true,
+      enumerable: false,
+      value: timing,
+      writable: false
+    });
+  }
+}
+
+// ../zveltio-extensions/node_modules/kysely/dist/query-executor/query-executor-base.js
 var NO_PLUGINS = freeze([]);
 
 class QueryExecutorBase {
@@ -77192,46 +75554,131 @@ class QueryExecutorBase {
     }
     return node;
   }
-  async executeQuery(compiledQuery, queryId) {
-    return await this.provideConnection(async (connection) => {
-      const result = await connection.executeQuery(compiledQuery);
-      const transformedResult = await this.#transformResult(result, queryId);
-      warnOfOutdatedDriverOrPlugins(result, transformedResult);
-      return transformedResult;
-    });
-  }
-  async* stream(compiledQuery, chunkSize, queryId) {
-    const connectionDefer = new Deferred;
-    const connectionReleaseDefer = new Deferred;
-    this.provideConnection(async (connection2) => {
-      connectionDefer.resolve(connection2);
-      return await connectionReleaseDefer.promise;
-    }).catch((ex) => connectionDefer.reject(ex));
-    const connection = await connectionDefer.promise;
+  async executeQuery(compiledQuery, options) {
+    const { inflightQueryAbortStrategy = "ignore query", signal } = options || {};
+    if (!signal) {
+      const result = await this.provideConnection(async (connection2) => {
+        return await connection2.executeQuery(compiledQuery);
+      }, options);
+      return await this.#transformResult(result, compiledQuery.queryId);
+    }
+    assertNotAborted(signal, "before query execution");
+    options = freeze({ signal });
+    const { connection, release } = await provideControlledConnection(this, options);
+    const controlConnectionProvider = this.provideConnection.bind(this);
+    const { promise: abortPromise, resolve } = new Deferred;
+    const abortListener = () => resolve(ABORTED);
+    signal.addEventListener("abort", abortListener, { once: true });
     try {
-      for await (const result of connection.streamQuery(compiledQuery, chunkSize)) {
-        yield await this.#transformResult(result, queryId);
+      assertNotAborted(signal, "before query execution", release);
+      const inflightQueryAbortHandler = getInflightQueryAbortHandler(inflightQueryAbortStrategy, connection, release);
+      if (inflightQueryAbortHandler && connection.collectSessionInfo) {
+        assertNotAborted(signal, "before query execution", release);
+        const collectPromise = connection.collectSessionInfo();
+        const result2 = await Promise.race([abortPromise, collectPromise]).catch((error51) => {
+          release();
+          throw error51;
+        });
+        if (result2 === ABORTED) {
+          collectPromise.catch(printBackgroundFail("collectSessionInfo")).finally(release);
+          throwReasonWithTiming(signal.reason, "before query execution");
+        }
       }
+      const queryPromise = connection.executeQuery(compiledQuery, options);
+      const result = await Promise.race([abortPromise, queryPromise]).catch((error51) => {
+        release();
+        throw error51;
+      });
+      if (result === ABORTED) {
+        Promise.allSettled([
+          queryPromise.catch(printBackgroundFail("query")),
+          inflightQueryAbortHandler?.(controlConnectionProvider).catch(printBackgroundFail("inflightQueryAbortHandler"))
+        ]).finally(release);
+        throwReasonWithTiming(signal.reason, "during query execution");
+      } else {
+        release();
+      }
+      const transformPromise = this.#transformResult(result, compiledQuery.queryId, options);
+      const transformedResult = await Promise.race([
+        abortPromise,
+        transformPromise
+      ]);
+      if (transformedResult === ABORTED) {
+        transformPromise.catch(printBackgroundFail("plugins.transformResult"));
+        throwReasonWithTiming(signal.reason, "during result transformation");
+      }
+      return transformedResult;
     } finally {
-      connectionReleaseDefer.resolve();
+      resolve(ABORTED);
+      signal.removeEventListener("abort", abortListener);
     }
   }
-  async#transformResult(result, queryId) {
+  async* stream(compiledQuery, chunkSize, options) {
+    const { signal } = options || {};
+    if (!signal) {
+      const { connection: connection2, release: release2 } = await provideControlledConnection(this);
+      try {
+        for await (const result of connection2.streamQuery(compiledQuery, chunkSize)) {
+          yield await this.#transformResult(result, compiledQuery.queryId, options);
+        }
+      } finally {
+        release2();
+      }
+      return;
+    }
+    options = freeze({ signal });
+    assertNotAborted(signal, "before connection acquisition");
+    const { connection, release } = await provideControlledConnection(this, options);
+    const { promise: abortPromise, resolve } = new Deferred;
+    const abortListener = () => resolve(ABORTED);
+    signal.addEventListener("abort", abortListener, { once: true });
+    let asyncIterator;
+    let releasePrerequisite;
+    assertNotAborted(signal, "before query streaming", release);
+    const { queryId } = compiledQuery;
+    try {
+      asyncIterator = connection.streamQuery(compiledQuery, chunkSize, options);
+      while (true) {
+        assertNotAborted(signal, "during query streaming");
+        const nextPromise = asyncIterator.next();
+        const result = await Promise.race([abortPromise, nextPromise]);
+        if (result === ABORTED) {
+          releasePrerequisite = nextPromise.catch(printBackgroundFail("iterator.next"));
+          throwReasonWithTiming(signal.reason, "during query streaming");
+        }
+        if (result.done) {
+          break;
+        }
+        const transformPromise = this.#transformResult(result.value, queryId, options);
+        const transformedResult = await Promise.race([
+          abortPromise,
+          transformPromise
+        ]);
+        if (transformedResult === ABORTED) {
+          releasePrerequisite = transformPromise.catch(printBackgroundFail("plugins.transformResult"));
+          throwReasonWithTiming(signal.reason, "during result transformation");
+        }
+        yield transformedResult;
+      }
+    } finally {
+      resolve(ABORTED);
+      signal.removeEventListener("abort", abortListener);
+      const cleanup = (asyncIterator?.return?.() || Promise.resolve()).finally(() => releasePrerequisite).finally(release);
+      if (!releasePrerequisite) {
+        await cleanup;
+      }
+    }
+  }
+  async#transformResult(result, queryId, options) {
+    const { signal } = options || {};
     for (const plugin of this.#plugins) {
-      result = await plugin.transformResult({ result, queryId });
+      result = await plugin.transformResult(freeze({ queryId, result, signal }));
     }
     return result;
   }
 }
-function warnOfOutdatedDriverOrPlugins(result, transformedResult) {
-  const { numAffectedRows } = result;
-  if (numAffectedRows === undefined && result.numUpdatedOrDeletedRows === undefined || numAffectedRows !== undefined && transformedResult.numAffectedRows !== undefined) {
-    return;
-  }
-  logOnce("kysely:warning: outdated driver/plugin detected! QueryResult.numUpdatedOrDeletedRows is deprecated and will be removed in a future release.");
-}
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-executor/noop-query-executor.js
+// ../zveltio-extensions/node_modules/kysely/dist/query-executor/noop-query-executor.js
 class NoopQueryExecutor extends QueryExecutorBase {
   get adapter() {
     throw new Error("this query cannot be compiled to SQL");
@@ -77260,315 +75707,7 @@ class NoopQueryExecutor extends QueryExecutorBase {
 }
 var NOOP_QUERY_EXECUTOR = new NoopQueryExecutor;
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/merge-result.js
-class MergeResult {
-  numChangedRows;
-  constructor(numChangedRows) {
-    this.numChangedRows = numChangedRows;
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/merge-query-builder.js
-class MergeQueryBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  modifyEnd(modifier) {
-    return new MergeQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, modifier.toOperationNode())
-    });
-  }
-  top(expression, modifiers) {
-    return new MergeQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithTop(this.#props.queryNode, parseTop(expression, modifiers))
-    });
-  }
-  using(...args) {
-    return new WheneableMergeQueryBuilder({
-      ...this.#props,
-      queryNode: MergeQueryNode.cloneWithUsing(this.#props.queryNode, parseJoin("Using", args))
-    });
-  }
-  output(args) {
-    return new MergeQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithOutput(this.#props.queryNode, parseSelectArg(args))
-    });
-  }
-  outputAll(table) {
-    return new MergeQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithOutput(this.#props.queryNode, parseSelectAll(table))
-    });
-  }
-}
-preventAwait(MergeQueryBuilder, "don't await MergeQueryBuilder instances directly. To execute the query you need to call `execute` when available.");
-
-class WheneableMergeQueryBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  modifyEnd(modifier) {
-    return new WheneableMergeQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, modifier.toOperationNode())
-    });
-  }
-  top(expression, modifiers) {
-    return new WheneableMergeQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithTop(this.#props.queryNode, parseTop(expression, modifiers))
-    });
-  }
-  whenMatched() {
-    return this.#whenMatched([]);
-  }
-  whenMatchedAnd(...args) {
-    return this.#whenMatched(args);
-  }
-  whenMatchedAndRef(lhs, op, rhs) {
-    return this.#whenMatched([lhs, op, rhs], true);
-  }
-  #whenMatched(args, refRight) {
-    return new MatchedThenableMergeQueryBuilder({
-      ...this.#props,
-      queryNode: MergeQueryNode.cloneWithWhen(this.#props.queryNode, parseMergeWhen({ isMatched: true }, args, refRight))
-    });
-  }
-  whenNotMatched() {
-    return this.#whenNotMatched([]);
-  }
-  whenNotMatchedAnd(...args) {
-    return this.#whenNotMatched(args);
-  }
-  whenNotMatchedAndRef(lhs, op, rhs) {
-    return this.#whenNotMatched([lhs, op, rhs], true);
-  }
-  whenNotMatchedBySource() {
-    return this.#whenNotMatched([], false, true);
-  }
-  whenNotMatchedBySourceAnd(...args) {
-    return this.#whenNotMatched(args, false, true);
-  }
-  whenNotMatchedBySourceAndRef(lhs, op, rhs) {
-    return this.#whenNotMatched([lhs, op, rhs], true, true);
-  }
-  output(args) {
-    return new WheneableMergeQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithOutput(this.#props.queryNode, parseSelectArg(args))
-    });
-  }
-  outputAll(table) {
-    return new WheneableMergeQueryBuilder({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithOutput(this.#props.queryNode, parseSelectAll(table))
-    });
-  }
-  #whenNotMatched(args, refRight = false, bySource = false) {
-    const props = {
-      ...this.#props,
-      queryNode: MergeQueryNode.cloneWithWhen(this.#props.queryNode, parseMergeWhen({ isMatched: false, bySource }, args, refRight))
-    };
-    const Builder = bySource ? MatchedThenableMergeQueryBuilder : NotMatchedThenableMergeQueryBuilder;
-    return new Builder(props);
-  }
-  $call(func) {
-    return func(this);
-  }
-  $if(condition, func) {
-    if (condition) {
-      return func(this);
-    }
-    return new WheneableMergeQueryBuilder({
-      ...this.#props
-    });
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(this.#props.queryNode, this.#props.queryId);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute() {
-    const compiledQuery = this.compile();
-    const result = await this.#props.executor.executeQuery(compiledQuery, this.#props.queryId);
-    if (compiledQuery.query.output && this.#props.executor.adapter.supportsOutput) {
-      return result.rows;
-    }
-    return [new MergeResult(result.numAffectedRows)];
-  }
-  async executeTakeFirst() {
-    const [result] = await this.execute();
-    return result;
-  }
-  async executeTakeFirstOrThrow(errorConstructor = NoResultError) {
-    const result = await this.executeTakeFirst();
-    if (result === undefined) {
-      const error51 = isNoResultErrorConstructor(errorConstructor) ? new errorConstructor(this.toOperationNode()) : errorConstructor(this.toOperationNode());
-      throw error51;
-    }
-    return result;
-  }
-}
-preventAwait(WheneableMergeQueryBuilder, "don't await WheneableMergeQueryBuilder instances directly. To execute the query you need to call `execute`.");
-
-class MatchedThenableMergeQueryBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  thenDelete() {
-    return new WheneableMergeQueryBuilder({
-      ...this.#props,
-      queryNode: MergeQueryNode.cloneWithThen(this.#props.queryNode, parseMergeThen("delete"))
-    });
-  }
-  thenDoNothing() {
-    return new WheneableMergeQueryBuilder({
-      ...this.#props,
-      queryNode: MergeQueryNode.cloneWithThen(this.#props.queryNode, parseMergeThen("do nothing"))
-    });
-  }
-  thenUpdate(set2) {
-    return new WheneableMergeQueryBuilder({
-      ...this.#props,
-      queryNode: MergeQueryNode.cloneWithThen(this.#props.queryNode, parseMergeThen(set2(new UpdateQueryBuilder({
-        queryId: this.#props.queryId,
-        executor: NOOP_QUERY_EXECUTOR,
-        queryNode: UpdateQueryNode.createWithoutTable()
-      }))))
-    });
-  }
-  thenUpdateSet(...args) {
-    return this.thenUpdate((ub) => ub.set(...args));
-  }
-}
-preventAwait(MatchedThenableMergeQueryBuilder, "don't await MatchedThenableMergeQueryBuilder instances directly. To execute the query you need to call `execute` when available.");
-
-class NotMatchedThenableMergeQueryBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  thenDoNothing() {
-    return new WheneableMergeQueryBuilder({
-      ...this.#props,
-      queryNode: MergeQueryNode.cloneWithThen(this.#props.queryNode, parseMergeThen("do nothing"))
-    });
-  }
-  thenInsertValues(insert) {
-    const [columns, values] = parseInsertExpression(insert);
-    return new WheneableMergeQueryBuilder({
-      ...this.#props,
-      queryNode: MergeQueryNode.cloneWithThen(this.#props.queryNode, parseMergeThen(InsertQueryNode.cloneWith(InsertQueryNode.createWithoutInto(), {
-        columns,
-        values
-      })))
-    });
-  }
-}
-preventAwait(NotMatchedThenableMergeQueryBuilder, "don't await NotMatchedThenableMergeQueryBuilder instances directly. To execute the query you need to call `execute` when available.");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-creator.js
-class QueryCreator {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  selectFrom(from) {
-    return createSelectQueryBuilder({
-      queryId: createQueryId(),
-      executor: this.#props.executor,
-      queryNode: SelectQueryNode.createFrom(parseTableExpressionOrList(from), this.#props.withNode)
-    });
-  }
-  selectNoFrom(selection) {
-    return createSelectQueryBuilder({
-      queryId: createQueryId(),
-      executor: this.#props.executor,
-      queryNode: SelectQueryNode.cloneWithSelections(SelectQueryNode.create(this.#props.withNode), parseSelectArg(selection))
-    });
-  }
-  insertInto(table) {
-    return new InsertQueryBuilder({
-      queryId: createQueryId(),
-      executor: this.#props.executor,
-      queryNode: InsertQueryNode.create(parseTable(table), this.#props.withNode)
-    });
-  }
-  replaceInto(table) {
-    return new InsertQueryBuilder({
-      queryId: createQueryId(),
-      executor: this.#props.executor,
-      queryNode: InsertQueryNode.create(parseTable(table), this.#props.withNode, true)
-    });
-  }
-  deleteFrom(tables) {
-    return new DeleteQueryBuilder({
-      queryId: createQueryId(),
-      executor: this.#props.executor,
-      queryNode: DeleteQueryNode.create(parseTableExpressionOrList(tables), this.#props.withNode)
-    });
-  }
-  updateTable(table) {
-    return new UpdateQueryBuilder({
-      queryId: createQueryId(),
-      executor: this.#props.executor,
-      queryNode: UpdateQueryNode.create(parseTableExpression(table), this.#props.withNode)
-    });
-  }
-  mergeInto(targetTable) {
-    return new MergeQueryBuilder({
-      queryId: createQueryId(),
-      executor: this.#props.executor,
-      queryNode: MergeQueryNode.create(parseAliasedTable(targetTable), this.#props.withNode)
-    });
-  }
-  with(nameOrBuilder, expression) {
-    const cte = parseCommonTableExpression(nameOrBuilder, expression);
-    return new QueryCreator({
-      ...this.#props,
-      withNode: this.#props.withNode ? WithNode.cloneWithExpression(this.#props.withNode, cte) : WithNode.create(cte)
-    });
-  }
-  withRecursive(nameOrBuilder, expression) {
-    const cte = parseCommonTableExpression(nameOrBuilder, expression);
-    return new QueryCreator({
-      ...this.#props,
-      withNode: this.#props.withNode ? WithNode.cloneWithExpression(this.#props.withNode, cte) : WithNode.create(cte, { recursive: true })
-    });
-  }
-  withPlugin(plugin) {
-    return new QueryCreator({
-      ...this.#props,
-      executor: this.#props.executor.withPlugin(plugin)
-    });
-  }
-  withoutPlugins() {
-    return new QueryCreator({
-      ...this.#props,
-      executor: this.#props.executor.withoutPlugins()
-    });
-  }
-  withSchema(schema) {
-    return new QueryCreator({
-      ...this.#props,
-      executor: this.#props.executor.withPluginAtFront(new WithSchemaPlugin(schema))
-    });
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/parse-utils.js
-function createQueryCreator() {
-  return new QueryCreator({
-    executor: NOOP_QUERY_EXECUTOR
-  });
-}
+// ../zveltio-extensions/node_modules/kysely/dist/parser/parse-utils.js
 function createJoinBuilder(joinType, table) {
   return new JoinBuilder({
     joinNode: JoinNode.create(joinType, parseTableExpression(table))
@@ -77580,12 +75719,14 @@ function createOverBuilder() {
   });
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/join-parser.js
+// ../zveltio-extensions/node_modules/kysely/dist/parser/join-parser.js
 function parseJoin(joinType, args) {
   if (args.length === 3) {
     return parseSingleOnJoin(joinType, args[0], args[1], args[2]);
   } else if (args.length === 2) {
     return parseCallbackJoin(joinType, args[0], args[1]);
+  } else if (args.length === 1) {
+    return parseOnlessJoin(joinType, args[0]);
   } else {
     throw new Error("not implemented");
   }
@@ -77596,8 +75737,11 @@ function parseCallbackJoin(joinType, from, callback) {
 function parseSingleOnJoin(joinType, from, lhsColumn, rhsColumn) {
   return JoinNode.createWithOn(joinType, parseTableExpression(from), parseReferentialBinaryOperation(lhsColumn, "=", rhsColumn));
 }
+function parseOnlessJoin(joinType, from) {
+  return JoinNode.create(joinType, parseTableExpression(from));
+}
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/offset-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/offset-node.js
 var OffsetNode = freeze({
   is(node) {
     return node.kind === "OffsetNode";
@@ -77610,7 +75754,7 @@ var OffsetNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/group-by-item-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/group-by-item-node.js
 var GroupByItemNode = freeze({
   is(node) {
     return node.kind === "GroupByItemNode";
@@ -77623,13 +75767,13 @@ var GroupByItemNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/group-by-parser.js
+// ../zveltio-extensions/node_modules/kysely/dist/parser/group-by-parser.js
 function parseGroupBy(groupBy) {
   groupBy = isFunction(groupBy) ? groupBy(expressionBuilder()) : groupBy;
   return parseReferenceExpressionOrList(groupBy).map(GroupByItemNode.create);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/set-operation-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/set-operation-node.js
 var SetOperationNode = freeze({
   is(node) {
     return node.kind === "SetOperationNode";
@@ -77644,7 +75788,7 @@ var SetOperationNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/set-operation-parser.js
+// ../zveltio-extensions/node_modules/kysely/dist/parser/set-operation-parser.js
 function parseSetOperations(operator, expression, all) {
   if (isFunction(expression)) {
     expression = expression(createExpressionBuilder());
@@ -77655,7 +75799,7 @@ function parseSetOperations(operator, expression, all) {
   return expression.map((expr) => SetOperationNode.create(operator, parseExpression(expr), all));
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/expression/expression-wrapper.js
+// ../zveltio-extensions/node_modules/kysely/dist/expression/expression-wrapper.js
 class ExpressionWrapper {
   #node;
   constructor(node) {
@@ -77746,8 +75890,8 @@ class AndWrapper {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/fetch-node.js
-var FetchNode = {
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/fetch-node.js
+var FetchNode = freeze({
   is(node) {
     return node.kind === "FetchNode";
   },
@@ -77758,9 +75902,9 @@ var FetchNode = {
       modifier
     };
   }
-};
+});
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/fetch-parser.js
+// ../zveltio-extensions/node_modules/kysely/dist/parser/fetch-parser.js
 function parseFetch(rowCount, modifier) {
   if (!isNumber(rowCount) && !isBigInt(rowCount)) {
     throw new Error(`Invalid fetch row count: ${rowCount}`);
@@ -77774,7 +75918,9 @@ function isFetchModifier(value) {
   return value === "only" || value === "with ties";
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/select-query-builder.js
+// ../zveltio-extensions/node_modules/kysely/dist/query-builder/select-query-builder.js
+var _a3;
+
 class SelectQueryBuilderImpl {
   #props;
   constructor(props) {
@@ -77787,205 +75933,205 @@ class SelectQueryBuilderImpl {
     return true;
   }
   where(...args) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: QueryNode.cloneWithWhere(this.#props.queryNode, parseValueBinaryOperationOrExpression(args))
     });
   }
   whereRef(lhs, op, rhs) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: QueryNode.cloneWithWhere(this.#props.queryNode, parseReferentialBinaryOperation(lhs, op, rhs))
     });
   }
   having(...args) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithHaving(this.#props.queryNode, parseValueBinaryOperationOrExpression(args))
     });
   }
   havingRef(lhs, op, rhs) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithHaving(this.#props.queryNode, parseReferentialBinaryOperation(lhs, op, rhs))
     });
   }
   select(selection) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithSelections(this.#props.queryNode, parseSelectArg(selection))
     });
   }
   distinctOn(selection) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithDistinctOn(this.#props.queryNode, parseReferenceExpressionOrList(selection))
     });
   }
   modifyFront(modifier) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithFrontModifier(this.#props.queryNode, SelectModifierNode.createWithExpression(modifier.toOperationNode()))
     });
   }
   modifyEnd(modifier) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.createWithExpression(modifier.toOperationNode()))
     });
   }
   distinct() {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithFrontModifier(this.#props.queryNode, SelectModifierNode.create("Distinct"))
     });
   }
   forUpdate(of) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("ForUpdate", of ? asArray(of).map(parseTable) : undefined))
     });
   }
   forShare(of) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("ForShare", of ? asArray(of).map(parseTable) : undefined))
     });
   }
   forKeyShare(of) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("ForKeyShare", of ? asArray(of).map(parseTable) : undefined))
     });
   }
   forNoKeyUpdate(of) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("ForNoKeyUpdate", of ? asArray(of).map(parseTable) : undefined))
     });
   }
   skipLocked() {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("SkipLocked"))
     });
   }
   noWait() {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("NoWait"))
     });
   }
   selectAll(table) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithSelections(this.#props.queryNode, parseSelectAll(table))
     });
   }
   innerJoin(...args) {
-    return new SelectQueryBuilderImpl({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithJoin(this.#props.queryNode, parseJoin("InnerJoin", args))
-    });
+    return this.#join("InnerJoin", args);
   }
   leftJoin(...args) {
-    return new SelectQueryBuilderImpl({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithJoin(this.#props.queryNode, parseJoin("LeftJoin", args))
-    });
+    return this.#join("LeftJoin", args);
   }
   rightJoin(...args) {
-    return new SelectQueryBuilderImpl({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithJoin(this.#props.queryNode, parseJoin("RightJoin", args))
-    });
+    return this.#join("RightJoin", args);
   }
   fullJoin(...args) {
-    return new SelectQueryBuilderImpl({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithJoin(this.#props.queryNode, parseJoin("FullJoin", args))
-    });
+    return this.#join("FullJoin", args);
+  }
+  crossJoin(...args) {
+    return this.#join("CrossJoin", args);
   }
   innerJoinLateral(...args) {
-    return new SelectQueryBuilderImpl({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithJoin(this.#props.queryNode, parseJoin("LateralInnerJoin", args))
-    });
+    return this.#join("LateralInnerJoin", args);
   }
   leftJoinLateral(...args) {
-    return new SelectQueryBuilderImpl({
+    return this.#join("LateralLeftJoin", args);
+  }
+  crossJoinLateral(...args) {
+    return this.#join("LateralCrossJoin", args);
+  }
+  crossApply(...args) {
+    return this.#join("CrossApply", args);
+  }
+  outerApply(...args) {
+    return this.#join("OuterApply", args);
+  }
+  #join(joinType, args) {
+    return new _a3({
       ...this.#props,
-      queryNode: QueryNode.cloneWithJoin(this.#props.queryNode, parseJoin("LateralLeftJoin", args))
+      queryNode: QueryNode.cloneWithJoin(this.#props.queryNode, parseJoin(joinType, args))
     });
   }
   orderBy(...args) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
-      queryNode: SelectQueryNode.cloneWithOrderByItems(this.#props.queryNode, parseOrderBy(args))
+      queryNode: QueryNode.cloneWithOrderByItems(this.#props.queryNode, parseOrderBy(args))
     });
   }
   groupBy(groupBy) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithGroupByItems(this.#props.queryNode, parseGroupBy(groupBy))
     });
   }
   limit(limit) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithLimit(this.#props.queryNode, LimitNode.create(parseValueExpression(limit)))
     });
   }
   offset(offset) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithOffset(this.#props.queryNode, OffsetNode.create(parseValueExpression(offset)))
     });
   }
   fetch(rowCount, modifier = "only") {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithFetch(this.#props.queryNode, parseFetch(rowCount, modifier))
     });
   }
   top(expression, modifiers) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: QueryNode.cloneWithTop(this.#props.queryNode, parseTop(expression, modifiers))
     });
   }
   union(expression) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("union", expression, false))
     });
   }
   unionAll(expression) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("union", expression, true))
     });
   }
   intersect(expression) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("intersect", expression, false))
     });
   }
   intersectAll(expression) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("intersect", expression, true))
     });
   }
   except(expression) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("except", expression, false))
     });
   }
   exceptAll(expression) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("except", expression, true))
     });
@@ -77994,37 +76140,37 @@ class SelectQueryBuilderImpl {
     return new AliasedSelectQueryBuilderImpl(this, alias);
   }
   clearSelect() {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithoutSelections(this.#props.queryNode)
     });
   }
   clearWhere() {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: QueryNode.cloneWithoutWhere(this.#props.queryNode)
     });
   }
   clearLimit() {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithoutLimit(this.#props.queryNode)
     });
   }
   clearOffset() {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithoutOffset(this.#props.queryNode)
     });
   }
   clearOrderBy() {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
-      queryNode: SelectQueryNode.cloneWithoutOrderBy(this.#props.queryNode)
+      queryNode: QueryNode.cloneWithoutOrderBy(this.#props.queryNode)
     });
   }
   clearGroupBy() {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       queryNode: SelectQueryNode.cloneWithoutGroupBy(this.#props.queryNode)
     });
@@ -78036,24 +76182,27 @@ class SelectQueryBuilderImpl {
     if (condition) {
       return func(this);
     }
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props
     });
   }
   $castTo() {
-    return new SelectQueryBuilderImpl(this.#props);
+    return new _a3(this.#props);
   }
   $narrowType() {
-    return new SelectQueryBuilderImpl(this.#props);
+    return new _a3(this.#props);
   }
   $assertType() {
-    return new SelectQueryBuilderImpl(this.#props);
+    return new _a3(this.#props);
   }
   $asTuple() {
     return new ExpressionWrapper(this.toOperationNode());
   }
+  $asScalar() {
+    return new ExpressionWrapper(this.toOperationNode());
+  }
   withPlugin(plugin) {
-    return new SelectQueryBuilderImpl({
+    return new _a3({
       ...this.#props,
       executor: this.#props.executor.withPlugin(plugin)
     });
@@ -78064,39 +76213,50 @@ class SelectQueryBuilderImpl {
   compile() {
     return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
   }
-  async execute() {
+  async execute(options) {
     const compiledQuery = this.compile();
-    const result = await this.#props.executor.executeQuery(compiledQuery, this.#props.queryId);
+    const result = await this.#props.executor.executeQuery(compiledQuery, options);
     return result.rows;
   }
-  async executeTakeFirst() {
-    const [result] = await this.execute();
+  async executeTakeFirst(options) {
+    const [result] = await this.execute(options);
     return result;
   }
-  async executeTakeFirstOrThrow(errorConstructor = NoResultError) {
-    const result = await this.executeTakeFirst();
+  async executeTakeFirstOrThrow(errorConstructorOrOptions) {
+    if (typeof errorConstructorOrOptions === "function") {
+      errorConstructorOrOptions = {
+        errorConstructor: errorConstructorOrOptions
+      };
+    }
+    const result = await this.executeTakeFirst(errorConstructorOrOptions);
     if (result === undefined) {
+      const errorConstructor = errorConstructorOrOptions?.errorConstructor ?? NoResultError;
       const error51 = isNoResultErrorConstructor(errorConstructor) ? new errorConstructor(this.toOperationNode()) : errorConstructor(this.toOperationNode());
       throw error51;
     }
     return result;
   }
-  async* stream(chunkSize = 100) {
+  async* stream(chunkSizeOrOptions) {
+    if (typeof chunkSizeOrOptions !== "object") {
+      chunkSizeOrOptions = {
+        chunkSize: chunkSizeOrOptions
+      };
+    }
     const compiledQuery = this.compile();
-    const stream = this.#props.executor.stream(compiledQuery, chunkSize, this.#props.queryId);
+    const stream = this.#props.executor.stream(compiledQuery, chunkSizeOrOptions.chunkSize ?? 100, chunkSizeOrOptions);
     for await (const item of stream) {
       yield* item.rows;
     }
   }
   async explain(format, options) {
-    const builder = new SelectQueryBuilderImpl({
+    const builder = new _a3({
       ...this.#props,
       queryNode: QueryNode.cloneWithExplain(this.#props.queryNode, format, options)
     });
     return await builder.execute();
   }
 }
-preventAwait(SelectQueryBuilderImpl, "don't await SelectQueryBuilder instances directly. To execute the query you need to call `execute` or `executeTakeFirst`.");
+_a3 = SelectQueryBuilderImpl;
 function createSelectQueryBuilder(props) {
   return new SelectQueryBuilderImpl(props);
 }
@@ -78121,9 +76281,8 @@ class AliasedSelectQueryBuilderImpl {
     return AliasNode.create(this.#queryBuilder.toOperationNode(), IdentifierNode.create(this.#alias));
   }
 }
-preventAwait(AliasedSelectQueryBuilderImpl, "don't await AliasedSelectQueryBuilder instances directly. AliasedSelectQueryBuilder should never be executed directly since it's always a part of another query.");
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/aggregate-function-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/aggregate-function-node.js
 var AggregateFunctionNode = freeze({
   is(node) {
     return node.kind === "AggregateFunctionNode";
@@ -78141,10 +76300,11 @@ var AggregateFunctionNode = freeze({
       distinct: true
     });
   },
-  cloneWithOrderBy(aggregateFunctionNode, orderItems) {
+  cloneWithOrderBy(aggregateFunctionNode, orderItems, withinGroup = false) {
+    const prop = withinGroup ? "withinGroup" : "orderBy";
     return freeze({
       ...aggregateFunctionNode,
-      orderBy: aggregateFunctionNode.orderBy ? OrderByNode.cloneWithItems(aggregateFunctionNode.orderBy, orderItems) : OrderByNode.create(orderItems)
+      [prop]: aggregateFunctionNode[prop] ? OrderByNode.cloneWithItems(aggregateFunctionNode[prop], orderItems) : OrderByNode.create(orderItems)
     });
   },
   cloneWithFilter(aggregateFunctionNode, filter) {
@@ -78167,7 +76327,7 @@ var AggregateFunctionNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/function-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/function-node.js
 var FunctionNode = freeze({
   is(node) {
     return node.kind === "FunctionNode";
@@ -78181,7 +76341,7 @@ var FunctionNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/aggregate-function-builder.js
+// ../zveltio-extensions/node_modules/kysely/dist/query-builder/aggregate-function-builder.js
 class AggregateFunctionBuilder {
   #props;
   constructor(props) {
@@ -78199,10 +76359,22 @@ class AggregateFunctionBuilder {
       aggregateFunctionNode: AggregateFunctionNode.cloneWithDistinct(this.#props.aggregateFunctionNode)
     });
   }
-  orderBy(orderBy, direction) {
+  orderBy(...args) {
     return new AggregateFunctionBuilder({
       ...this.#props,
-      aggregateFunctionNode: AggregateFunctionNode.cloneWithOrderBy(this.#props.aggregateFunctionNode, parseOrderBy([orderBy, direction]))
+      aggregateFunctionNode: QueryNode.cloneWithOrderByItems(this.#props.aggregateFunctionNode, parseOrderBy(args))
+    });
+  }
+  clearOrderBy() {
+    return new AggregateFunctionBuilder({
+      ...this.#props,
+      aggregateFunctionNode: QueryNode.cloneWithoutOrderBy(this.#props.aggregateFunctionNode)
+    });
+  }
+  withinGroupOrderBy(...args) {
+    return new AggregateFunctionBuilder({
+      ...this.#props,
+      aggregateFunctionNode: AggregateFunctionNode.cloneWithOrderBy(this.#props.aggregateFunctionNode, parseOrderBy(args), true)
     });
   }
   filterWhere(...args) {
@@ -78237,7 +76409,6 @@ class AggregateFunctionBuilder {
     return this.#props.aggregateFunctionNode;
   }
 }
-preventAwait(AggregateFunctionBuilder, "don't await AggregateFunctionBuilder instances. They are never executed directly and are always just a part of a query.");
 
 class AliasedAggregateFunctionBuilder {
   #aggregateFunctionBuilder;
@@ -78257,7 +76428,7 @@ class AliasedAggregateFunctionBuilder {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/function-module.js
+// ../zveltio-extensions/node_modules/kysely/dist/query-builder/function-module.js
 function createFunctionModule() {
   const fn = (name, args) => {
     return new ExpressionWrapper(FunctionNode.create(name, parseReferenceExpressionOrList(args ?? [])));
@@ -78310,7 +76481,7 @@ function createFunctionModule() {
   });
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/unary-operation-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/unary-operation-node.js
 var UnaryOperationNode = freeze({
   is(node) {
     return node.kind === "UnaryOperationNode";
@@ -78324,12 +76495,15 @@ var UnaryOperationNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/unary-operation-parser.js
+// ../zveltio-extensions/node_modules/kysely/dist/parser/unary-operation-parser.js
 function parseUnaryOperation(operator, operand) {
-  return UnaryOperationNode.create(OperatorNode.create(operator), parseReferenceExpression(operand));
+  if (isUnaryOperator(operator)) {
+    return UnaryOperationNode.create(OperatorNode.create(operator), parseReferenceExpression(operand));
+  }
+  throw new Error(`invalid unary operator ${JSON.stringify(operator)}`);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/case-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/case-node.js
 var CaseNode = freeze({
   is(node) {
     return node.kind === "CaseNode";
@@ -78363,7 +76537,7 @@ var CaseNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/case-builder.js
+// ../zveltio-extensions/node_modules/kysely/dist/query-builder/case-builder.js
 class CaseBuilder {
   #props;
   constructor(props) {
@@ -78373,6 +76547,12 @@ class CaseBuilder {
     return new CaseThenBuilder({
       ...this.#props,
       node: CaseNode.cloneWithWhen(this.#props.node, WhenNode.create(parseValueBinaryOperationOrExpression(args)))
+    });
+  }
+  whenRef(lhs, op, rhs) {
+    return new CaseThenBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWithWhen(this.#props.node, WhenNode.create(parseReferentialBinaryOperation(lhs, op, rhs)))
     });
   }
 }
@@ -78388,6 +76568,12 @@ class CaseThenBuilder {
       node: CaseNode.cloneWithThen(this.#props.node, isSafeImmediateValue(valueExpression) ? parseSafeImmediateValue(valueExpression) : parseValueExpression(valueExpression))
     });
   }
+  thenRef(expression) {
+    return new CaseWhenBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWithThen(this.#props.node, parseReferenceExpression(expression))
+    });
+  }
 }
 
 class CaseWhenBuilder {
@@ -78401,11 +76587,25 @@ class CaseWhenBuilder {
       node: CaseNode.cloneWithWhen(this.#props.node, WhenNode.create(parseValueBinaryOperationOrExpression(args)))
     });
   }
+  whenRef(lhs, op, rhs) {
+    return new CaseThenBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWithWhen(this.#props.node, WhenNode.create(parseReferentialBinaryOperation(lhs, op, rhs)))
+    });
+  }
   else(valueExpression) {
     return new CaseEndBuilder({
       ...this.#props,
       node: CaseNode.cloneWith(this.#props.node, {
         else: isSafeImmediateValue(valueExpression) ? parseSafeImmediateValue(valueExpression) : parseValueExpression(valueExpression)
+      })
+    });
+  }
+  elseRef(expression) {
+    return new CaseEndBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWith(this.#props.node, {
+        else: parseReferenceExpression(expression)
       })
     });
   }
@@ -78430,7 +76630,7 @@ class CaseEndBuilder {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/json-path-leg-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/json-path-leg-node.js
 var JSONPathLegNode = freeze({
   is(node) {
     return node.kind === "JSONPathLegNode";
@@ -78444,13 +76644,18 @@ var JSONPathLegNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-builder/json-path-builder.js
+// ../zveltio-extensions/node_modules/kysely/dist/query-builder/json-path-builder.js
+var HASH_NEGATIVE_INDEX_REGEX = /^#-\d+$/;
+
 class JSONPathBuilder {
   #node;
   constructor(node) {
     this.#node = node;
   }
   at(index) {
+    if (typeof index !== "number" && typeof index !== "string" || typeof index === "number" && !Number.isInteger(index) || typeof index === "string" && index !== "last" && !HASH_NEGATIVE_INDEX_REGEX.test(index)) {
+      throw new Error(`Unexpected index value in .at(...): ${index}`);
+    }
     return this.#createBuilderWithPathLeg("ArrayLocation", index);
   }
   key(key) {
@@ -78505,7 +76710,7 @@ class AliasedJSONPathBuilder {
   }
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/tuple-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/tuple-node.js
 var TupleNode = freeze({
   is(node) {
     return node.kind === "TupleNode";
@@ -78518,53 +76723,54 @@ var TupleNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/data-type-node.js
-var SIMPLE_COLUMN_DATA_TYPES = [
-  "varchar",
-  "char",
-  "text",
-  "integer",
-  "int2",
-  "int4",
-  "int8",
-  "smallint",
-  "bigint",
-  "boolean",
-  "real",
-  "double precision",
-  "float4",
-  "float8",
-  "decimal",
-  "numeric",
-  "binary",
-  "bytea",
-  "date",
-  "datetime",
-  "time",
-  "timetz",
-  "timestamp",
-  "timestamptz",
-  "serial",
-  "bigserial",
-  "uuid",
-  "json",
-  "jsonb",
-  "blob",
-  "varbinary",
-  "int4range",
-  "int4multirange",
-  "int8range",
-  "int8multirange",
-  "numrange",
-  "nummultirange",
-  "tsrange",
-  "tsmultirange",
-  "tstzrange",
-  "tstzmultirange",
-  "daterange",
-  "datemultirange"
-];
-var COLUMN_DATA_TYPE_REGEX = [
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/data-type-node.js
+var SIMPLE_COLUMN_DATA_TYPES = freeze({
+  bigint: true,
+  bigserial: true,
+  binary: true,
+  blob: true,
+  boolean: true,
+  bytea: true,
+  char: true,
+  date: true,
+  datemultirange: true,
+  daterange: true,
+  datetime: true,
+  datetime2: true,
+  decimal: true,
+  "double precision": true,
+  float4: true,
+  float8: true,
+  int2: true,
+  int4: true,
+  int4multirange: true,
+  int4range: true,
+  int8: true,
+  int8multirange: true,
+  int8range: true,
+  integer: true,
+  json: true,
+  jsonb: true,
+  numeric: true,
+  nummultirange: true,
+  numrange: true,
+  real: true,
+  serial: true,
+  smallint: true,
+  text: true,
+  time: true,
+  timestamp: true,
+  timestamptz: true,
+  timetz: true,
+  tsmultirange: true,
+  tsrange: true,
+  tstzmultirange: true,
+  tstzrange: true,
+  uuid: true,
+  varbinary: true,
+  varchar: true
+});
+var COLUMN_DATA_TYPE_REGEX = freeze([
   /^varchar\(\d+\)$/,
   /^char\(\d+\)$/,
   /^decimal\(\d+, \d+\)$/,
@@ -78575,8 +76781,9 @@ var COLUMN_DATA_TYPE_REGEX = [
   /^timetz\(\d+\)$/,
   /^timestamp\(\d+\)$/,
   /^timestamptz\(\d+\)$/,
+  /^datetime2\(\d+\)$/,
   /^varbinary\(\d+\)$/
-];
+]);
 var DataTypeNode = freeze({
   is(node) {
     return node.kind === "DataTypeNode";
@@ -78589,16 +76796,10 @@ var DataTypeNode = freeze({
   }
 });
 function isColumnDataType(dataType) {
-  if (SIMPLE_COLUMN_DATA_TYPES.includes(dataType)) {
-    return true;
-  }
-  if (COLUMN_DATA_TYPE_REGEX.some((r) => r.test(dataType))) {
-    return true;
-  }
-  return false;
+  return SIMPLE_COLUMN_DATA_TYPES[dataType] || COLUMN_DATA_TYPE_REGEX.some((r) => r.test(dataType));
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/data-type-parser.js
+// ../zveltio-extensions/node_modules/kysely/dist/parser/data-type-parser.js
 function parseDataTypeExpression(dataType) {
   if (isOperationNodeSource(dataType)) {
     return dataType.toOperationNode();
@@ -78609,7 +76810,7 @@ function parseDataTypeExpression(dataType) {
   throw new Error(`invalid column data type ${JSON.stringify(dataType)}`);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/cast-node.js
+// ../zveltio-extensions/node_modules/kysely/dist/operation-node/cast-node.js
 var CastNode = freeze({
   is(node) {
     return node.kind === "CastNode";
@@ -78623,7 +76824,7 @@ var CastNode = freeze({
   }
 });
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/expression/expression-builder.js
+// ../zveltio-extensions/node_modules/kysely/dist/expression/expression-builder.js
 function createExpressionBuilder(executor = NOOP_QUERY_EXECUTOR) {
   function binary(lhs, op, rhs) {
     return new ExpressionWrapper(parseValueBinaryOperation(lhs, op, rhs));
@@ -78708,9 +76909,6 @@ function createExpressionBuilder(executor = NOOP_QUERY_EXECUTOR) {
     },
     cast(expr, dataType) {
       return new ExpressionWrapper(CastNode.create(parseReferenceExpression(expr), parseDataTypeExpression(dataType)));
-    },
-    withSchema(schema) {
-      return createExpressionBuilder(executor.withPluginAtFront(new WithSchemaPlugin(schema)));
     }
   });
   eb.fn = createFunctionModule();
@@ -78721,7 +76919,7 @@ function expressionBuilder(_) {
   return createExpressionBuilder();
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/expression-parser.js
+// ../zveltio-extensions/node_modules/kysely/dist/parser/expression-parser.js
 function parseExpression(exp) {
   if (isOperationNodeSource(exp)) {
     return exp.toOperationNode();
@@ -78742,7 +76940,42 @@ function isExpressionOrFactory(obj) {
   return isExpression(obj) || isAliasedExpression(obj) || isFunction(obj);
 }
 
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/table-parser.js
+// ../zveltio-extensions/node_modules/kysely/dist/dynamic/dynamic-table-builder.js
+class DynamicTableBuilder {
+  #table;
+  get table() {
+    return this.#table;
+  }
+  constructor(table) {
+    this.#table = table;
+  }
+  as(alias) {
+    return new AliasedDynamicTableBuilder(this.#table, alias);
+  }
+}
+
+class AliasedDynamicTableBuilder {
+  #table;
+  #alias;
+  get table() {
+    return this.#table;
+  }
+  get alias() {
+    return this.#alias;
+  }
+  constructor(table, alias) {
+    this.#table = table;
+    this.#alias = alias;
+  }
+  toOperationNode() {
+    return AliasNode.create(parseTable(this.#table), IdentifierNode.create(this.#alias));
+  }
+}
+function isAliasedDynamicTableBuilder(obj) {
+  return isObject2(obj) && isOperationNodeSource(obj) && isString(obj.table) && isString(obj.alias);
+}
+
+// ../zveltio-extensions/node_modules/kysely/dist/parser/table-parser.js
 function parseTableExpressionOrList(table) {
   if (isReadonlyArray(table)) {
     return table.map((it) => parseTableExpression(it));
@@ -78753,6 +76986,8 @@ function parseTableExpressionOrList(table) {
 function parseTableExpression(table) {
   if (isString(table)) {
     return parseAliasedTable(table);
+  } else if (isAliasedDynamicTableBuilder(table)) {
+    return table.toOperationNode();
   } else {
     return parseAliasedExpression(table);
   }
@@ -78778,2021 +77013,7 @@ function parseTable(from) {
 function trim2(str) {
   return str.trim();
 }
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/add-column-node.js
-var AddColumnNode = freeze({
-  is(node) {
-    return node.kind === "AddColumnNode";
-  },
-  create(column) {
-    return freeze({
-      kind: "AddColumnNode",
-      column
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/column-definition-node.js
-var ColumnDefinitionNode = freeze({
-  is(node) {
-    return node.kind === "ColumnDefinitionNode";
-  },
-  create(column, dataType) {
-    return freeze({
-      kind: "ColumnDefinitionNode",
-      column: ColumnNode.create(column),
-      dataType
-    });
-  },
-  cloneWithFrontModifier(node, modifier) {
-    return freeze({
-      ...node,
-      frontModifiers: node.frontModifiers ? freeze([...node.frontModifiers, modifier]) : [modifier]
-    });
-  },
-  cloneWithEndModifier(node, modifier) {
-    return freeze({
-      ...node,
-      endModifiers: node.endModifiers ? freeze([...node.endModifiers, modifier]) : [modifier]
-    });
-  },
-  cloneWith(node, props) {
-    return freeze({
-      ...node,
-      ...props
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-column-node.js
-var DropColumnNode = freeze({
-  is(node) {
-    return node.kind === "DropColumnNode";
-  },
-  create(column) {
-    return freeze({
-      kind: "DropColumnNode",
-      column: ColumnNode.create(column)
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/rename-column-node.js
-var RenameColumnNode = freeze({
-  is(node) {
-    return node.kind === "RenameColumnNode";
-  },
-  create(column, newColumn) {
-    return freeze({
-      kind: "RenameColumnNode",
-      column: ColumnNode.create(column),
-      renameTo: ColumnNode.create(newColumn)
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/check-constraint-node.js
-var CheckConstraintNode = freeze({
-  is(node) {
-    return node.kind === "CheckConstraintNode";
-  },
-  create(expression, constraintName) {
-    return freeze({
-      kind: "CheckConstraintNode",
-      expression,
-      name: constraintName ? IdentifierNode.create(constraintName) : undefined
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/references-node.js
-var ON_MODIFY_FOREIGN_ACTIONS = [
-  "no action",
-  "restrict",
-  "cascade",
-  "set null",
-  "set default"
-];
-var ReferencesNode = freeze({
-  is(node) {
-    return node.kind === "ReferencesNode";
-  },
-  create(table, columns) {
-    return freeze({
-      kind: "ReferencesNode",
-      table,
-      columns: freeze([...columns])
-    });
-  },
-  cloneWithOnDelete(references, onDelete) {
-    return freeze({
-      ...references,
-      onDelete
-    });
-  },
-  cloneWithOnUpdate(references, onUpdate) {
-    return freeze({
-      ...references,
-      onUpdate
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/default-value-parser.js
-function parseDefaultValueExpression(value) {
-  return isOperationNodeSource(value) ? value.toOperationNode() : ValueNode.createImmediate(value);
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/generated-node.js
-var GeneratedNode = freeze({
-  is(node) {
-    return node.kind === "GeneratedNode";
-  },
-  create(params) {
-    return freeze({
-      kind: "GeneratedNode",
-      ...params
-    });
-  },
-  createWithExpression(expression) {
-    return freeze({
-      kind: "GeneratedNode",
-      always: true,
-      expression
-    });
-  },
-  cloneWith(node, params) {
-    return freeze({
-      ...node,
-      ...params
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/default-value-node.js
-var DefaultValueNode = freeze({
-  is(node) {
-    return node.kind === "DefaultValueNode";
-  },
-  create(defaultValue) {
-    return freeze({
-      kind: "DefaultValueNode",
-      defaultValue
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/on-modify-action-parser.js
-function parseOnModifyForeignAction(action) {
-  if (ON_MODIFY_FOREIGN_ACTIONS.includes(action)) {
-    return action;
-  }
-  throw new Error(`invalid OnModifyForeignAction ${action}`);
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/column-definition-builder.js
-class ColumnDefinitionBuilder {
-  #node;
-  constructor(node) {
-    this.#node = node;
-  }
-  autoIncrement() {
-    return new ColumnDefinitionBuilder(ColumnDefinitionNode.cloneWith(this.#node, { autoIncrement: true }));
-  }
-  identity() {
-    return new ColumnDefinitionBuilder(ColumnDefinitionNode.cloneWith(this.#node, { identity: true }));
-  }
-  primaryKey() {
-    return new ColumnDefinitionBuilder(ColumnDefinitionNode.cloneWith(this.#node, { primaryKey: true }));
-  }
-  references(ref) {
-    const references = parseStringReference(ref);
-    if (!references.table || SelectAllNode.is(references.column)) {
-      throw new Error(`invalid call references('${ref}'). The reference must have format table.column or schema.table.column`);
-    }
-    return new ColumnDefinitionBuilder(ColumnDefinitionNode.cloneWith(this.#node, {
-      references: ReferencesNode.create(references.table, [
-        references.column
-      ])
-    }));
-  }
-  onDelete(onDelete) {
-    if (!this.#node.references) {
-      throw new Error("on delete constraint can only be added for foreign keys");
-    }
-    return new ColumnDefinitionBuilder(ColumnDefinitionNode.cloneWith(this.#node, {
-      references: ReferencesNode.cloneWithOnDelete(this.#node.references, parseOnModifyForeignAction(onDelete))
-    }));
-  }
-  onUpdate(onUpdate) {
-    if (!this.#node.references) {
-      throw new Error("on update constraint can only be added for foreign keys");
-    }
-    return new ColumnDefinitionBuilder(ColumnDefinitionNode.cloneWith(this.#node, {
-      references: ReferencesNode.cloneWithOnUpdate(this.#node.references, parseOnModifyForeignAction(onUpdate))
-    }));
-  }
-  unique() {
-    return new ColumnDefinitionBuilder(ColumnDefinitionNode.cloneWith(this.#node, { unique: true }));
-  }
-  notNull() {
-    return new ColumnDefinitionBuilder(ColumnDefinitionNode.cloneWith(this.#node, { notNull: true }));
-  }
-  unsigned() {
-    return new ColumnDefinitionBuilder(ColumnDefinitionNode.cloneWith(this.#node, { unsigned: true }));
-  }
-  defaultTo(value) {
-    return new ColumnDefinitionBuilder(ColumnDefinitionNode.cloneWith(this.#node, {
-      defaultTo: DefaultValueNode.create(parseDefaultValueExpression(value))
-    }));
-  }
-  check(expression) {
-    return new ColumnDefinitionBuilder(ColumnDefinitionNode.cloneWith(this.#node, {
-      check: CheckConstraintNode.create(expression.toOperationNode())
-    }));
-  }
-  generatedAlwaysAs(expression) {
-    return new ColumnDefinitionBuilder(ColumnDefinitionNode.cloneWith(this.#node, {
-      generated: GeneratedNode.createWithExpression(expression.toOperationNode())
-    }));
-  }
-  generatedAlwaysAsIdentity() {
-    return new ColumnDefinitionBuilder(ColumnDefinitionNode.cloneWith(this.#node, {
-      generated: GeneratedNode.create({ identity: true, always: true })
-    }));
-  }
-  generatedByDefaultAsIdentity() {
-    return new ColumnDefinitionBuilder(ColumnDefinitionNode.cloneWith(this.#node, {
-      generated: GeneratedNode.create({ identity: true, byDefault: true })
-    }));
-  }
-  stored() {
-    if (!this.#node.generated) {
-      throw new Error("stored() can only be called after generatedAlwaysAs");
-    }
-    return new ColumnDefinitionBuilder(ColumnDefinitionNode.cloneWith(this.#node, {
-      generated: GeneratedNode.cloneWith(this.#node.generated, {
-        stored: true
-      })
-    }));
-  }
-  modifyFront(modifier) {
-    return new ColumnDefinitionBuilder(ColumnDefinitionNode.cloneWithFrontModifier(this.#node, modifier.toOperationNode()));
-  }
-  nullsNotDistinct() {
-    return new ColumnDefinitionBuilder(ColumnDefinitionNode.cloneWith(this.#node, { nullsNotDistinct: true }));
-  }
-  ifNotExists() {
-    return new ColumnDefinitionBuilder(ColumnDefinitionNode.cloneWith(this.#node, { ifNotExists: true }));
-  }
-  modifyEnd(modifier) {
-    return new ColumnDefinitionBuilder(ColumnDefinitionNode.cloneWithEndModifier(this.#node, modifier.toOperationNode()));
-  }
-  $call(func) {
-    return func(this);
-  }
-  toOperationNode() {
-    return this.#node;
-  }
-}
-preventAwait(ColumnDefinitionBuilder, "don't await ColumnDefinitionBuilder instances directly.");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/modify-column-node.js
-var ModifyColumnNode = freeze({
-  is(node) {
-    return node.kind === "ModifyColumnNode";
-  },
-  create(column) {
-    return freeze({
-      kind: "ModifyColumnNode",
-      column
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/foreign-key-constraint-node.js
-var ForeignKeyConstraintNode = freeze({
-  is(node) {
-    return node.kind === "ForeignKeyConstraintNode";
-  },
-  create(sourceColumns, targetTable, targetColumns, constraintName) {
-    return freeze({
-      kind: "ForeignKeyConstraintNode",
-      columns: sourceColumns,
-      references: ReferencesNode.create(targetTable, targetColumns),
-      name: constraintName ? IdentifierNode.create(constraintName) : undefined
-    });
-  },
-  cloneWith(node, props) {
-    return freeze({
-      ...node,
-      ...props
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/foreign-key-constraint-builder.js
-class ForeignKeyConstraintBuilder {
-  #node;
-  constructor(node) {
-    this.#node = node;
-  }
-  onDelete(onDelete) {
-    return new ForeignKeyConstraintBuilder(ForeignKeyConstraintNode.cloneWith(this.#node, {
-      onDelete: parseOnModifyForeignAction(onDelete)
-    }));
-  }
-  onUpdate(onUpdate) {
-    return new ForeignKeyConstraintBuilder(ForeignKeyConstraintNode.cloneWith(this.#node, {
-      onUpdate: parseOnModifyForeignAction(onUpdate)
-    }));
-  }
-  $call(func) {
-    return func(this);
-  }
-  toOperationNode() {
-    return this.#node;
-  }
-}
-preventAwait(ForeignKeyConstraintBuilder, "don't await ForeignKeyConstraintBuilder instances directly.");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/add-constraint-node.js
-var AddConstraintNode = freeze({
-  is(node) {
-    return node.kind === "AddConstraintNode";
-  },
-  create(constraint) {
-    return freeze({
-      kind: "AddConstraintNode",
-      constraint
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/unique-constraint-node.js
-var UniqueConstraintNode = freeze({
-  is(node) {
-    return node.kind === "UniqueConstraintNode";
-  },
-  create(columns, constraintName, nullsNotDistinct) {
-    return freeze({
-      kind: "UniqueConstraintNode",
-      columns: freeze(columns.map(ColumnNode.create)),
-      name: constraintName ? IdentifierNode.create(constraintName) : undefined,
-      nullsNotDistinct
-    });
-  },
-  cloneWith(node, props) {
-    return freeze({
-      ...node,
-      ...props
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-constraint-node.js
-var DropConstraintNode = freeze({
-  is(node) {
-    return node.kind === "DropConstraintNode";
-  },
-  create(constraintName) {
-    return freeze({
-      kind: "DropConstraintNode",
-      constraintName: IdentifierNode.create(constraintName)
-    });
-  },
-  cloneWith(dropConstraint, props) {
-    return freeze({
-      ...dropConstraint,
-      ...props
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/alter-column-node.js
-var AlterColumnNode = freeze({
-  is(node) {
-    return node.kind === "AlterColumnNode";
-  },
-  create(column, prop, value) {
-    return freeze({
-      kind: "AlterColumnNode",
-      column: ColumnNode.create(column),
-      [prop]: value
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/alter-column-builder.js
-class AlterColumnBuilder {
-  #column;
-  constructor(column) {
-    this.#column = column;
-  }
-  setDataType(dataType) {
-    return new AlteredColumnBuilder(AlterColumnNode.create(this.#column, "dataType", parseDataTypeExpression(dataType)));
-  }
-  setDefault(value) {
-    return new AlteredColumnBuilder(AlterColumnNode.create(this.#column, "setDefault", parseDefaultValueExpression(value)));
-  }
-  dropDefault() {
-    return new AlteredColumnBuilder(AlterColumnNode.create(this.#column, "dropDefault", true));
-  }
-  setNotNull() {
-    return new AlteredColumnBuilder(AlterColumnNode.create(this.#column, "setNotNull", true));
-  }
-  dropNotNull() {
-    return new AlteredColumnBuilder(AlterColumnNode.create(this.#column, "dropNotNull", true));
-  }
-  $call(func) {
-    return func(this);
-  }
-}
-preventAwait(AlterColumnBuilder, "don't await AlterColumnBuilder instances");
-
-class AlteredColumnBuilder {
-  #alterColumnNode;
-  constructor(alterColumnNode) {
-    this.#alterColumnNode = alterColumnNode;
-  }
-  toOperationNode() {
-    return this.#alterColumnNode;
-  }
-}
-preventAwait(AlteredColumnBuilder, "don't await AlteredColumnBuilder instances");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/alter-table-executor.js
-class AlterTableExecutor {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(this.#props.node, this.#props.queryId);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute() {
-    await this.#props.executor.executeQuery(this.compile(), this.#props.queryId);
-  }
-}
-preventAwait(AlterTableExecutor, "don't await AlterTableExecutor instances directly. To execute the query you need to call `execute`");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/alter-table-add-foreign-key-constraint-builder.js
-class AlterTableAddForeignKeyConstraintBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  onDelete(onDelete) {
-    return new AlterTableAddForeignKeyConstraintBuilder({
-      ...this.#props,
-      constraintBuilder: this.#props.constraintBuilder.onDelete(onDelete)
-    });
-  }
-  onUpdate(onUpdate) {
-    return new AlterTableAddForeignKeyConstraintBuilder({
-      ...this.#props,
-      constraintBuilder: this.#props.constraintBuilder.onUpdate(onUpdate)
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(AlterTableNode.cloneWithTableProps(this.#props.node, {
-      addConstraint: AddConstraintNode.create(this.#props.constraintBuilder.toOperationNode())
-    }), this.#props.queryId);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute() {
-    await this.#props.executor.executeQuery(this.compile(), this.#props.queryId);
-  }
-}
-preventAwait(AlterTableAddForeignKeyConstraintBuilder, "don't await AlterTableAddForeignKeyConstraintBuilder instances directly. To execute the query you need to call `execute`");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/alter-table-drop-constraint-builder.js
-class AlterTableDropConstraintBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  ifExists() {
-    return new AlterTableDropConstraintBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithTableProps(this.#props.node, {
-        dropConstraint: DropConstraintNode.cloneWith(this.#props.node.dropConstraint, {
-          ifExists: true
-        })
-      })
-    });
-  }
-  cascade() {
-    return new AlterTableDropConstraintBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithTableProps(this.#props.node, {
-        dropConstraint: DropConstraintNode.cloneWith(this.#props.node.dropConstraint, {
-          modifier: "cascade"
-        })
-      })
-    });
-  }
-  restrict() {
-    return new AlterTableDropConstraintBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithTableProps(this.#props.node, {
-        dropConstraint: DropConstraintNode.cloneWith(this.#props.node.dropConstraint, {
-          modifier: "restrict"
-        })
-      })
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(this.#props.node, this.#props.queryId);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute() {
-    await this.#props.executor.executeQuery(this.compile(), this.#props.queryId);
-  }
-}
-preventAwait(AlterTableDropConstraintBuilder, "don't await AlterTableDropConstraintBuilder instances directly. To execute the query you need to call `execute`");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/primary-constraint-node.js
-var PrimaryConstraintNode = freeze({
-  is(node) {
-    return node.kind === "PrimaryKeyConstraintNode";
-  },
-  create(columns, constraintName) {
-    return freeze({
-      kind: "PrimaryKeyConstraintNode",
-      columns: freeze(columns.map(ColumnNode.create)),
-      name: constraintName ? IdentifierNode.create(constraintName) : undefined
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/add-index-node.js
-var AddIndexNode = freeze({
-  is(node) {
-    return node.kind === "AddIndexNode";
-  },
-  create(name) {
-    return freeze({
-      kind: "AddIndexNode",
-      name: IdentifierNode.create(name)
-    });
-  },
-  cloneWith(node, props) {
-    return freeze({
-      ...node,
-      ...props
-    });
-  },
-  cloneWithColumns(node, columns) {
-    return freeze({
-      ...node,
-      columns: [...node.columns || [], ...columns]
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/alter-table-add-index-builder.js
-class AlterTableAddIndexBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  unique() {
-    return new AlterTableAddIndexBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithTableProps(this.#props.node, {
-        addIndex: AddIndexNode.cloneWith(this.#props.node.addIndex, {
-          unique: true
-        })
-      })
-    });
-  }
-  column(column) {
-    return new AlterTableAddIndexBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithTableProps(this.#props.node, {
-        addIndex: AddIndexNode.cloneWithColumns(this.#props.node.addIndex, [
-          parseOrderedColumnName(column)
-        ])
-      })
-    });
-  }
-  columns(columns) {
-    return new AlterTableAddIndexBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithTableProps(this.#props.node, {
-        addIndex: AddIndexNode.cloneWithColumns(this.#props.node.addIndex, columns.map(parseOrderedColumnName))
-      })
-    });
-  }
-  expression(expression) {
-    return new AlterTableAddIndexBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithTableProps(this.#props.node, {
-        addIndex: AddIndexNode.cloneWithColumns(this.#props.node.addIndex, [
-          expression.toOperationNode()
-        ])
-      })
-    });
-  }
-  using(indexType) {
-    return new AlterTableAddIndexBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithTableProps(this.#props.node, {
-        addIndex: AddIndexNode.cloneWith(this.#props.node.addIndex, {
-          using: RawNode.createWithSql(indexType)
-        })
-      })
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(this.#props.node, this.#props.queryId);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute() {
-    await this.#props.executor.executeQuery(this.compile(), this.#props.queryId);
-  }
-}
-preventAwait(AlterTableAddIndexBuilder, "don't await AlterTableAddIndexBuilder instances directly. To execute the query you need to call `execute`");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/unique-constraint-builder.js
-class UniqueConstraintNodeBuilder {
-  #node;
-  constructor(node) {
-    this.#node = node;
-  }
-  toOperationNode() {
-    return this.#node;
-  }
-  nullsNotDistinct() {
-    return new UniqueConstraintNodeBuilder(UniqueConstraintNode.cloneWith(this.#node, { nullsNotDistinct: true }));
-  }
-}
-preventAwait(UniqueConstraintNodeBuilder, "don't await UniqueConstraintNodeBuilder instances directly.");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/alter-table-builder.js
-class AlterTableBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  renameTo(newTableName) {
-    return new AlterTableExecutor({
-      ...this.#props,
-      node: AlterTableNode.cloneWithTableProps(this.#props.node, {
-        renameTo: parseTable(newTableName)
-      })
-    });
-  }
-  setSchema(newSchema) {
-    return new AlterTableExecutor({
-      ...this.#props,
-      node: AlterTableNode.cloneWithTableProps(this.#props.node, {
-        setSchema: IdentifierNode.create(newSchema)
-      })
-    });
-  }
-  alterColumn(column, alteration) {
-    const builder = alteration(new AlterColumnBuilder(column));
-    return new AlterTableColumnAlteringBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithColumnAlteration(this.#props.node, builder.toOperationNode())
-    });
-  }
-  dropColumn(column) {
-    return new AlterTableColumnAlteringBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithColumnAlteration(this.#props.node, DropColumnNode.create(column))
-    });
-  }
-  renameColumn(column, newColumn) {
-    return new AlterTableColumnAlteringBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithColumnAlteration(this.#props.node, RenameColumnNode.create(column, newColumn))
-    });
-  }
-  addColumn(columnName, dataType, build = noop) {
-    const builder = build(new ColumnDefinitionBuilder(ColumnDefinitionNode.create(columnName, parseDataTypeExpression(dataType))));
-    return new AlterTableColumnAlteringBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithColumnAlteration(this.#props.node, AddColumnNode.create(builder.toOperationNode()))
-    });
-  }
-  modifyColumn(columnName, dataType, build = noop) {
-    const builder = build(new ColumnDefinitionBuilder(ColumnDefinitionNode.create(columnName, parseDataTypeExpression(dataType))));
-    return new AlterTableColumnAlteringBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithColumnAlteration(this.#props.node, ModifyColumnNode.create(builder.toOperationNode()))
-    });
-  }
-  addUniqueConstraint(constraintName, columns, build = noop) {
-    const uniqueConstraintBuilder = build(new UniqueConstraintNodeBuilder(UniqueConstraintNode.create(columns, constraintName)));
-    return new AlterTableExecutor({
-      ...this.#props,
-      node: AlterTableNode.cloneWithTableProps(this.#props.node, {
-        addConstraint: AddConstraintNode.create(uniqueConstraintBuilder.toOperationNode())
-      })
-    });
-  }
-  addCheckConstraint(constraintName, checkExpression) {
-    return new AlterTableExecutor({
-      ...this.#props,
-      node: AlterTableNode.cloneWithTableProps(this.#props.node, {
-        addConstraint: AddConstraintNode.create(CheckConstraintNode.create(checkExpression.toOperationNode(), constraintName))
-      })
-    });
-  }
-  addForeignKeyConstraint(constraintName, columns, targetTable, targetColumns) {
-    return new AlterTableAddForeignKeyConstraintBuilder({
-      ...this.#props,
-      constraintBuilder: new ForeignKeyConstraintBuilder(ForeignKeyConstraintNode.create(columns.map(ColumnNode.create), parseTable(targetTable), targetColumns.map(ColumnNode.create), constraintName))
-    });
-  }
-  addPrimaryKeyConstraint(constraintName, columns) {
-    return new AlterTableExecutor({
-      ...this.#props,
-      node: AlterTableNode.cloneWithTableProps(this.#props.node, {
-        addConstraint: AddConstraintNode.create(PrimaryConstraintNode.create(columns, constraintName))
-      })
-    });
-  }
-  dropConstraint(constraintName) {
-    return new AlterTableDropConstraintBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithTableProps(this.#props.node, {
-        dropConstraint: DropConstraintNode.create(constraintName)
-      })
-    });
-  }
-  addIndex(indexName) {
-    return new AlterTableAddIndexBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithTableProps(this.#props.node, {
-        addIndex: AddIndexNode.create(indexName)
-      })
-    });
-  }
-  dropIndex(indexName) {
-    return new AlterTableExecutor({
-      ...this.#props,
-      node: AlterTableNode.cloneWithTableProps(this.#props.node, {
-        dropIndex: DropIndexNode.create(indexName)
-      })
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-}
-preventAwait(AlterTableBuilder, "don't await AlterTableBuilder instances");
-
-class AlterTableColumnAlteringBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  alterColumn(column, alteration) {
-    const builder = alteration(new AlterColumnBuilder(column));
-    return new AlterTableColumnAlteringBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithColumnAlteration(this.#props.node, builder.toOperationNode())
-    });
-  }
-  dropColumn(column) {
-    return new AlterTableColumnAlteringBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithColumnAlteration(this.#props.node, DropColumnNode.create(column))
-    });
-  }
-  renameColumn(column, newColumn) {
-    return new AlterTableColumnAlteringBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithColumnAlteration(this.#props.node, RenameColumnNode.create(column, newColumn))
-    });
-  }
-  addColumn(columnName, dataType, build = noop) {
-    const builder = build(new ColumnDefinitionBuilder(ColumnDefinitionNode.create(columnName, parseDataTypeExpression(dataType))));
-    return new AlterTableColumnAlteringBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithColumnAlteration(this.#props.node, AddColumnNode.create(builder.toOperationNode()))
-    });
-  }
-  modifyColumn(columnName, dataType, build = noop) {
-    const builder = build(new ColumnDefinitionBuilder(ColumnDefinitionNode.create(columnName, parseDataTypeExpression(dataType))));
-    return new AlterTableColumnAlteringBuilder({
-      ...this.#props,
-      node: AlterTableNode.cloneWithColumnAlteration(this.#props.node, ModifyColumnNode.create(builder.toOperationNode()))
-    });
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(this.#props.node, this.#props.queryId);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute() {
-    await this.#props.executor.executeQuery(this.compile(), this.#props.queryId);
-  }
-}
-preventAwait(AlterTableColumnAlteringBuilder, "don't await AlterTableColumnAlteringBuilder instances directly. To execute the query you need to call `execute`");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/immediate-value/immediate-value-transformer.js
-class ImmediateValueTransformer extends OperationNodeTransformer {
-  transformValue(node) {
-    return {
-      ...super.transformValue(node),
-      immediate: true
-    };
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/create-index-builder.js
-class CreateIndexBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  ifNotExists() {
-    return new CreateIndexBuilder({
-      ...this.#props,
-      node: CreateIndexNode.cloneWith(this.#props.node, {
-        ifNotExists: true
-      })
-    });
-  }
-  unique() {
-    return new CreateIndexBuilder({
-      ...this.#props,
-      node: CreateIndexNode.cloneWith(this.#props.node, {
-        unique: true
-      })
-    });
-  }
-  nullsNotDistinct() {
-    return new CreateIndexBuilder({
-      ...this.#props,
-      node: CreateIndexNode.cloneWith(this.#props.node, {
-        nullsNotDistinct: true
-      })
-    });
-  }
-  on(table) {
-    return new CreateIndexBuilder({
-      ...this.#props,
-      node: CreateIndexNode.cloneWith(this.#props.node, {
-        table: parseTable(table)
-      })
-    });
-  }
-  column(column) {
-    return new CreateIndexBuilder({
-      ...this.#props,
-      node: CreateIndexNode.cloneWithColumns(this.#props.node, [
-        parseOrderedColumnName(column)
-      ])
-    });
-  }
-  columns(columns) {
-    return new CreateIndexBuilder({
-      ...this.#props,
-      node: CreateIndexNode.cloneWithColumns(this.#props.node, columns.map(parseOrderedColumnName))
-    });
-  }
-  expression(expression) {
-    return new CreateIndexBuilder({
-      ...this.#props,
-      node: CreateIndexNode.cloneWithColumns(this.#props.node, [
-        expression.toOperationNode()
-      ])
-    });
-  }
-  using(indexType) {
-    return new CreateIndexBuilder({
-      ...this.#props,
-      node: CreateIndexNode.cloneWith(this.#props.node, {
-        using: RawNode.createWithSql(indexType)
-      })
-    });
-  }
-  where(...args) {
-    const transformer = new ImmediateValueTransformer;
-    return new CreateIndexBuilder({
-      ...this.#props,
-      node: QueryNode.cloneWithWhere(this.#props.node, transformer.transformNode(parseValueBinaryOperationOrExpression(args)))
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(this.#props.node, this.#props.queryId);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute() {
-    await this.#props.executor.executeQuery(this.compile(), this.#props.queryId);
-  }
-}
-preventAwait(CreateIndexBuilder, "don't await CreateIndexBuilder instances directly. To execute the query you need to call `execute`");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/create-schema-builder.js
-class CreateSchemaBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  ifNotExists() {
-    return new CreateSchemaBuilder({
-      ...this.#props,
-      node: CreateSchemaNode.cloneWith(this.#props.node, { ifNotExists: true })
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(this.#props.node, this.#props.queryId);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute() {
-    await this.#props.executor.executeQuery(this.compile(), this.#props.queryId);
-  }
-}
-preventAwait(CreateSchemaBuilder, "don't await CreateSchemaBuilder instances directly. To execute the query you need to call `execute`");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/on-commit-action-parse.js
-function parseOnCommitAction(action) {
-  if (ON_COMMIT_ACTIONS.includes(action)) {
-    return action;
-  }
-  throw new Error(`invalid OnCommitAction ${action}`);
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/create-table-builder.js
-class CreateTableBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  temporary() {
-    return new CreateTableBuilder({
-      ...this.#props,
-      node: CreateTableNode.cloneWith(this.#props.node, {
-        temporary: true
-      })
-    });
-  }
-  onCommit(onCommit) {
-    return new CreateTableBuilder({
-      ...this.#props,
-      node: CreateTableNode.cloneWith(this.#props.node, {
-        onCommit: parseOnCommitAction(onCommit)
-      })
-    });
-  }
-  ifNotExists() {
-    return new CreateTableBuilder({
-      ...this.#props,
-      node: CreateTableNode.cloneWith(this.#props.node, {
-        ifNotExists: true
-      })
-    });
-  }
-  addColumn(columnName, dataType, build = noop) {
-    const columnBuilder = build(new ColumnDefinitionBuilder(ColumnDefinitionNode.create(columnName, parseDataTypeExpression(dataType))));
-    return new CreateTableBuilder({
-      ...this.#props,
-      node: CreateTableNode.cloneWithColumn(this.#props.node, columnBuilder.toOperationNode())
-    });
-  }
-  addPrimaryKeyConstraint(constraintName, columns) {
-    return new CreateTableBuilder({
-      ...this.#props,
-      node: CreateTableNode.cloneWithConstraint(this.#props.node, PrimaryConstraintNode.create(columns, constraintName))
-    });
-  }
-  addUniqueConstraint(constraintName, columns, build = noop) {
-    const uniqueConstraintBuilder = build(new UniqueConstraintNodeBuilder(UniqueConstraintNode.create(columns, constraintName)));
-    return new CreateTableBuilder({
-      ...this.#props,
-      node: CreateTableNode.cloneWithConstraint(this.#props.node, uniqueConstraintBuilder.toOperationNode())
-    });
-  }
-  addCheckConstraint(constraintName, checkExpression) {
-    return new CreateTableBuilder({
-      ...this.#props,
-      node: CreateTableNode.cloneWithConstraint(this.#props.node, CheckConstraintNode.create(checkExpression.toOperationNode(), constraintName))
-    });
-  }
-  addForeignKeyConstraint(constraintName, columns, targetTable, targetColumns, build = noop) {
-    const builder = build(new ForeignKeyConstraintBuilder(ForeignKeyConstraintNode.create(columns.map(ColumnNode.create), parseTable(targetTable), targetColumns.map(ColumnNode.create), constraintName)));
-    return new CreateTableBuilder({
-      ...this.#props,
-      node: CreateTableNode.cloneWithConstraint(this.#props.node, builder.toOperationNode())
-    });
-  }
-  modifyFront(modifier) {
-    return new CreateTableBuilder({
-      ...this.#props,
-      node: CreateTableNode.cloneWithFrontModifier(this.#props.node, modifier.toOperationNode())
-    });
-  }
-  modifyEnd(modifier) {
-    return new CreateTableBuilder({
-      ...this.#props,
-      node: CreateTableNode.cloneWithEndModifier(this.#props.node, modifier.toOperationNode())
-    });
-  }
-  as(expression) {
-    return new CreateTableBuilder({
-      ...this.#props,
-      node: CreateTableNode.cloneWith(this.#props.node, {
-        selectQuery: parseExpression(expression)
-      })
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(this.#props.node, this.#props.queryId);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute() {
-    await this.#props.executor.executeQuery(this.compile(), this.#props.queryId);
-  }
-}
-preventAwait(CreateTableBuilder, "don't await CreateTableBuilder instances directly. To execute the query you need to call `execute`");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/drop-index-builder.js
-class DropIndexBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  on(table) {
-    return new DropIndexBuilder({
-      ...this.#props,
-      node: DropIndexNode.cloneWith(this.#props.node, {
-        table: parseTable(table)
-      })
-    });
-  }
-  ifExists() {
-    return new DropIndexBuilder({
-      ...this.#props,
-      node: DropIndexNode.cloneWith(this.#props.node, {
-        ifExists: true
-      })
-    });
-  }
-  cascade() {
-    return new DropIndexBuilder({
-      ...this.#props,
-      node: DropIndexNode.cloneWith(this.#props.node, {
-        cascade: true
-      })
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(this.#props.node, this.#props.queryId);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute() {
-    await this.#props.executor.executeQuery(this.compile(), this.#props.queryId);
-  }
-}
-preventAwait(DropIndexBuilder, "don't await DropIndexBuilder instances directly. To execute the query you need to call `execute`");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/drop-schema-builder.js
-class DropSchemaBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  ifExists() {
-    return new DropSchemaBuilder({
-      ...this.#props,
-      node: DropSchemaNode.cloneWith(this.#props.node, {
-        ifExists: true
-      })
-    });
-  }
-  cascade() {
-    return new DropSchemaBuilder({
-      ...this.#props,
-      node: DropSchemaNode.cloneWith(this.#props.node, {
-        cascade: true
-      })
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(this.#props.node, this.#props.queryId);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute() {
-    await this.#props.executor.executeQuery(this.compile(), this.#props.queryId);
-  }
-}
-preventAwait(DropSchemaBuilder, "don't await DropSchemaBuilder instances directly. To execute the query you need to call `execute`");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/drop-table-builder.js
-class DropTableBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  ifExists() {
-    return new DropTableBuilder({
-      ...this.#props,
-      node: DropTableNode.cloneWith(this.#props.node, {
-        ifExists: true
-      })
-    });
-  }
-  cascade() {
-    return new DropTableBuilder({
-      ...this.#props,
-      node: DropTableNode.cloneWith(this.#props.node, {
-        cascade: true
-      })
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(this.#props.node, this.#props.queryId);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute() {
-    await this.#props.executor.executeQuery(this.compile(), this.#props.queryId);
-  }
-}
-preventAwait(DropTableBuilder, "don't await DropTableBuilder instances directly. To execute the query you need to call `execute`");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/create-view-node.js
-var CreateViewNode = freeze({
-  is(node) {
-    return node.kind === "CreateViewNode";
-  },
-  create(name) {
-    return freeze({
-      kind: "CreateViewNode",
-      name: SchemableIdentifierNode.create(name)
-    });
-  },
-  cloneWith(createView, params) {
-    return freeze({
-      ...createView,
-      ...params
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/immediate-value/immediate-value-plugin.js
-class ImmediateValuePlugin {
-  #transformer = new ImmediateValueTransformer;
-  transformQuery(args) {
-    return this.#transformer.transformNode(args.node);
-  }
-  transformResult(args) {
-    return Promise.resolve(args.result);
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/create-view-builder.js
-class CreateViewBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  temporary() {
-    return new CreateViewBuilder({
-      ...this.#props,
-      node: CreateViewNode.cloneWith(this.#props.node, {
-        temporary: true
-      })
-    });
-  }
-  materialized() {
-    return new CreateViewBuilder({
-      ...this.#props,
-      node: CreateViewNode.cloneWith(this.#props.node, {
-        materialized: true
-      })
-    });
-  }
-  ifNotExists() {
-    return new CreateViewBuilder({
-      ...this.#props,
-      node: CreateViewNode.cloneWith(this.#props.node, {
-        ifNotExists: true
-      })
-    });
-  }
-  orReplace() {
-    return new CreateViewBuilder({
-      ...this.#props,
-      node: CreateViewNode.cloneWith(this.#props.node, {
-        orReplace: true
-      })
-    });
-  }
-  columns(columns) {
-    return new CreateViewBuilder({
-      ...this.#props,
-      node: CreateViewNode.cloneWith(this.#props.node, {
-        columns: columns.map(parseColumnName)
-      })
-    });
-  }
-  as(query) {
-    const queryNode = query.withPlugin(new ImmediateValuePlugin).toOperationNode();
-    return new CreateViewBuilder({
-      ...this.#props,
-      node: CreateViewNode.cloneWith(this.#props.node, {
-        as: queryNode
-      })
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(this.#props.node, this.#props.queryId);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute() {
-    await this.#props.executor.executeQuery(this.compile(), this.#props.queryId);
-  }
-}
-preventAwait(CreateViewBuilder, "don't await CreateViewBuilder instances directly. To execute the query you need to call `execute`");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-view-node.js
-var DropViewNode = freeze({
-  is(node) {
-    return node.kind === "DropViewNode";
-  },
-  create(name) {
-    return freeze({
-      kind: "DropViewNode",
-      name: SchemableIdentifierNode.create(name)
-    });
-  },
-  cloneWith(dropView, params) {
-    return freeze({
-      ...dropView,
-      ...params
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/drop-view-builder.js
-class DropViewBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  materialized() {
-    return new DropViewBuilder({
-      ...this.#props,
-      node: DropViewNode.cloneWith(this.#props.node, {
-        materialized: true
-      })
-    });
-  }
-  ifExists() {
-    return new DropViewBuilder({
-      ...this.#props,
-      node: DropViewNode.cloneWith(this.#props.node, {
-        ifExists: true
-      })
-    });
-  }
-  cascade() {
-    return new DropViewBuilder({
-      ...this.#props,
-      node: DropViewNode.cloneWith(this.#props.node, {
-        cascade: true
-      })
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(this.#props.node, this.#props.queryId);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute() {
-    await this.#props.executor.executeQuery(this.compile(), this.#props.queryId);
-  }
-}
-preventAwait(DropViewBuilder, "don't await DropViewBuilder instances directly. To execute the query you need to call `execute`");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/create-type-node.js
-var CreateTypeNode = freeze({
-  is(node) {
-    return node.kind === "CreateTypeNode";
-  },
-  create(name) {
-    return freeze({
-      kind: "CreateTypeNode",
-      name
-    });
-  },
-  cloneWithEnum(createType, values) {
-    return freeze({
-      ...createType,
-      enum: ValueListNode.create(values.map((value) => ValueNode.createImmediate(value)))
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/create-type-builder.js
-class CreateTypeBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(this.#props.node, this.#props.queryId);
-  }
-  asEnum(values) {
-    return new CreateTypeBuilder({
-      ...this.#props,
-      node: CreateTypeNode.cloneWithEnum(this.#props.node, values)
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute() {
-    await this.#props.executor.executeQuery(this.compile(), this.#props.queryId);
-  }
-}
-preventAwait(CreateTypeBuilder, "don't await CreateTypeBuilder instances directly. To execute the query you need to call `execute`");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/drop-type-node.js
-var DropTypeNode = freeze({
-  is(node) {
-    return node.kind === "DropTypeNode";
-  },
-  create(name) {
-    return freeze({
-      kind: "DropTypeNode",
-      name
-    });
-  },
-  cloneWith(dropType, params) {
-    return freeze({
-      ...dropType,
-      ...params
-    });
-  }
-});
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/drop-type-builder.js
-class DropTypeBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  ifExists() {
-    return new DropTypeBuilder({
-      ...this.#props,
-      node: DropTypeNode.cloneWith(this.#props.node, {
-        ifExists: true
-      })
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(this.#props.node, this.#props.queryId);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute() {
-    await this.#props.executor.executeQuery(this.compile(), this.#props.queryId);
-  }
-}
-preventAwait(DropTypeBuilder, "don't await DropTypeBuilder instances directly. To execute the query you need to call `execute`");
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/parser/identifier-parser.js
-function parseSchemableIdentifier(id) {
-  const SCHEMA_SEPARATOR = ".";
-  if (id.includes(SCHEMA_SEPARATOR)) {
-    const parts = id.split(SCHEMA_SEPARATOR).map(trim3);
-    if (parts.length === 2) {
-      return SchemableIdentifierNode.createWithSchema(parts[0], parts[1]);
-    } else {
-      throw new Error(`invalid schemable identifier ${id}`);
-    }
-  } else {
-    return SchemableIdentifierNode.create(id);
-  }
-}
-function trim3(str) {
-  return str.trim();
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/schema/schema.js
-class SchemaModule {
-  #executor;
-  constructor(executor) {
-    this.#executor = executor;
-  }
-  createTable(table) {
-    return new CreateTableBuilder({
-      queryId: createQueryId(),
-      executor: this.#executor,
-      node: CreateTableNode.create(parseTable(table))
-    });
-  }
-  dropTable(table) {
-    return new DropTableBuilder({
-      queryId: createQueryId(),
-      executor: this.#executor,
-      node: DropTableNode.create(parseTable(table))
-    });
-  }
-  createIndex(indexName) {
-    return new CreateIndexBuilder({
-      queryId: createQueryId(),
-      executor: this.#executor,
-      node: CreateIndexNode.create(indexName)
-    });
-  }
-  dropIndex(indexName) {
-    return new DropIndexBuilder({
-      queryId: createQueryId(),
-      executor: this.#executor,
-      node: DropIndexNode.create(indexName)
-    });
-  }
-  createSchema(schema) {
-    return new CreateSchemaBuilder({
-      queryId: createQueryId(),
-      executor: this.#executor,
-      node: CreateSchemaNode.create(schema)
-    });
-  }
-  dropSchema(schema) {
-    return new DropSchemaBuilder({
-      queryId: createQueryId(),
-      executor: this.#executor,
-      node: DropSchemaNode.create(schema)
-    });
-  }
-  alterTable(table) {
-    return new AlterTableBuilder({
-      queryId: createQueryId(),
-      executor: this.#executor,
-      node: AlterTableNode.create(parseTable(table))
-    });
-  }
-  createView(viewName) {
-    return new CreateViewBuilder({
-      queryId: createQueryId(),
-      executor: this.#executor,
-      node: CreateViewNode.create(viewName)
-    });
-  }
-  dropView(viewName) {
-    return new DropViewBuilder({
-      queryId: createQueryId(),
-      executor: this.#executor,
-      node: DropViewNode.create(viewName)
-    });
-  }
-  createType(typeName) {
-    return new CreateTypeBuilder({
-      queryId: createQueryId(),
-      executor: this.#executor,
-      node: CreateTypeNode.create(parseSchemableIdentifier(typeName))
-    });
-  }
-  dropType(typeName) {
-    return new DropTypeBuilder({
-      queryId: createQueryId(),
-      executor: this.#executor,
-      node: DropTypeNode.create(parseSchemableIdentifier(typeName))
-    });
-  }
-  withPlugin(plugin) {
-    return new SchemaModule(this.#executor.withPlugin(plugin));
-  }
-  withoutPlugins() {
-    return new SchemaModule(this.#executor.withoutPlugins());
-  }
-  withSchema(schema) {
-    return new SchemaModule(this.#executor.withPluginAtFront(new WithSchemaPlugin(schema)));
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dynamic/dynamic.js
-class DynamicModule {
-  ref(reference) {
-    return new DynamicReferenceBuilder(reference);
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/driver/default-connection-provider.js
-class DefaultConnectionProvider {
-  #driver;
-  constructor(driver) {
-    this.#driver = driver;
-  }
-  async provideConnection(consumer) {
-    const connection = await this.#driver.acquireConnection();
-    try {
-      return await consumer(connection);
-    } finally {
-      await this.#driver.releaseConnection(connection);
-    }
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-executor/default-query-executor.js
-class DefaultQueryExecutor extends QueryExecutorBase {
-  #compiler;
-  #adapter;
-  #connectionProvider;
-  constructor(compiler, adapter, connectionProvider, plugins = []) {
-    super(plugins);
-    this.#compiler = compiler;
-    this.#adapter = adapter;
-    this.#connectionProvider = connectionProvider;
-  }
-  get adapter() {
-    return this.#adapter;
-  }
-  compileQuery(node) {
-    return this.#compiler.compileQuery(node);
-  }
-  provideConnection(consumer) {
-    return this.#connectionProvider.provideConnection(consumer);
-  }
-  withPlugins(plugins) {
-    return new DefaultQueryExecutor(this.#compiler, this.#adapter, this.#connectionProvider, [...this.plugins, ...plugins]);
-  }
-  withPlugin(plugin) {
-    return new DefaultQueryExecutor(this.#compiler, this.#adapter, this.#connectionProvider, [...this.plugins, plugin]);
-  }
-  withPluginAtFront(plugin) {
-    return new DefaultQueryExecutor(this.#compiler, this.#adapter, this.#connectionProvider, [plugin, ...this.plugins]);
-  }
-  withConnectionProvider(connectionProvider) {
-    return new DefaultQueryExecutor(this.#compiler, this.#adapter, connectionProvider, [...this.plugins]);
-  }
-  withoutPlugins() {
-    return new DefaultQueryExecutor(this.#compiler, this.#adapter, this.#connectionProvider, []);
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/performance-now.js
-function performanceNow() {
-  if (typeof performance !== "undefined" && isFunction(performance.now)) {
-    return performance.now();
-  } else {
-    return Date.now();
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/driver/runtime-driver.js
-class RuntimeDriver {
-  #driver;
-  #log;
-  #initPromise;
-  #initDone;
-  #destroyPromise;
-  #connections = new WeakSet;
-  constructor(driver, log) {
-    this.#initDone = false;
-    this.#driver = driver;
-    this.#log = log;
-  }
-  async init() {
-    if (this.#destroyPromise) {
-      throw new Error("driver has already been destroyed");
-    }
-    if (!this.#initPromise) {
-      this.#initPromise = this.#driver.init().then(() => {
-        this.#initDone = true;
-      }).catch((err) => {
-        this.#initPromise = undefined;
-        return Promise.reject(err);
-      });
-    }
-    await this.#initPromise;
-  }
-  async acquireConnection() {
-    if (this.#destroyPromise) {
-      throw new Error("driver has already been destroyed");
-    }
-    if (!this.#initDone) {
-      await this.init();
-    }
-    const connection = await this.#driver.acquireConnection();
-    if (!this.#connections.has(connection)) {
-      if (this.#needsLogging()) {
-        this.#addLogging(connection);
-      }
-      this.#connections.add(connection);
-    }
-    return connection;
-  }
-  async releaseConnection(connection) {
-    await this.#driver.releaseConnection(connection);
-  }
-  beginTransaction(connection, settings) {
-    return this.#driver.beginTransaction(connection, settings);
-  }
-  commitTransaction(connection) {
-    return this.#driver.commitTransaction(connection);
-  }
-  rollbackTransaction(connection) {
-    return this.#driver.rollbackTransaction(connection);
-  }
-  async destroy() {
-    if (!this.#initPromise) {
-      return;
-    }
-    await this.#initPromise;
-    if (!this.#destroyPromise) {
-      this.#destroyPromise = this.#driver.destroy().catch((err) => {
-        this.#destroyPromise = undefined;
-        return Promise.reject(err);
-      });
-    }
-    await this.#destroyPromise;
-  }
-  #needsLogging() {
-    return this.#log.isLevelEnabled("query") || this.#log.isLevelEnabled("error");
-  }
-  #addLogging(connection) {
-    const executeQuery = connection.executeQuery;
-    connection.executeQuery = async (compiledQuery) => {
-      let caughtError;
-      const startTime = performanceNow();
-      try {
-        return await executeQuery.call(connection, compiledQuery);
-      } catch (error51) {
-        caughtError = error51;
-        await this.#logError(error51, compiledQuery, startTime);
-        throw error51;
-      } finally {
-        if (!caughtError) {
-          await this.#logQuery(compiledQuery, startTime);
-        }
-      }
-    };
-  }
-  async#logError(error51, compiledQuery, startTime) {
-    await this.#log.error(() => ({
-      level: "error",
-      error: error51,
-      query: compiledQuery,
-      queryDurationMillis: this.#calculateDurationMillis(startTime)
-    }));
-  }
-  async#logQuery(compiledQuery, startTime) {
-    await this.#log.query(() => ({
-      level: "query",
-      query: compiledQuery,
-      queryDurationMillis: this.#calculateDurationMillis(startTime)
-    }));
-  }
-  #calculateDurationMillis(startTime) {
-    return performanceNow() - startTime;
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/driver/single-connection-provider.js
-var ignoreError = () => {};
-
-class SingleConnectionProvider {
-  #connection;
-  #runningPromise;
-  constructor(connection) {
-    this.#connection = connection;
-  }
-  async provideConnection(consumer) {
-    while (this.#runningPromise) {
-      await this.#runningPromise.catch(ignoreError);
-    }
-    this.#runningPromise = this.#run(consumer).finally(() => {
-      this.#runningPromise = undefined;
-    });
-    return this.#runningPromise;
-  }
-  async#run(runner) {
-    return await runner(this.#connection);
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/driver/driver.js
-var TRANSACTION_ISOLATION_LEVELS = [
-  "read uncommitted",
-  "read committed",
-  "repeatable read",
-  "serializable",
-  "snapshot"
-];
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/log.js
-var LOG_LEVELS = freeze(["query", "error"]);
-
-class Log {
-  #levels;
-  #logger;
-  constructor(config2) {
-    if (isFunction(config2)) {
-      this.#logger = config2;
-      this.#levels = freeze({
-        query: true,
-        error: true
-      });
-    } else {
-      this.#logger = defaultLogger;
-      this.#levels = freeze({
-        query: config2.includes("query"),
-        error: config2.includes("error")
-      });
-    }
-  }
-  isLevelEnabled(level) {
-    return this.#levels[level];
-  }
-  async query(getEvent) {
-    if (this.#levels.query) {
-      await this.#logger(getEvent());
-    }
-  }
-  async error(getEvent) {
-    if (this.#levels.error) {
-      await this.#logger(getEvent());
-    }
-  }
-}
-function defaultLogger(event) {
-  if (event.level === "query") {
-    console.log(`kysely:query: ${event.query.sql}`);
-    console.log(`kysely:query: duration: ${event.queryDurationMillis.toFixed(1)}ms`);
-  } else if (event.level === "error") {
-    if (event.error instanceof Error) {
-      console.error(`kysely:error: ${event.error.stack ?? event.error.message}`);
-    } else {
-      console.error(`kysely:error: ${JSON.stringify({
-        error: event.error,
-        query: event.query.sql,
-        queryDurationMillis: event.queryDurationMillis
-      })}`);
-    }
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/compilable.js
-function isCompilable(value) {
-  return isObject2(value) && isFunction(value.compile);
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/kysely.js
-class Kysely extends QueryCreator {
-  #props;
-  constructor(args) {
-    let superProps;
-    let props;
-    if (isKyselyProps(args)) {
-      superProps = { executor: args.executor };
-      props = { ...args };
-    } else {
-      const dialect = args.dialect;
-      const driver = dialect.createDriver();
-      const compiler = dialect.createQueryCompiler();
-      const adapter = dialect.createAdapter();
-      const log = new Log(args.log ?? []);
-      const runtimeDriver = new RuntimeDriver(driver, log);
-      const connectionProvider = new DefaultConnectionProvider(runtimeDriver);
-      const executor = new DefaultQueryExecutor(compiler, adapter, connectionProvider, args.plugins ?? []);
-      superProps = { executor };
-      props = {
-        config: args,
-        executor,
-        dialect,
-        driver: runtimeDriver
-      };
-    }
-    super(superProps);
-    this.#props = freeze(props);
-  }
-  get schema() {
-    return new SchemaModule(this.#props.executor);
-  }
-  get dynamic() {
-    return new DynamicModule;
-  }
-  get introspection() {
-    return this.#props.dialect.createIntrospector(this.withoutPlugins());
-  }
-  case(value) {
-    return new CaseBuilder({
-      node: CaseNode.create(isUndefined(value) ? undefined : parseExpression(value))
-    });
-  }
-  get fn() {
-    return createFunctionModule();
-  }
-  transaction() {
-    return new TransactionBuilder({ ...this.#props });
-  }
-  connection() {
-    return new ConnectionBuilder({ ...this.#props });
-  }
-  withPlugin(plugin) {
-    return new Kysely({
-      ...this.#props,
-      executor: this.#props.executor.withPlugin(plugin)
-    });
-  }
-  withoutPlugins() {
-    return new Kysely({
-      ...this.#props,
-      executor: this.#props.executor.withoutPlugins()
-    });
-  }
-  withSchema(schema) {
-    return new Kysely({
-      ...this.#props,
-      executor: this.#props.executor.withPluginAtFront(new WithSchemaPlugin(schema))
-    });
-  }
-  withTables() {
-    return new Kysely({ ...this.#props });
-  }
-  async destroy() {
-    await this.#props.driver.destroy();
-  }
-  get isTransaction() {
-    return false;
-  }
-  getExecutor() {
-    return this.#props.executor;
-  }
-  executeQuery(query, queryId = createQueryId()) {
-    const compiledQuery = isCompilable(query) ? query.compile() : query;
-    return this.getExecutor().executeQuery(compiledQuery, queryId);
-  }
-}
-
-class Transaction extends Kysely {
-  #props;
-  constructor(props) {
-    super(props);
-    this.#props = props;
-  }
-  get isTransaction() {
-    return true;
-  }
-  transaction() {
-    throw new Error("calling the transaction method for a Transaction is not supported");
-  }
-  connection() {
-    throw new Error("calling the connection method for a Transaction is not supported");
-  }
-  async destroy() {
-    throw new Error("calling the destroy method for a Transaction is not supported");
-  }
-  withPlugin(plugin) {
-    return new Transaction({
-      ...this.#props,
-      executor: this.#props.executor.withPlugin(plugin)
-    });
-  }
-  withoutPlugins() {
-    return new Transaction({
-      ...this.#props,
-      executor: this.#props.executor.withoutPlugins()
-    });
-  }
-  withSchema(schema) {
-    return new Transaction({
-      ...this.#props,
-      executor: this.#props.executor.withPluginAtFront(new WithSchemaPlugin(schema))
-    });
-  }
-  withTables() {
-    return new Transaction({ ...this.#props });
-  }
-}
-function isKyselyProps(obj) {
-  return isObject2(obj) && isObject2(obj.config) && isObject2(obj.driver) && isObject2(obj.executor) && isObject2(obj.dialect);
-}
-
-class ConnectionBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  async execute(callback) {
-    return this.#props.executor.provideConnection(async (connection) => {
-      const executor = this.#props.executor.withConnectionProvider(new SingleConnectionProvider(connection));
-      const db = new Kysely({
-        ...this.#props,
-        executor
-      });
-      return await callback(db);
-    });
-  }
-}
-preventAwait(ConnectionBuilder, "don't await ConnectionBuilder instances directly. To execute the query you need to call the `execute` method");
-
-class TransactionBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  setIsolationLevel(isolationLevel) {
-    return new TransactionBuilder({
-      ...this.#props,
-      isolationLevel
-    });
-  }
-  async execute(callback) {
-    const { isolationLevel, ...kyselyProps } = this.#props;
-    const settings = { isolationLevel };
-    validateTransactionSettings(settings);
-    return this.#props.executor.provideConnection(async (connection) => {
-      const executor = this.#props.executor.withConnectionProvider(new SingleConnectionProvider(connection));
-      const transaction = new Transaction({
-        ...kyselyProps,
-        executor
-      });
-      try {
-        await this.#props.driver.beginTransaction(connection, settings);
-        const result = await callback(transaction);
-        await this.#props.driver.commitTransaction(connection);
-        return result;
-      } catch (error51) {
-        await this.#props.driver.rollbackTransaction(connection);
-        throw error51;
-      }
-    });
-  }
-}
-preventAwait(TransactionBuilder, "don't await TransactionBuilder instances directly. To execute the transaction you need to call the `execute` method");
-function validateTransactionSettings(settings) {
-  if (settings.isolationLevel && !TRANSACTION_ISOLATION_LEVELS.includes(settings.isolationLevel)) {
-    throw new Error(`invalid transaction isolation level ${settings.isolationLevel}`);
-  }
-}
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/raw-builder/raw-builder.js
+// ../zveltio-extensions/node_modules/kysely/dist/raw-builder/raw-builder.js
 class RawBuilderImpl {
   #props;
   constructor(props) {
@@ -80825,9 +77046,9 @@ class RawBuilderImpl {
   compile(executorProvider) {
     return this.#compile(this.#getExecutor(executorProvider));
   }
-  async execute(executorProvider) {
+  async execute(executorProvider, options) {
     const executor = this.#getExecutor(executorProvider);
-    return executor.executeQuery(this.#compile(executor), this.#props.queryId);
+    return executor.executeQuery(this.#compile(executor), options);
   }
   #getExecutor(executorProvider) {
     const executor = executorProvider !== undefined ? executorProvider.getExecutor() : NOOP_QUERY_EXECUTOR;
@@ -80843,7 +77064,6 @@ class RawBuilderImpl {
 function createRawBuilder(props) {
   return new RawBuilderImpl(props);
 }
-preventAwait(RawBuilderImpl, "don't await RawBuilder instances directly. To execute the query you need to call `execute`");
 
 class AliasedRawBuilderImpl {
   #rawBuilder;
@@ -80865,8 +77085,7 @@ class AliasedRawBuilderImpl {
     return AliasNode.create(this.#rawBuilder.toOperationNode(), isOperationNodeSource(this.#alias) ? this.#alias.toOperationNode() : IdentifierNode.create(this.#alias));
   }
 }
-preventAwait(AliasedRawBuilderImpl, "don't await AliasedRawBuilder instances directly. AliasedRawBuilder should never be executed directly since it's always a part of another query.");
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/raw-builder/sql.js
+// ../zveltio-extensions/node_modules/kysely/dist/raw-builder/sql.js
 var sql = Object.assign((sqlFragments, ...parameters) => {
   return createRawBuilder({
     queryId: createQueryId(),
@@ -80884,9 +77103,6 @@ var sql = Object.assign((sqlFragments, ...parameters) => {
       queryId: createQueryId(),
       rawNode: RawNode.createWithChild(parseValueExpression(value))
     });
-  },
-  value(value) {
-    return this.val(value);
   },
   table(tableReference) {
     return createRawBuilder({
@@ -80909,9 +77125,6 @@ var sql = Object.assign((sqlFragments, ...parameters) => {
       rawNode: RawNode.createWithChild(ValueNode.createImmediate(value))
     });
   },
-  literal(value) {
-    return this.lit(value);
-  },
   raw(sql2) {
     return createRawBuilder({
       queryId: createQueryId(),
@@ -80919,7 +77132,7 @@ var sql = Object.assign((sqlFragments, ...parameters) => {
     });
   },
   join(array2, separator = sql`, `) {
-    const nodes = new Array(2 * array2.length - 1);
+    const nodes = new Array(Math.max(2 * array2.length - 1, 0));
     const sep = separator.toOperationNode();
     for (let i = 0;i < array2.length; ++i) {
       nodes[2 * i] = parseParameter(array2[i]);
@@ -80939,3279 +77152,34 @@ function parseParameter(param) {
   }
   return parseValueExpression(param);
 }
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/operation-node-visitor.js
-class OperationNodeVisitor {
-  nodeStack = [];
-  get parentNode() {
-    return this.nodeStack[this.nodeStack.length - 2];
-  }
-  #visitors = freeze({
-    AliasNode: this.visitAlias.bind(this),
-    ColumnNode: this.visitColumn.bind(this),
-    IdentifierNode: this.visitIdentifier.bind(this),
-    SchemableIdentifierNode: this.visitSchemableIdentifier.bind(this),
-    RawNode: this.visitRaw.bind(this),
-    ReferenceNode: this.visitReference.bind(this),
-    SelectQueryNode: this.visitSelectQuery.bind(this),
-    SelectionNode: this.visitSelection.bind(this),
-    TableNode: this.visitTable.bind(this),
-    FromNode: this.visitFrom.bind(this),
-    SelectAllNode: this.visitSelectAll.bind(this),
-    AndNode: this.visitAnd.bind(this),
-    OrNode: this.visitOr.bind(this),
-    ValueNode: this.visitValue.bind(this),
-    ValueListNode: this.visitValueList.bind(this),
-    PrimitiveValueListNode: this.visitPrimitiveValueList.bind(this),
-    ParensNode: this.visitParens.bind(this),
-    JoinNode: this.visitJoin.bind(this),
-    OperatorNode: this.visitOperator.bind(this),
-    WhereNode: this.visitWhere.bind(this),
-    InsertQueryNode: this.visitInsertQuery.bind(this),
-    DeleteQueryNode: this.visitDeleteQuery.bind(this),
-    ReturningNode: this.visitReturning.bind(this),
-    CreateTableNode: this.visitCreateTable.bind(this),
-    AddColumnNode: this.visitAddColumn.bind(this),
-    ColumnDefinitionNode: this.visitColumnDefinition.bind(this),
-    DropTableNode: this.visitDropTable.bind(this),
-    DataTypeNode: this.visitDataType.bind(this),
-    OrderByNode: this.visitOrderBy.bind(this),
-    OrderByItemNode: this.visitOrderByItem.bind(this),
-    GroupByNode: this.visitGroupBy.bind(this),
-    GroupByItemNode: this.visitGroupByItem.bind(this),
-    UpdateQueryNode: this.visitUpdateQuery.bind(this),
-    ColumnUpdateNode: this.visitColumnUpdate.bind(this),
-    LimitNode: this.visitLimit.bind(this),
-    OffsetNode: this.visitOffset.bind(this),
-    OnConflictNode: this.visitOnConflict.bind(this),
-    OnDuplicateKeyNode: this.visitOnDuplicateKey.bind(this),
-    CreateIndexNode: this.visitCreateIndex.bind(this),
-    DropIndexNode: this.visitDropIndex.bind(this),
-    ListNode: this.visitList.bind(this),
-    PrimaryKeyConstraintNode: this.visitPrimaryKeyConstraint.bind(this),
-    UniqueConstraintNode: this.visitUniqueConstraint.bind(this),
-    ReferencesNode: this.visitReferences.bind(this),
-    CheckConstraintNode: this.visitCheckConstraint.bind(this),
-    WithNode: this.visitWith.bind(this),
-    CommonTableExpressionNode: this.visitCommonTableExpression.bind(this),
-    CommonTableExpressionNameNode: this.visitCommonTableExpressionName.bind(this),
-    HavingNode: this.visitHaving.bind(this),
-    CreateSchemaNode: this.visitCreateSchema.bind(this),
-    DropSchemaNode: this.visitDropSchema.bind(this),
-    AlterTableNode: this.visitAlterTable.bind(this),
-    DropColumnNode: this.visitDropColumn.bind(this),
-    RenameColumnNode: this.visitRenameColumn.bind(this),
-    AlterColumnNode: this.visitAlterColumn.bind(this),
-    ModifyColumnNode: this.visitModifyColumn.bind(this),
-    AddConstraintNode: this.visitAddConstraint.bind(this),
-    DropConstraintNode: this.visitDropConstraint.bind(this),
-    ForeignKeyConstraintNode: this.visitForeignKeyConstraint.bind(this),
-    CreateViewNode: this.visitCreateView.bind(this),
-    DropViewNode: this.visitDropView.bind(this),
-    GeneratedNode: this.visitGenerated.bind(this),
-    DefaultValueNode: this.visitDefaultValue.bind(this),
-    OnNode: this.visitOn.bind(this),
-    ValuesNode: this.visitValues.bind(this),
-    SelectModifierNode: this.visitSelectModifier.bind(this),
-    CreateTypeNode: this.visitCreateType.bind(this),
-    DropTypeNode: this.visitDropType.bind(this),
-    ExplainNode: this.visitExplain.bind(this),
-    DefaultInsertValueNode: this.visitDefaultInsertValue.bind(this),
-    AggregateFunctionNode: this.visitAggregateFunction.bind(this),
-    OverNode: this.visitOver.bind(this),
-    PartitionByNode: this.visitPartitionBy.bind(this),
-    PartitionByItemNode: this.visitPartitionByItem.bind(this),
-    SetOperationNode: this.visitSetOperation.bind(this),
-    BinaryOperationNode: this.visitBinaryOperation.bind(this),
-    UnaryOperationNode: this.visitUnaryOperation.bind(this),
-    UsingNode: this.visitUsing.bind(this),
-    FunctionNode: this.visitFunction.bind(this),
-    CaseNode: this.visitCase.bind(this),
-    WhenNode: this.visitWhen.bind(this),
-    JSONReferenceNode: this.visitJSONReference.bind(this),
-    JSONPathNode: this.visitJSONPath.bind(this),
-    JSONPathLegNode: this.visitJSONPathLeg.bind(this),
-    JSONOperatorChainNode: this.visitJSONOperatorChain.bind(this),
-    TupleNode: this.visitTuple.bind(this),
-    MergeQueryNode: this.visitMergeQuery.bind(this),
-    MatchedNode: this.visitMatched.bind(this),
-    AddIndexNode: this.visitAddIndex.bind(this),
-    CastNode: this.visitCast.bind(this),
-    FetchNode: this.visitFetch.bind(this),
-    TopNode: this.visitTop.bind(this),
-    OutputNode: this.visitOutput.bind(this)
-  });
-  visitNode = (node) => {
-    this.nodeStack.push(node);
-    this.#visitors[node.kind](node);
-    this.nodeStack.pop();
-  };
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-compiler/default-query-compiler.js
-class DefaultQueryCompiler extends OperationNodeVisitor {
-  #sql = "";
-  #parameters = [];
-  get numParameters() {
-    return this.#parameters.length;
-  }
-  compileQuery(node) {
-    this.#sql = "";
-    this.#parameters = [];
-    this.nodeStack.splice(0, this.nodeStack.length);
-    this.visitNode(node);
-    return freeze({
-      query: node,
-      sql: this.getSql(),
-      parameters: [...this.#parameters]
-    });
-  }
-  getSql() {
-    return this.#sql;
-  }
-  visitSelectQuery(node) {
-    const wrapInParens = this.parentNode !== undefined && !ParensNode.is(this.parentNode) && !InsertQueryNode.is(this.parentNode) && !CreateTableNode.is(this.parentNode) && !CreateViewNode.is(this.parentNode) && !SetOperationNode.is(this.parentNode);
-    if (this.parentNode === undefined && node.explain) {
-      this.visitNode(node.explain);
-      this.append(" ");
-    }
-    if (wrapInParens) {
-      this.append("(");
-    }
-    if (node.with) {
-      this.visitNode(node.with);
-      this.append(" ");
-    }
-    this.append("select");
-    if (node.distinctOn) {
-      this.append(" ");
-      this.compileDistinctOn(node.distinctOn);
-    }
-    if (node.frontModifiers?.length) {
-      this.append(" ");
-      this.compileList(node.frontModifiers, " ");
-    }
-    if (node.top) {
-      this.append(" ");
-      this.visitNode(node.top);
-    }
-    if (node.selections) {
-      this.append(" ");
-      this.compileList(node.selections);
-    }
-    if (node.from) {
-      this.append(" ");
-      this.visitNode(node.from);
-    }
-    if (node.joins) {
-      this.append(" ");
-      this.compileList(node.joins, " ");
-    }
-    if (node.where) {
-      this.append(" ");
-      this.visitNode(node.where);
-    }
-    if (node.groupBy) {
-      this.append(" ");
-      this.visitNode(node.groupBy);
-    }
-    if (node.having) {
-      this.append(" ");
-      this.visitNode(node.having);
-    }
-    if (node.setOperations) {
-      this.append(" ");
-      this.compileList(node.setOperations, " ");
-    }
-    if (node.orderBy) {
-      this.append(" ");
-      this.visitNode(node.orderBy);
-    }
-    if (node.limit) {
-      this.append(" ");
-      this.visitNode(node.limit);
-    }
-    if (node.offset) {
-      this.append(" ");
-      this.visitNode(node.offset);
-    }
-    if (node.fetch) {
-      this.append(" ");
-      this.visitNode(node.fetch);
-    }
-    if (node.endModifiers?.length) {
-      this.append(" ");
-      this.compileList(this.sortSelectModifiers([...node.endModifiers]), " ");
-    }
-    if (wrapInParens) {
-      this.append(")");
-    }
-  }
-  visitFrom(node) {
-    this.append("from ");
-    this.compileList(node.froms);
-  }
-  visitSelection(node) {
-    this.visitNode(node.selection);
-  }
-  visitColumn(node) {
-    this.visitNode(node.column);
-  }
-  compileDistinctOn(expressions) {
-    this.append("distinct on (");
-    this.compileList(expressions);
-    this.append(")");
-  }
-  compileList(nodes, separator = ", ") {
-    const lastIndex = nodes.length - 1;
-    for (let i = 0;i <= lastIndex; i++) {
-      this.visitNode(nodes[i]);
-      if (i < lastIndex) {
-        this.append(separator);
-      }
-    }
-  }
-  visitWhere(node) {
-    this.append("where ");
-    this.visitNode(node.where);
-  }
-  visitHaving(node) {
-    this.append("having ");
-    this.visitNode(node.having);
-  }
-  visitInsertQuery(node) {
-    const rootQueryNode = this.nodeStack.find(QueryNode.is);
-    const isSubQuery = rootQueryNode !== node;
-    if (!isSubQuery && node.explain) {
-      this.visitNode(node.explain);
-      this.append(" ");
-    }
-    if (isSubQuery && !MergeQueryNode.is(rootQueryNode)) {
-      this.append("(");
-    }
-    if (node.with) {
-      this.visitNode(node.with);
-      this.append(" ");
-    }
-    this.append(node.replace ? "replace" : "insert");
-    if (node.ignore) {
-      this.append(" ignore");
-    }
-    if (node.top) {
-      this.append(" ");
-      this.visitNode(node.top);
-    }
-    if (node.into) {
-      this.append(" into ");
-      this.visitNode(node.into);
-    }
-    if (node.columns) {
-      this.append(" (");
-      this.compileList(node.columns);
-      this.append(")");
-    }
-    if (node.output) {
-      this.append(" ");
-      this.visitNode(node.output);
-    }
-    if (node.values) {
-      this.append(" ");
-      this.visitNode(node.values);
-    }
-    if (node.defaultValues) {
-      this.append(" ");
-      this.append("default values");
-    }
-    if (node.onConflict) {
-      this.append(" ");
-      this.visitNode(node.onConflict);
-    }
-    if (node.onDuplicateKey) {
-      this.append(" ");
-      this.visitNode(node.onDuplicateKey);
-    }
-    if (node.returning) {
-      this.append(" ");
-      this.visitNode(node.returning);
-    }
-    if (isSubQuery && !MergeQueryNode.is(rootQueryNode)) {
-      this.append(")");
-    }
-    if (node.endModifiers?.length) {
-      this.append(" ");
-      this.compileList(node.endModifiers, " ");
-    }
-  }
-  visitValues(node) {
-    this.append("values ");
-    this.compileList(node.values);
-  }
-  visitDeleteQuery(node) {
-    const isSubQuery = this.nodeStack.find(QueryNode.is) !== node;
-    if (!isSubQuery && node.explain) {
-      this.visitNode(node.explain);
-      this.append(" ");
-    }
-    if (isSubQuery) {
-      this.append("(");
-    }
-    if (node.with) {
-      this.visitNode(node.with);
-      this.append(" ");
-    }
-    this.append("delete ");
-    if (node.top) {
-      this.visitNode(node.top);
-      this.append(" ");
-    }
-    this.visitNode(node.from);
-    if (node.output) {
-      this.append(" ");
-      this.visitNode(node.output);
-    }
-    if (node.using) {
-      this.append(" ");
-      this.visitNode(node.using);
-    }
-    if (node.joins) {
-      this.append(" ");
-      this.compileList(node.joins, " ");
-    }
-    if (node.where) {
-      this.append(" ");
-      this.visitNode(node.where);
-    }
-    if (node.orderBy) {
-      this.append(" ");
-      this.visitNode(node.orderBy);
-    }
-    if (node.limit) {
-      this.append(" ");
-      this.visitNode(node.limit);
-    }
-    if (node.returning) {
-      this.append(" ");
-      this.visitNode(node.returning);
-    }
-    if (isSubQuery) {
-      this.append(")");
-    }
-    if (node.endModifiers?.length) {
-      this.append(" ");
-      this.compileList(node.endModifiers, " ");
-    }
-  }
-  visitReturning(node) {
-    this.append("returning ");
-    this.compileList(node.selections);
-  }
-  visitAlias(node) {
-    this.visitNode(node.node);
-    this.append(" as ");
-    this.visitNode(node.alias);
-  }
-  visitReference(node) {
-    if (node.table) {
-      this.visitNode(node.table);
-      this.append(".");
-    }
-    this.visitNode(node.column);
-  }
-  visitSelectAll(_) {
-    this.append("*");
-  }
-  visitIdentifier(node) {
-    this.append(this.getLeftIdentifierWrapper());
-    this.compileUnwrappedIdentifier(node);
-    this.append(this.getRightIdentifierWrapper());
-  }
-  compileUnwrappedIdentifier(node) {
-    if (!isString(node.name)) {
-      throw new Error("a non-string identifier was passed to compileUnwrappedIdentifier.");
-    }
-    this.append(this.sanitizeIdentifier(node.name));
-  }
-  visitAnd(node) {
-    this.visitNode(node.left);
-    this.append(" and ");
-    this.visitNode(node.right);
-  }
-  visitOr(node) {
-    this.visitNode(node.left);
-    this.append(" or ");
-    this.visitNode(node.right);
-  }
-  visitValue(node) {
-    if (node.immediate) {
-      this.appendImmediateValue(node.value);
-    } else {
-      this.appendValue(node.value);
-    }
-  }
-  visitValueList(node) {
-    this.append("(");
-    this.compileList(node.values);
-    this.append(")");
-  }
-  visitTuple(node) {
-    this.append("(");
-    this.compileList(node.values);
-    this.append(")");
-  }
-  visitPrimitiveValueList(node) {
-    this.append("(");
-    const { values } = node;
-    for (let i = 0;i < values.length; ++i) {
-      this.appendValue(values[i]);
-      if (i !== values.length - 1) {
-        this.append(", ");
-      }
-    }
-    this.append(")");
-  }
-  visitParens(node) {
-    this.append("(");
-    this.visitNode(node.node);
-    this.append(")");
-  }
-  visitJoin(node) {
-    this.append(JOIN_TYPE_SQL[node.joinType]);
-    this.append(" ");
-    this.visitNode(node.table);
-    if (node.on) {
-      this.append(" ");
-      this.visitNode(node.on);
-    }
-  }
-  visitOn(node) {
-    this.append("on ");
-    this.visitNode(node.on);
-  }
-  visitRaw(node) {
-    const { sqlFragments, parameters: params } = node;
-    for (let i = 0;i < sqlFragments.length; ++i) {
-      this.append(sqlFragments[i]);
-      if (params.length > i) {
-        this.visitNode(params[i]);
-      }
-    }
-  }
-  visitOperator(node) {
-    this.append(node.operator);
-  }
-  visitTable(node) {
-    this.visitNode(node.table);
-  }
-  visitSchemableIdentifier(node) {
-    if (node.schema) {
-      this.visitNode(node.schema);
-      this.append(".");
-    }
-    this.visitNode(node.identifier);
-  }
-  visitCreateTable(node) {
-    this.append("create ");
-    if (node.frontModifiers && node.frontModifiers.length > 0) {
-      this.compileList(node.frontModifiers, " ");
-      this.append(" ");
-    }
-    if (node.temporary) {
-      this.append("temporary ");
-    }
-    this.append("table ");
-    if (node.ifNotExists) {
-      this.append("if not exists ");
-    }
-    this.visitNode(node.table);
-    if (node.selectQuery) {
-      this.append(" as ");
-      this.visitNode(node.selectQuery);
-    } else {
-      this.append(" (");
-      this.compileList([...node.columns, ...node.constraints ?? []]);
-      this.append(")");
-      if (node.onCommit) {
-        this.append(" on commit ");
-        this.append(node.onCommit);
-      }
-      if (node.endModifiers && node.endModifiers.length > 0) {
-        this.append(" ");
-        this.compileList(node.endModifiers, " ");
-      }
-    }
-  }
-  visitColumnDefinition(node) {
-    if (node.ifNotExists) {
-      this.append("if not exists ");
-    }
-    this.visitNode(node.column);
-    this.append(" ");
-    this.visitNode(node.dataType);
-    if (node.unsigned) {
-      this.append(" unsigned");
-    }
-    if (node.frontModifiers && node.frontModifiers.length > 0) {
-      this.append(" ");
-      this.compileList(node.frontModifiers, " ");
-    }
-    if (node.generated) {
-      this.append(" ");
-      this.visitNode(node.generated);
-    }
-    if (node.identity) {
-      this.append(" identity");
-    }
-    if (node.defaultTo) {
-      this.append(" ");
-      this.visitNode(node.defaultTo);
-    }
-    if (node.notNull) {
-      this.append(" not null");
-    }
-    if (node.unique) {
-      this.append(" unique");
-    }
-    if (node.nullsNotDistinct) {
-      this.append(" nulls not distinct");
-    }
-    if (node.primaryKey) {
-      this.append(" primary key");
-    }
-    if (node.autoIncrement) {
-      this.append(" ");
-      this.append(this.getAutoIncrement());
-    }
-    if (node.references) {
-      this.append(" ");
-      this.visitNode(node.references);
-    }
-    if (node.check) {
-      this.append(" ");
-      this.visitNode(node.check);
-    }
-    if (node.endModifiers && node.endModifiers.length > 0) {
-      this.append(" ");
-      this.compileList(node.endModifiers, " ");
-    }
-  }
-  getAutoIncrement() {
-    return "auto_increment";
-  }
-  visitReferences(node) {
-    this.append("references ");
-    this.visitNode(node.table);
-    this.append(" (");
-    this.compileList(node.columns);
-    this.append(")");
-    if (node.onDelete) {
-      this.append(" on delete ");
-      this.append(node.onDelete);
-    }
-    if (node.onUpdate) {
-      this.append(" on update ");
-      this.append(node.onUpdate);
-    }
-  }
-  visitDropTable(node) {
-    this.append("drop table ");
-    if (node.ifExists) {
-      this.append("if exists ");
-    }
-    this.visitNode(node.table);
-    if (node.cascade) {
-      this.append(" cascade");
-    }
-  }
-  visitDataType(node) {
-    this.append(node.dataType);
-  }
-  visitOrderBy(node) {
-    this.append("order by ");
-    this.compileList(node.items);
-  }
-  visitOrderByItem(node) {
-    this.visitNode(node.orderBy);
-    if (node.direction) {
-      this.append(" ");
-      this.visitNode(node.direction);
-    }
-  }
-  visitGroupBy(node) {
-    this.append("group by ");
-    this.compileList(node.items);
-  }
-  visitGroupByItem(node) {
-    this.visitNode(node.groupBy);
-  }
-  visitUpdateQuery(node) {
-    const rootQueryNode = this.nodeStack.find(QueryNode.is);
-    const isSubQuery = rootQueryNode !== node;
-    if (!isSubQuery && node.explain) {
-      this.visitNode(node.explain);
-      this.append(" ");
-    }
-    if (isSubQuery && !MergeQueryNode.is(rootQueryNode)) {
-      this.append("(");
-    }
-    if (node.with) {
-      this.visitNode(node.with);
-      this.append(" ");
-    }
-    this.append("update ");
-    if (node.top) {
-      this.visitNode(node.top);
-      this.append(" ");
-    }
-    if (node.table) {
-      this.visitNode(node.table);
-      this.append(" ");
-    }
-    this.append("set ");
-    if (node.updates) {
-      this.compileList(node.updates);
-    }
-    if (node.output) {
-      this.append(" ");
-      this.visitNode(node.output);
-    }
-    if (node.from) {
-      this.append(" ");
-      this.visitNode(node.from);
-    }
-    if (node.joins) {
-      this.append(" ");
-      this.compileList(node.joins, " ");
-    }
-    if (node.where) {
-      this.append(" ");
-      this.visitNode(node.where);
-    }
-    if (node.limit) {
-      this.append(" ");
-      this.visitNode(node.limit);
-    }
-    if (node.returning) {
-      this.append(" ");
-      this.visitNode(node.returning);
-    }
-    if (isSubQuery && !MergeQueryNode.is(rootQueryNode)) {
-      this.append(")");
-    }
-    if (node.endModifiers?.length) {
-      this.append(" ");
-      this.compileList(node.endModifiers, " ");
-    }
-  }
-  visitColumnUpdate(node) {
-    this.visitNode(node.column);
-    this.append(" = ");
-    this.visitNode(node.value);
-  }
-  visitLimit(node) {
-    this.append("limit ");
-    this.visitNode(node.limit);
-  }
-  visitOffset(node) {
-    this.append("offset ");
-    this.visitNode(node.offset);
-  }
-  visitOnConflict(node) {
-    this.append("on conflict");
-    if (node.columns) {
-      this.append(" (");
-      this.compileList(node.columns);
-      this.append(")");
-    } else if (node.constraint) {
-      this.append(" on constraint ");
-      this.visitNode(node.constraint);
-    } else if (node.indexExpression) {
-      this.append(" (");
-      this.visitNode(node.indexExpression);
-      this.append(")");
-    }
-    if (node.indexWhere) {
-      this.append(" ");
-      this.visitNode(node.indexWhere);
-    }
-    if (node.doNothing === true) {
-      this.append(" do nothing");
-    } else if (node.updates) {
-      this.append(" do update set ");
-      this.compileList(node.updates);
-      if (node.updateWhere) {
-        this.append(" ");
-        this.visitNode(node.updateWhere);
-      }
-    }
-  }
-  visitOnDuplicateKey(node) {
-    this.append("on duplicate key update ");
-    this.compileList(node.updates);
-  }
-  visitCreateIndex(node) {
-    this.append("create ");
-    if (node.unique) {
-      this.append("unique ");
-    }
-    this.append("index ");
-    if (node.ifNotExists) {
-      this.append("if not exists ");
-    }
-    this.visitNode(node.name);
-    if (node.table) {
-      this.append(" on ");
-      this.visitNode(node.table);
-    }
-    if (node.using) {
-      this.append(" using ");
-      this.visitNode(node.using);
-    }
-    if (node.columns) {
-      this.append(" (");
-      this.compileList(node.columns);
-      this.append(")");
-    }
-    if (node.nullsNotDistinct) {
-      this.append(" nulls not distinct");
-    }
-    if (node.where) {
-      this.append(" ");
-      this.visitNode(node.where);
-    }
-  }
-  visitDropIndex(node) {
-    this.append("drop index ");
-    if (node.ifExists) {
-      this.append("if exists ");
-    }
-    this.visitNode(node.name);
-    if (node.table) {
-      this.append(" on ");
-      this.visitNode(node.table);
-    }
-    if (node.cascade) {
-      this.append(" cascade");
-    }
-  }
-  visitCreateSchema(node) {
-    this.append("create schema ");
-    if (node.ifNotExists) {
-      this.append("if not exists ");
-    }
-    this.visitNode(node.schema);
-  }
-  visitDropSchema(node) {
-    this.append("drop schema ");
-    if (node.ifExists) {
-      this.append("if exists ");
-    }
-    this.visitNode(node.schema);
-    if (node.cascade) {
-      this.append(" cascade");
-    }
-  }
-  visitPrimaryKeyConstraint(node) {
-    if (node.name) {
-      this.append("constraint ");
-      this.visitNode(node.name);
-      this.append(" ");
-    }
-    this.append("primary key (");
-    this.compileList(node.columns);
-    this.append(")");
-  }
-  visitUniqueConstraint(node) {
-    if (node.name) {
-      this.append("constraint ");
-      this.visitNode(node.name);
-      this.append(" ");
-    }
-    this.append("unique");
-    if (node.nullsNotDistinct) {
-      this.append(" nulls not distinct");
-    }
-    this.append(" (");
-    this.compileList(node.columns);
-    this.append(")");
-  }
-  visitCheckConstraint(node) {
-    if (node.name) {
-      this.append("constraint ");
-      this.visitNode(node.name);
-      this.append(" ");
-    }
-    this.append("check (");
-    this.visitNode(node.expression);
-    this.append(")");
-  }
-  visitForeignKeyConstraint(node) {
-    if (node.name) {
-      this.append("constraint ");
-      this.visitNode(node.name);
-      this.append(" ");
-    }
-    this.append("foreign key (");
-    this.compileList(node.columns);
-    this.append(") ");
-    this.visitNode(node.references);
-    if (node.onDelete) {
-      this.append(" on delete ");
-      this.append(node.onDelete);
-    }
-    if (node.onUpdate) {
-      this.append(" on update ");
-      this.append(node.onUpdate);
-    }
-  }
-  visitList(node) {
-    this.compileList(node.items);
-  }
-  visitWith(node) {
-    this.append("with ");
-    if (node.recursive) {
-      this.append("recursive ");
-    }
-    this.compileList(node.expressions);
-  }
-  visitCommonTableExpression(node) {
-    this.visitNode(node.name);
-    this.append(" as ");
-    if (isBoolean(node.materialized)) {
-      if (!node.materialized) {
-        this.append("not ");
-      }
-      this.append("materialized ");
-    }
-    this.visitNode(node.expression);
-  }
-  visitCommonTableExpressionName(node) {
-    this.visitNode(node.table);
-    if (node.columns) {
-      this.append("(");
-      this.compileList(node.columns);
-      this.append(")");
-    }
-  }
-  visitAlterTable(node) {
-    this.append("alter table ");
-    this.visitNode(node.table);
-    this.append(" ");
-    if (node.renameTo) {
-      this.append("rename to ");
-      this.visitNode(node.renameTo);
-    }
-    if (node.setSchema) {
-      this.append("set schema ");
-      this.visitNode(node.setSchema);
-    }
-    if (node.addConstraint) {
-      this.visitNode(node.addConstraint);
-    }
-    if (node.dropConstraint) {
-      this.visitNode(node.dropConstraint);
-    }
-    if (node.columnAlterations) {
-      this.compileColumnAlterations(node.columnAlterations);
-    }
-    if (node.addIndex) {
-      this.visitNode(node.addIndex);
-    }
-    if (node.dropIndex) {
-      this.visitNode(node.dropIndex);
-    }
-  }
-  visitAddColumn(node) {
-    this.append("add column ");
-    this.visitNode(node.column);
-  }
-  visitRenameColumn(node) {
-    this.append("rename column ");
-    this.visitNode(node.column);
-    this.append(" to ");
-    this.visitNode(node.renameTo);
-  }
-  visitDropColumn(node) {
-    this.append("drop column ");
-    this.visitNode(node.column);
-  }
-  visitAlterColumn(node) {
-    this.append("alter column ");
-    this.visitNode(node.column);
-    this.append(" ");
-    if (node.dataType) {
-      if (this.announcesNewColumnDataType()) {
-        this.append("type ");
-      }
-      this.visitNode(node.dataType);
-      if (node.dataTypeExpression) {
-        this.append("using ");
-        this.visitNode(node.dataTypeExpression);
-      }
-    }
-    if (node.setDefault) {
-      this.append("set default ");
-      this.visitNode(node.setDefault);
-    }
-    if (node.dropDefault) {
-      this.append("drop default");
-    }
-    if (node.setNotNull) {
-      this.append("set not null");
-    }
-    if (node.dropNotNull) {
-      this.append("drop not null");
-    }
-  }
-  visitModifyColumn(node) {
-    this.append("modify column ");
-    this.visitNode(node.column);
-  }
-  visitAddConstraint(node) {
-    this.append("add ");
-    this.visitNode(node.constraint);
-  }
-  visitDropConstraint(node) {
-    this.append("drop constraint ");
-    if (node.ifExists) {
-      this.append("if exists ");
-    }
-    this.visitNode(node.constraintName);
-    if (node.modifier === "cascade") {
-      this.append(" cascade");
-    } else if (node.modifier === "restrict") {
-      this.append(" restrict");
-    }
-  }
-  visitSetOperation(node) {
-    this.append(node.operator);
-    this.append(" ");
-    if (node.all) {
-      this.append("all ");
-    }
-    this.visitNode(node.expression);
-  }
-  visitCreateView(node) {
-    this.append("create ");
-    if (node.orReplace) {
-      this.append("or replace ");
-    }
-    if (node.materialized) {
-      this.append("materialized ");
-    }
-    if (node.temporary) {
-      this.append("temporary ");
-    }
-    this.append("view ");
-    if (node.ifNotExists) {
-      this.append("if not exists ");
-    }
-    this.visitNode(node.name);
-    this.append(" ");
-    if (node.columns) {
-      this.append("(");
-      this.compileList(node.columns);
-      this.append(") ");
-    }
-    if (node.as) {
-      this.append("as ");
-      this.visitNode(node.as);
-    }
-  }
-  visitDropView(node) {
-    this.append("drop ");
-    if (node.materialized) {
-      this.append("materialized ");
-    }
-    this.append("view ");
-    if (node.ifExists) {
-      this.append("if exists ");
-    }
-    this.visitNode(node.name);
-    if (node.cascade) {
-      this.append(" cascade");
-    }
-  }
-  visitGenerated(node) {
-    this.append("generated ");
-    if (node.always) {
-      this.append("always ");
-    }
-    if (node.byDefault) {
-      this.append("by default ");
-    }
-    this.append("as ");
-    if (node.identity) {
-      this.append("identity");
-    }
-    if (node.expression) {
-      this.append("(");
-      this.visitNode(node.expression);
-      this.append(")");
-    }
-    if (node.stored) {
-      this.append(" stored");
-    }
-  }
-  visitDefaultValue(node) {
-    this.append("default ");
-    this.visitNode(node.defaultValue);
-  }
-  visitSelectModifier(node) {
-    if (node.rawModifier) {
-      this.visitNode(node.rawModifier);
-    } else {
-      this.append(SELECT_MODIFIER_SQL[node.modifier]);
-    }
-    if (node.of) {
-      this.append(" of ");
-      this.compileList(node.of, ", ");
-    }
-  }
-  visitCreateType(node) {
-    this.append("create type ");
-    this.visitNode(node.name);
-    if (node.enum) {
-      this.append(" as enum ");
-      this.visitNode(node.enum);
-    }
-  }
-  visitDropType(node) {
-    this.append("drop type ");
-    if (node.ifExists) {
-      this.append("if exists ");
-    }
-    this.visitNode(node.name);
-  }
-  visitExplain(node) {
-    this.append("explain");
-    if (node.options || node.format) {
-      this.append(" ");
-      this.append(this.getLeftExplainOptionsWrapper());
-      if (node.options) {
-        this.visitNode(node.options);
-        if (node.format) {
-          this.append(this.getExplainOptionsDelimiter());
-        }
-      }
-      if (node.format) {
-        this.append("format");
-        this.append(this.getExplainOptionAssignment());
-        this.append(node.format);
-      }
-      this.append(this.getRightExplainOptionsWrapper());
-    }
-  }
-  visitDefaultInsertValue(_) {
-    this.append("default");
-  }
-  visitAggregateFunction(node) {
-    this.append(node.func);
-    this.append("(");
-    if (node.distinct) {
-      this.append("distinct ");
-    }
-    this.compileList(node.aggregated);
-    if (node.orderBy) {
-      this.append(" ");
-      this.visitNode(node.orderBy);
-    }
-    this.append(")");
-    if (node.filter) {
-      this.append(" filter(");
-      this.visitNode(node.filter);
-      this.append(")");
-    }
-    if (node.over) {
-      this.append(" ");
-      this.visitNode(node.over);
-    }
-  }
-  visitOver(node) {
-    this.append("over(");
-    if (node.partitionBy) {
-      this.visitNode(node.partitionBy);
-      if (node.orderBy) {
-        this.append(" ");
-      }
-    }
-    if (node.orderBy) {
-      this.visitNode(node.orderBy);
-    }
-    this.append(")");
-  }
-  visitPartitionBy(node) {
-    this.append("partition by ");
-    this.compileList(node.items);
-  }
-  visitPartitionByItem(node) {
-    this.visitNode(node.partitionBy);
-  }
-  visitBinaryOperation(node) {
-    this.visitNode(node.leftOperand);
-    this.append(" ");
-    this.visitNode(node.operator);
-    this.append(" ");
-    this.visitNode(node.rightOperand);
-  }
-  visitUnaryOperation(node) {
-    this.visitNode(node.operator);
-    if (!this.isMinusOperator(node.operator)) {
-      this.append(" ");
-    }
-    this.visitNode(node.operand);
-  }
-  isMinusOperator(node) {
-    return OperatorNode.is(node) && node.operator === "-";
-  }
-  visitUsing(node) {
-    this.append("using ");
-    this.compileList(node.tables);
-  }
-  visitFunction(node) {
-    this.append(node.func);
-    this.append("(");
-    this.compileList(node.arguments);
-    this.append(")");
-  }
-  visitCase(node) {
-    this.append("case");
-    if (node.value) {
-      this.append(" ");
-      this.visitNode(node.value);
-    }
-    if (node.when) {
-      this.append(" ");
-      this.compileList(node.when, " ");
-    }
-    if (node.else) {
-      this.append(" else ");
-      this.visitNode(node.else);
-    }
-    this.append(" end");
-    if (node.isStatement) {
-      this.append(" case");
-    }
-  }
-  visitWhen(node) {
-    this.append("when ");
-    this.visitNode(node.condition);
-    if (node.result) {
-      this.append(" then ");
-      this.visitNode(node.result);
-    }
-  }
-  visitJSONReference(node) {
-    this.visitNode(node.reference);
-    this.visitNode(node.traversal);
-  }
-  visitJSONPath(node) {
-    if (node.inOperator) {
-      this.visitNode(node.inOperator);
-    }
-    this.append("'$");
-    for (const pathLeg of node.pathLegs) {
-      this.visitNode(pathLeg);
-    }
-    this.append("'");
-  }
-  visitJSONPathLeg(node) {
-    const isArrayLocation = node.type === "ArrayLocation";
-    this.append(isArrayLocation ? "[" : ".");
-    this.append(String(node.value));
-    if (isArrayLocation) {
-      this.append("]");
-    }
-  }
-  visitJSONOperatorChain(node) {
-    for (let i = 0, len = node.values.length;i < len; i++) {
-      if (i === len - 1) {
-        this.visitNode(node.operator);
-      } else {
-        this.append("->");
-      }
-      this.visitNode(node.values[i]);
-    }
-  }
-  visitMergeQuery(node) {
-    if (node.with) {
-      this.visitNode(node.with);
-      this.append(" ");
-    }
-    this.append("merge ");
-    if (node.top) {
-      this.visitNode(node.top);
-      this.append(" ");
-    }
-    this.append("into ");
-    this.visitNode(node.into);
-    if (node.using) {
-      this.append(" ");
-      this.visitNode(node.using);
-    }
-    if (node.whens) {
-      this.append(" ");
-      this.compileList(node.whens, " ");
-    }
-    if (node.output) {
-      this.append(" ");
-      this.visitNode(node.output);
-    }
-    if (node.endModifiers?.length) {
-      this.append(" ");
-      this.compileList(node.endModifiers, " ");
-    }
-  }
-  visitMatched(node) {
-    if (node.not) {
-      this.append("not ");
-    }
-    this.append("matched");
-    if (node.bySource) {
-      this.append(" by source");
-    }
-  }
-  visitAddIndex(node) {
-    this.append("add ");
-    if (node.unique) {
-      this.append("unique ");
-    }
-    this.append("index ");
-    this.visitNode(node.name);
-    if (node.columns) {
-      this.append(" (");
-      this.compileList(node.columns);
-      this.append(")");
-    }
-    if (node.using) {
-      this.append(" using ");
-      this.visitNode(node.using);
-    }
-  }
-  visitCast(node) {
-    this.append("cast(");
-    this.visitNode(node.expression);
-    this.append(" as ");
-    this.visitNode(node.dataType);
-    this.append(")");
-  }
-  visitFetch(node) {
-    this.append("fetch next ");
-    this.visitNode(node.rowCount);
-    this.append(` rows ${node.modifier}`);
-  }
-  visitOutput(node) {
-    this.append("output ");
-    this.compileList(node.selections);
-  }
-  visitTop(node) {
-    this.append(`top(${node.expression})`);
-    if (node.modifiers) {
-      this.append(` ${node.modifiers}`);
-    }
-  }
-  append(str) {
-    this.#sql += str;
-  }
-  appendValue(parameter) {
-    this.addParameter(parameter);
-    this.append(this.getCurrentParameterPlaceholder());
-  }
-  getLeftIdentifierWrapper() {
-    return '"';
-  }
-  getRightIdentifierWrapper() {
-    return '"';
-  }
-  getCurrentParameterPlaceholder() {
-    return "$" + this.numParameters;
-  }
-  getLeftExplainOptionsWrapper() {
-    return "(";
-  }
-  getExplainOptionAssignment() {
-    return " ";
-  }
-  getExplainOptionsDelimiter() {
-    return ", ";
-  }
-  getRightExplainOptionsWrapper() {
-    return ")";
-  }
-  sanitizeIdentifier(identifier) {
-    const leftWrap = this.getLeftIdentifierWrapper();
-    const rightWrap = this.getRightIdentifierWrapper();
-    let sanitized = "";
-    for (const c of identifier) {
-      sanitized += c;
-      if (c === leftWrap) {
-        sanitized += leftWrap;
-      } else if (c === rightWrap) {
-        sanitized += rightWrap;
-      }
-    }
-    return sanitized;
-  }
-  addParameter(parameter) {
-    this.#parameters.push(parameter);
-  }
-  appendImmediateValue(value) {
-    if (isString(value)) {
-      this.append(`'${value}'`);
-    } else if (isNumber(value) || isBoolean(value)) {
-      this.append(value.toString());
-    } else if (isNull(value)) {
-      this.append("null");
-    } else if (isDate(value)) {
-      this.appendImmediateValue(value.toISOString());
-    } else if (isBigInt(value)) {
-      this.appendImmediateValue(value.toString());
-    } else {
-      throw new Error(`invalid immediate value ${value}`);
-    }
-  }
-  sortSelectModifiers(arr) {
-    arr.sort((left, right) => left.modifier && right.modifier ? SELECT_MODIFIER_PRIORITY[left.modifier] - SELECT_MODIFIER_PRIORITY[right.modifier] : 1);
-    return freeze(arr);
-  }
-  compileColumnAlterations(columnAlterations) {
-    this.compileList(columnAlterations);
-  }
-  announcesNewColumnDataType() {
-    return true;
-  }
-}
-var SELECT_MODIFIER_SQL = freeze({
-  ForKeyShare: "for key share",
-  ForNoKeyUpdate: "for no key update",
-  ForUpdate: "for update",
-  ForShare: "for share",
-  NoWait: "nowait",
-  SkipLocked: "skip locked",
-  Distinct: "distinct"
-});
-var SELECT_MODIFIER_PRIORITY = freeze({
-  ForKeyShare: 1,
-  ForNoKeyUpdate: 1,
-  ForUpdate: 1,
-  ForShare: 1,
-  NoWait: 2,
-  SkipLocked: 2,
-  Distinct: 0
-});
-var JOIN_TYPE_SQL = freeze({
-  InnerJoin: "inner join",
-  LeftJoin: "left join",
-  RightJoin: "right join",
-  FullJoin: "full join",
-  LateralInnerJoin: "inner join lateral",
-  LateralLeftJoin: "left join lateral",
-  Using: "using"
-});
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/query-compiler/compiled-query.js
-var CompiledQuery = freeze({
-  raw(sql2, parameters = []) {
-    return freeze({
-      sql: sql2,
-      query: RawNode.createWithSql(sql2),
-      parameters: freeze(parameters)
-    });
-  }
-});
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/dialect-adapter-base.js
-class DialectAdapterBase {
-  get supportsCreateIfNotExists() {
-    return true;
-  }
-  get supportsTransactionalDdl() {
-    return false;
-  }
-  get supportsReturning() {
-    return false;
-  }
-  get supportsOutput() {
-    return false;
-  }
-}
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/sqlite/sqlite-driver.js
-class SqliteDriver {
-  #config;
-  #connectionMutex = new ConnectionMutex;
-  #db;
-  #connection;
-  constructor(config2) {
-    this.#config = freeze({ ...config2 });
-  }
-  async init() {
-    this.#db = isFunction(this.#config.database) ? await this.#config.database() : this.#config.database;
-    this.#connection = new SqliteConnection(this.#db);
-    if (this.#config.onCreateConnection) {
-      await this.#config.onCreateConnection(this.#connection);
-    }
-  }
-  async acquireConnection() {
-    await this.#connectionMutex.lock();
-    return this.#connection;
-  }
-  async beginTransaction(connection) {
-    await connection.executeQuery(CompiledQuery.raw("begin"));
-  }
-  async commitTransaction(connection) {
-    await connection.executeQuery(CompiledQuery.raw("commit"));
-  }
-  async rollbackTransaction(connection) {
-    await connection.executeQuery(CompiledQuery.raw("rollback"));
-  }
-  async releaseConnection() {
-    this.#connectionMutex.unlock();
-  }
-  async destroy() {
-    this.#db?.close();
-  }
-}
-
-class SqliteConnection {
-  #db;
-  constructor(db) {
-    this.#db = db;
-  }
-  executeQuery(compiledQuery) {
-    const { sql: sql2, parameters } = compiledQuery;
-    const stmt = this.#db.prepare(sql2);
-    if (stmt.reader) {
-      return Promise.resolve({
-        rows: stmt.all(parameters)
-      });
-    } else {
-      const { changes, lastInsertRowid } = stmt.run(parameters);
-      const numAffectedRows = changes !== undefined && changes !== null ? BigInt(changes) : undefined;
-      return Promise.resolve({
-        numUpdatedOrDeletedRows: numAffectedRows,
-        numAffectedRows,
-        insertId: lastInsertRowid !== undefined && lastInsertRowid !== null ? BigInt(lastInsertRowid) : undefined,
-        rows: []
-      });
-    }
-  }
-  async* streamQuery(compiledQuery, _chunkSize) {
-    const { sql: sql2, parameters, query } = compiledQuery;
-    const stmt = this.#db.prepare(sql2);
-    if (SelectQueryNode.is(query)) {
-      const iter = stmt.iterate(parameters);
-      for (const row of iter) {
-        yield {
-          rows: [row]
-        };
-      }
-    } else {
-      throw new Error("Sqlite driver only supports streaming of select queries");
-    }
-  }
-}
-
-class ConnectionMutex {
-  #promise;
-  #resolve;
-  async lock() {
-    while (this.#promise) {
-      await this.#promise;
-    }
-    this.#promise = new Promise((resolve) => {
-      this.#resolve = resolve;
-    });
-  }
-  unlock() {
-    const resolve = this.#resolve;
-    this.#promise = undefined;
-    this.#resolve = undefined;
-    resolve?.();
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/sqlite/sqlite-query-compiler.js
-var ID_WRAP_REGEX = /"/g;
-
-class SqliteQueryCompiler extends DefaultQueryCompiler {
-  getCurrentParameterPlaceholder() {
-    return "?";
-  }
-  getLeftExplainOptionsWrapper() {
-    return "";
-  }
-  getRightExplainOptionsWrapper() {
-    return "";
-  }
-  getLeftIdentifierWrapper() {
-    return '"';
-  }
-  getRightIdentifierWrapper() {
-    return '"';
-  }
-  getAutoIncrement() {
-    return "autoincrement";
-  }
-  sanitizeIdentifier(identifier) {
-    return identifier.replace(ID_WRAP_REGEX, '""');
-  }
-  visitDefaultInsertValue(_) {
-    this.append("null");
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/noop-plugin.js
-class NoopPlugin {
-  transformQuery(args) {
-    return args.node;
-  }
-  async transformResult(args) {
-    return args.result;
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/migration/migrator.js
-var DEFAULT_MIGRATION_TABLE = "kysely_migration";
-var DEFAULT_MIGRATION_LOCK_TABLE = "kysely_migration_lock";
-var DEFAULT_ALLOW_UNORDERED_MIGRATIONS = false;
-var MIGRATION_LOCK_ID = "migration_lock";
-var NO_MIGRATIONS = freeze({ __noMigrations__: true });
-
-class Migrator {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  async getMigrations() {
-    const executedMigrations = await this.#doesTableExists(this.#migrationTable) ? await this.#props.db.withPlugin(this.#schemaPlugin).selectFrom(this.#migrationTable).select(["name", "timestamp"]).$narrowType().execute() : [];
-    const migrations = await this.#resolveMigrations();
-    return migrations.map(({ name, ...migration }) => {
-      const executed = executedMigrations.find((it) => it.name === name);
-      return {
-        name,
-        migration,
-        executedAt: executed ? new Date(executed.timestamp) : undefined
-      };
-    });
-  }
-  async migrateToLatest() {
-    return this.#migrate(() => ({ direction: "Up", step: Infinity }));
-  }
-  async migrateTo(targetMigrationName) {
-    return this.#migrate(({ migrations, executedMigrations, pendingMigrations }) => {
-      if (targetMigrationName === NO_MIGRATIONS) {
-        return { direction: "Down", step: Infinity };
-      }
-      if (!migrations.find((m) => m.name === targetMigrationName)) {
-        throw new Error(`migration "${targetMigrationName}" doesn't exist`);
-      }
-      const executedIndex = executedMigrations.indexOf(targetMigrationName);
-      const pendingIndex = pendingMigrations.findIndex((m) => m.name === targetMigrationName);
-      if (executedIndex !== -1) {
-        return {
-          direction: "Down",
-          step: executedMigrations.length - executedIndex - 1
-        };
-      } else if (pendingIndex !== -1) {
-        return { direction: "Up", step: pendingIndex + 1 };
-      } else {
-        throw new Error(`migration "${targetMigrationName}" isn't executed or pending`);
-      }
-    });
-  }
-  async migrateUp() {
-    return this.#migrate(() => ({ direction: "Up", step: 1 }));
-  }
-  async migrateDown() {
-    return this.#migrate(() => ({ direction: "Down", step: 1 }));
-  }
-  async#migrate(getMigrationDirectionAndStep) {
-    try {
-      await this.#ensureMigrationTablesExists();
-      return await this.#runMigrations(getMigrationDirectionAndStep);
-    } catch (error51) {
-      if (error51 instanceof MigrationResultSetError) {
-        return error51.resultSet;
-      }
-      return { error: error51 };
-    }
-  }
-  get #migrationTableSchema() {
-    return this.#props.migrationTableSchema;
-  }
-  get #migrationTable() {
-    return this.#props.migrationTableName ?? DEFAULT_MIGRATION_TABLE;
-  }
-  get #migrationLockTable() {
-    return this.#props.migrationLockTableName ?? DEFAULT_MIGRATION_LOCK_TABLE;
-  }
-  get #allowUnorderedMigrations() {
-    return this.#props.allowUnorderedMigrations ?? DEFAULT_ALLOW_UNORDERED_MIGRATIONS;
-  }
-  get #schemaPlugin() {
-    if (this.#migrationTableSchema) {
-      return new WithSchemaPlugin(this.#migrationTableSchema);
-    }
-    return new NoopPlugin;
-  }
-  async#ensureMigrationTablesExists() {
-    await this.#ensureMigrationTableSchemaExists();
-    await this.#ensureMigrationTableExists();
-    await this.#ensureMigrationLockTableExists();
-    await this.#ensureLockRowExists();
-  }
-  async#ensureMigrationTableSchemaExists() {
-    if (!this.#migrationTableSchema) {
-      return;
-    }
-    if (!await this.#doesSchemaExists()) {
-      try {
-        await this.#createIfNotExists(this.#props.db.schema.createSchema(this.#migrationTableSchema));
-      } catch (error51) {
-        if (!await this.#doesSchemaExists()) {
-          throw error51;
-        }
-      }
-    }
-  }
-  async#ensureMigrationTableExists() {
-    if (!await this.#doesTableExists(this.#migrationTable)) {
-      try {
-        if (this.#migrationTableSchema) {
-          await this.#createIfNotExists(this.#props.db.schema.createSchema(this.#migrationTableSchema));
-        }
-        await this.#createIfNotExists(this.#props.db.schema.withPlugin(this.#schemaPlugin).createTable(this.#migrationTable).addColumn("name", "varchar(255)", (col) => col.notNull().primaryKey()).addColumn("timestamp", "varchar(255)", (col) => col.notNull()));
-      } catch (error51) {
-        if (!await this.#doesTableExists(this.#migrationTable)) {
-          throw error51;
-        }
-      }
-    }
-  }
-  async#ensureMigrationLockTableExists() {
-    if (!await this.#doesTableExists(this.#migrationLockTable)) {
-      try {
-        await this.#createIfNotExists(this.#props.db.schema.withPlugin(this.#schemaPlugin).createTable(this.#migrationLockTable).addColumn("id", "varchar(255)", (col) => col.notNull().primaryKey()).addColumn("is_locked", "integer", (col) => col.notNull().defaultTo(0)));
-      } catch (error51) {
-        if (!await this.#doesTableExists(this.#migrationLockTable)) {
-          throw error51;
-        }
-      }
-    }
-  }
-  async#ensureLockRowExists() {
-    if (!await this.#doesLockRowExists()) {
-      try {
-        await this.#props.db.withPlugin(this.#schemaPlugin).insertInto(this.#migrationLockTable).values({ id: MIGRATION_LOCK_ID, is_locked: 0 }).execute();
-      } catch (error51) {
-        if (!await this.#doesLockRowExists()) {
-          throw error51;
-        }
-      }
-    }
-  }
-  async#doesSchemaExists() {
-    const schemas3 = await this.#props.db.introspection.getSchemas();
-    return schemas3.some((it) => it.name === this.#migrationTableSchema);
-  }
-  async#doesTableExists(tableName) {
-    const schema = this.#migrationTableSchema;
-    const tables = await this.#props.db.introspection.getTables({
-      withInternalKyselyTables: true
-    });
-    return tables.some((it) => it.name === tableName && (!schema || it.schema === schema));
-  }
-  async#doesLockRowExists() {
-    const lockRow = await this.#props.db.withPlugin(this.#schemaPlugin).selectFrom(this.#migrationLockTable).where("id", "=", MIGRATION_LOCK_ID).select("id").executeTakeFirst();
-    return !!lockRow;
-  }
-  async#runMigrations(getMigrationDirectionAndStep) {
-    const adapter = this.#props.db.getExecutor().adapter;
-    const lockOptions = freeze({
-      lockTable: this.#props.migrationLockTableName ?? DEFAULT_MIGRATION_LOCK_TABLE,
-      lockRowId: MIGRATION_LOCK_ID,
-      lockTableSchema: this.#props.migrationTableSchema
-    });
-    const run = async (db) => {
-      try {
-        await adapter.acquireMigrationLock(db, lockOptions);
-        const state = await this.#getState(db);
-        if (state.migrations.length === 0) {
-          return { results: [] };
-        }
-        const { direction, step } = getMigrationDirectionAndStep(state);
-        if (step <= 0) {
-          return { results: [] };
-        }
-        if (direction === "Down") {
-          return await this.#migrateDown(db, state, step);
-        } else if (direction === "Up") {
-          return await this.#migrateUp(db, state, step);
-        }
-        return { results: [] };
-      } finally {
-        await adapter.releaseMigrationLock(db, lockOptions);
-      }
-    };
-    if (adapter.supportsTransactionalDdl) {
-      return this.#props.db.transaction().execute(run);
-    } else {
-      return this.#props.db.connection().execute(run);
-    }
-  }
-  async#getState(db) {
-    const migrations = await this.#resolveMigrations();
-    const executedMigrations = await this.#getExecutedMigrations(db);
-    this.#ensureNoMissingMigrations(migrations, executedMigrations);
-    if (!this.#allowUnorderedMigrations) {
-      this.#ensureMigrationsInOrder(migrations, executedMigrations);
-    }
-    const pendingMigrations = this.#getPendingMigrations(migrations, executedMigrations);
-    return freeze({
-      migrations,
-      executedMigrations,
-      lastMigration: getLast(executedMigrations),
-      pendingMigrations
-    });
-  }
-  #getPendingMigrations(migrations, executedMigrations) {
-    return migrations.filter((migration) => {
-      return !executedMigrations.includes(migration.name);
-    });
-  }
-  async#resolveMigrations() {
-    const allMigrations = await this.#props.provider.getMigrations();
-    return Object.keys(allMigrations).sort().map((name) => ({
-      ...allMigrations[name],
-      name
-    }));
-  }
-  async#getExecutedMigrations(db) {
-    const executedMigrations = await db.withPlugin(this.#schemaPlugin).selectFrom(this.#migrationTable).select(["name", "timestamp"]).$narrowType().execute();
-    const nameComparator = this.#props.nameComparator || ((a, b) => a.localeCompare(b));
-    return executedMigrations.sort((a, b) => {
-      if (a.timestamp === b.timestamp) {
-        return nameComparator(a.name, b.name);
-      }
-      return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
-    }).map((it) => it.name);
-  }
-  #ensureNoMissingMigrations(migrations, executedMigrations) {
-    for (const executed of executedMigrations) {
-      if (!migrations.some((it) => it.name === executed)) {
-        throw new Error(`corrupted migrations: previously executed migration ${executed} is missing`);
-      }
-    }
-  }
-  #ensureMigrationsInOrder(migrations, executedMigrations) {
-    for (let i = 0;i < executedMigrations.length; ++i) {
-      if (migrations[i].name !== executedMigrations[i]) {
-        throw new Error(`corrupted migrations: expected previously executed migration ${executedMigrations[i]} to be at index ${i} but ${migrations[i].name} was found in its place. New migrations must always have a name that comes alphabetically after the last executed migration.`);
-      }
-    }
-  }
-  async#migrateDown(db, state, step) {
-    const migrationsToRollback = state.executedMigrations.slice().reverse().slice(0, step).map((name) => {
-      return state.migrations.find((it) => it.name === name);
-    });
-    const results = migrationsToRollback.map((migration) => {
-      return {
-        migrationName: migration.name,
-        direction: "Down",
-        status: "NotExecuted"
-      };
-    });
-    for (let i = 0;i < results.length; ++i) {
-      const migration = migrationsToRollback[i];
-      try {
-        if (migration.down) {
-          await migration.down(db);
-          await db.withPlugin(this.#schemaPlugin).deleteFrom(this.#migrationTable).where("name", "=", migration.name).execute();
-          results[i] = {
-            migrationName: migration.name,
-            direction: "Down",
-            status: "Success"
-          };
-        }
-      } catch (error51) {
-        results[i] = {
-          migrationName: migration.name,
-          direction: "Down",
-          status: "Error"
-        };
-        throw new MigrationResultSetError({
-          error: error51,
-          results
-        });
-      }
-    }
-    return { results };
-  }
-  async#migrateUp(db, state, step) {
-    const migrationsToRun = state.pendingMigrations.slice(0, step);
-    const results = migrationsToRun.map((migration) => {
-      return {
-        migrationName: migration.name,
-        direction: "Up",
-        status: "NotExecuted"
-      };
-    });
-    for (let i = 0;i < results.length; i++) {
-      const migration = state.pendingMigrations[i];
-      try {
-        await migration.up(db);
-        await db.withPlugin(this.#schemaPlugin).insertInto(this.#migrationTable).values({
-          name: migration.name,
-          timestamp: new Date().toISOString()
-        }).execute();
-        results[i] = {
-          migrationName: migration.name,
-          direction: "Up",
-          status: "Success"
-        };
-      } catch (error51) {
-        results[i] = {
-          migrationName: migration.name,
-          direction: "Up",
-          status: "Error"
-        };
-        throw new MigrationResultSetError({
-          error: error51,
-          results
-        });
-      }
-    }
-    return { results };
-  }
-  async#createIfNotExists(qb) {
-    if (this.#props.db.getExecutor().adapter.supportsCreateIfNotExists) {
-      qb = qb.ifNotExists();
-    }
-    await qb.execute();
-  }
-}
-
-class MigrationResultSetError extends Error {
-  #resultSet;
-  constructor(result) {
-    super();
-    this.#resultSet = result;
-  }
-  get resultSet() {
-    return this.#resultSet;
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/sqlite/sqlite-introspector.js
-class SqliteIntrospector {
-  #db;
-  constructor(db) {
-    this.#db = db;
-  }
-  async getSchemas() {
-    return [];
-  }
-  async getTables(options = { withInternalKyselyTables: false }) {
-    return await this.#getTableMetadata(options);
-  }
-  async getMetadata(options) {
-    return {
-      tables: await this.getTables(options)
-    };
-  }
-  #tablesQuery(qb, options) {
-    let tablesQuery = qb.selectFrom("sqlite_master").where("type", "in", ["table", "view"]).where("name", "not like", "sqlite_%").select(["name", "sql", "type"]).orderBy("name");
-    if (!options.withInternalKyselyTables) {
-      tablesQuery = tablesQuery.where("name", "!=", DEFAULT_MIGRATION_TABLE).where("name", "!=", DEFAULT_MIGRATION_LOCK_TABLE);
-    }
-    return tablesQuery;
-  }
-  async#getTableMetadata(options) {
-    const tablesResult = await this.#tablesQuery(this.#db, options).execute();
-    const tableMetadata = await this.#db.with("table_list", (qb) => this.#tablesQuery(qb, options)).selectFrom([
-      "table_list as tl",
-      sql`pragma_table_info(tl.name)`.as("p")
-    ]).select([
-      "tl.name as table",
-      "p.cid",
-      "p.name",
-      "p.type",
-      "p.notnull",
-      "p.dflt_value",
-      "p.pk"
-    ]).orderBy(["tl.name", "p.cid"]).execute();
-    const columnsByTable = {};
-    for (const row of tableMetadata) {
-      columnsByTable[row.table] ??= [];
-      columnsByTable[row.table].push(row);
-    }
-    return tablesResult.map(({ name, sql: sql2, type }) => {
-      let autoIncrementCol = sql2?.split(/[\(\),]/)?.find((it) => it.toLowerCase().includes("autoincrement"))?.trimStart()?.split(/\s+/)?.[0]?.replace(/["`]/g, "");
-      const columns = columnsByTable[name] ?? [];
-      if (!autoIncrementCol) {
-        const pkCols = columns.filter((r) => r.pk > 0);
-        if (pkCols.length === 1 && pkCols[0].type.toLowerCase() === "integer") {
-          autoIncrementCol = pkCols[0].name;
-        }
-      }
-      return {
-        name,
-        isView: type === "view",
-        columns: columns.map((col) => ({
-          name: col.name,
-          dataType: col.type,
-          isNullable: !col.notnull,
-          isAutoIncrementing: col.name === autoIncrementCol,
-          hasDefaultValue: col.dflt_value != null,
-          comment: undefined
-        }))
-      };
-    });
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/sqlite/sqlite-adapter.js
-class SqliteAdapter extends DialectAdapterBase {
-  get supportsTransactionalDdl() {
-    return false;
-  }
-  get supportsReturning() {
-    return true;
-  }
-  async acquireMigrationLock(_db, _opt) {}
-  async releaseMigrationLock(_db, _opt) {}
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/sqlite/sqlite-dialect.js
-class SqliteDialect {
-  #config;
-  constructor(config2) {
-    this.#config = freeze({ ...config2 });
-  }
-  createDriver() {
-    return new SqliteDriver(this.#config);
-  }
-  createQueryCompiler() {
-    return new SqliteQueryCompiler;
-  }
-  createAdapter() {
-    return new SqliteAdapter;
-  }
-  createIntrospector(db) {
-    return new SqliteIntrospector(db);
-  }
-}
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/postgres/postgres-query-compiler.js
-var ID_WRAP_REGEX2 = /"/g;
-
-class PostgresQueryCompiler extends DefaultQueryCompiler {
-  sanitizeIdentifier(identifier) {
-    return identifier.replace(ID_WRAP_REGEX2, '""');
-  }
-}
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/postgres/postgres-introspector.js
-class PostgresIntrospector {
-  #db;
-  constructor(db) {
-    this.#db = db;
-  }
-  async getSchemas() {
-    let rawSchemas = await this.#db.selectFrom("pg_catalog.pg_namespace").select("nspname").$castTo().execute();
-    return rawSchemas.map((it) => ({ name: it.nspname }));
-  }
-  async getTables(options = { withInternalKyselyTables: false }) {
-    let query = this.#db.selectFrom("pg_catalog.pg_attribute as a").innerJoin("pg_catalog.pg_class as c", "a.attrelid", "c.oid").innerJoin("pg_catalog.pg_namespace as ns", "c.relnamespace", "ns.oid").innerJoin("pg_catalog.pg_type as typ", "a.atttypid", "typ.oid").innerJoin("pg_catalog.pg_namespace as dtns", "typ.typnamespace", "dtns.oid").select([
-      "a.attname as column",
-      "a.attnotnull as not_null",
-      "a.atthasdef as has_default",
-      "c.relname as table",
-      "c.relkind as table_type",
-      "ns.nspname as schema",
-      "typ.typname as type",
-      "dtns.nspname as type_schema",
-      sql`col_description(a.attrelid, a.attnum)`.as("column_description"),
-      this.#db.selectFrom("pg_class").select(sql`true`.as("auto_incrementing")).whereRef("relnamespace", "=", "c.relnamespace").where("relkind", "=", "S").where("relname", "=", sql`c.relname || '_' || a.attname || '_seq'`).as("auto_incrementing")
-    ]).where((eb) => eb.or([
-      eb("c.relkind", "=", "r"),
-      eb("c.relkind", "=", "v"),
-      eb("c.relkind", "=", "p")
-    ])).where("ns.nspname", "!~", "^pg_").where("ns.nspname", "!=", "information_schema").where("a.attnum", ">=", 0).where("a.attisdropped", "!=", true).orderBy("ns.nspname").orderBy("c.relname").orderBy("a.attnum").$castTo();
-    if (!options.withInternalKyselyTables) {
-      query = query.where("c.relname", "!=", DEFAULT_MIGRATION_TABLE).where("c.relname", "!=", DEFAULT_MIGRATION_LOCK_TABLE);
-    }
-    const rawColumns = await query.execute();
-    return this.#parseTableMetadata(rawColumns);
-  }
-  async getMetadata(options) {
-    return {
-      tables: await this.getTables(options)
-    };
-  }
-  #parseTableMetadata(columns) {
-    return columns.reduce((tables, it) => {
-      let table = tables.find((tbl) => tbl.name === it.table && tbl.schema === it.schema);
-      if (!table) {
-        table = freeze({
-          name: it.table,
-          isView: it.table_type === "v",
-          schema: it.schema,
-          columns: []
-        });
-        tables.push(table);
-      }
-      table.columns.push(freeze({
-        name: it.column,
-        dataType: it.type,
-        dataTypeSchema: it.type_schema,
-        isNullable: !it.not_null,
-        isAutoIncrementing: !!it.auto_incrementing,
-        hasDefaultValue: it.has_default,
-        comment: it.column_description ?? undefined
-      }));
-      return tables;
-    }, []);
-  }
-}
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/postgres/postgres-adapter.js
-var LOCK_ID = BigInt("3853314791062309107");
-
-class PostgresAdapter extends DialectAdapterBase {
-  get supportsTransactionalDdl() {
-    return true;
-  }
-  get supportsReturning() {
-    return true;
-  }
-  async acquireMigrationLock(db, _opt) {
-    await sql`select pg_advisory_xact_lock(${sql.lit(LOCK_ID)})`.execute(db);
-  }
-  async releaseMigrationLock(_db, _opt) {}
-}
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/util/stack-trace-utils.js
-function extendStackTrace(err, stackError) {
-  if (isStackHolder(err) && stackError.stack) {
-    const stackExtension = stackError.stack.split(`
-`).slice(1).join(`
-`);
-    err.stack += `
-${stackExtension}`;
-    return err;
-  }
-  return err;
-}
-function isStackHolder(obj) {
-  return isObject2(obj) && isString(obj.stack);
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mysql/mysql-driver.js
-var PRIVATE_RELEASE_METHOD = Symbol();
-
-class MysqlDriver {
-  #config;
-  #connections = new WeakMap;
-  #pool;
-  constructor(configOrPool) {
-    this.#config = freeze({ ...configOrPool });
-  }
-  async init() {
-    this.#pool = isFunction(this.#config.pool) ? await this.#config.pool() : this.#config.pool;
-  }
-  async acquireConnection() {
-    const rawConnection = await this.#acquireConnection();
-    let connection = this.#connections.get(rawConnection);
-    if (!connection) {
-      connection = new MysqlConnection(rawConnection);
-      this.#connections.set(rawConnection, connection);
-      if (this.#config?.onCreateConnection) {
-        await this.#config.onCreateConnection(connection);
-      }
-    }
-    if (this.#config?.onReserveConnection) {
-      await this.#config.onReserveConnection(connection);
-    }
-    return connection;
-  }
-  async#acquireConnection() {
-    return new Promise((resolve, reject) => {
-      this.#pool.getConnection(async (err, rawConnection) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(rawConnection);
-        }
-      });
-    });
-  }
-  async beginTransaction(connection, settings) {
-    if (settings.isolationLevel) {
-      await connection.executeQuery(CompiledQuery.raw(`set transaction isolation level ${settings.isolationLevel}`));
-    }
-    await connection.executeQuery(CompiledQuery.raw("begin"));
-  }
-  async commitTransaction(connection) {
-    await connection.executeQuery(CompiledQuery.raw("commit"));
-  }
-  async rollbackTransaction(connection) {
-    await connection.executeQuery(CompiledQuery.raw("rollback"));
-  }
-  async releaseConnection(connection) {
-    connection[PRIVATE_RELEASE_METHOD]();
-  }
-  async destroy() {
-    return new Promise((resolve, reject) => {
-      this.#pool.end((err) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
-    });
-  }
-}
-function isOkPacket(obj) {
-  return isObject2(obj) && "insertId" in obj && "affectedRows" in obj;
-}
-
-class MysqlConnection {
-  #rawConnection;
-  constructor(rawConnection) {
-    this.#rawConnection = rawConnection;
-  }
-  async executeQuery(compiledQuery) {
-    try {
-      const result = await this.#executeQuery(compiledQuery);
-      if (isOkPacket(result)) {
-        const { insertId, affectedRows, changedRows } = result;
-        const numAffectedRows = affectedRows !== undefined && affectedRows !== null ? BigInt(affectedRows) : undefined;
-        const numChangedRows = changedRows !== undefined && changedRows !== null ? BigInt(changedRows) : undefined;
-        return {
-          insertId: insertId !== undefined && insertId !== null && insertId.toString() !== "0" ? BigInt(insertId) : undefined,
-          numUpdatedOrDeletedRows: numAffectedRows,
-          numAffectedRows,
-          numChangedRows,
-          rows: []
-        };
-      } else if (Array.isArray(result)) {
-        return {
-          rows: result
-        };
-      }
-      return {
-        rows: []
-      };
-    } catch (err) {
-      throw extendStackTrace(err, new Error);
-    }
-  }
-  #executeQuery(compiledQuery) {
-    return new Promise((resolve, reject) => {
-      this.#rawConnection.query(compiledQuery.sql, compiledQuery.parameters, (err, result) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(result);
-        }
-      });
-    });
-  }
-  async* streamQuery(compiledQuery, _chunkSize) {
-    const stream = this.#rawConnection.query(compiledQuery.sql, compiledQuery.parameters).stream({
-      objectMode: true
-    });
-    try {
-      for await (const row of stream) {
-        yield {
-          rows: [row]
-        };
-      }
-    } catch (ex) {
-      if (ex && typeof ex === "object" && "code" in ex && ex.code === "ERR_STREAM_PREMATURE_CLOSE") {
-        return;
-      }
-      throw ex;
-    }
-  }
-  [PRIVATE_RELEASE_METHOD]() {
-    this.#rawConnection.release();
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mysql/mysql-query-compiler.js
-var ID_WRAP_REGEX3 = /`/g;
-
-class MysqlQueryCompiler extends DefaultQueryCompiler {
-  getCurrentParameterPlaceholder() {
-    return "?";
-  }
-  getLeftExplainOptionsWrapper() {
-    return "";
-  }
-  getExplainOptionAssignment() {
-    return "=";
-  }
-  getExplainOptionsDelimiter() {
-    return " ";
-  }
-  getRightExplainOptionsWrapper() {
-    return "";
-  }
-  getLeftIdentifierWrapper() {
-    return "`";
-  }
-  getRightIdentifierWrapper() {
-    return "`";
-  }
-  sanitizeIdentifier(identifier) {
-    return identifier.replace(ID_WRAP_REGEX3, "``");
-  }
-  visitCreateIndex(node) {
-    this.append("create ");
-    if (node.unique) {
-      this.append("unique ");
-    }
-    this.append("index ");
-    if (node.ifNotExists) {
-      this.append("if not exists ");
-    }
-    this.visitNode(node.name);
-    if (node.using) {
-      this.append(" using ");
-      this.visitNode(node.using);
-    }
-    if (node.table) {
-      this.append(" on ");
-      this.visitNode(node.table);
-    }
-    if (node.columns) {
-      this.append(" (");
-      this.compileList(node.columns);
-      this.append(")");
-    }
-    if (node.where) {
-      this.append(" ");
-      this.visitNode(node.where);
-    }
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mysql/mysql-introspector.js
-class MysqlIntrospector {
-  #db;
-  constructor(db) {
-    this.#db = db;
-  }
-  async getSchemas() {
-    let rawSchemas = await this.#db.selectFrom("information_schema.schemata").select("schema_name").$castTo().execute();
-    return rawSchemas.map((it) => ({ name: it.SCHEMA_NAME }));
-  }
-  async getTables(options = { withInternalKyselyTables: false }) {
-    let query = this.#db.selectFrom("information_schema.columns as columns").innerJoin("information_schema.tables as tables", (b) => b.onRef("columns.TABLE_CATALOG", "=", "tables.TABLE_CATALOG").onRef("columns.TABLE_SCHEMA", "=", "tables.TABLE_SCHEMA").onRef("columns.TABLE_NAME", "=", "tables.TABLE_NAME")).select([
-      "columns.COLUMN_NAME",
-      "columns.COLUMN_DEFAULT",
-      "columns.TABLE_NAME",
-      "columns.TABLE_SCHEMA",
-      "tables.TABLE_TYPE",
-      "columns.IS_NULLABLE",
-      "columns.DATA_TYPE",
-      "columns.EXTRA",
-      "columns.COLUMN_COMMENT"
-    ]).where("columns.TABLE_SCHEMA", "=", sql`database()`).orderBy("columns.TABLE_NAME").orderBy("columns.ORDINAL_POSITION").$castTo();
-    if (!options.withInternalKyselyTables) {
-      query = query.where("columns.TABLE_NAME", "!=", DEFAULT_MIGRATION_TABLE).where("columns.TABLE_NAME", "!=", DEFAULT_MIGRATION_LOCK_TABLE);
-    }
-    const rawColumns = await query.execute();
-    return this.#parseTableMetadata(rawColumns);
-  }
-  async getMetadata(options) {
-    return {
-      tables: await this.getTables(options)
-    };
-  }
-  #parseTableMetadata(columns) {
-    return columns.reduce((tables, it) => {
-      let table = tables.find((tbl) => tbl.name === it.TABLE_NAME);
-      if (!table) {
-        table = freeze({
-          name: it.TABLE_NAME,
-          isView: it.TABLE_TYPE === "VIEW",
-          schema: it.TABLE_SCHEMA,
-          columns: []
-        });
-        tables.push(table);
-      }
-      table.columns.push(freeze({
-        name: it.COLUMN_NAME,
-        dataType: it.DATA_TYPE,
-        isNullable: it.IS_NULLABLE === "YES",
-        isAutoIncrementing: it.EXTRA.toLowerCase().includes("auto_increment"),
-        hasDefaultValue: it.COLUMN_DEFAULT !== null,
-        comment: it.COLUMN_COMMENT === "" ? undefined : it.COLUMN_COMMENT
-      }));
-      return tables;
-    }, []);
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mysql/mysql-adapter.js
-var LOCK_ID2 = "ea586330-2c93-47c8-908d-981d9d270f9d";
-var LOCK_TIMEOUT_SECONDS = 60 * 60;
-
-class MysqlAdapter extends DialectAdapterBase {
-  get supportsTransactionalDdl() {
-    return false;
-  }
-  get supportsReturning() {
-    return false;
-  }
-  async acquireMigrationLock(db, _opt) {
-    await sql`select get_lock(${sql.lit(LOCK_ID2)}, ${sql.lit(LOCK_TIMEOUT_SECONDS)})`.execute(db);
-  }
-  async releaseMigrationLock(db, _opt) {
-    await sql`select release_lock(${sql.lit(LOCK_ID2)})`.execute(db);
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mysql/mysql-dialect.js
-class MysqlDialect {
-  #config;
-  constructor(config2) {
-    this.#config = config2;
-  }
-  createDriver() {
-    return new MysqlDriver(this.#config);
-  }
-  createQueryCompiler() {
-    return new MysqlQueryCompiler;
-  }
-  createAdapter() {
-    return new MysqlAdapter;
-  }
-  createIntrospector(db) {
-    return new MysqlIntrospector(db);
-  }
-}
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/postgres/postgres-driver.js
-var PRIVATE_RELEASE_METHOD2 = Symbol();
-
-class PostgresDriver {
-  #config;
-  #connections = new WeakMap;
-  #pool;
-  constructor(config2) {
-    this.#config = freeze({ ...config2 });
-  }
-  async init() {
-    this.#pool = isFunction(this.#config.pool) ? await this.#config.pool() : this.#config.pool;
-  }
-  async acquireConnection() {
-    const client = await this.#pool.connect();
-    let connection = this.#connections.get(client);
-    if (!connection) {
-      connection = new PostgresConnection(client, {
-        cursor: this.#config.cursor ?? null
-      });
-      this.#connections.set(client, connection);
-      if (this.#config.onCreateConnection) {
-        await this.#config.onCreateConnection(connection);
-      }
-    }
-    if (this.#config.onReserveConnection) {
-      await this.#config.onReserveConnection(connection);
-    }
-    return connection;
-  }
-  async beginTransaction(connection, settings) {
-    if (settings.isolationLevel) {
-      await connection.executeQuery(CompiledQuery.raw(`start transaction isolation level ${settings.isolationLevel}`));
-    } else {
-      await connection.executeQuery(CompiledQuery.raw("begin"));
-    }
-  }
-  async commitTransaction(connection) {
-    await connection.executeQuery(CompiledQuery.raw("commit"));
-  }
-  async rollbackTransaction(connection) {
-    await connection.executeQuery(CompiledQuery.raw("rollback"));
-  }
-  async releaseConnection(connection) {
-    connection[PRIVATE_RELEASE_METHOD2]();
-  }
-  async destroy() {
-    if (this.#pool) {
-      const pool = this.#pool;
-      this.#pool = undefined;
-      await pool.end();
-    }
-  }
-}
-
-class PostgresConnection {
-  #client;
-  #options;
-  constructor(client, options) {
-    this.#client = client;
-    this.#options = options;
-  }
-  async executeQuery(compiledQuery) {
-    try {
-      const result = await this.#client.query(compiledQuery.sql, [
-        ...compiledQuery.parameters
-      ]);
-      if (result.command === "INSERT" || result.command === "UPDATE" || result.command === "DELETE" || result.command === "MERGE") {
-        const numAffectedRows = BigInt(result.rowCount);
-        return {
-          numUpdatedOrDeletedRows: numAffectedRows,
-          numAffectedRows,
-          rows: result.rows ?? []
-        };
-      }
-      return {
-        rows: result.rows ?? []
-      };
-    } catch (err) {
-      throw extendStackTrace(err, new Error);
-    }
-  }
-  async* streamQuery(compiledQuery, chunkSize) {
-    if (!this.#options.cursor) {
-      throw new Error("'cursor' is not present in your postgres dialect config. It's required to make streaming work in postgres.");
-    }
-    if (!Number.isInteger(chunkSize) || chunkSize <= 0) {
-      throw new Error("chunkSize must be a positive integer");
-    }
-    const cursor = this.#client.query(new this.#options.cursor(compiledQuery.sql, compiledQuery.parameters.slice()));
-    try {
-      while (true) {
-        const rows = await cursor.read(chunkSize);
-        if (rows.length === 0) {
-          break;
-        }
-        yield {
-          rows
-        };
-      }
-    } finally {
-      await cursor.close();
-    }
-  }
-  [PRIVATE_RELEASE_METHOD2]() {
-    this.#client.release();
-  }
-}
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/postgres/postgres-dialect.js
-class PostgresDialect {
-  #config;
-  constructor(config2) {
-    this.#config = config2;
-  }
-  createDriver() {
-    return new PostgresDriver(this.#config);
-  }
-  createQueryCompiler() {
-    return new PostgresQueryCompiler;
-  }
-  createAdapter() {
-    return new PostgresAdapter;
-  }
-  createIntrospector(db) {
-    return new PostgresIntrospector(db);
-  }
-}
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mssql/mssql-adapter.js
-class MssqlAdapter extends DialectAdapterBase {
-  get supportsCreateIfNotExists() {
-    return false;
-  }
-  get supportsTransactionalDdl() {
-    return true;
-  }
-  get supportsOutput() {
-    return true;
-  }
-  async acquireMigrationLock(db) {
-    await sql`exec sp_getapplock @DbPrincipal = ${sql.lit("dbo")}, @Resource = ${sql.lit(DEFAULT_MIGRATION_TABLE)}, @LockMode = ${sql.lit("Exclusive")}`.execute(db);
-  }
-  async releaseMigrationLock() {}
-}
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mssql/mssql-driver.js
-var PRIVATE_RELEASE_METHOD3 = Symbol();
-var PRIVATE_DESTROY_METHOD = Symbol();
-
-class MssqlDriver {
-  #config;
-  #pool;
-  constructor(config2) {
-    this.#config = freeze({ ...config2 });
-    const { tarn, tedious } = this.#config;
-    const { validateConnections, ...poolOptions } = tarn.options;
-    this.#pool = new tarn.Pool({
-      ...poolOptions,
-      create: async () => {
-        const connection = await tedious.connectionFactory();
-        return await new MssqlConnection(connection, tedious).connect();
-      },
-      destroy: async (connection) => {
-        await connection[PRIVATE_DESTROY_METHOD]();
-      },
-      validate: validateConnections === false ? undefined : (connection) => connection.validate()
-    });
-  }
-  async init() {}
-  async acquireConnection() {
-    return await this.#pool.acquire().promise;
-  }
-  async beginTransaction(connection, settings) {
-    await connection.beginTransaction(settings);
-  }
-  async commitTransaction(connection) {
-    await connection.commitTransaction();
-  }
-  async rollbackTransaction(connection) {
-    await connection.rollbackTransaction();
-  }
-  async releaseConnection(connection) {
-    await connection[PRIVATE_RELEASE_METHOD3]();
-    this.#pool.release(connection);
-  }
-  async destroy() {
-    await this.#pool.destroy();
-  }
-}
-
-class MssqlConnection {
-  #connection;
-  #tedious;
-  constructor(connection, tedious) {
-    this.#connection = connection;
-    this.#tedious = tedious;
-    this.#connection.on("error", console.error);
-    this.#connection.once("end", () => {
-      this.#connection.off("error", console.error);
-    });
-  }
-  async beginTransaction(settings) {
-    const { isolationLevel } = settings;
-    await new Promise((resolve, reject) => this.#connection.beginTransaction((error51) => {
-      if (error51)
-        reject(error51);
-      else
-        resolve(undefined);
-    }, isolationLevel ? randomString2(8) : undefined, isolationLevel ? this.#getTediousIsolationLevel(isolationLevel) : undefined));
-  }
-  async commitTransaction() {
-    await new Promise((resolve, reject) => this.#connection.commitTransaction((error51) => {
-      if (error51)
-        reject(error51);
-      else
-        resolve(undefined);
-    }));
-  }
-  async connect() {
-    await new Promise((resolve, reject) => {
-      this.#connection.connect((error51) => {
-        if (error51) {
-          console.error(error51);
-          reject(error51);
-        } else {
-          resolve(undefined);
-        }
-      });
-    });
-    return this;
-  }
-  async executeQuery(compiledQuery) {
-    try {
-      const deferred = new Deferred;
-      const request = new MssqlRequest({
-        compiledQuery,
-        tedious: this.#tedious,
-        onDone: deferred
-      });
-      this.#connection.execSql(request.request);
-      const { rowCount, rows } = await deferred.promise;
-      return {
-        numAffectedRows: rowCount !== undefined ? BigInt(rowCount) : undefined,
-        rows
-      };
-    } catch (err) {
-      throw extendStackTrace(err, new Error);
-    }
-  }
-  async rollbackTransaction() {
-    await new Promise((resolve, reject) => this.#connection.rollbackTransaction((error51) => {
-      if (error51)
-        reject(error51);
-      else
-        resolve(undefined);
-    }));
-  }
-  async* streamQuery(compiledQuery, chunkSize) {
-    if (!Number.isInteger(chunkSize) || chunkSize <= 0) {
-      throw new Error("chunkSize must be a positive integer");
-    }
-    const request = new MssqlRequest({
-      compiledQuery,
-      streamChunkSize: chunkSize,
-      tedious: this.#tedious
-    });
-    this.#connection.execSql(request.request);
-    try {
-      while (true) {
-        const rows = await request.readChunk();
-        if (rows.length === 0) {
-          break;
-        }
-        yield { rows };
-        if (rows.length < chunkSize) {
-          break;
-        }
-      }
-    } finally {
-      await this.#cancelRequest(request);
-    }
-  }
-  async validate() {
-    try {
-      const deferred = new Deferred;
-      const request = new MssqlRequest({
-        compiledQuery: CompiledQuery.raw("select 1"),
-        onDone: deferred,
-        tedious: this.#tedious
-      });
-      this.#connection.execSql(request.request);
-      await deferred.promise;
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  #getTediousIsolationLevel(isolationLevel) {
-    const { ISOLATION_LEVEL } = this.#tedious;
-    const mapper = {
-      "read committed": ISOLATION_LEVEL.READ_COMMITTED,
-      "read uncommitted": ISOLATION_LEVEL.READ_UNCOMMITTED,
-      "repeatable read": ISOLATION_LEVEL.REPEATABLE_READ,
-      serializable: ISOLATION_LEVEL.SERIALIZABLE,
-      snapshot: ISOLATION_LEVEL.SNAPSHOT
-    };
-    const tediousIsolationLevel = mapper[isolationLevel];
-    if (tediousIsolationLevel === undefined) {
-      throw new Error(`Unknown isolation level: ${isolationLevel}`);
-    }
-    return tediousIsolationLevel;
-  }
-  #cancelRequest(request) {
-    return new Promise((resolve) => {
-      request.request.once("requestCompleted", resolve);
-      const wasCanceled = this.#connection.cancel();
-      if (!wasCanceled) {
-        request.request.off("requestCompleted", resolve);
-        resolve(undefined);
-      }
-    });
-  }
-  async[PRIVATE_RELEASE_METHOD3]() {
-    if (this.#tedious.resetConnectionOnRelease !== false) {
-      await new Promise((resolve, reject) => {
-        this.#connection.reset((error51) => {
-          if (error51)
-            reject(error51);
-          else
-            resolve(undefined);
-        });
-      });
-    }
-  }
-  [PRIVATE_DESTROY_METHOD]() {
-    return new Promise((resolve) => {
-      this.#connection.once("end", () => {
-        resolve(undefined);
-      });
-      this.#connection.close();
-    });
-  }
-}
-
-class MssqlRequest {
-  #request;
-  #rows;
-  #streamChunkSize;
-  #subscribers;
-  #tedious;
-  #error;
-  #rowCount;
-  constructor(props) {
-    const { compiledQuery, onDone, streamChunkSize, tedious } = props;
-    this.#rows = [];
-    this.#streamChunkSize = streamChunkSize;
-    this.#subscribers = {};
-    this.#tedious = tedious;
-    if (onDone) {
-      const subscriptionKey = "onDone";
-      this.#subscribers[subscriptionKey] = (event, error51) => {
-        if (event === "chunkReady") {
-          return;
-        }
-        delete this.#subscribers[subscriptionKey];
-        if (event === "error") {
-          onDone.reject(error51);
-        } else {
-          onDone.resolve({
-            rowCount: this.#rowCount,
-            rows: this.#rows
-          });
-        }
-      };
-    }
-    this.#request = new this.#tedious.Request(compiledQuery.sql, (err, rowCount) => {
-      if (err) {
-        Object.values(this.#subscribers).forEach((subscriber) => subscriber("error", err instanceof AggregateError ? err.errors : err));
-      } else {
-        this.#rowCount = rowCount;
-      }
-    });
-    this.#addParametersToRequest(compiledQuery.parameters);
-    this.#attachListeners();
-  }
-  get request() {
-    return this.#request;
-  }
-  readChunk() {
-    const subscriptionKey = this.readChunk.name;
-    return new Promise((resolve, reject) => {
-      this.#subscribers[subscriptionKey] = (event, error51) => {
-        delete this.#subscribers[subscriptionKey];
-        if (event === "error") {
-          reject(error51);
-        } else {
-          resolve(this.#rows.splice(0, this.#streamChunkSize));
-        }
-      };
-      this.#request.resume();
-    });
-  }
-  #addParametersToRequest(parameters) {
-    for (let i = 0;i < parameters.length; i++) {
-      const parameter = parameters[i];
-      this.#request.addParameter(String(i + 1), this.#getTediousDataType(parameter), parameter);
-    }
-  }
-  #attachListeners() {
-    const pauseAndEmitChunkReady = this.#streamChunkSize ? () => {
-      if (this.#streamChunkSize <= this.#rows.length) {
-        this.#request.pause();
-        Object.values(this.#subscribers).forEach((subscriber) => subscriber("chunkReady"));
-      }
-    } : () => {};
-    const rowListener = (columns) => {
-      const row = {};
-      for (const column of columns) {
-        row[column.metadata.colName] = column.value;
-      }
-      this.#rows.push(row);
-      pauseAndEmitChunkReady();
-    };
-    this.#request.on("row", rowListener);
-    this.#request.once("requestCompleted", () => {
-      Object.values(this.#subscribers).forEach((subscriber) => subscriber("completed"));
-      this.#request.off("row", rowListener);
-    });
-  }
-  #getTediousDataType(value) {
-    if (isNull(value) || isUndefined(value) || isString(value)) {
-      return this.#tedious.TYPES.NVarChar;
-    }
-    if (isBigInt(value) || isNumber(value) && value % 1 === 0) {
-      if (value < -2147483648 || value > 2147483647) {
-        return this.#tedious.TYPES.BigInt;
-      } else {
-        return this.#tedious.TYPES.Int;
-      }
-    }
-    if (isNumber(value)) {
-      return this.#tedious.TYPES.Float;
-    }
-    if (isBoolean(value)) {
-      return this.#tedious.TYPES.Bit;
-    }
-    if (isDate(value)) {
-      return this.#tedious.TYPES.DateTime;
-    }
-    if (isBuffer(value)) {
-      return this.#tedious.TYPES.VarBinary;
-    }
-    return this.#tedious.TYPES.NVarChar;
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mssql/mssql-introspector.js
-class MssqlIntrospector {
-  #db;
-  constructor(db) {
-    this.#db = db;
-  }
-  async getSchemas() {
-    return await this.#db.selectFrom("sys.schemas").select("name").execute();
-  }
-  async getTables(options = { withInternalKyselyTables: false }) {
-    const rawColumns = await this.#db.selectFrom("sys.tables as tables").leftJoin("sys.schemas as table_schemas", "table_schemas.schema_id", "tables.schema_id").innerJoin("sys.columns as columns", "columns.object_id", "tables.object_id").innerJoin("sys.types as types", "types.user_type_id", "columns.user_type_id").leftJoin("sys.schemas as type_schemas", "type_schemas.schema_id", "types.schema_id").leftJoin("sys.extended_properties as comments", (join) => join.onRef("comments.major_id", "=", "tables.object_id").onRef("comments.minor_id", "=", "columns.column_id").on("comments.name", "=", "MS_Description")).$if(!options.withInternalKyselyTables, (qb) => qb.where("tables.name", "!=", DEFAULT_MIGRATION_TABLE).where("tables.name", "!=", DEFAULT_MIGRATION_LOCK_TABLE)).select([
-      "tables.name as table_name",
-      (eb) => eb.ref("tables.type").$castTo().as("table_type"),
-      "table_schemas.name as table_schema_name",
-      "columns.default_object_id as column_default_object_id",
-      "columns.generated_always_type_desc as column_generated_always_type",
-      "columns.is_computed as column_is_computed",
-      "columns.is_identity as column_is_identity",
-      "columns.is_nullable as column_is_nullable",
-      "columns.is_rowguidcol as column_is_rowguidcol",
-      "columns.name as column_name",
-      "types.is_nullable as type_is_nullable",
-      "types.name as type_name",
-      "type_schemas.name as type_schema_name",
-      "comments.value as column_comment"
-    ]).unionAll(this.#db.selectFrom("sys.views as views").leftJoin("sys.schemas as view_schemas", "view_schemas.schema_id", "views.schema_id").innerJoin("sys.columns as columns", "columns.object_id", "views.object_id").innerJoin("sys.types as types", "types.user_type_id", "columns.user_type_id").leftJoin("sys.schemas as type_schemas", "type_schemas.schema_id", "types.schema_id").leftJoin("sys.extended_properties as comments", (join) => join.onRef("comments.major_id", "=", "views.object_id").onRef("comments.minor_id", "=", "columns.column_id").on("comments.name", "=", "MS_Description")).select([
-      "views.name as table_name",
-      "views.type as table_type",
-      "view_schemas.name as table_schema_name",
-      "columns.default_object_id as column_default_object_id",
-      "columns.generated_always_type_desc as column_generated_always_type",
-      "columns.is_computed as column_is_computed",
-      "columns.is_identity as column_is_identity",
-      "columns.is_nullable as column_is_nullable",
-      "columns.is_rowguidcol as column_is_rowguidcol",
-      "columns.name as column_name",
-      "types.is_nullable as type_is_nullable",
-      "types.name as type_name",
-      "type_schemas.name as type_schema_name",
-      "comments.value as column_comment"
-    ])).orderBy("table_schema_name").orderBy("table_name").orderBy("column_name").execute();
-    const tableDictionary = {};
-    for (const rawColumn of rawColumns) {
-      const key = `${rawColumn.table_schema_name}.${rawColumn.table_name}`;
-      const table = tableDictionary[key] = tableDictionary[key] || freeze({
-        columns: [],
-        isView: rawColumn.table_type === "V ",
-        name: rawColumn.table_name,
-        schema: rawColumn.table_schema_name ?? undefined
-      });
-      table.columns.push(freeze({
-        dataType: rawColumn.type_name,
-        dataTypeSchema: rawColumn.type_schema_name ?? undefined,
-        hasDefaultValue: rawColumn.column_default_object_id > 0 || rawColumn.column_generated_always_type !== "NOT_APPLICABLE" || rawColumn.column_is_identity || rawColumn.column_is_computed || rawColumn.column_is_rowguidcol,
-        isAutoIncrementing: rawColumn.column_is_identity,
-        isNullable: rawColumn.column_is_nullable && rawColumn.type_is_nullable,
-        name: rawColumn.column_name,
-        comment: rawColumn.column_comment ?? undefined
-      }));
-    }
-    return Object.values(tableDictionary);
-  }
-  async getMetadata(options) {
-    return {
-      tables: await this.getTables(options)
-    };
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mssql/mssql-query-compiler.js
-class MssqlQueryCompiler extends DefaultQueryCompiler {
-  getCurrentParameterPlaceholder() {
-    return `@${this.numParameters}`;
-  }
-  visitOffset(node) {
-    super.visitOffset(node);
-    this.append(" rows");
-  }
-  compileColumnAlterations(columnAlterations) {
-    const nodesByKind = {};
-    for (const columnAlteration of columnAlterations) {
-      if (!nodesByKind[columnAlteration.kind]) {
-        nodesByKind[columnAlteration.kind] = [];
-      }
-      nodesByKind[columnAlteration.kind].push(columnAlteration);
-    }
-    let first = true;
-    if (nodesByKind.AddColumnNode) {
-      this.append("add ");
-      this.compileList(nodesByKind.AddColumnNode);
-      first = false;
-    }
-    if (nodesByKind.AlterColumnNode) {
-      if (!first)
-        this.append(", ");
-      this.compileList(nodesByKind.AlterColumnNode);
-    }
-    if (nodesByKind.DropColumnNode) {
-      if (!first)
-        this.append(", ");
-      this.append("drop column ");
-      this.compileList(nodesByKind.DropColumnNode);
-    }
-    if (nodesByKind.ModifyColumnNode) {
-      if (!first)
-        this.append(", ");
-      this.compileList(nodesByKind.ModifyColumnNode);
-    }
-    if (nodesByKind.RenameColumnNode) {
-      if (!first)
-        this.append(", ");
-      this.compileList(nodesByKind.RenameColumnNode);
-    }
-  }
-  visitAddColumn(node) {
-    this.visitNode(node.column);
-  }
-  visitDropColumn(node) {
-    this.visitNode(node.column);
-  }
-  visitMergeQuery(node) {
-    super.visitMergeQuery(node);
-    this.append(";");
-  }
-  announcesNewColumnDataType() {
-    return false;
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/dialect/mssql/mssql-dialect.js
-class MssqlDialect {
-  #config;
-  constructor(config2) {
-    this.#config = config2;
-  }
-  createDriver() {
-    return new MssqlDriver(this.#config);
-  }
-  createQueryCompiler() {
-    return new MssqlQueryCompiler;
-  }
-  createAdapter() {
-    return new MssqlAdapter;
-  }
-  createIntrospector(db) {
-    return new MssqlIntrospector(db);
-  }
-}
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/migration/file-migration-provider.js
-class FileMigrationProvider {
-  #props;
-  constructor(props) {
-    this.#props = props;
-  }
-  async getMigrations() {
-    const migrations = {};
-    const files = await this.#props.fs.readdir(this.#props.migrationFolder);
-    for (const fileName of files) {
-      if (fileName.endsWith(".js") || fileName.endsWith(".ts") && !fileName.endsWith(".d.ts") || fileName.endsWith(".mjs") || fileName.endsWith(".mts") && !fileName.endsWith(".d.mts")) {
-        const migration = await import(this.#props.path.join(this.#props.migrationFolder, fileName));
-        const migrationKey = fileName.substring(0, fileName.lastIndexOf("."));
-        if (isMigration(migration?.default)) {
-          migrations[migrationKey] = migration.default;
-        } else if (isMigration(migration)) {
-          migrations[migrationKey] = migration;
-        }
-      }
-    }
-    return migrations;
-  }
-}
-function isMigration(obj) {
-  return isObject2(obj) && isFunction(obj.up);
-}
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/camel-case/camel-case-transformer.js
-class SnakeCaseTransformer extends OperationNodeTransformer {
-  #snakeCase;
-  constructor(snakeCase) {
-    super();
-    this.#snakeCase = snakeCase;
-  }
-  transformIdentifier(node) {
-    node = super.transformIdentifier(node);
-    return {
-      ...node,
-      name: this.#snakeCase(node.name)
-    };
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/camel-case/camel-case.js
-function createSnakeCaseMapper({ upperCase = false, underscoreBeforeDigits = false, underscoreBetweenUppercaseLetters = false } = {}) {
-  return memoize((str) => {
-    if (str.length === 0) {
-      return str;
-    }
-    const upper = str.toUpperCase();
-    const lower = str.toLowerCase();
-    let out = lower[0];
-    for (let i = 1, l = str.length;i < l; ++i) {
-      const char = str[i];
-      const prevChar = str[i - 1];
-      const upperChar = upper[i];
-      const prevUpperChar = upper[i - 1];
-      const lowerChar = lower[i];
-      const prevLowerChar = lower[i - 1];
-      if (underscoreBeforeDigits && isDigit(char) && !isDigit(prevChar) && !out.endsWith("_")) {
-        out += "_" + char;
-        continue;
-      }
-      if (char === upperChar && upperChar !== lowerChar) {
-        const prevCharacterIsUppercase = prevChar === prevUpperChar && prevUpperChar !== prevLowerChar;
-        if (underscoreBetweenUppercaseLetters || !prevCharacterIsUppercase) {
-          out += "_" + lowerChar;
-        } else {
-          out += lowerChar;
-        }
-      } else {
-        out += char;
-      }
-    }
-    if (upperCase) {
-      return out.toUpperCase();
-    } else {
-      return out;
-    }
-  });
-}
-function createCamelCaseMapper({ upperCase = false } = {}) {
-  return memoize((str) => {
-    if (str.length === 0) {
-      return str;
-    }
-    if (upperCase && isAllUpperCaseSnakeCase(str)) {
-      str = str.toLowerCase();
-    }
-    let out = str[0];
-    for (let i = 1, l = str.length;i < l; ++i) {
-      const char = str[i];
-      const prevChar = str[i - 1];
-      if (char !== "_") {
-        if (prevChar === "_") {
-          out += char.toUpperCase();
-        } else {
-          out += char;
-        }
-      }
-    }
-    return out;
-  });
-}
-function isAllUpperCaseSnakeCase(str) {
-  for (let i = 1, l = str.length;i < l; ++i) {
-    const char = str[i];
-    if (char !== "_" && char !== char.toUpperCase()) {
-      return false;
-    }
-  }
-  return true;
-}
-function isDigit(char) {
-  return char >= "0" && char <= "9";
-}
-function memoize(func) {
-  const cache = new Map;
-  return (str) => {
-    let mapped = cache.get(str);
-    if (!mapped) {
-      mapped = func(str);
-      cache.set(str, mapped);
-    }
-    return mapped;
-  };
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/camel-case/camel-case-plugin.js
-class CamelCasePlugin {
-  opt;
-  #camelCase;
-  #snakeCase;
-  #snakeCaseTransformer;
-  constructor(opt = {}) {
-    this.opt = opt;
-    this.#camelCase = createCamelCaseMapper(opt);
-    this.#snakeCase = createSnakeCaseMapper(opt);
-    this.#snakeCaseTransformer = new SnakeCaseTransformer(this.snakeCase.bind(this));
-  }
-  transformQuery(args) {
-    return this.#snakeCaseTransformer.transformNode(args.node);
-  }
-  async transformResult(args) {
-    if (args.result.rows && Array.isArray(args.result.rows)) {
-      return {
-        ...args.result,
-        rows: args.result.rows.map((row) => this.mapRow(row))
-      };
-    }
-    return args.result;
-  }
-  mapRow(row) {
-    return Object.keys(row).reduce((obj, key) => {
-      let value = row[key];
-      if (Array.isArray(value)) {
-        value = value.map((it) => canMap(it, this.opt) ? this.mapRow(it) : it);
-      } else if (canMap(value, this.opt)) {
-        value = this.mapRow(value);
-      }
-      obj[this.camelCase(key)] = value;
-      return obj;
-    }, {});
-  }
-  snakeCase(str) {
-    return this.#snakeCase(str);
-  }
-  camelCase(str) {
-    return this.#camelCase(str);
-  }
-}
-function canMap(obj, opt) {
-  return isPlainObject2(obj) && !opt?.maintainNestedObjectKeys;
-}
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/deduplicate-joins/deduplicate-joins-transformer.js
-class DeduplicateJoinsTransformer extends OperationNodeTransformer {
-  transformSelectQuery(node) {
-    return this.#transformQuery(super.transformSelectQuery(node));
-  }
-  transformUpdateQuery(node) {
-    return this.#transformQuery(super.transformUpdateQuery(node));
-  }
-  transformDeleteQuery(node) {
-    return this.#transformQuery(super.transformDeleteQuery(node));
-  }
-  #transformQuery(node) {
-    if (!node.joins || node.joins.length === 0) {
-      return node;
-    }
-    return freeze({
-      ...node,
-      joins: this.#deduplicateJoins(node.joins)
-    });
-  }
-  #deduplicateJoins(joins) {
-    const out = [];
-    for (let i = 0;i < joins.length; ++i) {
-      let foundDuplicate = false;
-      for (let j = 0;j < out.length; ++j) {
-        if (compare(joins[i], out[j])) {
-          foundDuplicate = true;
-          break;
-        }
-      }
-      if (!foundDuplicate) {
-        out.push(joins[i]);
-      }
-    }
-    return freeze(out);
-  }
-}
-
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/deduplicate-joins/deduplicate-joins-plugin.js
-class DeduplicateJoinsPlugin {
-  #transformer = new DeduplicateJoinsTransformer;
-  transformQuery(args) {
-    return this.#transformer.transformNode(args.node);
-  }
-  transformResult(args) {
-    return Promise.resolve(args.result);
-  }
-}
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/plugin/parse-json-results/parse-json-results-plugin.js
-class ParseJSONResultsPlugin {
-  opt;
-  #objectStrategy;
-  constructor(opt = {}) {
-    this.opt = opt;
-    this.#objectStrategy = opt.objectStrategy || "in-place";
-  }
-  transformQuery(args) {
-    return args.node;
-  }
-  async transformResult(args) {
-    return {
-      ...args.result,
-      rows: parseArray(args.result.rows, this.#objectStrategy)
-    };
-  }
-}
-function parseArray(arr, objectStrategy) {
-  const target = objectStrategy === "create" ? new Array(arr.length) : arr;
-  for (let i = 0;i < arr.length; ++i) {
-    target[i] = parse6(arr[i], objectStrategy);
-  }
-  return target;
-}
-function parse6(obj, objectStrategy) {
-  if (isString(obj)) {
-    return parseString(obj);
-  }
-  if (Array.isArray(obj)) {
-    return parseArray(obj, objectStrategy);
-  }
-  if (isPlainObject2(obj)) {
-    return parseObject(obj, objectStrategy);
-  }
-  return obj;
-}
-function parseString(str) {
-  if (maybeJson(str)) {
-    try {
-      return parse6(JSON.parse(str), "in-place");
-    } catch (err) {}
-  }
-  return str;
-}
-function maybeJson(value) {
-  return value.match(/^[\[\{]/) != null;
-}
-function parseObject(obj, objectStrategy) {
-  const target = objectStrategy === "create" ? {} : obj;
-  for (const key in obj) {
-    target[key] = parse6(obj[key], objectStrategy);
-  }
-  return target;
-}
-// ../zveltio/node_modules/.bun/kysely@0.27.6/node_modules/kysely/dist/esm/operation-node/list-node.js
-var ListNode = freeze({
-  is(node) {
-    return node.kind === "ListNode";
-  },
-  create(items) {
-    return freeze({
-      kind: "ListNode",
-      items: freeze(items)
-    });
-  }
-});
-// communications/mail/engine/lib/imap-client.ts
+// ../zveltio-extensions/communications/mail/engine/lib/imap-client.ts
 var import_imapflow = __toESM(require_imap_flow(), 1);
 var import_mailparser = __toESM(require_mailparser(), 1);
 var import_nodemailer = __toESM(require_nodemailer(), 1);
 
-// communications/mail/engine/lib/crypto.ts
-function getKey() {
-  const key = process.env.MAIL_ENCRYPTION_KEY;
-  if (!key || key.length < 32) {
-    throw new Error("MAIL_ENCRYPTION_KEY env var must be set to a 32+ character hex string. " + "Generate with: openssl rand -hex 32");
+// ../zveltio-extensions/communications/mail/engine/lib/crypto.ts
+var _internals;
+function setInternals(internals) {
+  _internals = internals;
+}
+function internals() {
+  if (!_internals) {
+    throw new Error("[mail] host internals not wired \u2014 setInternals(ctx.internals) must run in register()");
   }
-  return key;
+  return _internals;
 }
 async function encryptPassword(plaintext) {
   if (!plaintext)
     return "";
-  const keyMaterial = await crypto.subtle.importKey("raw", Buffer.from(getKey().slice(0, 64), "hex"), { name: "AES-GCM" }, false, ["encrypt"]);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, keyMaterial, new TextEncoder().encode(plaintext));
-  const ivHex = Buffer.from(iv).toString("hex");
-  const cipherHex = Buffer.from(encrypted).toString("hex");
-  return `aes256gcm:${ivHex}:${cipherHex}`;
+  return internals().encryptSecret(plaintext, { keyring: "mail" });
 }
 async function decryptPassword(stored) {
   if (!stored)
     return "";
-  if (!stored.startsWith("aes256gcm:"))
-    return stored;
-  const [, ivHex, cipherHex] = stored.split(":");
-  const keyMaterial = await crypto.subtle.importKey("raw", Buffer.from(getKey().slice(0, 64), "hex"), { name: "AES-GCM" }, false, ["decrypt"]);
-  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: Buffer.from(ivHex, "hex") }, keyMaterial, Buffer.from(cipherHex, "hex"));
-  return new TextDecoder().decode(decrypted);
+  return internals().decryptSecret(stored, { keyring: "mail" });
 }
 
-// communications/mail/engine/lib/imap-client.ts
+// ../zveltio-extensions/communications/mail/engine/lib/imap-client.ts
 async function syncImapAccount(db, account) {
   const imapPassword = await decryptPassword(account.imap_password);
   const client = new import_imapflow.ImapFlow({
@@ -84383,7 +77351,7 @@ function parseEnvelope(msg) {
   };
 }
 
-// communications/mail/engine/lib/imap-operations.ts
+// ../zveltio-extensions/communications/mail/engine/lib/imap-operations.ts
 var import_imapflow2 = __toESM(require_imap_flow(), 1);
 async function getImapClient(account) {
   const config2 = {
@@ -84456,7 +77424,7 @@ async function downloadMessageAsEml(account, folderPath, uid) {
   }
 }
 
-// communications/mail/engine/lib/compose.ts
+// ../zveltio-extensions/communications/mail/engine/lib/compose.ts
 async function buildReplyContext(db, messageId, type, userId) {
   const result = await sql`
     SELECT m.*, a.email_address AS my_email FROM zv_mail_messages m
@@ -84627,7 +77595,7 @@ async function autoCollectContacts(db, userId, emails) {
   }
 }
 
-// communications/mail/engine/lib/sieve.ts
+// ../zveltio-extensions/communications/mail/engine/lib/sieve.ts
 function compileFiltersToSieve(filters) {
   const lines = [
     "# Zveltio Mail \u2014 Auto-generated Sieve script",
@@ -84720,7 +77688,7 @@ async function uploadSieveScript(account, scriptName, script) {
   }
 }
 
-// communications/mail/engine/routes.ts
+// ../zveltio-extensions/communications/mail/engine/routes.ts
 function mailRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
   function reqDb(c) {
@@ -85579,7 +78547,7 @@ Your message "${m.subject}" was read on ${new Date().toLocaleString()}.`;
   return app;
 }
 
-// communications/mail/engine/index.ts
+// ../zveltio-extensions/communications/mail/engine/index.ts
 var extension = {
   name: "communications/mail",
   category: "communications",
@@ -85591,6 +78559,7 @@ var extension = {
     ];
   },
   async register(app, ctx) {
+    setInternals(ctx.internals);
     app.route("/", mailRoutes(ctx));
   }
 };

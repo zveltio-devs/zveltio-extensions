@@ -18,7 +18,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import { createHmac, randomBytes, randomUUID } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 // biome-ignore lint/suspicious/noExplicitAny: dual-kysely brand guard (see analytics/quality)
@@ -31,10 +31,14 @@ const SCIM_LIST = 'urn:ietf:params:scim:api:messages:2.0:ListResponse';
 const SCIM_ERROR = 'urn:ietf:params:scim:api:messages:2.0:Error';
 const SCIM_PATCH = 'urn:ietf:params:scim:api:messages:2.0:PatchOp';
 
-function hashToken(raw: string): string {
-  const secret = process.env.BETTER_AUTH_SECRET ?? '';
-  if (!secret) throw new Error('BETTER_AUTH_SECRET is required for SCIM tokens');
-  return createHmac('sha256', secret).update(raw).digest('hex');
+// Delegated to the host (`secrets` capability). This used to read
+// BETTER_AUTH_SECRET directly — the secret that signs every session cookie on
+// the instance — to compute one token hash. The host computes the same
+// HMAC-SHA256, so bearer tokens already issued keep authenticating, while the
+// extension no longer holds the secret itself.
+// biome-ignore lint/suspicious/noExplicitAny: ctx.internals is engine-typed
+function hashToken(internals: any, raw: string): Promise<string> {
+  return internals.deriveTokenHash(raw);
 }
 
 function scimError(c: Ctx, status: number, detail: string) {
@@ -83,7 +87,7 @@ export function scimAdminRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as { id: string };
     await sql`
       INSERT INTO zv_scim_tokens (name, token_hash, created_by)
-      VALUES (${c.req.valid('json').name}, ${hashToken(raw)}, ${user.id})
+      VALUES (${c.req.valid('json').name}, ${await hashToken(ctx.internals, raw)}, ${user.id})
     `.execute(reqDb(c));
     // Shown exactly once — paste it into the IdP's provisioning config.
     return c.json({ token: raw, base_url: '/scim/v2' }, 201);
@@ -109,7 +113,7 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     if (!raw) return scimError(c, 401, 'Bearer token required');
     let hash: string;
     try {
-      hash = hashToken(raw);
+      hash = await hashToken(ctx.internals, raw);
     } catch {
       return scimError(c, 500, 'SCIM is not configured on this server');
     }
