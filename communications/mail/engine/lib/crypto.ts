@@ -1,54 +1,46 @@
 /**
- * AES-256-GCM encryption for IMAP/SMTP passwords.
- * Requires env var: MAIL_ENCRYPTION_KEY (32 bytes hex, generated with: openssl rand -hex 32)
+ * AES-256-GCM for IMAP/SMTP passwords, performed by the host.
+ *
+ * This used to read `MAIL_ENCRYPTION_KEY` from the environment and do the
+ * crypto here. In-process that meant the extension could reach the ENGINE's
+ * whole environment — including `FIELD_ENCRYPTION_KEY` and
+ * `BETTER_AUTH_SECRET` — and it had the `secrets` capability in practice
+ * whether or not the manifest declared it.
+ *
+ * The host now holds the key and writes the same `aes256gcm:<iv>:<ct>` envelope
+ * under the same `MAIL_ENCRYPTION_KEY`, so passwords already stored keep
+ * decrypting and the separate mail key still does its job: rotating it does not
+ * touch field data.
  */
 
-function getKey(): string {
-  const key = process.env.MAIL_ENCRYPTION_KEY;
-  if (!key || key.length < 32) {
+// biome-ignore lint/suspicious/noExplicitAny: ctx.internals is engine-typed
+type Internals = any;
+
+let _internals: Internals | undefined;
+
+/** Wired from `register()` before any route can run. */
+export function setInternals(internals: Internals): void {
+  _internals = internals;
+}
+
+function internals(): Internals {
+  if (!_internals) {
     throw new Error(
-      'MAIL_ENCRYPTION_KEY env var must be set to a 32+ character hex string. ' +
-        'Generate with: openssl rand -hex 32',
+      '[mail] host internals not wired — setInternals(ctx.internals) must run in register()',
     );
   }
-  return key;
+  return _internals;
 }
 
 export async function encryptPassword(plaintext: string): Promise<string> {
   if (!plaintext) return '';
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    Buffer.from(getKey().slice(0, 64), 'hex'),
-    { name: 'AES-GCM' },
-    false,
-    ['encrypt'],
-  );
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    keyMaterial,
-    new TextEncoder().encode(plaintext),
-  );
-  const ivHex = Buffer.from(iv).toString('hex');
-  const cipherHex = Buffer.from(encrypted).toString('hex');
-  return `aes256gcm:${ivHex}:${cipherHex}`;
+  return internals().encryptSecret(plaintext, { keyring: 'mail' });
 }
 
 export async function decryptPassword(stored: string): Promise<string> {
   if (!stored) return '';
-  if (!stored.startsWith('aes256gcm:')) return stored; // legacy plaintext — returns as-is
-  const [, ivHex, cipherHex] = stored.split(':');
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    Buffer.from(getKey().slice(0, 64), 'hex'),
-    { name: 'AES-GCM' },
-    false,
-    ['decrypt'],
-  );
-  const decrypted = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: Buffer.from(ivHex, 'hex') },
-    keyMaterial,
-    Buffer.from(cipherHex, 'hex'),
-  );
-  return new TextDecoder().decode(decrypted);
+  // Accounts configured before this extension encrypted anything hold a bare
+  // password. The host passes an unrecognised envelope through unchanged, so
+  // those keep working instead of failing at connect time.
+  return internals().decryptSecret(stored, { keyring: 'mail' });
 }
