@@ -8,7 +8,10 @@
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-auth-saml",
   "permissions": [
-    "database"
+    "auth:session",
+    "database",
+    "documents",
+    "secrets"
   ],
   "peerDependencies": {
     "node-saml": "^3.1.0"

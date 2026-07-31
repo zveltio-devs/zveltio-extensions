@@ -9,6 +9,7 @@
   "package": "@zveltio/ext-media",
   "permissions": [
     "database",
+    "files",
     "storage"
   ],
   "studio": {

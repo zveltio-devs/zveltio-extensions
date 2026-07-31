@@ -9,6 +9,8 @@
   "package": "@zveltio/ext-cloud",
   "permissions": [
     "database",
+    "files",
+    "introspection",
     "storage"
   ],
   "publicRoutes": [
