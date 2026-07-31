@@ -308,4 +308,9 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/zveltio_ext_test
           FIELD_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+          # Extensions no longer hold key material — they call ctx.internals, and
+          # the harness supplies the real host crypto. auth/scim needs the auth
+          # secret for its token hash, communications/mail its own keyring.
+          BETTER_AUTH_SECRET: test-secret-000000000000000000000000
+          MAIL_ENCRYPTION_KEY: '1111111111111111111111111111111111111111111111111111111111111111'
         run: bun test --timeout 20000
