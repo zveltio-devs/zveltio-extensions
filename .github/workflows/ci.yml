@@ -58,6 +58,15 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      - name: No ambient authority (process.env / authority-bearing node:*)
+        # Extensions read configuration from ctx.config and do privileged work
+        # through ctx.internals, both capability-gated. Reading process.env
+        # in-process exposes the ENGINE's whole environment (DATABASE_URL,
+        # BETTER_AUTH_SECRET, FIELD_ENCRYPTION_KEY) and routes around that gate.
+        # Keeping this true is also what keeps a stricter extension runtime on
+        # the table — the property erodes one convenience at a time.
+        run: bun ../zveltio/scripts/check-ambient-authority.ts "$GITHUB_WORKSPACE"
+
       - name: Validate migration paths
         # Every engine/index.ts's getMigrations() must return paths
         # that actually exist on disk. A drift here means migrations
@@ -299,4 +308,9 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/zveltio_ext_test
           FIELD_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+          # Extensions no longer hold key material — they call ctx.internals, and
+          # the harness supplies the real host crypto. auth/scim needs the auth
+          # secret for its token hash, communications/mail its own keyring.
+          BETTER_AUTH_SECRET: test-secret-000000000000000000000000
+          MAIL_ENCRYPTION_KEY: '1111111111111111111111111111111111111111111111111111111111111111'
         run: bun test --timeout 20000

@@ -76,12 +76,26 @@ function generateD112Xml(period: any, entries: any[]): string {
 </D112>`;
 }
 
-function generateRevisalCsv(employees: any[]): string {
+// Every field goes through the host's csvCell. This used to join raw values
+// with commas and no escaping at all: an employee name containing a comma
+// broke the file for the whole payroll upload, and a name starting with `=`
+// executed as a formula when the export was opened.
+// biome-ignore lint/suspicious/noExplicitAny: ctx.internals is engine-typed
+function generateRevisalCsv(internals: any, employees: any[]): string {
   const header = 'CNP,Nume,Prenume,DataAngajare,FunctieId,Salariu,ContractTip,DataSfarsit';
-  const rows = employees.map(e =>
-    [e.national_id ?? '', e.last_name, e.first_name, e.hire_date,
-     e.position_id ?? '', e.salary ?? 0, e.employment_type,
-     e.end_date ?? ''].join(',')
+  const rows = employees.map((e) =>
+    [
+      e.national_id ?? '',
+      e.last_name,
+      e.first_name,
+      e.hire_date,
+      e.position_id ?? '',
+      e.salary ?? 0,
+      e.employment_type,
+      e.end_date ?? '',
+    ]
+      .map((v) => internals.csvCell(v))
+      .join(','),
   );
   return [header, ...rows].join('\n');
 }
@@ -359,7 +373,7 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
   // ── ReviSal CSV export ─────────────────────────────────────────
   app.get('/revisal', async (c) => {
     const employees = await sql`SELECT * FROM zvd_employees WHERE status = 'active'`.execute(reqDb(c));
-    const csv = generateRevisalCsv(employees.rows as any[]);
+    const csv = generateRevisalCsv(ctx.internals, employees.rows as any[]);
     return new Response(csv, { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': `attachment; filename="ReviSal_${new Date().toISOString().slice(0, 10)}.csv"` } });
   });
 

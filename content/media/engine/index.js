@@ -15,10 +15,10 @@ var __export = (target, all) => {
 };
 var __require = import.meta.require;
 
-// engine/index.ts
+// ../zveltio-extensions/content/media/engine/index.ts
 import { join } from "path";
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/compose.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
     let index = -1;
@@ -62,7 +62,7 @@ var compose = (middleware, onError, onNotFound) => {
   };
 };
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/http-exception.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/http-exception.js
 var HTTPException = class extends Error {
   res;
   status;
@@ -85,10 +85,10 @@ var HTTPException = class extends Error {
   }
 };
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/request/constants.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/request/constants.js
 var GET_MATCH_RESULT = /* @__PURE__ */ Symbol();
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/buffer.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/buffer.js
 var bufferToFormData = (arrayBuffer, contentType) => {
   const response = new Response(arrayBuffer, {
     headers: {
@@ -98,7 +98,7 @@ var bufferToFormData = (arrayBuffer, contentType) => {
   return response.formData();
 };
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/body.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/body.js
 var isRawRequest = (request) => ("headers" in request);
 var parseBody = async (request, options = /* @__PURE__ */ Object.create(null)) => {
   const { all = false, dot = false } = options;
@@ -177,7 +177,7 @@ var handleParsingNestedValues = (form, key, value) => {
   });
 };
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/url.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/url.js
 var splitPath = (path) => {
   const paths = path.split("/");
   if (paths[0] === "") {
@@ -377,7 +377,7 @@ var getQueryParams = (url, key) => {
 };
 var decodeURIComponent_ = decodeURIComponent;
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/request.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/request.js
 var tryDecodeURIComponent = (str) => tryDecode(str, decodeURIComponent_);
 var HonoRequest = class {
   raw;
@@ -491,7 +491,7 @@ var HonoRequest = class {
   }
 };
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/html.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/html.js
 var HtmlEscapedCallbackPhase = {
   Stringify: 1,
   BeforeStream: 2,
@@ -529,7 +529,7 @@ var resolveCallback = async (str, phase, preserveCallbacks, context, buffer) => 
   }
 };
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/context.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/context.js
 var TEXT_PLAIN = "text/plain; charset=UTF-8";
 var setDefaultContentType = (contentType, headers) => {
   return {
@@ -696,7 +696,7 @@ var Context = class {
   };
 };
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router.js
 var METHOD_NAME_ALL = "ALL";
 var METHOD_NAME_ALL_LOWERCASE = "all";
 var METHODS = ["get", "post", "put", "delete", "options", "patch"];
@@ -704,10 +704,10 @@ var MESSAGE_MATCHER_IS_ALREADY_BUILT = "Can not add a route since the matcher is
 var UnsupportedPathError = class extends Error {
 };
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/constants.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/constants.js
 var COMPOSED_HANDLER = "__COMPOSED_HANDLER";
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/hono-base.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/hono-base.js
 var notFoundHandler = (c) => {
   return c.text("404 Not Found", 404);
 };
@@ -931,7 +931,7 @@ var Hono = class _Hono {
   };
 };
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/matcher.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/matcher.js
 var emptyParam = [];
 function match(method, path) {
   const matchers = this.buildAllMatchers();
@@ -952,7 +952,7 @@ function match(method, path) {
   return match2(method, path);
 }
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/node.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/node.js
 var LABEL_REG_EXP_STR = "[^/]+";
 var ONLY_WILDCARD_REG_EXP_STR = ".*";
 var TAIL_WILDCARD_REG_EXP_STR = "(?:|/.*)";
@@ -1056,7 +1056,7 @@ var Node = class _Node {
   }
 };
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/trie.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/trie.js
 var Trie = class {
   #context = { varIndex: 0 };
   #root = new Node;
@@ -1112,7 +1112,7 @@ var Trie = class {
   }
 };
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/router.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/router.js
 var nullMatcher = [/^$/, [], /* @__PURE__ */ Object.create(null)];
 var wildcardRegExpCache = /* @__PURE__ */ Object.create(null);
 function buildWildcardRegExp(path) {
@@ -1277,7 +1277,7 @@ var RegExpRouter = class {
   }
 };
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/prepared-router.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/prepared-router.js
 var PreparedRegExpRouter = class {
   name = "PreparedRegExpRouter";
   #matchers;
@@ -1349,7 +1349,7 @@ var PreparedRegExpRouter = class {
   match = match;
 };
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/smart-router/router.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/smart-router/router.js
 var SmartRouter = class {
   name = "SmartRouter";
   #routers = [];
@@ -1404,7 +1404,7 @@ var SmartRouter = class {
   }
 };
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/trie-router/node.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/trie-router/node.js
 var emptyParams = /* @__PURE__ */ Object.create(null);
 var hasChildren = (children) => {
   for (const _ in children) {
@@ -1573,7 +1573,7 @@ var Node2 = class _Node2 {
   }
 };
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/trie-router/router.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/trie-router/router.js
 var TrieRouter = class {
   name = "TrieRouter";
   #node;
@@ -1595,7 +1595,7 @@ var TrieRouter = class {
   }
 };
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/hono.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/hono.js
 var Hono2 = class extends Hono {
   constructor(options = {}) {
     super(options);
@@ -1605,7 +1605,7 @@ var Hono2 = class extends Hono {
   }
 };
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/cookie.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/cookie.js
 var validCookieNameRegEx = /^[\w!#$%&'*.^`|~+-]+$/;
 var validCookieValueRegEx = /^[ !#-:<-[\]-~]*$/;
 var trimCookieWhitespace = (value) => {
@@ -1656,7 +1656,7 @@ var parse = (cookie, name) => {
   return parsedCookie;
 };
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/helper/cookie/index.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/helper/cookie/index.js
 var getCookie = (c, key, prefix) => {
   const cookie = c.req.raw.headers.get("Cookie");
   if (typeof key === "string") {
@@ -1679,7 +1679,7 @@ var getCookie = (c, key, prefix) => {
   return obj;
 };
 
-// ../../../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/validator/validator.js
+// node_modules/.bun/hono@4.12.28/node_modules/hono/dist/validator/validator.js
 var jsonRegex = /^application\/([a-z-\.]+\+)?json(;\s*[a-zA-Z0-9\-]+\=([^;]+))*$/i;
 var multipartRegex = /^multipart\/form-data(;\s?boundary=[a-zA-Z0-9'"()+_,\-./:=?]+)?$/i;
 var urlencodedRegex = /^application\/x-www-form-urlencoded(;\s*[a-zA-Z0-9\-]+\=([^;]+))*$/i;
@@ -1756,7 +1756,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+4bef6e9a69915e20/node_modules/@hono/zod-validator/dist/index.js
+// node_modules/.bun/@hono+zod-validator@0.7.6+4bef6e9a69915e20/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -1786,7 +1786,7 @@ function zValidatorFunction(target, schema, hook, options) {
 }
 var zValidator = zValidatorFunction;
 
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
 var exports_external = {};
 __export(exports_external, {
   xor: () => xor,
@@ -2029,7 +2029,7 @@ __export(exports_external, {
   $brand: () => $brand
 });
 
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/index.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/index.js
 var exports_core2 = {};
 __export(exports_core2, {
   version: () => version,
@@ -2045,7 +2045,7 @@ __export(exports_core2, {
   safeDecode: () => safeDecode,
   registry: () => registry,
   regexes: () => exports_regexes,
-  process: () => process2,
+  process: () => process,
   prettifyError: () => prettifyError,
   parseAsync: () => parseAsync,
   parse: () => parse2,
@@ -2308,7 +2308,7 @@ __export(exports_core2, {
   $ZodAny: () => $ZodAny
 });
 
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/core.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/core.js
 var _a;
 var NEVER = /* @__PURE__ */ Object.freeze({
   status: "aborted"
@@ -2386,7 +2386,7 @@ function config(newConfig) {
     Object.assign(globalConfig, newConfig);
   return globalConfig;
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/util.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/util.js
 var exports_util = {};
 __export(exports_util, {
   unwrapMessage: () => unwrapMessage,
@@ -3078,7 +3078,7 @@ class Class {
   constructor(..._args) {}
 }
 
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/errors.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/errors.js
 var initializer = (inst, def) => {
   inst.name = "$ZodError";
   Object.defineProperty(inst, "_zod", {
@@ -3218,7 +3218,7 @@ function prettifyError(error) {
 `);
 }
 
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/parse.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/parse.js
 var _parse = (_Err) => (schema, value, _ctx, _params) => {
   const ctx = _ctx ? { ..._ctx, async: false } : { async: false };
   const result = schema._zod.run({ value, issues: [] }, ctx);
@@ -3305,7 +3305,7 @@ var _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
   return _safeParseAsync(_Err)(schema, value, _ctx);
 };
 var safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync($ZodRealError);
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/regexes.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/regexes.js
 var exports_regexes = {};
 __export(exports_regexes, {
   xid: () => xid,
@@ -3464,7 +3464,7 @@ var sha512_hex = /^[0-9a-fA-F]{128}$/;
 var sha512_base64 = /* @__PURE__ */ fixedBase64(86, "==");
 var sha512_base64url = /* @__PURE__ */ fixedBase64url(86);
 
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/checks.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a2;
   inst._zod ?? (inst._zod = {});
@@ -4011,7 +4011,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/doc.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/doc.js
 class Doc {
   constructor(args = []) {
     this.content = [];
@@ -4049,14 +4049,14 @@ class Doc {
   }
 }
 
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/versions.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 4,
   patch: 3
 };
 
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/schemas.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a2;
   inst ?? (inst = {});
@@ -6140,7 +6140,7 @@ function handleRefineResult(result, payload, input, inst) {
     payload.issues.push(issue(_iss));
   }
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/index.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/index.js
 var exports_locales = {};
 __export(exports_locales, {
   zhTW: () => zh_TW_default,
@@ -6197,7 +6197,7 @@ __export(exports_locales, {
   ar: () => ar_default
 });
 
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ar.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ar.js
 var error = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0641", verb: "\u0623\u0646 \u064A\u062D\u0648\u064A" },
@@ -6303,7 +6303,7 @@ function ar_default() {
     localeError: error()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/az.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/az.js
 var error2 = () => {
   const Sizable = {
     string: { unit: "simvol", verb: "olmal\u0131d\u0131r" },
@@ -6408,7 +6408,7 @@ function az_default() {
     localeError: error2()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/be.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/be.js
 function getBelarusianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -6564,7 +6564,7 @@ function be_default() {
     localeError: error3()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/bg.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/bg.js
 var error4 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0430", verb: "\u0434\u0430 \u0441\u044A\u0434\u044A\u0440\u0436\u0430" },
@@ -6684,7 +6684,7 @@ function bg_default() {
     localeError: error4()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ca.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ca.js
 var error5 = () => {
   const Sizable = {
     string: { unit: "car\xE0cters", verb: "contenir" },
@@ -6791,7 +6791,7 @@ function ca_default() {
     localeError: error5()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/cs.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/cs.js
 var error6 = () => {
   const Sizable = {
     string: { unit: "znak\u016F", verb: "m\xEDt" },
@@ -6902,7 +6902,7 @@ function cs_default() {
     localeError: error6()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/da.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/da.js
 var error7 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "havde" },
@@ -7017,7 +7017,7 @@ function da_default() {
     localeError: error7()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/de.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/de.js
 var error8 = () => {
   const Sizable = {
     string: { unit: "Zeichen", verb: "zu haben" },
@@ -7125,7 +7125,7 @@ function de_default() {
     localeError: error8()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/el.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/el.js
 var error9 = () => {
   const Sizable = {
     string: { unit: "\u03C7\u03B1\u03C1\u03B1\u03BA\u03C4\u03AE\u03C1\u03B5\u03C2", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" },
@@ -7234,7 +7234,7 @@ function el_default() {
     localeError: error9()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/en.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/en.js
 var error10 = () => {
   const Sizable = {
     string: { unit: "characters", verb: "to have" },
@@ -7344,7 +7344,7 @@ function en_default() {
     localeError: error10()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/eo.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/eo.js
 var error11 = () => {
   const Sizable = {
     string: { unit: "karaktrojn", verb: "havi" },
@@ -7453,7 +7453,7 @@ function eo_default() {
     localeError: error11()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/es.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/es.js
 var error12 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "tener" },
@@ -7585,7 +7585,7 @@ function es_default() {
     localeError: error12()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fa.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fa.js
 var error13 = () => {
   const Sizable = {
     string: { unit: "\u06A9\u0627\u0631\u0627\u06A9\u062A\u0631", verb: "\u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F" },
@@ -7699,7 +7699,7 @@ function fa_default() {
     localeError: error13()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fi.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fi.js
 var error14 = () => {
   const Sizable = {
     string: { unit: "merkki\xE4", subject: "merkkijonon" },
@@ -7811,7 +7811,7 @@ function fi_default() {
     localeError: error14()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr.js
 var error15 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -7936,7 +7936,7 @@ function fr_default() {
     localeError: error15()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr-CA.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr-CA.js
 var error16 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -8043,7 +8043,7 @@ function fr_CA_default() {
     localeError: error16()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/he.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/he.js
 var error17 = () => {
   const TypeNames = {
     string: { label: "\u05DE\u05D7\u05E8\u05D5\u05D6\u05EA", gender: "f" },
@@ -8236,7 +8236,7 @@ function he_default() {
     localeError: error17()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hr.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hr.js
 var error18 = () => {
   const Sizable = {
     string: { unit: "znakova", verb: "imati" },
@@ -8358,7 +8358,7 @@ function hr_default() {
     localeError: error18()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hu.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hu.js
 var error19 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "legyen" },
@@ -8466,7 +8466,7 @@ function hu_default() {
     localeError: error19()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hy.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hy.js
 function getArmenianPlural(count, one, many) {
   return Math.abs(count) === 1 ? one : many;
 }
@@ -8613,7 +8613,7 @@ function hy_default() {
     localeError: error20()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/id.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/id.js
 var error21 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "memiliki" },
@@ -8719,7 +8719,7 @@ function id_default() {
     localeError: error21()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/is.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/is.js
 var error22 = () => {
   const Sizable = {
     string: { unit: "stafi", verb: "a\xF0 hafa" },
@@ -8828,7 +8828,7 @@ function is_default() {
     localeError: error22()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/it.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/it.js
 var error23 = () => {
   const Sizable = {
     string: { unit: "caratteri", verb: "avere" },
@@ -8936,7 +8936,7 @@ function it_default() {
     localeError: error23()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ja.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ja.js
 var error24 = () => {
   const Sizable = {
     string: { unit: "\u6587\u5B57", verb: "\u3067\u3042\u308B" },
@@ -9043,7 +9043,7 @@ function ja_default() {
     localeError: error24()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ka.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ka.js
 var error25 = () => {
   const Sizable = {
     string: { unit: "\u10E1\u10D8\u10DB\u10D1\u10DD\u10DA\u10DD", verb: "\u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1" },
@@ -9155,7 +9155,7 @@ function ka_default() {
     localeError: error25()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/km.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/km.js
 var error26 = () => {
   const Sizable = {
     string: { unit: "\u178F\u17BD\u17A2\u1780\u17D2\u179F\u179A", verb: "\u1782\u17BD\u179A\u1798\u17B6\u1793" },
@@ -9266,11 +9266,11 @@ function km_default() {
   };
 }
 
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/kh.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/kh.js
 function kh_default() {
   return km_default();
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ko.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ko.js
 var error27 = () => {
   const Sizable = {
     string: { unit: "\uBB38\uC790", verb: "to have" },
@@ -9381,7 +9381,7 @@ function ko_default() {
     localeError: error27()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/lt.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/lt.js
 var capitalizeFirstCharacter = (text) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
@@ -9584,7 +9584,7 @@ function lt_default() {
     localeError: error28()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/mk.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/mk.js
 var error29 = () => {
   const Sizable = {
     string: { unit: "\u0437\u043D\u0430\u0446\u0438", verb: "\u0434\u0430 \u0438\u043C\u0430\u0430\u0442" },
@@ -9693,7 +9693,7 @@ function mk_default() {
     localeError: error29()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ms.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ms.js
 var error30 = () => {
   const Sizable = {
     string: { unit: "aksara", verb: "mempunyai" },
@@ -9800,7 +9800,7 @@ function ms_default() {
     localeError: error30()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/nl.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/nl.js
 var error31 = () => {
   const Sizable = {
     string: { unit: "tekens", verb: "heeft" },
@@ -9910,7 +9910,7 @@ function nl_default() {
     localeError: error31()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/no.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/no.js
 var error32 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "\xE5 ha" },
@@ -10018,7 +10018,7 @@ function no_default() {
     localeError: error32()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ota.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ota.js
 var error33 = () => {
   const Sizable = {
     string: { unit: "harf", verb: "olmal\u0131d\u0131r" },
@@ -10127,7 +10127,7 @@ function ota_default() {
     localeError: error33()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ps.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ps.js
 var error34 = () => {
   const Sizable = {
     string: { unit: "\u062A\u0648\u06A9\u064A", verb: "\u0648\u0644\u0631\u064A" },
@@ -10241,7 +10241,7 @@ function ps_default() {
     localeError: error34()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pl.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pl.js
 var error35 = () => {
   const Sizable = {
     string: { unit: "znak\xF3w", verb: "mie\u0107" },
@@ -10350,7 +10350,7 @@ function pl_default() {
     localeError: error35()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pt.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pt.js
 var error36 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "ter" },
@@ -10458,7 +10458,7 @@ function pt_default() {
     localeError: error36()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ro.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ro.js
 var error37 = () => {
   const Sizable = {
     string: { unit: "caractere", verb: "s\u0103 aib\u0103" },
@@ -10577,7 +10577,7 @@ function ro_default() {
     localeError: error37()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ru.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ru.js
 function getRussianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -10733,7 +10733,7 @@ function ru_default() {
     localeError: error38()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sl.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sl.js
 var error39 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "imeti" },
@@ -10842,7 +10842,7 @@ function sl_default() {
     localeError: error39()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sv.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sv.js
 var error40 = () => {
   const Sizable = {
     string: { unit: "tecken", verb: "att ha" },
@@ -10952,7 +10952,7 @@ function sv_default() {
     localeError: error40()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ta.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ta.js
 var error41 = () => {
   const Sizable = {
     string: { unit: "\u0B8E\u0BB4\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1\u0B95\u0BCD\u0B95\u0BB3\u0BCD", verb: "\u0B95\u0BCA\u0BA3\u0BCD\u0B9F\u0BBF\u0BB0\u0BC1\u0B95\u0BCD\u0B95 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD" },
@@ -11062,7 +11062,7 @@ function ta_default() {
     localeError: error41()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/th.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/th.js
 var error42 = () => {
   const Sizable = {
     string: { unit: "\u0E15\u0E31\u0E27\u0E2D\u0E31\u0E01\u0E29\u0E23", verb: "\u0E04\u0E27\u0E23\u0E21\u0E35" },
@@ -11172,7 +11172,7 @@ function th_default() {
     localeError: error42()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/tr.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/tr.js
 var error43 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "olmal\u0131" },
@@ -11277,7 +11277,7 @@ function tr_default() {
     localeError: error43()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uk.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uk.js
 var error44 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0456\u0432", verb: "\u043C\u0430\u0442\u0438\u043C\u0435" },
@@ -11386,11 +11386,11 @@ function uk_default() {
   };
 }
 
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ua.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ua.js
 function ua_default() {
   return uk_default();
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ur.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ur.js
 var error45 = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0648\u0641", verb: "\u06C1\u0648\u0646\u0627" },
@@ -11500,7 +11500,7 @@ function ur_default() {
     localeError: error45()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uz.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uz.js
 var error46 = () => {
   const Sizable = {
     string: { unit: "belgi", verb: "bo\u2018lishi kerak" },
@@ -11610,7 +11610,7 @@ function uz_default() {
     localeError: error46()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/vi.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/vi.js
 var error47 = () => {
   const Sizable = {
     string: { unit: "k\xFD t\u1EF1", verb: "c\xF3" },
@@ -11718,7 +11718,7 @@ function vi_default() {
     localeError: error47()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-CN.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-CN.js
 var error48 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u7B26", verb: "\u5305\u542B" },
@@ -11827,7 +11827,7 @@ function zh_CN_default() {
     localeError: error48()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-TW.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-TW.js
 var error49 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u5143", verb: "\u64C1\u6709" },
@@ -11934,7 +11934,7 @@ function zh_TW_default() {
     localeError: error49()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/yo.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/yo.js
 var error50 = () => {
   const Sizable = {
     string: { unit: "\xE0mi", verb: "n\xED" },
@@ -12041,7 +12041,7 @@ function yo_default() {
     localeError: error50()
   };
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/registries.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/registries.js
 var _a2;
 var $output = Symbol("ZodOutput");
 var $input = Symbol("ZodInput");
@@ -12091,7 +12091,7 @@ function registry() {
 }
 (_a2 = globalThis).__zod_globalRegistry ?? (_a2.__zod_globalRegistry = registry());
 var globalRegistry = globalThis.__zod_globalRegistry;
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/api.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/api.js
 function _string(Class2, params) {
   return new Class2({
     type: "string",
@@ -13011,7 +13011,7 @@ function _stringFormat(Class2, format, fnOrRegex, _params = {}) {
   const inst = new Class2(def);
   return inst;
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/to-json-schema.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/to-json-schema.js
 function initializeContext(params) {
   let target = params?.target ?? "draft-2020-12";
   if (target === "draft-4")
@@ -13032,7 +13032,7 @@ function initializeContext(params) {
     external: params?.external ?? undefined
   };
 }
-function process2(schema, ctx, _params = { path: [], schemaPath: [] }) {
+function process(schema, ctx, _params = { path: [], schemaPath: [] }) {
   var _a3;
   const def = schema._zod.def;
   const seen = ctx.seen.get(schema);
@@ -13069,7 +13069,7 @@ function process2(schema, ctx, _params = { path: [], schemaPath: [] }) {
     if (parent) {
       if (!result.ref)
         result.ref = parent;
-      process2(parent, ctx, params);
+      process(parent, ctx, params);
       ctx.seen.get(parent).isParent = true;
     }
   }
@@ -13352,18 +13352,18 @@ function isTransforming(_schema, _ctx) {
 }
 var createToJSONSchemaMethod = (schema, processors = {}) => (params) => {
   const ctx = initializeContext({ ...params, processors });
-  process2(schema, ctx);
+  process(schema, ctx);
   extractDefs(ctx, schema);
   return finalize(ctx, schema);
 };
 var createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params) => {
   const { libraryOptions, target } = params ?? {};
   const ctx = initializeContext({ ...libraryOptions ?? {}, target, io, processors });
-  process2(schema, ctx);
+  process(schema, ctx);
   extractDefs(ctx, schema);
   return finalize(ctx, schema);
 };
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-processors.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-processors.js
 var formatMap = {
   guid: "uuid",
   url: "uri",
@@ -13599,7 +13599,7 @@ var arrayProcessor = (schema, ctx, _json, params) => {
   if (typeof maximum === "number")
     json.maxItems = maximum;
   json.type = "array";
-  json.items = process2(def.element, ctx, {
+  json.items = process(def.element, ctx, {
     ...params,
     path: [...params.path, "items"]
   });
@@ -13611,7 +13611,7 @@ var objectProcessor = (schema, ctx, _json, params) => {
   json.properties = {};
   const shape = def.shape;
   for (const key in shape) {
-    json.properties[key] = process2(shape[key], ctx, {
+    json.properties[key] = process(shape[key], ctx, {
       ...params,
       path: [...params.path, "properties", key]
     });
@@ -13634,7 +13634,7 @@ var objectProcessor = (schema, ctx, _json, params) => {
     if (ctx.io === "output")
       json.additionalProperties = false;
   } else if (def.catchall) {
-    json.additionalProperties = process2(def.catchall, ctx, {
+    json.additionalProperties = process(def.catchall, ctx, {
       ...params,
       path: [...params.path, "additionalProperties"]
     });
@@ -13643,7 +13643,7 @@ var objectProcessor = (schema, ctx, _json, params) => {
 var unionProcessor = (schema, ctx, json, params) => {
   const def = schema._zod.def;
   const isExclusive = def.inclusive === false;
-  const options = def.options.map((x, i) => process2(x, ctx, {
+  const options = def.options.map((x, i) => process(x, ctx, {
     ...params,
     path: [...params.path, isExclusive ? "oneOf" : "anyOf", i]
   }));
@@ -13655,11 +13655,11 @@ var unionProcessor = (schema, ctx, json, params) => {
 };
 var intersectionProcessor = (schema, ctx, json, params) => {
   const def = schema._zod.def;
-  const a = process2(def.left, ctx, {
+  const a = process(def.left, ctx, {
     ...params,
     path: [...params.path, "allOf", 0]
   });
-  const b = process2(def.right, ctx, {
+  const b = process(def.right, ctx, {
     ...params,
     path: [...params.path, "allOf", 1]
   });
@@ -13676,11 +13676,11 @@ var tupleProcessor = (schema, ctx, _json, params) => {
   json.type = "array";
   const prefixPath = ctx.target === "draft-2020-12" ? "prefixItems" : "items";
   const restPath = ctx.target === "draft-2020-12" ? "items" : ctx.target === "openapi-3.0" ? "items" : "additionalItems";
-  const prefixItems = def.items.map((x, i) => process2(x, ctx, {
+  const prefixItems = def.items.map((x, i) => process(x, ctx, {
     ...params,
     path: [...params.path, prefixPath, i]
   }));
-  const rest = def.rest ? process2(def.rest, ctx, {
+  const rest = def.rest ? process(def.rest, ctx, {
     ...params,
     path: [...params.path, restPath, ...ctx.target === "openapi-3.0" ? [def.items.length] : []]
   }) : null;
@@ -13720,7 +13720,7 @@ var recordProcessor = (schema, ctx, _json, params) => {
   const keyBag = keyType._zod.bag;
   const patterns = keyBag?.patterns;
   if (def.mode === "loose" && patterns && patterns.size > 0) {
-    const valueSchema = process2(def.valueType, ctx, {
+    const valueSchema = process(def.valueType, ctx, {
       ...params,
       path: [...params.path, "patternProperties", "*"]
     });
@@ -13730,12 +13730,12 @@ var recordProcessor = (schema, ctx, _json, params) => {
     }
   } else {
     if (ctx.target === "draft-07" || ctx.target === "draft-2020-12") {
-      json.propertyNames = process2(def.keyType, ctx, {
+      json.propertyNames = process(def.keyType, ctx, {
         ...params,
         path: [...params.path, "propertyNames"]
       });
     }
-    json.additionalProperties = process2(def.valueType, ctx, {
+    json.additionalProperties = process(def.valueType, ctx, {
       ...params,
       path: [...params.path, "additionalProperties"]
     });
@@ -13750,7 +13750,7 @@ var recordProcessor = (schema, ctx, _json, params) => {
 };
 var nullableProcessor = (schema, ctx, json, params) => {
   const def = schema._zod.def;
-  const inner = process2(def.innerType, ctx, params);
+  const inner = process(def.innerType, ctx, params);
   const seen = ctx.seen.get(schema);
   if (ctx.target === "openapi-3.0") {
     seen.ref = def.innerType;
@@ -13761,20 +13761,20 @@ var nullableProcessor = (schema, ctx, json, params) => {
 };
 var nonoptionalProcessor = (schema, ctx, _json, params) => {
   const def = schema._zod.def;
-  process2(def.innerType, ctx, params);
+  process(def.innerType, ctx, params);
   const seen = ctx.seen.get(schema);
   seen.ref = def.innerType;
 };
 var defaultProcessor = (schema, ctx, json, params) => {
   const def = schema._zod.def;
-  process2(def.innerType, ctx, params);
+  process(def.innerType, ctx, params);
   const seen = ctx.seen.get(schema);
   seen.ref = def.innerType;
   json.default = JSON.parse(JSON.stringify(def.defaultValue));
 };
 var prefaultProcessor = (schema, ctx, json, params) => {
   const def = schema._zod.def;
-  process2(def.innerType, ctx, params);
+  process(def.innerType, ctx, params);
   const seen = ctx.seen.get(schema);
   seen.ref = def.innerType;
   if (ctx.io === "input")
@@ -13782,7 +13782,7 @@ var prefaultProcessor = (schema, ctx, json, params) => {
 };
 var catchProcessor = (schema, ctx, json, params) => {
   const def = schema._zod.def;
-  process2(def.innerType, ctx, params);
+  process(def.innerType, ctx, params);
   const seen = ctx.seen.get(schema);
   seen.ref = def.innerType;
   let catchValue;
@@ -13797,32 +13797,32 @@ var pipeProcessor = (schema, ctx, _json, params) => {
   const def = schema._zod.def;
   const inIsTransform = def.in._zod.traits.has("$ZodTransform");
   const innerType = ctx.io === "input" ? inIsTransform ? def.out : def.in : def.out;
-  process2(innerType, ctx, params);
+  process(innerType, ctx, params);
   const seen = ctx.seen.get(schema);
   seen.ref = innerType;
 };
 var readonlyProcessor = (schema, ctx, json, params) => {
   const def = schema._zod.def;
-  process2(def.innerType, ctx, params);
+  process(def.innerType, ctx, params);
   const seen = ctx.seen.get(schema);
   seen.ref = def.innerType;
   json.readOnly = true;
 };
 var promiseProcessor = (schema, ctx, _json, params) => {
   const def = schema._zod.def;
-  process2(def.innerType, ctx, params);
+  process(def.innerType, ctx, params);
   const seen = ctx.seen.get(schema);
   seen.ref = def.innerType;
 };
 var optionalProcessor = (schema, ctx, _json, params) => {
   const def = schema._zod.def;
-  process2(def.innerType, ctx, params);
+  process(def.innerType, ctx, params);
   const seen = ctx.seen.get(schema);
   seen.ref = def.innerType;
 };
 var lazyProcessor = (schema, ctx, _json, params) => {
   const innerType = schema._zod.innerType;
-  process2(innerType, ctx, params);
+  process(innerType, ctx, params);
   const seen = ctx.seen.get(schema);
   seen.ref = innerType;
 };
@@ -13874,7 +13874,7 @@ function toJSONSchema(input, params) {
     const defs = {};
     for (const entry of registry2._idmap.entries()) {
       const [_, schema] = entry;
-      process2(schema, ctx2);
+      process(schema, ctx2);
     }
     const schemas = {};
     const external = {
@@ -13897,11 +13897,11 @@ function toJSONSchema(input, params) {
     return { schemas };
   }
   const ctx = initializeContext({ ...params, processors: allProcessors });
-  process2(input, ctx);
+  process(input, ctx);
   extractDefs(ctx, input);
   return finalize(ctx, input);
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-generator.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-generator.js
 class JSONSchemaGenerator {
   get metadataRegistry() {
     return this.ctx.metadataRegistry;
@@ -13943,7 +13943,7 @@ class JSONSchemaGenerator {
     });
   }
   process(schema, _params = { path: [], schemaPath: [] }) {
-    return process2(schema, this.ctx, _params);
+    return process(schema, this.ctx, _params);
   }
   emit(schema, _params) {
     if (_params) {
@@ -13960,9 +13960,9 @@ class JSONSchemaGenerator {
     return plainResult;
   }
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema.js
 var exports_json_schema = {};
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
 var exports_schemas2 = {};
 __export(exports_schemas2, {
   xor: () => xor,
@@ -14133,7 +14133,7 @@ __export(exports_schemas2, {
   ZodAny: () => ZodAny
 });
 
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/checks.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/checks.js
 var exports_checks2 = {};
 __export(exports_checks2, {
   uppercase: () => _uppercase,
@@ -14167,7 +14167,7 @@ __export(exports_checks2, {
   endsWith: () => _endsWith
 });
 
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/iso.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/iso.js
 var exports_iso = {};
 __export(exports_iso, {
   time: () => time2,
@@ -14208,7 +14208,7 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/errors.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/errors.js
 var initializer2 = (inst, issues) => {
   $ZodError.init(inst, issues);
   inst.name = "ZodError";
@@ -14243,7 +14243,7 @@ var ZodRealError = /* @__PURE__ */ $constructor("ZodError", initializer2, {
   Parent: Error
 });
 
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/parse.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/parse.js
 var parse4 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse2 = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -14257,7 +14257,7 @@ var safeDecode2 = /* @__PURE__ */ _safeDecode(ZodRealError);
 var safeEncodeAsync2 = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 var safeDecodeAsync2 = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
 var _installedGroups = /* @__PURE__ */ new WeakMap;
 function _installLazyMethods(inst, group, methods) {
   const proto = Object.getPrototypeOf(inst);
@@ -15544,7 +15544,7 @@ function preprocess(fn, schema) {
     out: schema
   });
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/compat.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/compat.js
 var ZodIssueCode = {
   invalid_type: "invalid_type",
   too_big: "too_big",
@@ -15568,7 +15568,7 @@ function getErrorMap() {
 }
 var ZodFirstPartyTypeKind;
 (function(ZodFirstPartyTypeKind2) {})(ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {}));
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/from-json-schema.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/from-json-schema.js
 var z = {
   ...exports_schemas2,
   ...exports_checks2,
@@ -16035,7 +16035,7 @@ function fromJSONSchema(schema, params) {
   };
   return convertSchema(normalized, ctx);
 }
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/coerce.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/coerce.js
 var exports_coerce = {};
 __export(exports_coerce, {
   string: () => string3,
@@ -16060,12 +16060,12 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
-// ../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
+// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
 config(en_default());
-// engine/routes.ts
+// ../zveltio-extensions/content/media/engine/routes.ts
 import { randomUUID } from "crypto";
 
-// ../../node_modules/aws4fetch/dist/aws4fetch.esm.mjs
+// ../zveltio-extensions/node_modules/aws4fetch/dist/aws4fetch.esm.mjs
 var encoder = new TextEncoder;
 var HOST_SERVICES = {
   appstream2: "appstream",
@@ -16351,7 +16351,7 @@ function guessServiceRegion(url2, headers) {
   return [HOST_SERVICES[service] || service, region || ""];
 }
 
-// ../../../zveltio/packages/sdk/src/extension/permission-gate.ts
+// packages/sdk/src/extension/permission-gate.ts
 function methodToAction(method) {
   const m = method.toUpperCase();
   switch (m) {
@@ -16398,28 +16398,40 @@ function permissionGate(ctx, resource, opts = {}) {
     await next();
   };
 }
-// engine/routes.ts
+// ../zveltio-extensions/content/media/engine/routes.ts
+var _config;
 var _aws = null;
+var _awsKey = "";
+function storage() {
+  return _config?.objectStorage;
+}
 function getAws() {
-  if (!process.env.S3_ENDPOINT)
+  const s = storage();
+  if (!s)
     return null;
-  if (!_aws) {
+  const key = `${s.endpoint}|${s.region}|${s.accessKeyId}`;
+  if (!_aws || _awsKey !== key) {
     _aws = new AwsClient({
-      accessKeyId: process.env.S3_ACCESS_KEY || "",
-      secretAccessKey: process.env.S3_SECRET_KEY || "",
-      region: process.env.S3_REGION || "us-east-1",
+      accessKeyId: s.accessKeyId,
+      secretAccessKey: s.secretAccessKey,
+      region: s.region,
       service: "s3"
     });
+    _awsKey = key;
   }
   return _aws;
 }
 function s3Url(key) {
-  const endpoint = (process.env.S3_ENDPOINT || "").replace(/\/$/, "");
-  const bucket = process.env.S3_BUCKET || "zveltio";
-  return `${endpoint}/${bucket}/${key}`;
+  const s = storage();
+  return `${s?.endpoint ?? ""}/${s?.bucket ?? "zveltio"}/${key}`;
+}
+function s3PublicUrl(key) {
+  const base = storage()?.publicUrl;
+  return base ? `${base}/${key}` : "";
 }
 function mediaRoutes(ctx) {
   const { db, auth } = ctx;
+  _config = ctx.config;
   function reqDb(c) {
     return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
   }
@@ -16569,7 +16581,7 @@ function mediaRoutes(ctx) {
               }
             });
           }
-          thumbnailUrl = `${process.env.S3_PUBLIC_URL}/${thumbnailKey}`;
+          thumbnailUrl = s3PublicUrl(thumbnailKey);
         }
       } catch (error51) {
         console.warn("Image processing skipped:", error51);
@@ -16590,7 +16602,7 @@ function mediaRoutes(ctx) {
         return c.json({ error: `Storage upload failed: ${uploadRes.status}` }, 502);
       }
     }
-    const url2 = `${process.env.S3_PUBLIC_URL}/${key}`;
+    const url2 = s3PublicUrl(key);
     const fileRecord = {
       id: fileId,
       folder_id: folderId || null,
@@ -16804,7 +16816,7 @@ function mediaRoutes(ctx) {
   return router;
 }
 
-// engine/index.ts
+// ../zveltio-extensions/content/media/engine/index.ts
 var extension = {
   name: "content/media",
   category: "content",

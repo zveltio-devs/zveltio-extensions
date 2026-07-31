@@ -17,7 +17,7 @@ import type { Context } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { ExtensionContext } from '@zveltio/sdk/extension';
+import type { ExtensionConfig, ExtensionContext } from '@zveltio/sdk/extension';
 
 type WidgetId = 'welcome' | 'health' | 'people' | 'data' | 'activity' | 'trust';
 
@@ -185,7 +185,11 @@ async function setUserLayout(
 const countOf = (p: Promise<{ rows: Array<{ count: string }> }>) =>
   p.then((r) => Number(r.rows[0]?.count ?? 0)).catch(() => 0);
 
-async function computeWidgetData(db: Db, ids: Iterable<WidgetId>): Promise<Record<string, unknown>> {
+async function computeWidgetData(
+  db: Db,
+  ids: Iterable<WidgetId>,
+  config: ExtensionConfig | undefined,
+): Promise<Record<string, unknown>> {
   const want = new Set(ids);
   const out: Record<string, unknown> = {};
   const tasks: Array<Promise<void>> = [];
@@ -289,7 +293,7 @@ async function computeWidgetData(db: Db, ids: Iterable<WidgetId>): Promise<Recor
         .catch(() => null)
         .then((last_backup) => ({
           // The invisible safeguards, made visible for a board / auditor.
-          encryption: !!process.env.FIELD_ENCRYPTION_KEY,
+          encryption: config?.encryptionConfigured ?? false,
           audit_log: true,
           self_hosted: true,
           last_backup,
@@ -325,7 +329,7 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
     const db = reqDb(c);
     const uid = userId(c);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
-    const data = await computeWidgetData(db, resolved.widgets);
+    const data = await computeWidgetData(db, resolved.widgets, ctx.config);
     return c.json({
       widgets: resolved.widgets,
       available: resolved.available,
@@ -341,7 +345,7 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
     const db = reqDb(c);
     const uid = userId(c);
     const saved = await setUserLayout(db, uid, c.req.valid('json').widgets, checkPermission);
-    const data = await computeWidgetData(db, saved);
+    const data = await computeWidgetData(db, saved, ctx.config);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
     return c.json({
       widgets: saved,
@@ -358,7 +362,7 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
     const uid = userId(c);
     await deleteUserLayout(db, uid);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
-    const data = await computeWidgetData(db, resolved.widgets);
+    const data = await computeWidgetData(db, resolved.widgets, ctx.config);
     return c.json({
       widgets: resolved.widgets,
       available: resolved.available,

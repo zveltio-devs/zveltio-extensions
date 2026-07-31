@@ -6,26 +6,14 @@ import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
 // ─── Serialization helpers ────────────────────────────────────────────────────
 
-function toCSV(rows: any[]): string {
-  if (rows.length === 0) return '';
-  const headers = Object.keys(rows[0]);
-  const lines = [
-    headers.join(','),
-    ...rows.map((row) =>
-      headers
-        .map((h) => {
-          const val = row[h];
-          if (val === null || val === undefined) return '';
-          const str =
-            typeof val === 'object' ? JSON.stringify(val) : String(val);
-          return str.includes(',') || str.includes('"') || str.includes('\n')
-            ? `"${str.replace(/"/g, '""')}"`
-            : str;
-        })
-        .join(','),
-    ),
-  ];
-  return lines.join('\n');
+// CSV rendering is the host's (`ctx.internals.recordsToCsv`). Quoting alone is
+// not enough: a spreadsheet executes any cell beginning `=`, `+`, `-` or `@`,
+// so exported data runs as a formula in the reviewer's Excel. The host also
+// takes the union of every row's keys, where this took Object.keys(rows[0])
+// and silently dropped columns whenever rows were ragged.
+// biome-ignore lint/suspicious/noExplicitAny: ctx.internals is engine-typed
+function toCSV(internals: any, rows: any[]): string {
+  return internals.recordsToCsv(rows);
 }
 
 function toNDJSON(rows: any[]): string {
@@ -559,7 +547,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
 
       switch (format) {
         case 'csv': {
-          const csv = toCSV(serialized);
+          const csv = toCSV(ctx.internals, serialized);
           c.header('Content-Type', 'text/csv');
           c.header('Content-Disposition', `attachment; filename="${filename}.csv"`);
           return c.body(csv);

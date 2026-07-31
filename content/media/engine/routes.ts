@@ -3,36 +3,64 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { AwsClient } from 'aws4fetch';
-import type { ExtensionContext } from '@zveltio/sdk/extension';
+import type {
+  ExtensionConfig,
+  ExtensionContext,
+  ObjectStorageConfig,
+} from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
 
 // Lazy aws4fetch client — mirrors the CORE media routes exactly
-// (packages/engine/src/routes/media.ts). Returns null when S3_ENDPOINT is not
-// configured, so uploads on a bare self-hosted install skip object storage
+// (packages/engine/src/routes/media.ts). Returns null when object storage is
+// not configured, so uploads on a bare self-hosted install skip object storage
 // instead of crashing (the previous eager @aws-sdk client made every upload
 // 500 without S3).
+//
+// Settings come from `ctx.config.objectStorage` (the `storage` capability), not
+// from `process.env`. Storage settings have an admin-editable overlay on top of
+// the environment, so reading `S3_*` here missed anything an administrator
+// configured from the Studio: this file saw an unset endpoint and quietly took
+// the "no object storage" path, keeping metadata while dropping the bytes.
+let _config: ExtensionConfig | undefined;
 let _aws: AwsClient | null = null;
+let _awsKey = '';
+
+function storage(): ObjectStorageConfig | undefined {
+  return _config?.objectStorage;
+}
+
 function getAws(): AwsClient | null {
-  if (!process.env.S3_ENDPOINT) return null;
-  if (!_aws) {
+  const s = storage();
+  if (!s) return null;
+  // Keyed on the credentials so a settings change is picked up; the previous
+  // cache was keyed on nothing and kept signing with the values seen at boot.
+  const key = `${s.endpoint}|${s.region}|${s.accessKeyId}`;
+  if (!_aws || _awsKey !== key) {
     _aws = new AwsClient({
-      accessKeyId: process.env.S3_ACCESS_KEY || '',
-      secretAccessKey: process.env.S3_SECRET_KEY || '',
-      region: process.env.S3_REGION || 'us-east-1',
+      accessKeyId: s.accessKeyId,
+      secretAccessKey: s.secretAccessKey,
+      region: s.region,
       service: 's3',
     });
+    _awsKey = key;
   }
   return _aws;
 }
 
 function s3Url(key: string): string {
-  const endpoint = (process.env.S3_ENDPOINT || '').replace(/\/$/, '');
-  const bucket = process.env.S3_BUCKET || 'zveltio';
-  return `${endpoint}/${bucket}/${key}`;
+  const s = storage();
+  return `${s?.endpoint ?? ''}/${s?.bucket ?? 'zveltio'}/${key}`;
+}
+
+/** Public URL for a stored object, or '' when no public base is configured. */
+function s3PublicUrl(key: string): string {
+  const base = storage()?.publicUrl;
+  return base ? `${base}/${key}` : '';
 }
 
 export function mediaRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
+  _config = ctx.config;
 
   // Per-request DB handle (CRM PR #1 pattern). After
   // migration 002_tenant_rls.sql, this extension's tables have FORCE
@@ -295,7 +323,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
               },
             });
           }
-          thumbnailUrl = `${process.env.S3_PUBLIC_URL}/${thumbnailKey}`;
+          thumbnailUrl = s3PublicUrl(thumbnailKey);
         }
       } catch (error) {
         console.warn('Image processing skipped:', error);
@@ -318,7 +346,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
       }
     }
 
-    const url = `${process.env.S3_PUBLIC_URL}/${key}`;
+    const url = s3PublicUrl(key);
 
     const fileRecord = {
       id: fileId,

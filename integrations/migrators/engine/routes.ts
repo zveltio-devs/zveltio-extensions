@@ -16,7 +16,6 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { ADAPTERS } from './adapters.js';
 
@@ -25,32 +24,24 @@ type Db = any;
 // biome-ignore lint/suspicious/noExplicitAny: Hono context
 type Ctx = any;
 
-// ── Token encryption (same practice as the engine's mail/AI key storage) ─────
+// ── Token encryption ────────────────────────────────────────────────────────
+// Delegated to the host (`secrets` capability). This used to read
+// FIELD_ENCRYPTION_KEY from the environment and run its own AES-256-GCM, which
+// meant holding the key that protects EVERY extension's encrypted data — and
+// having the `secrets` capability whether or not the manifest declared it.
+//
+// The host reads the old `enc1:` envelope, so tokens already stored keep
+// working; anything re-saved comes back in the engine's standard format.
 
-function keyBytes(): Buffer {
-  const hex = process.env.FIELD_ENCRYPTION_KEY ?? '';
-  if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
-    throw new Error('FIELD_ENCRYPTION_KEY (64 hex chars) is required to store migrator tokens');
-  }
-  return Buffer.from(hex, 'hex');
+// biome-ignore lint/suspicious/noExplicitAny: ctx.internals is engine-typed
+type Internals = any;
+
+function encryptToken(internals: Internals, plain: string): Promise<string> {
+  return internals.encryptSecret(plain);
 }
 
-function encryptToken(plain: string): string {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', keyBytes(), iv);
-  const ct = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
-  return `enc1:${Buffer.concat([iv, cipher.getAuthTag(), ct]).toString('base64')}`;
-}
-
-function decryptToken(stored: string): string {
-  if (!stored.startsWith('enc1:')) throw new Error('unknown token encoding');
-  const raw = Buffer.from(stored.slice(5), 'base64');
-  const iv = raw.subarray(0, 12);
-  const tag = raw.subarray(12, 28);
-  const ct = raw.subarray(28);
-  const decipher = createDecipheriv('aes-256-gcm', keyBytes(), iv);
-  decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8');
+function decryptToken(internals: Internals, stored: string): Promise<string> {
+  return internals.decryptSecret(stored);
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -133,7 +124,7 @@ export function migratorRoutes(ctx: ExtensionContext): Hono {
       const { source, name, token } = c.req.valid('json');
       let enc: string;
       try {
-        enc = encryptToken(token);
+        enc = await encryptToken(ctx.internals, token);
       } catch (e) {
         return c.json({ error: e instanceof Error ? e.message : 'encryption unavailable' }, 500);
       }
@@ -155,7 +146,7 @@ export function migratorRoutes(ctx: ExtensionContext): Hono {
     const conn = await loadConnection(c, c.req.param('id'));
     if (!conn) return c.json({ error: 'Connection not found' }, 404);
     try {
-      const objects = await ADAPTERS[conn.source]!.listObjects(decryptToken(conn.token_enc));
+      const objects = await ADAPTERS[conn.source]!.listObjects(await decryptToken(ctx.internals, conn.token_enc));
       return c.json({ source: conn.source, objects });
     } catch (e) {
       return c.json({ error: e instanceof Error ? e.message : 'source error' }, 502);
@@ -170,7 +161,7 @@ export function migratorRoutes(ctx: ExtensionContext): Hono {
       const conn = await loadConnection(c, connection_id);
       if (!conn) return c.json({ error: 'Connection not found' }, 404);
       try {
-        const { fields, rows } = await ADAPTERS[conn.source]!.fetchRows(decryptToken(conn.token_enc), object, 10);
+        const { fields, rows } = await ADAPTERS[conn.source]!.fetchRows(await decryptToken(ctx.internals, conn.token_enc), object, 10);
         const columns = fields.map((f) => ({
           source_field: f,
           column: toColumn(f),
@@ -207,7 +198,7 @@ export function migratorRoutes(ctx: ExtensionContext): Hono {
     const runId = runRow.rows[0]!.id;
 
     try {
-      const { fields, rows } = await ADAPTERS[conn.source]!.fetchRows(decryptToken(conn.token_enc), object, limit);
+      const { fields, rows } = await ADAPTERS[conn.source]!.fetchRows(await decryptToken(ctx.internals, conn.token_enc), object, limit);
       const mapping = fields
         .map((f) => ({ f, col: toColumn(f) }))
         .filter(({ col }) => targetCols.has(col) && IDENT.test(col));
