@@ -8,7 +8,9 @@
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-auth-ldap",
   "permissions": [
-    "database"
+    "auth:session",
+    "database",
+    "secrets"
   ],
   "peerDependencies": {
     "ldapts": "^4.2.6"
