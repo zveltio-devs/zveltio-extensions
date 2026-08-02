@@ -1,4 +1,8 @@
 {
+  "analytics.dashboard.includedWidgets": "Enthaltene Widgets",
+  "analytics.dashboard.noWidgets": "Keine Widgets ausgewählt.",
+  "analytics.dashboard.requiresPermission": "Erfordert diese Berechtigung",
+  "analytics.dashboard.subtitle": "Lege das Standard-Dashboard je Rolle fest. Nutzer personalisieren es darüber hinaus.",
   "analytics.dashboard.title": "Dashboards",
-  "analytics.dashboard.subtitle": "Lege das Standard-Dashboard je Rolle fest. Nutzer personalisieren es darüber hinaus."
+  "analytics.dashboard.widgetsForRole": "Widgets für diese Rolle"
 }

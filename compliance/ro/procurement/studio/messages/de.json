@@ -1,4 +1,6 @@
 {
+  "compliance.ro.procurement.addLine": "+ Position",
+  "compliance.ro.procurement.allocated": "Zugewiesen",
   "compliance.ro.procurement.btn.approve": "Genehmigen",
   "compliance.ro.procurement.btn.createOrder": "Bestellung erstellen",
   "compliance.ro.procurement.btn.createOrderModal": "Bestellung erstellen",
@@ -19,7 +21,10 @@
   "compliance.ro.procurement.empty.budget": "Noch keine Budgetposten.",
   "compliance.ro.procurement.empty.orders": "Noch keine Bestellungen.",
   "compliance.ro.procurement.empty.suppliers": "Noch keine Lieferanten erfasst.",
+  "compliance.ro.procurement.remaining": "Verbleibend",
+  "compliance.ro.procurement.spent": "Ausgegeben",
   "compliance.ro.procurement.subtitle": "Comenzi de achizitie, furnizori, executie bugetara",
+  "compliance.ro.procurement.subtotal": "Zwischensumme",
   "compliance.ro.procurement.tab.budget": "Budget",
   "compliance.ro.procurement.tab.orders": "Bestellungen",
   "compliance.ro.procurement.tab.suppliers": "Lieferanten",
@@ -35,5 +40,6 @@
   "compliance.ro.procurement.ui.furnizor": "Supplier",
   "compliance.ro.procurement.ui.furnizor_nou": "New supplier",
   "compliance.ro.procurement.ui.judet": "Judet",
-  "compliance.ro.procurement.ui.num_r_comanda": "Order number"
+  "compliance.ro.procurement.ui.num_r_comanda": "Order number",
+  "compliance.ro.procurement.vat19": "MwSt. 19 %"
 }

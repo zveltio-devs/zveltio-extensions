@@ -27,5 +27,6 @@
   "geospatial.postgis.ui.longitude": "Długość geograficzna",
   "geospatial.postgis.ui.new_geofence": "Nowy geofence",
   "geospatial.postgis.ui.point_clustering_dbscan": "Point Clustering (DBSCAN)",
-  "geospatial.postgis.ui.radius_meters": "Promień (metry)"
+  "geospatial.postgis.ui.radius_meters": "Promień (metry)",
+  "geospatial.postgis.withParameters": "z parametrami:"
 }

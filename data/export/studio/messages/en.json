@@ -8,6 +8,7 @@
   "data.export.col.user": "User",
   "data.export.empty": "No exports yet.",
   "data.export.filterHint": "Filter (Zveltio query, optional)",
+  "data.export.rowLimit": "Row limit (0 = all)",
   "data.export.subtitle": "Export collection data as JSON, CSV or NDJSON with filtering support",
   "data.export.title": "Data Export",
   "data.export.ui.excel_xlsx": "Excel (xlsx)",

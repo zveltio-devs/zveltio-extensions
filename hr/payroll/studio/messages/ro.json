@@ -6,6 +6,7 @@
   "hr.payroll.col.net": "Net",
   "hr.payroll.empty": "Niciun date încă.",
   "hr.payroll.empty.periods": "Nicio perioadă încă.",
+  "hr.payroll.preset.tax10": "Impozit 10%",
   "hr.payroll.selectPeriod": "Selectează o perioadă pentru înregistrări salarizare.",
   "hr.payroll.subtitle": "Gestionează perioadele de salarizare și generează fluturașii",
   "hr.payroll.tab.periods": "Perioade",

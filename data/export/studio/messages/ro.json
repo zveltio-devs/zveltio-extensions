@@ -8,6 +8,7 @@
   "data.export.col.user": "Utilizator",
   "data.export.empty": "Niciun export încă.",
   "data.export.filterHint": "Filtru (query Zveltio, opțional)",
+  "data.export.rowLimit": "Limită de rânduri (0 = toate)",
   "data.export.subtitle": "Export collection data as JSON, CSV or NDJSON with filtering support",
   "data.export.title": "Export de date",
   "data.export.ui.excel_xlsx": "Excel (xlsx)",

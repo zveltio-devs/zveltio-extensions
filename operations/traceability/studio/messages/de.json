@@ -1,5 +1,6 @@
 {
   "operations.traceability.action.details": "Details",
+  "operations.traceability.addConsumedMaterial": "Verbrauchtes Material hinzufügen",
   "operations.traceability.col.expiry": "Ablauf",
   "operations.traceability.col.location": "Standort",
   "operations.traceability.col.lotNumber": "Chargennummer",
@@ -39,6 +40,7 @@
   "operations.traceability.form.supplier": "Lieferant",
   "operations.traceability.form.supplierLot": "Lieferantencharge",
   "operations.traceability.form.unit": "Einheit *",
+  "operations.traceability.lot": "Charge",
   "operations.traceability.lot.col.datetime": "Datum/Uhrzeit",
   "operations.traceability.lot.col.quantity": "Menge",
   "operations.traceability.lot.col.reference": "Referenz",

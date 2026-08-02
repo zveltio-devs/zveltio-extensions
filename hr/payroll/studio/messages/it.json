@@ -6,6 +6,7 @@
   "hr.payroll.col.net": "Netto",
   "hr.payroll.empty": "Ancora nessun dato.",
   "hr.payroll.empty.periods": "Ancora nessun periodo.",
+  "hr.payroll.preset.tax10": "Imposta 10%",
   "hr.payroll.selectPeriod": "Select a period to view payroll entries.",
   "hr.payroll.subtitle": "Gestisci i periodi di paga e genera le buste paga",
   "hr.payroll.tab.periods": "Periodi",

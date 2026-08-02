@@ -6,6 +6,7 @@
   "hr.payroll.col.net": "Net",
   "hr.payroll.empty": "Aucune donnée pour l'instant.",
   "hr.payroll.empty.periods": "Aucune période pour l'instant.",
+  "hr.payroll.preset.tax10": "Impôt 10 %",
   "hr.payroll.selectPeriod": "Sélectionnez une période pour afficher les entrées de paie.",
   "hr.payroll.subtitle": "Gérer les périodes de paie et générer les bulletins",
   "hr.payroll.tab.periods": "Périodes",

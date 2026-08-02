@@ -1,4 +1,6 @@
 {
+  "compliance.ro.procurement.addLine": "+ Regel",
+  "compliance.ro.procurement.allocated": "Toegewezen",
   "compliance.ro.procurement.btn.approve": "Goedkeuren",
   "compliance.ro.procurement.btn.createOrder": "Bestelling aanmaken",
   "compliance.ro.procurement.btn.createOrderModal": "Bestelling aanmaken",
@@ -19,7 +21,10 @@
   "compliance.ro.procurement.empty.budget": "Nog geen budgetregels.",
   "compliance.ro.procurement.empty.orders": "Nog geen inkooporders.",
   "compliance.ro.procurement.empty.suppliers": "Nog geen leveranciers geregistreerd.",
+  "compliance.ro.procurement.remaining": "Resterend",
+  "compliance.ro.procurement.spent": "Besteed",
   "compliance.ro.procurement.subtitle": "Comenzi de achizitie, furnizori, executie bugetara",
+  "compliance.ro.procurement.subtotal": "Subtotaal",
   "compliance.ro.procurement.tab.budget": "Budget",
   "compliance.ro.procurement.tab.orders": "Bestellingen",
   "compliance.ro.procurement.tab.suppliers": "Leveranciers",
@@ -35,5 +40,6 @@
   "compliance.ro.procurement.ui.furnizor": "Supplier",
   "compliance.ro.procurement.ui.furnizor_nou": "New supplier",
   "compliance.ro.procurement.ui.judet": "Judet",
-  "compliance.ro.procurement.ui.num_r_comanda": "Order number"
+  "compliance.ro.procurement.ui.num_r_comanda": "Order number",
+  "compliance.ro.procurement.vat19": "Btw 19%"
 }

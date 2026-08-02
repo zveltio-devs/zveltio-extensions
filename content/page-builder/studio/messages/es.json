@@ -17,6 +17,9 @@
   "content.pageBuilder.menus.main": "Menú principal (encabezado)",
   "content.pageBuilder.menus.title": "Menús",
   "content.pageBuilder.newPage": "Nueva página",
+  "content.pageBuilder.ph.altText": "Texto alternativo",
+  "content.pageBuilder.ph.headingText": "Texto del encabezado",
+  "content.pageBuilder.ph.imageUrl": "URL de la imagen",
   "content.pageBuilder.toast.saved": "Guardado.",
   "content.pageBuilder.ui.ogImage": "OG image URL",
   "content.pageBuilder.unpublish": "Despublicar"

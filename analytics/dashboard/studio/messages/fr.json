@@ -1,4 +1,8 @@
 {
+  "analytics.dashboard.includedWidgets": "Widgets inclus",
+  "analytics.dashboard.noWidgets": "Aucun widget sélectionné.",
+  "analytics.dashboard.requiresPermission": "Nécessite cette permission",
+  "analytics.dashboard.subtitle": "Définissez le tableau de bord par défaut de chaque rôle. Les utilisateurs le personnalisent.",
   "analytics.dashboard.title": "Tableaux de bord",
-  "analytics.dashboard.subtitle": "Définissez le tableau de bord par défaut de chaque rôle. Les utilisateurs le personnalisent."
+  "analytics.dashboard.widgetsForRole": "Widgets pour ce rôle"
 }

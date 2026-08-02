@@ -8,6 +8,7 @@
   "data.export.col.user": "Felhasználó",
   "data.export.empty": "Még nincsenek exportok.",
   "data.export.filterHint": "Filter (Zveltio query, optional)",
+  "data.export.rowLimit": "Sorkorlát (0 = mind)",
   "data.export.subtitle": "Export collection data as JSON, CSV or NDJSON with filtering support",
   "data.export.title": "Adatexportálás",
   "data.export.ui.excel_xlsx": "Excel (xlsx)",
