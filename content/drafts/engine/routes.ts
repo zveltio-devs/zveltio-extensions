@@ -37,6 +37,39 @@ const CommentSchema = z.object({
   type: z.enum(['suggestion', 'required', 'info']).default('suggestion'),
 });
 
+/**
+ * Columns a draft may never write into the target record.
+ *
+ * Publishing does `UPDATE zvd_<collection> SET ...draftData`, and `draft_data`
+ * is a free-form JSON object supplied by whoever created the draft. So every
+ * key in it reached the row verbatim, including the ones that decide who owns
+ * the record and which tenant it belongs to: a draft carrying `tenant_id`
+ * moved the record to another tenant on publish, and one carrying `id` aimed
+ * the write somewhere else entirely.
+ *
+ * Mirrors PROTECTED_FIELDS in the engine's sync route, which strips the same
+ * set for the same reason on the other unattended write path.
+ */
+const PROTECTED_DRAFT_FIELDS = new Set([
+  'id',
+  'tenant_id',
+  'created_at',
+  'created_by',
+  'search_vector',
+  'embedding',
+]);
+
+/** The draft's payload with the protected columns removed. */
+function publishableDraftData(raw: unknown): Record<string, unknown> {
+  const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries((parsed ?? {}) as Record<string, unknown>)) {
+    if (PROTECTED_DRAFT_FIELDS.has(k)) continue;
+    out[k] = v;
+  }
+  return out;
+}
+
 // ── Route factory ─────────────────────────────────────────────────────────────
 
 export function draftsRoutes(ctx: ExtensionContext): Hono {
@@ -70,8 +103,24 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     const parsedLimit = Math.min(parseInt(limit) || 50, 200);
     const offset = (parseInt(page) - 1) * parsedLimit;
 
-    const canRead = await checkPermission(user.id, collection || 'drafts', 'read');
-    if (!canRead) return c.json({ error: 'Forbidden' }, 403);
+    // Permission is per COLLECTION, so an unfiltered listing cannot be
+    // authorized with a single check.
+    //
+    // It used to make one: `checkPermission(user, collection || 'drafts',
+    // 'read')`. Without `?collection=` that asked about a collection named
+    // `drafts`, which does not exist — so the answer had nothing to do with the
+    // rows about to be returned, and what came back was every draft in the
+    // tenant, for every collection, including ones the caller cannot read. A
+    // draft holds the pending contents of a record, so that is the record.
+    //
+    // Filtered instead: ask about the collection being requested, or — when
+    // none is — fetch and keep only the collections the caller may actually
+    // read. `checkPermission` is cached, and a listing spans few distinct
+    // collections, so this is a handful of lookups.
+    if (collection) {
+      const canRead = await checkPermission(user.id, collection, 'read');
+      if (!canRead) return c.json({ error: 'Forbidden' }, 403);
+    }
 
     let query = (db as any)
       .selectFrom('zv_content_drafts')
@@ -84,13 +133,33 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     if (record_id) query = query.where('record_id', '=', record_id);
     if (status) query = query.where('status', '=', status);
 
-    const drafts = await query.execute();
+    const rows = await query.execute();
+
+    let drafts = rows;
+    if (!collection) {
+      const readable = new Map<string, boolean>();
+      const names = new Set<string>(rows.map((r: any) => String(r.collection)));
+      for (const name of names) {
+        readable.set(name, await checkPermission(user.id, name, 'read'));
+      }
+      drafts = rows.filter((r: any) => readable.get(r.collection));
+    }
+
     return c.json({ drafts });
   });
 
   // GET /settings/:collection
   app.get('/settings/:collection', async (c) => {
+    const user = c.get('user') as any;
     const collection = c.req.param('collection');
+    // Any authenticated user could read these. They are small — whether drafts
+    // are on, whether review is required, and which roles may review — but
+    // that last one names the roles that can approve a publish, which is a
+    // map of who to go after. Read on the collection is the same bar its
+    // drafts are listed under.
+    if (!(await checkPermission(user.id, collection, 'read'))) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
     const settings = await (db as any)
       .selectFrom('zv_collection_publish_settings')
       .selectAll()
@@ -191,7 +260,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
         }
 
         const tableName = `zvd_${item.collection}`;
-        const draftData = typeof item.draft_data === 'string' ? JSON.parse(item.draft_data) : item.draft_data;
+        const draftData = publishableDraftData(item.draft_data);
         await (reqDb(c) as any).updateTable(tableName).set({ ...draftData, updated_at: new Date() }).where('id', '=', item.record_id).execute();
         await (reqDb(c) as any).updateTable('zv_content_drafts').set({ status: 'approved', published_at: new Date() }).where('id', '=', item.draft_id).execute();
         await (reqDb(c) as any).updateTable('zv_publish_schedule').set({ status: 'published', published_at: new Date() }).where('id', '=', item.schedule_id).execute();
@@ -228,7 +297,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
       try {
         const draft = await (reqDb(c) as any).selectFrom('zv_content_drafts').selectAll().where('id', '=', draftId).executeTakeFirst();
         if (!draft || draft.status !== 'approved') { failedCount++; jobErrors.push(`${draftId}: not approved`); continue; }
-        const draftData = typeof draft.draft_data === 'string' ? JSON.parse(draft.draft_data) : draft.draft_data;
+        const draftData = publishableDraftData(draft.draft_data);
         await (reqDb(c) as any).updateTable(`zvd_${draft.collection}`).set({ ...draftData, updated_at: new Date() }).where('id', '=', draft.record_id).execute();
         await (reqDb(c) as any).updateTable('zv_content_drafts').set({ status: 'approved', published_at: new Date() }).where('id', '=', draftId).execute();
         published++;
@@ -405,7 +474,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     if (!canPublish) return c.json({ error: 'Forbidden' }, 403);
 
     const tableName = `zvd_${draft.collection}`;
-    const draftData = typeof draft.draft_data === 'string' ? JSON.parse(draft.draft_data) : draft.draft_data;
+    const draftData = publishableDraftData(draft.draft_data);
 
     await (reqDb(c) as any).updateTable(tableName).set({ ...draftData, updated_at: new Date() }).where('id', '=', draft.record_id).execute();
     await (reqDb(c) as any).updateTable('zv_content_drafts').set({ status: 'approved', published_at: new Date() }).where('id', '=', id).execute();
