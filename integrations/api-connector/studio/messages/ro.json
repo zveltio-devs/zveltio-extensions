@@ -24,5 +24,7 @@
   "integrations.api-connector.ui.none": "Niciunul",
   "integrations.api-connector.ui.oauth_2_0": "OAuth 2.0",
   "integrations.api-connector.ui.token": "Token",
-  "integrations.api-connector.ui.username": "Nume utilizator"
+  "integrations.api-connector.ui.username": "Nume utilizator",
+  "integrations.apiConnector.confirmDelete": "Ștergeți conexiunea?",
+  "integrations.apiConnector.toast.created": "Conexiune creată."
 }

@@ -62,7 +62,7 @@
               { "value": "liability", "label": "finance.accounting.ui.liability" },
               { "value": "equity", "label": "finance.accounting.ui.equity" },
               { "value": "revenue", "label": "finance.accounting.ui.revenue" },
-              { "value": "expense", "label": "compliance.ro.saft.ui.expense" }
+              { "value": "expense", "label": "finance.accounting.ui.expense" }
             ]
           },
           { "name": "parent_id", "label": "common.col.parent", "type": "relation", "relation": { "dataSource": "/ext/finance/accounting/accounts", "dataPath": "data", "valueKey": "id", "labelKey": ["code", "name"] } }

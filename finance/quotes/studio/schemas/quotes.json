@@ -31,7 +31,7 @@
         "fields": [
           { "name": "client_name", "label": "finance.quotes.ui.client_name", "colSpan": 1, "required": true },
           { "name": "client_email", "label": "finance.quotes.ui.client_email", "type": "email", "colSpan": 1 },
-          { "name": "currency", "label": "crm.form.currency", "type": "select", "colSpan": 1, "default": "RON", "options": [{ "value": "RON", "label": "RON" }, { "value": "EUR", "label": "EUR" }, { "value": "USD", "label": "USD" }] },
+          { "name": "currency", "label": "common.col.currency", "type": "select", "colSpan": 1, "default": "RON", "options": [{ "value": "RON", "label": "RON" }, { "value": "EUR", "label": "EUR" }, { "value": "USD", "label": "USD" }] },
           { "name": "valid_days", "label": "finance.quotes.ui.valid_days", "type": "number", "colSpan": 1, "default": 30 },
           { "name": "notes", "label": "common.col.notes", "type": "textarea", "colSpan": 2 }
         ],

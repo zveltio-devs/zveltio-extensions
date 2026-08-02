@@ -1,0 +1,23 @@
+{
+  "auth.saml.btn.save": "Konfiguration speichern",
+  "auth.saml.empty": "Noch keine Daten.",
+  "auth.saml.enable": "SAML-SSO aktivieren",
+  "auth.saml.section.idp": "Einstellungen des Identitätsanbieters",
+  "auth.saml.section.sp": "Dienstanbieter-Informationen",
+  "auth.saml.subtitle": "Single Sign-On mit Identitätsanbieter",
+  "auth.saml.title": "SAML SSO",
+  "auth.saml.toast.saved": "SAML configuration saved.",
+  "auth.saml.ui.acs_callback_url": "ACS (Callback) URL",
+  "auth.saml.ui.email_attribute": "E-Mail-Attribut",
+  "auth.saml.ui.https_your_idp_com_sso_saml": "https://your-idp.com/sso/saml",
+  "auth.saml.ui.idp_certificate_pem": "IDP-Zertifikat (PEM)",
+  "auth.saml.ui.idp_entry_point_url": "IDP-Einstiegspunkt-URL *",
+  "auth.saml.ui.idp_issuer_entity_id": "IDP-Aussteller / Entitäts-ID",
+  "auth.saml.ui.name_attribute": "Name-Attribut",
+  "auth.saml.ui.require_signed_response": "Signierte Antwort erforderlich",
+  "auth.saml.ui.sha_1": "SHA-1",
+  "auth.saml.ui.sha_256": "SHA-256",
+  "auth.saml.ui.sha_512": "SHA-512",
+  "auth.saml.ui.signature_algorithm": "Signaturalgorithmus",
+  "auth.saml.ui.sp_metadata_url": "SP Metadata URL"
+}

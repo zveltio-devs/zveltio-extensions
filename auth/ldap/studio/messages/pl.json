@@ -1,0 +1,22 @@
+{
+  "auth.ldap.btn.test": "Testuj połączenie",
+  "auth.ldap.empty": "Brak danych.",
+  "auth.ldap.placeholder.username": "Użyj {{username}} jako symbolu zastępczego wartości logowania",
+  "auth.ldap.section.enable": "Włącz uwierzytelnianie LDAP",
+  "auth.ldap.section.search": "Ustawienia wyszukiwania",
+  "auth.ldap.section.server": "Połączenie z serwerem",
+  "auth.ldap.section.tls": "Zweryfikuj certyfikat TLS",
+  "auth.ldap.subtitle": "Ustawienia uwierzytelniania katalogowego",
+  "auth.ldap.title": "LDAP",
+  "auth.ldap.toast.connectionOk": "Połączenie udane!",
+  "auth.ldap.toast.saved": "Konfiguracja LDAP zapisana.",
+  "auth.ldap.ui.bind_dn": "Bind DN",
+  "auth.ldap.ui.bind_password": "Hasło Bind",
+  "auth.ldap.ui.email_attr": "Atrybut e-mail",
+  "auth.ldap.ui.ldap_ldap_example_com_389": "ldap://ldap.example.com:389",
+  "auth.ldap.ui.ldap_url": "URL LDAP *",
+  "auth.ldap.ui.name_attr": "Atrybut nazwy",
+  "auth.ldap.ui.search_base": "Baza wyszukiwania",
+  "auth.ldap.ui.search_filter": "Filtr wyszukiwania",
+  "auth.ldap.ui.username_attr": "Atrybut użytkownika"
+}

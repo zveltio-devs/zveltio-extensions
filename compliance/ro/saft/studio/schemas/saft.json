@@ -25,10 +25,10 @@
       "form": {
         "endpoint": "/ext/compliance/ro/saft",
         "fields": [
-          { "name": "period_start", "label": "compliance.ro.saft.ui.period_start", "type": "date", "default": "today", "colSpan": 1 },
-          { "name": "period_end", "label": "compliance.ro.saft.ui.period_end", "type": "date", "default": "today", "colSpan": 1 },
-          { "name": "company_name", "label": "compliance.ro.efactura.ui.company_name", "required": true, "colSpan": 2 },
-          { "name": "company_cui", "label": "compliance.ro.efactura.ui.cui_cif", "required": true, "mono": true, "colSpan": 2 },
+          { "name": "period_start", "label": "common.col.start", "type": "date", "default": "today", "colSpan": 1 },
+          { "name": "period_end", "label": "common.col.end", "type": "date", "default": "today", "colSpan": 1 },
+          { "name": "company_name", "label": "common.col.company", "required": true, "colSpan": 2 },
+          { "name": "company_cui", "label": "common.col.taxId", "required": true, "mono": true, "colSpan": 2 },
           { "name": "company_address", "label": "compliance.ro.saft.ui.address_optional", "colSpan": 2 }
         ]
       }

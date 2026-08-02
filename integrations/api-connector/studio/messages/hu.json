@@ -24,5 +24,7 @@
   "integrations.api-connector.ui.none": "Nincs",
   "integrations.api-connector.ui.oauth_2_0": "OAuth 2.0",
   "integrations.api-connector.ui.token": "Token",
-  "integrations.api-connector.ui.username": "Felhasználónév"
+  "integrations.api-connector.ui.username": "Felhasználónév",
+  "integrations.apiConnector.confirmDelete": "Törli a kapcsolatot?",
+  "integrations.apiConnector.toast.created": "Kapcsolat létrehozva."
 }

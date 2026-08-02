@@ -113,7 +113,7 @@
           {
             "title": "compliance.ro.etransport.section.departure",
             "fields": [
-              { "name": "departure_address", "label": "hr.employees.form.address", "colSpan": 2 },
+              { "name": "departure_address", "label": "common.col.address", "colSpan": 2 },
               { "name": "departure_county", "label": "compliance.ro.etransport.ui.county", "colSpan": 1 },
               { "name": "departure_country", "label": "compliance.ro.etransport.ui.country", "colSpan": 1, "default": "RO", "mono": true }
             ]
@@ -121,7 +121,7 @@
           {
             "title": "compliance.ro.etransport.section.destination",
             "fields": [
-              { "name": "destination_address", "label": "hr.employees.form.address", "colSpan": 2 },
+              { "name": "destination_address", "label": "common.col.address", "colSpan": 2 },
               { "name": "destination_county", "label": "compliance.ro.etransport.ui.county", "colSpan": 1 },
               { "name": "destination_country", "label": "compliance.ro.etransport.ui.country", "colSpan": 1, "default": "RO", "mono": true }
             ]
@@ -135,8 +135,8 @@
           "columns": [
             { "name": "tariff_code", "label": "compliance.ro.etransport.col.tariffCode", "mono": true },
             { "name": "description", "label": "common.col.description" },
-            { "name": "quantity", "label": "compliance.ro.efactura.col.qty", "type": "number" },
-            { "name": "unit", "label": "compliance.ro.efactura.col.unit" },
+            { "name": "quantity", "label": "common.col.quantity", "type": "number" },
+            { "name": "unit", "label": "common.col.unit" },
             { "name": "weight_kg", "label": "compliance.ro.etransport.col.weightKg", "type": "number" }
           ]
         },

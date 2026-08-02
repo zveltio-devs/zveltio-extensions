@@ -35,8 +35,8 @@
         "fields": [
           { "name": "code", "label": "finance.subscriptions.col.code", "colSpan": 2, "mono": true, "required": true },
           { "name": "name", "label": "finance.subscriptions.col.name", "colSpan": 2, "required": true },
-          { "name": "price", "label": "inventory.col.price", "type": "number", "colSpan": 1 },
-          { "name": "currency", "label": "crm.form.currency", "colSpan": 1, "default": "RON" },
+          { "name": "price", "label": "common.col.price", "type": "number", "colSpan": 1 },
+          { "name": "currency", "label": "common.col.currency", "colSpan": 1, "default": "RON" },
           { "name": "interval", "label": "finance.subscriptions.ui.interval", "type": "select", "colSpan": 1, "default": "monthly", "options": [{ "value": "monthly", "label": "finance.subscriptions.ui.monthly" }, { "value": "quarterly", "label": "finance.subscriptions.ui.quarterly" }, { "value": "yearly", "label": "finance.subscriptions.ui.yearly" }] },
           { "name": "trial_days", "label": "finance.subscriptions.ui.trial_days", "type": "number", "colSpan": 1 }
         ]
