@@ -1,4 +1,6 @@
 {
+  "compliance.ro.procurement.addLine": "+ Linie",
+  "compliance.ro.procurement.allocated": "Alocat",
   "compliance.ro.procurement.btn.approve": "Aprobă",
   "compliance.ro.procurement.btn.createOrder": "Creează comandă",
   "compliance.ro.procurement.btn.createOrderModal": "Creează comandă",
@@ -19,7 +21,10 @@
   "compliance.ro.procurement.empty.budget": "Nicio linie de buget încă.",
   "compliance.ro.procurement.empty.orders": "Nicio comandă de achiziție încă.",
   "compliance.ro.procurement.empty.suppliers": "Niciun furnizor înregistrat încă.",
+  "compliance.ro.procurement.remaining": "Rămas",
+  "compliance.ro.procurement.spent": "Cheltuit",
   "compliance.ro.procurement.subtitle": "Comenzi de achizitie, furnizori, executie bugetara",
+  "compliance.ro.procurement.subtotal": "Subtotal",
   "compliance.ro.procurement.tab.budget": "Buget",
   "compliance.ro.procurement.tab.orders": "Comenzi",
   "compliance.ro.procurement.tab.suppliers": "Furnizori",
@@ -35,5 +40,6 @@
   "compliance.ro.procurement.ui.furnizor": "Furnizor",
   "compliance.ro.procurement.ui.furnizor_nou": "Furnizor nou",
   "compliance.ro.procurement.ui.judet": "Judet",
-  "compliance.ro.procurement.ui.num_r_comanda": "Număr comanda"
+  "compliance.ro.procurement.ui.num_r_comanda": "Număr comanda",
+  "compliance.ro.procurement.vat19": "TVA 19%"
 }

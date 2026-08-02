@@ -27,5 +27,6 @@
   "geospatial.postgis.ui.longitude": "Longitud",
   "geospatial.postgis.ui.new_geofence": "Nueva geocerca",
   "geospatial.postgis.ui.point_clustering_dbscan": "Point Clustering (DBSCAN)",
-  "geospatial.postgis.ui.radius_meters": "Radio (metros)"
+  "geospatial.postgis.ui.radius_meters": "Radio (metros)",
+  "geospatial.postgis.withParameters": "con los parámetros:"
 }

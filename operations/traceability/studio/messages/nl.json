@@ -1,5 +1,6 @@
 {
   "operations.traceability.action.details": "Details",
+  "operations.traceability.addConsumedMaterial": "Verbruikt materiaal toevoegen",
   "operations.traceability.col.expiry": "Vervaldatum",
   "operations.traceability.col.location": "Locatie",
   "operations.traceability.col.lotNumber": "Partijnummer",
@@ -39,6 +40,7 @@
   "operations.traceability.form.supplier": "Leverancier",
   "operations.traceability.form.supplierLot": "Leverancierspartij",
   "operations.traceability.form.unit": "Eenheid *",
+  "operations.traceability.lot": "Partij",
   "operations.traceability.lot.col.datetime": "Datum/tijd",
   "operations.traceability.lot.col.quantity": "Aantal",
   "operations.traceability.lot.col.reference": "Referentie",

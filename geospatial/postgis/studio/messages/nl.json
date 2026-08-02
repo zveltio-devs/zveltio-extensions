@@ -27,5 +27,6 @@
   "geospatial.postgis.ui.longitude": "Lengtegraad",
   "geospatial.postgis.ui.new_geofence": "Nieuwe geofence",
   "geospatial.postgis.ui.point_clustering_dbscan": "Point Clustering (DBSCAN)",
-  "geospatial.postgis.ui.radius_meters": "Straal (meters)"
+  "geospatial.postgis.ui.radius_meters": "Straal (meters)",
+  "geospatial.postgis.withParameters": "met parameters:"
 }

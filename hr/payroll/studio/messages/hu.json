@@ -6,6 +6,7 @@
   "hr.payroll.col.net": "Nettó",
   "hr.payroll.empty": "Még nincsenek adatok.",
   "hr.payroll.empty.periods": "Még nincsenek időszakok.",
+  "hr.payroll.preset.tax10": "Adó 10%",
   "hr.payroll.selectPeriod": "Select a period to view payroll entries.",
   "hr.payroll.subtitle": "Bérszámfejtési időszakok kezelése és bérjegyzékek létrehozása",
   "hr.payroll.tab.periods": "Időszakok",

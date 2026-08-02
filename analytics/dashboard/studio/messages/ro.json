@@ -1,4 +1,8 @@
 {
+  "analytics.dashboard.includedWidgets": "Widgeturi incluse",
+  "analytics.dashboard.noWidgets": "Niciun widget selectat.",
+  "analytics.dashboard.requiresPermission": "Necesită această permisiune",
+  "analytics.dashboard.subtitle": "Setează dashboard-ul implicit pentru fiecare rol. Utilizatorii îl personalizează peste.",
   "analytics.dashboard.title": "Tablouri de bord",
-  "analytics.dashboard.subtitle": "Setează dashboard-ul implicit pentru fiecare rol. Utilizatorii îl personalizează peste."
+  "analytics.dashboard.widgetsForRole": "Widgeturi pentru acest rol"
 }

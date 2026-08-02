@@ -27,5 +27,6 @@
   "geospatial.postgis.ui.longitude": "Hosszúság",
   "geospatial.postgis.ui.new_geofence": "Új geokerítés",
   "geospatial.postgis.ui.point_clustering_dbscan": "Point Clustering (DBSCAN)",
-  "geospatial.postgis.ui.radius_meters": "Sugár (méter)"
+  "geospatial.postgis.ui.radius_meters": "Sugár (méter)",
+  "geospatial.postgis.withParameters": "paraméterekkel:"
 }

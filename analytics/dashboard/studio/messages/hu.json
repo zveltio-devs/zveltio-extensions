@@ -1,4 +1,8 @@
 {
+  "analytics.dashboard.includedWidgets": "Tartalmazott widgetek",
+  "analytics.dashboard.noWidgets": "Nincs kiválasztott widget.",
+  "analytics.dashboard.requiresPermission": "Ehhez az engedélyhez kötött",
+  "analytics.dashboard.subtitle": "Set the default dashboard each role sees. Users personalize on top of it.",
   "analytics.dashboard.title": "Irányítópultok",
-  "analytics.dashboard.subtitle": "Set the default dashboard each role sees. Users personalize on top of it."
+  "analytics.dashboard.widgetsForRole": "Widgetek ehhez a szerepkörhöz"
 }

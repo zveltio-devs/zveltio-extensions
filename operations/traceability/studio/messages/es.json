@@ -1,5 +1,6 @@
 {
   "operations.traceability.action.details": "Detalles",
+  "operations.traceability.addConsumedMaterial": "Añadir material consumido",
   "operations.traceability.col.expiry": "Caducidad",
   "operations.traceability.col.location": "Ubicación",
   "operations.traceability.col.lotNumber": "Número de lote",
@@ -39,6 +40,7 @@
   "operations.traceability.form.supplier": "Proveedor",
   "operations.traceability.form.supplierLot": "Lote del proveedor",
   "operations.traceability.form.unit": "Unidad *",
+  "operations.traceability.lot": "Lote",
   "operations.traceability.lot.col.datetime": "Fecha/hora",
   "operations.traceability.lot.col.quantity": "Cantidad",
   "operations.traceability.lot.col.reference": "Referencia",

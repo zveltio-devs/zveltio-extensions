@@ -1,4 +1,6 @@
 {
+  "compliance.ro.procurement.addLine": "+ Sor",
+  "compliance.ro.procurement.allocated": "Lekötve",
   "compliance.ro.procurement.btn.approve": "Jóváhagyás",
   "compliance.ro.procurement.btn.createOrder": "Rendelés létrehozása",
   "compliance.ro.procurement.btn.createOrderModal": "Rendelés létrehozása",
@@ -19,7 +21,10 @@
   "compliance.ro.procurement.empty.budget": "Még nincsenek költségvetési sorok.",
   "compliance.ro.procurement.empty.orders": "Még nincsenek beszerzési rendelések.",
   "compliance.ro.procurement.empty.suppliers": "Még nincsenek regisztrált beszállítók.",
+  "compliance.ro.procurement.remaining": "Fennmaradó",
+  "compliance.ro.procurement.spent": "Elköltve",
   "compliance.ro.procurement.subtitle": "Comenzi de achizitie, furnizori, executie bugetara",
+  "compliance.ro.procurement.subtotal": "Részösszeg",
   "compliance.ro.procurement.tab.budget": "Költségvetés",
   "compliance.ro.procurement.tab.orders": "Rendelések",
   "compliance.ro.procurement.tab.suppliers": "Beszállítók",
@@ -35,5 +40,6 @@
   "compliance.ro.procurement.ui.furnizor": "Supplier",
   "compliance.ro.procurement.ui.furnizor_nou": "New supplier",
   "compliance.ro.procurement.ui.judet": "Judet",
-  "compliance.ro.procurement.ui.num_r_comanda": "Order number"
+  "compliance.ro.procurement.ui.num_r_comanda": "Order number",
+  "compliance.ro.procurement.vat19": "ÁFA 19%"
 }

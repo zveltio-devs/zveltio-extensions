@@ -6,6 +6,7 @@
   "hr.payroll.col.net": "Neto",
   "hr.payroll.empty": "Aún no hay datos.",
   "hr.payroll.empty.periods": "Aún no hay períodos.",
+  "hr.payroll.preset.tax10": "Impuesto 10 %",
   "hr.payroll.selectPeriod": "Select a period to view payroll entries.",
   "hr.payroll.subtitle": "Gestiona períodos de nómina y genera nóminas",
   "hr.payroll.tab.periods": "Períodos",

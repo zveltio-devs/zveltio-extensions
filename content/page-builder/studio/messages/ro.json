@@ -17,6 +17,9 @@
   "content.pageBuilder.menus.main": "Meniu principal (antet)",
   "content.pageBuilder.menus.title": "Meniuri",
   "content.pageBuilder.newPage": "Pagină nouă",
+  "content.pageBuilder.ph.altText": "Text alternativ",
+  "content.pageBuilder.ph.headingText": "Textul titlului",
+  "content.pageBuilder.ph.imageUrl": "URL imagine",
   "content.pageBuilder.toast.saved": "Salvat.",
   "content.pageBuilder.ui.ogImage": "URL imagine OG",
   "content.pageBuilder.unpublish": "Retrage publicarea"

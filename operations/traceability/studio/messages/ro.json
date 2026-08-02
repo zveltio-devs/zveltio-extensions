@@ -1,5 +1,6 @@
 {
   "operations.traceability.action.details": "Detalii",
+  "operations.traceability.addConsumedMaterial": "Adaugă material consumat",
   "operations.traceability.col.expiry": "Expirare",
   "operations.traceability.col.location": "Locație",
   "operations.traceability.col.lotNumber": "Număr lot",
@@ -39,6 +40,7 @@
   "operations.traceability.form.supplier": "Furnizor",
   "operations.traceability.form.supplierLot": "Lot furnizor",
   "operations.traceability.form.unit": "Unitate *",
+  "operations.traceability.lot": "Lot",
   "operations.traceability.lot.col.datetime": "Dată/oră",
   "operations.traceability.lot.col.quantity": "Cantitate",
   "operations.traceability.lot.col.reference": "Referință",
