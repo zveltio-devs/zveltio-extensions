@@ -1,0 +1,22 @@
+{
+  "auth.ldap.btn.test": "Testează conexiunea",
+  "auth.ldap.empty": "Niciun date încă.",
+  "auth.ldap.placeholder.username": "Folosește {{username}} ca placeholder pentru login",
+  "auth.ldap.section.enable": "Activează autentificarea LDAP",
+  "auth.ldap.section.search": "Setări de căutare",
+  "auth.ldap.section.server": "Conexiune la server",
+  "auth.ldap.section.tls": "Verifică certificatul TLS",
+  "auth.ldap.subtitle": "Setări autentificare director",
+  "auth.ldap.title": "LDAP",
+  "auth.ldap.toast.connectionOk": "Conexiune reușită!",
+  "auth.ldap.toast.saved": "Configurare LDAP salvată.",
+  "auth.ldap.ui.bind_dn": "Bind DN",
+  "auth.ldap.ui.bind_password": "Parolă Bind",
+  "auth.ldap.ui.email_attr": "Atribut email",
+  "auth.ldap.ui.ldap_ldap_example_com_389": "ldap://ldap.example.com:389",
+  "auth.ldap.ui.ldap_url": "LDAP URL *",
+  "auth.ldap.ui.name_attr": "Atribut nume",
+  "auth.ldap.ui.search_base": "Bază de căutare",
+  "auth.ldap.ui.search_filter": "Filtru de căutare",
+  "auth.ldap.ui.username_attr": "Username Attr"
+}

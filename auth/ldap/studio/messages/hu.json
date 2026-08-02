@@ -1,0 +1,22 @@
+{
+  "auth.ldap.btn.test": "Kapcsolat tesztelése",
+  "auth.ldap.empty": "Még nincsenek adatok.",
+  "auth.ldap.placeholder.username": "Használd a {{username}} helyettesítőt a bejelentkezési értékhez",
+  "auth.ldap.section.enable": "LDAP-hitelesítés engedélyezése",
+  "auth.ldap.section.search": "Keresési beállítások",
+  "auth.ldap.section.server": "Szerverkapcsolat",
+  "auth.ldap.section.tls": "TLS-tanúsítvány ellenőrzése",
+  "auth.ldap.subtitle": "Címtár-hitelesítési beállítások",
+  "auth.ldap.title": "LDAP",
+  "auth.ldap.toast.connectionOk": "Sikeres kapcsolat!",
+  "auth.ldap.toast.saved": "LDAP-konfiguráció mentve.",
+  "auth.ldap.ui.bind_dn": "Bind DN",
+  "auth.ldap.ui.bind_password": "Bind jelszó",
+  "auth.ldap.ui.email_attr": "E-mail attribútum",
+  "auth.ldap.ui.ldap_ldap_example_com_389": "ldap://ldap.example.com:389",
+  "auth.ldap.ui.ldap_url": "LDAP URL *",
+  "auth.ldap.ui.name_attr": "Név attribútum",
+  "auth.ldap.ui.search_base": "Keresési bázis",
+  "auth.ldap.ui.search_filter": "Keresési szűrő",
+  "auth.ldap.ui.username_attr": "Felhasználónév attribútum"
+}

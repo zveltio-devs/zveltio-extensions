@@ -24,5 +24,7 @@
   "integrations.api-connector.ui.none": "Geen",
   "integrations.api-connector.ui.oauth_2_0": "OAuth 2.0",
   "integrations.api-connector.ui.token": "Token",
-  "integrations.api-connector.ui.username": "Gebruikersnaam"
+  "integrations.api-connector.ui.username": "Gebruikersnaam",
+  "integrations.apiConnector.confirmDelete": "Verbinding verwijderen?",
+  "integrations.apiConnector.toast.created": "Verbinding aangemaakt."
 }

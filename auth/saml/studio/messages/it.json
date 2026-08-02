@@ -1,0 +1,23 @@
+{
+  "auth.saml.btn.save": "Salva configurazione",
+  "auth.saml.empty": "Ancora nessun dato.",
+  "auth.saml.enable": "Abilita SSO SAML",
+  "auth.saml.section.idp": "Impostazioni del provider di identità",
+  "auth.saml.section.sp": "Informazioni service provider",
+  "auth.saml.subtitle": "Single sign-on con provider di identità",
+  "auth.saml.title": "SAML SSO",
+  "auth.saml.toast.saved": "Configurazione SAML salvata.",
+  "auth.saml.ui.acs_callback_url": "URL ACS (callback)",
+  "auth.saml.ui.email_attribute": "Attributo e-mail",
+  "auth.saml.ui.https_your_idp_com_sso_saml": "https://your-idp.com/sso/saml",
+  "auth.saml.ui.idp_certificate_pem": "Certificato IDP (PEM)",
+  "auth.saml.ui.idp_entry_point_url": "URL entry point IDP *",
+  "auth.saml.ui.idp_issuer_entity_id": "Emittente IDP / Entity ID",
+  "auth.saml.ui.name_attribute": "Attributo nome",
+  "auth.saml.ui.require_signed_response": "Richiedi risposta firmata",
+  "auth.saml.ui.sha_1": "SHA-1",
+  "auth.saml.ui.sha_256": "SHA-256",
+  "auth.saml.ui.sha_512": "SHA-512",
+  "auth.saml.ui.signature_algorithm": "Algoritmo di firma",
+  "auth.saml.ui.sp_metadata_url": "URL metadati SP"
+}

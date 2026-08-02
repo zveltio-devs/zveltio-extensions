@@ -1,0 +1,23 @@
+{
+  "auth.saml.btn.save": "Konfiguráció mentése",
+  "auth.saml.empty": "Még nincsenek adatok.",
+  "auth.saml.enable": "SAML SSO engedélyezése",
+  "auth.saml.section.idp": "Identitásszolgáltató beállításai",
+  "auth.saml.section.sp": "Szolgáltató adatai",
+  "auth.saml.subtitle": "Egyszeri bejelentkezés identitásszolgáltatóval",
+  "auth.saml.title": "SAML SSO",
+  "auth.saml.toast.saved": "SAML-konfiguráció mentve.",
+  "auth.saml.ui.acs_callback_url": "ACS (callback) URL",
+  "auth.saml.ui.email_attribute": "E-mail attribútum",
+  "auth.saml.ui.https_your_idp_com_sso_saml": "https://your-idp.com/sso/saml",
+  "auth.saml.ui.idp_certificate_pem": "IDP-tanúsítvány (PEM)",
+  "auth.saml.ui.idp_entry_point_url": "IDP belépési pont URL *",
+  "auth.saml.ui.idp_issuer_entity_id": "IDP-kibocsátó / Entity ID",
+  "auth.saml.ui.name_attribute": "Név attribútum",
+  "auth.saml.ui.require_signed_response": "Aláírt válasz megkövetelése",
+  "auth.saml.ui.sha_1": "SHA-1",
+  "auth.saml.ui.sha_256": "SHA-256",
+  "auth.saml.ui.sha_512": "SHA-512",
+  "auth.saml.ui.signature_algorithm": "Aláírási algoritmus",
+  "auth.saml.ui.sp_metadata_url": "SP-metaadat URL"
+}

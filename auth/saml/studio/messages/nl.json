@@ -1,0 +1,23 @@
+{
+  "auth.saml.btn.save": "Configuratie opslaan",
+  "auth.saml.empty": "Nog geen gegevens.",
+  "auth.saml.enable": "SAML-SSO inschakelen",
+  "auth.saml.section.idp": "Instellingen identiteitsprovider",
+  "auth.saml.section.sp": "Serviceprovider-informatie",
+  "auth.saml.subtitle": "Eenmalige aanmelding met identiteitsprovider",
+  "auth.saml.title": "SAML SSO",
+  "auth.saml.toast.saved": "SAML-configuratie opgeslagen.",
+  "auth.saml.ui.acs_callback_url": "ACS-URL (callback)",
+  "auth.saml.ui.email_attribute": "E-mailattribuut",
+  "auth.saml.ui.https_your_idp_com_sso_saml": "https://your-idp.com/sso/saml",
+  "auth.saml.ui.idp_certificate_pem": "IDP-certificaat (PEM)",
+  "auth.saml.ui.idp_entry_point_url": "IDP entry point URL *",
+  "auth.saml.ui.idp_issuer_entity_id": "IDP-issuer / Entity ID",
+  "auth.saml.ui.name_attribute": "Naamattribuut",
+  "auth.saml.ui.require_signed_response": "Ondertekend antwoord vereisen",
+  "auth.saml.ui.sha_1": "SHA-1",
+  "auth.saml.ui.sha_256": "SHA-256",
+  "auth.saml.ui.sha_512": "SHA-512",
+  "auth.saml.ui.signature_algorithm": "Handtekeningalgoritme",
+  "auth.saml.ui.sp_metadata_url": "SP-metadata-URL"
+}

@@ -1,0 +1,22 @@
+{
+  "auth.ldap.btn.test": "Verbindung testen",
+  "auth.ldap.empty": "Noch keine Daten.",
+  "auth.ldap.placeholder.username": "Use {{username}} as placeholder for the login value",
+  "auth.ldap.section.enable": "LDAP-Authentifizierung aktivieren",
+  "auth.ldap.section.search": "Sucheinstellungen",
+  "auth.ldap.section.server": "Serververbindung",
+  "auth.ldap.section.tls": "TLS-Zertifikat überprüfen",
+  "auth.ldap.subtitle": "Einstellungen für die Verzeichnisauthentifizierung",
+  "auth.ldap.title": "LDAP",
+  "auth.ldap.toast.connectionOk": "Verbindung erfolgreich!",
+  "auth.ldap.toast.saved": "LDAP-Konfiguration gespeichert.",
+  "auth.ldap.ui.bind_dn": "Bind-DN",
+  "auth.ldap.ui.bind_password": "Bind-Passwort",
+  "auth.ldap.ui.email_attr": "E-Mail-Attribut",
+  "auth.ldap.ui.ldap_ldap_example_com_389": "ldap://ldap.example.com:389",
+  "auth.ldap.ui.ldap_url": "LDAP-URL *",
+  "auth.ldap.ui.name_attr": "Name-Attribut",
+  "auth.ldap.ui.search_base": "Suchbasis",
+  "auth.ldap.ui.search_filter": "Suchfilter",
+  "auth.ldap.ui.username_attr": "Benutzername-Attribut"
+}
