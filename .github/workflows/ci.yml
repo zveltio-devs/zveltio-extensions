@@ -146,8 +146,13 @@ jobs:
             echo "── validate $d"
             out=$(bun "$CLI" extension validate --dir "$d" --first-party 2>&1 || true)
             echo "$out" | grep -E "SDUI schemas:" || true
-            if echo "$out" | grep -qE "SDUI_[A-Z_]+"; then
-              echo "$out" | grep -E "SDUI_[A-Z_]+"
+            # Drive the gate off the summary line, not off any SDUI_* code
+            # appearing anywhere: the validator emits warnings too (hardcoded
+            # schema text), and those must not fail the build. The summary is
+            # already severity-aware — it says "error(s)" only for hard errors.
+            # Always print the codes, so warnings stay visible without gating.
+            echo "$out" | grep -E "SDUI_[A-Z_]+" || true
+            if echo "$out" | grep -qE "SDUI schemas:.*error"; then
               FAIL=1
             fi
           done
