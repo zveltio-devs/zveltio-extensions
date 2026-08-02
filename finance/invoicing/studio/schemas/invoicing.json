@@ -23,7 +23,7 @@
         { "key": "client_name", "label": "invoicing.col.client", "secondary": "client_email" },
         { "key": "total", "label": "invoicing.col.total", "type": "currency", "currency": { "codeKey": "currency" } },
         { "key": "amount_paid", "label": "invoicing.col.paid", "type": "currency", "currency": { "codeKey": "currency" } },
-        { "key": "status", "label": "invoicing.col.status", "type": "badge", "badge": { "colors": { "draft": "badge-ghost", "sent": "badge-info", "partial": "badge-warning", "paid": "badge-success", "overdue": "badge-error", "cancelled": "badge-ghost" }, "labels": { "draft": "invoicing.status.draft", "sent": "invoicing.status.sent", "partial": "invoicing.status.partial", "paid": "invoicing.status.paid", "overdue": "invoicing.status.overdue", "cancelled": "invoicing.status.cancelled" } } },
+        { "key": "status", "label": "invoicing.col.status", "type": "badge", "badge": { "colors": { "draft": "badge-ghost", "sent": "badge-info", "partial": "badge-warning", "paid": "badge-success", "overdue": "badge-error", "cancelled": "badge-ghost" }, "labels": { "draft": "invoicing.status.draft", "sent": "invoicing.status.sent", "partial": "invoicing.status.partial", "paid": "invoicing.status.paid", "overdue": "invoicing.status.overdue", "cancelled": "common.status.cancelled" } } },
         { "key": "due_date", "label": "invoicing.col.dueDate", "type": "date", "classWhen": [{ "field": "status", "equals": "overdue", "class": "text-error font-medium" }] }
       ],
       "rowActions": [
@@ -36,7 +36,7 @@
         "fields": [
           { "name": "client_name", "label": "invoicing.form.clientName", "required": true, "colSpan": 1 },
           { "name": "client_email", "label": "invoicing.form.clientEmail", "type": "email", "colSpan": 1 },
-          { "name": "currency", "label": "crm.form.currency", "type": "select", "default": "RON", "colSpan": 1, "options": [{ "value": "RON", "label": "RON" }, { "value": "EUR", "label": "EUR" }, { "value": "USD", "label": "USD" }] },
+          { "name": "currency", "label": "common.col.currency", "type": "select", "default": "RON", "colSpan": 1, "options": [{ "value": "RON", "label": "RON" }, { "value": "EUR", "label": "EUR" }, { "value": "USD", "label": "USD" }] },
           { "name": "due_days", "label": "invoicing.form.dueDays", "type": "number", "default": 30, "colSpan": 1 }
         ],
         "repeatable": {

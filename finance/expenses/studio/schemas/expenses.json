@@ -22,7 +22,7 @@
       ],
       "columns": [
         { "key": "expense_date", "label": "finance.expenses.col.date", "type": "date" },
-        { "key": "category", "label": "finance.expenses.col.category", "type": "badge", "badge": { "colors": {} } },
+        { "key": "category", "label": "common.col.category", "type": "badge", "badge": { "colors": {} } },
         { "key": "vendor", "label": "finance.expenses.col.vendor" },
         { "key": "description", "label": "finance.expenses.col.description" },
         { "key": "amount", "label": "finance.expenses.col.amount", "type": "currency", "currency": { "codeKey": "currency" } },
@@ -51,7 +51,7 @@
         "fields": [
           { "name": "expense_date", "label": "finance.expenses.col.date", "type": "date", "colSpan": 1, "default": "today" },
           {
-            "name": "category", "label": "finance.expenses.col.category", "type": "select", "colSpan": 1, "default": "travel",
+            "name": "category", "label": "common.col.category", "type": "select", "colSpan": 1, "default": "travel",
             "options": [
               { "value": "travel", "label": "finance.expenses.category.travel" },
               { "value": "meals", "label": "finance.expenses.category.meals" },
@@ -63,7 +63,7 @@
           { "name": "vendor", "label": "finance.expenses.col.vendor", "colSpan": 2 },
           { "name": "description", "label": "finance.expenses.col.description", "colSpan": 2, "required": true },
           { "name": "amount", "label": "finance.expenses.col.amount", "type": "number", "colSpan": 1 },
-          { "name": "currency", "label": "crm.form.currency", "colSpan": 1, "default": "RON" },
+          { "name": "currency", "label": "common.col.currency", "colSpan": 1, "default": "RON" },
           { "name": "receipt_url", "label": "finance.expenses.form.receiptUrl", "colSpan": 2 }
         ]
       }

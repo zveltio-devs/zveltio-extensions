@@ -24,5 +24,7 @@
   "integrations.api-connector.ui.none": "None",
   "integrations.api-connector.ui.oauth_2_0": "OAuth 2.0",
   "integrations.api-connector.ui.token": "Token",
-  "integrations.api-connector.ui.username": "Username"
+  "integrations.api-connector.ui.username": "Username",
+  "integrations.apiConnector.confirmDelete": "Delete connection?",
+  "integrations.apiConnector.toast.created": "Connection created."
 }

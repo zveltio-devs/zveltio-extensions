@@ -33,7 +33,7 @@
           { "name": "code", "label": "operations.assets.ui.code_tag", "colSpan": 1 },
           { "name": "serial_number", "label": "operations.assets.ui.serial_number", "colSpan": 1 },
           {
-            "name": "category", "label": "finance.expenses.col.category", "type": "select", "colSpan": 1,
+            "name": "category", "label": "common.col.category", "type": "select", "colSpan": 1,
             "options": [
               { "value": "IT Equipment", "label": "IT Equipment" },
               { "value": "Furniture", "label": "Furniture" },
@@ -53,7 +53,7 @@
             ]
           },
           { "name": "acquisition_cost", "label": "operations.assets.ui.acquisition_cost", "type": "number", "colSpan": 1 },
-          { "name": "currency", "label": "crm.form.currency", "colSpan": 1, "default": "RON" },
+          { "name": "currency", "label": "common.col.currency", "colSpan": 1, "default": "RON" },
           { "name": "acquisition_date", "label": "operations.assets.ui.acquisition_date", "type": "date", "colSpan": 1 },
           { "name": "location", "label": "operations.assets.ui.location", "colSpan": 1 }
         ]

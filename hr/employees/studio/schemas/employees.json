@@ -62,7 +62,7 @@
           },
           { "name": "salary", "label": "hr.employees.form.salary", "type": "number", "colSpan": 1 },
           { "name": "currency", "label": "hr.employees.form.currency", "colSpan": 1, "default": "RON" },
-          { "name": "address", "label": "hr.employees.form.address", "colSpan": 2 }
+          { "name": "address", "label": "common.col.address", "colSpan": 2 }
         ]
       }
     }

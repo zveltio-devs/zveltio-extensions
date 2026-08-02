@@ -1,0 +1,22 @@
+{
+  "auth.ldap.btn.test": "Verbinding testen",
+  "auth.ldap.empty": "Nog geen gegevens.",
+  "auth.ldap.placeholder.username": "Gebruik {{username}} als plaatshouder voor de inlogwaarde",
+  "auth.ldap.section.enable": "LDAP-authenticatie inschakelen",
+  "auth.ldap.section.search": "Zoekinstellingen",
+  "auth.ldap.section.server": "Serververbinding",
+  "auth.ldap.section.tls": "TLS-certificaat verifiëren",
+  "auth.ldap.subtitle": "Instellingen voor directory-authenticatie",
+  "auth.ldap.title": "LDAP",
+  "auth.ldap.toast.connectionOk": "Verbinding geslaagd!",
+  "auth.ldap.toast.saved": "LDAP-configuratie opgeslagen.",
+  "auth.ldap.ui.bind_dn": "Bind-DN",
+  "auth.ldap.ui.bind_password": "Bind-wachtwoord",
+  "auth.ldap.ui.email_attr": "E-mailattribuut",
+  "auth.ldap.ui.ldap_ldap_example_com_389": "ldap://ldap.example.com:389",
+  "auth.ldap.ui.ldap_url": "LDAP-URL *",
+  "auth.ldap.ui.name_attr": "Naamattribuut",
+  "auth.ldap.ui.search_base": "Zoekbasis",
+  "auth.ldap.ui.search_filter": "Zoekfilter",
+  "auth.ldap.ui.username_attr": "Gebruikersattribuut"
+}
