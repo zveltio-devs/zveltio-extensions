@@ -6,6 +6,7 @@
   "hr.payroll.col.net": "Netto",
   "hr.payroll.empty": "Noch keine Daten.",
   "hr.payroll.empty.periods": "Noch keine Zeiträume.",
+  "hr.payroll.preset.tax10": "Steuer 10 %",
   "hr.payroll.selectPeriod": "Wählen Sie einen Zeitraum, um Lohnbuchungen anzuzeigen.",
   "hr.payroll.subtitle": "Abrechnungszeiträume verwalten und Gehaltsabrechnungen erstellen",
   "hr.payroll.tab.periods": "Zeiträume",

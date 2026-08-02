@@ -17,6 +17,9 @@
   "content.pageBuilder.menus.main": "Hauptmenü (Kopfzeile)",
   "content.pageBuilder.menus.title": "Menüs",
   "content.pageBuilder.newPage": "Neue Seite",
+  "content.pageBuilder.ph.altText": "Alt-Text",
+  "content.pageBuilder.ph.headingText": "Überschriftstext",
+  "content.pageBuilder.ph.imageUrl": "Bild-URL",
   "content.pageBuilder.toast.saved": "Gespeichert.",
   "content.pageBuilder.ui.ogImage": "OG-Bild-URL",
   "content.pageBuilder.unpublish": "Veröffentlichung aufheben"

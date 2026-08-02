@@ -1,4 +1,8 @@
 {
+  "analytics.dashboard.includedWidgets": "Opgenomen widgets",
+  "analytics.dashboard.noWidgets": "Geen widgets geselecteerd.",
+  "analytics.dashboard.requiresPermission": "Vereist deze machtiging",
+  "analytics.dashboard.subtitle": "Set the default dashboard each role sees. Users personalize on top of it.",
   "analytics.dashboard.title": "Dashboards",
-  "analytics.dashboard.subtitle": "Set the default dashboard each role sees. Users personalize on top of it."
+  "analytics.dashboard.widgetsForRole": "Widgets voor deze rol"
 }

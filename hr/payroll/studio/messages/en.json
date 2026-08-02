@@ -6,6 +6,7 @@
   "hr.payroll.col.net": "Net",
   "hr.payroll.empty": "No data yet.",
   "hr.payroll.empty.periods": "No periods yet.",
+  "hr.payroll.preset.tax10": "Tax 10%",
   "hr.payroll.selectPeriod": "Select a period to view payroll entries.",
   "hr.payroll.subtitle": "Manage payroll periods and generate payslips",
   "hr.payroll.tab.periods": "Periods",

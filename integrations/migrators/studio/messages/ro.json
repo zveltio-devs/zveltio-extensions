@@ -1,15 +1,17 @@
 {
-  "integrations.migrators.title": "Migratoare de date",
+  "integrations.migrators.col.object": "Obiect",
+  "integrations.migrators.col.rows": "Rânduri",
+  "integrations.migrators.col.source": "Sursă",
+  "integrations.migrators.confirm.deleteConnection": "Ștergeți această conexiune? Tokenul stocat va fi distrus.",
+  "integrations.migrators.field.connection": "Conexiune",
+  "integrations.migrators.field.limit": "Limită rânduri",
+  "integrations.migrators.field.object": "Obiect sursă",
+  "integrations.migrators.field.target": "Colecție țintă",
+  "integrations.migrators.field.token": "Token API",
+  "integrations.migrators.ph.resource": "contacte · id bază de date Notion · baseId/tableId",
+  "integrations.migrators.ph.token": "pat-… / secret_… / token de aplicație privată",
   "integrations.migrators.subtitle": "Adu-ți datele din HubSpot, Notion sau Airtable",
   "integrations.migrators.tab.connections": "Conexiuni",
   "integrations.migrators.tab.runs": "Importuri",
-  "integrations.migrators.col.source": "Sursă",
-  "integrations.migrators.col.object": "Obiect",
-  "integrations.migrators.col.rows": "Rânduri",
-  "integrations.migrators.field.token": "Token API",
-  "integrations.migrators.field.connection": "Conexiune",
-  "integrations.migrators.field.object": "Obiect sursă",
-  "integrations.migrators.field.target": "Colecție țintă",
-  "integrations.migrators.field.limit": "Limită rânduri",
-  "integrations.migrators.confirm.deleteConnection": "Ștergeți această conexiune? Tokenul stocat va fi distrus."
+  "integrations.migrators.title": "Migratoare de date"
 }

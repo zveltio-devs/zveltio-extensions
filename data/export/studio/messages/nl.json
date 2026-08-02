@@ -8,6 +8,7 @@
   "data.export.col.user": "Gebruiker",
   "data.export.empty": "Nog geen exports.",
   "data.export.filterHint": "Filter (Zveltio query, optional)",
+  "data.export.rowLimit": "Rijlimiet (0 = alle)",
   "data.export.subtitle": "Export collection data as JSON, CSV or NDJSON with filtering support",
   "data.export.title": "Gegevensexport",
   "data.export.ui.excel_xlsx": "Excel (xlsx)",

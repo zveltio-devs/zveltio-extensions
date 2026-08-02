@@ -17,6 +17,9 @@
   "content.pageBuilder.menus.main": "Főmenü (fejléc)",
   "content.pageBuilder.menus.title": "Menük",
   "content.pageBuilder.newPage": "Új oldal",
+  "content.pageBuilder.ph.altText": "Alternatív szöveg",
+  "content.pageBuilder.ph.headingText": "Címsor szövege",
+  "content.pageBuilder.ph.imageUrl": "Kép URL-je",
   "content.pageBuilder.toast.saved": "Mentve.",
   "content.pageBuilder.ui.ogImage": "OG image URL",
   "content.pageBuilder.unpublish": "Közzététel visszavonása"

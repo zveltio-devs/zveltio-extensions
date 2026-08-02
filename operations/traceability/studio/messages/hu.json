@@ -1,5 +1,6 @@
 {
   "operations.traceability.action.details": "Részletek",
+  "operations.traceability.addConsumedMaterial": "Felhasznált anyag hozzáadása",
   "operations.traceability.col.expiry": "Lejárat",
   "operations.traceability.col.location": "Hely",
   "operations.traceability.col.lotNumber": "Tételszám",
@@ -39,6 +40,7 @@
   "operations.traceability.form.supplier": "Beszállító",
   "operations.traceability.form.supplierLot": "Beszállítói tétel",
   "operations.traceability.form.unit": "Egység *",
+  "operations.traceability.lot": "Tétel",
   "operations.traceability.lot.col.datetime": "Dátum/idő",
   "operations.traceability.lot.col.quantity": "Mennyiség",
   "operations.traceability.lot.col.reference": "Hivatkozás",

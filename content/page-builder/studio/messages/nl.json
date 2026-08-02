@@ -17,6 +17,9 @@
   "content.pageBuilder.menus.main": "Hoofdmenu (koptekst)",
   "content.pageBuilder.menus.title": "Menu's",
   "content.pageBuilder.newPage": "Nieuwe pagina",
+  "content.pageBuilder.ph.altText": "Alt-tekst",
+  "content.pageBuilder.ph.headingText": "Koptekst",
+  "content.pageBuilder.ph.imageUrl": "Afbeeldings-URL",
   "content.pageBuilder.toast.saved": "Opgeslagen.",
   "content.pageBuilder.ui.ogImage": "OG image URL",
   "content.pageBuilder.unpublish": "Publicatie ongedaan maken"

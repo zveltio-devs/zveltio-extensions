@@ -1,4 +1,6 @@
 {
+  "compliance.ro.procurement.addLine": "+ Wiersz",
+  "compliance.ro.procurement.allocated": "Przydzielono",
   "compliance.ro.procurement.btn.approve": "Zatwierdź",
   "compliance.ro.procurement.btn.createOrder": "Utwórz zamówienie",
   "compliance.ro.procurement.btn.createOrderModal": "Utwórz zamówienie",
@@ -19,7 +21,10 @@
   "compliance.ro.procurement.empty.budget": "Brak pozycji budżetu.",
   "compliance.ro.procurement.empty.orders": "Brak zamówień zakupu.",
   "compliance.ro.procurement.empty.suppliers": "Brak zarejestrowanych dostawców.",
+  "compliance.ro.procurement.remaining": "Pozostało",
+  "compliance.ro.procurement.spent": "Wydano",
   "compliance.ro.procurement.subtitle": "Comenzi de achizitie, furnizori, executie bugetara",
+  "compliance.ro.procurement.subtotal": "Suma częściowa",
   "compliance.ro.procurement.tab.budget": "Budżet",
   "compliance.ro.procurement.tab.orders": "Zamówienia",
   "compliance.ro.procurement.tab.suppliers": "Dostawcy",
@@ -35,5 +40,6 @@
   "compliance.ro.procurement.ui.furnizor": "Supplier",
   "compliance.ro.procurement.ui.furnizor_nou": "New supplier",
   "compliance.ro.procurement.ui.judet": "Judet",
-  "compliance.ro.procurement.ui.num_r_comanda": "Order number"
+  "compliance.ro.procurement.ui.num_r_comanda": "Order number",
+  "compliance.ro.procurement.vat19": "VAT 19%"
 }

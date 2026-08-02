@@ -8,6 +8,7 @@
   "data.export.col.user": "Utente",
   "data.export.empty": "Ancora nessuna esportazione.",
   "data.export.filterHint": "Filter (Zveltio query, optional)",
+  "data.export.rowLimit": "Limite di righe (0 = tutte)",
   "data.export.subtitle": "Export collection data as JSON, CSV or NDJSON with filtering support",
   "data.export.title": "Esportazione dati",
   "data.export.ui.excel_xlsx": "Excel (xlsx)",

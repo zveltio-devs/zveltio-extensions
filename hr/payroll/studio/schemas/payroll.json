@@ -13,28 +13,104 @@
         "dataPath": "data",
         "idKey": "id",
         "titleKey": "name",
-        "subtitle": { "keys": ["period_start", "period_end"], "sep": " → " },
+        "subtitle": {
+          "keys": [
+            "period_start",
+            "period_end"
+          ],
+          "sep": " → "
+        },
         "badgeKey": "status"
       },
       "detailActions": [
-        { "id": "generate", "icon": "Plus", "label": "hr.payroll.btn.generate", "method": "POST", "endpoint": "/ext/hr/payroll/periods/{id}/generate" },
-        { "id": "revisal", "kind": "download", "icon": "Download", "label": "hr.payroll.btn.revisal", "endpoint": "/ext/hr/payroll/revisal" }
+        {
+          "id": "generate",
+          "icon": "Plus",
+          "label": "hr.payroll.btn.generate",
+          "method": "POST",
+          "endpoint": "/ext/hr/payroll/periods/{id}/generate"
+        },
+        {
+          "id": "revisal",
+          "kind": "download",
+          "icon": "Download",
+          "label": "hr.payroll.btn.revisal",
+          "endpoint": "/ext/hr/payroll/revisal"
+        }
       ],
       "columns": [
-        { "key": "employee_name", "label": "common.col.employee" },
-        { "key": "gross_salary", "label": "hr.payroll.col.gross", "type": "currency", "currency": { "code": "RON" } },
-        { "key": "cas", "label": "CAS 25%", "type": "currency", "currency": { "code": "RON" } },
-        { "key": "cass", "label": "CASS 10%", "type": "currency", "currency": { "code": "RON" } },
-        { "key": "income_tax", "label": "Tax 10%", "type": "currency", "currency": { "code": "RON" } },
-        { "key": "net_salary", "label": "hr.payroll.col.net", "type": "currency", "currency": { "code": "RON" } }
+        {
+          "key": "employee_name",
+          "label": "common.col.employee"
+        },
+        {
+          "key": "gross_salary",
+          "label": "hr.payroll.col.gross",
+          "type": "currency",
+          "currency": {
+            "code": "RON"
+          }
+        },
+        {
+          "key": "cas",
+          "label": "CAS 25%",
+          "type": "currency",
+          "currency": {
+            "code": "RON"
+          }
+        },
+        {
+          "key": "cass",
+          "label": "CASS 10%",
+          "type": "currency",
+          "currency": {
+            "code": "RON"
+          }
+        },
+        {
+          "key": "income_tax",
+          "label": "hr.payroll.preset.tax10",
+          "type": "currency",
+          "currency": {
+            "code": "RON"
+          }
+        },
+        {
+          "key": "net_salary",
+          "label": "hr.payroll.col.net",
+          "type": "currency",
+          "currency": {
+            "code": "RON"
+          }
+        }
       ],
       "form": {
         "endpoint": "/ext/hr/payroll/periods",
         "fields": [
-          { "name": "name", "label": "hr.payroll.ui.name_e_g_november_2026", "required": true, "colSpan": 2 },
-          { "name": "period_start", "label": "common.col.start", "type": "date", "colSpan": 1 },
-          { "name": "period_end", "label": "common.col.end", "type": "date", "colSpan": 1 },
-          { "name": "pay_date", "label": "hr.payroll.ui.pay_date", "type": "date", "colSpan": 2 }
+          {
+            "name": "name",
+            "label": "hr.payroll.ui.name_e_g_november_2026",
+            "required": true,
+            "colSpan": 2
+          },
+          {
+            "name": "period_start",
+            "label": "common.col.start",
+            "type": "date",
+            "colSpan": 1
+          },
+          {
+            "name": "period_end",
+            "label": "common.col.end",
+            "type": "date",
+            "colSpan": 1
+          },
+          {
+            "name": "pay_date",
+            "label": "hr.payroll.ui.pay_date",
+            "type": "date",
+            "colSpan": 2
+          }
         ]
       }
     }

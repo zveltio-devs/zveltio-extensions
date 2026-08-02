@@ -6,6 +6,7 @@
   "hr.payroll.col.net": "Netto",
   "hr.payroll.empty": "Brak danych.",
   "hr.payroll.empty.periods": "Brak okresów.",
+  "hr.payroll.preset.tax10": "Podatek 10%",
   "hr.payroll.selectPeriod": "Select a period to view payroll entries.",
   "hr.payroll.subtitle": "Zarządzaj okresami płacowymi i generuj paski wynagrodzeń",
   "hr.payroll.tab.periods": "Okresy",

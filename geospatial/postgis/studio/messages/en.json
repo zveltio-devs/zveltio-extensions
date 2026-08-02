@@ -27,5 +27,6 @@
   "geospatial.postgis.ui.longitude": "Longitude",
   "geospatial.postgis.ui.new_geofence": "New Geofence",
   "geospatial.postgis.ui.point_clustering_dbscan": "Point Clustering (DBSCAN)",
-  "geospatial.postgis.ui.radius_meters": "Radius (meters)"
+  "geospatial.postgis.ui.radius_meters": "Radius (meters)",
+  "geospatial.postgis.withParameters": "with parameters:"
 }
