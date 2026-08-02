@@ -9,6 +9,8 @@
     ChevronDown, Settings, FileText, Users, AlertCircle
   } from '@lucide/svelte';
   import { toast } from '$lib/stores/toast.svelte.js';
+  import ConfirmModal from '$lib/components/common/ConfirmModal.svelte';
+  import { createExtensionConfirm } from '$lib/utils/extension-confirm.svelte.js';
 
   type Tab = 'mail' | 'drafts' | 'contacts' | 'signatures' | 'filters';
 
@@ -20,6 +22,12 @@
   let messages = $state<any[]>([]);
   let selectedMessage = $state<any>(null);
   let selectedIds = $state<Set<string>>(new Set());
+
+  // Every destructive action in this page went straight through on one click:
+  // a message, a draft, a signature, a filter, and bulk delete over a whole
+  // selection. ConfirmModal is used in 46 other files; the mail client was the
+  // one place that deleted without asking.
+  const { confirmState, askConfirm, runConfirmAction, cancelConfirm } = createExtensionConfirm();
   let searchQuery = $state('');
   let loading = $state(false);
   let syncing = $state(false);
@@ -472,7 +480,7 @@
                     <li><button onclick={() => bulkAction('mark_read')}>{m['communications.mail.ui.markRead']()}</button></li>
                     <li><button onclick={() => bulkAction('mark_unread')}>{m['communications.mail.ui.markUnread']()}</button></li>
                     <li><button onclick={() => bulkAction('star')}>{m['communications.mail.ui.star']()}</button></li>
-                    <li><button onclick={() => bulkAction('delete')}>{m['common.delete']()}</button></li>
+                    <li><button onclick={() => askConfirm(m['mail.confirmBulkDelete'](), () => bulkAction('delete'))}>{m['common.delete']()}</button></li>
                     <li><button onclick={() => bulkAction('spam')}>{m['communications.mail.ui.spam']()}</button></li>
                   </ul>
                 {/if}
@@ -539,7 +547,7 @@
                 <button class="btn btn-xs btn-ghost" onclick={() => openReplyContext('reply_all')} title={m['communications.mail.ui.replyAll']()}><ReplyAll class="w-3.5 h-3.5" /></button>
                 <button class="btn btn-xs btn-ghost" onclick={() => openReplyContext('forward')} title={m['communications.mail.ui.forward']()}><Forward class="w-3.5 h-3.5" /></button>
                 <button class="btn btn-xs btn-ghost" onclick={downloadEml} title={m['communications.mail.ui.downloadEml']()}><Paperclip class="w-3.5 h-3.5" /></button>
-                <button class="btn btn-xs btn-ghost text-error" onclick={() => deleteMessage(selectedMessage)}><Trash2 class="w-3.5 h-3.5" /></button>
+                <button class="btn btn-xs btn-ghost text-error" onclick={() => askConfirm(m['mail.confirmDeleteMessage'](), () => deleteMessage(selectedMessage))}><Trash2 class="w-3.5 h-3.5" /></button>
               </div>
             </div>
             <div class="flex gap-2 mt-3 flex-wrap">
@@ -610,7 +618,7 @@
                 </div>
                 <div class="flex gap-2 shrink-0">
                   <button class="btn btn-xs btn-ghost" onclick={() => openDraft(d)}>{m['common.edit']()}</button>
-                  <button class="btn btn-xs btn-ghost text-error" onclick={() => deleteDraft(d.id)}><Trash2 class="w-3 h-3" /></button>
+                  <button class="btn btn-xs btn-ghost text-error" onclick={() => askConfirm(m['mail.confirmDeleteDraft'](), () => deleteDraft(d.id))}><Trash2 class="w-3 h-3" /></button>
                 </div>
               </div>
             </div>
@@ -689,7 +697,7 @@
                 </div>
                 <div class="flex gap-2 shrink-0">
                   <button class="btn btn-xs btn-ghost" onclick={() => { editSig = sig; sigName = sig.name; sigHtml = sig.body_html; sigDefault = sig.is_default; }}>{m['common.edit']()}</button>
-                  <button class="btn btn-xs btn-ghost text-error" onclick={() => deleteSignature(sig.id)}><Trash2 class="w-3 h-3" /></button>
+                  <button class="btn btn-xs btn-ghost text-error" onclick={() => askConfirm(m['mail.confirmDeleteSignature'](), () => deleteSignature(sig.id))}><Trash2 class="w-3 h-3" /></button>
                 </div>
               </div>
             </div>
@@ -726,7 +734,7 @@
                   </div>
                   <div class="flex gap-2 shrink-0">
                     <input type="checkbox" class="toggle toggle-sm" checked={f.is_active} onchange={() => toggleFilter(f)} />
-                    <button class="btn btn-xs btn-ghost text-error" onclick={() => deleteFilter(f.id)}><Trash2 class="w-3 h-3" /></button>
+                    <button class="btn btn-xs btn-ghost text-error" onclick={() => askConfirm(m['mail.confirmDeleteFilter'](), () => deleteFilter(f.id))}><Trash2 class="w-3 h-3" /></button>
                   </div>
                 </div>
               </div>
@@ -745,7 +753,7 @@
 
 <!-- COMPOSE MODAL -->
 {#if showCompose}
-  <dialog class="modal modal-open">
+  <dialog open aria-modal="true" class="modal modal-open">
     <div class="modal-box max-w-2xl">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">{replyToMessageId ? m['communications.mail.ui.reply']() : draftId ? m['common.status.draft']() : m['communications.mail.ui.newMessage']()}</h3>
@@ -817,7 +825,7 @@
 
 <!-- ADD ACCOUNT MODAL -->
 {#if showAddAccount}
-  <dialog class="modal modal-open">
+  <dialog open aria-modal="true" class="modal modal-open">
     <div class="modal-box max-w-xl max-h-[90vh] overflow-y-auto">
       <h3 class="font-bold text-lg mb-4">{m['communications.mail.ui.add_mail_account']()}</h3>
       <div class="space-y-3">
@@ -900,7 +908,7 @@
 
 <!-- NEW FILTER MODAL -->
 {#if showFilterModal}
-  <dialog class="modal modal-open">
+  <dialog open aria-modal="true" class="modal modal-open">
     <div class="modal-box max-w-lg">
       <h3 class="font-bold text-lg mb-4">{m['communications.mail.ui.new_mail_filter']()}</h3>
       <div class="space-y-3">
@@ -968,3 +976,13 @@
     <button class="modal-backdrop" aria-label={m['common.close']()} onclick={() => showFilterModal = false}></button>
   </dialog>
 {/if}
+
+<ConfirmModal
+  open={confirmState.open}
+  title={confirmState.title}
+  message={confirmState.message}
+  confirmLabel={confirmState.confirmLabel}
+  confirmClass={confirmState.confirmClass}
+  onconfirm={runConfirmAction}
+  oncancel={cancelConfirm}
+/>
