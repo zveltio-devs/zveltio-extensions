@@ -82,6 +82,20 @@ jobs:
         # every gate stayed green.
         run: bun scripts/check-bespoke-contracts.ts
 
+      - name: Verify packed bundles were built from the committed source
+        # The check below compares the bundle against the MANIFEST. It cannot
+        # tell whether either matches the SOURCE, and on 2026-08-02 three
+        # security fixes were written into content/drafts/engine/routes.ts,
+        # committed, reviewed and merged — and never ran anywhere, because
+        # nobody repacked. The bundle and the manifest agreed with each other.
+        # They were both older than the code.
+        #
+        # Re-packing here to compare bytes would fail for reasons that have
+        # nothing to do with the author (bundler output is not stable across
+        # Bun versions), so this hashes the INPUT, exactly as `extension pack`
+        # recorded it.
+        run: bun scripts/check-bundle-sources.ts
+
       - name: Verify packed bundles match manifest engineSha256
         # Drift between manifest.integrity.engineSha256 and the committed
         # engine/index.js bytes is what tripped the marketplace pipeline

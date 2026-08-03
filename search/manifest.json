@@ -34,6 +34,7 @@
     "fieldTypes": []
   },
   "integrity": {
-    "engineSha256": "5bd109aa3402a2083d287e0e887fd3b410515a7bb5531539925aa2af0c668b21"
+    "engineSha256": "5bb63b53c69f2d6f3f84a32226a03f349fb0f82cbc9ec449986a4ce97b1edf7a",
+    "sourceSha256": "42a644f7153ef510bdd999cd99dfd25c0847349de764ce0c4e33978c4083d8db"
   }
 }
