@@ -134,7 +134,13 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
   });
 
   // Abandoned cart save (public)
-  app.post('/public/carts', zValidator('json', z.object({
+  // Rate-limited like its sibling `/public/products/:id/reviews`, which has had
+  // this since it was written. Cart creation is the cheaper endpoint to abuse:
+  // it is unauthenticated, it writes a row per call, and it accepts an
+  // arbitrary item array — so an unlimited one fills the table faster than the
+  // review endpoint the limit was built for. The helper already existed; only
+  // one of the two public writers was using it.
+  app.post('/public/carts', rateLimit(30, 3_600_000), zValidator('json', z.object({
     session_id: z.string().min(1),
     customer_email: z.string().email().optional(),
     customer_name: z.string().optional(),
