@@ -123,7 +123,7 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
     // event_type matches the engine's auditLog() schema (not the
     // legacy `action` column the older code used).
     try {
-      await (db as any).transaction().execute(async (trx: any) => {
+      await (reqDb(c) as any).transaction().execute(async (trx: any) => {
         await sql`
           INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, created_at)
           VALUES ('gdpr.account_deleted', ${userId}, 'user', ${JSON.stringify({ gdpr: true, requested_at: new Date().toISOString() })}::jsonb, NOW())

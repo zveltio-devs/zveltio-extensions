@@ -19508,7 +19508,7 @@ function qualityRoutes(ctx) {
   });
   app.get("/scans/:collection", async (c) => {
     const collection = c.req.param("collection");
-    const scans = await db.selectFrom("zv_quality_scans").selectAll().where("collection", "=", collection).orderBy("started_at", "desc").limit(10).execute();
+    const scans = await reqDb(c).selectFrom("zv_quality_scans").selectAll().where("collection", "=", collection).orderBy("started_at", "desc").limit(10).execute();
     return c.json({ scans });
   });
   app.get("/scan/:scanId", async (c) => {
@@ -19541,8 +19541,8 @@ function qualityRoutes(ctx) {
       return c.json({ error: "Forbidden" }, 403);
     const [summary, latestScans, latestScores] = await Promise.all([
       sql`SELECT i.collection, i.severity, COUNT(i.id) as count FROM zv_quality_issues i WHERE i.dismissed = false GROUP BY i.collection, i.severity`.execute(reqDb(c)).then((r) => r.rows),
-      db.selectFrom("zv_quality_scans").select(["collection", "status", "issues_found", "completed_at"]).distinctOn(["collection"]).orderBy("collection").orderBy("started_at", "desc").execute().catch(() => []),
-      db.selectFrom("zvd_quality_scores").select(["collection", "score", "calculated_at"]).distinctOn(["collection"]).orderBy("collection").orderBy("calculated_at", "desc").execute().catch(() => [])
+      reqDb(c).selectFrom("zv_quality_scans").select(["collection", "status", "issues_found", "completed_at"]).distinctOn(["collection"]).orderBy("collection").orderBy("started_at", "desc").execute().catch(() => []),
+      reqDb(c).selectFrom("zvd_quality_scores").select(["collection", "score", "calculated_at"]).distinctOn(["collection"]).orderBy("collection").orderBy("calculated_at", "desc").execute().catch(() => [])
     ]);
     return c.json({ summary, latest_scans: latestScans, latest_scores: latestScores });
   });
@@ -19559,7 +19559,7 @@ function qualityRoutes(ctx) {
     if (!await checkPermission(user.id, "admin", "*"))
       return c.json({ error: "Admin access required" }, 403);
     const data = c.req.valid("json");
-    const rule = await db.insertInto("zvd_quality_rules").values({ ...data, rule_config: JSON.stringify(data.rule_config), created_by: user.id }).returningAll().executeTakeFirst();
+    const rule = await reqDb(c).insertInto("zvd_quality_rules").values({ ...data, rule_config: JSON.stringify(data.rule_config), created_by: user.id }).returningAll().executeTakeFirst();
     return c.json({ rule }, 201);
   });
   app.patch("/rules/:id", zValidator("json", RuleSchema.partial()), async (c) => {
@@ -19583,7 +19583,7 @@ function qualityRoutes(ctx) {
     return c.json({ success: true });
   });
   app.get("/scores/:collection", async (c) => {
-    const scores = await db.selectFrom("zvd_quality_scores").selectAll().where("collection", "=", c.req.param("collection")).orderBy("calculated_at", "desc").limit(30).execute();
+    const scores = await reqDb(c).selectFrom("zvd_quality_scores").selectAll().where("collection", "=", c.req.param("collection")).orderBy("calculated_at", "desc").limit(30).execute();
     return c.json({ scores });
   });
   app.get("/sla-targets", async (c) => {
@@ -19598,7 +19598,7 @@ function qualityRoutes(ctx) {
     if (!await checkPermission(user.id, "admin", "*"))
       return c.json({ error: "Admin access required" }, 403);
     const data = c.req.valid("json");
-    const target = await db.insertInto("zvd_quality_sla_targets").values({ ...data, created_by: user.id }).onConflict((oc) => oc.column("collection").doUpdateSet({ min_score: data.min_score, max_critical_issues: data.max_critical_issues, max_error_issues: data.max_error_issues, alert_email: data.alert_email })).returningAll().executeTakeFirst();
+    const target = await reqDb(c).insertInto("zvd_quality_sla_targets").values({ ...data, created_by: user.id }).onConflict((oc) => oc.column("collection").doUpdateSet({ min_score: data.min_score, max_critical_issues: data.max_critical_issues, max_error_issues: data.max_error_issues, alert_email: data.alert_email })).returningAll().executeTakeFirst();
     return c.json({ target }, 201);
   });
   app.delete("/sla-targets/:id", async (c) => {
@@ -19651,7 +19651,7 @@ function qualityRoutes(ctx) {
   });
   app.post("/issues/:id/remediations/:remId/apply", async (c) => {
     const user = c.get("user");
-    const updated = await db.updateTable("zvd_quality_remediations").set({ applied_at: new Date, applied_by: user.id, result: "applied" }).where("id", "=", c.req.param("remId")).returningAll().executeTakeFirst();
+    const updated = await reqDb(c).updateTable("zvd_quality_remediations").set({ applied_at: new Date, applied_by: user.id, result: "applied" }).where("id", "=", c.req.param("remId")).returningAll().executeTakeFirst();
     if (!updated)
       return c.json({ error: "Remediation not found" }, 404);
     return c.json({ remediation: updated });
@@ -19667,7 +19667,7 @@ function qualityRoutes(ctx) {
         FROM zv_quality_issues GROUP BY collection ORDER BY total DESC LIMIT 10
       `.execute(reqDb(c)),
       reqDb(c).selectFrom("zvd_quality_sla_targets").select(["collection", "min_score", "is_active"]).where("is_active", "=", true).execute().catch(() => []),
-      db.selectFrom("zvd_quality_scores").select(["collection", "score", "calculated_at"]).distinctOn(["collection"]).orderBy("collection").orderBy("calculated_at", "desc").execute().catch(() => [])
+      reqDb(c).selectFrom("zvd_quality_scores").select(["collection", "score", "calculated_at"]).distinctOn(["collection"]).orderBy("collection").orderBy("calculated_at", "desc").execute().catch(() => [])
     ]);
     return c.json({
       scans_last_30_days: parseInt(scansCount.rows[0]?.count || "0"),

@@ -571,7 +571,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const id   = c.req.param('id');
       const data = c.req.valid('json');
       try {
-        await (db as any)
+        await (reqDb(c) as any)
           .updateTable('zv_saved_queries')
           .set({ ...data, updated_at: new Date() })
           .where('id', '=', id)

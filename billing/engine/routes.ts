@@ -74,7 +74,7 @@ export function billingRoutes(
 
   // GET /usage/live — last 100 events
   app.get('/usage/live', async (c) => {
-    const events = await (db as any)
+    const events = await (reqDb(c) as any)
       .selectFrom('zv_usage_events')
       .selectAll()
       .orderBy('created_at', 'desc')
@@ -85,7 +85,7 @@ export function billingRoutes(
 
   // GET /plans — list all plans
   app.get('/plans', async (c) => {
-    const plans = await (db as any)
+    const plans = await (reqDb(c) as any)
       .selectFrom('zv_billing_plans')
       .selectAll()
       .orderBy('price_cents', 'asc')
@@ -108,7 +108,7 @@ export function billingRoutes(
     ),
     async (c) => {
       const data = c.req.valid('json');
-      const plan = await (db as any)
+      const plan = await (reqDb(c) as any)
         .insertInto('zv_billing_plans')
         .values({
           name: data.name,
@@ -125,7 +125,7 @@ export function billingRoutes(
 
   // GET /subscriptions — list subscriptions
   app.get('/subscriptions', async (c) => {
-    const subs = await (db as any)
+    const subs = await (reqDb(c) as any)
       .selectFrom('zv_billing_subscriptions as s')
       .leftJoin('zv_billing_plans as p', 'p.id', 's.plan_id')
       .select([

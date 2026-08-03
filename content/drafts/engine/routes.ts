@@ -122,7 +122,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
       if (!canRead) return c.json({ error: 'Forbidden' }, 403);
     }
 
-    let query = (db as any)
+    let query = (reqDb(c) as any)
       .selectFrom('zv_content_drafts')
       .selectAll()
       .orderBy('created_at', 'desc')
@@ -160,7 +160,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     if (!(await checkPermission(user.id, collection, 'read'))) {
       return c.json({ error: 'Forbidden' }, 403);
     }
-    const settings = await (db as any)
+    const settings = await (reqDb(c) as any)
       .selectFrom('zv_collection_publish_settings')
       .selectAll()
       .where('collection', '=', collection)
@@ -186,20 +186,20 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     }
 
     const body = c.req.valid('json');
-    const existing = await (db as any)
+    const existing = await (reqDb(c) as any)
       .selectFrom('zv_collection_publish_settings')
       .select('id')
       .where('collection', '=', collection)
       .executeTakeFirst();
 
     if (existing) {
-      await (db as any)
+      await (reqDb(c) as any)
         .updateTable('zv_collection_publish_settings')
         .set({ ...body, updated_at: new Date() })
         .where('collection', '=', collection)
         .execute();
     } else {
-      await (db as any)
+      await (reqDb(c) as any)
         .insertInto('zv_collection_publish_settings')
         .values({ collection, ...body })
         .execute();
@@ -214,7 +214,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     if (!(await checkPermission(user.id, 'admin', '*'))) {
       return c.json({ error: 'Admin access required' }, 403);
     }
-    const scheduled = await (db as any)
+    const scheduled = await (reqDb(c) as any)
       .selectFrom('zv_publish_schedule as ps')
       .leftJoin('zv_content_drafts as d', 'd.id', 'ps.draft_id')
       .select(['ps.id', 'ps.draft_id', 'ps.scheduled_at', 'ps.status',
@@ -232,7 +232,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'Admin access required' }, 403);
     }
 
-    const due = await (db as any)
+    const due = await (reqDb(c) as any)
       .selectFrom('zv_publish_schedule as ps')
       .innerJoin('zv_content_drafts as d', 'd.id', 'ps.draft_id')
       .select(['ps.id as schedule_id', 'ps.draft_id', 'd.collection', 'd.record_id', 'd.draft_data', 'd.status'])
@@ -246,7 +246,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
 
     for (const item of due) {
       try {
-        const settings = await (db as any)
+        const settings = await (reqDb(c) as any)
           .selectFrom('zv_collection_publish_settings')
           .selectAll()
           .where('collection', '=', item.collection)
@@ -283,7 +283,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     }
     const { draft_ids } = c.req.valid('json');
 
-    const job = await (db as any)
+    const job = await (reqDb(c) as any)
       .insertInto('zv_draft_publish_jobs')
       .values({ draft_ids, collection: 'mixed', status: 'running', created_by: user.id })
       .returningAll()
@@ -347,7 +347,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     const canCreate = await checkPermission(user.id, data.collection, 'update');
     if (!canCreate) return c.json({ error: 'Forbidden' }, 403);
 
-    const versionResult = await (db as any)
+    const versionResult = await (reqDb(c) as any)
       .selectFrom('zv_revisions')
       .select((eb: any) => eb.fn.count('id').as('count'))
       .where('collection', '=', data.collection)
@@ -356,7 +356,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
 
     const baseVersion = parseInt(versionResult?.count || '0') + 1;
 
-    const draft = await (db as any)
+    const draft = await (reqDb(c) as any)
       .insertInto('zv_content_drafts')
       .values({
         collection: data.collection,
@@ -372,7 +372,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
       .executeTakeFirst();
 
     if (data.scheduled_at && draft) {
-      await (db as any)
+      await (reqDb(c) as any)
         .insertInto('zv_publish_schedule')
         .values({ draft_id: draft.id, scheduled_at: new Date(data.scheduled_at) })
         .execute();
@@ -386,7 +386,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const id = c.req.param('id');
 
-    const draft = await (db as any)
+    const draft = await (reqDb(c) as any)
       .selectFrom('zv_content_drafts')
       .selectAll()
       .where('id', '=', id)
@@ -397,7 +397,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     const canRead = await checkPermission(user.id, draft.collection, 'read');
     if (!canRead) return c.json({ error: 'Forbidden' }, 403);
 
-    const comments = await (db as any)
+    const comments = await (reqDb(c) as any)
       .selectFrom('zv_draft_review_comments')
       .selectAll()
       .where('draft_id', '=', id)
@@ -413,7 +413,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     const id = c.req.param('id');
     const data = c.req.valid('json');
 
-    const draft = await (db as any)
+    const draft = await (reqDb(c) as any)
       .selectFrom('zv_content_drafts')
       .selectAll()
       .where('id', '=', id)
@@ -473,7 +473,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
       updateData.status = data.status;
     }
 
-    const updated = await (db as any)
+    const updated = await (reqDb(c) as any)
       .updateTable('zv_content_drafts')
       .set(updateData)
       .where('id', '=', id)
@@ -488,7 +488,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const id = c.req.param('id');
 
-    const draft = await (db as any)
+    const draft = await (reqDb(c) as any)
       .selectFrom('zv_content_drafts')
       .selectAll()
       .where('id', '=', id)
@@ -496,7 +496,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
 
     if (!draft) return c.json({ error: 'Draft not found' }, 404);
 
-    const settings = await (db as any)
+    const settings = await (reqDb(c) as any)
       .selectFrom('zv_collection_publish_settings')
       .selectAll()
       .where('collection', '=', draft.collection)
@@ -525,7 +525,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const id = c.req.param('id');
 
-    const draft = await (db as any)
+    const draft = await (reqDb(c) as any)
       .selectFrom('zv_content_drafts')
       .select(['id', 'collection', 'created_by'])
       .where('id', '=', id)
@@ -565,7 +565,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     const draft = await (reqDb(c) as any).selectFrom('zv_content_drafts').select(['id', 'collection']).where('id', '=', id).executeTakeFirst();
     if (!draft) return c.json({ error: 'Draft not found' }, 404);
 
-    const comment = await (db as any)
+    const comment = await (reqDb(c) as any)
       .insertInto('zv_draft_review_comments')
       .values({ draft_id: id, ...data, created_by: user.id })
       .returningAll()
@@ -578,7 +578,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
   app.post('/:id/review-comments/:commentId/resolve', async (c) => {
     const user = c.get('user') as any;
     const commentId = c.req.param('commentId');
-    const updated = await (db as any)
+    const updated = await (reqDb(c) as any)
       .updateTable('zv_draft_review_comments')
       .set({ resolved_at: new Date(), resolved_by: user.id })
       .where('id', '=', commentId)
@@ -593,7 +593,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
   // GET /:id/snapshots
   app.get('/:id/snapshots', async (c) => {
     const id = c.req.param('id');
-    const snapshots = await (db as any)
+    const snapshots = await (reqDb(c) as any)
       .selectFrom('zv_draft_snapshots')
       .select(['id', 'version', 'description', 'created_by', 'created_at'])
       .where('draft_id', '=', id)
@@ -611,7 +611,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     const draft = await (reqDb(c) as any).selectFrom('zv_content_drafts').selectAll().where('id', '=', id).executeTakeFirst();
     if (!draft) return c.json({ error: 'Draft not found' }, 404);
 
-    const lastSnap = await (db as any)
+    const lastSnap = await (reqDb(c) as any)
       .selectFrom('zv_draft_snapshots')
       .select(['version'])
       .where('draft_id', '=', id)
@@ -620,7 +620,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
       .executeTakeFirst();
 
     const version = (lastSnap?.version || 0) + 1;
-    const snap = await (db as any)
+    const snap = await (reqDb(c) as any)
       .insertInto('zv_draft_snapshots')
       .values({ draft_id: id, snapshot_data: draft.draft_data, version, description: description || null, created_by: user.id })
       .returningAll()

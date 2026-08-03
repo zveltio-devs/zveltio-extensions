@@ -84,7 +84,7 @@ export function smsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any 
     const parsedLimit = Math.min(parseInt(limit) || 50, 200);
     const offset = (parseInt(page) - 1) * parsedLimit;
 
-    let query = (db as any)
+    let query = (reqDb(c) as any)
       .selectFrom('zv_sms_messages')
       .selectAll()
       .orderBy('created_at', 'desc')
@@ -99,7 +99,7 @@ export function smsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any 
 
   // GET /templates — list templates
   app.get('/templates', async (c) => {
-    const templates = await (db as any)
+    const templates = await (reqDb(c) as any)
       .selectFrom('zv_sms_templates')
       .selectAll()
       .orderBy('created_at', 'desc')
@@ -120,7 +120,7 @@ export function smsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any 
     ),
     async (c) => {
       const data = c.req.valid('json');
-      const template = await (db as any)
+      const template = await (reqDb(c) as any)
         .insertInto('zv_sms_templates')
         .values(data)
         .returningAll()
