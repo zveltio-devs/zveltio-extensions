@@ -19521,8 +19521,8 @@ async function fetchWithRetry(url2, options, maxRetries, timeoutMs) {
   }
   return { res: null, retries: maxRetries, error: lastError };
 }
-async function resolveOAuth2Token(db, connectionId, authConfig) {
-  const cached2 = await sql`SELECT * FROM zvd_api_oauth_tokens WHERE connection_id = ${connectionId}`.execute(db);
+async function resolveOAuth2Token(dbh, connectionId, authConfig) {
+  const cached2 = await sql`SELECT * FROM zvd_api_oauth_tokens WHERE connection_id = ${connectionId}`.execute(dbh);
   if (cached2.rows.length) {
     const tok = cached2.rows[0];
     const isExpired = tok.expires_at && new Date(tok.expires_at) < new Date(Date.now() + 60000);
@@ -19542,7 +19542,7 @@ async function resolveOAuth2Token(db, connectionId, authConfig) {
             UPDATE zvd_api_oauth_tokens SET access_token = ${data.access_token}, refresh_token = ${data.refresh_token ?? tok.refresh_token},
               expires_at = ${expiresAt}, updated_at = NOW()
             WHERE connection_id = ${connectionId}
-          `.execute(db);
+          `.execute(dbh);
           return data.access_token;
         }
       } catch {}
@@ -19561,7 +19561,7 @@ async function resolveOAuth2Token(db, connectionId, authConfig) {
         INSERT INTO zvd_api_oauth_tokens (connection_id, access_token, refresh_token, expires_at)
         VALUES (${connectionId}, ${data.access_token}, ${data.refresh_token ?? null}, ${expiresAt})
         ON CONFLICT (connection_id) DO UPDATE SET access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token, expires_at = EXCLUDED.expires_at, updated_at = NOW()
-      `.execute(db);
+      `.execute(dbh);
       return data.access_token;
     }
     throw new Error("OAuth2 token request failed");

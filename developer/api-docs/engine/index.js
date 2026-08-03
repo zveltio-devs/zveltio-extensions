@@ -19464,9 +19464,9 @@ var CustomDocCreateSchema = exports_external.object({
   is_published: exports_external.boolean().default(true)
 });
 var CustomDocUpdateSchema = CustomDocCreateSchema.partial();
-async function getSettingValue(db, key) {
+async function getSettingValue(dbh, key) {
   try {
-    const row = await db.selectFrom("zv_settings").select("value").where("key", "=", key).executeTakeFirst();
+    const row = await dbh.selectFrom("zv_settings").select("value").where("key", "=", key).executeTakeFirst();
     if (!row)
       return null;
     return typeof row.value === "string" ? JSON.parse(row.value) : row.value;

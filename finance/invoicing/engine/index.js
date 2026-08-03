@@ -19489,13 +19489,13 @@ function permissionGate(ctx, resource, opts = {}) {
   };
 }
 // engine/routes.ts
-async function nextInvoiceNumber(db, prefix = "INV") {
-  const row = await sql`SELECT nextval('zvd_invoice_seq') as n`.execute(db);
+async function nextInvoiceNumber(dbh, prefix = "INV") {
+  const row = await sql`SELECT nextval('zvd_invoice_seq') as n`.execute(dbh);
   const n = row.rows[0].n;
   return `${prefix}-${String(n).padStart(5, "0")}`;
 }
-async function nextCreditNoteNumber(db) {
-  const row = await sql`SELECT nextval('zvd_credit_note_seq') as n`.execute(db);
+async function nextCreditNoteNumber(dbh) {
+  const row = await sql`SELECT nextval('zvd_credit_note_seq') as n`.execute(dbh);
   const n = row.rows[0].n;
   return `CN-${String(n).padStart(5, "0")}`;
 }

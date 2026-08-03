@@ -5,24 +5,24 @@ import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
 
-async function nextQuoteNumber(db: any): Promise<string> {
-  const row = await sql`SELECT COUNT(*) as cnt FROM zvd_quotes`.execute(db);
+async function nextQuoteNumber(dbh: any): Promise<string> {
+  const row = await sql`SELECT COUNT(*) as cnt FROM zvd_quotes`.execute(dbh);
   const n = parseInt((row.rows[0] as any).cnt) + 1;
   return `QUO-${String(n).padStart(5, '0')}`;
 }
 
-async function saveRevision(db: any, quoteId: string, userId: string, changeNote: string | null) {
+async function saveRevision(dbh: any, quoteId: string, userId: string, changeNote: string | null) {
   const quote = await sql`
     SELECT q.*, json_agg(l.* ORDER BY l.sort_order) as lines
     FROM zvd_quotes q LEFT JOIN zvd_quote_lines l ON l.quote_id = q.id
     WHERE q.id = ${quoteId} GROUP BY q.id
-  `.execute(db);
+  `.execute(dbh);
   if (!quote.rows.length) return;
-  const rev = await sql`SELECT COALESCE(MAX(revision_number), 0) as max FROM zvd_quote_revisions WHERE quote_id = ${quoteId}`.execute(db);
+  const rev = await sql`SELECT COALESCE(MAX(revision_number), 0) as max FROM zvd_quote_revisions WHERE quote_id = ${quoteId}`.execute(dbh);
   await sql`
     INSERT INTO zvd_quote_revisions (quote_id, revision_number, snapshot, change_note, created_by)
     VALUES (${quoteId}, ${+(rev.rows[0] as any).max + 1}, ${JSON.stringify(quote.rows[0])}, ${changeNote ?? null}, ${userId})
-  `.execute(db);
+  `.execute(dbh);
 }
 
 export function quotesRoutes(ctx: ExtensionContext): Hono {
@@ -139,7 +139,7 @@ export function quotesRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
-    const number = await nextQuoteNumber(db);
+    const number = await nextQuoteNumber(reqDb(c));
     const subtotalGross = d.lines.reduce((s, l) => s + l.quantity * l.unit_price * (1 - l.discount / 100), 0);
     const discount_amount = subtotalGross * (d.discount_percent / 100);
     const subtotal = subtotalGross - discount_amount;
@@ -180,7 +180,7 @@ export function quotesRoutes(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     const existing = await sql`SELECT * FROM zvd_quotes WHERE id = ${c.req.param('id')} AND status = 'draft'`.execute(reqDb(c));
     if (!existing.rows.length) return c.json({ error: 'Quote not found or not editable' }, 400);
-    await saveRevision(db, c.req.param('id'), user.id, d.change_note ?? null);
+    await saveRevision(reqDb(c), c.req.param('id'), user.id, d.change_note ?? null);
     const row = await sql`
       UPDATE zvd_quotes SET
         title = COALESCE(${d.title ?? null}, title),

@@ -27536,7 +27536,7 @@ function mapFieldType(fieldType) {
   };
   return map2[fieldType] ?? GraphQLString;
 }
-async function getRelations(db) {
+async function getRelations(dbh) {
   try {
     const result = await sql`
       SELECT id, name, type,
@@ -27544,7 +27544,7 @@ async function getRelations(db) {
              target_collection, target_field,
              junction_table
       FROM zvd_relations
-    `.execute(db);
+    `.execute(dbh);
     return result.rows;
   } catch {
     return [];

@@ -5,12 +5,12 @@ import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
 
-async function countWorkingDays(db: any, startDate: string, endDate: string, isHalfDay = false): Promise<number> {
+async function countWorkingDays(dbh: any, startDate: string, endDate: string, isHalfDay = false): Promise<number> {
   if (isHalfDay) return 0.5;
   // Get public holidays in range
   const holidays = await sql`
     SELECT date FROM zvd_public_holidays WHERE date BETWEEN ${startDate} AND ${endDate}
-  `.execute(db);
+  `.execute(dbh);
   const holidaySet = new Set((holidays.rows as any[]).map(h => h.date instanceof Date ? h.date.toISOString().slice(0, 10) : h.date));
   let days = 0;
   const cur = new Date(startDate);
@@ -251,7 +251,7 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
     `.execute(reqDb(c));
     if (overlap.rows.length) return c.json({ error: 'Overlapping leave request exists' }, 400);
 
-    const workingDays = await countWorkingDays(db, d.start_date, d.end_date, d.is_half_day);
+    const workingDays = await countWorkingDays(reqDb(c), d.start_date, d.end_date, d.is_half_day);
     if (workingDays === 0) return c.json({ error: 'No working days in selected range' }, 400);
 
     const year = start.getFullYear();

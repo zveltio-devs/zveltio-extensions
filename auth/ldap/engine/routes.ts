@@ -88,8 +88,8 @@ async function upsertLdapConfig(
   }
 }
 
-async function findOrCreateSsoUser(db: any, email: string, displayName: string): Promise<any> {
-  const existing = await db
+async function findOrCreateSsoUser(dbh: any, email: string, displayName: string): Promise<any> {
+  const existing = await dbh
     .selectFrom('user')
     .selectAll()
     .where('email', '=', email)
@@ -104,9 +104,9 @@ async function findOrCreateSsoUser(db: any, email: string, displayName: string):
   await sql`
     INSERT INTO "user" (id, email, name, "emailVerified", "createdAt", "updatedAt")
     VALUES (${id}, ${email}, ${displayName || email.split('@')[0]}, true, ${now}, ${now})
-  `.execute(db);
+  `.execute(dbh);
 
-  return db.selectFrom('user').selectAll().where('id', '=', id).executeTakeFirstOrThrow();
+  return dbh.selectFrom('user').selectAll().where('id', '=', id).executeTakeFirstOrThrow();
 }
 
 export function ldapRoutes(ctx: ExtensionContext): Hono {
@@ -205,7 +205,7 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'LDAP user does not have an email address configured' }, 400);
     }
 
-    const user = await findOrCreateSsoUser(db, ldapUser.email, ldapUser.displayName);
+    const user = await findOrCreateSsoUser(reqDb(c), ldapUser.email, ldapUser.displayName);
 
     // Invalidate prior sessions for this user — limits the blast radius of
     // a credential leak and matches the "one active SSO session per user"

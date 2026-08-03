@@ -19460,12 +19460,12 @@ var SequenceSchema = exports_external.object({
   prefix: exports_external.string().min(1).max(20),
   year_reset: exports_external.boolean().default(true)
 });
-async function getNextDocNumber(db, templateId, prefix) {
+async function getNextDocNumber(dbh, templateId, prefix) {
   const now = new Date;
   const year = now.getFullYear();
-  const seq = await db.selectFrom("zv_document_number_sequences").selectAll().where("template_id", "=", templateId).executeTakeFirst();
+  const seq = await dbh.selectFrom("zv_document_number_sequences").selectAll().where("template_id", "=", templateId).executeTakeFirst();
   if (!seq) {
-    await db.insertInto("zv_document_number_sequences").values({
+    await dbh.insertInto("zv_document_number_sequences").values({
       template_id: templateId,
       prefix,
       next_number: 2,
@@ -19477,9 +19477,9 @@ async function getNextDocNumber(db, templateId, prefix) {
   let nextNumber = seq.next_number;
   if (seq.year_reset && seq.reset_year !== year) {
     nextNumber = 1;
-    await db.updateTable("zv_document_number_sequences").set({ next_number: 2, reset_year: year, updated_at: new Date }).where("template_id", "=", templateId).execute();
+    await dbh.updateTable("zv_document_number_sequences").set({ next_number: 2, reset_year: year, updated_at: new Date }).where("template_id", "=", templateId).execute();
   } else {
-    await db.updateTable("zv_document_number_sequences").set({ next_number: nextNumber + 1, updated_at: new Date }).where("template_id", "=", templateId).execute();
+    await dbh.updateTable("zv_document_number_sequences").set({ next_number: nextNumber + 1, updated_at: new Date }).where("template_id", "=", templateId).execute();
   }
   const padded = String(nextNumber).padStart(4, "0");
   return seq.year_reset ? `${seq.prefix}-${year}-${padded}` : `${seq.prefix}-${padded}`;
