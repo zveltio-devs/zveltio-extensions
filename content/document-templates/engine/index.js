@@ -19503,10 +19503,10 @@ function documentTemplatesRoutes(ctx) {
     const now = new Date;
     const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const [totalTemplates, totalRenders, rendersThisMonth, topTemplates] = await Promise.all([
-      db.selectFrom("zv_document_templates").select((eb) => eb.fn.count("id").as("count")).executeTakeFirst(),
-      db.selectFrom("zv_document_renders").select((eb) => eb.fn.count("id").as("count")).executeTakeFirst(),
-      db.selectFrom("zv_document_renders").select((eb) => eb.fn.count("id").as("count")).where("rendered_at", ">=", firstOfMonth).executeTakeFirst(),
-      db.selectFrom("zv_document_templates").select(["id", "name", "usage_count"]).where("is_active", "=", true).orderBy("usage_count", "desc").limit(5).execute()
+      reqDb(c).selectFrom("zv_document_templates").select((eb) => eb.fn.count("id").as("count")).executeTakeFirst(),
+      reqDb(c).selectFrom("zv_document_renders").select((eb) => eb.fn.count("id").as("count")).executeTakeFirst(),
+      reqDb(c).selectFrom("zv_document_renders").select((eb) => eb.fn.count("id").as("count")).where("rendered_at", ">=", firstOfMonth).executeTakeFirst(),
+      reqDb(c).selectFrom("zv_document_templates").select(["id", "name", "usage_count"]).where("is_active", "=", true).orderBy("usage_count", "desc").limit(5).execute()
     ]);
     return c.json({
       total_templates: Number(totalTemplates?.count || 0),
@@ -19516,13 +19516,13 @@ function documentTemplatesRoutes(ctx) {
     });
   });
   app.get("/batch-jobs", async (c) => {
-    const jobs = await db.selectFrom("zv_document_render_jobs").selectAll().orderBy("created_at", "desc").limit(50).execute();
+    const jobs = await reqDb(c).selectFrom("zv_document_render_jobs").selectAll().orderBy("created_at", "desc").limit(50).execute();
     return c.json({ jobs });
   });
   app.post("/batch-jobs", zValidator("json", BatchJobSchema), async (c) => {
     const user = c.get("user");
     const data = c.req.valid("json");
-    const job = await db.insertInto("zv_document_render_jobs").values({
+    const job = await reqDb(c).insertInto("zv_document_render_jobs").values({
       template_id: data.template_id,
       job_name: data.job_name,
       data_source: data.data_source,
@@ -19535,18 +19535,18 @@ function documentTemplatesRoutes(ctx) {
   });
   app.get("/batch-jobs/:id", async (c) => {
     const id = c.req.param("id");
-    const job = await db.selectFrom("zv_document_render_jobs").selectAll().where("id", "=", id).executeTakeFirst();
+    const job = await reqDb(c).selectFrom("zv_document_render_jobs").selectAll().where("id", "=", id).executeTakeFirst();
     if (!job)
       return c.json({ error: "Job not found" }, 404);
     return c.json({ job });
   });
   app.get("/", async (c) => {
-    const result = await db.selectFrom("zv_document_templates").selectAll().orderBy("name").execute();
+    const result = await reqDb(c).selectFrom("zv_document_templates").selectAll().orderBy("name").execute();
     return c.json({ templates: result });
   });
   app.get("/:id", async (c) => {
     const id = c.req.param("id");
-    const template = await db.selectFrom("zv_document_templates").selectAll().where("id", "=", id).executeTakeFirst();
+    const template = await reqDb(c).selectFrom("zv_document_templates").selectAll().where("id", "=", id).executeTakeFirst();
     if (!template)
       return c.json({ error: "Template not found" }, 404);
     return c.json({ template });
@@ -19566,7 +19566,7 @@ function documentTemplatesRoutes(ctx) {
   app.patch("/:id", zValidator("json", UpdateDocumentTemplateSchema), async (c) => {
     const id = c.req.param("id");
     const data = c.req.valid("json");
-    const existing = await db.selectFrom("zv_document_templates").select("id").where("id", "=", id).executeTakeFirst();
+    const existing = await reqDb(c).selectFrom("zv_document_templates").select("id").where("id", "=", id).executeTakeFirst();
     if (!existing)
       return c.json({ error: "Template not found" }, 404);
     const updateFields = { updated_at: new Date };
@@ -19579,7 +19579,7 @@ function documentTemplatesRoutes(ctx) {
         updateFields[key] = value;
       }
     }
-    const template = await db.updateTable("zv_document_templates").set(updateFields).where("id", "=", id).returningAll().executeTakeFirst();
+    const template = await reqDb(c).updateTable("zv_document_templates").set(updateFields).where("id", "=", id).returningAll().executeTakeFirst();
     return c.json({ template });
   });
   app.delete("/:id", async (c) => {
@@ -19593,19 +19593,19 @@ function documentTemplatesRoutes(ctx) {
     const templateId = c.req.param("id");
     const data = c.req.valid("json");
     const user = c.get("user");
-    const template = await db.selectFrom("zv_document_templates").selectAll().where("id", "=", templateId).executeTakeFirst();
+    const template = await reqDb(c).selectFrom("zv_document_templates").selectAll().where("id", "=", templateId).executeTakeFirst();
     if (!template)
       return c.json({ error: "Template not found" }, 404);
     if (!template.is_active)
       return c.json({ error: "Template is not active" }, 400);
     const populated = populatePlaceholders(template.content, data.variables || {});
     const pdfBuffer = await generatePDFAsync(populated, template.style_config ?? {});
-    await db.updateTable("zv_document_templates").set({
+    await reqDb(c).updateTable("zv_document_templates").set({
       usage_count: sql`usage_count + 1`,
       last_used_at: new Date
     }).where("id", "=", templateId).execute();
     try {
-      await db.insertInto("zv_document_renders").values({
+      await reqDb(c).insertInto("zv_document_renders").values({
         template_id: templateId,
         variables: JSON.stringify(data.variables || {}),
         output_format: "pdf",
@@ -19622,24 +19622,24 @@ function documentTemplatesRoutes(ctx) {
     const templateId = c.req.param("id");
     const limit = parseInt(c.req.query("limit") || "20");
     const offset = parseInt(c.req.query("offset") || "0");
-    const result = await db.selectFrom("zv_document_renders").selectAll().where("template_id", "=", templateId).orderBy("rendered_at", "desc").limit(limit).offset(offset).execute();
+    const result = await reqDb(c).selectFrom("zv_document_renders").selectAll().where("template_id", "=", templateId).orderBy("rendered_at", "desc").limit(limit).offset(offset).execute();
     return c.json({ generations: result });
   });
   app.get("/:id/versions", async (c) => {
     const templateId = c.req.param("id");
-    const versions2 = await db.selectFrom("zv_document_template_versions").selectAll().where("template_id", "=", templateId).orderBy("version_number", "desc").execute();
+    const versions2 = await reqDb(c).selectFrom("zv_document_template_versions").selectAll().where("template_id", "=", templateId).orderBy("version_number", "desc").execute();
     return c.json({ versions: versions2 });
   });
   app.post("/:id/versions", zValidator("json", VersionSnapshotSchema), async (c) => {
     const user = c.get("user");
     const templateId = c.req.param("id");
     const data = c.req.valid("json");
-    const template = await db.selectFrom("zv_document_templates").select(["id", "content", "style_config", "variables", "version_number"]).where("id", "=", templateId).executeTakeFirst();
+    const template = await reqDb(c).selectFrom("zv_document_templates").select(["id", "content", "style_config", "variables", "version_number"]).where("id", "=", templateId).executeTakeFirst();
     if (!template)
       return c.json({ error: "Template not found" }, 404);
-    const maxVersionResult = await db.selectFrom("zv_document_template_versions").select((eb) => eb.fn.max("version_number").as("max_version")).where("template_id", "=", templateId).executeTakeFirst();
+    const maxVersionResult = await reqDb(c).selectFrom("zv_document_template_versions").select((eb) => eb.fn.max("version_number").as("max_version")).where("template_id", "=", templateId).executeTakeFirst();
     const nextVersion = Number(maxVersionResult?.max_version || 0) + 1;
-    const version2 = await db.insertInto("zv_document_template_versions").values({
+    const version2 = await reqDb(c).insertInto("zv_document_template_versions").values({
       template_id: templateId,
       version_number: nextVersion,
       html_body: template.content || "",
@@ -19656,14 +19656,14 @@ function documentTemplatesRoutes(ctx) {
     const versionNumber = parseInt(c.req.param("versionNumber"));
     if (isNaN(versionNumber))
       return c.json({ error: "Invalid version number" }, 400);
-    const version2 = await db.selectFrom("zv_document_template_versions").selectAll().where("template_id", "=", templateId).where("version_number", "=", versionNumber).executeTakeFirst();
+    const version2 = await reqDb(c).selectFrom("zv_document_template_versions").selectAll().where("template_id", "=", templateId).where("version_number", "=", versionNumber).executeTakeFirst();
     if (!version2)
       return c.json({ error: "Version not found" }, 404);
-    const current = await db.selectFrom("zv_document_templates").select(["content", "style_config", "variables", "version_number"]).where("id", "=", templateId).executeTakeFirst();
+    const current = await reqDb(c).selectFrom("zv_document_templates").select(["content", "style_config", "variables", "version_number"]).where("id", "=", templateId).executeTakeFirst();
     if (current) {
-      const maxVersionResult = await db.selectFrom("zv_document_template_versions").select((eb) => eb.fn.max("version_number").as("max_version")).where("template_id", "=", templateId).executeTakeFirst();
+      const maxVersionResult = await reqDb(c).selectFrom("zv_document_template_versions").select((eb) => eb.fn.max("version_number").as("max_version")).where("template_id", "=", templateId).executeTakeFirst();
       const nextVersion = Number(maxVersionResult?.max_version || 0) + 1;
-      await db.insertInto("zv_document_template_versions").values({
+      await reqDb(c).insertInto("zv_document_template_versions").values({
         template_id: templateId,
         version_number: nextVersion,
         html_body: current.content || "",
@@ -19673,7 +19673,7 @@ function documentTemplatesRoutes(ctx) {
         created_by: user.id
       }).execute();
     }
-    const template = await db.updateTable("zv_document_templates").set({
+    const template = await reqDb(c).updateTable("zv_document_templates").set({
       content: version2.html_body,
       variables: JSON.stringify(typeof version2.variables === "string" ? JSON.parse(version2.variables) : version2.variables || {}),
       updated_at: new Date

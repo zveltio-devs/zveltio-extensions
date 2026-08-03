@@ -171,7 +171,7 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
       }
     }
 
-    const row = await (db as any)
+    const row = await (reqDb(c) as any)
       .updateTable('zvd_byod_scan_profiles')
       .set(updates)
       .where('id', '=', id)
@@ -186,7 +186,7 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
 
   router.delete('/profiles/:id', async (c) => {
     const id = c.req.param('id');
-    const res = await (db as any)
+    const res = await (reqDb(c) as any)
       .deleteFrom('zvd_byod_scan_profiles')
       .where('id', '=', id)
       .executeTakeFirst();

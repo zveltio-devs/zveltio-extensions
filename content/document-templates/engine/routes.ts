@@ -105,20 +105,20 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
     const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const [totalTemplates, totalRenders, rendersThisMonth, topTemplates] = await Promise.all([
-      (db as any)
+      (reqDb(c) as any)
         .selectFrom('zv_document_templates')
         .select((eb: any) => eb.fn.count('id').as('count'))
         .executeTakeFirst(),
-      (db as any)
+      (reqDb(c) as any)
         .selectFrom('zv_document_renders')
         .select((eb: any) => eb.fn.count('id').as('count'))
         .executeTakeFirst(),
-      (db as any)
+      (reqDb(c) as any)
         .selectFrom('zv_document_renders')
         .select((eb: any) => eb.fn.count('id').as('count'))
         .where('rendered_at', '>=', firstOfMonth)
         .executeTakeFirst(),
-      (db as any)
+      (reqDb(c) as any)
         .selectFrom('zv_document_templates')
         .select(['id', 'name', 'usage_count'])
         .where('is_active', '=', true)
@@ -137,7 +137,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
 
   // GET /batch-jobs — must be before /:id
   app.get('/batch-jobs', async (c) => {
-    const jobs = await (db as any)
+    const jobs = await (reqDb(c) as any)
       .selectFrom('zv_document_render_jobs')
       .selectAll()
       .orderBy('created_at', 'desc')
@@ -151,7 +151,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user');
     const data = c.req.valid('json');
 
-    const job = await (db as any)
+    const job = await (reqDb(c) as any)
       .insertInto('zv_document_render_jobs')
       .values({
         template_id: data.template_id,
@@ -171,7 +171,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
   // GET /batch-jobs/:id — must be before /:id
   app.get('/batch-jobs/:id', async (c) => {
     const id = c.req.param('id');
-    const job = await (db as any)
+    const job = await (reqDb(c) as any)
       .selectFrom('zv_document_render_jobs')
       .selectAll()
       .where('id', '=', id)
@@ -182,7 +182,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
 
   // GET /
   app.get('/', async (c) => {
-    const result = await (db as any)
+    const result = await (reqDb(c) as any)
       .selectFrom('zv_document_templates')
       .selectAll()
       .orderBy('name')
@@ -193,7 +193,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
   // GET /:id
   app.get('/:id', async (c) => {
     const id = c.req.param('id');
-    const template = await (db as any)
+    const template = await (reqDb(c) as any)
       .selectFrom('zv_document_templates')
       .selectAll()
       .where('id', '=', id)
@@ -221,7 +221,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
     const id = c.req.param('id');
     const data = c.req.valid('json');
 
-    const existing = await (db as any)
+    const existing = await (reqDb(c) as any)
       .selectFrom('zv_document_templates')
       .select('id')
       .where('id', '=', id)
@@ -238,7 +238,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
       }
     }
 
-    const template = await (db as any)
+    const template = await (reqDb(c) as any)
       .updateTable('zv_document_templates')
       .set(updateFields)
       .where('id', '=', id)
@@ -261,7 +261,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
     const data = c.req.valid('json');
     const user = c.get('user');
 
-    const template = await (db as any)
+    const template = await (reqDb(c) as any)
       .selectFrom('zv_document_templates')
       .selectAll()
       .where('id', '=', templateId)
@@ -273,7 +273,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
     const pdfBuffer = await generatePDFAsync(populated, template.style_config ?? {}) as Buffer;
 
     // Increment usage_count and last_used_at
-    await (db as any)
+    await (reqDb(c) as any)
       .updateTable('zv_document_templates')
       .set({
         usage_count: sql`usage_count + 1`,
@@ -283,7 +283,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
       .execute();
 
     try {
-      await (db as any)
+      await (reqDb(c) as any)
         .insertInto('zv_document_renders')
         .values({
           template_id: templateId,
@@ -307,7 +307,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
     const limit = parseInt(c.req.query('limit') || '20');
     const offset = parseInt(c.req.query('offset') || '0');
 
-    const result = await (db as any)
+    const result = await (reqDb(c) as any)
       .selectFrom('zv_document_renders')
       .selectAll()
       .where('template_id', '=', templateId)
@@ -323,7 +323,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
   app.get('/:id/versions', async (c) => {
     const templateId = c.req.param('id');
 
-    const versions = await (db as any)
+    const versions = await (reqDb(c) as any)
       .selectFrom('zv_document_template_versions')
       .selectAll()
       .where('template_id', '=', templateId)
@@ -339,7 +339,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
     const templateId = c.req.param('id');
     const data = c.req.valid('json');
 
-    const template = await (db as any)
+    const template = await (reqDb(c) as any)
       .selectFrom('zv_document_templates')
       .select(['id', 'content', 'style_config', 'variables', 'version_number'])
       .where('id', '=', templateId)
@@ -348,7 +348,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
     if (!template) return c.json({ error: 'Template not found' }, 404);
 
     // Get max existing version number
-    const maxVersionResult = await (db as any)
+    const maxVersionResult = await (reqDb(c) as any)
       .selectFrom('zv_document_template_versions')
       .select((eb: any) => eb.fn.max('version_number').as('max_version'))
       .where('template_id', '=', templateId)
@@ -356,7 +356,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
 
     const nextVersion = (Number(maxVersionResult?.max_version || 0)) + 1;
 
-    const version = await (db as any)
+    const version = await (reqDb(c) as any)
       .insertInto('zv_document_template_versions')
       .values({
         template_id: templateId,
@@ -385,7 +385,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
 
     if (isNaN(versionNumber)) return c.json({ error: 'Invalid version number' }, 400);
 
-    const version = await (db as any)
+    const version = await (reqDb(c) as any)
       .selectFrom('zv_document_template_versions')
       .selectAll()
       .where('template_id', '=', templateId)
@@ -395,14 +395,14 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
     if (!version) return c.json({ error: 'Version not found' }, 404);
 
     // Snapshot current state before restoring
-    const current = await (db as any)
+    const current = await (reqDb(c) as any)
       .selectFrom('zv_document_templates')
       .select(['content', 'style_config', 'variables', 'version_number'])
       .where('id', '=', templateId)
       .executeTakeFirst();
 
     if (current) {
-      const maxVersionResult = await (db as any)
+      const maxVersionResult = await (reqDb(c) as any)
         .selectFrom('zv_document_template_versions')
         .select((eb: any) => eb.fn.max('version_number').as('max_version'))
         .where('template_id', '=', templateId)
@@ -410,7 +410,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
 
       const nextVersion = (Number(maxVersionResult?.max_version || 0)) + 1;
 
-      await (db as any)
+      await (reqDb(c) as any)
         .insertInto('zv_document_template_versions')
         .values({
           template_id: templateId,
@@ -429,7 +429,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
     }
 
     // Restore to the requested version
-    const template = await (db as any)
+    const template = await (reqDb(c) as any)
       .updateTable('zv_document_templates')
       .set({
         content: version.html_body,

@@ -27,9 +27,19 @@
  * disclosure.
  *
  * So this ratchets. The recorded count per file is the line; a file may improve
- * and may not get worse, and a NEW file starts at zero. That stops the pattern
- * spreading while the existing 205 are worked down, without pretending they can
- * all be fixed in one change.
+ * and may not get worse, and a NEW file starts at zero.
+ *
+ * 2026-08-03: 209 → 78. The conversion was done by applying `reqDb(c)`
+ * everywhere and letting the TYPE CHECKER decide where it was wrong — a regex
+ * cannot tell whether `c` is in scope, and tsc can. Any line where the compiler
+ * then said "Cannot find name 'c'" was reverted, which is precisely the set
+ * living inside helpers that take `db` as a parameter.
+ *
+ * The 78 that remain are not oversights. Most are those helpers, where the fix
+ * belongs at the CALL SITE (pass `reqDb(c)` in) rather than inside. A few are
+ * deliberate: `auth/scim`'s public app resolves its tenant from the bearer
+ * token, not from the host, so a request-scoped handle there would be the wrong
+ * tenant.
  *
  * Usage:
  *   bun scripts/check-reqdb-bypass.ts            # verify against the baseline

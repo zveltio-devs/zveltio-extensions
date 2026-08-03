@@ -19910,7 +19910,7 @@ function databaseRoutes(ctx) {
     const id = c.req.param("id");
     const data = c.req.valid("json");
     try {
-      await db.updateTable("zv_saved_queries").set({ ...data, updated_at: new Date }).where("id", "=", id).execute();
+      await reqDb(c).updateTable("zv_saved_queries").set({ ...data, updated_at: new Date }).where("id", "=", id).execute();
       return c.json({ success: true });
     } catch {
       return c.json({ error: "Failed to update query" }, 500);

@@ -88,7 +88,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.get('/locales', async (c) => {
-    const locales = await (db as any)
+    const locales = await (reqDb(c) as any)
       .selectFrom('zvd_locales').selectAll()
       .orderBy('is_default', 'desc').orderBy('name', 'asc').execute();
     return c.json({ locales });

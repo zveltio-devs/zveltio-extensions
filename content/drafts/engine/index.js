@@ -19507,7 +19507,7 @@ function draftsRoutes(ctx) {
       if (!canRead)
         return c.json({ error: "Forbidden" }, 403);
     }
-    let query = db.selectFrom("zv_content_drafts").selectAll().orderBy("created_at", "desc").limit(parsedLimit).offset(offset);
+    let query = reqDb(c).selectFrom("zv_content_drafts").selectAll().orderBy("created_at", "desc").limit(parsedLimit).offset(offset);
     if (collection)
       query = query.where("collection", "=", collection);
     if (record_id)
@@ -19532,7 +19532,7 @@ function draftsRoutes(ctx) {
     if (!await checkPermission(user.id, collection, "read")) {
       return c.json({ error: "Forbidden" }, 403);
     }
-    const settings = await db.selectFrom("zv_collection_publish_settings").selectAll().where("collection", "=", collection).executeTakeFirst();
+    const settings = await reqDb(c).selectFrom("zv_collection_publish_settings").selectAll().where("collection", "=", collection).executeTakeFirst();
     return c.json({
       settings: settings || {
         collection,
@@ -19550,11 +19550,11 @@ function draftsRoutes(ctx) {
       return c.json({ error: "Admin access required" }, 403);
     }
     const body = c.req.valid("json");
-    const existing = await db.selectFrom("zv_collection_publish_settings").select("id").where("collection", "=", collection).executeTakeFirst();
+    const existing = await reqDb(c).selectFrom("zv_collection_publish_settings").select("id").where("collection", "=", collection).executeTakeFirst();
     if (existing) {
-      await db.updateTable("zv_collection_publish_settings").set({ ...body, updated_at: new Date }).where("collection", "=", collection).execute();
+      await reqDb(c).updateTable("zv_collection_publish_settings").set({ ...body, updated_at: new Date }).where("collection", "=", collection).execute();
     } else {
-      await db.insertInto("zv_collection_publish_settings").values({ collection, ...body }).execute();
+      await reqDb(c).insertInto("zv_collection_publish_settings").values({ collection, ...body }).execute();
     }
     return c.json({ success: true });
   });
@@ -19563,7 +19563,7 @@ function draftsRoutes(ctx) {
     if (!await checkPermission(user.id, "admin", "*")) {
       return c.json({ error: "Admin access required" }, 403);
     }
-    const scheduled = await db.selectFrom("zv_publish_schedule as ps").leftJoin("zv_content_drafts as d", "d.id", "ps.draft_id").select([
+    const scheduled = await reqDb(c).selectFrom("zv_publish_schedule as ps").leftJoin("zv_content_drafts as d", "d.id", "ps.draft_id").select([
       "ps.id",
       "ps.draft_id",
       "ps.scheduled_at",
@@ -19579,13 +19579,13 @@ function draftsRoutes(ctx) {
     if (!await checkPermission(user.id, "admin", "*")) {
       return c.json({ error: "Admin access required" }, 403);
     }
-    const due = await db.selectFrom("zv_publish_schedule as ps").innerJoin("zv_content_drafts as d", "d.id", "ps.draft_id").select(["ps.id as schedule_id", "ps.draft_id", "d.collection", "d.record_id", "d.draft_data", "d.status"]).where("ps.status", "=", "pending").where("ps.scheduled_at", "<=", new Date).execute();
+    const due = await reqDb(c).selectFrom("zv_publish_schedule as ps").innerJoin("zv_content_drafts as d", "d.id", "ps.draft_id").select(["ps.id as schedule_id", "ps.draft_id", "d.collection", "d.record_id", "d.draft_data", "d.status"]).where("ps.status", "=", "pending").where("ps.scheduled_at", "<=", new Date).execute();
     let published = 0;
     let failed = 0;
     const errors3 = [];
     for (const item of due) {
       try {
-        const settings = await db.selectFrom("zv_collection_publish_settings").selectAll().where("collection", "=", item.collection).executeTakeFirst();
+        const settings = await reqDb(c).selectFrom("zv_collection_publish_settings").selectAll().where("collection", "=", item.collection).executeTakeFirst();
         if (settings?.require_review && item.status !== "approved") {
           await reqDb(c).updateTable("zv_publish_schedule").set({ status: "failed" }).where("id", "=", item.schedule_id).execute();
           errors3.push(`Draft ${item.draft_id} not approved`);
@@ -19612,7 +19612,7 @@ function draftsRoutes(ctx) {
       return c.json({ error: "Admin access required" }, 403);
     }
     const { draft_ids } = c.req.valid("json");
-    const job = await db.insertInto("zv_draft_publish_jobs").values({ draft_ids, collection: "mixed", status: "running", created_by: user.id }).returningAll().executeTakeFirst();
+    const job = await reqDb(c).insertInto("zv_draft_publish_jobs").values({ draft_ids, collection: "mixed", status: "running", created_by: user.id }).returningAll().executeTakeFirst();
     let published = 0;
     let failedCount = 0;
     const jobErrors = [];
@@ -19669,9 +19669,9 @@ function draftsRoutes(ctx) {
     const canCreate = await checkPermission(user.id, data.collection, "update");
     if (!canCreate)
       return c.json({ error: "Forbidden" }, 403);
-    const versionResult = await db.selectFrom("zv_revisions").select((eb) => eb.fn.count("id").as("count")).where("collection", "=", data.collection).where("record_id", "=", data.record_id).executeTakeFirst();
+    const versionResult = await reqDb(c).selectFrom("zv_revisions").select((eb) => eb.fn.count("id").as("count")).where("collection", "=", data.collection).where("record_id", "=", data.record_id).executeTakeFirst();
     const baseVersion = parseInt(versionResult?.count || "0") + 1;
-    const draft = await db.insertInto("zv_content_drafts").values({
+    const draft = await reqDb(c).insertInto("zv_content_drafts").values({
       collection: data.collection,
       record_id: data.record_id,
       draft_data: JSON.stringify(data.draft_data),
@@ -19682,27 +19682,27 @@ function draftsRoutes(ctx) {
       created_by: user.id
     }).returningAll().executeTakeFirst();
     if (data.scheduled_at && draft) {
-      await db.insertInto("zv_publish_schedule").values({ draft_id: draft.id, scheduled_at: new Date(data.scheduled_at) }).execute();
+      await reqDb(c).insertInto("zv_publish_schedule").values({ draft_id: draft.id, scheduled_at: new Date(data.scheduled_at) }).execute();
     }
     return c.json({ draft }, 201);
   });
   app.get("/:id", async (c) => {
     const user = c.get("user");
     const id = c.req.param("id");
-    const draft = await db.selectFrom("zv_content_drafts").selectAll().where("id", "=", id).executeTakeFirst();
+    const draft = await reqDb(c).selectFrom("zv_content_drafts").selectAll().where("id", "=", id).executeTakeFirst();
     if (!draft)
       return c.json({ error: "Draft not found" }, 404);
     const canRead = await checkPermission(user.id, draft.collection, "read");
     if (!canRead)
       return c.json({ error: "Forbidden" }, 403);
-    const comments = await db.selectFrom("zv_draft_review_comments").selectAll().where("draft_id", "=", id).orderBy("created_at", "asc").execute();
+    const comments = await reqDb(c).selectFrom("zv_draft_review_comments").selectAll().where("draft_id", "=", id).orderBy("created_at", "asc").execute();
     return c.json({ draft: { ...draft, review_comments: comments } });
   });
   app.patch("/:id", zValidator("json", UpdateDraftSchema), async (c) => {
     const user = c.get("user");
     const id = c.req.param("id");
     const data = c.req.valid("json");
-    const draft = await db.selectFrom("zv_content_drafts").selectAll().where("id", "=", id).executeTakeFirst();
+    const draft = await reqDb(c).selectFrom("zv_content_drafts").selectAll().where("id", "=", id).executeTakeFirst();
     if (!draft)
       return c.json({ error: "Draft not found" }, 404);
     const canUpdate = await checkPermission(user.id, draft.collection, "update");
@@ -19734,16 +19734,16 @@ function draftsRoutes(ctx) {
       }
       updateData.status = data.status;
     }
-    const updated = await db.updateTable("zv_content_drafts").set(updateData).where("id", "=", id).returningAll().executeTakeFirst();
+    const updated = await reqDb(c).updateTable("zv_content_drafts").set(updateData).where("id", "=", id).returningAll().executeTakeFirst();
     return c.json({ draft: updated });
   });
   app.post("/:id/publish", async (c) => {
     const user = c.get("user");
     const id = c.req.param("id");
-    const draft = await db.selectFrom("zv_content_drafts").selectAll().where("id", "=", id).executeTakeFirst();
+    const draft = await reqDb(c).selectFrom("zv_content_drafts").selectAll().where("id", "=", id).executeTakeFirst();
     if (!draft)
       return c.json({ error: "Draft not found" }, 404);
-    const settings = await db.selectFrom("zv_collection_publish_settings").selectAll().where("collection", "=", draft.collection).executeTakeFirst();
+    const settings = await reqDb(c).selectFrom("zv_collection_publish_settings").selectAll().where("collection", "=", draft.collection).executeTakeFirst();
     if (settings?.require_review && draft.status !== "approved") {
       return c.json({ error: "Draft must be approved before publishing" }, 422);
     }
@@ -19759,7 +19759,7 @@ function draftsRoutes(ctx) {
   app.delete("/:id", async (c) => {
     const user = c.get("user");
     const id = c.req.param("id");
-    const draft = await db.selectFrom("zv_content_drafts").select(["id", "collection", "created_by"]).where("id", "=", id).executeTakeFirst();
+    const draft = await reqDb(c).selectFrom("zv_content_drafts").select(["id", "collection", "created_by"]).where("id", "=", id).executeTakeFirst();
     if (!draft)
       return c.json({ error: "Draft not found" }, 404);
     const isAdmin = await checkPermission(user.id, "admin", "*");
@@ -19787,20 +19787,20 @@ function draftsRoutes(ctx) {
     const draft = await reqDb(c).selectFrom("zv_content_drafts").select(["id", "collection"]).where("id", "=", id).executeTakeFirst();
     if (!draft)
       return c.json({ error: "Draft not found" }, 404);
-    const comment = await db.insertInto("zv_draft_review_comments").values({ draft_id: id, ...data, created_by: user.id }).returningAll().executeTakeFirst();
+    const comment = await reqDb(c).insertInto("zv_draft_review_comments").values({ draft_id: id, ...data, created_by: user.id }).returningAll().executeTakeFirst();
     return c.json({ comment }, 201);
   });
   app.post("/:id/review-comments/:commentId/resolve", async (c) => {
     const user = c.get("user");
     const commentId = c.req.param("commentId");
-    const updated = await db.updateTable("zv_draft_review_comments").set({ resolved_at: new Date, resolved_by: user.id }).where("id", "=", commentId).returningAll().executeTakeFirst();
+    const updated = await reqDb(c).updateTable("zv_draft_review_comments").set({ resolved_at: new Date, resolved_by: user.id }).where("id", "=", commentId).returningAll().executeTakeFirst();
     if (!updated)
       return c.json({ error: "Comment not found" }, 404);
     return c.json({ comment: updated });
   });
   app.get("/:id/snapshots", async (c) => {
     const id = c.req.param("id");
-    const snapshots = await db.selectFrom("zv_draft_snapshots").select(["id", "version", "description", "created_by", "created_at"]).where("draft_id", "=", id).orderBy("version", "desc").execute();
+    const snapshots = await reqDb(c).selectFrom("zv_draft_snapshots").select(["id", "version", "description", "created_by", "created_at"]).where("draft_id", "=", id).orderBy("version", "desc").execute();
     return c.json({ snapshots });
   });
   app.post("/:id/snapshot", zValidator("json", exports_external.object({ description: exports_external.string().optional() })), async (c) => {
@@ -19810,9 +19810,9 @@ function draftsRoutes(ctx) {
     const draft = await reqDb(c).selectFrom("zv_content_drafts").selectAll().where("id", "=", id).executeTakeFirst();
     if (!draft)
       return c.json({ error: "Draft not found" }, 404);
-    const lastSnap = await db.selectFrom("zv_draft_snapshots").select(["version"]).where("draft_id", "=", id).orderBy("version", "desc").limit(1).executeTakeFirst();
+    const lastSnap = await reqDb(c).selectFrom("zv_draft_snapshots").select(["version"]).where("draft_id", "=", id).orderBy("version", "desc").limit(1).executeTakeFirst();
     const version2 = (lastSnap?.version || 0) + 1;
-    const snap = await db.insertInto("zv_draft_snapshots").values({ draft_id: id, snapshot_data: draft.draft_data, version: version2, description: description || null, created_by: user.id }).returningAll().executeTakeFirst();
+    const snap = await reqDb(c).insertInto("zv_draft_snapshots").values({ draft_id: id, snapshot_data: draft.draft_data, version: version2, description: description || null, created_by: user.id }).returningAll().executeTakeFirst();
     return c.json({ snapshot: snap }, 201);
   });
   app.get("/:id/snapshots/:version", async (c) => {

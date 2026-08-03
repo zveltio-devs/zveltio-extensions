@@ -57,7 +57,7 @@ function normalise(ids: readonly unknown[]): WidgetId[] {
 
 // `any` on purpose: when this extension is type-checked alongside the engine,
 // its own kysely and the engine's kysely@0.29.3 are two distinct installs whose
-// `Kysely` brands clash on `sql(...).execute(db)`. analytics/quality uses `any`
+// `Kysely` brands clash on `sql(...).execute(reqDb(c))`. analytics/quality uses `any`
 // for the same reason. Runtime is unaffected (one kysely at load time).
 // biome-ignore lint/suspicious/noExplicitAny: dual-kysely brand clash guard
 type Db = any;

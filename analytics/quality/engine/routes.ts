@@ -106,7 +106,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
   // GET /scans/:collection — list recent scans
   app.get('/scans/:collection', async (c) => {
     const collection = c.req.param('collection');
-    const scans = await (db as any)
+    const scans = await (reqDb(c) as any)
       .selectFrom('zv_quality_scans')
       .selectAll()
       .where('collection', '=', collection)
@@ -153,7 +153,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
 
     const [summary, latestScans, latestScores] = await Promise.all([
       sql`SELECT i.collection, i.severity, COUNT(i.id) as count FROM zv_quality_issues i WHERE i.dismissed = false GROUP BY i.collection, i.severity`.execute(reqDb(c)).then(r => r.rows),
-      (db as any)
+      (reqDb(c) as any)
         .selectFrom('zv_quality_scans')
         .select(['collection', 'status', 'issues_found', 'completed_at'])
         .distinctOn(['collection'])
@@ -161,7 +161,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
         .orderBy('started_at', 'desc')
         .execute()
         .catch(() => []),
-      (db as any)
+      (reqDb(c) as any)
         .selectFrom('zvd_quality_scores')
         .select(['collection', 'score', 'calculated_at'])
         .distinctOn(['collection'])
@@ -188,7 +188,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     if (!(await checkPermission(user.id, 'admin', '*'))) return c.json({ error: 'Admin access required' }, 403);
     const data = c.req.valid('json');
-    const rule = await (db as any)
+    const rule = await (reqDb(c) as any)
       .insertInto('zvd_quality_rules')
       .values({ ...data, rule_config: JSON.stringify(data.rule_config), created_by: user.id })
       .returningAll()
@@ -217,7 +217,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
   // ── Enterprise: Quality Scores ──────────────────────────────────
 
   app.get('/scores/:collection', async (c) => {
-    const scores = await (db as any)
+    const scores = await (reqDb(c) as any)
       .selectFrom('zvd_quality_scores')
       .selectAll()
       .where('collection', '=', c.req.param('collection'))
@@ -240,7 +240,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     if (!(await checkPermission(user.id, 'admin', '*'))) return c.json({ error: 'Admin access required' }, 403);
     const data = c.req.valid('json');
-    const target = await (db as any)
+    const target = await (reqDb(c) as any)
       .insertInto('zvd_quality_sla_targets')
       .values({ ...data, created_by: user.id })
       .onConflict((oc: any) => oc.column('collection').doUpdateSet({ min_score: data.min_score, max_critical_issues: data.max_critical_issues, max_error_issues: data.max_error_issues, alert_email: data.alert_email }))
@@ -306,7 +306,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
 
   app.post('/issues/:id/remediations/:remId/apply', async (c) => {
     const user = c.get('user') as any;
-    const updated = await (db as any)
+    const updated = await (reqDb(c) as any)
       .updateTable('zvd_quality_remediations')
       .set({ applied_at: new Date(), applied_by: user.id, result: 'applied' })
       .where('id', '=', c.req.param('remId'))
@@ -329,7 +329,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
         FROM zv_quality_issues GROUP BY collection ORDER BY total DESC LIMIT 10
       `.execute(reqDb(c)),
       (reqDb(c) as any).selectFrom('zvd_quality_sla_targets').select(['collection', 'min_score', 'is_active']).where('is_active', '=', true).execute().catch(() => []),
-      (db as any)
+      (reqDb(c) as any)
         .selectFrom('zvd_quality_scores')
         .select(['collection', 'score', 'calculated_at'])
         .distinctOn(['collection'])
