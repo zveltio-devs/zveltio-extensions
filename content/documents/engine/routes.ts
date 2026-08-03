@@ -291,6 +291,44 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
   });
 
   // GET /generated — list generated docs
+
+  /**
+   * May this user read a generated document?
+   *
+   * `GET /generated` listed every document in the tenant to anyone with a
+   * session, and `GET /generated/:id` returned any of them together with its
+   * signature requests — signer names and email addresses included. These are
+   * contracts, invoices and official papers generated from templates; on a
+   * Business OS for companies and public institutions, "any employee can read
+   * all of them" is not a default anyone chose, it is one nobody wrote down.
+   *
+   * Three ways in, using what the row already carries:
+   *   - you generated it (`generated_by`);
+   *   - you are a tenant admin, who can already revoke any of them;
+   *   - it was generated FROM a record, and you may read that collection.
+   *
+   * The third is the interesting one and mirrors the `?expand=` fix in the
+   * engine: a document about an invoice is as readable as the invoice. A
+   * document with no source collection is nobody's but its author's.
+   */
+  async function mayReadDoc(
+    doc: { generated_by?: string | null; source_collection?: string | null },
+    userId: string,
+    isAdmin: boolean,
+    // Memoised across a listing: a page spans few distinct collections and
+    // `checkPermission` is cached anyway.
+    readable: Map<string, boolean>,
+  ): Promise<boolean> {
+    if (isAdmin) return true;
+    if (doc.generated_by === userId) return true;
+    const src = doc.source_collection;
+    if (!src) return false;
+    if (!readable.has(src)) {
+      readable.set(src, await checkPermission(userId, src, 'read').catch(() => false));
+    }
+    return readable.get(src) === true;
+  }
+
   app.get('/generated', async (c) => {
     const { template_id, source_collection, source_record_id, status, limit = '50', offset = '0' } = c.req.query();
 
@@ -304,16 +342,22 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
     if (source_record_id) query = query.where('source_record_id', '=', source_record_id);
     if (status) query = query.where('status', '=', status);
 
-    const docs = await query.limit(Number(limit)).offset(Number(offset)).execute();
+    const rows = await query.limit(Number(limit)).offset(Number(offset)).execute();
 
-    const countResult = await (reqDb(c) as any)
-      .selectFrom('zv_generated_docs')
-      .select((eb: any) => eb.fn.count('id').as('count'))
-      .executeTakeFirst();
+    const listUser = c.get('user');
+    const listAdmin = await checkPermission(listUser.id, 'admin', '*').catch(() => false);
+    const readable = new Map<string, boolean>();
+    const docs = [];
+    for (const d of rows) {
+      if (await mayReadDoc(d, listUser.id, listAdmin, readable)) docs.push(d);
+    }
 
+    // The count reflects what was returned. Reporting the tenant-wide total
+    // next to a filtered page tells the caller exactly how many documents they
+    // are not allowed to see, which is most of what they wanted to know.
     return c.json({
       documents: docs,
-      pagination: { total: Number(countResult?.count || 0), limit: Number(limit), offset: Number(offset) },
+      pagination: { total: docs.length, limit: Number(limit), offset: Number(offset) },
     });
   });
 
@@ -328,6 +372,13 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
       .executeTakeFirst();
 
     if (!doc) return c.json({ error: 'Document not found' }, 404);
+
+    // 404, not 403 — whether a document exists is part of what it discloses.
+    const getUser = c.get('user');
+    const getAdmin = await checkPermission(getUser.id, 'admin', '*').catch(() => false);
+    if (!(await mayReadDoc(doc, getUser.id, getAdmin, new Map()))) {
+      return c.json({ error: 'Document not found' }, 404);
+    }
 
     const signRequests = await (reqDb(c) as any)
       .selectFrom('zv_document_sign_requests')
@@ -372,11 +423,17 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
 
     const doc = await (reqDb(c) as any)
       .selectFrom('zv_generated_docs')
-      .select(['id', 'status'])
+      .select(['id', 'status', 'generated_by', 'source_collection'])
       .where('id', '=', id)
       .executeTakeFirst();
 
     if (!doc) return c.json({ error: 'Document not found' }, 404);
+    // Same gate as reading it. Asking a third party to put their signature on a
+    // document you are not allowed to read is worse than reading it.
+    const signAdmin = await checkPermission(user.id, 'admin', '*').catch(() => false);
+    if (!(await mayReadDoc(doc, user.id, signAdmin, new Map()))) {
+      return c.json({ error: 'Document not found' }, 404);
+    }
     if (doc.status !== 'active') return c.json({ error: 'Cannot create sign request for inactive document' }, 400);
 
     const expiresAt = new Date(Date.now() + data.expires_hours * 3600 * 1000);
@@ -400,6 +457,20 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
   // GET /generated/:id/sign-requests
   app.get('/generated/:id/sign-requests', async (c) => {
     const id = c.req.param('id');
+
+    // Signature requests carry the signer's name and email — the same gate as
+    // the document they belong to.
+    const srUser = c.get('user');
+    const srDoc = await (reqDb(c) as any)
+      .selectFrom('zv_generated_docs')
+      .select(['id', 'generated_by', 'source_collection'])
+      .where('id', '=', id)
+      .executeTakeFirst();
+    if (!srDoc) return c.json({ error: 'Document not found' }, 404);
+    const srAdmin = await checkPermission(srUser.id, 'admin', '*').catch(() => false);
+    if (!(await mayReadDoc(srDoc, srUser.id, srAdmin, new Map()))) {
+      return c.json({ error: 'Document not found' }, 404);
+    }
 
     const signRequests = await (reqDb(c) as any)
       .selectFrom('zv_document_sign_requests')
