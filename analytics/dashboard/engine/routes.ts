@@ -86,11 +86,11 @@ async function visibleWidgets(userId: string, checkPermission: CheckPermission):
 
 // ── Layout storage (own table, tenant-scoped via RLS) ────────────────
 
-async function readLayout(db: Db, scope: 'role' | 'user', owner: string): Promise<WidgetId[] | null> {
+async function readLayout(dbh: Db, scope: 'role' | 'user', owner: string): Promise<WidgetId[] | null> {
   const r = await sql<{ widgets: unknown }>`
     SELECT widgets FROM zv_dashboard_layouts WHERE scope = ${scope} AND owner = ${owner} LIMIT 1
   `
-    .execute(db)
+    .execute(dbh)
     .catch(() => ({ rows: [] as Array<{ widgets: unknown }> }));
   const raw = r.rows[0]?.widgets;
   if (!Array.isArray(raw)) return null;
@@ -121,20 +121,20 @@ async function writeLayout(
   }
 }
 
-async function deleteUserLayout(db: Db, userId: string): Promise<void> {
+async function deleteUserLayout(dbh: Db, userId: string): Promise<void> {
   await sql`DELETE FROM zv_dashboard_layouts WHERE scope = 'user' AND owner = ${userId}`
-    .execute(db)
+    .execute(dbh)
     .catch(() => undefined);
 }
 
 // ── Resolution ───────────────────────────────────────────────────────
 
-async function roleUnion(db: Db, userId: string, getUserRoles: GetUserRoles): Promise<WidgetId[] | null> {
+async function roleUnion(dbh: Db, userId: string, getUserRoles: GetUserRoles): Promise<WidgetId[] | null> {
   const roles = await getUserRoles(userId).catch(() => [] as string[]);
   const acc = new Set<WidgetId>();
   let any = false;
   for (const role of roles) {
-    const layout = await readLayout(db, 'role', role);
+    const layout = await readLayout(dbh, 'role', role);
     if (layout) {
       any = true;
       for (const id of layout) acc.add(id);
@@ -386,7 +386,7 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
   app.delete('/', async (c) => {
     const db = reqDb(c);
     const uid = userId(c);
-    await deleteUserLayout(db, uid);
+    await deleteUserLayout(reqDb(c), uid);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
     const data = await computeWidgetData(db, resolved.widgets, ctx.config, tenantOf(c));
     return c.json({

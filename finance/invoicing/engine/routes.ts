@@ -8,14 +8,14 @@ import { permissionGate } from '@zveltio/sdk/extension';
 // These helpers receive an already-scoped db (the caller passes
 // `reqDb(c)`), so they use that parameter directly. They're declared
 // outside the route factory closure, so they cannot reference `c`.
-async function nextInvoiceNumber(db: any, prefix = 'INV'): Promise<string> {
-  const row = await sql`SELECT nextval('zvd_invoice_seq') as n`.execute(db);
+async function nextInvoiceNumber(dbh: any, prefix = 'INV'): Promise<string> {
+  const row = await sql`SELECT nextval('zvd_invoice_seq') as n`.execute(dbh);
   const n = (row.rows[0] as any).n;
   return `${prefix}-${String(n).padStart(5, '0')}`;
 }
 
-async function nextCreditNoteNumber(db: any): Promise<string> {
-  const row = await sql`SELECT nextval('zvd_credit_note_seq') as n`.execute(db);
+async function nextCreditNoteNumber(dbh: any): Promise<string> {
+  const row = await sql`SELECT nextval('zvd_credit_note_seq') as n`.execute(dbh);
   const n = (row.rows[0] as any).n;
   return `CN-${String(n).padStart(5, '0')}`;
 }

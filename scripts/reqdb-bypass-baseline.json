@@ -1,21 +1,10 @@
 {
-  "content/documents/engine/routes.ts": 4,
   "data/export/engine/routes.ts": 4,
   "data/import/engine/routes.ts": 3,
-  "developer/api-docs/engine/routes.ts": 1,
-  "developer/graphql/engine/routes.ts": 4,
-  "auth/ldap/engine/routes.ts": 3,
+  "developer/graphql/engine/routes.ts": 3,
+  "auth/ldap/engine/routes.ts": 2,
   "auth/scim/engine/routes.ts": 24,
-  "auth/saml/engine/routes.ts": 3,
-  "integrations/api-connector/engine/routes.ts": 3,
+  "auth/saml/engine/routes.ts": 2,
   "storage/cloud/engine/routes.ts": 1,
-  "operations/traceability/engine/routes/labels.ts": 1,
-  "operations/inventory/engine/routes.ts": 3,
-  "finance/banking/engine/routes.ts": 1,
-  "finance/quotes/engine/routes.ts": 4,
-  "finance/invoicing/engine/routes.ts": 2,
-  "finance/expenses/engine/routes.ts": 1,
-  "analytics/dashboard/engine/routes.ts": 14,
-  "compliance/ro/efactura/engine/routes.ts": 1,
-  "hr/leave/engine/routes.ts": 1
+  "analytics/dashboard/engine/routes.ts": 12
 }

@@ -101,7 +101,7 @@ function mapFieldType(fieldType: string): any {
 
 // ── Relations loader ──────────────────────────────────────────────────────────
 
-async function getRelations(db: any): Promise<RelationInfo[]> {
+async function getRelations(dbh: any): Promise<RelationInfo[]> {
   try {
     const result = await sql<RelationInfo>`
       SELECT id, name, type,
@@ -109,7 +109,7 @@ async function getRelations(db: any): Promise<RelationInfo[]> {
              target_collection, target_field,
              junction_table
       FROM zvd_relations
-    `.execute(db);
+    `.execute(dbh);
     return result.rows;
   } catch {
     return [];

@@ -19479,10 +19479,10 @@ async function visibleWidgets(userId, checkPermission) {
   }
   return out;
 }
-async function readLayout(db, scope, owner) {
+async function readLayout(dbh, scope, owner) {
   const r = await sql`
     SELECT widgets FROM zv_dashboard_layouts WHERE scope = ${scope} AND owner = ${owner} LIMIT 1
-  `.execute(db).catch(() => ({ rows: [] }));
+  `.execute(dbh).catch(() => ({ rows: [] }));
   const raw2 = r.rows[0]?.widgets;
   if (!Array.isArray(raw2))
     return null;
@@ -19503,17 +19503,17 @@ async function writeLayout(db, scope, owner, widgets, updatedBy) {
     `.execute(db);
   }
 }
-async function deleteUserLayout(db, userId) {
-  await sql`DELETE FROM zv_dashboard_layouts WHERE scope = 'user' AND owner = ${userId}`.execute(db).catch(() => {
+async function deleteUserLayout(dbh, userId) {
+  await sql`DELETE FROM zv_dashboard_layouts WHERE scope = 'user' AND owner = ${userId}`.execute(dbh).catch(() => {
     return;
   });
 }
-async function roleUnion(db, userId, getUserRoles) {
+async function roleUnion(dbh, userId, getUserRoles) {
   const roles = await getUserRoles(userId).catch(() => []);
   const acc = new Set;
   let any2 = false;
   for (const role of roles) {
-    const layout = await readLayout(db, "role", role);
+    const layout = await readLayout(dbh, "role", role);
     if (layout) {
       any2 = true;
       for (const id of layout)
@@ -19653,7 +19653,7 @@ function dashboardRoutes(ctx) {
   app.delete("/", async (c) => {
     const db = reqDb(c);
     const uid = userId(c);
-    await deleteUserLayout(db, uid);
+    await deleteUserLayout(reqDb(c), uid);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
     const data = await computeWidgetData(db, resolved.widgets, ctx.config, tenantOf(c));
     return c.json({

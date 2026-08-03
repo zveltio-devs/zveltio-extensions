@@ -19635,11 +19635,11 @@ async function getUser(c, auth) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   return session?.user ?? null;
 }
-async function logStatusChange(db, invoiceId, oldStatus, newStatus, userId, note) {
+async function logStatusChange(dbh, invoiceId, oldStatus, newStatus, userId, note) {
   await sql`
     INSERT INTO zv_efactura_status_log (invoice_id, old_status, new_status, changed_by, note)
     VALUES (${invoiceId}::uuid, ${oldStatus}, ${newStatus}, ${userId}, ${note ?? null})
-  `.execute(db).catch(() => {});
+  `.execute(dbh).catch(() => {});
 }
 function efacturaRoutes(ctx) {
   const { db, auth } = ctx;

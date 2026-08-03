@@ -45,11 +45,11 @@ const SequenceSchema = z.object({
 
 // ── Helper: get or generate next doc number ───────────────────────────────────
 
-async function getNextDocNumber(db: any, templateId: string, prefix: string): Promise<string> {
+async function getNextDocNumber(dbh: any, templateId: string, prefix: string): Promise<string> {
   const now = new Date();
   const year = now.getFullYear();
 
-  const seq = await (db as any)
+  const seq = await (dbh as any)
     .selectFrom('zv_document_number_sequences')
     .selectAll()
     .where('template_id', '=', templateId)
@@ -57,7 +57,7 @@ async function getNextDocNumber(db: any, templateId: string, prefix: string): Pr
 
   if (!seq) {
     // Create initial sequence
-    await (db as any)
+    await (dbh as any)
       .insertInto('zv_document_number_sequences')
       .values({
         template_id: templateId,
@@ -74,13 +74,13 @@ async function getNextDocNumber(db: any, templateId: string, prefix: string): Pr
   let nextNumber = seq.next_number;
   if (seq.year_reset && seq.reset_year !== year) {
     nextNumber = 1;
-    await (db as any)
+    await (dbh as any)
       .updateTable('zv_document_number_sequences')
       .set({ next_number: 2, reset_year: year, updated_at: new Date() })
       .where('template_id', '=', templateId)
       .execute();
   } else {
-    await (db as any)
+    await (dbh as any)
       .updateTable('zv_document_number_sequences')
       .set({ next_number: nextNumber + 1, updated_at: new Date() })
       .where('template_id', '=', templateId)

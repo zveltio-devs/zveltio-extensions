@@ -7,7 +7,7 @@ import { LabelService } from '../services/LabelService.js';
 import { QRService } from '../services/QRService.js';
 
 // Top-level helper: keeps `db: any` parameter; callers pass reqDb(c).
-async function fetchLotDetails(db: any, lotId: string) {
+async function fetchLotDetails(dbh: any, lotId: string) {
   const row = await sql`
     SELECT l.id, l.lot_number, l.quantity_remaining, l.unit, l.best_before_date,
            i.name as item_name, i.allergens, i.storage_conditions,
@@ -18,7 +18,7 @@ async function fetchLotDetails(db: any, lotId: string) {
     LEFT JOIN trace_suppliers s ON s.id = l.supplier_id
     LEFT JOIN trace_locations loc ON loc.id = l.location_id
     WHERE l.id = ${lotId}
-  `.execute(db);
+  `.execute(dbh);
   return row.rows[0] as any;
 }
 

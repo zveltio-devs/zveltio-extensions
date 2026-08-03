@@ -37,12 +37,12 @@ function parseMT940(text: string): Array<{date: string, type: 'credit'|'debit', 
 }
 
 // Apply categorization rules to a transaction
-async function applyRules(db: any, accountId: string, tx: any): Promise<string | null> {
+async function applyRules(dbh: any, accountId: string, tx: any): Promise<string | null> {
   const rules = await sql`
     SELECT * FROM zvd_bank_rules
     WHERE (account_id = ${accountId} OR account_id IS NULL) AND is_active = true
     ORDER BY priority DESC, created_at ASC
-  `.execute(db);
+  `.execute(dbh);
   for (const rule of rules.rows as any[]) {
     const fieldValue = String(tx[rule.match_field] ?? '').toLowerCase();
     const matchVal = rule.match_value.toLowerCase();
@@ -158,7 +158,7 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
     const accountId = c.req.param('id');
-    const autoCategory = d.category ?? await applyRules(db, accountId, d);
+    const autoCategory = d.category ?? await applyRules(reqDb(c), accountId, d);
     const row = await sql`
       INSERT INTO zvd_bank_transactions (account_id, date, type, amount, description, reference, counterparty_name, category, auto_categorized, created_by)
       VALUES (${accountId}, ${d.date}, ${d.type}, ${d.amount}, ${d.description},
@@ -187,7 +187,7 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     let imported = 0;
     let balance_delta = 0;
     for (const t of transactions) {
-      const autoCategory = await applyRules(db, accountId, t);
+      const autoCategory = await applyRules(reqDb(c), accountId, t);
       const result = await sql`
         INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, category, auto_categorized, created_by)
         VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description}, ${t.reference}, ${autoCategory}, ${!!autoCategory}, ${user.id})
@@ -225,7 +225,7 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     let balance_delta = 0;
     let imported = 0;
     for (const t of d.transactions) {
-      const autoCategory = await applyRules(db, accountId, t);
+      const autoCategory = await applyRules(reqDb(c), accountId, t);
       const result = await sql`
         INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, counterparty_name, category, auto_categorized, created_by)
         VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description},
@@ -277,7 +277,7 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     const txns = await sql`SELECT * FROM zvd_bank_transactions WHERE account_id = ${c.req.param('id')} AND is_reconciled = false`.execute(reqDb(c));
     let updated = 0;
     for (const tx of txns.rows as any[]) {
-      const cat = await applyRules(db, c.req.param('id'), tx);
+      const cat = await applyRules(reqDb(c), c.req.param('id'), tx);
       if (cat && cat !== tx.category) {
         await sql`UPDATE zvd_bank_transactions SET category = ${cat}, auto_categorized = true WHERE id = ${tx.id}`.execute(reqDb(c));
         updated++;

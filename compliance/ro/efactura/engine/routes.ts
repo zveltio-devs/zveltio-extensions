@@ -45,11 +45,11 @@ async function getUser(c: any, auth: any) {
   return session?.user ?? null;
 }
 
-async function logStatusChange(db: any, invoiceId: string, oldStatus: string, newStatus: string, userId: string, note?: string) {
+async function logStatusChange(dbh: any, invoiceId: string, oldStatus: string, newStatus: string, userId: string, note?: string) {
   await sql`
     INSERT INTO zv_efactura_status_log (invoice_id, old_status, new_status, changed_by, note)
     VALUES (${invoiceId}::uuid, ${oldStatus}, ${newStatus}, ${userId}, ${note ?? null})
-  `.execute(db).catch(() => {});
+  `.execute(dbh).catch(() => {});
 }
 
 export function efacturaRoutes(ctx: ExtensionContext): Hono {

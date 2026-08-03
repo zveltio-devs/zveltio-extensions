@@ -35,11 +35,33 @@
  * then said "Cannot find name 'c'" was reverted, which is precisely the set
  * living inside helpers that take `db` as a parameter.
  *
- * The 78 that remain are not oversights. Most are those helpers, where the fix
- * belongs at the CALL SITE (pass `reqDb(c)` in) rather than inside. A few are
- * deliberate: `auth/scim`'s public app resolves its tenant from the bearer
- * token, not from the host, so a request-scoped handle there would be the wrong
- * tenant.
+ * Then 78 → 51, by rewriting the CALL SITES of helpers that take a `db`
+ * parameter — `applyRules(db, …)` became `applyRules(reqDb(c), …)` — and
+ * renaming the parameter to `dbh` so it no longer shadows the closed-over `db`.
+ * That shadowing is the root of the whole class: inside such a helper you
+ * cannot tell by reading whether `db` is the argument or the global pool.
+ *
+ * The 51 that remain are each one of four things, and none of them is a
+ * forgotten line:
+ *
+ *   24  `auth/scim`'s PUBLIC app. Its tenant comes from the bearer token, not
+ *       from the host, so a request-scoped handle would be the wrong tenant —
+ *       the explicit `tenant_id` filtering added on 2026-08-03 is what makes it
+ *       correct, and `reqDb(c)` would quietly undo it.
+ *   12  `analytics/dashboard`, where the identifier IS the request handle: the
+ *       handlers do `const db = reqDb(c)` and pass it into helpers whose
+ *       parameter is spelled `db`. This is the known false positive, and the
+ *       multi-line signatures are why the rename above did not reach them.
+ *    7  `data/export` and `data/import` background JOBS. They run after the
+ *       response, from a queue, with no request to scope to — the file says so,
+ *       and threading the tenant through the job payload is the real fix.
+ *    8  Resolver closures (`developer/graphql`), config writers (`auth/ldap`,
+ *       `auth/saml`) and one fire-and-forget access log, all of which execute
+ *       where no `c` exists.
+ *
+ * Which is to say: the mechanical part is finished. What is left needs
+ * signatures changed or a tenant plumbed through a queue, and each has a reason
+ * written next to it.
  *
  * Usage:
  *   bun scripts/check-reqdb-bypass.ts            # verify against the baseline
