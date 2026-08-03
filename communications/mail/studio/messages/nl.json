@@ -54,6 +54,7 @@
   "communications.mail.ui.fromLabel": "From:",
   "communications.mail.ui.high": "Hoog",
   "communications.mail.ui.highPriority": "Hoge prioriteit",
+  "communications.mail.ui.imagesBlocked": "Externe afbeeldingen geblokkeerd — ze kunnen de afzender vertellen dat u dit hebt geopend.",
   "communications.mail.ui.imapIncoming": "IMAP (Incoming)",
   "communications.mail.ui.imap_gmail_com": "imap.gmail.com",
   "communications.mail.ui.inbox_newsletter": "INBOX.Newsletter",
@@ -79,6 +80,7 @@
   "communications.mail.ui.no_mail_accounts": "Geen e-mailaccounts",
   "communications.mail.ui.normal": "Normaal",
   "communications.mail.ui.optional": "Optioneel",
+  "communications.mail.ui.p_your_signature_here_p": "<p>Your signature here...</p>",
   "communications.mail.ui.priority": "Prioriteit:",
   "communications.mail.ui.readReceipt": "Leesbevestiging",
   "communications.mail.ui.reply": "Beantwoorden",
@@ -90,6 +92,7 @@
   "communications.mail.ui.selectAccountFilters": "Select a mail account first to manage filters.",
   "communications.mail.ui.selectMessage": "Selecteer een bericht",
   "communications.mail.ui.selectedCount": "{count} selected",
+  "communications.mail.ui.showImages": "Externe afbeeldingen tonen",
   "communications.mail.ui.signatures": "Handtekeningen",
   "communications.mail.ui.smtpOutgoing": "SMTP (Outgoing)",
   "communications.mail.ui.smtp_gmail_com": "smtp.gmail.com",
@@ -103,6 +106,5 @@
   "communications.mail.ui.toLabel": "To:",
   "communications.mail.ui.value": "value...",
   "communications.mail.ui.work_personal": "Work, Personal...",
-  "communications.mail.ui.write_your_message": "Schrijf je bericht...",
-  "communications.mail.ui.p_your_signature_here_p": "<p>Your signature here...</p>"
+  "communications.mail.ui.write_your_message": "Schrijf je bericht..."
 }
