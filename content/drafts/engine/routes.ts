@@ -73,7 +73,7 @@ function publishableDraftData(raw: unknown): Record<string, unknown> {
 // ── Route factory ─────────────────────────────────────────────────────────────
 
 export function draftsRoutes(ctx: ExtensionContext): Hono {
-  const { db, auth, checkPermission } = ctx;
+  const { db, auth, checkPermission, getUserRoles } = ctx;
 
   // Per-request DB handle (CRM PR #1 pattern). After
   // migration 002_tenant_rls.sql, this extension's tables have FORCE
@@ -430,11 +430,47 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     if (data.reviewer_note !== undefined) updateData.reviewer_note = data.reviewer_note;
     if (data.scheduled_at !== undefined) updateData.scheduled_at = data.scheduled_at ? new Date(data.scheduled_at) : null;
     if (data.status) {
-      updateData.status = data.status;
       if (data.status === 'approved' || data.status === 'rejected') {
+        // Reviewing is not the same right as editing.
+        //
+        // Any `update` on the collection could set `status: 'approved'`,
+        // including on your own draft — so the review step was a field the
+        // author filled in about themselves. And
+        // `zv_collection_publish_settings.reviewer_roles` existed, defaulted to
+        // `['admin']`, was shown in the settings UI, and was read by nothing:
+        // an administrator could name the reviewers and the system would not
+        // consult the list. A control that is configurable and inert is worse
+        // than one that is absent, because it is believed.
+        const reviewSettings = await (reqDb(c) as any)
+          .selectFrom('zv_collection_publish_settings')
+          .select(['reviewer_roles'])
+          .where('collection', '=', draft.collection)
+          .executeTakeFirst();
+        const reviewerRoles: string[] = Array.isArray(reviewSettings?.reviewer_roles)
+          ? reviewSettings.reviewer_roles
+          : ['admin'];
+
+        const roles = await getUserRoles(user.id).catch(() => [] as string[]);
+        const isReviewer =
+          roles.some((r) => reviewerRoles.includes(r)) ||
+          (await checkPermission(user.id, 'admin', '*').catch(() => false));
+        if (!isReviewer) {
+          return c.json(
+            { error: `Reviewing this collection requires one of: ${reviewerRoles.join(', ')}` },
+            403,
+          );
+        }
+
+        // Four eyes. Someone who may review still may not sign off their own
+        // work — that is the point of asking for a review at all.
+        if (draft.created_by === user.id) {
+          return c.json({ error: 'A draft cannot be reviewed by its author' }, 403);
+        }
+
         updateData.reviewed_by = user.id;
         updateData.reviewed_at = new Date();
       }
+      updateData.status = data.status;
     }
 
     const updated = await (db as any)

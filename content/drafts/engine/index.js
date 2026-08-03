@@ -19485,7 +19485,7 @@ function publishableDraftData(raw2) {
   return out;
 }
 function draftsRoutes(ctx) {
-  const { db, auth, checkPermission } = ctx;
+  const { db, auth, checkPermission, getUserRoles } = ctx;
   function reqDb(c) {
     return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
   }
@@ -19718,11 +19718,21 @@ function draftsRoutes(ctx) {
     if (data.scheduled_at !== undefined)
       updateData.scheduled_at = data.scheduled_at ? new Date(data.scheduled_at) : null;
     if (data.status) {
-      updateData.status = data.status;
       if (data.status === "approved" || data.status === "rejected") {
+        const reviewSettings = await reqDb(c).selectFrom("zv_collection_publish_settings").select(["reviewer_roles"]).where("collection", "=", draft.collection).executeTakeFirst();
+        const reviewerRoles = Array.isArray(reviewSettings?.reviewer_roles) ? reviewSettings.reviewer_roles : ["admin"];
+        const roles = await getUserRoles(user.id).catch(() => []);
+        const isReviewer = roles.some((r) => reviewerRoles.includes(r)) || await checkPermission(user.id, "admin", "*").catch(() => false);
+        if (!isReviewer) {
+          return c.json({ error: `Reviewing this collection requires one of: ${reviewerRoles.join(", ")}` }, 403);
+        }
+        if (draft.created_by === user.id) {
+          return c.json({ error: "A draft cannot be reviewed by its author" }, 403);
+        }
         updateData.reviewed_by = user.id;
         updateData.reviewed_at = new Date;
       }
+      updateData.status = data.status;
     }
     const updated = await db.updateTable("zv_content_drafts").set(updateData).where("id", "=", id).returningAll().executeTakeFirst();
     return c.json({ draft: updated });
