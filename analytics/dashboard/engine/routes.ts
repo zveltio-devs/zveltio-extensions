@@ -185,10 +185,14 @@ async function setUserLayout(
 const countOf = (p: Promise<{ rows: Array<{ count: string }> }>) =>
   p.then((r) => Number(r.rows[0]?.count ?? 0)).catch(() => 0);
 
+/** The implicit tenant on a single-tenant install — see the `people` widget. */
+const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
+
 async function computeWidgetData(
   db: Db,
   ids: Iterable<WidgetId>,
   config: ExtensionConfig | undefined,
+  tenantId: string,
 ): Promise<Record<string, unknown>> {
   const want = new Set(ids);
   const out: Record<string, unknown> = {};
@@ -232,13 +236,32 @@ async function computeWidgetData(
   }
 
   if (want.has('people')) {
-    set(
-      'people',
-      Promise.all([
-        countOf(sql<{ count: string }>`SELECT COUNT(*) AS count FROM "user"`.execute(db)),
-        countOf(sql<{ count: string }>`SELECT COUNT(*) AS count FROM "user" WHERE role = 'god'`.execute(db)),
-      ]).then(([total, admins]) => ({ total, admins })),
-    );
+    // Counted across the whole instance, and the second number counted
+    // `role = 'god'` — so a tenant's dashboard reported how many users every
+    // other customer had, plus how many instance superusers exist. The `user`
+    // table carries no tenant_id and no RLS, so `reqDb(c)` does not scope this
+    // on its own; membership does.
+    //
+    // Single-tenant installs have no membership rows (the engine's membership
+    // middleware no-ops for the default tenant), so there the count is the
+    // instance, which is the same thing.
+    const isDefault = tenantId === DEFAULT_TENANT_ID;
+    const total = isDefault
+      ? countOf(sql<{ count: string }>`SELECT COUNT(*) AS count FROM "user"`.execute(db))
+      : countOf(sql<{ count: string }>`
+          SELECT COUNT(*) AS count FROM zv_tenant_users WHERE tenant_id = ${tenantId}::uuid
+        `.execute(db));
+    // "admins" now means admins OF THIS TENANT. The number of instance-wide
+    // superusers is not a fact a tenant dashboard should be reporting.
+    const admins = isDefault
+      ? countOf(sql<{ count: string }>`
+          SELECT COUNT(*) AS count FROM "user" WHERE role IN ('god', 'admin')
+        `.execute(db))
+      : countOf(sql<{ count: string }>`
+          SELECT COUNT(*) AS count FROM zv_tenant_users
+           WHERE tenant_id = ${tenantId}::uuid AND role IN ('owner', 'admin')
+        `.execute(db));
+    set('people', Promise.all([total, admins]).then(([t, a]) => ({ total: t, admins: a })));
   }
 
   if (want.has('data')) {
@@ -313,6 +336,9 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
   // Per-request tenant-scoped DB handle so this extension's tables (FORCE RLS
   // keyed on `zveltio.current_tenant`) resolve inside the tenant transaction.
   const reqDb = (c: Context): Db => (ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') as Db) ?? ctx.db);
+  /** Tenant of the request; the default tenant on a single-tenant install. */
+  const tenantOf = (c: Context): string =>
+    ((c.get('tenant') as { id?: string } | null)?.id ?? DEFAULT_TENANT_ID);
   const userId = (c: Context) => (c.get('user') as { id: string }).id;
 
   const app = new Hono();
@@ -329,7 +355,7 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
     const db = reqDb(c);
     const uid = userId(c);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
-    const data = await computeWidgetData(db, resolved.widgets, ctx.config);
+    const data = await computeWidgetData(db, resolved.widgets, ctx.config, tenantOf(c));
     return c.json({
       widgets: resolved.widgets,
       available: resolved.available,
@@ -345,7 +371,7 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
     const db = reqDb(c);
     const uid = userId(c);
     const saved = await setUserLayout(db, uid, c.req.valid('json').widgets, checkPermission);
-    const data = await computeWidgetData(db, saved, ctx.config);
+    const data = await computeWidgetData(db, saved, ctx.config, tenantOf(c));
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
     return c.json({
       widgets: saved,
@@ -362,7 +388,7 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
     const uid = userId(c);
     await deleteUserLayout(db, uid);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
-    const data = await computeWidgetData(db, resolved.widgets, ctx.config);
+    const data = await computeWidgetData(db, resolved.widgets, ctx.config, tenantOf(c));
     return c.json({
       widgets: resolved.widgets,
       available: resolved.available,
