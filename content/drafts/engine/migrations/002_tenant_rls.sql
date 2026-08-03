@@ -26,12 +26,12 @@ ALTER TABLE zv_draft_review_comments ADD COLUMN IF NOT EXISTS tenant_id UUID;
 ALTER TABLE zv_draft_snapshots ADD COLUMN IF NOT EXISTS tenant_id UUID;
 ALTER TABLE zv_publish_schedule ADD COLUMN IF NOT EXISTS tenant_id UUID;
 
-ALTER TABLE zv_collection_publish_settings ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zv_content_drafts ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zv_draft_publish_jobs ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zv_draft_review_comments ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zv_draft_snapshots ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zv_publish_schedule ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
+ALTER TABLE zv_collection_publish_settings ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zv_content_drafts ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zv_draft_publish_jobs ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zv_draft_review_comments ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zv_draft_snapshots ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zv_publish_schedule ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
 
 CREATE INDEX IF NOT EXISTS idx_zv_collection_publish_settings_tenant ON zv_collection_publish_settings (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_zv_content_drafts_tenant ON zv_content_drafts (tenant_id);
@@ -69,16 +69,8 @@ BEGIN
     EXECUTE format('DROP POLICY IF EXISTS tenant_isolation_%I ON %I', tbl, tbl);
     EXECUTE format($pol$
       CREATE POLICY tenant_isolation_%I ON %I
-      USING (
-        NULLIF(current_setting('zveltio.current_tenant', true), '') IS NULL
-        OR tenant_id IS NULL
-        OR tenant_id::text = current_setting('zveltio.current_tenant', true)
-      )
-      WITH CHECK (
-        NULLIF(current_setting('zveltio.current_tenant', true), '') IS NULL
-        OR tenant_id IS NULL
-        OR tenant_id::text = current_setting('zveltio.current_tenant', true)
-      )
+      USING (zveltio_tenant_scope_ok(tenant_id))
+      WITH CHECK (zveltio_tenant_scope_ok(tenant_id))
     $pol$, tbl, tbl);
   END LOOP;
 END $$;

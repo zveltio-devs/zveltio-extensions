@@ -25,11 +25,11 @@ ALTER TABLE zv_document_template_access ADD COLUMN IF NOT EXISTS tenant_id UUID;
 ALTER TABLE zv_document_template_versions ADD COLUMN IF NOT EXISTS tenant_id UUID;
 ALTER TABLE zv_document_templates ADD COLUMN IF NOT EXISTS tenant_id UUID;
 
-ALTER TABLE zv_document_render_jobs ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zv_document_renders ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zv_document_template_access ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zv_document_template_versions ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zv_document_templates ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
+ALTER TABLE zv_document_render_jobs ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zv_document_renders ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zv_document_template_access ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zv_document_template_versions ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zv_document_templates ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
 
 CREATE INDEX IF NOT EXISTS idx_zv_document_render_jobs_tenant ON zv_document_render_jobs (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_zv_document_renders_tenant ON zv_document_renders (tenant_id);
@@ -63,16 +63,8 @@ BEGIN
     EXECUTE format('DROP POLICY IF EXISTS tenant_isolation_%I ON %I', tbl, tbl);
     EXECUTE format($pol$
       CREATE POLICY tenant_isolation_%I ON %I
-      USING (
-        NULLIF(current_setting('zveltio.current_tenant', true), '') IS NULL
-        OR tenant_id IS NULL
-        OR tenant_id::text = current_setting('zveltio.current_tenant', true)
-      )
-      WITH CHECK (
-        NULLIF(current_setting('zveltio.current_tenant', true), '') IS NULL
-        OR tenant_id IS NULL
-        OR tenant_id::text = current_setting('zveltio.current_tenant', true)
-      )
+      USING (zveltio_tenant_scope_ok(tenant_id))
+      WITH CHECK (zveltio_tenant_scope_ok(tenant_id))
     $pol$, tbl, tbl);
   END LOOP;
 END $$;

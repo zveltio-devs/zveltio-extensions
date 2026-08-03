@@ -13,6 +13,7 @@ var __export = (target, all) => {
       set: __exportSetter.bind(all, name)
     });
 };
+var __require = import.meta.require;
 
 // engine/index.ts
 import { join } from "path";
@@ -19824,12 +19825,28 @@ function apiConnectorRoutes(ctx) {
     if (!webhook.rows.length)
       return c.json({ error: "Webhook not found" }, 404);
     const w = webhook.rows[0];
+    let rawBody = "";
     if (w.secret) {
       const sig = c.req.header("x-hub-signature-256") ?? c.req.header("x-webhook-signature");
       if (!sig)
         return c.json({ error: "Missing signature" }, 401);
+      rawBody = await c.req.text();
+      const { createHmac, timingSafeEqual } = await import("crypto");
+      const expected = createHmac("sha256", w.secret).update(rawBody).digest("hex");
+      const provided = sig.startsWith("sha256=") ? sig.slice(7) : sig;
+      const a = Buffer.from(provided.toLowerCase(), "hex");
+      const b = Buffer.from(expected, "hex");
+      if (a.length !== b.length || !timingSafeEqual(a, b)) {
+        return c.json({ error: "Invalid signature" }, 401);
+      }
     }
-    const payload = await c.req.json().catch(() => ({}));
+    const payload = w.secret ? (() => {
+      try {
+        return JSON.parse(rawBody);
+      } catch {
+        return {};
+      }
+    })() : await c.req.json().catch(() => ({}));
     const headers = {};
     c.req.raw.headers.forEach((v, k) => {
       headers[k] = v;
