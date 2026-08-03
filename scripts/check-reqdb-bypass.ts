@@ -41,7 +41,7 @@
  * That shadowing is the root of the whole class: inside such a helper you
  * cannot tell by reading whether `db` is the argument or the global pool.
  *
- * The 51 that remain are each one of four things, and none of them is a
+ * The 44 that remain are each one of three things, and none of them is a
  * forgotten line:
  *
  *   24  `auth/scim`'s PUBLIC app. Its tenant comes from the bearer token, not
@@ -52,9 +52,12 @@
  *       handlers do `const db = reqDb(c)` and pass it into helpers whose
  *       parameter is spelled `db`. This is the known false positive, and the
  *       multi-line signatures are why the rename above did not reach them.
- *    7  `data/export` and `data/import` background JOBS. They run after the
- *       response, from a queue, with no request to scope to — the file says so,
- *       and threading the tenant through the job payload is the real fix.
+ *    0  `data/export` and `data/import` — FIXED. Their jobs run after the
+ *       response with no request to scope to, which is why they were exempt;
+ *       the engine now offers `ctx.internals.withTenantIsolation(tenantId, …)`
+ *       and the enqueueing handler passes the tenant in. The transaction
+ *       parameter is named `tdb`, not `db`, so it cannot be mistaken for the
+ *       pool by the next reader — or by this gate.
  *    8  Resolver closures (`developer/graphql`), config writers (`auth/ldap`,
  *       `auth/saml`) and one fire-and-forget access log, all of which execute
  *       where no `c` exists.
