@@ -389,13 +389,42 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
     const webhook = await sql`SELECT * FROM zvd_incoming_webhooks WHERE endpoint_path = ${path} AND is_active = true`.execute(reqDb(c));
     if (!webhook.rows.length) return c.json({ error: 'Webhook not found' }, 404);
     const w = webhook.rows[0] as any;
-    // Verify HMAC secret if set
+    // Verify the HMAC signature when the webhook carries a secret.
+    //
+    // This used to check that the header was PRESENT and stop there, with a
+    // note saying real verification would need the crypto module. So the
+    // endpoint accepted any payload from anyone who knew the path, as long as
+    // they sent `x-hub-signature-256: anything` — and the signature check
+    // being visibly "there" is what stopped anyone looking again. Configuring
+    // a secret bought nothing.
+    let rawBody = '';
     if (w.secret) {
       const sig = c.req.header('x-hub-signature-256') ?? c.req.header('x-webhook-signature');
       if (!sig) return c.json({ error: 'Missing signature' }, 401);
-      // Note: proper HMAC verification would need crypto module
+      // The signature covers the bytes as sent. Parsing to JSON and
+      // re-serialising would change key order and whitespace, so the body is
+      // read once as text and reused below.
+      rawBody = await c.req.text();
+      const { createHmac, timingSafeEqual } = await import('node:crypto');
+      const expected = createHmac('sha256', w.secret).update(rawBody).digest('hex');
+      // GitHub-style `sha256=<hex>`; also accept a bare hex digest, which is
+      // what most other senders emit.
+      const provided = sig.startsWith('sha256=') ? sig.slice(7) : sig;
+      const a = Buffer.from(provided.toLowerCase(), 'hex');
+      const b = Buffer.from(expected, 'hex');
+      if (a.length !== b.length || !timingSafeEqual(a, b)) {
+        return c.json({ error: 'Invalid signature' }, 401);
+      }
     }
-    const payload = await c.req.json().catch(() => ({}));
+    const payload = w.secret
+      ? ((): unknown => {
+          try {
+            return JSON.parse(rawBody);
+          } catch {
+            return {};
+          }
+        })()
+      : await c.req.json().catch(() => ({}));
     const headers: Record<string, string> = {};
     c.req.raw.headers.forEach((v, k) => { headers[k] = v; });
     await sql`

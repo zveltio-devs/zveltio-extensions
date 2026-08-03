@@ -26,12 +26,12 @@ ALTER TABLE zvd_quality_rules ADD COLUMN IF NOT EXISTS tenant_id UUID;
 ALTER TABLE zvd_quality_scores ADD COLUMN IF NOT EXISTS tenant_id UUID;
 ALTER TABLE zvd_quality_sla_targets ADD COLUMN IF NOT EXISTS tenant_id UUID;
 
-ALTER TABLE zv_quality_issues ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zv_quality_scans ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zvd_quality_remediations ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zvd_quality_rules ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zvd_quality_scores ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zvd_quality_sla_targets ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
+ALTER TABLE zv_quality_issues ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zv_quality_scans ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zvd_quality_remediations ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zvd_quality_rules ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zvd_quality_scores ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zvd_quality_sla_targets ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
 
 CREATE INDEX IF NOT EXISTS idx_zv_quality_issues_tenant ON zv_quality_issues (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_zv_quality_scans_tenant ON zv_quality_scans (tenant_id);
@@ -69,16 +69,8 @@ BEGIN
     EXECUTE format('DROP POLICY IF EXISTS tenant_isolation_%I ON %I', tbl, tbl);
     EXECUTE format($pol$
       CREATE POLICY tenant_isolation_%I ON %I
-      USING (
-        NULLIF(current_setting('zveltio.current_tenant', true), '') IS NULL
-        OR tenant_id IS NULL
-        OR tenant_id::text = current_setting('zveltio.current_tenant', true)
-      )
-      WITH CHECK (
-        NULLIF(current_setting('zveltio.current_tenant', true), '') IS NULL
-        OR tenant_id IS NULL
-        OR tenant_id::text = current_setting('zveltio.current_tenant', true)
-      )
+      USING (zveltio_tenant_scope_ok(tenant_id))
+      WITH CHECK (zveltio_tenant_scope_ok(tenant_id))
     $pol$, tbl, tbl);
   END LOOP;
 END $$;

@@ -30,16 +30,16 @@ ALTER TABLE zvd_task_custom_values ADD COLUMN IF NOT EXISTS tenant_id UUID;
 ALTER TABLE zvd_task_dependencies ADD COLUMN IF NOT EXISTS tenant_id UUID;
 ALTER TABLE zvd_tasks ADD COLUMN IF NOT EXISTS tenant_id UUID;
 
-ALTER TABLE zvd_milestones ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zvd_project_custom_fields ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zvd_project_members ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zvd_projects ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zvd_subtasks ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zvd_task_attachments ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zvd_task_comments ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zvd_task_custom_values ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zvd_task_dependencies ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
-ALTER TABLE zvd_tasks ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
+ALTER TABLE zvd_milestones ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zvd_project_custom_fields ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zvd_project_members ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zvd_projects ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zvd_subtasks ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zvd_task_attachments ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zvd_task_comments ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zvd_task_custom_values ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zvd_task_dependencies ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
+ALTER TABLE zvd_tasks ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
 
 CREATE INDEX IF NOT EXISTS idx_zvd_milestones_tenant ON zvd_milestones (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_zvd_project_custom_fields_tenant ON zvd_project_custom_fields (tenant_id);
@@ -93,16 +93,8 @@ BEGIN
     EXECUTE format('DROP POLICY IF EXISTS tenant_isolation_%I ON %I', tbl, tbl);
     EXECUTE format($pol$
       CREATE POLICY tenant_isolation_%I ON %I
-      USING (
-        NULLIF(current_setting('zveltio.current_tenant', true), '') IS NULL
-        OR tenant_id IS NULL
-        OR tenant_id::text = current_setting('zveltio.current_tenant', true)
-      )
-      WITH CHECK (
-        NULLIF(current_setting('zveltio.current_tenant', true), '') IS NULL
-        OR tenant_id IS NULL
-        OR tenant_id::text = current_setting('zveltio.current_tenant', true)
-      )
+      USING (zveltio_tenant_scope_ok(tenant_id))
+      WITH CHECK (zveltio_tenant_scope_ok(tenant_id))
     $pol$, tbl, tbl);
   END LOOP;
 END $$;

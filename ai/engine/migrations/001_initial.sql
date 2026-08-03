@@ -285,9 +285,12 @@ CREATE INDEX IF NOT EXISTS idx_zv_ai_memory_user ON zv_ai_memory(user_id);
 --      poorly-written route that forgets to filter by tenant cannot
 --      return cross-tenant rows.
 --
--- Single-tenant deployments (no tenantMiddleware → no SET LOCAL) keep
--- working because rows then have `tenant_id IS NULL` and the policy
--- below also allows NULL when the GUC is empty.
+-- Single-tenant deployments (no tenantMiddleware → no SET LOCAL) keep working
+-- because the column DEFAULT and the policy both fall back to the DEFAULT
+-- tenant when the GUC is empty — see `zveltio_tenant_scope_ok`, engine
+-- migration 029. They used to keep working by letting EVERY row through when
+-- the GUC was unset, which also let any query that forgot the tenant
+-- transaction read every tenant's embeddings.
 
 ALTER TABLE zvd_ai_embeddings
   ADD COLUMN IF NOT EXISTS tenant_id UUID;
@@ -296,7 +299,7 @@ ALTER TABLE zvd_ai_embeddings
 -- The default for new rows pulls from the session GUC so application code
 -- doesn't have to know about the column.
 ALTER TABLE zvd_ai_embeddings
-  ALTER COLUMN tenant_id SET DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid;
+  ALTER COLUMN tenant_id SET DEFAULT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid, '00000000-0000-0000-0000-000000000001'::uuid);
 
 CREATE INDEX IF NOT EXISTS idx_zvd_ai_embeddings_tenant
   ON zvd_ai_embeddings (tenant_id, collection);
@@ -306,19 +309,8 @@ ALTER TABLE zvd_ai_embeddings FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS tenant_isolation_ai_embeddings ON zvd_ai_embeddings;
 CREATE POLICY tenant_isolation_ai_embeddings ON zvd_ai_embeddings
-  USING (
-    -- Single-tenant mode (no GUC): the policy must allow NULL rows so
-    -- legacy data is still readable; multi-tenant mode requires the GUC
-    -- to match the row's tenant_id.
-    NULLIF(current_setting('zveltio.current_tenant', true), '') IS NULL
-    OR tenant_id IS NULL
-    OR tenant_id::text = current_setting('zveltio.current_tenant', true)
-  )
-  WITH CHECK (
-    NULLIF(current_setting('zveltio.current_tenant', true), '') IS NULL
-    OR tenant_id IS NULL
-    OR tenant_id::text = current_setting('zveltio.current_tenant', true)
-  );
+  USING (zveltio_tenant_scope_ok(tenant_id))
+  WITH CHECK (zveltio_tenant_scope_ok(tenant_id));
 
 -- Loud warning if pre-existing rows have NULL tenant_id in a deployment
 -- that has any populated tenant. Operator should backfill.

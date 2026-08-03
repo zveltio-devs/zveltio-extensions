@@ -19443,6 +19443,7 @@ function parseParameter(param) {
 }
 // engine/routes.ts
 import { randomBytes, randomUUID } from "crypto";
+var DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 var SCIM_USER = "urn:ietf:params:scim:schemas:core:2.0:User";
 var SCIM_LIST = "urn:ietf:params:scim:api:messages:2.0:ListResponse";
 var SCIM_ERROR = "urn:ietf:params:scim:api:messages:2.0:Error";
@@ -19504,6 +19505,20 @@ function scimAdminRoutes(ctx) {
 function buildScimApp(ctx) {
   const { db, auth } = ctx;
   const app = new Hono2().basePath("/scim/v2");
+  const tenantOf = (c) => c.get("scimTenantId");
+  async function isMember(userId, tenantId) {
+    if (tenantId === DEFAULT_TENANT_ID) {
+      const r2 = await sql`
+        SELECT COUNT(*)::int AS n FROM "user" WHERE id = ${userId}
+      `.execute(db);
+      return (r2.rows[0]?.n ?? 0) > 0;
+    }
+    const r = await sql`
+      SELECT COUNT(*)::int AS n FROM zv_tenant_users
+       WHERE user_id = ${userId} AND tenant_id = ${tenantId}::uuid
+    `.execute(db);
+    return (r.rows[0]?.n ?? 0) > 0;
+  }
   app.use("*", async (c, next) => {
     const header = c.req.header("authorization") ?? "";
     const raw2 = header.startsWith("Bearer ") ? header.slice(7) : "";
@@ -19516,10 +19531,11 @@ function buildScimApp(ctx) {
       return scimError(c, 500, "SCIM is not configured on this server");
     }
     const row = await sql`
-      SELECT id::text FROM zv_scim_tokens WHERE token_hash = ${hash2}
+      SELECT id::text, tenant_id::text FROM zv_scim_tokens WHERE token_hash = ${hash2}
     `.execute(db);
     if (row.rows.length === 0)
       return scimError(c, 401, "Invalid bearer token");
+    c.set("scimTenantId", row.rows[0].tenant_id);
     await sql`UPDATE zv_scim_tokens SET last_used_at = NOW() WHERE id = ${row.rows[0].id}`.execute(db).catch(() => {
       return;
     });
@@ -19537,13 +19553,15 @@ function buildScimApp(ctx) {
       { type: "oauthbearertoken", name: "Bearer token", description: "Long-lived bearer token configured in Zveltio Studio" }
     ]
   }));
-  async function stateOf(userId) {
+  async function stateOf(userId, tenantId) {
     const r = await sql`
-      SELECT external_id, active FROM zv_scim_users WHERE user_id = ${userId}
+      SELECT external_id, active FROM zv_scim_users
+       WHERE user_id = ${userId} AND tenant_id = ${tenantId}::uuid
     `.execute(db);
     return r.rows[0] ?? { external_id: null, active: true };
   }
   app.get("/Users", async (c) => {
+    const tenantId = tenantOf(c);
     const filter = c.req.query("filter") ?? "";
     const startIndex = Math.max(1, parseInt(c.req.query("startIndex") ?? "1", 10) || 1);
     const count = Math.min(200, Math.max(0, parseInt(c.req.query("count") ?? "100", 10) || 100));
@@ -19551,17 +19569,26 @@ function buildScimApp(ctx) {
     let rows;
     if (m) {
       const r = await sql`
-        SELECT id, email, name, "createdAt", "updatedAt" FROM "user" WHERE lower(email) = ${m[1].toLowerCase()}
+        SELECT u.id, u.email, u.name, u."createdAt", u."updatedAt"
+          FROM "user" u
+         WHERE lower(u.email) = ${m[1].toLowerCase()}
+           AND (${tenantId} = ${DEFAULT_TENANT_ID} OR EXISTS (
+                 SELECT 1 FROM zv_tenant_users tu
+                  WHERE tu.user_id = u.id AND tu.tenant_id = ${tenantId}::uuid))
       `.execute(db);
       rows = r.rows;
     } else {
       const r = await sql`
-        SELECT id, email, name, "createdAt", "updatedAt" FROM "user"
-        ORDER BY "createdAt" LIMIT ${count} OFFSET ${startIndex - 1}
+        SELECT u.id, u.email, u.name, u."createdAt", u."updatedAt"
+          FROM "user" u
+         WHERE (${tenantId} = ${DEFAULT_TENANT_ID} OR EXISTS (
+                 SELECT 1 FROM zv_tenant_users tu
+                  WHERE tu.user_id = u.id AND tu.tenant_id = ${tenantId}::uuid))
+         ORDER BY u."createdAt" LIMIT ${count} OFFSET ${startIndex - 1}
       `.execute(db);
       rows = r.rows;
     }
-    const resources = await Promise.all(rows.map(async (u) => toScimUser(u, await stateOf(u.id))));
+    const resources = await Promise.all(rows.map(async (u) => toScimUser(u, await stateOf(u.id, tenantId))));
     return c.json({
       schemas: [SCIM_LIST],
       totalResults: resources.length,
@@ -19571,12 +19598,19 @@ function buildScimApp(ctx) {
     });
   });
   app.get("/Users/:id", async (c) => {
+    const tenantId = tenantOf(c);
+    const id = c.req.param("id");
     const r = await sql`
-      SELECT id, email, name, "createdAt", "updatedAt" FROM "user" WHERE id = ${c.req.param("id")}
+      SELECT u.id, u.email, u.name, u."createdAt", u."updatedAt"
+        FROM "user" u
+       WHERE u.id = ${id}
+         AND (${tenantId} = ${DEFAULT_TENANT_ID} OR EXISTS (
+               SELECT 1 FROM zv_tenant_users tu
+                WHERE tu.user_id = u.id AND tu.tenant_id = ${tenantId}::uuid))
     `.execute(db);
     if (r.rows.length === 0)
       return scimError(c, 404, "User not found");
-    return c.json(toScimUser(r.rows[0], await stateOf(c.req.param("id"))));
+    return c.json(toScimUser(r.rows[0], await stateOf(id, tenantId)));
   });
   app.post("/Users", async (c) => {
     const body = await c.req.json().catch(() => null);
@@ -19584,35 +19618,47 @@ function buildScimApp(ctx) {
     if (!email3)
       return scimError(c, 400, "userName (email) is required");
     const name = body?.name?.formatted ?? body?.displayName ?? email3;
-    const existing = await sql`SELECT id FROM "user" WHERE lower(email) = ${email3.toLowerCase()}`.execute(db);
-    if (existing.rows.length > 0)
-      return scimError(c, 409, "User already exists");
-    let userId;
-    try {
-      const res = await auth.api.signUpEmail({
-        body: { email: email3, name, password: `Scim!${randomUUID()}` }
-      });
-      userId = res?.user?.id;
-    } catch (e) {
-      return scimError(c, 500, `signup failed: ${e instanceof Error ? e.message : String(e)}`);
+    const tenantId = tenantOf(c);
+    const existing = await sql`
+      SELECT id FROM "user" WHERE lower(email) = ${email3.toLowerCase()}
+    `.execute(db);
+    let userId = existing.rows[0]?.id;
+    if (userId) {
+      if (await isMember(userId, tenantId))
+        return scimError(c, 409, "User already exists");
+    } else {
+      try {
+        const res = await auth.api.signUpEmail({
+          body: { email: email3, name, password: `Scim!${randomUUID()}` }
+        });
+        userId = res?.user?.id;
+      } catch (e) {
+        return scimError(c, 500, `signup failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      if (!userId)
+        return scimError(c, 500, "signup did not return a user");
     }
-    if (!userId)
-      return scimError(c, 500, "signup did not return a user");
+    await sql`
+      INSERT INTO zv_tenant_users (tenant_id, user_id, role)
+      VALUES (${tenantId}::uuid, ${userId}, 'member')
+      ON CONFLICT (tenant_id, user_id) DO NOTHING
+    `.execute(db);
     const active = body?.active !== false;
     await sql`
-      INSERT INTO zv_scim_users (user_id, external_id, active)
-      VALUES (${userId}, ${body?.externalId ?? null}, ${active})
-      ON CONFLICT (user_id) DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active, updated_at = NOW()
+      INSERT INTO zv_scim_users (tenant_id, user_id, external_id, active)
+      VALUES (${tenantId}::uuid, ${userId}, ${body?.externalId ?? null}, ${active})
+      ON CONFLICT (tenant_id, user_id) DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active, updated_at = NOW()
     `.execute(db);
     const row = await sql`
       SELECT id, email, name, "createdAt", "updatedAt" FROM "user" WHERE id = ${userId}
     `.execute(db);
     return c.json(toScimUser(row.rows[0], { external_id: body?.externalId ?? null, active }), 201);
   });
-  async function setActive(userId, active) {
+  async function setActive(userId, tenantId, active) {
     await sql`
-      INSERT INTO zv_scim_users (user_id, active) VALUES (${userId}, ${active})
-      ON CONFLICT (user_id) DO UPDATE SET active = EXCLUDED.active, updated_at = NOW()
+      INSERT INTO zv_scim_users (tenant_id, user_id, active)
+      VALUES (${tenantId}::uuid, ${userId}, ${active})
+      ON CONFLICT (tenant_id, user_id) DO UPDATE SET active = EXCLUDED.active, updated_at = NOW()
     `.execute(db);
     if (!active) {
       await sql`DELETE FROM "session" WHERE "userId" = ${userId}`.execute(db).catch(() => {
@@ -19628,8 +19674,8 @@ function buildScimApp(ctx) {
   }
   app.patch("/Users/:id", async (c) => {
     const id = c.req.param("id");
-    const exists = await sql`SELECT id FROM "user" WHERE id = ${id}`.execute(db);
-    if (exists.rows.length === 0)
+    const tenantId = tenantOf(c);
+    if (!await isMember(id, tenantId))
       return scimError(c, 404, "User not found");
     const body = await c.req.json().catch(() => null);
     if (!body?.schemas?.includes(SCIM_PATCH) || !Array.isArray(body.Operations)) {
@@ -19641,12 +19687,12 @@ function buildScimApp(ctx) {
         continue;
       const path = String(op.path ?? "").toLowerCase();
       if (path === "active") {
-        await setActive(id, op.value === true || op.value === "True" || op.value === "true");
+        await setActive(id, tenantId, op.value === true || op.value === "True" || op.value === "true");
       } else if (path === "displayname" || path === "name.formatted") {
         await sql`UPDATE "user" SET name = ${String(op.value)}, "updatedAt" = NOW() WHERE id = ${id}`.execute(db);
       } else if (!path && op.value && typeof op.value === "object") {
         if ("active" in op.value) {
-          await setActive(id, op.value.active === true || op.value.active === "True" || op.value.active === "true");
+          await setActive(id, tenantId, op.value.active === true || op.value.active === "True" || op.value.active === "true");
         }
         if (typeof op.value.displayName === "string") {
           await sql`UPDATE "user" SET name = ${op.value.displayName}, "updatedAt" = NOW() WHERE id = ${id}`.execute(db);
@@ -19656,20 +19702,33 @@ function buildScimApp(ctx) {
     const row = await sql`
       SELECT id, email, name, "createdAt", "updatedAt" FROM "user" WHERE id = ${id}
     `.execute(db);
-    return c.json(toScimUser(row.rows[0], await stateOf(id)));
+    return c.json(toScimUser(row.rows[0], await stateOf(id, tenantId)));
   });
   app.delete("/Users/:id", async (c) => {
     const id = c.req.param("id");
+    const tenantId = tenantOf(c);
+    if (!await isMember(id, tenantId))
+      return scimError(c, 404, "User not found");
+    await sql`
+      DELETE FROM zv_tenant_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
+    `.execute(db);
+    await sql`
+      DELETE FROM zv_scim_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
+    `.execute(db).catch(() => {
+      return;
+    });
     await sql`DELETE FROM "session" WHERE "userId" = ${id}`.execute(db).catch(() => {
       return;
     });
-    await sql`DELETE FROM "account" WHERE "userId" = ${id}`.execute(db).catch(() => {
-      return;
-    });
-    await sql`DELETE FROM zv_scim_users WHERE user_id = ${id}`.execute(db).catch(() => {
-      return;
-    });
-    await sql`DELETE FROM "user" WHERE id = ${id}`.execute(db);
+    const remaining = await sql`
+      SELECT COUNT(*)::int AS n FROM zv_tenant_users WHERE user_id = ${id}
+    `.execute(db);
+    if ((remaining.rows[0]?.n ?? 0) === 0) {
+      await sql`DELETE FROM "account" WHERE "userId" = ${id}`.execute(db).catch(() => {
+        return;
+      });
+      await sql`DELETE FROM "user" WHERE id = ${id}`.execute(db);
+    }
     return c.body(null, 204);
   });
   app.get("/Groups", (c) => c.json({ schemas: [SCIM_LIST], totalResults: 0, startIndex: 1, itemsPerPage: 0, Resources: [] }));
@@ -19682,7 +19741,10 @@ var extension = {
   category: "auth",
   mountStrategy: "subapp",
   getMigrations() {
-    return [join(import.meta.dir, "migrations/001_initial.sql")];
+    return [
+      join(import.meta.dir, "migrations/001_initial.sql"),
+      join(import.meta.dir, "migrations/002_tenant_scoped_tokens.sql")
+    ];
   },
   async register(app, ctx) {
     app.route("/", scimAdminRoutes(ctx));
