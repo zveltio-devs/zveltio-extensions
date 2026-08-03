@@ -18,7 +18,8 @@
     "documents"
   ],
   "publicRoutes": [
-    "/sign/*"
+    "/sign/*",
+    "/share/*"
   ],
   "studio": {
     "pages": [

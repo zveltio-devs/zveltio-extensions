@@ -19540,7 +19540,8 @@ async function setUserLayout(db, userId, widgets, checkPermission) {
   return withMandatory;
 }
 var countOf = (p) => p.then((r) => Number(r.rows[0]?.count ?? 0)).catch(() => 0);
-async function computeWidgetData(db, ids, config2) {
+var DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+async function computeWidgetData(db, ids, config2, tenantId) {
   const want = new Set(ids);
   const out = {};
   const tasks = [];
@@ -19568,10 +19569,17 @@ async function computeWidgetData(db, ids, config2) {
     set2("health", sql`SELECT 1`.execute(db).then(() => ({ ok: true, database: true })).catch(() => ({ ok: false, database: false })));
   }
   if (want.has("people")) {
-    set2("people", Promise.all([
-      countOf(sql`SELECT COUNT(*) AS count FROM "user"`.execute(db)),
-      countOf(sql`SELECT COUNT(*) AS count FROM "user" WHERE role = 'god'`.execute(db))
-    ]).then(([total, admins]) => ({ total, admins })));
+    const isDefault = tenantId === DEFAULT_TENANT_ID;
+    const total = isDefault ? countOf(sql`SELECT COUNT(*) AS count FROM "user"`.execute(db)) : countOf(sql`
+          SELECT COUNT(*) AS count FROM zv_tenant_users WHERE tenant_id = ${tenantId}::uuid
+        `.execute(db));
+    const admins = isDefault ? countOf(sql`
+          SELECT COUNT(*) AS count FROM "user" WHERE role IN ('god', 'admin')
+        `.execute(db)) : countOf(sql`
+          SELECT COUNT(*) AS count FROM zv_tenant_users
+           WHERE tenant_id = ${tenantId}::uuid AND role IN ('owner', 'admin')
+        `.execute(db));
+    set2("people", Promise.all([total, admins]).then(([t, a]) => ({ total: t, admins: a })));
   }
   if (want.has("data")) {
     set2("data", Promise.all([
@@ -19605,6 +19613,7 @@ async function computeWidgetData(db, ids, config2) {
 function dashboardRoutes(ctx) {
   const { auth, checkPermission, getUserRoles } = ctx;
   const reqDb = (c) => ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? ctx.db;
+  const tenantOf = (c) => c.get("tenant")?.id ?? DEFAULT_TENANT_ID;
   const userId = (c) => c.get("user").id;
   const app = new Hono2;
   app.use("*", async (c, next) => {
@@ -19618,7 +19627,7 @@ function dashboardRoutes(ctx) {
     const db = reqDb(c);
     const uid = userId(c);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
-    const data = await computeWidgetData(db, resolved.widgets, ctx.config);
+    const data = await computeWidgetData(db, resolved.widgets, ctx.config, tenantOf(c));
     return c.json({
       widgets: resolved.widgets,
       available: resolved.available,
@@ -19631,7 +19640,7 @@ function dashboardRoutes(ctx) {
     const db = reqDb(c);
     const uid = userId(c);
     const saved = await setUserLayout(db, uid, c.req.valid("json").widgets, checkPermission);
-    const data = await computeWidgetData(db, saved, ctx.config);
+    const data = await computeWidgetData(db, saved, ctx.config, tenantOf(c));
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
     return c.json({
       widgets: saved,
@@ -19646,7 +19655,7 @@ function dashboardRoutes(ctx) {
     const uid = userId(c);
     await deleteUserLayout(db, uid);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
-    const data = await computeWidgetData(db, resolved.widgets, ctx.config);
+    const data = await computeWidgetData(db, resolved.widgets, ctx.config, tenantOf(c));
     return c.json({
       widgets: resolved.widgets,
       available: resolved.available,

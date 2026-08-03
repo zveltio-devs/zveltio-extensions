@@ -26,7 +26,7 @@
   "finance/invoicing/engine/routes.ts": 2,
   "finance/expenses/engine/routes.ts": 1,
   "analytics/quality/engine/routes.ts": 8,
-  "analytics/dashboard/engine/routes.ts": 12,
+  "analytics/dashboard/engine/routes.ts": 14,
   "sms/engine/routes.ts": 3,
   "compliance/gdpr/engine/routes.ts": 1,
   "compliance/ro/efactura/engine/routes.ts": 1,
