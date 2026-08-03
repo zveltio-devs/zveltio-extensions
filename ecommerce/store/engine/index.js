@@ -19592,7 +19592,7 @@ function ecommerceRoutes(ctx) {
     `.execute(reqDb(c));
     return c.json({ data: row.rows[0] }, 201);
   });
-  app.post("/public/carts", zValidator("json", exports_external.object({
+  app.post("/public/carts", rateLimit(30, 3600000), zValidator("json", exports_external.object({
     session_id: exports_external.string().min(1),
     customer_email: exports_external.string().email().optional(),
     customer_name: exports_external.string().optional(),
