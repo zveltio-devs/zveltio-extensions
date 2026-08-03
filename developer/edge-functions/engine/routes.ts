@@ -284,15 +284,35 @@ export async function mountEdgeFunctions(ctx: ExtensionContext): Promise<void> {
       });
     };
 
-    // S3-01: each method registered on the engine's global app via the
-    // sub-app extension's escape hatch. User-deployed function paths
-    // (e.g. /api/fn/my-webhook, /webhooks/stripe) stay at their chosen
-    // root-relative URLs even though the extension's own routes live
-    // under /ext/developer/edge-functions/.
+    // `/api/fn/*` belongs to the engine, not to this extension.
+    //
+    // Both used to serve it. The engine mounts `/api/fn/:name`; this loop
+    // registered `/api/fn/<name>` per function, and Hono prefers a static path
+    // over a parameterised one — so the extension silently won, and the two
+    // do not authenticate alike. The engine accepts a session OR an API key
+    // bound to the tenant; this handler accepts a session only, and treats
+    // `ZVELTIO_PUBLIC=true` as no authentication at all. A function author
+    // could therefore turn the engine's gate off by setting an env var.
+    //
+    // The engine's route is also the better one for this prefix: it resolves
+    // the function per request, so one created a minute ago answers
+    // immediately, where these mounts are taken once at boot and a new
+    // function stays dead until the extension reloads. It reads the row with
+    // `tenant_id` in the WHERE clause, which the boot query above cannot do.
+    // And it now honours `ZVELTIO_PUBLIC`, so nothing is lost by deferring.
+    //
+    // Custom root paths (`/webhooks/stripe` and the like) are the part the
+    // engine cannot serve, so they stay here.
+    if (fn.path.startsWith('/api/fn/')) continue;
+
     for (const method of methods) {
       ctx.registerPublicRoute({ method, path: fn.path, handler });
     }
   }
 
-  console.log(`  Edge functions mounted: ${fns.length}`);
+  const custom = fns.filter((f) => !String(f.path).startsWith('/api/fn/')).length;
+  console.log(
+    `  Edge functions: ${custom} custom-path mount(s); ` +
+      `${fns.length - custom} served by the engine at /api/fn/:name`,
+  );
 }

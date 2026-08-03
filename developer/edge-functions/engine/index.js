@@ -16230,11 +16230,14 @@ async function mountEdgeFunctions(ctx) {
         headers: { "Content-Type": "application/json" }
       });
     };
+    if (fn.path.startsWith("/api/fn/"))
+      continue;
     for (const method of methods) {
       ctx.registerPublicRoute({ method, path: fn.path, handler });
     }
   }
-  console.log(`  Edge functions mounted: ${fns.length}`);
+  const custom2 = fns.filter((f) => !String(f.path).startsWith("/api/fn/")).length;
+  console.log(`  Edge functions: ${custom2} custom-path mount(s); ` + `${fns.length - custom2} served by the engine at /api/fn/:name`);
 }
 
 // engine/index.ts
