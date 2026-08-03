@@ -42,7 +42,19 @@ import { join, relative } from 'node:path';
 const ROOT = join(import.meta.dir, '..');
 const BASELINE = join(ROOT, 'scripts', 'reqdb-bypass-baseline.json');
 
-/** A query issued on the closed-over `db` rather than the request's `reqDb(c)`. */
+/**
+ * A query issued on the closed-over `db` rather than the request's `reqDb(c)`.
+ *
+ * Known false positive, and worth stating rather than quietly tuning away: a
+ * helper that takes `db: Db` as a PARAMETER matches too, even when every caller
+ * passes `reqDb(c)`. Telling those apart needs to know what the identifier is
+ * bound to, which is a type-checker's job, not a regex's.
+ *
+ * That is survivable because this is a ratchet, not a verdict: a helper like
+ * that raises the recorded count once, a human reads the diff, and it gets
+ * re-recorded with `--update`. What must not happen is re-recording without
+ * reading — the whole value of the number is that somebody looked.
+ */
 const BARE_DB = /\(db as any\)|\.execute\(db\)|await db\./;
 /** The file has to know about `reqDb` for going around it to mean anything. */
 const DEFINES_REQDB = /\breqDb\s*=|\bfunction reqDb\b/;
