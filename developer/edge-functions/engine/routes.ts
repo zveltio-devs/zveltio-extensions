@@ -238,10 +238,12 @@ export async function mountEdgeFunctions(ctx: ExtensionContext): Promise<void> {
 
   let fns: any[];
   try {
-    // Boot-time path (mountEdgeFunctions runs at startup) — no request
-    // context, so we use the bare pool. Multi-tenant deployments need
-    // to surface tenant_id explicitly here once edge functions become
-    // tenant-scoped (follow-up).
+    // Boot-time path (mountEdgeFunctions runs at startup) — no request context,
+    // so this reads the bare pool across every tenant. That is deliberate and
+    // now harmless: this query decides only WHICH PATHS get a route, and the
+    // handler re-resolves the function per request under the caller's tenant.
+    // It used to decide what the handler RAN, which is what made it a
+    // cross-tenant hole.
     fns = await db
       .selectFrom('zv_edge_functions')
       .selectAll()
@@ -260,19 +262,47 @@ export async function mountEdgeFunctions(ctx: ExtensionContext): Promise<void> {
     const isPublic = env.ZVELTIO_PUBLIC === 'true';
 
     const handler = async (c: any) => {
-      if (!fn.is_active) return c.json({ error: 'Function is inactive' }, 503);
+      // Re-resolve the function for THIS request, in THIS tenant.
+      //
+      // `fn` above is a snapshot taken at boot from a query with no tenant in
+      // it, so the loop mounted every tenant's custom paths onto one global
+      // app and each handler closed over whichever tenant's row happened to be
+      // there. Two tenants with a `/webhooks/stripe` shared one handler, and
+      // the code that ran belonged to whoever was read first. The comment above
+      // the boot query has admitted the gap for a while; this closes it at the
+      // only place a tenant is knowable, which is the request.
+      //
+      // Re-reading also ends a quieter bug: an edited function kept running its
+      // boot-time code until the extension reloaded.
+      const live = await reqDb(c)
+        .selectFrom('zv_edge_functions')
+        .selectAll()
+        .where('path', '=', fn.path)
+        .where('is_active', '=', true)
+        .executeTakeFirst()
+        .catch(() => null);
+
+      // The path is mounted because SOME tenant defined it. That does not mean
+      // this one did.
+      if (!live) return c.json({ error: 'Function not found' }, 404);
+
+      // From the live row, not the snapshot — otherwise a tenant could inherit
+      // another's "public" flag, which is the same mistake in a smaller place.
+      const liveEnv =
+        typeof live.env_vars === 'string' ? JSON.parse(live.env_vars) : (live.env_vars ?? {});
+      const livePublic = liveEnv.ZVELTIO_PUBLIC === 'true';
 
       // N5: require auth for non-public functions
-      if (!isPublic && auth) {
+      if (!livePublic && auth) {
         const session = await auth.api.getSession({ headers: c.req.raw.headers });
         if (!session?.user) return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      const result = await runFunction(fn.code, c.req.raw, env, fn.timeout_ms) as any;
+      const result = await runFunction(live.code, c.req.raw, liveEnv, live.timeout_ms) as any;
 
       // Log async
       reqDb(c).insertInto('zv_edge_function_logs').values({
-        function_id: fn.id,
+        function_id: live.id,
         status: result.status,
         duration_ms: result.duration_ms,
         error: result.error || null,
