@@ -19465,8 +19465,9 @@ function translationsRoutes(ctx) {
   const app = new Hono2;
   app.get("/public/:locale", async (c) => {
     const locale = c.req.param("locale");
-    if (Date.now() < cacheExpiry && i18nCache.has(locale)) {
-      return c.json({ locale, translations: Object.fromEntries(i18nCache.get(locale)) });
+    const cacheKey = `${c.get("tenant")?.id ?? "default"}:${locale}`;
+    if (Date.now() < cacheExpiry && i18nCache.has(cacheKey)) {
+      return c.json({ locale, translations: Object.fromEntries(i18nCache.get(cacheKey)) });
     }
     const rows = await sql`
       SELECT tk.key, t.value
@@ -19485,7 +19486,7 @@ function translationsRoutes(ctx) {
           map2.set(row.key, row.default_value);
       }
     }
-    i18nCache.set(locale, map2);
+    i18nCache.set(cacheKey, map2);
     cacheExpiry = Date.now() + CACHE_TTL;
     return c.json({ locale, translations: Object.fromEntries(map2) });
   });
