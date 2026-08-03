@@ -19617,14 +19617,14 @@ Description: ${description}`;
     if (!isAdmin)
       return c.json({ error: "Admin access required" }, 403);
     const id = c.req.param("id");
-    const res = await db.deleteFrom("zvd_validation_rule_groups").where("id", "=", id).executeTakeFirst();
+    const res = await reqDb(c).deleteFrom("zvd_validation_rule_groups").where("id", "=", id).executeTakeFirst();
     if ((res?.numDeletedRows ?? 0n) === 0n)
       return c.json({ error: "Not found" }, 404);
     return c.json({ success: true });
   });
   app.get("/:collection", async (c) => {
     const collection = c.req.param("collection");
-    const rules = await db.selectFrom("zv_validation_rules").selectAll().where("collection", "=", collection).orderBy("field_name", "asc").execute();
+    const rules = await reqDb(c).selectFrom("zv_validation_rules").selectAll().where("collection", "=", collection).orderBy("field_name", "asc").execute();
     return c.json({ rules });
   });
   app.post("/:collection", zValidator("json", RuleCreateSchema), async (c) => {
@@ -19634,7 +19634,7 @@ Description: ${description}`;
     if (!isAdmin)
       return c.json({ error: "Admin access required" }, 403);
     const body = c.req.valid("json");
-    const rule = await db.insertInto("zv_validation_rules").values({
+    const rule = await reqDb(c).insertInto("zv_validation_rules").values({
       collection,
       field_name: body.field_name,
       rule_type: body.rule_type,
@@ -19712,7 +19712,7 @@ Description: ${description}`;
       }
       const rule = parsed.data;
       try {
-        await db.insertInto("zv_validation_rules").values({
+        await reqDb(c).insertInto("zv_validation_rules").values({
           collection,
           field_name: rule.field_name,
           rule_type: rule.rule_type,
@@ -19747,7 +19747,7 @@ Description: ${description}`;
     if (!isAdmin)
       return c.json({ error: "Admin access required" }, 403);
     const body = c.req.valid("json");
-    const rule = await db.updateTable("zv_validation_rules").set({ is_active: body.is_active, updated_at: new Date }).where("id", "=", id).where("collection", "=", collection).returningAll().executeTakeFirst();
+    const rule = await reqDb(c).updateTable("zv_validation_rules").set({ is_active: body.is_active, updated_at: new Date }).where("id", "=", id).where("collection", "=", collection).returningAll().executeTakeFirst();
     invalidateRulesCache(collection);
     return c.json({ rule });
   });
@@ -19834,7 +19834,7 @@ Description: ${description}`;
       return c.json({ error: "Admin access required" }, 403);
     const testId = c.req.param("testId");
     const ruleId = c.req.param("id");
-    const res = await db.deleteFrom("zvd_validation_test_cases").where("id", "=", testId).where("rule_id", "=", ruleId).executeTakeFirst();
+    const res = await reqDb(c).deleteFrom("zvd_validation_test_cases").where("id", "=", testId).where("rule_id", "=", ruleId).executeTakeFirst();
     if ((res?.numDeletedRows ?? 0n) === 0n)
       return c.json({ error: "Not found" }, 404);
     return c.json({ success: true });

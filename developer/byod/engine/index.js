@@ -19563,14 +19563,14 @@ function introspectRoutes(ctx) {
         updates.next_sync_at = autoSync ? new Date(Date.now() + intervalHours * 3600000) : null;
       }
     }
-    const row = await db.updateTable("zvd_byod_scan_profiles").set(updates).where("id", "=", id).returningAll().executeTakeFirst();
+    const row = await reqDb(c).updateTable("zvd_byod_scan_profiles").set(updates).where("id", "=", id).returningAll().executeTakeFirst();
     if (!row)
       return c.json({ error: "Not found" }, 404);
     return c.json({ profile: row });
   });
   router.delete("/profiles/:id", async (c) => {
     const id = c.req.param("id");
-    const res = await db.deleteFrom("zvd_byod_scan_profiles").where("id", "=", id).executeTakeFirst();
+    const res = await reqDb(c).deleteFrom("zvd_byod_scan_profiles").where("id", "=", id).executeTakeFirst();
     if ((res?.numDeletedRows ?? 0n) === 0n)
       return c.json({ error: "Not found" }, 404);
     return c.json({ success: true });

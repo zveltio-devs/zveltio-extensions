@@ -19511,7 +19511,7 @@ function gdprRoutes(ctx) {
     }
     const userId = user.id;
     try {
-      await db.transaction().execute(async (trx) => {
+      await reqDb(c).transaction().execute(async (trx) => {
         await sql`
           INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, created_at)
           VALUES ('gdpr.account_deleted', ${userId}, 'user', ${JSON.stringify({ gdpr: true, requested_at: new Date().toISOString() })}::jsonb, NOW())

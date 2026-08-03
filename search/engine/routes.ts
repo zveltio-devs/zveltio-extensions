@@ -56,7 +56,7 @@ export function searchRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
 
   // GET /indexes — list configured search indexes
   app.get('/indexes', async (c) => {
-    const indexes = await (db as any)
+    const indexes = await (reqDb(c) as any)
       .selectFrom('zv_search_indexes')
       .selectAll()
       .orderBy('created_at', 'desc')
@@ -82,7 +82,7 @@ export function searchRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
       const data = c.req.valid('json');
 
       // Upsert: update if exists, insert if not
-      const existing = await (db as any)
+      const existing = await (reqDb(c) as any)
         .selectFrom('zv_search_indexes')
         .select('id')
         .where('collection', '=', data.collection)
@@ -90,7 +90,7 @@ export function searchRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
 
       let indexRecord: any;
       if (existing) {
-        indexRecord = await (db as any)
+        indexRecord = await (reqDb(c) as any)
           .updateTable('zv_search_indexes')
           .set({
             provider: data.provider,
@@ -104,7 +104,7 @@ export function searchRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
           .returningAll()
           .executeTakeFirst();
       } else {
-        indexRecord = await (db as any)
+        indexRecord = await (reqDb(c) as any)
           .insertInto('zv_search_indexes')
           .values({
             collection: data.collection,
@@ -125,7 +125,7 @@ export function searchRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
   // DELETE /indexes/:collection — remove index config
   app.delete('/indexes/:collection', async (c) => {
     const collection = c.req.param('collection');
-    await (db as any)
+    await (reqDb(c) as any)
       .updateTable('zv_search_indexes')
       .set({ status: 'inactive' })
       .where('collection', '=', collection)
@@ -148,7 +148,7 @@ export function searchRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
   // GET /indexes/:collection/stats — record count, last synced, status
   app.get('/indexes/:collection/stats', async (c) => {
     const collection = c.req.param('collection');
-    const index = await (db as any)
+    const index = await (reqDb(c) as any)
       .selectFrom('zv_search_indexes')
       .selectAll()
       .where('collection', '=', collection)

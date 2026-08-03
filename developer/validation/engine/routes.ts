@@ -232,7 +232,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
     if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
 
     const id = c.req.param('id');
-    const res = await (db as any)
+    const res = await (reqDb(c) as any)
       .deleteFrom('zvd_validation_rule_groups')
       .where('id', '=', id)
       .executeTakeFirst();
@@ -244,7 +244,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
   // ── GET /:collection — list rules ─────────────────────────────────────────
   app.get('/:collection', async (c) => {
     const collection = c.req.param('collection');
-    const rules = await (db as any)
+    const rules = await (reqDb(c) as any)
       .selectFrom('zv_validation_rules')
       .selectAll()
       .where('collection', '=', collection)
@@ -261,7 +261,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
     if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
 
     const body = c.req.valid('json');
-    const rule = await (db as any)
+    const rule = await (reqDb(c) as any)
       .insertInto('zv_validation_rules')
       .values({
         collection,
@@ -372,7 +372,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
 
       const rule = parsed.data;
       try {
-        await (db as any)
+        await (reqDb(c) as any)
           .insertInto('zv_validation_rules')
           .values({
             collection,
@@ -414,7 +414,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
     if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
 
     const body = c.req.valid('json');
-    const rule = await (db as any)
+    const rule = await (reqDb(c) as any)
       .updateTable('zv_validation_rules')
       .set({ is_active: body.is_active, updated_at: new Date() })
       .where('id', '=', id)
@@ -537,7 +537,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
 
     const testId = c.req.param('testId');
     const ruleId = c.req.param('id');
-    const res = await (db as any)
+    const res = await (reqDb(c) as any)
       .deleteFrom('zvd_validation_test_cases')
       .where('id', '=', testId)
       .where('rule_id', '=', ruleId)

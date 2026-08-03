@@ -30220,7 +30220,7 @@ function aiRoutes(ctx) {
     const name = c.req.param("name");
     const result = await sql`
       DELETE FROM zv_ai_providers WHERE name = ${name} RETURNING id
-    `.execute(db);
+    `.execute(reqDb(c));
     if (result.rows.length === 0)
       return c.json({ error: "Provider not found" }, 404);
     return c.json({ success: true });
@@ -30403,7 +30403,7 @@ function aiRoutes(ctx) {
           FROM ${sql.id(tableName)}
           WHERE ${sql.id(field)} ILIKE ${"%" + query + "%"}
           LIMIT ${limit}
-        `.execute(db).then((r) => r.rows).catch(() => []);
+        `.execute(reqDb(c)).then((r) => r.rows).catch(() => []);
     } catch {}
     return c.json({
       results: fallbackResults,

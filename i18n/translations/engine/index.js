@@ -19498,7 +19498,7 @@ function translationsRoutes(ctx) {
     await next();
   });
   app.get("/locales", async (c) => {
-    const locales = await db.selectFrom("zvd_locales").selectAll().orderBy("is_default", "desc").orderBy("name", "asc").execute();
+    const locales = await reqDb(c).selectFrom("zvd_locales").selectAll().orderBy("is_default", "desc").orderBy("name", "asc").execute();
     return c.json({ locales });
   });
   app.post("/locales", zValidator("json", exports_external.object({ code: exports_external.string().min(2).max(10), name: exports_external.string().min(1), is_default: exports_external.boolean().default(false) })), async (c) => {

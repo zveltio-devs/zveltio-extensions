@@ -19640,11 +19640,11 @@ function billingRoutes(ctx) {
     return c.json({ usage: rows.rows });
   });
   app.get("/usage/live", async (c) => {
-    const events = await db.selectFrom("zv_usage_events").selectAll().orderBy("created_at", "desc").limit(100).execute();
+    const events = await reqDb(c).selectFrom("zv_usage_events").selectAll().orderBy("created_at", "desc").limit(100).execute();
     return c.json({ events });
   });
   app.get("/plans", async (c) => {
-    const plans = await db.selectFrom("zv_billing_plans").selectAll().orderBy("price_cents", "asc").execute();
+    const plans = await reqDb(c).selectFrom("zv_billing_plans").selectAll().orderBy("price_cents", "asc").execute();
     return c.json({ plans });
   });
   app.post("/plans", zValidator("json", exports_external.object({
@@ -19655,7 +19655,7 @@ function billingRoutes(ctx) {
     interval: exports_external.enum(["month", "year"]).default("month")
   })), async (c) => {
     const data = c.req.valid("json");
-    const plan = await db.insertInto("zv_billing_plans").values({
+    const plan = await reqDb(c).insertInto("zv_billing_plans").values({
       name: data.name,
       stripe_price_id: data.stripe_price_id ?? null,
       limits: JSON.stringify(data.limits),
@@ -19665,7 +19665,7 @@ function billingRoutes(ctx) {
     return c.json({ plan }, 201);
   });
   app.get("/subscriptions", async (c) => {
-    const subs = await db.selectFrom("zv_billing_subscriptions as s").leftJoin("zv_billing_plans as p", "p.id", "s.plan_id").select([
+    const subs = await reqDb(c).selectFrom("zv_billing_subscriptions as s").leftJoin("zv_billing_plans as p", "p.id", "s.plan_id").select([
       "s.id",
       "s.tenant_id",
       "s.stripe_subscription_id",

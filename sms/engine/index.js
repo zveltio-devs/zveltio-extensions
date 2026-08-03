@@ -16259,14 +16259,14 @@ function smsRoutes(ctx) {
     const { page = "1", limit = "50", status } = c.req.query();
     const parsedLimit = Math.min(parseInt(limit) || 50, 200);
     const offset = (parseInt(page) - 1) * parsedLimit;
-    let query = db.selectFrom("zv_sms_messages").selectAll().orderBy("created_at", "desc").limit(parsedLimit).offset(offset);
+    let query = reqDb(c).selectFrom("zv_sms_messages").selectAll().orderBy("created_at", "desc").limit(parsedLimit).offset(offset);
     if (status)
       query = query.where("status", "=", status);
     const messages = await query.execute();
     return c.json({ messages });
   });
   app.get("/templates", async (c) => {
-    const templates = await db.selectFrom("zv_sms_templates").selectAll().orderBy("created_at", "desc").execute();
+    const templates = await reqDb(c).selectFrom("zv_sms_templates").selectAll().orderBy("created_at", "desc").execute();
     return c.json({ templates });
   });
   app.post("/templates", zValidator("json", exports_external.object({
@@ -16275,7 +16275,7 @@ function smsRoutes(ctx) {
     provider: exports_external.enum(["twilio", "vonage"]).default("twilio")
   })), async (c) => {
     const data = c.req.valid("json");
-    const template = await db.insertInto("zv_sms_templates").values(data).returningAll().executeTakeFirst();
+    const template = await reqDb(c).insertInto("zv_sms_templates").values(data).returningAll().executeTakeFirst();
     return c.json({ template }, 201);
   });
   app.post("/webhook/twilio", async (c) => {
