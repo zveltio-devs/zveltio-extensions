@@ -19496,58 +19496,63 @@ function toNDJSON(rows) {
   return rows.map((r) => JSON.stringify(r)).join(`
 `);
 }
-async function runExportJob(ctx, jobId, collection, format, filters, fields, sortField, sortOrder) {
-  const { db, DDLManager, fieldTypeRegistry } = ctx;
-  try {
-    await db.updateTable("zvd_export_jobs").set({ status: "running" }).where("id", "=", jobId).execute();
-    if (!await DDLManager.tableExists(db, collection)) {
-      throw new Error(`Collection "${collection}" not found`);
-    }
-    const tableName = DDLManager.getTableName(collection);
-    const collectionDef = await DDLManager.getCollection(db, collection);
-    const allowedFields = new Set((collectionDef?.fields ?? []).map((f) => f.name));
-    ["id", "created_at", "updated_at", "status", "created_by", "updated_by"].forEach((f) => allowedFields.add(f));
-    let query = db.selectFrom(tableName);
-    if (fields.length > 0) {
-      const safeFields = fields.filter((f) => allowedFields.has(f));
-      query = query.select(safeFields.length > 0 ? safeFields : ["*"]);
-    } else {
-      query = query.selectAll();
-    }
-    for (const [key, value] of Object.entries(filters)) {
-      if (allowedFields.has(key)) {
-        query = query.where(key, "=", value);
+async function runExportJob(ctx, tenantId, jobId, collection, format, filters, fields, sortField, sortOrder) {
+  const { DDLManager, fieldTypeRegistry } = ctx;
+  return ctx.internals.withTenantIsolation(tenantId, async (tdb) => {
+    try {
+      await tdb.updateTable("zvd_export_jobs").set({ status: "running" }).where("id", "=", jobId).execute();
+      if (!await DDLManager.tableExists(tdb, collection)) {
+        throw new Error(`Collection "${collection}" not found`);
       }
-    }
-    if (sortField && allowedFields.has(sortField)) {
-      query = query.orderBy(sortField, sortOrder === "desc" ? "desc" : "asc");
-    }
-    const rows = await query.execute();
-    const serialized = rows.map((row) => {
-      const result = { ...row };
-      for (const field of collectionDef?.fields || []) {
-        if (result[field.name] !== undefined) {
-          result[field.name] = fieldTypeRegistry.serialize(field.type, result[field.name]);
+      const tableName = DDLManager.getTableName(collection);
+      const collectionDef = await DDLManager.getCollection(tdb, collection);
+      const allowedFields = new Set((collectionDef?.fields ?? []).map((f) => f.name));
+      ["id", "created_at", "updated_at", "status", "created_by", "updated_by"].forEach((f) => allowedFields.add(f));
+      let query = tdb.selectFrom(tableName);
+      if (fields.length > 0) {
+        const safeFields = fields.filter((f) => allowedFields.has(f));
+        query = query.select(safeFields.length > 0 ? safeFields : ["*"]);
+      } else {
+        query = query.selectAll();
+      }
+      for (const [key, value] of Object.entries(filters)) {
+        if (allowedFields.has(key)) {
+          query = query.where(key, "=", value);
         }
       }
-      return result;
-    });
-    await db.updateTable("zvd_export_jobs").set({
-      status: "completed",
-      total_records: serialized.length,
-      exported_records: serialized.length,
-      completed_at: new Date
-    }).where("id", "=", jobId).execute();
-  } catch (err) {
-    await db.updateTable("zvd_export_jobs").set({
-      status: "failed",
-      error: err?.message ?? String(err),
-      completed_at: new Date
-    }).where("id", "=", jobId).execute();
-  }
+      if (sortField && allowedFields.has(sortField)) {
+        query = query.orderBy(sortField, sortOrder === "desc" ? "desc" : "asc");
+      }
+      const rows = await query.execute();
+      const serialized = rows.map((row) => {
+        const result = { ...row };
+        for (const field of collectionDef?.fields || []) {
+          if (result[field.name] !== undefined) {
+            result[field.name] = fieldTypeRegistry.serialize(field.type, result[field.name]);
+          }
+        }
+        return result;
+      });
+      await tdb.updateTable("zvd_export_jobs").set({
+        status: "completed",
+        total_records: serialized.length,
+        exported_records: serialized.length,
+        completed_at: new Date
+      }).where("id", "=", jobId).execute();
+    } catch (err) {
+      await tdb.updateTable("zvd_export_jobs").set({
+        status: "failed",
+        error: err?.message ?? String(err),
+        completed_at: new Date
+      }).where("id", "=", jobId).execute();
+    }
+  });
 }
 function exportRoutes(ctx) {
   const { db, auth, checkPermission, DDLManager, fieldTypeRegistry } = ctx;
+  function tenantOf(c) {
+    return c.get("tenant")?.id ?? "00000000-0000-0000-0000-000000000001";
+  }
   function reqDb(c) {
     return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
   }
@@ -19634,7 +19639,7 @@ function exportRoutes(ctx) {
       status: "pending",
       created_by: user.id
     }).returningAll().executeTakeFirst();
-    runExportJob(ctx, job.id, body.collection, body.format, body.filters, body.fields, body.sort_field, body.sort_order).catch(() => {});
+    runExportJob(ctx, tenantOf(c), job.id, body.collection, body.format, body.filters, body.fields, body.sort_field, body.sort_order).catch(() => {});
     return c.json({ job_id: job.id, status: "pending", message: "Export job queued" }, 202);
   });
   app.get("/jobs/:id", async (c) => {

@@ -24,6 +24,7 @@ function toNDJSON(rows: any[]): string {
 
 async function runExportJob(
   ctx: ExtensionContext,
+  tenantId: string,
   jobId: string,
   collection: string,
   format: string,
@@ -32,28 +33,31 @@ async function runExportJob(
   sortField: string | undefined,
   sortOrder: string,
 ): Promise<void> {
-  const { db, DDLManager, fieldTypeRegistry } = ctx;
+  const { DDLManager, fieldTypeRegistry } = ctx;
 
-  // NOTE: this is a background-task path (not a request handler), so
-  // there's no `c` context with `tenantTrx`. Queries run on the bare
-  // `db`; in multi-tenant mode the FORCE RLS returns zero rows unless
-  // the tenant id is plumbed through the job-queue payload — tracked
-  // as follow-up. The request handler that ENQUEUES the job is
-  // tenant-scoped via `reqDb(c)` below.
-
+  // A background task has no request, so it has no `c` and no `reqDb(c)`. It
+  // used to run on the bare pool, and the note here called plumbing the tenant
+  // through "a follow-up" — this is that follow-up. `tenantId` comes from the
+  // handler that ENQUEUED the export, which is the only place it is knowable,
+  // and `withTenantIsolation` opens the same kind of transaction a request
+  // gets: the GUC set, `SET LOCAL ROLE` applied, policies binding.
+  //
+  // Everything below runs on `db` as before — but `db` is now that
+  // transaction, not the global pool.
+  return ctx.internals.withTenantIsolation(tenantId, async (tdb: any) => {
   try {
-    await (db as any)
+    await (tdb as any)
       .updateTable('zvd_export_jobs')
       .set({ status: 'running' })
       .where('id', '=', jobId)
       .execute();
 
-    if (!(await DDLManager.tableExists(db, collection))) {
+    if (!(await DDLManager.tableExists(tdb, collection))) {
       throw new Error(`Collection "${collection}" not found`);
     }
 
     const tableName = DDLManager.getTableName(collection);
-    const collectionDef = await DDLManager.getCollection(db, collection);
+    const collectionDef = await DDLManager.getCollection(tdb, collection);
 
     const allowedFields = new Set<string>(
       (collectionDef?.fields ?? []).map((f: any) => f.name),
@@ -62,7 +66,7 @@ async function runExportJob(
       (f) => allowedFields.add(f),
     );
 
-    let query = (db as any).selectFrom(tableName);
+    let query = (tdb as any).selectFrom(tableName);
 
     if (fields.length > 0) {
       const safeFields = fields.filter((f) => allowedFields.has(f));
@@ -93,7 +97,7 @@ async function runExportJob(
       return result;
     });
 
-    await (db as any)
+    await (tdb as any)
       .updateTable('zvd_export_jobs')
       .set({
         status: 'completed',
@@ -104,7 +108,7 @@ async function runExportJob(
       .where('id', '=', jobId)
       .execute();
   } catch (err: any) {
-    await (db as any)
+    await (tdb as any)
       .updateTable('zvd_export_jobs')
       .set({
         status: 'failed',
@@ -114,6 +118,7 @@ async function runExportJob(
       .where('id', '=', jobId)
       .execute();
   }
+  });
 }
 
 // ─── Route factory ────────────────────────────────────────────────────────────
@@ -125,6 +130,11 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
   // handlers run inside the request transaction; reqDb pulls the
   // active tenantTrx so FORCE RLS on zvd_export_jobs / zvd_export_logs
   // sees the right tenant.
+  /** Tenant of the request; the default tenant on a single-tenant install. */
+  function tenantOf(c: any): string {
+    return (c.get('tenant') as { id?: string } | null)?.id ?? '00000000-0000-0000-0000-000000000001';
+  }
+
   function reqDb(c: any): any {
     return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
   }
@@ -265,6 +275,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
       // Fire-and-forget background export
       runExportJob(
         ctx,
+        tenantOf(c),
         job.id,
         body.collection,
         body.format,

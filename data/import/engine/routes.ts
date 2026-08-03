@@ -54,6 +54,7 @@ function parseCSV(text: string, delimiter = ','): Record<string, string>[] {
 
 async function runImport(
   ctx: ExtensionContext,
+  tenantId: string,
   jobId: string,
   collection: string,
   rows: Record<string, any>[],
@@ -64,11 +65,17 @@ async function runImport(
   },
   collectionDef: any,
 ): Promise<void> {
-  const { db, DDLManager, fieldTypeRegistry } = ctx;
+  const { DDLManager, fieldTypeRegistry } = ctx;
 
-  // Background task — no `c` context with `tenantTrx`. Same caveat as
-  // runExportJob in data/export. Tenant id should be plumbed through
-  // the job-queue payload; follow-up.
+  // Background task — no `c`, so no `reqDb(c)`. The tenant comes from the
+  // handler that ENQUEUED the import, which is the only place it is knowable,
+  // and `withTenantIsolation` gives this job the same transaction a request
+  // gets: GUC set, `SET LOCAL ROLE` applied, isolation policies binding.
+  //
+  // `db` below is that transaction rather than the global pool. Same change as
+  // `runExportJob` in data/export — the comment there called it a follow-up
+  // and pointed at this one.
+  return ctx.internals.withTenantIsolation(tenantId, async (tdb: any) => {
 
   const { dynamicInsert } = ctx.internals;
   const insertedIds: string[] = [];
@@ -76,7 +83,7 @@ async function runImport(
   let success = 0;
   const errors: Array<{ row: number; error: string }> = [];
 
-  await (db as any)
+  await (tdb as any)
     .updateTable('zv_import_logs')
     .set({ status: 'running', total_rows: rows.length })
     .where('id', '=', jobId)
@@ -103,7 +110,7 @@ async function runImport(
       }
 
       if (!dryRun) {
-        const inserted = await dynamicInsert(db, tableName, row) as any;
+        const inserted = await dynamicInsert(tdb, tableName, row) as any;
         if (inserted?.id) insertedIds.push(inserted.id);
       }
       success++;
@@ -122,7 +129,7 @@ async function runImport(
         ? 'failed'
         : 'completed';
 
-  await (db as any)
+  await (tdb as any)
     .updateTable('zv_import_logs')
     .set({
       status: finalStatus,
@@ -136,7 +143,7 @@ async function runImport(
 
   // Store rollback record if we actually inserted rows
   if (!dryRun && insertedIds.length > 0) {
-    await (db as any)
+    await (tdb as any)
       .insertInto('zvd_import_rollbacks')
       .values({
         job_id: jobId,
@@ -146,6 +153,7 @@ async function runImport(
       .execute()
       .catch(() => { /* non-fatal */ });
   }
+  });
 }
 
 // ─── Route factory ────────────────────────────────────────────────────────────
@@ -157,6 +165,11 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
   // Per-request DB handle (CRM PR #1 pattern). Handlers run inside the
   // request transaction; reqDb pulls tenantTrx so FORCE RLS on
   // zv_import_logs / zvd_import_profiles sees the right tenant.
+  /** Tenant of the request; the default tenant on a single-tenant install. */
+  function tenantOf(c: any): string {
+    return (c.get('tenant') as { id?: string } | null)?.id ?? '00000000-0000-0000-0000-000000000001';
+  }
+
   function reqDb(c: any): any {
     return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
   }
@@ -595,7 +608,7 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
     const options = { mapping, on_duplicate: onDuplicate, dry_run: dryRun };
 
     // Fire-and-forget
-    runImport(ctx, job.id, collection, rows, options, collectionDef).catch((err: any) => {
+    runImport(ctx, tenantOf(c), job.id, collection, rows, options, collectionDef).catch((err: any) => {
       (reqDb(c) as any)
         .updateTable('zv_import_logs')
         .set({

@@ -19532,61 +19532,66 @@ function parseCSV(text, delimiter = ",") {
   }
   return rows;
 }
-async function runImport(ctx, jobId, collection, rows, options, collectionDef) {
-  const { db, DDLManager, fieldTypeRegistry } = ctx;
-  const { dynamicInsert } = ctx.internals;
-  const insertedIds = [];
-  let processed = 0;
-  let success2 = 0;
-  const errors3 = [];
-  await db.updateTable("zv_import_logs").set({ status: "running", total_rows: rows.length }).where("id", "=", jobId).execute();
-  const tableName = DDLManager.getTableName(collection);
-  const mapping = options.mapping ?? {};
-  const dryRun = options.dry_run ?? false;
-  for (const [idx, rawRow] of rows.entries()) {
-    try {
-      const row = {};
-      for (const [col, value] of Object.entries(rawRow)) {
-        const mappedCol = mapping[col] ?? col;
-        row[mappedCol] = value === "" ? null : value;
-      }
-      if (collectionDef?.fields) {
-        for (const field of collectionDef.fields) {
-          if (row[field.name] !== undefined) {
-            row[field.name] = fieldTypeRegistry.deserialize(field.type, row[field.name]);
+async function runImport(ctx, tenantId, jobId, collection, rows, options, collectionDef) {
+  const { DDLManager, fieldTypeRegistry } = ctx;
+  return ctx.internals.withTenantIsolation(tenantId, async (tdb) => {
+    const { dynamicInsert } = ctx.internals;
+    const insertedIds = [];
+    let processed = 0;
+    let success2 = 0;
+    const errors3 = [];
+    await tdb.updateTable("zv_import_logs").set({ status: "running", total_rows: rows.length }).where("id", "=", jobId).execute();
+    const tableName = DDLManager.getTableName(collection);
+    const mapping = options.mapping ?? {};
+    const dryRun = options.dry_run ?? false;
+    for (const [idx, rawRow] of rows.entries()) {
+      try {
+        const row = {};
+        for (const [col, value] of Object.entries(rawRow)) {
+          const mappedCol = mapping[col] ?? col;
+          row[mappedCol] = value === "" ? null : value;
+        }
+        if (collectionDef?.fields) {
+          for (const field of collectionDef.fields) {
+            if (row[field.name] !== undefined) {
+              row[field.name] = fieldTypeRegistry.deserialize(field.type, row[field.name]);
+            }
           }
         }
+        if (!dryRun) {
+          const inserted = await dynamicInsert(tdb, tableName, row);
+          if (inserted?.id)
+            insertedIds.push(inserted.id);
+        }
+        success2++;
+      } catch (err) {
+        errors3.push({ row: idx + 1, error: err?.message ?? "Unknown error" });
       }
-      if (!dryRun) {
-        const inserted = await dynamicInsert(db, tableName, row);
-        if (inserted?.id)
-          insertedIds.push(inserted.id);
-      }
-      success2++;
-    } catch (err) {
-      errors3.push({ row: idx + 1, error: err?.message ?? "Unknown error" });
+      processed++;
     }
-    processed++;
-  }
-  const finalStatus = errors3.length === 0 ? dryRun ? "completed" : "completed" : errors3.length === processed ? "failed" : "completed";
-  await db.updateTable("zv_import_logs").set({
-    status: finalStatus,
-    imported_rows: success2,
-    failed_rows: errors3.length,
-    errors: JSON.stringify(errors3.slice(0, 100)),
-    completed_at: new Date
-  }).where("id", "=", jobId).execute();
-  if (!dryRun && insertedIds.length > 0) {
-    await db.insertInto("zvd_import_rollbacks").values({
-      job_id: jobId,
-      record_ids: insertedIds,
-      status: "available"
-    }).execute().catch(() => {});
-  }
+    const finalStatus = errors3.length === 0 ? dryRun ? "completed" : "completed" : errors3.length === processed ? "failed" : "completed";
+    await tdb.updateTable("zv_import_logs").set({
+      status: finalStatus,
+      imported_rows: success2,
+      failed_rows: errors3.length,
+      errors: JSON.stringify(errors3.slice(0, 100)),
+      completed_at: new Date
+    }).where("id", "=", jobId).execute();
+    if (!dryRun && insertedIds.length > 0) {
+      await tdb.insertInto("zvd_import_rollbacks").values({
+        job_id: jobId,
+        record_ids: insertedIds,
+        status: "available"
+      }).execute().catch(() => {});
+    }
+  });
 }
 function importRoutes(ctx) {
   const { db, auth, checkPermission, DDLManager, fieldTypeRegistry } = ctx;
   const { dynamicInsert } = ctx.internals;
+  function tenantOf(c) {
+    return c.get("tenant")?.id ?? "00000000-0000-0000-0000-000000000001";
+  }
   function reqDb(c) {
     return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
   }
@@ -19894,7 +19899,7 @@ function importRoutes(ctx) {
       created_by: user.id
     }).returningAll().executeTakeFirst();
     const options = { mapping, on_duplicate: onDuplicate, dry_run: dryRun };
-    runImport(ctx, job.id, collection, rows, options, collectionDef).catch((err) => {
+    runImport(ctx, tenantOf(c), job.id, collection, rows, options, collectionDef).catch((err) => {
       reqDb(c).updateTable("zv_import_logs").set({
         status: "failed",
         errors: JSON.stringify([{ row: 0, error: String(err) }]),
