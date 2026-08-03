@@ -4,6 +4,16 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 // In-memory i18n cache: locale → key → value
+/**
+ * Cache key is `<tenant>:<locale>`, not `<locale>`.
+ *
+ * The query below is tenant-scoped through `reqDb(c)`, so the DATA was always
+ * right — but the cache in front of it was keyed on locale alone, and this is
+ * a PUBLIC route. Whichever tenant asked for `ro` first populated the entry,
+ * and for the next five minutes every other tenant's site was served that
+ * tenant's translations. Correct query, wrong cache: the scoping stopped one
+ * layer short.
+ */
 const i18nCache = new Map<string, Map<string, string>>();
 const CACHE_TTL = 5 * 60 * 1000;
 let cacheExpiry = 0;
@@ -39,8 +49,9 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
   app.get('/public/:locale', async (c) => {
     const locale = c.req.param('locale');
 
-    if (Date.now() < cacheExpiry && i18nCache.has(locale)) {
-      return c.json({ locale, translations: Object.fromEntries(i18nCache.get(locale)!) });
+    const cacheKey = `${(c.get('tenant') as { id?: string } | null)?.id ?? 'default'}:${locale}`;
+    if (Date.now() < cacheExpiry && i18nCache.has(cacheKey)) {
+      return c.json({ locale, translations: Object.fromEntries(i18nCache.get(cacheKey)!) });
     }
 
     const rows = await sql`
@@ -62,7 +73,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
       }
     }
 
-    i18nCache.set(locale, map);
+    i18nCache.set(cacheKey, map);
     cacheExpiry = Date.now() + CACHE_TTL;
     return c.json({ locale, translations: Object.fromEntries(map) });
   });
