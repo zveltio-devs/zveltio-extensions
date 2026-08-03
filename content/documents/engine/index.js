@@ -19585,6 +19585,19 @@ function documentsRoutes(ctx) {
     }
     return c.json({ document: doc2, html: htmlContent }, 201);
   });
+  async function mayReadDoc(doc2, userId, isAdmin, readable) {
+    if (isAdmin)
+      return true;
+    if (doc2.generated_by === userId)
+      return true;
+    const src = doc2.source_collection;
+    if (!src)
+      return false;
+    if (!readable.has(src)) {
+      readable.set(src, await checkPermission(userId, src, "read").catch(() => false));
+    }
+    return readable.get(src) === true;
+  }
   app.get("/generated", async (c) => {
     const { template_id, source_collection, source_record_id, status, limit = "50", offset = "0" } = c.req.query();
     let query = reqDb(c).selectFrom("zv_generated_docs").selectAll().orderBy("generated_at", "desc");
@@ -19596,11 +19609,18 @@ function documentsRoutes(ctx) {
       query = query.where("source_record_id", "=", source_record_id);
     if (status)
       query = query.where("status", "=", status);
-    const docs = await query.limit(Number(limit)).offset(Number(offset)).execute();
-    const countResult = await reqDb(c).selectFrom("zv_generated_docs").select((eb) => eb.fn.count("id").as("count")).executeTakeFirst();
+    const rows = await query.limit(Number(limit)).offset(Number(offset)).execute();
+    const listUser = c.get("user");
+    const listAdmin = await checkPermission(listUser.id, "admin", "*").catch(() => false);
+    const readable = new Map;
+    const docs = [];
+    for (const d of rows) {
+      if (await mayReadDoc(d, listUser.id, listAdmin, readable))
+        docs.push(d);
+    }
     return c.json({
       documents: docs,
-      pagination: { total: Number(countResult?.count || 0), limit: Number(limit), offset: Number(offset) }
+      pagination: { total: docs.length, limit: Number(limit), offset: Number(offset) }
     });
   });
   app.get("/generated/:id", async (c) => {
@@ -19608,6 +19628,11 @@ function documentsRoutes(ctx) {
     const doc2 = await reqDb(c).selectFrom("zv_generated_docs").selectAll().where("id", "=", id).executeTakeFirst();
     if (!doc2)
       return c.json({ error: "Document not found" }, 404);
+    const getUser = c.get("user");
+    const getAdmin = await checkPermission(getUser.id, "admin", "*").catch(() => false);
+    if (!await mayReadDoc(doc2, getUser.id, getAdmin, new Map)) {
+      return c.json({ error: "Document not found" }, 404);
+    }
     const signRequests = await reqDb(c).selectFrom("zv_document_sign_requests").select(["id", "signer_email", "signer_name", "status", "signed_at", "expires_at", "created_at"]).where("document_id", "=", id).orderBy("created_at", "desc").execute();
     return c.json({ document: doc2, sign_requests: signRequests });
   });
@@ -19627,9 +19652,13 @@ function documentsRoutes(ctx) {
     const user = c.get("user");
     const id = c.req.param("id");
     const data = c.req.valid("json");
-    const doc2 = await reqDb(c).selectFrom("zv_generated_docs").select(["id", "status"]).where("id", "=", id).executeTakeFirst();
+    const doc2 = await reqDb(c).selectFrom("zv_generated_docs").select(["id", "status", "generated_by", "source_collection"]).where("id", "=", id).executeTakeFirst();
     if (!doc2)
       return c.json({ error: "Document not found" }, 404);
+    const signAdmin = await checkPermission(user.id, "admin", "*").catch(() => false);
+    if (!await mayReadDoc(doc2, user.id, signAdmin, new Map)) {
+      return c.json({ error: "Document not found" }, 404);
+    }
     if (doc2.status !== "active")
       return c.json({ error: "Cannot create sign request for inactive document" }, 400);
     const expiresAt = new Date(Date.now() + data.expires_hours * 3600 * 1000);
@@ -19645,6 +19674,14 @@ function documentsRoutes(ctx) {
   });
   app.get("/generated/:id/sign-requests", async (c) => {
     const id = c.req.param("id");
+    const srUser = c.get("user");
+    const srDoc = await reqDb(c).selectFrom("zv_generated_docs").select(["id", "generated_by", "source_collection"]).where("id", "=", id).executeTakeFirst();
+    if (!srDoc)
+      return c.json({ error: "Document not found" }, 404);
+    const srAdmin = await checkPermission(srUser.id, "admin", "*").catch(() => false);
+    if (!await mayReadDoc(srDoc, srUser.id, srAdmin, new Map)) {
+      return c.json({ error: "Document not found" }, 404);
+    }
     const signRequests = await reqDb(c).selectFrom("zv_document_sign_requests").selectAll().where("document_id", "=", id).orderBy("created_at", "desc").execute();
     return c.json({ sign_requests: signRequests });
   });
