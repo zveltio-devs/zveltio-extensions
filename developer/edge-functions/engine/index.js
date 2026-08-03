@@ -16211,16 +16211,19 @@ async function mountEdgeFunctions(ctx) {
     const env = typeof fn.env_vars === "string" ? JSON.parse(fn.env_vars) : fn.env_vars;
     const isPublic = env.ZVELTIO_PUBLIC === "true";
     const handler = async (c) => {
-      if (!fn.is_active)
-        return c.json({ error: "Function is inactive" }, 503);
-      if (!isPublic && auth) {
+      const live = await reqDb(c).selectFrom("zv_edge_functions").selectAll().where("path", "=", fn.path).where("is_active", "=", true).executeTakeFirst().catch(() => null);
+      if (!live)
+        return c.json({ error: "Function not found" }, 404);
+      const liveEnv = typeof live.env_vars === "string" ? JSON.parse(live.env_vars) : live.env_vars ?? {};
+      const livePublic = liveEnv.ZVELTIO_PUBLIC === "true";
+      if (!livePublic && auth) {
         const session = await auth.api.getSession({ headers: c.req.raw.headers });
         if (!session?.user)
           return c.json({ error: "Unauthorized" }, 401);
       }
-      const result = await runFunction(fn.code, c.req.raw, env, fn.timeout_ms);
+      const result = await runFunction(live.code, c.req.raw, liveEnv, live.timeout_ms);
       reqDb(c).insertInto("zv_edge_function_logs").values({
-        function_id: fn.id,
+        function_id: live.id,
         status: result.status,
         duration_ms: result.duration_ms,
         error: result.error || null
