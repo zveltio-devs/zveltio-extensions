@@ -54,6 +54,7 @@
   "communications.mail.ui.fromLabel": "Von:",
   "communications.mail.ui.high": "Hoch",
   "communications.mail.ui.highPriority": "Hohe Priorität",
+  "communications.mail.ui.imagesBlocked": "Externe Bilder blockiert — sie können dem Absender verraten, dass Sie die Nachricht geöffnet haben.",
   "communications.mail.ui.imapIncoming": "IMAP (eingehend)",
   "communications.mail.ui.imap_gmail_com": "imap.gmail.com",
   "communications.mail.ui.inbox_newsletter": "INBOX.Newsletter",
@@ -79,6 +80,7 @@
   "communications.mail.ui.no_mail_accounts": "Keine E-Mail-Konten",
   "communications.mail.ui.normal": "Normal",
   "communications.mail.ui.optional": "Optional",
+  "communications.mail.ui.p_your_signature_here_p": "<p>Your signature here...</p>",
   "communications.mail.ui.priority": "Priorität:",
   "communications.mail.ui.readReceipt": "Lesebestätigung",
   "communications.mail.ui.reply": "Antworten",
@@ -90,6 +92,7 @@
   "communications.mail.ui.selectAccountFilters": "Wählen Sie zuerst ein E-Mail-Konto aus, um Filter zu verwalten.",
   "communications.mail.ui.selectMessage": "Nachricht auswählen",
   "communications.mail.ui.selectedCount": "{count} selected",
+  "communications.mail.ui.showImages": "Externe Bilder anzeigen",
   "communications.mail.ui.signatures": "Signaturen",
   "communications.mail.ui.smtpOutgoing": "SMTP (Outgoing)",
   "communications.mail.ui.smtp_gmail_com": "smtp.gmail.com",
@@ -103,6 +106,5 @@
   "communications.mail.ui.toLabel": "An:",
   "communications.mail.ui.value": "value...",
   "communications.mail.ui.work_personal": "Work, Personal...",
-  "communications.mail.ui.write_your_message": "Schreiben Sie Ihre Nachricht...",
-  "communications.mail.ui.p_your_signature_here_p": "<p>Your signature here...</p>"
+  "communications.mail.ui.write_your_message": "Schreiben Sie Ihre Nachricht..."
 }
