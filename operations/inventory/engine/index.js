@@ -19490,23 +19490,23 @@ function permissionGate(ctx, resource, opts = {}) {
 }
 // engine/routes.ts
 var poCounter = 0;
-async function nextPONumber(db) {
-  const row = await sql`SELECT COUNT(*) as cnt FROM zvd_purchase_orders`.execute(db);
+async function nextPONumber(dbh) {
+  const row = await sql`SELECT COUNT(*) as cnt FROM zvd_purchase_orders`.execute(dbh);
   return `PO-${String(parseInt(row.rows[0].cnt) + 1 + poCounter++).padStart(5, "0")}`;
 }
-async function updateAvgCost(db, productId, addedQty, addedCost) {
+async function updateAvgCost(dbh, productId, addedQty, addedCost) {
   const current = await sql`
     SELECT COALESCE(SUM(sl.quantity), 0) as qty, p.avg_cost
     FROM zvd_products p LEFT JOIN zvd_stock_levels sl ON sl.product_id = p.id
     WHERE p.id = ${productId} GROUP BY p.avg_cost
-  `.execute(db);
+  `.execute(dbh);
   if (!current.rows.length)
     return;
   const { qty, avg_cost } = current.rows[0];
   const totalQtyBefore = Math.max(0, +qty - addedQty);
   const newAvgCost = (totalQtyBefore * +avg_cost + addedQty * addedCost) / Math.max(+qty, 1);
   const totalValue = +qty * newAvgCost;
-  await sql`UPDATE zvd_products SET avg_cost = ${newAvgCost}, total_value = ${totalValue}, updated_at = NOW() WHERE id = ${productId}`.execute(db);
+  await sql`UPDATE zvd_products SET avg_cost = ${newAvgCost}, total_value = ${totalValue}, updated_at = NOW() WHERE id = ${productId}`.execute(dbh);
 }
 function inventoryRoutes(ctx) {
   const { db, auth } = ctx;

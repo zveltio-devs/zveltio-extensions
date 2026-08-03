@@ -27225,8 +27225,8 @@ async function upsertLdapConfig(db, config2, encryptSecret) {
     await db.insertInto("zv_settings").values({ key: "ldap_config", value, created_at: new Date, updated_at: new Date }).execute();
   }
 }
-async function findOrCreateSsoUser(db, email3, displayName) {
-  const existing = await db.selectFrom("user").selectAll().where("email", "=", email3).executeTakeFirst();
+async function findOrCreateSsoUser(dbh, email3, displayName) {
+  const existing = await dbh.selectFrom("user").selectAll().where("email", "=", email3).executeTakeFirst();
   if (existing)
     return existing;
   const id = crypto.randomUUID();
@@ -27234,8 +27234,8 @@ async function findOrCreateSsoUser(db, email3, displayName) {
   await sql`
     INSERT INTO "user" (id, email, name, "emailVerified", "createdAt", "updatedAt")
     VALUES (${id}, ${email3}, ${displayName || email3.split("@")[0]}, true, ${now}, ${now})
-  `.execute(db);
-  return db.selectFrom("user").selectAll().where("id", "=", id).executeTakeFirstOrThrow();
+  `.execute(dbh);
+  return dbh.selectFrom("user").selectAll().where("id", "=", id).executeTakeFirstOrThrow();
 }
 function ldapRoutes(ctx) {
   const { db, auth, checkPermission, internals } = ctx;
@@ -27302,7 +27302,7 @@ function ldapRoutes(ctx) {
       await auditFailure({ message: "no email attribute" });
       return c.json({ error: "LDAP user does not have an email address configured" }, 400);
     }
-    const user = await findOrCreateSsoUser(db, ldapUser.email, ldapUser.displayName);
+    const user = await findOrCreateSsoUser(reqDb(c), ldapUser.email, ldapUser.displayName);
     await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(reqDb(c)).catch((err) => {
       console.warn("[ldap] could not invalidate previous sessions:", err.message);
     });

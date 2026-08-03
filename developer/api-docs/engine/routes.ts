@@ -34,9 +34,9 @@ const CustomDocUpdateSchema = CustomDocCreateSchema.partial();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function getSettingValue(db: any, key: string): Promise<any> {
+async function getSettingValue(dbh: any, key: string): Promise<any> {
   try {
-    const row = await (db as any)
+    const row = await (dbh as any)
       .selectFrom('zv_settings')
       .select('value')
       .where('key', '=', key)

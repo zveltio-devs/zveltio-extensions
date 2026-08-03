@@ -5,7 +5,7 @@ import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
 
-async function recalcReportTotals(db: any, reportId: string) {
+async function recalcReportTotals(dbh: any, reportId: string) {
   await sql`
     UPDATE zvd_expense_reports SET
       total_amount = COALESCE((SELECT SUM(amount) FROM zvd_expenses WHERE report_id = ${reportId}), 0),
@@ -18,7 +18,7 @@ async function recalcReportTotals(db: any, reportId: string) {
       ),
       updated_at = NOW()
     WHERE id = ${reportId}
-  `.execute(db);
+  `.execute(dbh);
 }
 
 export function expensesRoutes(ctx: ExtensionContext): Hono {
@@ -125,7 +125,7 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
       VALUES (${id}, ${d.date}, ${d.category}, ${d.description}, ${d.amount}, ${d.currency}, ${d.exchange_rate}, ${amount_local}, ${d.tax_amount}, ${d.receipt_url ?? null}, ${d.is_reimbursable}, ${user.id})
       RETURNING *
     `.execute(reqDb(c));
-    await recalcReportTotals(db, id);
+    await recalcReportTotals(reqDb(c), id);
     return c.json({ data: item.rows[0] }, 201);
   });
 
@@ -145,14 +145,14 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
       WHERE id = ${c.req.param('itemId')} AND report_id = ${c.req.param('id')} RETURNING *
     `.execute(reqDb(c));
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
-    await recalcReportTotals(db, c.req.param('id'));
+    await recalcReportTotals(reqDb(c), c.req.param('id'));
     return c.json({ data: row.rows[0] });
   });
 
   app.delete('/reports/:id/items/:itemId', async (c) => {
     const id = c.req.param('id');
     await sql`DELETE FROM zvd_expenses WHERE id = ${c.req.param('itemId')} AND report_id = ${id}`.execute(reqDb(c));
-    await recalcReportTotals(db, id);
+    await recalcReportTotals(reqDb(c), id);
     return c.json({ success: true });
   });
 
@@ -174,13 +174,13 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
       VALUES (${id}, ${user.id}, ${d.date}, ${d.from_location}, ${d.to_location}, ${d.distance_km}, ${d.rate_per_km}, ${d.purpose ?? null}, ${d.vehicle_type}, ${user.id})
       RETURNING *
     `.execute(reqDb(c));
-    await recalcReportTotals(db, id);
+    await recalcReportTotals(reqDb(c), id);
     return c.json({ data: row.rows[0] }, 201);
   });
 
   app.delete('/reports/:id/mileage/:mId', async (c) => {
     await sql`DELETE FROM zvd_mileage_entries WHERE id = ${c.req.param('mId')} AND report_id = ${c.req.param('id')}`.execute(reqDb(c));
-    await recalcReportTotals(db, c.req.param('id'));
+    await recalcReportTotals(reqDb(c), c.req.param('id'));
     return c.json({ success: true });
   });
 
@@ -202,7 +202,7 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
       VALUES (${id}, ${user.id}, ${d.date}, ${d.destination}, ${d.rate}, ${d.currency}, ${d.is_domestic}, ${d.partial_day}, ${d.meals_deducted}, ${user.id})
       RETURNING *
     `.execute(reqDb(c));
-    await recalcReportTotals(db, id);
+    await recalcReportTotals(reqDb(c), id);
     return c.json({ data: row.rows[0] }, 201);
   });
 

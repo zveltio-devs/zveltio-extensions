@@ -96,8 +96,8 @@ async function upsertSamlConfig(
 // Better-Auth's `user` table uses camelCase columns ("emailVerified",
 // "createdAt", "updatedAt"). Raw SQL keeps the casing literal so a
 // snake_case typo doesn't silently fail.
-async function findOrCreateSsoUser(db: any, email: string, displayName: string): Promise<any> {
-  const existing = await db
+async function findOrCreateSsoUser(dbh: any, email: string, displayName: string): Promise<any> {
+  const existing = await dbh
     .selectFrom('user')
     .selectAll()
     .where('email', '=', email)
@@ -109,9 +109,9 @@ async function findOrCreateSsoUser(db: any, email: string, displayName: string):
   await sql`
     INSERT INTO "user" (id, email, name, "emailVerified", "createdAt", "updatedAt")
     VALUES (${id}, ${email}, ${displayName || email.split('@')[0]}, true, ${now}, ${now})
-  `.execute(db);
+  `.execute(dbh);
 
-  return db.selectFrom('user').selectAll().where('id', '=', id).executeTakeFirstOrThrow();
+  return dbh.selectFrom('user').selectAll().where('id', '=', id).executeTakeFirstOrThrow();
 }
 
 export function samlRoutes(ctx: ExtensionContext): Hono {
@@ -188,7 +188,7 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
 
     if (!email) return c.json({ error: 'IdP did not return an email address' }, 400);
 
-    const user = await findOrCreateSsoUser(db, email, name);
+    const user = await findOrCreateSsoUser(reqDb(c), email, name);
 
     // Invalidate prior sessions so each SAML login produces exactly one
     // active session — limits blast radius if a previous token leaks.
