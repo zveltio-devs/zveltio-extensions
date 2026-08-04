@@ -45,13 +45,10 @@ const latLng = z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(
 export function postgisRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
-  // Per-request DB handle (CRM PR #1 pattern). After
-  // migration 002_tenant_rls.sql, this extension's tables have FORCE
-  // RLS keyed on `zveltio.current_tenant`; routes must run through
-  // this handle so the GUC is active inside the transaction.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
   const app = new Hono();
 
@@ -111,7 +108,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
         )
         ORDER BY distance_meters ASC
         LIMIT ${sql.lit(limit)}
-      `.execute(reqDb(c));
+      `.execute(db);
 
       return c.json({ records: records.rows, count: records.rows.length });
     },
@@ -142,7 +139,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
         FROM ${sql.id(tableName)}
         WHERE ${locationRef} && ST_SetSRID(ST_MakeEnvelope(${sql.lit(min_lng)}, ${sql.lit(min_lat)}, ${sql.lit(max_lng)}, ${sql.lit(max_lat)}, 4326), 4326)::geography
         LIMIT ${sql.lit(limit)}
-      `.execute(reqDb(c));
+      `.execute(db);
 
       return c.json({ records: records.rows, count: records.rows.length });
     },
@@ -179,7 +176,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
                ST_AsGeoJSON(ST_Centroid(ST_Collect(${locationRef}::geometry)))::jsonb AS centroid
         FROM clustered
         GROUP BY cluster_id ORDER BY point_count DESC
-      `.execute(reqDb(c));
+      `.execute(db);
 
       return c.json({ clusters: result.rows });
     },
@@ -191,7 +188,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const geofences = await reqDb(c)
+    const geofences = await db
       .selectFrom('zv_geofences')
       .select(['id', 'name', 'description', 'metadata', 'is_active', 'created_at'])
       .where('is_active', '=', true)
@@ -219,7 +216,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
         INSERT INTO zv_geofences (name, description, zone, metadata)
         VALUES (${name}, ${description || null}, ST_GeographyFromText(ST_AsText(ST_GeomFromGeoJSON(${geojson}))), ${JSON.stringify(metadata)})
         RETURNING id, name, description, is_active, created_at
-      `.execute(reqDb(c));
+      `.execute(db);
 
       return c.json({ geofence: geofence.rows[0] }, 201);
     },
@@ -229,7 +226,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    await reqDb(c).updateTable('zv_geofences').set({ is_active: false }).where('id', '=', c.req.param('id')).execute();
+    await db.updateTable('zv_geofences').set({ is_active: false }).where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
   });
 
@@ -241,7 +238,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
     const result = await sql<{ contains: boolean }>`
       SELECT ST_Contains(zone::geometry, ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)) AS contains
       FROM zv_geofences WHERE id = ${c.req.param('id')}::uuid
-    `.execute(reqDb(c));
+    `.execute(db);
 
     return c.json({ contains: result.rows[0]?.contains ?? false, lat, lng, geofence_id: c.req.param('id') });
   });
@@ -259,7 +256,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
         ${entity_type ? sql`AND entity_type = ${entity_type}` : sql``}
       ORDER BY occurred_at DESC
       LIMIT ${parseInt(limit, 10)}
-    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+    `.execute(db).catch(() => ({ rows: [] }));
 
     return c.json({ events: events.rows });
   });
@@ -290,7 +287,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
         WHERE ST_Within(${locationRef}::geometry, g.zone::geometry)
           AND ${locationRef} IS NOT NULL
         LIMIT ${sql.lit(limit)}
-      `.execute(reqDb(c));
+      `.execute(db);
 
       return c.json({ entities_inside: result.rows, count: result.rows.length });
     },
@@ -330,14 +327,14 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
            ${body.source}, ${JSON.stringify(body.metadata)},
            ${body.recorded_at ?? new Date().toISOString()})
         RETURNING id, entity_type, entity_id, recorded_at
-      `.execute(reqDb(c));
+      `.execute(db);
 
       // Check geofence rules asynchronously
       sql<any>`
         SELECT g.id AS geofence_id, g.name,
                ST_Within(${point}::geometry, g.zone::geometry) AS inside
         FROM zv_geofences g WHERE g.is_active = true
-      `.execute(reqDb(c)).then(async (fences: any) => {
+      `.execute(db).then(async (fences: any) => {
         for (const fence of fences.rows) {
           await sql`
             INSERT INTO zv_geofence_events (geofence_id, entity_type, entity_id, event_type, location)
@@ -351,7 +348,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
                 AND event_type = CASE WHEN ${fence.inside} THEN 'enter' ELSE 'exit' END
                 AND occurred_at > NOW() - INTERVAL '5 minutes'
             )
-          `.execute(reqDb(c)).catch(() => {});
+          `.execute(db).catch(() => {});
         }
       }).catch(() => {});
 
@@ -375,7 +372,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
         ${to ? sql`AND recorded_at <= ${to}::timestamptz` : sql``}
       ORDER BY recorded_at DESC
       LIMIT ${parseInt(limit, 10)}
-    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+    `.execute(db).catch(() => ({ rows: [] }));
 
     return c.json({ history: history.rows });
   });
@@ -386,7 +383,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const routes = await reqDb(c).selectFrom('zv_geo_routes')
+    const routes = await db.selectFrom('zv_geo_routes')
       .select(['id', 'name', 'description', 'distance_m', 'metadata', 'created_at'])
       .where('is_active', '=', true)
       .orderBy('name', 'asc')
@@ -417,7 +414,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
                 ${linestring}::geography, ${JSON.stringify(metadata)}, ${user.id})
         RETURNING id, name, description,
                   ST_Length(path) AS distance_m, created_at
-      `.execute(reqDb(c));
+      `.execute(db);
 
       return c.json({ route: route.rows[0] }, 201);
     },
@@ -427,7 +424,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    await reqDb(c).updateTable('zv_geo_routes').set({ is_active: false }).where('id', '=', c.req.param('id')).execute();
+    await db.updateTable('zv_geo_routes').set({ is_active: false }).where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
   });
 
@@ -439,7 +436,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
 
     const rules = await sql<any>`
       SELECT * FROM zv_geofence_rules WHERE geofence_id = ${c.req.param('id')}::uuid ORDER BY created_at
-    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+    `.execute(db).catch(() => ({ rows: [] }));
 
     return c.json({ rules: rules.rows });
   });
@@ -463,7 +460,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
         VALUES (${c.req.param('id')}::uuid, ${body.name}, ${body.trigger_on},
                 ${body.entity_type ?? null}, ${body.action_type}, ${JSON.stringify(body.action_config)}, ${user.id})
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
 
       return c.json({ rule: rule.rows[0] }, 201);
     },

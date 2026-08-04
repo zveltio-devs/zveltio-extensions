@@ -19502,9 +19502,6 @@ async function nextCreditNoteNumber(dbh) {
 function invoicingRoutes(ctx) {
   const { db, auth } = ctx;
   const app = new Hono2;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session)
@@ -19532,9 +19529,9 @@ function invoicingRoutes(ctx) {
       GROUP BY i.id
       ORDER BY i.created_at DESC
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
     const total = await sql`SELECT COUNT(*) as cnt FROM zvd_invoices
-      WHERE (${status ? sql`status = ${status}` : sql`TRUE`})`.execute(reqDb(c));
+      WHERE (${status ? sql`status = ${status}` : sql`TRUE`})`.execute(db);
     return c.json({ data: rows.rows, meta: { total: +total.rows[0].cnt } });
   });
   app.get("/invoices/stats", async (c) => {
@@ -19546,7 +19543,7 @@ function invoicingRoutes(ctx) {
         COUNT(*) FILTER (WHERE status = 'overdue') as overdue_count,
         COALESCE(AVG(EXTRACT(DAYS FROM (paid_at - issue_date))) FILTER (WHERE paid_at IS NOT NULL), 0) as avg_days_to_pay
       FROM zvd_invoices
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] });
   });
   app.get("/invoices/:id", async (c) => {
@@ -19561,11 +19558,11 @@ function invoicingRoutes(ctx) {
       LEFT JOIN zvd_invoice_lines l ON l.invoice_id = i.id
       WHERE i.id = ${c.req.param("id")}
       GROUP BY i.id
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
-    const payments = await sql`SELECT * FROM zvd_invoice_payments WHERE invoice_id = ${c.req.param("id")} ORDER BY payment_date`.execute(reqDb(c));
-    const reminders = await sql`SELECT * FROM zvd_payment_reminders WHERE invoice_id = ${c.req.param("id")} ORDER BY sent_at DESC`.execute(reqDb(c));
+    const payments = await sql`SELECT * FROM zvd_invoice_payments WHERE invoice_id = ${c.req.param("id")} ORDER BY payment_date`.execute(db);
+    const reminders = await sql`SELECT * FROM zvd_payment_reminders WHERE invoice_id = ${c.req.param("id")} ORDER BY sent_at DESC`.execute(db);
     return c.json({ data: { ...row.rows[0], payments: payments.rows, reminders: reminders.rows } });
   });
   app.post("/invoices", zValidator("json", exports_external.object({
@@ -19607,7 +19604,7 @@ function invoicingRoutes(ctx) {
         }
       }
     }
-    const number4 = await nextInvoiceNumber(reqDb(c));
+    const number4 = await nextInvoiceNumber(db);
     const subtotalBeforeDiscount = d.lines.reduce((s, l) => s + l.quantity * l.unit_price, 0);
     const discount_amount = subtotalBeforeDiscount * (d.discount_percent / 100);
     const subtotal = subtotalBeforeDiscount - discount_amount;
@@ -19624,7 +19621,7 @@ function invoicingRoutes(ctx) {
         ${d.discount_percent}, ${d.notes ?? null}, ${d.footer_notes ?? null}, ${d.po_number ?? null},
         ${d.recurring_interval ?? null}, 0, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     const invId = inv.rows[0].id;
     const insertedLines = [];
     for (const line of d.lines) {
@@ -19633,7 +19630,7 @@ function invoicingRoutes(ctx) {
         INSERT INTO zvd_invoice_lines (invoice_id, description, quantity, unit, unit_price, tax_rate, total, sort_order, metadata)
         VALUES (${invId}, ${line.description}, ${line.quantity}, ${line.unit ?? null}, ${line.unit_price}, ${line.tax_rate}, ${lineTotal}, ${line.sort_order}, ${JSON.stringify(line.metadata ?? {})}::jsonb)
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
       insertedLines.push(lineRow.rows[0]);
     }
     ctx.events.emit("record.created", {
@@ -19670,7 +19667,7 @@ function invoicingRoutes(ctx) {
         po_number = COALESCE(${d.po_number ?? null}, po_number),
         updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND status = 'draft' RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found or not editable (must be draft)" }, 400);
     return c.json({ data: row.rows[0] });
@@ -19679,7 +19676,7 @@ function invoicingRoutes(ctx) {
     const row = await sql`
       UPDATE zvd_invoices SET status = 'sent', updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND status = 'draft' RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Invoice not found or not in draft" }, 400);
     return c.json({ data: row.rows[0] });
@@ -19693,7 +19690,7 @@ function invoicingRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const d = c.req.valid("json");
-    const inv = await sql`SELECT * FROM zvd_invoices WHERE id = ${c.req.param("id")} AND status IN ('sent','overdue','partially_paid')`.execute(reqDb(c));
+    const inv = await sql`SELECT * FROM zvd_invoices WHERE id = ${c.req.param("id")} AND status IN ('sent','overdue','partially_paid')`.execute(db);
     if (!inv.rows.length)
       return c.json({ error: "Invoice not found or not payable" }, 400);
     const invoice = inv.rows[0];
@@ -19704,21 +19701,21 @@ function invoicingRoutes(ctx) {
       INSERT INTO zvd_invoice_payments (invoice_id, amount, payment_date, payment_method, reference, notes, created_by)
       VALUES (${invoice.id}, ${d.amount}, ${d.payment_date}, ${d.payment_method}, ${d.reference ?? null}, ${d.notes ?? null}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     const newPaid = +invoice.amount_paid + d.amount;
     const newStatus = newPaid >= invoice.total ? "paid" : "partially_paid";
     await sql`
       UPDATE zvd_invoices SET amount_paid = ${newPaid}, status = ${newStatus},
         paid_at = ${newStatus === "paid" ? sql`NOW()` : sql`paid_at`}, updated_at = NOW()
       WHERE id = ${invoice.id}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: payment.rows[0] }, 201);
   });
   app.post("/invoices/:id/pay", async (c) => {
     const row = await sql`
       UPDATE zvd_invoices SET status = 'paid', paid_at = NOW(), amount_paid = total, updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND status IN ('sent','overdue','partially_paid') RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Invoice not found or not payable" }, 400);
     return c.json({ data: row.rows[0] });
@@ -19727,7 +19724,7 @@ function invoicingRoutes(ctx) {
     const row = await sql`
       UPDATE zvd_invoices SET status = 'cancelled', updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND status NOT IN ('paid','cancelled') RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Cannot cancel this invoice" }, 400);
     return c.json({ data: row.rows[0] });
@@ -19738,23 +19735,23 @@ function invoicingRoutes(ctx) {
     notes: exports_external.string().optional()
   })), async (c) => {
     const d = c.req.valid("json");
-    const inv = await sql`SELECT id, status, due_date, client_email FROM zvd_invoices WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    const inv = await sql`SELECT id, status, due_date, client_email FROM zvd_invoices WHERE id = ${c.req.param("id")}`.execute(db);
     if (!inv.rows.length)
       return c.json({ error: "Not found" }, 404);
     const row = await sql`
       INSERT INTO zvd_payment_reminders (invoice_id, reminder_type, channel, notes)
       VALUES (${c.req.param("id")}, ${d.reminder_type}, ${d.channel}, ${d.notes ?? null})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.post("/invoices/:id/generate-next", async (c) => {
     const user = c.get("user");
-    const inv = await sql`SELECT * FROM zvd_invoices WHERE id = ${c.req.param("id")} AND recurring_interval IS NOT NULL`.execute(reqDb(c));
+    const inv = await sql`SELECT * FROM zvd_invoices WHERE id = ${c.req.param("id")} AND recurring_interval IS NOT NULL`.execute(db);
     if (!inv.rows.length)
       return c.json({ error: "Invoice not found or not recurring" }, 400);
     const i = inv.rows[0];
-    const lines = await sql`SELECT * FROM zvd_invoice_lines WHERE invoice_id = ${i.id}`.execute(reqDb(c));
+    const lines = await sql`SELECT * FROM zvd_invoice_lines WHERE invoice_id = ${i.id}`.execute(db);
     const newIssue = new Date(i.due_date);
     newIssue.setDate(newIssue.getDate() + 1);
     const newDue = new Date(newIssue);
@@ -19764,7 +19761,7 @@ function invoicingRoutes(ctx) {
       newDue.setMonth(newDue.getMonth() + 3);
     else
       newDue.setFullYear(newDue.getFullYear() + 1);
-    const number4 = await nextInvoiceNumber(reqDb(c));
+    const number4 = await nextInvoiceNumber(db);
     const newInv = await sql`
       INSERT INTO zvd_invoices (number, client_id, client_type, client_name, client_email, client_address,
         issue_date, due_date, currency, subtotal, tax_rate, tax_amount, total, discount_amount, discount_percent,
@@ -19774,12 +19771,12 @@ function invoicingRoutes(ctx) {
         ${i.currency}, ${i.subtotal}, ${i.tax_rate}, ${i.tax_amount}, ${i.total},
         ${i.discount_amount}, ${i.discount_percent}, ${i.notes}, ${i.footer_notes}, ${i.recurring_interval}, 0, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     const newId = newInv.rows[0].id;
     for (const line of lines.rows) {
       await sql`INSERT INTO zvd_invoice_lines (invoice_id, description, quantity, unit_price, tax_rate, total, sort_order)
         VALUES (${newId}, ${line.description}, ${line.quantity}, ${line.unit_price}, ${line.tax_rate}, ${line.total}, ${line.sort_order})
-      `.execute(reqDb(c));
+      `.execute(db);
     }
     return c.json({ data: newInv.rows[0] }, 201);
   });
@@ -19790,7 +19787,7 @@ function invoicingRoutes(ctx) {
       FROM zvd_credit_notes cn
       LEFT JOIN zvd_credit_note_lines l ON l.credit_note_id = cn.id
       GROUP BY cn.id ORDER BY cn.created_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/credit-notes", zValidator("json", exports_external.object({
@@ -19809,7 +19806,7 @@ function invoicingRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const d = c.req.valid("json");
-    const number4 = await nextCreditNoteNumber(reqDb(c));
+    const number4 = await nextCreditNoteNumber(db);
     const subtotal = d.lines.reduce((s, l) => s + l.quantity * l.unit_price, 0);
     const tax_amount = d.lines.reduce((s, l) => s + l.quantity * l.unit_price * l.tax_rate / 100, 0);
     const total = subtotal + tax_amount;
@@ -19820,19 +19817,19 @@ function invoicingRoutes(ctx) {
         ${d.reason}, ${d.issue_date ?? new Date().toISOString().slice(0, 10)},
         ${d.currency}, ${subtotal}, ${tax_amount}, ${total}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     const cnId = cn.rows[0].id;
     let sort = 0;
     for (const line of d.lines) {
       const lineTotal = line.quantity * line.unit_price * (1 + line.tax_rate / 100);
       await sql`INSERT INTO zvd_credit_note_lines (credit_note_id, description, quantity, unit_price, tax_rate, total, sort_order)
         VALUES (${cnId}, ${line.description}, ${line.quantity}, ${line.unit_price}, ${line.tax_rate}, ${lineTotal}, ${sort++})
-      `.execute(reqDb(c));
+      `.execute(db);
     }
     return c.json({ data: cn.rows[0] }, 201);
   });
   app.post("/credit-notes/:id/issue", async (c) => {
-    const row = await sql`UPDATE zvd_credit_notes SET status = 'issued', updated_at = NOW() WHERE id = ${c.req.param("id")} AND status = 'draft' RETURNING *`.execute(reqDb(c));
+    const row = await sql`UPDATE zvd_credit_notes SET status = 'issued', updated_at = NOW() WHERE id = ${c.req.param("id")} AND status = 'draft' RETURNING *`.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found or not draft" }, 400);
     return c.json({ data: row.rows[0] });
@@ -19841,10 +19838,10 @@ function invoicingRoutes(ctx) {
     invoice_id: exports_external.string().uuid()
   })), async (c) => {
     const { invoice_id } = c.req.valid("json");
-    const cn = await sql`SELECT * FROM zvd_credit_notes WHERE id = ${c.req.param("id")} AND status = 'issued'`.execute(reqDb(c));
+    const cn = await sql`SELECT * FROM zvd_credit_notes WHERE id = ${c.req.param("id")} AND status = 'issued'`.execute(db);
     if (!cn.rows.length)
       return c.json({ error: "Credit note not found or not issued" }, 400);
-    const inv = await sql`SELECT * FROM zvd_invoices WHERE id = ${invoice_id}`.execute(reqDb(c));
+    const inv = await sql`SELECT * FROM zvd_invoices WHERE id = ${invoice_id}`.execute(db);
     if (!inv.rows.length)
       return c.json({ error: "Invoice not found" }, 404);
     const credit = cn.rows[0];
@@ -19852,8 +19849,8 @@ function invoicingRoutes(ctx) {
     const applied = Math.min(credit.total, invoice.total - invoice.amount_paid);
     const newPaid = +invoice.amount_paid + applied;
     const newStatus = newPaid >= invoice.total ? "paid" : "partially_paid";
-    await sql`UPDATE zvd_invoices SET amount_paid = ${newPaid}, status = ${newStatus}, updated_at = NOW() WHERE id = ${invoice_id}`.execute(reqDb(c));
-    await sql`UPDATE zvd_credit_notes SET status = 'applied', updated_at = NOW() WHERE id = ${credit.id}`.execute(reqDb(c));
+    await sql`UPDATE zvd_invoices SET amount_paid = ${newPaid}, status = ${newStatus}, updated_at = NOW() WHERE id = ${invoice_id}`.execute(db);
+    await sql`UPDATE zvd_credit_notes SET status = 'applied', updated_at = NOW() WHERE id = ${credit.id}`.execute(db);
     return c.json({ data: { applied_amount: applied, invoice_status: newStatus } });
   });
   app.get("/invoices/:id/html", async (c) => {
@@ -19865,7 +19862,7 @@ function invoicingRoutes(ctx) {
         ) ORDER BY l.sort_order) FILTER (WHERE l.id IS NOT NULL), '[]') as lines
       FROM zvd_invoices i LEFT JOIN zvd_invoice_lines l ON l.invoice_id = i.id
       WHERE i.id = ${c.req.param("id")} GROUP BY i.id
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
     const inv = row.rows[0];
@@ -19909,16 +19906,16 @@ ${inv.footer_notes ? `<p style="font-size:12px;color:#666">${inv.footer_notes}</
       UPDATE zvd_invoices SET status = 'overdue', updated_at = NOW()
       WHERE due_date < CURRENT_DATE AND status = 'sent'
       RETURNING id
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: { marked: row.rows.length } });
   });
   app.delete("/invoices/:id", async (c) => {
-    const existing = await sql`SELECT status FROM zvd_invoices WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    const existing = await sql`SELECT status FROM zvd_invoices WHERE id = ${c.req.param("id")}`.execute(db);
     if (!existing.rows.length)
       return c.json({ error: "Not found" }, 404);
     if (existing.rows[0].status === "paid")
       return c.json({ error: "Cannot delete a paid invoice" }, 400);
-    await sql`DELETE FROM zvd_invoices WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_invoices WHERE id = ${c.req.param("id")}`.execute(db);
     return c.json({ success: true });
   });
   return app;

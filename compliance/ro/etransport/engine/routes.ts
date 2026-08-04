@@ -36,13 +36,10 @@ const declarationSchema = z.object({
 export function etransportRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
-  // Per-request DB handle (CRM PR #1 pattern). After
-  // migration 002_tenant_rls.sql, this extension's tables have FORCE
-  // RLS keyed on `zveltio.current_tenant`; routes must run through
-  // this handle so the GUC is active inside the transaction.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
   const app = new Hono();
 

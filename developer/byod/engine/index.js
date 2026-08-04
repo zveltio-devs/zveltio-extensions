@@ -19457,9 +19457,6 @@ var ImportBodySchema = exports_external.object({
 });
 function introspectRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const { introspectSchema } = ctx.internals;
   const router = new Hono2;
   router.use("*", async (c, next) => {
@@ -19499,7 +19496,7 @@ function introspectRoutes(ctx) {
         VALUES
           (${schema}, ${tables.length}, ${imported}, ${updated},
            ${skipped}, 'completed', 'manual', ${user.id})
-      `.execute(reqDb(c));
+      `.execute(db);
       return c.json({ imported, updated, tables });
     } catch (err) {
       await sql`
@@ -19509,7 +19506,7 @@ function introspectRoutes(ctx) {
         VALUES
           (${schema}, 0, 0, 0, 0, 'failed', ${err.message || "Unknown error"},
            'manual', ${user.id})
-      `.execute(reqDb(c)).catch(() => {});
+      `.execute(db).catch(() => {});
       return c.json({ error: err.message || "Introspection failed" }, 500);
     }
   });
@@ -19517,7 +19514,7 @@ function introspectRoutes(ctx) {
     const rows = await sql`
       SELECT * FROM zvd_byod_scan_profiles
       ORDER BY created_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ profiles: rows.rows });
   });
   router.post("/profiles", zValidator("json", ProfileCreateSchema), async (c) => {
@@ -19533,14 +19530,14 @@ function introspectRoutes(ctx) {
          ${body.exclude_patterns}, ${body.auto_sync},
          ${body.sync_interval_hours}, ${nextSync}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ profile: row.rows[0] }, 201);
   });
   router.get("/profiles/:id", async (c) => {
     const id = c.req.param("id");
     const row = await sql`
       SELECT * FROM zvd_byod_scan_profiles WHERE id = ${id}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows[0])
       return c.json({ error: "Not found" }, 404);
     return c.json({ profile: row.rows[0] });
@@ -19555,7 +19552,7 @@ function introspectRoutes(ctx) {
     if (updates.auto_sync === true || updates.sync_interval_hours !== undefined) {
       const profile = await sql`
         SELECT auto_sync, sync_interval_hours FROM zvd_byod_scan_profiles WHERE id = ${id}
-      `.execute(reqDb(c));
+      `.execute(db);
       const existing = profile.rows[0];
       if (existing) {
         const autoSync = updates.auto_sync ?? existing.auto_sync;
@@ -19563,14 +19560,14 @@ function introspectRoutes(ctx) {
         updates.next_sync_at = autoSync ? new Date(Date.now() + intervalHours * 3600000) : null;
       }
     }
-    const row = await reqDb(c).updateTable("zvd_byod_scan_profiles").set(updates).where("id", "=", id).returningAll().executeTakeFirst();
+    const row = await db.updateTable("zvd_byod_scan_profiles").set(updates).where("id", "=", id).returningAll().executeTakeFirst();
     if (!row)
       return c.json({ error: "Not found" }, 404);
     return c.json({ profile: row });
   });
   router.delete("/profiles/:id", async (c) => {
     const id = c.req.param("id");
-    const res = await reqDb(c).deleteFrom("zvd_byod_scan_profiles").where("id", "=", id).executeTakeFirst();
+    const res = await db.deleteFrom("zvd_byod_scan_profiles").where("id", "=", id).executeTakeFirst();
     if ((res?.numDeletedRows ?? 0n) === 0n)
       return c.json({ error: "Not found" }, 404);
     return c.json({ success: true });
@@ -19580,7 +19577,7 @@ function introspectRoutes(ctx) {
     const id = c.req.param("id");
     const profileRes = await sql`
       SELECT * FROM zvd_byod_scan_profiles WHERE id = ${id} AND is_active = true
-    `.execute(reqDb(c));
+    `.execute(db);
     const profile = profileRes.rows[0];
     if (!profile)
       return c.json({ error: "Profile not found or inactive" }, 404);
@@ -19596,7 +19593,7 @@ function introspectRoutes(ctx) {
         UPDATE zvd_byod_scan_profiles
         SET last_sync_at = ${now}, next_sync_at = ${nextSync}, updated_at = ${now}
         WHERE id = ${id}
-      `.execute(reqDb(c));
+      `.execute(db);
       const histRow = await sql`
         INSERT INTO zvd_byod_scan_history
           (profile_id, schema_name, tables_found, tables_imported, tables_updated,
@@ -19605,7 +19602,7 @@ function introspectRoutes(ctx) {
           (${id}, ${schema}, ${tables.length}, ${imported}, ${updated},
            0, 'completed', 'profile', ${user.id})
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
       return c.json({ imported, updated, tables, history: histRow.rows[0] });
     } catch (err) {
       await sql`
@@ -19615,7 +19612,7 @@ function introspectRoutes(ctx) {
         VALUES
           (${id}, ${schema}, 0, 0, 0, 0, 'failed',
            ${err.message || "Unknown error"}, 'profile', ${user.id})
-      `.execute(reqDb(c)).catch(() => {});
+      `.execute(db).catch(() => {});
       return c.json({ error: err.message || "Scan failed" }, 500);
     }
   });
@@ -19628,13 +19625,13 @@ function introspectRoutes(ctx) {
           WHERE h.profile_id = ${profileId}
           ORDER BY h.created_at DESC
           LIMIT 50
-        `.execute(reqDb(c)) : await sql`
+        `.execute(db) : await sql`
           SELECT h.*, p.name AS profile_name
           FROM zvd_byod_scan_history h
           LEFT JOIN zvd_byod_scan_profiles p ON p.id = h.profile_id
           ORDER BY h.created_at DESC
           LIMIT 50
-        `.execute(reqDb(c));
+        `.execute(db);
     return c.json({ history: rows.rows });
   });
   router.get("/stats", async (c) => {
@@ -19643,14 +19640,14 @@ function introspectRoutes(ctx) {
         SELECT COUNT(*)::int AS total
         FROM zv_collections
         WHERE is_managed = false
-      `.execute(reqDb(c)).catch(() => ({ rows: [{ total: 0 }] })),
+      `.execute(db).catch(() => ({ rows: [{ total: 0 }] })),
       sql`
         SELECT created_at FROM zvd_byod_scan_history
         ORDER BY created_at DESC LIMIT 1
-      `.execute(reqDb(c)).catch(() => ({ rows: [] })),
+      `.execute(db).catch(() => ({ rows: [] })),
       sql`
         SELECT COUNT(*)::int AS total FROM zvd_byod_scan_profiles
-      `.execute(reqDb(c)).catch(() => ({ rows: [{ total: 0 }] }))
+      `.execute(db).catch(() => ({ rows: [{ total: 0 }] }))
     ]);
     return c.json({
       imported_tables: importedRes.rows[0]?.total ?? 0,

@@ -19,13 +19,10 @@ function acceptsCsv(c: any): boolean {
 export function reportsRouter(ctx: ExtensionContext): Hono {
   const { db } = ctx;
 
-  // Per-request DB handle (CRM PR #1 pattern). After
-  // migration 002_tenant_rls.sql, this extension's tables have FORCE
-  // RLS keyed on `zveltio.current_tenant`; routes must run through
-  // this handle so the GUC is active inside the transaction.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
   const app = new Hono();
 
@@ -62,7 +59,7 @@ export function reportsRouter(ctx: ExtensionContext): Hono {
       WHERE l.reception_date BETWEEN ${from} AND ${to}
         OR l.created_at::date BETWEEN ${from} AND ${to}
       ORDER BY COALESCE(l.reception_date, l.created_at::date), l.lot_number
-    `.execute(reqDb(c));
+    `.execute(db);
 
     if (acceptsCsv(c)) {
       const cols = rows.rows.length > 0 ? Object.keys(rows.rows[0] as object) : [];
@@ -101,7 +98,7 @@ export function reportsRouter(ctx: ExtensionContext): Hono {
         AND (${from ? sql`m.performed_at::date >= ${from}` : sql`TRUE`})
         AND (${to ? sql`m.performed_at::date <= ${to}` : sql`TRUE`})
       ORDER BY m.performed_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
 
     if (acceptsCsv(c)) {
       const cols = rows.rows.length > 0 ? Object.keys(rows.rows[0] as object) : [];
@@ -138,7 +135,7 @@ export function reportsRouter(ctx: ExtensionContext): Hono {
       WHERE (${from ? sql`c.scanned_at::date >= ${from}` : sql`TRUE`})
         AND (${to ? sql`c.scanned_at::date <= ${to}` : sql`TRUE`})
       ORDER BY c.scanned_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
 
     if (acceptsCsv(c)) {
       const cols = rows.rows.length > 0 ? Object.keys(rows.rows[0] as object) : [];
@@ -175,7 +172,7 @@ export function reportsRouter(ctx: ExtensionContext): Hono {
       LEFT JOIN trace_locations loc ON loc.id = l.location_id
       WHERE l.status = 'available'
       ORDER BY i.name, l.best_before_date NULLS LAST
-    `.execute(reqDb(c));
+    `.execute(db);
 
     if (acceptsCsv(c)) {
       const cols = rows.rows.length > 0 ? Object.keys(rows.rows[0] as object) : [];
@@ -209,7 +206,7 @@ export function reportsRouter(ctx: ExtensionContext): Hono {
         AND (${from ? sql`po.completed_at::date >= ${from}` : sql`TRUE`})
         AND (${to ? sql`po.completed_at::date <= ${to}` : sql`TRUE`})
       ORDER BY po.completed_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
 
     return c.json({ data: rows.rows });
   });

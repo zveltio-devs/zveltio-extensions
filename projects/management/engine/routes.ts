@@ -8,13 +8,10 @@ import { permissionGate } from '@zveltio/sdk/extension';
 export function projectsRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
-  // Per-request DB handle (CRM PR #1 pattern). After
-  // migration 002_tenant_rls.sql, this extension's tables have FORCE
-  // RLS keyed on `zveltio.current_tenant`; routes must run through
-  // this handle so the GUC is active inside the transaction.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
   const app = new Hono();
 
@@ -45,7 +42,7 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
         AND (p.owner_id = ${user.id} OR pm.user_id = ${user.id} OR p.created_by = ${user.id})
       GROUP BY p.id ORDER BY p.created_at DESC
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
 
@@ -66,7 +63,7 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
       LEFT JOIN zvd_tasks t ON t.project_id = p.id
       WHERE p.id = ${c.req.param('id')}
       GROUP BY p.id
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
@@ -89,9 +86,9 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
       VALUES (${d.name}, ${d.description ?? null}, ${d.client_id ?? null}, ${d.status}, ${d.priority},
         ${d.start_date ?? null}, ${d.end_date ?? null}, ${d.budget ?? null}, ${d.color}, ${user.id}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     const projectId = (row.rows[0] as any).id;
-    await sql`INSERT INTO zvd_project_members (project_id, user_id, role) VALUES (${projectId}, ${user.id}, 'owner')`.execute(reqDb(c));
+    await sql`INSERT INTO zvd_project_members (project_id, user_id, role) VALUES (${projectId}, ${user.id}, 'owner')`.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -120,19 +117,19 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
         progress_percent = COALESCE(${d.progress_percent ?? null}, progress_percent),
         updated_at = NOW()
       WHERE id = ${c.req.param('id')} RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
 
   app.delete('/:id', async (c) => {
-    await sql`DELETE FROM zvd_projects WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_projects WHERE id = ${c.req.param('id')}`.execute(db);
     return c.json({ success: true });
   });
 
   // ── Members ────────────────────────────────────────────────────
   app.get('/:id/members', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_project_members WHERE project_id = ${c.req.param('id')}`.execute(reqDb(c));
+    const rows = await sql`SELECT * FROM zvd_project_members WHERE project_id = ${c.req.param('id')}`.execute(db);
     return c.json({ data: rows.rows });
   });
 
@@ -145,12 +142,12 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_project_members (project_id, user_id, role)
       VALUES (${c.req.param('id')}, ${d.user_id}, ${d.role})
       ON CONFLICT (project_id, user_id) DO UPDATE SET role = ${d.role}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ success: true });
   });
 
   app.delete('/:id/members/:userId', async (c) => {
-    await sql`DELETE FROM zvd_project_members WHERE project_id = ${c.req.param('id')} AND user_id = ${c.req.param('userId')} AND role != 'owner'`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_project_members WHERE project_id = ${c.req.param('id')} AND user_id = ${c.req.param('userId')} AND role != 'owner'`.execute(db);
     return c.json({ success: true });
   });
 
@@ -162,7 +159,7 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
       LEFT JOIN zvd_tasks t ON t.milestone_id = m.id
       WHERE m.project_id = ${c.req.param('id')}
       GROUP BY m.id ORDER BY m.due_date
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
 
@@ -177,7 +174,7 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_milestones (project_id, name, description, due_date, created_by)
       VALUES (${c.req.param('id')}, ${d.name}, ${d.description ?? null}, ${d.due_date}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -194,7 +191,7 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
         completed_at = CASE WHEN ${d.is_completed ?? null} = true AND completed_at IS NULL THEN NOW() ELSE completed_at END,
         due_date = COALESCE(${d.due_date ?? null}, due_date)
       WHERE id = ${c.req.param('id')} RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
@@ -216,7 +213,7 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
         AND (${assignee_id ? sql`t.assignee_id = ${assignee_id}` : sql`TRUE`})
         AND (${milestone_id ? sql`t.milestone_id = ${milestone_id}` : sql`TRUE`})
       GROUP BY t.id ORDER BY t.sort_order, t.created_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
 
@@ -233,7 +230,7 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
       LEFT JOIN zvd_task_dependencies td ON td.task_id = t.id
       LEFT JOIN zvd_task_attachments ta ON ta.task_id = t.id
       WHERE t.id = ${c.req.param('id')} GROUP BY t.id
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
@@ -262,7 +259,7 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
         ${d.due_date ?? null}, ${d.start_date ?? null}, ${d.estimated_hours ?? null},
         ${d.story_points ?? null}, ${JSON.stringify(d.tags)}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -298,13 +295,13 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
         completed_at = CASE WHEN ${d.status ?? null} = 'done' AND status != 'done' THEN NOW() ELSE completed_at END,
         updated_at = NOW()
       WHERE id = ${c.req.param('id')} RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
 
   app.delete('/tasks/:id', async (c) => {
-    await sql`DELETE FROM zvd_tasks WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_tasks WHERE id = ${c.req.param('id')}`.execute(db);
     return c.json({ success: true });
   });
 
@@ -320,12 +317,12 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
       VALUES (${c.req.param('id')}, ${d.depends_on_id}, ${d.type})
       ON CONFLICT (task_id, depends_on_id) DO UPDATE SET type = ${d.type}
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
 
   app.delete('/tasks/:id/dependencies/:depId', async (c) => {
-    await sql`DELETE FROM zvd_task_dependencies WHERE task_id = ${c.req.param('id')} AND depends_on_id = ${c.req.param('depId')}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_task_dependencies WHERE task_id = ${c.req.param('id')} AND depends_on_id = ${c.req.param('depId')}`.execute(db);
     return c.json({ success: true });
   });
 
@@ -340,7 +337,7 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_subtasks (task_id, title, assignee_id, created_by)
       VALUES (${c.req.param('id')}, ${d.title}, ${d.assignee_id ?? null}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -357,13 +354,13 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
         completed_at = CASE WHEN ${d.is_completed ?? null} = true AND completed_at IS NULL THEN NOW() ELSE completed_at END,
         assignee_id = COALESCE(${d.assignee_id ?? null}, assignee_id)
       WHERE id = ${c.req.param('id')} RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
 
   app.delete('/subtasks/:id', async (c) => {
-    await sql`DELETE FROM zvd_subtasks WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_subtasks WHERE id = ${c.req.param('id')}`.execute(db);
     return c.json({ success: true });
   });
 
@@ -380,18 +377,18 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_task_attachments (task_id, name, file_url, file_size, mime_type, uploaded_by)
       VALUES (${c.req.param('id')}, ${d.name}, ${d.file_url}, ${d.file_size ?? null}, ${d.mime_type ?? null}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
 
   app.delete('/attachments/:id', async (c) => {
-    await sql`DELETE FROM zvd_task_attachments WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_task_attachments WHERE id = ${c.req.param('id')}`.execute(db);
     return c.json({ success: true });
   });
 
   // ── Custom Fields ──────────────────────────────────────────────
   app.get('/:id/custom-fields', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_project_custom_fields WHERE project_id = ${c.req.param('id')} ORDER BY name`.execute(reqDb(c));
+    const rows = await sql`SELECT * FROM zvd_project_custom_fields WHERE project_id = ${c.req.param('id')} ORDER BY name`.execute(db);
     return c.json({ data: rows.rows });
   });
 
@@ -406,7 +403,7 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_project_custom_fields (project_id, name, field_type, options, is_required)
       VALUES (${c.req.param('id')}, ${d.name}, ${d.field_type}, ${d.options ? JSON.stringify(d.options) : null}, ${d.is_required})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -420,7 +417,7 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
       VALUES (${c.req.param('id')}, ${d.field_id}, ${d.value})
       ON CONFLICT (task_id, field_id) DO UPDATE SET value = ${d.value}
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] });
   });
 
@@ -434,12 +431,12 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
       INSERT INTO zvd_task_comments (task_id, author_id, content)
       VALUES (${c.req.param('id')}, ${user.id}, ${content})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
 
   app.delete('/comments/:id', async (c) => {
-    await sql`DELETE FROM zvd_task_comments WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_task_comments WHERE id = ${c.req.param('id')}`.execute(db);
     return c.json({ success: true });
   });
 
@@ -454,10 +451,10 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
       LEFT JOIN zvd_task_dependencies td ON td.task_id = t.id
       WHERE t.project_id = ${c.req.param('id')} AND t.status != 'done'
       GROUP BY t.id ORDER BY t.start_date NULLS LAST, t.sort_order
-    `.execute(reqDb(c));
+    `.execute(db);
     const milestones = await sql`
       SELECT id, name, due_date, is_completed FROM zvd_milestones WHERE project_id = ${c.req.param('id')} ORDER BY due_date
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: { tasks: tasks.rows, milestones: milestones.rows } });
   });
 
@@ -473,7 +470,7 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
         COALESCE(SUM(estimated_hours), 0) as total_estimated_hours,
         COALESCE(SUM(actual_hours), 0) as total_actual_hours
       FROM zvd_tasks WHERE project_id = ${c.req.param('id')}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] });
   });
 

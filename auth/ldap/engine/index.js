@@ -27239,9 +27239,6 @@ async function findOrCreateSsoUser(dbh, email3, displayName) {
 }
 function ldapRoutes(ctx) {
   const { db, auth, checkPermission, internals } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   if (!internals?.createBetterAuthSession) {
     throw new Error("[ldap] engine internals missing createBetterAuthSession \u2014 Zveltio version mismatch");
   }
@@ -27287,7 +27284,7 @@ function ldapRoutes(ctx) {
           VALUES ('auth.login_failed', NULL, 'session',
                   ${JSON.stringify({ provider: "ldap", username, user_agent: userAgent, error: err?.message })}::jsonb,
                   ${remoteIp}, NOW())
-        `.execute(reqDb(c));
+        `.execute(db);
       } catch (auditErr) {
         console.warn("[ldap] failed-login audit write failed:", auditErr.message);
       }
@@ -27302,8 +27299,8 @@ function ldapRoutes(ctx) {
       await auditFailure({ message: "no email attribute" });
       return c.json({ error: "LDAP user does not have an email address configured" }, 400);
     }
-    const user = await findOrCreateSsoUser(reqDb(c), ldapUser.email, ldapUser.displayName);
-    await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(reqDb(c)).catch((err) => {
+    const user = await findOrCreateSsoUser(db, ldapUser.email, ldapUser.displayName);
+    await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(db).catch((err) => {
       console.warn("[ldap] could not invalidate previous sessions:", err.message);
     });
     const { token, setCookie } = await internals.createBetterAuthSession(db, user.id, {
@@ -27317,7 +27314,7 @@ function ldapRoutes(ctx) {
         VALUES ('auth.login_success', ${user.id}, 'session',
                 ${JSON.stringify({ provider: "ldap", username, user_agent: userAgent })}::jsonb,
                 ${remoteIp}, NOW())
-      `.execute(reqDb(c));
+      `.execute(db);
     } catch (auditErr) {
       console.warn("[ldap] success audit write failed:", auditErr.message);
     }

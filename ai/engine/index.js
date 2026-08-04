@@ -30110,9 +30110,6 @@ function maskApiKey(key) {
 function aiRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
   const app = new Hono2;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   async function requireAuth(c) {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     return session?.user ?? null;
@@ -30220,7 +30217,7 @@ function aiRoutes(ctx) {
     const name = c.req.param("name");
     const result = await sql`
       DELETE FROM zv_ai_providers WHERE name = ${name} RETURNING id
-    `.execute(reqDb(c));
+    `.execute(db);
     if (result.rows.length === 0)
       return c.json({ error: "Provider not found" }, 404);
     return c.json({ success: true });
@@ -30316,7 +30313,7 @@ function aiRoutes(ctx) {
             embedding    = EXCLUDED.embedding,
             model        = EXCLUDED.model,
             updated_at   = NOW()
-        `.execute(reqDb(c)).catch((err) => {
+        `.execute(db).catch((err) => {
         console.warn("[ai.embed] embedding persist failed:", err.message);
       });
     }
@@ -30340,7 +30337,7 @@ function aiRoutes(ctx) {
     if (!await checkPermission(user.id, collection, "read")) {
       return c.json({ error: "Forbidden: no read permission on this collection" }, 403);
     }
-    const tdb = reqDb(c);
+    const tdb = db;
     const provider = aiProviderManager.getDefault();
     if (provider?.embed) {
       try {
@@ -30403,7 +30400,7 @@ function aiRoutes(ctx) {
           FROM ${sql.id(tableName)}
           WHERE ${sql.id(field)} ILIKE ${"%" + query + "%"}
           LIMIT ${limit}
-        `.execute(reqDb(c)).then((r) => r.rows).catch(() => []);
+        `.execute(db).then((r) => r.rows).catch(() => []);
     } catch {}
     return c.json({
       results: fallbackResults,

@@ -34,13 +34,10 @@ const SlaTargetSchema = z.object({
 export function qualityRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
 
-  // Per-request DB handle (CRM PR #1 pattern). After
-  // migration 002_tenant_rls.sql, this extension's tables have FORCE
-  // RLS keyed on `zveltio.current_tenant`; routes must run through
-  // this handle so the GUC is active inside the transaction.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
   const { runQualityScan } = ctx.internals;
 
@@ -69,10 +66,10 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     const storeScore = async () => {
       try {
         await new Promise(r => setTimeout(r, 2000)); // brief wait for scan to progress
-        const scan = await (reqDb(c) as any).selectFrom('zv_quality_scans').selectAll().where('id', '=', scanId).executeTakeFirst();
+        const scan = await (db as any).selectFrom('zv_quality_scans').selectAll().where('id', '=', scanId).executeTakeFirst();
         if (!scan || scan.status !== 'completed') return;
 
-        const issues = await (reqDb(c) as any).selectFrom('zv_quality_issues').selectAll().where('scan_id', '=', scanId).execute();
+        const issues = await (db as any).selectFrom('zv_quality_issues').selectAll().where('scan_id', '=', scanId).execute();
         const critical = issues.filter((i: any) => i.severity === 'critical').length;
         const error = issues.filter((i: any) => i.severity === 'error').length;
         const warning = issues.filter((i: any) => i.severity === 'warning').length;
@@ -82,7 +79,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
         const deduction = (critical * 10 + error * 5 + warning * 2 + info * 0.5) / total * 100;
         const score = Math.max(0, Math.round(100 - deduction));
 
-        await (reqDb(c) as any).insertInto('zvd_quality_scores')
+        await (db as any).insertInto('zvd_quality_scores')
           .values({ collection, scan_id: scanId, score, total_records: total, critical_count: critical, error_count: error, warning_count: warning, info_count: info })
           .execute();
       } catch { /* non-critical */ }
@@ -94,7 +91,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
 
   // GET /scans — recent scans across all collections (dashboard history)
   app.get('/scans', async (c) => {
-    const scans = await (reqDb(c) as any)
+    const scans = await (db as any)
       .selectFrom('zv_quality_scans')
       .selectAll()
       .orderBy('created_at', 'desc')
@@ -106,7 +103,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
   // GET /scans/:collection — list recent scans
   app.get('/scans/:collection', async (c) => {
     const collection = c.req.param('collection');
-    const scans = await (reqDb(c) as any)
+    const scans = await (db as any)
       .selectFrom('zv_quality_scans')
       .selectAll()
       .where('collection', '=', collection)
@@ -118,7 +115,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
 
   // GET /scan/:scanId — get scan status
   app.get('/scan/:scanId', async (c) => {
-    const scan = await (reqDb(c) as any).selectFrom('zv_quality_scans').selectAll().where('id', '=', c.req.param('scanId')).executeTakeFirst();
+    const scan = await (db as any).selectFrom('zv_quality_scans').selectAll().where('id', '=', c.req.param('scanId')).executeTakeFirst();
     if (!scan) return c.json({ error: 'Scan not found' }, 404);
     return c.json({ scan });
   });
@@ -126,7 +123,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
   // GET /scan/:scanId/issues
   app.get('/scan/:scanId/issues', async (c) => {
     const includeDismissed = c.req.query('dismissed') === 'true';
-    let query = (reqDb(c) as any).selectFrom('zv_quality_issues').selectAll().where('scan_id', '=', c.req.param('scanId'));
+    let query = (db as any).selectFrom('zv_quality_issues').selectAll().where('scan_id', '=', c.req.param('scanId'));
     if (!includeDismissed) query = query.where('dismissed', '=', false);
     const issues = await query.orderBy('severity', 'asc').orderBy('created_at', 'asc').execute();
     return c.json({ issues });
@@ -135,14 +132,14 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
   // POST /issues/:id/dismiss
   app.post('/issues/:id/dismiss', async (c) => {
     const user = c.get('user') as any;
-    await (reqDb(c) as any).updateTable('zv_quality_issues').set({ dismissed: true, dismissed_by: user.id, dismissed_at: new Date() }).where('id', '=', c.req.param('id')).execute();
+    await (db as any).updateTable('zv_quality_issues').set({ dismissed: true, dismissed_by: user.id, dismissed_at: new Date() }).where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
   });
 
   // POST /scan/:scanId/dismiss-all
   app.post('/scan/:scanId/dismiss-all', async (c) => {
     const user = c.get('user') as any;
-    await (reqDb(c) as any).updateTable('zv_quality_issues').set({ dismissed: true, dismissed_by: user.id, dismissed_at: new Date() }).where('scan_id', '=', c.req.param('scanId')).execute();
+    await (db as any).updateTable('zv_quality_issues').set({ dismissed: true, dismissed_by: user.id, dismissed_at: new Date() }).where('scan_id', '=', c.req.param('scanId')).execute();
     return c.json({ success: true });
   });
 
@@ -152,8 +149,8 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     if (!(await checkPermission(user.id, 'admin', '*'))) return c.json({ error: 'Forbidden' }, 403);
 
     const [summary, latestScans, latestScores] = await Promise.all([
-      sql`SELECT i.collection, i.severity, COUNT(i.id) as count FROM zv_quality_issues i WHERE i.dismissed = false GROUP BY i.collection, i.severity`.execute(reqDb(c)).then(r => r.rows),
-      (reqDb(c) as any)
+      sql`SELECT i.collection, i.severity, COUNT(i.id) as count FROM zv_quality_issues i WHERE i.dismissed = false GROUP BY i.collection, i.severity`.execute(db).then(r => r.rows),
+      (db as any)
         .selectFrom('zv_quality_scans')
         .select(['collection', 'status', 'issues_found', 'completed_at'])
         .distinctOn(['collection'])
@@ -161,7 +158,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
         .orderBy('started_at', 'desc')
         .execute()
         .catch(() => []),
-      (reqDb(c) as any)
+      (db as any)
         .selectFrom('zvd_quality_scores')
         .select(['collection', 'score', 'calculated_at'])
         .distinctOn(['collection'])
@@ -178,7 +175,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
 
   app.get('/rules', async (c) => {
     const { collection } = c.req.query();
-    let query = (reqDb(c) as any).selectFrom('zvd_quality_rules').selectAll().orderBy('created_at', 'desc');
+    let query = (db as any).selectFrom('zvd_quality_rules').selectAll().orderBy('created_at', 'desc');
     if (collection) query = query.where('collection', '=', collection);
     const rules = await query.execute();
     return c.json({ rules });
@@ -188,7 +185,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     if (!(await checkPermission(user.id, 'admin', '*'))) return c.json({ error: 'Admin access required' }, 403);
     const data = c.req.valid('json');
-    const rule = await (reqDb(c) as any)
+    const rule = await (db as any)
       .insertInto('zvd_quality_rules')
       .values({ ...data, rule_config: JSON.stringify(data.rule_config), created_by: user.id })
       .returningAll()
@@ -202,7 +199,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     const data = c.req.valid('json');
     const updates: any = { ...data };
     if (data.rule_config) updates.rule_config = JSON.stringify(data.rule_config);
-    const rule = await (reqDb(c) as any).updateTable('zvd_quality_rules').set(updates).where('id', '=', c.req.param('id')).returningAll().executeTakeFirst();
+    const rule = await (db as any).updateTable('zvd_quality_rules').set(updates).where('id', '=', c.req.param('id')).returningAll().executeTakeFirst();
     if (!rule) return c.json({ error: 'Rule not found' }, 404);
     return c.json({ rule });
   });
@@ -210,14 +207,14 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
   app.delete('/rules/:id', async (c) => {
     const user = c.get('user') as any;
     if (!(await checkPermission(user.id, 'admin', '*'))) return c.json({ error: 'Admin access required' }, 403);
-    await (reqDb(c) as any).deleteFrom('zvd_quality_rules').where('id', '=', c.req.param('id')).execute();
+    await (db as any).deleteFrom('zvd_quality_rules').where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
   });
 
   // ── Enterprise: Quality Scores ──────────────────────────────────
 
   app.get('/scores/:collection', async (c) => {
-    const scores = await (reqDb(c) as any)
+    const scores = await (db as any)
       .selectFrom('zvd_quality_scores')
       .selectAll()
       .where('collection', '=', c.req.param('collection'))
@@ -232,7 +229,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
   app.get('/sla-targets', async (c) => {
     const user = c.get('user') as any;
     if (!(await checkPermission(user.id, 'admin', '*'))) return c.json({ error: 'Admin access required' }, 403);
-    const targets = await (reqDb(c) as any).selectFrom('zvd_quality_sla_targets').selectAll().orderBy('collection', 'asc').execute();
+    const targets = await (db as any).selectFrom('zvd_quality_sla_targets').selectAll().orderBy('collection', 'asc').execute();
     return c.json({ targets });
   });
 
@@ -240,7 +237,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     if (!(await checkPermission(user.id, 'admin', '*'))) return c.json({ error: 'Admin access required' }, 403);
     const data = c.req.valid('json');
-    const target = await (reqDb(c) as any)
+    const target = await (db as any)
       .insertInto('zvd_quality_sla_targets')
       .values({ ...data, created_by: user.id })
       .onConflict((oc: any) => oc.column('collection').doUpdateSet({ min_score: data.min_score, max_critical_issues: data.max_critical_issues, max_error_issues: data.max_error_issues, alert_email: data.alert_email }))
@@ -252,7 +249,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
   app.delete('/sla-targets/:id', async (c) => {
     const user = c.get('user') as any;
     if (!(await checkPermission(user.id, 'admin', '*'))) return c.json({ error: 'Admin access required' }, 403);
-    await (reqDb(c) as any).deleteFrom('zvd_quality_sla_targets').where('id', '=', c.req.param('id')).execute();
+    await (db as any).deleteFrom('zvd_quality_sla_targets').where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
   });
 
@@ -261,14 +258,14 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const scanId = c.req.param('scanId');
 
-    const scan = await (reqDb(c) as any).selectFrom('zv_quality_scans').selectAll().where('id', '=', scanId).executeTakeFirst();
+    const scan = await (db as any).selectFrom('zv_quality_scans').selectAll().where('id', '=', scanId).executeTakeFirst();
     if (!scan) return c.json({ error: 'Scan not found' }, 404);
 
-    const target = await (reqDb(c) as any).selectFrom('zvd_quality_sla_targets').selectAll().where('collection', '=', scan.collection).where('is_active', '=', true).executeTakeFirst();
+    const target = await (db as any).selectFrom('zvd_quality_sla_targets').selectAll().where('collection', '=', scan.collection).where('is_active', '=', true).executeTakeFirst();
     if (!target) return c.json({ compliant: true, message: 'No SLA target configured for this collection' });
 
-    const score = await (reqDb(c) as any).selectFrom('zvd_quality_scores').selectAll().where('scan_id', '=', scanId).executeTakeFirst();
-    const issues = await (reqDb(c) as any).selectFrom('zv_quality_issues').selectAll().where('scan_id', '=', scanId).where('dismissed', '=', false).execute();
+    const score = await (db as any).selectFrom('zvd_quality_scores').selectAll().where('scan_id', '=', scanId).executeTakeFirst();
+    const issues = await (db as any).selectFrom('zv_quality_issues').selectAll().where('scan_id', '=', scanId).where('dismissed', '=', false).execute();
 
     const criticalCount = issues.filter((i: any) => i.severity === 'critical').length;
     const errorCount = issues.filter((i: any) => i.severity === 'error').length;
@@ -291,7 +288,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
   // ── Enterprise: Remediations ────────────────────────────────────
 
   app.get('/issues/:id/remediations', async (c) => {
-    const remediations = await (reqDb(c) as any).selectFrom('zvd_quality_remediations').selectAll().where('issue_id', '=', c.req.param('id')).orderBy('created_at', 'desc').execute();
+    const remediations = await (db as any).selectFrom('zvd_quality_remediations').selectAll().where('issue_id', '=', c.req.param('id')).orderBy('created_at', 'desc').execute();
     return c.json({ remediations });
   });
 
@@ -300,13 +297,13 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     description: z.string().min(1),
   })), async (c) => {
     const data = c.req.valid('json');
-    const rem = await (reqDb(c) as any).insertInto('zvd_quality_remediations').values({ issue_id: c.req.param('id'), ...data }).returningAll().executeTakeFirst();
+    const rem = await (db as any).insertInto('zvd_quality_remediations').values({ issue_id: c.req.param('id'), ...data }).returningAll().executeTakeFirst();
     return c.json({ remediation: rem }, 201);
   });
 
   app.post('/issues/:id/remediations/:remId/apply', async (c) => {
     const user = c.get('user') as any;
-    const updated = await (reqDb(c) as any)
+    const updated = await (db as any)
       .updateTable('zvd_quality_remediations')
       .set({ applied_at: new Date(), applied_by: user.id, result: 'applied' })
       .where('id', '=', c.req.param('remId'))
@@ -323,13 +320,13 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     if (!(await checkPermission(user.id, 'admin', '*'))) return c.json({ error: 'Admin access required' }, 403);
 
     const [scansCount, issuesByCollection, slaTargets, latestScores] = await Promise.all([
-      sql<{ count: string }>`SELECT COUNT(*)::text FROM zv_quality_scans WHERE created_at >= NOW() - INTERVAL '30 days'`.execute(reqDb(c)),
+      sql<{ count: string }>`SELECT COUNT(*)::text FROM zv_quality_scans WHERE created_at >= NOW() - INTERVAL '30 days'`.execute(db),
       sql<{ collection: string; total: string; dismissed: string }>`
         SELECT collection, COUNT(*)::text AS total, SUM(CASE WHEN dismissed THEN 1 ELSE 0 END)::text AS dismissed
         FROM zv_quality_issues GROUP BY collection ORDER BY total DESC LIMIT 10
-      `.execute(reqDb(c)),
-      (reqDb(c) as any).selectFrom('zvd_quality_sla_targets').select(['collection', 'min_score', 'is_active']).where('is_active', '=', true).execute().catch(() => []),
-      (reqDb(c) as any)
+      `.execute(db),
+      (db as any).selectFrom('zvd_quality_sla_targets').select(['collection', 'min_score', 'is_active']).where('is_active', '=', true).execute().catch(() => []),
+      (db as any)
         .selectFrom('zvd_quality_scores')
         .select(['collection', 'score', 'calculated_at'])
         .distinctOn(['collection'])

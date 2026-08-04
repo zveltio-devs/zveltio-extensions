@@ -20081,9 +20081,6 @@ async function revokeShare(db, shareId, userId) {
 // engine/routes.ts
 function cloudRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   const requireAuth = async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -20112,7 +20109,7 @@ function cloudRoutes(ctx) {
     try {
       const buffer = Buffer.from(await file2.arrayBuffer());
       const result = await createFileVersion(db, fileId, buffer, file2.type, file2.size, user.id);
-      await logAccess(reqDb(c), fileId, user.id, "version", c.req.header("user-agent"), null, null);
+      await logAccess(db, fileId, user.id, "version", c.req.header("user-agent"), null, null);
       return c.json({ version: result.versionNum, message: "New version uploaded" }, 201);
     } catch (err) {
       return c.json({ error: err.message }, 400);
@@ -20178,7 +20175,7 @@ function cloudRoutes(ctx) {
         createdBy: user.id
       });
       if (data.file_id) {
-        await logAccess(reqDb(c), data.file_id, user.id, "share", c.req.header("user-agent"), null, null);
+        await logAccess(db, data.file_id, user.id, "share", c.req.header("user-agent"), null, null);
       }
       return c.json(result, 201);
     } catch (err) {
@@ -20208,11 +20205,11 @@ function cloudRoutes(ctx) {
         return c.json({ error: "Object storage is not configured" }, 503);
       }
       await incrementDownloadCount(db, result.share.id);
-      await logAccess(reqDb(c), result.file.id, null, "download", c.req.header("user-agent"), token, c.req.header("x-forwarded-for") || null);
+      await logAccess(db, result.file.id, null, "download", c.req.header("user-agent"), token, c.req.header("x-forwarded-for") || null);
       return c.redirect(presigned);
     }
     if (result.file) {
-      await logAccess(reqDb(c), result.file.id, null, "view", c.req.header("user-agent"), token, c.req.header("x-forwarded-for") || null);
+      await logAccess(db, result.file.id, null, "view", c.req.header("user-agent"), token, c.req.header("x-forwarded-for") || null);
     }
     return c.json({
       file: result.file ? {
@@ -20230,12 +20227,12 @@ function cloudRoutes(ctx) {
   app.post("/favorites/:fileId", requireAuth, async (c) => {
     const user = c.get("user");
     const fileId = c.req.param("fileId");
-    const existing = await reqDb(c).selectFrom("zv_media_favorites").select("user_id").where("user_id", "=", user.id).where("file_id", "=", fileId).executeTakeFirst();
+    const existing = await db.selectFrom("zv_media_favorites").select("user_id").where("user_id", "=", user.id).where("file_id", "=", fileId).executeTakeFirst();
     if (existing) {
-      await reqDb(c).deleteFrom("zv_media_favorites").where("user_id", "=", user.id).where("file_id", "=", fileId).execute();
+      await db.deleteFrom("zv_media_favorites").where("user_id", "=", user.id).where("file_id", "=", fileId).execute();
       return c.json({ favorited: false });
     }
-    await reqDb(c).insertInto("zv_media_favorites").values({ user_id: user.id, file_id: fileId, created_at: new Date }).execute();
+    await db.insertInto("zv_media_favorites").values({ user_id: user.id, file_id: fileId, created_at: new Date }).execute();
     return c.json({ favorited: true });
   });
   app.get("/favorites", requireAuth, async (c) => {
@@ -20246,21 +20243,21 @@ function cloudRoutes(ctx) {
       INNER JOIN zv_media_files f ON f.id = fav.file_id
       WHERE fav.user_id = ${user.id} AND f.deleted_at IS NULL
       ORDER BY fav.created_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ files: files.rows });
   });
   async function resolveFolder(c, path, create = false) {
     const parts = path.split("/").filter(Boolean);
     let parentId = null;
     for (const name of parts) {
-      const existing = await reqDb(c).selectFrom("zv_media_folders").select(["id"]).where("name", "=", name).where("deleted_at", "is", null).where((eb) => parentId === null ? eb("parent_id", "is", null) : eb("parent_id", "=", parentId)).executeTakeFirst();
+      const existing = await db.selectFrom("zv_media_folders").select(["id"]).where("name", "=", name).where("deleted_at", "is", null).where((eb) => parentId === null ? eb("parent_id", "is", null) : eb("parent_id", "=", parentId)).executeTakeFirst();
       if (existing) {
         parentId = existing.id;
         continue;
       }
       if (!create)
         return null;
-      const created = await reqDb(c).insertInto("zv_media_folders").values({ name, parent_id: parentId, created_by: c.get("user")?.id ?? null }).returning(["id"]).executeTakeFirst();
+      const created = await db.insertInto("zv_media_folders").values({ name, parent_id: parentId, created_by: c.get("user")?.id ?? null }).returning(["id"]).executeTakeFirst();
       parentId = created?.id ?? null;
     }
     return { id: parentId };
@@ -20270,8 +20267,8 @@ function cloudRoutes(ctx) {
     const folder = await resolveFolder(c, path);
     if (!folder)
       return c.json({ error: "Folder not found" }, 404);
-    const folders = await reqDb(c).selectFrom("zv_media_folders").select(["id", "name", "updated_at"]).where("deleted_at", "is", null).where((eb) => folder.id === null ? eb("parent_id", "is", null) : eb("parent_id", "=", folder.id)).orderBy("name", "asc").execute();
-    const files = await reqDb(c).selectFrom("zv_media_files").select(["id", "original_name", "filename", "size", "mimetype", "updated_at"]).where("deleted_at", "is", null).where((eb) => folder.id === null ? eb("folder_id", "is", null) : eb("folder_id", "=", folder.id)).orderBy("original_name", "asc").execute();
+    const folders = await db.selectFrom("zv_media_folders").select(["id", "name", "updated_at"]).where("deleted_at", "is", null).where((eb) => folder.id === null ? eb("parent_id", "is", null) : eb("parent_id", "=", folder.id)).orderBy("name", "asc").execute();
+    const files = await db.selectFrom("zv_media_files").select(["id", "original_name", "filename", "size", "mimetype", "updated_at"]).where("deleted_at", "is", null).where((eb) => folder.id === null ? eb("folder_id", "is", null) : eb("folder_id", "=", folder.id)).orderBy("original_name", "asc").execute();
     const base = path === "/" ? "" : path.replace(/\/$/, "");
     return c.json({
       path,
@@ -20306,8 +20303,8 @@ function cloudRoutes(ctx) {
       SELECT COALESCE(SUM(size), 0) AS total
       FROM zv_media_files
       WHERE created_by = ${user.id} AND deleted_at IS NULL
-    `.execute(reqDb(c));
-    const quotaRow = await reqDb(c).selectFrom("zv_storage_quotas").selectAll().where("user_id", "=", user.id).executeTakeFirst();
+    `.execute(db);
+    const quotaRow = await db.selectFrom("zv_storage_quotas").selectAll().where("user_id", "=", user.id).executeTakeFirst();
     const usedBytes = parseInt(usage.rows[0]?.total || "0");
     const quotaBytes = quotaRow?.quota_bytes ?? 5368709120;
     if (usedBytes + file2.size > quotaBytes) {
@@ -20335,8 +20332,8 @@ function cloudRoutes(ctx) {
       url: `${objectStorage()?.publicUrl ?? ""}/${key}`,
       created_by: user.id
     };
-    await reqDb(c).insertInto("zv_media_files").values(record2).execute();
-    await logAccess(reqDb(c), id, user.id, "upload", c.req.header("user-agent"), null, null);
+    await db.insertInto("zv_media_files").values(record2).execute();
+    await logAccess(db, id, user.id, "upload", c.req.header("user-agent"), null, null);
     return c.json({ file: record2 }, 201);
   });
   app.delete("/files/:id", requireAuth, async (c) => {
@@ -20350,13 +20347,13 @@ function cloudRoutes(ctx) {
   });
   app.get("/files/:id/download", requireAuth, async (c) => {
     const user = c.get("user");
-    const file2 = await reqDb(c).selectFrom("zv_media_files").select(["id", "storage_path", "original_name"]).where("id", "=", c.req.param("id")).where("deleted_at", "is", null).executeTakeFirst();
+    const file2 = await db.selectFrom("zv_media_files").select(["id", "storage_path", "original_name"]).where("id", "=", c.req.param("id")).where("deleted_at", "is", null).executeTakeFirst();
     if (!file2)
       return c.json({ error: "File not found" }, 404);
     const url2 = await presignedGetUrl(file2.storage_path);
     if (!url2)
       return c.json({ error: "Object storage is not configured" }, 503);
-    await logAccess(reqDb(c), file2.id, user.id, "download", c.req.header("user-agent"), null, null);
+    await logAccess(db, file2.id, user.id, "download", c.req.header("user-agent"), null, null);
     return c.redirect(url2, 302);
   });
   app.get("/quota", requireAuth, async (c) => {
@@ -20365,8 +20362,8 @@ function cloudRoutes(ctx) {
       SELECT COALESCE(SUM(size), 0) AS total
       FROM zv_media_files
       WHERE created_by = ${user.id} AND deleted_at IS NULL
-    `.execute(reqDb(c));
-    const quota = await reqDb(c).selectFrom("zv_storage_quotas").selectAll().where("user_id", "=", user.id).executeTakeFirst();
+    `.execute(db);
+    const quota = await db.selectFrom("zv_storage_quotas").selectAll().where("user_id", "=", user.id).executeTakeFirst();
     const usedBytes = parseInt(usage.rows[0]?.total || "0");
     const quotaBytes = quota?.quota_bytes ?? 5368709120;
     return c.json({
@@ -20386,15 +20383,15 @@ function cloudRoutes(ctx) {
     message: "Either user_id or role_name is required"
   });
   app.get("/admin/quotas", requireAdmin, async (c) => {
-    const quotas = await reqDb(c).selectFrom("zv_storage_quotas").selectAll().orderBy("created_at", "desc").execute();
+    const quotas = await db.selectFrom("zv_storage_quotas").selectAll().orderBy("created_at", "desc").execute();
     return c.json({ quotas });
   });
   app.post("/admin/quotas", requireAdmin, zValidator("json", QuotaSchema), async (c) => {
     const user = c.get("user");
     const data = c.req.valid("json");
-    const existing = data.user_id ? await reqDb(c).selectFrom("zv_storage_quotas").select("id").where("user_id", "=", data.user_id).executeTakeFirst() : await reqDb(c).selectFrom("zv_storage_quotas").select("id").where("role_name", "=", data.role_name).executeTakeFirst();
+    const existing = data.user_id ? await db.selectFrom("zv_storage_quotas").select("id").where("user_id", "=", data.user_id).executeTakeFirst() : await db.selectFrom("zv_storage_quotas").select("id").where("role_name", "=", data.role_name).executeTakeFirst();
     if (existing) {
-      await reqDb(c).updateTable("zv_storage_quotas").set({
+      await db.updateTable("zv_storage_quotas").set({
         quota_bytes: data.quota_bytes,
         max_file_size_bytes: data.max_file_size_bytes,
         allowed_extensions: JSON.stringify(data.allowed_extensions),
@@ -20402,7 +20399,7 @@ function cloudRoutes(ctx) {
       }).where("id", "=", existing.id).execute();
       return c.json({ success: true, quota_id: existing.id });
     }
-    const quota = await reqDb(c).insertInto("zv_storage_quotas").values({
+    const quota = await db.insertInto("zv_storage_quotas").values({
       user_id: data.user_id ?? null,
       role_name: data.role_name ?? null,
       quota_bytes: data.quota_bytes,
@@ -20413,7 +20410,7 @@ function cloudRoutes(ctx) {
     return c.json({ quota }, 201);
   });
   app.delete("/admin/quotas/:id", requireAdmin, async (c) => {
-    await reqDb(c).deleteFrom("zv_storage_quotas").where("id", "=", c.req.param("id")).execute();
+    await db.deleteFrom("zv_storage_quotas").where("id", "=", c.req.param("id")).execute();
     return c.json({ success: true });
   });
   app.get("/access-logs/:fileId", requireAuth, async (c) => {
@@ -20423,7 +20420,7 @@ function cloudRoutes(ctx) {
     if (!isAdmin) {
       const file2 = await sql`
         SELECT uploaded_by FROM zv_media_files WHERE id = ${fileId}
-      `.execute(reqDb(c));
+      `.execute(db);
       if (!file2.rows[0])
         return c.json({ error: "File not found" }, 404);
       if (file2.rows[0].uploaded_by !== user.id) {
@@ -20436,7 +20433,7 @@ function cloudRoutes(ctx) {
       WHERE file_id = ${fileId}
       ORDER BY created_at DESC
       LIMIT 100
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ file_id: fileId, logs: logs.rows });
   });
   const RetentionPolicySchema = exports_external.object({
@@ -20449,13 +20446,13 @@ function cloudRoutes(ctx) {
     is_active: exports_external.boolean().default(true)
   });
   app.get("/retention-policies", requireAdmin, async (c) => {
-    const policies = await reqDb(c).selectFrom("zv_cloud_retention_policies").selectAll().where("is_active", "=", true).orderBy("created_at", "desc").execute();
+    const policies = await db.selectFrom("zv_cloud_retention_policies").selectAll().where("is_active", "=", true).orderBy("created_at", "desc").execute();
     return c.json({ policies });
   });
   app.post("/retention-policies", requireAdmin, zValidator("json", RetentionPolicySchema), async (c) => {
     const user = c.get("user");
     const data = c.req.valid("json");
-    const policy = await reqDb(c).insertInto("zv_cloud_retention_policies").values({
+    const policy = await db.insertInto("zv_cloud_retention_policies").values({
       name: data.name,
       folder_path: data.folder_path ?? null,
       file_extension: data.file_extension ?? null,
@@ -20468,12 +20465,12 @@ function cloudRoutes(ctx) {
     return c.json({ policy }, 201);
   });
   app.delete("/retention-policies/:id", requireAdmin, async (c) => {
-    await reqDb(c).deleteFrom("zv_cloud_retention_policies").where("id", "=", c.req.param("id")).execute();
+    await db.deleteFrom("zv_cloud_retention_policies").where("id", "=", c.req.param("id")).execute();
     return c.json({ success: true });
   });
   app.post("/retention-policies/apply", requireAdmin, zValidator("json", exports_external.object({ dry_run: exports_external.boolean().default(true) })), async (c) => {
     const { dry_run } = c.req.valid("json");
-    const policies = await reqDb(c).selectFrom("zv_cloud_retention_policies").selectAll().where("is_active", "=", true).execute();
+    const policies = await db.selectFrom("zv_cloud_retention_policies").selectAll().where("is_active", "=", true).execute();
     const actions = [];
     for (const policy of policies) {
       if (policy.max_versions) {
@@ -20483,7 +20480,7 @@ function cloudRoutes(ctx) {
             ${policy.folder_path ? sql`WHERE file_id IN (SELECT id FROM zv_media_files WHERE folder_id IN (SELECT id FROM zv_media_folders WHERE name LIKE ${policy.folder_path + "%"}))` : sql``}
             GROUP BY file_id
             HAVING COUNT(*) > ${policy.max_versions}
-          `.execute(reqDb(c));
+          `.execute(db);
         for (const row of filesWithExcessVersions.rows) {
           const versionsToDelete = await sql`
               SELECT id::text, version_number
@@ -20491,7 +20488,7 @@ function cloudRoutes(ctx) {
               WHERE file_id = ${row.file_id}
               ORDER BY version_number ASC
               LIMIT ${parseInt(row.version_count) - policy.max_versions}
-            `.execute(reqDb(c));
+            `.execute(db);
           for (const ver of versionsToDelete.rows) {
             actions.push({
               action: "delete_version",
@@ -20499,7 +20496,7 @@ function cloudRoutes(ctx) {
               reason: `Version ${ver.version_number} exceeds max_versions (${policy.max_versions}) for policy "${policy.name}"`
             });
             if (!dry_run) {
-              await sql`DELETE FROM zv_cloud_file_versions WHERE id = ${ver.id}`.execute(reqDb(c));
+              await sql`DELETE FROM zv_cloud_file_versions WHERE id = ${ver.id}`.execute(db);
             }
           }
         }
@@ -20512,7 +20509,7 @@ function cloudRoutes(ctx) {
             ${policy.folder_path ? sql`AND folder_id IN (SELECT id FROM zv_media_folders WHERE name LIKE ${policy.folder_path + "%"}) ` : sql``}
             ${policy.file_extension ? sql`AND original_name ILIKE ${"%." + policy.file_extension}` : sql``}
           `;
-        const oldFiles = await filesQuery.execute(reqDb(c));
+        const oldFiles = await filesQuery.execute(db);
         for (const file2 of oldFiles.rows) {
           actions.push({
             action: "move_to_trash",
@@ -20535,7 +20532,7 @@ function cloudRoutes(ctx) {
     const totalFilesResult = await sql`
       SELECT COUNT(*) as count, SUM(size)::text as total_size
       FROM zv_media_files WHERE deleted_at IS NULL
-    `.execute(reqDb(c));
+    `.execute(db);
     const byTypeResult = await sql`
       SELECT
         SPLIT_PART(mimetype, '/', 1) as mime_type,
@@ -20545,10 +20542,10 @@ function cloudRoutes(ctx) {
       GROUP BY SPLIT_PART(mimetype, '/', 1)
       ORDER BY count DESC
       LIMIT 10
-    `.execute(reqDb(c));
+    `.execute(db);
     const shareCountResult = await sql`
       SELECT COUNT(*) as count FROM zv_cloud_shares WHERE (expires_at IS NULL OR expires_at > NOW())
-    `.execute(reqDb(c));
+    `.execute(db);
     const quotaViolationsResult = await sql`
       SELECT COUNT(DISTINCT usage.created_by) as count
       FROM (
@@ -20558,7 +20555,7 @@ function cloudRoutes(ctx) {
       ) usage
       INNER JOIN zv_storage_quotas q ON q.user_id = usage.created_by
       WHERE usage.used_bytes > q.quota_bytes
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({
       total_files: parseInt(totalFilesResult.rows[0]?.count || "0"),
       total_size_bytes: totalFilesResult.rows[0]?.total_size ? parseInt(totalFilesResult.rows[0].total_size) : 0,
@@ -20583,9 +20580,6 @@ async function logAccess(db, fileId, userId, action, userAgent, shareToken, ip) 
 }
 function makePublicShareHandler(ctx) {
   const { db } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   return async (c) => {
     const password = c.req.query("password");
     const token = c.req.param("token");
@@ -20599,11 +20593,11 @@ function makePublicShareHandler(ctx) {
         return c.json({ error: "Object storage is not configured" }, 503);
       }
       await incrementDownloadCount(db, result.share.id);
-      await logAccess(reqDb(c), result.file.id, null, "download", c.req.header("user-agent"), token, c.req.header("x-forwarded-for") || null);
+      await logAccess(db, result.file.id, null, "download", c.req.header("user-agent"), token, c.req.header("x-forwarded-for") || null);
       return c.redirect(presigned);
     }
     if (result.file) {
-      await logAccess(reqDb(c), result.file.id, null, "view", c.req.header("user-agent"), token, c.req.header("x-forwarded-for") || null);
+      await logAccess(db, result.file.id, null, "view", c.req.header("user-agent"), token, c.req.header("x-forwarded-for") || null);
     }
     return c.json({
       file: result.file ? {

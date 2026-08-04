@@ -19506,9 +19506,6 @@ async function recalcReportTotals(dbh, reportId) {
 }
 function expensesRoutes(ctx) {
   const { db, auth } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -19531,7 +19528,7 @@ function expensesRoutes(ctx) {
       GROUP BY r.id
       ORDER BY r.created_at DESC
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/reports/my", async (c) => {
@@ -19542,7 +19539,7 @@ function expensesRoutes(ctx) {
       LEFT JOIN zvd_expenses e ON e.report_id = r.id
       WHERE r.employee_id = ${user.id}
       GROUP BY r.id ORDER BY r.created_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/reports/:id", async (c) => {
@@ -19553,12 +19550,12 @@ function expensesRoutes(ctx) {
       LEFT JOIN zvd_expenses e ON e.report_id = r.id
       WHERE r.id = ${c.req.param("id")}
       GROUP BY r.id
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
-    const mileage = await sql`SELECT * FROM zvd_mileage_entries WHERE report_id = ${c.req.param("id")} ORDER BY date`.execute(reqDb(c));
-    const perDiem = await sql`SELECT * FROM zvd_per_diem_entries WHERE report_id = ${c.req.param("id")} ORDER BY date`.execute(reqDb(c));
-    const reimbursements = await sql`SELECT * FROM zvd_expense_reimbursements WHERE report_id = ${c.req.param("id")} ORDER BY payment_date`.execute(reqDb(c));
+    const mileage = await sql`SELECT * FROM zvd_mileage_entries WHERE report_id = ${c.req.param("id")} ORDER BY date`.execute(db);
+    const perDiem = await sql`SELECT * FROM zvd_per_diem_entries WHERE report_id = ${c.req.param("id")} ORDER BY date`.execute(db);
+    const reimbursements = await sql`SELECT * FROM zvd_expense_reimbursements WHERE report_id = ${c.req.param("id")} ORDER BY payment_date`.execute(db);
     return c.json({ data: { ...row.rows[0], mileage: mileage.rows, per_diem: perDiem.rows, reimbursements: reimbursements.rows } });
   });
   app.post("/reports", zValidator("json", exports_external.object({
@@ -19572,7 +19569,7 @@ function expensesRoutes(ctx) {
       INSERT INTO zvd_expense_reports (title, employee_id, currency, notes, created_by)
       VALUES (${d.title}, ${user.id}, ${d.currency}, ${d.notes ?? null}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.post("/reports/:id/items", zValidator("json", exports_external.object({
@@ -19594,8 +19591,8 @@ function expensesRoutes(ctx) {
       INSERT INTO zvd_expenses (report_id, date, category, description, amount, currency, exchange_rate, amount_local, tax_amount, receipt_url, is_reimbursable, created_by)
       VALUES (${id}, ${d.date}, ${d.category}, ${d.description}, ${d.amount}, ${d.currency}, ${d.exchange_rate}, ${amount_local}, ${d.tax_amount}, ${d.receipt_url ?? null}, ${d.is_reimbursable}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
-    await recalcReportTotals(reqDb(c), id);
+    `.execute(db);
+    await recalcReportTotals(db, id);
     return c.json({ data: item.rows[0] }, 201);
   });
   app.patch("/reports/:id/items/:itemId", zValidator("json", exports_external.object({
@@ -19612,16 +19609,16 @@ function expensesRoutes(ctx) {
         category = COALESCE(${d.category ?? null}, category),
         receipt_url = COALESCE(${d.receipt_url ?? null}, receipt_url)
       WHERE id = ${c.req.param("itemId")} AND report_id = ${c.req.param("id")} RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
-    await recalcReportTotals(reqDb(c), c.req.param("id"));
+    await recalcReportTotals(db, c.req.param("id"));
     return c.json({ data: row.rows[0] });
   });
   app.delete("/reports/:id/items/:itemId", async (c) => {
     const id = c.req.param("id");
-    await sql`DELETE FROM zvd_expenses WHERE id = ${c.req.param("itemId")} AND report_id = ${id}`.execute(reqDb(c));
-    await recalcReportTotals(reqDb(c), id);
+    await sql`DELETE FROM zvd_expenses WHERE id = ${c.req.param("itemId")} AND report_id = ${id}`.execute(db);
+    await recalcReportTotals(db, id);
     return c.json({ success: true });
   });
   app.post("/reports/:id/mileage", zValidator("json", exports_external.object({
@@ -19640,13 +19637,13 @@ function expensesRoutes(ctx) {
       INSERT INTO zvd_mileage_entries (report_id, employee_id, date, from_location, to_location, distance_km, rate_per_km, purpose, vehicle_type, created_by)
       VALUES (${id}, ${user.id}, ${d.date}, ${d.from_location}, ${d.to_location}, ${d.distance_km}, ${d.rate_per_km}, ${d.purpose ?? null}, ${d.vehicle_type}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
-    await recalcReportTotals(reqDb(c), id);
+    `.execute(db);
+    await recalcReportTotals(db, id);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.delete("/reports/:id/mileage/:mId", async (c) => {
-    await sql`DELETE FROM zvd_mileage_entries WHERE id = ${c.req.param("mId")} AND report_id = ${c.req.param("id")}`.execute(reqDb(c));
-    await recalcReportTotals(reqDb(c), c.req.param("id"));
+    await sql`DELETE FROM zvd_mileage_entries WHERE id = ${c.req.param("mId")} AND report_id = ${c.req.param("id")}`.execute(db);
+    await recalcReportTotals(db, c.req.param("id"));
     return c.json({ success: true });
   });
   app.post("/reports/:id/per-diem", zValidator("json", exports_external.object({
@@ -19665,15 +19662,15 @@ function expensesRoutes(ctx) {
       INSERT INTO zvd_per_diem_entries (report_id, employee_id, date, destination, rate, currency, is_domestic, partial_day, meals_deducted, created_by)
       VALUES (${id}, ${user.id}, ${d.date}, ${d.destination}, ${d.rate}, ${d.currency}, ${d.is_domestic}, ${d.partial_day}, ${d.meals_deducted}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
-    await recalcReportTotals(reqDb(c), id);
+    `.execute(db);
+    await recalcReportTotals(db, id);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.post("/reports/:id/submit", async (c) => {
     const row = await sql`
       UPDATE zvd_expense_reports SET status = 'submitted', submitted_at = NOW(), updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND status = 'draft' RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Report not found or not in draft" }, 400);
     return c.json({ data: row.rows[0] });
@@ -19683,7 +19680,7 @@ function expensesRoutes(ctx) {
     const row = await sql`
       UPDATE zvd_expense_reports SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND status = 'submitted' RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Report not found or not submitted" }, 400);
     return c.json({ data: row.rows[0] });
@@ -19693,7 +19690,7 @@ function expensesRoutes(ctx) {
     const row = await sql`
       UPDATE zvd_expense_reports SET status = 'rejected', rejection_reason = ${reason}, updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND status = 'submitted' RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Report not found or not submitted" }, 400);
     return c.json({ data: row.rows[0] });
@@ -19707,7 +19704,7 @@ function expensesRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const d = c.req.valid("json");
-    const report = await sql`SELECT * FROM zvd_expense_reports WHERE id = ${c.req.param("id")} AND status = 'approved'`.execute(reqDb(c));
+    const report = await sql`SELECT * FROM zvd_expense_reports WHERE id = ${c.req.param("id")} AND status = 'approved'`.execute(db);
     if (!report.rows.length)
       return c.json({ error: "Report not found or not approved" }, 400);
     const r = report.rows[0];
@@ -19715,7 +19712,7 @@ function expensesRoutes(ctx) {
       INSERT INTO zvd_expense_reimbursements (report_id, amount, payment_date, payment_method, reference, notes, created_by)
       VALUES (${r.id}, ${d.amount}, ${d.payment_date}, ${d.payment_method}, ${d.reference ?? null}, ${d.notes ?? null}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     const newReimbursed = +r.reimbursed_amount + d.amount;
     const fullyReimbursed = newReimbursed >= r.grand_total;
     await sql`
@@ -19725,7 +19722,7 @@ function expensesRoutes(ctx) {
         reimbursed_at = ${fullyReimbursed ? sql`NOW()` : sql`reimbursed_at`},
         updated_at = NOW()
       WHERE id = ${r.id}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.get("/stats", async (c) => {
@@ -19738,12 +19735,12 @@ function expensesRoutes(ctx) {
         COALESCE(SUM(grand_total) FILTER (WHERE status = 'approved'), 0) as total_approved,
         COALESCE(SUM(reimbursed_amount), 0) as total_reimbursed
       FROM zvd_expense_reports
-    `.execute(reqDb(c));
+    `.execute(db);
     const byCategory = await sql`
       SELECT category, COALESCE(SUM(amount), 0) as total
       FROM zvd_expenses GROUP BY category ORDER BY total DESC
-    `.execute(reqDb(c));
-    const mileageTotal = await sql`SELECT COALESCE(SUM(amount), 0) as total FROM zvd_mileage_entries`.execute(reqDb(c));
+    `.execute(db);
+    const mileageTotal = await sql`SELECT COALESCE(SUM(amount), 0) as total FROM zvd_mileage_entries`.execute(db);
     return c.json({ data: {
       ...row.rows[0],
       by_category: byCategory.rows,

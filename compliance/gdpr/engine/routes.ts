@@ -27,13 +27,10 @@ import type { ExtensionContext } from '@zveltio/sdk/extension';
 export function gdprRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
 
-  // Per-request DB handle (CRM PR #1 pattern). After
-  // migration 002_tenant_rls.sql, this extension's tables have FORCE
-  // RLS keyed on `zveltio.current_tenant`; routes must run through
-  // this handle so the GUC is active inside the transaction.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
 
   async function requireUser(c: any) {
@@ -60,12 +57,12 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
 
     const [userRow, auditRows, notifRows, apiKeyRows, approvalRows, consentRows] =
       await Promise.all([
-        sql<any>`SELECT id::text, name, email, "createdAt" AS created_at FROM "user" WHERE id = ${userId}`.execute(reqDb(c)),
-        sql<any>`SELECT event_type AS action, resource_type AS collection, resource_id AS record_id, created_at FROM zv_audit_log WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 1000`.execute(reqDb(c)),
-        sql<any>`SELECT title, message, type, is_read, created_at FROM zv_notifications WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 500`.execute(reqDb(c)),
-        sql<any>`SELECT name, key_prefix, scopes, created_at FROM zv_api_keys WHERE created_by = ${userId}`.execute(reqDb(c)),
-        sql<any>`SELECT id::text, collection, record_id, status, requested_at FROM zv_approval_requests WHERE requested_by = ${userId} ORDER BY requested_at DESC`.execute(reqDb(c)).catch(() => ({ rows: [] })),
-        sql<any>`SELECT purpose, granted, source, created_at, withdrawn_at FROM zvd_gdpr_consents WHERE user_id = ${userId} ORDER BY created_at DESC`.execute(reqDb(c)).catch(() => ({ rows: [] })),
+        sql<any>`SELECT id::text, name, email, "createdAt" AS created_at FROM "user" WHERE id = ${userId}`.execute(db),
+        sql<any>`SELECT event_type AS action, resource_type AS collection, resource_id AS record_id, created_at FROM zv_audit_log WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 1000`.execute(db),
+        sql<any>`SELECT title, message, type, is_read, created_at FROM zv_notifications WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 500`.execute(db),
+        sql<any>`SELECT name, key_prefix, scopes, created_at FROM zv_api_keys WHERE created_by = ${userId}`.execute(db),
+        sql<any>`SELECT id::text, collection, record_id, status, requested_at FROM zv_approval_requests WHERE requested_by = ${userId} ORDER BY requested_at DESC`.execute(db).catch(() => ({ rows: [] })),
+        sql<any>`SELECT purpose, granted, source, created_at, withdrawn_at FROM zvd_gdpr_consents WHERE user_id = ${userId} ORDER BY created_at DESC`.execute(db).catch(() => ({ rows: [] })),
       ]);
 
     const exportData = {
@@ -123,7 +120,7 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
     // event_type matches the engine's auditLog() schema (not the
     // legacy `action` column the older code used).
     try {
-      await (reqDb(c) as any).transaction().execute(async (trx: any) => {
+      await (db as any).transaction().execute(async (trx: any) => {
         await sql`
           INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, created_at)
           VALUES ('gdpr.account_deleted', ${userId}, 'user', ${JSON.stringify({ gdpr: true, requested_at: new Date().toISOString() })}::jsonb, NOW())
@@ -180,7 +177,7 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
         VALUES (${user.id}, ${user.email}, ${body.purpose}, ${body.processing_record_id ?? null},
                 ${body.granted}, ${ip}, ${userAgent}, ${body.source}, ${body.expires_at ?? null})
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
 
       return c.json({ consent: consent.rows[0] }, 201);
     },
@@ -196,7 +193,7 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
       FROM zvd_gdpr_consents
       WHERE user_id = ${user.id}
       ORDER BY created_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
 
     return c.json({ consents: consents.rows });
   });
@@ -211,7 +208,7 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
       SET granted = false, withdrawn_at = NOW()
       WHERE id = ${c.req.param('id')}::uuid AND user_id = ${user.id} AND withdrawn_at IS NULL
       RETURNING id
-    `.execute(reqDb(c));
+    `.execute(db);
 
     if (!result.rows[0]) return c.json({ error: 'Consent not found' }, 404);
     return c.json({ success: true });
@@ -237,7 +234,7 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
         VALUES (${user.email}, ${body.requester_name ?? user.name ?? user.email},
                 ${body.request_type}, ${body.description ?? null}, ${user.id})
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
 
       return c.json({ access_request: req.rows[0] }, 201);
     },
@@ -254,7 +251,7 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
       WHERE 1=1
         ${status ? sql`AND status = ${status}` : sql``}
       ORDER BY created_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
 
     return c.json({ access_requests: rows.rows });
   });
@@ -286,7 +283,7 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
         UPDATE zvd_gdpr_access_requests SET ${setClauses}
         WHERE id = ${c.req.param('id')}::uuid
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
 
       if (!result.rows[0]) return c.json({ error: 'Request not found' }, 404);
       return c.json({ access_request: result.rows[0] });
@@ -303,7 +300,7 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
     const records = await sql<any>`
       SELECT * FROM zvd_gdpr_processing_records
       WHERE is_active = true ORDER BY name ASC
-    `.execute(reqDb(c));
+    `.execute(db);
 
     return c.json({ processing_records: records.rows });
   });
@@ -339,7 +336,7 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
            ${body.technical_measures ?? null}, ${body.organizational_measures ?? null},
            ${body.dpia_required}, ${admin.id})
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
 
       return c.json({ processing_record: record.rows[0] }, 201);
     },
@@ -375,7 +372,7 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
         UPDATE zvd_gdpr_processing_records SET ${setClauses}
         WHERE id = ${c.req.param('id')}::uuid AND is_active = true
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
 
       if (!result.rows[0]) return c.json({ error: 'Record not found' }, 404);
       return c.json({ processing_record: result.rows[0] });
@@ -390,7 +387,7 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
     await sql`
       UPDATE zvd_gdpr_processing_records SET is_active = false, updated_at = NOW()
       WHERE id = ${c.req.param('id')}::uuid
-    `.execute(reqDb(c));
+    `.execute(db);
 
     return c.json({ success: true });
   });
@@ -409,7 +406,7 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
         ${status ? sql`AND status = ${status}` : sql``}
         ${severity ? sql`AND severity = ${severity}` : sql``}
       ORDER BY discovered_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
 
     return c.json({ breaches: rows.rows });
   });
@@ -438,7 +435,7 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
            ${body.affected_records_estimate ?? null}, ${body.data_categories},
            ${body.severity}, ${admin.id})
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
 
       return c.json({ breach: breach.rows[0] }, 201);
     },
@@ -473,7 +470,7 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
         UPDATE zvd_gdpr_breach_incidents SET ${setClauses}
         WHERE id = ${c.req.param('id')}::uuid
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
 
       if (!result.rows[0]) return c.json({ error: 'Breach not found' }, 404);
       return c.json({ breach: result.rows[0] });
@@ -490,18 +487,18 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
       sql<any>`
         SELECT status, COUNT(*)::int AS count
         FROM zvd_gdpr_access_requests GROUP BY status
-      `.execute(reqDb(c)).catch(() => ({ rows: [] })),
+      `.execute(db).catch(() => ({ rows: [] })),
       sql<any>`
         SELECT COUNT(*) FILTER (WHERE granted = true)::int AS active_consents,
                COUNT(*) FILTER (WHERE withdrawn_at IS NOT NULL)::int AS withdrawn,
                COUNT(DISTINCT user_id)::int AS unique_users
         FROM zvd_gdpr_consents
-      `.execute(reqDb(c)).catch(() => ({ rows: [{ active_consents: 0, withdrawn: 0, unique_users: 0 }] })),
+      `.execute(db).catch(() => ({ rows: [{ active_consents: 0, withdrawn: 0, unique_users: 0 }] })),
       sql<any>`
         SELECT severity, status, COUNT(*)::int AS count
         FROM zvd_gdpr_breach_incidents GROUP BY severity, status
-      `.execute(reqDb(c)).catch(() => ({ rows: [] })),
-      sql<any>`SELECT COUNT(*)::int AS count FROM zvd_gdpr_processing_records WHERE is_active = true`.execute(reqDb(c)).catch(() => ({ rows: [{ count: 0 }] })),
+      `.execute(db).catch(() => ({ rows: [] })),
+      sql<any>`SELECT COUNT(*)::int AS count FROM zvd_gdpr_processing_records WHERE is_active = true`.execute(db).catch(() => ({ rows: [{ count: 0 }] })),
     ]);
 
     const sarByStatus: Record<string, number> = {};

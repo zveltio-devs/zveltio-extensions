@@ -19526,9 +19526,6 @@ function applyRule(ruleType, ruleConfig, inputValue) {
 }
 function validationRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const { invalidateRulesCache } = ctx.internals;
   const app = new Hono2;
   app.use("*", async (c, next) => {
@@ -19588,10 +19585,10 @@ Description: ${description}`;
           SELECT * FROM zvd_validation_rule_groups
           WHERE collection = ${collection}
           ORDER BY name ASC
-        `.execute(reqDb(c)) : await sql`
+        `.execute(db) : await sql`
           SELECT * FROM zvd_validation_rule_groups
           ORDER BY collection ASC, name ASC
-        `.execute(reqDb(c));
+        `.execute(db);
     return c.json({ groups: rows.rows });
   });
   app.post("/groups", zValidator("json", RuleGroupCreateSchema), async (c) => {
@@ -19608,7 +19605,7 @@ Description: ${description}`;
          ${body.description ?? null}, ${body.logic}, ${body.rule_ids},
          ${body.is_active}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ group: row.rows[0] }, 201);
   });
   app.delete("/groups/:id", async (c) => {
@@ -19617,14 +19614,14 @@ Description: ${description}`;
     if (!isAdmin)
       return c.json({ error: "Admin access required" }, 403);
     const id = c.req.param("id");
-    const res = await reqDb(c).deleteFrom("zvd_validation_rule_groups").where("id", "=", id).executeTakeFirst();
+    const res = await db.deleteFrom("zvd_validation_rule_groups").where("id", "=", id).executeTakeFirst();
     if ((res?.numDeletedRows ?? 0n) === 0n)
       return c.json({ error: "Not found" }, 404);
     return c.json({ success: true });
   });
   app.get("/:collection", async (c) => {
     const collection = c.req.param("collection");
-    const rules = await reqDb(c).selectFrom("zv_validation_rules").selectAll().where("collection", "=", collection).orderBy("field_name", "asc").execute();
+    const rules = await db.selectFrom("zv_validation_rules").selectAll().where("collection", "=", collection).orderBy("field_name", "asc").execute();
     return c.json({ rules });
   });
   app.post("/:collection", zValidator("json", RuleCreateSchema), async (c) => {
@@ -19634,7 +19631,7 @@ Description: ${description}`;
     if (!isAdmin)
       return c.json({ error: "Admin access required" }, 403);
     const body = c.req.valid("json");
-    const rule = await reqDb(c).insertInto("zv_validation_rules").values({
+    const rule = await db.insertInto("zv_validation_rules").values({
       collection,
       field_name: body.field_name,
       rule_type: body.rule_type,
@@ -19655,7 +19652,7 @@ Description: ${description}`;
       FROM zv_validation_rules r
       LEFT JOIN zvd_validation_test_cases tc ON tc.rule_id = r.id
       WHERE r.collection = ${collection}
-    `.execute(reqDb(c));
+    `.execute(db);
     const results = [];
     const updatePromises = [];
     for (const row of rulesRes.rows) {
@@ -19678,7 +19675,7 @@ Description: ${description}`;
           UPDATE zvd_validation_test_cases
           SET last_run_result = ${actual}, last_run_at = ${now}
           WHERE id = ${row.tc_id}
-        `.execute(reqDb(c)).catch(() => {}));
+        `.execute(db).catch(() => {}));
     }
     await Promise.all(updatePromises);
     const total = results.length;
@@ -19712,7 +19709,7 @@ Description: ${description}`;
       }
       const rule = parsed.data;
       try {
-        await reqDb(c).insertInto("zv_validation_rules").values({
+        await db.insertInto("zv_validation_rules").values({
           collection,
           field_name: rule.field_name,
           rule_type: rule.rule_type,
@@ -19734,7 +19731,7 @@ Description: ${description}`;
       VALUES
         (${collection}, ${importedCount}, ${failedCount},
          ${JSON.stringify(errors3)}::jsonb, ${user.id})
-    `.execute(reqDb(c)).catch(() => {});
+    `.execute(db).catch(() => {});
     if (importedCount > 0)
       invalidateRulesCache(collection);
     return c.json({ imported: importedCount, failed: failedCount, errors: errors3 }, importedCount > 0 ? 201 : 422);
@@ -19747,7 +19744,7 @@ Description: ${description}`;
     if (!isAdmin)
       return c.json({ error: "Admin access required" }, 403);
     const body = c.req.valid("json");
-    const rule = await reqDb(c).updateTable("zv_validation_rules").set({ is_active: body.is_active, updated_at: new Date }).where("id", "=", id).where("collection", "=", collection).returningAll().executeTakeFirst();
+    const rule = await db.updateTable("zv_validation_rules").set({ is_active: body.is_active, updated_at: new Date }).where("id", "=", id).where("collection", "=", collection).returningAll().executeTakeFirst();
     invalidateRulesCache(collection);
     return c.json({ rule });
   });
@@ -19758,7 +19755,7 @@ Description: ${description}`;
     const isAdmin = await checkPermission(user.id, "admin", "*");
     if (!isAdmin)
       return c.json({ error: "Admin access required" }, 403);
-    await reqDb(c).deleteFrom("zv_validation_rules").where("id", "=", id).execute();
+    await db.deleteFrom("zv_validation_rules").where("id", "=", id).execute();
     invalidateRulesCache(collection);
     return c.json({ success: true });
   });
@@ -19766,13 +19763,13 @@ Description: ${description}`;
     const id = c.req.param("id");
     const ruleRes = await sql`
       SELECT id, rule_type, rule_config FROM zv_validation_rules WHERE id = ${id}
-    `.execute(reqDb(c));
+    `.execute(db);
     const rule = ruleRes.rows[0];
     if (!rule)
       return c.json({ error: "Rule not found" }, 404);
     const casesRes = await sql`
       SELECT * FROM zvd_validation_test_cases WHERE rule_id = ${id}
-    `.execute(reqDb(c));
+    `.execute(db);
     const config2 = typeof rule.rule_config === "string" ? JSON.parse(rule.rule_config) : rule.rule_config;
     const results = [];
     const now = new Date;
@@ -19791,7 +19788,7 @@ Description: ${description}`;
         UPDATE zvd_validation_test_cases
         SET last_run_result = ${actual}, last_run_at = ${now}
         WHERE id = ${tc.id}
-      `.execute(reqDb(c)).catch(() => {});
+      `.execute(db).catch(() => {});
     }
     const total = results.length;
     const passed = results.filter((r) => r.passed).length;
@@ -19803,7 +19800,7 @@ Description: ${description}`;
       SELECT * FROM zvd_validation_test_cases
       WHERE rule_id = ${id}
       ORDER BY created_at ASC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ test_cases: rows.rows });
   });
   app.post("/:collection/:id/test-cases", zValidator("json", TestCaseCreateSchema), async (c) => {
@@ -19814,7 +19811,7 @@ Description: ${description}`;
       return c.json({ error: "Admin access required" }, 403);
     const ruleRes = await sql`
       SELECT id FROM zv_validation_rules WHERE id = ${id}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!ruleRes.rows[0])
       return c.json({ error: "Rule not found" }, 404);
     const body = c.req.valid("json");
@@ -19824,7 +19821,7 @@ Description: ${description}`;
       VALUES
         (${id}, ${body.label}, ${body.input_value}, ${body.expected_result}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ test_case: row.rows[0] }, 201);
   });
   app.delete("/:collection/:id/test-cases/:testId", async (c) => {
@@ -19834,7 +19831,7 @@ Description: ${description}`;
       return c.json({ error: "Admin access required" }, 403);
     const testId = c.req.param("testId");
     const ruleId = c.req.param("id");
-    const res = await reqDb(c).deleteFrom("zvd_validation_test_cases").where("id", "=", testId).where("rule_id", "=", ruleId).executeTakeFirst();
+    const res = await db.deleteFrom("zvd_validation_test_cases").where("id", "=", testId).where("rule_id", "=", ruleId).executeTakeFirst();
     if ((res?.numDeletedRows ?? 0n) === 0n)
       return c.json({ error: "Not found" }, 404);
     return c.json({ success: true });

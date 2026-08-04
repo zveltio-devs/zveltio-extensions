@@ -19469,7 +19469,6 @@ function toScimUser(u, state = {}) {
 }
 function scimAdminRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
-  const reqDb = (c) => ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
   const app = new Hono2;
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -19484,7 +19483,7 @@ function scimAdminRoutes(ctx) {
   app.get("/tokens", async (c) => {
     const rows = await sql`
       SELECT id::text, name, created_at, last_used_at FROM zv_scim_tokens ORDER BY created_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ tokens: rows.rows });
   });
   app.post("/tokens", zValidator("json", exports_external.object({ name: exports_external.string().min(1).max(120) })), async (c) => {
@@ -19493,11 +19492,11 @@ function scimAdminRoutes(ctx) {
     await sql`
       INSERT INTO zv_scim_tokens (name, token_hash, created_by)
       VALUES (${c.req.valid("json").name}, ${await hashToken(ctx.internals, raw2)}, ${user.id})
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ token: raw2, base_url: "/scim/v2" }, 201);
   });
   app.delete("/tokens/:id", async (c) => {
-    await sql`DELETE FROM zv_scim_tokens WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    await sql`DELETE FROM zv_scim_tokens WHERE id = ${c.req.param("id")}`.execute(db);
     return c.json({ success: true });
   });
   return app;

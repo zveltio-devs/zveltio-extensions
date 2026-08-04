@@ -19451,9 +19451,6 @@ function invalidateCache() {
 }
 function translationsRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   async function requireAdmin(c) {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session)
@@ -19474,13 +19471,13 @@ function translationsRoutes(ctx) {
       FROM zvd_translations t
       JOIN zvd_translation_keys tk ON tk.id = t.key_id
       WHERE t.locale = ${locale}
-    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+    `.execute(db).catch(() => ({ rows: [] }));
     const map2 = new Map;
     for (const row of rows.rows) {
       map2.set(row.key, row.value);
     }
     if (rows.rows.length === 0) {
-      const allKeys = await sql`SELECT key, default_value FROM zvd_translation_keys`.execute(reqDb(c)).catch(() => ({ rows: [] }));
+      const allKeys = await sql`SELECT key, default_value FROM zvd_translation_keys`.execute(db).catch(() => ({ rows: [] }));
       for (const row of allKeys.rows) {
         if (row.default_value)
           map2.set(row.key, row.default_value);
@@ -19498,19 +19495,19 @@ function translationsRoutes(ctx) {
     await next();
   });
   app.get("/locales", async (c) => {
-    const locales = await reqDb(c).selectFrom("zvd_locales").selectAll().orderBy("is_default", "desc").orderBy("name", "asc").execute();
+    const locales = await db.selectFrom("zvd_locales").selectAll().orderBy("is_default", "desc").orderBy("name", "asc").execute();
     return c.json({ locales });
   });
   app.post("/locales", zValidator("json", exports_external.object({ code: exports_external.string().min(2).max(10), name: exports_external.string().min(1), is_default: exports_external.boolean().default(false) })), async (c) => {
     const { code, name, is_default: is_default2 } = c.req.valid("json");
     if (is_default2) {
-      await reqDb(c).updateTable("zvd_locales").set({ is_default: false }).where("is_default", "=", true).execute();
+      await db.updateTable("zvd_locales").set({ is_default: false }).where("is_default", "=", true).execute();
     }
-    const locale = await reqDb(c).insertInto("zvd_locales").values({ code, name, is_default: is_default2 }).returningAll().executeTakeFirst();
+    const locale = await db.insertInto("zvd_locales").values({ code, name, is_default: is_default2 }).returningAll().executeTakeFirst();
     return c.json({ locale }, 201);
   });
   app.delete("/locales/:code", async (c) => {
-    await reqDb(c).deleteFrom("zvd_locales").where("code", "=", c.req.param("code")).execute();
+    await db.deleteFrom("zvd_locales").where("code", "=", c.req.param("code")).execute();
     invalidateCache();
     return c.json({ success: true });
   });
@@ -19541,13 +19538,13 @@ function translationsRoutes(ctx) {
       GROUP BY tk.id
       ORDER BY tk.key ASC
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
     const total = await sql`
       SELECT COUNT(*)::int AS count FROM zvd_translation_keys
       WHERE 1=1
         ${context ? sql`AND context = ${context}` : sql``}
         ${search ? sql`AND (key ILIKE ${"%" + search + "%"} OR default_value ILIKE ${"%" + search + "%"})` : sql``}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({
       keys: rows.rows,
       pagination: { total: total.rows[0]?.count ?? 0, page: parseInt(page), limit: lim }
@@ -19563,15 +19560,15 @@ function translationsRoutes(ctx) {
     is_pluralized: exports_external.boolean().default(false)
   })), async (c) => {
     const data = c.req.valid("json");
-    const existing = await reqDb(c).selectFrom("zvd_translation_keys").where("key", "=", data.key).executeTakeFirst();
+    const existing = await db.selectFrom("zvd_translation_keys").where("key", "=", data.key).executeTakeFirst();
     if (existing)
       return c.json({ error: `Key '${data.key}' already exists` }, 409);
-    const key = await reqDb(c).insertInto("zvd_translation_keys").values(data).returningAll().executeTakeFirst();
+    const key = await db.insertInto("zvd_translation_keys").values(data).returningAll().executeTakeFirst();
     return c.json({ key }, 201);
   });
   app.get("/glossary", async (c) => {
     const { locale } = c.req.query();
-    let query = reqDb(c).selectFrom("zvd_translation_glossary").selectAll().orderBy("term", "asc");
+    let query = db.selectFrom("zvd_translation_glossary").selectAll().orderBy("term", "asc");
     if (locale)
       query = query.where("locale", "=", locale);
     return c.json({ glossary: await query.execute() });
@@ -19584,13 +19581,13 @@ function translationsRoutes(ctx) {
       LEFT JOIN zvd_translations t ON t.key_id = tk.id
       WHERE tk.id = ${c.req.param("keyId")}
       GROUP BY tk.id
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!rows.rows[0])
       return c.json({ error: "Key not found" }, 404);
     return c.json({ key: rows.rows[0] });
   });
   app.delete("/:keyId", async (c) => {
-    await reqDb(c).deleteFrom("zvd_translation_keys").where("id", "=", c.req.param("keyId")).execute();
+    await db.deleteFrom("zvd_translation_keys").where("id", "=", c.req.param("keyId")).execute();
     invalidateCache();
     return c.json({ success: true });
   });
@@ -19602,7 +19599,7 @@ function translationsRoutes(ctx) {
     const user = c.get("user");
     const { keyId, locale } = c.req.param();
     const data = c.req.valid("json");
-    const key = await reqDb(c).selectFrom("zvd_translation_keys").where("id", "=", keyId).executeTakeFirst();
+    const key = await db.selectFrom("zvd_translation_keys").where("id", "=", keyId).executeTakeFirst();
     if (!key)
       return c.json({ error: "Translation key not found" }, 404);
     const translation = await sql`
@@ -19612,7 +19609,7 @@ function translationsRoutes(ctx) {
         DO UPDATE SET value = EXCLUDED.value, is_machine_translated = EXCLUDED.is_machine_translated,
                       reviewed = EXCLUDED.reviewed, updated_by = EXCLUDED.updated_by, updated_at = NOW()
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
     invalidateCache();
     return c.json({ translation: translation.rows[0] });
   });
@@ -19624,14 +19621,14 @@ function translationsRoutes(ctx) {
       SET reviewed = true, approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
       WHERE key_id = ${keyId}::uuid AND locale = ${locale}
       RETURNING id
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!result.rows[0])
       return c.json({ error: "Translation not found" }, 404);
     invalidateCache();
     return c.json({ success: true });
   });
   app.delete("/:keyId/:locale", async (c) => {
-    await reqDb(c).deleteFrom("zvd_translations").where("key_id", "=", c.req.param("keyId")).where("locale", "=", c.req.param("locale")).execute();
+    await db.deleteFrom("zvd_translations").where("key_id", "=", c.req.param("keyId")).where("locale", "=", c.req.param("locale")).execute();
     invalidateCache();
     return c.json({ success: true });
   });
@@ -19649,7 +19646,7 @@ function translationsRoutes(ctx) {
       CROSS JOIN zvd_translation_keys tk
       LEFT JOIN zvd_translations t ON t.key_id = tk.id AND t.locale = l.code
       GROUP BY l.code, l.name ORDER BY l.code
-    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+    `.execute(db).catch(() => ({ rows: [] }));
     return c.json({ coverage: stats.rows });
   });
   app.get("/stats/missing/:locale", async (c) => {
@@ -19662,7 +19659,7 @@ function translationsRoutes(ctx) {
       )
       ORDER BY tk.key
       LIMIT 200
-    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+    `.execute(db).catch(() => ({ rows: [] }));
     return c.json({ locale, missing_keys: missing.rows, count: missing.rows.length });
   });
   app.post("/glossary", zValidator("json", exports_external.object({
@@ -19679,7 +19676,7 @@ function translationsRoutes(ctx) {
                 ${c.req.valid("json").definition ?? null}, ${c.req.valid("json").forbidden}, ${user.id})
         ON CONFLICT (term, locale) DO UPDATE SET translation = EXCLUDED.translation, definition = EXCLUDED.definition
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
     return c.json({ term: term.rows[0] }, 201);
   });
   return app;

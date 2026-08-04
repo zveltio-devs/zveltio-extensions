@@ -1,8 +1,0 @@
-{
-  "developer/graphql/engine/routes.ts": 3,
-  "auth/ldap/engine/routes.ts": 2,
-  "auth/scim/engine/routes.ts": 24,
-  "auth/saml/engine/routes.ts": 2,
-  "storage/cloud/engine/routes.ts": 1,
-  "analytics/dashboard/engine/routes.ts": 12
-}

@@ -59187,9 +59187,6 @@ async function findOrCreateSsoUser(dbh, email3, displayName) {
 }
 function samlRoutes(ctx) {
   const { db, auth, checkPermission, internals } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   if (!internals?.createBetterAuthSession) {
     throw new Error("[saml] engine internals missing createBetterAuthSession \u2014 Zveltio version mismatch");
   }
@@ -59239,8 +59236,8 @@ function samlRoutes(ctx) {
     const name2 = profile[config2.mapName] ?? profile.displayName ?? email3;
     if (!email3)
       return c.json({ error: "IdP did not return an email address" }, 400);
-    const user = await findOrCreateSsoUser(reqDb(c), email3, name2);
-    await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(reqDb(c)).catch((err) => {
+    const user = await findOrCreateSsoUser(db, email3, name2);
+    await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(db).catch((err) => {
       console.warn("[saml] could not invalidate previous sessions:", err.message);
     });
     const remoteIp = c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? undefined;

@@ -8,13 +8,10 @@ import { permissionGate } from '@zveltio/sdk/extension';
 export function checklistsRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
-  // Per-request DB handle (CRM PR #1 pattern). After
-  // migration 002_tenant_rls.sql, this extension's tables have FORCE
-  // RLS keyed on `zveltio.current_tenant`; routes must run through
-  // this handle so the GUC is active inside the transaction.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
   const app = new Hono();
 
@@ -35,7 +32,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
 
   app.get('/templates', async (c) => {
     const { collection } = c.req.query();
-    let query = reqDb(c).selectFrom('zv_checklist_templates').selectAll().where('is_active', '=', true);
+    let query = db.selectFrom('zv_checklist_templates').selectAll().where('is_active', '=', true);
     if (collection) {
       query = query.where((eb: any) =>
         eb.or([eb('collection', '=', collection), eb('collection', 'is', null)])
@@ -72,14 +69,14 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
       const { name, description, collection, items } = c.req.valid('json');
-      const template = await reqDb(c)
+      const template = await db
         .insertInto('zv_checklist_templates')
         .values({ name, description, collection: collection || null })
         .returningAll()
         .executeTakeFirst();
 
       if (items.length > 0) {
-        await reqDb(c).insertInto('zv_checklist_template_items')
+        await db.insertInto('zv_checklist_template_items')
           .values(items.map((item: any, i: number) => ({
             template_id: template.id,
             label: item.label,
@@ -94,7 +91,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
           .execute();
       }
 
-      const templateItems = await reqDb(c)
+      const templateItems = await db
         .selectFrom('zv_checklist_template_items')
         .selectAll()
         .where('template_id', '=', template.id)
@@ -110,7 +107,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const template = await reqDb(c)
+    const template = await db
       .selectFrom('zv_checklist_templates')
       .selectAll()
       .where('id', '=', c.req.param('id'))
@@ -118,7 +115,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
 
     if (!template) return c.json({ error: 'Template not found' }, 404);
 
-    const items = await reqDb(c)
+    const items = await db
       .selectFrom('zv_checklist_template_items')
       .selectAll()
       .where('template_id', '=', template.id)
@@ -159,7 +156,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
       const id = c.req.param('id');
       const { items, ...fields } = c.req.valid('json');
 
-      const existing = await reqDb(c)
+      const existing = await db
         .selectFrom('zv_checklist_templates')
         .select('id')
         .where('id', '=', id)
@@ -173,7 +170,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
       if ('collection' in fields) updateFields.collection = fields.collection;
       if (fields.is_active !== undefined) updateFields.is_active = fields.is_active;
 
-      const template = await reqDb(c)
+      const template = await db
         .updateTable('zv_checklist_templates')
         .set(updateFields)
         .where('id', '=', id)
@@ -181,9 +178,9 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
         .executeTakeFirst();
 
       if (items !== undefined) {
-        await reqDb(c).deleteFrom('zv_checklist_template_items').where('template_id', '=', id).execute();
+        await db.deleteFrom('zv_checklist_template_items').where('template_id', '=', id).execute();
         if (items.length > 0) {
-          await reqDb(c).insertInto('zv_checklist_template_items')
+          await db.insertInto('zv_checklist_template_items')
             .values(items.map((item, i) => ({
               template_id: id,
               label: item.label,
@@ -199,7 +196,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
         }
       }
 
-      const templateItems = await reqDb(c)
+      const templateItems = await db
         .selectFrom('zv_checklist_template_items')
         .selectAll()
         .where('template_id', '=', id)
@@ -214,7 +211,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    await reqDb(c).updateTable('zv_checklist_templates')
+    await db.updateTable('zv_checklist_templates')
       .set({ is_active: false })
       .where('id', '=', c.req.param('id'))
       .execute();
@@ -231,7 +228,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
 
     const { collection, recordId } = c.req.param();
 
-    const checklists = await reqDb(c)
+    const checklists = await db
       .selectFrom('zv_checklists')
       .selectAll()
       .where('collection', '=', collection)
@@ -241,7 +238,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
 
     const withItems = await Promise.all(
       checklists.map(async (cl: any) => {
-        const items = await reqDb(c)
+        const items = await db
           .selectFrom('zv_checklist_items')
           .selectAll()
           .where('checklist_id', '=', cl.id)
@@ -279,7 +276,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
       const { collection, recordId } = c.req.param();
       const { template_id, name, items: customItems } = c.req.valid('json');
 
-      const checklist = await reqDb(c)
+      const checklist = await db
         .insertInto('zv_checklists')
         .values({
           template_id: template_id || null,
@@ -293,7 +290,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
 
       let itemsToInsert: any[] = [];
       if (template_id) {
-        itemsToInsert = await reqDb(c)
+        itemsToInsert = await db
           .selectFrom('zv_checklist_template_items')
           .selectAll()
           .where('template_id', '=', template_id)
@@ -304,7 +301,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
       }
 
       if (itemsToInsert.length > 0) {
-        await reqDb(c).insertInto('zv_checklist_items')
+        await db.insertInto('zv_checklist_items')
           .values(itemsToInsert.map((item: any, i: number) => ({
             checklist_id: checklist.id,
             label: item.label,
@@ -315,7 +312,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
           .execute();
       }
 
-      const items = await reqDb(c)
+      const items = await db
         .selectFrom('zv_checklist_items')
         .selectAll()
         .where('checklist_id', '=', checklist.id)
@@ -357,7 +354,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
       if (assignee_user_id !== undefined) updateSet.assignee_user_id = assignee_user_id;
       if (due_at !== undefined) updateSet.due_at = new Date(due_at);
 
-      const item = await reqDb(c)
+      const item = await db
         .updateTable('zv_checklist_items')
         .set(updateSet)
         .where('id', '=', c.req.param('itemId'))
@@ -368,7 +365,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
 
       // Auto-complete checklist if all required items are checked
       if (checked !== undefined) {
-        const allItems = await reqDb(c)
+        const allItems = await db
           .selectFrom('zv_checklist_items')
           .selectAll()
           .where('checklist_id', '=', item.checklist_id)
@@ -378,7 +375,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
           .filter((i: any) => i.required)
           .every((i: any) => i.checked);
 
-        const checklist = await reqDb(c)
+        const checklist = await db
           .selectFrom('zv_checklists')
           .selectAll()
           .where('id', '=', item.checklist_id)
@@ -391,7 +388,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
             timeToComplete = Math.round((now.getTime() - new Date(checklist.created_at).getTime()) / 60000);
           }
 
-          await reqDb(c)
+          await db
             .updateTable('zv_checklists')
             .set({
               completed_at: now,
@@ -403,7 +400,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
             .where('completed_at', 'is', null)
             .execute();
         } else if (!allRequiredChecked) {
-          await reqDb(c)
+          await db
             .updateTable('zv_checklists')
             .set({ completed_at: null, updated_at: now })
             .where('id', '=', item.checklist_id)
@@ -442,7 +439,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
 
       const updatedItems = await Promise.all(
         item_ids.map(async (itemId) => {
-          const item = await reqDb(c)
+          const item = await db
             .updateTable('zv_checklist_items')
             .set(updateSet)
             .where('id', '=', itemId)
@@ -457,7 +454,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
       // Auto-complete affected checklists
       const affectedChecklistIds = [...new Set(validItems.map((i: any) => i.checklist_id))];
       for (const checklistId of affectedChecklistIds) {
-        const allItems = await reqDb(c)
+        const allItems = await db
           .selectFrom('zv_checklist_items')
           .selectAll()
           .where('checklist_id', '=', checklistId)
@@ -467,7 +464,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
           .filter((i: any) => i.required)
           .every((i: any) => i.checked);
 
-        const checklist = await reqDb(c)
+        const checklist = await db
           .selectFrom('zv_checklists')
           .selectAll()
           .where('id', '=', checklistId)
@@ -478,14 +475,14 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
           if (checklist.created_at) {
             timeToComplete = Math.round((now.getTime() - new Date(checklist.created_at).getTime()) / 60000);
           }
-          await reqDb(c)
+          await db
             .updateTable('zv_checklists')
             .set({ completed_at: now, updated_at: now, completed_by: user.id, time_to_complete_minutes: timeToComplete })
             .where('id', '=', checklistId)
             .where('completed_at', 'is', null)
             .execute();
         } else if (!allRequiredChecked) {
-          await reqDb(c)
+          await db
             .updateTable('zv_checklists')
             .set({ completed_at: null, updated_at: now })
             .where('id', '=', checklistId)
@@ -512,7 +509,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
         AND ci.due_at < NOW()
         AND ci.checked = false
       ORDER BY ci.due_at ASC
-    `.execute(reqDb(c));
+    `.execute(db);
 
     return c.json({ items: items.rows, count: items.rows.length });
   });
@@ -524,7 +521,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const schedules = await reqDb(c)
+    const schedules = await db
       .selectFrom('zv_checklist_recurrence as r')
       .leftJoin('zv_checklist_templates as t', 't.id', 'r.template_id')
       .select([
@@ -559,7 +556,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
 
       const { template_id, collection, record_id, frequency, next_run_at } = c.req.valid('json');
 
-      const template = await reqDb(c)
+      const template = await db
         .selectFrom('zv_checklist_templates')
         .select('id')
         .where('id', '=', template_id)
@@ -567,7 +564,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
 
       if (!template) return c.json({ error: 'Template not found' }, 404);
 
-      const schedule = await reqDb(c)
+      const schedule = await db
         .insertInto('zv_checklist_recurrence')
         .values({
           template_id,
@@ -589,7 +586,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    await reqDb(c)
+    await db
       .updateTable('zv_checklist_recurrence')
       .set({ is_active: false })
       .where('id', '=', c.req.param('id'))
@@ -610,7 +607,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
 
     const now = new Date();
 
-    const dueSchedules = await reqDb(c)
+    const dueSchedules = await db
       .selectFrom('zv_checklist_recurrence')
       .selectAll()
       .where('is_active', '=', true)
@@ -622,14 +619,14 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
     for (const schedule of dueSchedules) {
       try {
         // Get template items
-        const templateItems = await reqDb(c)
+        const templateItems = await db
           .selectFrom('zv_checklist_template_items')
           .selectAll()
           .where('template_id', '=', schedule.template_id)
           .orderBy('order_idx', 'asc')
           .execute();
 
-        const templateData = await reqDb(c)
+        const templateData = await db
           .selectFrom('zv_checklist_templates')
           .selectAll()
           .where('id', '=', schedule.template_id)
@@ -638,7 +635,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
         if (!templateData) continue;
 
         // Create checklist instance
-        const checklist = await reqDb(c)
+        const checklist = await db
           .insertInto('zv_checklists')
           .values({
             template_id: schedule.template_id,
@@ -651,7 +648,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
           .executeTakeFirst();
 
         if (templateItems.length > 0) {
-          await reqDb(c).insertInto('zv_checklist_items')
+          await db.insertInto('zv_checklist_items')
             .values(templateItems.map((item: any, i: number) => ({
               checklist_id: checklist.id,
               label: item.label,
@@ -679,7 +676,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
             break;
         }
 
-        await reqDb(c)
+        await db
           .updateTable('zv_checklist_recurrence')
           .set({ last_run_at: now, next_run_at: nextRun })
           .where('id', '=', schedule.id)
@@ -705,18 +702,18 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
 
     const totalResult = await sql<{ count: string }>`
       SELECT COUNT(*) as count FROM zv_checklists WHERE collection = ${collection}
-    `.execute(reqDb(c));
+    `.execute(db);
 
     const completedResult = await sql<{ count: string }>`
       SELECT COUNT(*) as count FROM zv_checklists
       WHERE collection = ${collection} AND completed_at IS NOT NULL
-    `.execute(reqDb(c));
+    `.execute(db);
 
     const avgTimeResult = await sql<{ avg_minutes: string | null }>`
       SELECT AVG(time_to_complete_minutes) as avg_minutes
       FROM zv_checklists
       WHERE collection = ${collection} AND time_to_complete_minutes IS NOT NULL
-    `.execute(reqDb(c));
+    `.execute(db);
 
     const overdueResult = await sql<{ count: string }>`
       SELECT COUNT(*) as count
@@ -726,7 +723,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
         AND ci.due_at IS NOT NULL
         AND ci.due_at < NOW()
         AND ci.checked = false
-    `.execute(reqDb(c));
+    `.execute(db);
 
     const total = parseInt(totalResult.rows[0]?.count || '0');
     const completed = parseInt(completedResult.rows[0]?.count || '0');
@@ -752,7 +749,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
 
     const { limit: lim = '20' } = c.req.query();
 
-    const checklists = await reqDb(c)
+    const checklists = await db
       .selectFrom('zv_checklists')
       .selectAll()
       .orderBy('updated_at', 'desc')
@@ -761,7 +758,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
 
     const withProgress = await Promise.all(
       checklists.map(async (cl: any) => {
-        const items = await reqDb(c)
+        const items = await db
           .selectFrom('zv_checklist_items')
           .selectAll()
           .where('checklist_id', '=', cl.id)
@@ -786,7 +783,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    await reqDb(c).deleteFrom('zv_checklists').where('id', '=', c.req.param('id')).execute();
+    await db.deleteFrom('zv_checklists').where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
   });
 

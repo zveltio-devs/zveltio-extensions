@@ -19553,9 +19553,6 @@ function exportRoutes(ctx) {
   function tenantOf(c) {
     return c.get("tenant")?.id ?? "00000000-0000-0000-0000-000000000001";
   }
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -19575,24 +19572,24 @@ function exportRoutes(ctx) {
       sql`
         SELECT COUNT(*) AS count FROM zvd_export_audit_log
         WHERE created_at >= ${startOfMonth.toISOString()}
-      `.execute(reqDb(c)),
+      `.execute(db),
       sql`
         SELECT COALESCE(SUM(record_count), 0) AS total FROM zvd_export_audit_log
         WHERE created_at >= ${startOfMonth.toISOString()}
-      `.execute(reqDb(c)),
+      `.execute(db),
       sql`
         SELECT collection, COUNT(*) AS exports
         FROM zvd_export_audit_log
         GROUP BY collection
         ORDER BY exports DESC
         LIMIT 5
-      `.execute(reqDb(c)),
+      `.execute(db),
       sql`
         SELECT format, COUNT(*) AS count
         FROM zvd_export_audit_log
         GROUP BY format
         ORDER BY count DESC
-      `.execute(reqDb(c))
+      `.execute(db)
     ]);
     return c.json({
       exports_this_month: Number(countRow.rows[0]?.count ?? 0),
@@ -19605,7 +19602,7 @@ function exportRoutes(ctx) {
     collection: exports_external.string().optional()
   })), async (c) => {
     const { collection } = c.req.valid("query");
-    let query = reqDb(c).selectFrom("zvd_export_audit_log").selectAll().orderBy("created_at", "desc").limit(100);
+    let query = db.selectFrom("zvd_export_audit_log").selectAll().orderBy("created_at", "desc").limit(100);
     if (collection)
       query = query.where("collection", "=", collection);
     const entries = await query.execute();
@@ -19615,7 +19612,7 @@ function exportRoutes(ctx) {
     collection: exports_external.string().optional()
   })), async (c) => {
     const { collection } = c.req.valid("query");
-    let query = reqDb(c).selectFrom("zvd_export_jobs").selectAll().orderBy("created_at", "desc").limit(50);
+    let query = db.selectFrom("zvd_export_jobs").selectAll().orderBy("created_at", "desc").limit(50);
     if (collection)
       query = query.where("collection", "=", collection);
     const jobs = await query.execute();
@@ -19631,7 +19628,7 @@ function exportRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const body = c.req.valid("json");
-    const job = await reqDb(c).insertInto("zvd_export_jobs").values({
+    const job = await db.insertInto("zvd_export_jobs").values({
       collection: body.collection,
       format: body.format,
       filters: JSON.stringify(body.filters),
@@ -19643,20 +19640,20 @@ function exportRoutes(ctx) {
     return c.json({ job_id: job.id, status: "pending", message: "Export job queued" }, 202);
   });
   app.get("/jobs/:id", async (c) => {
-    const job = await reqDb(c).selectFrom("zvd_export_jobs").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
+    const job = await db.selectFrom("zvd_export_jobs").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
     if (!job)
       return c.json({ error: "Export job not found" }, 404);
     return c.json({ job });
   });
   app.delete("/jobs/:id", async (c) => {
-    const deleted = await reqDb(c).deleteFrom("zvd_export_jobs").where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
+    const deleted = await db.deleteFrom("zvd_export_jobs").where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
     if (!deleted)
       return c.json({ error: "Export job not found" }, 404);
     return c.json({ success: true });
   });
   app.get("/templates", async (c) => {
     const user = c.get("user");
-    const templates = await reqDb(c).selectFrom("zvd_export_templates").selectAll().where((eb) => eb.or([
+    const templates = await db.selectFrom("zvd_export_templates").selectAll().where((eb) => eb.or([
       eb("is_public", "=", true),
       eb("created_by", "=", user.id)
     ])).orderBy("created_at", "desc").execute();
@@ -19675,7 +19672,7 @@ function exportRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const body = c.req.valid("json");
-    const template = await reqDb(c).insertInto("zvd_export_templates").values({
+    const template = await db.insertInto("zvd_export_templates").values({
       name: body.name,
       collection: body.collection,
       format: body.format,
@@ -19702,7 +19699,7 @@ function exportRoutes(ctx) {
     const user = c.get("user");
     const id = c.req.param("id");
     const body = c.req.valid("json");
-    const existing = await reqDb(c).selectFrom("zvd_export_templates").select(["id", "created_by"]).where("id", "=", id).executeTakeFirst();
+    const existing = await db.selectFrom("zvd_export_templates").select(["id", "created_by"]).where("id", "=", id).executeTakeFirst();
     if (!existing)
       return c.json({ error: "Template not found" }, 404);
     if (existing.created_by !== user.id) {
@@ -19725,19 +19722,19 @@ function exportRoutes(ctx) {
       updates.description = body.description;
     if (body.is_public !== undefined)
       updates.is_public = body.is_public;
-    const template = await reqDb(c).updateTable("zvd_export_templates").set(updates).where("id", "=", id).returningAll().executeTakeFirst();
+    const template = await db.updateTable("zvd_export_templates").set(updates).where("id", "=", id).returningAll().executeTakeFirst();
     return c.json({ template });
   });
   app.delete("/templates/:id", async (c) => {
     const user = c.get("user");
     const id = c.req.param("id");
-    const existing = await reqDb(c).selectFrom("zvd_export_templates").select(["id", "created_by"]).where("id", "=", id).executeTakeFirst();
+    const existing = await db.selectFrom("zvd_export_templates").select(["id", "created_by"]).where("id", "=", id).executeTakeFirst();
     if (!existing)
       return c.json({ error: "Template not found" }, 404);
     if (existing.created_by !== user.id) {
       return c.json({ error: "Forbidden" }, 403);
     }
-    await reqDb(c).deleteFrom("zvd_export_templates").where("id", "=", id).execute();
+    await db.deleteFrom("zvd_export_templates").where("id", "=", id).execute();
     return c.json({ success: true });
   });
   app.get("/:collection", zValidator("query", exports_external.object({
@@ -19761,9 +19758,9 @@ function exportRoutes(ctx) {
     let query;
     if (fields) {
       const requestedFields = fields.split(",").map((f) => f.trim()).filter((f) => allowedFields.has(f));
-      query = requestedFields.length > 0 ? reqDb(c).selectFrom(tableName).select(requestedFields) : reqDb(c).selectFrom(tableName).selectAll();
+      query = requestedFields.length > 0 ? db.selectFrom(tableName).select(requestedFields) : db.selectFrom(tableName).selectAll();
     } else {
-      query = reqDb(c).selectFrom(tableName).selectAll();
+      query = db.selectFrom(tableName).selectAll();
     }
     query = query.limit(limit);
     const appliedFilters = {};
@@ -19793,7 +19790,7 @@ function exportRoutes(ctx) {
       return result;
     });
     const exportedFieldNames = fields ? fields.split(",").map((f) => f.trim()).filter((f) => allowedFields.has(f)) : Array.from(allowedFields);
-    await reqDb(c).insertInto("zvd_export_audit_log").values({
+    await db.insertInto("zvd_export_audit_log").values({
       collection,
       format,
       record_count: serialized.length,

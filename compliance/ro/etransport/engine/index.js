@@ -16137,9 +16137,6 @@ var declarationSchema = exports_external.object({
 });
 function etransportRoutes(ctx) {
   const { db, auth } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });

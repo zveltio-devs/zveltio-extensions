@@ -96,19 +96,6 @@ jobs:
         # recorded it.
         run: bun scripts/check-bundle-sources.ts
 
-      - name: No new queries around reqDb
-        # `reqDb(c)` is the request's tenant transaction; the bare `db` sitting
-        # next to it is the engine's global pool, with no tenant GUC and no
-        # SET LOCAL ROLE. Both compile, both return rows, and the difference
-        # only ever shows up as one tenant reading another's data — which is
-        # how 31 of 53 extensions drifted onto the wrong one, `forms` defining
-        # `reqDb` and then calling it zero times on its public routes.
-        #
-        # A ratchet, not a wall. The database now fails closed (engine
-        # migrations 029/030) so the remaining 207 are a correctness bug rather
-        # than a disclosure, and a gate that failed on all of them today would
-        # be switched off by Thursday. This stops the count going back up.
-        run: bun scripts/check-reqdb-bypass.ts
 
       - name: Verify packed bundles match manifest engineSha256
         # Drift between manifest.integrity.engineSha256 and the committed

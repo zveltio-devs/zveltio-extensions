@@ -62,13 +62,10 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
   _config = ctx.config;
 
-  // Per-request DB handle (CRM PR #1 pattern). After
-  // migration 002_tenant_rls.sql, this extension's tables have FORCE
-  // RLS keyed on `zveltio.current_tenant`; routes must run through
-  // this handle so the GUC is active inside the transaction.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
   const { moveToTrash, scheduleFileIndexing } = ctx.internals;
 
@@ -88,7 +85,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   // ==========================================
 
   router.get('/folders', async (c) => {
-    const folders = await (reqDb(c) as any)
+    const folders = await (db as any)
       .selectFrom('zv_media_folders')
       .selectAll()
       .where('deleted_at', 'is', null)
@@ -114,7 +111,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
         description: data.description || null,
         created_by: user.id,
       };
-      await (reqDb(c) as any).insertInto('zv_media_folders').values(folder).execute();
+      await (db as any).insertInto('zv_media_folders').values(folder).execute();
       return c.json({ folder }, 201);
     },
   );
@@ -129,7 +126,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const id = c.req.param('id');
       const data = c.req.valid('json');
-      await (reqDb(c) as any)
+      await (db as any)
         .updateTable('zv_media_folders')
         .set({ ...data, updated_at: new Date() })
         .where('id', '=', id)
@@ -141,7 +138,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   router.delete('/folders/:id', async (c) => {
     const id = c.req.param('id');
 
-    const subfolders = await (reqDb(c) as any)
+    const subfolders = await (db as any)
       .selectFrom('zv_media_folders')
       .select((eb: any) => eb.fn.count('id').as('count'))
       .where('parent_id', '=', id)
@@ -151,7 +148,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'Folder has subfolders. Delete them first.' }, 400);
     }
 
-    const fileCount = await (reqDb(c) as any)
+    const fileCount = await (db as any)
       .selectFrom('zv_media_files')
       .select((eb: any) => eb.fn.count('id').as('count'))
       .where('folder_id', '=', id)
@@ -161,7 +158,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'Folder is not empty. Move or delete files first.' }, 400);
     }
 
-    await (reqDb(c) as any).deleteFrom('zv_media_folders').where('id', '=', id).execute();
+    await (db as any).deleteFrom('zv_media_folders').where('id', '=', id).execute();
     return c.json({ success: true });
   });
 
@@ -172,7 +169,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   router.get('/files', async (c) => {
     const { folder_id, tag, search, limit = '50', offset = '0', mime_type } = c.req.query();
 
-    let query = (reqDb(c) as any)
+    let query = (db as any)
       .selectFrom('zv_media_files')
       .selectAll()
       .where('deleted_at', 'is', null)
@@ -203,7 +200,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
 
     // Load tags for each file
     for (const file of files) {
-      file.tags = await (reqDb(c) as any)
+      file.tags = await (db as any)
         .selectFrom('zv_media_file_tags')
         .innerJoin('zv_media_tags', 'zv_media_tags.id', 'zv_media_file_tags.tag_id')
         .select(['zv_media_tags.id', 'zv_media_tags.name', 'zv_media_tags.color'])
@@ -211,7 +208,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
         .execute();
     }
 
-    let countQuery = (reqDb(c) as any)
+    let countQuery = (db as any)
       .selectFrom('zv_media_files')
       .select(({ fn }: any) => fn.count('id').as('count'))
       .where('deleted_at', 'is', null);
@@ -238,7 +235,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   router.get('/files/:id', async (c) => {
     const id = c.req.param('id');
 
-    const file = await (reqDb(c) as any)
+    const file = await (db as any)
       .selectFrom('zv_media_files')
       .selectAll()
       .where('id', '=', id)
@@ -247,7 +244,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
 
     if (!file) return c.json({ error: 'File not found' }, 404);
 
-    file.tags = await (reqDb(c) as any)
+    file.tags = await (db as any)
       .selectFrom('zv_media_file_tags')
       .innerJoin('zv_media_tags', 'zv_media_tags.id', 'zv_media_file_tags.tag_id')
       .select(['zv_media_tags.id', 'zv_media_tags.name', 'zv_media_tags.color'])
@@ -269,13 +266,13 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     if (!file) return c.json({ error: 'No file provided' }, 400);
 
     // Check storage quota
-    const usageResult = await (reqDb(c) as any)
+    const usageResult = await (db as any)
       .selectFrom('zv_media_files')
       .select(({ fn }: any) => fn.sum('size').as('total'))
       .where('created_by', '=', user.id)
       .where('deleted_at', 'is', null)
       .executeTakeFirst();
-    const quotaRecord = await (reqDb(c) as any)
+    const quotaRecord = await (db as any)
       .selectFrom('zv_storage_quotas')
       .selectAll()
       .where('user_id', '=', user.id)
@@ -366,7 +363,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
       alt_text: altText || null,
     };
 
-    await (reqDb(c) as any).insertInto('zv_media_files').values(fileRecord).execute();
+    await (db as any).insertInto('zv_media_files').values(fileRecord).execute();
 
     // AI document indexing — fire-and-forget
     scheduleFileIndexing(db, fileId, buffer, file.type);
@@ -385,7 +382,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const id = c.req.param('id');
       const data = c.req.valid('json');
-      await (reqDb(c) as any)
+      await (db as any)
         .updateTable('zv_media_files')
         .set({ ...data, updated_at: new Date() })
         .where('id', '=', id)
@@ -433,7 +430,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   // ==========================================
 
   router.get('/tags', async (c) => {
-    const tags = await (reqDb(c) as any)
+    const tags = await (db as any)
       .selectFrom('zv_media_tags')
       .selectAll()
       .orderBy('name', 'asc')
@@ -451,7 +448,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
       const data = c.req.valid('json');
       const tag = { id: randomUUID().replace(/-/g, ''), name: data.name, color: data.color || null };
       try {
-        await (reqDb(c) as any).insertInto('zv_media_tags').values(tag).execute();
+        await (db as any).insertInto('zv_media_tags').values(tag).execute();
         return c.json({ tag }, 201);
       } catch {
         return c.json({ error: 'Tag already exists' }, 400);
@@ -468,13 +465,13 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const id = c.req.param('id');
       const data = c.req.valid('json');
-      await (reqDb(c) as any).updateTable('zv_media_tags').set(data).where('id', '=', id).execute();
+      await (db as any).updateTable('zv_media_tags').set(data).where('id', '=', id).execute();
       return c.json({ success: true });
     },
   );
 
   router.delete('/tags/:id', async (c) => {
-    await (reqDb(c) as any).deleteFrom('zv_media_tags').where('id', '=', c.req.param('id')).execute();
+    await (db as any).deleteFrom('zv_media_tags').where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
   });
 
@@ -485,7 +482,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
       const fileId = c.req.param('id');
       const { tag_id } = c.req.valid('json');
       try {
-        await (reqDb(c) as any)
+        await (db as any)
           .insertInto('zv_media_file_tags')
           .values({ file_id: fileId, tag_id })
           .onConflict((oc: any) => oc.doNothing())
@@ -498,7 +495,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   );
 
   router.delete('/files/:id/tags/:tagId', async (c) => {
-    await (reqDb(c) as any)
+    await (db as any)
       .deleteFrom('zv_media_file_tags')
       .where('file_id', '=', c.req.param('id'))
       .where('tag_id', '=', c.req.param('tagId'))
@@ -512,17 +509,17 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
 
   router.get('/stats', async (c) => {
     const [totalFiles, totalSize, filesByType, totalFolders, totalTags] = await Promise.all([
-      (reqDb(c) as any)
+      (db as any)
         .selectFrom('zv_media_files')
         .select(({ fn }: any) => fn.count('id').as('count'))
         .where('deleted_at', 'is', null)
         .executeTakeFirst(),
-      (reqDb(c) as any)
+      (db as any)
         .selectFrom('zv_media_files')
         .select(({ fn }: any) => fn.sum('size').as('total'))
         .where('deleted_at', 'is', null)
         .executeTakeFirst(),
-      (reqDb(c) as any)
+      (db as any)
         .selectFrom('zv_media_files')
         .select(['mimetype', (eb: any) => eb.fn.count('id').as('count')])
         .where('deleted_at', 'is', null)
@@ -530,12 +527,12 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
         .orderBy('count', 'desc')
         .limit(10)
         .execute(),
-      (reqDb(c) as any)
+      (db as any)
         .selectFrom('zv_media_folders')
         .select(({ fn }: any) => fn.count('id').as('count'))
         .where('deleted_at', 'is', null)
         .executeTakeFirst(),
-      (reqDb(c) as any)
+      (db as any)
         .selectFrom('zv_media_tags')
         .select(({ fn }: any) => fn.count('id').as('count'))
         .executeTakeFirst(),
@@ -556,7 +553,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
 
   router.get('/collections', async (c) => {
     const user = c.get('user' as never) as any;
-    const collections = await (reqDb(c) as any)
+    const collections = await (db as any)
       .selectFrom('zv_media_collections')
       .selectAll()
       .where((eb: any) => eb.or([
@@ -576,7 +573,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user' as never) as any;
     const data = c.req.valid('json');
-    const coll = await (reqDb(c) as any)
+    const coll = await (db as any)
       .insertInto('zv_media_collections')
       .values({ ...data, cover_file_id: data.cover_file_id || null, created_by: user.id })
       .returningAll()
@@ -592,25 +589,25 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user' as never) as any;
     const id = c.req.param('id');
-    const existing = await (reqDb(c) as any).selectFrom('zv_media_collections').select(['id', 'created_by']).where('id', '=', id).executeTakeFirst();
+    const existing = await (db as any).selectFrom('zv_media_collections').select(['id', 'created_by']).where('id', '=', id).executeTakeFirst();
     if (!existing) return c.json({ error: 'Collection not found' }, 404);
     if (existing.created_by !== user.id) return c.json({ error: 'Forbidden' }, 403);
-    const updated = await (reqDb(c) as any).updateTable('zv_media_collections').set({ ...c.req.valid('json'), updated_at: new Date() }).where('id', '=', id).returningAll().executeTakeFirst();
+    const updated = await (db as any).updateTable('zv_media_collections').set({ ...c.req.valid('json'), updated_at: new Date() }).where('id', '=', id).returningAll().executeTakeFirst();
     return c.json({ collection: updated });
   });
 
   router.delete('/collections/:id', async (c) => {
     const user = c.get('user' as never) as any;
     const id = c.req.param('id');
-    const existing = await (reqDb(c) as any).selectFrom('zv_media_collections').select(['id', 'created_by']).where('id', '=', id).executeTakeFirst();
+    const existing = await (db as any).selectFrom('zv_media_collections').select(['id', 'created_by']).where('id', '=', id).executeTakeFirst();
     if (!existing) return c.json({ error: 'Collection not found' }, 404);
     if (existing.created_by !== user.id) return c.json({ error: 'Forbidden' }, 403);
-    await (reqDb(c) as any).deleteFrom('zv_media_collections').where('id', '=', id).execute();
+    await (db as any).deleteFrom('zv_media_collections').where('id', '=', id).execute();
     return c.json({ success: true });
   });
 
   router.get('/collections/:id/files', async (c) => {
-    const files = await (reqDb(c) as any)
+    const files = await (db as any)
       .selectFrom('zv_media_collection_files as cf')
       .innerJoin('zv_media_files as f', 'f.id', 'cf.file_id')
       .select([
@@ -635,7 +632,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user' as never) as any;
     const collId = c.req.param('id');
     const { file_ids } = c.req.valid('json');
-    const existing = await (reqDb(c) as any)
+    const existing = await (db as any)
       .selectFrom('zv_media_collection_files')
       .select('file_id')
       .where('collection_id', '=', collId)
@@ -643,7 +640,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     const existingIds = new Set(existing.map((r: any) => r.file_id));
     const toInsert = file_ids.filter((id: string) => !existingIds.has(id));
     if (toInsert.length > 0) {
-      await (reqDb(c) as any).insertInto('zv_media_collection_files')
+      await (db as any).insertInto('zv_media_collection_files')
         .values(toInsert.map((fid: string, i: number) => ({ collection_id: collId, file_id: fid, sort_order: existing.length + i, added_by: user.id })))
         .execute();
     }
@@ -651,7 +648,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   });
 
   router.delete('/collections/:id/files/:fileId', async (c) => {
-    await (reqDb(c) as any)
+    await (db as any)
       .deleteFrom('zv_media_collection_files')
       .where('collection_id', '=', c.req.param('id'))
       .where('file_id', '=', c.req.param('fileId'))
@@ -664,7 +661,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   // ==========================================
 
   router.get('/admin/quotas', async (c) => {
-    const quotas = await (reqDb(c) as any).selectFrom('zv_storage_quotas').selectAll().orderBy('created_at', 'desc').execute();
+    const quotas = await (db as any).selectFrom('zv_storage_quotas').selectAll().orderBy('created_at', 'desc').execute();
     return c.json({ quotas });
   });
 
@@ -677,7 +674,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   }).refine(d => d.user_id || d.role_name, { message: 'user_id or role_name required' })), async (c) => {
     const user = c.get('user' as never) as any;
     const data = c.req.valid('json');
-    const quota = await (reqDb(c) as any)
+    const quota = await (db as any)
       .insertInto('zv_storage_quotas')
       .values({ ...data, created_by: user.id })
       .onConflict((oc: any) => oc
@@ -690,7 +687,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   });
 
   router.delete('/admin/quotas/:id', async (c) => {
-    await (reqDb(c) as any).deleteFrom('zv_storage_quotas').where('id', '=', c.req.param('id')).execute();
+    await (db as any).deleteFrom('zv_storage_quotas').where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
   });
 

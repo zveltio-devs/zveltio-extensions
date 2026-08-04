@@ -54,13 +54,10 @@ const CreateRequestSchema = z.object({
 export function approvalsRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission, getUserRoles } = ctx;
 
-  // Per-request DB handle (CRM PR #1 pattern). After
-  // migration 002_tenant_rls.sql, this extension's tables have FORCE
-  // RLS keyed on `zveltio.current_tenant`; routes must run through
-  // this handle so the GUC is active inside the transaction.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
 
   const app = new Hono();
@@ -82,7 +79,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
     const parsedLimit = Math.min(parseInt(limit) || 50, 200);
     const offset = (parseInt(page) - 1) * parsedLimit;
 
-    let query = (reqDb(c) as any)
+    let query = (db as any)
       .selectFrom('zv_approval_requests as r')
       .leftJoin('zv_approval_workflows as w', 'w.id', 'r.workflow_id')
       .leftJoin('user as u', 'u.id', 'r.requested_by')
@@ -125,7 +122,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const { workflow_id, collection, record_id, metadata, priority } = c.req.valid('json');
 
-    const workflow = await (reqDb(c) as any)
+    const workflow = await (db as any)
       .selectFrom('zv_approval_workflows')
       .selectAll()
       .where('id', '=', workflow_id)
@@ -135,7 +132,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
     if (!workflow) return c.json({ error: 'Workflow not found or inactive' }, 404);
 
     // Get first step
-    const firstStep = await (reqDb(c) as any)
+    const firstStep = await (db as any)
       .selectFrom('zv_approval_steps')
       .selectAll()
       .where('workflow_id', '=', workflow_id)
@@ -149,7 +146,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
       slaDueAt = new Date(Date.now() + firstStep.deadline_hours * 60 * 60 * 1000);
     }
 
-    const request = await (reqDb(c) as any)
+    const request = await (db as any)
       .insertInto('zv_approval_requests')
       .values({
         workflow_id,
@@ -173,7 +170,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
   app.get('/delegates', async (c) => {
     const user = c.get('user') as any;
 
-    const delegates = await (reqDb(c) as any)
+    const delegates = await (db as any)
       .selectFrom('zv_approval_delegates as d')
       .leftJoin('zv_approval_workflows as w', 'w.id', 'd.workflow_id')
       .select([
@@ -202,7 +199,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'Admin access required' }, 403);
     }
 
-    const requests = await (reqDb(c) as any)
+    const requests = await (db as any)
       .selectFrom('zv_approval_requests as r')
       .leftJoin('zv_approval_workflows as w', 'w.id', 'r.workflow_id')
       .leftJoin('user as u', 'u.id', 'r.requested_by')
@@ -235,28 +232,28 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
 
     const pendingResult = await sql<{ count: string }>`
       SELECT COUNT(*) as count FROM zv_approval_requests WHERE status = 'pending'
-    `.execute(reqDb(c));
+    `.execute(db);
 
     const approvedThisMonthResult = await sql<{ count: string }>`
       SELECT COUNT(*) as count FROM zv_approval_requests
       WHERE status = 'approved' AND completed_at >= ${startOfMonth}
-    `.execute(reqDb(c));
+    `.execute(db);
 
     const rejectedThisMonthResult = await sql<{ count: string }>`
       SELECT COUNT(*) as count FROM zv_approval_requests
       WHERE status = 'rejected' AND completed_at >= ${startOfMonth}
-    `.execute(reqDb(c));
+    `.execute(db);
 
     const avgHoursResult = await sql<{ avg_hours: string | null }>`
       SELECT AVG(EXTRACT(EPOCH FROM (completed_at - requested_at)) / 3600) as avg_hours
       FROM zv_approval_requests
       WHERE status IN ('approved', 'rejected') AND completed_at IS NOT NULL
-    `.execute(reqDb(c));
+    `.execute(db);
 
     const overdueResult = await sql<{ count: string }>`
       SELECT COUNT(*) as count FROM zv_approval_requests
       WHERE status = 'pending' AND sla_due_at IS NOT NULL AND sla_due_at < NOW()
-    `.execute(reqDb(c));
+    `.execute(db);
 
     const byCollectionResult = await sql<{ collection: string; count: string }>`
       SELECT collection, COUNT(*) as count
@@ -264,7 +261,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
       WHERE status = 'pending'
       GROUP BY collection
       ORDER BY count DESC
-    `.execute(reqDb(c));
+    `.execute(db);
 
     return c.json({
       total_pending: parseInt(pendingResult.rows[0]?.count || '0'),
@@ -285,7 +282,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
 
   // GET /workflows — List workflows
   app.get('/workflows', async (c) => {
-    const workflows = await (reqDb(c) as any)
+    const workflows = await (db as any)
       .selectFrom('zv_approval_workflows as w')
       .select([
         'w.id', 'w.name', 'w.description', 'w.collection',
@@ -296,7 +293,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
 
     const withStepCounts = await Promise.all(
       workflows.map(async (wf: any) => {
-        const count = await (reqDb(c) as any)
+        const count = await (db as any)
           .selectFrom('zv_approval_steps')
           .select((eb: any) => eb.fn.count('id').as('count'))
           .where('workflow_id', '=', wf.id)
@@ -310,7 +307,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
 
   // GET /:id — Get request details with steps & decisions
   app.get('/:id', async (c) => {
-    const request = await (reqDb(c) as any)
+    const request = await (db as any)
       .selectFrom('zv_approval_requests as r')
       .leftJoin('zv_approval_workflows as w', 'w.id', 'r.workflow_id')
       .select([
@@ -324,14 +321,14 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
 
     if (!request) return c.json({ error: 'Request not found' }, 404);
 
-    const steps = await (reqDb(c) as any)
+    const steps = await (db as any)
       .selectFrom('zv_approval_steps')
       .selectAll()
       .where('workflow_id', '=', request.workflow_id)
       .orderBy('step_order')
       .execute();
 
-    const decisions = await (reqDb(c) as any)
+    const decisions = await (db as any)
       .selectFrom('zv_approval_decisions as d')
       .leftJoin('user as u', 'u.id', 'd.decided_by')
       .select(['d.id', 'd.step_id', 'd.decision', 'd.comment', 'd.decided_at', 'u.name as decided_by_name'])
@@ -347,7 +344,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
     const { decision, comment } = c.req.valid('json');
     const requestId = c.req.param('id');
 
-    const request = await (reqDb(c) as any)
+    const request = await (db as any)
       .selectFrom('zv_approval_requests')
       .selectAll()
       .where('id', '=', requestId)
@@ -359,7 +356,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
     }
 
     // Check if user can decide on current step
-    const currentStep = await (reqDb(c) as any)
+    const currentStep = await (db as any)
       .selectFrom('zv_approval_steps')
       .selectAll()
       .where('id', '=', request.current_step_id)
@@ -373,7 +370,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
     // Check delegation: if step has approver_user_id, check if that user delegated to current user
     let hasDelegation = false;
     if (currentStep.approver_user_id && currentStep.approver_user_id !== user.id) {
-      const delegation = await (reqDb(c) as any)
+      const delegation = await (db as any)
         .selectFrom('zv_approval_delegates')
         .select('id')
         .where('delegator_id', '=', currentStep.approver_user_id)
@@ -404,7 +401,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
     if (!canDecide) return c.json({ error: 'You are not authorized to decide on this step' }, 403);
 
     // Record decision
-    await (reqDb(c) as any)
+    await (db as any)
       .insertInto('zv_approval_decisions')
       .values({
         request_id: requestId,
@@ -416,7 +413,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
       .execute();
 
     if (decision === 'rejected') {
-      await (reqDb(c) as any)
+      await (db as any)
         .updateTable('zv_approval_requests')
         .set({
           status: 'rejected',
@@ -431,7 +428,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
     }
 
     // Advance to next step (or complete)
-    const nextStep = await (reqDb(c) as any)
+    const nextStep = await (db as any)
       .selectFrom('zv_approval_steps')
       .selectAll()
       .where('workflow_id', '=', request.workflow_id)
@@ -441,14 +438,14 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
       .executeTakeFirst();
 
     if (nextStep) {
-      await (reqDb(c) as any)
+      await (db as any)
         .updateTable('zv_approval_requests')
         .set({ current_step_id: nextStep.id })
         .where('id', '=', requestId)
         .execute();
       return c.json({ success: true, status: 'pending', next_step: nextStep });
     } else {
-      await (reqDb(c) as any)
+      await (db as any)
         .updateTable('zv_approval_requests')
         .set({ status: 'approved', completed_at: new Date(), current_step_id: null })
         .where('id', '=', requestId)
@@ -460,7 +457,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
   // POST /:id/cancel — Cancel a pending request
   app.post('/:id/cancel', async (c) => {
     const user = c.get('user') as any;
-    const request = await (reqDb(c) as any)
+    const request = await (db as any)
       .selectFrom('zv_approval_requests')
       .selectAll()
       .where('id', '=', c.req.param('id'))
@@ -474,7 +471,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
 
     if (!isOwner && !isAdmin) return c.json({ error: 'Unauthorized' }, 403);
 
-    await (reqDb(c) as any)
+    await (db as any)
       .updateTable('zv_approval_requests')
       .set({ status: 'cancelled', completed_at: new Date(), current_step_id: null })
       .where('id', '=', request.id)
@@ -498,7 +495,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
 
     for (const requestId of request_ids) {
       try {
-        const request = await (reqDb(c) as any)
+        const request = await (db as any)
           .selectFrom('zv_approval_requests')
           .selectAll()
           .where('id', '=', requestId)
@@ -514,14 +511,14 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
           continue;
         }
 
-        const currentStep = await (reqDb(c) as any)
+        const currentStep = await (db as any)
           .selectFrom('zv_approval_steps')
           .selectAll()
           .where('id', '=', request.current_step_id)
           .executeTakeFirst();
 
         if (currentStep) {
-          await (reqDb(c) as any)
+          await (db as any)
             .insertInto('zv_approval_decisions')
             .values({
               request_id: requestId,
@@ -534,7 +531,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
         }
 
         if (decision === 'rejected') {
-          await (reqDb(c) as any)
+          await (db as any)
             .updateTable('zv_approval_requests')
             .set({
               status: 'rejected',
@@ -546,7 +543,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
             .execute();
         } else {
           const nextStep = currentStep
-            ? await (reqDb(c) as any)
+            ? await (db as any)
                 .selectFrom('zv_approval_steps')
                 .selectAll()
                 .where('workflow_id', '=', request.workflow_id)
@@ -557,13 +554,13 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
             : null;
 
           if (nextStep) {
-            await (reqDb(c) as any)
+            await (db as any)
               .updateTable('zv_approval_requests')
               .set({ current_step_id: nextStep.id })
               .where('id', '=', requestId)
               .execute();
           } else {
-            await (reqDb(c) as any)
+            await (db as any)
               .updateTable('zv_approval_requests')
               .set({ status: 'approved', completed_at: new Date(), current_step_id: null })
               .where('id', '=', requestId)
@@ -588,7 +585,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const { delegate_id, workflow_id, valid_until, reason } = c.req.valid('json');
 
-    const delegation = await (reqDb(c) as any)
+    const delegation = await (db as any)
       .insertInto('zv_approval_delegates')
       .values({
         delegator_id: user.id,
@@ -608,7 +605,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const id = c.req.param('id');
 
-    const delegation = await (reqDb(c) as any)
+    const delegation = await (db as any)
       .selectFrom('zv_approval_delegates')
       .selectAll()
       .where('id', '=', id)
@@ -621,7 +618,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'Unauthorized' }, 403);
     }
 
-    await (reqDb(c) as any)
+    await (db as any)
       .updateTable('zv_approval_delegates')
       .set({ is_active: false })
       .where('id', '=', id)
@@ -647,7 +644,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
         AND sla_due_at < NOW()
         AND sla_breached = false
       RETURNING id
-    `.execute(reqDb(c));
+    `.execute(db);
 
     const count = result.rows.length;
 
@@ -658,7 +655,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
 
   // GET /workflows/:id — Get workflow with steps
   app.get('/workflows/:id', async (c) => {
-    const workflow = await (reqDb(c) as any)
+    const workflow = await (db as any)
       .selectFrom('zv_approval_workflows')
       .selectAll()
       .where('id', '=', c.req.param('id'))
@@ -666,7 +663,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
 
     if (!workflow) return c.json({ error: 'Workflow not found' }, 404);
 
-    const steps = await (reqDb(c) as any)
+    const steps = await (db as any)
       .selectFrom('zv_approval_steps')
       .selectAll()
       .where('workflow_id', '=', workflow.id)
@@ -685,20 +682,20 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
 
     const { steps, ...workflowData } = c.req.valid('json');
 
-    const workflow = await (reqDb(c) as any)
+    const workflow = await (db as any)
       .insertInto('zv_approval_workflows')
       .values({ ...workflowData, created_by: user.id })
       .returningAll()
       .executeTakeFirst();
 
     for (let i = 0; i < steps.length; i++) {
-      await (reqDb(c) as any)
+      await (db as any)
         .insertInto('zv_approval_steps')
         .values({ ...steps[i], workflow_id: workflow.id, step_order: i })
         .execute();
     }
 
-    const fullWorkflow = await (reqDb(c) as any)
+    const fullWorkflow = await (db as any)
       .selectFrom('zv_approval_steps')
       .selectAll()
       .where('workflow_id', '=', workflow.id)
@@ -718,7 +715,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
     const { steps, ...workflowData } = c.req.valid('json');
     const id = c.req.param('id');
 
-    const workflow = await (reqDb(c) as any)
+    const workflow = await (db as any)
       .updateTable('zv_approval_workflows')
       .set({ ...workflowData, updated_at: new Date() })
       .where('id', '=', id)
@@ -728,9 +725,9 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
     if (!workflow) return c.json({ error: 'Workflow not found' }, 404);
 
     if (steps) {
-      await (reqDb(c) as any).deleteFrom('zv_approval_steps').where('workflow_id', '=', id).execute();
+      await (db as any).deleteFrom('zv_approval_steps').where('workflow_id', '=', id).execute();
       for (let i = 0; i < steps.length; i++) {
-        await (reqDb(c) as any)
+        await (db as any)
           .insertInto('zv_approval_steps')
           .values({ ...steps[i], workflow_id: id, step_order: i })
           .execute();
@@ -747,7 +744,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'Admin access required' }, 403);
     }
 
-    await (reqDb(c) as any).deleteFrom('zv_approval_workflows').where('id', '=', c.req.param('id')).execute();
+    await (db as any).deleteFrom('zv_approval_workflows').where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
   });
 

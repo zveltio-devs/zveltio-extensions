@@ -19444,9 +19444,6 @@ function parseParameter(param) {
 // engine/routes.ts
 function databaseRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const router = new Hono2().use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session)
@@ -19469,7 +19466,7 @@ function databaseRoutes(ctx) {
         WHERE t.table_type = 'BASE TABLE'
           AND t.table_schema NOT IN ('pg_catalog', 'information_schema')
         ORDER BY t.table_schema, t.table_name
-      `.execute(reqDb(c));
+      `.execute(db);
     return c.json({
       tables: result.rows.map((r) => ({ ...r, is_data: r.name.startsWith("zvd_") }))
     });
@@ -19482,7 +19479,7 @@ function databaseRoutes(ctx) {
           AND table_schema NOT IN ('pg_catalog', 'information_schema')
         ORDER BY table_schema
         LIMIT 1
-      `.execute(reqDb(c));
+      `.execute(db);
     if (!found.rows.length)
       return c.json({ error: "Table not found" }, 404);
     const { schema, name } = found.rows[0];
@@ -19491,14 +19488,14 @@ function databaseRoutes(ctx) {
         FROM information_schema.columns
         WHERE table_schema = ${schema} AND table_name = ${name}
         ORDER BY ordinal_position
-      `.execute(reqDb(c));
+      `.execute(db);
     const limit = Math.min(Math.max(Number(c.req.query("limit")) || 100, 1), 500);
     const q = (s) => `"${s.replace(/"/g, '""')}"`;
     const ref = sql.raw(`${q(schema)}.${q(name)}`);
-    const rows = await sql`SELECT * FROM ${ref} LIMIT ${limit}`.execute(reqDb(c));
+    const rows = await sql`SELECT * FROM ${ref} LIMIT ${limit}`.execute(db);
     const total = await sql`
         SELECT COUNT(*)::text AS count FROM ${ref}
-      `.execute(reqDb(c));
+      `.execute(db);
     return c.json({
       table: { schema, name },
       columns: columns.rows,
@@ -19524,7 +19521,7 @@ function databaseRoutes(ctx) {
           WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
             AND p.prokind = 'f'
           ORDER BY n.nspname, p.proname
-        `.execute(reqDb(c));
+        `.execute(db);
       return c.json({ functions: result.rows });
     } catch (error51) {
       console.error("Failed to list functions:", error51);
@@ -19536,7 +19533,7 @@ function databaseRoutes(ctx) {
       return c.json({ error: "Definition must contain CREATE [OR REPLACE] FUNCTION" }, 400);
     }
     try {
-      await sql.raw(definition).execute(reqDb(c));
+      await sql.raw(definition).execute(db);
       return c.json({ success: true }, 201);
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to create function" }, 400);
@@ -19549,7 +19546,7 @@ function databaseRoutes(ctx) {
       return c.json({ error: "Cannot drop system functions" }, 403);
     }
     try {
-      await sql.raw(`DROP FUNCTION IF EXISTS "${schema}"."${name}" ${cascade ? "CASCADE" : "RESTRICT"}`).execute(reqDb(c));
+      await sql.raw(`DROP FUNCTION IF EXISTS "${schema}"."${name}" ${cascade ? "CASCADE" : "RESTRICT"}`).execute(db);
       return c.json({ success: true });
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to drop function" }, 400);
@@ -19572,7 +19569,7 @@ function databaseRoutes(ctx) {
           WHERE t.trigger_schema NOT IN ('pg_catalog', 'information_schema')
             AND NOT pt.tgisinternal
           ORDER BY t.event_object_table, t.trigger_name
-        `.execute(reqDb(c));
+        `.execute(db);
       return c.json({ triggers: result.rows });
     } catch (error51) {
       console.error("Failed to list triggers:", error51);
@@ -19584,7 +19581,7 @@ function databaseRoutes(ctx) {
       return c.json({ error: "Definition must contain CREATE TRIGGER" }, 400);
     }
     try {
-      await sql.raw(definition).execute(reqDb(c));
+      await sql.raw(definition).execute(db);
       return c.json({ success: true }, 201);
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to create trigger" }, 400);
@@ -19594,7 +19591,7 @@ function databaseRoutes(ctx) {
     const name = c.req.param("name");
     const { enabled } = c.req.valid("json");
     try {
-      await sql.raw(`ALTER TABLE "${table}" ${enabled ? "ENABLE" : "DISABLE"} TRIGGER "${name}"`).execute(reqDb(c));
+      await sql.raw(`ALTER TABLE "${table}" ${enabled ? "ENABLE" : "DISABLE"} TRIGGER "${name}"`).execute(db);
       return c.json({ success: true });
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to toggle trigger" }, 400);
@@ -19604,7 +19601,7 @@ function databaseRoutes(ctx) {
     const name = c.req.param("name");
     const cascade = c.req.query("cascade") === "true";
     try {
-      await sql.raw(`DROP TRIGGER IF EXISTS "${name}" ON "${table}" ${cascade ? "CASCADE" : "RESTRICT"}`).execute(reqDb(c));
+      await sql.raw(`DROP TRIGGER IF EXISTS "${name}" ON "${table}" ${cascade ? "CASCADE" : "RESTRICT"}`).execute(db);
       return c.json({ success: true });
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to drop trigger" }, 400);
@@ -19629,7 +19626,7 @@ function databaseRoutes(ctx) {
           WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
           GROUP BY n.nspname, t.typname
           ORDER BY n.nspname, t.typname
-        `.execute(reqDb(c));
+        `.execute(db);
       return c.json({ enums: result.rows });
     } catch (error51) {
       console.error("Failed to list enums:", error51);
@@ -19643,7 +19640,7 @@ function databaseRoutes(ctx) {
     const { name, values, schema } = c.req.valid("json");
     const valuesSQL = values.map((v) => `'${v.replace(/'/g, "''")}'`).join(", ");
     try {
-      await sql.raw(`CREATE TYPE "${schema}"."${name}" AS ENUM (${valuesSQL})`).execute(reqDb(c));
+      await sql.raw(`CREATE TYPE "${schema}"."${name}" AS ENUM (${valuesSQL})`).execute(db);
       return c.json({ success: true }, 201);
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to create enum" }, 400);
@@ -19653,7 +19650,7 @@ function databaseRoutes(ctx) {
     const name = c.req.param("name");
     const { value } = c.req.valid("json");
     try {
-      await sql.raw(`ALTER TYPE "${schema}"."${name}" ADD VALUE IF NOT EXISTS '${value.replace(/'/g, "''")}'`).execute(reqDb(c));
+      await sql.raw(`ALTER TYPE "${schema}"."${name}" ADD VALUE IF NOT EXISTS '${value.replace(/'/g, "''")}'`).execute(db);
       return c.json({ success: true });
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to add enum value" }, 400);
@@ -19664,7 +19661,7 @@ function databaseRoutes(ctx) {
     if (schema === "pg_catalog")
       return c.json({ error: "Cannot drop system enums" }, 403);
     try {
-      await sql.raw(`DROP TYPE IF EXISTS "${schema}"."${name}" CASCADE`).execute(reqDb(c));
+      await sql.raw(`DROP TYPE IF EXISTS "${schema}"."${name}" CASCADE`).execute(db);
       return c.json({ success: true });
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to drop enum" }, 400);
@@ -19683,7 +19680,7 @@ function databaseRoutes(ctx) {
           LEFT JOIN pg_extension ie ON ie.extname = ae.name
           LEFT JOIN pg_namespace n ON n.oid = ie.extnamespace
           ORDER BY ae.name
-        `.execute(reqDb(c));
+        `.execute(db);
       return c.json({ extensions: result.rows });
     } catch (error51) {
       console.error("Failed to list extensions:", error51);
@@ -19713,7 +19710,7 @@ function databaseRoutes(ctx) {
     if (!ALLOWED.includes(name))
       return c.json({ error: `Extension "${name}" not in allowed list` }, 403);
     try {
-      await sql.raw(`CREATE EXTENSION IF NOT EXISTS "${name}"`).execute(reqDb(c));
+      await sql.raw(`CREATE EXTENSION IF NOT EXISTS "${name}"`).execute(db);
       return c.json({ success: true });
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to enable extension" }, 400);
@@ -19724,7 +19721,7 @@ function databaseRoutes(ctx) {
     if (PROTECTED.includes(name))
       return c.json({ error: `Extension "${name}" is protected and cannot be disabled` }, 403);
     try {
-      await sql.raw(`DROP EXTENSION IF EXISTS "${name}" CASCADE`).execute(reqDb(c));
+      await sql.raw(`DROP EXTENSION IF EXISTS "${name}" CASCADE`).execute(db);
       return c.json({ success: true });
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to disable extension" }, 400);
@@ -19751,7 +19748,7 @@ function databaseRoutes(ctx) {
           GROUP BY r.rolname, r.rolsuper, r.rolcreatedb, r.rolcreaterole,
                    r.rolcanlogin, r.rolconnlimit, r.rolvaliduntil
           ORDER BY r.rolname
-        `.execute(reqDb(c));
+        `.execute(db);
       return c.json({ roles: result.rows });
     } catch (error51) {
       console.error("Failed to list roles:", error51);
@@ -19781,7 +19778,7 @@ function databaseRoutes(ctx) {
     if (attrs.length > 0)
       parts.push("WITH", attrs.join(" "));
     try {
-      await sql.raw(parts.join(" ")).execute(reqDb(c));
+      await sql.raw(parts.join(" ")).execute(db);
       return c.json({ success: true }, 201);
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to create role" }, 400);
@@ -19792,7 +19789,7 @@ function databaseRoutes(ctx) {
     if (PROTECTED.includes(name) || name.startsWith("pg_"))
       return c.json({ error: "Cannot drop system role" }, 403);
     try {
-      await sql.raw(`DROP ROLE IF EXISTS "${name}"`).execute(reqDb(c));
+      await sql.raw(`DROP ROLE IF EXISTS "${name}"`).execute(db);
       return c.json({ success: true });
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to drop role" }, 400);
@@ -19823,7 +19820,7 @@ function databaseRoutes(ctx) {
           WHERE c.relkind = 'r'
             AND n.nspname NOT IN ('pg_catalog', 'information_schema')
           ORDER BY n.nspname, c.relname, p.polname
-        `.execute(reqDb(c));
+        `.execute(db);
       return c.json({ policies: result.rows });
     } catch (error51) {
       console.error("Failed to list RLS policies:", error51);
@@ -19836,9 +19833,9 @@ function databaseRoutes(ctx) {
     const table = c.req.param("table");
     const { enabled, forced } = c.req.valid("json");
     try {
-      await sql.raw(`ALTER TABLE "${table}" ${enabled ? "ENABLE" : "DISABLE"} ROW LEVEL SECURITY`).execute(reqDb(c));
+      await sql.raw(`ALTER TABLE "${table}" ${enabled ? "ENABLE" : "DISABLE"} ROW LEVEL SECURITY`).execute(db);
       if (forced !== undefined) {
-        await sql.raw(`ALTER TABLE "${table}" ${forced ? "FORCE" : "NO FORCE"} ROW LEVEL SECURITY`).execute(reqDb(c));
+        await sql.raw(`ALTER TABLE "${table}" ${forced ? "FORCE" : "NO FORCE"} ROW LEVEL SECURITY`).execute(db);
       }
       return c.json({ success: true });
     } catch (error51) {
@@ -19861,7 +19858,7 @@ function databaseRoutes(ctx) {
     if (data.with_check)
       sql_str += ` WITH CHECK (${data.with_check})`;
     try {
-      await sql.raw(sql_str).execute(reqDb(c));
+      await sql.raw(sql_str).execute(db);
       return c.json({ success: true }, 201);
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to create policy" }, 400);
@@ -19870,7 +19867,7 @@ function databaseRoutes(ctx) {
     const table = c.req.param("table");
     const policy = c.req.param("policy");
     try {
-      await sql.raw(`DROP POLICY IF EXISTS "${policy}" ON "${table}"`).execute(reqDb(c));
+      await sql.raw(`DROP POLICY IF EXISTS "${policy}" ON "${table}"`).execute(db);
       return c.json({ success: true });
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to drop policy" }, 400);
@@ -19880,7 +19877,7 @@ function databaseRoutes(ctx) {
       const result = await sql`
           SELECT id, name, description, config::text AS query, created_by, created_at, created_at AS updated_at
           FROM zv_saved_queries ORDER BY name
-        `.execute(reqDb(c));
+        `.execute(db);
       return c.json({ queries: result.rows });
     } catch {
       return c.json({ error: "Failed to list saved queries" }, 500);
@@ -19897,7 +19894,7 @@ function databaseRoutes(ctx) {
           INSERT INTO zv_saved_queries (name, description, query, created_by)
           VALUES (${data.name}, ${data.description || null}, ${data.query}, ${user.id})
           RETURNING id
-        `.execute(reqDb(c));
+        `.execute(db);
       return c.json({ id: result.rows[0].id }, 201);
     } catch {
       return c.json({ error: "Failed to save query" }, 500);
@@ -19910,7 +19907,7 @@ function databaseRoutes(ctx) {
     const id = c.req.param("id");
     const data = c.req.valid("json");
     try {
-      await reqDb(c).updateTable("zv_saved_queries").set({ ...data, updated_at: new Date }).where("id", "=", id).execute();
+      await db.updateTable("zv_saved_queries").set({ ...data, updated_at: new Date }).where("id", "=", id).execute();
       return c.json({ success: true });
     } catch {
       return c.json({ error: "Failed to update query" }, 500);
@@ -19918,7 +19915,7 @@ function databaseRoutes(ctx) {
   }).delete("/saved-queries/:id", async (c) => {
     const id = c.req.param("id");
     try {
-      await reqDb(c).deleteFrom("zv_saved_queries").where("id", "=", id).execute();
+      await db.deleteFrom("zv_saved_queries").where("id", "=", id).execute();
       return c.json({ success: true });
     } catch {
       return c.json({ error: "Failed to delete query" }, 500);
