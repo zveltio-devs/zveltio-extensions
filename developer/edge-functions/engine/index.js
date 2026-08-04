@@ -16074,9 +16074,6 @@ export default async function handler(ctx) {
 `;
 function edgeFunctionsRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const { runEdgeFunction: runFunction } = ctx.internals;
   async function requireAdmin(c) {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -16090,14 +16087,14 @@ function edgeFunctionsRoutes(ctx) {
     const user = await requireAdmin(c);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const fns = await reqDb(c).selectFrom("zv_edge_functions").select(["id", "name", "display_name", "description", "http_method", "path", "is_active", "runtime", "created_at"]).orderBy("name", "asc").execute();
+    const fns = await db.selectFrom("zv_edge_functions").select(["id", "name", "display_name", "description", "http_method", "path", "is_active", "runtime", "created_at"]).orderBy("name", "asc").execute();
     return c.json({ functions: fns });
   });
   app.get("/:id", zValidator("param", exports_external.object({ id: exports_external.string().uuid() })), async (c) => {
     const user = await requireAdmin(c);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const fn = await reqDb(c).selectFrom("zv_edge_functions").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
+    const fn = await db.selectFrom("zv_edge_functions").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
     if (!fn)
       return c.json({ error: "Function not found" }, 404);
     return c.json({ function: fn });
@@ -16116,7 +16113,7 @@ function edgeFunctionsRoutes(ctx) {
       return c.json({ error: "Unauthorized" }, 401);
     const body = c.req.valid("json");
     const path = `/api/fn/${body.name}`;
-    const fn = await reqDb(c).insertInto("zv_edge_functions").values({
+    const fn = await db.insertInto("zv_edge_functions").values({
       name: body.name,
       display_name: body.display_name,
       description: body.description,
@@ -16148,7 +16145,7 @@ function edgeFunctionsRoutes(ctx) {
         updates[k] = k === "env_vars" ? JSON.stringify(v) : v;
       }
     }
-    const fn = await reqDb(c).updateTable("zv_edge_functions").set(updates).where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
+    const fn = await db.updateTable("zv_edge_functions").set(updates).where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
     if (!fn)
       return c.json({ error: "Function not found" }, 404);
     return c.json({ function: fn });
@@ -16157,21 +16154,21 @@ function edgeFunctionsRoutes(ctx) {
     const user = await requireAdmin(c);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    await reqDb(c).deleteFrom("zv_edge_functions").where("id", "=", c.req.param("id")).execute();
+    await db.deleteFrom("zv_edge_functions").where("id", "=", c.req.param("id")).execute();
     return c.json({ success: true });
   });
   app.get("/:id/logs", zValidator("param", exports_external.object({ id: exports_external.string().uuid() })), async (c) => {
     const user = await requireAdmin(c);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const logs = await reqDb(c).selectFrom("zv_edge_function_logs").select(["id", "status", "duration_ms", "error", "created_at"]).where("function_id", "=", c.req.param("id")).orderBy("created_at", "desc").limit(50).execute();
+    const logs = await db.selectFrom("zv_edge_function_logs").select(["id", "status", "duration_ms", "error", "created_at"]).where("function_id", "=", c.req.param("id")).orderBy("created_at", "desc").limit(50).execute();
     return c.json({ logs });
   });
   app.post("/:id/invoke", zValidator("param", exports_external.object({ id: exports_external.string().uuid() })), async (c) => {
     const user = await requireAdmin(c);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const fn = await reqDb(c).selectFrom("zv_edge_functions").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
+    const fn = await db.selectFrom("zv_edge_functions").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
     if (!fn)
       return c.json({ error: "Function not found" }, 404);
     const bodyText = await c.req.text();
@@ -16182,7 +16179,7 @@ function edgeFunctionsRoutes(ctx) {
     });
     const env = typeof fn.env_vars === "string" ? JSON.parse(fn.env_vars) : fn.env_vars;
     const result = await runFunction(fn.code, testRequest, env, fn.timeout_ms);
-    await reqDb(c).insertInto("zv_edge_function_logs").values({
+    await db.insertInto("zv_edge_function_logs").values({
       function_id: fn.id,
       status: result.status,
       duration_ms: result.duration_ms,
@@ -16197,9 +16194,6 @@ function edgeFunctionsRoutes(ctx) {
 async function mountEdgeFunctions(ctx) {
   const { db, auth } = ctx;
   const { runEdgeFunction: runFunction } = ctx.internals;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   let fns;
   try {
     fns = await db.selectFrom("zv_edge_functions").selectAll().where("is_active", "=", true).execute();
@@ -16211,7 +16205,7 @@ async function mountEdgeFunctions(ctx) {
     const env = typeof fn.env_vars === "string" ? JSON.parse(fn.env_vars) : fn.env_vars;
     const isPublic = env.ZVELTIO_PUBLIC === "true";
     const handler = async (c) => {
-      const live = await reqDb(c).selectFrom("zv_edge_functions").selectAll().where("path", "=", fn.path).where("is_active", "=", true).executeTakeFirst().catch(() => null);
+      const live = await db.selectFrom("zv_edge_functions").selectAll().where("path", "=", fn.path).where("is_active", "=", true).executeTakeFirst().catch(() => null);
       if (!live)
         return c.json({ error: "Function not found" }, 404);
       const liveEnv = typeof live.env_vars === "string" ? JSON.parse(live.env_vars) : live.env_vars ?? {};
@@ -16222,7 +16216,7 @@ async function mountEdgeFunctions(ctx) {
           return c.json({ error: "Unauthorized" }, 401);
       }
       const result = await runFunction(live.code, c.req.raw, liveEnv, live.timeout_ms);
-      reqDb(c).insertInto("zv_edge_function_logs").values({
+      db.insertInto("zv_edge_function_logs").values({
         function_id: live.id,
         status: result.status,
         duration_ms: result.duration_ms,

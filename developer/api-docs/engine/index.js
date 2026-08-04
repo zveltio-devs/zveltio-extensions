@@ -19748,9 +19748,6 @@ async function checkDocsAccess(ctx, c) {
 }
 function apiDocsRoutes(ctx) {
   const { db, DDLManager, auth, checkPermission } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const router = new Hono2;
   router.get("/", async (c) => {
     const accessible = await checkDocsAccess(ctx, c);
@@ -19839,7 +19836,7 @@ function apiDocsRoutes(ctx) {
       FROM zvd_api_changelogs
       WHERE is_published = true
       ORDER BY published_at DESC NULLS LAST, created_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ changelogs: rows.rows });
   });
   router.post("/changelogs", zValidator("json", ChangelogCreateSchema), async (c) => {
@@ -19858,7 +19855,7 @@ function apiDocsRoutes(ctx) {
          ${body.breaking_changes ?? null}, ${body.migration_guide ?? null},
          ${session.user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ changelog: row.rows[0] }, 201);
   });
   router.patch("/changelogs/:id", zValidator("json", ChangelogUpdateSchema), async (c) => {
@@ -19894,7 +19891,7 @@ function apiDocsRoutes(ctx) {
     }
     if (setClauses.length === 0)
       return c.json({ error: "No fields to update" }, 400);
-    const row = await reqDb(c).updateTable("zvd_api_changelogs").set(Object.fromEntries(Object.entries(body).filter(([, v]) => v !== undefined))).where("id", "=", id).returningAll().executeTakeFirst();
+    const row = await db.updateTable("zvd_api_changelogs").set(Object.fromEntries(Object.entries(body).filter(([, v]) => v !== undefined))).where("id", "=", id).returningAll().executeTakeFirst();
     if (!row)
       return c.json({ error: "Not found" }, 404);
     return c.json({ changelog: row });
@@ -19907,7 +19904,7 @@ function apiDocsRoutes(ctx) {
     if (!isAdmin)
       return c.json({ error: "Admin required" }, 403);
     const id = c.req.param("id");
-    const res = await reqDb(c).deleteFrom("zvd_api_changelogs").where("id", "=", id).executeTakeFirst();
+    const res = await db.deleteFrom("zvd_api_changelogs").where("id", "=", id).executeTakeFirst();
     if ((res?.numDeletedRows ?? 0n) === 0n)
       return c.json({ error: "Not found" }, 404);
     return c.json({ success: true });
@@ -19920,7 +19917,7 @@ function apiDocsRoutes(ctx) {
     if (!isAdmin)
       return c.json({ error: "Admin required" }, 403);
     const id = c.req.param("id");
-    const row = await reqDb(c).updateTable("zvd_api_changelogs").set({ is_published: true, published_at: new Date }).where("id", "=", id).returningAll().executeTakeFirst();
+    const row = await db.updateTable("zvd_api_changelogs").set({ is_published: true, published_at: new Date }).where("id", "=", id).returningAll().executeTakeFirst();
     if (!row)
       return c.json({ error: "Not found" }, 404);
     return c.json({ changelog: row });
@@ -19936,7 +19933,7 @@ function apiDocsRoutes(ctx) {
       WHERE created_by = ${session.user.id}
         AND revoked_at IS NULL
       ORDER BY created_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ tokens: rows.rows });
   });
   router.post("/tokens", zValidator("json", TokenCreateSchema), async (c) => {
@@ -19955,7 +19952,7 @@ function apiDocsRoutes(ctx) {
          ${body.scopes}, ${body.expires_at ? new Date(body.expires_at) : null},
          ${session.user.id})
       RETURNING id, name, token_prefix, scopes, expires_at, created_at
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({
       token: row.rows[0],
       plaintext_token: plaintext,
@@ -19967,7 +19964,7 @@ function apiDocsRoutes(ctx) {
     if (!session)
       return c.json({ error: "Unauthorized" }, 401);
     const id = c.req.param("id");
-    const row = await reqDb(c).updateTable("zvd_api_access_tokens").set({ revoked_at: new Date }).where("id", "=", id).where("created_by", "=", session.user.id).where("revoked_at", "is", null).returningAll().executeTakeFirst();
+    const row = await db.updateTable("zvd_api_access_tokens").set({ revoked_at: new Date }).where("id", "=", id).where("created_by", "=", session.user.id).where("revoked_at", "is", null).returningAll().executeTakeFirst();
     if (!row)
       return c.json({ error: "Token not found or already revoked" }, 404);
     return c.json({ success: true });
@@ -19978,7 +19975,7 @@ function apiDocsRoutes(ctx) {
       FROM zvd_api_custom_docs
       WHERE is_published = true
       ORDER BY sort_order ASC, created_at ASC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ docs: rows.rows });
   });
   router.post("/custom-docs", zValidator("json", CustomDocCreateSchema), async (c) => {
@@ -19996,7 +19993,7 @@ function apiDocsRoutes(ctx) {
         (${body.title}, ${body.slug}, ${body.body},
          ${body.sort_order}, ${body.is_published}, ${session.user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ doc: row.rows[0] }, 201);
   });
   router.patch("/custom-docs/:id", zValidator("json", CustomDocUpdateSchema), async (c) => {
@@ -20012,7 +20009,7 @@ function apiDocsRoutes(ctx) {
       ...Object.fromEntries(Object.entries(body).filter(([, v]) => v !== undefined)),
       updated_at: new Date
     };
-    const row = await reqDb(c).updateTable("zvd_api_custom_docs").set(updates).where("id", "=", id).returningAll().executeTakeFirst();
+    const row = await db.updateTable("zvd_api_custom_docs").set(updates).where("id", "=", id).returningAll().executeTakeFirst();
     if (!row)
       return c.json({ error: "Not found" }, 404);
     return c.json({ doc: row });
@@ -20025,7 +20022,7 @@ function apiDocsRoutes(ctx) {
     if (!isAdmin)
       return c.json({ error: "Admin required" }, 403);
     const id = c.req.param("id");
-    const res = await reqDb(c).deleteFrom("zvd_api_custom_docs").where("id", "=", id).executeTakeFirst();
+    const res = await db.deleteFrom("zvd_api_custom_docs").where("id", "=", id).executeTakeFirst();
     if ((res?.numDeletedRows ?? 0n) === 0n)
       return c.json({ error: "Not found" }, 404);
     return c.json({ success: true });

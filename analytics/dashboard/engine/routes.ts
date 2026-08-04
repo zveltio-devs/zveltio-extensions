@@ -57,7 +57,7 @@ function normalise(ids: readonly unknown[]): WidgetId[] {
 
 // `any` on purpose: when this extension is type-checked alongside the engine,
 // its own kysely and the engine's kysely@0.29.3 are two distinct installs whose
-// `Kysely` brands clash on `sql(...).execute(reqDb(c))`. analytics/quality uses `any`
+// `Kysely` brands clash on `sql(...).execute(db)`. analytics/quality uses `any`
 // for the same reason. Runtime is unaffected (one kysely at load time).
 // biome-ignore lint/suspicious/noExplicitAny: dual-kysely brand clash guard
 type Db = any;
@@ -239,7 +239,7 @@ async function computeWidgetData(
     // Counted across the whole instance, and the second number counted
     // `role = 'god'` — so a tenant's dashboard reported how many users every
     // other customer had, plus how many instance superusers exist. The `user`
-    // table carries no tenant_id and no RLS, so `reqDb(c)` does not scope this
+    // table carries no tenant_id and no RLS, so `db` does not scope this
     // on its own; membership does.
     //
     // Single-tenant installs have no membership rows (the engine's membership
@@ -331,11 +331,10 @@ async function computeWidgetData(
 // ── Router ───────────────────────────────────────────────────────────
 
 export function dashboardRoutes(ctx: ExtensionContext): Hono {
-  const { auth, checkPermission, getUserRoles } = ctx;
+  const { db, auth, checkPermission, getUserRoles } = ctx;
 
   // Per-request tenant-scoped DB handle so this extension's tables (FORCE RLS
   // keyed on `zveltio.current_tenant`) resolve inside the tenant transaction.
-  const reqDb = (c: Context): Db => (ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') as Db) ?? ctx.db);
   /** Tenant of the request; the default tenant on a single-tenant install. */
   const tenantOf = (c: Context): string =>
     ((c.get('tenant') as { id?: string } | null)?.id ?? DEFAULT_TENANT_ID);
@@ -352,7 +351,6 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
 
   // GET / — the caller's resolved dashboard + data for the shown widgets.
   app.get('/', async (c) => {
-    const db = reqDb(c);
     const uid = userId(c);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
     const data = await computeWidgetData(db, resolved.widgets, ctx.config, tenantOf(c));
@@ -368,7 +366,6 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
   // PUT / — save the caller's personal layout (clamped server-side to what
   // they may see, so a crafted body can't reveal more).
   app.put('/', zValidator('json', z.object({ widgets: z.array(z.string()).max(50) })), async (c) => {
-    const db = reqDb(c);
     const uid = userId(c);
     const saved = await setUserLayout(db, uid, c.req.valid('json').widgets, checkPermission);
     const data = await computeWidgetData(db, saved, ctx.config, tenantOf(c));
@@ -384,9 +381,8 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
 
   // DELETE / — drop personalisation, fall back to the role / default layout.
   app.delete('/', async (c) => {
-    const db = reqDb(c);
     const uid = userId(c);
-    await deleteUserLayout(reqDb(c), uid);
+    await deleteUserLayout(db, uid);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
     const data = await computeWidgetData(db, resolved.widgets, ctx.config, tenantOf(c));
     return c.json({
@@ -412,7 +408,7 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
     const rolesRes = await sql<{ role: string }>`
       SELECT DISTINCT v1 AS role FROM zvd_permissions WHERE ptype = 'g' AND v1 IS NOT NULL
     `
-      .execute(reqDb(c))
+      .execute(db)
       .catch(() => ({ rows: [] as Array<{ role: string }> }));
     const roles = rolesRes.rows.map((r) => r.role).filter(Boolean);
     return c.json({
@@ -425,7 +421,7 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
   app.get('/admin/role/:role', async (c) => {
     if (!(await requireAdmin(c))) return c.json({ error: 'Forbidden' }, 403);
     const role = c.req.param('role');
-    const widgets = await readLayout(reqDb(c), 'role', role);
+    const widgets = await readLayout(db, 'role', role);
     return c.json({ role, widgets: widgets ?? DEFAULT_LAYOUT, configured: widgets !== null });
   });
 
@@ -436,7 +432,7 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
       if (!(await requireAdmin(c))) return c.json({ error: 'Forbidden' }, 403);
       const role = c.req.param('role');
       const saved = normalise(c.req.valid('json').widgets);
-      await writeLayout(reqDb(c), 'role', role, saved, userId(c));
+      await writeLayout(db, 'role', role, saved, userId(c));
       return c.json({ role, widgets: saved, configured: true });
     },
   );

@@ -55,13 +55,10 @@ export function formsRoutes(
 ): Hono<{ Variables: { user: any } }> {
   const { db, auth, checkPermission } = ctx;
 
-  // Per-request DB handle (CRM PR #1 pattern). After
-  // migration 002_tenant_rls.sql, this extension's tables have FORCE
-  // RLS keyed on `zveltio.current_tenant`; routes must run through
-  // this handle so the GUC is active inside the transaction.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
 
   async function requireAdmin(c: any): Promise<any | null> {
@@ -91,7 +88,7 @@ export function formsRoutes(
 
   // GET / — list forms with submission counts
   app.get('/', async (c) => {
-    const forms = await (reqDb(c) as any)
+    const forms = await (db as any)
       .selectFrom('zv_forms as f')
       .leftJoin(
         (eb: any) =>
@@ -126,7 +123,7 @@ export function formsRoutes(
   // POST / — create form
   app.post('/', zValidator('json', formSchema), async (c) => {
     const data = c.req.valid('json');
-    const form = await (reqDb(c) as any)
+    const form = await (db as any)
       .insertInto('zv_forms')
       .values({
         name: data.name,
@@ -143,7 +140,7 @@ export function formsRoutes(
 
   // GET /:id — get form with fields
   app.get('/:id', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
-    const form = await (reqDb(c) as any)
+    const form = await (db as any)
       .selectFrom('zv_forms')
       .selectAll()
       .where('id', '=', c.req.param('id'))
@@ -169,7 +166,7 @@ export function formsRoutes(
         updates.target_collection = data.target_collection;
       if (data.active !== undefined) updates.active = data.active;
 
-      const form = await (reqDb(c) as any)
+      const form = await (db as any)
         .updateTable('zv_forms')
         .set(updates)
         .where('id', '=', c.req.param('id'))
@@ -182,7 +179,7 @@ export function formsRoutes(
 
   // DELETE /:id — delete form
   app.delete('/:id', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
-    await (reqDb(c) as any)
+    await (db as any)
       .deleteFrom('zv_forms')
       .where('id', '=', c.req.param('id'))
       .execute();
@@ -196,12 +193,12 @@ export function formsRoutes(
     const offset = (parseInt(page) - 1) * parsedLimit;
 
     const [form, submissions] = await Promise.all([
-      (reqDb(c) as any)
+      (db as any)
         .selectFrom('zv_forms')
         .selectAll()
         .where('id', '=', c.req.param('id'))
         .executeTakeFirst(),
-      (reqDb(c) as any)
+      (db as any)
         .selectFrom('zv_form_submissions')
         .selectAll()
         .where('form_id', '=', c.req.param('id'))
@@ -216,7 +213,7 @@ export function formsRoutes(
 
   // GET /public/:slug — public form schema (no auth)
   app.get('/public/:slug', async (c) => {
-    const form = await (reqDb(c) as any)
+    const form = await (db as any)
       .selectFrom('zv_forms')
       .select(['id', 'name', 'slug', 'description', 'fields'])
       .where('slug', '=', c.req.param('slug'))
@@ -237,7 +234,7 @@ export function formsRoutes(
       );
     }
 
-    const form = await (reqDb(c) as any)
+    const form = await (db as any)
       .selectFrom('zv_forms')
       .selectAll()
       .where('slug', '=', c.req.param('slug'))
@@ -278,7 +275,7 @@ export function formsRoutes(
     }
 
     // Insert submission
-    const submission = await (reqDb(c) as any)
+    const submission = await (db as any)
       .insertInto('zv_form_submissions')
       .values({
         form_id: form.id,
@@ -296,7 +293,7 @@ export function formsRoutes(
       try {
         const col = await ctx.DDLManager.getCollection(db, form.target_collection);
         if (col) {
-          await (reqDb(c) as any)
+          await (db as any)
             .insertInto(form.target_collection)
             .values(cleanData as any)
             .execute();

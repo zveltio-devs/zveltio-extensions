@@ -34,7 +34,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "05495e60aefba6b77821db88cc808e8259aecdd3e9c78d91650f76d5e6d53bf6",
-    "sourceSha256": "a516d564507bd2f37987aec48d16513d9a6985e8134fe70176433984bb3cbc3b"
+    "engineSha256": "2638b5f61ddad58fd3b18700abcf651296b7e9c626c51aedd856bf673d2b10b5",
+    "sourceSha256": "4415cd63efa7eaf1ce4eb0601bb6960c461ee573fb5def5d419ec07997f5ddf0"
   }
 }

@@ -19592,9 +19592,6 @@ function importRoutes(ctx) {
   function tenantOf(c) {
     return c.get("tenant")?.id ?? "00000000-0000-0000-0000-000000000001";
   }
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -19611,22 +19608,22 @@ function importRoutes(ctx) {
     const now = new Date;
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const [totalRow, successRow, monthRow, topCols] = await Promise.all([
-      sql`SELECT COUNT(*) AS total FROM zv_import_logs`.execute(reqDb(c)),
+      sql`SELECT COUNT(*) AS total FROM zv_import_logs`.execute(db),
       sql`
         SELECT COUNT(*) AS success FROM zv_import_logs WHERE status = 'completed'
-      `.execute(reqDb(c)),
+      `.execute(db),
       sql`
         SELECT COALESCE(SUM(imported_rows), 0) AS records
         FROM zv_import_logs
         WHERE created_at >= ${startOfMonth.toISOString()}
-      `.execute(reqDb(c)),
+      `.execute(db),
       sql`
         SELECT collection, COUNT(*) AS imports
         FROM zv_import_logs
         GROUP BY collection
         ORDER BY imports DESC
         LIMIT 5
-      `.execute(reqDb(c))
+      `.execute(db)
     ]);
     const total = Number(totalRow.rows[0]?.total ?? 0);
     const success2 = Number(successRow.rows[0]?.success ?? 0);
@@ -19638,7 +19635,7 @@ function importRoutes(ctx) {
     });
   });
   app.get("/profiles", async (c) => {
-    const profiles = await reqDb(c).selectFrom("zvd_import_profiles").selectAll().orderBy("created_at", "desc").execute();
+    const profiles = await db.selectFrom("zvd_import_profiles").selectAll().orderBy("created_at", "desc").execute();
     return c.json({ profiles });
   });
   app.post("/profiles", zValidator("json", exports_external.object({
@@ -19654,7 +19651,7 @@ function importRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const body = c.req.valid("json");
-    const profile = await reqDb(c).insertInto("zvd_import_profiles").values({
+    const profile = await db.insertInto("zvd_import_profiles").values({
       name: body.name,
       collection: body.collection,
       format: body.format,
@@ -19680,7 +19677,7 @@ function importRoutes(ctx) {
   })), async (c) => {
     const id = c.req.param("id");
     const body = c.req.valid("json");
-    const existing = await reqDb(c).selectFrom("zvd_import_profiles").select(["id"]).where("id", "=", id).executeTakeFirst();
+    const existing = await db.selectFrom("zvd_import_profiles").select(["id"]).where("id", "=", id).executeTakeFirst();
     if (!existing)
       return c.json({ error: "Profile not found" }, 404);
     const updates = { updated_at: new Date };
@@ -19700,11 +19697,11 @@ function importRoutes(ctx) {
       updates.mappings = JSON.stringify(body.mappings);
     if (body.description !== undefined)
       updates.description = body.description;
-    const profile = await reqDb(c).updateTable("zvd_import_profiles").set(updates).where("id", "=", id).returningAll().executeTakeFirst();
+    const profile = await db.updateTable("zvd_import_profiles").set(updates).where("id", "=", id).returningAll().executeTakeFirst();
     return c.json({ profile });
   });
   app.delete("/profiles/:id", async (c) => {
-    const deleted = await reqDb(c).deleteFrom("zvd_import_profiles").where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
+    const deleted = await db.deleteFrom("zvd_import_profiles").where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
     if (!deleted)
       return c.json({ error: "Profile not found" }, 404);
     return c.json({ success: true });
@@ -19714,21 +19711,21 @@ function importRoutes(ctx) {
     limit: exports_external.coerce.number().min(1).max(100).default(20)
   })), async (c) => {
     const { collection, limit } = c.req.valid("query");
-    let query = reqDb(c).selectFrom("zv_import_logs").selectAll().orderBy("created_at", "desc").limit(limit);
+    let query = db.selectFrom("zv_import_logs").selectAll().orderBy("created_at", "desc").limit(limit);
     if (collection)
       query = query.where("collection", "=", collection);
     const jobs = await query.execute();
     return c.json({ jobs });
   });
   app.get("/jobs/:id", async (c) => {
-    const job = await reqDb(c).selectFrom("zv_import_logs").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
+    const job = await db.selectFrom("zv_import_logs").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
     if (!job)
       return c.json({ error: "Import job not found" }, 404);
     return c.json({ job });
   });
   app.get("/jobs/:id/rollback", async (c) => {
     const jobId = c.req.param("id");
-    const rollback = await reqDb(c).selectFrom("zvd_import_rollbacks").selectAll().where("job_id", "=", jobId).executeTakeFirst();
+    const rollback = await db.selectFrom("zvd_import_rollbacks").selectAll().where("job_id", "=", jobId).executeTakeFirst();
     if (!rollback) {
       return c.json({ available: false, reason: "No rollback record for this job" });
     }
@@ -19747,10 +19744,10 @@ function importRoutes(ctx) {
   app.post("/jobs/:id/rollback", async (c) => {
     const user = c.get("user");
     const jobId = c.req.param("id");
-    const job = await reqDb(c).selectFrom("zv_import_logs").select(["id", "collection", "status"]).where("id", "=", jobId).executeTakeFirst();
+    const job = await db.selectFrom("zv_import_logs").select(["id", "collection", "status"]).where("id", "=", jobId).executeTakeFirst();
     if (!job)
       return c.json({ error: "Import job not found" }, 404);
-    const rollback = await reqDb(c).selectFrom("zvd_import_rollbacks").selectAll().where("job_id", "=", jobId).executeTakeFirst();
+    const rollback = await db.selectFrom("zvd_import_rollbacks").selectAll().where("job_id", "=", jobId).executeTakeFirst();
     if (!rollback)
       return c.json({ error: "No rollback record for this job" }, 400);
     if (rollback.status === "rolled_back") {
@@ -19764,9 +19761,9 @@ function importRoutes(ctx) {
     const BATCH = 500;
     for (let i = 0;i < recordIds.length; i += BATCH) {
       const batch = recordIds.slice(i, i + BATCH);
-      await reqDb(c).deleteFrom(tableName).where("id", "in", batch).execute().catch(() => {});
+      await db.deleteFrom(tableName).where("id", "in", batch).execute().catch(() => {});
     }
-    await reqDb(c).updateTable("zvd_import_rollbacks").set({
+    await db.updateTable("zvd_import_rollbacks").set({
       status: "rolled_back",
       rolled_back_at: new Date,
       rolled_back_by: user.id
@@ -19873,7 +19870,7 @@ function importRoutes(ctx) {
       return c.json({ error: "Import limited to 10,000 rows per request" }, 400);
     }
     if (profileId) {
-      const profile = await reqDb(c).selectFrom("zvd_import_profiles").selectAll().where("id", "=", profileId).executeTakeFirst();
+      const profile = await db.selectFrom("zvd_import_profiles").selectAll().where("id", "=", profileId).executeTakeFirst();
       if (profile) {
         if (!Object.keys(mapping).length && profile.mappings) {
           const profileMappings = typeof profile.mappings === "string" ? JSON.parse(profile.mappings) : profile.mappings;
@@ -19887,7 +19884,7 @@ function importRoutes(ctx) {
           onDuplicate = profile.on_duplicate ?? "skip";
       }
     }
-    const job = await reqDb(c).insertInto("zv_import_logs").values({
+    const job = await db.insertInto("zv_import_logs").values({
       collection,
       filename,
       format: fileFormat,
@@ -19900,7 +19897,7 @@ function importRoutes(ctx) {
     }).returningAll().executeTakeFirst();
     const options = { mapping, on_duplicate: onDuplicate, dry_run: dryRun };
     runImport(ctx, tenantOf(c), job.id, collection, rows, options, collectionDef).catch((err) => {
-      reqDb(c).updateTable("zv_import_logs").set({
+      db.updateTable("zv_import_logs").set({
         status: "failed",
         errors: JSON.stringify([{ row: 0, error: String(err) }]),
         completed_at: new Date

@@ -19516,9 +19516,6 @@ var poItemSchema = exports_external.object({
 });
 function roProcurementRoutes(ctx) {
   const { db, auth } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -19533,7 +19530,7 @@ function roProcurementRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const { search, category } = c.req.query();
-    let query = reqDb(c).selectFrom("zv_ro_suppliers").selectAll().where("is_active", "=", true).orderBy("name", "asc");
+    let query = db.selectFrom("zv_ro_suppliers").selectAll().where("is_active", "=", true).orderBy("name", "asc");
     if (search)
       query = query.where("name", "ilike", `%${search}%`);
     if (category)
@@ -19545,13 +19542,13 @@ function roProcurementRoutes(ctx) {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const supplier = await reqDb(c).selectFrom("zv_ro_suppliers").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
+    const supplier = await db.selectFrom("zv_ro_suppliers").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
     if (!supplier)
       return c.json({ error: "Supplier not found" }, 404);
     const [orders, evaluations, contracts] = await Promise.all([
-      reqDb(c).selectFrom("zv_ro_purchase_orders").select(["id", "number", "date", "total", "currency", "status"]).where("supplier_id", "=", c.req.param("id")).orderBy("date", "desc").limit(10).execute(),
-      sql`SELECT * FROM zv_ro_supplier_evaluations WHERE supplier_id = ${c.req.param("id")}::uuid ORDER BY period DESC`.execute(reqDb(c)).catch(() => ({ rows: [] })),
-      sql`SELECT id, number, title, value, currency, status, start_date, end_date FROM zv_ro_contracts WHERE supplier_id = ${c.req.param("id")}::uuid AND status = 'active'`.execute(reqDb(c)).catch(() => ({ rows: [] }))
+      db.selectFrom("zv_ro_purchase_orders").select(["id", "number", "date", "total", "currency", "status"]).where("supplier_id", "=", c.req.param("id")).orderBy("date", "desc").limit(10).execute(),
+      sql`SELECT * FROM zv_ro_supplier_evaluations WHERE supplier_id = ${c.req.param("id")}::uuid ORDER BY period DESC`.execute(db).catch(() => ({ rows: [] })),
+      sql`SELECT id, number, title, value, currency, status, start_date, end_date FROM zv_ro_contracts WHERE supplier_id = ${c.req.param("id")}::uuid AND status = 'active'`.execute(db).catch(() => ({ rows: [] }))
     ]);
     return c.json({ supplier, recent_orders: orders, evaluations: evaluations.rows, active_contracts: contracts.rows });
   });
@@ -19559,14 +19556,14 @@ function roProcurementRoutes(ctx) {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const supplier = await reqDb(c).insertInto("zv_ro_suppliers").values(c.req.valid("json")).returningAll().executeTakeFirst();
+    const supplier = await db.insertInto("zv_ro_suppliers").values(c.req.valid("json")).returningAll().executeTakeFirst();
     return c.json({ supplier }, 201);
   });
   app.patch("/suppliers/:id", zValidator("json", supplierSchema.partial()), async (c) => {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const supplier = await reqDb(c).updateTable("zv_ro_suppliers").set({ ...c.req.valid("json"), updated_at: new Date }).where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
+    const supplier = await db.updateTable("zv_ro_suppliers").set({ ...c.req.valid("json"), updated_at: new Date }).where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
     if (!supplier)
       return c.json({ error: "Supplier not found" }, 404);
     return c.json({ supplier });
@@ -19575,7 +19572,7 @@ function roProcurementRoutes(ctx) {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    await reqDb(c).updateTable("zv_ro_suppliers").set({ is_active: false }).where("id", "=", c.req.param("id")).execute();
+    await db.updateTable("zv_ro_suppliers").set({ is_active: false }).where("id", "=", c.req.param("id")).execute();
     return c.json({ success: true });
   });
   app.post("/suppliers/:id/evaluate", zValidator("json", exports_external.object({
@@ -19596,7 +19593,7 @@ function roProcurementRoutes(ctx) {
         DO UPDATE SET quality_score = EXCLUDED.quality_score, delivery_score = EXCLUDED.delivery_score,
                       price_score = EXCLUDED.price_score, notes = EXCLUDED.notes
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
     return c.json({ evaluation: evaluation.rows[0] }, 201);
   });
   app.get("/orders", async (c) => {
@@ -19604,7 +19601,7 @@ function roProcurementRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const { status, priority } = c.req.query();
-    let query = reqDb(c).selectFrom("zv_ro_purchase_orders").select(["id", "number", "date", "supplier_name", "description", "total", "currency", "status", "priority", "budget_line", "created_at"]).orderBy("date", "desc");
+    let query = db.selectFrom("zv_ro_purchase_orders").select(["id", "number", "date", "supplier_name", "description", "total", "currency", "status", "priority", "budget_line", "created_at"]).orderBy("date", "desc");
     if (status)
       query = query.where("status", "=", status);
     if (priority)
@@ -19616,13 +19613,13 @@ function roProcurementRoutes(ctx) {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const order = await reqDb(c).selectFrom("zv_ro_purchase_orders").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
+    const order = await db.selectFrom("zv_ro_purchase_orders").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
     if (!order)
       return c.json({ error: "Order not found" }, 404);
     const nirs = await sql`
       SELECT id, number, date, status, total_value FROM zv_ro_reception_notes
       WHERE order_id = ${c.req.param("id")}::uuid ORDER BY date DESC
-    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+    `.execute(db).catch(() => ({ rows: [] }));
     return c.json({ order, reception_notes: nirs.rows });
   });
   app.post("/orders", zValidator("json", exports_external.object({
@@ -19647,14 +19644,14 @@ function roProcurementRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const body = c.req.valid("json");
-    const order = await reqDb(c).insertInto("zv_ro_purchase_orders").values({ ...body, items: JSON.stringify(body.items), created_by: user.id }).returningAll().executeTakeFirst();
+    const order = await db.insertInto("zv_ro_purchase_orders").values({ ...body, items: JSON.stringify(body.items), created_by: user.id }).returningAll().executeTakeFirst();
     return c.json({ order }, 201);
   });
   app.post("/orders/:id/approve", async (c) => {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const order = await reqDb(c).updateTable("zv_ro_purchase_orders").set({ status: "approved", approved_by: user.id, approved_at: new Date, updated_at: new Date }).where("id", "=", c.req.param("id")).where("status", "=", "draft").returningAll().executeTakeFirst();
+    const order = await db.updateTable("zv_ro_purchase_orders").set({ status: "approved", approved_by: user.id, approved_at: new Date, updated_at: new Date }).where("id", "=", c.req.param("id")).where("status", "=", "draft").returningAll().executeTakeFirst();
     if (!order)
       return c.json({ error: "Order not found or not approvable" }, 404);
     return c.json({ order });
@@ -19663,7 +19660,7 @@ function roProcurementRoutes(ctx) {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const order = await reqDb(c).updateTable("zv_ro_purchase_orders").set({ status: "received", received_at: new Date, updated_at: new Date }).where("id", "=", c.req.param("id")).where("status", "=", "approved").returningAll().executeTakeFirst();
+    const order = await db.updateTable("zv_ro_purchase_orders").set({ status: "received", received_at: new Date, updated_at: new Date }).where("id", "=", c.req.param("id")).where("status", "=", "approved").returningAll().executeTakeFirst();
     if (!order)
       return c.json({ error: "Order not found or not receivable" }, 404);
     return c.json({ order });
@@ -19673,7 +19670,7 @@ function roProcurementRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const { reason } = c.req.valid("json");
-    const order = await reqDb(c).updateTable("zv_ro_purchase_orders").set({ status: "cancelled", cancellation_reason: reason, cancelled_at: new Date, updated_at: new Date }).where("id", "=", c.req.param("id")).where("status", "in", ["draft", "approved"]).returningAll().executeTakeFirst();
+    const order = await db.updateTable("zv_ro_purchase_orders").set({ status: "cancelled", cancellation_reason: reason, cancelled_at: new Date, updated_at: new Date }).where("id", "=", c.req.param("id")).where("status", "in", ["draft", "approved"]).returningAll().executeTakeFirst();
     if (!order)
       return c.json({ error: "Order not found or not cancellable" }, 404);
     return c.json({ order });
@@ -19682,7 +19679,7 @@ function roProcurementRoutes(ctx) {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    await reqDb(c).deleteFrom("zv_ro_purchase_orders").where("id", "=", c.req.param("id")).where("status", "=", "draft").execute();
+    await db.deleteFrom("zv_ro_purchase_orders").where("id", "=", c.req.param("id")).where("status", "=", "draft").execute();
     return c.json({ success: true });
   });
   app.get("/reception-notes", async (c) => {
@@ -19690,7 +19687,7 @@ function roProcurementRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const { status } = c.req.query();
-    let query = reqDb(c).selectFrom("zv_ro_reception_notes").select(["id", "number", "date", "supplier_name", "total_value", "currency", "status", "created_at"]).orderBy("date", "desc");
+    let query = db.selectFrom("zv_ro_reception_notes").select(["id", "number", "date", "supplier_name", "total_value", "currency", "status", "created_at"]).orderBy("date", "desc");
     if (status)
       query = query.where("status", "=", status);
     return c.json({ reception_notes: await query.execute() });
@@ -19717,14 +19714,14 @@ function roProcurementRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const body = c.req.valid("json");
-    const nir = await reqDb(c).insertInto("zv_ro_reception_notes").values({ ...body, items: JSON.stringify(body.items), created_by: user.id }).returningAll().executeTakeFirst();
+    const nir = await db.insertInto("zv_ro_reception_notes").values({ ...body, items: JSON.stringify(body.items), created_by: user.id }).returningAll().executeTakeFirst();
     return c.json({ reception_note: nir }, 201);
   });
   app.post("/reception-notes/:id/confirm", async (c) => {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const nir = await reqDb(c).updateTable("zv_ro_reception_notes").set({ status: "confirmed", confirmed_by: user.id, confirmed_at: new Date }).where("id", "=", c.req.param("id")).where("status", "=", "draft").returningAll().executeTakeFirst();
+    const nir = await db.updateTable("zv_ro_reception_notes").set({ status: "confirmed", confirmed_by: user.id, confirmed_at: new Date }).where("id", "=", c.req.param("id")).where("status", "=", "draft").returningAll().executeTakeFirst();
     if (!nir)
       return c.json({ error: "NIR not found or already confirmed" }, 404);
     return c.json({ reception_note: nir });
@@ -19734,7 +19731,7 @@ function roProcurementRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const { status, type } = c.req.query();
-    let query = reqDb(c).selectFrom("zv_ro_contracts").select(["id", "number", "supplier_name", "title", "type", "value", "currency", "status", "start_date", "end_date"]).orderBy("created_at", "desc");
+    let query = db.selectFrom("zv_ro_contracts").select(["id", "number", "supplier_name", "title", "type", "value", "currency", "status", "start_date", "end_date"]).orderBy("created_at", "desc");
     if (status)
       query = query.where("status", "=", status);
     if (type)
@@ -19759,14 +19756,14 @@ function roProcurementRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const body = c.req.valid("json");
-    const contract = await reqDb(c).insertInto("zv_ro_contracts").values({ ...body, created_by: user.id }).returningAll().executeTakeFirst();
+    const contract = await db.insertInto("zv_ro_contracts").values({ ...body, created_by: user.id }).returningAll().executeTakeFirst();
     return c.json({ contract }, 201);
   });
   app.patch("/contracts/:id/activate", async (c) => {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const contract = await reqDb(c).updateTable("zv_ro_contracts").set({ status: "active", updated_at: new Date }).where("id", "=", c.req.param("id")).where("status", "=", "draft").returningAll().executeTakeFirst();
+    const contract = await db.updateTable("zv_ro_contracts").set({ status: "active", updated_at: new Date }).where("id", "=", c.req.param("id")).where("status", "=", "draft").returningAll().executeTakeFirst();
     if (!contract)
       return c.json({ error: "Contract not found or not activatable" }, 404);
     return c.json({ contract });
@@ -19776,11 +19773,11 @@ function roProcurementRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const { year } = c.req.query();
-    let query = reqDb(c).selectFrom("zv_ro_budget_lines").selectAll().orderBy("code", "asc");
+    let query = db.selectFrom("zv_ro_budget_lines").selectAll().orderBy("code", "asc");
     if (year)
       query = query.where("year", "=", parseInt(year, 10));
     const lines = await query.execute();
-    const spent = await reqDb(c).selectFrom("zv_ro_purchase_orders").select(["budget_line", db.fn.sum("total").as("spent")]).where("status", "in", ["approved", "received"]).groupBy("budget_line").execute();
+    const spent = await db.selectFrom("zv_ro_purchase_orders").select(["budget_line", db.fn.sum("total").as("spent")]).where("status", "in", ["approved", "received"]).groupBy("budget_line").execute();
     const spentMap = {};
     for (const s of spent) {
       if (s.budget_line)
@@ -19805,7 +19802,7 @@ function roProcurementRoutes(ctx) {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const line = await reqDb(c).insertInto("zv_ro_budget_lines").values(c.req.valid("json")).returningAll().executeTakeFirst();
+    const line = await db.insertInto("zv_ro_budget_lines").values(c.req.valid("json")).returningAll().executeTakeFirst();
     return c.json({ budget_line: line }, 201);
   });
   app.get("/reports/spending", async (c) => {
@@ -19820,20 +19817,20 @@ function roProcurementRoutes(ctx) {
         FROM zv_ro_purchase_orders
         WHERE EXTRACT(YEAR FROM date) = ${currentYear} AND status IN ('approved','received')
         GROUP BY category ORDER BY total DESC
-      `.execute(reqDb(c)).catch(() => ({ rows: [] })),
+      `.execute(db).catch(() => ({ rows: [] })),
       sql`
         SELECT TO_CHAR(date, 'YYYY-MM') AS month, SUM(total) AS total, COUNT(*)::int AS count
         FROM zv_ro_purchase_orders
         WHERE EXTRACT(YEAR FROM date) = ${currentYear} AND status IN ('approved','received')
         GROUP BY month ORDER BY month
-      `.execute(reqDb(c)).catch(() => ({ rows: [] })),
+      `.execute(db).catch(() => ({ rows: [] })),
       sql`
         SELECT supplier_name, supplier_cui, SUM(total) AS total, COUNT(*)::int AS count
         FROM zv_ro_purchase_orders
         WHERE EXTRACT(YEAR FROM date) = ${currentYear} AND status IN ('approved','received')
           ${supplier_id ? sql`AND supplier_id = ${supplier_id}::uuid` : sql``}
         GROUP BY supplier_name, supplier_cui ORDER BY total DESC LIMIT 20
-      `.execute(reqDb(c)).catch(() => ({ rows: [] }))
+      `.execute(db).catch(() => ({ rows: [] }))
     ]);
     return c.json({ year: currentYear, by_category: byCategory.rows, by_month: byMonth.rows, by_supplier: bySupplier.rows });
   });

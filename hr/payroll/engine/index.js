@@ -19578,9 +19578,6 @@ function generateRevisalCsv(internals, employees) {
 function payrollRoutes(ctx) {
   const { db, auth } = ctx;
   const app = new Hono2;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session)
@@ -19597,7 +19594,7 @@ function payrollRoutes(ctx) {
       FROM zvd_payroll_periods p
       LEFT JOIN zvd_payroll_entries e ON e.period_id = p.id
       GROUP BY p.id ORDER BY p.year DESC, p.month DESC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/periods", zValidator("json", exports_external.object({
@@ -19611,20 +19608,20 @@ function payrollRoutes(ctx) {
       INSERT INTO zvd_payroll_periods (year, month, notes, created_by)
       VALUES (${d.year}, ${d.month}, ${d.notes ?? null}, ${user.id})
       ON CONFLICT (year, month) DO NOTHING RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Period already exists" }, 409);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.post("/periods/:id/generate", async (c) => {
     const user = c.get("user");
-    const period = await sql`SELECT * FROM zvd_payroll_periods WHERE id = ${c.req.param("id")} AND status = 'open'`.execute(reqDb(c));
+    const period = await sql`SELECT * FROM zvd_payroll_periods WHERE id = ${c.req.param("id")} AND status = 'open'`.execute(db);
     if (!period.rows.length)
       return c.json({ error: "Period not found or not open" }, 400);
     const p = period.rows[0];
     const employees = await sql`
       SELECT * FROM zvd_employees WHERE status = 'active' AND employment_type != 'contractor'
-    `.execute(reqDb(c));
+    `.execute(db);
     let generated = 0;
     for (const emp of employees.rows) {
       const gross = +(emp.salary ?? 0);
@@ -19632,7 +19629,7 @@ function payrollRoutes(ctx) {
         SELECT * FROM zvd_payroll_adjustments WHERE entry_id IN (
           SELECT id FROM zvd_payroll_entries WHERE period_id = ${p.id} AND employee_id = ${emp.id}
         )
-      `.execute(reqDb(c));
+      `.execute(db);
       let taxable_bonuses = 0;
       let deductions = 0;
       for (const adj of adjs.rows) {
@@ -19644,22 +19641,22 @@ function payrollRoutes(ctx) {
       const sick = await sql`
         SELECT COALESCE(SUM(days), 0) as days, COALESCE(SUM(amount), 0) as amount
         FROM zvd_payroll_sick_leave WHERE period_id = ${p.id} AND employee_id = ${emp.id}
-      `.execute(reqDb(c));
+      `.execute(db);
       const sickDays = +sick.rows[0].days;
       const sickAmount = +sick.rows[0].amount;
       const vouchers = await sql`
         SELECT COALESCE(SUM(total_value), 0) as total FROM zvd_payroll_meal_vouchers
         WHERE period_id = ${p.id} AND employee_id = ${emp.id}
-      `.execute(reqDb(c));
+      `.execute(db);
       const mealVouchersAmount = +vouchers.rows[0].total;
       const overtime = await sql`
         SELECT COALESCE(SUM(amount), 0) as amount FROM zvd_payroll_overtime
         WHERE period_id = ${p.id} AND employee_id = ${emp.id} AND is_night_shift = false
-      `.execute(reqDb(c));
+      `.execute(db);
       const nightShift = await sql`
         SELECT COALESCE(SUM(amount), 0) as amount FROM zvd_payroll_overtime
         WHERE period_id = ${p.id} AND employee_id = ${emp.id} AND is_night_shift = true
-      `.execute(reqDb(c));
+      `.execute(db);
       const overtimeAmt = +overtime.rows[0].amount;
       const nightShiftAmt = +nightShift.rows[0].amount;
       const calc = computeRO({
@@ -19696,29 +19693,29 @@ function payrollRoutes(ctx) {
           sick_leave_days = EXCLUDED.sick_leave_days, sick_leave_amount = EXCLUDED.sick_leave_amount,
           meal_vouchers_amount = EXCLUDED.meal_vouchers_amount, overtime_amount = EXCLUDED.overtime_amount,
           night_shift_bonus = EXCLUDED.night_shift_bonus, updated_at = NOW()
-      `.execute(reqDb(c));
+      `.execute(db);
       generated++;
     }
-    await sql`UPDATE zvd_payroll_periods SET status = 'calculated', updated_at = NOW() WHERE id = ${p.id}`.execute(reqDb(c));
+    await sql`UPDATE zvd_payroll_periods SET status = 'calculated', updated_at = NOW() WHERE id = ${p.id}`.execute(db);
     return c.json({ data: { generated } });
   });
   app.post("/periods/:id/approve", async (c) => {
     const user = c.get("user");
-    await sql`UPDATE zvd_payroll_entries SET status = 'approved', updated_at = NOW() WHERE period_id = ${c.req.param("id")} AND status = 'draft'`.execute(reqDb(c));
+    await sql`UPDATE zvd_payroll_entries SET status = 'approved', updated_at = NOW() WHERE period_id = ${c.req.param("id")} AND status = 'draft'`.execute(db);
     const row = await sql`
       UPDATE zvd_payroll_periods SET status = 'calculated', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND status = 'calculated' RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Period not found or not calculated" }, 400);
     return c.json({ data: row.rows[0] });
   });
   app.post("/periods/:id/pay", async (c) => {
-    await sql`UPDATE zvd_payroll_entries SET paid_at = NOW(), updated_at = NOW() WHERE period_id = ${c.req.param("id")} AND status = 'approved'`.execute(reqDb(c));
+    await sql`UPDATE zvd_payroll_entries SET paid_at = NOW(), updated_at = NOW() WHERE period_id = ${c.req.param("id")} AND status = 'approved'`.execute(db);
     const row = await sql`
       UPDATE zvd_payroll_periods SET status = 'closed', paid_at = NOW(), updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND status = 'calculated' RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Period not found or not ready" }, 400);
     return c.json({ data: row.rows[0] });
@@ -19730,7 +19727,7 @@ function payrollRoutes(ctx) {
       JOIN zvd_employees e ON e.id = pe.employee_id
       WHERE pe.period_id = ${c.req.param("id")}
       ORDER BY e.last_name, e.first_name
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/sick-leave", zValidator("json", exports_external.object({
@@ -19741,14 +19738,14 @@ function payrollRoutes(ctx) {
     notes: exports_external.string().optional()
   })), async (c) => {
     const d = c.req.valid("json");
-    const emp = await sql`SELECT salary FROM zvd_employees WHERE id = ${d.employee_id}`.execute(reqDb(c));
+    const emp = await sql`SELECT salary FROM zvd_employees WHERE id = ${d.employee_id}`.execute(db);
     const dailyGross = emp.rows.length ? +emp.rows[0].salary / 21.75 : 0;
     const amount = dailyGross * d.days * 0.75;
     const row = await sql`
       INSERT INTO zvd_payroll_sick_leave (period_id, employee_id, days, amount, leave_request_id, notes)
       VALUES (${d.period_id}, ${d.employee_id}, ${d.days}, ${amount}, ${d.leave_request_id ?? null}, ${d.notes ?? null})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.post("/meal-vouchers", zValidator("json", exports_external.object({
@@ -19763,7 +19760,7 @@ function payrollRoutes(ctx) {
       VALUES (${d.period_id}, ${d.employee_id}, ${d.quantity}, ${d.face_value})
       ON CONFLICT (period_id, employee_id) DO UPDATE SET quantity = EXCLUDED.quantity, face_value = EXCLUDED.face_value
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.post("/overtime", zValidator("json", exports_external.object({
@@ -19775,14 +19772,14 @@ function payrollRoutes(ctx) {
     description: exports_external.string().optional()
   })), async (c) => {
     const d = c.req.valid("json");
-    const emp = await sql`SELECT salary FROM zvd_employees WHERE id = ${d.employee_id}`.execute(reqDb(c));
+    const emp = await sql`SELECT salary FROM zvd_employees WHERE id = ${d.employee_id}`.execute(db);
     const hourlyRate = emp.rows.length ? +emp.rows[0].salary / 168 : 0;
     const amount = hourlyRate * d.hours * d.rate_multiplier;
     const row = await sql`
       INSERT INTO zvd_payroll_overtime (period_id, employee_id, hours, rate_multiplier, amount, is_night_shift, description)
       VALUES (${d.period_id}, ${d.employee_id}, ${d.hours}, ${d.rate_multiplier}, ${amount}, ${d.is_night_shift}, ${d.description ?? null})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.post("/adjustments", zValidator("json", exports_external.object({
@@ -19797,32 +19794,32 @@ function payrollRoutes(ctx) {
       INSERT INTO zvd_payroll_adjustments (entry_id, type, description, amount, taxable)
       VALUES (${d.entry_id}, ${d.type}, ${d.description}, ${d.amount}, ${d.taxable})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.delete("/adjustments/:id", async (c) => {
-    await sql`DELETE FROM zvd_payroll_adjustments WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_payroll_adjustments WHERE id = ${c.req.param("id")}`.execute(db);
     return c.json({ success: true });
   });
   app.get("/periods/:id/d112", async (c) => {
-    const period = await sql`SELECT * FROM zvd_payroll_periods WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    const period = await sql`SELECT * FROM zvd_payroll_periods WHERE id = ${c.req.param("id")}`.execute(db);
     if (!period.rows.length)
       return c.json({ error: "Not found" }, 404);
     const entries = await sql`
       SELECT pe.*, e.national_id, e.first_name, e.last_name
       FROM zvd_payroll_entries pe JOIN zvd_employees e ON e.id = pe.employee_id
       WHERE pe.period_id = ${c.req.param("id")}
-    `.execute(reqDb(c));
+    `.execute(db);
     const xml = generateD112Xml(period.rows[0], entries.rows);
     const user = c.get("user");
     await sql`
       INSERT INTO zvd_payroll_exports (period_id, type, file_content, generated_by)
       VALUES (${c.req.param("id")}, 'd112', ${xml}, ${user.id})
-    `.execute(reqDb(c));
+    `.execute(db);
     return new Response(xml, { headers: { "Content-Type": "application/xml", "Content-Disposition": `attachment; filename="D112_${period.rows[0].year}_${String(period.rows[0].month).padStart(2, "0")}.xml"` } });
   });
   app.get("/revisal", async (c) => {
-    const employees = await sql`SELECT * FROM zvd_employees WHERE status = 'active'`.execute(reqDb(c));
+    const employees = await sql`SELECT * FROM zvd_employees WHERE status = 'active'`.execute(db);
     const csv = generateRevisalCsv(ctx.internals, employees.rows);
     return new Response(csv, { headers: { "Content-Type": "text/csv", "Content-Disposition": `attachment; filename="ReviSal_${new Date().toISOString().slice(0, 10)}.csv"` } });
   });
@@ -19852,13 +19849,13 @@ function payrollRoutes(ctx) {
       FROM zvd_payroll_entries pe
       JOIN zvd_payroll_periods pp ON pp.id = pe.period_id
       WHERE pp.year = EXTRACT(YEAR FROM NOW()) AND pp.month = EXTRACT(MONTH FROM NOW())
-    `.execute(reqDb(c));
+    `.execute(db);
     const history = await sql`
       SELECT pp.year, pp.month, COALESCE(SUM(pe.net_salary), 0) as net, COALESCE(SUM(pe.total_employer_cost), 0) as cost
       FROM zvd_payroll_periods pp LEFT JOIN zvd_payroll_entries pe ON pe.period_id = pp.id
       WHERE pp.year >= EXTRACT(YEAR FROM NOW()) - 1
       GROUP BY pp.id, pp.year, pp.month ORDER BY pp.year DESC, pp.month DESC LIMIT 12
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: { ...row.rows[0], history: history.rows } });
   });
   return app;

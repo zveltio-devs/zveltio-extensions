@@ -19491,9 +19491,6 @@ function permissionGate(ctx, resource, opts = {}) {
 // engine/routes.ts
 function checklistsRoutes(ctx) {
   const { db, auth } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   async function getUser(c) {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -19509,7 +19506,7 @@ function checklistsRoutes(ctx) {
   app.use("*", permissionGate(ctx, "checklists"));
   app.get("/templates", async (c) => {
     const { collection } = c.req.query();
-    let query = reqDb(c).selectFrom("zv_checklist_templates").selectAll().where("is_active", "=", true);
+    let query = db.selectFrom("zv_checklist_templates").selectAll().where("is_active", "=", true);
     if (collection) {
       query = query.where((eb) => eb.or([eb("collection", "=", collection), eb("collection", "is", null)]));
     }
@@ -19535,9 +19532,9 @@ function checklistsRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const { name, description, collection, items } = c.req.valid("json");
-    const template = await reqDb(c).insertInto("zv_checklist_templates").values({ name, description, collection: collection || null }).returningAll().executeTakeFirst();
+    const template = await db.insertInto("zv_checklist_templates").values({ name, description, collection: collection || null }).returningAll().executeTakeFirst();
     if (items.length > 0) {
-      await reqDb(c).insertInto("zv_checklist_template_items").values(items.map((item, i) => ({
+      await db.insertInto("zv_checklist_template_items").values(items.map((item, i) => ({
         template_id: template.id,
         label: item.label,
         description: item.description,
@@ -19549,17 +19546,17 @@ function checklistsRoutes(ctx) {
         condition_checked: item.condition_checked ?? null
       }))).execute();
     }
-    const templateItems = await reqDb(c).selectFrom("zv_checklist_template_items").selectAll().where("template_id", "=", template.id).orderBy("order_idx", "asc").execute();
+    const templateItems = await db.selectFrom("zv_checklist_template_items").selectAll().where("template_id", "=", template.id).orderBy("order_idx", "asc").execute();
     return c.json({ template: { ...template, items: templateItems } }, 201);
   });
   app.get("/templates/:id", async (c) => {
     const user = await getUser(c);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const template = await reqDb(c).selectFrom("zv_checklist_templates").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
+    const template = await db.selectFrom("zv_checklist_templates").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
     if (!template)
       return c.json({ error: "Template not found" }, 404);
-    const items = await reqDb(c).selectFrom("zv_checklist_template_items").selectAll().where("template_id", "=", template.id).orderBy("order_idx", "asc").execute();
+    const items = await db.selectFrom("zv_checklist_template_items").selectAll().where("template_id", "=", template.id).orderBy("order_idx", "asc").execute();
     return c.json({ template: { ...template, items } });
   });
   app.patch("/templates/:id", zValidator("json", exports_external.object({
@@ -19583,7 +19580,7 @@ function checklistsRoutes(ctx) {
       return c.json({ error: "Unauthorized" }, 401);
     const id = c.req.param("id");
     const { items, ...fields } = c.req.valid("json");
-    const existing = await reqDb(c).selectFrom("zv_checklist_templates").select("id").where("id", "=", id).executeTakeFirst();
+    const existing = await db.selectFrom("zv_checklist_templates").select("id").where("id", "=", id).executeTakeFirst();
     if (!existing)
       return c.json({ error: "Template not found" }, 404);
     const updateFields = { updated_at: new Date };
@@ -19595,11 +19592,11 @@ function checklistsRoutes(ctx) {
       updateFields.collection = fields.collection;
     if (fields.is_active !== undefined)
       updateFields.is_active = fields.is_active;
-    const template = await reqDb(c).updateTable("zv_checklist_templates").set(updateFields).where("id", "=", id).returningAll().executeTakeFirst();
+    const template = await db.updateTable("zv_checklist_templates").set(updateFields).where("id", "=", id).returningAll().executeTakeFirst();
     if (items !== undefined) {
-      await reqDb(c).deleteFrom("zv_checklist_template_items").where("template_id", "=", id).execute();
+      await db.deleteFrom("zv_checklist_template_items").where("template_id", "=", id).execute();
       if (items.length > 0) {
-        await reqDb(c).insertInto("zv_checklist_template_items").values(items.map((item, i) => ({
+        await db.insertInto("zv_checklist_template_items").values(items.map((item, i) => ({
           template_id: id,
           label: item.label,
           description: item.description,
@@ -19612,14 +19609,14 @@ function checklistsRoutes(ctx) {
         }))).execute();
       }
     }
-    const templateItems = await reqDb(c).selectFrom("zv_checklist_template_items").selectAll().where("template_id", "=", id).orderBy("order_idx", "asc").execute();
+    const templateItems = await db.selectFrom("zv_checklist_template_items").selectAll().where("template_id", "=", id).orderBy("order_idx", "asc").execute();
     return c.json({ template: { ...template, items: templateItems } });
   });
   app.delete("/templates/:id", async (c) => {
     const user = await getUser(c);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    await reqDb(c).updateTable("zv_checklist_templates").set({ is_active: false }).where("id", "=", c.req.param("id")).execute();
+    await db.updateTable("zv_checklist_templates").set({ is_active: false }).where("id", "=", c.req.param("id")).execute();
     return c.json({ success: true });
   });
   app.get("/record/:collection/:recordId", async (c) => {
@@ -19627,9 +19624,9 @@ function checklistsRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const { collection, recordId } = c.req.param();
-    const checklists = await reqDb(c).selectFrom("zv_checklists").selectAll().where("collection", "=", collection).where("record_id", "=", recordId).orderBy("created_at", "asc").execute();
+    const checklists = await db.selectFrom("zv_checklists").selectAll().where("collection", "=", collection).where("record_id", "=", recordId).orderBy("created_at", "asc").execute();
     const withItems = await Promise.all(checklists.map(async (cl) => {
-      const items = await reqDb(c).selectFrom("zv_checklist_items").selectAll().where("checklist_id", "=", cl.id).orderBy("order_idx", "asc").execute();
+      const items = await db.selectFrom("zv_checklist_items").selectAll().where("checklist_id", "=", cl.id).orderBy("order_idx", "asc").execute();
       return { ...cl, items };
     }));
     return c.json({ checklists: withItems });
@@ -19649,7 +19646,7 @@ function checklistsRoutes(ctx) {
       return c.json({ error: "Unauthorized" }, 401);
     const { collection, recordId } = c.req.param();
     const { template_id, name, items: customItems } = c.req.valid("json");
-    const checklist = await reqDb(c).insertInto("zv_checklists").values({
+    const checklist = await db.insertInto("zv_checklists").values({
       template_id: template_id || null,
       collection,
       record_id: recordId,
@@ -19658,12 +19655,12 @@ function checklistsRoutes(ctx) {
     }).returningAll().executeTakeFirst();
     let itemsToInsert = [];
     if (template_id) {
-      itemsToInsert = await reqDb(c).selectFrom("zv_checklist_template_items").selectAll().where("template_id", "=", template_id).orderBy("order_idx", "asc").execute();
+      itemsToInsert = await db.selectFrom("zv_checklist_template_items").selectAll().where("template_id", "=", template_id).orderBy("order_idx", "asc").execute();
     } else if (customItems) {
       itemsToInsert = customItems;
     }
     if (itemsToInsert.length > 0) {
-      await reqDb(c).insertInto("zv_checklist_items").values(itemsToInsert.map((item, i) => ({
+      await db.insertInto("zv_checklist_items").values(itemsToInsert.map((item, i) => ({
         checklist_id: checklist.id,
         label: item.label,
         description: item.description,
@@ -19671,7 +19668,7 @@ function checklistsRoutes(ctx) {
         order_idx: item.order_idx ?? i
       }))).execute();
     }
-    const items = await reqDb(c).selectFrom("zv_checklist_items").selectAll().where("checklist_id", "=", checklist.id).orderBy("order_idx", "asc").execute();
+    const items = await db.selectFrom("zv_checklist_items").selectAll().where("checklist_id", "=", checklist.id).orderBy("order_idx", "asc").execute();
     return c.json({ checklist: { ...checklist, items } }, 201);
   });
   app.patch("/items/:itemId", zValidator("json", exports_external.object({
@@ -19700,26 +19697,26 @@ function checklistsRoutes(ctx) {
       updateSet.assignee_user_id = assignee_user_id;
     if (due_at !== undefined)
       updateSet.due_at = new Date(due_at);
-    const item = await reqDb(c).updateTable("zv_checklist_items").set(updateSet).where("id", "=", c.req.param("itemId")).returningAll().executeTakeFirst();
+    const item = await db.updateTable("zv_checklist_items").set(updateSet).where("id", "=", c.req.param("itemId")).returningAll().executeTakeFirst();
     if (!item)
       return c.json({ error: "Item not found" }, 404);
     if (checked !== undefined) {
-      const allItems = await reqDb(c).selectFrom("zv_checklist_items").selectAll().where("checklist_id", "=", item.checklist_id).execute();
+      const allItems = await db.selectFrom("zv_checklist_items").selectAll().where("checklist_id", "=", item.checklist_id).execute();
       const allRequiredChecked = allItems.filter((i) => i.required).every((i) => i.checked);
-      const checklist = await reqDb(c).selectFrom("zv_checklists").selectAll().where("id", "=", item.checklist_id).executeTakeFirst();
+      const checklist = await db.selectFrom("zv_checklists").selectAll().where("id", "=", item.checklist_id).executeTakeFirst();
       if (allRequiredChecked && checklist && !checklist.completed_at) {
         let timeToComplete = null;
         if (checklist.created_at) {
           timeToComplete = Math.round((now.getTime() - new Date(checklist.created_at).getTime()) / 60000);
         }
-        await reqDb(c).updateTable("zv_checklists").set({
+        await db.updateTable("zv_checklists").set({
           completed_at: now,
           updated_at: now,
           completed_by: user.id,
           time_to_complete_minutes: timeToComplete
         }).where("id", "=", item.checklist_id).where("completed_at", "is", null).execute();
       } else if (!allRequiredChecked) {
-        await reqDb(c).updateTable("zv_checklists").set({ completed_at: null, updated_at: now }).where("id", "=", item.checklist_id).execute();
+        await db.updateTable("zv_checklists").set({ completed_at: null, updated_at: now }).where("id", "=", item.checklist_id).execute();
       }
     }
     return c.json({ item });
@@ -19739,23 +19736,23 @@ function checklistsRoutes(ctx) {
       checked_at: checked ? now : null
     };
     const updatedItems = await Promise.all(item_ids.map(async (itemId) => {
-      const item = await reqDb(c).updateTable("zv_checklist_items").set(updateSet).where("id", "=", itemId).returningAll().executeTakeFirst();
+      const item = await db.updateTable("zv_checklist_items").set(updateSet).where("id", "=", itemId).returningAll().executeTakeFirst();
       return item;
     }));
     const validItems = updatedItems.filter(Boolean);
     const affectedChecklistIds = [...new Set(validItems.map((i) => i.checklist_id))];
     for (const checklistId of affectedChecklistIds) {
-      const allItems = await reqDb(c).selectFrom("zv_checklist_items").selectAll().where("checklist_id", "=", checklistId).execute();
+      const allItems = await db.selectFrom("zv_checklist_items").selectAll().where("checklist_id", "=", checklistId).execute();
       const allRequiredChecked = allItems.filter((i) => i.required).every((i) => i.checked);
-      const checklist = await reqDb(c).selectFrom("zv_checklists").selectAll().where("id", "=", checklistId).executeTakeFirst();
+      const checklist = await db.selectFrom("zv_checklists").selectAll().where("id", "=", checklistId).executeTakeFirst();
       if (allRequiredChecked && checklist && !checklist.completed_at) {
         let timeToComplete = null;
         if (checklist.created_at) {
           timeToComplete = Math.round((now.getTime() - new Date(checklist.created_at).getTime()) / 60000);
         }
-        await reqDb(c).updateTable("zv_checklists").set({ completed_at: now, updated_at: now, completed_by: user.id, time_to_complete_minutes: timeToComplete }).where("id", "=", checklistId).where("completed_at", "is", null).execute();
+        await db.updateTable("zv_checklists").set({ completed_at: now, updated_at: now, completed_by: user.id, time_to_complete_minutes: timeToComplete }).where("id", "=", checklistId).where("completed_at", "is", null).execute();
       } else if (!allRequiredChecked) {
-        await reqDb(c).updateTable("zv_checklists").set({ completed_at: null, updated_at: now }).where("id", "=", checklistId).execute();
+        await db.updateTable("zv_checklists").set({ completed_at: null, updated_at: now }).where("id", "=", checklistId).execute();
       }
     }
     return c.json({ updated: validItems.length, items: validItems });
@@ -19772,14 +19769,14 @@ function checklistsRoutes(ctx) {
         AND ci.due_at < NOW()
         AND ci.checked = false
       ORDER BY ci.due_at ASC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ items: items.rows, count: items.rows.length });
   });
   app.get("/recurrence", async (c) => {
     const user = await getUser(c);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const schedules = await reqDb(c).selectFrom("zv_checklist_recurrence as r").leftJoin("zv_checklist_templates as t", "t.id", "r.template_id").select([
+    const schedules = await db.selectFrom("zv_checklist_recurrence as r").leftJoin("zv_checklist_templates as t", "t.id", "r.template_id").select([
       "r.id",
       "r.template_id",
       "r.collection",
@@ -19805,10 +19802,10 @@ function checklistsRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const { template_id, collection, record_id, frequency, next_run_at } = c.req.valid("json");
-    const template = await reqDb(c).selectFrom("zv_checklist_templates").select("id").where("id", "=", template_id).executeTakeFirst();
+    const template = await db.selectFrom("zv_checklist_templates").select("id").where("id", "=", template_id).executeTakeFirst();
     if (!template)
       return c.json({ error: "Template not found" }, 404);
-    const schedule = await reqDb(c).insertInto("zv_checklist_recurrence").values({
+    const schedule = await db.insertInto("zv_checklist_recurrence").values({
       template_id,
       collection,
       record_id,
@@ -19822,7 +19819,7 @@ function checklistsRoutes(ctx) {
     const user = await getUser(c);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    await reqDb(c).updateTable("zv_checklist_recurrence").set({ is_active: false }).where("id", "=", c.req.param("id")).execute();
+    await db.updateTable("zv_checklist_recurrence").set({ is_active: false }).where("id", "=", c.req.param("id")).execute();
     return c.json({ success: true });
   });
   app.post("/recurrence/trigger", async (c) => {
@@ -19834,15 +19831,15 @@ function checklistsRoutes(ctx) {
     if (!isAdmin)
       return c.json({ error: "Admin access required" }, 403);
     const now = new Date;
-    const dueSchedules = await reqDb(c).selectFrom("zv_checklist_recurrence").selectAll().where("is_active", "=", true).where("next_run_at", "<=", now).execute();
+    const dueSchedules = await db.selectFrom("zv_checklist_recurrence").selectAll().where("is_active", "=", true).where("next_run_at", "<=", now).execute();
     const created = [];
     for (const schedule of dueSchedules) {
       try {
-        const templateItems = await reqDb(c).selectFrom("zv_checklist_template_items").selectAll().where("template_id", "=", schedule.template_id).orderBy("order_idx", "asc").execute();
-        const templateData = await reqDb(c).selectFrom("zv_checklist_templates").selectAll().where("id", "=", schedule.template_id).executeTakeFirst();
+        const templateItems = await db.selectFrom("zv_checklist_template_items").selectAll().where("template_id", "=", schedule.template_id).orderBy("order_idx", "asc").execute();
+        const templateData = await db.selectFrom("zv_checklist_templates").selectAll().where("id", "=", schedule.template_id).executeTakeFirst();
         if (!templateData)
           continue;
-        const checklist = await reqDb(c).insertInto("zv_checklists").values({
+        const checklist = await db.insertInto("zv_checklists").values({
           template_id: schedule.template_id,
           collection: schedule.collection,
           record_id: schedule.record_id,
@@ -19850,7 +19847,7 @@ function checklistsRoutes(ctx) {
           created_by: schedule.created_by
         }).returningAll().executeTakeFirst();
         if (templateItems.length > 0) {
-          await reqDb(c).insertInto("zv_checklist_items").values(templateItems.map((item, i) => ({
+          await db.insertInto("zv_checklist_items").values(templateItems.map((item, i) => ({
             checklist_id: checklist.id,
             label: item.label,
             description: item.description,
@@ -19873,7 +19870,7 @@ function checklistsRoutes(ctx) {
             nextRun.setMonth(nextRun.getMonth() + 3);
             break;
         }
-        await reqDb(c).updateTable("zv_checklist_recurrence").set({ last_run_at: now, next_run_at: nextRun }).where("id", "=", schedule.id).execute();
+        await db.updateTable("zv_checklist_recurrence").set({ last_run_at: now, next_run_at: nextRun }).where("id", "=", schedule.id).execute();
         created.push({ schedule_id: schedule.id, checklist_id: checklist.id });
       } catch (err) {
         console.error(`Failed to trigger recurrence ${schedule.id}:`, err.message);
@@ -19888,16 +19885,16 @@ function checklistsRoutes(ctx) {
     const { collection } = c.req.param();
     const totalResult = await sql`
       SELECT COUNT(*) as count FROM zv_checklists WHERE collection = ${collection}
-    `.execute(reqDb(c));
+    `.execute(db);
     const completedResult = await sql`
       SELECT COUNT(*) as count FROM zv_checklists
       WHERE collection = ${collection} AND completed_at IS NOT NULL
-    `.execute(reqDb(c));
+    `.execute(db);
     const avgTimeResult = await sql`
       SELECT AVG(time_to_complete_minutes) as avg_minutes
       FROM zv_checklists
       WHERE collection = ${collection} AND time_to_complete_minutes IS NOT NULL
-    `.execute(reqDb(c));
+    `.execute(db);
     const overdueResult = await sql`
       SELECT COUNT(*) as count
       FROM zv_checklist_items ci
@@ -19906,7 +19903,7 @@ function checklistsRoutes(ctx) {
         AND ci.due_at IS NOT NULL
         AND ci.due_at < NOW()
         AND ci.checked = false
-    `.execute(reqDb(c));
+    `.execute(db);
     const total = parseInt(totalResult.rows[0]?.count || "0");
     const completed = parseInt(completedResult.rows[0]?.count || "0");
     return c.json({
@@ -19923,9 +19920,9 @@ function checklistsRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const { limit: lim = "20" } = c.req.query();
-    const checklists = await reqDb(c).selectFrom("zv_checklists").selectAll().orderBy("updated_at", "desc").limit(parseInt(lim)).execute();
+    const checklists = await db.selectFrom("zv_checklists").selectAll().orderBy("updated_at", "desc").limit(parseInt(lim)).execute();
     const withProgress = await Promise.all(checklists.map(async (cl) => {
-      const items = await reqDb(c).selectFrom("zv_checklist_items").selectAll().where("checklist_id", "=", cl.id).execute();
+      const items = await db.selectFrom("zv_checklist_items").selectAll().where("checklist_id", "=", cl.id).execute();
       const total = items.length;
       const checked = items.filter((i) => i.checked).length;
       return { ...cl, total_items: total, checked_items: checked, progress: total > 0 ? Math.round(checked / total * 100) : 0 };
@@ -19941,7 +19938,7 @@ function checklistsRoutes(ctx) {
     const user = await getUser(c);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    await reqDb(c).deleteFrom("zv_checklists").where("id", "=", c.req.param("id")).execute();
+    await db.deleteFrom("zv_checklists").where("id", "=", c.req.param("id")).execute();
     return c.json({ success: true });
   });
   return app;

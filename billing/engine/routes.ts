@@ -11,13 +11,10 @@ export function billingRoutes(
 ): Hono<{ Variables: { user: any } }> {
   const { db, auth, checkPermission } = ctx;
 
-  // Per-request DB handle (CRM PR #1 pattern). After
-  // migration 002_tenant_rls.sql, this extension's tables have FORCE
-  // RLS keyed on `zveltio.current_tenant`; routes must run through
-  // this handle so the GUC is active inside the transaction.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
 
   async function requireAdmin(c: any): Promise<any | null> {
@@ -67,14 +64,14 @@ export function billingRoutes(
       WHERE created_at >= ${since}
       GROUP BY event_type, DATE_TRUNC('day', created_at)
       ORDER BY day DESC, event_type
-    `.execute(reqDb(c));
+    `.execute(db);
 
     return c.json({ usage: rows.rows });
   });
 
   // GET /usage/live — last 100 events
   app.get('/usage/live', async (c) => {
-    const events = await (reqDb(c) as any)
+    const events = await (db as any)
       .selectFrom('zv_usage_events')
       .selectAll()
       .orderBy('created_at', 'desc')
@@ -85,7 +82,7 @@ export function billingRoutes(
 
   // GET /plans — list all plans
   app.get('/plans', async (c) => {
-    const plans = await (reqDb(c) as any)
+    const plans = await (db as any)
       .selectFrom('zv_billing_plans')
       .selectAll()
       .orderBy('price_cents', 'asc')
@@ -108,7 +105,7 @@ export function billingRoutes(
     ),
     async (c) => {
       const data = c.req.valid('json');
-      const plan = await (reqDb(c) as any)
+      const plan = await (db as any)
         .insertInto('zv_billing_plans')
         .values({
           name: data.name,
@@ -125,7 +122,7 @@ export function billingRoutes(
 
   // GET /subscriptions — list subscriptions
   app.get('/subscriptions', async (c) => {
-    const subs = await (reqDb(c) as any)
+    const subs = await (db as any)
       .selectFrom('zv_billing_subscriptions as s')
       .leftJoin('zv_billing_plans as p', 'p.id', 's.plan_id')
       .select([

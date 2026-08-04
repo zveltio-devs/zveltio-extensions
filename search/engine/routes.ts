@@ -7,13 +7,10 @@ import type { ExtensionContext } from '@zveltio/sdk/extension';
 export function searchRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any } }> {
   const { db, auth, checkPermission } = ctx;
 
-  // Per-request DB handle (CRM PR #1 pattern). After
-  // migration 002_tenant_rls.sql, this extension's tables have FORCE
-  // RLS keyed on `zveltio.current_tenant`; routes must run through
-  // this handle so the GUC is active inside the transaction.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
 
   async function requireAdmin(c: any): Promise<any | null> {
@@ -56,7 +53,7 @@ export function searchRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
 
   // GET /indexes — list configured search indexes
   app.get('/indexes', async (c) => {
-    const indexes = await (reqDb(c) as any)
+    const indexes = await (db as any)
       .selectFrom('zv_search_indexes')
       .selectAll()
       .orderBy('created_at', 'desc')
@@ -82,7 +79,7 @@ export function searchRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
       const data = c.req.valid('json');
 
       // Upsert: update if exists, insert if not
-      const existing = await (reqDb(c) as any)
+      const existing = await (db as any)
         .selectFrom('zv_search_indexes')
         .select('id')
         .where('collection', '=', data.collection)
@@ -90,7 +87,7 @@ export function searchRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
 
       let indexRecord: any;
       if (existing) {
-        indexRecord = await (reqDb(c) as any)
+        indexRecord = await (db as any)
           .updateTable('zv_search_indexes')
           .set({
             provider: data.provider,
@@ -104,7 +101,7 @@ export function searchRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
           .returningAll()
           .executeTakeFirst();
       } else {
-        indexRecord = await (reqDb(c) as any)
+        indexRecord = await (db as any)
           .insertInto('zv_search_indexes')
           .values({
             collection: data.collection,
@@ -125,7 +122,7 @@ export function searchRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
   // DELETE /indexes/:collection — remove index config
   app.delete('/indexes/:collection', async (c) => {
     const collection = c.req.param('collection');
-    await (reqDb(c) as any)
+    await (db as any)
       .updateTable('zv_search_indexes')
       .set({ status: 'inactive' })
       .where('collection', '=', collection)
@@ -148,7 +145,7 @@ export function searchRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
   // GET /indexes/:collection/stats — record count, last synced, status
   app.get('/indexes/:collection/stats', async (c) => {
     const collection = c.req.param('collection');
-    const index = await (reqDb(c) as any)
+    const index = await (db as any)
       .selectFrom('zv_search_indexes')
       .selectAll()
       .where('collection', '=', collection)

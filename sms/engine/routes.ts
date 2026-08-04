@@ -7,13 +7,10 @@ import type { ExtensionContext } from '@zveltio/sdk/extension';
 export function smsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any } }> {
   const { db, auth, checkPermission } = ctx;
 
-  // Per-request DB handle (CRM PR #1 pattern). After
-  // migration 002_tenant_rls.sql, this extension's tables have FORCE
-  // RLS keyed on `zveltio.current_tenant`; routes must run through
-  // this handle so the GUC is active inside the transaction.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
 
   async function requireAdmin(c: any): Promise<any | null> {
@@ -84,7 +81,7 @@ export function smsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any 
     const parsedLimit = Math.min(parseInt(limit) || 50, 200);
     const offset = (parseInt(page) - 1) * parsedLimit;
 
-    let query = (reqDb(c) as any)
+    let query = (db as any)
       .selectFrom('zv_sms_messages')
       .selectAll()
       .orderBy('created_at', 'desc')
@@ -99,7 +96,7 @@ export function smsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any 
 
   // GET /templates — list templates
   app.get('/templates', async (c) => {
-    const templates = await (reqDb(c) as any)
+    const templates = await (db as any)
       .selectFrom('zv_sms_templates')
       .selectAll()
       .orderBy('created_at', 'desc')
@@ -120,7 +117,7 @@ export function smsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any 
     ),
     async (c) => {
       const data = c.req.valid('json');
-      const template = await (reqDb(c) as any)
+      const template = await (db as any)
         .insertInto('zv_sms_templates')
         .values(data)
         .returningAll()
@@ -176,7 +173,7 @@ export function smsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any 
     };
     const mappedStatus = statusMap[messageStatus] ?? messageStatus;
 
-    await reqDb(c)
+    await db
       .updateTable('zv_sms_messages')
       .set({ status: mappedStatus })
       .where('provider_message_id', '=', messageSid)

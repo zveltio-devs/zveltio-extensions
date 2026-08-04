@@ -19491,9 +19491,6 @@ function permissionGate(ctx, resource, opts = {}) {
 // engine/routes.ts
 function helpdeskRoutes(ctx) {
   const { db, auth } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -19509,7 +19506,7 @@ function helpdeskRoutes(ctx) {
       FROM zvd_ticket_categories c
       LEFT JOIN zvd_tickets t ON t.category_id = c.id
       GROUP BY c.id ORDER BY c.name
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/categories", zValidator("json", exports_external.object({
@@ -19526,7 +19523,7 @@ function helpdeskRoutes(ctx) {
       INSERT INTO zvd_ticket_categories (name, description, color, default_priority, sla_hours, sla_response_hours, created_by)
       VALUES (${d.name}, ${d.description ?? null}, ${d.color}, ${d.default_priority}, ${d.sla_hours}, ${d.sla_response_hours}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.patch("/categories/:id", zValidator("json", exports_external.object({
@@ -19543,7 +19540,7 @@ function helpdeskRoutes(ctx) {
         sla_response_hours = COALESCE(${d.sla_response_hours ?? null}, sla_response_hours),
         default_priority = COALESCE(${d.default_priority ?? null}, default_priority)
       WHERE id = ${c.req.param("id")} RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -19570,7 +19567,7 @@ function helpdeskRoutes(ctx) {
         CASE t.priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END,
         t.sla_due_at ASC NULLS LAST, t.created_at DESC
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/tickets/:id", async (c) => {
@@ -19578,12 +19575,12 @@ function helpdeskRoutes(ctx) {
       SELECT t.*, cat.name as category_name, cat.color as category_color, cat.sla_hours
       FROM zvd_tickets t LEFT JOIN zvd_ticket_categories cat ON cat.id = t.category_id
       WHERE t.id = ${c.req.param("id")}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
-    const messages = await sql`SELECT * FROM zvd_ticket_messages WHERE ticket_id = ${c.req.param("id")} ORDER BY created_at ASC`.execute(reqDb(c));
-    const escalations = await sql`SELECT * FROM zvd_ticket_escalations WHERE ticket_id = ${c.req.param("id")} ORDER BY escalated_at DESC`.execute(reqDb(c));
-    const csat = await sql`SELECT * FROM zvd_ticket_csat WHERE ticket_id = ${c.req.param("id")}`.execute(reqDb(c));
+    const messages = await sql`SELECT * FROM zvd_ticket_messages WHERE ticket_id = ${c.req.param("id")} ORDER BY created_at ASC`.execute(db);
+    const escalations = await sql`SELECT * FROM zvd_ticket_escalations WHERE ticket_id = ${c.req.param("id")} ORDER BY escalated_at DESC`.execute(db);
+    const csat = await sql`SELECT * FROM zvd_ticket_csat WHERE ticket_id = ${c.req.param("id")}`.execute(db);
     return c.json({ data: {
       ...row.rows[0],
       messages: messages.rows,
@@ -19604,11 +19601,11 @@ function helpdeskRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const d = c.req.valid("json");
-    const count = await sql`SELECT COUNT(*) as cnt FROM zvd_tickets`.execute(reqDb(c));
+    const count = await sql`SELECT COUNT(*) as cnt FROM zvd_tickets`.execute(db);
     const number4 = `TKT-${String(+count.rows[0].cnt + 1).padStart(5, "0")}`;
     let slaDueAt = null;
     if (d.category_id) {
-      const cat = await sql`SELECT sla_hours FROM zvd_ticket_categories WHERE id = ${d.category_id}`.execute(reqDb(c));
+      const cat = await sql`SELECT sla_hours FROM zvd_ticket_categories WHERE id = ${d.category_id}`.execute(db);
       if (cat.rows.length) {
         const slaMs = +cat.rows[0].sla_hours * 3600000;
         slaDueAt = new Date(Date.now() + slaMs).toISOString();
@@ -19621,12 +19618,12 @@ function helpdeskRoutes(ctx) {
         ${d.assignee_id ?? null}, ${d.channel}, ${slaDueAt},
         ${JSON.stringify(d.tags)}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     const ticketId = row.rows[0].id;
     await sql`
       INSERT INTO zvd_ticket_messages (ticket_id, author_id, author_name, author_email, content, is_internal)
       VALUES (${ticketId}, ${user.id}, ${d.requester_name ?? user.name ?? ""}, ${d.requester_email}, ${d.description}, false)
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.patch("/tickets/:id", zValidator("json", exports_external.object({
@@ -19649,7 +19646,7 @@ function helpdeskRoutes(ctx) {
         closed_at = CASE WHEN ${d.status ?? null} = 'closed' AND status != 'closed' THEN NOW() ELSE closed_at END,
         updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND is_merged = false RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -19662,21 +19659,21 @@ function helpdeskRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const d = c.req.valid("json");
-    const ticket = await sql`SELECT status FROM zvd_tickets WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    const ticket = await sql`SELECT status FROM zvd_tickets WHERE id = ${c.req.param("id")}`.execute(db);
     if (!ticket.rows.length)
       return c.json({ error: "Not found" }, 404);
     const row = await sql`
       INSERT INTO zvd_ticket_messages (ticket_id, author_id, author_name, author_email, content, is_internal)
       VALUES (${c.req.param("id")}, ${user.id}, ${d.author_name ?? user.name ?? ""}, ${d.author_email ?? user.email ?? ""}, ${d.content}, ${d.is_internal})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     await sql`
       UPDATE zvd_tickets SET
         first_response_at = CASE WHEN first_response_at IS NULL AND ${!d.is_internal} THEN NOW() ELSE first_response_at END,
         status = CASE WHEN status = 'open' AND ${!d.is_internal} THEN 'in_progress' ELSE status END,
         updated_at = NOW()
       WHERE id = ${c.req.param("id")}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.get("/canned-responses", async (c) => {
@@ -19685,7 +19682,7 @@ function helpdeskRoutes(ctx) {
       SELECT * FROM zvd_canned_responses
       WHERE (${q ? sql`name ILIKE ${"%" + q + "%"} OR shortcut ILIKE ${"%" + q + "%"} OR content ILIKE ${"%" + q + "%"}` : sql`TRUE`})
       ORDER BY name
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/canned-responses", zValidator("json", exports_external.object({
@@ -19700,7 +19697,7 @@ function helpdeskRoutes(ctx) {
       INSERT INTO zvd_canned_responses (name, shortcut, content, category_id, created_by)
       VALUES (${d.name}, ${d.shortcut ?? null}, ${d.content}, ${d.category_id ?? null}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.patch("/canned-responses/:id", zValidator("json", exports_external.object({
@@ -19715,13 +19712,13 @@ function helpdeskRoutes(ctx) {
         shortcut = COALESCE(${d.shortcut ?? null}, shortcut),
         content = COALESCE(${d.content ?? null}, content)
       WHERE id = ${c.req.param("id")} RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
     return c.json({ data: row.rows[0] });
   });
   app.delete("/canned-responses/:id", async (c) => {
-    await sql`DELETE FROM zvd_canned_responses WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_canned_responses WHERE id = ${c.req.param("id")}`.execute(db);
     return c.json({ success: true });
   });
   app.post("/tickets/:id/csat", zValidator("json", exports_external.object({
@@ -19734,7 +19731,7 @@ function helpdeskRoutes(ctx) {
       VALUES (${c.req.param("id")}, ${d.rating}, ${d.comment ?? null})
       ON CONFLICT (ticket_id) DO UPDATE SET rating = ${d.rating}, comment = ${d.comment ?? null}
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.post("/tickets/:id/merge", zValidator("json", exports_external.object({
@@ -19745,19 +19742,19 @@ function helpdeskRoutes(ctx) {
     const d = c.req.valid("json");
     if (d.into_ticket_id === c.req.param("id"))
       return c.json({ error: "Cannot merge ticket into itself" }, 400);
-    await sql`UPDATE zvd_ticket_messages SET ticket_id = ${d.into_ticket_id} WHERE ticket_id = ${c.req.param("id")}`.execute(reqDb(c));
+    await sql`UPDATE zvd_ticket_messages SET ticket_id = ${d.into_ticket_id} WHERE ticket_id = ${c.req.param("id")}`.execute(db);
     await sql`
       UPDATE zvd_tickets SET is_merged = true, merged_into_id = ${d.into_ticket_id}, status = 'closed', closed_at = NOW(), updated_at = NOW()
       WHERE id = ${c.req.param("id")}
-    `.execute(reqDb(c));
+    `.execute(db);
     await sql`
       INSERT INTO zvd_ticket_messages (ticket_id, author_id, author_name, author_email, content, is_internal)
       VALUES (${d.into_ticket_id}, ${user.id}, 'System', '', ${`Ticket ${c.req.param("id")} was merged into this ticket. ${d.reason ?? ""}`}, true)
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ success: true });
   });
   app.get("/escalation-rules", async (c) => {
-    const rows = await sql`SELECT * FROM zvd_escalation_rules WHERE is_active = true ORDER BY condition_hours`.execute(reqDb(c));
+    const rows = await sql`SELECT * FROM zvd_escalation_rules WHERE is_active = true ORDER BY condition_hours`.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/escalation-rules", zValidator("json", exports_external.object({
@@ -19776,11 +19773,11 @@ function helpdeskRoutes(ctx) {
       VALUES (${d.name}, ${d.priority ?? null}, ${d.category_id ?? null}, ${d.condition_hours}, ${d.condition_type},
         ${d.action_assign_to ?? null}, ${d.action_priority ?? null}, ${d.action_notify_email ?? null})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.post("/escalate", async (c) => {
-    const rules = await sql`SELECT * FROM zvd_escalation_rules WHERE is_active = true`.execute(reqDb(c));
+    const rules = await sql`SELECT * FROM zvd_escalation_rules WHERE is_active = true`.execute(db);
     let escalated = 0;
     for (const rule of rules.rows) {
       const cutoff = new Date(Date.now() - rule.condition_hours * 3600000).toISOString();
@@ -19792,35 +19789,35 @@ function helpdeskRoutes(ctx) {
             AND (${rule.priority ? sql`priority = ${rule.priority}` : sql`TRUE`})
             AND (${rule.category_id ? sql`category_id = ${rule.category_id}` : sql`TRUE`})
             AND is_merged = false
-        `.execute(reqDb(c));
+        `.execute(db);
       } else if (rule.condition_type === "sla_breach") {
         tickets = await sql`
           SELECT id FROM zvd_tickets
           WHERE sla_due_at < NOW() AND sla_breached = false AND status NOT IN ('resolved','closed')
             AND is_merged = false
-        `.execute(reqDb(c));
+        `.execute(db);
       } else {
         tickets = await sql`
           SELECT id FROM zvd_tickets
           WHERE status IN ('open','in_progress') AND created_at < ${cutoff}
             AND resolved_at IS NULL AND is_merged = false
             AND (${rule.priority ? sql`priority = ${rule.priority}` : sql`TRUE`})
-        `.execute(reqDb(c));
+        `.execute(db);
       }
       for (const t of tickets.rows) {
         await sql`
           INSERT INTO zvd_ticket_escalations (ticket_id, rule_id, reason)
           VALUES (${t.id}, ${rule.id}, ${rule.condition_type + " after " + rule.condition_hours + "h"})
           ON CONFLICT DO NOTHING
-        `.execute(reqDb(c));
+        `.execute(db);
         if (rule.action_assign_to) {
-          await sql`UPDATE zvd_tickets SET assignee_id = ${rule.action_assign_to}, updated_at = NOW() WHERE id = ${t.id}`.execute(reqDb(c));
+          await sql`UPDATE zvd_tickets SET assignee_id = ${rule.action_assign_to}, updated_at = NOW() WHERE id = ${t.id}`.execute(db);
         }
         if (rule.action_priority) {
-          await sql`UPDATE zvd_tickets SET priority = ${rule.action_priority}, updated_at = NOW() WHERE id = ${t.id}`.execute(reqDb(c));
+          await sql`UPDATE zvd_tickets SET priority = ${rule.action_priority}, updated_at = NOW() WHERE id = ${t.id}`.execute(db);
         }
         if (rule.condition_type === "sla_breach") {
-          await sql`UPDATE zvd_tickets SET sla_breached = true, updated_at = NOW() WHERE id = ${t.id}`.execute(reqDb(c));
+          await sql`UPDATE zvd_tickets SET sla_breached = true, updated_at = NOW() WHERE id = ${t.id}`.execute(db);
         }
         escalated++;
       }
@@ -19841,14 +19838,14 @@ function helpdeskRoutes(ctx) {
         ROUND(AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))/3600) FILTER (WHERE resolved_at IS NOT NULL), 2) as avg_resolution_hours,
         ROUND(AVG(EXTRACT(EPOCH FROM (first_response_at - created_at))/3600) FILTER (WHERE first_response_at IS NOT NULL), 2) as avg_first_response_hours
       FROM zvd_tickets WHERE is_merged = false
-    `.execute(reqDb(c));
-    const csatAvg = await sql`SELECT ROUND(AVG(rating), 2) as avg_csat, COUNT(*) as responses FROM zvd_ticket_csat`.execute(reqDb(c));
+    `.execute(db);
+    const csatAvg = await sql`SELECT ROUND(AVG(rating), 2) as avg_csat, COUNT(*) as responses FROM zvd_ticket_csat`.execute(db);
     const byCategory = await sql`
       SELECT cat.name, cat.color, COUNT(t.id) as ticket_count
       FROM zvd_ticket_categories cat
       LEFT JOIN zvd_tickets t ON t.category_id = cat.id AND t.is_merged = false
       GROUP BY cat.id, cat.name, cat.color ORDER BY ticket_count DESC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: {
       ...row.rows[0],
       ...csatAvg.rows[0],

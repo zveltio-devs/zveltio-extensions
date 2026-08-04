@@ -15,13 +15,10 @@ const DOC_TYPES = ['contract', 'pv', 'nir', 'dispozitie_plata', 'proces_verbal',
 export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
-  // Per-request DB handle (CRM PR #1 pattern). After
-  // migration 002_tenant_rls.sql, this extension's tables have FORCE
-  // RLS keyed on `zveltio.current_tenant`; routes must run through
-  // this handle so the GUC is active inside the transaction.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
   const app = new Hono();
 
@@ -38,7 +35,7 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const templates = await reqDb(c)
+    const templates = await db
       .selectFrom('zv_ro_document_templates')
       .select(['id', 'name', 'type', 'description', 'variables'])
       .where('is_active', '=', true)
@@ -54,7 +51,7 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const { type, status, category, search } = c.req.query();
-    let query = reqDb(c)
+    let query = db
       .selectFrom('zv_ro_documents')
       .select(['id', 'type', 'number', 'date', 'title', 'status', 'category', 'version_number', 'signed_at', 'created_at'])
       .orderBy('date', 'desc');
@@ -83,7 +80,7 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
         COUNT(*)::int AS count
       FROM zv_ro_documents
       GROUP BY GROUPING SETS ((), (type))
-    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+    `.execute(db).catch(() => ({ rows: [] }));
 
     return c.json({ stats: stats.rows });
   });
@@ -93,7 +90,7 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const doc = await reqDb(c)
+    const doc = await db
       .selectFrom('zv_ro_documents')
       .selectAll()
       .where('id', '=', c.req.param('id'))
@@ -135,7 +132,7 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
           SET last_seq = last_seq + 1, updated_at = NOW()
           WHERE type = ${body.type}
           RETURNING prefix, year, last_seq, format
-        `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+        `.execute(db).catch(() => ({ rows: [] }));
 
         if (seq.rows[0]) {
           const { prefix, year, last_seq, format } = seq.rows[0];
@@ -148,7 +145,7 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
         }
       }
 
-      const doc = await reqDb(c)
+      const doc = await db
         .insertInto('zv_ro_documents')
         .values({
           ...body,
@@ -180,7 +177,7 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
       const body = c.req.valid('json');
-      const existing = await reqDb(c).selectFrom('zv_ro_documents').select(['id', 'status', 'version_number', 'content']).where('id', '=', c.req.param('id')).executeTakeFirst();
+      const existing = await db.selectFrom('zv_ro_documents').select(['id', 'status', 'version_number', 'content']).where('id', '=', c.req.param('id')).executeTakeFirst();
       if (!existing) return c.json({ error: 'Document not found' }, 404);
       if (existing.status !== 'draft') return c.json({ error: 'Only draft documents can be edited' }, 400);
 
@@ -188,7 +185,7 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
       await sql`
         INSERT INTO zv_ro_document_versions (document_id, version, content, changed_by)
         VALUES (${existing.id}::uuid, ${existing.version_number}, ${existing.content ?? null}, ${user.id})
-      `.execute(reqDb(c)).catch(() => {});
+      `.execute(db).catch(() => {});
 
       const updates: any = { updated_at: new Date(), version_number: existing.version_number + 1 };
       if (body.title !== undefined) updates.title = body.title;
@@ -198,7 +195,7 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
       if (body.internal_notes !== undefined) updates.internal_notes = body.internal_notes;
       if (body.category !== undefined) updates.category = body.category;
 
-      const doc = await reqDb(c).updateTable('zv_ro_documents').set(updates).where('id', '=', c.req.param('id')).returningAll().executeTakeFirst();
+      const doc = await db.updateTable('zv_ro_documents').set(updates).where('id', '=', c.req.param('id')).returningAll().executeTakeFirst();
       return c.json({ document: doc });
     },
   );
@@ -208,7 +205,7 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const doc = await reqDb(c)
+    const doc = await db
       .updateTable('zv_ro_documents')
       .set({ status: 'signed', signed_at: new Date(), updated_at: new Date() })
       .where('id', '=', c.req.param('id'))
@@ -224,7 +221,7 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const doc = await reqDb(c)
+    const doc = await db
       .updateTable('zv_ro_documents')
       .set({ status: 'archived', archived_at: new Date(), updated_at: new Date() })
       .where('id', '=', c.req.param('id'))
@@ -245,7 +242,7 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
       FROM zv_ro_document_versions
       WHERE document_id = ${c.req.param('id')}::uuid
       ORDER BY version DESC
-    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+    `.execute(db).catch(() => ({ rows: [] }));
 
     return c.json({ versions: versions.rows });
   });
@@ -258,20 +255,20 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
     const version = await sql<any>`
       SELECT content FROM zv_ro_document_versions
       WHERE document_id = ${c.req.param('id')}::uuid AND version = ${parseInt(c.req.param('version'), 10)}
-    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+    `.execute(db).catch(() => ({ rows: [] }));
 
     if (!version.rows[0]) return c.json({ error: 'Version not found' }, 404);
 
-    const existing = await reqDb(c).selectFrom('zv_ro_documents').select(['version_number']).where('id', '=', c.req.param('id')).executeTakeFirst();
+    const existing = await db.selectFrom('zv_ro_documents').select(['version_number']).where('id', '=', c.req.param('id')).executeTakeFirst();
     if (!existing) return c.json({ error: 'Document not found' }, 404);
 
     await sql`
       INSERT INTO zv_ro_document_versions (document_id, version, content, changed_by, change_note)
       SELECT id, ${existing.version_number}::int, content, ${user.id}, 'Pre-restore snapshot'
       FROM zv_ro_documents WHERE id = ${c.req.param('id')}::uuid
-    `.execute(reqDb(c)).catch(() => {});
+    `.execute(db).catch(() => {});
 
-    const doc = await reqDb(c).updateTable('zv_ro_documents')
+    const doc = await db.updateTable('zv_ro_documents')
       .set({ content: version.rows[0].content, status: 'draft', version_number: existing.version_number + 1, updated_at: new Date() })
       .where('id', '=', c.req.param('id'))
       .returningAll()
@@ -293,7 +290,7 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
         SET status = 'signed', signed_at = NOW(), updated_at = NOW()
         WHERE id = ANY(${c.req.valid('json').ids}::uuid[]) AND status = 'draft'
         RETURNING id, number, title
-      `.execute(reqDb(c));
+      `.execute(db);
 
       return c.json({ signed: result.rows, count: result.rows.length });
     },
@@ -304,7 +301,7 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    await reqDb(c)
+    await db
       .deleteFrom('zv_ro_documents')
       .where('id', '=', c.req.param('id'))
       .where('status', '=', 'draft')

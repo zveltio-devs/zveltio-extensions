@@ -116,13 +116,10 @@ function applyRule(ruleType: string, ruleConfig: any, inputValue: string): boole
 export function validationRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
 
-  // Per-request DB handle (CRM PR #1 pattern). After
-  // migration 002_tenant_rls.sql, this extension's tables have FORCE
-  // RLS keyed on `zveltio.current_tenant`; routes must run through
-  // this handle so the GUC is active inside the transaction.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
   const { invalidateRulesCache } = ctx.internals;
 
@@ -198,11 +195,11 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
           SELECT * FROM zvd_validation_rule_groups
           WHERE collection = ${collection}
           ORDER BY name ASC
-        `.execute(reqDb(c))
+        `.execute(db)
       : await sql<any>`
           SELECT * FROM zvd_validation_rule_groups
           ORDER BY collection ASC, name ASC
-        `.execute(reqDb(c));
+        `.execute(db);
     return c.json({ groups: rows.rows });
   });
 
@@ -221,7 +218,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
          ${body.description ?? null}, ${body.logic}, ${body.rule_ids as any},
          ${body.is_active}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ group: row.rows[0] }, 201);
   });
 
@@ -232,7 +229,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
     if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
 
     const id = c.req.param('id');
-    const res = await (reqDb(c) as any)
+    const res = await (db as any)
       .deleteFrom('zvd_validation_rule_groups')
       .where('id', '=', id)
       .executeTakeFirst();
@@ -244,7 +241,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
   // ── GET /:collection — list rules ─────────────────────────────────────────
   app.get('/:collection', async (c) => {
     const collection = c.req.param('collection');
-    const rules = await (reqDb(c) as any)
+    const rules = await (db as any)
       .selectFrom('zv_validation_rules')
       .selectAll()
       .where('collection', '=', collection)
@@ -261,7 +258,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
     if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
 
     const body = c.req.valid('json');
-    const rule = await (reqDb(c) as any)
+    const rule = await (db as any)
       .insertInto('zv_validation_rules')
       .values({
         collection,
@@ -292,7 +289,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
       FROM zv_validation_rules r
       LEFT JOIN zvd_validation_test_cases tc ON tc.rule_id = r.id
       WHERE r.collection = ${collection}
-    `.execute(reqDb(c));
+    `.execute(db);
 
     interface TestResult {
       rule_id: string;
@@ -331,7 +328,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
           UPDATE zvd_validation_test_cases
           SET last_run_result = ${actual}, last_run_at = ${now}
           WHERE id = ${row.tc_id}
-        `.execute(reqDb(c)).catch(() => {}),
+        `.execute(db).catch(() => {}),
       );
     }
 
@@ -372,7 +369,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
 
       const rule = parsed.data;
       try {
-        await (reqDb(c) as any)
+        await (db as any)
           .insertInto('zv_validation_rules')
           .values({
             collection,
@@ -399,7 +396,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
       VALUES
         (${collection}, ${importedCount}, ${failedCount},
          ${JSON.stringify(errors)}::jsonb, ${user.id})
-    `.execute(reqDb(c)).catch(() => {});
+    `.execute(db).catch(() => {});
 
     if (importedCount > 0) invalidateRulesCache(collection);
     return c.json({ imported: importedCount, failed: failedCount, errors }, importedCount > 0 ? 201 : 422);
@@ -414,7 +411,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
     if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
 
     const body = c.req.valid('json');
-    const rule = await (reqDb(c) as any)
+    const rule = await (db as any)
       .updateTable('zv_validation_rules')
       .set({ is_active: body.is_active, updated_at: new Date() })
       .where('id', '=', id)
@@ -434,7 +431,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
     const isAdmin = await checkPermission(user.id, 'admin', '*');
     if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
 
-    await (reqDb(c) as any).deleteFrom('zv_validation_rules').where('id', '=', id).execute();
+    await (db as any).deleteFrom('zv_validation_rules').where('id', '=', id).execute();
     invalidateRulesCache(collection);
     return c.json({ success: true });
   });
@@ -446,13 +443,13 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
 
     const ruleRes = await sql<any>`
       SELECT id, rule_type, rule_config FROM zv_validation_rules WHERE id = ${id}
-    `.execute(reqDb(c));
+    `.execute(db);
     const rule = ruleRes.rows[0];
     if (!rule) return c.json({ error: 'Rule not found' }, 404);
 
     const casesRes = await sql<any>`
       SELECT * FROM zvd_validation_test_cases WHERE rule_id = ${id}
-    `.execute(reqDb(c));
+    `.execute(db);
 
     const config = typeof rule.rule_config === 'string'
       ? JSON.parse(rule.rule_config)
@@ -486,7 +483,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
         UPDATE zvd_validation_test_cases
         SET last_run_result = ${actual}, last_run_at = ${now}
         WHERE id = ${tc.id}
-      `.execute(reqDb(c)).catch(() => {});
+      `.execute(db).catch(() => {});
     }
 
     const total = results.length;
@@ -501,7 +498,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
       SELECT * FROM zvd_validation_test_cases
       WHERE rule_id = ${id}
       ORDER BY created_at ASC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ test_cases: rows.rows });
   });
 
@@ -515,7 +512,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
     // Verify rule exists
     const ruleRes = await sql<any>`
       SELECT id FROM zv_validation_rules WHERE id = ${id}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!ruleRes.rows[0]) return c.json({ error: 'Rule not found' }, 404);
 
     const body = c.req.valid('json');
@@ -525,7 +522,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
       VALUES
         (${id}, ${body.label}, ${body.input_value}, ${body.expected_result}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ test_case: row.rows[0] }, 201);
   });
 
@@ -537,7 +534,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
 
     const testId = c.req.param('testId');
     const ruleId = c.req.param('id');
-    const res = await (reqDb(c) as any)
+    const res = await (db as any)
       .deleteFrom('zvd_validation_test_cases')
       .where('id', '=', testId)
       .where('rule_id', '=', ruleId)

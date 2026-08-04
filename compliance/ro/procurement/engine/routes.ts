@@ -36,13 +36,10 @@ const poItemSchema = z.object({
 export function roProcurementRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
-  // Per-request DB handle (CRM PR #1 pattern). After
-  // migration 002_tenant_rls.sql, this extension's tables have FORCE
-  // RLS keyed on `zveltio.current_tenant`; routes must run through
-  // this handle so the GUC is active inside the transaction.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
   const app = new Hono();
 
@@ -61,7 +58,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const { search, category } = c.req.query();
-    let query = reqDb(c).selectFrom('zv_ro_suppliers').selectAll().where('is_active', '=', true).orderBy('name', 'asc');
+    let query = db.selectFrom('zv_ro_suppliers').selectAll().where('is_active', '=', true).orderBy('name', 'asc');
     if (search) query = query.where('name', 'ilike', `%${search}%`);
     if (category) query = query.where('category', '=', category);
 
@@ -73,13 +70,13 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const supplier = await reqDb(c).selectFrom('zv_ro_suppliers').selectAll().where('id', '=', c.req.param('id')).executeTakeFirst();
+    const supplier = await db.selectFrom('zv_ro_suppliers').selectAll().where('id', '=', c.req.param('id')).executeTakeFirst();
     if (!supplier) return c.json({ error: 'Supplier not found' }, 404);
 
     const [orders, evaluations, contracts] = await Promise.all([
-      reqDb(c).selectFrom('zv_ro_purchase_orders').select(['id', 'number', 'date', 'total', 'currency', 'status']).where('supplier_id', '=', c.req.param('id')).orderBy('date', 'desc').limit(10).execute(),
-      sql<any>`SELECT * FROM zv_ro_supplier_evaluations WHERE supplier_id = ${c.req.param('id')}::uuid ORDER BY period DESC`.execute(reqDb(c)).catch(() => ({ rows: [] })),
-      sql<any>`SELECT id, number, title, value, currency, status, start_date, end_date FROM zv_ro_contracts WHERE supplier_id = ${c.req.param('id')}::uuid AND status = 'active'`.execute(reqDb(c)).catch(() => ({ rows: [] })),
+      db.selectFrom('zv_ro_purchase_orders').select(['id', 'number', 'date', 'total', 'currency', 'status']).where('supplier_id', '=', c.req.param('id')).orderBy('date', 'desc').limit(10).execute(),
+      sql<any>`SELECT * FROM zv_ro_supplier_evaluations WHERE supplier_id = ${c.req.param('id')}::uuid ORDER BY period DESC`.execute(db).catch(() => ({ rows: [] })),
+      sql<any>`SELECT id, number, title, value, currency, status, start_date, end_date FROM zv_ro_contracts WHERE supplier_id = ${c.req.param('id')}::uuid AND status = 'active'`.execute(db).catch(() => ({ rows: [] })),
     ]);
 
     return c.json({ supplier, recent_orders: orders, evaluations: evaluations.rows, active_contracts: contracts.rows });
@@ -89,7 +86,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const supplier = await reqDb(c).insertInto('zv_ro_suppliers').values(c.req.valid('json')).returningAll().executeTakeFirst();
+    const supplier = await db.insertInto('zv_ro_suppliers').values(c.req.valid('json')).returningAll().executeTakeFirst();
     return c.json({ supplier }, 201);
   });
 
@@ -97,7 +94,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const supplier = await reqDb(c)
+    const supplier = await db
       .updateTable('zv_ro_suppliers')
       .set({ ...c.req.valid('json'), updated_at: new Date() })
       .where('id', '=', c.req.param('id'))
@@ -112,7 +109,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    await reqDb(c).updateTable('zv_ro_suppliers').set({ is_active: false }).where('id', '=', c.req.param('id')).execute();
+    await db.updateTable('zv_ro_suppliers').set({ is_active: false }).where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
   });
 
@@ -138,7 +135,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
         DO UPDATE SET quality_score = EXCLUDED.quality_score, delivery_score = EXCLUDED.delivery_score,
                       price_score = EXCLUDED.price_score, notes = EXCLUDED.notes
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
 
       return c.json({ evaluation: evaluation.rows[0] }, 201);
     },
@@ -151,7 +148,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const { status, priority } = c.req.query();
-    let query = reqDb(c)
+    let query = db
       .selectFrom('zv_ro_purchase_orders')
       .select(['id', 'number', 'date', 'supplier_name', 'description', 'total', 'currency', 'status', 'priority', 'budget_line', 'created_at'])
       .orderBy('date', 'desc');
@@ -166,7 +163,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const order = await reqDb(c)
+    const order = await db
       .selectFrom('zv_ro_purchase_orders')
       .selectAll()
       .where('id', '=', c.req.param('id'))
@@ -178,7 +175,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
     const nirs = await sql<any>`
       SELECT id, number, date, status, total_value FROM zv_ro_reception_notes
       WHERE order_id = ${c.req.param('id')}::uuid ORDER BY date DESC
-    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+    `.execute(db).catch(() => ({ rows: [] }));
 
     return c.json({ order, reception_notes: nirs.rows });
   });
@@ -211,7 +208,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
       const body = c.req.valid('json');
-      const order = await reqDb(c)
+      const order = await db
         .insertInto('zv_ro_purchase_orders')
         .values({ ...body, items: JSON.stringify(body.items), created_by: user.id })
         .returningAll()
@@ -225,7 +222,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const order = await reqDb(c)
+    const order = await db
       .updateTable('zv_ro_purchase_orders')
       .set({ status: 'approved', approved_by: user.id, approved_at: new Date(), updated_at: new Date() })
       .where('id', '=', c.req.param('id'))
@@ -241,7 +238,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const order = await reqDb(c)
+    const order = await db
       .updateTable('zv_ro_purchase_orders')
       .set({ status: 'received', received_at: new Date(), updated_at: new Date() })
       .where('id', '=', c.req.param('id'))
@@ -261,7 +258,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
       const { reason } = c.req.valid('json');
-      const order = await reqDb(c)
+      const order = await db
         .updateTable('zv_ro_purchase_orders')
         .set({ status: 'cancelled', cancellation_reason: reason, cancelled_at: new Date(), updated_at: new Date() })
         .where('id', '=', c.req.param('id'))
@@ -278,7 +275,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    await reqDb(c).deleteFrom('zv_ro_purchase_orders').where('id', '=', c.req.param('id')).where('status', '=', 'draft').execute();
+    await db.deleteFrom('zv_ro_purchase_orders').where('id', '=', c.req.param('id')).where('status', '=', 'draft').execute();
     return c.json({ success: true });
   });
 
@@ -289,7 +286,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const { status } = c.req.query();
-    let query = reqDb(c).selectFrom('zv_ro_reception_notes')
+    let query = db.selectFrom('zv_ro_reception_notes')
       .select(['id', 'number', 'date', 'supplier_name', 'total_value', 'currency', 'status', 'created_at'])
       .orderBy('date', 'desc');
     if (status) query = query.where('status', '=', status);
@@ -321,7 +318,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
       const body = c.req.valid('json');
-      const nir = await reqDb(c).insertInto('zv_ro_reception_notes')
+      const nir = await db.insertInto('zv_ro_reception_notes')
         .values({ ...body, items: JSON.stringify(body.items), created_by: user.id })
         .returningAll()
         .executeTakeFirst();
@@ -334,7 +331,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const nir = await reqDb(c).updateTable('zv_ro_reception_notes')
+    const nir = await db.updateTable('zv_ro_reception_notes')
       .set({ status: 'confirmed', confirmed_by: user.id, confirmed_at: new Date() })
       .where('id', '=', c.req.param('id'))
       .where('status', '=', 'draft')
@@ -352,7 +349,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const { status, type } = c.req.query();
-    let query = reqDb(c).selectFrom('zv_ro_contracts')
+    let query = db.selectFrom('zv_ro_contracts')
       .select(['id', 'number', 'supplier_name', 'title', 'type', 'value', 'currency', 'status', 'start_date', 'end_date'])
       .orderBy('created_at', 'desc');
     if (status) query = query.where('status', '=', status);
@@ -381,7 +378,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
       const body = c.req.valid('json');
-      const contract = await reqDb(c).insertInto('zv_ro_contracts').values({ ...body, created_by: user.id }).returningAll().executeTakeFirst();
+      const contract = await db.insertInto('zv_ro_contracts').values({ ...body, created_by: user.id }).returningAll().executeTakeFirst();
       return c.json({ contract }, 201);
     },
   );
@@ -390,7 +387,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const contract = await reqDb(c).updateTable('zv_ro_contracts').set({ status: 'active', updated_at: new Date() }).where('id', '=', c.req.param('id')).where('status', '=', 'draft').returningAll().executeTakeFirst();
+    const contract = await db.updateTable('zv_ro_contracts').set({ status: 'active', updated_at: new Date() }).where('id', '=', c.req.param('id')).where('status', '=', 'draft').returningAll().executeTakeFirst();
     if (!contract) return c.json({ error: 'Contract not found or not activatable' }, 404);
     return c.json({ contract });
   });
@@ -402,12 +399,12 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const { year } = c.req.query();
-    let query = reqDb(c).selectFrom('zv_ro_budget_lines').selectAll().orderBy('code', 'asc');
+    let query = db.selectFrom('zv_ro_budget_lines').selectAll().orderBy('code', 'asc');
     if (year) query = query.where('year', '=', parseInt(year, 10));
 
     const lines = await query.execute();
 
-    const spent = await reqDb(c)
+    const spent = await db
       .selectFrom('zv_ro_purchase_orders')
       .select(['budget_line', db.fn.sum('total').as('spent')])
       .where('status', 'in', ['approved', 'received'])
@@ -442,7 +439,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
       const user = await getUser(c, auth);
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-      const line = await reqDb(c).insertInto('zv_ro_budget_lines').values(c.req.valid('json')).returningAll().executeTakeFirst();
+      const line = await db.insertInto('zv_ro_budget_lines').values(c.req.valid('json')).returningAll().executeTakeFirst();
       return c.json({ budget_line: line }, 201);
     },
   );
@@ -462,20 +459,20 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
         FROM zv_ro_purchase_orders
         WHERE EXTRACT(YEAR FROM date) = ${currentYear} AND status IN ('approved','received')
         GROUP BY category ORDER BY total DESC
-      `.execute(reqDb(c)).catch(() => ({ rows: [] })),
+      `.execute(db).catch(() => ({ rows: [] })),
       sql<any>`
         SELECT TO_CHAR(date, 'YYYY-MM') AS month, SUM(total) AS total, COUNT(*)::int AS count
         FROM zv_ro_purchase_orders
         WHERE EXTRACT(YEAR FROM date) = ${currentYear} AND status IN ('approved','received')
         GROUP BY month ORDER BY month
-      `.execute(reqDb(c)).catch(() => ({ rows: [] })),
+      `.execute(db).catch(() => ({ rows: [] })),
       sql<any>`
         SELECT supplier_name, supplier_cui, SUM(total) AS total, COUNT(*)::int AS count
         FROM zv_ro_purchase_orders
         WHERE EXTRACT(YEAR FROM date) = ${currentYear} AND status IN ('approved','received')
           ${supplier_id ? sql`AND supplier_id = ${supplier_id}::uuid` : sql``}
         GROUP BY supplier_name, supplier_cui ORDER BY total DESC LIMIT 20
-      `.execute(reqDb(c)).catch(() => ({ rows: [] })),
+      `.execute(db).catch(() => ({ rows: [] })),
     ]);
 
     return c.json({ year: currentYear, by_category: byCategory.rows, by_month: byMonth.rows, by_supplier: bySupplier.rows });

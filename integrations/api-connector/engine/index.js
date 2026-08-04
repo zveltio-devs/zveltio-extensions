@@ -19570,9 +19570,6 @@ async function resolveOAuth2Token(dbh, connectionId, authConfig) {
 }
 function apiConnectorRoutes(ctx) {
   const { db, auth } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   const isPublicWebhook = (c) => c.req.path.includes("/webhooks/receive/");
   app.use("*", async (c, next) => {
@@ -19590,14 +19587,14 @@ function apiConnectorRoutes(ctx) {
     return permissionGate(ctx, "api-connector")(c, next);
   });
   app.get("/connections", async (c) => {
-    const rows = await sql`SELECT id, name, base_url, auth_type, is_active, retry_count, timeout_ms, created_at FROM zvd_api_connections ORDER BY name`.execute(reqDb(c));
+    const rows = await sql`SELECT id, name, base_url, auth_type, is_active, retry_count, timeout_ms, created_at FROM zvd_api_connections ORDER BY name`.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/connections/:id", async (c) => {
-    const row = await sql`SELECT id, name, base_url, auth_type, is_active, retry_count, timeout_ms, created_at FROM zvd_api_connections WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    const row = await sql`SELECT id, name, base_url, auth_type, is_active, retry_count, timeout_ms, created_at FROM zvd_api_connections WHERE id = ${c.req.param("id")}`.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
-    const endpoints = await sql`SELECT id, name, method, path, is_active FROM zvd_api_endpoints WHERE connection_id = ${c.req.param("id")} ORDER BY name`.execute(reqDb(c));
+    const endpoints = await sql`SELECT id, name, method, path, is_active FROM zvd_api_endpoints WHERE connection_id = ${c.req.param("id")} ORDER BY name`.execute(db);
     return c.json({ data: { ...row.rows[0], endpoints: endpoints.rows } });
   });
   app.post("/connections", zValidator("json", exports_external.object({
@@ -19620,7 +19617,7 @@ function apiConnectorRoutes(ctx) {
       INSERT INTO zvd_api_connections (name, base_url, auth_type, auth_config, headers, default_headers, retry_count, timeout_ms, created_by)
       VALUES (${d.name}, ${d.base_url}, ${d.auth_type}, ${JSON.stringify(d.auth_config)}, ${JSON.stringify(d.default_headers)}, ${JSON.stringify(d.default_headers)}, ${d.retry_count}, ${d.timeout_ms}, ${user.id})
       RETURNING id, name, base_url, auth_type, is_active, retry_count, timeout_ms, created_at
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.patch("/connections/:id", zValidator("json", exports_external.object({
@@ -19642,17 +19639,17 @@ function apiConnectorRoutes(ctx) {
         timeout_ms = COALESCE(${d.timeout_ms ?? null}, timeout_ms),
         updated_at = NOW()
       WHERE id = ${c.req.param("id")} RETURNING id, name, base_url, auth_type, is_active
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
     return c.json({ data: row.rows[0] });
   });
   app.delete("/connections/:id", async (c) => {
-    await sql`DELETE FROM zvd_api_connections WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_api_connections WHERE id = ${c.req.param("id")}`.execute(db);
     return c.json({ success: true });
   });
   app.post("/connections/:id/health-check", async (c) => {
-    const conn = await sql`SELECT * FROM zvd_api_connections WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    const conn = await sql`SELECT * FROM zvd_api_connections WHERE id = ${c.req.param("id")}`.execute(db);
     if (!conn.rows.length)
       return c.json({ error: "Not found" }, 404);
     const connection = conn.rows[0];
@@ -19669,7 +19666,7 @@ function apiConnectorRoutes(ctx) {
     }
   });
   app.get("/connections/:id/endpoints", async (c) => {
-    const rows = await sql`SELECT * FROM zvd_api_endpoints WHERE connection_id = ${c.req.param("id")} ORDER BY name`.execute(reqDb(c));
+    const rows = await sql`SELECT * FROM zvd_api_endpoints WHERE connection_id = ${c.req.param("id")} ORDER BY name`.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/connections/:id/endpoints", zValidator("json", exports_external.object({
@@ -19688,7 +19685,7 @@ function apiConnectorRoutes(ctx) {
       VALUES (${c.req.param("id")}, ${d.name}, ${d.method}, ${d.path}, ${d.description ?? null},
         ${d.default_body ?? null}, ${JSON.stringify(d.default_headers)}, ${JSON.stringify(d.response_mapping)}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.patch("/endpoints/:id", zValidator("json", exports_external.object({
@@ -19708,13 +19705,13 @@ function apiConnectorRoutes(ctx) {
         is_active = COALESCE(${d.is_active ?? null}, is_active),
         updated_at = NOW()
       WHERE id = ${c.req.param("id")} RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
     return c.json({ data: row.rows[0] });
   });
   app.delete("/endpoints/:id", async (c) => {
-    await sql`DELETE FROM zvd_api_endpoints WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_api_endpoints WHERE id = ${c.req.param("id")}`.execute(db);
     return c.json({ success: true });
   });
   app.post("/endpoints/:id/execute", zValidator("json", exports_external.object({
@@ -19731,7 +19728,7 @@ function apiConnectorRoutes(ctx) {
       FROM zvd_api_endpoints e
       JOIN zvd_api_connections conn ON conn.id = e.connection_id
       WHERE e.id = ${c.req.param("id")} AND conn.is_active = true AND e.is_active = true
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!ep.rows.length)
       return c.json({ error: "Endpoint not found or connection inactive" }, 404);
     const endpoint = ep.rows[0];
@@ -19753,7 +19750,7 @@ function apiConnectorRoutes(ctx) {
       headers["Authorization"] = `Basic ${btoa(`${authConfig.username}:${authConfig.password}`)}`;
     } else if (endpoint.auth_type === "oauth2") {
       try {
-        const token = await resolveOAuth2Token(reqDb(c), endpoint.connection_id, authConfig);
+        const token = await resolveOAuth2Token(db, endpoint.connection_id, authConfig);
         headers["Authorization"] = `Bearer ${token}`;
       } catch (e) {
         return c.json({ error: "OAuth2 token error: " + e.message }, 502);
@@ -19773,7 +19770,7 @@ function apiConnectorRoutes(ctx) {
       VALUES (${endpoint.id}, ${user.id}, ${url2}, ${endpoint.method},
         ${d.body ? JSON.stringify(d.body) : null}, ${status_code},
         ${response_body.slice(0, 1e4)}, ${duration_ms}, ${fetchError}, ${retries})
-    `.execute(reqDb(c));
+    `.execute(db);
     if (fetchError)
       return c.json({ error: fetchError }, 502);
     let parsed = response_body;
@@ -19792,11 +19789,11 @@ function apiConnectorRoutes(ctx) {
       JOIN zvd_api_endpoints e ON e.id = l.endpoint_id
       WHERE e.connection_id = ${c.req.param("id")}
       ORDER BY l.created_at DESC LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/webhooks", async (c) => {
-    const rows = await sql`SELECT w.*, COUNT(e.id) as event_count FROM zvd_incoming_webhooks w LEFT JOIN zvd_webhook_events e ON e.webhook_id = w.id GROUP BY w.id ORDER BY w.name`.execute(reqDb(c));
+    const rows = await sql`SELECT w.*, COUNT(e.id) as event_count FROM zvd_incoming_webhooks w LEFT JOIN zvd_webhook_events e ON e.webhook_id = w.id GROUP BY w.id ORDER BY w.name`.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/webhooks", zValidator("json", exports_external.object({
@@ -19812,16 +19809,16 @@ function apiConnectorRoutes(ctx) {
       INSERT INTO zvd_incoming_webhooks (name, endpoint_path, description, secret, connection_id, created_by)
       VALUES (${d.name}, ${d.endpoint_path}, ${d.description ?? null}, ${d.secret ?? null}, ${d.connection_id ?? null}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.delete("/webhooks/:id", async (c) => {
-    await sql`DELETE FROM zvd_incoming_webhooks WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_incoming_webhooks WHERE id = ${c.req.param("id")}`.execute(db);
     return c.json({ success: true });
   });
   app.post("/webhooks/receive/:path{.+}", async (c) => {
     const path = "/" + c.req.param("path");
-    const webhook = await sql`SELECT * FROM zvd_incoming_webhooks WHERE endpoint_path = ${path} AND is_active = true`.execute(reqDb(c));
+    const webhook = await sql`SELECT * FROM zvd_incoming_webhooks WHERE endpoint_path = ${path} AND is_active = true`.execute(db);
     if (!webhook.rows.length)
       return c.json({ error: "Webhook not found" }, 404);
     const w = webhook.rows[0];
@@ -19854,8 +19851,8 @@ function apiConnectorRoutes(ctx) {
     await sql`
       INSERT INTO zvd_webhook_events (webhook_id, payload, headers, source_ip)
       VALUES (${w.id}, ${JSON.stringify(payload)}, ${JSON.stringify(headers)}, ${c.req.header("x-forwarded-for") ?? null})
-    `.execute(reqDb(c));
-    await sql`UPDATE zvd_incoming_webhooks SET last_received_at = NOW() WHERE id = ${w.id}`.execute(reqDb(c));
+    `.execute(db);
+    await sql`UPDATE zvd_incoming_webhooks SET last_received_at = NOW() WHERE id = ${w.id}`.execute(db);
     return c.json({ received: true });
   });
   app.get("/webhooks/:id/events", async (c) => {
@@ -19863,7 +19860,7 @@ function apiConnectorRoutes(ctx) {
     const lim = Math.min(+limit, 200);
     const rows = await sql`
       SELECT * FROM zvd_webhook_events WHERE webhook_id = ${c.req.param("id")} ORDER BY received_at DESC LIMIT ${lim}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   return app;

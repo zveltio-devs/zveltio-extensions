@@ -19502,9 +19502,6 @@ function buildListQuery(table, allowed) {
 function crmRoutes(ctx) {
   const { db, auth, checkPermission, events } = ctx;
   const app = new Hono2;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session)
@@ -19527,13 +19524,13 @@ function crmRoutes(ctx) {
       )
       ORDER BY ${sql.raw(sortCol)} ${sql.raw(dir)}
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
     const total = await sql`
       SELECT COUNT(*) as count FROM zvd_contacts
       WHERE (${search ? sql`first_name ILIKE ${"%" + search + "%"}
         OR last_name ILIKE ${"%" + search + "%"}
         OR email ILIKE ${"%" + search + "%"}` : sql`TRUE`})
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({
       data: rows.rows,
       meta: { total: parseInt(total.rows[0].count), page: Math.ceil(offset / lim) + 1, limit: lim }
@@ -19547,7 +19544,7 @@ function crmRoutes(ctx) {
       LEFT JOIN zvd_organizations o ON o.id = co.organization_id
       WHERE c.id = ${c.req.param("id")}
       GROUP BY c.id
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -19577,7 +19574,7 @@ function crmRoutes(ctx) {
            ${d.avatar_url ?? null}, ${d.tags ?? []}, ${d.notes ?? null},
            ${d.source ?? null}, ${JSON.stringify(d.metadata ?? {})}::jsonb, ${user.id})
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
     const contact = result.rows[0];
     events.emit("contact.created", { id: contact.id, contact });
     return c.json({ data: contact }, 201);
@@ -19608,7 +19605,7 @@ function crmRoutes(ctx) {
     }
     if (!sets.length)
       return c.json({ error: "No fields to update" }, 400);
-    const result = await reqDb(c).executeQuery({ sql: `UPDATE zvd_contacts SET ${sets.join(", ")}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] });
+    const result = await db.executeQuery({ sql: `UPDATE zvd_contacts SET ${sets.join(", ")}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] });
     if (!result.rows.length)
       return c.json({ error: "Not found" }, 404);
     const contact = result.rows[0];
@@ -19620,14 +19617,14 @@ function crmRoutes(ctx) {
     const id = c.req.param("id");
     const existing = await sql`
       SELECT created_by FROM zvd_contacts WHERE id = ${id}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!existing.rows[0])
       return c.json({ error: "Not found" }, 404);
     const isAdmin = await checkPermission(user.id, "admin", "*");
     if (existing.rows[0].created_by !== user.id && !isAdmin) {
       return c.json({ error: "Forbidden" }, 403);
     }
-    await sql`DELETE FROM zvd_contacts WHERE id = ${id}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_contacts WHERE id = ${id}`.execute(db);
     events.emit("contact.deleted", { id });
     return c.json({ success: true });
   });
@@ -19640,11 +19637,11 @@ function crmRoutes(ctx) {
       WHERE (${search ? sql`name ILIKE ${"%" + search + "%"} OR tax_id ILIKE ${"%" + search + "%"}` : sql`TRUE`})
       ORDER BY ${sql.raw(sortCol)} ${sql.raw(dir)}
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
     const total = await sql`
       SELECT COUNT(*) as count FROM zvd_organizations
       WHERE (${search ? sql`name ILIKE ${"%" + search + "%"}` : sql`TRUE`})
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({
       data: rows.rows,
       meta: { total: parseInt(total.rows[0].count), page: Math.ceil(offset / lim) + 1, limit: lim }
@@ -19660,7 +19657,7 @@ function crmRoutes(ctx) {
       LEFT JOIN zvd_contacts c ON c.id = co.contact_id
       WHERE o.id = ${c.req.param("id")}
       GROUP BY o.id
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -19693,7 +19690,7 @@ function crmRoutes(ctx) {
            ${d.logo_url ?? null}, ${d.tags ?? []},
            ${JSON.stringify(d.metadata ?? {})}::jsonb, ${user.id})
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
     const organization = result.rows[0];
     events.emit("organization.created", { id: organization.id, organization });
     return c.json({ data: organization }, 201);
@@ -19725,7 +19722,7 @@ function crmRoutes(ctx) {
     }
     if (!sets.length)
       return c.json({ error: "No fields to update" }, 400);
-    const result = await reqDb(c).executeQuery({ sql: `UPDATE zvd_organizations SET ${sets.join(", ")}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] });
+    const result = await db.executeQuery({ sql: `UPDATE zvd_organizations SET ${sets.join(", ")}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] });
     if (!result.rows.length)
       return c.json({ error: "Not found" }, 404);
     const organization = result.rows[0];
@@ -19737,14 +19734,14 @@ function crmRoutes(ctx) {
     const id = c.req.param("id");
     const existing = await sql`
       SELECT created_by FROM zvd_organizations WHERE id = ${id}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!existing.rows[0])
       return c.json({ error: "Not found" }, 404);
     const isAdmin = await checkPermission(user.id, "admin", "*");
     if (existing.rows[0].created_by !== user.id && !isAdmin) {
       return c.json({ error: "Forbidden" }, 403);
     }
-    await sql`DELETE FROM zvd_organizations WHERE id = ${id}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_organizations WHERE id = ${id}`.execute(db);
     events.emit("organization.deleted", { id });
     return c.json({ success: true });
   });
@@ -19765,12 +19762,12 @@ function crmRoutes(ctx) {
         AND (${search ? sql`t.number ILIKE ${"%" + search + "%"} OR t.reference ILIKE ${"%" + search + "%"}` : sql`TRUE`})
       ORDER BY ${sql.raw("t." + sortCol)} ${sql.raw(dir)}
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
     const total = await sql`
       SELECT COUNT(*) as count FROM zvd_transactions
       WHERE (${type ? sql`type = ${type}` : sql`TRUE`})
         AND (${status ? sql`status = ${status}` : sql`TRUE`})
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({
       data: rows.rows,
       meta: { total: parseInt(total.rows[0].count), page: Math.ceil(offset / lim) + 1, limit: lim }
@@ -19785,7 +19782,7 @@ function crmRoutes(ctx) {
       LEFT JOIN zvd_contacts c ON c.id = t.contact_id
       LEFT JOIN zvd_organizations o ON o.id = t.organization_id
       WHERE t.id = ${c.req.param("id")}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -19823,7 +19820,7 @@ function crmRoutes(ctx) {
            ${d.notes ?? null}, ${d.reference ?? null},
            ${JSON.stringify(d.metadata ?? {})}::jsonb, ${user.id})
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
     return c.json({ data: result.rows[0] }, 201);
   });
   app.patch("/transactions/:id", zValidator("json", exports_external.object({
@@ -19852,7 +19849,7 @@ function crmRoutes(ctx) {
     }
     if (!sets.length)
       return c.json({ error: "No fields to update" }, 400);
-    const result = await reqDb(c).executeQuery({ sql: `UPDATE zvd_transactions SET ${sets.join(", ")}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] });
+    const result = await db.executeQuery({ sql: `UPDATE zvd_transactions SET ${sets.join(", ")}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] });
     if (!result.rows.length)
       return c.json({ error: "Not found" }, 404);
     return c.json({ data: result.rows[0] });
@@ -19862,14 +19859,14 @@ function crmRoutes(ctx) {
     const id = c.req.param("id");
     const existing = await sql`
       SELECT created_by FROM zvd_transactions WHERE id = ${id}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!existing.rows[0])
       return c.json({ error: "Not found" }, 404);
     const isAdmin = await checkPermission(user.id, "admin", "*");
     if (existing.rows[0].created_by !== user.id && !isAdmin) {
       return c.json({ error: "Forbidden" }, 403);
     }
-    await sql`DELETE FROM zvd_transactions WHERE id = ${id}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_transactions WHERE id = ${id}`.execute(db);
     return c.json({ success: true });
   });
   return app;

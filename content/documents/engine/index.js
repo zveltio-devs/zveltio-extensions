@@ -19486,9 +19486,6 @@ async function getNextDocNumber(dbh, templateId, prefix) {
 }
 function documentsRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const { renderTemplate, generatePDF } = ctx.internals;
   const app = new Hono2;
   const requireAuth = async (c, next) => {
@@ -19501,30 +19498,30 @@ function documentsRoutes(ctx) {
   app.post("/sign/:token", async (c) => {
     const token = c.req.param("token");
     const ip = c.req.header("x-forwarded-for") || c.req.header("cf-connecting-ip") || "unknown";
-    const signReq = await reqDb(c).selectFrom("zv_document_sign_requests").selectAll().where("sign_token", "=", token).executeTakeFirst();
+    const signReq = await db.selectFrom("zv_document_sign_requests").selectAll().where("sign_token", "=", token).executeTakeFirst();
     if (!signReq)
       return c.json({ error: "Invalid or expired sign token" }, 404);
     if (signReq.status !== "pending")
       return c.json({ error: `Request already ${signReq.status}` }, 400);
     if (new Date(signReq.expires_at) < new Date) {
-      await reqDb(c).updateTable("zv_document_sign_requests").set({ status: "expired" }).where("id", "=", signReq.id).execute();
+      await db.updateTable("zv_document_sign_requests").set({ status: "expired" }).where("id", "=", signReq.id).execute();
       return c.json({ error: "Sign token has expired" }, 410);
     }
-    await reqDb(c).updateTable("zv_document_sign_requests").set({ status: "signed", signed_at: new Date, ip_address: ip }).where("id", "=", signReq.id).execute();
-    await reqDb(c).updateTable("zv_generated_docs").set({ is_signed: true }).where("id", "=", signReq.document_id).execute();
-    await reqDb(c).insertInto("zv_document_access_log").values({ document_id: signReq.document_id, ip, action: "sign" }).execute();
+    await db.updateTable("zv_document_sign_requests").set({ status: "signed", signed_at: new Date, ip_address: ip }).where("id", "=", signReq.id).execute();
+    await db.updateTable("zv_generated_docs").set({ is_signed: true }).where("id", "=", signReq.document_id).execute();
+    await db.insertInto("zv_document_access_log").values({ document_id: signReq.document_id, ip, action: "sign" }).execute();
     return c.json({ success: true, signed_at: new Date });
   });
   app.get("/share/:token", async (c) => {
     const token = c.req.param("token");
     const ip = c.req.header("x-forwarded-for") || c.req.header("cf-connecting-ip") || "unknown";
-    const doc2 = await reqDb(c).selectFrom("zv_generated_docs").select(["id", "template_name", "document_number", "output_format", "generated_at", "status", "is_signed", "expires_at"]).where("share_token", "=", token).where("status", "=", "active").executeTakeFirst();
+    const doc2 = await db.selectFrom("zv_generated_docs").select(["id", "template_name", "document_number", "output_format", "generated_at", "status", "is_signed", "expires_at"]).where("share_token", "=", token).where("status", "=", "active").executeTakeFirst();
     if (!doc2)
       return c.json({ error: "Document not found or has been revoked" }, 404);
     if (doc2.expires_at && new Date(doc2.expires_at) < new Date) {
       return c.json({ error: "Document has expired" }, 410);
     }
-    await reqDb(c).insertInto("zv_document_access_log").values({ document_id: doc2.id, ip, action: "view" }).execute();
+    await db.insertInto("zv_document_access_log").values({ document_id: doc2.id, ip, action: "view" }).execute();
     return c.json({ document: doc2 });
   });
   app.use("/templates", requireAuth);
@@ -19536,19 +19533,19 @@ function documentsRoutes(ctx) {
   app.use("/sequences/*", requireAuth);
   app.use("/stats", requireAuth);
   app.get("/templates", async (c) => {
-    const templates = await reqDb(c).selectFrom("zv_document_templates").select(["id", "name", "description", "category", "variables", "pdf_options"]).where("is_active", "=", true).orderBy("name", "asc").execute();
+    const templates = await db.selectFrom("zv_document_templates").select(["id", "name", "description", "category", "variables", "pdf_options"]).where("is_active", "=", true).orderBy("name", "asc").execute();
     return c.json({ templates });
   });
   app.post("/generate/:templateId", zValidator("json", GenerateDocSchema), async (c) => {
     const user = c.get("user");
     const templateId = c.req.param("templateId");
     const data = c.req.valid("json");
-    const template = await reqDb(c).selectFrom("zv_document_templates").selectAll().where("id", "=", templateId).where("is_active", "=", true).executeTakeFirst();
+    const template = await db.selectFrom("zv_document_templates").selectAll().where("id", "=", templateId).where("is_active", "=", true).executeTakeFirst();
     if (!template)
       return c.json({ error: "Template not found or inactive" }, 404);
-    const seqData = await reqDb(c).selectFrom("zv_document_number_sequences").selectAll().where("template_id", "=", templateId).executeTakeFirst();
+    const seqData = await db.selectFrom("zv_document_number_sequences").selectAll().where("template_id", "=", templateId).executeTakeFirst();
     const prefix = seqData?.prefix || template.category || "DOC";
-    const docNumber = await getNextDocNumber(reqDb(c), templateId, prefix);
+    const docNumber = await getNextDocNumber(db, templateId, prefix);
     const allVariables = {
       ...data.variables_data,
       _document_number: docNumber,
@@ -19559,7 +19556,7 @@ function documentsRoutes(ctx) {
     const htmlContent = renderTemplate(htmlBody, allVariables);
     const pdfBuffer = await generatePDF(htmlContent, { title: `${template.name} ${docNumber}` });
     const expiresAt = data.expires_hours ? new Date(Date.now() + data.expires_hours * 3600 * 1000) : null;
-    const doc2 = await reqDb(c).insertInto("zv_generated_docs").values({
+    const doc2 = await db.insertInto("zv_generated_docs").values({
       template_id: templateId,
       template_name: template.name,
       source_collection: data.source_collection || null,
@@ -19571,7 +19568,7 @@ function documentsRoutes(ctx) {
       expires_at: expiresAt,
       status: "active"
     }).returningAll().executeTakeFirst();
-    await reqDb(c).updateTable("zv_document_templates").set({
+    await db.updateTable("zv_document_templates").set({
       usage_count: sql`usage_count + 1`,
       last_used_at: new Date
     }).where("id", "=", templateId).execute();
@@ -19600,7 +19597,7 @@ function documentsRoutes(ctx) {
   }
   app.get("/generated", async (c) => {
     const { template_id, source_collection, source_record_id, status, limit = "50", offset = "0" } = c.req.query();
-    let query = reqDb(c).selectFrom("zv_generated_docs").selectAll().orderBy("generated_at", "desc");
+    let query = db.selectFrom("zv_generated_docs").selectAll().orderBy("generated_at", "desc");
     if (template_id)
       query = query.where("template_id", "=", template_id);
     if (source_collection)
@@ -19625,7 +19622,7 @@ function documentsRoutes(ctx) {
   });
   app.get("/generated/:id", async (c) => {
     const id = c.req.param("id");
-    const doc2 = await reqDb(c).selectFrom("zv_generated_docs").selectAll().where("id", "=", id).executeTakeFirst();
+    const doc2 = await db.selectFrom("zv_generated_docs").selectAll().where("id", "=", id).executeTakeFirst();
     if (!doc2)
       return c.json({ error: "Document not found" }, 404);
     const getUser = c.get("user");
@@ -19633,7 +19630,7 @@ function documentsRoutes(ctx) {
     if (!await mayReadDoc(doc2, getUser.id, getAdmin, new Map)) {
       return c.json({ error: "Document not found" }, 404);
     }
-    const signRequests = await reqDb(c).selectFrom("zv_document_sign_requests").select(["id", "signer_email", "signer_name", "status", "signed_at", "expires_at", "created_at"]).where("document_id", "=", id).orderBy("created_at", "desc").execute();
+    const signRequests = await db.selectFrom("zv_document_sign_requests").select(["id", "signer_email", "signer_name", "status", "signed_at", "expires_at", "created_at"]).where("document_id", "=", id).orderBy("created_at", "desc").execute();
     return c.json({ document: doc2, sign_requests: signRequests });
   });
   app.delete("/generated/:id", async (c) => {
@@ -19642,17 +19639,17 @@ function documentsRoutes(ctx) {
     const isAdmin = await checkPermission(user.id, "admin", "*");
     if (!isAdmin)
       return c.json({ error: "Admin access required" }, 403);
-    const doc2 = await reqDb(c).selectFrom("zv_generated_docs").select("id").where("id", "=", id).executeTakeFirst();
+    const doc2 = await db.selectFrom("zv_generated_docs").select("id").where("id", "=", id).executeTakeFirst();
     if (!doc2)
       return c.json({ error: "Document not found" }, 404);
-    await reqDb(c).updateTable("zv_generated_docs").set({ status: "revoked" }).where("id", "=", id).execute();
+    await db.updateTable("zv_generated_docs").set({ status: "revoked" }).where("id", "=", id).execute();
     return c.json({ success: true });
   });
   app.post("/generated/:id/sign-request", zValidator("json", SignRequestSchema), async (c) => {
     const user = c.get("user");
     const id = c.req.param("id");
     const data = c.req.valid("json");
-    const doc2 = await reqDb(c).selectFrom("zv_generated_docs").select(["id", "status", "generated_by", "source_collection"]).where("id", "=", id).executeTakeFirst();
+    const doc2 = await db.selectFrom("zv_generated_docs").select(["id", "status", "generated_by", "source_collection"]).where("id", "=", id).executeTakeFirst();
     if (!doc2)
       return c.json({ error: "Document not found" }, 404);
     const signAdmin = await checkPermission(user.id, "admin", "*").catch(() => false);
@@ -19662,7 +19659,7 @@ function documentsRoutes(ctx) {
     if (doc2.status !== "active")
       return c.json({ error: "Cannot create sign request for inactive document" }, 400);
     const expiresAt = new Date(Date.now() + data.expires_hours * 3600 * 1000);
-    const signReq = await reqDb(c).insertInto("zv_document_sign_requests").values({
+    const signReq = await db.insertInto("zv_document_sign_requests").values({
       document_id: id,
       signer_email: data.signer_email,
       signer_name: data.signer_name,
@@ -19675,14 +19672,14 @@ function documentsRoutes(ctx) {
   app.get("/generated/:id/sign-requests", async (c) => {
     const id = c.req.param("id");
     const srUser = c.get("user");
-    const srDoc = await reqDb(c).selectFrom("zv_generated_docs").select(["id", "generated_by", "source_collection"]).where("id", "=", id).executeTakeFirst();
+    const srDoc = await db.selectFrom("zv_generated_docs").select(["id", "generated_by", "source_collection"]).where("id", "=", id).executeTakeFirst();
     if (!srDoc)
       return c.json({ error: "Document not found" }, 404);
     const srAdmin = await checkPermission(srUser.id, "admin", "*").catch(() => false);
     if (!await mayReadDoc(srDoc, srUser.id, srAdmin, new Map)) {
       return c.json({ error: "Document not found" }, 404);
     }
-    const signRequests = await reqDb(c).selectFrom("zv_document_sign_requests").selectAll().where("document_id", "=", id).orderBy("created_at", "desc").execute();
+    const signRequests = await db.selectFrom("zv_document_sign_requests").selectAll().where("document_id", "=", id).orderBy("created_at", "desc").execute();
     return c.json({ sign_requests: signRequests });
   });
   app.get("/sequences", async (c) => {
@@ -19690,7 +19687,7 @@ function documentsRoutes(ctx) {
     const isAdmin = await checkPermission(user.id, "admin", "*");
     if (!isAdmin)
       return c.json({ error: "Admin access required" }, 403);
-    const sequences = await reqDb(c).selectFrom("zv_document_number_sequences").selectAll().orderBy("updated_at", "desc").execute();
+    const sequences = await db.selectFrom("zv_document_number_sequences").selectAll().orderBy("updated_at", "desc").execute();
     return c.json({ sequences });
   });
   app.post("/sequences", zValidator("json", SequenceSchema), async (c) => {
@@ -19707,17 +19704,17 @@ function documentsRoutes(ctx) {
             year_reset = EXCLUDED.year_reset,
             updated_at = NOW()
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ sequence: result.rows[0] }, 201);
   });
   app.get("/stats", async (c) => {
     const now = new Date;
     const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const [totalDocs, docsThisMonth, pendingSigs, byTemplate] = await Promise.all([
-      reqDb(c).selectFrom("zv_generated_docs").select((eb) => eb.fn.count("id").as("count")).executeTakeFirst(),
-      reqDb(c).selectFrom("zv_generated_docs").select((eb) => eb.fn.count("id").as("count")).where("generated_at", ">=", firstOfMonth).executeTakeFirst(),
-      reqDb(c).selectFrom("zv_document_sign_requests").select((eb) => eb.fn.count("id").as("count")).where("status", "=", "pending").executeTakeFirst(),
-      reqDb(c).selectFrom("zv_generated_docs").select(["template_name", (eb) => eb.fn.count("id").as("count")]).groupBy("template_name").orderBy("count", "desc").limit(10).execute()
+      db.selectFrom("zv_generated_docs").select((eb) => eb.fn.count("id").as("count")).executeTakeFirst(),
+      db.selectFrom("zv_generated_docs").select((eb) => eb.fn.count("id").as("count")).where("generated_at", ">=", firstOfMonth).executeTakeFirst(),
+      db.selectFrom("zv_document_sign_requests").select((eb) => eb.fn.count("id").as("count")).where("status", "=", "pending").executeTakeFirst(),
+      db.selectFrom("zv_generated_docs").select(["template_name", (eb) => eb.fn.count("id").as("count")]).groupBy("template_name").orderBy("count", "desc").limit(10).execute()
     ]);
     return c.json({
       total_documents: Number(totalDocs?.count || 0),

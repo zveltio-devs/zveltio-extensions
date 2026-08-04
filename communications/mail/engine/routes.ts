@@ -19,13 +19,10 @@ import type { ExtensionContext } from '@zveltio/sdk/extension';
 export function mailRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
 
-  // Per-request DB handle (CRM PR #1 pattern). After
-  // migration 002_tenant_rls.sql, this extension's tables have FORCE
-  // RLS keyed on `zveltio.current_tenant`; routes must run through
-  // this handle so the GUC is active inside the transaction.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
   // AI access goes through the cross-extension service registry. Returns null
   // if the `ai` extension isn't active — AI compose/summarize endpoints will 503.
@@ -50,7 +47,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
         is_default, is_active, last_sync_at, sync_error, created_at
       FROM zv_mail_accounts WHERE user_id = ${user.id}
       ORDER BY is_default DESC, created_at
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ accounts: accounts.rows });
   });
 
@@ -90,7 +87,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
 
     // If is_default, clear existing default
     if (data.is_default) {
-      await sql`UPDATE zv_mail_accounts SET is_default = false WHERE user_id = ${user.id}`.execute(reqDb(c));
+      await sql`UPDATE zv_mail_accounts SET is_default = false WHERE user_id = ${user.id}`.execute(db);
     }
 
     const encryptedImapPass = await encryptPassword(data.imap_password);
@@ -108,7 +105,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
         ${data.smtp_user ?? null}, ${encryptedSmtpPass}, ${data.is_default}
       )
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
 
     const account = inserted.rows[0] as any;
 
@@ -131,7 +128,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     const data = c.req.valid('json');
 
     if (data.is_default) {
-      await sql`UPDATE zv_mail_accounts SET is_default = false WHERE user_id = ${user.id}`.execute(reqDb(c));
+      await sql`UPDATE zv_mail_accounts SET is_default = false WHERE user_id = ${user.id}`.execute(db);
     }
 
     await sql`
@@ -142,14 +139,14 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
         is_active = COALESCE(${data.is_active ?? null}::boolean, is_active),
         updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND user_id = ${user.id}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ success: true });
   });
 
   // DELETE /ext/communications/mail/accounts/:id
   app.delete('/accounts/:id', async (c) => {
     const user = c.get('user') as any;
-    await sql`DELETE FROM zv_mail_accounts WHERE id = ${c.req.param('id')} AND user_id = ${user.id}`.execute(reqDb(c));
+    await sql`DELETE FROM zv_mail_accounts WHERE id = ${c.req.param('id')} AND user_id = ${user.id}`.execute(db);
     return c.json({ success: true });
   });
 
@@ -158,7 +155,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const account = await sql`
       SELECT * FROM zv_mail_accounts WHERE id = ${c.req.param('id')} AND user_id = ${user.id}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!account.rows[0]) return c.json({ error: 'Account not found' }, 404);
 
     const result = await syncImapAccount(db, account.rows[0] as any);
@@ -180,7 +177,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
           WHEN 'archive' THEN 3 WHEN 'spam' THEN 4 WHEN 'trash' THEN 5
           ELSE 6 END,
         f.name
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ folders: folders.rows });
   });
 
@@ -216,7 +213,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     // CompiledQuery is the right hook for parameterised raw SQL — the
     // legacy `sql.raw(query, params)` signature was dropped in
     // Kysely ≥ 0.25 and now takes a single string argument.
-    const messages = await reqDb(c).executeQuery({
+    const messages = await db.executeQuery({
       sql: query,
       parameters: params,
       query: { kind: 'RawNode', sqlFragments: [query], parameters: params },
@@ -231,15 +228,15 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
       SELECT m.* FROM zv_mail_messages m
       INNER JOIN zv_mail_accounts a ON a.id = m.account_id
       WHERE m.id = ${c.req.param('id')} AND a.user_id = ${user.id}
-    `.execute(reqDb(c));
+    `.execute(db);
 
     if (!msgResult.rows[0]) return c.json({ error: 'Message not found' }, 404);
     const msg = msgResult.rows[0] as any;
 
     // Fetch body on-demand if not cached
     if (!msg.body_html && !msg.body_text && msg.uid) {
-      const accountResult = await sql`SELECT * FROM zv_mail_accounts WHERE id = ${msg.account_id}`.execute(reqDb(c));
-      const folderResult = await sql`SELECT path FROM zv_mail_folders WHERE id = ${msg.folder_id}`.execute(reqDb(c));
+      const accountResult = await sql`SELECT * FROM zv_mail_accounts WHERE id = ${msg.account_id}`.execute(db);
+      const folderResult = await sql`SELECT path FROM zv_mail_folders WHERE id = ${msg.folder_id}`.execute(db);
 
       if (accountResult.rows[0] && folderResult.rows[0]) {
         try {
@@ -251,7 +248,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
           await sql`
             UPDATE zv_mail_messages SET body_text = ${body.bodyText}, body_html = ${body.bodyHtml}
             WHERE id = ${msg.id}
-          `.execute(reqDb(c));
+          `.execute(db);
           msg.body_text = body.bodyText;
           msg.body_html = body.bodyHtml;
         } catch (err: any) {
@@ -262,14 +259,14 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
 
     // Mark as read
     if (!msg.is_read) {
-      await sql`UPDATE zv_mail_messages SET is_read = true WHERE id = ${msg.id}`.execute(reqDb(c));
+      await sql`UPDATE zv_mail_messages SET is_read = true WHERE id = ${msg.id}`.execute(db);
       msg.is_read = true;
     }
 
     const attachments = await sql`
       SELECT id, filename, mime_type, size_bytes, is_inline
       FROM zv_mail_attachments WHERE message_id = ${msg.id}
-    `.execute(reqDb(c));
+    `.execute(db);
 
     return c.json({ message: { ...msg, attachments: attachments.rows } });
   });
@@ -300,7 +297,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
       WHERE id = $${params.length - 1}
       AND account_id IN (SELECT id FROM zv_mail_accounts WHERE user_id = $${params.length})
     `;
-    await reqDb(c).executeQuery({
+    await db.executeQuery({
       sql: updateSql,
       parameters: params,
       query: { kind: 'RawNode', sqlFragments: [updateSql], parameters: params },
@@ -317,21 +314,21 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
       SELECT m.account_id FROM zv_mail_messages m
       INNER JOIN zv_mail_accounts a ON a.id = m.account_id
       WHERE m.id = ${c.req.param('id')} AND a.user_id = ${user.id}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!msgResult.rows[0]) return c.json({ error: 'Not found' }, 404);
 
     const accountId = (msgResult.rows[0] as any).account_id;
     const trashResult = await sql`
       SELECT id FROM zv_mail_folders WHERE account_id = ${accountId} AND type = 'trash' LIMIT 1
-    `.execute(reqDb(c));
+    `.execute(db);
 
     if (trashResult.rows[0]) {
       await sql`
         UPDATE zv_mail_messages SET folder_id = ${(trashResult.rows[0] as any).id}
         WHERE id = ${c.req.param('id')}
-      `.execute(reqDb(c));
+      `.execute(db);
     } else {
-      await sql`DELETE FROM zv_mail_messages WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
+      await sql`DELETE FROM zv_mail_messages WHERE id = ${c.req.param('id')}`.execute(db);
     }
     return c.json({ success: true });
   });
@@ -354,7 +351,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
 
     const accountResult = await sql`
       SELECT * FROM zv_mail_accounts WHERE id = ${data.account_id} AND user_id = ${user.id}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!accountResult.rows[0]) return c.json({ error: 'Account not found' }, 404);
     const account = accountResult.rows[0] as any;
 
@@ -362,7 +359,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     if (data.reply_to_message_id) {
       const original = await sql`
         SELECT message_id FROM zv_mail_messages WHERE id = ${data.reply_to_message_id}
-      `.execute(reqDb(c));
+      `.execute(db);
       inReplyTo = (original.rows[0] as any)?.message_id;
     }
 
@@ -374,7 +371,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     // Save to local Sent folder
     const sentFolderResult = await sql`
       SELECT id FROM zv_mail_folders WHERE account_id = ${account.id} AND type = 'sent' LIMIT 1
-    `.execute(reqDb(c));
+    `.execute(db);
 
     if (sentFolderResult.rows[0]) {
       const folderId = (sentFolderResult.rows[0] as any).id;
@@ -392,7 +389,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
           ${data.subject}, ${data.body_html}, ${data.body_text ?? null},
           ${snippet}, true, NOW()
         )
-      `.execute(reqDb(c));
+      `.execute(db);
     }
 
     return c.json({ success: true, messageId: result.messageId });
@@ -407,7 +404,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
       SELECT m.subject, m.body_text FROM zv_mail_messages m
       INNER JOIN zv_mail_accounts a ON a.id = m.account_id
       WHERE m.id = ${c.req.param('id')} AND a.user_id = ${user.id}
-    `.execute(reqDb(c));
+    `.execute(db);
 
     if (!msgResult.rows[0]) return c.json({ error: 'Not found' }, 404);
     const { subject, body_text } = msgResult.rows[0] as any;
@@ -430,7 +427,7 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
       SELECT m.subject, m.body_text, m.from_address, m.from_name FROM zv_mail_messages m
       INNER JOIN zv_mail_accounts a ON a.id = m.account_id
       WHERE m.id = ${c.req.param('id')} AND a.user_id = ${user.id}
-    `.execute(reqDb(c));
+    `.execute(db);
 
     if (!msgResult.rows[0]) return c.json({ error: 'Not found' }, 404);
     const { subject, body_text, from_address, from_name } = msgResult.rows[0] as any;
@@ -470,7 +467,7 @@ Please draft a reply to this email.`,
           @@ plainto_tsquery('simple', ${q})
       ORDER BY m.received_at DESC
       LIMIT ${parseInt(limit)}
-    `.execute(reqDb(c));
+    `.execute(db);
 
     return c.json({ messages: messages.rows });
   });
@@ -486,7 +483,7 @@ Please draft a reply to this email.`,
     const user = c.get('user') as any;
     const { account_id, name, parent_path } = c.req.valid('json');
 
-    const accountResult = await sql`SELECT * FROM zv_mail_accounts WHERE id = ${account_id} AND user_id = ${user.id}`.execute(reqDb(c));
+    const accountResult = await sql`SELECT * FROM zv_mail_accounts WHERE id = ${account_id} AND user_id = ${user.id}`.execute(db);
     if (!accountResult.rows[0]) return c.json({ error: 'Account not found' }, 404);
 
     const fullPath = parent_path ? `${parent_path}.${name}` : name;
@@ -495,7 +492,7 @@ Please draft a reply to this email.`,
       INSERT INTO zv_mail_folders (account_id, name, path, type)
       VALUES (${account_id}, ${name}, ${fullPath}, 'other')
       ON CONFLICT (account_id, path) DO NOTHING
-    `.execute(reqDb(c));
+    `.execute(db);
 
     return c.json({ success: true, path: fullPath });
   });
@@ -507,7 +504,7 @@ Please draft a reply to this email.`,
       SELECT f.*, a.* FROM zv_mail_folders f
       INNER JOIN zv_mail_accounts a ON a.id = f.account_id
       WHERE f.id = ${c.req.param('id')} AND a.user_id = ${user.id}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!folderResult.rows[0]) return c.json({ error: 'Folder not found' }, 404);
     const folder = folderResult.rows[0] as any;
 
@@ -517,7 +514,7 @@ Please draft a reply to this email.`,
       : newName;
 
     await renameImapFolder(folder, folder.path, newPath);
-    await sql`UPDATE zv_mail_folders SET name = ${newName}, path = ${newPath} WHERE id = ${folder.id}`.execute(reqDb(c));
+    await sql`UPDATE zv_mail_folders SET name = ${newName}, path = ${newPath} WHERE id = ${folder.id}`.execute(db);
     return c.json({ success: true });
   });
 
@@ -528,7 +525,7 @@ Please draft a reply to this email.`,
       SELECT f.*, a.* FROM zv_mail_folders f
       INNER JOIN zv_mail_accounts a ON a.id = f.account_id
       WHERE f.id = ${c.req.param('id')} AND a.user_id = ${user.id}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!folderResult.rows[0]) return c.json({ error: 'Folder not found' }, 404);
     const folder = folderResult.rows[0] as any;
 
@@ -537,7 +534,7 @@ Please draft a reply to this email.`,
     }
 
     await deleteImapFolder(folder, folder.path);
-    await sql`DELETE FROM zv_mail_folders WHERE id = ${folder.id}`.execute(reqDb(c));
+    await sql`DELETE FROM zv_mail_folders WHERE id = ${folder.id}`.execute(db);
     return c.json({ success: true });
   });
 
@@ -557,39 +554,39 @@ Please draft a reply to this email.`,
 
     switch (action) {
       case 'mark_read':
-        await sql.raw(`UPDATE zv_mail_messages SET is_read = true WHERE id IN ('${idList}') AND ${userFilter}`).execute(reqDb(c));
+        await sql.raw(`UPDATE zv_mail_messages SET is_read = true WHERE id IN ('${idList}') AND ${userFilter}`).execute(db);
         break;
       case 'mark_unread':
-        await sql.raw(`UPDATE zv_mail_messages SET is_read = false WHERE id IN ('${idList}') AND ${userFilter}`).execute(reqDb(c));
+        await sql.raw(`UPDATE zv_mail_messages SET is_read = false WHERE id IN ('${idList}') AND ${userFilter}`).execute(db);
         break;
       case 'star':
-        await sql.raw(`UPDATE zv_mail_messages SET is_starred = true WHERE id IN ('${idList}') AND ${userFilter}`).execute(reqDb(c));
+        await sql.raw(`UPDATE zv_mail_messages SET is_starred = true WHERE id IN ('${idList}') AND ${userFilter}`).execute(db);
         break;
       case 'unstar':
-        await sql.raw(`UPDATE zv_mail_messages SET is_starred = false WHERE id IN ('${idList}') AND ${userFilter}`).execute(reqDb(c));
+        await sql.raw(`UPDATE zv_mail_messages SET is_starred = false WHERE id IN ('${idList}') AND ${userFilter}`).execute(db);
         break;
       case 'move':
         if (!target_folder_id) return c.json({ error: 'target_folder_id required' }, 400);
-        await sql.raw(`UPDATE zv_mail_messages SET folder_id = '${target_folder_id}' WHERE id IN ('${idList}') AND ${userFilter}`).execute(reqDb(c));
+        await sql.raw(`UPDATE zv_mail_messages SET folder_id = '${target_folder_id}' WHERE id IN ('${idList}') AND ${userFilter}`).execute(db);
         break;
       case 'delete': {
-        const firstMsg = await sql`SELECT account_id FROM zv_mail_messages WHERE id = ${message_ids[0]}`.execute(reqDb(c));
+        const firstMsg = await sql`SELECT account_id FROM zv_mail_messages WHERE id = ${message_ids[0]}`.execute(db);
         if (firstMsg.rows[0]) {
-          const trashRes = await sql`SELECT id FROM zv_mail_folders WHERE account_id = ${(firstMsg.rows[0] as any).account_id} AND type = 'trash' LIMIT 1`.execute(reqDb(c));
+          const trashRes = await sql`SELECT id FROM zv_mail_folders WHERE account_id = ${(firstMsg.rows[0] as any).account_id} AND type = 'trash' LIMIT 1`.execute(db);
           if (trashRes.rows[0]) {
-            await sql.raw(`UPDATE zv_mail_messages SET folder_id = '${(trashRes.rows[0] as any).id}' WHERE id IN ('${idList}') AND ${userFilter}`).execute(reqDb(c));
+            await sql.raw(`UPDATE zv_mail_messages SET folder_id = '${(trashRes.rows[0] as any).id}' WHERE id IN ('${idList}') AND ${userFilter}`).execute(db);
             break;
           }
         }
-        await sql.raw(`DELETE FROM zv_mail_messages WHERE id IN ('${idList}') AND ${userFilter}`).execute(reqDb(c));
+        await sql.raw(`DELETE FROM zv_mail_messages WHERE id IN ('${idList}') AND ${userFilter}`).execute(db);
         break;
       }
       case 'spam': {
-        const firstMsg2 = await sql`SELECT account_id FROM zv_mail_messages WHERE id = ${message_ids[0]}`.execute(reqDb(c));
+        const firstMsg2 = await sql`SELECT account_id FROM zv_mail_messages WHERE id = ${message_ids[0]}`.execute(db);
         if (firstMsg2.rows[0]) {
-          const spamRes = await sql`SELECT id FROM zv_mail_folders WHERE account_id = ${(firstMsg2.rows[0] as any).account_id} AND type = 'spam' LIMIT 1`.execute(reqDb(c));
+          const spamRes = await sql`SELECT id FROM zv_mail_folders WHERE account_id = ${(firstMsg2.rows[0] as any).account_id} AND type = 'spam' LIMIT 1`.execute(db);
           if (spamRes.rows[0]) {
-            await sql.raw(`UPDATE zv_mail_messages SET folder_id = '${(spamRes.rows[0] as any).id}' WHERE id IN ('${idList}') AND ${userFilter}`).execute(reqDb(c));
+            await sql.raw(`UPDATE zv_mail_messages SET folder_id = '${(spamRes.rows[0] as any).id}' WHERE id IN ('${idList}') AND ${userFilter}`).execute(db);
           }
         }
         break;
@@ -609,11 +606,11 @@ Please draft a reply to this email.`,
       FROM zv_mail_messages m
       INNER JOIN zv_mail_accounts a ON a.id = m.account_id
       WHERE m.id = ${c.req.param('id')} AND a.user_id = ${user.id}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!msgResult.rows[0]) return c.json({ error: 'Not found' }, 404);
     const m = msgResult.rows[0] as any;
 
-    const folderResult = await sql`SELECT path FROM zv_mail_folders WHERE id = ${m.folder_id}`.execute(reqDb(c));
+    const folderResult = await sql`SELECT path FROM zv_mail_folders WHERE id = ${m.folder_id}`.execute(db);
     if (!folderResult.rows[0]) return c.json({ error: 'Folder not found' }, 404);
 
     const eml = await downloadMessageAsEml(m, (folderResult.rows[0] as any).path, m.uid);
@@ -627,7 +624,7 @@ Please draft a reply to this email.`,
   // GET /ext/communications/mail/accounts/:id/quota
   app.get('/accounts/:id/quota', async (c) => {
     const user = c.get('user') as any;
-    const accountResult = await sql`SELECT * FROM zv_mail_accounts WHERE id = ${c.req.param('id')} AND user_id = ${user.id}`.execute(reqDb(c));
+    const accountResult = await sql`SELECT * FROM zv_mail_accounts WHERE id = ${c.req.param('id')} AND user_id = ${user.id}`.execute(db);
     if (!accountResult.rows[0]) return c.json({ error: 'Account not found' }, 404);
 
     const quota = await getImapQuota(accountResult.rows[0] as any);
@@ -661,7 +658,7 @@ Please draft a reply to this email.`,
       INNER JOIN zv_mail_accounts a ON a.id = d.account_id
       WHERE a.user_id = ${user.id}
       ORDER BY d.updated_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ drafts: drafts.rows });
   });
 
@@ -672,7 +669,7 @@ Please draft a reply to this email.`,
       SELECT d.* FROM zv_mail_drafts d
       INNER JOIN zv_mail_accounts a ON a.id = d.account_id
       WHERE d.id = ${c.req.param('id')} AND a.user_id = ${user.id}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!result.rows[0]) return c.json({ error: 'Draft not found' }, 404);
     return c.json({ draft: result.rows[0] });
   });
@@ -729,7 +726,7 @@ Please draft a reply to this email.`,
 
   // DELETE /ext/communications/mail/drafts/:id
   app.delete('/drafts/:id', async (c) => {
-    await sql`DELETE FROM zv_mail_drafts WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
+    await sql`DELETE FROM zv_mail_drafts WHERE id = ${c.req.param('id')}`.execute(db);
     return c.json({ success: true });
   });
 
@@ -743,7 +740,7 @@ Please draft a reply to this email.`,
       INNER JOIN zv_mail_accounts a ON a.id = i.account_id
       WHERE i.account_id = ${c.req.param('accountId')} AND a.user_id = ${user.id}
       ORDER BY i.is_default DESC, i.sort_order
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ identities: identities.rows });
   });
 
@@ -762,13 +759,13 @@ Please draft a reply to this email.`,
       VALUES (${c.req.param('accountId')}, ${data.email_address}, ${data.display_name ?? null},
               ${data.reply_to ?? null}, ${data.bcc_self}, ${data.is_default}, ${data.signature_id ?? null})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ identity: result.rows[0] }, 201);
   });
 
   // DELETE /ext/communications/mail/accounts/:accountId/identities/:id
   app.delete('/accounts/:accountId/identities/:id', async (c) => {
-    await sql`DELETE FROM zv_mail_identities WHERE id = ${c.req.param('id')} AND account_id = ${c.req.param('accountId')}`.execute(reqDb(c));
+    await sql`DELETE FROM zv_mail_identities WHERE id = ${c.req.param('id')} AND account_id = ${c.req.param('accountId')}`.execute(db);
     return c.json({ success: true });
   });
 
@@ -779,7 +776,7 @@ Please draft a reply to this email.`,
     const user = c.get('user') as any;
     const sigs = await sql`
       SELECT * FROM zv_mail_signatures WHERE user_id = ${user.id} ORDER BY is_default DESC, name
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ signatures: sigs.rows });
   });
 
@@ -797,7 +794,7 @@ Please draft a reply to this email.`,
       VALUES (${user.id}, ${data.name}, ${data.body_html},
               ${data.body_text ?? data.body_html.replace(/<[^>]*>/g, '')}, ${data.is_default})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ signature: result.rows[0] }, 201);
   });
 
@@ -812,7 +809,7 @@ Please draft a reply to this email.`,
     const data = c.req.valid('json');
 
     if (data.is_default) {
-      await sql`UPDATE zv_mail_signatures SET is_default = false WHERE user_id = ${user.id}`.execute(reqDb(c));
+      await sql`UPDATE zv_mail_signatures SET is_default = false WHERE user_id = ${user.id}`.execute(db);
     }
 
     await sql`
@@ -823,14 +820,14 @@ Please draft a reply to this email.`,
         is_default = COALESCE(${data.is_default ?? null}::boolean, is_default),
         updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND user_id = ${user.id}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ success: true });
   });
 
   // DELETE /ext/communications/mail/signatures/:id
   app.delete('/signatures/:id', async (c) => {
     const user = c.get('user') as any;
-    await sql`DELETE FROM zv_mail_signatures WHERE id = ${c.req.param('id')} AND user_id = ${user.id}`.execute(reqDb(c));
+    await sql`DELETE FROM zv_mail_signatures WHERE id = ${c.req.param('id')} AND user_id = ${user.id}`.execute(db);
     return c.json({ success: true });
   });
 
@@ -840,7 +837,7 @@ Please draft a reply to this email.`,
   app.get('/accounts/:accountId/filters', async (c) => {
     const filters = await sql`
       SELECT * FROM zv_mail_filters WHERE account_id = ${c.req.param('accountId')} ORDER BY sort_order
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ filters: filters.rows });
   });
 
@@ -869,7 +866,7 @@ Please draft a reply to this email.`,
     const accountId = c.req.param('accountId');
 
     // Compile Sieve script for all active filters
-    const existing = await sql`SELECT * FROM zv_mail_filters WHERE account_id = ${accountId} AND is_active = true ORDER BY sort_order`.execute(reqDb(c));
+    const existing = await sql`SELECT * FROM zv_mail_filters WHERE account_id = ${accountId} AND is_active = true ORDER BY sort_order`.execute(db);
     const allRules = [...(existing.rows as any[]).map(r => ({
       name: r.name,
       is_active: r.is_active,
@@ -884,10 +881,10 @@ Please draft a reply to this email.`,
       VALUES (${accountId}, ${data.name}, ${JSON.stringify(data.conditions)}::jsonb,
               ${JSON.stringify(data.actions)}::jsonb, ${data.is_active}, ${data.sort_order}, ${sieveScript})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
 
     // Upload to server async (fallback gracefully)
-    const accountResult = await sql`SELECT * FROM zv_mail_accounts WHERE id = ${accountId}`.execute(reqDb(c));
+    const accountResult = await sql`SELECT * FROM zv_mail_accounts WHERE id = ${accountId}`.execute(db);
     if (accountResult.rows[0]) {
       uploadSieveScript(accountResult.rows[0] as any, 'zveltio', sieveScript).catch(() => { /* ignore */ });
     }
@@ -909,13 +906,13 @@ Please draft a reply to this email.`,
         sort_order = COALESCE(${data.sort_order ?? null}::int, sort_order),
         updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND account_id = ${c.req.param('accountId')}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ success: true });
   });
 
   // DELETE /ext/communications/mail/accounts/:accountId/filters/:id
   app.delete('/accounts/:accountId/filters/:id', async (c) => {
-    await sql`DELETE FROM zv_mail_filters WHERE id = ${c.req.param('id')} AND account_id = ${c.req.param('accountId')}`.execute(reqDb(c));
+    await sql`DELETE FROM zv_mail_filters WHERE id = ${c.req.param('id')} AND account_id = ${c.req.param('accountId')}`.execute(db);
     return c.json({ success: true });
   });
 
@@ -936,7 +933,7 @@ Please draft a reply to this email.`,
           AND (email ILIKE ${'%' + q + '%'} OR display_name ILIKE ${'%' + q + '%'})
         ORDER BY frequency DESC
         LIMIT ${limit}
-      `.execute(reqDb(c));
+      `.execute(db);
     } else {
       contacts = await sql`
         SELECT email, display_name, company, frequency
@@ -944,7 +941,7 @@ Please draft a reply to this email.`,
         WHERE user_id = ${user.id}
         ORDER BY frequency DESC
         LIMIT ${limit}
-      `.execute(reqDb(c));
+      `.execute(db);
     }
     return c.json({ contacts: contacts.rows });
   });
@@ -966,7 +963,7 @@ Please draft a reply to this email.`,
         display_name = COALESCE(EXCLUDED.display_name, zv_mail_contacts.display_name),
         company = COALESCE(EXCLUDED.company, zv_mail_contacts.company),
         phone = COALESCE(EXCLUDED.phone, zv_mail_contacts.phone)
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ success: true });
   });
 
@@ -982,7 +979,7 @@ Please draft a reply to this email.`,
       INNER JOIN zv_mail_accounts a ON a.id = m.account_id
       WHERE m.id = ${c.req.param('id')} AND a.user_id = ${user.id}
         AND m.read_receipt_requested = true AND m.read_receipt_sent = false
-    `.execute(reqDb(c));
+    `.execute(db);
 
     if (!msgResult.rows[0]) return c.json({ error: 'No read receipt needed or already sent' }, 400);
     const m = msgResult.rows[0] as any;
@@ -996,7 +993,7 @@ Please draft a reply to this email.`,
       mdnBody,
     );
 
-    await sql`UPDATE zv_mail_messages SET read_receipt_sent = true WHERE id = ${m.id}`.execute(reqDb(c));
+    await sql`UPDATE zv_mail_messages SET read_receipt_sent = true WHERE id = ${m.id}`.execute(db);
     return c.json({ success: true });
   });
 
@@ -1008,7 +1005,7 @@ Please draft a reply to this email.`,
     const isAdmin = await checkPermission(user.id, 'admin', '*');
     if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
 
-    const config = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(reqDb(c));
+    const config = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
     return c.json({ config: config.rows[0] ? (config.rows[0] as any).value : {} });
   });
 
@@ -1036,7 +1033,7 @@ Please draft a reply to this email.`,
     const isAdmin = await checkPermission(user.id, 'admin', '*');
     if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
 
-    const current = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(reqDb(c));
+    const current = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
     const existing = current.rows[0] ? (current.rows[0] as any).value : {};
     const merged = { ...existing, ...c.req.valid('json') };
 
@@ -1044,7 +1041,7 @@ Please draft a reply to this email.`,
       INSERT INTO zv_settings (key, value, description, is_public)
       VALUES ('mail', ${JSON.stringify(merged)}::jsonb, 'Mail client configuration (admin)', false)
       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
-    `.execute(reqDb(c));
+    `.execute(db);
 
     return c.json({ success: true });
   });
@@ -1065,7 +1062,7 @@ Please draft a reply to this email.`,
       INNER JOIN zv_mail_folders f ON f.id = m.folder_id
       INNER JOIN zv_mail_accounts a ON a.id = m.account_id
       WHERE a.user_id = ${user.id}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ stats: stats.rows[0] ?? {} });
   });
 

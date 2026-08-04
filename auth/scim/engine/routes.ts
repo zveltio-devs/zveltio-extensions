@@ -69,7 +69,6 @@ function toScimUser(u: any, state: { external_id?: string | null; active?: boole
 
 export function scimAdminRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
-  const reqDb = (c: Ctx): Db => (ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db));
   const app = new Hono();
 
   app.use('*', async (c, next) => {
@@ -85,7 +84,7 @@ export function scimAdminRoutes(ctx: ExtensionContext): Hono {
   app.get('/tokens', async (c) => {
     const rows = await sql<Record<string, unknown>>`
       SELECT id::text, name, created_at, last_used_at FROM zv_scim_tokens ORDER BY created_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ tokens: rows.rows });
   });
 
@@ -95,13 +94,13 @@ export function scimAdminRoutes(ctx: ExtensionContext): Hono {
     await sql`
       INSERT INTO zv_scim_tokens (name, token_hash, created_by)
       VALUES (${c.req.valid('json').name}, ${await hashToken(ctx.internals, raw)}, ${user.id})
-    `.execute(reqDb(c));
+    `.execute(db);
     // Shown exactly once — paste it into the IdP's provisioning config.
     return c.json({ token: raw, base_url: '/scim/v2' }, 201);
   });
 
   app.delete('/tokens/:id', async (c) => {
-    await sql`DELETE FROM zv_scim_tokens WHERE id = ${c.req.param('id')}`.execute(reqDb(c));
+    await sql`DELETE FROM zv_scim_tokens WHERE id = ${c.req.param('id')}`.execute(db);
     return c.json({ success: true });
   });
 

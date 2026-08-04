@@ -19644,9 +19644,6 @@ async function logStatusChange(dbh, invoiceId, oldStatus, newStatus, userId, not
 function efacturaRoutes(ctx) {
   const { db, auth } = ctx;
   const app = new Hono2;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session)
@@ -19660,7 +19657,7 @@ function efacturaRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const { status, seller_cui, from_date, to_date } = c.req.query();
-    let query = reqDb(c).selectFrom("zv_efactura_invoices").select(["id", "invoice_number", "invoice_date", "buyer_name", "buyer_cui", "total", "currency", "status", "anaf_index", "created_at"]).orderBy("invoice_date", "desc");
+    let query = db.selectFrom("zv_efactura_invoices").select(["id", "invoice_number", "invoice_date", "buyer_name", "buyer_cui", "total", "currency", "status", "anaf_index", "created_at"]).orderBy("invoice_date", "desc");
     if (status)
       query = query.where("status", "=", status);
     if (seller_cui)
@@ -19685,7 +19682,7 @@ function efacturaRoutes(ctx) {
         WHERE EXTRACT(YEAR FROM invoice_date) = ${currentYear}
           ${seller_cui ? sql`AND seller_cui = ${seller_cui}` : sql``}
         GROUP BY status
-      `.execute(reqDb(c)).catch(() => ({ rows: [] })),
+      `.execute(db).catch(() => ({ rows: [] })),
       sql`
         SELECT TO_CHAR(invoice_date, 'YYYY-MM') AS month,
                COUNT(*)::int AS count, SUM(total) AS total, SUM(vat_total) AS vat
@@ -19693,7 +19690,7 @@ function efacturaRoutes(ctx) {
         WHERE EXTRACT(YEAR FROM invoice_date) = ${currentYear}
           ${seller_cui ? sql`AND seller_cui = ${seller_cui}` : sql``}
         GROUP BY month ORDER BY month
-      `.execute(reqDb(c)).catch(() => ({ rows: [] }))
+      `.execute(db).catch(() => ({ rows: [] }))
     ]);
     return c.json({ year: currentYear, by_status: statusStats.rows, by_month: monthlyStats.rows });
   });
@@ -19701,7 +19698,7 @@ function efacturaRoutes(ctx) {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const invoice = await reqDb(c).selectFrom("zv_efactura_invoices").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
+    const invoice = await db.selectFrom("zv_efactura_invoices").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
     if (!invoice)
       return c.json({ error: "Invoice not found" }, 404);
     return c.json({ invoice });
@@ -19714,7 +19711,7 @@ function efacturaRoutes(ctx) {
       SELECT * FROM zv_efactura_status_log
       WHERE invoice_id = ${c.req.param("id")}::uuid
       ORDER BY created_at ASC
-    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+    `.execute(db).catch(() => ({ rows: [] }));
     return c.json({ log: logs.rows });
   });
   app.post("/", zValidator("json", invoiceSchema), async (c) => {
@@ -19722,7 +19719,7 @@ function efacturaRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const body = c.req.valid("json");
-    const invoice = await reqDb(c).insertInto("zv_efactura_invoices").values({
+    const invoice = await db.insertInto("zv_efactura_invoices").values({
       ...body,
       lines: JSON.stringify(body.lines),
       created_by: user.id
@@ -19739,7 +19736,7 @@ function efacturaRoutes(ctx) {
       if (v !== undefined)
         updates[k] = k === "lines" ? JSON.stringify(v) : v;
     }
-    const invoice = await reqDb(c).updateTable("zv_efactura_invoices").set(updates).where("id", "=", c.req.param("id")).where("status", "=", "draft").returningAll().executeTakeFirst();
+    const invoice = await db.updateTable("zv_efactura_invoices").set(updates).where("id", "=", c.req.param("id")).where("status", "=", "draft").returningAll().executeTakeFirst();
     if (!invoice)
       return c.json({ error: "Invoice not found or not editable" }, 404);
     return c.json({ invoice });
@@ -19748,27 +19745,27 @@ function efacturaRoutes(ctx) {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    await reqDb(c).deleteFrom("zv_efactura_invoices").where("id", "=", c.req.param("id")).where("status", "=", "draft").execute();
+    await db.deleteFrom("zv_efactura_invoices").where("id", "=", c.req.param("id")).where("status", "=", "draft").execute();
     return c.json({ success: true });
   });
   app.post("/:id/generate-xml", async (c) => {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const invoice = await reqDb(c).selectFrom("zv_efactura_invoices").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
+    const invoice = await db.selectFrom("zv_efactura_invoices").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
     if (!invoice)
       return c.json({ error: "Invoice not found" }, 404);
     const lines = typeof invoice.lines === "string" ? JSON.parse(invoice.lines) : invoice.lines;
     const xml = generateUBLXML({ ...invoice, lines });
-    await reqDb(c).updateTable("zv_efactura_invoices").set({ xml_content: xml, status: "xml_generated", updated_at: new Date }).where("id", "=", invoice.id).execute();
-    await logStatusChange(reqDb(c), invoice.id, invoice.status, "xml_generated", user.id);
+    await db.updateTable("zv_efactura_invoices").set({ xml_content: xml, status: "xml_generated", updated_at: new Date }).where("id", "=", invoice.id).execute();
+    await logStatusChange(db, invoice.id, invoice.status, "xml_generated", user.id);
     return c.json({ xml, message: "UBL XML generated successfully" });
   });
   app.get("/:id/xml", async (c) => {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const invoice = await reqDb(c).selectFrom("zv_efactura_invoices").select(["xml_content", "invoice_number"]).where("id", "=", c.req.param("id")).executeTakeFirst();
+    const invoice = await db.selectFrom("zv_efactura_invoices").select(["xml_content", "invoice_number"]).where("id", "=", c.req.param("id")).executeTakeFirst();
     if (!invoice?.xml_content)
       return c.json({ error: "XML not generated yet" }, 404);
     const safeInvoiceNumber = String(invoice.invoice_number).replace(/[^a-zA-Z0-9\-_.]/g, "_");
@@ -19783,7 +19780,7 @@ function efacturaRoutes(ctx) {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const invoice = await reqDb(c).selectFrom("zv_efactura_invoices").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
+    const invoice = await db.selectFrom("zv_efactura_invoices").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
     if (!invoice)
       return c.json({ error: "Invoice not found" }, 404);
     if (!invoice.xml_content)
@@ -19793,13 +19790,13 @@ function efacturaRoutes(ctx) {
       ExecutionStatus: "0",
       index_incarcare: `RO${Date.now()}`
     };
-    await reqDb(c).updateTable("zv_efactura_invoices").set({
+    await db.updateTable("zv_efactura_invoices").set({
       status: "submitted",
       anaf_index: mockResponse.index_incarcare,
       anaf_response: JSON.stringify(mockResponse),
       updated_at: new Date
     }).where("id", "=", invoice.id).execute();
-    await logStatusChange(reqDb(c), invoice.id, invoice.status, "submitted", user.id, `ANAF index: ${mockResponse.index_incarcare}`);
+    await logStatusChange(db, invoice.id, invoice.status, "submitted", user.id, `ANAF index: ${mockResponse.index_incarcare}`);
     await sql`
       INSERT INTO zv_efactura_daily_stats (date, seller_cui, submitted_count, total_amount, vat_amount)
       VALUES (CURRENT_DATE, ${invoice.seller_cui}, 1, ${invoice.total}, ${invoice.vat_total})
@@ -19807,21 +19804,21 @@ function efacturaRoutes(ctx) {
       DO UPDATE SET submitted_count = zv_efactura_daily_stats.submitted_count + 1,
                     total_amount = zv_efactura_daily_stats.total_amount + EXCLUDED.total_amount,
                     vat_amount = zv_efactura_daily_stats.vat_amount + EXCLUDED.vat_amount
-    `.execute(reqDb(c)).catch(() => {});
+    `.execute(db).catch(() => {});
     return c.json({ message: "Submitted to ANAF", anaf_index: mockResponse.index_incarcare, response: mockResponse });
   });
   app.post("/:id/storno", zValidator("json", exports_external.object({ reason: exports_external.string().min(1) })), async (c) => {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const original = await reqDb(c).selectFrom("zv_efactura_invoices").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
+    const original = await db.selectFrom("zv_efactura_invoices").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
     if (!original)
       return c.json({ error: "Invoice not found" }, 404);
     if (!["submitted", "accepted"].includes(original.status))
       return c.json({ error: "Only submitted/accepted invoices can be storned" }, 400);
     const { reason } = c.req.valid("json");
     const stornoLines = (typeof original.lines === "string" ? JSON.parse(original.lines) : original.lines).map((l) => ({ ...l, quantity: -l.quantity, vat_amount: -l.vat_amount, line_total: -l.line_total }));
-    const storno = await reqDb(c).insertInto("zv_efactura_invoices").values({
+    const storno = await db.insertInto("zv_efactura_invoices").values({
       invoice_number: `STORNO-${original.invoice_number}`,
       invoice_date: new Date().toISOString().split("T")[0],
       seller_name: original.seller_name,
@@ -19838,7 +19835,7 @@ function efacturaRoutes(ctx) {
     await sql`
         INSERT INTO zv_efactura_storno (original_id, storno_invoice_id, reason, requested_by)
         VALUES (${original.id}::uuid, ${storno.id}::uuid, ${reason}, ${user.id})
-      `.execute(reqDb(c));
+      `.execute(db);
     return c.json({ storno_invoice: storno }, 201);
   });
   app.post("/batch-submit", zValidator("json", exports_external.object({ ids: exports_external.array(exports_external.string().uuid()).min(1).max(20) })), async (c) => {
@@ -19848,7 +19845,7 @@ function efacturaRoutes(ctx) {
     const { ids } = c.req.valid("json");
     const results = [];
     for (const id of ids) {
-      const inv = await reqDb(c).selectFrom("zv_efactura_invoices").select(["id", "status", "xml_content", "seller_cui", "total", "vat_total"]).where("id", "=", id).executeTakeFirst().catch(() => null);
+      const inv = await db.selectFrom("zv_efactura_invoices").select(["id", "status", "xml_content", "seller_cui", "total", "vat_total"]).where("id", "=", id).executeTakeFirst().catch(() => null);
       if (!inv) {
         results.push({ id, success: false, error: "Not found" });
         continue;
@@ -19858,8 +19855,8 @@ function efacturaRoutes(ctx) {
         continue;
       }
       const anafIndex = `RO${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      await reqDb(c).updateTable("zv_efactura_invoices").set({ status: "submitted", anaf_index: anafIndex, updated_at: new Date }).where("id", "=", id).execute();
-      await logStatusChange(reqDb(c), id, inv.status, "submitted", user.id);
+      await db.updateTable("zv_efactura_invoices").set({ status: "submitted", anaf_index: anafIndex, updated_at: new Date }).where("id", "=", id).execute();
+      await logStatusChange(db, id, inv.status, "submitted", user.id);
       results.push({ id, success: true });
     }
     return c.json({ results, submitted: results.filter((r) => r.success).length });

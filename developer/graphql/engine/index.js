@@ -27552,9 +27552,6 @@ async function getRelations(dbh) {
 }
 async function buildDynamicSchema(ctx) {
   const { db, DDLManager } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   let collections = [];
   let relations = [];
   try {
@@ -27788,9 +27785,6 @@ function detectOperationType(query) {
 function graphqlRoutes(ctx) {
   const { db, DDLManager, auth, checkPermission } = ctx;
   const { DataLoaderRegistry, checkQueryDepth } = ctx.internals;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   app.get("/", async (c) => {
     if (ctx.config?.isProduction) {
@@ -27828,7 +27822,7 @@ function graphqlRoutes(ctx) {
     try {
       const schema = await getSchema(ctx);
       const tenantTrx = c.get?.("tenantTrx") ?? null;
-      const loaders = new DataLoaderRegistry(reqDb(c));
+      const loaders = new DataLoaderRegistry(db);
       result = await graphql({
         schema,
         source: query,
@@ -27838,7 +27832,7 @@ function graphqlRoutes(ctx) {
           user: session.user,
           db,
           tenantTrx,
-          reqDb: reqDb(c),
+          reqDb: db,
           loaders,
           checkPermission
         }
@@ -27860,7 +27854,7 @@ function graphqlRoutes(ctx) {
          ${variables ? JSON.stringify(variables) : null}::jsonb,
          ${durationMs}, ${resultSizeBytes}, ${errorCount},
          ${session.user.id}, ${ip})
-    `.execute(reqDb(c)).catch(() => {});
+    `.execute(db).catch(() => {});
     if (errorCount > 0 && !result.data) {
       return c.json(result, 400);
     }
@@ -27886,7 +27880,7 @@ function graphqlRoutes(ctx) {
         FROM zvd_graphql_persisted_queries
         WHERE is_public = true
         ORDER BY name ASC
-      `.execute(reqDb(c));
+      `.execute(db);
       return c.json({ queries: rows2.rows });
     }
     const rows = await sql`
@@ -27894,7 +27888,7 @@ function graphqlRoutes(ctx) {
              is_public, allowed_roles, use_count, last_used_at, created_at
       FROM zvd_graphql_persisted_queries
       ORDER BY name ASC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ queries: rows.rows });
   });
   app.post("/persisted", zValidator("json", PersistedQueryCreateSchema), async (c) => {
@@ -27913,7 +27907,7 @@ function graphqlRoutes(ctx) {
          ${body.variables_schema ? JSON.stringify(body.variables_schema) : null}::jsonb,
          ${body.is_public}, ${body.allowed_roles}, ${session.user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ query: row.rows[0] }, 201);
   });
   app.delete("/persisted/:id", async (c) => {
@@ -27924,7 +27918,7 @@ function graphqlRoutes(ctx) {
     if (!isAdmin)
       return c.json({ error: "Admin required" }, 403);
     const id = c.req.param("id");
-    const res = await reqDb(c).deleteFrom("zvd_graphql_persisted_queries").where("id", "=", id).executeTakeFirst();
+    const res = await db.deleteFrom("zvd_graphql_persisted_queries").where("id", "=", id).executeTakeFirst();
     if ((res?.numDeletedRows ?? 0n) === 0n)
       return c.json({ error: "Not found" }, 404);
     return c.json({ success: true });
@@ -27936,7 +27930,7 @@ function graphqlRoutes(ctx) {
     const name = c.req.param("name");
     const pqRes = await sql`
       SELECT * FROM zvd_graphql_persisted_queries WHERE name = ${name}
-    `.execute(reqDb(c));
+    `.execute(db);
     const pq = pqRes.rows[0];
     if (!pq)
       return c.json({ errors: [{ message: "Persisted query not found" }] }, 404);
@@ -27957,7 +27951,7 @@ function graphqlRoutes(ctx) {
     try {
       const schema = await getSchema(ctx);
       const tenantTrx = c.get?.("tenantTrx") ?? null;
-      const loaders = new DataLoaderRegistry(reqDb(c));
+      const loaders = new DataLoaderRegistry(db);
       const result = await graphql({
         schema,
         source: pq.query,
@@ -27966,7 +27960,7 @@ function graphqlRoutes(ctx) {
           user: session.user,
           db,
           tenantTrx,
-          reqDb: reqDb(c),
+          reqDb: db,
           loaders,
           checkPermission
         }
@@ -27975,7 +27969,7 @@ function graphqlRoutes(ctx) {
         UPDATE zvd_graphql_persisted_queries
         SET use_count = use_count + 1, last_used_at = NOW(), updated_at = NOW()
         WHERE name = ${name}
-      `.execute(reqDb(c)).catch(() => {});
+      `.execute(db).catch(() => {});
       return c.json(result);
     } catch (err) {
       return c.json({ errors: [{ message: String(err) }] }, 400);
@@ -27994,7 +27988,7 @@ function graphqlRoutes(ctx) {
       FROM zvd_graphql_operation_logs
       ORDER BY created_at DESC
       LIMIT 100
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ logs: rows.rows });
   });
   app.delete("/logs", async (c) => {
@@ -28007,7 +28001,7 @@ function graphqlRoutes(ctx) {
     const res = await sql`
       DELETE FROM zvd_graphql_operation_logs
       WHERE created_at < NOW() - INTERVAL '30 days'
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ deleted: Number(res.numAffectedRows ?? 0) });
   });
   app.get("/stats", async (c) => {
@@ -28025,7 +28019,7 @@ function graphqlRoutes(ctx) {
           ROUND(AVG(duration_ms))::int AS avg_duration_ms,
           COUNT(*) FILTER (WHERE error_count > 0)::int AS total_errors
         FROM zvd_graphql_operation_logs
-      `.execute(reqDb(c)),
+      `.execute(db),
       sql`
         SELECT operation_name, COUNT(*)::int AS count,
                ROUND(AVG(duration_ms))::int AS avg_duration_ms
@@ -28034,7 +28028,7 @@ function graphqlRoutes(ctx) {
         GROUP BY operation_name
         ORDER BY count DESC
         LIMIT 10
-      `.execute(reqDb(c))
+      `.execute(db)
     ]);
     return c.json({
       ...totalsRes.rows[0],
@@ -28050,7 +28044,7 @@ function graphqlRoutes(ctx) {
       return c.json({ error: "Admin required" }, 403);
     const rows = await sql`
       SELECT * FROM zvd_graphql_field_policies ORDER BY collection ASC, field ASC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ policies: rows.rows });
   });
   app.post("/field-policies", zValidator("json", FieldPolicyCreateSchema), async (c) => {
@@ -28072,7 +28066,7 @@ function graphqlRoutes(ctx) {
         SET allowed_roles = EXCLUDED.allowed_roles,
             deny_roles = EXCLUDED.deny_roles
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ policy: row.rows[0] }, 201);
   });
   app.delete("/field-policies/:id", async (c) => {
@@ -28083,7 +28077,7 @@ function graphqlRoutes(ctx) {
     if (!isAdmin)
       return c.json({ error: "Admin required" }, 403);
     const id = c.req.param("id");
-    const res = await reqDb(c).deleteFrom("zvd_graphql_field_policies").where("id", "=", id).executeTakeFirst();
+    const res = await db.deleteFrom("zvd_graphql_field_policies").where("id", "=", id).executeTakeFirst();
     if ((res?.numDeletedRows ?? 0n) === 0n)
       return c.json({ error: "Not found" }, 404);
     return c.json({ success: true });

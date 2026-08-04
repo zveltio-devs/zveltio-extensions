@@ -19611,8 +19611,7 @@ async function computeWidgetData(db, ids, config2, tenantId) {
   return out;
 }
 function dashboardRoutes(ctx) {
-  const { auth, checkPermission, getUserRoles } = ctx;
-  const reqDb = (c) => ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? ctx.db;
+  const { db, auth, checkPermission, getUserRoles } = ctx;
   const tenantOf = (c) => c.get("tenant")?.id ?? DEFAULT_TENANT_ID;
   const userId = (c) => c.get("user").id;
   const app = new Hono2;
@@ -19624,7 +19623,6 @@ function dashboardRoutes(ctx) {
     return next();
   });
   app.get("/", async (c) => {
-    const db = reqDb(c);
     const uid = userId(c);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
     const data = await computeWidgetData(db, resolved.widgets, ctx.config, tenantOf(c));
@@ -19637,7 +19635,6 @@ function dashboardRoutes(ctx) {
     });
   });
   app.put("/", zValidator("json", exports_external.object({ widgets: exports_external.array(exports_external.string()).max(50) })), async (c) => {
-    const db = reqDb(c);
     const uid = userId(c);
     const saved = await setUserLayout(db, uid, c.req.valid("json").widgets, checkPermission);
     const data = await computeWidgetData(db, saved, ctx.config, tenantOf(c));
@@ -19651,9 +19648,8 @@ function dashboardRoutes(ctx) {
     });
   });
   app.delete("/", async (c) => {
-    const db = reqDb(c);
     const uid = userId(c);
-    await deleteUserLayout(reqDb(c), uid);
+    await deleteUserLayout(db, uid);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
     const data = await computeWidgetData(db, resolved.widgets, ctx.config, tenantOf(c));
     return c.json({
@@ -19670,7 +19666,7 @@ function dashboardRoutes(ctx) {
       return c.json({ error: "Forbidden" }, 403);
     const rolesRes = await sql`
       SELECT DISTINCT v1 AS role FROM zvd_permissions WHERE ptype = 'g' AND v1 IS NOT NULL
-    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+    `.execute(db).catch(() => ({ rows: [] }));
     const roles = rolesRes.rows.map((r) => r.role).filter(Boolean);
     return c.json({
       catalog: WIDGET_CATALOG.map((w) => ({ id: w.id, removable: w.removable, permission: w.permission })),
@@ -19682,7 +19678,7 @@ function dashboardRoutes(ctx) {
     if (!await requireAdmin(c))
       return c.json({ error: "Forbidden" }, 403);
     const role = c.req.param("role");
-    const widgets = await readLayout(reqDb(c), "role", role);
+    const widgets = await readLayout(db, "role", role);
     return c.json({ role, widgets: widgets ?? DEFAULT_LAYOUT, configured: widgets !== null });
   });
   app.put("/admin/role/:role", zValidator("json", exports_external.object({ widgets: exports_external.array(exports_external.string()).max(50) })), async (c) => {
@@ -19690,7 +19686,7 @@ function dashboardRoutes(ctx) {
       return c.json({ error: "Forbidden" }, 403);
     const role = c.req.param("role");
     const saved = normalise(c.req.valid("json").widgets);
-    await writeLayout(reqDb(c), "role", role, saved, userId(c));
+    await writeLayout(db, "role", role, saved, userId(c));
     return c.json({ role, widgets: saved, configured: true });
   });
   return app;

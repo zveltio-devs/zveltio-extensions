@@ -19631,7 +19631,6 @@ var RunSchema = exports_external.object({
 });
 function migratorRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
-  const reqDb = (c) => ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
   const app = new Hono2;
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -19647,13 +19646,13 @@ function migratorRoutes(ctx) {
   async function loadConnection(c, id) {
     const row = await sql`
       SELECT id::text, source, token_enc FROM zv_migrator_connections WHERE id = ${id}
-    `.execute(reqDb(c));
+    `.execute(db);
     return row.rows[0] ?? null;
   }
   app.get("/connections", async (c) => {
     const rows = await sql`
       SELECT id::text, source, name, created_at FROM zv_migrator_connections ORDER BY created_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ connections: rows.rows });
   });
   app.post("/connections", zValidator("json", exports_external.object({
@@ -19672,11 +19671,11 @@ function migratorRoutes(ctx) {
         INSERT INTO zv_migrator_connections (source, name, token_enc, created_by)
         VALUES (${source}, ${name}, ${enc}, ${userId(c)})
         RETURNING id::text
-      `.execute(reqDb(c));
+      `.execute(db);
     return c.json({ connection: { id: row.rows[0]?.id, source, name } }, 201);
   });
   app.delete("/connections/:id", async (c) => {
-    await sql`DELETE FROM zv_migrator_connections WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    await sql`DELETE FROM zv_migrator_connections WHERE id = ${c.req.param("id")}`.execute(db);
     return c.json({ success: true });
   });
   app.get("/connections/:id/objects", async (c) => {
@@ -19716,7 +19715,7 @@ function migratorRoutes(ctx) {
       return c.json({ error: "invalid target" }, 400);
     const colsRes = await sql`
       SELECT column_name FROM information_schema.columns WHERE table_name = ${target_collection}
-    `.execute(reqDb(c));
+    `.execute(db);
     const targetCols = new Set(colsRes.rows.map((r) => r.column_name));
     if (targetCols.size === 0) {
       return c.json({ error: `Collection table "${target_collection}" does not exist \u2014 create the collection first` }, 400);
@@ -19725,7 +19724,7 @@ function migratorRoutes(ctx) {
       INSERT INTO zv_migrator_runs (connection_id, source, source_object, target_collection, created_by)
       VALUES (${connection_id}, ${conn.source}, ${object2}, ${target_collection}, ${userId(c)})
       RETURNING id::text
-    `.execute(reqDb(c));
+    `.execute(db);
     const runId = runRow.rows[0].id;
     try {
       const { fields, rows } = await ADAPTERS[conn.source].fetchRows(await decryptToken(ctx.internals, conn.token_enc), object2, limit);
@@ -19738,20 +19737,20 @@ function migratorRoutes(ctx) {
           continue;
         const colSql = sql.join(cols.map(({ col }) => sql.ref(col)), sql`, `);
         const valSql = sql.join(cols.map(({ f }) => sql`${row[f]}`), sql`, `);
-        await sql`INSERT INTO ${sql.table(target_collection)} (${colSql}) VALUES (${valSql})`.execute(reqDb(c));
+        await sql`INSERT INTO ${sql.table(target_collection)} (${colSql}) VALUES (${valSql})`.execute(db);
         imported++;
       }
       await sql`
         UPDATE zv_migrator_runs
         SET status = 'completed', total_rows = ${rows.length}, imported_rows = ${imported}, completed_at = NOW()
         WHERE id = ${runId}
-      `.execute(reqDb(c));
+      `.execute(db);
       return c.json({ run_id: runId, status: "completed", total_rows: rows.length, imported_rows: imported, skipped_fields: skipped });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       await sql`
         UPDATE zv_migrator_runs SET status = 'failed', error = ${msg}, completed_at = NOW() WHERE id = ${runId}
-      `.execute(reqDb(c)).catch(() => {
+      `.execute(db).catch(() => {
         return;
       });
       return c.json({ run_id: runId, status: "failed", error: msg }, 502);
@@ -19761,7 +19760,7 @@ function migratorRoutes(ctx) {
     const rows = await sql`
       SELECT id::text, source, source_object, target_collection, status, total_rows, imported_rows, error, created_at, completed_at
       FROM zv_migrator_runs ORDER BY created_at DESC LIMIT 50
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ runs: rows.rows });
   });
   return app;
