@@ -16213,9 +16213,6 @@ var entrySchema = exports_external.object({
 });
 function saftRoutes(ctx) {
   const { db, auth } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -16244,7 +16241,7 @@ function saftRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const { from, to, account_code } = c.req.query();
-    let query = reqDb(c).selectFrom("zv_saft_journal_entries").selectAll();
+    let query = db.selectFrom("zv_saft_journal_entries").selectAll();
     if (from)
       query = query.where("entry_date", ">=", from);
     if (to)
@@ -16342,7 +16339,7 @@ function saftRoutes(ctx) {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    await reqDb(c).deleteFrom("zv_saft_accounts").where("id", "=", c.req.param("id")).execute();
+    await db.deleteFrom("zv_saft_accounts").where("id", "=", c.req.param("id")).execute();
     return c.json({ success: true });
   });
   app.post("/entries", zValidator("json", entrySchema), async (c) => {
@@ -16357,7 +16354,7 @@ function saftRoutes(ctx) {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    await reqDb(c).deleteFrom("zv_saft_journal_entries").where("id", "=", c.req.param("id")).execute();
+    await db.deleteFrom("zv_saft_journal_entries").where("id", "=", c.req.param("id")).execute();
     return c.json({ success: true });
   });
   return app;

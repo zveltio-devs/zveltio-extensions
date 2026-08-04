@@ -19510,9 +19510,6 @@ async function updateAvgCost(dbh, productId, addedQty, addedCost) {
 }
 function inventoryRoutes(ctx) {
   const { db, auth } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -19523,7 +19520,7 @@ function inventoryRoutes(ctx) {
   });
   app.use("*", permissionGate(ctx, "inventory"));
   app.get("/warehouses", async (c) => {
-    const rows = await sql`SELECT * FROM zvd_warehouses ORDER BY name`.execute(reqDb(c));
+    const rows = await sql`SELECT * FROM zvd_warehouses ORDER BY name`.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/warehouses", zValidator("json", exports_external.object({
@@ -19533,11 +19530,11 @@ function inventoryRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const d = c.req.valid("json");
-    const row = await sql`INSERT INTO zvd_warehouses (name, address, notes, created_by) VALUES (${d.name}, ${d.address ?? null}, ${d.notes ?? null}, ${user.id}) RETURNING *`.execute(reqDb(c));
+    const row = await sql`INSERT INTO zvd_warehouses (name, address, notes, created_by) VALUES (${d.name}, ${d.address ?? null}, ${d.notes ?? null}, ${user.id}) RETURNING *`.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.get("/suppliers", async (c) => {
-    const rows = await sql`SELECT * FROM zvd_suppliers WHERE is_active = true ORDER BY name`.execute(reqDb(c));
+    const rows = await sql`SELECT * FROM zvd_suppliers WHERE is_active = true ORDER BY name`.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/suppliers", zValidator("json", exports_external.object({
@@ -19558,7 +19555,7 @@ function inventoryRoutes(ctx) {
       VALUES (${d.name}, ${d.contact_name ?? null}, ${d.email ?? null}, ${d.phone ?? null},
         ${d.address ?? null}, ${d.tax_id ?? null}, ${d.payment_terms}, ${d.currency}, ${d.notes ?? null}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.patch("/suppliers/:id", zValidator("json", exports_external.object({
@@ -19572,7 +19569,7 @@ function inventoryRoutes(ctx) {
       UPDATE zvd_suppliers SET name = COALESCE(${d.name ?? null}, name), email = COALESCE(${d.email ?? null}, email),
         payment_terms = COALESCE(${d.payment_terms ?? null}, payment_terms), is_active = COALESCE(${d.is_active ?? null}, is_active), updated_at = NOW()
       WHERE id = ${c.req.param("id")} RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -19595,7 +19592,7 @@ function inventoryRoutes(ctx) {
         AND p.is_active = true
       GROUP BY p.id ORDER BY p.name
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/products/:id", async (c) => {
@@ -19607,7 +19604,7 @@ function inventoryRoutes(ctx) {
       LEFT JOIN zvd_stock_levels sl ON sl.product_id = p.id
       LEFT JOIN zvd_product_variants v ON v.product_id = p.id AND v.is_active = true
       WHERE p.id = ${c.req.param("id")} GROUP BY p.id
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -19638,10 +19635,10 @@ function inventoryRoutes(ctx) {
       VALUES (${d.name}, ${d.sku ?? null}, ${d.barcode ?? null}, ${d.category ?? null}, ${d.description ?? null},
         ${d.unit}, ${d.unit_cost}, ${d.unit_price}, ${d.tax_rate}, ${d.reorder_point}, ${d.reorder_quantity}, ${d.unit_cost}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     const productId = row.rows[0].id;
     for (const v of d.variants) {
-      await sql`INSERT INTO zvd_product_variants (product_id, name, sku, attributes, unit_price) VALUES (${productId}, ${v.name}, ${v.sku ?? null}, ${JSON.stringify(v.attributes)}, ${v.unit_price ?? null})`.execute(reqDb(c));
+      await sql`INSERT INTO zvd_product_variants (product_id, name, sku, attributes, unit_price) VALUES (${productId}, ${v.name}, ${v.sku ?? null}, ${JSON.stringify(v.attributes)}, ${v.unit_price ?? null})`.execute(db);
     }
     return c.json({ data: row.rows[0] }, 201);
   });
@@ -19662,7 +19659,7 @@ function inventoryRoutes(ctx) {
         reorder_point = COALESCE(${d.reorder_point ?? null}, reorder_point), reorder_quantity = COALESCE(${d.reorder_quantity ?? null}, reorder_quantity),
         is_active = COALESCE(${d.is_active ?? null}, is_active), updated_at = NOW()
       WHERE id = ${c.req.param("id")} RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -19680,7 +19677,7 @@ function inventoryRoutes(ctx) {
       INSERT INTO zvd_product_variants (product_id, name, sku, attributes, unit_price, unit_cost, barcode)
       VALUES (${c.req.param("id")}, ${d.name}, ${d.sku ?? null}, ${JSON.stringify(d.attributes)}, ${d.unit_price ?? null}, ${d.unit_cost ?? null}, ${d.barcode ?? null})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.get("/purchase-orders", async (c) => {
@@ -19693,7 +19690,7 @@ function inventoryRoutes(ctx) {
       WHERE (${status ? sql`po.status = ${status}` : sql`TRUE`})
         AND (${supplier_id ? sql`po.supplier_id = ${supplier_id}` : sql`TRUE`})
       ORDER BY po.created_at DESC LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/purchase-orders/:id", async (c) => {
@@ -19706,7 +19703,7 @@ function inventoryRoutes(ctx) {
       LEFT JOIN zvd_purchase_order_lines l ON l.po_id = po.id
       LEFT JOIN zvd_products p ON p.id = l.product_id
       WHERE po.id = ${c.req.param("id")} GROUP BY po.id, s.name
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -19726,7 +19723,7 @@ function inventoryRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const d = c.req.valid("json");
-    const number4 = await nextPONumber(reqDb(c));
+    const number4 = await nextPONumber(db);
     const subtotal = d.lines.reduce((s, l) => s + l.quantity_ordered * l.unit_cost, 0);
     const tax_amount = d.lines.reduce((s, l) => s + l.quantity_ordered * l.unit_cost * l.tax_rate / 100, 0);
     const total = subtotal + tax_amount;
@@ -19734,12 +19731,12 @@ function inventoryRoutes(ctx) {
       INSERT INTO zvd_purchase_orders (number, supplier_id, warehouse_id, expected_date, currency, subtotal, tax_amount, total, notes, created_by)
       VALUES (${number4}, ${d.supplier_id}, ${d.warehouse_id ?? null}, ${d.expected_date ?? null}, ${d.currency}, ${subtotal}, ${tax_amount}, ${total}, ${d.notes ?? null}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     const poId = po.rows[0].id;
     let sort = 0;
     for (const line of d.lines) {
       const lineTotal = line.quantity_ordered * line.unit_cost * (1 + line.tax_rate / 100);
-      await sql`INSERT INTO zvd_purchase_order_lines (po_id, product_id, quantity_ordered, unit_cost, tax_rate, total, sort_order) VALUES (${poId}, ${line.product_id}, ${line.quantity_ordered}, ${line.unit_cost}, ${line.tax_rate}, ${lineTotal}, ${sort++})`.execute(reqDb(c));
+      await sql`INSERT INTO zvd_purchase_order_lines (po_id, product_id, quantity_ordered, unit_cost, tax_rate, total, sort_order) VALUES (${poId}, ${line.product_id}, ${line.quantity_ordered}, ${line.unit_cost}, ${line.tax_rate}, ${lineTotal}, ${sort++})`.execute(db);
     }
     return c.json({ data: po.rows[0] }, 201);
   });
@@ -19754,37 +19751,37 @@ function inventoryRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const d = c.req.valid("json");
-    const po = await sql`SELECT * FROM zvd_purchase_orders WHERE id = ${c.req.param("id")} AND status NOT IN ('cancelled','received')`.execute(reqDb(c));
+    const po = await sql`SELECT * FROM zvd_purchase_orders WHERE id = ${c.req.param("id")} AND status NOT IN ('cancelled','received')`.execute(db);
     if (!po.rows.length)
       return c.json({ error: "PO not found or already received" }, 400);
     const poData = po.rows[0];
     const receivedDate = d.received_date ?? new Date().toISOString().slice(0, 10);
     for (const recv of d.lines) {
-      const line = await sql`SELECT * FROM zvd_purchase_order_lines WHERE id = ${recv.line_id} AND po_id = ${poData.id}`.execute(reqDb(c));
+      const line = await sql`SELECT * FROM zvd_purchase_order_lines WHERE id = ${recv.line_id} AND po_id = ${poData.id}`.execute(db);
       if (!line.rows.length)
         continue;
       const l = line.rows[0];
-      await sql`UPDATE zvd_purchase_order_lines SET quantity_received = quantity_received + ${recv.quantity_received} WHERE id = ${l.id}`.execute(reqDb(c));
+      await sql`UPDATE zvd_purchase_order_lines SET quantity_received = quantity_received + ${recv.quantity_received} WHERE id = ${l.id}`.execute(db);
       let batchId = null;
       if (recv.batch_number) {
         await sql`
           INSERT INTO zvd_product_batches (product_id, warehouse_id, batch_number, quantity, expiry_date, unit_cost)
           VALUES (${l.product_id}, ${poData.warehouse_id}, ${recv.batch_number}, ${recv.quantity_received}, ${recv.expiry_date ?? null}, ${l.unit_cost})
           ON CONFLICT (product_id, warehouse_id, batch_number) DO UPDATE SET quantity = zvd_product_batches.quantity + ${recv.quantity_received}
-        `.execute(reqDb(c));
-        const bRow = await sql`SELECT id FROM zvd_product_batches WHERE product_id = ${l.product_id} AND batch_number = ${recv.batch_number}`.execute(reqDb(c));
+        `.execute(db);
+        const bRow = await sql`SELECT id FROM zvd_product_batches WHERE product_id = ${l.product_id} AND batch_number = ${recv.batch_number}`.execute(db);
         batchId = bRow.rows[0]?.id;
       }
-      await sql`INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity) VALUES (${l.product_id}, ${poData.warehouse_id}, 0) ON CONFLICT (product_id, warehouse_id) DO NOTHING`.execute(reqDb(c));
-      await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${recv.quantity_received}, updated_at = NOW() WHERE product_id = ${l.product_id} AND warehouse_id = ${poData.warehouse_id}`.execute(reqDb(c));
-      await sql`INSERT INTO zvd_stock_movements (product_id, warehouse_id, type, quantity, unit_cost, reference, batch_id, po_line_id, created_by) VALUES (${l.product_id}, ${poData.warehouse_id}, 'in', ${recv.quantity_received}, ${l.unit_cost}, ${poData.number}, ${batchId}, ${l.id}, ${user.id})`.execute(reqDb(c));
-      await updateAvgCost(reqDb(c), l.product_id, recv.quantity_received, l.unit_cost);
+      await sql`INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity) VALUES (${l.product_id}, ${poData.warehouse_id}, 0) ON CONFLICT (product_id, warehouse_id) DO NOTHING`.execute(db);
+      await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${recv.quantity_received}, updated_at = NOW() WHERE product_id = ${l.product_id} AND warehouse_id = ${poData.warehouse_id}`.execute(db);
+      await sql`INSERT INTO zvd_stock_movements (product_id, warehouse_id, type, quantity, unit_cost, reference, batch_id, po_line_id, created_by) VALUES (${l.product_id}, ${poData.warehouse_id}, 'in', ${recv.quantity_received}, ${l.unit_cost}, ${poData.number}, ${batchId}, ${l.id}, ${user.id})`.execute(db);
+      await updateAvgCost(db, l.product_id, recv.quantity_received, l.unit_cost);
     }
-    const allLines = await sql`SELECT quantity_ordered, quantity_received FROM zvd_purchase_order_lines WHERE po_id = ${poData.id}`.execute(reqDb(c));
+    const allLines = await sql`SELECT quantity_ordered, quantity_received FROM zvd_purchase_order_lines WHERE po_id = ${poData.id}`.execute(db);
     const allReceived = allLines.rows.every((l) => l.quantity_received >= l.quantity_ordered);
     const anyReceived = allLines.rows.some((l) => l.quantity_received > 0);
     const newStatus = allReceived ? "received" : anyReceived ? "partial" : "sent";
-    await sql`UPDATE zvd_purchase_orders SET status = ${newStatus}, received_date = ${receivedDate}, updated_at = NOW() WHERE id = ${poData.id}`.execute(reqDb(c));
+    await sql`UPDATE zvd_purchase_orders SET status = ${newStatus}, received_date = ${receivedDate}, updated_at = NOW() WHERE id = ${poData.id}`.execute(db);
     return c.json({ data: { status: newStatus } });
   });
   app.post("/movements", zValidator("json", exports_external.object({
@@ -19802,26 +19799,26 @@ function inventoryRoutes(ctx) {
     const d = c.req.valid("json");
     if (d.type === "transfer" && !d.destination_warehouse_id)
       return c.json({ error: "destination_warehouse_id required for transfer" }, 400);
-    await sql`INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity) VALUES (${d.product_id}, ${d.warehouse_id}, 0) ON CONFLICT (product_id, warehouse_id) DO NOTHING`.execute(reqDb(c));
+    await sql`INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity) VALUES (${d.product_id}, ${d.warehouse_id}, 0) ON CONFLICT (product_id, warehouse_id) DO NOTHING`.execute(db);
     const delta = d.type === "in" || d.type === "adjustment" ? d.quantity : -d.quantity;
     if (d.type === "out" || d.type === "transfer") {
-      const current = await sql`SELECT quantity FROM zvd_stock_levels WHERE product_id = ${d.product_id} AND warehouse_id = ${d.warehouse_id}`.execute(reqDb(c));
+      const current = await sql`SELECT quantity FROM zvd_stock_levels WHERE product_id = ${d.product_id} AND warehouse_id = ${d.warehouse_id}`.execute(db);
       if (current.rows[0]?.quantity < d.quantity)
         return c.json({ error: "Insufficient stock" }, 400);
     }
-    await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${delta}, updated_at = NOW() WHERE product_id = ${d.product_id} AND warehouse_id = ${d.warehouse_id}`.execute(reqDb(c));
+    await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${delta}, updated_at = NOW() WHERE product_id = ${d.product_id} AND warehouse_id = ${d.warehouse_id}`.execute(db);
     if (d.type === "transfer" && d.destination_warehouse_id) {
-      await sql`INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity) VALUES (${d.product_id}, ${d.destination_warehouse_id}, 0) ON CONFLICT (product_id, warehouse_id) DO NOTHING`.execute(reqDb(c));
-      await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${d.quantity}, updated_at = NOW() WHERE product_id = ${d.product_id} AND warehouse_id = ${d.destination_warehouse_id}`.execute(reqDb(c));
+      await sql`INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity) VALUES (${d.product_id}, ${d.destination_warehouse_id}, 0) ON CONFLICT (product_id, warehouse_id) DO NOTHING`.execute(db);
+      await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${d.quantity}, updated_at = NOW() WHERE product_id = ${d.product_id} AND warehouse_id = ${d.destination_warehouse_id}`.execute(db);
     }
     if (d.type === "in" && d.unit_cost) {
-      await updateAvgCost(reqDb(c), d.product_id, d.quantity, d.unit_cost);
+      await updateAvgCost(db, d.product_id, d.quantity, d.unit_cost);
     }
     const movement = await sql`
       INSERT INTO zvd_stock_movements (product_id, warehouse_id, destination_warehouse_id, type, quantity, unit_cost, reference, notes, created_by)
       VALUES (${d.product_id}, ${d.warehouse_id}, ${d.destination_warehouse_id ?? null}, ${d.type}, ${d.quantity}, ${d.unit_cost ?? null}, ${d.reference ?? null}, ${d.notes ?? null}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: movement.rows[0] }, 201);
   });
   app.get("/movements", async (c) => {
@@ -19834,14 +19831,14 @@ function inventoryRoutes(ctx) {
       WHERE (${product_id ? sql`m.product_id = ${product_id}` : sql`TRUE`})
         AND (${warehouse_id ? sql`m.warehouse_id = ${warehouse_id}` : sql`TRUE`})
       ORDER BY m.created_at DESC LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/products/:id/batches", async (c) => {
     const rows = await sql`
       SELECT b.*, w.name as warehouse_name FROM zvd_product_batches b JOIN zvd_warehouses w ON w.id = b.warehouse_id
       WHERE b.product_id = ${c.req.param("id")} ORDER BY b.expiry_date NULLS LAST, b.created_at
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/batches/expiring", async (c) => {
@@ -19852,7 +19849,7 @@ function inventoryRoutes(ctx) {
       WHERE b.expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + ${parseInt(days)}::int
         AND b.quantity > 0
       ORDER BY b.expiry_date
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/low-stock", async (c) => {
@@ -19862,7 +19859,7 @@ function inventoryRoutes(ctx) {
       WHERE p.is_active = true AND p.reorder_point > 0
       GROUP BY p.id HAVING COALESCE(SUM(sl.quantity), 0) <= p.reorder_point
       ORDER BY (COALESCE(SUM(sl.quantity), 0) - p.reorder_point) ASC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/valuation", async (c) => {
@@ -19871,7 +19868,7 @@ function inventoryRoutes(ctx) {
         COALESCE(SUM(sl.quantity), 0) * p.avg_cost as inventory_value
       FROM zvd_products p LEFT JOIN zvd_stock_levels sl ON sl.product_id = p.id
       WHERE p.is_active = true GROUP BY p.id ORDER BY inventory_value DESC
-    `.execute(reqDb(c));
+    `.execute(db);
     const total = rows.rows.reduce((s, r) => s + +r.inventory_value, 0);
     return c.json({ data: rows.rows, meta: { total_value: total } });
   });

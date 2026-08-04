@@ -30896,29 +30896,26 @@ var UpdatePageSchema = PageSchema.partial().extend({
 });
 function pageBuilderRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   app.get("/block-types", async (c) => {
-    const types = await reqDb(c).selectFrom("zv_page_block_types").selectAll().where("is_active", "=", true).orderBy("display_name", "asc").execute();
+    const types = await db.selectFrom("zv_page_block_types").selectAll().where("is_active", "=", true).orderBy("display_name", "asc").execute();
     return c.json({ block_types: types });
   });
   app.get("/redirects", async (c) => {
     const user = await requireAuth(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const redirects = await reqDb(c).selectFrom("zv_page_redirects").selectAll().orderBy("created_at", "desc").execute();
+    const redirects = await db.selectFrom("zv_page_redirects").selectAll().orderBy("created_at", "desc").execute();
     return c.json({ redirects });
   });
   app.get("/redirects/check", async (c) => {
     const path = c.req.query("path");
     if (!path)
       return c.json({ redirect: null });
-    const redirect = await reqDb(c).selectFrom("zv_page_redirects").selectAll().where("from_path", "=", path).where("is_active", "=", true).executeTakeFirst();
+    const redirect = await db.selectFrom("zv_page_redirects").selectAll().where("from_path", "=", path).where("is_active", "=", true).executeTakeFirst();
     if (!redirect)
       return c.json({ redirect: null });
-    await reqDb(c).updateTable("zv_page_redirects").set({ hit_count: sql`hit_count + 1` }).where("id", "=", redirect.id).execute();
+    await db.updateTable("zv_page_redirects").set({ hit_count: sql`hit_count + 1` }).where("id", "=", redirect.id).execute();
     return c.json({ redirect });
   });
   app.post("/redirects", zValidator("json", exports_external.object({
@@ -30930,14 +30927,14 @@ function pageBuilderRoutes(ctx) {
     if (!user)
       return res;
     const data = c.req.valid("json");
-    const redirect = await reqDb(c).insertInto("zv_page_redirects").values({ ...data, created_by: user.id }).returningAll().executeTakeFirst();
+    const redirect = await db.insertInto("zv_page_redirects").values({ ...data, created_by: user.id }).returningAll().executeTakeFirst();
     return c.json({ redirect }, 201);
   });
   app.delete("/redirects/:id", async (c) => {
     const { user, res } = await requireAdmin(c, auth, checkPermission);
     if (!user)
       return res;
-    await reqDb(c).deleteFrom("zv_page_redirects").where("id", "=", c.req.param("id")).execute();
+    await db.deleteFrom("zv_page_redirects").where("id", "=", c.req.param("id")).execute();
     return c.json({ success: true });
   });
   const MenuItemsSchema = exports_external.object({
@@ -30952,7 +30949,7 @@ function pageBuilderRoutes(ctx) {
     const user = await requireAuth(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const rows = await reqDb(c).selectFrom("zv_page_menus").select(["menu_key", "items", "updated_at"]).execute().catch(() => []);
+    const rows = await db.selectFrom("zv_page_menus").select(["menu_key", "items", "updated_at"]).execute().catch(() => []);
     const menus = { main: [], footer: [] };
     for (const r of rows) {
       menus[r.menu_key] = typeof r.items === "string" ? JSON.parse(r.items) : r.items;
@@ -30971,17 +30968,17 @@ function pageBuilderRoutes(ctx) {
     const updated = await sql`
       UPDATE zv_page_menus SET items = ${items}::jsonb, updated_by = ${user.id}, updated_at = NOW()
       WHERE menu_key = ${key} RETURNING id
-    `.execute(reqDb(c));
+    `.execute(db);
     if (updated.rows.length === 0) {
       await sql`
         INSERT INTO zv_page_menus (menu_key, items, updated_by)
         VALUES (${key}, ${items}::jsonb, ${user.id})
-      `.execute(reqDb(c));
+      `.execute(db);
     }
     return c.json({ menu_key: key, items: c.req.valid("json").items });
   });
   app.get("/sitemap.xml", async (c) => {
-    const pages = await reqDb(c).selectFrom("zv_pages as p").leftJoin("zv_page_sitemap_config as sc", "sc.page_id", "p.id").select(["p.slug", "p.updated_at", "sc.change_freq", "sc.priority"]).where("p.status", "=", "published").where((eb) => eb.or([eb("sc.include_in_sitemap", "=", true), eb("sc.page_id", "is", null)])).execute();
+    const pages = await db.selectFrom("zv_pages as p").leftJoin("zv_page_sitemap_config as sc", "sc.page_id", "p.id").select(["p.slug", "p.updated_at", "sc.change_freq", "sc.priority"]).where("p.status", "=", "published").where((eb) => eb.or([eb("sc.include_in_sitemap", "=", true), eb("sc.page_id", "is", null)])).execute();
     const proto = c.req.header("x-forwarded-proto") || "https";
     const host = c.req.header("host") || "example.com";
     const baseUrl = `${proto}://${host}`;
@@ -31007,7 +31004,7 @@ function pageBuilderRoutes(ctx) {
     if (!user)
       return res;
     const data = c.req.valid("json");
-    const config2 = await reqDb(c).insertInto("zv_page_sitemap_config").values(data).onConflict((oc) => oc.column("page_id").doUpdateSet({ include_in_sitemap: data.include_in_sitemap, change_freq: data.change_freq, priority: data.priority, updated_at: new Date })).returningAll().executeTakeFirst();
+    const config2 = await db.insertInto("zv_page_sitemap_config").values(data).onConflict((oc) => oc.column("page_id").doUpdateSet({ include_in_sitemap: data.include_in_sitemap, change_freq: data.change_freq, priority: data.priority, updated_at: new Date })).returningAll().executeTakeFirst();
     return c.json({ config: config2 });
   });
   app.post("/metrics/track", rateLimit(120, 60000), zValidator("json", exports_external.object({
@@ -31022,7 +31019,7 @@ function pageBuilderRoutes(ctx) {
       ON CONFLICT (page_id, date) DO UPDATE SET
         views = zv_page_metrics.views + 1,
         avg_time_on_page_seconds = (zv_page_metrics.avg_time_on_page_seconds * zv_page_metrics.views + ${time_on_page_seconds}) / (zv_page_metrics.views + 1)
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ success: true });
   });
   app.get("/", async (c) => {
@@ -31030,7 +31027,7 @@ function pageBuilderRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const { status, search, locale } = c.req.query();
-    let query = reqDb(c).selectFrom("zv_pages").selectAll().orderBy("updated_at", "desc");
+    let query = db.selectFrom("zv_pages").selectAll().orderBy("updated_at", "desc");
     if (status)
       query = query.where("status", "=", status);
     if (locale)
@@ -31048,10 +31045,10 @@ function pageBuilderRoutes(ctx) {
       return c.json({ error: "Admin access required" }, 403);
     }
     const [byStatus, avgSeo, viewsMonth, redirectCount] = await Promise.all([
-      sql`SELECT status, COUNT(*)::text AS count FROM zv_pages GROUP BY status`.execute(reqDb(c)),
-      sql`SELECT AVG(overall_score)::text AS avg_score FROM zv_page_seo_scores`.execute(reqDb(c)),
-      sql`SELECT COALESCE(SUM(views), 0)::text AS total FROM zv_page_metrics WHERE date >= CURRENT_DATE - INTERVAL '30 days'`.execute(reqDb(c)),
-      reqDb(c).selectFrom("zv_page_redirects").select((eb) => eb.fn.count("id").as("count")).executeTakeFirst()
+      sql`SELECT status, COUNT(*)::text AS count FROM zv_pages GROUP BY status`.execute(db),
+      sql`SELECT AVG(overall_score)::text AS avg_score FROM zv_page_seo_scores`.execute(db),
+      sql`SELECT COALESCE(SUM(views), 0)::text AS total FROM zv_page_metrics WHERE date >= CURRENT_DATE - INTERVAL '30 days'`.execute(db),
+      db.selectFrom("zv_page_redirects").select((eb) => eb.fn.count("id").as("count")).executeTakeFirst()
     ]);
     return c.json({
       by_status: byStatus.rows,
@@ -31064,7 +31061,7 @@ function pageBuilderRoutes(ctx) {
     const user = await requireAuth(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const page = await reqDb(c).selectFrom("zv_pages").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
+    const page = await db.selectFrom("zv_pages").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
     if (!page)
       return c.json({ error: "Page not found" }, 404);
     const rawBlocks = typeof page.blocks === "string" ? JSON.parse(page.blocks) : page.blocks ?? [];
@@ -31084,7 +31081,7 @@ function pageBuilderRoutes(ctx) {
       }
       try {
         const fields = typeof display_fields === "string" ? display_fields.split(",").map((s) => s.trim()).filter(Boolean) : [];
-        let q = fields.length > 0 ? reqDb(c).selectFrom(collection).select(fields) : reqDb(c).selectFrom(collection).selectAll();
+        let q = fields.length > 0 ? db.selectFrom(collection).select(fields) : db.selectFrom(collection).selectAll();
         for (const f of filters) {
           if (!f.field || !f.op)
             continue;
@@ -31123,7 +31120,7 @@ function pageBuilderRoutes(ctx) {
     const user = await requireAuth(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const page = await reqDb(c).selectFrom("zv_pages").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
+    const page = await db.selectFrom("zv_pages").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
     if (!page)
       return c.json({ error: "Page not found" }, 404);
     return c.json({ page });
@@ -31133,7 +31130,7 @@ function pageBuilderRoutes(ctx) {
     if (!user)
       return res;
     const body = c.req.valid("json");
-    const page = await reqDb(c).insertInto("zv_pages").values({ ...body, blocks: JSON.stringify(sanitizeBlocks(body.blocks)), meta: JSON.stringify(body.meta), created_by: user.id, updated_by: user.id }).returningAll().executeTakeFirst();
+    const page = await db.insertInto("zv_pages").values({ ...body, blocks: JSON.stringify(sanitizeBlocks(body.blocks)), meta: JSON.stringify(body.meta), created_by: user.id, updated_by: user.id }).returningAll().executeTakeFirst();
     return c.json({ page }, 201);
   });
   app.on(["PUT", "PATCH"], "/:id", zValidator("json", UpdatePageSchema), async (c) => {
@@ -31143,11 +31140,11 @@ function pageBuilderRoutes(ctx) {
     const id = c.req.param("id");
     const body = c.req.valid("json");
     const now = new Date;
-    const current = await reqDb(c).selectFrom("zv_pages").select(["blocks", "meta"]).where("id", "=", id).executeTakeFirst();
+    const current = await db.selectFrom("zv_pages").select(["blocks", "meta"]).where("id", "=", id).executeTakeFirst();
     if (current) {
       const snapBlocks = typeof current.blocks === "string" ? current.blocks : JSON.stringify(current.blocks ?? []);
       const snapMeta = typeof current.meta === "string" ? current.meta : JSON.stringify(current.meta ?? {});
-      await reqDb(c).insertInto("zv_page_revisions").values({ page_id: id, blocks: snapBlocks, meta: snapMeta, created_by: user.id }).execute();
+      await db.insertInto("zv_page_revisions").values({ page_id: id, blocks: snapBlocks, meta: snapMeta, created_by: user.id }).execute();
     }
     const updates = { updated_at: now, updated_by: user.id };
     if (body.title !== undefined)
@@ -31177,7 +31174,7 @@ function pageBuilderRoutes(ctx) {
       if (body.status === "published")
         updates.published_at = now;
     }
-    const page = await reqDb(c).updateTable("zv_pages").set(updates).where("id", "=", id).returningAll().executeTakeFirst();
+    const page = await db.updateTable("zv_pages").set(updates).where("id", "=", id).returningAll().executeTakeFirst();
     if (!page)
       return c.json({ error: "Page not found" }, 404);
     return c.json({ page });
@@ -31186,21 +31183,21 @@ function pageBuilderRoutes(ctx) {
     const { user, res } = await requireAdmin(c, auth, checkPermission);
     if (!user)
       return res;
-    await reqDb(c).deleteFrom("zv_pages").where("id", "=", c.req.param("id")).execute();
+    await db.deleteFrom("zv_pages").where("id", "=", c.req.param("id")).execute();
     return c.json({ success: true });
   });
   app.get("/:id/revisions", async (c) => {
     const user = await requireAuth(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const revisions = await reqDb(c).selectFrom("zv_page_revisions").select(["id", "created_by", "created_at"]).where("page_id", "=", c.req.param("id")).orderBy("created_at", "desc").limit(20).execute();
+    const revisions = await db.selectFrom("zv_page_revisions").select(["id", "created_by", "created_at"]).where("page_id", "=", c.req.param("id")).orderBy("created_at", "desc").limit(20).execute();
     return c.json({ revisions });
   });
   app.get("/:id/seo", async (c) => {
     const user = await requireAuth(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const score = await reqDb(c).selectFrom("zv_page_seo_scores").selectAll().where("page_id", "=", c.req.param("id")).orderBy("analyzed_at", "desc").limit(1).executeTakeFirst();
+    const score = await db.selectFrom("zv_page_seo_scores").selectAll().where("page_id", "=", c.req.param("id")).orderBy("analyzed_at", "desc").limit(1).executeTakeFirst();
     return c.json({ seo: score || null });
   });
   app.post("/:id/seo/analyze", async (c) => {
@@ -31208,7 +31205,7 @@ function pageBuilderRoutes(ctx) {
     if (!user)
       return res;
     const id = c.req.param("id");
-    const page = await reqDb(c).selectFrom("zv_pages").selectAll().where("id", "=", id).executeTakeFirst();
+    const page = await db.selectFrom("zv_pages").selectAll().where("id", "=", id).executeTakeFirst();
     if (!page)
       return c.json({ error: "Page not found" }, 404);
     const issues = [];
@@ -31245,14 +31242,14 @@ function pageBuilderRoutes(ctx) {
     if (!hasHeading)
       issues.push("No heading/content block found");
     const overall = Math.round((titleScore + metaScore + headingScore + imageAltScore) / 4);
-    const seo = await reqDb(c).insertInto("zv_page_seo_scores").values({ page_id: id, overall_score: overall, title_score: titleScore, meta_description_score: metaScore, heading_score: headingScore, image_alt_score: imageAltScore, issues: JSON.stringify(issues) }).returningAll().executeTakeFirst();
+    const seo = await db.insertInto("zv_page_seo_scores").values({ page_id: id, overall_score: overall, title_score: titleScore, meta_description_score: metaScore, heading_score: headingScore, image_alt_score: imageAltScore, issues: JSON.stringify(issues) }).returningAll().executeTakeFirst();
     return c.json({ seo });
   });
   app.get("/:id/ab-variants", async (c) => {
     const user = await requireAuth(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const variants = await reqDb(c).selectFrom("zv_page_ab_variants").selectAll().where("page_id", "=", c.req.param("id")).execute();
+    const variants = await db.selectFrom("zv_page_ab_variants").selectAll().where("page_id", "=", c.req.param("id")).execute();
     return c.json({ variants });
   });
   app.post("/:id/ab-variants", zValidator("json", exports_external.object({
@@ -31264,29 +31261,29 @@ function pageBuilderRoutes(ctx) {
     if (!user)
       return res;
     const data = c.req.valid("json");
-    const variant = await reqDb(c).insertInto("zv_page_ab_variants").values({ page_id: c.req.param("id"), ...data, blocks: JSON.stringify(sanitizeBlocks(data.blocks)), created_by: user.id }).returningAll().executeTakeFirst();
+    const variant = await db.insertInto("zv_page_ab_variants").values({ page_id: c.req.param("id"), ...data, blocks: JSON.stringify(sanitizeBlocks(data.blocks)), created_by: user.id }).returningAll().executeTakeFirst();
     return c.json({ variant }, 201);
   });
   app.delete("/:id/ab-variants/:variantId", async (c) => {
     const { user, res } = await requireAdmin(c, auth, checkPermission);
     if (!user)
       return res;
-    await reqDb(c).deleteFrom("zv_page_ab_variants").where("id", "=", c.req.param("variantId")).where("page_id", "=", c.req.param("id")).execute();
+    await db.deleteFrom("zv_page_ab_variants").where("id", "=", c.req.param("variantId")).where("page_id", "=", c.req.param("id")).execute();
     return c.json({ success: true });
   });
   app.post("/:id/ab-variants/:variantId/track", rateLimit(60, 60000), async (c) => {
-    await reqDb(c).updateTable("zv_page_ab_variants").set({ conversions: sql`conversions + 1` }).where("id", "=", c.req.param("variantId")).execute();
+    await db.updateTable("zv_page_ab_variants").set({ conversions: sql`conversions + 1` }).where("id", "=", c.req.param("variantId")).execute();
     return c.json({ success: true });
   });
   app.get("/:id/metrics", async (c) => {
     const user = await requireAuth(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const metrics = await reqDb(c).selectFrom("zv_page_metrics").selectAll().where("page_id", "=", c.req.param("id")).where("date", ">=", sql`CURRENT_DATE - INTERVAL '30 days'`).orderBy("date", "desc").execute();
+    const metrics = await db.selectFrom("zv_page_metrics").selectAll().where("page_id", "=", c.req.param("id")).where("date", ">=", sql`CURRENT_DATE - INTERVAL '30 days'`).orderBy("date", "desc").execute();
     return c.json({ metrics });
   });
   app.get("/public/:slug", async (c) => {
-    const page = await reqDb(c).selectFrom("zv_pages").selectAll().where("slug", "=", c.req.param("slug")).where("status", "=", "published").executeTakeFirst();
+    const page = await db.selectFrom("zv_pages").selectAll().where("slug", "=", c.req.param("slug")).where("status", "=", "published").executeTakeFirst();
     if (!page)
       return c.json({ error: "Page not found" }, 404);
     return c.json({ page });

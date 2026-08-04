@@ -16280,9 +16280,6 @@ var SearchManager = {
 // engine/routes.ts
 function searchRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   async function requireAdmin(c) {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session)
@@ -16317,7 +16314,7 @@ function searchRoutes(ctx) {
     }
   });
   app.get("/indexes", async (c) => {
-    const indexes = await reqDb(c).selectFrom("zv_search_indexes").selectAll().orderBy("created_at", "desc").execute();
+    const indexes = await db.selectFrom("zv_search_indexes").selectAll().orderBy("created_at", "desc").execute();
     return c.json({ indexes });
   });
   app.post("/indexes", zValidator("json", exports_external.object({
@@ -16329,10 +16326,10 @@ function searchRoutes(ctx) {
     sortable_fields: exports_external.array(exports_external.string()).default([])
   })), async (c) => {
     const data = c.req.valid("json");
-    const existing = await reqDb(c).selectFrom("zv_search_indexes").select("id").where("collection", "=", data.collection).executeTakeFirst();
+    const existing = await db.selectFrom("zv_search_indexes").select("id").where("collection", "=", data.collection).executeTakeFirst();
     let indexRecord;
     if (existing) {
-      indexRecord = await reqDb(c).updateTable("zv_search_indexes").set({
+      indexRecord = await db.updateTable("zv_search_indexes").set({
         provider: data.provider,
         index_name: data.index_name,
         searchable_fields: data.searchable_fields,
@@ -16341,7 +16338,7 @@ function searchRoutes(ctx) {
         status: "active"
       }).where("collection", "=", data.collection).returningAll().executeTakeFirst();
     } else {
-      indexRecord = await reqDb(c).insertInto("zv_search_indexes").values({
+      indexRecord = await db.insertInto("zv_search_indexes").values({
         collection: data.collection,
         provider: data.provider,
         index_name: data.index_name,
@@ -16354,7 +16351,7 @@ function searchRoutes(ctx) {
   });
   app.delete("/indexes/:collection", async (c) => {
     const collection = c.req.param("collection");
-    await reqDb(c).updateTable("zv_search_indexes").set({ status: "inactive" }).where("collection", "=", collection).execute();
+    await db.updateTable("zv_search_indexes").set({ status: "inactive" }).where("collection", "=", collection).execute();
     return c.json({ success: true });
   });
   app.post("/indexes/:collection/sync", async (c) => {
@@ -16366,7 +16363,7 @@ function searchRoutes(ctx) {
   });
   app.get("/indexes/:collection/stats", async (c) => {
     const collection = c.req.param("collection");
-    const index = await reqDb(c).selectFrom("zv_search_indexes").selectAll().where("collection", "=", collection).executeTakeFirst();
+    const index = await db.selectFrom("zv_search_indexes").selectAll().where("collection", "=", collection).executeTakeFirst();
     if (!index)
       return c.json({ error: "Index not found" }, 404);
     return c.json({

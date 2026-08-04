@@ -67,7 +67,7 @@ async function runImport(
 ): Promise<void> {
   const { DDLManager, fieldTypeRegistry } = ctx;
 
-  // Background task — no `c`, so no `reqDb(c)`. The tenant comes from the
+  // Background task — no `c`, so no `db`. The tenant comes from the
   // handler that ENQUEUED the import, which is the only place it is knowable,
   // and `withTenantIsolation` gives this job the same transaction a request
   // gets: GUC set, `SET LOCAL ROLE` applied, isolation policies binding.
@@ -162,17 +162,15 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
   const { db, auth, checkPermission, DDLManager, fieldTypeRegistry } = ctx;
   const { dynamicInsert } = ctx.internals;
 
-  // Per-request DB handle (CRM PR #1 pattern). Handlers run inside the
-  // request transaction; reqDb pulls tenantTrx so FORCE RLS on
-  // zv_import_logs / zvd_import_profiles sees the right tenant.
+  // `db` here is `ctx.db`, which the engine hands over as a proxy resolving the
+  // CURRENT tenant transaction per query through AsyncLocalStorage (H-12). So a
+  // plain `db` inside a handler is already scoped; there is no second spelling
+  // to remember, and none to forget.
   /** Tenant of the request; the default tenant on a single-tenant install. */
   function tenantOf(c: any): string {
     return (c.get('tenant') as { id?: string } | null)?.id ?? '00000000-0000-0000-0000-000000000001';
   }
 
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
 
   const app = new Hono<{ Variables: { user: any } }>();
 
@@ -195,22 +193,22 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const [totalRow, successRow, monthRow, topCols] = await Promise.all([
-      sql<{ total: string }>`SELECT COUNT(*) AS total FROM zv_import_logs`.execute(reqDb(c)),
+      sql<{ total: string }>`SELECT COUNT(*) AS total FROM zv_import_logs`.execute(db),
       sql<{ success: string }>`
         SELECT COUNT(*) AS success FROM zv_import_logs WHERE status = 'completed'
-      `.execute(reqDb(c)),
+      `.execute(db),
       sql<{ records: string }>`
         SELECT COALESCE(SUM(imported_rows), 0) AS records
         FROM zv_import_logs
         WHERE created_at >= ${startOfMonth.toISOString()}
-      `.execute(reqDb(c)),
+      `.execute(db),
       sql<{ collection: string; imports: string }>`
         SELECT collection, COUNT(*) AS imports
         FROM zv_import_logs
         GROUP BY collection
         ORDER BY imports DESC
         LIMIT 5
-      `.execute(reqDb(c)),
+      `.execute(db),
     ]);
 
     const total = Number(totalRow.rows[0]?.total ?? 0);
@@ -226,7 +224,7 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
 
   // ── GET /profiles ────────────────────────────────────────────────────────────
   app.get('/profiles', async (c) => {
-    const profiles = await (reqDb(c) as any)
+    const profiles = await (db as any)
       .selectFrom('zvd_import_profiles')
       .selectAll()
       .orderBy('created_at', 'desc')
@@ -255,7 +253,7 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
       const user = c.get('user') as any;
       const body = c.req.valid('json');
 
-      const profile = await (reqDb(c) as any)
+      const profile = await (db as any)
         .insertInto('zvd_import_profiles')
         .values({
           name: body.name,
@@ -296,7 +294,7 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
       const id = c.req.param('id');
       const body = c.req.valid('json');
 
-      const existing = await (reqDb(c) as any)
+      const existing = await (db as any)
         .selectFrom('zvd_import_profiles')
         .select(['id'])
         .where('id', '=', id)
@@ -314,7 +312,7 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
       if (body.mappings !== undefined) updates.mappings = JSON.stringify(body.mappings);
       if (body.description !== undefined) updates.description = body.description;
 
-      const profile = await (reqDb(c) as any)
+      const profile = await (db as any)
         .updateTable('zvd_import_profiles')
         .set(updates)
         .where('id', '=', id)
@@ -327,7 +325,7 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
 
   // ── DELETE /profiles/:id ─────────────────────────────────────────────────────
   app.delete('/profiles/:id', async (c) => {
-    const deleted = await (reqDb(c) as any)
+    const deleted = await (db as any)
       .deleteFrom('zvd_import_profiles')
       .where('id', '=', c.req.param('id'))
       .returningAll()
@@ -350,7 +348,7 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
     async (c) => {
       const { collection, limit } = c.req.valid('query');
 
-      let query = (reqDb(c) as any)
+      let query = (db as any)
         .selectFrom('zv_import_logs')
         .selectAll()
         .orderBy('created_at', 'desc')
@@ -365,7 +363,7 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
 
   // ── GET /jobs/:id ────────────────────────────────────────────────────────────
   app.get('/jobs/:id', async (c) => {
-    const job = await (reqDb(c) as any)
+    const job = await (db as any)
       .selectFrom('zv_import_logs')
       .selectAll()
       .where('id', '=', c.req.param('id'))
@@ -379,7 +377,7 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
   app.get('/jobs/:id/rollback', async (c) => {
     const jobId = c.req.param('id');
 
-    const rollback = await (reqDb(c) as any)
+    const rollback = await (db as any)
       .selectFrom('zvd_import_rollbacks')
       .selectAll()
       .where('job_id', '=', jobId)
@@ -409,7 +407,7 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
     const user = c.get('user') as any;
     const jobId = c.req.param('id');
 
-    const job = await (reqDb(c) as any)
+    const job = await (db as any)
       .selectFrom('zv_import_logs')
       .select(['id', 'collection', 'status'])
       .where('id', '=', jobId)
@@ -417,7 +415,7 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
 
     if (!job) return c.json({ error: 'Import job not found' }, 404);
 
-    const rollback = await (reqDb(c) as any)
+    const rollback = await (db as any)
       .selectFrom('zvd_import_rollbacks')
       .selectAll()
       .where('job_id', '=', jobId)
@@ -438,14 +436,14 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
     const BATCH = 500;
     for (let i = 0; i < recordIds.length; i += BATCH) {
       const batch = recordIds.slice(i, i + BATCH);
-      await (reqDb(c) as any)
+      await (db as any)
         .deleteFrom(tableName)
         .where('id', 'in', batch)
         .execute()
         .catch(() => { /* non-fatal per batch */ });
     }
 
-    await (reqDb(c) as any)
+    await (db as any)
       .updateTable('zvd_import_rollbacks')
       .set({
         status: 'rolled_back',
@@ -569,7 +567,7 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
 
     // If profile provided, merge profile settings
     if (profileId) {
-      const profile = await (reqDb(c) as any)
+      const profile = await (db as any)
         .selectFrom('zvd_import_profiles')
         .selectAll()
         .where('id', '=', profileId)
@@ -589,7 +587,7 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
       }
     }
 
-    const job = await (reqDb(c) as any)
+    const job = await (db as any)
       .insertInto('zv_import_logs')
       .values({
         collection,
@@ -609,7 +607,7 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
 
     // Fire-and-forget
     runImport(ctx, tenantOf(c), job.id, collection, rows, options, collectionDef).catch((err: any) => {
-      (reqDb(c) as any)
+      (db as any)
         .updateTable('zv_import_logs')
         .set({
           status: 'failed',

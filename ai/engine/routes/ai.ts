@@ -25,9 +25,6 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
    * multi-tenant deployment yields cross-tenant rows (or zero rows,
    * depending on the row's `tenant_id`). Always use this.
    */
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
 
   async function requireAuth(c: any) {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -199,7 +196,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
     const name = c.req.param('name');
     const result = await sql`
       DELETE FROM zv_ai_providers WHERE name = ${name} RETURNING id
-    `.execute(reqDb(c));
+    `.execute(db);
 
     if (result.rows.length === 0)
       return c.json({ error: 'Provider not found' }, 404);
@@ -362,7 +359,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
             model        = EXCLUDED.model,
             updated_at   = NOW()
         `
-          .execute(reqDb(c))
+          .execute(db)
           .catch((err: Error) => {
             console.warn('[ai.embed] embedding persist failed:', err.message);
           });
@@ -409,12 +406,12 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
       // Falls back to pg_trgm on stored text_content when no embedder
       // is available — both paths target the canonical zvd_ai_embeddings
       // table from ai/engine/migrations/002_embeddings.sql.
-      // reqDb(c) routes the query through the tenant transaction, so
+      // db routes the query through the tenant transaction, so
       // FORCE RLS on zvd_ai_embeddings (migration 009) restricts the
       // result set to rows tagged with this tenant. Without it a user
       // in tenant A could pull semantic-search hits — including the
       // raw `text_content` column — from tenant B's records.
-      const tdb = reqDb(c);
+      const tdb = db;
       const provider = aiProviderManager.getDefault();
       if (provider?.embed) {
         try {
@@ -490,7 +487,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
           WHERE ${sql.id(field)} ILIKE ${'%' + query + '%'}
           LIMIT ${limit}
         `
-          .execute(reqDb(c))
+          .execute(db)
           .then((r) => r.rows)
           .catch(() => []);
       } catch {

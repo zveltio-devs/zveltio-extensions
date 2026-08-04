@@ -164603,9 +164603,6 @@ var receptionSchema = exports_external.object({
 });
 function lotsRouter(ctx) {
   const { db } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const stockService = new StockService(db);
   const app = new Hono2;
   app.get("/", async (c) => {
@@ -164630,12 +164627,12 @@ function lotsRouter(ctx) {
         AND (${expiry_to ? sql`l.best_before_date <= ${expiry_to}` : sql`TRUE`})
       ORDER BY l.created_at DESC
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
     const total = await sql`
       SELECT COUNT(*) as count FROM trace_lots l
       WHERE (${status ? sql`l.status = ${status}` : sql`TRUE`})
         AND (${item_id ? sql`l.item_id = ${item_id}` : sql`TRUE`})
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({
       data: rows.rows,
       meta: { total: parseInt(total.rows[0].count), page: Math.ceil(offset / lim) + 1, limit: lim }
@@ -164662,7 +164659,7 @@ function lotsRouter(ctx) {
       LEFT JOIN trace_suppliers s ON s.id = l.supplier_id
       LEFT JOIN trace_locations loc ON loc.id = l.location_id
       WHERE l.id = ${c.req.param("id")}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Lot neg\u0103sit / Lot not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -164688,12 +164685,12 @@ function lotsRouter(ctx) {
         ${d.sscc ?? null}, ${d.gtin_scanned ?? null}, ${user.id}, ${d.notes ?? null}
       )
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     const lot = row.rows[0];
     await sql`
       INSERT INTO trace_movements (lot_id, type, quantity, unit, reference_type, reference_number, to_location_id, performed_by, performed_at)
       VALUES (${lot.id}, 'reception', ${d.quantity_initial}, ${d.unit}, 'reception', ${lotNumber}, ${d.location_id ?? null}, ${user.id}, now())
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: lot }, 201);
   });
   app.patch("/:id/release", async (c) => {
@@ -164704,7 +164701,7 @@ function lotsRouter(ctx) {
       SET status = 'available', released_by = ${user.id}, released_at = now()
       WHERE id = ${id} AND status = 'quarantine'
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Lot nu este \xEEn carantin\u0103 / Lot not in quarantine" }, 400);
     return c.json({ data: row.rows[0] });
@@ -164717,7 +164714,7 @@ function lotsRouter(ctx) {
     const id = c.req.param("id");
     const row = await sql`
       UPDATE trace_lots SET status = ${d.status}, notes = COALESCE(${d.notes ?? null}, notes) WHERE id = ${id} RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Lot neg\u0103sit / Lot not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -164729,9 +164726,6 @@ function lotsRouter(ctx) {
 var UNITS2 = ["kg", "g", "l", "ml", "buc", "cutie", "sac", "palet"];
 function dispatchesRouter(ctx) {
   const { db } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   app.get("/", async (c) => {
     const { status, lot_id, limit = "50", page = "1" } = c.req.query();
@@ -164748,11 +164742,11 @@ function dispatchesRouter(ctx) {
         AND (${lot_id ? sql`d.lot_id = ${lot_id}` : sql`TRUE`})
       ORDER BY d.created_at DESC
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
     const total = await sql`
       SELECT COUNT(*) as count FROM trace_dispatches
       WHERE (${status ? sql`status = ${status}` : sql`TRUE`})
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({
       data: rows.rows,
       meta: { total: parseInt(total.rows[0].count) }
@@ -164770,7 +164764,7 @@ function dispatchesRouter(ctx) {
       LEFT JOIN trace_items i ON i.id = l.item_id
       LEFT JOIN trace_suppliers s ON s.id = l.supplier_id
       WHERE d.id = ${c.req.param("id")}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Expediere neg\u0103sit\u0103 / Dispatch not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -164784,7 +164778,7 @@ function dispatchesRouter(ctx) {
     const id = c.req.param("id");
     const dispatchResult = await sql`
       SELECT * FROM trace_dispatches WHERE id = ${id} AND status = 'pending'
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!dispatchResult.rows.length) {
       return c.json({ error: "Expediere neg\u0103sit\u0103 sau deja confirmat\u0103 / Dispatch not found or already confirmed" }, 400);
     }
@@ -164795,7 +164789,7 @@ function dispatchesRouter(ctx) {
     const lotResult = await sql`
       SELECT id, quantity_remaining, unit, status FROM trace_lots
       WHERE id = ${dispatch.lot_id} AND status = 'available'
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!lotResult.rows.length) {
       return c.json({ error: "Lotul nu este disponibil / Lot not available" }, 400);
     }
@@ -164811,7 +164805,7 @@ function dispatchesRouter(ctx) {
       SET quantity_remaining = ${newQty},
           status = ${newQty === 0 ? "exhausted" : "available"}
       WHERE id = ${dispatch.lot_id}
-    `.execute(reqDb(c));
+    `.execute(db);
     await sql`
       INSERT INTO trace_movements (
         lot_id, type, quantity, unit,
@@ -164822,7 +164816,7 @@ function dispatchesRouter(ctx) {
         'invoice', ${dispatch.invoice_id ?? null}, ${dispatch.invoice_number ?? null},
         ${dispatch.customer_id ?? null}, ${d.notes ?? null}, ${user.id}, now()
       )
-    `.execute(reqDb(c));
+    `.execute(db);
     const updated = await sql`
       UPDATE trace_dispatches
       SET status = 'confirmed',
@@ -164832,7 +164826,7 @@ function dispatchesRouter(ctx) {
           notes = COALESCE(${d.notes ?? null}, notes)
       WHERE id = ${id}
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: updated.rows[0] });
   });
   app.post("/:id/assign-lot", zValidator("json", exports_external.object({
@@ -164840,12 +164834,12 @@ function dispatchesRouter(ctx) {
   })), async (c) => {
     const { lot_id } = c.req.valid("json");
     const id = c.req.param("id");
-    const lotCheck = await sql`SELECT id FROM trace_lots WHERE id = ${lot_id} AND status = 'available'`.execute(reqDb(c));
+    const lotCheck = await sql`SELECT id FROM trace_lots WHERE id = ${lot_id} AND status = 'available'`.execute(db);
     if (!lotCheck.rows.length)
       return c.json({ error: "Lot indisponibil / Lot not available" }, 400);
     const row = await sql`
       UPDATE trace_dispatches SET lot_id = ${lot_id} WHERE id = ${id} AND status = 'pending' RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Expediere neg\u0103sit\u0103 / Dispatch not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -164859,7 +164853,7 @@ function dispatchesRouter(ctx) {
       SET status = 'cancelled', notes = COALESCE(${d.notes ?? null}, notes)
       WHERE id = ${c.req.param("id")} AND status = 'pending'
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Expediere neg\u0103sit\u0103 sau nu poate fi anulat\u0103" }, 400);
     return c.json({ data: row.rows[0] });
@@ -164878,7 +164872,7 @@ function dispatchesRouter(ctx) {
     const lotResult = await sql`
       SELECT id, quantity_remaining, unit, status FROM trace_lots
       WHERE id = ${d.lot_id} AND status = 'available'
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!lotResult.rows.length)
       return c.json({ error: "Lot indisponibil / Lot not available" }, 400);
     const lot = lotResult.rows[0];
@@ -164892,7 +164886,7 @@ function dispatchesRouter(ctx) {
       UPDATE trace_lots
       SET quantity_remaining = ${newQty}, status = ${newQty === 0 ? "exhausted" : "available"}
       WHERE id = ${d.lot_id}
-    `.execute(reqDb(c));
+    `.execute(db);
     await sql`
       INSERT INTO trace_movements (
         lot_id, type, quantity, unit,
@@ -164903,7 +164897,7 @@ function dispatchesRouter(ctx) {
         'manual', ${d.invoice_number ?? null},
         ${d.customer_id ?? null}, ${d.notes ?? null}, ${user.id}, now()
       )
-    `.execute(reqDb(c));
+    `.execute(db);
     const dispatch = await sql`
       INSERT INTO trace_dispatches (
         invoice_number, customer_id, customer_name,
@@ -164915,7 +164909,7 @@ function dispatchesRouter(ctx) {
         'confirmed', now(), ${user.id}, ${d.notes ?? null}
       )
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: dispatch.rows[0] }, 201);
   });
   return app;
@@ -164975,9 +164969,6 @@ var consumeSchema = exports_external.object({
 });
 function scanRouter(ctx) {
   const { db } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const stockService = new StockService(db);
   const app = new Hono2;
   app.get("/lot/:id", async (c) => {
@@ -164995,7 +164986,7 @@ function scanRouter(ctx) {
       LEFT JOIN trace_suppliers s ON s.id = l.supplier_id
       LEFT JOIN trace_locations loc ON loc.id = l.location_id
       WHERE l.id = ${id}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length) {
       return c.json({ error: "Lot neg\u0103sit / Lot not found" }, 404);
     }
@@ -165041,9 +165032,6 @@ function generateLotNumber2(type) {
 }
 function productionRouter(ctx) {
   const { db } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const stockService = new StockService(db);
   const app = new Hono2;
   app.get("/", async (c) => {
@@ -165063,7 +165051,7 @@ function productionRouter(ctx) {
       WHERE (${status ? sql`po.status = ${status}` : sql`TRUE`})
       ORDER BY po.created_at DESC
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/recipes", async (c) => {
@@ -165082,7 +165070,7 @@ function productionRouter(ctx) {
         AND (${item_id ? sql`r.output_item_id = ${item_id}` : sql`TRUE`})
       GROUP BY r.id, i.name
       ORDER BY r.name
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/:id", async (c) => {
@@ -165095,7 +165083,7 @@ function productionRouter(ctx) {
       LEFT JOIN trace_recipes r ON r.id = po.recipe_id
       LEFT JOIN trace_lots l ON l.id = po.output_lot_id
       WHERE po.id = ${id}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!orderResult.rows.length)
       return c.json({ error: "Ordin neg\u0103sit / Order not found" }, 404);
     const consumptions = await sql`
@@ -165107,7 +165095,7 @@ function productionRouter(ctx) {
       INNER JOIN trace_items i ON i.id = l.item_id
       WHERE c.production_order_id = ${id}
       ORDER BY c.scanned_at
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({
       data: { ...orderResult.rows[0], consumptions: consumptions.rows }
     });
@@ -165127,13 +165115,13 @@ function productionRouter(ctx) {
       INSERT INTO trace_lots (item_id, lot_type, lot_number, status, quantity_initial, quantity_remaining, unit, received_by)
       VALUES (${d.output_item_id}, 'internal', ${lotNumber}, 'quarantine', ${d.planned_quantity}, ${d.planned_quantity}, ${d.unit}, ${user.id})
       RETURNING id
-    `.execute(reqDb(c));
+    `.execute(db);
     const outputLotId = lotResult.rows[0].id;
     const row = await sql`
       INSERT INTO trace_production_orders (order_number, recipe_id, output_lot_id, status, planned_quantity, unit, operator_id, notes)
       VALUES (${orderNumber}, ${d.recipe_id ?? null}, ${outputLotId}, 'draft', ${d.planned_quantity}, ${d.unit}, ${user.id}, ${d.notes ?? null})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.patch("/:id/start", async (c) => {
@@ -165143,7 +165131,7 @@ function productionRouter(ctx) {
       SET status = 'in_progress', started_at = now()
       WHERE id = ${id} AND status = 'draft'
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Ordinul nu poate fi pornit / Order cannot be started" }, 400);
     return c.json({ data: row.rows[0] });
@@ -165164,7 +165152,7 @@ function productionRouter(ctx) {
     const user = c.get("user");
     const d = c.req.valid("json");
     const id = c.req.param("id");
-    const orderResult = await sql`SELECT * FROM trace_production_orders WHERE id = ${id} AND status = 'in_progress'`.execute(reqDb(c));
+    const orderResult = await sql`SELECT * FROM trace_production_orders WHERE id = ${id} AND status = 'in_progress'`.execute(db);
     if (!orderResult.rows.length)
       return c.json({ error: "Ordinul nu este \xEEn execu\u021Bie / Order not in progress" }, 400);
     const order = orderResult.rows[0];
@@ -165172,18 +165160,18 @@ function productionRouter(ctx) {
       UPDATE trace_lots
       SET quantity_initial = ${d.actual_quantity}, quantity_remaining = ${d.actual_quantity}, status = 'available'
       WHERE id = ${order.output_lot_id}
-    `.execute(reqDb(c));
+    `.execute(db);
     await sql`
       INSERT INTO trace_movements (lot_id, type, quantity, unit, reference_type, reference_id, performed_by, performed_at)
       VALUES (${order.output_lot_id}, 'reception', ${d.actual_quantity}, ${order.unit}, 'production_order', ${id}, ${user.id}, now())
-    `.execute(reqDb(c));
+    `.execute(db);
     const row = await sql`
       UPDATE trace_production_orders
       SET status = 'completed', actual_quantity = ${d.actual_quantity},
           completed_at = now(), haccp_checks = ${JSON.stringify(d.haccp_checks)}::jsonb
       WHERE id = ${id}
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] });
   });
   app.post("/:id/consume", zValidator("json", exports_external.object({
@@ -165193,7 +165181,7 @@ function productionRouter(ctx) {
     const user = c.get("user");
     const d = c.req.valid("json");
     const id = c.req.param("id");
-    const orderResult = await sql`SELECT status FROM trace_production_orders WHERE id = ${id}`.execute(reqDb(c));
+    const orderResult = await sql`SELECT status FROM trace_production_orders WHERE id = ${id}`.execute(db);
     if (!orderResult.rows.length)
       return c.json({ error: "Ordin neg\u0103sit / Order not found" }, 404);
     if (orderResult.rows[0].status !== "in_progress") {
@@ -165226,7 +165214,7 @@ function productionRouter(ctx) {
       SET haccp_checks = haccp_checks || ${JSON.stringify({ ...check2, checked_by: user.id })}::jsonb
       WHERE id = ${id}
       RETURNING haccp_checks
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Ordin neg\u0103sit / Order not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -165345,14 +165333,11 @@ class TraceTreeService {
 // engine/routes/trace.ts
 function traceRouter(ctx) {
   const { db } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const traceTree = new TraceTreeService(db);
   const app = new Hono2;
   app.get("/:lot_id/upstream", async (c) => {
     const lotId = c.req.param("lot_id");
-    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${lotId}`.execute(reqDb(c));
+    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${lotId}`.execute(db);
     if (!exists.rows.length)
       return c.json({ error: "Lot neg\u0103sit / Lot not found" }, 404);
     const tree = await traceTree.traceUpstream(lotId);
@@ -165360,7 +165345,7 @@ function traceRouter(ctx) {
   });
   app.get("/:lot_id/downstream", async (c) => {
     const lotId = c.req.param("lot_id");
-    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${lotId}`.execute(reqDb(c));
+    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${lotId}`.execute(db);
     if (!exists.rows.length)
       return c.json({ error: "Lot neg\u0103sit / Lot not found" }, 404);
     const result = await traceTree.traceDownstream(lotId);
@@ -165368,7 +165353,7 @@ function traceRouter(ctx) {
   });
   app.get("/:lot_id/timeline", async (c) => {
     const lotId = c.req.param("lot_id");
-    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${lotId}`.execute(reqDb(c));
+    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${lotId}`.execute(db);
     if (!exists.rows.length)
       return c.json({ error: "Lot neg\u0103sit / Lot not found" }, 404);
     const timeline = await traceTree.getLotTimeline(lotId);
@@ -165439,14 +165424,11 @@ class RecallService {
 // engine/routes/recalls.ts
 function recallsRouter(ctx) {
   const { db } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const recallService = new RecallService(db);
   const app = new Hono2;
   app.post("/simulate/:lot_id", async (c) => {
     const lotId = c.req.param("lot_id");
-    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${lotId}`.execute(reqDb(c));
+    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${lotId}`.execute(db);
     if (!exists.rows.length)
       return c.json({ error: "Lot neg\u0103sit / Lot not found" }, 404);
     const simulation = await recallService.simulateRecall(lotId);
@@ -165459,7 +165441,7 @@ function recallsRouter(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const d = c.req.valid("json");
-    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${d.lot_id}`.execute(reqDb(c));
+    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${d.lot_id}`.execute(db);
     if (!exists.rows.length)
       return c.json({ error: "Lot neg\u0103sit / Lot not found" }, 404);
     const recall = await recallService.initiateRecall({
@@ -165481,7 +165463,7 @@ function recallsRouter(ctx) {
       INNER JOIN trace_items i ON i.id = l.item_id
       WHERE (${status ? sql`r.status = ${status}` : sql`TRUE`})
       ORDER BY r.initiated_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/:id", async (c) => {
@@ -165493,7 +165475,7 @@ function recallsRouter(ctx) {
       INNER JOIN trace_lots l ON l.id = r.lot_id
       INNER JOIN trace_items i ON i.id = l.item_id
       WHERE r.id = ${c.req.param("id")}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Recall neg\u0103sit / Recall not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -185106,12 +185088,9 @@ async function fetchLotDetails(dbh, lotId) {
 }
 function labelsRouter(ctx) {
   const { db } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   app.get("/:lot_id", async (c) => {
-    const lot = await fetchLotDetails(reqDb(c), c.req.param("lot_id"));
+    const lot = await fetchLotDetails(db, c.req.param("lot_id"));
     if (!lot)
       return c.json({ error: "Lot neg\u0103sit / Lot not found" }, 404);
     const pdf = await LabelService.generateLabel(lot);
@@ -185124,7 +185103,7 @@ function labelsRouter(ctx) {
   });
   app.post("/batch", zValidator("json", exports_external.object({ lot_ids: exports_external.array(exports_external.string().uuid()).min(1).max(50) })), async (c) => {
     const { lot_ids } = c.req.valid("json");
-    const lots = await Promise.all(lot_ids.map((id) => fetchLotDetails(reqDb(c), id)));
+    const lots = await Promise.all(lot_ids.map((id) => fetchLotDetails(db, id)));
     const validLots = lots.filter(Boolean);
     if (!validLots.length)
       return c.json({ error: "Niciun lot valid / No valid lots" }, 404);
@@ -185137,7 +185116,7 @@ function labelsRouter(ctx) {
     });
   });
   app.get("/:lot_id/qr-png", async (c) => {
-    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${c.req.param("lot_id")}`.execute(reqDb(c));
+    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${c.req.param("lot_id")}`.execute(db);
     if (!exists.rows.length)
       return c.json({ error: "Lot neg\u0103sit / Lot not found" }, 404);
     const buffer = await QRService.generateQRBuffer(c.req.param("lot_id"));
@@ -185146,7 +185125,7 @@ function labelsRouter(ctx) {
     });
   });
   app.get("/:lot_id/qr-dataurl", async (c) => {
-    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${c.req.param("lot_id")}`.execute(reqDb(c));
+    const exists = await sql`SELECT id FROM trace_lots WHERE id = ${c.req.param("lot_id")}`.execute(db);
     if (!exists.rows.length)
       return c.json({ error: "Lot neg\u0103sit / Lot not found" }, 404);
     const dataUrl = await QRService.generateQRDataURL(c.req.param("lot_id"));
@@ -185167,9 +185146,6 @@ function acceptsCsv(c) {
 }
 function reportsRouter(ctx) {
   const { db } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   app.get("/ansvsa-traceability", async (c) => {
     const { from, to } = c.req.query();
@@ -185203,7 +185179,7 @@ function reportsRouter(ctx) {
       WHERE l.reception_date BETWEEN ${from} AND ${to}
         OR l.created_at::date BETWEEN ${from} AND ${to}
       ORDER BY COALESCE(l.reception_date, l.created_at::date), l.lot_number
-    `.execute(reqDb(c));
+    `.execute(db);
     if (acceptsCsv(c)) {
       const cols = rows.rows.length > 0 ? Object.keys(rows.rows[0]) : [];
       return new Response(toCSV(ctx.internals, rows.rows, cols), {
@@ -185238,7 +185214,7 @@ function reportsRouter(ctx) {
         AND (${from ? sql`m.performed_at::date >= ${from}` : sql`TRUE`})
         AND (${to ? sql`m.performed_at::date <= ${to}` : sql`TRUE`})
       ORDER BY m.performed_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
     if (acceptsCsv(c)) {
       const cols = rows.rows.length > 0 ? Object.keys(rows.rows[0]) : [];
       return new Response(toCSV(ctx.internals, rows.rows, cols), {
@@ -185271,7 +185247,7 @@ function reportsRouter(ctx) {
       WHERE (${from ? sql`c.scanned_at::date >= ${from}` : sql`TRUE`})
         AND (${to ? sql`c.scanned_at::date <= ${to}` : sql`TRUE`})
       ORDER BY c.scanned_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
     if (acceptsCsv(c)) {
       const cols = rows.rows.length > 0 ? Object.keys(rows.rows[0]) : [];
       return new Response(toCSV(ctx.internals, rows.rows, cols), {
@@ -185305,7 +185281,7 @@ function reportsRouter(ctx) {
       LEFT JOIN trace_locations loc ON loc.id = l.location_id
       WHERE l.status = 'available'
       ORDER BY i.name, l.best_before_date NULLS LAST
-    `.execute(reqDb(c));
+    `.execute(db);
     if (acceptsCsv(c)) {
       const cols = rows.rows.length > 0 ? Object.keys(rows.rows[0]) : [];
       return new Response(toCSV(ctx.internals, rows.rows, cols), {
@@ -185335,7 +185311,7 @@ function reportsRouter(ctx) {
         AND (${from ? sql`po.completed_at::date >= ${from}` : sql`TRUE`})
         AND (${to ? sql`po.completed_at::date <= ${to}` : sql`TRUE`})
       ORDER BY po.completed_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   return app;
@@ -185353,9 +185329,6 @@ var supplierSchema = exports_external.object({
 });
 function suppliersRouter(ctx) {
   const { db } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   app.get("/", async (c) => {
     const { q, active } = c.req.query();
@@ -185364,11 +185337,11 @@ function suppliersRouter(ctx) {
       WHERE (${q ? sql`name ILIKE ${"%" + q + "%"} OR cui ILIKE ${"%" + q + "%"}` : sql`TRUE`})
         AND (${active !== undefined ? sql`is_active = ${active === "true"}` : sql`TRUE`})
       ORDER BY name
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/:id", async (c) => {
-    const row = await sql`SELECT * FROM trace_suppliers WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    const row = await sql`SELECT * FROM trace_suppliers WHERE id = ${c.req.param("id")}`.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Furnizor neg\u0103sit / Supplier not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -185379,7 +185352,7 @@ function suppliersRouter(ctx) {
       INSERT INTO trace_suppliers (name, cui, contact_person, phone, email, address)
       VALUES (${d.name}, ${d.cui ?? null}, ${d.contact_person ?? null}, ${d.phone ?? null}, ${d.email ?? null}, ${d.address ?? null})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.patch("/:id", zValidator("json", supplierSchema.partial()), async (c) => {
@@ -185396,7 +185369,7 @@ function suppliersRouter(ctx) {
         is_active = COALESCE(${d.is_active ?? null}, is_active)
       WHERE id = ${id}
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Furnizor neg\u0103sit / Supplier not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -185421,9 +185394,6 @@ var itemSchema = exports_external.object({
 });
 function itemsRouter(ctx) {
   const { db } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   app.get("/", async (c) => {
     const { q, type, category } = c.req.query();
@@ -185434,11 +185404,11 @@ function itemsRouter(ctx) {
         AND (${category ? sql`category = ${category}` : sql`TRUE`})
         AND is_active = true
       ORDER BY name
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/:id", async (c) => {
-    const row = await sql`SELECT * FROM trace_items WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    const row = await sql`SELECT * FROM trace_items WHERE id = ${c.req.param("id")}`.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Articol neg\u0103sit / Item not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -185454,7 +185424,7 @@ function itemsRouter(ctx) {
         ${d.gtin ?? null}, ${d.min_stock_alert ?? null}
       )
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.patch("/:id", zValidator("json", itemSchema.partial()), async (c) => {
@@ -185476,7 +185446,7 @@ function itemsRouter(ctx) {
         is_active = COALESCE(${d.is_active ?? null}, is_active)
       WHERE id = ${id}
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Articol neg\u0103sit / Item not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -185494,9 +185464,6 @@ var locationSchema = exports_external.object({
 });
 function locationsRouter(ctx) {
   const { db } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   app.get("/", async (c) => {
     const { warehouse, zone } = c.req.query();
@@ -185505,11 +185472,11 @@ function locationsRouter(ctx) {
       WHERE (${warehouse ? sql`warehouse ILIKE ${"%" + warehouse + "%"}` : sql`TRUE`})
         AND (${zone ? sql`temperature_zone = ${zone}` : sql`TRUE`})
       ORDER BY warehouse, row, shelf
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/:id", async (c) => {
-    const row = await sql`SELECT * FROM trace_locations WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    const row = await sql`SELECT * FROM trace_locations WHERE id = ${c.req.param("id")}`.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Loca\u021Bie neg\u0103sit\u0103 / Location not found" }, 404);
     return c.json({ data: row.rows[0] });
@@ -185520,7 +185487,7 @@ function locationsRouter(ctx) {
       INSERT INTO trace_locations (warehouse, row, shelf, description, temperature_zone)
       VALUES (${d.warehouse}, ${d.row ?? null}, ${d.shelf ?? null}, ${d.description ?? null}, ${d.temperature_zone ?? null})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.patch("/:id", zValidator("json", locationSchema.partial()), async (c) => {
@@ -185535,17 +185502,17 @@ function locationsRouter(ctx) {
         temperature_zone = COALESCE(${d.temperature_zone ?? null}, temperature_zone)
       WHERE id = ${id}
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Loca\u021Bie neg\u0103sit\u0103 / Location not found" }, 404);
     return c.json({ data: row.rows[0] });
   });
   app.delete("/:id", async (c) => {
     const id = c.req.param("id");
-    const inUse = await sql`SELECT id FROM trace_lots WHERE location_id = ${id} LIMIT 1`.execute(reqDb(c));
+    const inUse = await sql`SELECT id FROM trace_lots WHERE location_id = ${id} LIMIT 1`.execute(db);
     if (inUse.rows.length)
       return c.json({ error: "Loca\u021Bia are loturi asociate / Location has associated lots" }, 409);
-    await sql`DELETE FROM trace_locations WHERE id = ${id}`.execute(reqDb(c));
+    await sql`DELETE FROM trace_locations WHERE id = ${id}`.execute(db);
     return c.json({ success: true });
   });
   return app;

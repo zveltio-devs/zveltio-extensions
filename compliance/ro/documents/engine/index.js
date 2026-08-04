@@ -19496,9 +19496,6 @@ async function getUser(c, auth) {
 var DOC_TYPES = ["contract", "pv", "nir", "dispozitie_plata", "proces_verbal", "notificare", "other"];
 function roDocumentsRoutes(ctx) {
   const { db, auth } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -19512,7 +19509,7 @@ function roDocumentsRoutes(ctx) {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const templates = await reqDb(c).selectFrom("zv_ro_document_templates").select(["id", "name", "type", "description", "variables"]).where("is_active", "=", true).orderBy("name", "asc").execute();
+    const templates = await db.selectFrom("zv_ro_document_templates").select(["id", "name", "type", "description", "variables"]).where("is_active", "=", true).orderBy("name", "asc").execute();
     return c.json({ templates });
   });
   app.get("/", async (c) => {
@@ -19520,7 +19517,7 @@ function roDocumentsRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const { type, status, category, search } = c.req.query();
-    let query = reqDb(c).selectFrom("zv_ro_documents").select(["id", "type", "number", "date", "title", "status", "category", "version_number", "signed_at", "created_at"]).orderBy("date", "desc");
+    let query = db.selectFrom("zv_ro_documents").select(["id", "type", "number", "date", "title", "status", "category", "version_number", "signed_at", "created_at"]).orderBy("date", "desc");
     if (type)
       query = query.where("type", "=", type);
     if (status)
@@ -19546,14 +19543,14 @@ function roDocumentsRoutes(ctx) {
         COUNT(*)::int AS count
       FROM zv_ro_documents
       GROUP BY GROUPING SETS ((), (type))
-    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+    `.execute(db).catch(() => ({ rows: [] }));
     return c.json({ stats: stats.rows });
   });
   app.get("/:id", async (c) => {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const doc2 = await reqDb(c).selectFrom("zv_ro_documents").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
+    const doc2 = await db.selectFrom("zv_ro_documents").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
     if (!doc2)
       return c.json({ error: "Document not found" }, 404);
     return c.json({ document: doc2 });
@@ -19581,7 +19578,7 @@ function roDocumentsRoutes(ctx) {
           SET last_seq = last_seq + 1, updated_at = NOW()
           WHERE type = ${body.type}
           RETURNING prefix, year, last_seq, format
-        `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+        `.execute(db).catch(() => ({ rows: [] }));
       if (seq.rows[0]) {
         const { prefix, year, last_seq, format } = seq.rows[0];
         number4 = format.replace("{prefix}", prefix).replace("{year}", String(year)).replace(/{seq:(\d+)d}/, (_, w) => String(last_seq).padStart(parseInt(w), "0"));
@@ -19589,7 +19586,7 @@ function roDocumentsRoutes(ctx) {
         number4 = `${body.type.toUpperCase()}-${Date.now()}`;
       }
     }
-    const doc2 = await reqDb(c).insertInto("zv_ro_documents").values({
+    const doc2 = await db.insertInto("zv_ro_documents").values({
       ...body,
       number: number4,
       parties: JSON.stringify(body.parties),
@@ -19610,7 +19607,7 @@ function roDocumentsRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const body = c.req.valid("json");
-    const existing = await reqDb(c).selectFrom("zv_ro_documents").select(["id", "status", "version_number", "content"]).where("id", "=", c.req.param("id")).executeTakeFirst();
+    const existing = await db.selectFrom("zv_ro_documents").select(["id", "status", "version_number", "content"]).where("id", "=", c.req.param("id")).executeTakeFirst();
     if (!existing)
       return c.json({ error: "Document not found" }, 404);
     if (existing.status !== "draft")
@@ -19618,7 +19615,7 @@ function roDocumentsRoutes(ctx) {
     await sql`
         INSERT INTO zv_ro_document_versions (document_id, version, content, changed_by)
         VALUES (${existing.id}::uuid, ${existing.version_number}, ${existing.content ?? null}, ${user.id})
-      `.execute(reqDb(c)).catch(() => {});
+      `.execute(db).catch(() => {});
     const updates = { updated_at: new Date, version_number: existing.version_number + 1 };
     if (body.title !== undefined)
       updates.title = body.title;
@@ -19632,14 +19629,14 @@ function roDocumentsRoutes(ctx) {
       updates.internal_notes = body.internal_notes;
     if (body.category !== undefined)
       updates.category = body.category;
-    const doc2 = await reqDb(c).updateTable("zv_ro_documents").set(updates).where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
+    const doc2 = await db.updateTable("zv_ro_documents").set(updates).where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
     return c.json({ document: doc2 });
   });
   app.patch("/:id/sign", async (c) => {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const doc2 = await reqDb(c).updateTable("zv_ro_documents").set({ status: "signed", signed_at: new Date, updated_at: new Date }).where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
+    const doc2 = await db.updateTable("zv_ro_documents").set({ status: "signed", signed_at: new Date, updated_at: new Date }).where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
     if (!doc2)
       return c.json({ error: "Document not found" }, 404);
     return c.json({ document: doc2 });
@@ -19648,7 +19645,7 @@ function roDocumentsRoutes(ctx) {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const doc2 = await reqDb(c).updateTable("zv_ro_documents").set({ status: "archived", archived_at: new Date, updated_at: new Date }).where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
+    const doc2 = await db.updateTable("zv_ro_documents").set({ status: "archived", archived_at: new Date, updated_at: new Date }).where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
     if (!doc2)
       return c.json({ error: "Document not found" }, 404);
     return c.json({ document: doc2 });
@@ -19662,7 +19659,7 @@ function roDocumentsRoutes(ctx) {
       FROM zv_ro_document_versions
       WHERE document_id = ${c.req.param("id")}::uuid
       ORDER BY version DESC
-    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+    `.execute(db).catch(() => ({ rows: [] }));
     return c.json({ versions: versions2.rows });
   });
   app.post("/:id/versions/:version/restore", async (c) => {
@@ -19672,18 +19669,18 @@ function roDocumentsRoutes(ctx) {
     const version2 = await sql`
       SELECT content FROM zv_ro_document_versions
       WHERE document_id = ${c.req.param("id")}::uuid AND version = ${parseInt(c.req.param("version"), 10)}
-    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+    `.execute(db).catch(() => ({ rows: [] }));
     if (!version2.rows[0])
       return c.json({ error: "Version not found" }, 404);
-    const existing = await reqDb(c).selectFrom("zv_ro_documents").select(["version_number"]).where("id", "=", c.req.param("id")).executeTakeFirst();
+    const existing = await db.selectFrom("zv_ro_documents").select(["version_number"]).where("id", "=", c.req.param("id")).executeTakeFirst();
     if (!existing)
       return c.json({ error: "Document not found" }, 404);
     await sql`
       INSERT INTO zv_ro_document_versions (document_id, version, content, changed_by, change_note)
       SELECT id, ${existing.version_number}::int, content, ${user.id}, 'Pre-restore snapshot'
       FROM zv_ro_documents WHERE id = ${c.req.param("id")}::uuid
-    `.execute(reqDb(c)).catch(() => {});
-    const doc2 = await reqDb(c).updateTable("zv_ro_documents").set({ content: version2.rows[0].content, status: "draft", version_number: existing.version_number + 1, updated_at: new Date }).where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
+    `.execute(db).catch(() => {});
+    const doc2 = await db.updateTable("zv_ro_documents").set({ content: version2.rows[0].content, status: "draft", version_number: existing.version_number + 1, updated_at: new Date }).where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
     return c.json({ document: doc2 });
   });
   app.post("/bulk-sign", zValidator("json", exports_external.object({ ids: exports_external.array(exports_external.string().uuid()).min(1).max(50) })), async (c) => {
@@ -19695,14 +19692,14 @@ function roDocumentsRoutes(ctx) {
         SET status = 'signed', signed_at = NOW(), updated_at = NOW()
         WHERE id = ANY(${c.req.valid("json").ids}::uuid[]) AND status = 'draft'
         RETURNING id, number, title
-      `.execute(reqDb(c));
+      `.execute(db);
     return c.json({ signed: result.rows, count: result.rows.length });
   });
   app.delete("/:id", async (c) => {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    await reqDb(c).deleteFrom("zv_ro_documents").where("id", "=", c.req.param("id")).where("status", "=", "draft").execute();
+    await db.deleteFrom("zv_ro_documents").where("id", "=", c.req.param("id")).where("status", "=", "draft").execute();
     return c.json({ success: true });
   });
   return app;

@@ -16432,9 +16432,6 @@ function s3PublicUrl(key) {
 function mediaRoutes(ctx) {
   const { db, auth } = ctx;
   _config = ctx.config;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const { moveToTrash, scheduleFileIndexing } = ctx.internals;
   const router = new Hono2;
   router.use("*", async (c, next) => {
@@ -16446,7 +16443,7 @@ function mediaRoutes(ctx) {
   });
   router.use("*", permissionGate(ctx, "media"));
   router.get("/folders", async (c) => {
-    const folders = await reqDb(c).selectFrom("zv_media_folders").selectAll().where("deleted_at", "is", null).orderBy("name", "asc").execute();
+    const folders = await db.selectFrom("zv_media_folders").selectAll().where("deleted_at", "is", null).orderBy("name", "asc").execute();
     return c.json({ folders });
   });
   router.post("/folders", zValidator("json", exports_external.object({
@@ -16463,7 +16460,7 @@ function mediaRoutes(ctx) {
       description: data.description || null,
       created_by: user.id
     };
-    await reqDb(c).insertInto("zv_media_folders").values(folder).execute();
+    await db.insertInto("zv_media_folders").values(folder).execute();
     return c.json({ folder }, 201);
   });
   router.put("/folders/:id", zValidator("json", exports_external.object({
@@ -16473,25 +16470,25 @@ function mediaRoutes(ctx) {
   })), async (c) => {
     const id = c.req.param("id");
     const data = c.req.valid("json");
-    await reqDb(c).updateTable("zv_media_folders").set({ ...data, updated_at: new Date }).where("id", "=", id).execute();
+    await db.updateTable("zv_media_folders").set({ ...data, updated_at: new Date }).where("id", "=", id).execute();
     return c.json({ success: true });
   });
   router.delete("/folders/:id", async (c) => {
     const id = c.req.param("id");
-    const subfolders = await reqDb(c).selectFrom("zv_media_folders").select((eb) => eb.fn.count("id").as("count")).where("parent_id", "=", id).executeTakeFirst();
+    const subfolders = await db.selectFrom("zv_media_folders").select((eb) => eb.fn.count("id").as("count")).where("parent_id", "=", id).executeTakeFirst();
     if (Number(subfolders?.count) > 0) {
       return c.json({ error: "Folder has subfolders. Delete them first." }, 400);
     }
-    const fileCount = await reqDb(c).selectFrom("zv_media_files").select((eb) => eb.fn.count("id").as("count")).where("folder_id", "=", id).executeTakeFirst();
+    const fileCount = await db.selectFrom("zv_media_files").select((eb) => eb.fn.count("id").as("count")).where("folder_id", "=", id).executeTakeFirst();
     if (Number(fileCount?.count) > 0) {
       return c.json({ error: "Folder is not empty. Move or delete files first." }, 400);
     }
-    await reqDb(c).deleteFrom("zv_media_folders").where("id", "=", id).execute();
+    await db.deleteFrom("zv_media_folders").where("id", "=", id).execute();
     return c.json({ success: true });
   });
   router.get("/files", async (c) => {
     const { folder_id, tag, search, limit = "50", offset = "0", mime_type } = c.req.query();
-    let query = reqDb(c).selectFrom("zv_media_files").selectAll().where("deleted_at", "is", null).orderBy("created_at", "desc");
+    let query = db.selectFrom("zv_media_files").selectAll().where("deleted_at", "is", null).orderBy("created_at", "desc");
     if (folder_id)
       query = query.where("folder_id", "=", folder_id);
     if (mime_type)
@@ -16509,9 +16506,9 @@ function mediaRoutes(ctx) {
     }
     const files = await query.limit(Number(limit)).offset(Number(offset)).execute();
     for (const file2 of files) {
-      file2.tags = await reqDb(c).selectFrom("zv_media_file_tags").innerJoin("zv_media_tags", "zv_media_tags.id", "zv_media_file_tags.tag_id").select(["zv_media_tags.id", "zv_media_tags.name", "zv_media_tags.color"]).where("zv_media_file_tags.file_id", "=", file2.id).execute();
+      file2.tags = await db.selectFrom("zv_media_file_tags").innerJoin("zv_media_tags", "zv_media_tags.id", "zv_media_file_tags.tag_id").select(["zv_media_tags.id", "zv_media_tags.name", "zv_media_tags.color"]).where("zv_media_file_tags.file_id", "=", file2.id).execute();
     }
-    let countQuery = reqDb(c).selectFrom("zv_media_files").select(({ fn }) => fn.count("id").as("count")).where("deleted_at", "is", null);
+    let countQuery = db.selectFrom("zv_media_files").select(({ fn }) => fn.count("id").as("count")).where("deleted_at", "is", null);
     if (folder_id)
       countQuery = countQuery.where("folder_id", "=", folder_id);
     if (mime_type)
@@ -16530,10 +16527,10 @@ function mediaRoutes(ctx) {
   });
   router.get("/files/:id", async (c) => {
     const id = c.req.param("id");
-    const file2 = await reqDb(c).selectFrom("zv_media_files").selectAll().where("id", "=", id).where("deleted_at", "is", null).executeTakeFirst();
+    const file2 = await db.selectFrom("zv_media_files").selectAll().where("id", "=", id).where("deleted_at", "is", null).executeTakeFirst();
     if (!file2)
       return c.json({ error: "File not found" }, 404);
-    file2.tags = await reqDb(c).selectFrom("zv_media_file_tags").innerJoin("zv_media_tags", "zv_media_tags.id", "zv_media_file_tags.tag_id").select(["zv_media_tags.id", "zv_media_tags.name", "zv_media_tags.color"]).where("zv_media_file_tags.file_id", "=", id).execute();
+    file2.tags = await db.selectFrom("zv_media_file_tags").innerJoin("zv_media_tags", "zv_media_tags.id", "zv_media_file_tags.tag_id").select(["zv_media_tags.id", "zv_media_tags.name", "zv_media_tags.color"]).where("zv_media_file_tags.file_id", "=", id).execute();
     return c.json({ file: file2 });
   });
   router.post("/upload", async (c) => {
@@ -16546,8 +16543,8 @@ function mediaRoutes(ctx) {
     const altText = formData.get("alt_text");
     if (!file2)
       return c.json({ error: "No file provided" }, 400);
-    const usageResult = await reqDb(c).selectFrom("zv_media_files").select(({ fn }) => fn.sum("size").as("total")).where("created_by", "=", user.id).where("deleted_at", "is", null).executeTakeFirst();
-    const quotaRecord = await reqDb(c).selectFrom("zv_storage_quotas").selectAll().where("user_id", "=", user.id).executeTakeFirst();
+    const usageResult = await db.selectFrom("zv_media_files").select(({ fn }) => fn.sum("size").as("total")).where("created_by", "=", user.id).where("deleted_at", "is", null).executeTakeFirst();
+    const quotaRecord = await db.selectFrom("zv_storage_quotas").selectAll().where("user_id", "=", user.id).executeTakeFirst();
     const usedBytes = Number(usageResult?.total || 0);
     const quotaBytes = quotaRecord?.quota_bytes ?? 5368709120;
     if (usedBytes + file2.size > quotaBytes) {
@@ -16620,7 +16617,7 @@ function mediaRoutes(ctx) {
       description: description || null,
       alt_text: altText || null
     };
-    await reqDb(c).insertInto("zv_media_files").values(fileRecord).execute();
+    await db.insertInto("zv_media_files").values(fileRecord).execute();
     scheduleFileIndexing(db, fileId, buffer, file2.type);
     return c.json({ file: fileRecord }, 201);
   });
@@ -16632,7 +16629,7 @@ function mediaRoutes(ctx) {
   })), async (c) => {
     const id = c.req.param("id");
     const data = c.req.valid("json");
-    await reqDb(c).updateTable("zv_media_files").set({ ...data, updated_at: new Date }).where("id", "=", id).execute();
+    await db.updateTable("zv_media_files").set({ ...data, updated_at: new Date }).where("id", "=", id).execute();
     return c.json({ success: true });
   });
   router.delete("/files/:id", async (c) => {
@@ -16658,7 +16655,7 @@ function mediaRoutes(ctx) {
     return c.json({ success: true, deleted: moved });
   });
   router.get("/tags", async (c) => {
-    const tags = await reqDb(c).selectFrom("zv_media_tags").selectAll().orderBy("name", "asc").execute();
+    const tags = await db.selectFrom("zv_media_tags").selectAll().orderBy("name", "asc").execute();
     return c.json({ tags });
   });
   router.post("/tags", zValidator("json", exports_external.object({
@@ -16668,7 +16665,7 @@ function mediaRoutes(ctx) {
     const data = c.req.valid("json");
     const tag = { id: randomUUID().replace(/-/g, ""), name: data.name, color: data.color || null };
     try {
-      await reqDb(c).insertInto("zv_media_tags").values(tag).execute();
+      await db.insertInto("zv_media_tags").values(tag).execute();
       return c.json({ tag }, 201);
     } catch {
       return c.json({ error: "Tag already exists" }, 400);
@@ -16680,34 +16677,34 @@ function mediaRoutes(ctx) {
   })), async (c) => {
     const id = c.req.param("id");
     const data = c.req.valid("json");
-    await reqDb(c).updateTable("zv_media_tags").set(data).where("id", "=", id).execute();
+    await db.updateTable("zv_media_tags").set(data).where("id", "=", id).execute();
     return c.json({ success: true });
   });
   router.delete("/tags/:id", async (c) => {
-    await reqDb(c).deleteFrom("zv_media_tags").where("id", "=", c.req.param("id")).execute();
+    await db.deleteFrom("zv_media_tags").where("id", "=", c.req.param("id")).execute();
     return c.json({ success: true });
   });
   router.post("/files/:id/tags", zValidator("json", exports_external.object({ tag_id: exports_external.string() })), async (c) => {
     const fileId = c.req.param("id");
     const { tag_id } = c.req.valid("json");
     try {
-      await reqDb(c).insertInto("zv_media_file_tags").values({ file_id: fileId, tag_id }).onConflict((oc) => oc.doNothing()).execute();
+      await db.insertInto("zv_media_file_tags").values({ file_id: fileId, tag_id }).onConflict((oc) => oc.doNothing()).execute();
       return c.json({ success: true });
     } catch {
       return c.json({ error: "Failed to add tag" }, 400);
     }
   });
   router.delete("/files/:id/tags/:tagId", async (c) => {
-    await reqDb(c).deleteFrom("zv_media_file_tags").where("file_id", "=", c.req.param("id")).where("tag_id", "=", c.req.param("tagId")).execute();
+    await db.deleteFrom("zv_media_file_tags").where("file_id", "=", c.req.param("id")).where("tag_id", "=", c.req.param("tagId")).execute();
     return c.json({ success: true });
   });
   router.get("/stats", async (c) => {
     const [totalFiles, totalSize, filesByType, totalFolders, totalTags] = await Promise.all([
-      reqDb(c).selectFrom("zv_media_files").select(({ fn }) => fn.count("id").as("count")).where("deleted_at", "is", null).executeTakeFirst(),
-      reqDb(c).selectFrom("zv_media_files").select(({ fn }) => fn.sum("size").as("total")).where("deleted_at", "is", null).executeTakeFirst(),
-      reqDb(c).selectFrom("zv_media_files").select(["mimetype", (eb) => eb.fn.count("id").as("count")]).where("deleted_at", "is", null).groupBy("mimetype").orderBy("count", "desc").limit(10).execute(),
-      reqDb(c).selectFrom("zv_media_folders").select(({ fn }) => fn.count("id").as("count")).where("deleted_at", "is", null).executeTakeFirst(),
-      reqDb(c).selectFrom("zv_media_tags").select(({ fn }) => fn.count("id").as("count")).executeTakeFirst()
+      db.selectFrom("zv_media_files").select(({ fn }) => fn.count("id").as("count")).where("deleted_at", "is", null).executeTakeFirst(),
+      db.selectFrom("zv_media_files").select(({ fn }) => fn.sum("size").as("total")).where("deleted_at", "is", null).executeTakeFirst(),
+      db.selectFrom("zv_media_files").select(["mimetype", (eb) => eb.fn.count("id").as("count")]).where("deleted_at", "is", null).groupBy("mimetype").orderBy("count", "desc").limit(10).execute(),
+      db.selectFrom("zv_media_folders").select(({ fn }) => fn.count("id").as("count")).where("deleted_at", "is", null).executeTakeFirst(),
+      db.selectFrom("zv_media_tags").select(({ fn }) => fn.count("id").as("count")).executeTakeFirst()
     ]);
     return c.json({
       totalFiles: Number(totalFiles?.count || 0),
@@ -16719,7 +16716,7 @@ function mediaRoutes(ctx) {
   });
   router.get("/collections", async (c) => {
     const user = c.get("user");
-    const collections = await reqDb(c).selectFrom("zv_media_collections").selectAll().where((eb) => eb.or([
+    const collections = await db.selectFrom("zv_media_collections").selectAll().where((eb) => eb.or([
       eb("is_public", "=", true),
       eb("created_by", "=", user.id)
     ])).orderBy("created_at", "desc").execute();
@@ -16733,7 +16730,7 @@ function mediaRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const data = c.req.valid("json");
-    const coll = await reqDb(c).insertInto("zv_media_collections").values({ ...data, cover_file_id: data.cover_file_id || null, created_by: user.id }).returningAll().executeTakeFirst();
+    const coll = await db.insertInto("zv_media_collections").values({ ...data, cover_file_id: data.cover_file_id || null, created_by: user.id }).returningAll().executeTakeFirst();
     return c.json({ collection: coll }, 201);
   });
   router.patch("/collections/:id", zValidator("json", exports_external.object({
@@ -16744,27 +16741,27 @@ function mediaRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const id = c.req.param("id");
-    const existing = await reqDb(c).selectFrom("zv_media_collections").select(["id", "created_by"]).where("id", "=", id).executeTakeFirst();
+    const existing = await db.selectFrom("zv_media_collections").select(["id", "created_by"]).where("id", "=", id).executeTakeFirst();
     if (!existing)
       return c.json({ error: "Collection not found" }, 404);
     if (existing.created_by !== user.id)
       return c.json({ error: "Forbidden" }, 403);
-    const updated = await reqDb(c).updateTable("zv_media_collections").set({ ...c.req.valid("json"), updated_at: new Date }).where("id", "=", id).returningAll().executeTakeFirst();
+    const updated = await db.updateTable("zv_media_collections").set({ ...c.req.valid("json"), updated_at: new Date }).where("id", "=", id).returningAll().executeTakeFirst();
     return c.json({ collection: updated });
   });
   router.delete("/collections/:id", async (c) => {
     const user = c.get("user");
     const id = c.req.param("id");
-    const existing = await reqDb(c).selectFrom("zv_media_collections").select(["id", "created_by"]).where("id", "=", id).executeTakeFirst();
+    const existing = await db.selectFrom("zv_media_collections").select(["id", "created_by"]).where("id", "=", id).executeTakeFirst();
     if (!existing)
       return c.json({ error: "Collection not found" }, 404);
     if (existing.created_by !== user.id)
       return c.json({ error: "Forbidden" }, 403);
-    await reqDb(c).deleteFrom("zv_media_collections").where("id", "=", id).execute();
+    await db.deleteFrom("zv_media_collections").where("id", "=", id).execute();
     return c.json({ success: true });
   });
   router.get("/collections/:id/files", async (c) => {
-    const files = await reqDb(c).selectFrom("zv_media_collection_files as cf").innerJoin("zv_media_files as f", "f.id", "cf.file_id").select([
+    const files = await db.selectFrom("zv_media_collection_files as cf").innerJoin("zv_media_files as f", "f.id", "cf.file_id").select([
       "f.id",
       "f.original_name",
       "f.mimetype",
@@ -16781,20 +16778,20 @@ function mediaRoutes(ctx) {
     const user = c.get("user");
     const collId = c.req.param("id");
     const { file_ids } = c.req.valid("json");
-    const existing = await reqDb(c).selectFrom("zv_media_collection_files").select("file_id").where("collection_id", "=", collId).execute();
+    const existing = await db.selectFrom("zv_media_collection_files").select("file_id").where("collection_id", "=", collId).execute();
     const existingIds = new Set(existing.map((r) => r.file_id));
     const toInsert = file_ids.filter((id) => !existingIds.has(id));
     if (toInsert.length > 0) {
-      await reqDb(c).insertInto("zv_media_collection_files").values(toInsert.map((fid, i) => ({ collection_id: collId, file_id: fid, sort_order: existing.length + i, added_by: user.id }))).execute();
+      await db.insertInto("zv_media_collection_files").values(toInsert.map((fid, i) => ({ collection_id: collId, file_id: fid, sort_order: existing.length + i, added_by: user.id }))).execute();
     }
     return c.json({ added: toInsert.length });
   });
   router.delete("/collections/:id/files/:fileId", async (c) => {
-    await reqDb(c).deleteFrom("zv_media_collection_files").where("collection_id", "=", c.req.param("id")).where("file_id", "=", c.req.param("fileId")).execute();
+    await db.deleteFrom("zv_media_collection_files").where("collection_id", "=", c.req.param("id")).where("file_id", "=", c.req.param("fileId")).execute();
     return c.json({ success: true });
   });
   router.get("/admin/quotas", async (c) => {
-    const quotas = await reqDb(c).selectFrom("zv_storage_quotas").selectAll().orderBy("created_at", "desc").execute();
+    const quotas = await db.selectFrom("zv_storage_quotas").selectAll().orderBy("created_at", "desc").execute();
     return c.json({ quotas });
   });
   router.post("/admin/quotas", zValidator("json", exports_external.object({
@@ -16806,11 +16803,11 @@ function mediaRoutes(ctx) {
   }).refine((d) => d.user_id || d.role_name, { message: "user_id or role_name required" })), async (c) => {
     const user = c.get("user");
     const data = c.req.valid("json");
-    const quota = await reqDb(c).insertInto("zv_storage_quotas").values({ ...data, created_by: user.id }).onConflict((oc) => oc.columns(data.user_id ? ["user_id"] : ["role_name"]).doUpdateSet({ quota_bytes: data.quota_bytes, max_file_size_bytes: data.max_file_size_bytes, allowed_extensions: data.allowed_extensions, updated_at: new Date })).returningAll().executeTakeFirst();
+    const quota = await db.insertInto("zv_storage_quotas").values({ ...data, created_by: user.id }).onConflict((oc) => oc.columns(data.user_id ? ["user_id"] : ["role_name"]).doUpdateSet({ quota_bytes: data.quota_bytes, max_file_size_bytes: data.max_file_size_bytes, allowed_extensions: data.allowed_extensions, updated_at: new Date })).returningAll().executeTakeFirst();
     return c.json({ quota }, 201);
   });
   router.delete("/admin/quotas/:id", async (c) => {
-    await reqDb(c).deleteFrom("zv_storage_quotas").where("id", "=", c.req.param("id")).execute();
+    await db.deleteFrom("zv_storage_quotas").where("id", "=", c.req.param("id")).execute();
     return c.json({ success: true });
   });
   return router;

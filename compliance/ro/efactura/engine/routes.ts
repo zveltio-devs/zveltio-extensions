@@ -56,13 +56,10 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
   const app = new Hono();
 
-  // Per-request DB handle (see CRM PR #1 for rationale). After
-  // migration 002_tenant_rls.sql, every zv_efactura_* table has
-  // FORCE RLS keyed on `zveltio.current_tenant`; routes must run
-  // through this handle so the GUC is active.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
   // Auth + RBAC gate — populate c.user then check `efactura` permission.
   app.use('*', async (c, next) => {
@@ -79,7 +76,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const { status, seller_cui, from_date, to_date } = c.req.query();
-    let query = reqDb(c)
+    let query = db
       .selectFrom('zv_efactura_invoices')
       .select(['id', 'invoice_number', 'invoice_date', 'buyer_name', 'buyer_cui', 'total', 'currency', 'status', 'anaf_index', 'created_at'])
       .orderBy('invoice_date', 'desc');
@@ -109,7 +106,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
         WHERE EXTRACT(YEAR FROM invoice_date) = ${currentYear}
           ${seller_cui ? sql`AND seller_cui = ${seller_cui}` : sql``}
         GROUP BY status
-      `.execute(reqDb(c)).catch(() => ({ rows: [] })),
+      `.execute(db).catch(() => ({ rows: [] })),
       sql<any>`
         SELECT TO_CHAR(invoice_date, 'YYYY-MM') AS month,
                COUNT(*)::int AS count, SUM(total) AS total, SUM(vat_total) AS vat
@@ -117,7 +114,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
         WHERE EXTRACT(YEAR FROM invoice_date) = ${currentYear}
           ${seller_cui ? sql`AND seller_cui = ${seller_cui}` : sql``}
         GROUP BY month ORDER BY month
-      `.execute(reqDb(c)).catch(() => ({ rows: [] })),
+      `.execute(db).catch(() => ({ rows: [] })),
     ]);
 
     return c.json({ year: currentYear, by_status: statusStats.rows, by_month: monthlyStats.rows });
@@ -128,7 +125,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const invoice = await reqDb(c)
+    const invoice = await db
       .selectFrom('zv_efactura_invoices')
       .selectAll()
       .where('id', '=', c.req.param('id'))
@@ -147,7 +144,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
       SELECT * FROM zv_efactura_status_log
       WHERE invoice_id = ${c.req.param('id')}::uuid
       ORDER BY created_at ASC
-    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+    `.execute(db).catch(() => ({ rows: [] }));
 
     return c.json({ log: logs.rows });
   });
@@ -158,7 +155,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const body = c.req.valid('json');
-    const invoice = await reqDb(c)
+    const invoice = await db
       .insertInto('zv_efactura_invoices')
       .values({
         ...body,
@@ -182,7 +179,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
       if (v !== undefined) updates[k] = k === 'lines' ? JSON.stringify(v) : v;
     }
 
-    const invoice = await reqDb(c)
+    const invoice = await db
       .updateTable('zv_efactura_invoices')
       .set(updates)
       .where('id', '=', c.req.param('id'))
@@ -198,7 +195,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    await reqDb(c)
+    await db
       .deleteFrom('zv_efactura_invoices')
       .where('id', '=', c.req.param('id'))
       .where('status', '=', 'draft')
@@ -212,7 +209,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const invoice = await reqDb(c)
+    const invoice = await db
       .selectFrom('zv_efactura_invoices')
       .selectAll()
       .where('id', '=', c.req.param('id'))
@@ -227,13 +224,13 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     // bridge the loose row → strict InvoiceData boundary.
     const xml = generateUBLXML({ ...(invoice as any), lines });
 
-    await reqDb(c)
+    await db
       .updateTable('zv_efactura_invoices')
       .set({ xml_content: xml, status: 'xml_generated', updated_at: new Date() })
       .where('id', '=', invoice.id)
       .execute();
 
-    await logStatusChange(reqDb(c), invoice.id, invoice.status, 'xml_generated', user.id);
+    await logStatusChange(db, invoice.id, invoice.status, 'xml_generated', user.id);
 
     return c.json({ xml, message: 'UBL XML generated successfully' });
   });
@@ -243,7 +240,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const invoice = await reqDb(c)
+    const invoice = await db
       .selectFrom('zv_efactura_invoices')
       .select(['xml_content', 'invoice_number'])
       .where('id', '=', c.req.param('id'))
@@ -265,7 +262,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const invoice = await reqDb(c)
+    const invoice = await db
       .selectFrom('zv_efactura_invoices')
       .selectAll()
       .where('id', '=', c.req.param('id'))
@@ -281,7 +278,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
       index_incarcare: `RO${Date.now()}`,
     };
 
-    await reqDb(c)
+    await db
       .updateTable('zv_efactura_invoices')
       .set({
         status: 'submitted',
@@ -292,7 +289,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
       .where('id', '=', invoice.id)
       .execute();
 
-    await logStatusChange(reqDb(c), invoice.id, invoice.status, 'submitted', user.id, `ANAF index: ${mockResponse.index_incarcare}`);
+    await logStatusChange(db, invoice.id, invoice.status, 'submitted', user.id, `ANAF index: ${mockResponse.index_incarcare}`);
 
     // Update daily stats
     await sql`
@@ -302,7 +299,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
       DO UPDATE SET submitted_count = zv_efactura_daily_stats.submitted_count + 1,
                     total_amount = zv_efactura_daily_stats.total_amount + EXCLUDED.total_amount,
                     vat_amount = zv_efactura_daily_stats.vat_amount + EXCLUDED.vat_amount
-    `.execute(reqDb(c)).catch(() => {});
+    `.execute(db).catch(() => {});
 
     return c.json({ message: 'Submitted to ANAF', anaf_index: mockResponse.index_incarcare, response: mockResponse });
   });
@@ -315,7 +312,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
       const user = await getUser(c, auth);
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-      const original = await reqDb(c).selectFrom('zv_efactura_invoices').selectAll().where('id', '=', c.req.param('id')).executeTakeFirst();
+      const original = await db.selectFrom('zv_efactura_invoices').selectAll().where('id', '=', c.req.param('id')).executeTakeFirst();
       if (!original) return c.json({ error: 'Invoice not found' }, 404);
       if (!['submitted', 'accepted'].includes(original.status)) return c.json({ error: 'Only submitted/accepted invoices can be storned' }, 400);
 
@@ -325,7 +322,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
       const stornoLines = (typeof original.lines === 'string' ? JSON.parse(original.lines) : original.lines)
         .map((l: any) => ({ ...l, quantity: -l.quantity, vat_amount: -l.vat_amount, line_total: -l.line_total }));
 
-      const storno = await reqDb(c).insertInto('zv_efactura_invoices').values({
+      const storno = await db.insertInto('zv_efactura_invoices').values({
         invoice_number: `STORNO-${original.invoice_number}`,
         invoice_date: new Date().toISOString().split('T')[0],
         seller_name: original.seller_name,
@@ -343,7 +340,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
       await sql`
         INSERT INTO zv_efactura_storno (original_id, storno_invoice_id, reason, requested_by)
         VALUES (${original.id}::uuid, ${storno.id}::uuid, ${reason}, ${user.id})
-      `.execute(reqDb(c));
+      `.execute(db);
 
       return c.json({ storno_invoice: storno }, 201);
     },
@@ -361,13 +358,13 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
       const results: { id: string; success: boolean; error?: string }[] = [];
 
       for (const id of ids) {
-        const inv = await reqDb(c).selectFrom('zv_efactura_invoices').select(['id', 'status', 'xml_content', 'seller_cui', 'total', 'vat_total']).where('id', '=', id).executeTakeFirst().catch(() => null);
+        const inv = await db.selectFrom('zv_efactura_invoices').select(['id', 'status', 'xml_content', 'seller_cui', 'total', 'vat_total']).where('id', '=', id).executeTakeFirst().catch(() => null);
         if (!inv) { results.push({ id, success: false, error: 'Not found' }); continue; }
         if (!inv.xml_content) { results.push({ id, success: false, error: 'XML not generated' }); continue; }
 
         const anafIndex = `RO${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-        await reqDb(c).updateTable('zv_efactura_invoices').set({ status: 'submitted', anaf_index: anafIndex, updated_at: new Date() }).where('id', '=', id).execute();
-        await logStatusChange(reqDb(c), id, inv.status, 'submitted', user.id);
+        await db.updateTable('zv_efactura_invoices').set({ status: 'submitted', anaf_index: anafIndex, updated_at: new Date() }).where('id', '=', id).execute();
+        await logStatusChange(db, id, inv.status, 'submitted', user.id);
         results.push({ id, success: true });
       }
 

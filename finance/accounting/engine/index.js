@@ -19491,9 +19491,6 @@ function permissionGate(ctx, resource, opts = {}) {
 // engine/routes.ts
 function accountingRoutes(ctx) {
   const { db, auth } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -19513,7 +19510,7 @@ function accountingRoutes(ctx) {
       LEFT JOIN zvd_journal_entries e ON e.id = l.entry_id AND e.status = 'posted'
       GROUP BY a.id, p.name
       ORDER BY a.code
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/accounts", zValidator("json", exports_external.object({
@@ -19532,7 +19529,7 @@ function accountingRoutes(ctx) {
       VALUES (${d.code}, ${d.name}, ${d.type}, ${d.parent_id ?? null}, ${d.description ?? null},
         ${d.currency}, ${d.cost_center_id ?? null}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.patch("/accounts/:id", zValidator("json", exports_external.object({
@@ -19548,20 +19545,20 @@ function accountingRoutes(ctx) {
         is_active = COALESCE(${d.is_active ?? null}, is_active),
         updated_at = NOW()
       WHERE id = ${c.req.param("id")} RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
     return c.json({ data: row.rows[0] });
   });
   app.delete("/accounts/:id", async (c) => {
-    const used = await sql`SELECT COUNT(*) as cnt FROM zvd_journal_lines WHERE account_id = ${c.req.param("id")}`.execute(reqDb(c));
+    const used = await sql`SELECT COUNT(*) as cnt FROM zvd_journal_lines WHERE account_id = ${c.req.param("id")}`.execute(db);
     if (+used.rows[0].cnt > 0)
       return c.json({ error: "Account has journal entries \u2014 deactivate instead" }, 400);
-    await sql`DELETE FROM zvd_accounts WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_accounts WHERE id = ${c.req.param("id")}`.execute(db);
     return c.json({ success: true });
   });
   app.get("/cost-centers", async (c) => {
-    const rows = await sql`SELECT * FROM zvd_cost_centers ORDER BY code`.execute(reqDb(c));
+    const rows = await sql`SELECT * FROM zvd_cost_centers ORDER BY code`.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/cost-centers", zValidator("json", exports_external.object({
@@ -19574,11 +19571,11 @@ function accountingRoutes(ctx) {
     const row = await sql`
       INSERT INTO zvd_cost_centers (code, name, parent_id, created_by)
       VALUES (${d.code}, ${d.name}, ${d.parent_id ?? null}, ${user.id}) RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.get("/fiscal-years", async (c) => {
-    const rows = await sql`SELECT * FROM zvd_fiscal_years ORDER BY year DESC`.execute(reqDb(c));
+    const rows = await sql`SELECT * FROM zvd_fiscal_years ORDER BY year DESC`.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/fiscal-years", zValidator("json", exports_external.object({
@@ -19592,25 +19589,25 @@ function accountingRoutes(ctx) {
     const row = await sql`
       INSERT INTO zvd_fiscal_years (year, start_date, end_date)
       VALUES (${d.year}, ${start}, ${end}) RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.post("/fiscal-years/:id/close", async (c) => {
     const user = c.get("user");
-    const fy = await sql`SELECT * FROM zvd_fiscal_years WHERE id = ${c.req.param("id")} AND status = 'open'`.execute(reqDb(c));
+    const fy = await sql`SELECT * FROM zvd_fiscal_years WHERE id = ${c.req.param("id")} AND status = 'open'`.execute(db);
     if (!fy.rows.length)
       return c.json({ error: "Fiscal year not found or already closed" }, 400);
     const f = fy.rows[0];
     const drafts = await sql`
       SELECT COUNT(*) as cnt FROM zvd_journal_entries
       WHERE status = 'draft' AND date BETWEEN ${f.start_date} AND ${f.end_date}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (+drafts.rows[0].cnt > 0)
       return c.json({ error: "Post all draft journal entries before closing the year" }, 400);
     const row = await sql`
       UPDATE zvd_fiscal_years SET status = 'closed', closed_at = NOW(), closed_by = ${user.id}
       WHERE id = ${c.req.param("id")} RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] });
   });
   app.get("/exchange-rates", async (c) => {
@@ -19621,7 +19618,7 @@ function accountingRoutes(ctx) {
         AND (${to ? sql`to_currency = ${to}` : sql`TRUE`})
         AND (${date5 ? sql`date = ${date5}` : sql`TRUE`})
       ORDER BY date DESC LIMIT 100
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/exchange-rates", zValidator("json", exports_external.object({
@@ -19637,7 +19634,7 @@ function accountingRoutes(ctx) {
       VALUES (${d.from_currency}, ${d.to_currency}, ${d.rate}, ${d.date}, ${d.source})
       ON CONFLICT (from_currency, to_currency, date) DO UPDATE SET rate = EXCLUDED.rate
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] });
   });
   app.get("/budgets", async (c) => {
@@ -19655,7 +19652,7 @@ function accountingRoutes(ctx) {
       JOIN zvd_accounts a ON a.id = b.account_id
       WHERE (${fiscal_year_id ? sql`b.fiscal_year_id = ${fiscal_year_id}` : sql`TRUE`})
       ORDER BY a.code, b.month
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/budgets", zValidator("json", exports_external.object({
@@ -19672,7 +19669,7 @@ function accountingRoutes(ctx) {
       VALUES (${d.fiscal_year_id}, ${d.account_id}, ${d.month ?? null}, ${d.amount}, ${d.notes ?? null}, ${user.id})
       ON CONFLICT (fiscal_year_id, account_id, month) DO UPDATE SET amount = EXCLUDED.amount, notes = EXCLUDED.notes
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.get("/journal", async (c) => {
@@ -19696,7 +19693,7 @@ function accountingRoutes(ctx) {
       GROUP BY e.id
       ORDER BY e.date DESC, e.created_at DESC
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/journal", zValidator("json", exports_external.object({
@@ -19724,21 +19721,21 @@ function accountingRoutes(ctx) {
     }
     let fyId = d.fiscal_year_id ?? null;
     if (!fyId) {
-      const fy = await sql`SELECT id FROM zvd_fiscal_years WHERE ${d.date} BETWEEN start_date AND end_date AND status = 'open'`.execute(reqDb(c));
+      const fy = await sql`SELECT id FROM zvd_fiscal_years WHERE ${d.date} BETWEEN start_date AND end_date AND status = 'open'`.execute(db);
       fyId = fy.rows[0]?.id ?? null;
     }
     const entry = await sql`
       INSERT INTO zvd_journal_entries (date, description, reference, fiscal_year_id, created_by)
       VALUES (${d.date}, ${d.description}, ${d.reference ?? null}, ${fyId}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     const entryId = entry.rows[0].id;
     for (const line of d.lines) {
       await sql`
         INSERT INTO zvd_journal_lines (entry_id, account_id, debit, credit, description, currency, exchange_rate, amount_foreign, cost_center_id)
         VALUES (${entryId}, ${line.account_id}, ${line.debit}, ${line.credit}, ${line.description ?? null},
           ${line.currency}, ${line.exchange_rate}, ${line.amount_foreign ?? null}, ${line.cost_center_id ?? null})
-      `.execute(reqDb(c));
+      `.execute(db);
     }
     return c.json({ data: entry.rows[0] }, 201);
   });
@@ -19746,40 +19743,40 @@ function accountingRoutes(ctx) {
     const row = await sql`
       UPDATE zvd_journal_entries SET status = 'posted', updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND status = 'draft' RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Entry not found or already posted" }, 400);
     return c.json({ data: row.rows[0] });
   });
   app.post("/journal/:id/void", async (c) => {
     const user = c.get("user");
-    const entry = await sql`SELECT * FROM zvd_journal_entries WHERE id = ${c.req.param("id")} AND status = 'posted'`.execute(reqDb(c));
+    const entry = await sql`SELECT * FROM zvd_journal_entries WHERE id = ${c.req.param("id")} AND status = 'posted'`.execute(db);
     if (!entry.rows.length)
       return c.json({ error: "Entry not found or not posted" }, 400);
     const e = entry.rows[0];
-    const lines = await sql`SELECT * FROM zvd_journal_lines WHERE entry_id = ${e.id}`.execute(reqDb(c));
+    const lines = await sql`SELECT * FROM zvd_journal_lines WHERE entry_id = ${e.id}`.execute(db);
     const reversal = await sql`
       INSERT INTO zvd_journal_entries (date, description, reference, fiscal_year_id, status, created_by)
       VALUES (${new Date().toISOString().slice(0, 10)}, ${"VOID: " + e.description}, ${"VOID-" + (e.reference ?? e.id)}, ${e.fiscal_year_id}, 'posted', ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     const revId = reversal.rows[0].id;
     for (const line of lines.rows) {
       await sql`
         INSERT INTO zvd_journal_lines (entry_id, account_id, debit, credit, description, currency, exchange_rate)
         VALUES (${revId}, ${line.account_id}, ${line.credit}, ${line.debit}, ${line.description}, ${line.currency}, ${line.exchange_rate})
-      `.execute(reqDb(c));
+      `.execute(db);
     }
-    await sql`UPDATE zvd_journal_entries SET status = 'voided', updated_at = NOW() WHERE id = ${e.id}`.execute(reqDb(c));
+    await sql`UPDATE zvd_journal_entries SET status = 'voided', updated_at = NOW() WHERE id = ${e.id}`.execute(db);
     return c.json({ data: reversal.rows[0] });
   });
   app.delete("/journal/:id", async (c) => {
-    const existing = await sql`SELECT status FROM zvd_journal_entries WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    const existing = await sql`SELECT status FROM zvd_journal_entries WHERE id = ${c.req.param("id")}`.execute(db);
     if (!existing.rows.length)
       return c.json({ error: "Not found" }, 404);
     if (existing.rows[0].status === "posted")
       return c.json({ error: "Cannot delete a posted entry. Void it instead." }, 400);
-    await sql`DELETE FROM zvd_journal_entries WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_journal_entries WHERE id = ${c.req.param("id")}`.execute(db);
     return c.json({ success: true });
   });
   app.get("/recurring", async (c) => {
@@ -19793,7 +19790,7 @@ function accountingRoutes(ctx) {
       LEFT JOIN zvd_accounts a ON a.id = l.account_id
       WHERE r.is_active = true
       GROUP BY r.id ORDER BY r.next_run_date
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/recurring", zValidator("json", exports_external.object({
@@ -19819,27 +19816,27 @@ function accountingRoutes(ctx) {
       INSERT INTO zvd_recurring_journals (description, reference, frequency, next_run_date, end_date, created_by)
       VALUES (${d.description}, ${d.reference ?? null}, ${d.frequency}, ${d.next_run_date}, ${d.end_date ?? null}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     const recId = rec.rows[0].id;
     for (const line of d.lines) {
-      await sql`INSERT INTO zvd_recurring_journal_lines (recurring_id, account_id, debit, credit, description) VALUES (${recId}, ${line.account_id}, ${line.debit}, ${line.credit}, ${line.description ?? null})`.execute(reqDb(c));
+      await sql`INSERT INTO zvd_recurring_journal_lines (recurring_id, account_id, debit, credit, description) VALUES (${recId}, ${line.account_id}, ${line.debit}, ${line.credit}, ${line.description ?? null})`.execute(db);
     }
     return c.json({ data: rec.rows[0] }, 201);
   });
   app.post("/recurring/:id/run", async (c) => {
     const user = c.get("user");
-    const rec = await sql`SELECT * FROM zvd_recurring_journals WHERE id = ${c.req.param("id")} AND is_active = true`.execute(reqDb(c));
+    const rec = await sql`SELECT * FROM zvd_recurring_journals WHERE id = ${c.req.param("id")} AND is_active = true`.execute(db);
     if (!rec.rows.length)
       return c.json({ error: "Recurring template not found or inactive" }, 400);
     const r = rec.rows[0];
-    const lines = await sql`SELECT * FROM zvd_recurring_journal_lines WHERE recurring_id = ${r.id}`.execute(reqDb(c));
+    const lines = await sql`SELECT * FROM zvd_recurring_journal_lines WHERE recurring_id = ${r.id}`.execute(db);
     const entry = await sql`
       INSERT INTO zvd_journal_entries (date, description, reference, created_by)
       VALUES (${r.next_run_date}, ${r.description}, ${r.reference}, ${user.id}) RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     const entryId = entry.rows[0].id;
     for (const line of lines.rows) {
-      await sql`INSERT INTO zvd_journal_lines (entry_id, account_id, debit, credit, description) VALUES (${entryId}, ${line.account_id}, ${line.debit}, ${line.credit}, ${line.description ?? null})`.execute(reqDb(c));
+      await sql`INSERT INTO zvd_journal_lines (entry_id, account_id, debit, credit, description) VALUES (${entryId}, ${line.account_id}, ${line.debit}, ${line.credit}, ${line.description ?? null})`.execute(db);
     }
     const next = new Date(r.next_run_date);
     if (r.frequency === "daily")
@@ -19854,7 +19851,7 @@ function accountingRoutes(ctx) {
       next.setFullYear(next.getFullYear() + 1);
     const nextStr = next.toISOString().slice(0, 10);
     const shouldDeactivate = r.end_date && nextStr > r.end_date;
-    await sql`UPDATE zvd_recurring_journals SET next_run_date = ${nextStr}, last_run_date = ${r.next_run_date}, is_active = ${!shouldDeactivate}, updated_at = NOW() WHERE id = ${r.id}`.execute(reqDb(c));
+    await sql`UPDATE zvd_recurring_journals SET next_run_date = ${nextStr}, last_run_date = ${r.next_run_date}, is_active = ${!shouldDeactivate}, updated_at = NOW() WHERE id = ${r.id}`.execute(db);
     return c.json({ data: entry.rows[0] }, 201);
   });
   app.get("/reports/trial-balance", async (c) => {
@@ -19872,7 +19869,7 @@ function accountingRoutes(ctx) {
       WHERE a.is_active = true
       GROUP BY a.id, a.code, a.name, a.type
       ORDER BY a.code
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/reports/pl", async (c) => {
@@ -19890,7 +19887,7 @@ function accountingRoutes(ctx) {
       WHERE a.type IN ('revenue','expense')
       GROUP BY a.code, a.name, a.type
       ORDER BY a.type, a.code
-    `.execute(reqDb(c));
+    `.execute(db);
     const revenue = rows.rows.filter((r) => r.type === "revenue").reduce((s, r) => s + +r.amount, 0);
     const expense = rows.rows.filter((r) => r.type === "expense").reduce((s, r) => s + +r.amount, 0);
     return c.json({ data: { from: fromDate, to: toDate, revenue, expenses: expense, net: revenue - expense, breakdown: rows.rows } });
@@ -19907,7 +19904,7 @@ function accountingRoutes(ctx) {
       WHERE a.type IN ('asset','liability','equity') AND a.is_active = true
       GROUP BY a.id, a.code, a.name, a.type
       ORDER BY a.type, a.code
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/reports/budget-vs-actual", async (c) => {
@@ -19929,11 +19926,11 @@ function accountingRoutes(ctx) {
       JOIN zvd_accounts a ON a.id = b.account_id
       WHERE b.fiscal_year_id = ${fiscal_year_id}
       ORDER BY a.code, b.month
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/tax-reports", async (c) => {
-    const rows = await sql`SELECT id, type, period_from, period_to, status, submitted_at, anaf_ref, created_at FROM zvd_tax_reports ORDER BY created_at DESC`.execute(reqDb(c));
+    const rows = await sql`SELECT id, type, period_from, period_to, status, submitted_at, anaf_ref, created_at FROM zvd_tax_reports ORDER BY created_at DESC`.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/tax-reports/d300", zValidator("json", exports_external.object({
@@ -19950,7 +19947,7 @@ function accountingRoutes(ctx) {
         AND e.date BETWEEN ${period_from} AND ${period_to}
       JOIN zvd_accounts a ON a.id = l.account_id AND a.code LIKE '4427%' OR a.code LIKE '4426%'
       GROUP BY a.id, a.code, a.name, a.type
-    `.execute(reqDb(c)).catch(() => ({ rows: [] }));
+    `.execute(db).catch(() => ({ rows: [] }));
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Declaration xmlns="mfp:anaf:dgti:d300:declaratie:v2">
   <Declarant/>
@@ -19962,14 +19959,14 @@ function accountingRoutes(ctx) {
     const row = await sql`
       INSERT INTO zvd_tax_reports (type, period_from, period_to, xml_content, created_by)
       VALUES ('D300', ${period_from}, ${period_to}, ${xml}, ${user.id}) RETURNING id, type, period_from, period_to, status
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.post("/tax-reports/:id/submit", async (c) => {
     const row = await sql`
       UPDATE zvd_tax_reports SET status = 'submitted', submitted_at = NOW()
       WHERE id = ${c.req.param("id")} AND status = 'draft' RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Report not found or not in draft" }, 400);
     return c.json({ data: row.rows[0] });

@@ -16104,9 +16104,6 @@ var formSchema = exports_external.object({
 });
 function formsRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   async function requireAdmin(c) {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session)
@@ -16126,7 +16123,7 @@ function formsRoutes(ctx) {
     await next();
   });
   app.get("/", async (c) => {
-    const forms = await reqDb(c).selectFrom("zv_forms as f").leftJoin((eb) => eb.selectFrom("zv_form_submissions").select([
+    const forms = await db.selectFrom("zv_forms as f").leftJoin((eb) => eb.selectFrom("zv_form_submissions").select([
       "form_id",
       (eb2) => eb2.fn.count("id").as("submission_count")
     ]).groupBy("form_id").as("sc"), "sc.form_id", "f.id").select([
@@ -16145,7 +16142,7 @@ function formsRoutes(ctx) {
   });
   app.post("/", zValidator("json", formSchema), async (c) => {
     const data = c.req.valid("json");
-    const form = await reqDb(c).insertInto("zv_forms").values({
+    const form = await db.insertInto("zv_forms").values({
       name: data.name,
       slug: data.slug,
       description: data.description ?? null,
@@ -16156,7 +16153,7 @@ function formsRoutes(ctx) {
     return c.json({ form }, 201);
   });
   app.get("/:id", zValidator("param", exports_external.object({ id: exports_external.string().uuid() })), async (c) => {
-    const form = await reqDb(c).selectFrom("zv_forms").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
+    const form = await db.selectFrom("zv_forms").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst();
     if (!form)
       return c.json({ error: "Form not found" }, 404);
     return c.json({ form });
@@ -16176,13 +16173,13 @@ function formsRoutes(ctx) {
       updates.target_collection = data.target_collection;
     if (data.active !== undefined)
       updates.active = data.active;
-    const form = await reqDb(c).updateTable("zv_forms").set(updates).where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
+    const form = await db.updateTable("zv_forms").set(updates).where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
     if (!form)
       return c.json({ error: "Form not found" }, 404);
     return c.json({ form });
   });
   app.delete("/:id", zValidator("param", exports_external.object({ id: exports_external.string().uuid() })), async (c) => {
-    await reqDb(c).deleteFrom("zv_forms").where("id", "=", c.req.param("id")).execute();
+    await db.deleteFrom("zv_forms").where("id", "=", c.req.param("id")).execute();
     return c.json({ success: true });
   });
   app.get("/:id/responses", zValidator("param", exports_external.object({ id: exports_external.string().uuid() })), async (c) => {
@@ -16190,15 +16187,15 @@ function formsRoutes(ctx) {
     const parsedLimit = Math.min(parseInt(limit) || 50, 200);
     const offset = (parseInt(page) - 1) * parsedLimit;
     const [form, submissions] = await Promise.all([
-      reqDb(c).selectFrom("zv_forms").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst(),
-      reqDb(c).selectFrom("zv_form_submissions").selectAll().where("form_id", "=", c.req.param("id")).orderBy("created_at", "desc").limit(parsedLimit).offset(offset).execute()
+      db.selectFrom("zv_forms").selectAll().where("id", "=", c.req.param("id")).executeTakeFirst(),
+      db.selectFrom("zv_form_submissions").selectAll().where("form_id", "=", c.req.param("id")).orderBy("created_at", "desc").limit(parsedLimit).offset(offset).execute()
     ]);
     if (!form)
       return c.json({ error: "Form not found" }, 404);
     return c.json({ form, submissions });
   });
   app.get("/public/:slug", async (c) => {
-    const form = await reqDb(c).selectFrom("zv_forms").select(["id", "name", "slug", "description", "fields"]).where("slug", "=", c.req.param("slug")).where("active", "=", true).executeTakeFirst();
+    const form = await db.selectFrom("zv_forms").select(["id", "name", "slug", "description", "fields"]).where("slug", "=", c.req.param("slug")).where("active", "=", true).executeTakeFirst();
     if (!form)
       return c.json({ error: "Form not found" }, 404);
     return c.json({ form });
@@ -16208,7 +16205,7 @@ function formsRoutes(ctx) {
     if (!checkSubmitRateLimit(ip)) {
       return c.json({ error: "Rate limit exceeded. Try again in a minute." }, 429);
     }
-    const form = await reqDb(c).selectFrom("zv_forms").selectAll().where("slug", "=", c.req.param("slug")).where("active", "=", true).executeTakeFirst();
+    const form = await db.selectFrom("zv_forms").selectAll().where("slug", "=", c.req.param("slug")).where("active", "=", true).executeTakeFirst();
     if (!form)
       return c.json({ error: "Form not found" }, 404);
     const body = await c.req.json().catch(() => ({}));
@@ -16228,7 +16225,7 @@ function formsRoutes(ctx) {
       if (allowedIds.has(k))
         cleanData[k] = v;
     }
-    const submission = await reqDb(c).insertInto("zv_form_submissions").values({
+    const submission = await db.insertInto("zv_form_submissions").values({
       form_id: form.id,
       data: JSON.stringify(cleanData),
       ip_address: ip,
@@ -16238,7 +16235,7 @@ function formsRoutes(ctx) {
       try {
         const col = await ctx.DDLManager.getCollection(db, form.target_collection);
         if (col) {
-          await reqDb(c).insertInto(form.target_collection).values(cleanData).execute();
+          await db.insertInto(form.target_collection).values(cleanData).execute();
         }
       } catch (err) {
         console.error("[Forms] Failed to insert into target_collection:", err);

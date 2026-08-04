@@ -117,13 +117,10 @@ async function findOrCreateSsoUser(dbh: any, email: string, displayName: string)
 export function samlRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission, internals } = ctx;
 
-  // Per-request DB handle (CRM PR #1 pattern). After
-  // migration 002_tenant_rls.sql, this extension's tables have FORCE
-  // RLS keyed on `zveltio.current_tenant`; routes must run through
-  // this handle so the GUC is active inside the transaction.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
   // See ctx.internals.createBetterAuthSession docs — it's the only way to
   // produce a session row + signed cookie that the engine's
@@ -188,11 +185,11 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
 
     if (!email) return c.json({ error: 'IdP did not return an email address' }, 400);
 
-    const user = await findOrCreateSsoUser(reqDb(c), email, name);
+    const user = await findOrCreateSsoUser(db, email, name);
 
     // Invalidate prior sessions so each SAML login produces exactly one
     // active session — limits blast radius if a previous token leaks.
-    await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(reqDb(c)).catch((err: Error) => {
+    await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(db).catch((err: Error) => {
       console.warn('[saml] could not invalidate previous sessions:', err.message);
     });
 

@@ -34,13 +34,10 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
    * issues. Running through the bare pool returns zero rows under
    * FORCE RLS because the GUC is empty there.
    *
-   * Prefers `ctx.reqDb(c)` (engine ≥ beta.20): the tenant transaction
+   * Prefers `ctx.db` (engine ≥ beta.20): the tenant transaction
    * wrapped in the RestrictedDb table guard. Single-tenant runs as the
    * default tenant, so rows carry that tenant_id and the policy matches.
    */
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
 
   // ── Auth guard ────────────────────────────────────────────────────────────
   app.use('*', async (c, next) => {
@@ -78,14 +75,14 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       )
       ORDER BY ${sql.raw(sortCol)} ${sql.raw(dir)}
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
 
     const total = await sql<{ count: string }>`
       SELECT COUNT(*) as count FROM zvd_contacts
       WHERE (${search ? sql`first_name ILIKE ${'%' + search + '%'}
         OR last_name ILIKE ${'%' + search + '%'}
         OR email ILIKE ${'%' + search + '%'}` : sql`TRUE`})
-    `.execute(reqDb(c));
+    `.execute(db);
 
     return c.json({
       data: rows.rows,
@@ -101,7 +98,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       LEFT JOIN zvd_organizations o ON o.id = co.organization_id
       WHERE c.id = ${c.req.param('id')}
       GROUP BY c.id
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
@@ -133,7 +130,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
            ${d.avatar_url ?? null}, ${d.tags ?? []}, ${d.notes ?? null},
            ${d.source ?? null}, ${JSON.stringify(d.metadata ?? {})}::jsonb, ${user.id})
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
       const contact = result.rows[0] as any;
       events.emit('contact.created', { id: contact.id, contact });
       return c.json({ data: contact }, 201);
@@ -164,7 +161,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
         if (v !== undefined) { sets.push(`${k} = $${i++}`); vals.push(k === 'metadata' ? JSON.stringify(v) : v); }
       }
       if (!sets.length) return c.json({ error: 'No fields to update' }, 400);
-      const result = await reqDb(c).executeQuery({ sql: `UPDATE zvd_contacts SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] } as any);
+      const result = await db.executeQuery({ sql: `UPDATE zvd_contacts SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] } as any);
       if (!(result as any).rows.length) return c.json({ error: 'Not found' }, 404);
       const contact = (result as any).rows[0];
       events.emit('contact.updated', { id: contact.id, contact });
@@ -177,13 +174,13 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
     const id = c.req.param('id');
     const existing = await sql<{ created_by: string }>`
       SELECT created_by FROM zvd_contacts WHERE id = ${id}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!existing.rows[0]) return c.json({ error: 'Not found' }, 404);
     const isAdmin = await checkPermission(user.id, 'admin', '*');
     if (existing.rows[0].created_by !== user.id && !isAdmin) {
       return c.json({ error: 'Forbidden' }, 403);
     }
-    await sql`DELETE FROM zvd_contacts WHERE id = ${id}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_contacts WHERE id = ${id}`.execute(db);
     events.emit('contact.deleted', { id });
     return c.json({ success: true });
   });
@@ -205,12 +202,12 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       WHERE (${search ? sql`name ILIKE ${'%' + search + '%'} OR tax_id ILIKE ${'%' + search + '%'}` : sql`TRUE`})
       ORDER BY ${sql.raw(sortCol)} ${sql.raw(dir)}
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
 
     const total = await sql<{ count: string }>`
       SELECT COUNT(*) as count FROM zvd_organizations
       WHERE (${search ? sql`name ILIKE ${'%' + search + '%'}` : sql`TRUE`})
-    `.execute(reqDb(c));
+    `.execute(db);
 
     return c.json({
       data: rows.rows,
@@ -228,7 +225,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       LEFT JOIN zvd_contacts c ON c.id = co.contact_id
       WHERE o.id = ${c.req.param('id')}
       GROUP BY o.id
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
@@ -263,7 +260,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
            ${d.logo_url ?? null}, ${d.tags ?? []},
            ${JSON.stringify(d.metadata ?? {})}::jsonb, ${user.id})
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
       const organization = result.rows[0] as any;
       events.emit('organization.created', { id: organization.id, organization });
       return c.json({ data: organization }, 201);
@@ -295,7 +292,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
         if (v !== undefined) { sets.push(`${k} = $${i++}`); vals.push(k === 'metadata' ? JSON.stringify(v) : v); }
       }
       if (!sets.length) return c.json({ error: 'No fields to update' }, 400);
-      const result = await reqDb(c).executeQuery({ sql: `UPDATE zvd_organizations SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] } as any);
+      const result = await db.executeQuery({ sql: `UPDATE zvd_organizations SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] } as any);
       if (!(result as any).rows.length) return c.json({ error: 'Not found' }, 404);
       const organization = (result as any).rows[0];
       events.emit('organization.updated', { id: organization.id, organization });
@@ -308,13 +305,13 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
     const id = c.req.param('id');
     const existing = await sql<{ created_by: string }>`
       SELECT created_by FROM zvd_organizations WHERE id = ${id}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!existing.rows[0]) return c.json({ error: 'Not found' }, 404);
     const isAdmin = await checkPermission(user.id, 'admin', '*');
     if (existing.rows[0].created_by !== user.id && !isAdmin) {
       return c.json({ error: 'Forbidden' }, 403);
     }
-    await sql`DELETE FROM zvd_organizations WHERE id = ${id}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_organizations WHERE id = ${id}`.execute(db);
     events.emit('organization.deleted', { id });
     return c.json({ success: true });
   });
@@ -344,13 +341,13 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
         AND (${search ? sql`t.number ILIKE ${'%' + search + '%'} OR t.reference ILIKE ${'%' + search + '%'}` : sql`TRUE`})
       ORDER BY ${sql.raw('t.' + sortCol)} ${sql.raw(dir)}
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
 
     const total = await sql<{ count: string }>`
       SELECT COUNT(*) as count FROM zvd_transactions
       WHERE (${type ? sql`type = ${type}` : sql`TRUE`})
         AND (${status ? sql`status = ${status}` : sql`TRUE`})
-    `.execute(reqDb(c));
+    `.execute(db);
 
     return c.json({
       data: rows.rows,
@@ -367,7 +364,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       LEFT JOIN zvd_contacts c ON c.id = t.contact_id
       LEFT JOIN zvd_organizations o ON o.id = t.organization_id
       WHERE t.id = ${c.req.param('id')}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
@@ -407,7 +404,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
            ${d.notes ?? null}, ${d.reference ?? null},
            ${JSON.stringify(d.metadata ?? {})}::jsonb, ${user.id})
         RETURNING *
-      `.execute(reqDb(c));
+      `.execute(db);
       return c.json({ data: result.rows[0] }, 201);
     },
   );
@@ -439,7 +436,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
         }
       }
       if (!sets.length) return c.json({ error: 'No fields to update' }, 400);
-      const result = await reqDb(c).executeQuery({ sql: `UPDATE zvd_transactions SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] } as any);
+      const result = await db.executeQuery({ sql: `UPDATE zvd_transactions SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] } as any);
       if (!(result as any).rows.length) return c.json({ error: 'Not found' }, 404);
       return c.json({ data: (result as any).rows[0] });
     },
@@ -450,13 +447,13 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
     const id = c.req.param('id');
     const existing = await sql<{ created_by: string }>`
       SELECT created_by FROM zvd_transactions WHERE id = ${id}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!existing.rows[0]) return c.json({ error: 'Not found' }, 404);
     const isAdmin = await checkPermission(user.id, 'admin', '*');
     if (existing.rows[0].created_by !== user.id && !isAdmin) {
       return c.json({ error: 'Forbidden' }, 403);
     }
-    await sql`DELETE FROM zvd_transactions WHERE id = ${id}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_transactions WHERE id = ${id}`.execute(db);
     return c.json({ success: true });
   });
 

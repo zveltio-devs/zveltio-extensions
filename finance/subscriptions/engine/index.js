@@ -19498,9 +19498,6 @@ function computeProration(oldPrice, newPrice, interval, daysRemaining) {
 var DUNNING_DAYS = [1, 3, 7, 14];
 function subscriptionsRoutes(ctx) {
   const { db, auth } = ctx;
-  function reqDb(c) {
-    return ctx.reqDb ? ctx.reqDb(c) : c.get("tenantTrx") ?? db;
-  }
   const app = new Hono2;
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -19511,7 +19508,7 @@ function subscriptionsRoutes(ctx) {
   });
   app.use("*", permissionGate(ctx, "subscriptions"));
   app.get("/plans", async (c) => {
-    const rows = await sql`SELECT * FROM zvd_subscription_plans ORDER BY price ASC`.execute(reqDb(c));
+    const rows = await sql`SELECT * FROM zvd_subscription_plans ORDER BY price ASC`.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/plans", zValidator("json", exports_external.object({
@@ -19535,7 +19532,7 @@ function subscriptionsRoutes(ctx) {
         ${d.trial_days}, ${JSON.stringify(d.features)}, ${d.usage_billing}, ${d.usage_metric ?? null},
         ${d.usage_unit_price}, ${d.max_usage ?? null}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.patch("/plans/:id", zValidator("json", exports_external.object({
@@ -19555,16 +19552,16 @@ function subscriptionsRoutes(ctx) {
         features = COALESCE(${d.features ? JSON.stringify(d.features) : null}, features),
         updated_at = NOW()
       WHERE id = ${c.req.param("id")} RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
     return c.json({ data: row.rows[0] });
   });
   app.delete("/plans/:id", async (c) => {
-    const used = await sql`SELECT COUNT(*) as cnt FROM zvd_subscribers WHERE plan_id = ${c.req.param("id")} AND status = 'active'`.execute(reqDb(c));
+    const used = await sql`SELECT COUNT(*) as cnt FROM zvd_subscribers WHERE plan_id = ${c.req.param("id")} AND status = 'active'`.execute(db);
     if (+used.rows[0].cnt > 0)
       return c.json({ error: "Plan has active subscribers" }, 400);
-    await sql`DELETE FROM zvd_subscription_plans WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    await sql`DELETE FROM zvd_subscription_plans WHERE id = ${c.req.param("id")}`.execute(db);
     return c.json({ success: true });
   });
   app.get("/subscribers", async (c) => {
@@ -19579,7 +19576,7 @@ function subscriptionsRoutes(ctx) {
         AND (${plan_id ? sql`s.plan_id = ${plan_id}` : sql`TRUE`})
       ORDER BY s.created_at DESC
       LIMIT ${lim} OFFSET ${offset}
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: rows.rows });
   });
   app.get("/subscribers/:id", async (c) => {
@@ -19587,17 +19584,17 @@ function subscriptionsRoutes(ctx) {
       SELECT s.*, p.name as plan_name, p.price, p.interval, p.currency, p.usage_billing
       FROM zvd_subscribers s JOIN zvd_subscription_plans p ON p.id = s.plan_id
       WHERE s.id = ${c.req.param("id")}
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);
-    const invoices = await sql`SELECT * FROM zvd_subscription_invoices WHERE subscriber_id = ${c.req.param("id")} ORDER BY period_start DESC LIMIT 12`.execute(reqDb(c));
+    const invoices = await sql`SELECT * FROM zvd_subscription_invoices WHERE subscriber_id = ${c.req.param("id")} ORDER BY period_start DESC LIMIT 12`.execute(db);
     const planChanges = await sql`
       SELECT pc.*, fp.name as from_plan_name, tp.name as to_plan_name
       FROM zvd_plan_changes pc
       LEFT JOIN zvd_subscription_plans fp ON fp.id = pc.from_plan_id
       JOIN zvd_subscription_plans tp ON tp.id = pc.to_plan_id
       WHERE pc.subscriber_id = ${c.req.param("id")} ORDER BY pc.created_at DESC
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: { ...row.rows[0], invoices: invoices.rows, plan_changes: planChanges.rows } });
   });
   app.post("/subscribers", zValidator("json", exports_external.object({
@@ -19611,7 +19608,7 @@ function subscriptionsRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const d = c.req.valid("json");
-    const plan = await sql`SELECT * FROM zvd_subscription_plans WHERE id = ${d.plan_id} AND is_active = true`.execute(reqDb(c));
+    const plan = await sql`SELECT * FROM zvd_subscription_plans WHERE id = ${d.plan_id} AND is_active = true`.execute(db);
     if (!plan.rows.length)
       return c.json({ error: "Plan not found or inactive" }, 400);
     const p = plan.rows[0];
@@ -19624,7 +19621,7 @@ function subscriptionsRoutes(ctx) {
         ${d.client_name}, ${d.client_email}, ${startDate}, ${trialEnd},
         ${trialEnd ? "trialing" : "active"}, ${d.notes ?? null}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.post("/subscribers/:id/change-plan", zValidator("json", exports_external.object({
@@ -19638,11 +19635,11 @@ function subscriptionsRoutes(ctx) {
       SELECT s.*, p.price as old_price, p.interval as old_interval
       FROM zvd_subscribers s JOIN zvd_subscription_plans p ON p.id = s.plan_id
       WHERE s.id = ${c.req.param("id")} AND s.status IN ('active','trialing')
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!sub.rows.length)
       return c.json({ error: "Subscriber not found or not active" }, 400);
     const s = sub.rows[0];
-    const newPlan = await sql`SELECT * FROM zvd_subscription_plans WHERE id = ${d.new_plan_id} AND is_active = true`.execute(reqDb(c));
+    const newPlan = await sql`SELECT * FROM zvd_subscription_plans WHERE id = ${d.new_plan_id} AND is_active = true`.execute(db);
     if (!newPlan.rows.length)
       return c.json({ error: "New plan not found" }, 400);
     const np = newPlan.rows[0];
@@ -19654,8 +19651,8 @@ function subscriptionsRoutes(ctx) {
     await sql`
       INSERT INTO zvd_plan_changes (subscriber_id, from_plan_id, to_plan_id, effective_date, proration_amount, reason, created_by)
       VALUES (${s.id}, ${s.plan_id}, ${d.new_plan_id}, ${effectiveDate}, ${prorationAmount}, ${d.reason ?? null}, ${user.id})
-    `.execute(reqDb(c));
-    const row = await sql`UPDATE zvd_subscribers SET plan_id = ${d.new_plan_id}, updated_at = NOW() WHERE id = ${s.id} RETURNING *`.execute(reqDb(c));
+    `.execute(db);
+    const row = await sql`UPDATE zvd_subscribers SET plan_id = ${d.new_plan_id}, updated_at = NOW() WHERE id = ${s.id} RETURNING *`.execute(db);
     return c.json({ data: { subscriber: row.rows[0], proration_amount: prorationAmount } });
   });
   app.post("/subscribers/:id/pause", zValidator("json", exports_external.object({
@@ -19666,7 +19663,7 @@ function subscriptionsRoutes(ctx) {
       UPDATE zvd_subscribers SET status = 'paused', paused_at = NOW(),
         paused_until = ${resume_date ?? null}, updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND status = 'active' RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Subscriber not found or not active" }, 400);
     return c.json({ data: row.rows[0] });
@@ -19675,7 +19672,7 @@ function subscriptionsRoutes(ctx) {
     const row = await sql`
       UPDATE zvd_subscribers SET status = 'active', paused_at = NULL, paused_until = NULL, updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND status = 'paused' RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Subscriber not found or not paused" }, 400);
     return c.json({ data: row.rows[0] });
@@ -19691,7 +19688,7 @@ function subscriptionsRoutes(ctx) {
         cancelled_at = ${cancel_at_period_end ? null : sql`NOW()`}, updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND status IN ('active','trialing','cancel_scheduled','paused')
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Subscriber not found or already cancelled" }, 400);
     return c.json({ data: row.rows[0] });
@@ -19700,7 +19697,7 @@ function subscriptionsRoutes(ctx) {
     const row = await sql`
       UPDATE zvd_subscribers SET status = 'active', cancellation_reason = NULL, cancelled_at = NULL, dunning_count = 0, updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND status IN ('cancelled','cancel_scheduled') RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Subscriber not found or not cancelled" }, 400);
     return c.json({ data: row.rows[0] });
@@ -19716,7 +19713,7 @@ function subscriptionsRoutes(ctx) {
       SELECT s.*, p.usage_unit_price FROM zvd_subscribers s
       JOIN zvd_subscription_plans p ON p.id = s.plan_id
       WHERE s.id = ${c.req.param("id")} AND p.usage_billing = true
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!sub.rows.length)
       return c.json({ error: "Subscriber not found or plan does not support usage billing" }, 400);
     const row = await sql`
@@ -19724,11 +19721,11 @@ function subscriptionsRoutes(ctx) {
       VALUES (${c.req.param("id")}, ${d.metric_name}, ${d.quantity}, ${sub.rows[0].usage_unit_price},
         ${d.billing_period_start ?? null}, ${d.billing_period_end ?? null})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.get("/subscribers/:id/invoices", async (c) => {
-    const rows = await sql`SELECT * FROM zvd_subscription_invoices WHERE subscriber_id = ${c.req.param("id")} ORDER BY period_start DESC`.execute(reqDb(c));
+    const rows = await sql`SELECT * FROM zvd_subscription_invoices WHERE subscriber_id = ${c.req.param("id")} ORDER BY period_start DESC`.execute(db);
     return c.json({ data: rows.rows });
   });
   app.post("/subscribers/:id/invoices", async (c) => {
@@ -19737,7 +19734,7 @@ function subscriptionsRoutes(ctx) {
       SELECT s.*, p.price, p.currency, p.usage_billing, p.usage_unit_price
       FROM zvd_subscribers s JOIN zvd_subscription_plans p ON p.id = s.plan_id
       WHERE s.id = ${c.req.param("id")} AND s.status = 'active'
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!sub.rows.length)
       return c.json({ error: "Subscriber not found or not active" }, 400);
     const s = sub.rows[0];
@@ -19749,44 +19746,44 @@ function subscriptionsRoutes(ctx) {
         SELECT COALESCE(SUM(quantity * unit_price), 0) as total
         FROM zvd_subscription_usage
         WHERE subscriber_id = ${s.id} AND is_billed = false
-      `.execute(reqDb(c));
+      `.execute(db);
       usageAmount = +usage.rows[0].total;
-      await sql`UPDATE zvd_subscription_usage SET is_billed = true WHERE subscriber_id = ${s.id} AND is_billed = false`.execute(reqDb(c));
+      await sql`UPDATE zvd_subscription_usage SET is_billed = true WHERE subscriber_id = ${s.id} AND is_billed = false`.execute(db);
     }
     const totalAmount = s.price + usageAmount;
     const row = await sql`
       INSERT INTO zvd_subscription_invoices (subscriber_id, amount, usage_amount, total_amount, currency, period_start, due_date, created_by)
       VALUES (${s.id}, ${s.price}, ${usageAmount}, ${totalAmount}, ${s.currency}, ${periodStart}, ${dueDate}, ${user.id})
       RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
   app.post("/invoices/:id/pay", async (c) => {
     const row = await sql`
       UPDATE zvd_subscription_invoices SET status = 'paid', paid_at = NOW(), updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND status = 'open' RETURNING *
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Invoice not found or not open" }, 400);
     return c.json({ data: row.rows[0] });
   });
   app.post("/invoices/:id/fail", async (c) => {
-    const inv = await sql`SELECT * FROM zvd_subscription_invoices WHERE id = ${c.req.param("id")}`.execute(reqDb(c));
+    const inv = await sql`SELECT * FROM zvd_subscription_invoices WHERE id = ${c.req.param("id")}`.execute(db);
     if (!inv.rows.length)
       return c.json({ error: "Not found" }, 404);
     const invoice = inv.rows[0];
-    const attempts = await sql`SELECT COUNT(*) as cnt FROM zvd_dunning_attempts WHERE invoice_id = ${invoice.id}`.execute(reqDb(c));
+    const attempts = await sql`SELECT COUNT(*) as cnt FROM zvd_dunning_attempts WHERE invoice_id = ${invoice.id}`.execute(db);
     const attemptNum = +attempts.rows[0].cnt + 1;
     const nextDays = DUNNING_DAYS[attemptNum - 1];
     const nextAttempt = nextDays ? new Date(Date.now() + nextDays * 86400000).toISOString() : null;
     await sql`
       INSERT INTO zvd_dunning_attempts (subscriber_id, invoice_id, attempt_number, status, next_attempt_at)
       VALUES (${invoice.subscriber_id}, ${invoice.id}, ${attemptNum}, 'failed', ${nextAttempt})
-    `.execute(reqDb(c));
+    `.execute(db);
     if (!nextAttempt) {
-      await sql`UPDATE zvd_subscribers SET status = 'past_due', dunning_count = ${attemptNum}, payment_failure_at = NOW(), updated_at = NOW() WHERE id = ${invoice.subscriber_id}`.execute(reqDb(c));
+      await sql`UPDATE zvd_subscribers SET status = 'past_due', dunning_count = ${attemptNum}, payment_failure_at = NOW(), updated_at = NOW() WHERE id = ${invoice.subscriber_id}`.execute(db);
     } else {
-      await sql`UPDATE zvd_subscribers SET dunning_count = ${attemptNum}, payment_failure_at = NOW(), updated_at = NOW() WHERE id = ${invoice.subscriber_id}`.execute(reqDb(c));
+      await sql`UPDATE zvd_subscribers SET dunning_count = ${attemptNum}, payment_failure_at = NOW(), updated_at = NOW() WHERE id = ${invoice.subscriber_id}`.execute(db);
     }
     return c.json({ data: { attempt: attemptNum, next_attempt_at: nextAttempt } });
   });
@@ -19802,7 +19799,7 @@ function subscriptionsRoutes(ctx) {
         COUNT(*) FILTER (WHERE s.cancelled_at >= date_trunc('month', NOW())) as churned_this_month
       FROM zvd_subscribers s
       JOIN zvd_subscription_plans p ON p.id = s.plan_id
-    `.execute(reqDb(c));
+    `.execute(db);
     return c.json({ data: row.rows[0] });
   });
   return app;

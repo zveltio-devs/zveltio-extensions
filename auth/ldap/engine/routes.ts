@@ -112,13 +112,10 @@ async function findOrCreateSsoUser(dbh: any, email: string, displayName: string)
 export function ldapRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission, internals } = ctx;
 
-  // Per-request DB handle (CRM PR #1 pattern). After
-  // migration 002_tenant_rls.sql, this extension's tables have FORCE
-  // RLS keyed on `zveltio.current_tenant`; routes must run through
-  // this handle so the GUC is active inside the transaction.
-  function reqDb(c: any): any {
-    return ctx.reqDb ? ctx.reqDb(c) : (c.get('tenantTrx') ?? db);
-  }
+  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
+  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
+  // a handler is therefore already RLS-scoped — there is one spelling, so there
+  // is none to forget.
 
   // ctx.internals.createBetterAuthSession produces a session row + signed
   // cookie matching Better-Auth's exact shape (camelCase columns + Hono
@@ -187,7 +184,7 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
           VALUES ('auth.login_failed', NULL, 'session',
                   ${JSON.stringify({ provider: 'ldap', username, user_agent: userAgent, error: err?.message })}::jsonb,
                   ${remoteIp}, NOW())
-        `.execute(reqDb(c));
+        `.execute(db);
       } catch (auditErr) {
         console.warn('[ldap] failed-login audit write failed:', (auditErr as Error).message);
       }
@@ -205,13 +202,13 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'LDAP user does not have an email address configured' }, 400);
     }
 
-    const user = await findOrCreateSsoUser(reqDb(c), ldapUser.email, ldapUser.displayName);
+    const user = await findOrCreateSsoUser(db, ldapUser.email, ldapUser.displayName);
 
     // Invalidate prior sessions for this user — limits the blast radius of
     // a credential leak and matches the "one active SSO session per user"
     // expectation most ops teams have. Without this, every successful
     // sign-in leaves the previous token live until its TTL expires.
-    await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(reqDb(c)).catch((err: Error) => {
+    await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(db).catch((err: Error) => {
       console.warn('[ldap] could not invalidate previous sessions:', err.message);
     });
 
@@ -227,7 +224,7 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
         VALUES ('auth.login_success', ${user.id}, 'session',
                 ${JSON.stringify({ provider: 'ldap', username, user_agent: userAgent })}::jsonb,
                 ${remoteIp}, NOW())
-      `.execute(reqDb(c));
+      `.execute(db);
     } catch (auditErr) {
       console.warn('[ldap] success audit write failed:', (auditErr as Error).message);
     }
