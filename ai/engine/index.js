@@ -30758,7 +30758,7 @@ function aiSchemaGenRoutes(ctx) {
   const { db, auth, checkPermission, DDLManager, fieldTypeRegistry, internals } = ctx;
   const enqueueDDLJob = internals.enqueueDDLJob;
   const router = new Hono2;
-  router.use("*", async (c, next) => {
+  const adminOnly = async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session)
       return c.json({ error: "Unauthorized" }, 401);
@@ -30768,7 +30768,10 @@ function aiSchemaGenRoutes(ctx) {
     const row = await db.selectFrom("user").select(["role"]).where("id", "=", session.user.id).executeTakeFirst();
     c.set("user", { ...session.user, role: row?.role ?? session.user.role });
     await next();
-  });
+  };
+  router.use("/preview-schema", adminOnly);
+  router.use("/generate-schema", adminOnly);
+  router.use("/generate-schema/*", adminOnly);
   router.post("/preview-schema", zValidator("json", PreviewSchema), async (c) => {
     const { description } = c.req.valid("json");
     const provider = aiProviderManager.getDefault();
@@ -32820,7 +32823,7 @@ function zveltioAIRoutes(ctx) {
     const user = await getUser(c);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const conversations = await db.selectFrom("zv_ai_messages").select(["conversation_id"]).select(db.fn.max("created_at").as("last_message_at")).select(db.fn.count("id").as("message_count")).where("user_id", "=", user.id).groupBy("conversation_id").orderBy("last_message_at", "desc").limit(20).execute().catch(() => []);
+    const conversations = await db.selectFrom("zv_ai_conversations").select(["id as conversation_id", "title", "updated_at as last_message_at"]).where("user_id", "=", user.id).orderBy("updated_at", "desc").limit(20).execute().catch(() => []);
     return c.json({ conversations });
   });
   app.delete("/conversations/:id", async (c) => {
@@ -32915,7 +32918,8 @@ var extension = {
     return [
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_ai_complete.sql"),
-      join(import.meta.dir, "migrations/003_ai_memory_columns.sql")
+      join(import.meta.dir, "migrations/003_ai_memory_columns.sql"),
+      join(import.meta.dir, "migrations/004_tenant_rls.sql")
     ];
   },
   async register(app, ctx) {

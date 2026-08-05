@@ -76,14 +76,25 @@ export function zveltioAIRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
+    // Listed from `zv_ai_conversations`, the table that exists to answer this.
+    //
+    // This aggregated `zv_ai_messages` with `db.fn.max(...)`, and `db` here is
+    // the host's restricted proxy, which exposes no `fn` — so the route threw
+    // `db.fn.max is not a function` and answered 500 to everyone who reached
+    // it. Nobody noticed because an unrelated admin gate, mounted at `/` by a
+    // sibling router, had been refusing the whole extension to non-admins; the
+    // few admins who got through hit the 500.
+    //
+    // Grouping messages was also the wrong shape: it filtered on
+    // `zv_ai_messages.user_id`, which is nullable because assistant turns have
+    // no user, so a conversation would be ranked by the timestamp of the user's
+    // own messages only. The conversation row owns `user_id` (NOT NULL) and
+    // `updated_at`, which `saveConversation` bumps on every exchange.
     const conversations = await db
-      .selectFrom('zv_ai_messages')
-      .select(['conversation_id'])
-      .select(db.fn.max('created_at').as('last_message_at'))
-      .select(db.fn.count('id').as('message_count'))
+      .selectFrom('zv_ai_conversations')
+      .select(['id as conversation_id', 'title', 'updated_at as last_message_at'])
       .where('user_id', '=', user.id)
-      .groupBy('conversation_id')
-      .orderBy('last_message_at', 'desc')
+      .orderBy('updated_at', 'desc')
       .limit(20)
       .execute()
       .catch(() => []);

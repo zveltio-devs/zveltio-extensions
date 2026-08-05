@@ -105,8 +105,27 @@ export function aiSchemaGenRoutes(ctx: ExtensionContext): Hono {
   const enqueueDDLJob = internals.enqueueDDLJob;
   const router = new Hono();
 
-  // Admin-only
-  router.use('*', async (c, next) => {
+  // Admin-only — bound to this router's own three paths.
+  //
+  // This was `router.use('*', …)`, and `buildAIRoutes` mounts this router at
+  // `/` alongside the others. A wildcard middleware on a router mounted at the
+  // root runs for every sibling path, so one sub-router's gate quietly became
+  // the gate for the whole extension: chat, conversations, prompts and usage
+  // analytics all answered 403 "Admin required" to ordinary users, and the
+  // assistant — the feature most of this extension exists for — was unusable by
+  // anyone but an admin.
+  //
+  // It also hid a real bug. The chat endpoint took a conversation id from the
+  // request body and loaded it with no owner check; this line was the only
+  // reason that needed an admin, which made a cross-tenant read look like an
+  // admin-only one. The ownership check now sits where it belongs (see
+  // `getConversationHistory`), so narrowing this gate does not reopen it.
+  //
+  // Every sibling carries its own intended gate — checked route by route before
+  // touching this: `ai.ts` requires admin to configure providers and session to
+  // list them (that query deliberately omits `api_key`), while `ai-chats`,
+  // `ai-alchemist` and `ai-query` each declare their own.
+  const adminOnly = async (c: any, next: any) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.json({ error: 'Unauthorized' }, 401);
     const isAdmin = await checkPermission(session.user.id, 'admin', '*');
@@ -114,7 +133,10 @@ export function aiSchemaGenRoutes(ctx: ExtensionContext): Hono {
     const row = await db.selectFrom('user' as any).select(['role'] as any).where('id' as any, '=', session.user.id).executeTakeFirst() as any;
     c.set('user', { ...session.user, role: row?.role ?? (session.user as any).role });
     await next();
-  });
+  };
+  router.use('/preview-schema', adminOnly);
+  router.use('/generate-schema', adminOnly);
+  router.use('/generate-schema/*', adminOnly);
 
   // POST /preview-schema — generate schema preview without executing DDL
   router.post('/preview-schema', zValidator('json', PreviewSchema), async (c) => {
