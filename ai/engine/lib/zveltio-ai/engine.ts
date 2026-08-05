@@ -42,7 +42,7 @@ export class ZveltioAIEngine {
     try {
       const context = await this.buildContext(request);
       const history = request.conversationId
-        ? await this.getConversationHistory(request.conversationId)
+        ? await this.getConversationHistory(request.conversationId, request.userId)
         : [];
 
       const provider = aiProviderManager.getDefault();
@@ -1306,15 +1306,35 @@ Rules:
     return generateId();
   }
 
-  private async getConversationHistory(conversationId: string): Promise<any[]> {
+  /**
+   * Prior turns of a conversation, for the user who owns it.
+   *
+   * `conversationId` arrives from the chat request body and was looked up with
+   * no owner check at all, so any authenticated user could quote someone
+   * else's id and have that conversation loaded as context — then read it back
+   * by asking the model to repeat it. `zv_ai_*` carries no tenant column, so
+   * this reached across tenants too, not only across users.
+   *
+   * The check is on the CONVERSATION, whose `user_id` is NOT NULL and is the
+   * authoritative owner. Filtering the messages by `user_id` instead would
+   * look equivalent and silently drop every assistant turn — that column is
+   * nullable precisely because the model's replies have no user — leaving a
+   * history with the answers missing.
+   *
+   * An unowned or unknown id returns empty rather than an error: the caller
+   * treats "no history" as a new conversation, which is the same thing an
+   * attacker learns from a wrong guess.
+   */
+  private async getConversationHistory(conversationId: string, userId: string): Promise<any[]> {
     try {
-      const rows = await this.db
+      const conversation = await this.db
         .selectFrom('zv_ai_conversations')
-        .selectAll()
+        .select(['id'])
         .where('id', '=', conversationId)
+        .where('user_id', '=', userId)
         .executeTakeFirst();
 
-      if (!rows) return [];
+      if (!conversation) return [];
 
       const messages = await this.db
         .selectFrom('zv_ai_messages')
@@ -1336,6 +1356,26 @@ Rules:
     assistantMessage: string,
   ): Promise<void> {
     try {
+      // The other half of the same hole. Reading someone else's conversation is
+      // now refused, but the write path was reached with the same caller-supplied
+      // id: the upsert conflicts on `id` and only bumps `updated_at`, leaving
+      // `user_id` alone — and then two messages land in the victim's thread.
+      //
+      // That is worse than it sounds. The injected turns become context for the
+      // owner's NEXT request, so an attacker can plant instructions the model
+      // will read while answering someone else.
+      //
+      // An existing conversation owned by another user ends the save. The reply
+      // still reaches the caller; only the persistence is dropped, because the
+      // alternative is writing into a thread that is not theirs.
+      const existing = await this.db
+        .selectFrom('zv_ai_conversations')
+        .select(['user_id'])
+        .where('id', '=', conversationId)
+        .executeTakeFirst();
+
+      if (existing && existing.user_id !== userId) return;
+
       await this.db
         .insertInto('zv_ai_conversations' as any)
         .values({
@@ -1353,6 +1393,7 @@ Rules:
         .insertInto('zv_ai_messages' as any)
         .values({
           conversation_id: conversationId,
+          user_id: userId,
           role: 'user',
           content: userMessage,
           created_at: new Date(),
