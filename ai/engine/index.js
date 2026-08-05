@@ -31939,7 +31939,7 @@ class ZveltioAIEngine {
     const startTime = Date.now();
     try {
       const context = await this.buildContext(request);
-      const history = request.conversationId ? await this.getConversationHistory(request.conversationId) : [];
+      const history = request.conversationId ? await this.getConversationHistory(request.conversationId, request.userId) : [];
       const provider = aiProviderManager.getDefault();
       if (!provider) {
         return {
@@ -32740,10 +32740,10 @@ Rules:
   generateConversationId() {
     return generateId();
   }
-  async getConversationHistory(conversationId) {
+  async getConversationHistory(conversationId, userId) {
     try {
-      const rows = await this.db.selectFrom("zv_ai_conversations").selectAll().where("id", "=", conversationId).executeTakeFirst();
-      if (!rows)
+      const conversation = await this.db.selectFrom("zv_ai_conversations").select(["id"]).where("id", "=", conversationId).where("user_id", "=", userId).executeTakeFirst();
+      if (!conversation)
         return [];
       const messages = await this.db.selectFrom("zv_ai_messages").selectAll().where("conversation_id", "=", conversationId).orderBy("created_at", "asc").execute();
       return messages;
@@ -32753,6 +32753,9 @@ Rules:
   }
   async saveConversation(conversationId, userId, userMessage, assistantMessage) {
     try {
+      const existing = await this.db.selectFrom("zv_ai_conversations").select(["user_id"]).where("id", "=", conversationId).executeTakeFirst();
+      if (existing && existing.user_id !== userId)
+        return;
       await this.db.insertInto("zv_ai_conversations").values({
         id: conversationId,
         user_id: userId,
@@ -32761,6 +32764,7 @@ Rules:
       }).onConflict((oc) => oc.column("id").doUpdateSet({ updated_at: new Date })).execute();
       await this.db.insertInto("zv_ai_messages").values({
         conversation_id: conversationId,
+        user_id: userId,
         role: "user",
         content: userMessage,
         created_at: new Date
