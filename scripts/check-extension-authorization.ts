@@ -98,7 +98,7 @@ function stripComments(src: string): string {
 }
 
 function walk(dir: string, out: string[] = []): string[] {
-  let entries: ReturnType<typeof readdirSync>;
+  let entries: string[];
   try {
     entries = readdirSync(dir);
   } catch {
