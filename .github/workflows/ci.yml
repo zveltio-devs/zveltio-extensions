@@ -67,6 +67,21 @@ jobs:
         # the table — the property erodes one convenience at a time.
         run: bun ../zveltio/scripts/check-ambient-authority.ts "$GITHUB_WORKSPACE"
 
+      - name: Extension authorization
+        # A session check proves the caller is somebody; it does not say they
+        # may change this data. `operations/traceability` shipped 55 routes
+        # behind a bare session check, so any member of a tenant could alter
+        # lots and recalls — found by an external audit reading the code, not
+        # by anything here.
+        #
+        # 43 of 44 extensions already call `permissionGate(ctx, '<resource>')`.
+        # One missing line is not a reason to move authorization into the host:
+        # extensions pick resource names the host cannot know (`invoices`, not
+        # `finance/invoicing`), so a host-side gate would demand a second,
+        # differently-named permission on top of the one already enforced and
+        # break every deployment. This notices the next one that forgets.
+        run: bun scripts/check-extension-authorization.ts "$GITHUB_WORKSPACE"
+
       - name: Validate migration paths
         # Every engine/index.ts's getMigrations() must return paths
         # that actually exist on disk. A drift here means migrations
