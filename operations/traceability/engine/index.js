@@ -185526,6 +185526,15 @@ function traceRoutes(ctx) {
     if (!session)
       return c.json({ error: "Unauthorized" }, 401);
     c.set("user", session.user);
+    const method = c.req.method.toUpperCase();
+    if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+      const allowed = await ctx.checkPermission(session.user.id, "traceability", "write");
+      if (!allowed) {
+        return c.json({
+          error: 'Writing traceability records requires the "traceability" write permission. ' + "Grant it to the role that needs it."
+        }, 403);
+      }
+    }
     await next();
   });
   app.get("/me", (c) => {

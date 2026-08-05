@@ -15,10 +15,52 @@ import { locationsRouter } from './locations.js';
 export function traceRoutes(ctx: ExtensionContext): Hono {
   const app = new Hono();
 
+  /**
+   * Authentication for everything, authorization for anything that writes.
+   *
+   * This router checked only that a session existed. Across 55 routes that
+   * meant every authenticated user in the tenant could create, alter and delete
+   * lots, movements, dispatches and recalls — the records a traceability system
+   * exists to make trustworthy. RLS confined the damage to one tenant; inside
+   * it, there was no authorization at all.
+   *
+   * The gate is deliberately asymmetric, and the asymmetry is the decision:
+   *
+   *   - Reads stay open to any member of the tenant. Shop-floor staff scan and
+   *     look things up; requiring a grant for that would break every existing
+   *     deployment on upgrade, and an operator who hits a wall of 403s turns
+   *     the control off rather than writing policy.
+   *
+   *   - Writes require `traceability` / `write`. Admins already match through
+   *     the seeded `p, admin, *, *, *` rule, so an upgrade keeps working for
+   *     them; anyone else needs an explicit grant. The extension's tables are
+   *     `trace_*`, not `zvd_*`, so the seeded `member → zvd_* read` policy
+   *     never covered them and no existing grant is silently widened here.
+   *
+   * Read exposure inside a tenant is a real remaining gap, not an oversight —
+   * closing it belongs with a per-collection permission model, not with a
+   * blanket deny that operators will disable.
+   */
   app.use('*', async (c, next) => {
     const session = await ctx.auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', session.user);
+
+    const method = c.req.method.toUpperCase();
+    if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+      const allowed = await ctx.checkPermission(session.user.id, 'traceability', 'write');
+      if (!allowed) {
+        return c.json(
+          {
+            error:
+              'Writing traceability records requires the "traceability" write permission. ' +
+              'Grant it to the role that needs it.',
+          },
+          403,
+        );
+      }
+    }
+
     await next();
   });
 

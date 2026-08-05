@@ -549,36 +549,48 @@ Please draft a reply to this email.`,
     const user = c.get('user') as any;
     const { message_ids, action, target_folder_id } = c.req.valid('json');
 
-    const idList = message_ids.join("','");
-    const userFilter = `account_id IN (SELECT id FROM zv_mail_accounts WHERE user_id = '${user.id}')`;
+    // Parameterised, not interpolated.
+    //
+    // These were built with `sql.raw` and string concatenation: the ids were
+    // joined with `','` and the session user id was pasted into a subquery. It
+    // did not produce an injection today — zod validates every id as a UUID and
+    // `user.id` comes from the session — but the query's safety rested entirely
+    // on validation happening somewhere else, in another file, for reasons
+    // nobody reading this line would see. One relaxed schema, or one caller
+    // passing an id from a different source, and the concatenation is the bug.
+    //
+    // `sql.join` binds each id as its own parameter, so the shape is the same
+    // and the guarantee is local.
+    const ids = sql.join(message_ids.map((id) => sql`${id}`), sql`, `);
+    const userFilter = sql`account_id IN (SELECT id FROM zv_mail_accounts WHERE user_id = ${user.id})`;
 
     switch (action) {
       case 'mark_read':
-        await sql.raw(`UPDATE zv_mail_messages SET is_read = true WHERE id IN ('${idList}') AND ${userFilter}`).execute(db);
+        await sql`UPDATE zv_mail_messages SET is_read = true WHERE id IN (${ids}) AND ${userFilter}`.execute(db);
         break;
       case 'mark_unread':
-        await sql.raw(`UPDATE zv_mail_messages SET is_read = false WHERE id IN ('${idList}') AND ${userFilter}`).execute(db);
+        await sql`UPDATE zv_mail_messages SET is_read = false WHERE id IN (${ids}) AND ${userFilter}`.execute(db);
         break;
       case 'star':
-        await sql.raw(`UPDATE zv_mail_messages SET is_starred = true WHERE id IN ('${idList}') AND ${userFilter}`).execute(db);
+        await sql`UPDATE zv_mail_messages SET is_starred = true WHERE id IN (${ids}) AND ${userFilter}`.execute(db);
         break;
       case 'unstar':
-        await sql.raw(`UPDATE zv_mail_messages SET is_starred = false WHERE id IN ('${idList}') AND ${userFilter}`).execute(db);
+        await sql`UPDATE zv_mail_messages SET is_starred = false WHERE id IN (${ids}) AND ${userFilter}`.execute(db);
         break;
       case 'move':
         if (!target_folder_id) return c.json({ error: 'target_folder_id required' }, 400);
-        await sql.raw(`UPDATE zv_mail_messages SET folder_id = '${target_folder_id}' WHERE id IN ('${idList}') AND ${userFilter}`).execute(db);
+        await sql`UPDATE zv_mail_messages SET folder_id = ${target_folder_id} WHERE id IN (${ids}) AND ${userFilter}`.execute(db);
         break;
       case 'delete': {
         const firstMsg = await sql`SELECT account_id FROM zv_mail_messages WHERE id = ${message_ids[0]}`.execute(db);
         if (firstMsg.rows[0]) {
           const trashRes = await sql`SELECT id FROM zv_mail_folders WHERE account_id = ${(firstMsg.rows[0] as any).account_id} AND type = 'trash' LIMIT 1`.execute(db);
           if (trashRes.rows[0]) {
-            await sql.raw(`UPDATE zv_mail_messages SET folder_id = '${(trashRes.rows[0] as any).id}' WHERE id IN ('${idList}') AND ${userFilter}`).execute(db);
+            await sql`UPDATE zv_mail_messages SET folder_id = ${(trashRes.rows[0] as any).id} WHERE id IN (${ids}) AND ${userFilter}`.execute(db);
             break;
           }
         }
-        await sql.raw(`DELETE FROM zv_mail_messages WHERE id IN ('${idList}') AND ${userFilter}`).execute(db);
+        await sql`DELETE FROM zv_mail_messages WHERE id IN (${ids}) AND ${userFilter}`.execute(db);
         break;
       }
       case 'spam': {
@@ -586,7 +598,7 @@ Please draft a reply to this email.`,
         if (firstMsg2.rows[0]) {
           const spamRes = await sql`SELECT id FROM zv_mail_folders WHERE account_id = ${(firstMsg2.rows[0] as any).account_id} AND type = 'spam' LIMIT 1`.execute(db);
           if (spamRes.rows[0]) {
-            await sql.raw(`UPDATE zv_mail_messages SET folder_id = '${(spamRes.rows[0] as any).id}' WHERE id IN ('${idList}') AND ${userFilter}`).execute(db);
+            await sql`UPDATE zv_mail_messages SET folder_id = ${(spamRes.rows[0] as any).id} WHERE id IN (${ids}) AND ${userFilter}`.execute(db);
           }
         }
         break;
