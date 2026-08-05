@@ -48,5 +48,9 @@
   "integrity": {
     "engineSha256": "c60d6acba90d3f20501ed0bf986d10072d4d828b0c059ed3c6f91680c1577547",
     "sourceSha256": "55d6b63ade8b80ef5a92ecdf74bc31cae12497b23f99fb1eee950b238436b015"
-  }
+  },
+  "globalRoutes": [
+    "/sitemap.xml",
+    "/robots.txt"
+  ]
 }

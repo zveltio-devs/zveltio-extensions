@@ -32,5 +32,6 @@
   "content.media.ui.tags": "Tagi",
   "content.media.ui.upload_files": "Prześlij pliki",
   "content.media.uploadFiles": "Prześlij {n} plik(ów)",
-  "content.media.uploadFilesCount": "Prześlij {n} plik(ów)"
+  "content.media.uploadFilesCount": "Prześlij {n} plik(ów)",
+  "content.media.ui.search": "Szukaj mediów…"
 }

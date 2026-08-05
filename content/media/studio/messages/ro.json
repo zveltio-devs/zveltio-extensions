@@ -32,5 +32,6 @@
   "content.media.ui.tags": "Etichete",
   "content.media.ui.upload_files": "Încarcă fișiere",
   "content.media.uploadFiles": "Încarcă {n} fișier(e)",
-  "content.media.uploadFilesCount": "Încarcă {n} fișier(e)"
+  "content.media.uploadFilesCount": "Încarcă {n} fișier(e)",
+  "content.media.ui.search": "Caută media…"
 }

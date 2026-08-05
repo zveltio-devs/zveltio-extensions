@@ -32,5 +32,6 @@
   "content.media.ui.tags": "Etiquetas",
   "content.media.ui.upload_files": "Subir archivos",
   "content.media.uploadFiles": "Subir {n} archivo(s)",
-  "content.media.uploadFilesCount": "Subir {n} archivo(s)"
+  "content.media.uploadFilesCount": "Subir {n} archivo(s)",
+  "content.media.ui.search": "Buscar medios…"
 }

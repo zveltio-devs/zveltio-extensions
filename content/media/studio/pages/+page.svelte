@@ -304,7 +304,7 @@
  <Search size={14} />
  <input
  type="text"
- placeholder={m['communications.mail.ui.search']()}
+ placeholder={m['content.media.ui.search']()}
  bind:value={searchQuery}
  onkeyup={(e) => e.key === 'Enter' && loadFiles()}
  class="grow"

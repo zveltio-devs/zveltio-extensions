@@ -159,7 +159,33 @@ function findExtensions(root: string): string[] {
   return found;
 }
 
+/**
+ * Extensions that mount routes on the GLOBAL app must say so in the manifest.
+ *
+ * `ctx.registerPublicRoute` puts a path at the ROOT of the operator's instance,
+ * outside `/ext/<name>` and therefore outside the auth gate. That is by design —
+ * an IdP posting SCIM carries a bearer token, not a session — but the manifest
+ * gave no sign of it, so installing an extension could open `/scim/v2/*` with
+ * nothing in the file a reviewer reads to say so. An audit flagged the absence
+ * as an oversight; it was documented design with no declaration behind it.
+ *
+ * `globalRoutes` is informational: the engine does not gate on it. This check is
+ * what keeps it honest.
+ */
+function checkGlobalRouteDeclaration(extDir: string, code: string): string | null {
+  if (!/\bregisterPublicRoute\s*\(/.test(code)) return null;
+  try {
+    const manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'));
+    const declared = manifest.globalRoutes;
+    if (Array.isArray(declared) && declared.length > 0) return null;
+  } catch {
+    /* unreadable manifest — reported below as undeclared */
+  }
+  return 'registers global routes without declaring them in manifest.globalRoutes';
+}
+
 const findings: string[] = [];
+const globalFindings: string[] = [];
 let checked = 0;
 let exempt = 0;
 
@@ -179,10 +205,30 @@ for (const extDir of findExtensions(ROOT).sort()) {
     }
   }
   const code = stripComments(source);
+
+  const globalIssue = checkGlobalRouteDeclaration(extDir, code);
+  if (globalIssue) globalFindings.push(rel);
+
   if (!WRITE_ROUTE.test(code)) continue;
 
   checked++;
   if (!AUTHORIZATION.some((re) => re.test(code))) findings.push(rel);
+}
+
+if (globalFindings.length > 0) {
+  console.error(
+    `\n❌ extension-authorization: ${globalFindings.length} extension(s) mount routes on the global app without declaring them.\n`,
+  );
+  for (const f of globalFindings) console.error(`  ${f}`);
+  console.error(
+    '\n  `ctx.registerPublicRoute` puts a path at the ROOT of the instance, outside\n' +
+      '  the /ext/* auth gate. That is allowed; leaving it invisible is not.\n\n' +
+      '  Add the paths to manifest.globalRoutes.\n',
+  );
+}
+
+if (findings.length > 0 || globalFindings.length > 0) {
+  if (findings.length === 0) process.exit(1);
 }
 
 if (findings.length > 0) {
