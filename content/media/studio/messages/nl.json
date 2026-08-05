@@ -32,5 +32,6 @@
   "content.media.ui.tags": "Tags",
   "content.media.ui.upload_files": "Bestanden uploaden",
   "content.media.uploadFiles": "{n} bestand(en) uploaden",
-  "content.media.uploadFilesCount": "{n} bestand(en) uploaden"
+  "content.media.uploadFilesCount": "{n} bestand(en) uploaden",
+  "content.media.ui.search": "Media zoeken…"
 }

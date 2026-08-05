@@ -32,5 +32,6 @@
   "content.media.ui.tags": "Címkék",
   "content.media.ui.upload_files": "Fájlok feltöltése",
   "content.media.uploadFiles": "{n} fájl feltöltése",
-  "content.media.uploadFilesCount": "{n} fájl feltöltése"
+  "content.media.uploadFilesCount": "{n} fájl feltöltése",
+  "content.media.ui.search": "Média keresése…"
 }
