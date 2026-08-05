@@ -32,5 +32,6 @@
   "content.media.ui.tags": "Schlagwörter",
   "content.media.ui.upload_files": "Dateien hochladen",
   "content.media.uploadFiles": "{n} Datei(en) hochladen",
-  "content.media.uploadFilesCount": "{n} Datei(en) hochladen"
+  "content.media.uploadFilesCount": "{n} Datei(en) hochladen",
+  "content.media.ui.search": "Medien suchen…"
 }

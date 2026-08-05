@@ -32,5 +32,6 @@
   "content.media.ui.tags": "Étiquettes",
   "content.media.ui.upload_files": "Téléverser des fichiers",
   "content.media.uploadFiles": "Téléverser {n} fichier(s)",
-  "content.media.uploadFilesCount": "Téléverser {n} fichier(s)"
+  "content.media.uploadFilesCount": "Téléverser {n} fichier(s)",
+  "content.media.ui.search": "Rechercher des médias…"
 }

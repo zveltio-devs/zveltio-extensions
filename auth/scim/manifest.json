@@ -36,5 +36,8 @@
         "schema": "schemas/scim.json"
       }
     ]
-  }
+  },
+  "globalRoutes": [
+    "/scim/v2/*"
+  ]
 }

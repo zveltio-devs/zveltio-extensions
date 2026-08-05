@@ -35,5 +35,8 @@
   "integrity": {
     "engineSha256": "e5d22c856fb27b62aa3642b4bc4e9e583b493c68ef6c75dd9e7c4a0476d9ebb7",
     "sourceSha256": "0a7b5bdfccb9c0f37b3a843b6b259ad886d6da05d8f8962970de601d3931ca2b"
-  }
+  },
+  "globalRoutes": [
+    "<operator-defined>"
+  ]
 }

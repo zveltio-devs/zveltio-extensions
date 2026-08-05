@@ -52,5 +52,8 @@
   "integrity": {
     "engineSha256": "71ae41fbc1035f3f2142f502978d9c33a16ddc4ec59d2f9a6ff759c535e3f3da",
     "sourceSha256": "dbfc56171474683aeca0324cc9e29aaea811c5dfcd307e2d29e7bd6eae5c4206"
-  }
+  },
+  "globalRoutes": [
+    "/share/:token"
+  ]
 }

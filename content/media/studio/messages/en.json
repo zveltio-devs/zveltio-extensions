@@ -32,5 +32,6 @@
   "content.media.ui.tags": "Tags",
   "content.media.ui.upload_files": "Upload Files",
   "content.media.uploadFiles": "Upload {n} file(s)",
-  "content.media.uploadFilesCount": "Upload {n} file(s)"
+  "content.media.uploadFilesCount": "Upload {n} file(s)",
+  "content.media.ui.search": "Search media…"
 }
