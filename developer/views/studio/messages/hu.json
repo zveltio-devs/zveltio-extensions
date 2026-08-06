@@ -12,5 +12,6 @@
   "developer.views.ui.list": "Lista",
   "developer.views.ui.map_requires_postgis": "Map (requires PostGIS)",
   "developer.views.ui.new_view": "Új nézet",
+  "developer.views.ui.preview": "Előnézet",
   "developer.views.ui.view_type": "Nézet típusa"
 }

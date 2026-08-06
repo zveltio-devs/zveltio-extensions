@@ -5,6 +5,9 @@
   import ExtensionPageShell from '$lib/components/extension/ExtensionPageShell.svelte';
   import ExtensionDataPanel from '$lib/components/extension/ExtensionDataPanel.svelte';
   import { onMount } from 'svelte';
+  import ListView from '../src/components/ListView.svelte';
+  import CardView from '../src/components/CardView.svelte';
+  import CalendarView from '../src/components/CalendarView.svelte';
   import { api } from '$lib/api.js';
   import { toast } from '$lib/stores/toast.svelte.js';
   import { LayoutGrid, Plus, X, List, KanbanSquare, Calendar, Map, LoaderCircle } from '@lucide/svelte';
@@ -12,6 +15,42 @@
   const { confirmState, askConfirm, runConfirmAction, cancelConfirm } = createExtensionConfirm();
 
   let views = $state<any[]>([]);
+
+  /**
+   * Preview of a saved view.
+   *
+   * This page could define views and never show one — the three renderers
+   * existed as placeholders (`<div>CalendarView</div>`) and nothing imported
+   * them, so a view was a row in a table and a promise. Fetching a page of the
+   * view's own collection and handing it to the matching renderer is what makes
+   * the definition mean something at the moment it is written.
+   *
+   * Capped at 50 records: this is a preview, and an unbounded fetch against a
+   * large collection would be a denial of service the operator performed on
+   * themselves.
+   */
+  let preview = $state<{ view: any; rows: any[]; loading: boolean; error: string | null } | null>(null);
+
+  async function openPreview(v: any) {
+    preview = { view: v, rows: [], loading: true, error: null };
+    try {
+      const res = await api(`/api/data/${encodeURIComponent(v.collection)}?limit=50`);
+      preview = { view: v, rows: res?.records ?? [], loading: false, error: null };
+    } catch (e: any) {
+      preview = { view: v, rows: [], loading: false, error: e?.message ?? 'Failed to load records' };
+    }
+  }
+
+  function previewColumns(v: any): string[] {
+    try {
+      const cfg = typeof v.config === 'string' ? JSON.parse(v.config) : (v.config ?? {});
+      return Array.isArray(cfg.columns) ? cfg.columns.filter((c: unknown) => typeof c === 'string') : [];
+    } catch {
+      // A view whose config is not valid JSON still previews — the renderers
+      // fall back to the record's own keys.
+      return [];
+    }
+  }
   let collections = $state<any[]>([]);
   let loading = $state(true);
 
@@ -87,13 +126,42 @@
                 <span class="badge badge-ghost badge-sm">{v.view_type}</span>
               </div>
               <div class="text-xs text-base-content/60 font-mono">{v.collection}</div>
-              <div class="flex justify-end"><button class="btn btn-ghost btn-xs text-error" onclick={() => deleteView(v.id)}>{m['common.delete']()}</button></div>
+              <div class="flex justify-end gap-1">
+                <button class="btn btn-ghost btn-xs" onclick={() => openPreview(v)}>{m['developer.views.ui.preview']()}</button>
+                <button class="btn btn-ghost btn-xs text-error" onclick={() => deleteView(v.id)}>{m['common.delete']()}</button>
+              </div>
             </div>
           </div>
         {/each}
       {/if}
     </div>
   {/if}
+
+{#if preview}
+  <div class="mt-6 card bg-base-100 border border-base-300">
+    <div class="card-body p-4 gap-3">
+      <div class="flex items-center justify-between">
+        <div class="font-medium text-sm">
+          {preview.view.name}
+          <span class="opacity-50 font-mono text-xs">· {preview.view.collection}</span>
+        </div>
+        <button class="btn btn-ghost btn-xs" onclick={() => (preview = null)} aria-label="Close preview"><X size={14} /></button>
+      </div>
+
+      {#if preview.loading}
+        <div class="flex justify-center py-8"><LoaderCircle size={20} class="animate-spin text-primary" /></div>
+      {:else if preview.error}
+        <div class="alert alert-error text-sm">{preview.error}</div>
+      {:else if preview.view.view_type === 'calendar'}
+        <CalendarView items={preview.rows} />
+      {:else if preview.view.view_type === 'card' || preview.view.view_type === 'kanban'}
+        <CardView items={preview.rows} columns={previewColumns(preview.view)} />
+      {:else}
+        <ListView items={preview.rows} columns={previewColumns(preview.view)} />
+      {/if}
+    </div>
+  </div>
+{/if}
 
 <ConfirmModal
   open={confirmState.open}
