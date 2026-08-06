@@ -171,13 +171,34 @@ function findExtensions(root: string): string[] {
  *
  * `globalRoutes` is informational: the engine does not gate on it. This check is
  * what keeps it honest.
+ *
+ * It originally accepted any non-empty array, and `developer/edge-functions`
+ * passed it with `["<operator-defined>"]` — which satisfied the check while
+ * declaring nothing. The intent behind that was not dishonest: the paths come
+ * from rows in a table, chosen by the operator after install, so the extension
+ * genuinely cannot list them. But a gate that accepts a placeholder is a gate
+ * that anyone can pass by typing angle brackets.
+ *
+ * So the dynamic case gets a declaration of its own. `"globalRoutes":
+ * "operator-defined"` says something true and checkable — this extension mounts
+ * global routes whose paths live in data — and a placeholder inside the array
+ * form is now refused by name.
  */
+const DYNAMIC_GLOBAL_ROUTES = 'operator-defined';
+
 function checkGlobalRouteDeclaration(extDir: string, code: string): string | null {
   if (!/\bregisterPublicRoute\s*\(/.test(code)) return null;
   try {
     const manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'));
     const declared = manifest.globalRoutes;
-    if (Array.isArray(declared) && declared.length > 0) return null;
+    if (declared === DYNAMIC_GLOBAL_ROUTES) return null;
+    if (Array.isArray(declared) && declared.length > 0) {
+      const placeholder = declared.map(String).find((p) => p.includes('<') || p.includes('>'));
+      if (placeholder) {
+        return `declares the placeholder global route '${placeholder}' — list the real paths, or use "globalRoutes": "${DYNAMIC_GLOBAL_ROUTES}" if they come from data`;
+      }
+      return null;
+    }
   } catch {
     /* unreadable manifest — reported below as undeclared */
   }
