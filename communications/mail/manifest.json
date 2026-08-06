@@ -3,7 +3,7 @@
   "displayName": "Mail Client",
   "category": "communications",
   "description": "Full IMAP/SMTP email client with AI features, Sieve filtering, and contacts",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-mail",

@@ -3,7 +3,7 @@
   "displayName": "Alternative Views",
   "category": "developer",
   "description": "Calendar, Card, and List views for collection data",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-views",

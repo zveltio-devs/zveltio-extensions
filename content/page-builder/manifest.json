@@ -3,7 +3,7 @@
   "displayName": "Page Builder",
   "category": "content",
   "description": "Visual drag-and-drop page builder with block-based content editing",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-page-builder",
