@@ -54,5 +54,8 @@
   "integrity": {
     "engineSha256": "261bfc0566cf66cf514ef8d4da27d2ed7dd99299073c3006fd6b8d246be314f9",
     "sourceSha256": "9c0a4f8bdc2d868eb14e85e9fd050da5b425a61e9125de4280b49b2eee58890f"
-  }
+  },
+  "resources": [
+    "postgis"
+  ]
 }

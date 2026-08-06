@@ -42,5 +42,8 @@
   "integrity": {
     "engineSha256": "61ce2ed342fac217d64e7e02a112d4bf1bafc0a5667fb35e8b7346a5c9867f9d",
     "sourceSha256": "1a96b3b8b3412f4f6d159ca6b33b40d3df8a86d98ef82977b0585a8fc294301d"
-  }
+  },
+  "resources": [
+    "payroll"
+  ]
 }

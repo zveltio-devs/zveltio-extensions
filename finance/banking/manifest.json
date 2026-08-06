@@ -41,5 +41,8 @@
   "integrity": {
     "engineSha256": "56ce24f16f9da36ba94bbe398c7e0558caef370edf69a1292dd9452706938674",
     "sourceSha256": "78b16535b2a52d706193cca5337f1dfbc3f610dc34640261ae2e8655af6cf99c"
-  }
+  },
+  "resources": [
+    "banking"
+  ]
 }

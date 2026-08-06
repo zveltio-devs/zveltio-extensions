@@ -36,5 +36,8 @@
   "integrity": {
     "engineSha256": "73fcb466927a8247cb17392cbd9cd96a699c22c97b04e1fc83f34606d0d1af72",
     "sourceSha256": "2ad466592713ca5c86f551fcae26db9c54b0be47207c1c765406577ce04d25d7"
-  }
+  },
+  "resources": [
+    "media"
+  ]
 }
