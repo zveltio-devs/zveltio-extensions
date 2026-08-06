@@ -4,6 +4,7 @@
   "content.media.btn.download": "Herunterladen",
   "content.media.btn.selectAll": "Alle auswählen",
   "content.media.btn.upload": "Hochladen",
+  "content.media.confirm.deleteFileMsg": "Diese Datei löschen?",
   "content.media.confirm.deleteFileTitle": "Datei löschen",
   "content.media.confirm.deleteFilesMsg": "{n} ausgewählte Dateien löschen?",
   "content.media.confirm.deleteFilesTitle": "Ausgewählte Dateien löschen",
@@ -29,9 +30,9 @@
   "content.media.ui.my_folder": "Mein Ordner",
   "content.media.ui.new_folder": "Neuer Ordner",
   "content.media.ui.new_tag": "Neues Schlagwort",
+  "content.media.ui.search": "Medien suchen…",
   "content.media.ui.tags": "Schlagwörter",
   "content.media.ui.upload_files": "Dateien hochladen",
   "content.media.uploadFiles": "{n} Datei(en) hochladen",
-  "content.media.uploadFilesCount": "{n} Datei(en) hochladen",
-  "content.media.ui.search": "Medien suchen…"
+  "content.media.uploadFilesCount": "{n} Datei(en) hochladen"
 }

@@ -4,6 +4,7 @@
   "content.media.btn.download": "Descargar",
   "content.media.btn.selectAll": "Seleccionar todo",
   "content.media.btn.upload": "Subir",
+  "content.media.confirm.deleteFileMsg": "¿Eliminar este archivo?",
   "content.media.confirm.deleteFileTitle": "Eliminar archivo",
   "content.media.confirm.deleteFilesMsg": "¿Eliminar los {n} archivos seleccionados?",
   "content.media.confirm.deleteFilesTitle": "Eliminar archivos seleccionados",
@@ -29,9 +30,9 @@
   "content.media.ui.my_folder": "My Folder",
   "content.media.ui.new_folder": "Nueva carpeta",
   "content.media.ui.new_tag": "Nueva etiqueta",
+  "content.media.ui.search": "Buscar medios…",
   "content.media.ui.tags": "Etiquetas",
   "content.media.ui.upload_files": "Subir archivos",
   "content.media.uploadFiles": "Subir {n} archivo(s)",
-  "content.media.uploadFilesCount": "Subir {n} archivo(s)",
-  "content.media.ui.search": "Buscar medios…"
+  "content.media.uploadFilesCount": "Subir {n} archivo(s)"
 }

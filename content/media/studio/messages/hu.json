@@ -4,6 +4,7 @@
   "content.media.btn.download": "Letöltés",
   "content.media.btn.selectAll": "Összes kijelölése",
   "content.media.btn.upload": "Feltöltés",
+  "content.media.confirm.deleteFileMsg": "Törli ezt a fájlt?",
   "content.media.confirm.deleteFileTitle": "Fájl törlése",
   "content.media.confirm.deleteFilesMsg": "Törli a(z) {n} kijelölt fájlt?",
   "content.media.confirm.deleteFilesTitle": "Kijelölt fájlok törlése",
@@ -29,9 +30,9 @@
   "content.media.ui.my_folder": "My Folder",
   "content.media.ui.new_folder": "Új mappa",
   "content.media.ui.new_tag": "Új címke",
+  "content.media.ui.search": "Média keresése…",
   "content.media.ui.tags": "Címkék",
   "content.media.ui.upload_files": "Fájlok feltöltése",
   "content.media.uploadFiles": "{n} fájl feltöltése",
-  "content.media.uploadFilesCount": "{n} fájl feltöltése",
-  "content.media.ui.search": "Média keresése…"
+  "content.media.uploadFilesCount": "{n} fájl feltöltése"
 }
