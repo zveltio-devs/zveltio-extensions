@@ -34,8 +34,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "3cdec597f238fb7eb7f408afde80467b25de984c1a6cb046f5139d50515a26e5",
-    "sourceSha256": "551f752bfc1edc50277fae9bc97107189b3a90d0418e81fc6165758926174e1d"
+    "engineSha256": "aae548cfc4e7f68dcdbe04117e6775565a78602cd425d70c0076b9a0ad9558c5",
+    "sourceSha256": "5e0fc829e03b1551d260be22b3a8a4f66c8989bd86ad45f0726b6dcdf9191512"
   },
   "resources": [
     "ro-documents"
