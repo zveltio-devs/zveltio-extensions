@@ -3,7 +3,7 @@
   "displayName": "SCIM Provisioning",
   "category": "auth",
   "description": "SCIM 2.0 user provisioning for Azure AD / Entra, Okta and other identity providers — bearer tokens, Users CRUD, active-flag offboarding",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-scim",
