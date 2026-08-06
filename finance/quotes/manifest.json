@@ -45,5 +45,8 @@
   "integrity": {
     "engineSha256": "b4c370d5a75fddc41e4b9a904def9c2dff703ae2b0d24acdc76866f89dab5056",
     "sourceSha256": "4f982f8f1db71b2760892012e19d667fc2b0d01f27ac1208ae7b87605bfc67e5"
-  }
+  },
+  "resources": [
+    "quotes"
+  ]
 }

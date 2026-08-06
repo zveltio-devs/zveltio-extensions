@@ -184,8 +184,53 @@ function checkGlobalRouteDeclaration(extDir: string, code: string): string | nul
   return 'registers global routes without declaring them in manifest.globalRoutes';
 }
 
+/**
+ * A resource nobody declared is a resource nobody can be granted.
+ *
+ * The engine denies by default: `permissionGate(ctx, 'invoices')` passes only
+ * for a role holding an explicit grant on `invoices`. Grants for the resources
+ * that existed when that landed were written by migration 034, and new ones are
+ * materialized from what an extension declares here. So an extension that
+ * guards a resource without declaring it installs cleanly, starts cleanly, and
+ * answers 403 to everyone except administrators — with nothing in any log
+ * saying why, because from the engine's side nothing went wrong.
+ *
+ * That is the failure this check exists to prevent, and it is worth saying why
+ * it is a separate field from `permissions`. That one lists CAPABILITIES —
+ * database, network, ddl — which the host grants to the extension. This lists
+ * the resources the extension guards, which an operator grants to their staff.
+ * The same English word pointing in opposite directions; folding them together
+ * would quietly break the capability contract.
+ *
+ * Placeholders are rejected by name: `<resource>` is what the developer guide's
+ * template contains, and a gate that accepts it teaches authors to paste rather
+ * than think.
+ */
+function checkResourceDeclaration(extDir: string, code: string): string | null {
+  const named = new Set<string>();
+  for (const m of code.matchAll(/permissionGate\s*\(\s*ctx\s*,\s*['"]([^'"]+)['"]/g)) {
+    named.add(m[1]);
+  }
+  if (named.size === 0) return null;
+
+  const placeholder = [...named].find((n) => n.startsWith('<') || n.includes(' '));
+  if (placeholder) return `guards the placeholder resource '${placeholder}'`;
+
+  let declared: unknown;
+  try {
+    declared = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8')).resources;
+  } catch {
+    /* unreadable manifest — reported below as undeclared */
+  }
+  const list = new Set(Array.isArray(declared) ? declared.map(String) : []);
+  const missing = [...named].filter((n) => !list.has(n)).sort();
+  if (missing.length === 0) return null;
+  return `guards ${missing.map((m) => `'${m}'`).join(', ')} without declaring it in manifest.resources`;
+}
+
 const findings: string[] = [];
 const globalFindings: string[] = [];
+const resourceFindings: string[] = [];
 let checked = 0;
 let exempt = 0;
 
@@ -209,6 +254,9 @@ for (const extDir of findExtensions(ROOT).sort()) {
   const globalIssue = checkGlobalRouteDeclaration(extDir, code);
   if (globalIssue) globalFindings.push(rel);
 
+  const resourceIssue = checkResourceDeclaration(extDir, code);
+  if (resourceIssue) resourceFindings.push(`${rel} — ${resourceIssue}`);
+
   if (!WRITE_ROUTE.test(code)) continue;
 
   checked++;
@@ -227,7 +275,21 @@ if (globalFindings.length > 0) {
   );
 }
 
-if (findings.length > 0 || globalFindings.length > 0) {
+if (resourceFindings.length > 0) {
+  console.error(
+    `\n❌ extension-authorization: ${resourceFindings.length} extension(s) guard resources they do not declare.\n`,
+  );
+  for (const f of resourceFindings) console.error(`  ${f}`);
+  console.error(
+    '\n  The engine denies by default, and grants for a resource are created from\n' +
+      '  this declaration. Undeclared, the guard still runs and still refuses —\n' +
+      '  everyone but an administrator gets a 403 and no log line explains it.\n\n' +
+      '  Add the names to manifest.resources (an array of strings). This is NOT\n' +
+      '  manifest.permissions, which lists host capabilities.\n',
+  );
+}
+
+if (findings.length > 0 || globalFindings.length > 0 || resourceFindings.length > 0) {
   if (findings.length === 0) process.exit(1);
 }
 

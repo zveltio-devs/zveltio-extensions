@@ -45,5 +45,8 @@
   "integrity": {
     "engineSha256": "46290d7df43db151542c72b140c50f0bd14e3c82420b2dfbe49eab045ef4e50e",
     "sourceSha256": "c4cf390f9ccf0635e35c1a07a8a220baa2ea87a1894c1edc5d27505168856709"
-  }
+  },
+  "resources": [
+    "time-tracking"
+  ]
 }

@@ -35,5 +35,8 @@
   "integrity": {
     "engineSha256": "376a8ec5fd6d8f432597c8a5d28df1299f467b90a3523a48a1c3ff5143583c01",
     "sourceSha256": "ef0b1823963938f6ded5a4d316b0f9dd530389cebbfd6a7ff1b2b4c1e601ce93"
-  }
+  },
+  "resources": [
+    "efactura"
+  ]
 }

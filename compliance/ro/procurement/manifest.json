@@ -35,5 +35,8 @@
   "integrity": {
     "engineSha256": "79394e5160133732048874bf99a4b649807f342244f0e715f974c8cd358e7134",
     "sourceSha256": "02af1836c47e90572f3e5e09d182c0dc696629d580f1368bef5ea473ef8d4bb5"
-  }
+  },
+  "resources": [
+    "procurement"
+  ]
 }

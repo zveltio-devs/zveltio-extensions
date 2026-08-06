@@ -36,5 +36,8 @@
   "integrity": {
     "engineSha256": "7cd18f99e8c4c0d54b603cde43deaa57e8cf170381854e6b27065daa53effcff",
     "sourceSha256": "b22b6b31d416235e062426af5f97e78c7875c4aee09327af6f0c1c041c8ad735"
-  }
+  },
+  "resources": [
+    "etransport"
+  ]
 }
