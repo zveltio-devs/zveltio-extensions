@@ -12,5 +12,6 @@
   "developer.views.ui.list": "Lista",
   "developer.views.ui.map_requires_postgis": "Map (requires PostGIS)",
   "developer.views.ui.new_view": "Nowy widok",
+  "developer.views.ui.preview": "Podgląd",
   "developer.views.ui.view_type": "Typ widoku"
 }
