@@ -4,6 +4,7 @@
   "content.media.btn.download": "Download",
   "content.media.btn.selectAll": "Select all",
   "content.media.btn.upload": "Upload",
+  "content.media.confirm.deleteFileMsg": "Delete this file?",
   "content.media.confirm.deleteFileTitle": "Delete file",
   "content.media.confirm.deleteFilesMsg": "Delete {n} selected files?",
   "content.media.confirm.deleteFilesTitle": "Delete selected files",
@@ -29,9 +30,9 @@
   "content.media.ui.my_folder": "My Folder",
   "content.media.ui.new_folder": "New Folder",
   "content.media.ui.new_tag": "New Tag",
+  "content.media.ui.search": "Search media…",
   "content.media.ui.tags": "Tags",
   "content.media.ui.upload_files": "Upload Files",
   "content.media.uploadFiles": "Upload {n} file(s)",
-  "content.media.uploadFilesCount": "Upload {n} file(s)",
-  "content.media.ui.search": "Search media…"
+  "content.media.uploadFilesCount": "Upload {n} file(s)"
 }
