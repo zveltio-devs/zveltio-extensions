@@ -8,6 +8,28 @@
 
 import { assertNonMetadataUrl } from './endpoint-guard.js';
 
+/**
+ * Every embedding call is fired from a write hook, so it needs a deadline.
+ *
+ * `record.created` and `record.updated` run this on every row written anywhere
+ * in the instance. The event bus fans out synchronously and does not await
+ * listeners, so a slow provider does not block the write — but nothing bounded
+ * these calls either, and a provider that is misconfigured, unreachable, or
+ * simply gone leaves one detached request per write, each holding a socket,
+ * accumulating for as long as people keep working.
+ *
+ * An audit reported an engine that stopped accepting writes while Postgres sat
+ * completely idle and nothing appeared in the log, could not reproduce it, and
+ * named this as the most plausible suspect. It stayed unreproduced here too, so
+ * this is not presented as the cause. It is an unbounded network call on the
+ * hottest path in the product, which is worth closing whether or not it was.
+ *
+ * Thirty seconds is far above a healthy embedding round-trip and far below
+ * "never".
+ */
+const EMBED_TIMEOUT_MS = Number(process.env.AI_EMBED_TIMEOUT_MS ?? 30_000);
+
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
@@ -120,6 +142,7 @@ export class OpenAIProvider implements AIProvider {
         Authorization: `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify({ model, input: text }),
+      signal: AbortSignal.timeout(EMBED_TIMEOUT_MS),
     });
 
     if (!res.ok) throw new Error(`OpenAI embeddings error: ${res.status}`);
@@ -261,6 +284,7 @@ export class OllamaProvider implements AIProvider {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: useModel, input: text }),
+      signal: AbortSignal.timeout(EMBED_TIMEOUT_MS),
     });
     const data: any = await res.json();
     return { embedding: data.embeddings[0], model: useModel };
