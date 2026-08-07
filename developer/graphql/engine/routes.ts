@@ -420,7 +420,7 @@ function detectOperationType(query: string): 'query' | 'mutation' | 'subscriptio
 
 export function graphqlRoutes(ctx: ExtensionContext): Hono {
   const { db, DDLManager, auth, checkPermission } = ctx;
-  const { DataLoaderRegistry, checkQueryDepth } = ctx.internals;
+  const { DataLoaderRegistry, checkQueryDepth, checkQueryWidth } = ctx.internals;
 
   // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
   // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
@@ -461,6 +461,11 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
 
     const depthError = checkQueryDepth(query, 5);
     if (depthError) return c.json({ errors: [{ message: depthError }] }, 400);
+    // Depth bounds how deep one field goes; this bounds how many there are.
+    // 600 aliases of the same root field returned 200 OK in 0.42 s and up to
+    // 300k rows, all of it one request as far as the rate limiter could tell.
+    const widthError = checkQueryWidth(query, 50);
+    if (widthError) return c.json({ errors: [{ message: widthError }] }, 400);
 
     const queryHash = crypto.createHash('sha256').update(query).digest('hex');
     const opType = detectOperationType(query);
@@ -620,6 +625,9 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
       if (bodyText) variables = JSON.parse(bodyText).variables || {};
     } catch { /* no variables */ }
 
+    const widthErrorPersisted = checkQueryWidth(pq.query, 50);
+    if (widthErrorPersisted)
+      return c.json({ errors: [{ message: widthErrorPersisted }] }, 400);
     const depthError = checkQueryDepth(pq.query, 5);
     if (depthError) return c.json({ errors: [{ message: depthError }] }, 400);
 

@@ -27784,7 +27784,7 @@ function detectOperationType(query) {
 }
 function graphqlRoutes(ctx) {
   const { db, DDLManager, auth, checkPermission } = ctx;
-  const { DataLoaderRegistry, checkQueryDepth } = ctx.internals;
+  const { DataLoaderRegistry, checkQueryDepth, checkQueryWidth } = ctx.internals;
   const app = new Hono2;
   app.get("/", async (c) => {
     if (ctx.config?.isProduction) {
@@ -27813,6 +27813,9 @@ function graphqlRoutes(ctx) {
     const depthError = checkQueryDepth(query, 5);
     if (depthError)
       return c.json({ errors: [{ message: depthError }] }, 400);
+    const widthError = checkQueryWidth(query, 50);
+    if (widthError)
+      return c.json({ errors: [{ message: widthError }] }, 400);
     const queryHash = crypto2.createHash("sha256").update(query).digest("hex");
     const opType = detectOperationType(query);
     const startMs = Date.now();
@@ -27945,6 +27948,9 @@ function graphqlRoutes(ctx) {
       if (bodyText)
         variables = JSON.parse(bodyText).variables || {};
     } catch {}
+    const widthErrorPersisted = checkQueryWidth(pq.query, 50);
+    if (widthErrorPersisted)
+      return c.json({ errors: [{ message: widthErrorPersisted }] }, 400);
     const depthError = checkQueryDepth(pq.query, 5);
     if (depthError)
       return c.json({ errors: [{ message: depthError }] }, 400);

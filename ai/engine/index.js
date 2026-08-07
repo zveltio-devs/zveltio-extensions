@@ -29808,6 +29808,8 @@ function assertNonMetadataUrl(rawUrl, label = "Endpoint") {
 }
 
 // engine/lib/ai-provider.ts
+var EMBED_TIMEOUT_MS = Number(process.env.AI_EMBED_TIMEOUT_MS ?? 30000);
+
 class OpenAIProvider {
   apiKey;
   baseUrl;
@@ -29864,7 +29866,8 @@ class OpenAIProvider {
         "Content-Type": "application/json",
         Authorization: `Bearer ${this.apiKey}`
       },
-      body: JSON.stringify({ model, input: text })
+      body: JSON.stringify({ model, input: text }),
+      signal: AbortSignal.timeout(EMBED_TIMEOUT_MS)
     });
     if (!res.ok)
       throw new Error(`OpenAI embeddings error: ${res.status}`);
@@ -29988,7 +29991,8 @@ class OllamaProvider {
     const res = await fetch(`${this.baseUrl}/api/embed`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: useModel, input: text })
+      body: JSON.stringify({ model: useModel, input: text }),
+      signal: AbortSignal.timeout(EMBED_TIMEOUT_MS)
     });
     const data = await res.json();
     return { embedding: data.embeddings[0], model: useModel };
