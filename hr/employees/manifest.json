@@ -39,5 +39,8 @@
   },
   "resources": [
     "employees"
+  ],
+  "sensitiveResources": [
+    "employees"
   ]
 }

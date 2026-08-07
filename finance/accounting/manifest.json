@@ -39,5 +39,8 @@
   },
   "resources": [
     "accounting"
+  ],
+  "sensitiveResources": [
+    "accounting"
   ]
 }
