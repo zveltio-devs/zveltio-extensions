@@ -179,23 +179,30 @@ function findExtensions(root: string): string[] {
  * genuinely cannot list them. But a gate that accepts a placeholder is a gate
  * that anyone can pass by typing angle brackets.
  *
- * So the dynamic case gets a declaration of its own. `"globalRoutes":
- * "operator-defined"` says something true and checkable — this extension mounts
- * global routes whose paths live in data — and a placeholder inside the array
- * form is now refused by name.
+ * So the dynamic case gets a declaration of its own: `"globalRoutesDynamic":
+ * true`, alongside an empty `globalRoutes`. It says something true and
+ * checkable — this extension mounts global routes whose paths live in data —
+ * and a placeholder inside the array form is refused by name.
+ *
+ * The first attempt at this put the sentinel in `globalRoutes` itself, as the
+ * string `"operator-defined"`. That made the manifest fail the ENGINE's schema,
+ * where the field is `z.array(z.string())`, so the extension could no longer be
+ * enabled at all — 422 on install, and this gate still green, because nothing
+ * ran the manifest through the schema the engine actually parses. Both halves
+ * are fixed: the declaration is a boolean the schema knows about, and
+ * `validate-all-extensions.ts` now checks every manifest against
+ * `ManifestSchema`.
  */
-const DYNAMIC_GLOBAL_ROUTES = 'operator-defined';
-
 function checkGlobalRouteDeclaration(extDir: string, code: string): string | null {
   if (!/\bregisterPublicRoute\s*\(/.test(code)) return null;
   try {
     const manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'));
     const declared = manifest.globalRoutes;
-    if (declared === DYNAMIC_GLOBAL_ROUTES) return null;
+    if (manifest.globalRoutesDynamic === true) return null;
     if (Array.isArray(declared) && declared.length > 0) {
       const placeholder = declared.map(String).find((p) => p.includes('<') || p.includes('>'));
       if (placeholder) {
-        return `declares the placeholder global route '${placeholder}' — list the real paths, or use "globalRoutes": "${DYNAMIC_GLOBAL_ROUTES}" if they come from data`;
+        return `declares the placeholder global route '${placeholder}' — list the real paths, or set "globalRoutesDynamic": true if they come from data`;
       }
       return null;
     }
@@ -245,8 +252,27 @@ function checkResourceDeclaration(extDir: string, code: string): string | null {
   }
   const list = new Set(Array.isArray(declared) ? declared.map(String) : []);
   const missing = [...named].filter((n) => !list.has(n)).sort();
-  if (missing.length === 0) return null;
-  return `guards ${missing.map((m) => `'${m}'`).join(', ')} without declaring it in manifest.resources`;
+  if (missing.length > 0) {
+    return `guards ${missing.map((m) => `'${m}'`).join(', ')} without declaring it in manifest.resources`;
+  }
+
+  // `sensitiveResources` withholds the automatic default grant, so a name in it
+  // that the extension does not actually guard withholds nothing and reads, to
+  // anyone auditing the manifest, as a protection that is in place. A typo here
+  // is silent in exactly the direction that matters.
+  let sensitive: unknown;
+  try {
+    sensitive = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8')).sensitiveResources;
+  } catch {
+    /* already reported above */
+  }
+  const stray = (Array.isArray(sensitive) ? sensitive.map(String) : [])
+    .filter((s) => !list.has(s))
+    .sort();
+  if (stray.length > 0) {
+    return `declares ${stray.map((s) => `'${s}'`).join(', ')} as sensitive, but does not guard it — the name must appear in manifest.resources too`;
+  }
+  return null;
 }
 
 const findings: string[] = [];
