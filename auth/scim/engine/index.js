@@ -19507,10 +19507,15 @@ function buildScimApp(ctx) {
   const tenantOf = (c) => c.get("scimTenantId");
   async function isMember(userId, tenantId) {
     if (tenantId === DEFAULT_TENANT_ID) {
-      const r2 = await sql`
-        SELECT COUNT(*)::int AS n FROM "user" WHERE id = ${userId}
+      const t = await sql`
+        SELECT COUNT(*)::int AS n FROM zv_tenants
       `.execute(db);
-      return (r2.rows[0]?.n ?? 0) > 0;
+      if ((t.rows[0]?.n ?? 0) <= 1) {
+        const r2 = await sql`
+          SELECT COUNT(*)::int AS n FROM "user" WHERE id = ${userId}
+        `.execute(db);
+        return (r2.rows[0]?.n ?? 0) > 0;
+      }
     }
     const r = await sql`
       SELECT COUNT(*)::int AS n FROM zv_tenant_users
