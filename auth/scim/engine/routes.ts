@@ -133,14 +133,33 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
   async function isMember(userId: string, tenantId: string): Promise<boolean> {
     // Single-tenant installs have no membership rows at all — the engine's own
     // membership middleware no-ops for the default tenant for exactly this
-    // reason. Requiring a row here would have made SCIM list nothing and refuse
-    // every operation on the most common deployment, which is a worse bug than
-    // the one being fixed.
+    // reason. Requiring a row here would make SCIM list nothing and refuse every
+    // operation on the most common deployment, which is a worse bug than the one
+    // being fixed.
+    //
+    // But the question is whether the INSTANCE is single-tenant, not which
+    // tenant the token belongs to. The default tenant exists on a multi-tenant
+    // install too, so keying off it alone turned any token issued there into an
+    // instance-wide credential. An audit combined that with a separate defect
+    // that deposited every extension row in the default tenant, listed every
+    // user on the instance with a token issued for an ordinary tenant, and
+    // deleted the administrator account.
+    //
+    // The other defect is fixed (see the engine's `runWithTenantTrx`), which
+    // alone would close that path. This closes it a second way, because a rule
+    // that is only safe while another rule holds is not a rule.
     if (tenantId === DEFAULT_TENANT_ID) {
-      const r = await sql<{ n: number }>`
-        SELECT COUNT(*)::int AS n FROM "user" WHERE id = ${userId}
+      const t = await sql<{ n: number }>`
+        SELECT COUNT(*)::int AS n FROM zv_tenants
       `.execute(db);
-      return (r.rows[0]?.n ?? 0) > 0;
+      if ((t.rows[0]?.n ?? 0) <= 1) {
+        const r = await sql<{ n: number }>`
+          SELECT COUNT(*)::int AS n FROM "user" WHERE id = ${userId}
+        `.execute(db);
+        return (r.rows[0]?.n ?? 0) > 0;
+      }
+      // Multi-tenant: the default tenant is a tenant like any other, and
+      // membership is what the IdP is allowed to see.
     }
     const r = await sql<{ n: number }>`
       SELECT COUNT(*)::int AS n FROM zv_tenant_users
