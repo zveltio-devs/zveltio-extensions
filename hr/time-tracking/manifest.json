@@ -48,5 +48,8 @@
   },
   "resources": [
     "time-tracking"
+  ],
+  "sensitiveResources": [
+    "time-tracking"
   ]
 }
