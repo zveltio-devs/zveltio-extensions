@@ -23,8 +23,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "8f8dcf7fbea0be6f713e7def5b08460ccc9d06778379f3fb7d04912e943d98f7",
-    "sourceSha256": "4801f1b73bc70d417aefaa5bf890b6ba4fb0292ddabcbf6b44db835d34ef4724"
+    "engineSha256": "57e00ef7d5bfd853a04418defef1475bb130f7bc18159c84d7b917ace005a274",
+    "sourceSha256": "8f2798fe0c6870074c51bd16775254e15de80146faaaf6ed36c1304d57f2afb2"
   },
   "studio": {
     "navGroup": "other",
