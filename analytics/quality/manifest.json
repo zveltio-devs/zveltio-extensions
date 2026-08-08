@@ -16,7 +16,14 @@
     "studio": true
   },
   "studio": {
-    "navGroup": "developer"
+    "navGroup": "developer",
+    "pages": [
+      {
+        "path": "/admin/analytics/quality",
+        "label": "Data Quality",
+        "icon": "ShieldCheck"
+      }
+    ]
   },
   "engine": {
     "entry": "engine/index.js",
