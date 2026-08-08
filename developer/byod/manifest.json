@@ -14,8 +14,8 @@
   "studio": {
     "pages": [
       {
-        "path": "/admin/byod",
-        "label": "Bring Your Own Database",
+        "path": "/admin/introspect",
+        "label": "BYOD Import",
         "icon": "Database"
       }
     ],
