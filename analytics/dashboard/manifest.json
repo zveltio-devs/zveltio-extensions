@@ -15,7 +15,14 @@
     "studio": true
   },
   "studio": {
-    "navGroup": "developer"
+    "navGroup": "developer",
+    "pages": [
+      {
+        "path": "/admin/analytics/dashboard",
+        "label": "Analytics Dashboard",
+        "icon": "LayoutDashboard"
+      }
+    ]
   },
   "engine": {
     "entry": "engine/index.js",
