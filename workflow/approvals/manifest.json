@@ -24,8 +24,7 @@
       {
         "path": "/admin/workflow/approvals",
         "label": "Approvals",
-        "icon": "CheckSquare",
-        "schema": "schemas/approvals.json"
+        "icon": "CheckSquare"
       }
     ]
   },
