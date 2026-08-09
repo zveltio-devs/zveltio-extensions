@@ -266,11 +266,64 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
   // ── Catalogue ─────────────────────────────────────────────────
   // What a company sells, so an invoice line is picked rather than retyped —
   // and the VAT rate comes from the item instead of from memory.
+  /**
+   * What can go on an invoice line: stock items and services, in one list.
+   *
+   * `operations/inventory` already owns products — it has done all along, with
+   * `inventory.products.list` published for exactly this — and this extension
+   * grew its own `zvd_catalogue_items` table anyway. That is a duplicate
+   * catalogue: the same goods maintained twice, drifting apart, with the price
+   * on an invoice eventually disagreeing with the price in the warehouse.
+   *
+   * Products now come from inventory when it is installed. The local table
+   * keeps its purpose rather than being deleted: a service is not stock. A
+   * consultancy has no warehouse and must still be able to invoice; a shop has
+   * both and should maintain its goods in one place.
+   *
+   * Inventory is OPTIONAL, as CRM is for client lookup. `services.get` returns
+   * null when it is not active, and the local table answers alone.
+   */
   app.get('/catalogue', async (c) => {
     const rows = await sql`
       SELECT * FROM zvd_catalogue_items WHERE is_active = TRUE ORDER BY name
     `.execute(db);
-    return c.json({ data: rows.rows });
+    // biome-ignore lint/suspicious/noExplicitAny: cross-extension service payload
+    const local = rows.rows as any[];
+
+    const listProducts = ctx.services.get<
+      // biome-ignore lint/suspicious/noExplicitAny: cross-extension service payload
+      (opts?: { active?: boolean; q?: string }) => Promise<any[]>
+    >('inventory.products.list');
+    if (!listProducts) return c.json({ data: local });
+
+    // biome-ignore lint/suspicious/noExplicitAny: cross-extension service payload
+    const products = (await listProducts({ active: true }).catch(() => [])) as any[];
+    // Mapped into the shape an invoice line expects, so the picker does not
+    // have to know which extension a row came from. `sale_price` is what a
+    // customer pays; `cost_price` is what we paid, and putting that on an
+    // invoice would be a costly kind of wrong.
+    const mapped = products.map((p) => ({
+      id: p.id,
+      code: p.sku,
+      name: p.name,
+      description: p.description,
+      kind: 'product',
+      unit: p.unit,
+      unit_price: p.sale_price,
+      currency: 'RON',
+      tax_rate: p.tax_rate,
+      is_active: p.is_active,
+      source: 'inventory',
+    }));
+
+    // A local item whose code matches a product is the older duplicate; the
+    // warehouse wins, because that is where the goods actually are.
+    const codes = new Set(mapped.map((p) => String(p.code ?? '').toLowerCase()).filter(Boolean));
+    const services = local
+      .filter((i) => !i.code || !codes.has(String(i.code).toLowerCase()))
+      .map((i) => ({ ...i, source: 'invoicing' }));
+
+    return c.json({ data: [...mapped, ...services].sort((a, b) => String(a.name).localeCompare(String(b.name))) });
   });
 
   app.post('/catalogue',
@@ -743,13 +796,97 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
   });
 
   // ── Lifecycle actions ─────────────────────────────────────────
-  app.post('/invoices/:id/send', async (c) => {
+  app.post('/invoices/:id/send', zValidator('query', z.object({ warehouse_id: z.string().uuid().optional() })), async (c) => {
     const row = await sql`
       UPDATE zvd_invoices SET status = 'sent', updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND status = 'draft' RETURNING *
     `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Invoice not found or not in draft' }, 400);
-    return c.json({ data: row.rows[0] });
+    const invoice = row.rows[0] as any;
+
+    /**
+     * Stock leaves on the DELIVERY NOTE, not on the invoice.
+     *
+     * An invoice and a dispatch are different events and can be days apart in
+     * either order: paid in advance and shipped later, shipped now and invoiced
+     * monthly, or both at once. Only the delivery note travels with the goods,
+     * so only it says anything about what physically left the warehouse.
+     *
+     * A first version of this moved stock when the INVOICE was sent. That is
+     * right for a shop that sells and ships in one motion and wrong for
+     * everyone else — which is the definition of a special case dressed up as a
+     * model.
+     *
+     * The deeper reason to keep it here rather than in a country's invoicing
+     * extension: dispatch is an inventory concept. If moving stock lived in the
+     * Romanian extension, a German one would reimplement it, and the second
+     * implementation would differ from the first in some way nobody noticed.
+     * An invoicing extension REFERENCES a dispatch; it never moves stock.
+     *
+     * Only lines naming an inventory product move. A service has no stock, and
+     * a hand-typed line was never linked to anything — guessing what
+     * "Transport" refers to is worse than moving nothing.
+     *
+     * The move is a consequence of the dispatch, not a precondition: if a move
+     * fails, the note stays issued and the failure is reported beside it. A
+     * document that silently failed to adjust stock is how a warehouse drifts
+     * from the shelf; one rolled back because of the warehouse is worse.
+     */
+    const stockMove = ctx.services.get<
+      (input: {
+        productId: string;
+        warehouseId: string;
+        qty: number;
+        type: 'in' | 'out' | 'adjust' | 'transfer';
+        reference?: string;
+        reason?: string;
+        userId?: string;
+      }) => Promise<{ balance: number }>
+    >('inventory.stock.move');
+
+    const warehouseId = c.req.query('warehouse_id');
+    // biome-ignore lint/suspicious/noExplicitAny: cross-extension payload
+    const moved: any[] = [];
+    const stockErrors: string[] = [];
+
+    // Invoices and proformas move nothing. Only the document that accompanies
+    // the goods does.
+    const movesStock = invoice.doc_type === 'delivery_note';
+    if (stockMove && warehouseId && movesStock) {
+      const lines = await sql<{ description: string; quantity: string; metadata: unknown }>`
+        SELECT description, quantity, metadata FROM zvd_invoice_lines WHERE invoice_id = ${invoice.id}
+      `.execute(db);
+      for (const l of lines.rows) {
+        const meta = typeof l.metadata === 'string' ? JSON.parse(l.metadata) : (l.metadata ?? {});
+        const productId = (meta as { catalogue_item?: string }).catalogue_item;
+        if (!productId) continue;
+        try {
+          const res = await stockMove({
+            productId,
+            warehouseId,
+            qty: Number(l.quantity),
+            type: 'out',
+            reference: invoice.number,
+            reason: `Invoice ${invoice.number}`,
+            userId: (c.get('user') as { id: string } | undefined)?.id,
+          });
+          moved.push({ product_id: productId, qty: Number(l.quantity), balance: res?.balance });
+        } catch (err) {
+          // Named, so somebody can correct the one line that failed rather than
+          // rediscovering it at a stock count.
+          stockErrors.push(`${l.description}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    }
+
+    return c.json({
+      data: invoice,
+      stock: !stockMove
+        ? { skipped: 'inventory extension is not active' }
+        : !movesStock
+          ? { skipped: `stock moves on a delivery note, not on a ${invoice.doc_type}` }
+          : { warehouse_id: warehouseId ?? null, moved, errors: stockErrors },
+    });
   });
 
   // ── Partial payments ──────────────────────────────────────────
