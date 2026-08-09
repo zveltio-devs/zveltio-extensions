@@ -40,6 +40,72 @@ const invoiceSchema = z.object({
   reverse_charge: z.boolean().default(false),
 });
 
+/**
+ * Nothing is sent to ANAF, and saying so is the whole point.
+ *
+ * This route used to FABRICATE the answer. It built a response object with
+ * `ExecutionStatus: '0'` and an upload index of `RO` followed by the current
+ * timestamp, wrote that to `anaf_index` and `anaf_response`, moved the invoice
+ * to `submitted`, recorded a status-log entry reading "ANAF index: …",
+ * incremented the daily count of submitted invoices, and replied "Submitted to
+ * ANAF". `batch-submit` did the same for twenty at a time.
+ *
+ * There is no ANAF call anywhere in this extension — no OAuth, no certificate,
+ * no request to anaf.ro — so every one of those invoices was still sitting on
+ * the operator's own disk while the product told them it had been filed. A
+ * missing feature costs someone an afternoon; a feature that reports success it
+ * did not achieve costs them a penalty, months later, with the evidence in
+ * their own database saying they had complied.
+ *
+ * 501 is the honest status: the route exists and is understood, the capability
+ * does not. The XML is real and already downloadable, so the reply points at
+ * the path that does work today — generate it, fetch it, upload it in SPV by
+ * hand — rather than leaving somebody stuck at a button.
+ */
+/**
+ * A database row, as the UBL generator declares its input.
+ *
+ * Postgres gives NUMERIC back as a string and DATE as a Date; `InvoiceData`
+ * asks for `number` and `string`. Converting here keeps every `.toFixed()` in
+ * the template honest instead of each one guarding itself.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: legacy any; tracked in docs/HARDENING-9-PLAN.md H-01
+function toInvoiceData(row: any, lines: any[]): any {
+  const num = (v: unknown): number => (v === null || v === undefined ? 0 : Number(v));
+  const day = (v: unknown): string =>
+    v instanceof Date ? v.toISOString().slice(0, 10) : v ? String(v).slice(0, 10) : '';
+  return {
+    ...row,
+    invoice_date: day(row.invoice_date),
+    due_date: day(row.due_date),
+    subtotal: num(row.subtotal),
+    vat_total: num(row.vat_total),
+    total: num(row.total),
+    lines: (lines ?? []).map((l) => ({
+      ...l,
+      quantity: num(l.quantity),
+      unit_price: num(l.unit_price),
+      vat_rate: num(l.vat_rate),
+      vat_amount: num(l.vat_amount),
+      line_total: num(l.line_total),
+    })),
+  };
+}
+
+const NOT_SUBMITTED_DETAIL =
+  'Automatic submission to ANAF is not implemented: this build has no SPV ' +
+  'integration (no certificate, no OAuth, no call to anaf.ro). The invoice was ' +
+  'NOT sent and its status is unchanged. Generate the XML and download it from ' +
+  'GET /:id/xml, then upload that file in SPV yourself.';
+
+// biome-ignore lint/suspicious/noExplicitAny: legacy any; tracked in docs/HARDENING-9-PLAN.md H-01
+function notSubmitted(c: any) {
+  return c.json(
+    { code: 'anaf_submission_not_implemented', error: NOT_SUBMITTED_DETAIL, submitted: false },
+    501,
+  );
+}
+
 async function getUser(c: any, auth: any) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   return session?.user ?? null;
@@ -218,11 +284,21 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     if (!invoice) return c.json({ error: 'Invoice not found' }, 404);
 
     const lines = typeof invoice.lines === 'string' ? JSON.parse(invoice.lines) : invoice.lines;
-    // `invoice` is selectAll() so it's loosely typed; the UBL generator
-    // expects an InvoiceData shape but at this point we've validated
-    // upstream that all required fields are present. Cast to any to
-    // bridge the loose row → strict InvoiceData boundary.
-    const xml = generateUBLXML({ ...(invoice as any), lines });
+    // The row is NOT the shape the generator declares, and the cast that used
+    // to sit here said it was.
+    //
+    // `InvoiceData` types its amounts as `number`, but Postgres returns NUMERIC
+    // as a STRING — the driver refuses to silently lose precision — so
+    // `vat_total.toFixed(2)` threw "toFixed is not a function" on every real
+    // invoice. Dates come back as Date objects for the same reason. The `as
+    // any` bridged the two shapes for the type checker and left the mismatch
+    // for runtime, where it turned into a 500 nobody saw, because generating
+    // the XML was only ever a precondition for a submission that was faked and
+    // never read it.
+    //
+    // Coerce once, here, at the boundary where the row becomes InvoiceData —
+    // rather than defending inside every field of the template.
+    const xml = generateUBLXML(toInvoiceData(invoice, lines));
 
     await db
       .updateTable('zv_efactura_invoices')
@@ -271,37 +347,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     if (!invoice) return c.json({ error: 'Invoice not found' }, 404);
     if (!invoice.xml_content) return c.json({ error: 'Generate XML first' }, 400);
 
-    // Stub: in production, call ANAF upload endpoint with OAuth token
-    const mockResponse = {
-      dateResponse: new Date().toISOString(),
-      ExecutionStatus: '0',
-      index_incarcare: `RO${Date.now()}`,
-    };
-
-    await db
-      .updateTable('zv_efactura_invoices')
-      .set({
-        status: 'submitted',
-        anaf_index: mockResponse.index_incarcare,
-        anaf_response: JSON.stringify(mockResponse),
-        updated_at: new Date(),
-      })
-      .where('id', '=', invoice.id)
-      .execute();
-
-    await logStatusChange(db, invoice.id, invoice.status, 'submitted', user.id, `ANAF index: ${mockResponse.index_incarcare}`);
-
-    // Update daily stats
-    await sql`
-      INSERT INTO zv_efactura_daily_stats (date, seller_cui, submitted_count, total_amount, vat_amount)
-      VALUES (CURRENT_DATE, ${invoice.seller_cui}, 1, ${invoice.total}, ${invoice.vat_total})
-      ON CONFLICT (date, seller_cui)
-      DO UPDATE SET submitted_count = zv_efactura_daily_stats.submitted_count + 1,
-                    total_amount = zv_efactura_daily_stats.total_amount + EXCLUDED.total_amount,
-                    vat_amount = zv_efactura_daily_stats.vat_amount + EXCLUDED.vat_amount
-    `.execute(db).catch(() => {});
-
-    return c.json({ message: 'Submitted to ANAF', anaf_index: mockResponse.index_incarcare, response: mockResponse });
+    return notSubmitted(c);
   });
 
   // POST /:id/storno — create storno/credit note
@@ -362,13 +408,12 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
         if (!inv) { results.push({ id, success: false, error: 'Not found' }); continue; }
         if (!inv.xml_content) { results.push({ id, success: false, error: 'XML not generated' }); continue; }
 
-        const anafIndex = `RO${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-        await db.updateTable('zv_efactura_invoices').set({ status: 'submitted', anaf_index: anafIndex, updated_at: new Date() }).where('id', '=', id).execute();
-        await logStatusChange(db, id, inv.status, 'submitted', user.id);
-        results.push({ id, success: true });
+        // Same refusal as the single-invoice route, per id, so the caller sees
+        // exactly which ones would have gone and why none of them did.
+        results.push({ id, success: false, error: NOT_SUBMITTED_DETAIL });
       }
 
-      return c.json({ results, submitted: results.filter(r => r.success).length });
+      return c.json({ results, submitted: 0 }, 501);
     },
   );
 
