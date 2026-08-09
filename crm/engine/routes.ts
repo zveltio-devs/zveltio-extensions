@@ -17,6 +17,32 @@ function buildListQuery(table: string, allowed: string[]) {
   };
 }
 
+/**
+ * Is this a syntactically valid Romanian tax code?
+ *
+ * Deliberately a copy of the same function in finance/invoicing rather than a
+ * shared import: each extension is bundled independently, so sharing would mean
+ * a runtime dependency between two extensions for the sake of a pure function
+ * defined by a published formula that does not change.
+ *
+ * It matters here because an organization's code flows onto invoices — the
+ * invoice form fills the buyer's CUI from the CRM record — and ANAF refuses the
+ * whole e-invoice with "CUI cumparator incorect" over a wrong check digit.
+ * Catching it where the number is first typed is the only place it is cheap.
+ */
+function isValidCui(value: string): boolean {
+  const digits = String(value).trim().toUpperCase().replace(/^RO/, '').replace(/\s/g, '');
+  if (!/^\d{2,10}$/.test(digits)) return false;
+  const body = digits.slice(0, -1);
+  const check = Number(digits.slice(-1));
+  const key = '753217532';
+  const padded = body.padStart(9, '0');
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += Number(padded[i]) * Number(key[i]);
+  const computed = (sum * 10) % 11;
+  return (computed === 10 ? 0 : computed) === check;
+}
+
 export function crmRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission, events } = ctx;
 
@@ -63,17 +89,29 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       ['first_name', 'last_name', 'email', 'created_at'],
     )(c);
 
+    // The primary organization comes along, so the list can show who someone
+    // actually belongs to rather than only the free-text company they typed.
+    //
+    // Every column is table-qualified below. Joining organizations brings a
+    // second email, created_at, id and name into scope, and an unqualified
+    // reference to any of them stops being a search and becomes an ambiguity
+    // error.
     const rows = await sql`
-      SELECT id, first_name, last_name, email, phone, company, job_title,
-             avatar_url, tags, source, created_at, updated_at
-      FROM zvd_contacts
+      SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.company, c.job_title,
+             c.avatar_url, c.tags, c.source, c.notes, c.created_at, c.updated_at,
+             po.id AS organization_id, po.name AS organization_name, pco.role AS organization_role
+      FROM zvd_contacts c
+      LEFT JOIN zvd_contact_organizations pco
+             ON pco.contact_id = c.id AND pco.is_primary = TRUE
+      LEFT JOIN zvd_organizations po ON po.id = pco.organization_id
       WHERE (
-        ${search ? sql`(first_name ILIKE ${'%' + search + '%'}
-          OR last_name ILIKE ${'%' + search + '%'}
-          OR email ILIKE ${'%' + search + '%'}
-          OR company ILIKE ${'%' + search + '%'})` : sql`TRUE`}
+        ${search ? sql`(c.first_name ILIKE ${'%' + search + '%'}
+          OR c.last_name ILIKE ${'%' + search + '%'}
+          OR c.email ILIKE ${'%' + search + '%'}
+          OR c.company ILIKE ${'%' + search + '%'}
+          OR po.name ILIKE ${'%' + search + '%'})` : sql`TRUE`}
       )
-      ORDER BY ${sql.raw(sortCol)} ${sql.raw(dir)}
+      ORDER BY c.${sql.raw(sortCol)} ${sql.raw(dir)}
       LIMIT ${lim} OFFSET ${offset}
     `.execute(db);
 
@@ -103,6 +141,44 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: row.rows[0] });
   });
 
+  /**
+   * Put a contact in an organization.
+   *
+   * `zvd_contact_organizations` has been in the schema since the first
+   * migration, carrying `role` and `is_primary`, and BOTH read paths join it:
+   * `GET /contacts/:id` returns an `organizations` array built from it, and the
+   * organizations list counts its members through it. Nothing ever inserted a
+   * row — it was read in two places and written in none.
+   *
+   * So every contact came back with an empty `organizations` array, every
+   * organization reported zero people, and the relation existed only as a
+   * drawing on the schema. That is the whole reason the CRM behaves like a flat
+   * address book: `company` is a free-text string on the contact, which is what
+   * people ended up typing, and the actual link had no way in.
+   *
+   * `is_primary` is kept unique per contact by demoting the others first —
+   * "primary" has to mean one of them for the list view to pick a single
+   * organization to show.
+   */
+  async function linkContactOrganization(
+    contactId: string,
+    organizationId: string,
+    role: string | undefined,
+    isPrimary: boolean,
+  ): Promise<void> {
+    if (isPrimary) {
+      await sql`
+        UPDATE zvd_contact_organizations SET is_primary = FALSE WHERE contact_id = ${contactId}
+      `.execute(db);
+    }
+    await sql`
+      INSERT INTO zvd_contact_organizations (contact_id, organization_id, role, is_primary)
+      VALUES (${contactId}, ${organizationId}, ${role ?? null}, ${isPrimary})
+      ON CONFLICT (contact_id, organization_id)
+      DO UPDATE SET role = EXCLUDED.role, is_primary = EXCLUDED.is_primary
+    `.execute(db);
+  }
+
   app.post('/contacts',
     zValidator('json', z.object({
       first_name: z.string().min(1),
@@ -116,6 +192,9 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       notes: z.string().optional(),
       source: z.string().optional(),
       metadata: z.record(z.string(), z.unknown()).optional(),
+      organization_id: z.string().uuid().optional(),
+      /** Free text — "CFO", "buyer". The model does not fix a vocabulary. */
+      organization_role: z.string().optional(),
     })),
     async (c) => {
       const user = c.get('user') as any;
@@ -132,6 +211,10 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
         RETURNING *
       `.execute(db);
       const contact = result.rows[0] as any;
+      // Primary: it is the only membership a contact has when created.
+      if (d.organization_id) {
+        await linkContactOrganization(contact.id, d.organization_id, d.organization_role, true);
+      }
       events.emit('contact.created', { id: contact.id, contact });
       return c.json({ data: contact }, 201);
     },
@@ -150,6 +233,8 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       notes: z.string().optional(),
       source: z.string().optional(),
       metadata: z.record(z.string(), z.unknown()).optional(),
+      organization_id: z.string().uuid().optional(),
+      organization_role: z.string().optional(),
     })),
     async (c) => {
       const d = c.req.valid('json');
@@ -158,9 +243,27 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       const vals: any[] = [];
       let i = 1;
       for (const [k, v] of Object.entries(d)) {
+        // The membership lives in the join table, not in a column here. This
+        // UPDATE is built by walking the validated body, so anything accepted
+        // becomes a `SET` unless it is excluded — and `zvd_contacts` does carry
+        // an unused legacy `organization_id` column, so this would have written
+        // silently to the wrong place and still shown no organization.
+        if (k === 'organization_id' || k === 'organization_role') continue;
         if (v !== undefined) { sets.push(`${k} = $${i++}`); vals.push(k === 'metadata' ? JSON.stringify(v) : v); }
       }
-      if (!sets.length) return c.json({ error: 'No fields to update' }, 400);
+      if (d.organization_id) {
+        await linkContactOrganization(id, d.organization_id, d.organization_role, true);
+      }
+      if (!sets.length) {
+        // Changing only the organization is a legitimate edit, so this is no
+        // longer "nothing to update".
+        if (d.organization_id) {
+          const row = await sql`SELECT * FROM zvd_contacts WHERE id = ${id}`.execute(db);
+          if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
+          return c.json({ data: row.rows[0] });
+        }
+        return c.json({ error: 'No fields to update' }, 400);
+      }
       const result = await db.executeQuery({ sql: `UPDATE zvd_contacts SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] } as any);
       if (!(result as any).rows.length) return c.json({ error: 'Not found' }, 404);
       const contact = (result as any).rows[0];
@@ -249,15 +352,21 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const user = c.get('user') as any;
       const d = c.req.valid('json');
+      if (d.tax_id && !isValidCui(d.tax_id)) {
+        return c.json(
+          { error: `"${d.tax_id}" is not a valid Romanian tax code — the check digit does not match.` },
+          400,
+        );
+      }
       const result = await sql`
         INSERT INTO zvd_organizations
           (name, legal_name, tax_id, registration_no, type, industry,
-           website, email, phone, logo_url, tags, metadata, created_by)
+           website, email, phone, logo_url, tags, notes, metadata, created_by)
         VALUES
           (${d.name}, ${d.legal_name ?? null}, ${d.tax_id ?? null},
            ${d.registration_no ?? null}, ${d.type}, ${d.industry ?? null},
            ${d.website ?? null}, ${d.email ?? null}, ${d.phone ?? null},
-           ${d.logo_url ?? null}, ${d.tags ?? []},
+           ${d.logo_url ?? null}, ${d.tags ?? []}, ${d.notes ?? null},
            ${JSON.stringify(d.metadata ?? {})}::jsonb, ${user.id})
         RETURNING *
       `.execute(db);
