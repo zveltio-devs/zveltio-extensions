@@ -33,6 +33,25 @@ const entrySchema = z.object({
   document_number: z.string().optional(),
 });
 
+
+/**
+ * A DATE column as `YYYY-MM-DD`, which is the only form Postgres takes back.
+ *
+ * The driver returns `date` columns as JavaScript Date objects. Passing one
+ * straight into a query serialises it the JavaScript way — "Wed Jul 01 2026
+ * 00:00:00 GMT+0000 (Coordinated Universal Time)" — and Postgres answers
+ * "invalid input syntax for type date".
+ *
+ * Third place today with this exact defect, after finance/invoicing and
+ * compliance/ro/efactura, and hidden the same way in all three: generation was
+ * only ever a precondition for a submission that was faked and never read what
+ * it demanded, so nothing exercised it against a real row.
+ */
+function isoDay(value: unknown): string {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value ?? '').slice(0, 10);
+}
+
 export function saftRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
@@ -159,8 +178,8 @@ export function saftRoutes(ctx: ExtensionContext): Hono {
     const entries = await db
       .selectFrom('zv_saft_journal_entries')
       .selectAll()
-      .where('entry_date', '>=', exp.period_start)
-      .where('entry_date', '<=', exp.period_end)
+      .where('entry_date', '>=', isoDay(exp.period_start))
+      .where('entry_date', '<=', isoDay(exp.period_end))
       .orderBy('entry_date', 'asc')
       .execute();
 
@@ -168,8 +187,8 @@ export function saftRoutes(ctx: ExtensionContext): Hono {
       company_name: exp.company_name,
       company_cui: exp.company_cui,
       company_address: exp.company_address,
-      period_start: exp.period_start,
-      period_end: exp.period_end,
+      period_start: isoDay(exp.period_start),
+      period_end: isoDay(exp.period_end),
       // selectAll() rows are loosely typed; SAFTAccount / SAFTJournalEntry
       // are the strict shapes the generator expects. Schema columns
       // match — only the type system disagrees with the runtime.
@@ -201,7 +220,7 @@ export function saftRoutes(ctx: ExtensionContext): Hono {
     return new Response(exp.xml_content, {
       headers: {
         'Content-Type': 'application/xml; charset=utf-8',
-        'Content-Disposition': `attachment; filename="SAFT_${exp.company_cui}_${exp.period_start}_${exp.period_end}.xml"`,
+        'Content-Disposition': `attachment; filename="SAFT_${exp.company_cui}_${isoDay(exp.period_start)}_${isoDay(exp.period_end)}.xml"`,
       },
     });
   });
@@ -219,19 +238,39 @@ export function saftRoutes(ctx: ExtensionContext): Hono {
     if (!exp) return c.json({ error: 'Export not found' }, 404);
     if (!exp.xml_content) return c.json({ error: 'Generate XML first' }, 400);
 
-    const mockResponse = {
-      dateResponse: new Date().toISOString(),
-      ExecutionStatus: '0',
-      index_incarcare: `SAFT${Date.now()}`,
-    };
-
-    await db
-      .updateTable('zv_saft_exports')
-      .set({ status: 'submitted', anaf_response: JSON.stringify(mockResponse), updated_at: new Date() })
-      .where('id', '=', exp.id)
-      .execute();
-
-    return c.json({ message: 'Submitted to ANAF', response: mockResponse });
+    // Nothing is submitted, and nothing pretends to be.
+    //
+    // This route used to invent `SAFT` plus a timestamp as an upload index,
+    // store a made-up ANAF response with `ExecutionStatus: '0'`, move the
+    // export to `submitted` and reply "Submitted to ANAF". No request left this
+    // process — there is no call to anaf.ro in this extension.
+    //
+    // D406 is also not filed the way e-Factura is. There is no REST upload for
+    // it: the XML is validated and signed with ANAF's DUK Integrator, which
+    // produces a PDF carrying the XML, and that PDF is submitted in SPV like
+    // any other declaration. So the honest answer is not "not implemented yet"
+    // but "this is not the shape of the thing" — and the reply says which two
+    // steps a person actually has to take.
+    //
+    // The generator is ALSO partial, which matters more than the missing
+    // upload: it emits Header, the chart of accounts and general ledger
+    // entries. D406 additionally requires the tax table, customers, suppliers,
+    // products, units of measure, owners, assets and the whole SourceDocuments
+    // section — sales and purchase invoices, payments, movement of goods. An
+    // export produced here will not pass validation, and saying so now costs
+    // less than discovering it at a deadline.
+    return c.json(
+      {
+        code: 'saft_submission_not_implemented',
+        error:
+          'D406 is not submitted through an API. Download the XML, validate and sign it with ANAF\'s DUK Integrator, ' +
+          'then submit the resulting PDF in SPV. NOTE: this generator is incomplete — it produces Header, the chart of ' +
+          'accounts and ledger entries only, and omits the tax table, partners, products, assets and source documents ' +
+          'that D406 requires, so the file will not validate as-is.',
+        submitted: false,
+      },
+      501,
+    );
   });
 
   // --- Accounts ---
