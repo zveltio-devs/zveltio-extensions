@@ -36,5 +36,22 @@
   "compliance.ro.efactura.ui.fac_2026_001": "FAC-2026-001",
   "compliance.ro.efactura.ui.invoice_date": "Rechnungsdatum",
   "compliance.ro.efactura.ui.invoice_number": "Rechnungsnummer",
-  "compliance.ro.efactura.ui.new_invoice": "Neue Rechnung"
+  "compliance.ro.efactura.ui.new_invoice": "Neue Rechnung",
+  "efactura.settings.callbackHint": "Muss EXAKT der bei ANAF registrierten URL entsprechen",
+  "efactura.settings.callbackUrl": "Callback-URL",
+  "efactura.settings.cert": "Qualifiziertes Zertifikat",
+  "efactura.settings.certPassword": "Zertifikatspasswort",
+  "efactura.settings.certPath": "Zertifikatspfad auf diesem Server",
+  "efactura.settings.certPathHint": "z. B. /etc/zveltio/anaf.p12 — die Datei bleibt auf dem Server",
+  "efactura.settings.clientId": "Client-ID",
+  "efactura.settings.clientSecret": "Client-Secret",
+  "efactura.settings.env": "Umgebung",
+  "efactura.settings.envProd": "Produktion — echte Einreichung",
+  "efactura.settings.envTest": "Test — ohne steuerliche Wirkung",
+  "efactura.settings.environment": "Ziel",
+  "efactura.settings.leaveBlank": "Leer lassen, um den gespeicherten Wert zu behalten",
+  "efactura.settings.oauth": "OAuth-Anwendung",
+  "efactura.settings.sellerCif": "Einreichende USt-IdNr.",
+  "efactura.settings.subtitle": "Zugangsdaten für die SPV-Einreichung",
+  "efactura.settings.title": "ANAF-Verbindung"
 }

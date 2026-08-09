@@ -1356,10 +1356,10 @@ var SelectQueryNode = freeze({
       offset
     });
   },
-  cloneWithFetch(selectNode, fetch) {
+  cloneWithFetch(selectNode, fetch2) {
     return freeze({
       ...selectNode,
-      fetch
+      fetch: fetch2
     });
   },
   cloneWithHaving(selectNode, operation) {
@@ -19792,30 +19792,6 @@ var invoiceSchema = exports_external.object({
   payment_reference: exports_external.string().optional(),
   reverse_charge: exports_external.boolean().default(false)
 });
-function toInvoiceData(row, lines) {
-  const num = (v) => v === null || v === undefined ? 0 : Number(v);
-  const day = (v) => v instanceof Date ? v.toISOString().slice(0, 10) : v ? String(v).slice(0, 10) : "";
-  return {
-    ...row,
-    invoice_date: day(row.invoice_date),
-    due_date: day(row.due_date),
-    subtotal: num(row.subtotal),
-    vat_total: num(row.vat_total),
-    total: num(row.total),
-    lines: (lines ?? []).map((l) => ({
-      ...l,
-      quantity: num(l.quantity),
-      unit_price: num(l.unit_price),
-      vat_rate: num(l.vat_rate),
-      vat_amount: num(l.vat_amount),
-      line_total: num(l.line_total)
-    }))
-  };
-}
-var NOT_SUBMITTED_DETAIL = "Automatic submission to ANAF is not implemented: this build has no SPV " + "integration (no certificate, no OAuth, no call to anaf.ro). The invoice was " + "NOT sent and its status is unchanged. Generate the XML and download it from " + "GET /:id/xml, then upload that file in SPV yourself.";
-function notSubmitted(c) {
-  return c.json({ code: "anaf_submission_not_implemented", error: NOT_SUBMITTED_DETAIL, submitted: false }, 501);
-}
 async function getUser(c, auth) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   return session?.user ?? null;
@@ -19878,6 +19854,247 @@ function efacturaRoutes(ctx) {
       `.execute(db).catch(() => ({ rows: [] }))
     ]);
     return c.json({ year: currentYear, by_status: statusStats.rows, by_month: monthlyStats.rows });
+  });
+  app.get("/settings", async (c) => {
+    const user = await getUser(c, auth);
+    if (!user)
+      return c.json({ error: "Unauthorized" }, 401);
+    const row = await sql`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
+    const r = row.rows[0];
+    return c.json({
+      data: {
+        environment: r?.environment ?? "test",
+        seller_cif: r?.seller_cif ?? "",
+        client_id: r?.client_id ?? "",
+        cert_path: r?.cert_path ?? "",
+        callback_url: r?.callback_url ?? "",
+        client_secret_set: Boolean(r?.client_secret),
+        cert_password_set: Boolean(r?.cert_password),
+        connected: Boolean(r?.access_token),
+        token_expires_at: r?.token_expires_at ?? null,
+        last_verified_at: r?.last_verified_at ?? null,
+        last_error: r?.last_error ?? null
+      }
+    });
+  });
+  const settingsSchema = exports_external.object({
+    environment: exports_external.enum(["test", "prod"]).default("test"),
+    seller_cif: exports_external.string().optional(),
+    client_id: exports_external.string().optional(),
+    client_secret: exports_external.string().optional(),
+    cert_path: exports_external.string().optional(),
+    cert_password: exports_external.string().optional(),
+    callback_url: exports_external.string().optional()
+  });
+  async function saveSettings(c) {
+    const user = await getUser(c, auth);
+    if (!user)
+      return c.json({ error: "Unauthorized" }, 401);
+    const d = c.req.valid("json");
+    const enc = ctx.internals?.encryptSecret;
+    const needsEncryption = Boolean(d.client_secret || d.cert_password);
+    if (needsEncryption && !enc) {
+      return c.json({ error: "FIELD_ENCRYPTION_KEY is not configured, so credentials cannot be stored safely." }, 400);
+    }
+    const existing = await sql`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
+    const prev = existing.rows[0];
+    const secret = d.client_secret ? await enc(d.client_secret) : prev?.client_secret ?? null;
+    const certPw = d.cert_password ? await enc(d.cert_password) : prev?.cert_password ?? null;
+    const row = prev ? await sql`
+          UPDATE zv_efactura_settings SET
+            environment = ${d.environment}, seller_cif = ${d.seller_cif ?? null},
+            client_id = ${d.client_id ?? null}, client_secret = ${secret},
+            cert_path = ${d.cert_path ?? null}, cert_password = ${certPw},
+            callback_url = ${d.callback_url ?? null},
+            updated_at = NOW()
+          WHERE id = ${prev.id} RETURNING id
+        `.execute(db) : await sql`
+          INSERT INTO zv_efactura_settings
+            (environment, seller_cif, client_id, client_secret, cert_path, cert_password, callback_url)
+          VALUES (${d.environment}, ${d.seller_cif ?? null}, ${d.client_id ?? null},
+                  ${secret}, ${d.cert_path ?? null}, ${certPw}, ${d.callback_url ?? null})
+          RETURNING id
+        `.execute(db);
+    return c.json({ data: { id: row.rows[0].id, saved: true } });
+  }
+  app.post("/settings", zValidator("json", settingsSchema), saveSettings);
+  app.put("/settings", zValidator("json", settingsSchema), saveSettings);
+  const anafApi = (env) => `https://api.anaf.ro/${env === "prod" ? "prod" : "test"}/FCTEL/rest`;
+  const ANAF_PUBLIC = "https://webservicesp.anaf.ro/prod/FCTEL/rest";
+  async function anafAuth() {
+    const row = await sql`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
+    const cfg = row.rows[0];
+    if (!cfg?.access_token)
+      return { error: "Not connected to ANAF. Sign in on the ANAF connection screen first." };
+    const dec = ctx.internals?.decryptSecret;
+    if (!dec)
+      return { error: "FIELD_ENCRYPTION_KEY is not configured." };
+    if (cfg.token_expires_at && new Date(cfg.token_expires_at) < new Date) {
+      return { error: "The ANAF token has expired. Refresh it on the ANAF connection screen." };
+    }
+    return { cfg, token: await dec(cfg.access_token) };
+  }
+  const ANAF_IDP = "https://logincert.anaf.ro/anaf-oauth2/v1";
+  app.get("/oauth/authorize-url", async (c) => {
+    const user = await getUser(c, auth);
+    if (!user)
+      return c.json({ error: "Unauthorized" }, 401);
+    const row = await sql`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
+    const cfg = row.rows[0];
+    if (!cfg?.client_id) {
+      return c.json({ error: "Set the ANAF client_id first, on the ANAF connection screen." }, 400);
+    }
+    const redirectUri = cfg.callback_url || c.req.query("redirect_uri");
+    if (!redirectUri) {
+      return c.json({ error: "Set the callback URL on the ANAF connection screen \u2014 it must match exactly what you registered with ANAF." }, 400);
+    }
+    const url2 = new URL(`${ANAF_IDP}/authorize`);
+    url2.searchParams.set("response_type", "code");
+    url2.searchParams.set("client_id", cfg.client_id);
+    url2.searchParams.set("redirect_uri", redirectUri);
+    url2.searchParams.set("token_content_type", "jwt");
+    return c.json({ data: { url: url2.toString(), redirect_uri: redirectUri } });
+  });
+  app.post("/oauth/exchange", zValidator("json", exports_external.object({ code: exports_external.string().min(1), redirect_uri: exports_external.string().url() })), async (c) => {
+    const user = await getUser(c, auth);
+    if (!user)
+      return c.json({ error: "Unauthorized" }, 401);
+    const d = c.req.valid("json");
+    const row = await sql`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
+    const cfg = row.rows[0];
+    const dec = ctx.internals?.decryptSecret;
+    const enc = ctx.internals?.encryptSecret;
+    if (!cfg?.client_id || !cfg?.client_secret || !dec || !enc) {
+      return c.json({ error: "ANAF credentials are not configured." }, 400);
+    }
+    const body = new URLSearchParams({
+      grant_type: "authorization_code",
+      code: d.code,
+      client_id: cfg.client_id,
+      client_secret: await dec(cfg.client_secret),
+      redirect_uri: d.redirect_uri,
+      token_content_type: "jwt"
+    });
+    let payload;
+    try {
+      const res = await fetch(`${ANAF_IDP}/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+        signal: AbortSignal.timeout(20000)
+      });
+      const text = await res.text();
+      if (!res.ok) {
+        await sql`UPDATE zv_efactura_settings SET last_error = ${text.slice(0, 500)}, updated_at = NOW() WHERE id = ${cfg.id}`.execute(db);
+        return c.json({ error: `ANAF refused the token request (${res.status})`, detail: text.slice(0, 500) }, 400);
+      }
+      payload = JSON.parse(text);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await sql`UPDATE zv_efactura_settings SET last_error = ${msg} , updated_at = NOW() WHERE id = ${cfg.id}`.execute(db);
+      return c.json({ error: `Could not reach ANAF: ${msg}` }, 502);
+    }
+    const expiresAt = payload.expires_in ? new Date(Date.now() + Number(payload.expires_in) * 1000) : null;
+    await sql`
+        UPDATE zv_efactura_settings SET
+          access_token = ${await enc(String(payload.access_token ?? ""))},
+          refresh_token = ${payload.refresh_token ? await enc(String(payload.refresh_token)) : null},
+          token_expires_at = ${expiresAt},
+          last_verified_at = NOW(), last_error = NULL, updated_at = NOW()
+        WHERE id = ${cfg.id}
+      `.execute(db);
+    return c.json({ data: { connected: true, token_expires_at: expiresAt } });
+  });
+  app.post("/oauth/refresh", async (c) => {
+    const user = await getUser(c, auth);
+    if (!user)
+      return c.json({ error: "Unauthorized" }, 401);
+    const row = await sql`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
+    const cfg = row.rows[0];
+    const dec = ctx.internals?.decryptSecret;
+    const enc = ctx.internals?.encryptSecret;
+    if (!cfg?.refresh_token || !dec || !enc)
+      return c.json({ error: "No refresh token stored." }, 400);
+    const body = new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: await dec(cfg.refresh_token),
+      client_id: cfg.client_id,
+      client_secret: await dec(cfg.client_secret),
+      token_content_type: "jwt"
+    });
+    try {
+      const res = await fetch(`${ANAF_IDP}/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+        signal: AbortSignal.timeout(20000)
+      });
+      const text = await res.text();
+      if (!res.ok)
+        return c.json({ error: `ANAF refused the refresh (${res.status})`, detail: text.slice(0, 400) }, 400);
+      const payload = JSON.parse(text);
+      const expiresAt = payload.expires_in ? new Date(Date.now() + Number(payload.expires_in) * 1000) : null;
+      await sql`
+        UPDATE zv_efactura_settings SET
+          access_token = ${await enc(String(payload.access_token ?? ""))},
+          refresh_token = ${payload.refresh_token ? await enc(String(payload.refresh_token)) : cfg.refresh_token},
+          token_expires_at = ${expiresAt}, last_verified_at = NOW(), last_error = NULL, updated_at = NOW()
+        WHERE id = ${cfg.id}
+      `.execute(db);
+      return c.json({ data: { connected: true, token_expires_at: expiresAt } });
+    } catch (err) {
+      return c.json({ error: `Could not reach ANAF: ${err instanceof Error ? err.message : String(err)}` }, 502);
+    }
+  });
+  app.get("/oauth/test", async (c) => {
+    const user = await getUser(c, auth);
+    if (!user)
+      return c.json({ error: "Unauthorized" }, 401);
+    const row = await sql`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
+    const cfg = row.rows[0];
+    const dec = ctx.internals?.decryptSecret;
+    if (!cfg?.access_token || !dec)
+      return c.json({ error: "Not connected to ANAF yet." }, 400);
+    try {
+      const res = await fetch("https://api.anaf.ro/TestOauth/jaxrs/hello?name=zveltio", {
+        headers: { Authorization: `Bearer ${await dec(cfg.access_token)}` },
+        signal: AbortSignal.timeout(20000)
+      });
+      const text = await res.text();
+      return c.json({ data: { status: res.status, ok: res.ok, response: text.slice(0, 300) } });
+    } catch (err) {
+      return c.json({ error: `Could not reach ANAF: ${err instanceof Error ? err.message : String(err)}` }, 502);
+    }
+  });
+  app.get("/:id/pdf", async (c) => {
+    const user = await getUser(c, auth);
+    if (!user)
+      return c.json({ error: "Unauthorized" }, 401);
+    const row = await sql`SELECT invoice_number, xml_content FROM zv_efactura_invoices WHERE id = ${c.req.param("id")}`.execute(db);
+    const inv = row.rows[0];
+    if (!inv)
+      return c.json({ error: "Not found" }, 404);
+    if (!inv.xml_content)
+      return c.json({ error: "Generate the XML first" }, 400);
+    try {
+      const res = await fetch(`${ANAF_PUBLIC}/transformare/FACT1`, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: inv.xml_content,
+        signal: AbortSignal.timeout(30000)
+      });
+      if (!res.ok) {
+        return c.json({ error: `ANAF could not render the PDF (${res.status})`, detail: (await res.text()).slice(0, 300) }, 400);
+      }
+      return new Response(await res.arrayBuffer(), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="${String(inv.invoice_number).replace(/[^\w.-]/g, "_")}.pdf"`
+        }
+      });
+    } catch (err) {
+      return c.json({ error: `Could not reach ANAF: ${err instanceof Error ? err.message : String(err)}` }, 502);
+    }
   });
   app.get("/:id", async (c) => {
     const user = await getUser(c, auth);
@@ -19970,7 +20187,135 @@ function efacturaRoutes(ctx) {
       return c.json({ error: "Invoice not found" }, 404);
     if (!invoice.xml_content)
       return c.json({ error: "Generate XML first" }, 400);
-    return notSubmitted(c);
+    const authz = await anafAuth();
+    if ("error" in authz)
+      return c.json({ error: authz.error, submitted: false }, 400);
+    const cif = String(authz.cfg.seller_cif || invoice.seller_cui || "").replace(/^RO/i, "");
+    if (!cif)
+      return c.json({ error: "No filing CIF configured." }, 400);
+    const url2 = `${anafApi(authz.cfg.environment)}/upload?standard=UBL&cif=${encodeURIComponent(cif)}`;
+    let body;
+    let status;
+    try {
+      const res = await fetch(url2, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${authz.token}`, "Content-Type": "application/xml" },
+        body: invoice.xml_content,
+        signal: AbortSignal.timeout(60000)
+      });
+      status = res.status;
+      body = await res.text();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return c.json({ error: `Could not reach ANAF: ${msg}`, submitted: false }, 502);
+    }
+    const index = /index_incarcare\s*=\s*"([^"]+)"/i.exec(body)?.[1];
+    if (status < 200 || status >= 300 || !index) {
+      await sql`
+        UPDATE zv_efactura_invoices SET anaf_response = ${body.slice(0, 2000)}, updated_at = NOW()
+        WHERE id = ${invoice.id}
+      `.execute(db);
+      return c.json({ error: `ANAF rejected the upload (HTTP ${status})`, detail: body.slice(0, 600), submitted: false }, 400);
+    }
+    await sql`
+      UPDATE zv_efactura_invoices SET
+        status = 'submitted', anaf_index = ${index},
+        anaf_response = ${body.slice(0, 2000)}, updated_at = NOW()
+      WHERE id = ${invoice.id}
+    `.execute(db);
+    await logStatusChange(db, invoice.id, invoice.status, "submitted", user.id, `ANAF index: ${index}`);
+    await sql`
+      INSERT INTO zv_efactura_daily_stats (date, seller_cui, submitted_count, total_amount, vat_amount)
+      VALUES (CURRENT_DATE, ${invoice.seller_cui}, 1, ${invoice.total}, ${invoice.vat_total})
+      ON CONFLICT (date, seller_cui)
+      DO UPDATE SET submitted_count = zv_efactura_daily_stats.submitted_count + 1,
+                    total_amount = zv_efactura_daily_stats.total_amount + EXCLUDED.total_amount,
+                    vat_amount = zv_efactura_daily_stats.vat_amount + EXCLUDED.vat_amount
+    `.execute(db).catch(() => {});
+    return c.json({ data: { submitted: true, anaf_index: index, environment: authz.cfg.environment } });
+  });
+  app.get("/:id/anaf-status", async (c) => {
+    const user = await getUser(c, auth);
+    if (!user)
+      return c.json({ error: "Unauthorized" }, 401);
+    const row = await sql`SELECT * FROM zv_efactura_invoices WHERE id = ${c.req.param("id")}`.execute(db);
+    const inv = row.rows[0];
+    if (!inv)
+      return c.json({ error: "Not found" }, 404);
+    if (!inv.anaf_index)
+      return c.json({ error: "This invoice has not been submitted." }, 400);
+    const authz = await anafAuth();
+    if ("error" in authz)
+      return c.json({ error: authz.error }, 400);
+    try {
+      const res = await fetch(`${anafApi(authz.cfg.environment)}/stareMesaj?id_incarcare=${encodeURIComponent(inv.anaf_index)}`, { headers: { Authorization: `Bearer ${authz.token}` }, signal: AbortSignal.timeout(30000) });
+      const text = await res.text();
+      const stare = /stare\s*=\s*"([^"]+)"/i.exec(text)?.[1] ?? null;
+      const downloadId = /id_descarcare\s*=\s*"([^"]+)"/i.exec(text)?.[1] ?? null;
+      if (stare === "ok" || stare === "nok") {
+        await sql`
+          UPDATE zv_efactura_invoices SET status = ${stare === "ok" ? "accepted" : "rejected"},
+            anaf_response = ${text.slice(0, 2000)}, updated_at = NOW()
+          WHERE id = ${inv.id}
+        `.execute(db);
+        await logStatusChange(db, inv.id, inv.status, stare === "ok" ? "accepted" : "rejected", user.id);
+      }
+      return c.json({ data: { stare, download_id: downloadId, raw: text.slice(0, 600) } });
+    } catch (err) {
+      return c.json({ error: `Could not reach ANAF: ${err instanceof Error ? err.message : String(err)}` }, 502);
+    }
+  });
+  app.get("/anaf/messages", async (c) => {
+    const user = await getUser(c, auth);
+    if (!user)
+      return c.json({ error: "Unauthorized" }, 401);
+    const authz = await anafAuth();
+    if ("error" in authz)
+      return c.json({ error: authz.error }, 400);
+    const zile = Math.min(Math.max(parseInt(c.req.query("zile") ?? "30", 10) || 30, 1), 60);
+    const cif = String(authz.cfg.seller_cif ?? "").replace(/^RO/i, "");
+    if (!cif)
+      return c.json({ error: "No filing CIF configured." }, 400);
+    const filtru = c.req.query("filtru");
+    let url2 = `${anafApi(authz.cfg.environment)}/listaMesajeFactura?zile=${zile}&cif=${encodeURIComponent(cif)}`;
+    if (filtru && ["E", "T", "P", "R"].includes(filtru))
+      url2 += `&filtru=${filtru}`;
+    try {
+      const res = await fetch(url2, { headers: { Authorization: `Bearer ${authz.token}` }, signal: AbortSignal.timeout(30000) });
+      const text = await res.text();
+      try {
+        return c.json({ data: JSON.parse(text) });
+      } catch {
+        return c.json({ data: { raw: text.slice(0, 2000) } });
+      }
+    } catch (err) {
+      return c.json({ error: `Could not reach ANAF: ${err instanceof Error ? err.message : String(err)}` }, 502);
+    }
+  });
+  app.get("/anaf/download/:downloadId", async (c) => {
+    const user = await getUser(c, auth);
+    if (!user)
+      return c.json({ error: "Unauthorized" }, 401);
+    const authz = await anafAuth();
+    if ("error" in authz)
+      return c.json({ error: authz.error }, 400);
+    const id = c.req.param("downloadId");
+    try {
+      const res = await fetch(`${anafApi(authz.cfg.environment)}/descarcare?id=${encodeURIComponent(id)}`, {
+        headers: { Authorization: `Bearer ${authz.token}` },
+        signal: AbortSignal.timeout(60000)
+      });
+      if (!res.ok)
+        return c.json({ error: `ANAF refused the download (${res.status})` }, 400);
+      return new Response(await res.arrayBuffer(), {
+        headers: {
+          "Content-Type": "application/zip",
+          "Content-Disposition": `attachment; filename="anaf-${id.replace(/[^\w.-]/g, "_")}.zip"`
+        }
+      });
+    } catch (err) {
+      return c.json({ error: `Could not reach ANAF: ${err instanceof Error ? err.message : String(err)}` }, 502);
+    }
   });
   app.post("/:id/storno", zValidator("json", exports_external.object({ reason: exports_external.string().min(1) })), async (c) => {
     const user = await getUser(c, auth);
@@ -20019,7 +20364,11 @@ function efacturaRoutes(ctx) {
         results.push({ id, success: false, error: "XML not generated" });
         continue;
       }
-      results.push({ id, success: false, error: NOT_SUBMITTED_DETAIL });
+      results.push({
+        id,
+        success: false,
+        error: "Use POST /:id/submit for each invoice; batch upload is not implemented."
+      });
     }
     return c.json({ results, submitted: 0 }, 501);
   });
@@ -20044,7 +20393,8 @@ var extension = {
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
       join(import.meta.dir, "migrations/003_party_address.sql"),
       join(import.meta.dir, "migrations/004_party_county.sql"),
-      join(import.meta.dir, "migrations/005_anaf_settings.sql")
+      join(import.meta.dir, "migrations/005_anaf_settings.sql"),
+      join(import.meta.dir, "migrations/006_callback_url.sql")
     ];
   },
   async register(app, ctx) {

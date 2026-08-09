@@ -36,5 +36,22 @@
   "compliance.ro.efactura.ui.fac_2026_001": "FAC-2026-001",
   "compliance.ro.efactura.ui.invoice_date": "Data fattura",
   "compliance.ro.efactura.ui.invoice_number": "Numero fattura",
-  "compliance.ro.efactura.ui.new_invoice": "Nuova fattura"
+  "compliance.ro.efactura.ui.new_invoice": "Nuova fattura",
+  "efactura.settings.callbackHint": "Deve corrispondere ESATTAMENTE a quella registrata presso ANAF",
+  "efactura.settings.callbackUrl": "URL di callback",
+  "efactura.settings.cert": "Certificato qualificato",
+  "efactura.settings.certPassword": "Password del certificato",
+  "efactura.settings.certPath": "Percorso del certificato sul server",
+  "efactura.settings.certPathHint": "es. /etc/zveltio/anaf.p12 — il file resta sul server",
+  "efactura.settings.clientId": "Client ID",
+  "efactura.settings.clientSecret": "Client secret",
+  "efactura.settings.env": "Ambiente",
+  "efactura.settings.envProd": "Produzione — invio reale",
+  "efactura.settings.envTest": "Test — senza effetti fiscali",
+  "efactura.settings.environment": "Destinazione",
+  "efactura.settings.leaveBlank": "Lascia vuoto per mantenere il valore salvato",
+  "efactura.settings.oauth": "Applicazione OAuth",
+  "efactura.settings.sellerCif": "P. IVA dichiarante",
+  "efactura.settings.subtitle": "Credenziali per l'invio a SPV",
+  "efactura.settings.title": "Connessione ANAF"
 }
