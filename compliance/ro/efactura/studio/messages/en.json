@@ -36,5 +36,22 @@
   "compliance.ro.efactura.ui.fac_2026_001": "FAC-2026-001",
   "compliance.ro.efactura.ui.invoice_date": "Invoice date",
   "compliance.ro.efactura.ui.invoice_number": "Invoice number",
-  "compliance.ro.efactura.ui.new_invoice": "New Invoice"
+  "compliance.ro.efactura.ui.new_invoice": "New Invoice",
+  "efactura.settings.callbackHint": "Must match EXACTLY what you registered with ANAF, e.g. https://your-domain/admin/anaf/callback",
+  "efactura.settings.callbackUrl": "Callback URL",
+  "efactura.settings.cert": "Qualified certificate",
+  "efactura.settings.certPassword": "Certificate password",
+  "efactura.settings.certPath": "Certificate path on this server",
+  "efactura.settings.certPathHint": "e.g. /etc/zveltio/anaf.p12 — the file stays on the server",
+  "efactura.settings.clientId": "Client ID",
+  "efactura.settings.clientSecret": "Client secret",
+  "efactura.settings.env": "Environment",
+  "efactura.settings.envProd": "Production — filed for real",
+  "efactura.settings.envTest": "Test — no fiscal effect",
+  "efactura.settings.environment": "Target",
+  "efactura.settings.leaveBlank": "Leave blank to keep the stored value",
+  "efactura.settings.oauth": "OAuth application",
+  "efactura.settings.sellerCif": "Filing CIF",
+  "efactura.settings.subtitle": "Credentials for submitting e-invoices to SPV",
+  "efactura.settings.title": "ANAF connection"
 }

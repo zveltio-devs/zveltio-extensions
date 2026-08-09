@@ -40,72 +40,6 @@ const invoiceSchema = z.object({
   reverse_charge: z.boolean().default(false),
 });
 
-/**
- * Nothing is sent to ANAF, and saying so is the whole point.
- *
- * This route used to FABRICATE the answer. It built a response object with
- * `ExecutionStatus: '0'` and an upload index of `RO` followed by the current
- * timestamp, wrote that to `anaf_index` and `anaf_response`, moved the invoice
- * to `submitted`, recorded a status-log entry reading "ANAF index: …",
- * incremented the daily count of submitted invoices, and replied "Submitted to
- * ANAF". `batch-submit` did the same for twenty at a time.
- *
- * There is no ANAF call anywhere in this extension — no OAuth, no certificate,
- * no request to anaf.ro — so every one of those invoices was still sitting on
- * the operator's own disk while the product told them it had been filed. A
- * missing feature costs someone an afternoon; a feature that reports success it
- * did not achieve costs them a penalty, months later, with the evidence in
- * their own database saying they had complied.
- *
- * 501 is the honest status: the route exists and is understood, the capability
- * does not. The XML is real and already downloadable, so the reply points at
- * the path that does work today — generate it, fetch it, upload it in SPV by
- * hand — rather than leaving somebody stuck at a button.
- */
-/**
- * A database row, as the UBL generator declares its input.
- *
- * Postgres gives NUMERIC back as a string and DATE as a Date; `InvoiceData`
- * asks for `number` and `string`. Converting here keeps every `.toFixed()` in
- * the template honest instead of each one guarding itself.
- */
-// biome-ignore lint/suspicious/noExplicitAny: legacy any; tracked in docs/HARDENING-9-PLAN.md H-01
-function toInvoiceData(row: any, lines: any[]): any {
-  const num = (v: unknown): number => (v === null || v === undefined ? 0 : Number(v));
-  const day = (v: unknown): string =>
-    v instanceof Date ? v.toISOString().slice(0, 10) : v ? String(v).slice(0, 10) : '';
-  return {
-    ...row,
-    invoice_date: day(row.invoice_date),
-    due_date: day(row.due_date),
-    subtotal: num(row.subtotal),
-    vat_total: num(row.vat_total),
-    total: num(row.total),
-    lines: (lines ?? []).map((l) => ({
-      ...l,
-      quantity: num(l.quantity),
-      unit_price: num(l.unit_price),
-      vat_rate: num(l.vat_rate),
-      vat_amount: num(l.vat_amount),
-      line_total: num(l.line_total),
-    })),
-  };
-}
-
-const NOT_SUBMITTED_DETAIL =
-  'Automatic submission to ANAF is not implemented: this build has no SPV ' +
-  'integration (no certificate, no OAuth, no call to anaf.ro). The invoice was ' +
-  'NOT sent and its status is unchanged. Generate the XML and download it from ' +
-  'GET /:id/xml, then upload that file in SPV yourself.';
-
-// biome-ignore lint/suspicious/noExplicitAny: legacy any; tracked in docs/HARDENING-9-PLAN.md H-01
-function notSubmitted(c: any) {
-  return c.json(
-    { code: 'anaf_submission_not_implemented', error: NOT_SUBMITTED_DETAIL, submitted: false },
-    501,
-  );
-}
-
 async function getUser(c: any, auth: any) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   return session?.user ?? null;
@@ -184,6 +118,355 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     ]);
 
     return c.json({ year: currentYear, by_status: statusStats.rows, by_month: monthlyStats.rows });
+  });
+
+  // ── ANAF connection ───────────────────────────────────────────
+  //
+  // Reading NEVER returns a secret. The screen needs to know whether the
+  // connection is configured, not what it is configured with — and a settings
+  // endpoint that echoes credentials back turns every stray log, proxy cache
+  // and browser history entry into a copy of them.
+  app.get('/settings', async (c) => {
+    const user = await getUser(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const row = await sql<any>`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
+    const r = row.rows[0];
+    return c.json({
+      data: {
+        environment: r?.environment ?? 'test',
+        seller_cif: r?.seller_cif ?? '',
+        client_id: r?.client_id ?? '',
+        cert_path: r?.cert_path ?? '',
+        callback_url: r?.callback_url ?? '',
+        // Booleans, not values.
+        client_secret_set: Boolean(r?.client_secret),
+        cert_password_set: Boolean(r?.cert_password),
+        connected: Boolean(r?.access_token),
+        token_expires_at: r?.token_expires_at ?? null,
+        last_verified_at: r?.last_verified_at ?? null,
+        last_error: r?.last_error ?? null,
+      },
+    });
+  });
+
+  const settingsSchema = z.object({
+    environment: z.enum(['test', 'prod']).default('test'),
+    seller_cif: z.string().optional(),
+    client_id: z.string().optional(),
+    /** Left blank on a re-save to keep the stored one. */
+    client_secret: z.string().optional(),
+    cert_path: z.string().optional(),
+    cert_password: z.string().optional(),
+    callback_url: z.string().optional(),
+  });
+
+  // biome-ignore lint/suspicious/noExplicitAny: Hono context
+  async function saveSettings(c: any) {
+    const user = await getUser(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const d = c.req.valid('json') as z.infer<typeof settingsSchema>;
+
+    // Refuse rather than persist plaintext. Without a field key there is no way
+    // to store an OAuth secret safely, and writing it anyway would put a
+    // credential to a tax authority in the clear on the operator's disk.
+    const enc = ctx.internals?.encryptSecret;
+    const needsEncryption = Boolean(d.client_secret || d.cert_password);
+    if (needsEncryption && !enc) {
+      return c.json(
+        { error: 'FIELD_ENCRYPTION_KEY is not configured, so credentials cannot be stored safely.' },
+        400,
+      );
+    }
+
+    const existing = await sql<any>`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
+    const prev = existing.rows[0];
+
+    // An empty secret means "leave what is there", so re-saving the form after
+    // changing the environment does not silently wipe the credentials the user
+    // cannot see to retype.
+    const secret = d.client_secret ? await enc!(d.client_secret) : (prev?.client_secret ?? null);
+    const certPw = d.cert_password ? await enc!(d.cert_password) : (prev?.cert_password ?? null);
+
+    const row = prev
+      ? await sql<any>`
+          UPDATE zv_efactura_settings SET
+            environment = ${d.environment}, seller_cif = ${d.seller_cif ?? null},
+            client_id = ${d.client_id ?? null}, client_secret = ${secret},
+            cert_path = ${d.cert_path ?? null}, cert_password = ${certPw},
+            callback_url = ${d.callback_url ?? null},
+            updated_at = NOW()
+          WHERE id = ${prev.id} RETURNING id
+        `.execute(db)
+      : await sql<any>`
+          INSERT INTO zv_efactura_settings
+            (environment, seller_cif, client_id, client_secret, cert_path, cert_password, callback_url)
+          VALUES (${d.environment}, ${d.seller_cif ?? null}, ${d.client_id ?? null},
+                  ${secret}, ${d.cert_path ?? null}, ${certPw}, ${d.callback_url ?? null})
+          RETURNING id
+        `.execute(db);
+
+    return c.json({ data: { id: row.rows[0].id, saved: true } });
+  }
+
+  app.post('/settings', zValidator('json', settingsSchema), saveSettings);
+  app.put('/settings', zValidator('json', settingsSchema), saveSettings);
+
+
+
+  /**
+   * ANAF's e-Factura web services, from their own specification.
+   *
+   * Two families, and the difference matters: `webserviceapl.anaf.ro` expects
+   * the digital certificate presented on the call itself, `api.anaf.ro` expects
+   * an OAuth bearer token. This engine has no certificate to present — the
+   * certificate lives with the person, in their browser — so it always uses the
+   * OAuth family.
+   *
+   * `webservicesp.anaf.ro` is a third, unauthenticated host carrying validation
+   * and XML-to-PDF. Those need no credentials at all, which is why the invoice
+   * can be validated and rendered before anyone has connected anything.
+   */
+  const anafApi = (env: string) => `https://api.anaf.ro/${env === 'prod' ? 'prod' : 'test'}/FCTEL/rest`;
+  const ANAF_PUBLIC = 'https://webservicesp.anaf.ro/prod/FCTEL/rest';
+
+  /** Settings row plus a decrypted bearer token, or a reason there is none. */
+  async function anafAuth(): Promise<{ cfg: any; token: string } | { error: string }> {
+    const row = await sql<any>`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
+    const cfg = row.rows[0];
+    if (!cfg?.access_token) return { error: 'Not connected to ANAF. Sign in on the ANAF connection screen first.' };
+    const dec = ctx.internals?.decryptSecret;
+    if (!dec) return { error: 'FIELD_ENCRYPTION_KEY is not configured.' };
+    if (cfg.token_expires_at && new Date(cfg.token_expires_at) < new Date()) {
+      return { error: 'The ANAF token has expired. Refresh it on the ANAF connection screen.' };
+    }
+    return { cfg, token: await dec(cfg.access_token) };
+  }
+
+  // ── ANAF OAuth 2.0 ────────────────────────────────────────────
+  //
+  // Endpoints from ANAF's own registration procedure, not inferred:
+  //
+  //   Authorization  https://logincert.anaf.ro/anaf-oauth2/v1/authorize
+  //   Token          https://logincert.anaf.ro/anaf-oauth2/v1/token
+  //
+  // `logincert.anaf.ro` is the identity provider; `api.anaf.ro` is the
+  // protected resource. Authentication is by qualified digital certificate,
+  // which the person must have physically connected — the browser does that
+  // handshake, not this server, which is why the flow is a redirect rather than
+  // something the engine can perform on its own.
+  //
+  // The token granted depends on TWO enrolments, per the procedure: the user's
+  // SPV rights for the company, and whether the registered application itself
+  // was enrolled for that service. A token can therefore be valid and still not
+  // open e-Factura, which is why `/oauth/test` exists below.
+  const ANAF_IDP = 'https://logincert.anaf.ro/anaf-oauth2/v1';
+
+  /** Where to send the person's browser to sign with their certificate. */
+  app.get('/oauth/authorize-url', async (c) => {
+    const user = await getUser(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const row = await sql<any>`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
+    const cfg = row.rows[0];
+    if (!cfg?.client_id) {
+      return c.json({ error: 'Set the ANAF client_id first, on the ANAF connection screen.' }, 400);
+    }
+    // The stored value wins. ANAF matches redirect_uri against what was
+    // registered, character for character, so a guess from the request URL is
+    // wrong the moment the instance sits behind a proxy or a different host.
+    const redirectUri = cfg.callback_url || c.req.query('redirect_uri');
+    if (!redirectUri) {
+      return c.json(
+        { error: 'Set the callback URL on the ANAF connection screen — it must match exactly what you registered with ANAF.' },
+        400,
+      );
+    }
+    const url = new URL(`${ANAF_IDP}/authorize`);
+    url.searchParams.set('response_type', 'code');
+    url.searchParams.set('client_id', cfg.client_id);
+    url.searchParams.set('redirect_uri', redirectUri);
+    // JWT, so the token can be decoded to see which company and rights it
+    // carries rather than discovering them from a later refusal.
+    url.searchParams.set('token_content_type', 'jwt');
+    return c.json({ data: { url: url.toString(), redirect_uri: redirectUri } });
+  });
+
+  /**
+   * Exchange the authorization code for tokens.
+   *
+   * The code arrives on the registered callback, which the operator's own
+   * front end forwards here — rather than ANAF calling this route directly,
+   * because the callback URL is fixed at application registration and an
+   * install's engine may sit behind any path.
+   */
+  app.post('/oauth/exchange',
+    zValidator('json', z.object({ code: z.string().min(1), redirect_uri: z.string().url() })),
+    async (c) => {
+      const user = await getUser(c, auth);
+      if (!user) return c.json({ error: 'Unauthorized' }, 401);
+      const d = c.req.valid('json');
+
+      const row = await sql<any>`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
+      const cfg = row.rows[0];
+      const dec = ctx.internals?.decryptSecret;
+      const enc = ctx.internals?.encryptSecret;
+      if (!cfg?.client_id || !cfg?.client_secret || !dec || !enc) {
+        return c.json({ error: 'ANAF credentials are not configured.' }, 400);
+      }
+
+      const body = new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: d.code,
+        client_id: cfg.client_id,
+        client_secret: await dec(cfg.client_secret),
+        redirect_uri: d.redirect_uri,
+        token_content_type: 'jwt',
+      });
+
+      let payload: any;
+      try {
+        const res = await fetch(`${ANAF_IDP}/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body,
+          signal: AbortSignal.timeout(20_000),
+        });
+        const text = await res.text();
+        if (!res.ok) {
+          await sql`UPDATE zv_efactura_settings SET last_error = ${text.slice(0, 500)}, updated_at = NOW() WHERE id = ${cfg.id}`.execute(db);
+          return c.json({ error: `ANAF refused the token request (${res.status})`, detail: text.slice(0, 500) }, 400);
+        }
+        payload = JSON.parse(text);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        await sql`UPDATE zv_efactura_settings SET last_error = ${msg} , updated_at = NOW() WHERE id = ${cfg.id}`.execute(db);
+        return c.json({ error: `Could not reach ANAF: ${msg}` }, 502);
+      }
+
+      // `expires_in` is seconds. Stored as an instant so a restart does not lose
+      // track of when the token dies.
+      const expiresAt = payload.expires_in
+        ? new Date(Date.now() + Number(payload.expires_in) * 1000)
+        : null;
+
+      await sql`
+        UPDATE zv_efactura_settings SET
+          access_token = ${await enc(String(payload.access_token ?? ''))},
+          refresh_token = ${payload.refresh_token ? await enc(String(payload.refresh_token)) : null},
+          token_expires_at = ${expiresAt},
+          last_verified_at = NOW(), last_error = NULL, updated_at = NOW()
+        WHERE id = ${cfg.id}
+      `.execute(db);
+
+      // The token itself is never returned. It is a credential to a tax
+      // authority, and the screen only needs to know it worked.
+      return c.json({ data: { connected: true, token_expires_at: expiresAt } });
+    },
+  );
+
+  /** Trade the refresh token for a new access token. */
+  app.post('/oauth/refresh', async (c) => {
+    const user = await getUser(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const row = await sql<any>`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
+    const cfg = row.rows[0];
+    const dec = ctx.internals?.decryptSecret;
+    const enc = ctx.internals?.encryptSecret;
+    if (!cfg?.refresh_token || !dec || !enc) return c.json({ error: 'No refresh token stored.' }, 400);
+
+    const body = new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: await dec(cfg.refresh_token),
+      client_id: cfg.client_id,
+      client_secret: await dec(cfg.client_secret),
+      token_content_type: 'jwt',
+    });
+    try {
+      const res = await fetch(`${ANAF_IDP}/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+        signal: AbortSignal.timeout(20_000),
+      });
+      const text = await res.text();
+      if (!res.ok) return c.json({ error: `ANAF refused the refresh (${res.status})`, detail: text.slice(0, 400) }, 400);
+      const payload = JSON.parse(text);
+      const expiresAt = payload.expires_in ? new Date(Date.now() + Number(payload.expires_in) * 1000) : null;
+      await sql`
+        UPDATE zv_efactura_settings SET
+          access_token = ${await enc(String(payload.access_token ?? ''))},
+          refresh_token = ${payload.refresh_token ? await enc(String(payload.refresh_token)) : cfg.refresh_token},
+          token_expires_at = ${expiresAt}, last_verified_at = NOW(), last_error = NULL, updated_at = NOW()
+        WHERE id = ${cfg.id}
+      `.execute(db);
+      return c.json({ data: { connected: true, token_expires_at: expiresAt } });
+    } catch (err) {
+      return c.json({ error: `Could not reach ANAF: ${err instanceof Error ? err.message : String(err)}` }, 502);
+    }
+  });
+
+  /**
+   * Call ANAF's own "Hello" service to prove the token works.
+   *
+   * The procedure states that ANY token issued by the IdP reaches TestOauth, so
+   * a failure here means the token itself is wrong — as opposed to a failure on
+   * e-Factura, which may equally mean the application was never enrolled for
+   * that service. Separating those two is the difference between a useful error
+   * and an afternoon.
+   */
+  app.get('/oauth/test', async (c) => {
+    const user = await getUser(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const row = await sql<any>`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
+    const cfg = row.rows[0];
+    const dec = ctx.internals?.decryptSecret;
+    if (!cfg?.access_token || !dec) return c.json({ error: 'Not connected to ANAF yet.' }, 400);
+    try {
+      const res = await fetch('https://api.anaf.ro/TestOauth/jaxrs/hello?name=zveltio', {
+        headers: { Authorization: `Bearer ${await dec(cfg.access_token)}` },
+        signal: AbortSignal.timeout(20_000),
+      });
+      const text = await res.text();
+      return c.json({ data: { status: res.status, ok: res.ok, response: text.slice(0, 300) } });
+    } catch (err) {
+      return c.json({ error: `Could not reach ANAF: ${err instanceof Error ? err.message : String(err)}` }, 502);
+    }
+  });
+
+
+  /**
+   * The official PDF, rendered by ANAF from our own XML.
+   *
+   * `webservicesp.anaf.ro/.../transformare` needs no credentials, so this works
+   * on any install the moment an invoice exists — and the result is the
+   * rendering the tax authority itself produces, rather than one this codebase
+   * invented and hoped matched.
+   */
+  app.get('/:id/pdf', async (c) => {
+    const user = await getUser(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const row = await sql<any>`SELECT invoice_number, xml_content FROM zv_efactura_invoices WHERE id = ${c.req.param('id')}`.execute(db);
+    const inv = row.rows[0];
+    if (!inv) return c.json({ error: 'Not found' }, 404);
+    if (!inv.xml_content) return c.json({ error: 'Generate the XML first' }, 400);
+    try {
+      const res = await fetch(`${ANAF_PUBLIC}/transformare/FACT1`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: inv.xml_content,
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!res.ok) {
+        return c.json({ error: `ANAF could not render the PDF (${res.status})`, detail: (await res.text()).slice(0, 300) }, 400);
+      }
+      return new Response(await res.arrayBuffer(), {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${String(inv.invoice_number).replace(/[^\w.-]/g, '_')}.pdf"`,
+        },
+      });
+    } catch (err) {
+      return c.json({ error: `Could not reach ANAF: ${err instanceof Error ? err.message : String(err)}` }, 502);
+    }
   });
 
   // GET /:id — get invoice
@@ -334,6 +617,8 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
   });
 
   // POST /:id/submit — submit to ANAF
+
+
   app.post('/:id/submit', async (c) => {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
@@ -347,7 +632,151 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     if (!invoice) return c.json({ error: 'Invoice not found' }, 404);
     if (!invoice.xml_content) return c.json({ error: 'Generate XML first' }, 400);
 
-    return notSubmitted(c);
+    const authz = await anafAuth();
+    if ('error' in authz) return c.json({ error: authz.error, submitted: false }, 400);
+
+    // `cif` is where ANAF sends the error if it cannot identify the seller from
+    // the XML, and the caller must hold SPV rights for it. It is the filing CIF
+    // from settings, falling back to the seller's own — a filing agent files
+    // for others, so the two are not always the same.
+    const cif = String(authz.cfg.seller_cif || invoice.seller_cui || '').replace(/^RO/i, '');
+    if (!cif) return c.json({ error: 'No filing CIF configured.' }, 400);
+
+    const url = `${anafApi(authz.cfg.environment)}/upload?standard=UBL&cif=${encodeURIComponent(cif)}`;
+    let body: string;
+    let status: number;
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authz.token}`, 'Content-Type': 'application/xml' },
+        body: invoice.xml_content,
+        signal: AbortSignal.timeout(60_000),
+      });
+      status = res.status;
+      body = await res.text();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return c.json({ error: `Could not reach ANAF: ${msg}`, submitted: false }, 502);
+    }
+
+    // The upload index is what every later call needs, and ANAF returns it in
+    // XML. A response we cannot parse an index out of is NOT a success, however
+    // encouraging it looks — that assumption is exactly what the old stub made.
+    const index = /index_incarcare\s*=\s*"([^"]+)"/i.exec(body)?.[1];
+    if (status < 200 || status >= 300 || !index) {
+      await sql`
+        UPDATE zv_efactura_invoices SET anaf_response = ${body.slice(0, 2000)}, updated_at = NOW()
+        WHERE id = ${invoice.id}
+      `.execute(db);
+      return c.json(
+        { error: `ANAF rejected the upload (HTTP ${status})`, detail: body.slice(0, 600), submitted: false },
+        400,
+      );
+    }
+
+    await sql`
+      UPDATE zv_efactura_invoices SET
+        status = 'submitted', anaf_index = ${index},
+        anaf_response = ${body.slice(0, 2000)}, updated_at = NOW()
+      WHERE id = ${invoice.id}
+    `.execute(db);
+    await logStatusChange(db, invoice.id, invoice.status, 'submitted', user.id, `ANAF index: ${index}`);
+    await sql`
+      INSERT INTO zv_efactura_daily_stats (date, seller_cui, submitted_count, total_amount, vat_amount)
+      VALUES (CURRENT_DATE, ${invoice.seller_cui}, 1, ${invoice.total}, ${invoice.vat_total})
+      ON CONFLICT (date, seller_cui)
+      DO UPDATE SET submitted_count = zv_efactura_daily_stats.submitted_count + 1,
+                    total_amount = zv_efactura_daily_stats.total_amount + EXCLUDED.total_amount,
+                    vat_amount = zv_efactura_daily_stats.vat_amount + EXCLUDED.vat_amount
+    `.execute(db).catch(() => {});
+
+    return c.json({ data: { submitted: true, anaf_index: index, environment: authz.cfg.environment } });
+  });
+
+  /** Where a submitted invoice has got to. `stare` is ok / nok / in prelucrare. */
+  app.get('/:id/anaf-status', async (c) => {
+    const user = await getUser(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const row = await sql<any>`SELECT * FROM zv_efactura_invoices WHERE id = ${c.req.param('id')}`.execute(db);
+    const inv = row.rows[0];
+    if (!inv) return c.json({ error: 'Not found' }, 404);
+    if (!inv.anaf_index) return c.json({ error: 'This invoice has not been submitted.' }, 400);
+
+    const authz = await anafAuth();
+    if ('error' in authz) return c.json({ error: authz.error }, 400);
+
+    try {
+      const res = await fetch(
+        `${anafApi(authz.cfg.environment)}/stareMesaj?id_incarcare=${encodeURIComponent(inv.anaf_index)}`,
+        { headers: { Authorization: `Bearer ${authz.token}` }, signal: AbortSignal.timeout(30_000) },
+      );
+      const text = await res.text();
+      const stare = /stare\s*=\s*"([^"]+)"/i.exec(text)?.[1] ?? null;
+      const downloadId = /id_descarcare\s*=\s*"([^"]+)"/i.exec(text)?.[1] ?? null;
+      // 'ok' means validated and delivered to the buyer; 'nok' means it was
+      // refused and the buyer never sees it. Both are terminal, and conflating
+      // them is how somebody believes an invoice arrived.
+      if (stare === 'ok' || stare === 'nok') {
+        await sql`
+          UPDATE zv_efactura_invoices SET status = ${stare === 'ok' ? 'accepted' : 'rejected'},
+            anaf_response = ${text.slice(0, 2000)}, updated_at = NOW()
+          WHERE id = ${inv.id}
+        `.execute(db);
+        await logStatusChange(db, inv.id, inv.status, stare === 'ok' ? 'accepted' : 'rejected', user.id);
+      }
+      return c.json({ data: { stare, download_id: downloadId, raw: text.slice(0, 600) } });
+    } catch (err) {
+      return c.json({ error: `Could not reach ANAF: ${err instanceof Error ? err.message : String(err)}` }, 502);
+    }
+  });
+
+  /** Invoices others have sent us, and our own responses, from the last N days. */
+  app.get('/anaf/messages', async (c) => {
+    const user = await getUser(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const authz = await anafAuth();
+    if ('error' in authz) return c.json({ error: authz.error }, 400);
+    const zile = Math.min(Math.max(parseInt(c.req.query('zile') ?? '30', 10) || 30, 1), 60);
+    const cif = String(authz.cfg.seller_cif ?? '').replace(/^RO/i, '');
+    if (!cif) return c.json({ error: 'No filing CIF configured.' }, 400);
+    const filtru = c.req.query('filtru');
+    let url = `${anafApi(authz.cfg.environment)}/listaMesajeFactura?zile=${zile}&cif=${encodeURIComponent(cif)}`;
+    if (filtru && ['E', 'T', 'P', 'R'].includes(filtru)) url += `&filtru=${filtru}`;
+    try {
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${authz.token}` }, signal: AbortSignal.timeout(30_000) });
+      const text = await res.text();
+      try {
+        return c.json({ data: JSON.parse(text) });
+      } catch {
+        return c.json({ data: { raw: text.slice(0, 2000) } });
+      }
+    } catch (err) {
+      return c.json({ error: `Could not reach ANAF: ${err instanceof Error ? err.message : String(err)}` }, 502);
+    }
+  });
+
+  /** The signed response archive: the original invoice plus the MF signature. */
+  app.get('/anaf/download/:downloadId', async (c) => {
+    const user = await getUser(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const authz = await anafAuth();
+    if ('error' in authz) return c.json({ error: authz.error }, 400);
+    const id = c.req.param('downloadId');
+    try {
+      const res = await fetch(`${anafApi(authz.cfg.environment)}/descarcare?id=${encodeURIComponent(id)}`, {
+        headers: { Authorization: `Bearer ${authz.token}` },
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (!res.ok) return c.json({ error: `ANAF refused the download (${res.status})` }, 400);
+      return new Response(await res.arrayBuffer(), {
+        headers: {
+          'Content-Type': 'application/zip',
+          'Content-Disposition': `attachment; filename="anaf-${id.replace(/[^\w.-]/g, '_')}.zip"`,
+        },
+      });
+    } catch (err) {
+      return c.json({ error: `Could not reach ANAF: ${err instanceof Error ? err.message : String(err)}` }, 502);
+    }
   });
 
   // POST /:id/storno — create storno/credit note
@@ -408,9 +837,15 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
         if (!inv) { results.push({ id, success: false, error: 'Not found' }); continue; }
         if (!inv.xml_content) { results.push({ id, success: false, error: 'XML not generated' }); continue; }
 
-        // Same refusal as the single-invoice route, per id, so the caller sees
-        // exactly which ones would have gone and why none of them did.
-        results.push({ id, success: false, error: NOT_SUBMITTED_DETAIL });
+        // Batch is deliberately NOT a second upload implementation. One code
+        // path uploads to ANAF, and it is the single-invoice route above;
+        // duplicating it here is how the two drift until one of them is wrong
+        // in a way nobody notices.
+        results.push({
+          id,
+          success: false,
+          error: 'Use POST /:id/submit for each invoice; batch upload is not implemented.',
+        });
       }
 
       return c.json({ results, submitted: 0 }, 501);
