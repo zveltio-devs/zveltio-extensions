@@ -19671,7 +19671,27 @@ function invoicingRoutes(ctx) {
     const rows = await sql`
       SELECT * FROM zvd_catalogue_items WHERE is_active = TRUE ORDER BY name
     `.execute(db);
-    return c.json({ data: rows.rows });
+    const local = rows.rows;
+    const listProducts = ctx.services.get("inventory.products.list");
+    if (!listProducts)
+      return c.json({ data: local });
+    const products = await listProducts({ active: true }).catch(() => []);
+    const mapped = products.map((p) => ({
+      id: p.id,
+      code: p.sku,
+      name: p.name,
+      description: p.description,
+      kind: "product",
+      unit: p.unit,
+      unit_price: p.sale_price,
+      currency: "RON",
+      tax_rate: p.tax_rate,
+      is_active: p.is_active,
+      source: "inventory"
+    }));
+    const codes = new Set(mapped.map((p) => String(p.code ?? "").toLowerCase()).filter(Boolean));
+    const services = local.filter((i) => !i.code || !codes.has(String(i.code).toLowerCase())).map((i) => ({ ...i, source: "invoicing" }));
+    return c.json({ data: [...mapped, ...services].sort((a, b) => String(a.name).localeCompare(String(b.name))) });
   });
   app.post("/catalogue", zValidator("json", exports_external.object({
     code: exports_external.string().optional(),
@@ -20015,14 +20035,48 @@ function invoicingRoutes(ctx) {
       return c.json({ error: "Not found or not editable (must be draft)" }, 400);
     return c.json({ data: row.rows[0] });
   });
-  app.post("/invoices/:id/send", async (c) => {
+  app.post("/invoices/:id/send", zValidator("query", exports_external.object({ warehouse_id: exports_external.string().uuid().optional() })), async (c) => {
     const row = await sql`
       UPDATE zvd_invoices SET status = 'sent', updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND status = 'draft' RETURNING *
     `.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Invoice not found or not in draft" }, 400);
-    return c.json({ data: row.rows[0] });
+    const invoice = row.rows[0];
+    const stockMove = ctx.services.get("inventory.stock.move");
+    const warehouseId = c.req.query("warehouse_id");
+    const moved = [];
+    const stockErrors = [];
+    const movesStock = invoice.doc_type === "delivery_note";
+    if (stockMove && warehouseId && movesStock) {
+      const lines = await sql`
+        SELECT description, quantity, metadata FROM zvd_invoice_lines WHERE invoice_id = ${invoice.id}
+      `.execute(db);
+      for (const l of lines.rows) {
+        const meta3 = typeof l.metadata === "string" ? JSON.parse(l.metadata) : l.metadata ?? {};
+        const productId = meta3.catalogue_item;
+        if (!productId)
+          continue;
+        try {
+          const res = await stockMove({
+            productId,
+            warehouseId,
+            qty: Number(l.quantity),
+            type: "out",
+            reference: invoice.number,
+            reason: `Invoice ${invoice.number}`,
+            userId: c.get("user")?.id
+          });
+          moved.push({ product_id: productId, qty: Number(l.quantity), balance: res?.balance });
+        } catch (err) {
+          stockErrors.push(`${l.description}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    }
+    return c.json({
+      data: invoice,
+      stock: !stockMove ? { skipped: "inventory extension is not active" } : !movesStock ? { skipped: `stock moves on a delivery note, not on a ${invoice.doc_type}` } : { warehouse_id: warehouseId ?? null, moved, errors: stockErrors }
+    });
   });
   app.post("/invoices/:id/payments", zValidator("json", exports_external.object({
     amount: exports_external.number().positive(),
