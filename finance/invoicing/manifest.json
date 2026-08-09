@@ -17,6 +17,18 @@
         "label": "Invoicing",
         "icon": "DollarSign",
         "schema": "schemas/invoicing.json"
+      },
+      {
+        "path": "/admin/finance/invoicing/company",
+        "label": "invoicing.settings.title",
+        "icon": "Building2",
+        "schema": "schemas/company.json"
+      },
+      {
+        "path": "/admin/finance/invoicing/series",
+        "label": "invoicing.series.title",
+        "icon": "Hash",
+        "schema": "schemas/series.json"
       }
     ],
     "navGroup": "finance"
@@ -34,8 +46,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "09cf90cc6230795ac80e076ccbc5690d4b76259d6eef9ec4e9b2130e0822a64a",
-    "sourceSha256": "0c6a7cb8f381ca690f18e216e1f0b0c7e798e0866509873b385e3a4be46acdfa"
+    "engineSha256": "b0a17a139aa1737419592617541817b53efaff1525ba47434630e0a6d0deeb65",
+    "sourceSha256": "ff09eebc05097dc403e6ae9e06ecd4da7883dddb832df721bf40bd3dc9d5747f"
   },
   "resources": [
     "invoices"
