@@ -533,7 +533,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
           query: string; created_by: string; created_at: string; updated_at: string;
         }>`
           SELECT id, name, description, config::text AS query, created_by, created_at, created_at AS updated_at
-          FROM zv_saved_queries ORDER BY name
+          FROM zv_developer_database_snippets ORDER BY name
         `.execute(db);
         return c.json({ queries: result.rows });
       } catch {
@@ -550,7 +550,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const data = c.req.valid('json');
       try {
         const result = await sql<{ id: string }>`
-          INSERT INTO zv_saved_queries (name, description, query, created_by)
+          INSERT INTO zv_developer_database_snippets (name, description, query, created_by)
           VALUES (${data.name}, ${data.description || null}, ${data.query}, ${user.id})
           RETURNING id
         `.execute(db);
@@ -569,7 +569,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const data = c.req.valid('json');
       try {
         await (db as any)
-          .updateTable('zv_saved_queries')
+          .updateTable('zv_developer_database_snippets')
           .set({ ...data, updated_at: new Date() })
           .where('id', '=', id)
           .execute();
@@ -582,7 +582,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
     .delete('/saved-queries/:id', async (c) => {
       const id = c.req.param('id');
       try {
-        await (db as any).deleteFrom('zv_saved_queries').where('id', '=', id).execute();
+        await (db as any).deleteFrom('zv_developer_database_snippets').where('id', '=', id).execute();
         return c.json({ success: true });
       } catch {
         return c.json({ error: 'Failed to delete query' }, 500);
