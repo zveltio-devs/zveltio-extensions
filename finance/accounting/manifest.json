@@ -34,8 +34,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "f93c050f2c5f9e293bb2a09674f3059d2bf91e88c41ecf4afde9462fb6266dd7",
-    "sourceSha256": "c466313cb513141646b2dd6421ca3d4441e2e145d13d58ad5a0e279a8245e74c"
+    "engineSha256": "bd81fac6fc22382d5fa91849f1513be83629ee8863850950a6fabdc8303f2401",
+    "sourceSha256": "10be9d4d799155d40ca3bd5d1469c51459a8b739f767636d208c44f90431a26b"
   },
   "resources": [
     "accounting"

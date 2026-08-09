@@ -154,11 +154,11 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
       ? new Date(Date.now() + p.trial_days * 86400000).toISOString().slice(0, 10)
       : null;
     const row = await sql`
-      INSERT INTO zvd_subscribers (plan_id, contact_id, organization_id, client_name, client_email,
-        start_date, trial_end_date, status, notes, created_by)
+      INSERT INTO zvd_subscribers (plan_id, contact_id, organization_id, name, email,
+        current_period_start, trial_end, status, metadata, created_by)
       VALUES (${d.plan_id}, ${d.contact_id ?? null}, ${d.organization_id ?? null},
         ${d.client_name}, ${d.client_email}, ${startDate}, ${trialEnd},
-        ${trialEnd ? 'trialing' : 'active'}, ${d.notes ?? null}, ${user.id})
+        ${trialEnd ? 'trialing' : 'active'}, ${JSON.stringify(d.notes ? { notes: d.notes } : {})}::jsonb, ${user.id})
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);

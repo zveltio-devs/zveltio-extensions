@@ -263,7 +263,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
         } else {
           // Create canonical product directly via the extension's writable db
           const create = await sql<any>`
-            INSERT INTO zvd_products (sku, name, description, price, currency, tax_rate, is_active)
+            INSERT INTO zvd_products (sku, name, description, sale_price, currency, tax_rate, is_active)
             VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === 'active'})
             ON CONFLICT (sku) DO UPDATE SET name = EXCLUDED.name
             RETURNING id
