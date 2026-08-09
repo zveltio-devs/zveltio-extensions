@@ -8,7 +8,8 @@
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ro-efactura",
   "permissions": [
-    "database"
+    "database",
+    "secrets"
   ],
   "studio": {
     "pages": [
@@ -16,6 +17,12 @@
         "path": "/admin/compliance/ro/efactura",
         "label": "e-Factura RO",
         "icon": "receipt"
+      },
+      {
+        "path": "/admin/compliance/ro/efactura/anaf",
+        "label": "efactura.settings.title",
+        "icon": "KeyRound",
+        "schema": "schemas/anaf.json"
       }
     ],
     "navGroup": "compliance"
@@ -33,8 +40,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "e86120126af2c656245e5969cd1a7ac8a911adbbbdb0585cfcac7be06c071e3b",
-    "sourceSha256": "74e04cfced99082d0268bfba1ec8be6b7841b33cb5e0ab1f91cabc2c2e694462"
+    "engineSha256": "ca6882f8017c3de91f4da4855d3a71994857cc27c1ec0f0fe7877d83d6609b6a",
+    "sourceSha256": "d08b47d4b8878bad5c5b7de6a5cc46c7ac36ea4129bee6d9cb738a59f8ab59e0"
   },
   "resources": [
     "efactura"
