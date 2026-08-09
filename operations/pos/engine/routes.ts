@@ -252,7 +252,7 @@ export function posRoutes(ctx: ExtensionContext): Hono {
     }
 
     const order = await sql`
-      INSERT INTO zvd_pos_orders (session_id, cashier_id, payment_method, customer_id, customer_name, canonical_contact_id, subtotal, tax_amount, total, loyalty_discount, loyalty_points_earned, loyalty_points_redeemed, notes, status)
+      INSERT INTO zvd_pos_orders (session_id, created_by, payment_method, customer_id, customer_name, canonical_contact_id, subtotal, tax_amount, total, loyalty_discount, loyalty_points_earned, loyalty_points_redeemed, notes, status)
       VALUES (${d.session_id}, ${user.id}, ${d.payment_method}, ${d.customer_id ?? null}, ${customerName}, ${canonicalContactId}, ${subtotal}, ${tax_amount}, ${total}, ${loyalty_discount}, ${earnedPoints}, ${redeemedPoints}, ${d.notes ?? null}, 'completed')
       RETURNING *
     `.execute(db);

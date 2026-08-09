@@ -177,7 +177,7 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     const transactions = parseMT940(content);
     if (!transactions.length) return c.json({ error: 'No transactions found in MT940 content' }, 400);
     const importRow = await sql`
-      INSERT INTO zvd_bank_imports (account_id, source, row_count, created_by)
+      INSERT INTO zvd_bank_imports (account_id, source, rows_imported, imported_by)
       VALUES (${accountId}, 'mt940', ${transactions.length}, ${user.id}) RETURNING id
     `.execute(db);
     const importId = (importRow.rows[0] as any).id;
@@ -215,7 +215,7 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     const accountId = c.req.param('id');
     const importRow = await sql`
-      INSERT INTO zvd_bank_imports (account_id, source, row_count, created_by)
+      INSERT INTO zvd_bank_imports (account_id, source, rows_imported, imported_by)
       VALUES (${accountId}, ${d.source}, ${d.transactions.length}, ${user.id}) RETURNING id
     `.execute(db);
     const importId = (importRow.rows[0] as any).id;
