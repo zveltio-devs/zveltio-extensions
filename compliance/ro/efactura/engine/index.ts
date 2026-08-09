@@ -5,6 +5,22 @@ import { efacturaRoutes } from './routes.js';
 import { generateUBLXML as generateUBL } from './ubl-generator.js';
 
 /**
+ * A DATE column, as Postgres will accept it back.
+ *
+ * The driver hands `date` columns over as JavaScript Date objects, and
+ * interpolating one into SQL stringifies it the JavaScript way —
+ * "Sun Aug 09 2026 00:00:00 GMT+0000 (Coordinated Universal Time)" — which
+ * Postgres rejects with "invalid input syntax for type date". The invoice row
+ * arrives here straight from an INSERT ... RETURNING, so its dates are Date
+ * objects, never the strings they looked like in the request body.
+ */
+function isoDate(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+}
+
+/**
  * Romanian e-Factura compliance extension.
  *
  * Before alpha.67 this extension stored a full duplicate of every invoice in
@@ -55,21 +71,42 @@ const extension: ZveltioExtension = {
           line_total:  Number(l.total ?? 0),
         }));
 
+        // The four identity fields below are the ones ANAF validates against,
+        // and until the invoicing extension grew a company profile there was
+        // nothing behind any of them. Neither seller_cui nor client_tax_id was
+        // ever a column on the invoices table, so both resolved to undefined on
+        // every invoice ever created: the seller name fell through to the
+        // placeholder, the seller code went out as an empty string, and the
+        // buyer code went out NULL — which ANAF rejects outright. Those
+        // fallbacks were not an edge case, they were the behaviour, on every
+        // single document this extension ever drafted.
+        //
+        // The seller values are snapshotted onto the invoice at issue time, so
+        // a submission keeps the details the document was issued under even
+        // after the company changes its address or its bank.
         await sql`
           INSERT INTO zv_efactura_invoices (
             source_invoice_id, invoice_number, invoice_date, due_date,
-            seller_name, seller_cui, buyer_name, buyer_cui, buyer_address,
+            seller_name, seller_cui, seller_address, seller_city, seller_county, seller_country,
+            buyer_name, buyer_cui, buyer_address, buyer_city, buyer_county, buyer_country,
             lines, subtotal, vat_total, total, currency, status
           ) VALUES (
             ${id},
             ${invoice.number},
-            ${invoice.issue_date},
-            ${invoice.due_date ?? null},
+            ${isoDate(invoice.issue_date)},
+            ${isoDate(invoice.due_date)},
             ${invoice.seller_name ?? 'Set in e-Factura settings'},
-            ${invoice.seller_cui ?? ''},
+            ${invoice.seller_tax_id ?? invoice.seller_cui ?? ''},
+            ${invoice.seller_address ?? null},
+            ${invoice.seller_city ?? null},
+            ${invoice.seller_county ?? null},
+            ${invoice.seller_country ?? 'RO'},
             ${invoice.client_name ?? ''},
             ${invoice.client_tax_id ?? null},
             ${invoice.client_address ?? null},
+            ${invoice.client_city ?? null},
+            ${invoice.client_county ?? null},
+            ${invoice.client_country ?? 'RO'},
             ${JSON.stringify(linesJson)}::jsonb,
             ${Number(invoice.subtotal ?? 0)},
             ${Number(invoice.tax_amount ?? 0)},
