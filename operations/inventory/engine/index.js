@@ -19945,11 +19945,46 @@ var extension = {
       `.execute(ctx.db);
       return Number(r.rows[0]?.qty ?? 0);
     });
+    ctx.services.register("inventory.stock.reserve", async (input) => {
+      await sql`
+        INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity, reserved_qty)
+        VALUES (${input.productId}::uuid, ${input.warehouseId}::uuid, 0, ${Math.abs(input.qty)})
+        ON CONFLICT (product_id, warehouse_id)
+        DO UPDATE SET reserved_qty = zvd_stock_levels.reserved_qty + ${Math.abs(input.qty)},
+                      updated_at = NOW()
+      `.execute(ctx.db);
+      const r = await sql`
+        SELECT quantity, reserved_qty FROM zvd_stock_levels
+        WHERE product_id = ${input.productId}::uuid AND warehouse_id = ${input.warehouseId}::uuid
+      `.execute(ctx.db);
+      const row = r.rows[0] ?? { quantity: 0, reserved_qty: 0 };
+      const available = Number(row.quantity) - Number(row.reserved_qty);
+      ctx.events.emit("stock.reserved", { ...input, available });
+      return { quantity: Number(row.quantity), reserved: Number(row.reserved_qty), available };
+    });
+    ctx.services.register("inventory.stock.release", async (input) => {
+      await sql`
+        UPDATE zvd_stock_levels
+           SET reserved_qty = GREATEST(reserved_qty - ${Math.abs(input.qty)}, 0), updated_at = NOW()
+         WHERE product_id = ${input.productId}::uuid AND warehouse_id = ${input.warehouseId}::uuid
+      `.execute(ctx.db);
+      const r = await sql`
+        SELECT quantity, reserved_qty FROM zvd_stock_levels
+        WHERE product_id = ${input.productId}::uuid AND warehouse_id = ${input.warehouseId}::uuid
+      `.execute(ctx.db);
+      const row = r.rows[0] ?? { quantity: 0, reserved_qty: 0 };
+      return {
+        quantity: Number(row.quantity),
+        reserved: Number(row.reserved_qty),
+        available: Number(row.quantity) - Number(row.reserved_qty)
+      };
+    });
     ctx.services.register("inventory.stock.move", async (input) => {
       await sql`
-        INSERT INTO zvd_stock_movements (product_id, warehouse_id, quantity, movement_type, reference, reason)
+        INSERT INTO zvd_stock_movements (product_id, warehouse_id, quantity, type, reference, note, created_by)
         VALUES (${input.productId}::uuid, ${input.warehouseId}::uuid, ${input.qty},
-                ${input.type}, ${input.reference ?? null}, ${input.reason ?? null})
+                ${input.type}, ${input.reference ?? null}, ${input.reason ?? null},
+                ${input.userId ?? "system"})
       `.execute(ctx.db);
       const delta = input.type === "out" ? -Math.abs(input.qty) : Math.abs(input.qty);
       await sql`
