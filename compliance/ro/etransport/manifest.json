@@ -34,8 +34,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "7cd18f99e8c4c0d54b603cde43deaa57e8cf170381854e6b27065daa53effcff",
-    "sourceSha256": "b22b6b31d416235e062426af5f97e78c7875c4aee09327af6f0c1c041c8ad735"
+    "engineSha256": "2097f7482d8ff862968ed4c5824da78ae5c53bd148928c0c7ed155d4afe34e08",
+    "sourceSha256": "54117dd98b47fd47cd7c18e47f64f46cae5472c57dc403da61ff23f85aa75bc7"
   },
   "resources": [
     "etransport"
