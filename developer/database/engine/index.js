@@ -19875,11 +19875,12 @@ function databaseRoutes(ctx) {
   }).get("/saved-queries", async (c) => {
     try {
       const result = await sql`
-          SELECT id, name, description, config::text AS query, created_by, created_at, created_at AS updated_at
+          SELECT id, name, description, query, created_by, created_at, updated_at
           FROM zv_developer_database_snippets ORDER BY name
         `.execute(db);
       return c.json({ queries: result.rows });
-    } catch {
+    } catch (err) {
+      console.error(`[developer/database] listing saved queries failed: ${err instanceof Error ? err.message : String(err)}`);
       return c.json({ error: "Failed to list saved queries" }, 500);
     }
   }).post("/saved-queries", zValidator("json", exports_external.object({

@@ -23,6 +23,20 @@
 -- since 002. Existing rows keep the default tenant and their counters, so no
 -- number already issued changes.
 
+-- Backfill BEFORE the NOT NULL, which is the order this originally got wrong.
+--
+-- 001 seeds the seven sequences and 002 adds `tenant_id` afterwards, so on a
+-- database built from scratch those rows carry NULL and `SET NOT NULL` fails
+-- with "column tenant_id contains null values". It passed locally only because
+-- the rows there had been written after the column existed — the migration was
+-- never run against the state a fresh install actually produces.
+--
+-- They belong to the default tenant: they are the install-time seeds, from
+-- before this table knew about companies at all.
+UPDATE zv_ro_doc_number_sequences
+   SET tenant_id = '00000000-0000-0000-0000-000000000001'::uuid
+ WHERE tenant_id IS NULL;
+
 ALTER TABLE zv_ro_doc_number_sequences
   ALTER COLUMN tenant_id SET NOT NULL;
 
