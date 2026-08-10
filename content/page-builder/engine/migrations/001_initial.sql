@@ -76,7 +76,7 @@ INSERT INTO zv_page_block_types (name, display_name, description, icon, schema, 
   ('cta', 'Call to Action', 'Highlighted call-to-action section', 'Megaphone', '{"heading": "string", "text": "string", "button_text": "string", "button_url": "string", "style": "string"}', '{"heading": "Ready to get started?", "text": "", "button_text": "Contact Us", "button_url": "/contact", "style": "primary"}'),
   ('embed', 'Embed', 'Arbitrary HTML or iframe embed', 'Code', '{"html": "string"}', '{"html": ""}'),
   ('spacer', 'Spacer', 'Vertical whitespace', 'Minus', '{"height": "number"}', '{"height": 48}')
-ON CONFLICT (name) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- ── from 002_enterprise.sql ──
 -- SEO analysis scores

@@ -147,5 +147,5 @@ INSERT INTO zv_ro_doc_number_sequences (type, prefix, format) VALUES
   ('contract', 'CTR', '{prefix}-{year}/{seq:04d}'),
   ('pv', 'PV', '{prefix}-{year}/{seq:04d}'),
   ('nir', 'NIR', '{prefix}-{year}/{seq:04d}')
-ON CONFLICT (type) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
