@@ -19535,6 +19535,12 @@ var poItemSchema = exports_external.object({
   unit_price: exports_external.number(),
   total: exports_external.number()
 });
+function emptyOnFailure(label) {
+  return (err) => {
+    console.error(`[ro/procurement] ${label} failed: ${err instanceof Error ? err.message : String(err)}`);
+    return { rows: [] };
+  };
+}
 function roProcurementRoutes(ctx) {
   const { db, auth } = ctx;
   const app = new Hono2;
@@ -19568,8 +19574,8 @@ function roProcurementRoutes(ctx) {
       return c.json({ error: "Supplier not found" }, 404);
     const [orders, evaluations, contracts] = await Promise.all([
       db.selectFrom("zv_ro_purchase_orders").select(["id", "number", "date", "total", "currency", "status"]).where("supplier_id", "=", c.req.param("id")).orderBy("date", "desc").limit(10).execute(),
-      sql`SELECT * FROM zv_ro_supplier_evaluations WHERE supplier_id = ${c.req.param("id")}::uuid ORDER BY period DESC`.execute(db).catch(() => ({ rows: [] })),
-      sql`SELECT id, number, title, value, currency, status, start_date, end_date FROM zv_ro_contracts WHERE supplier_id = ${c.req.param("id")}::uuid AND status = 'active'`.execute(db).catch(() => ({ rows: [] }))
+      sql`SELECT * FROM zv_ro_supplier_evaluations WHERE supplier_id = ${c.req.param("id")}::uuid ORDER BY period DESC`.execute(db).catch(emptyOnFailure("supplier evaluations")),
+      sql`SELECT id, number, title, value, currency, status, start_date, end_date FROM zv_ro_contracts WHERE supplier_id = ${c.req.param("id")}::uuid AND status = 'active'`.execute(db).catch(emptyOnFailure("supplier contracts"))
     ]);
     return c.json({ supplier, recent_orders: orders, evaluations: evaluations.rows, active_contracts: contracts.rows });
   });
@@ -19640,7 +19646,7 @@ function roProcurementRoutes(ctx) {
     const nirs = await sql`
       SELECT id, number, date, status, total_value FROM zv_ro_reception_notes
       WHERE order_id = ${c.req.param("id")}::uuid ORDER BY date DESC
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db).catch(emptyOnFailure("reception notes for the order"));
     return c.json({ order, reception_notes: nirs.rows });
   });
   app.post("/orders", zValidator("json", exports_external.object({
@@ -19838,20 +19844,20 @@ function roProcurementRoutes(ctx) {
         FROM zv_ro_purchase_orders
         WHERE EXTRACT(YEAR FROM date) = ${currentYear} AND status IN ('approved','received')
         GROUP BY category ORDER BY total DESC
-      `.execute(db).catch(() => ({ rows: [] })),
+      `.execute(db).catch(emptyOnFailure("spending by category")),
       sql`
         SELECT TO_CHAR(date, 'YYYY-MM') AS month, SUM(total) AS total, COUNT(*)::int AS count
         FROM zv_ro_purchase_orders
         WHERE EXTRACT(YEAR FROM date) = ${currentYear} AND status IN ('approved','received')
         GROUP BY month ORDER BY month
-      `.execute(db).catch(() => ({ rows: [] })),
+      `.execute(db).catch(emptyOnFailure("spending by month")),
       sql`
         SELECT supplier_name, supplier_cui, SUM(total) AS total, COUNT(*)::int AS count
         FROM zv_ro_purchase_orders
         WHERE EXTRACT(YEAR FROM date) = ${currentYear} AND status IN ('approved','received')
           ${supplier_id ? sql`AND supplier_id = ${supplier_id}::uuid` : sql``}
         GROUP BY supplier_name, supplier_cui ORDER BY total DESC LIMIT 20
-      `.execute(db).catch(() => ({ rows: [] }))
+      `.execute(db).catch(emptyOnFailure("spending by supplier"))
     ]);
     return c.json({ year: currentYear, by_category: byCategory.rows, by_month: byMonth.rows, by_supplier: bySupplier.rows });
   });

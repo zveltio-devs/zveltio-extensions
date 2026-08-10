@@ -33,6 +33,25 @@ const poItemSchema = z.object({
   total: z.number(),
 });
 
+/**
+ * Keep the empty list, never lose the reason.
+ *
+ * These reads back spending reports and supplier histories, where an empty
+ * result renders as "nothing was bought" — believable, and indistinguishable
+ * from a query that broke. Worse, the three report queries share one
+ * transaction: a single failure poisons it and the other two return empty too,
+ * so one broken statement produces three false zeros in a public-spending
+ * report. The labels below name which one actually failed.
+ */
+function emptyOnFailure(label: string) {
+  return (err: unknown) => {
+    console.error(
+      `[ro/procurement] ${label} failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return { rows: [] as any[] };
+  };
+}
+
 export function roProcurementRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
@@ -75,8 +94,8 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
 
     const [orders, evaluations, contracts] = await Promise.all([
       db.selectFrom('zv_ro_purchase_orders').select(['id', 'number', 'date', 'total', 'currency', 'status']).where('supplier_id', '=', c.req.param('id')).orderBy('date', 'desc').limit(10).execute(),
-      sql<any>`SELECT * FROM zv_ro_supplier_evaluations WHERE supplier_id = ${c.req.param('id')}::uuid ORDER BY period DESC`.execute(db).catch(() => ({ rows: [] })),
-      sql<any>`SELECT id, number, title, value, currency, status, start_date, end_date FROM zv_ro_contracts WHERE supplier_id = ${c.req.param('id')}::uuid AND status = 'active'`.execute(db).catch(() => ({ rows: [] })),
+      sql<any>`SELECT * FROM zv_ro_supplier_evaluations WHERE supplier_id = ${c.req.param('id')}::uuid ORDER BY period DESC`.execute(db).catch(emptyOnFailure('supplier evaluations')),
+      sql<any>`SELECT id, number, title, value, currency, status, start_date, end_date FROM zv_ro_contracts WHERE supplier_id = ${c.req.param('id')}::uuid AND status = 'active'`.execute(db).catch(emptyOnFailure('supplier contracts')),
     ]);
 
     return c.json({ supplier, recent_orders: orders, evaluations: evaluations.rows, active_contracts: contracts.rows });
@@ -175,7 +194,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
     const nirs = await sql<any>`
       SELECT id, number, date, status, total_value FROM zv_ro_reception_notes
       WHERE order_id = ${c.req.param('id')}::uuid ORDER BY date DESC
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db).catch(emptyOnFailure('reception notes for the order'));
 
     return c.json({ order, reception_notes: nirs.rows });
   });
@@ -459,20 +478,20 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
         FROM zv_ro_purchase_orders
         WHERE EXTRACT(YEAR FROM date) = ${currentYear} AND status IN ('approved','received')
         GROUP BY category ORDER BY total DESC
-      `.execute(db).catch(() => ({ rows: [] })),
+      `.execute(db).catch(emptyOnFailure('spending by category')),
       sql<any>`
         SELECT TO_CHAR(date, 'YYYY-MM') AS month, SUM(total) AS total, COUNT(*)::int AS count
         FROM zv_ro_purchase_orders
         WHERE EXTRACT(YEAR FROM date) = ${currentYear} AND status IN ('approved','received')
         GROUP BY month ORDER BY month
-      `.execute(db).catch(() => ({ rows: [] })),
+      `.execute(db).catch(emptyOnFailure('spending by month')),
       sql<any>`
         SELECT supplier_name, supplier_cui, SUM(total) AS total, COUNT(*)::int AS count
         FROM zv_ro_purchase_orders
         WHERE EXTRACT(YEAR FROM date) = ${currentYear} AND status IN ('approved','received')
           ${supplier_id ? sql`AND supplier_id = ${supplier_id}::uuid` : sql``}
         GROUP BY supplier_name, supplier_cui ORDER BY total DESC LIMIT 20
-      `.execute(db).catch(() => ({ rows: [] })),
+      `.execute(db).catch(emptyOnFailure('spending by supplier')),
     ]);
 
     return c.json({ year: currentYear, by_category: byCategory.rows, by_month: byMonth.rows, by_supplier: bySupplier.rows });
