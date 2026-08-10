@@ -50,8 +50,8 @@
     "bundlePeers": true
   },
   "integrity": {
-    "engineSha256": "71ae41fbc1035f3f2142f502978d9c33a16ddc4ec59d2f9a6ff759c535e3f3da",
-    "sourceSha256": "dbfc56171474683aeca0324cc9e29aaea811c5dfcd307e2d29e7bd6eae5c4206"
+    "engineSha256": "bfd94a907180197abe7a256be63a6f5ad6999970fcc401b02bcd2ac2d4b68e09",
+    "sourceSha256": "1ff385f054e5be889f8a3b70c2f22607888fe22709d099d4b8fac6a43630f9e1"
   },
   "globalRoutes": [
     "/share/:token"

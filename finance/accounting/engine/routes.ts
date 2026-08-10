@@ -167,7 +167,7 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       INSERT INTO zvd_exchange_rates (from_currency, to_currency, rate, date, source)
       VALUES (${d.from_currency}, ${d.to_currency}, ${d.rate}, ${d.date}, ${d.source})
-      ON CONFLICT (from_currency, to_currency, date) DO UPDATE SET rate = EXCLUDED.rate
+      ON CONFLICT (tenant_id, from_currency, to_currency, date) DO UPDATE SET rate = EXCLUDED.rate
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] });
