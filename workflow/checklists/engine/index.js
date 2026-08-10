@@ -19513,6 +19513,57 @@ function permissionGate(ctx, resource, opts = {}) {
 function checklistsRoutes(ctx) {
   const { db, auth } = ctx;
   const app = new Hono2;
+  async function scoreChecklist(checklistId) {
+    const checklist = await db.selectFrom("zv_checklists").select(["id", "template_id"]).where("id", "=", checklistId).executeTakeFirst();
+    if (!checklist?.template_id)
+      return;
+    const schemes = await db.selectFrom("zv_checklist_scoring_schemes").selectAll().where("template_id", "=", checklist.template_id).where("is_active", "=", true).execute();
+    if (schemes.length === 0)
+      return;
+    const items = await db.selectFrom("zv_checklist_items").select(["id", "label", "checked", "template_item_id"]).where("checklist_id", "=", checklistId).execute();
+    for (const scheme of schemes) {
+      const weights = await db.selectFrom("zv_checklist_scheme_weights").select(["template_item_id", "weight"]).where("scheme_id", "=", scheme.id).execute();
+      const byItem = new Map(weights.map((w) => [w.template_item_id, Number(w.weight)]));
+      let earned = 0;
+      let possible = 0;
+      const breakdown = [];
+      for (const item of items) {
+        if (!item.template_item_id || !byItem.has(item.template_item_id))
+          continue;
+        const weight = byItem.get(item.template_item_id) ?? 0;
+        if (weight === 0)
+          continue;
+        possible += weight;
+        if (item.checked)
+          earned += weight;
+        breakdown.push({ label: item.label, weight, checked: Boolean(item.checked) });
+      }
+      if (possible === 0)
+        continue;
+      const score = Math.round(earned / possible * 1e4) / 100;
+      const threshold = scheme.pass_threshold === null ? null : Number(scheme.pass_threshold);
+      await sql`
+        INSERT INTO zv_checklist_scores
+          (checklist_id, scheme_id, scheme_name, method, score, passed, snapshot)
+        VALUES (
+          ${checklistId}::uuid,
+          ${scheme.id}::uuid,
+          ${scheme.name},
+          ${scheme.method},
+          ${score},
+          ${threshold === null ? null : score >= threshold},
+          ${JSON.stringify({ earned, possible, pass_threshold: threshold, items: breakdown })}::jsonb
+        )
+        ON CONFLICT (checklist_id, scheme_id) DO UPDATE SET
+          scheme_name = EXCLUDED.scheme_name,
+          method      = EXCLUDED.method,
+          score       = EXCLUDED.score,
+          passed      = EXCLUDED.passed,
+          snapshot    = EXCLUDED.snapshot,
+          computed_at = NOW()
+      `.execute(db);
+    }
+  }
   async function getUser(c) {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     return session?.user ?? null;
@@ -19686,7 +19737,8 @@ function checklistsRoutes(ctx) {
         label: item.label,
         description: item.description,
         required: item.required ?? false,
-        order_idx: item.order_idx ?? i
+        order_idx: item.order_idx ?? i,
+        template_item_id: template_id ? item.id ?? null : null
       }))).execute();
     }
     const items = await db.selectFrom("zv_checklist_items").selectAll().where("checklist_id", "=", checklist.id).orderBy("order_idx", "asc").execute();
@@ -19740,6 +19792,7 @@ function checklistsRoutes(ctx) {
         await db.updateTable("zv_checklists").set({ completed_at: null, updated_at: now }).where("id", "=", item.checklist_id).execute();
       }
     }
+    await scoreChecklist(item.checklist_id);
     return c.json({ item });
   });
   app.post("/items/bulk-check", zValidator("json", exports_external.object({
@@ -19772,6 +19825,7 @@ function checklistsRoutes(ctx) {
           timeToComplete = Math.round((now.getTime() - new Date(checklist.created_at).getTime()) / 60000);
         }
         await db.updateTable("zv_checklists").set({ completed_at: now, updated_at: now, completed_by: user.id, time_to_complete_minutes: timeToComplete }).where("id", "=", checklistId).where("completed_at", "is", null).execute();
+        await scoreChecklist(checklistId);
       } else if (!allRequiredChecked) {
         await db.updateTable("zv_checklists").set({ completed_at: null, updated_at: now }).where("id", "=", checklistId).execute();
       }
@@ -19962,6 +20016,86 @@ function checklistsRoutes(ctx) {
     await db.deleteFrom("zv_checklists").where("id", "=", c.req.param("id")).execute();
     return c.json({ success: true });
   });
+  const SchemeSchema = exports_external.object({
+    name: exports_external.string().min(1),
+    description: exports_external.string().optional(),
+    pass_threshold: exports_external.number().min(0).max(100).nullable().optional(),
+    is_active: exports_external.boolean().optional()
+  });
+  app.get("/templates/:id/scoring-schemes", async (c) => {
+    const user = await getUser(c);
+    if (!user)
+      return c.json({ error: "Unauthorized" }, 401);
+    const schemes = await db.selectFrom("zv_checklist_scoring_schemes").selectAll().where("template_id", "=", c.req.param("id")).orderBy("name", "asc").execute();
+    const withWeights = [];
+    for (const scheme of schemes) {
+      const weights = await db.selectFrom("zv_checklist_scheme_weights as w").innerJoin("zv_checklist_template_items as i", "i.id", "w.template_item_id").select(["w.template_item_id", "w.weight", "i.label", "i.order_idx"]).where("w.scheme_id", "=", scheme.id).orderBy("i.order_idx", "asc").execute();
+      withWeights.push({ ...scheme, weights });
+    }
+    return c.json({ schemes: withWeights });
+  });
+  app.post("/templates/:id/scoring-schemes", zValidator("json", SchemeSchema), async (c) => {
+    const user = await getUser(c);
+    if (!user)
+      return c.json({ error: "Unauthorized" }, 401);
+    const templateId = c.req.param("id");
+    const template = await db.selectFrom("zv_checklist_templates").select(["id"]).where("id", "=", templateId).executeTakeFirst();
+    if (!template)
+      return c.json({ error: "Template not found" }, 404);
+    const scheme = await db.insertInto("zv_checklist_scoring_schemes").values({ ...c.req.valid("json"), template_id: templateId, created_by: user.id }).returningAll().executeTakeFirst();
+    return c.json({ scheme }, 201);
+  });
+  app.patch("/scoring-schemes/:id", zValidator("json", SchemeSchema.partial()), async (c) => {
+    const user = await getUser(c);
+    if (!user)
+      return c.json({ error: "Unauthorized" }, 401);
+    const scheme = await db.updateTable("zv_checklist_scoring_schemes").set({ ...c.req.valid("json"), updated_at: new Date }).where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
+    if (!scheme)
+      return c.json({ error: "Scheme not found" }, 404);
+    return c.json({ scheme });
+  });
+  app.delete("/scoring-schemes/:id", async (c) => {
+    const user = await getUser(c);
+    if (!user)
+      return c.json({ error: "Unauthorized" }, 401);
+    await db.deleteFrom("zv_checklist_scoring_schemes").where("id", "=", c.req.param("id")).execute();
+    return c.json({ success: true });
+  });
+  app.put("/scoring-schemes/:id/weights", zValidator("json", exports_external.object({
+    weights: exports_external.array(exports_external.object({ template_item_id: exports_external.string().uuid(), weight: exports_external.number().min(0) })).default([])
+  })), async (c) => {
+    const user = await getUser(c);
+    if (!user)
+      return c.json({ error: "Unauthorized" }, 401);
+    const schemeId = c.req.param("id");
+    const scheme = await db.selectFrom("zv_checklist_scoring_schemes").select(["id", "template_id"]).where("id", "=", schemeId).executeTakeFirst();
+    if (!scheme)
+      return c.json({ error: "Scheme not found" }, 404);
+    const { weights } = c.req.valid("json");
+    if (weights.length > 0) {
+      const valid = await db.selectFrom("zv_checklist_template_items").select(["id"]).where("template_id", "=", scheme.template_id).execute();
+      const allowed = new Set(valid.map((v) => v.id));
+      const stray = weights.filter((w) => !allowed.has(w.template_item_id));
+      if (stray.length > 0) {
+        return c.json({
+          error: `${stray.length} item(s) do not belong to this scheme's template`,
+          items: stray.map((s) => s.template_item_id)
+        }, 400);
+      }
+    }
+    await db.deleteFrom("zv_checklist_scheme_weights").where("scheme_id", "=", schemeId).execute();
+    if (weights.length > 0) {
+      await db.insertInto("zv_checklist_scheme_weights").values(weights.map((w) => ({ scheme_id: schemeId, ...w }))).execute();
+    }
+    return c.json({ success: true, count: weights.length });
+  });
+  app.get("/:id/scores", async (c) => {
+    const user = await getUser(c);
+    if (!user)
+      return c.json({ error: "Unauthorized" }, 401);
+    const scores = await db.selectFrom("zv_checklist_scores").selectAll().where("checklist_id", "=", c.req.param("id")).orderBy("scheme_name", "asc").execute();
+    return c.json({ scores });
+  });
   return app;
 }
 
@@ -19974,7 +20108,9 @@ var extension = {
     return [
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
-      join(import.meta.dir, "migrations/003_user_ref_text.sql")
+      join(import.meta.dir, "migrations/003_user_ref_text.sql"),
+      join(import.meta.dir, "migrations/004_scoring_schemes.sql"),
+      join(import.meta.dir, "migrations/005_user_ref_text.sql")
     ];
   },
   async register(app, ctx) {
