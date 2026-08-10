@@ -12,6 +12,23 @@ async function getUser(c: any, auth: any) {
 
 const DOC_TYPES = ['contract', 'pv', 'nir', 'dispozitie_plata', 'proces_verbal', 'notificare', 'other'] as const;
 
+/**
+ * Prefixes used when a company issues its first document of a type and its
+ * register sequence is created. Same values 001_initial.sql seeds, kept here
+ * because sequences are now created on demand, per company, rather than only at
+ * install time. A company can change its prefix or format afterwards; this is
+ * only the starting point.
+ */
+const DEFAULT_PREFIX: Record<(typeof DOC_TYPES)[number], string> = {
+  contract: 'CTR',
+  pv: 'PV',
+  nir: 'NIR',
+  dispozitie_plata: 'DP',
+  proces_verbal: 'PVG',
+  notificare: 'NOT',
+  other: 'DOC',
+};
+
 export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
@@ -80,7 +97,14 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
         COUNT(*)::int AS count
       FROM zv_ro_documents
       GROUP BY GROUPING SETS ((), (type))
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db).catch((err) => {
+      // An empty result renders as a register with nothing in it, which is a
+      // believable thing to see and a bad thing to be wrong about.
+      console.error(
+        `[ro/documents] register statistics failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return { rows: [] };
+    });
 
     return c.json({ stats: stats.rows });
   });
@@ -124,25 +148,61 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
 
       const body = c.req.valid('json');
 
-      // Auto-generate number from sequence if not provided
+      // Auto-generate number from the register sequence if not provided.
+      //
+      // Deliberately one statement. It claims the next number, creates the
+      // company's sequence the first time it issues a document, and restarts the
+      // count in January — atomically, so two documents created at the same
+      // moment cannot take the same number.
+      //
+      // There is no fallback number, and that is the point. This used to fall
+      // back to a millisecond timestamp whenever the claim came back empty,
+      // which was the normal path for every company but the first (see
+      // migration 004). An issued number is a legal fact; the register either
+      // gives out the next one in the series or the document is not created.
       let number = body.number;
       if (!number) {
-        const seq = await sql<any>`
-          UPDATE zv_ro_doc_number_sequences
-          SET last_seq = last_seq + 1, updated_at = NOW()
-          WHERE type = ${body.type}
+        const seq = await sql<{
+          prefix: string;
+          year: number;
+          last_seq: number;
+          format: string;
+        }>`
+          INSERT INTO zv_ro_doc_number_sequences (type, prefix, format, year, last_seq)
+          VALUES (
+            ${body.type},
+            ${DEFAULT_PREFIX[body.type]},
+            '{prefix}-{year}-{seq:4d}',
+            EXTRACT(YEAR FROM NOW())::int,
+            1
+          )
+          ON CONFLICT (tenant_id, type) DO UPDATE
+          SET last_seq = CASE
+                WHEN zv_ro_doc_number_sequences.year = EXCLUDED.year
+                THEN zv_ro_doc_number_sequences.last_seq + 1
+                ELSE 1
+              END,
+              year = EXCLUDED.year,
+              updated_at = NOW()
           RETURNING prefix, year, last_seq, format
-        `.execute(db).catch(() => ({ rows: [] }));
+        `.execute(db);
 
-        if (seq.rows[0]) {
-          const { prefix, year, last_seq, format } = seq.rows[0];
-          number = format
-            .replace('{prefix}', prefix)
-            .replace('{year}', String(year))
-            .replace(/{seq:(\d+)d}/, (_: string, w: string) => String(last_seq).padStart(parseInt(w), '0'));
-        } else {
-          number = `${body.type.toUpperCase()}-${Date.now()}`;
+        const claimed = seq.rows[0];
+        if (!claimed) {
+          // Unreachable in practice — the statement above always returns a row —
+          // but a register that cannot number a document must say so rather than
+          // store one without a number.
+          return c.json(
+            { error: 'Could not claim a register number; the document was not created' },
+            500,
+          );
         }
+        number = claimed.format
+          .replace('{prefix}', claimed.prefix)
+          .replace('{year}', String(claimed.year))
+          .replace(/{seq:(\d+)d}/, (_: string, w: string) =>
+            String(claimed.last_seq).padStart(Number.parseInt(w, 10), '0'),
+          );
       }
 
       const doc = await db
@@ -181,11 +241,17 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
       if (!existing) return c.json({ error: 'Document not found' }, 404);
       if (existing.status !== 'draft') return c.json({ error: 'Only draft documents can be edited' }, 400);
 
-      // Save version snapshot
+      // Save version snapshot.
+      //
+      // Not caught, on purpose. This is the copy of the text as it stands right
+      // now, and the update below overwrites it. Swallowing a failure here means
+      // the edit still goes through and the previous version is gone for good —
+      // silent, permanent loss of exactly the history this register exists to
+      // keep. If the snapshot cannot be written, the edit must not happen.
       await sql`
         INSERT INTO zv_ro_document_versions (document_id, version, content, changed_by)
         VALUES (${existing.id}::uuid, ${existing.version_number}, ${existing.content ?? null}, ${user.id})
-      `.execute(db).catch(() => {});
+      `.execute(db);
 
       const updates: any = { updated_at: new Date(), version_number: existing.version_number + 1 };
       if (body.title !== undefined) updates.title = body.title;
@@ -242,7 +308,14 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
       FROM zv_ro_document_versions
       WHERE document_id = ${c.req.param('id')}::uuid
       ORDER BY version DESC
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db).catch((err) => {
+      // Showing "no earlier versions" for a document that has them is the exact
+      // opposite of what a register is for, so say so in the log at least.
+      console.error(
+        `[ro/documents] version history failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return { rows: [] };
+    });
 
     return c.json({ versions: versions.rows });
   });
@@ -252,21 +325,28 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
+    // Not caught: an empty result becomes "Version not found" below, so
+    // swallowing a failure would tell someone their version no longer exists
+    // when in fact the read broke. On a document register, a missing version and
+    // a broken query must not look the same.
     const version = await sql<any>`
       SELECT content FROM zv_ro_document_versions
       WHERE document_id = ${c.req.param('id')}::uuid AND version = ${parseInt(c.req.param('version'), 10)}
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
 
     if (!version.rows[0]) return c.json({ error: 'Version not found' }, 404);
 
     const existing = await db.selectFrom('zv_ro_documents').select(['version_number']).where('id', '=', c.req.param('id')).executeTakeFirst();
     if (!existing) return c.json({ error: 'Document not found' }, 404);
 
+    // Same reasoning as the snapshot on edit, and it matters more here: the
+    // restore below replaces the current text wholesale, so a swallowed failure
+    // would destroy it with nothing kept back.
     await sql`
       INSERT INTO zv_ro_document_versions (document_id, version, content, changed_by, change_note)
       SELECT id, ${existing.version_number}::int, content, ${user.id}, 'Pre-restore snapshot'
       FROM zv_ro_documents WHERE id = ${c.req.param('id')}::uuid
-    `.execute(db).catch(() => {});
+    `.execute(db);
 
     const doc = await db.updateTable('zv_ro_documents')
       .set({ content: version.rows[0].content, status: 'draft', version_number: existing.version_number + 1, updated_at: new Date() })
