@@ -265,7 +265,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
           const create = await sql<any>`
             INSERT INTO zvd_products (sku, name, description, sale_price, currency, tax_rate, is_active)
             VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === 'active'})
-            ON CONFLICT (sku) DO UPDATE SET name = EXCLUDED.name
+            ON CONFLICT (tenant_id, sku) DO UPDATE SET name = EXCLUDED.name
             RETURNING id
           `.execute(db).catch(() => null);
           canonicalProductId = create?.rows[0]?.id ?? null;
@@ -439,7 +439,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       INSERT INTO zvd_ec_tax_rules (name, country, region, rate, applies_to)
       VALUES (${d.name}, ${d.country}, ${d.region ?? null}, ${d.rate}, ${d.applies_to})
-      ON CONFLICT (country, region, applies_to) DO UPDATE SET rate = ${d.rate}, name = ${d.name}
+      ON CONFLICT (tenant_id, country, region, applies_to) DO UPDATE SET rate = ${d.rate}, name = ${d.name}
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);

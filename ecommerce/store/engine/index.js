@@ -19726,7 +19726,7 @@ function ecommerceRoutes(ctx) {
           const create = await sql`
             INSERT INTO zvd_products (sku, name, description, sale_price, currency, tax_rate, is_active)
             VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === "active"})
-            ON CONFLICT (sku) DO UPDATE SET name = EXCLUDED.name
+            ON CONFLICT (tenant_id, sku) DO UPDATE SET name = EXCLUDED.name
             RETURNING id
           `.execute(db).catch(() => null);
           canonicalProductId = create?.rows[0]?.id ?? null;
@@ -19887,7 +19887,7 @@ function ecommerceRoutes(ctx) {
     const row = await sql`
       INSERT INTO zvd_ec_tax_rules (name, country, region, rate, applies_to)
       VALUES (${d.name}, ${d.country}, ${d.region ?? null}, ${d.rate}, ${d.applies_to})
-      ON CONFLICT (country, region, applies_to) DO UPDATE SET rate = ${d.rate}, name = ${d.name}
+      ON CONFLICT (tenant_id, country, region, applies_to) DO UPDATE SET rate = ${d.rate}, name = ${d.name}
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
@@ -20166,7 +20166,8 @@ var extension = {
   getMigrations() {
     return [
       join(import.meta.dir, "migrations/001_initial.sql"),
-      join(import.meta.dir, "migrations/002_tenant_rls.sql")
+      join(import.meta.dir, "migrations/002_tenant_rls.sql"),
+      join(import.meta.dir, "migrations/003_tenant_scoped_unique_keys.sql")
     ];
   },
   async register(app, ctx) {

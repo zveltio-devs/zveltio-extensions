@@ -141,7 +141,7 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       INSERT INTO zvd_payroll_periods (year, month, notes, created_by)
       VALUES (${d.year}, ${d.month}, ${d.notes ?? null}, ${user.id})
-      ON CONFLICT (year, month) DO NOTHING RETURNING *
+      ON CONFLICT (tenant_id, year, month) DO NOTHING RETURNING *
     `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Period already exists' }, 409);
     return c.json({ data: row.rows[0] }, 201);

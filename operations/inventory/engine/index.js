@@ -19907,7 +19907,8 @@ var extension = {
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
       join(import.meta.dir, "migrations/003_user_ref_text.sql"),
       join(import.meta.dir, "migrations/004_movement_cost_and_transfers.sql"),
-      join(import.meta.dir, "migrations/005_product_currency.sql")
+      join(import.meta.dir, "migrations/005_product_currency.sql"),
+      join(import.meta.dir, "migrations/006_tenant_scoped_unique_keys.sql")
     ];
   },
   async register(app, ctx) {

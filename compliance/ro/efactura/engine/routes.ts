@@ -684,7 +684,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     await sql`
       INSERT INTO zv_efactura_daily_stats (date, seller_cui, submitted_count, total_amount, vat_amount)
       VALUES (CURRENT_DATE, ${invoice.seller_cui}, 1, ${invoice.total}, ${invoice.vat_total})
-      ON CONFLICT (date, seller_cui)
+      ON CONFLICT (tenant_id, date, seller_cui)
       DO UPDATE SET submitted_count = zv_efactura_daily_stats.submitted_count + 1,
                     total_amount = zv_efactura_daily_stats.total_amount + EXCLUDED.total_amount,
                     vat_amount = zv_efactura_daily_stats.vat_amount + EXCLUDED.vat_amount
