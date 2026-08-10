@@ -25,7 +25,6 @@ const RuleSchema = z.object({
 
 const SlaTargetSchema = z.object({
   collection: z.string().min(1),
-  min_score: z.number().int().min(0).max(100).default(80),
   max_critical_issues: z.number().int().min(0).default(0),
   max_error_issues: z.number().int().min(0).default(5),
   alert_email: z.string().email().optional(),
@@ -41,57 +40,29 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
 
   const { runQualityScan } = ctx.internals;
 
-  // The score is computed when the scan actually ends, not when we guess it has.
+  // There is deliberately no quality score.
   //
-  // `runQualityScan` returns the id immediately and the work continues in its own
-  // tenant transaction, so the route that started it has no idea when it
-  // finished. This used to be handled by launching a detached function that slept
-  // two seconds — `await new Promise(r => setTimeout(r, 2000))` — and then wrote
-  // the score on the REQUEST's transaction, which had closed while it slept. Two
-  // catches, one inside and one outside, meant the failure was never seen:
-  // `zvd_quality_scores` was empty on every installation and the dashboard that
-  // reads it showed nothing, without ever reporting a fault.
+  // There used to be one, computed from a formula nobody chose:
+  // `(critical*10 + error*5 + warning*2 + info*0.5) / records * 100`. Measured on
+  // a real instance, 4 warnings over 2 records deducted 400% and scored 0, while
+  // the same 4 warnings over 100 records scored 92 — so the number said more
+  // about how big a collection was than about how good its data were.
   //
-  // Verified before the change, on a virgin database: one scan completed, zero
-  // score rows.
+  // It also never worked: the write was launched detached, slept two seconds and
+  // landed on a closed transaction, so `zvd_quality_scores` was empty on every
+  // installation that has ever existed. Nobody has ever seen one of these
+  // numbers, which is the only reason it can be deleted rather than migrated.
   //
-  // The denominator was wrong too. It read `scan.total_records` where the column
-  // is `records_scanned`, so `|| 1` divided every deduction by one and a
-  // collection with a single issue scored zero. The event carries the count, so
-  // there is nothing left to misname.
-  ctx.events.on('quality.scanCompleted', async (payload) => {
-    const { scanId, collection, recordsScanned } = payload;
-
-    const issues = await (db as any)
-      .selectFrom('zv_quality_issues')
-      .selectAll()
-      .where('scan_id', '=', scanId)
-      .execute();
-
-    const count = (severity: string) => issues.filter((i: any) => i.severity === severity).length;
-    const critical = count('critical');
-    const error = count('error');
-    const warning = count('warning');
-    const info = count('info');
-
-    const total = recordsScanned || 1;
-    const deduction = ((critical * 10 + error * 5 + warning * 2 + info * 0.5) / total) * 100;
-    const score = Math.max(0, Math.round(100 - deduction));
-
-    await (db as any)
-      .insertInto('zvd_quality_scores')
-      .values({
-        collection,
-        scan_id: scanId,
-        score,
-        total_records: total,
-        critical_count: critical,
-        error_count: error,
-        warning_count: warning,
-        info_count: info,
-      })
-      .execute();
-  });
+  // What is left is what can be defended: issue counts by severity, and SLA
+  // thresholds expressed in those counts. "No critical issues" is a rule anyone
+  // can argue for; "score at least 80" was not, because nobody could say what 80
+  // meant.
+  //
+  // A score is worth having when someone CONFIGURES what it means — weights per
+  // checklist item, several schemes over the same list, stored with the scheme
+  // that produced them so history does not move when the weights do. That
+  // belongs to workflow/checklists, not here, and it needs the master-detail
+  // renderer before its configuration screen can exist.
 
   const app = new Hono();
 
@@ -114,8 +85,6 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
 
     const scanId = await runQualityScan(db, collection, scan_type, user.id);
 
-    // The score is stored by the `quality.scanCompleted` listener registered
-    // below — see the note there for why it cannot be done from here.
     return c.json({ scan_id: scanId, message: 'Scan started' }, 202);
   });
 
@@ -178,7 +147,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     if (!(await checkPermission(user.id, 'admin', '*'))) return c.json({ error: 'Forbidden' }, 403);
 
-    const [summary, latestScans, latestScores] = await Promise.all([
+    const [summary, latestScans] = await Promise.all([
       sql`SELECT i.collection, i.severity, COUNT(i.id) as count FROM zv_quality_issues i WHERE i.dismissed = false GROUP BY i.collection, i.severity`.execute(db).then(r => r.rows),
       (db as any)
         .selectFrom('zv_quality_scans')
@@ -188,17 +157,9 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
         .orderBy('started_at', 'desc')
         .execute()
         .catch(() => []),
-      (db as any)
-        .selectFrom('zvd_quality_scores')
-        .select(['collection', 'score', 'calculated_at'])
-        .distinctOn(['collection'])
-        .orderBy('collection')
-        .orderBy('calculated_at', 'desc')
-        .execute()
-        .catch(() => []),
     ]);
 
-    return c.json({ summary, latest_scans: latestScans, latest_scores: latestScores });
+    return c.json({ summary, latest_scans: latestScans });
   });
 
   // ── Enterprise: Quality Rules ───────────────────────────────────
@@ -241,19 +202,6 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     return c.json({ success: true });
   });
 
-  // ── Enterprise: Quality Scores ──────────────────────────────────
-
-  app.get('/scores/:collection', async (c) => {
-    const scores = await (db as any)
-      .selectFrom('zvd_quality_scores')
-      .selectAll()
-      .where('collection', '=', c.req.param('collection'))
-      .orderBy('calculated_at', 'desc')
-      .limit(30)
-      .execute();
-    return c.json({ scores });
-  });
-
   // ── Enterprise: SLA Targets ─────────────────────────────────────
 
   app.get('/sla-targets', async (c) => {
@@ -270,7 +218,19 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     const target = await (db as any)
       .insertInto('zvd_quality_sla_targets')
       .values({ ...data, created_by: user.id })
-      .onConflict((oc: any) => oc.column('collection').doUpdateSet({ min_score: data.min_score, max_critical_issues: data.max_critical_issues, max_error_issues: data.max_error_issues, alert_email: data.alert_email }))
+      // `(tenant_id, collection)`, not `collection`. The key was widened so two
+      // companies on one instance can each set a target for a collection of the
+      // same name; a conflict target that still named one column would have
+      // matched no constraint and thrown at runtime. Missed by the sweep that
+      // moved the SQL-text `ON CONFLICT (...)` clauses, because this one is
+      // Kysely's builder form.
+      .onConflict((oc: any) =>
+        oc.columns(['tenant_id', 'collection']).doUpdateSet({
+          max_critical_issues: data.max_critical_issues,
+          max_error_issues: data.max_error_issues,
+          alert_email: data.alert_email,
+        }),
+      )
       .returningAll()
       .executeTakeFirst();
     return c.json({ target }, 201);
@@ -294,24 +254,24 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     const target = await (db as any).selectFrom('zvd_quality_sla_targets').selectAll().where('collection', '=', scan.collection).where('is_active', '=', true).executeTakeFirst();
     if (!target) return c.json({ compliant: true, message: 'No SLA target configured for this collection' });
 
-    const score = await (db as any).selectFrom('zvd_quality_scores').selectAll().where('scan_id', '=', scanId).executeTakeFirst();
     const issues = await (db as any).selectFrom('zv_quality_issues').selectAll().where('scan_id', '=', scanId).where('dismissed', '=', false).execute();
 
     const criticalCount = issues.filter((i: any) => i.severity === 'critical').length;
     const errorCount = issues.filter((i: any) => i.severity === 'error').length;
 
     const breaches: string[] = [];
-    if (score && score.score < target.min_score) breaches.push(`Quality score ${score.score} below minimum ${target.min_score}`);
     if (criticalCount > target.max_critical_issues) breaches.push(`${criticalCount} critical issues exceeds max ${target.max_critical_issues}`);
     if (errorCount > target.max_error_issues) breaches.push(`${errorCount} error issues exceeds max ${target.max_error_issues}`);
 
     return c.json({
       compliant: breaches.length === 0,
-      score: score?.score ?? null,
       critical_count: criticalCount,
       error_count: errorCount,
       breaches,
-      target: { min_score: target.min_score, max_critical_issues: target.max_critical_issues, max_error_issues: target.max_error_issues },
+      target: {
+        max_critical_issues: target.max_critical_issues,
+        max_error_issues: target.max_error_issues,
+      },
     });
   });
 
@@ -349,19 +309,16 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     if (!(await checkPermission(user.id, 'admin', '*'))) return c.json({ error: 'Admin access required' }, 403);
 
-    const [scansCount, issuesByCollection, slaTargets, latestScores] = await Promise.all([
+    const [scansCount, issuesByCollection, slaTargets] = await Promise.all([
       sql<{ count: string }>`SELECT COUNT(*)::text FROM zv_quality_scans WHERE created_at >= NOW() - INTERVAL '30 days'`.execute(db),
       sql<{ collection: string; total: string; dismissed: string }>`
         SELECT collection, COUNT(*)::text AS total, SUM(CASE WHEN dismissed THEN 1 ELSE 0 END)::text AS dismissed
         FROM zv_quality_issues GROUP BY collection ORDER BY total DESC LIMIT 10
       `.execute(db),
-      (db as any).selectFrom('zvd_quality_sla_targets').select(['collection', 'min_score', 'is_active']).where('is_active', '=', true).execute().catch(() => []),
       (db as any)
-        .selectFrom('zvd_quality_scores')
-        .select(['collection', 'score', 'calculated_at'])
-        .distinctOn(['collection'])
-        .orderBy('collection')
-        .orderBy('calculated_at', 'desc')
+        .selectFrom('zvd_quality_sla_targets')
+        .select(['collection', 'max_critical_issues', 'max_error_issues', 'is_active'])
+        .where('is_active', '=', true)
         .execute()
         .catch(() => []),
     ]);
@@ -370,7 +327,6 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
       scans_last_30_days: parseInt(scansCount.rows[0]?.count || '0'),
       issues_by_collection: issuesByCollection.rows,
       sla_targets: slaTargets,
-      latest_scores: latestScores,
     });
   });
 

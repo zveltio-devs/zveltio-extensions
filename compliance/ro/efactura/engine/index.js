@@ -19800,7 +19800,47 @@ async function logStatusChange(dbh, invoiceId, oldStatus, newStatus, userId, not
   await sql`
     INSERT INTO zv_efactura_status_log (invoice_id, old_status, new_status, changed_by, note)
     VALUES (${invoiceId}::uuid, ${oldStatus}, ${newStatus}, ${userId}, ${note ?? null})
-  `.execute(dbh).catch(() => {});
+  `.execute(dbh);
+}
+function num(v) {
+  const n = typeof v === "number" ? v : Number(v ?? 0);
+  return Number.isFinite(n) ? n : 0;
+}
+function day(v) {
+  if (!v)
+    return "";
+  if (v instanceof Date)
+    return v.toISOString().slice(0, 10);
+  return String(v).split("T")[0];
+}
+function toInvoiceData(row, lines) {
+  return {
+    invoice_number: String(row.invoice_number ?? ""),
+    invoice_date: day(row.invoice_date),
+    due_date: row.due_date ? day(row.due_date) : undefined,
+    currency: String(row.currency ?? "RON"),
+    seller_name: String(row.seller_name ?? ""),
+    seller_cui: String(row.seller_cui ?? ""),
+    seller_reg_com: row.seller_reg_com ?? undefined,
+    seller_address: row.seller_address ?? undefined,
+    seller_iban: row.seller_iban ?? undefined,
+    seller_bank: row.seller_bank ?? undefined,
+    buyer_name: String(row.buyer_name ?? ""),
+    buyer_cui: row.buyer_cui ?? undefined,
+    buyer_address: row.buyer_address ?? undefined,
+    lines: (Array.isArray(lines) ? lines : []).map((l) => ({
+      description: String(l?.description ?? ""),
+      quantity: num(l?.quantity),
+      unit: String(l?.unit ?? "H87"),
+      unit_price: num(l?.unit_price),
+      vat_rate: num(l?.vat_rate),
+      vat_amount: num(l?.vat_amount),
+      line_total: num(l?.line_total)
+    })),
+    subtotal: num(row.subtotal),
+    vat_total: num(row.vat_total),
+    total: num(row.total)
+  };
 }
 function efacturaRoutes(ctx) {
   const { db, auth } = ctx;
