@@ -20379,7 +20379,8 @@ var extension = {
       join(import.meta.dir, "migrations/006_vat_compliance.sql"),
       join(import.meta.dir, "migrations/007_catalogue_and_documents.sql"),
       join(import.meta.dir, "migrations/008_party_city.sql"),
-      join(import.meta.dir, "migrations/009_party_county.sql")
+      join(import.meta.dir, "migrations/009_party_county.sql"),
+      join(import.meta.dir, "migrations/010_tenant_scoped_unique_keys.sql")
     ];
   },
   async register(app, ctx) {

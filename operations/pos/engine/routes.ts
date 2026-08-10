@@ -75,7 +75,7 @@ export function posRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       INSERT INTO zvd_pos_customers (name, email, phone, notes, canonical_contact_id)
       VALUES (${d.name}, ${d.email ?? null}, ${d.phone ?? null}, ${d.notes ?? null}, ${canonicalContactId})
-      ON CONFLICT (email) DO UPDATE SET
+      ON CONFLICT (tenant_id, email) DO UPDATE SET
         name = EXCLUDED.name,
         phone = EXCLUDED.phone,
         canonical_contact_id = COALESCE(zvd_pos_customers.canonical_contact_id, EXCLUDED.canonical_contact_id)

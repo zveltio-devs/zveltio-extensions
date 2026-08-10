@@ -19653,7 +19653,7 @@ function accountingRoutes(ctx) {
     const row = await sql`
       INSERT INTO zvd_exchange_rates (from_currency, to_currency, rate, date, source)
       VALUES (${d.from_currency}, ${d.to_currency}, ${d.rate}, ${d.date}, ${d.source})
-      ON CONFLICT (from_currency, to_currency, date) DO UPDATE SET rate = EXCLUDED.rate
+      ON CONFLICT (tenant_id, from_currency, to_currency, date) DO UPDATE SET rate = EXCLUDED.rate
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] });
@@ -20005,7 +20005,8 @@ var extension = {
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
       join(import.meta.dir, "migrations/003_user_ref_text.sql"),
-      join(import.meta.dir, "migrations/004_account_currency.sql")
+      join(import.meta.dir, "migrations/004_account_currency.sql"),
+      join(import.meta.dir, "migrations/005_tenant_scoped_unique_keys.sql")
     ];
   },
   async register(app, ctx) {

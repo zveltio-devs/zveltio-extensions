@@ -59,7 +59,7 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     const row = await sql`
       INSERT INTO zvd_public_holidays (date, name, year) VALUES (${d.date}, ${d.name}, ${d.year})
-      ON CONFLICT (date) DO UPDATE SET name = EXCLUDED.name
+      ON CONFLICT (tenant_id, date) DO UPDATE SET name = EXCLUDED.name
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
