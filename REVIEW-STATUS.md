@@ -17,7 +17,7 @@ Generat automat. `verificat` = cineva a parcurs secțiunea G din REVIEW-CHECKLIS
 | `compliance/ro/documents` | 12 | 4 | 0 | 0 | 2 | 0 | 1 | SDUI | da | **verificat** |
 | `compliance/ro/efactura` | 23 | 6 | 2 | 1 | 6 | 6 | 2 | SDUI | da | **verificat** |
 | `compliance/ro/etransport` | 9 | 2 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
-| `compliance/ro/procurement` | 22 | 2 | 0 | 0 | 6 | 0 | 1 | cod | da | neverificat |
+| `compliance/ro/procurement` | 22 | 3 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat** |
 | `compliance/ro/saft` | 13 | 2 | 0 | 0 | 0 | 1 | 1 | SDUI | da | **verificat** |
 | `content/document-templates` | 14 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
 | `content/documents` | 12 | 3 | 0 | 0 | 5 | 0 | 1 | cod | da | neverificat |
@@ -30,7 +30,7 @@ Generat automat. `verificat` = cineva a parcurs secțiunea G din REVIEW-CHECKLIS
 | `data/import` | 11 | 2 | 0 | 0 | 3 | 0 | 1 | SDUI | da | neverificat |
 | `developer/api-docs` | 0 | 2 | 0 | 0 | 1 | 4 | 1 | cod | da | neverificat |
 | `developer/byod` | 0 | 2 | 0 | 0 | 5 | 0 | 1 | cod | da | neverificat |
-| `developer/database` | 0 | 3 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat** |
+| `developer/database` | 0 | 4 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat** |
 | `developer/edge-functions` | 7 | 0 | 0 | 0 | 4 | 0 | 1 | cod | da | neverificat |
 | `developer/graphql` | 13 | 2 | 0 | 0 | 2 | 4 | 1 | cod | da | neverificat |
 | `developer/validation` | 14 | 2 | 0 | 0 | 3 | 0 | 1 | cod | da | neverificat |
@@ -63,7 +63,7 @@ Generat automat. `verificat` = cineva a parcurs secțiunea G din REVIEW-CHECKLIS
 | `workflow/approvals` | 17 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | neverificat |
 | `workflow/checklists` | 17 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | neverificat |
 
-**Total: 57 extensii · verificate: 17**
+**Total: 57 extensii · verificate: 18**
 
 Coloane: `catch` = numărul de `.catch(() => …)` (candidați la A2) · `ext` = apeluri către servicii externe · `serv`/`ascult` = servicii publicate și ascultători de evenimente.
 
@@ -95,8 +95,20 @@ la `emitAsync` în engine — ceea ce cere şi trecerea interogărilor de la par
 la secvenţial, fiindcă savepoint-urile nu se compun cu instrucţiuni paralele pe
 aceeaşi conexiune. Panoul rulează în 76 ms, deci costul e neglijabil.
 
-Merită căutat şi în celelalte extensii care compun mai multe interogări cu
-`Promise.all` sub `ctx.reqDb`.
+**A doua instanţă, găsită de atunci:** raportul de cheltuieli din
+`compliance/ro/procurement` compune trei interogări analitice exact la fel. O
+singură interogare stricată acolo dă trei zerouri false într-un raport de
+cheltuieli publice.
+
+Două instanţe schimbă concluzia. Reparaţia — un SAVEPOINT per interogare — **nu
+se poate scrie corect în fiecare extensie**: `SAVEPOINT` e valid doar într-un
+bloc de tranzacţie, iar o extensie n-are cum să afle dacă rulează în tranzacţia
+unei cereri sau pe pool. Gazda ştie. Deci cere un ajutor oferit prin contractul
+SDK — ceva de forma `ctx.isolated(label, fn)`, care pune savepoint-ul când există
+tranzacţie şi nu face nimic când nu există — nu încă o rescriere per extensie.
+
+Până atunci ambele locuri îşi loghează cauza cu etichetă, deci un zero fals e
+diagnosticabil într-o linie în loc să fie invizibil.
 
 ### `zv_extension_registry (name)` — singura cheie nelărgită
 
