@@ -110,55 +110,30 @@ tranzacţie şi nu face nimic când nu există — nu încă o rescriere per ext
 Până atunci ambele locuri îşi loghează cauza cu etichetă, deci un zero fals e
 diagnosticabil într-o linie în loc să fie invizibil.
 
-### Formula scorului de calitate e sensibilă la scară — decizie de produs
+### Scorul de calitate — ELIMINAT (decizie de owner, 2026-08-10)
 
-`analytics/quality`. Scorurile chiar se scriu acum (nu se scriau niciodată), deci
-formula a devenit vizibilă pentru prima dată:
+Scos complet: tabelul, ruta `/scores/:collection`, câmpurile din `/summary` şi
+`/stats`, jumătatea de scor din verificarea SLA, şi `min_score` din praguri.
 
-```
-deducere = (critice*10 + erori*5 + avertismente*2 + info*0.5) / înregistrări * 100
-```
+Motivul: formula `(critice*10 + erori*5 + avertismente*2 + info*0.5) / înregistrări * 100`
+dădea 0 pentru 4 avertismente pe 2 înregistrări şi 92 pentru aceleaşi 4 pe 100.
+Numărul spunea mai mult despre mărimea colecţiei decât despre calitatea datelor,
+iar nimeni nu putea explica ce înseamnă un 78.
 
-Măsurat pe instanţă: 4 avertismente pe 2 înregistrări ⇒ deducere 400% ⇒ scor 0.
-Aceleaşi 4 avertismente pe 100 de înregistrări ⇒ 92.
+Ştergerea tabelului e sigură fiindcă e **gol pe orice instalare** — scrierea era
+detaşată, dormea două secunde şi ateriza pe o tranzacţie închisă, cu câte un
+`catch` înăuntru şi în afară. Niciun scor n-a existat vreodată.
 
-Nu e greşită, e sensibilă la scară: împarte puncte la înregistrări şi tratează
-rezultatul ca pe o fracţie, deşi o singură problemă critică valorează 10 puncte.
-Orice colecţie mică cu o problemă iese 0, ceea ce face scorul inutil exact acolo
-unde ar fi cel mai uşor de reparat datele.
+SLA-ul nu pierde nimic: verificarea avea deja `if (score && …)`, deci rula
+dintotdeauna doar pe `max_critical_issues` şi `max_error_issues` — praguri pe care
+le poate apăra oricine, spre deosebire de „scor minim 80".
 
-**Nu am schimbat-o**: e o decizie de produs, nu un defect fără ambiguitate. Ce am
-reparat e ce era clar greşit — scorul nu se stoca deloc, iar numitorul citea
-`total_records` pe un tabel care are `records_scanned`.
-
-### `workflow/checklists` — pagina de studio e scrisă contra altui API
-
-Motorul extensiei funcţionează: şablon creat, ataşat pe o înregistrare, cele trei
-puncte copiate din şablon, toate verificate pe instanţă.
-
-Pagina nu. Cheamă patru adrese, şi **niciuna nu există**:
-
-```
-GET /ext/workflow/checklists                → 404
-GET /ext/workflow/checklists/{id}           → 404
-GET /ext/workflow/checklists/{id}/responses → 404
-```
-
-API-ul real e `/templates`, `/record/:collection/:recordId`, `/items/:itemId`,
-`/overdue-items`, `/summary`. Pagina are stare `responses` şi o vedere
-`'responses'` — e o copie a paginii de **formulare**, unde forma aia are sens.
-Ecranul e mort cap-coadă, nu parţial rupt.
-
-**Nu am rescris-o, şi motivul contează.** O pagină nouă scrisă de mână ar merge
-împotriva pivotului spre pagini declarative. Iar varianta declarativă corectă e
-blocată pe acelaşi gol de randare ca pagina de aprobări: un şablon are **puncte
-imbricate**, iar editarea unei liste imbricate cere master-detail, care încă nu
-există în randor.
-
-Deci ori se face după master-detail, ori se face o pagină declarativă parţială
-(listă de şabloane + creare nume/descriere, punctele doar de citit), care ar fi
-oricum strict mai bună decât un 404. Decizia ţine de ordinea în care se face
-pivotul.
+**Ce urmează, la cerere:** punctaj configurat pe liste de verificare — scheme
+multiple per şablon, ponderi per punct **per schemă** (acelaşi punct poate conta
+la „siguranţă" şi deloc la „completitudine"), o singură metodă la început, iar
+rezultatul stocat împreună cu schema care l-a produs, ca un audit vechi să nu se
+schimbe când se schimbă ponderile. Cere master-detail pentru ecranul de
+configurare — al treilea lucru care îl aşteaptă.
 
 ### `zv_extension_registry (name)` — singura cheie nelărgită
 
