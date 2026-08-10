@@ -41,6 +41,58 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
 
   const { runQualityScan } = ctx.internals;
 
+  // The score is computed when the scan actually ends, not when we guess it has.
+  //
+  // `runQualityScan` returns the id immediately and the work continues in its own
+  // tenant transaction, so the route that started it has no idea when it
+  // finished. This used to be handled by launching a detached function that slept
+  // two seconds — `await new Promise(r => setTimeout(r, 2000))` — and then wrote
+  // the score on the REQUEST's transaction, which had closed while it slept. Two
+  // catches, one inside and one outside, meant the failure was never seen:
+  // `zvd_quality_scores` was empty on every installation and the dashboard that
+  // reads it showed nothing, without ever reporting a fault.
+  //
+  // Verified before the change, on a virgin database: one scan completed, zero
+  // score rows.
+  //
+  // The denominator was wrong too. It read `scan.total_records` where the column
+  // is `records_scanned`, so `|| 1` divided every deduction by one and a
+  // collection with a single issue scored zero. The event carries the count, so
+  // there is nothing left to misname.
+  ctx.events.on('quality.scanCompleted', async (payload) => {
+    const { scanId, collection, recordsScanned } = payload;
+
+    const issues = await (db as any)
+      .selectFrom('zv_quality_issues')
+      .selectAll()
+      .where('scan_id', '=', scanId)
+      .execute();
+
+    const count = (severity: string) => issues.filter((i: any) => i.severity === severity).length;
+    const critical = count('critical');
+    const error = count('error');
+    const warning = count('warning');
+    const info = count('info');
+
+    const total = recordsScanned || 1;
+    const deduction = ((critical * 10 + error * 5 + warning * 2 + info * 0.5) / total) * 100;
+    const score = Math.max(0, Math.round(100 - deduction));
+
+    await (db as any)
+      .insertInto('zvd_quality_scores')
+      .values({
+        collection,
+        scan_id: scanId,
+        score,
+        total_records: total,
+        critical_count: critical,
+        error_count: error,
+        warning_count: warning,
+        info_count: info,
+      })
+      .execute();
+  });
+
   const app = new Hono();
 
   app.use('*', async (c, next) => {
@@ -62,30 +114,8 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
 
     const scanId = await runQualityScan(db, collection, scan_type, user.id);
 
-    // Calculate and store quality score after scan completes (fire-and-forget)
-    const storeScore = async () => {
-      try {
-        await new Promise(r => setTimeout(r, 2000)); // brief wait for scan to progress
-        const scan = await (db as any).selectFrom('zv_quality_scans').selectAll().where('id', '=', scanId).executeTakeFirst();
-        if (!scan || scan.status !== 'completed') return;
-
-        const issues = await (db as any).selectFrom('zv_quality_issues').selectAll().where('scan_id', '=', scanId).execute();
-        const critical = issues.filter((i: any) => i.severity === 'critical').length;
-        const error = issues.filter((i: any) => i.severity === 'error').length;
-        const warning = issues.filter((i: any) => i.severity === 'warning').length;
-        const info = issues.filter((i: any) => i.severity === 'info').length;
-        const total = scan.total_records || 1;
-
-        const deduction = (critical * 10 + error * 5 + warning * 2 + info * 0.5) / total * 100;
-        const score = Math.max(0, Math.round(100 - deduction));
-
-        await (db as any).insertInto('zvd_quality_scores')
-          .values({ collection, scan_id: scanId, score, total_records: total, critical_count: critical, error_count: error, warning_count: warning, info_count: info })
-          .execute();
-      } catch { /* non-critical */ }
-    };
-    storeScore().catch(() => {});
-
+    // The score is stored by the `quality.scanCompleted` listener registered
+    // below — see the note there for why it cannot be done from here.
     return c.json({ scan_id: scanId, message: 'Scan started' }, 202);
   });
 

@@ -19464,6 +19464,28 @@ var SlaTargetSchema = exports_external.object({
 function qualityRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
   const { runQualityScan } = ctx.internals;
+  ctx.events.on("quality.scanCompleted", async (payload) => {
+    const { scanId, collection, recordsScanned } = payload;
+    const issues = await db.selectFrom("zv_quality_issues").selectAll().where("scan_id", "=", scanId).execute();
+    const count = (severity) => issues.filter((i) => i.severity === severity).length;
+    const critical = count("critical");
+    const error51 = count("error");
+    const warning = count("warning");
+    const info = count("info");
+    const total = recordsScanned || 1;
+    const deduction = (critical * 10 + error51 * 5 + warning * 2 + info * 0.5) / total * 100;
+    const score = Math.max(0, Math.round(100 - deduction));
+    await db.insertInto("zvd_quality_scores").values({
+      collection,
+      scan_id: scanId,
+      score,
+      total_records: total,
+      critical_count: critical,
+      error_count: error51,
+      warning_count: warning,
+      info_count: info
+    }).execute();
+  });
   const app = new Hono2;
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -19479,24 +19501,6 @@ function qualityRoutes(ctx) {
     if (!canRead)
       return c.json({ error: "Forbidden" }, 403);
     const scanId = await runQualityScan(db, collection, scan_type, user.id);
-    const storeScore = async () => {
-      try {
-        await new Promise((r) => setTimeout(r, 2000));
-        const scan = await db.selectFrom("zv_quality_scans").selectAll().where("id", "=", scanId).executeTakeFirst();
-        if (!scan || scan.status !== "completed")
-          return;
-        const issues = await db.selectFrom("zv_quality_issues").selectAll().where("scan_id", "=", scanId).execute();
-        const critical = issues.filter((i) => i.severity === "critical").length;
-        const error51 = issues.filter((i) => i.severity === "error").length;
-        const warning = issues.filter((i) => i.severity === "warning").length;
-        const info = issues.filter((i) => i.severity === "info").length;
-        const total = scan.total_records || 1;
-        const deduction = (critical * 10 + error51 * 5 + warning * 2 + info * 0.5) / total * 100;
-        const score = Math.max(0, Math.round(100 - deduction));
-        await db.insertInto("zvd_quality_scores").values({ collection, scan_id: scanId, score, total_records: total, critical_count: critical, error_count: error51, warning_count: warning, info_count: info }).execute();
-      } catch {}
-    };
-    storeScore().catch(() => {});
     return c.json({ scan_id: scanId, message: "Scan started" }, 202);
   });
   app.get("/scans", async (c) => {

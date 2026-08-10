@@ -7,7 +7,7 @@ Generat automat. `verificat` = cineva a parcurs secțiunea G din REVIEW-CHECKLIS
 |---|--:|--:|--:|--:|--:|--:|--:|---|---|---|
 | `ai` | 0 | 4 | 5 | 2 | 0 | 0 | 1 | cod | da | neverificat |
 | `analytics/dashboard` | 6 | 2 | 0 | 0 | 5 | 0 | 1 | cod | da | **verificat** |
-| `analytics/quality` | 21 | 2 | 0 | 0 | 5 | 0 | 1 | cod | da | neverificat |
+| `analytics/quality` | 21 | 3 | 0 | 1 | 3 | 0 | 1 | cod | da | **verificat** |
 | `auth/ldap` | 0 | 2 | 0 | 0 | 0 | 0 | 1 | SDUI | da | neverificat |
 | `auth/saml` | 0 | 2 | 0 | 0 | 0 | 4 | 1 | SDUI | da | neverificat |
 | `auth/scim` | 10 | 2 | 0 | 0 | 9 | 0 | 1 | SDUI | da | **verificat** |
@@ -63,7 +63,7 @@ Generat automat. `verificat` = cineva a parcurs secțiunea G din REVIEW-CHECKLIS
 | `workflow/approvals` | 17 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | neverificat |
 | `workflow/checklists` | 17 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | neverificat |
 
-**Total: 57 extensii · verificate: 18**
+**Total: 57 extensii · verificate: 19**
 
 Coloane: `catch` = numărul de `.catch(() => …)` (candidați la A2) · `ext` = apeluri către servicii externe · `serv`/`ascult` = servicii publicate și ascultători de evenimente.
 
@@ -109,6 +109,27 @@ tranzacţie şi nu face nimic când nu există — nu încă o rescriere per ext
 
 Până atunci ambele locuri îşi loghează cauza cu etichetă, deci un zero fals e
 diagnosticabil într-o linie în loc să fie invizibil.
+
+### Formula scorului de calitate e sensibilă la scară — decizie de produs
+
+`analytics/quality`. Scorurile chiar se scriu acum (nu se scriau niciodată), deci
+formula a devenit vizibilă pentru prima dată:
+
+```
+deducere = (critice*10 + erori*5 + avertismente*2 + info*0.5) / înregistrări * 100
+```
+
+Măsurat pe instanţă: 4 avertismente pe 2 înregistrări ⇒ deducere 400% ⇒ scor 0.
+Aceleaşi 4 avertismente pe 100 de înregistrări ⇒ 92.
+
+Nu e greşită, e sensibilă la scară: împarte puncte la înregistrări şi tratează
+rezultatul ca pe o fracţie, deşi o singură problemă critică valorează 10 puncte.
+Orice colecţie mică cu o problemă iese 0, ceea ce face scorul inutil exact acolo
+unde ar fi cel mai uşor de reparat datele.
+
+**Nu am schimbat-o**: e o decizie de produs, nu un defect fără ambiguitate. Ce am
+reparat e ce era clar greşit — scorul nu se stoca deloc, iar numitorul citea
+`total_records` pe un tabel care are `records_scanned`.
 
 ### `zv_extension_registry (name)` — singura cheie nelărgită
 
