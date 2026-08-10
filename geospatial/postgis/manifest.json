@@ -52,8 +52,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "261bfc0566cf66cf514ef8d4da27d2ed7dd99299073c3006fd6b8d246be314f9",
-    "sourceSha256": "9c0a4f8bdc2d868eb14e85e9fd050da5b425a61e9125de4280b49b2eee58890f"
+    "engineSha256": "2cbd5635eed345e73f099a631d5516ad82bfbd0ec321af24dcab9f2567f27d3e",
+    "sourceSha256": "2227e5adc087203c1bf38f20bd3249369a5f51bcf6fdd583ee3a65f7b16bda7e"
   },
   "resources": [
     "postgis"
