@@ -45,11 +45,76 @@ async function getUser(c: any, auth: any) {
   return session?.user ?? null;
 }
 
+// Not caught. A swallowed failure here would be worse than useless: the status
+// log is the audit trail of what was told to ANAF and when, and — because a
+// failed statement aborts the whole Postgres transaction — the JavaScript catch
+// would not contain it anyway. The caller would get an opaque "current
+// transaction is aborted" from the next query instead of the real cause.
 async function logStatusChange(dbh: any, invoiceId: string, oldStatus: string, newStatus: string, userId: string, note?: string) {
   await sql`
     INSERT INTO zv_efactura_status_log (invoice_id, old_status, new_status, changed_by, note)
     VALUES (${invoiceId}::uuid, ${oldStatus}, ${newStatus}, ${userId}, ${note ?? null})
-  `.execute(dbh).catch(() => {});
+  `.execute(dbh);
+}
+
+/** NUMERIC arrives as a string — the driver refuses to lose precision silently. */
+function num(v: unknown): number {
+  const n = typeof v === 'number' ? v : Number(v ?? 0);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** DATE and TIMESTAMPTZ arrive as Date objects; UBL wants `YYYY-MM-DD`. */
+function day(v: unknown): string {
+  if (!v) return '';
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  return String(v).split('T')[0];
+}
+
+/**
+ * The database row is not the shape the generator declares, and an `as any` used
+ * to claim it was.
+ *
+ * `InvoiceData` types every amount as `number` and every date as `string`.
+ * Postgres hands NUMERIC back as a string and DATE back as a `Date`, so
+ * `vat_total.toFixed(2)` threw "toFixed is not a function" and `d.split('T')`
+ * threw "d.split is not a function" — on every invoice that came out of the
+ * database rather than out of a test fixture.
+ *
+ * Coerced once here, at the boundary where the row becomes InvoiceData, instead
+ * of defending inside each field of the template.
+ */
+function toInvoiceData(row: any, lines: any[]): Parameters<typeof generateUBLXML>[0] {
+  return {
+    invoice_number: String(row.invoice_number ?? ''),
+    invoice_date: day(row.invoice_date),
+    due_date: row.due_date ? day(row.due_date) : undefined,
+    currency: String(row.currency ?? 'RON'),
+
+    seller_name: String(row.seller_name ?? ''),
+    seller_cui: String(row.seller_cui ?? ''),
+    seller_reg_com: row.seller_reg_com ?? undefined,
+    seller_address: row.seller_address ?? undefined,
+    seller_iban: row.seller_iban ?? undefined,
+    seller_bank: row.seller_bank ?? undefined,
+
+    buyer_name: String(row.buyer_name ?? ''),
+    buyer_cui: row.buyer_cui ?? undefined,
+    buyer_address: row.buyer_address ?? undefined,
+
+    lines: (Array.isArray(lines) ? lines : []).map((l: any) => ({
+      description: String(l?.description ?? ''),
+      quantity: num(l?.quantity),
+      unit: String(l?.unit ?? 'H87'),
+      unit_price: num(l?.unit_price),
+      vat_rate: num(l?.vat_rate),
+      vat_amount: num(l?.vat_amount),
+      line_total: num(l?.line_total),
+    })),
+
+    subtotal: num(row.subtotal),
+    vat_total: num(row.vat_total),
+    total: num(row.total),
+  };
 }
 
 export function efacturaRoutes(ctx: ExtensionContext): Hono {
