@@ -248,3 +248,35 @@ puncte, ce s-a găsit.
 
 O extensie „verificată" înseamnă că cineva a parcurs G-ul de mai sus. Nu că a
 citit codul.
+
+---
+
+## `CONTEXT.md` — citește-l ÎNAINTE să atingi o extensie
+
+Extensiile verificate au fiecare un `CONTEXT.md` în rădăcina lor. **Nu descrie ce
+face extensia** — aia o spune codul. Conține doar ce s-a pierdut altfel între
+sesiuni:
+
+- ce s-a găsit rupt și **de ce n-a văzut nimeni** (partea care se uită);
+- ce s-a încercat și s-a dat înapoi, cu motivul;
+- capcanele proprii extensiei — ordinea rutelor, cerințe de instalare, ce pare
+  rupt și nu e;
+- ce înseamnă „verificat" acolo: **care butoane**, la ce dată;
+- decizii de proprietate: ce tabel e al cui, ce coloană a cui.
+
+Regulile care le țin utile:
+
+**Subțire.** Un fișier gros driftează, iar unul depășit e mai rău decât niciunul
+— pe ăla îl crezi.
+
+**Scris din ce s-a văzut rulând**, nu din ce spune codul. O afirmație pe care n-a
+verificat-o nimeni n-are ce căuta acolo.
+
+**Include ce NU e rupt**, când o afirmație contrară circulă. SCIM pare stricat de
+sub `/ext/`, balanța de verificare pare goală dacă ceri câmpurile greșite — două
+ore fiecare, ambele evitabile printr-o propoziție.
+
+Când repari ceva într-o extensie, actualizează-i `CONTEXT.md`. Când găsești un
+tipar care traversează mai multe extensii, locul lui e **aici**, nu în fiecare
+fișier — cele mai scumpe trei găsiri ale campaniei au fost clase, nu instanțe, iar
+o clasă nu se vede din interiorul unui modul.

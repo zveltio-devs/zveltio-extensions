@@ -61,9 +61,9 @@ Generat automat. `verificat` = cineva a parcurs secțiunea G din REVIEW-CHECKLIS
 | `sms` | 6 | 2 | 0 | 0 | 1 | 0 | 1 | cod | da | neverificat |
 | `storage/cloud` | 28 | 2 | 0 | 0 | 0 | 1 | 1 | cod | da | neverificat |
 | `workflow/approvals` | 17 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | neverificat |
-| `workflow/checklists` | 17 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | neverificat |
+| `workflow/checklists` | 22 | 5 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat** |
 
-**Total: 57 extensii · verificate: 19**
+**Total: 57 extensii · verificate: 22**
 
 Coloane: `catch` = numărul de `.catch(() => …)` (candidați la A2) · `ext` = apeluri către servicii externe · `serv`/`ascult` = servicii publicate și ascultători de evenimente.
 
