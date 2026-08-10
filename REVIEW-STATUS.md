@@ -43,7 +43,7 @@ Generat automat. `verificat` = cineva a parcurs secțiunea G din REVIEW-CHECKLIS
 | `finance/quotes` | 16 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | neverificat |
 | `finance/subscriptions` | 18 | 4 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
 | `forms` | 8 | 2 | 0 | 0 | 1 | 0 | 3 | cod | da | neverificat |
-| `geospatial/postgis` | 16 | 2 | 0 | 0 | 7 | 0 | 1 | cod | da | neverificat |
+| `geospatial/postgis` | 16 | 2 | 0 | 0 | 2 | 0 | 1 | cod | da | **verificat** |
 | `hr/employees` | 32 | 3 | 5 | 0 | 0 | 0 | 1 | SDUI | da | neverificat |
 | `hr/leave` | 16 | 2 | 0 | 0 | 0 | 0 | 1 | SDUI | da | neverificat |
 | `hr/payroll` | 15 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | neverificat |
@@ -63,7 +63,7 @@ Generat automat. `verificat` = cineva a parcurs secțiunea G din REVIEW-CHECKLIS
 | `workflow/approvals` | 17 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | neverificat |
 | `workflow/checklists` | 17 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | neverificat |
 
-**Total: 57 extensii · verificate: 16**
+**Total: 57 extensii · verificate: 17**
 
 Coloane: `catch` = numărul de `.catch(() => …)` (candidați la A2) · `ext` = apeluri către servicii externe · `serv`/`ascult` = servicii publicate și ascultători de evenimente.
 
