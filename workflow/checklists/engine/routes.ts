@@ -15,6 +15,107 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
 
   const app = new Hono();
 
+  /**
+   * Score a finished checklist against every active scheme on its template.
+   *
+   * Awaited by the caller, deliberately. The obvious shape for this is a
+   * detached "compute the score afterwards", and that shape is exactly how the
+   * data-quality score managed never to store a single row: work launched
+   * without waiting runs after the request's transaction has closed, and the
+   * write lands nowhere. The score belongs to the same transaction as the tick
+   * that completed the checklist — either both happened or neither did.
+   *
+   * `weighted_completion` is the only method: the weight of the checked items
+   * over the weight of everything the scheme covers. Items the scheme gives no
+   * weight to are not in the denominator, which is what makes several schemes
+   * over one checklist mean anything — "safety" can ignore what "completeness"
+   * counts.
+   *
+   * The result carries a snapshot of the inputs. Weights change; last year's
+   * audit must not. Anything that recomputes from current configuration is
+   * quietly rewriting history, so the row keeps the item labels, their weights,
+   * whether each was ticked, and the threshold that was in force.
+   */
+  async function scoreChecklist(checklistId: string): Promise<void> {
+    const checklist = await db
+      .selectFrom('zv_checklists')
+      .select(['id', 'template_id'])
+      .where('id', '=', checklistId)
+      .executeTakeFirst();
+
+    // No template means no scheme to score against — an ad-hoc checklist is a
+    // list of things to do, not a measurement.
+    if (!checklist?.template_id) return;
+
+    const schemes = await db
+      .selectFrom('zv_checklist_scoring_schemes')
+      .selectAll()
+      .where('template_id', '=', checklist.template_id)
+      .where('is_active', '=', true)
+      .execute();
+    if (schemes.length === 0) return;
+
+    const items = await db
+      .selectFrom('zv_checklist_items')
+      .select(['id', 'label', 'checked', 'template_item_id'])
+      .where('checklist_id', '=', checklistId)
+      .execute();
+
+    for (const scheme of schemes) {
+      const weights = await db
+        .selectFrom('zv_checklist_scheme_weights')
+        .select(['template_item_id', 'weight'])
+        .where('scheme_id', '=', scheme.id)
+        .execute();
+
+      const byItem = new Map(weights.map((w: any) => [w.template_item_id, Number(w.weight)]));
+
+      let earned = 0;
+      let possible = 0;
+      const breakdown: Array<Record<string, unknown>> = [];
+
+      for (const item of items as any[]) {
+        // An item the scheme never weighted is outside it entirely — not a zero,
+        // which would drag the score down for being irrelevant.
+        if (!item.template_item_id || !byItem.has(item.template_item_id)) continue;
+        const weight = byItem.get(item.template_item_id) ?? 0;
+        if (weight === 0) continue;
+
+        possible += weight;
+        if (item.checked) earned += weight;
+        breakdown.push({ label: item.label, weight, checked: Boolean(item.checked) });
+      }
+
+      // A scheme that covers nothing on this checklist scores nothing. Zero would
+      // be a claim; absence is the truth.
+      if (possible === 0) continue;
+
+      const score = Math.round((earned / possible) * 10000) / 100;
+      const threshold = scheme.pass_threshold === null ? null : Number(scheme.pass_threshold);
+
+      await sql`
+        INSERT INTO zv_checklist_scores
+          (checklist_id, scheme_id, scheme_name, method, score, passed, snapshot)
+        VALUES (
+          ${checklistId}::uuid,
+          ${scheme.id}::uuid,
+          ${scheme.name},
+          ${scheme.method},
+          ${score},
+          ${threshold === null ? null : score >= threshold},
+          ${JSON.stringify({ earned, possible, pass_threshold: threshold, items: breakdown })}::jsonb
+        )
+        ON CONFLICT (checklist_id, scheme_id) DO UPDATE SET
+          scheme_name = EXCLUDED.scheme_name,
+          method      = EXCLUDED.method,
+          score       = EXCLUDED.score,
+          passed      = EXCLUDED.passed,
+          snapshot    = EXCLUDED.snapshot,
+          computed_at = NOW()
+      `.execute(db);
+    }
+  }
+
   async function getUser(c: any) {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     return session?.user ?? null;
@@ -308,6 +409,14 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
             description: item.description,
             required: item.required ?? false,
             order_idx: item.order_idx ?? i,
+            // Which template item this copy came from — set only when the
+            // checklist was built from a template; an ad-hoc one has no origin.
+            //
+            // Scoring weights are configured against template items, so without
+            // this the only link back is the label, and the first typo fixed in
+            // a template would detach every weight. Silently, and in the
+            // direction that flatters the score.
+            template_item_id: template_id ? (item.id ?? null) : null,
           })))
           .execute();
       }
@@ -399,6 +508,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
             .where('id', '=', item.checklist_id)
             .where('completed_at', 'is', null)
             .execute();
+
         } else if (!allRequiredChecked) {
           await db
             .updateTable('zv_checklists')
@@ -407,6 +517,20 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
             .execute();
         }
       }
+
+      // Scored on every change, not only on the tick that completes the list.
+      //
+      // Completion fires when the last REQUIRED item is ticked, and optional
+      // items usually come after — an inspector clears the mandatory ones and
+      // then works through the rest. Scoring on that transition froze the number
+      // early: measured on an instance, a list scored 5/10 because the one
+      // required item happened to be ticked first, and ticking two more never
+      // moved it. The score reflects the state of the list, so it is recomputed
+      // whenever the state changes.
+      //
+      // Awaited, inside the request's transaction: the score and the tick that
+      // caused it commit together or not at all.
+      await scoreChecklist(item.checklist_id);
 
       return c.json({ item });
     }
@@ -481,6 +605,8 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
             .where('id', '=', checklistId)
             .where('completed_at', 'is', null)
             .execute();
+
+          await scoreChecklist(checklistId);
         } else if (!allRequiredChecked) {
           await db
             .updateTable('zv_checklists')
@@ -785,6 +911,176 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
 
     await db.deleteFrom('zv_checklists').where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
+  });
+
+  // ── Scoring schemes ──────────────────────────────────────────────
+
+  const SchemeSchema = z.object({
+    name: z.string().min(1),
+    description: z.string().optional(),
+    pass_threshold: z.number().min(0).max(100).nullable().optional(),
+    is_active: z.boolean().optional(),
+  });
+
+  // GET /templates/:id/scoring-schemes — schemes with their weights
+  app.get('/templates/:id/scoring-schemes', async (c) => {
+    const user = await getUser(c);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const schemes = await db
+      .selectFrom('zv_checklist_scoring_schemes')
+      .selectAll()
+      .where('template_id', '=', c.req.param('id'))
+      .orderBy('name', 'asc')
+      .execute();
+
+    const withWeights = [];
+    for (const scheme of schemes as any[]) {
+      const weights = await db
+        .selectFrom('zv_checklist_scheme_weights as w')
+        .innerJoin('zv_checklist_template_items as i', 'i.id', 'w.template_item_id')
+        .select(['w.template_item_id', 'w.weight', 'i.label', 'i.order_idx'])
+        .where('w.scheme_id', '=', scheme.id)
+        .orderBy('i.order_idx', 'asc')
+        .execute();
+      withWeights.push({ ...scheme, weights });
+    }
+
+    return c.json({ schemes: withWeights });
+  });
+
+  // POST /templates/:id/scoring-schemes
+  app.post('/templates/:id/scoring-schemes', zValidator('json', SchemeSchema), async (c) => {
+    const user = await getUser(c);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const templateId = c.req.param('id');
+    const template = await db
+      .selectFrom('zv_checklist_templates')
+      .select(['id'])
+      .where('id', '=', templateId)
+      .executeTakeFirst();
+    if (!template) return c.json({ error: 'Template not found' }, 404);
+
+    const scheme = await db
+      .insertInto('zv_checklist_scoring_schemes')
+      .values({ ...c.req.valid('json'), template_id: templateId, created_by: user.id } as never)
+      .returningAll()
+      .executeTakeFirst();
+
+    return c.json({ scheme }, 201);
+  });
+
+  // PATCH /scoring-schemes/:id
+  app.patch('/scoring-schemes/:id', zValidator('json', SchemeSchema.partial()), async (c) => {
+    const user = await getUser(c);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const scheme = await db
+      .updateTable('zv_checklist_scoring_schemes')
+      .set({ ...c.req.valid('json'), updated_at: new Date() } as never)
+      .where('id', '=', c.req.param('id'))
+      .returningAll()
+      .executeTakeFirst();
+    if (!scheme) return c.json({ error: 'Scheme not found' }, 404);
+
+    return c.json({ scheme });
+  });
+
+  // DELETE /scoring-schemes/:id
+  app.delete('/scoring-schemes/:id', async (c) => {
+    const user = await getUser(c);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    await db
+      .deleteFrom('zv_checklist_scoring_schemes')
+      .where('id', '=', c.req.param('id'))
+      .execute();
+    return c.json({ success: true });
+  });
+
+  // PUT /scoring-schemes/:id/weights — replace the whole set
+  //
+  // Replace rather than merge, because a weight absent from the request has to
+  // mean "not part of this scheme". Merging would leave a removed item silently
+  // in the denominator, which is the sort of thing nobody notices until a score
+  // disagrees with an inspector.
+  app.put(
+    '/scoring-schemes/:id/weights',
+    zValidator(
+      'json',
+      z.object({
+        weights: z
+          .array(z.object({ template_item_id: z.string().uuid(), weight: z.number().min(0) }))
+          .default([]),
+      }),
+    ),
+    async (c) => {
+      const user = await getUser(c);
+      if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+      const schemeId = c.req.param('id');
+      const scheme = await db
+        .selectFrom('zv_checklist_scoring_schemes')
+        .select(['id', 'template_id'])
+        .where('id', '=', schemeId)
+        .executeTakeFirst();
+      if (!scheme) return c.json({ error: 'Scheme not found' }, 404);
+
+      const { weights } = c.req.valid('json');
+
+      // Every item must belong to this scheme's template. Without the check a
+      // caller could weight another template's items; they would then match
+      // nothing, and the scheme would score every checklist without ever saying
+      // why.
+      if (weights.length > 0) {
+        const valid = await db
+          .selectFrom('zv_checklist_template_items')
+          .select(['id'])
+          .where('template_id', '=', (scheme as any).template_id)
+          .execute();
+        const allowed = new Set((valid as any[]).map((v) => v.id));
+        const stray = weights.filter((w) => !allowed.has(w.template_item_id));
+        if (stray.length > 0) {
+          return c.json(
+            {
+              error: `${stray.length} item(s) do not belong to this scheme's template`,
+              items: stray.map((s) => s.template_item_id),
+            },
+            400,
+          );
+        }
+      }
+
+      await db
+        .deleteFrom('zv_checklist_scheme_weights')
+        .where('scheme_id', '=', schemeId)
+        .execute();
+
+      if (weights.length > 0) {
+        await db
+          .insertInto('zv_checklist_scheme_weights')
+          .values(weights.map((w) => ({ scheme_id: schemeId, ...w })) as never)
+          .execute();
+      }
+
+      return c.json({ success: true, count: weights.length });
+    },
+  );
+
+  // GET /:id/scores — what a finished checklist scored, and from what
+  app.get('/:id/scores', async (c) => {
+    const user = await getUser(c);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const scores = await db
+      .selectFrom('zv_checklist_scores')
+      .selectAll()
+      .where('checklist_id', '=', c.req.param('id'))
+      .orderBy('scheme_name', 'asc')
+      .execute();
+
+    return c.json({ scores });
   });
 
   return app;
