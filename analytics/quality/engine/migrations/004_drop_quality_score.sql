@@ -31,3 +31,36 @@
 DROP TABLE IF EXISTS zvd_quality_scores;
 
 ALTER TABLE zvd_quality_sla_targets DROP COLUMN IF EXISTS min_score;
+
+-- DOWN
+--
+-- Puts the shape back, not the data — there was never any. The table is
+-- recreated exactly as 001_initial declared it, tenant column and RLS included,
+-- so a rollback lands on a schema the old code would recognise.
+
+CREATE TABLE IF NOT EXISTS zvd_quality_scores (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  collection TEXT NOT NULL,
+  scan_id UUID NOT NULL REFERENCES zv_quality_scans(id) ON DELETE CASCADE,
+  score INT NOT NULL DEFAULT 0 CHECK (score BETWEEN 0 AND 100),
+  total_records INT NOT NULL DEFAULT 0,
+  critical_count INT NOT NULL DEFAULT 0,
+  error_count INT NOT NULL DEFAULT 0,
+  warning_count INT NOT NULL DEFAULT 0,
+  info_count INT NOT NULL DEFAULT 0,
+  calculated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  tenant_id UUID NOT NULL DEFAULT COALESCE(
+    NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+    '00000000-0000-0000-0000-000000000001'::uuid
+  )
+);
+
+ALTER TABLE zvd_quality_sla_targets
+  ADD COLUMN IF NOT EXISTS min_score INT NOT NULL DEFAULT 80;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'zveltio_rls') THEN
+    GRANT SELECT, INSERT, UPDATE, DELETE ON zvd_quality_scores TO zveltio_rls;
+  END IF;
+END $$;
