@@ -6,15 +6,15 @@ Generat automat. `verificat` = cineva a parcurs secțiunea G din REVIEW-CHECKLIS
 | extensie | rute | migr | serv | ascult | catch | ext | pagini | UI | teste | stare |
 |---|--:|--:|--:|--:|--:|--:|--:|---|---|---|
 | `ai` | 0 | 4 | 5 | 2 | 0 | 0 | 1 | cod | da | neverificat |
-| `analytics/dashboard` | 6 | 2 | 0 | 0 | 11 | 0 | 1 | cod | da | neverificat |
+| `analytics/dashboard` | 6 | 2 | 0 | 0 | 5 | 0 | 1 | cod | da | **verificat** |
 | `analytics/quality` | 21 | 2 | 0 | 0 | 5 | 0 | 1 | cod | da | neverificat |
 | `auth/ldap` | 0 | 2 | 0 | 0 | 0 | 0 | 1 | SDUI | da | neverificat |
 | `auth/saml` | 0 | 2 | 0 | 0 | 0 | 4 | 1 | SDUI | da | neverificat |
-| `auth/scim` | 10 | 2 | 0 | 0 | 9 | 0 | 1 | SDUI | da | neverificat |
+| `auth/scim` | 10 | 2 | 0 | 0 | 9 | 0 | 1 | SDUI | da | **verificat** |
 | `billing` | 6 | 2 | 0 | 0 | 0 | 0 | 2 | cod | da | neverificat |
 | `communications/mail` | 43 | 2 | 0 | 0 | 1 | 0 | 1 | cod | da | neverificat |
-| `compliance/gdpr` | 16 | 2 | 0 | 0 | 14 | 0 | 1 | SDUI | da | neverificat |
-| `compliance/ro/documents` | 12 | 3 | 0 | 0 | 6 | 0 | 1 | SDUI | da | neverificat |
+| `compliance/gdpr` | 16 | 2 | 0 | 0 | 14 | 0 | 1 | SDUI | da | **verificat** |
+| `compliance/ro/documents` | 12 | 4 | 0 | 0 | 2 | 0 | 1 | SDUI | da | **verificat** |
 | `compliance/ro/efactura` | 23 | 6 | 2 | 1 | 6 | 6 | 2 | SDUI | da | **verificat** |
 | `compliance/ro/etransport` | 9 | 2 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
 | `compliance/ro/procurement` | 22 | 2 | 0 | 0 | 6 | 0 | 1 | cod | da | neverificat |
@@ -63,7 +63,38 @@ Generat automat. `verificat` = cineva a parcurs secțiunea G din REVIEW-CHECKLIS
 | `workflow/approvals` | 17 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | neverificat |
 | `workflow/checklists` | 17 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | neverificat |
 
-**Total: 57 extensii · verificate: 14**
+**Total: 57 extensii · verificate: 16**
 
 Coloane: `catch` = numărul de `.catch(() => …)` (candidați la A2) · `ext` = apeluri către servicii externe · `serv`/`ascult` = servicii publicate și ascultători de evenimente.
+
+---
+
+## Găsiri amânate
+
+Lucruri reale, confirmate prin rulare, pe care am ales deliberat să nu le repar
+în aceeași trecere fiindcă schimbă o cale comună şi îşi merită verificarea lor.
+
+### Widget-urile panoului împart o tranzacţie, deci se contaminează
+
+`analytics/dashboard`. Un singur tabel lipsă a produs asta în log:
+
+```
+widget count "zv_audit_log" failed: relation "zv_audit_log" does not exist
+recent activity failed: current transaction is aborted…
+trust "audit_log" failed: current transaction is aborted…
+trust "last_backup" failed: current transaction is aborted…
+```
+
+`last_backup` citeşte `zv_backups` — un tabel perfect sănătos — şi a raportat
+totuşi `null`, adică „nicio copie de siguranţă". O interogare stricată a produs
+patru valori false, toate plauzibile.
+
+Etichetele adăugate acum fac cauza vizibilă într-o linie, dar valorile false tot
+ajung pe ecran. Reparaţia adevărată e un SAVEPOINT per widget — acelaşi tipar ca
+la `emitAsync` în engine — ceea ce cere şi trecerea interogărilor de la paralel
+la secvenţial, fiindcă savepoint-urile nu se compun cu instrucţiuni paralele pe
+aceeaşi conexiune. Panoul rulează în 76 ms, deci costul e neglijabil.
+
+Merită căutat şi în celelalte extensii care compun mai multe interogări cu
+`Promise.all` sub `ctx.reqDb`.
 
