@@ -1,0 +1,24 @@
+-- A user id does not fit in a uuid column.
+--
+-- `"user".id` is a 32-character nanoid and always was; these columns were
+-- declared UUID because a name like `created_by` reads as a foreign key to a
+-- table whose primary key happens to be one. Postgres rejects the write with
+-- 22P02 `invalid input syntax for type uuid`, so the routes below returned 500
+-- to every caller. Not a permission problem and not intermittent: the feature
+-- never worked for anybody.
+--
+-- Found by pressing the button on a virgin database. On an instance that has
+-- been used, some of these were quietly altered by hand at some point, which is
+-- why the fault is invisible anywhere except a fresh install — and why the
+-- earlier repair (`003_user_ref_text.sql` in compliance/ro/documents) covered a
+-- single column and left its own siblings alone.
+--
+-- Only columns that actually RECEIVE `user.id` are converted here, established
+-- by reading each INSERT/UPDATE against its bound values. Naming was not enough:
+-- `zvd_employees.manager_id` is also a uuid named after a person and correctly
+-- references `zvd_employees(id)`, so it stays. `zv_rate_limit_configs.updated_by`
+-- and `zvd_quote_approvals.rejected_by` stay too — nothing writes to either.
+--
+-- uuid → text needs no USING clause and preserves existing values.
+
+ALTER TABLE IF EXISTS zv_checklists ALTER COLUMN created_by TYPE TEXT;
