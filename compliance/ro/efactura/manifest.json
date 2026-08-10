@@ -40,8 +40,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "0d1223ddb3bb51cc48566650637450feaeb5566c70859cffea8ef2a22df09ca2",
-    "sourceSha256": "c633b72a0304c81f8809be367cb723c6cd623c687ed90b8b2825d30cc1770252"
+    "engineSha256": "a2a23d43c77ef9fc399ee76b7b30b7a63c64e3886ff928fcd7567802ba2771c1",
+    "sourceSha256": "4ac06f09be9267ac5ba5261d9b497afd783ebfd7cd492030a469e6ef73e3b30d"
   },
   "resources": [
     "efactura"

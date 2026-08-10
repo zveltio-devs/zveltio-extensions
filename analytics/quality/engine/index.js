@@ -19456,7 +19456,6 @@ var RuleSchema = exports_external.object({
 });
 var SlaTargetSchema = exports_external.object({
   collection: exports_external.string().min(1),
-  min_score: exports_external.number().int().min(0).max(100).default(80),
   max_critical_issues: exports_external.number().int().min(0).default(0),
   max_error_issues: exports_external.number().int().min(0).default(5),
   alert_email: exports_external.string().email().optional()
@@ -19464,28 +19463,6 @@ var SlaTargetSchema = exports_external.object({
 function qualityRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
   const { runQualityScan } = ctx.internals;
-  ctx.events.on("quality.scanCompleted", async (payload) => {
-    const { scanId, collection, recordsScanned } = payload;
-    const issues = await db.selectFrom("zv_quality_issues").selectAll().where("scan_id", "=", scanId).execute();
-    const count = (severity) => issues.filter((i) => i.severity === severity).length;
-    const critical = count("critical");
-    const error51 = count("error");
-    const warning = count("warning");
-    const info = count("info");
-    const total = recordsScanned || 1;
-    const deduction = (critical * 10 + error51 * 5 + warning * 2 + info * 0.5) / total * 100;
-    const score = Math.max(0, Math.round(100 - deduction));
-    await db.insertInto("zvd_quality_scores").values({
-      collection,
-      scan_id: scanId,
-      score,
-      total_records: total,
-      critical_count: critical,
-      error_count: error51,
-      warning_count: warning,
-      info_count: info
-    }).execute();
-  });
   const app = new Hono2;
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -19540,12 +19517,11 @@ function qualityRoutes(ctx) {
     const user = c.get("user");
     if (!await checkPermission(user.id, "admin", "*"))
       return c.json({ error: "Forbidden" }, 403);
-    const [summary, latestScans, latestScores] = await Promise.all([
+    const [summary, latestScans] = await Promise.all([
       sql`SELECT i.collection, i.severity, COUNT(i.id) as count FROM zv_quality_issues i WHERE i.dismissed = false GROUP BY i.collection, i.severity`.execute(db).then((r) => r.rows),
-      db.selectFrom("zv_quality_scans").select(["collection", "status", "issues_found", "completed_at"]).distinctOn(["collection"]).orderBy("collection").orderBy("started_at", "desc").execute().catch(() => []),
-      db.selectFrom("zvd_quality_scores").select(["collection", "score", "calculated_at"]).distinctOn(["collection"]).orderBy("collection").orderBy("calculated_at", "desc").execute().catch(() => [])
+      db.selectFrom("zv_quality_scans").select(["collection", "status", "issues_found", "completed_at"]).distinctOn(["collection"]).orderBy("collection").orderBy("started_at", "desc").execute().catch(() => [])
     ]);
-    return c.json({ summary, latest_scans: latestScans, latest_scores: latestScores });
+    return c.json({ summary, latest_scans: latestScans });
   });
   app.get("/rules", async (c) => {
     const { collection } = c.req.query();
@@ -19583,10 +19559,6 @@ function qualityRoutes(ctx) {
     await db.deleteFrom("zvd_quality_rules").where("id", "=", c.req.param("id")).execute();
     return c.json({ success: true });
   });
-  app.get("/scores/:collection", async (c) => {
-    const scores = await db.selectFrom("zvd_quality_scores").selectAll().where("collection", "=", c.req.param("collection")).orderBy("calculated_at", "desc").limit(30).execute();
-    return c.json({ scores });
-  });
   app.get("/sla-targets", async (c) => {
     const user = c.get("user");
     if (!await checkPermission(user.id, "admin", "*"))
@@ -19599,7 +19571,11 @@ function qualityRoutes(ctx) {
     if (!await checkPermission(user.id, "admin", "*"))
       return c.json({ error: "Admin access required" }, 403);
     const data = c.req.valid("json");
-    const target = await db.insertInto("zvd_quality_sla_targets").values({ ...data, created_by: user.id }).onConflict((oc) => oc.column("collection").doUpdateSet({ min_score: data.min_score, max_critical_issues: data.max_critical_issues, max_error_issues: data.max_error_issues, alert_email: data.alert_email })).returningAll().executeTakeFirst();
+    const target = await db.insertInto("zvd_quality_sla_targets").values({ ...data, created_by: user.id }).onConflict((oc) => oc.columns(["tenant_id", "collection"]).doUpdateSet({
+      max_critical_issues: data.max_critical_issues,
+      max_error_issues: data.max_error_issues,
+      alert_email: data.alert_email
+    })).returningAll().executeTakeFirst();
     return c.json({ target }, 201);
   });
   app.delete("/sla-targets/:id", async (c) => {
@@ -19618,24 +19594,23 @@ function qualityRoutes(ctx) {
     const target = await db.selectFrom("zvd_quality_sla_targets").selectAll().where("collection", "=", scan.collection).where("is_active", "=", true).executeTakeFirst();
     if (!target)
       return c.json({ compliant: true, message: "No SLA target configured for this collection" });
-    const score = await db.selectFrom("zvd_quality_scores").selectAll().where("scan_id", "=", scanId).executeTakeFirst();
     const issues = await db.selectFrom("zv_quality_issues").selectAll().where("scan_id", "=", scanId).where("dismissed", "=", false).execute();
     const criticalCount = issues.filter((i) => i.severity === "critical").length;
     const errorCount = issues.filter((i) => i.severity === "error").length;
     const breaches = [];
-    if (score && score.score < target.min_score)
-      breaches.push(`Quality score ${score.score} below minimum ${target.min_score}`);
     if (criticalCount > target.max_critical_issues)
       breaches.push(`${criticalCount} critical issues exceeds max ${target.max_critical_issues}`);
     if (errorCount > target.max_error_issues)
       breaches.push(`${errorCount} error issues exceeds max ${target.max_error_issues}`);
     return c.json({
       compliant: breaches.length === 0,
-      score: score?.score ?? null,
       critical_count: criticalCount,
       error_count: errorCount,
       breaches,
-      target: { min_score: target.min_score, max_critical_issues: target.max_critical_issues, max_error_issues: target.max_error_issues }
+      target: {
+        max_critical_issues: target.max_critical_issues,
+        max_error_issues: target.max_error_issues
+      }
     });
   });
   app.get("/issues/:id/remediations", async (c) => {
@@ -19661,20 +19636,18 @@ function qualityRoutes(ctx) {
     const user = c.get("user");
     if (!await checkPermission(user.id, "admin", "*"))
       return c.json({ error: "Admin access required" }, 403);
-    const [scansCount, issuesByCollection, slaTargets, latestScores] = await Promise.all([
+    const [scansCount, issuesByCollection, slaTargets] = await Promise.all([
       sql`SELECT COUNT(*)::text FROM zv_quality_scans WHERE created_at >= NOW() - INTERVAL '30 days'`.execute(db),
       sql`
         SELECT collection, COUNT(*)::text AS total, SUM(CASE WHEN dismissed THEN 1 ELSE 0 END)::text AS dismissed
         FROM zv_quality_issues GROUP BY collection ORDER BY total DESC LIMIT 10
       `.execute(db),
-      db.selectFrom("zvd_quality_sla_targets").select(["collection", "min_score", "is_active"]).where("is_active", "=", true).execute().catch(() => []),
-      db.selectFrom("zvd_quality_scores").select(["collection", "score", "calculated_at"]).distinctOn(["collection"]).orderBy("collection").orderBy("calculated_at", "desc").execute().catch(() => [])
+      db.selectFrom("zvd_quality_sla_targets").select(["collection", "max_critical_issues", "max_error_issues", "is_active"]).where("is_active", "=", true).execute().catch(() => [])
     ]);
     return c.json({
       scans_last_30_days: parseInt(scansCount.rows[0]?.count || "0"),
       issues_by_collection: issuesByCollection.rows,
-      sla_targets: slaTargets,
-      latest_scores: latestScores
+      sla_targets: slaTargets
     });
   });
   return app;
@@ -19689,7 +19662,8 @@ var extension = {
     return [
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
-      join(import.meta.dir, "migrations/003_tenant_scoped_unique_keys.sql")
+      join(import.meta.dir, "migrations/003_tenant_scoped_unique_keys.sql"),
+      join(import.meta.dir, "migrations/004_drop_quality_score.sql")
     ];
   },
   async register(app, ctx) {
