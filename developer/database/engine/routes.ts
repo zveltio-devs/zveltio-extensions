@@ -532,11 +532,23 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
           id: string; name: string; description: string | null;
           query: string; created_by: string; created_at: string; updated_at: string;
         }>`
-          SELECT id, name, description, config::text AS query, created_by, created_at, created_at AS updated_at
+          SELECT id, name, description, query, created_by, created_at, updated_at
           FROM zv_developer_database_snippets ORDER BY name
         `.execute(db);
         return c.json({ queries: result.rows });
-      } catch {
+      } catch (err) {
+        // This read asked for `config::text AS query` against a table whose
+        // column is `query`, and aliased `created_at` as `updated_at` while a
+        // real `updated_at` sat next to it. Listing saved queries answered 500
+        // to everyone, always — the INSERT below writes `query` correctly, so
+        // the two statements disagreed about the same table.
+        //
+        // A bare `catch` is why that lasted: the message names the route and
+        // not the cause, so the failure reads as "the feature is broken" rather
+        // than "this column does not exist".
+        console.error(
+          `[developer/database] listing saved queries failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
         return c.json({ error: 'Failed to list saved queries' }, 500);
       }
     })

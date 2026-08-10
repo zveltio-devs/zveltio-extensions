@@ -40,8 +40,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "7dda35ef32becaeed23d4a6b84943d71847776328dec34a812ff1111ff9c2459",
-    "sourceSha256": "0e9e42cfac420d524624a2edbb049c4716373575ee9247abf8ca9057545c2569"
+    "engineSha256": "628c57c5b9d127e271cad2868b69410ced2a8df9315a780345d7cbd0fba7b395",
+    "sourceSha256": "3b58ce575ca08d1dbdebb3483ba406ccac1349097cbc958a5b37f05708993657"
   },
   "resources": [
     "payroll"
