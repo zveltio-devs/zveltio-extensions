@@ -98,3 +98,26 @@ aceeaşi conexiune. Panoul rulează în 76 ms, deci costul e neglijabil.
 Merită căutat şi în celelalte extensii care compun mai multe interogări cu
 `Promise.all` sub `ctx.reqDb`.
 
+### `zv_extension_registry (name)` — singura cheie nelărgită
+
+A 61-a din campania de chei, lăsată deliberat. Codul de fuziune din marketplace
+suprapune rândurile de tenant peste cele globale, deci e scris pentru rânduri per
+firmă; `UNIQUE (name)` le-a interzis dintotdeauna, de unde 55 de rânduri globale
+şi 0 per firmă.
+
+Trei motive pentru care nu s-a lărgit odată cu celelalte:
+
+1. `tenant_id` **nu are valoare implicită** pe acest tabel, spre deosebire de
+   toate celelalte. Cu `UNIQUE (tenant_id, name)` şi `tenant_id` NULL, cum
+   NULL-urile sunt distincte, fiecare activare ar insera un rând nou în loc să-l
+   actualizeze.
+2. Cinci ţinte `onConflict(oc.column('name'))` ar înceta să se potrivească, iar
+   una dintre ele stă sub `.catch(() => {})` — deci eşecul ar fi tăcut, exact pe
+   operaţia cea mai importantă din produs.
+3. Nu deblochează nimic azi: `requireInstanceAdmin` refuză oricum orice cerere
+   al cărei domeniu nu e tenantul implicit.
+
+Se face împreună cu decizia despre activarea per firmă, cu valoarea implicită şi
+cu toate cele cinci ţinte, sau deloc. Poarta din CI o are pe listă de excepţii,
+cu acelaşi raţionament scris lângă ea.
+
