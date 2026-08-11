@@ -55,7 +55,7 @@ export function itemsRouter(ctx: ExtensionContext): Hono {
       INSERT INTO trace_items (code, name, type, category, default_unit, allergens, shelf_life_days, storage_conditions, gtin, min_stock_alert)
       VALUES (
         ${d.code}, ${d.name}, ${d.type}, ${d.category ?? null}, ${d.default_unit},
-        ${JSON.stringify(d.allergens)}::jsonb,
+        ${JSON.stringify(d.allergens)}::text::jsonb,
         ${d.shelf_life_days ?? null}, ${d.storage_conditions ?? null},
         ${d.gtin ?? null}, ${d.min_stock_alert ?? null}
       )
@@ -68,7 +68,7 @@ export function itemsRouter(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     const id = c.req.param('id');
     const allergensUpdate = d.allergens !== undefined
-      ? sql`${JSON.stringify(d.allergens)}::jsonb`
+      ? sql`${JSON.stringify(d.allergens)}::text::jsonb`
       : sql`allergens`;
     const row = await sql`
       UPDATE trace_items SET
