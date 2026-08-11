@@ -19533,7 +19533,7 @@ async function runExportJob(ctx, tenantId, jobId, collection, format, filters, f
       let query = tdb.selectFrom(tableName);
       const allCols = [...allowedFields];
       const requested = fields.length > 0 ? allCols.filter((f) => fields.includes(f)) : allCols;
-      const colAccess = await getColumnAccess(tdb, collection, await resolveUserRole(user));
+      const colAccess = await getColumnAccess(collection, await resolveUserRole(user));
       const selectCols = requested.filter((f) => !colAccess.hidden.has(f));
       if (selectCols.length === 0) {
         throw new Error("No exportable columns for this role");
