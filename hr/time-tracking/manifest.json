@@ -3,7 +3,7 @@
   "displayName": "Time Tracking",
   "category": "hr",
   "description": "Timesheets, project-based time logging, billable hours and client reports",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-time-tracking",
@@ -43,8 +43,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "9713bb6082d3f8a00e8fd1c3c6fe9ed51365e1cfc6f5ce032c6712f861778d68",
-    "sourceSha256": "1c98f0e103048594b967ed4a94dd37a05db82bf7fabc7fadb07b7952b7f1fa16"
+    "engineSha256": "c13b6304345f75014fa03c84c8a774fdb95792d7df350cf1b53cc5a7a0fcff0d",
+    "sourceSha256": "edf2f40b7849f1460694c7873755f7fa289949b39273ed10355ab18acd95a7e9"
   },
   "resources": [
     "time-tracking"
