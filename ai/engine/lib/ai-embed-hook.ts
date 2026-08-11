@@ -113,7 +113,10 @@ export async function triggerEmbedding(
       ${tenantId},
       NOW()
     )
-    ON CONFLICT (collection, record_id, field)
+    -- tenant_id leads the target, matching the unique key after migration 006.
+    -- It has to move with the constraint or every upsert fails with "no unique
+    -- or exclusion constraint matching the ON CONFLICT specification".
+    ON CONFLICT (tenant_id, collection, record_id, field)
     DO UPDATE SET
       text_content = EXCLUDED.text_content,
       embedding    = EXCLUDED.embedding,
