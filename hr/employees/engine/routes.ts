@@ -5,54 +5,6 @@ import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
 
-/**
- * Is this a structurally valid CNP?
- *
- * The field was free text, so `9999999999999` was accepted — month 99, day 99,
- * a number that cannot belong to anyone. It matters because the CNP is not
- * decoration here: `hr/payroll` puts it in the first column of the ReviSal
- * export, and ITM rejects the register over it. A typo entered once at hiring
- * surfaces months later as a rejected legal filing, with nothing pointing back
- * to the form that accepted it.
- *
- * Checked the way `crm` checks a company's CUI — same country, same class of
- * identifier. That precedent is why this is a validator rather than a length
- * check: the control digit catches transposed digits, which a length check
- * never does.
- *
- * Structure, not existence: it confirms the number COULD be a CNP (century and
- * gender marker, a real date, a real county code, the control digit), not that
- * it belongs to the person in front of you.
- */
-function isValidCnp(value: string): boolean {
-  const cnp = String(value).trim();
-  if (!/^\d{13}$/.test(cnp)) return false;
-
-  // First digit: century + gender. 1-6 are residents by birth century; 7-9
-  // cover foreign residents and people born abroad. 0 is not issued.
-  const s = Number(cnp[0]);
-  if (s === 0) return false;
-
-  const yy = Number(cnp.slice(1, 3));
-  const mm = Number(cnp.slice(3, 5));
-  const dd = Number(cnp.slice(5, 7));
-  const century =
-    s === 1 || s === 2 ? 1900 : s === 3 || s === 4 ? 1800 : s === 5 || s === 6 ? 2000 : 1900;
-  if (mm < 1 || mm > 12) return false;
-  const daysInMonth = new Date(Date.UTC(century + yy, mm, 0)).getUTCDate();
-  if (dd < 1 || dd > daysInMonth) return false;
-
-  // County: 01-46, plus 51/52 for the Bucharest sectors that used them.
-  const county = Number(cnp.slice(7, 9));
-  if (county < 1 || (county > 46 && county !== 51 && county !== 52)) return false;
-
-  const key = '279146358279';
-  let sum = 0;
-  for (let i = 0; i < 12; i++) sum += Number(cnp[i]) * Number(key[i]);
-  const rest = sum % 11;
-  return (rest === 10 ? 1 : rest) === Number(cnp[12]);
-}
-
 export function employeesRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, events } = ctx;
 
@@ -294,9 +246,28 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     national_id: z
       .string()
       .optional()
-      .refine((v) => v === undefined || v === '' || isValidCnp(v), {
-        message: 'CNP invalid (cifra de control nu corespunde) / invalid CNP: control digit',
-      }),
+      // Checked by whatever the instance's country extension registered, and
+      // not otherwise.
+      //
+      // A national identifier is not a shape this module can know: a CNP, an NI
+      // number and a social security number share nothing but a column. The
+      // first version of this validated a CNP right here, which quietly made an
+      // HR module that only fits one country — the wrong trade for catching a
+      // typo.
+      //
+      // So the rule lives with the country and is looked up per request, which
+      // also means an extension enabled after this one still applies. Nothing
+      // registered means no format check: an instance outside that country is
+      // not told its identifiers are malformed by a rule written for somebody
+      // else.
+      .refine(
+        (v) => {
+          if (v === undefined || v === '') return true;
+          const validate = ctx.services.get<(value: string) => boolean>('identity.nationalId');
+          return validate ? validate(v) : true;
+        },
+        { message: 'Invalid national identifier for this country / identificator national invalid' },
+      ),
     tax_id: z.string().optional(),
     hire_date: z.string(),
     department_id: z.string().uuid().optional(),

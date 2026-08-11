@@ -32,15 +32,30 @@ Garda anti-ciclu (`NOT (e.id = ANY(org.path))`) ține — am creat intenționat 
 și interogarea răspunde fără să se blocheze. Dar **API-ul acceptă ciclul**: nimic
 nu refuză „raportezi la propriul tău subaltern". De reparat separat.
 
-## CNP acceptat fără validare
+## Identificatorul național — verificat de țară, nu de acest modul
 
 `national_id` era text liber, deci `9999999999999` — luna 99, ziua 99 — intra
-liniștit. Contează fiindcă `hr/payroll` îl pune în prima coloană a exportului
-ReviSal, iar ITM respinge registrul din cauza lui: o greșeală de tastare la
-angajare iese la suprafață luni mai târziu, ca depunere legală respinsă, fără
-nimic care să trimită înapoi la formularul care a acceptat-o.
+liniștit.
 
-Validat pe cifra de control, ca la CUI în `crm`. Structură, nu existență.
+**Prima reparație a fost greșită ca direcție**: am pus validarea de CNP direct
+aici, ceea ce făcea modulul de HR să se potrivească unei singure țări. Un CNP, un
+NI number britanic și un social security number nu au nimic în comun în afară de
+coloană.
+
+Acum `hr/employees` întreabă registrul de servicii — `identity.nationalId` — și
+aplică ce găsește. Implementarea românească stă în `compliance/ro/documents`, care
+oricum lucrează cu identificatori românești. Nimic înregistrat înseamnă nicio
+verificare de format: o instanță din altă țară nu e certată de o regulă scrisă
+pentru altcineva.
+
+Căutarea se face **per cerere**, deci o extensie de țară activată după HR se
+aplică imediat, fără repornire. Verificat exact așa:
+
+| | fără extensia RO | cu ea |
+|---|---|---|
+| `AB123456C` (britanic) | **201** | — |
+| `9999999999999` | — | **400** |
+| CNP valid | — | **201** |
 
 **Capcană de metodă:** primul CNP „valid" cu care am testat era inventat de mine
 și a fost corect refuzat. Dacă rulam doar testul negativ, aș fi raportat succes.
@@ -57,7 +72,10 @@ Propunerea completă e în conversație; pe scurt, în ordinea în care blocheaz
    firmă. Istoricul salarial există dar nu e legat de niciun document.
 2. **Nu există cod COR pe poziții**, iar exportul ReviSal din `hr/payroll` pune
    `position_id` (un UUID) în coloana `FunctieId` și `full_time` în
-   `ContractTip`. Fișierul nu e importabil nicăieri.
+   `ContractTip`. Fișierul nu e importabil nicăieri. **Amânat deliberat de
+   owner**: ReviSal e specific României (și s-a mutat între timp în REGES-ONLINE),
+   iar HR nu trebuie să fie specific unei țări. Se discută ca integrare separată,
+   pe același tipar ca `identity.nationalId` de mai sus.
 3. **Încetarea nu are temei legal** — `reason` e text liber lipit în `notes`, deși
    articolul din Codul Muncii determină preavizul, compensațiile și dreptul la
    șomaj.
@@ -67,7 +85,6 @@ Propunerea completă e în conversație; pe scurt, în ordinea în care blocheaz
 6. Lipsesc offboarding, generarea CIM din șablon, raportare de fluctuație, și
    unicitatea CNP-ului pe firmă.
 
-ReviSal e, pe deasupra, în extensia greșită: e registrul de evidență a
-salariaților, nu o funcție de salarizare, iar `hr/payroll` citește direct
-`zvd_employees`, tabelul altei extensii. Locul lui firesc, dată fiind familia
-`compliance/ro/*`, e `compliance/ro/revisal`.
+ReviSal e, pe deasupra, în extensia greșită: nu e o funcție de salarizare, iar
+`hr/payroll` citește direct `zvd_employees`, tabelul altei extensii. Oriunde
+ajunge, forma corectă e cea de mai sus — HR expune datele, țara aduce regula.
