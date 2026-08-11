@@ -48,7 +48,7 @@ numerice au driftat față de fișiere. Coloana `stare` e singura de încredere.
 | `ecommerce/store` | 33 | 2 | 0 | 0 | 1 | 0 | 1 | SDUI | da | **verificat** |
 | `finance/accounting` | 28 | 4 | 0 | 0 | 1 | 0 | 1 | SDUI | da | **verificat** |
 | `finance/banking` | 18 | 4 | 0 | 0 | 2 | 0 | 1 | cod | da | **verificat** |
-| `finance/expenses` | 15 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | neverificat |
+| `finance/expenses` | 15 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
 | `finance/invoicing` | 29 | 9 | 3 | 0 | 4 | 0 | 3 | SDUI | da | **verificat** |
 | `finance/quotes` | 16 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | neverificat |
 | `finance/subscriptions` | 18 | 4 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
