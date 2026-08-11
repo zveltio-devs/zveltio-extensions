@@ -22,7 +22,7 @@ numerice au driftat față de fișiere. Coloana `stare` e singura de încredere.
 | `auth/saml` | 5 | 4 | 0 | 0 | 0 | 4 | 1 | SDUI | da | **reparat 2026-08-11 — G nepresat** |
 | `auth/scim` | 10 | 2 | 0 | 0 | 9 | 0 | 1 | SDUI | da | **verificat** |
 | `billing` | 6 | 2 | 0 | 0 | 0 | 0 | 2 | cod | da | neverificat |
-| `communications/mail` | 43 | 2 | 0 | 0 | 1 | 0 | 1 | cod | da | neverificat |
+| `communications/mail` | 43 | 2 | 0 | 0 | 1 | 0 | 1 | cod | da | **reparat 2026-08-11 — G nepresat** |
 | `compliance/gdpr` | 16 | 2 | 0 | 0 | 14 | 0 | 1 | SDUI | da | **verificat** |
 | `compliance/ro/documents` | 12 | 4 | 0 | 0 | 2 | 0 | 1 | SDUI | da | **verificat** |
 | `compliance/ro/efactura` | 23 | 6 | 2 | 1 | 6 | 6 | 2 | SDUI | da | **verificat** |
@@ -64,7 +64,7 @@ numerice au driftat față de fișiere. Coloana `stare` e singura de încredere.
 | `operations/assets` | 11 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
 | `operations/inventory` | 20 | 5 | 7 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
 | `operations/pos` | 15 | 4 | 0 | 0 | 1 | 0 | 1 | cod | da | **verificat** |
-| `operations/traceability` | 0 | 3 | 0 | 1 | 0 | 0 | 1 | cod | da | neverificat |
+| `operations/traceability` | 0 | 3 | 0 | 1 | 0 | 0 | 1 | cod | da | **reparat 2026-08-11 — G nepresat** |
 | `projects/helpdesk` | 18 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | neverificat |
 | `projects/management` | 30 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | neverificat |
 | `search` | 6 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | neverificat |
