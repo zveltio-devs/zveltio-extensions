@@ -19510,32 +19510,6 @@ function permissionGate(ctx, resource, opts = {}) {
   };
 }
 // hr/employees/engine/routes.ts
-function isValidCnp(value) {
-  const cnp = String(value).trim();
-  if (!/^\d{13}$/.test(cnp))
-    return false;
-  const s = Number(cnp[0]);
-  if (s === 0)
-    return false;
-  const yy = Number(cnp.slice(1, 3));
-  const mm = Number(cnp.slice(3, 5));
-  const dd = Number(cnp.slice(5, 7));
-  const century = s === 1 || s === 2 ? 1900 : s === 3 || s === 4 ? 1800 : s === 5 || s === 6 ? 2000 : 1900;
-  if (mm < 1 || mm > 12)
-    return false;
-  const daysInMonth = new Date(Date.UTC(century + yy, mm, 0)).getUTCDate();
-  if (dd < 1 || dd > daysInMonth)
-    return false;
-  const county = Number(cnp.slice(7, 9));
-  if (county < 1 || county > 46 && county !== 51 && county !== 52)
-    return false;
-  const key = "279146358279";
-  let sum = 0;
-  for (let i = 0;i < 12; i++)
-    sum += Number(cnp[i]) * Number(key[i]);
-  const rest = sum % 11;
-  return (rest === 10 ? 1 : rest) === Number(cnp[12]);
-}
 function employeesRoutes(ctx) {
   const { db, auth, events } = ctx;
   const app = new Hono2;
@@ -19753,9 +19727,12 @@ function employeesRoutes(ctx) {
     phone: exports_external.string().optional(),
     birth_date: exports_external.string().optional(),
     gender: exports_external.enum(["m", "f", "other"]).optional(),
-    national_id: exports_external.string().optional().refine((v) => v === undefined || v === "" || isValidCnp(v), {
-      message: "CNP invalid (cifra de control nu corespunde) / invalid CNP: control digit"
-    }),
+    national_id: exports_external.string().optional().refine((v) => {
+      if (v === undefined || v === "")
+        return true;
+      const validate = ctx.services.get("identity.nationalId");
+      return validate ? validate(v) : true;
+    }, { message: "Invalid national identifier for this country / identificator national invalid" }),
     tax_id: exports_external.string().optional(),
     hire_date: exports_external.string(),
     department_id: exports_external.string().uuid().optional(),
