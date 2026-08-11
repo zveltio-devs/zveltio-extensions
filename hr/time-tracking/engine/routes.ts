@@ -5,6 +5,55 @@ import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
 
+/**
+ * The employee record behind the signed-in user, or null.
+ *
+ * `user_id` first, because that is the link the schema declares. Email is the
+ * fallback this file used on its own, and it is the weaker one: somebody whose
+ * work address differs from their login cannot start a timer at all.
+ */
+async function callerEmployee(dbh: any, user: any): Promise<any | null> {
+  const rows = await sql`
+    SELECT id FROM zvd_employees
+    WHERE user_id = ${user.id} OR email = ${user.email} OR work_email = ${user.email}
+    LIMIT 1
+  `.execute(dbh);
+  return (rows.rows[0] as any) ?? null;
+}
+
+/**
+ * May this user log or alter time on behalf of `employeeId`?
+ *
+ * Your own time, somebody you manage, or the instance administrator.
+ *
+ * `employee_id` was an optional field on the timer and entry routes, defaulting
+ * to the caller — so leaving it out did the right thing and filling it in logged
+ * hours against anyone. Combined with `POST /timesheets/:id/approve`, which
+ * checked nothing at all, one permission was enough to record hours for a
+ * colleague, approve them, and send them through `POST /entries/invoice`.
+ *
+ * Same shape as the guard in `hr/leave`. Two copies now; if a third HR module
+ * needs it, this belongs on a service exposed by `hr/employees` — which would
+ * also remove the direct read of `zvd_employees` from here.
+ */
+async function mayActFor(
+  dbh: any,
+  ctx: ExtensionContext,
+  user: any,
+  employeeId: string,
+): Promise<boolean> {
+  const me = await callerEmployee(dbh, user);
+  if (me && me.id === employeeId) return true;
+
+  const target = await sql`SELECT manager_id FROM zvd_employees WHERE id = ${employeeId}`.execute(
+    dbh,
+  );
+  const managerId = (target.rows[0] as any)?.manager_id;
+  if (me && managerId && managerId === me.id) return true;
+
+  return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
+}
+
 export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
@@ -139,9 +188,12 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     let employeeId = d.employee_id;
     if (!employeeId) {
-      const emp = await sql`SELECT id FROM zvd_employees WHERE email = ${user.email} OR work_email = ${user.email} LIMIT 1`.execute(db);
-      if (!emp.rows.length) return c.json({ error: 'Employee record not found' }, 400);
-      employeeId = (emp.rows[0] as any).id;
+      const me = await callerEmployee(db, user);
+      if (!me) return c.json({ error: 'Employee record not found' }, 400);
+      employeeId = me.id;
+    } else if (!(await mayActFor(db, ctx, user, employeeId))) {
+      // Naming somebody else here used to be enough to run their clock.
+      return c.json({ error: 'You may only track time for yourself or someone you manage' }, 403);
     }
     const row = await sql`
       INSERT INTO zvd_active_timers (employee_id, project_id, task_description, is_billable, notes)
@@ -217,12 +269,27 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
+    // Whose hours are these?
+    //
+    // The insert used `d.employee_id ?? null`, so leaving the field out created
+    // an entry belonging to NOBODY — invisible to the person who worked those
+    // hours and to every per-employee report — and filling it in logged billable
+    // time against a colleague.
+    let employeeId = d.employee_id;
+    if (!employeeId) {
+      const me = await callerEmployee(db, user);
+      if (!me) return c.json({ error: 'Employee record not found' }, 400);
+      employeeId = me.id;
+    } else if (!(await mayActFor(db, ctx, user, employeeId))) {
+      return c.json({ error: 'You may only log time for yourself or someone you manage' }, 403);
+    }
+
     const project = await sql`SELECT hourly_rate FROM zvd_time_projects WHERE id = ${d.project_id}`.execute(db);
     const rate = project.rows.length ? +(project.rows[0] as any).hourly_rate : 0;
     const amount = d.is_billable ? (d.duration_minutes / 60) * rate : 0;
     const row = await sql`
       INSERT INTO zvd_time_entries (employee_id, project_id, task_description, date, start_time, end_time, duration_minutes, is_billable, hourly_rate, amount, notes, created_by)
-      VALUES (${d.employee_id ?? null}, ${d.project_id}, ${d.task_description}, ${d.date},
+      VALUES (${employeeId}, ${d.project_id}, ${d.task_description}, ${d.date},
         ${d.start_time ?? null}, ${d.end_time ?? null}, ${d.duration_minutes},
         ${d.is_billable}, ${rate}, ${amount}, ${d.notes ?? null}, ${user.id})
       RETURNING *
@@ -354,6 +421,24 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
 
   app.post('/timesheets/:id/approve', async (c) => {
     const user = c.get('user') as any;
+
+    // Approval is a manager's act, and it is not self-service.
+    //
+    // This checked nothing: one `time-tracking` permission let anybody approve
+    // any timesheet, their own included — and an approved timesheet is what
+    // `POST /entries/invoice` bills from. Approving your own hours is issuing
+    // your own invoice line.
+    const sheet = await sql`SELECT employee_id FROM zvd_timesheets WHERE id = ${c.req.param('id')}`.execute(db);
+    if (!sheet.rows.length) return c.json({ error: 'Timesheet not found' }, 404);
+    const employeeId = (sheet.rows[0] as any).employee_id;
+    const me = await callerEmployee(db, user);
+    if (me && me.id === employeeId) {
+      return c.json({ error: 'You cannot approve your own timesheet' }, 403);
+    }
+    if (!(await mayActFor(db, ctx, user, employeeId))) {
+      return c.json({ error: 'Only a manager may approve this' }, 403);
+    }
+
     const row = await sql`
       UPDATE zvd_timesheets SET status = 'approved', approved_by = ${user.id}, approved_at = NOW()
       WHERE id = ${c.req.param('id')} AND status = 'submitted' RETURNING *
@@ -364,6 +449,22 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
 
   app.post('/timesheets/:id/reject', zValidator('json', z.object({ reason: z.string().min(1) })), async (c) => {
     const { reason } = c.req.valid('json');
+    const user = c.get('user') as any;
+
+    // Same gate as approve. Rejecting somebody's timesheet is a manager's act
+    // too, and left open it is the easier one to abuse: it needs nothing but an
+    // id and it sends the hours back as disputed.
+    const sheet = await sql`SELECT employee_id FROM zvd_timesheets WHERE id = ${c.req.param('id')}`.execute(db);
+    if (!sheet.rows.length) return c.json({ error: 'Timesheet not found' }, 404);
+    const employeeId = (sheet.rows[0] as any).employee_id;
+    const me = await callerEmployee(db, user);
+    if (me && me.id === employeeId) {
+      return c.json({ error: 'You cannot reject your own timesheet' }, 403);
+    }
+    if (!(await mayActFor(db, ctx, user, employeeId))) {
+      return c.json({ error: 'Only a manager may reject this' }, 403);
+    }
+
     const row = await sql`
       UPDATE zvd_timesheets SET status = 'rejected', rejection_reason = ${reason}
       WHERE id = ${c.req.param('id')} AND status = 'submitted' RETURNING *
