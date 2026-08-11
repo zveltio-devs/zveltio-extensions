@@ -125,6 +125,30 @@ async function nextCreditNoteNumber(dbh: any): Promise<string> {
   return `CN-${String(n).padStart(5, '0')}`;
 }
 
+/**
+ * May this user record a payment against an invoice, or cancel one?
+ *
+ * Recording a payment says the customer paid. Nothing else in the system
+ * verifies that — it is a claim, and it closes a receivable. Cancelling an
+ * invoice removes a document that has already been issued, and in Romania an
+ * issued invoice is cancelled by a specific procedure rather than by deletion.
+ *
+ * Both sat behind one `invoices` permission, which is also what somebody needs
+ * to draft an invoice at all.
+ *
+ * `invoices:settle` and `invoices:cancel`, granted deliberately, with `admin`
+ * still sufficient so an existing install keeps working before anyone edits
+ * policies.
+ */
+async function mayDecideInvoice(
+  ctx: ExtensionContext,
+  user: any,
+  action: 'settle' | 'cancel',
+): Promise<boolean> {
+  if (await ctx.checkPermission(user.id, 'invoices', action).catch(() => false)) return true;
+  return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
+}
+
 export function invoicingRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
   const app = new Hono();
@@ -898,6 +922,9 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
     notes: z.string().optional(),
   })), async (c) => {
     const user = c.get('user') as any;
+    if (!(await mayDecideInvoice(ctx, user, 'settle'))) {
+      return c.json({ error: 'You may not record payments' }, 403);
+    }
     const d = c.req.valid('json');
     const inv = await sql`SELECT * FROM zvd_invoices WHERE id = ${c.req.param('id')} AND status IN ('sent','overdue','partially_paid')`.execute(db);
     if (!inv.rows.length) return c.json({ error: 'Invoice not found or not payable' }, 400);
@@ -930,6 +957,10 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/invoices/:id/cancel', async (c) => {
+    const user = c.get('user') as any;
+    if (!(await mayDecideInvoice(ctx, user, 'cancel'))) {
+      return c.json({ error: 'You may not cancel invoices' }, 403);
+    }
     const row = await sql`
       UPDATE zvd_invoices SET status = 'cancelled', updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND status NOT IN ('paid','cancelled') RETURNING *
