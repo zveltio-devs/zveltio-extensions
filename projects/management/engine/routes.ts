@@ -257,7 +257,7 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
       VALUES (${c.req.param('id')}, ${d.title}, ${d.description ?? null}, ${d.status}, ${d.priority},
         ${d.assignee_id ?? null}, ${d.milestone_id ?? null}, ${d.parent_task_id ?? null},
         ${d.due_date ?? null}, ${d.start_date ?? null}, ${d.estimated_hours ?? null},
-        ${d.story_points ?? null}, ${JSON.stringify(d.tags)}, ${user.id})
+        ${d.story_points ?? null}, ${d.tags}, ${user.id})
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);

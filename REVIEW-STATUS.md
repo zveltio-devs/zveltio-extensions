@@ -13,6 +13,25 @@ fiindcă lipsește o dependință externă. Nu e „verificat" și nu se promove
 „Generat automat" e o intenție, nu un fapt: nu există generator, iar coloanele
 numerice au driftat față de fișiere. Coloana `stare` e singura de încredere.
 
+## Ce înseamnă „verificat" după trecerea din 11 august
+
+Fiecare extensie a fost activată pe o **bază virgină** și i s-au apăsat rutele —
+citirile, apoi ciclul de scriere pe care extensia îl are (creare → modificare →
+decizie → ștergere), plus căile publice acolo unde există. Ce nu se putea apăsa
+fără o dependință externă e scris în `CONTEXT.md`-ul extensiei.
+
+Notabil: **cinci extensii nu funcționau deloc pe o instalare nouă** și niciuna
+n-ar fi ieșit dintr-o citire de cod. Toate cinci sunt aceeași formă — un tabel cu
+doi creatori, engine-ul rulează primul, extensia scrie în forma ei:
+
+| extensie | ce era mort |
+|---|---|
+| `forms` | orice trimitere publică de formular — `page_id NOT NULL` |
+| `data/import` | orice import — `format` / `failed_rows` / statusul `running` |
+| `content/documents` | orice generare de document — cheie străină către alt tabel |
+| `storage/cloud` | listarea fișierelor — `updated_at` inexistent |
+| `developer/edge-functions` | propria pagină de administrare — tabel refuzat de gardă |
+
 | extensie | rute | migr | serv | ascult | catch | ext | pagini | UI | teste | stare |
 |---|--:|--:|--:|--:|--:|--:|--:|---|---|---|
 | `ai` | 0 | 6 | 5 | 2 | 0 | 0 | 1 | cod | da | **reparat 2026-08-11 — G nepresat** |
@@ -21,7 +40,7 @@ numerice au driftat față de fișiere. Coloana `stare` e singura de încredere.
 | `auth/ldap` | 4 | 4 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **reparat 2026-08-11 — G nepresat** |
 | `auth/saml` | 5 | 4 | 0 | 0 | 0 | 4 | 1 | SDUI | da | **reparat 2026-08-11 — G nepresat** |
 | `auth/scim` | 10 | 2 | 0 | 0 | 9 | 0 | 1 | SDUI | da | **verificat** |
-| `billing` | 6 | 2 | 0 | 0 | 0 | 0 | 2 | cod | da | neverificat |
+| `billing` | 6 | 2 | 0 | 0 | 0 | 0 | 2 | cod | da | **verificat 2026-08-11** |
 | `communications/mail` | 43 | 2 | 0 | 0 | 1 | 0 | 1 | cod | da | **reparat 2026-08-11 — G nepresat** |
 | `compliance/gdpr` | 16 | 2 | 0 | 0 | 14 | 0 | 1 | SDUI | da | **verificat** |
 | `compliance/ro/documents` | 12 | 4 | 0 | 0 | 2 | 0 | 1 | SDUI | da | **verificat** |
@@ -30,47 +49,47 @@ numerice au driftat față de fișiere. Coloana `stare` e singura de încredere.
 | `compliance/ro/procurement` | 22 | 3 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat** |
 | `compliance/ro/saft` | 13 | 2 | 0 | 0 | 0 | 1 | 1 | SDUI | da | **verificat** |
 | `content/document-templates` | 14 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
-| `content/documents` | 12 | 3 | 0 | 0 | 5 | 0 | 1 | cod | da | neverificat |
-| `content/drafts` | 18 | 2 | 0 | 0 | 2 | 0 | 1 | SDUI | da | neverificat |
+| `content/documents` | 12 | 3 | 0 | 0 | 5 | 0 | 1 | cod | da | **verificat 2026-08-11** |
+| `content/drafts` | 18 | 2 | 0 | 0 | 2 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
 | `content/media` | 27 | 2 | 0 | 0 | 1 | 0 | 1 | cod | da | **reparat 2026-08-11 — G nepresat** |
-| `content/page-builder` | 25 | 4 | 0 | 0 | 3 | 2 | 1 | cod | da | neverificat |
-| `content/pdf-viewer` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | nu | neverificat |
+| `content/page-builder` | 25 | 4 | 0 | 0 | 3 | 2 | 1 | cod | da | **verificat 2026-08-11** |
+| `content/pdf-viewer` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | nu | **verificat 2026-08-11** |
 | `crm` | 15 | 2 | 5 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
 | `data/export` | 11 | 2 | 0 | 0 | 2 | 0 | 1 | SDUI | da | **reparat 2026-08-11 — G nepresat** |
 | `data/import` | 11 | 3 | 0 | 0 | 3 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
 | `developer/api-docs` | 15 | 4 | 0 | 0 | 1 | 4 | 1 | cod | da | **verificat 2026-08-11** |
-| `developer/byod` | 0 | 2 | 0 | 0 | 5 | 0 | 1 | cod | da | neverificat |
+| `developer/byod` | 0 | 2 | 0 | 0 | 5 | 0 | 1 | cod | da | **verificat 2026-08-11** |
 | `developer/database` | 0 | 4 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat** |
-| `developer/edge-functions` | 7 | 0 | 0 | 0 | 4 | 0 | 1 | cod | da | neverificat |
-| `developer/graphql` | 13 | 2 | 0 | 0 | 2 | 4 | 1 | cod | da | neverificat |
-| `developer/validation` | 14 | 2 | 0 | 0 | 3 | 0 | 1 | cod | da | neverificat |
-| `developer/views` | 0 | 0 | 0 | 0 | 0 | 0 | 1 | cod | nu | neverificat |
+| `developer/edge-functions` | 7 | 0 | 0 | 0 | 4 | 0 | 1 | cod | da | **verificat 2026-08-11** |
+| `developer/graphql` | 13 | 2 | 0 | 0 | 2 | 4 | 1 | cod | da | **verificat 2026-08-11** |
+| `developer/validation` | 14 | 2 | 0 | 0 | 3 | 0 | 1 | cod | da | **verificat 2026-08-11** |
+| `developer/views` | 0 | 0 | 0 | 0 | 0 | 0 | 1 | cod | nu | **verificat 2026-08-11** |
 | `ecommerce/store` | 33 | 2 | 0 | 0 | 1 | 0 | 1 | SDUI | da | **verificat** |
 | `finance/accounting` | 28 | 4 | 0 | 0 | 1 | 0 | 1 | SDUI | da | **verificat** |
 | `finance/banking` | 18 | 4 | 0 | 0 | 2 | 0 | 1 | cod | da | **verificat** |
 | `finance/expenses` | 15 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
 | `finance/invoicing` | 29 | 9 | 3 | 0 | 4 | 0 | 3 | SDUI | da | **verificat** |
-| `finance/quotes` | 16 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | neverificat |
+| `finance/quotes` | 16 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
 | `finance/subscriptions` | 18 | 4 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
-| `forms` | 8 | 2 | 0 | 0 | 1 | 0 | 3 | cod | da | neverificat |
+| `forms` | 8 | 2 | 0 | 0 | 1 | 0 | 3 | cod | da | **verificat 2026-08-11** |
 | `geospatial/postgis` | 16 | 2 | 0 | 0 | 2 | 0 | 1 | cod | da | **verificat** |
 | `hr/employees` | 32 | 3 | 5 | 0 | 0 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
 | `hr/leave` | 16 | 2 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
 | `hr/payroll` | 15 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
 | `hr/time-tracking` | 18 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat 2026-08-11** |
-| `i18n/translations` | 15 | 2 | 0 | 0 | 4 | 0 | 1 | cod | da | neverificat |
-| `integrations/api-connector` | 17 | 2 | 0 | 0 | 1 | 0 | 1 | SDUI | da | neverificat |
-| `integrations/migrators` | 7 | 2 | 0 | 0 | 5 | 6 | 1 | SDUI | da | neverificat |
+| `i18n/translations` | 15 | 2 | 0 | 0 | 4 | 0 | 1 | cod | da | **verificat 2026-08-11** |
+| `integrations/api-connector` | 17 | 2 | 0 | 0 | 1 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
+| `integrations/migrators` | 7 | 2 | 0 | 0 | 5 | 6 | 1 | SDUI | da | **verificat 2026-08-11** |
 | `operations/assets` | 11 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
 | `operations/inventory` | 20 | 5 | 7 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
 | `operations/pos` | 15 | 4 | 0 | 0 | 1 | 0 | 1 | cod | da | **verificat** |
 | `operations/traceability` | 0 | 3 | 0 | 1 | 0 | 0 | 1 | cod | da | **reparat 2026-08-11 — G nepresat** |
-| `projects/helpdesk` | 18 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | neverificat |
-| `projects/management` | 30 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | neverificat |
-| `search` | 6 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | neverificat |
-| `sms` | 6 | 2 | 0 | 0 | 1 | 0 | 1 | cod | da | neverificat |
-| `storage/cloud` | 28 | 2 | 0 | 0 | 0 | 1 | 1 | cod | da | neverificat |
-| `workflow/approvals` | 17 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | neverificat |
+| `projects/helpdesk` | 18 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat 2026-08-11** |
+| `projects/management` | 30 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat 2026-08-11** |
+| `search` | 6 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat 2026-08-11** |
+| `sms` | 6 | 2 | 0 | 0 | 1 | 0 | 1 | cod | da | **verificat 2026-08-11** |
+| `storage/cloud` | 28 | 2 | 0 | 0 | 0 | 1 | 1 | cod | da | **verificat 2026-08-11** |
+| `workflow/approvals` | 17 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat 2026-08-11** |
 | `workflow/checklists` | 22 | 5 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat** |
 
 **Total: 57 extensii · verificate: 22**

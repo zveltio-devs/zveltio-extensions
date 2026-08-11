@@ -279,7 +279,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
       VALUES (${d.name}, ${d.slug}, ${d.sku}, ${canonicalProductId}, ${d.description ?? null}, ${d.short_description ?? null}, ${d.category_id ?? null},
         ${d.price}, ${d.compare_price ?? null}, ${d.cost ?? null}, ${d.currency}, ${d.tax_rate},
         ${d.stock_qty}, ${d.track_stock}, ${d.allow_backorder}, ${d.weight ?? null},
-        ${JSON.stringify(d.images)}, ${JSON.stringify(d.tags)}, '{}', ${d.status}, ${d.is_featured},
+        ${JSON.stringify(d.images)}::text::jsonb, ${d.tags}, '{}', ${d.status}, ${d.is_featured},
         ${d.digital_file_url ?? null}, ${user.id})
       RETURNING *
     `.execute(db);
@@ -309,8 +309,8 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
         stock_qty = COALESCE(${d.stock_qty ?? null}, stock_qty),
         status = COALESCE(${d.status ?? null}, status),
         is_featured = COALESCE(${d.is_featured ?? null}, is_featured),
-        images = COALESCE(${d.images ? JSON.stringify(d.images) : null}::jsonb, images),
-        tags = COALESCE(${d.tags ? JSON.stringify(d.tags) : null}::text[], tags),
+        images = COALESCE(${d.images ? JSON.stringify(d.images) : null}::text::jsonb, images),
+        tags = COALESCE(${d.tags ?? null}, tags),
         category_id = COALESCE(${d.category_id ?? null}, category_id),
         tax_rate = COALESCE(${d.tax_rate ?? null}, tax_rate),
         updated_at = NOW()

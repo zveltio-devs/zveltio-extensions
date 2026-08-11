@@ -146,7 +146,7 @@ export function helpdeskRoutes(ctx: ExtensionContext): Hono {
       VALUES (${number}, ${d.title}, ${d.description}, ${d.priority}, ${d.category_id ?? null},
         ${user.id}, ${d.requester_email}, ${d.requester_name ?? user.name ?? ''},
         ${d.assignee_id ?? null}, ${d.channel}, ${slaDueAt},
-        ${JSON.stringify(d.tags)}, ${user.id})
+        ${d.tags}, ${user.id})
       RETURNING *
     `.execute(db);
     const ticketId = (row.rows[0] as any).id;
