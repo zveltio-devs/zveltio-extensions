@@ -32,8 +32,11 @@ async function runExportJob(
   fields: string[],
   sortField: string | undefined,
   sortOrder: string,
+  user: { id: string; email?: string; role?: string },
+  authType: 'session' | 'api_key',
 ): Promise<void> {
   const { DDLManager, fieldTypeRegistry } = ctx;
+  const { getRlsFilters, applyRlsFilters, getColumnAccess, resolveUserRole } = ctx.internals;
 
   // A background task has no request, so it has no `c` and no `db`. It
   // used to run on the bare pool, and the note here called plumbing the tenant
@@ -68,12 +71,31 @@ async function runExportJob(
 
     let query = (tdb as any).selectFrom(tableName);
 
-    if (fields.length > 0) {
-      const safeFields = fields.filter((f) => allowedFields.has(f));
-      query = query.select(safeFields.length > 0 ? safeFields : ['*']);
-    } else {
-      query = query.selectAll();
+    // Column permissions.
+    //
+    // Export checked read on the COLLECTION and then selected every column, so a
+    // role forbidden a column in the data API could read it by exporting — the
+    // same data, one route to the left. `withTenantIsolation` above does not
+    // help: it carries the TENANT boundary, while hidden columns are a rule the
+    // operator writes inside a tenant, and until the host exposed
+    // `getColumnAccess` this side had no way to ask.
+    //
+    // The engine's `/api/export` was given both guards on 2026-07-31. Nothing
+    // calls that route; the Studio exports through here.
+    //
+    // The no-fields case changes shape on purpose: it used to be `selectAll()`,
+    // which returns every physical column including ones the collection does not
+    // declare — `tenant_id` among them. It is now the same schema+system list
+    // the engine builds.
+    const allCols = [...allowedFields];
+    const requested = fields.length > 0 ? allCols.filter((f) => fields.includes(f)) : allCols;
+    const colAccess = await getColumnAccess(tdb, collection, await resolveUserRole(user));
+    const selectCols = requested.filter((f: string) => !colAccess.hidden.has(f));
+
+    if (selectCols.length === 0) {
+      throw new Error('No exportable columns for this role');
     }
+    query = query.select(selectCols);
 
     for (const [key, value] of Object.entries(filters)) {
       if (allowedFields.has(key)) {
@@ -85,7 +107,11 @@ async function runExportJob(
       query = query.orderBy(sortField as any, sortOrder === 'desc' ? 'desc' : 'asc');
     }
 
-    const rows = await query.execute();
+    // Row-level security. Export applied none: a user could export exactly the
+    // rows a policy hides. RLS is the read boundary, and a boundary only one
+    // route honours is not a boundary.
+    const rlsFilters = await getRlsFilters(collection, { ...user, role: user.role ?? '' }, authType);
+    const rows = await applyRlsFilters(query, rlsFilters).execute();
 
     const serialized = rows.map((row: any) => {
       const result = { ...row };
@@ -280,6 +306,12 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
         body.fields,
         body.sort_field,
         body.sort_order,
+        // The job runs after the response, so it has no request to read the
+        // caller from — the same shape as the `tenantId` follow-up above, and
+        // for the same reason: an export is answered on behalf of somebody, and
+        // RLS and column permissions are both questions about who.
+        { id: user.id, email: user.email, role: user.role },
+        (c.get('authType') as 'session' | 'api_key') ?? 'session',
       ).catch(() => { /* errors handled inside runExportJob */ });
 
       return c.json({ job_id: job.id, status: 'pending', message: 'Export job queued' }, 202);
