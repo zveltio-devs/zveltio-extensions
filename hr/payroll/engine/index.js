@@ -19622,11 +19622,13 @@ async function mayDecidePayroll(ctx, user, action) {
   return ctx.checkPermission(user.id, "admin", "*").catch(() => false);
 }
 function employment(ctx) {
-  const svc = ctx.services.get("hr.employment");
-  if (!svc) {
-    throw new Error("hr.employment service not registered \u2014 enable hr/employees (a declared dependency of hr/payroll)");
-  }
-  return svc;
+  return ctx.services.get("hr.employment");
+}
+function noEmploymentService(c) {
+  return c.json({
+    error: "hr/employees is not enabled. Payroll reads employment terms from it.",
+    code: "dependency_unavailable"
+  }, 503);
 }
 function payrollRoutes(ctx) {
   const { db, auth } = ctx;
@@ -19672,7 +19674,10 @@ function payrollRoutes(ctx) {
     if (!period.rows.length)
       return c.json({ error: "Period not found or not open" }, 400);
     const p = period.rows[0];
-    const subjects = await employment(ctx).payrollSubjects();
+    const svc = employment(ctx);
+    if (!svc)
+      return noEmploymentService(c);
+    const subjects = await svc.payrollSubjects();
     const rates = await loadRates(db);
     let generated = 0;
     const skipped = [];
@@ -19811,7 +19816,10 @@ function payrollRoutes(ctx) {
     notes: exports_external.string().optional()
   })), async (c) => {
     const d = c.req.valid("json");
-    const terms = await employment(ctx).currentTerms(d.employee_id);
+    const svc = employment(ctx);
+    if (!svc)
+      return noEmploymentService(c);
+    const terms = await svc.currentTerms(d.employee_id);
     const dailyGross = terms?.salary ? +terms.salary / 21.75 : 0;
     const amount = dailyGross * d.days * 0.75;
     const row = await sql`
@@ -19845,7 +19853,10 @@ function payrollRoutes(ctx) {
     description: exports_external.string().optional()
   })), async (c) => {
     const d = c.req.valid("json");
-    const terms = await employment(ctx).currentTerms(d.employee_id);
+    const svc = employment(ctx);
+    if (!svc)
+      return noEmploymentService(c);
+    const terms = await svc.currentTerms(d.employee_id);
     const monthlyHours = (terms?.weekly_hours ?? 40) * 52 / 12;
     const hourlyRate = terms?.salary ? +terms.salary / monthlyHours : 0;
     const amount = hourlyRate * d.hours * d.rate_multiplier;
@@ -19893,7 +19904,10 @@ function payrollRoutes(ctx) {
     return new Response(xml, { headers: { "Content-Type": "application/xml", "Content-Disposition": `attachment; filename="D112_${period.rows[0].year}_${String(period.rows[0].month).padStart(2, "0")}.xml"` } });
   });
   app.get("/revisal", async (c) => {
-    const subjects = await employment(ctx).payrollSubjects();
+    const svc = employment(ctx);
+    if (!svc)
+      return noEmploymentService(c);
+    const subjects = await svc.payrollSubjects();
     const csv = generateRevisalCsv(ctx.internals, subjects);
     return new Response(csv, { headers: { "Content-Type": "text/csv", "Content-Disposition": `attachment; filename="ReviSal_${new Date().toISOString().slice(0, 10)}.csv"` } });
   });
