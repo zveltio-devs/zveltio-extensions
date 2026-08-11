@@ -287,6 +287,8 @@ RESPONSE FORMAT (JSON only):
           const SAFE_COL_RE = /^[a-z][a-z0-9_]*$/;
 
           let inserted = 0;
+          let failed = 0;
+          let firstError: string | null = null;
           for (const row of rows) {
             try {
               const cleanRow: any = {};
@@ -309,11 +311,22 @@ RESPONSE FORMAT (JSON only):
                 db,
               );
               inserted++;
-            } catch {
-              /* row-level failure: continue */
+            } catch (err) {
+              // Row-level failures continue — one bad row from a model should not
+              // discard the other nine. But they are counted and the first reason
+              // is reported: a bare `catch {}` here meant a column-type mismatch
+              // could reject every single row while the response still said the
+              // data had been imported.
+              failed++;
+              if (!firstError) firstError = (err as Error).message;
             }
           }
           results.records_inserted[colName] = inserted;
+          if (failed > 0) {
+            results.errors.push(
+              `${colName}: ${failed} of ${rows.length} row(s) rejected — ${firstError}`,
+            );
+          }
         }
       }
 
@@ -326,10 +339,23 @@ RESPONSE FORMAT (JSON only):
         /* ignore */
       }
 
+      // `success` reflects what happened. It was hardcoded `true`, and the
+      // message counted collections that merely had an ENTRY in
+      // `records_inserted` — including the ones where every row was rejected — so
+      // "inserted data into 3 collection(s)" could sit on top of zero rows.
+      const totalRows = Object.values(results.records_inserted).reduce((a, b) => a + b, 0);
+      const collectionsWithRows = Object.values(results.records_inserted).filter(
+        (n) => n > 0,
+      ).length;
+
       return c.json({
-        success: true,
+        success: results.errors.length === 0,
         ...results,
-        message: `Created ${results.collections_created.length} collection(s), inserted data into ${Object.keys(results.records_inserted).length} collection(s)`,
+        rows_inserted_total: totalRows,
+        message:
+          `Created ${results.collections_created.length} collection(s), ` +
+          `inserted ${totalRows} row(s) into ${collectionsWithRows} collection(s)` +
+          (results.errors.length > 0 ? `, ${results.errors.length} problem(s) — see errors` : ''),
       });
     },
   );
