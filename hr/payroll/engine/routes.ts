@@ -5,7 +5,23 @@ import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
 
-// RO 2024 statutory rates
+/**
+ * Fallback rates, used only until the instance has a row of its own.
+ *
+ * These used to BE the rates: a literal in this file, with
+ * `computeRO(input, rates = RO_RATES)` offering a parameter no call site ever
+ * passed. So the statutory percentages were compiled into the bundle, and a
+ * legislative change — which happens every year — needed a new extension
+ * release shipped through the registry to every installation. An accountant who
+ * KNEW the new rate had nowhere to put it.
+ *
+ * They live in `zvd_payroll_rates` now (migration 006), seeded with exactly
+ * these numbers so nothing moves on upgrade. What changes is that they can be
+ * corrected.
+ *
+ * Left here as the fallback rather than deleted, because a payroll run that
+ * silently used zeroes would be worse than one using last year's figures.
+ */
 const RO_RATES = {
   cas_employee: 0.25,
   cass_employee: 0.10,
@@ -100,6 +116,33 @@ function generateRevisalCsv(internals: any, employees: any[]): string {
   return [header, ...rows].join('\n');
 }
 
+/**
+ * The instance's current rates, falling back to the built-in defaults.
+ *
+ * Read per calculation rather than cached: a correction made by an accountant
+ * has to apply to the next payroll run, not the next restart.
+ *
+ * Not effective-dated, and that is safe here rather than lucky —
+ * `zvd_payroll_entries` records the rates it was computed with on every row, so
+ * a closed period keeps its own figures when these change. What this table means
+ * is "the rates from now on".
+ */
+async function loadRates(dbh: any): Promise<typeof RO_RATES> {
+  const row = await sql`SELECT * FROM zvd_payroll_rates LIMIT 1`
+    .execute(dbh)
+    .catch(() => ({ rows: [] as any[] }));
+  const r = (row.rows as any[])[0];
+  if (!r) return RO_RATES;
+  return {
+    cas_employee: Number(r.cas_employee),
+    cass_employee: Number(r.cass_employee),
+    income_tax: Number(r.income_tax),
+    cas_employer: Number(r.cas_employer),
+    cam_employer: Number(r.cam_employer),
+    personal_deduction_base: Number(r.personal_deduction_base),
+  };
+}
+
 export function payrollRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
   const app = new Hono();
@@ -158,6 +201,10 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
       SELECT * FROM zvd_employees WHERE status = 'active' AND employment_type != 'contractor'
     `.execute(db);
 
+    // Loaded once for the run: every entry in a period is computed with the same
+    // rates, and the row each entry stores records which ones those were.
+    const rates = await loadRates(db);
+
     let generated = 0;
     for (const emp of employees.rows as any[]) {
       const gross = +(emp.salary ?? 0);
@@ -202,7 +249,7 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
         gross, taxable_bonuses, deductions,
         sick_leave_days: sickDays, sick_leave_amount: sickAmount,
         meal_vouchers: mealVouchersAmount, overtime_amount: overtimeAmt, night_shift_bonus: nightShiftAmt,
-      });
+      }, rates);
 
       await sql`
         INSERT INTO zvd_payroll_entries (
@@ -213,10 +260,19 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
           sick_leave_days, sick_leave_amount, meal_vouchers_amount, overtime_amount, night_shift_bonus
         ) VALUES (
           ${p.id}, ${emp.id}, ${emp.first_name + ' ' + emp.last_name}, ${calc.gross}, ${mealVouchersAmount}, 0,
-          ${RO_RATES.cas_employee}, ${RO_RATES.cass_employee}, ${RO_RATES.income_tax},
+          -- The rates this payslip was ACTUALLY computed with, not the built-in
+          -- constants. They were the same thing while the constants were the
+          -- only source; now that an accountant can correct them, writing the
+          -- constants here would make a payslip record a percentage that does
+          -- not match its own amounts. Caught exactly that way: employer cost
+          -- fell to the corrected rate while the stored rate still read 0.0400.
+          --
+          -- These columns are also what makes the rates table safe without
+          -- effective dating — a closed period keeps its own figures.
+          ${rates.cas_employee}, ${rates.cass_employee}, ${rates.income_tax},
           ${calc.cas_emp}, ${calc.cass_emp}, ${calc.personal_deduction}, ${calc.taxable_income},
           ${calc.income_tax}, ${calc.net},
-          ${RO_RATES.cas_employer}, ${RO_RATES.cam_employer}, ${calc.cas_empl}, ${calc.cam_empl},
+          ${rates.cas_employer}, ${rates.cam_employer}, ${calc.cas_empl}, ${calc.cam_empl},
           ${calc.total_employer_cost}, ${sickDays}, ${sickAmount}, ${mealVouchersAmount},
           ${overtimeAmt}, ${nightShiftAmt}
         )
@@ -385,11 +441,57 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
     personal_deduction: z.number().min(0).default(500),
   })), async (c) => {
     const d = c.req.valid('json');
-    const calc = computeRO({ gross: d.gross_salary, ...d });
+    const calc = computeRO({ gross: d.gross_salary, ...d }, await loadRates(db));
     return c.json({ data: { ...calc, rates: RO_RATES } });
   });
 
   // ── Stats ──────────────────────────────────────────────────────
+  // ── Statutory rates ──────────────────────────────────────────────
+  //
+  // The percentages change by law, usually once a year and sometimes mid-year.
+  // Until now they were a literal in this file, so following the law meant
+  // waiting for an extension release. These two routes are what an accountant
+  // needs: read what the instance is using, and correct it.
+
+  app.get('/rates', async (c) => {
+    return c.json({ data: await loadRates(db) });
+  });
+
+  app.put('/rates', zValidator('json', z.object({
+    cas_employee: z.number().min(0).max(1).optional(),
+    cass_employee: z.number().min(0).max(1).optional(),
+    income_tax: z.number().min(0).max(1).optional(),
+    // 0 for normal working conditions, which is what most employers owe.
+    cas_employer: z.number().min(0).max(1).optional(),
+    cam_employer: z.number().min(0).max(1).optional(),
+    personal_deduction_base: z.number().min(0).optional(),
+  })), async (c) => {
+    const d = c.req.valid('json');
+    const current = await loadRates(db);
+    const m = { ...current, ...d };
+
+    // `tenant_id` is left to its column default, which reads the tenant GUC of
+    // the surrounding transaction — so the row lands in the caller's tenant.
+    await sql`
+      INSERT INTO zvd_payroll_rates (
+        cas_employee, cass_employee, income_tax, cas_employer, cam_employer, personal_deduction_base, updated_at
+      ) VALUES (
+        ${m.cas_employee}, ${m.cass_employee}, ${m.income_tax},
+        ${m.cas_employer}, ${m.cam_employer}, ${m.personal_deduction_base}, NOW()
+      )
+      ON CONFLICT (tenant_id) DO UPDATE SET
+        cas_employee = EXCLUDED.cas_employee,
+        cass_employee = EXCLUDED.cass_employee,
+        income_tax = EXCLUDED.income_tax,
+        cas_employer = EXCLUDED.cas_employer,
+        cam_employer = EXCLUDED.cam_employer,
+        personal_deduction_base = EXCLUDED.personal_deduction_base,
+        updated_at = NOW()
+    `.execute(db);
+
+    return c.json({ data: await loadRates(db) });
+  });
+
   app.get('/stats', async (c) => {
     const row = await sql`
       SELECT
