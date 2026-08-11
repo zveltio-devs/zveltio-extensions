@@ -77,7 +77,7 @@ async function runImport(
   // and pointed at this one.
   return ctx.internals.withTenantIsolation(tenantId, async (tdb: any) => {
 
-  const { dynamicInsert } = ctx.internals;
+  const { dynamicInsert, maybeEncrypt } = ctx.internals;
   const insertedIds: string[] = [];
   let processed = 0;
   let success = 0;
@@ -103,9 +103,30 @@ async function runImport(
 
       if (collectionDef?.fields) {
         for (const field of collectionDef.fields) {
-          if (row[field.name] !== undefined) {
-            row[field.name] = fieldTypeRegistry.deserialize(field.type, row[field.name]);
-          }
+          if (row[field.name] === undefined) continue;
+          // `deserialize` is async, and this never awaited it — so what went
+          // into the row was a PROMISE. It reached the table anyway because
+          // Bun.SQL resolves a promise passed as a query parameter, so the bug
+          // was invisible for as long as nothing looked at the value in between.
+          //
+          // Adding encryption is exactly that: `maybeEncrypt` saw a Promise,
+          // took the `typeof value !== 'string'` exit, and handed it back
+          // untouched. The column stayed PLAINTEXT with the guard sitting right
+          // there. Found by printing the value rather than trusting the call.
+          row[field.name] = await fieldTypeRegistry.deserialize(field.type, row[field.name]);
+          // Import writes straight to the table through `dynamicInsert`, not
+          // through the host's write pipeline, so field encryption has to be
+          // applied here. Without it a column marked `encrypted: true` was
+          // stored in PLAINTEXT when the rows arrived by CSV and encrypted when
+          // the same rows arrived by API — the field still reads as encrypted
+          // everywhere in the UI, and only the bytes on disk differ. Import is
+          // the bulk path, so it is the one most likely to carry the sensitive
+          // column.
+          //
+          // The engine's own `/api/import` was given this on 2026-07-31. That
+          // route has no caller: the Studio and the SDK reach import through
+          // this extension, so the fix landed on the copy nobody runs.
+          row[field.name] = await maybeEncrypt(row[field.name], field.encrypted === true);
         }
       }
 
@@ -605,19 +626,43 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
 
     const options = { mapping, on_duplicate: onDuplicate, dry_run: dryRun };
 
-    // Fire-and-forget
-    runImport(ctx, tenantOf(c), job.id, collection, rows, options, collectionDef).catch((err: any) => {
-      (db as any)
-        .updateTable('zv_import_logs')
-        .set({
-          status: 'failed',
-          errors: JSON.stringify([{ row: 0, error: String(err) }]),
-          completed_at: new Date(),
-        })
-        .where('id', '=', job.id)
-        .execute()
-        .catch(() => { /* ignore */ });
-    });
+    // Fire-and-forget — but the failure path has to survive the response.
+    //
+    // This ran `db.updateTable(...)` and swallowed whatever came back. `db` is
+    // `ctx.db`, a proxy resolving the CURRENT tenant transaction through
+    // AsyncLocalStorage, and the job is started INSIDE the handler, so it
+    // inherits the request's async context: by the time the catch runs, the
+    // transaction it resolves has been committed and the connection returned.
+    // The recovery write went to a closed transaction, its `.catch` discarded
+    // the error, and a job that died left `status: 'pending'`, `errors: []` and
+    // not one line anywhere.
+    //
+    // Measured on a virgin database: an import stayed pending forever with no
+    // trace, which is how a broken import reads as a slow one. `stderr` first,
+    // because a recovery path that can fail silently is not a recovery path;
+    // then the write, through its own tenant transaction rather than a request's
+    // spent one.
+    const jobTenant = tenantOf(c);
+    runImport(ctx, jobTenant, job.id, collection, rows, options, collectionDef).catch(
+      (err: any) => {
+        console.error(`[data/import] job ${job.id} failed:`, err);
+        ctx.internals
+          .withTenantIsolation(jobTenant, async (tdb: any) =>
+            tdb
+              .updateTable('zv_import_logs')
+              .set({
+                status: 'failed',
+                errors: JSON.stringify([{ row: 0, error: String(err?.message ?? err) }]),
+                completed_at: new Date(),
+              })
+              .where('id', '=', job.id)
+              .execute(),
+          )
+          .catch((e: any) => {
+            console.error(`[data/import] could not record failure for ${job.id}:`, e);
+          });
+      },
+    );
 
     return c.json(
       {
