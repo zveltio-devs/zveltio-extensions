@@ -89,7 +89,7 @@ async function runExportJob(
     // the engine builds.
     const allCols = [...allowedFields];
     const requested = fields.length > 0 ? allCols.filter((f) => fields.includes(f)) : allCols;
-    const colAccess = await getColumnAccess(tdb, collection, await resolveUserRole(user));
+    const colAccess = await getColumnAccess(collection, await resolveUserRole(user));
     const selectCols = requested.filter((f: string) => !colAccess.hidden.has(f));
 
     if (selectCols.length === 0) {
