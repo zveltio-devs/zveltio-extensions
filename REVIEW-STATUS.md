@@ -56,7 +56,7 @@ numerice au driftat față de fișiere. Coloana `stare` e singura de încredere.
 | `geospatial/postgis` | 16 | 2 | 0 | 0 | 2 | 0 | 1 | cod | da | **verificat** |
 | `hr/employees` | 32 | 3 | 5 | 0 | 0 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
 | `hr/leave` | 16 | 2 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
-| `hr/payroll` | 15 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | neverificat |
+| `hr/payroll` | 15 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
 | `hr/time-tracking` | 18 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | neverificat |
 | `i18n/translations` | 15 | 2 | 0 | 0 | 4 | 0 | 1 | cod | da | neverificat |
 | `integrations/api-connector` | 17 | 2 | 0 | 0 | 1 | 0 | 1 | SDUI | da | neverificat |
