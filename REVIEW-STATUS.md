@@ -54,7 +54,7 @@ numerice au driftat față de fișiere. Coloana `stare` e singura de încredere.
 | `finance/subscriptions` | 18 | 4 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
 | `forms` | 8 | 2 | 0 | 0 | 1 | 0 | 3 | cod | da | neverificat |
 | `geospatial/postgis` | 16 | 2 | 0 | 0 | 2 | 0 | 1 | cod | da | **verificat** |
-| `hr/employees` | 32 | 3 | 5 | 0 | 0 | 0 | 1 | SDUI | da | neverificat |
+| `hr/employees` | 32 | 3 | 5 | 0 | 0 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
 | `hr/leave` | 16 | 2 | 0 | 0 | 0 | 0 | 1 | SDUI | da | neverificat |
 | `hr/payroll` | 15 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | neverificat |
 | `hr/time-tracking` | 18 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | neverificat |
