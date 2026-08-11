@@ -19,12 +19,18 @@
  * second user, and the fourth was found by running this check over the whole
  * catalogue after the third.
  *
- * The rule: if an extension mounts `permissionGate` and exposes a route whose
- * path names a decision — approve, reject, void, refund, close, sign, submit,
- * cancel, pay — then somewhere in its engine code there must be a
- * `checkPermission` call. This cannot verify that the check is in the RIGHT
- * place; it verifies that the question is asked at all, which is the failure
- * that keeps recurring.
+ * The rule: every route whose path names a decision — approve, reject, void,
+ * refund, close, sign, submit, cancel, pay — must have a `checkPermission` in
+ * its own handler body, not merely somewhere in the file.
+ *
+ * The first version of this checked the file as a whole, and it was not enough.
+ * Guarding seven extensions in one pass with a regex silently skipped
+ * `/subscribers/:id/cancel`, because its `zValidator` schema spans several lines
+ * and the pattern only matched single-line handler heads. The extension then had
+ * a `checkPermission` and passed a file-level check with a route still open.
+ *
+ * So the gate reads each handler: from the route registration to the balanced
+ * closing brace, and asks whether the question is put THERE.
  *
  * BASELINE: extensions listed below are known to be missing it and are not yet
  * fixed. Removing a name is the only direction this list may move. Adding one
@@ -42,15 +48,10 @@ const ROOT = join(import.meta.dir, '..');
  * Not yet guarded. Each still runs a decision route behind nothing but the
  * module permission.
  */
-const BASELINE = new Set([
-  'compliance/ro/documents', // /:id/sign
-  'compliance/ro/efactura', // /:id/submit
-  'compliance/ro/etransport', // /:id/cancel
-  'compliance/ro/procurement', // /orders/:id/approve
-  'compliance/ro/saft', // /:id/submit
-  'finance/quotes', // /:id/approve-internal, /:id/reject
-  'finance/subscriptions', // /invoices/:id/pay, /subscribers/:id/cancel
-  'hr/employees', // /performance/cycles/:id/close
+const BASELINE = new Set<string>([
+  // Empty, and it should stay that way. Every decision route in the catalogue
+  // asks who is asking. A name appearing here again means somebody shipped one
+  // that does not.
 ]);
 
 const DECISION =
@@ -86,6 +87,40 @@ function extensionDirs(): string[] {
   return found;
 }
 
+/**
+ * The source of one route handler: from the arrow that opens it to the brace
+ * that closes it.
+ *
+ * Not simply the next `{` after the registration. Half these routes are written
+ * `app.post('/x', zValidator('json', z.object({ … })), async (c) => { … })`, and
+ * the first brace belongs to the SCHEMA. Reading that as the handler made the
+ * gate report guarded routes as unguarded — it was inspecting a zod object and
+ * finding no permission check in it, which is true and irrelevant.
+ *
+ * Balanced braces from the arrow, rather than a pattern, because handler shapes
+ * vary — nested callbacks, template literals full of SQL — and a pattern that
+ * covers today's shapes is how the last route got missed.
+ */
+function handlerBody(src: string, from: number): string {
+  const arrow = src.indexOf('=> {', from);
+  return arrow === -1 ? '' : balanced(src, arrow + 3);
+}
+
+/** Balanced braces starting at the first `{` at or after `from`. */
+function balanced(src: string, from: number): string {
+  const open = src.indexOf('{', from);
+  if (open === -1) return '';
+  let depth = 0;
+  for (let i = open; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') {
+      depth--;
+      if (depth === 0) return src.slice(open, i + 1);
+    }
+  }
+  return src.slice(open);
+}
+
 const offenders: Array<{ ext: string; routes: string[] }> = [];
 const fixedButBaselined: string[] = [];
 
@@ -100,14 +135,35 @@ for (const dir of extensionDirs()) {
   const body = files.map((f) => readFileSync(f, 'utf8')).join('\n');
   if (!body.includes('permissionGate')) continue;
 
-  const routes = [...body.matchAll(new RegExp(DECISION, 'gi'))].map((m) => m[2]);
-  if (routes.length === 0) continue;
-
   const name = dir.slice(ROOT.length + 1).replace(/\\/g, '/');
-  const asks = /checkPermission\s*\(/.test(body);
+  const unguarded: string[] = [];
 
-  if (!asks && !BASELINE.has(name)) offenders.push({ ext: name, routes: [...new Set(routes)] });
-  if (asks && BASELINE.has(name)) fixedButBaselined.push(name);
+  for (const file of files) {
+    const src = readFileSync(file, 'utf8');
+
+    // A handler rarely calls `checkPermission` itself — the readable shape is a
+    // named helper (`mayApprove`, `mayActOnReport`) that says what the rule IS.
+    // So resolve one level: any function in this file whose own body asks the
+    // question counts as asking it.
+    const guards = new Set<string>(['checkPermission']);
+    for (const g of src.matchAll(/(?:async\s+)?function\s+(\w+)\s*\(/g)) {
+      const body = balanced(src, g.index! + g[0].length - 1);
+      if (/checkPermission\s*\(/.test(body)) guards.add(g[1]);
+    }
+    const asks = new RegExp(`\\b(${[...guards].join('|')})\\s*\\(`);
+
+    const re = new RegExp(DECISION, 'gi');
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(src)) !== null) {
+      if (!asks.test(handlerBody(src, m.index))) unguarded.push(m[2]);
+    }
+  }
+
+  if (unguarded.length === 0) {
+    if (BASELINE.has(name)) fixedButBaselined.push(name);
+    continue;
+  }
+  if (!BASELINE.has(name)) offenders.push({ ext: name, routes: [...new Set(unguarded)] });
 }
 
 if (fixedButBaselined.length > 0) {
