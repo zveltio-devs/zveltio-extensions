@@ -38,7 +38,7 @@ numerice au driftat față de fișiere. Coloana `stare` e singura de încredere.
 | `crm` | 15 | 2 | 5 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
 | `data/export` | 11 | 2 | 0 | 0 | 2 | 0 | 1 | SDUI | da | **reparat 2026-08-11 — G nepresat** |
 | `data/import` | 11 | 3 | 0 | 0 | 3 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
-| `developer/api-docs` | 0 | 2 | 0 | 0 | 1 | 4 | 1 | cod | da | neverificat |
+| `developer/api-docs` | 15 | 4 | 0 | 0 | 1 | 4 | 1 | cod | da | **verificat 2026-08-11** |
 | `developer/byod` | 0 | 2 | 0 | 0 | 5 | 0 | 1 | cod | da | neverificat |
 | `developer/database` | 0 | 4 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat** |
 | `developer/edge-functions` | 7 | 0 | 0 | 0 | 4 | 0 | 1 | cod | da | neverificat |
