@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
+import type { Context } from 'hono';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
 
@@ -196,16 +197,32 @@ async function mayDecidePayroll(
  * always there; the throw names what to do if somebody removes that.
  */
 function employment(ctx: ExtensionContext) {
-  const svc = ctx.services.get<{
+  return ctx.services.get<{
     payrollSubjects(): Promise<any[]>;
     currentTerms(id: string): Promise<any | null>;
   }>('hr.employment');
-  if (!svc) {
-    throw new Error(
-      'hr.employment service not registered — enable hr/employees (a declared dependency of hr/payroll)',
-    );
-  }
-  return svc;
+}
+
+/**
+ * The answer when `hr/employees` is not there.
+ *
+ * The first version threw. `hr/employees` is a declared dependency, so the
+ * service is always present on a real install — but the contract-test harness
+ * loads each extension ON ITS OWN, and a throw made every read route crash
+ * instead of answering. An extension that cannot be looked at in isolation is
+ * one nobody can test in isolation either.
+ *
+ * 503 rather than 500: this is a dependency that is not running, which is a
+ * true statement about the deployment and a fixable one, not an internal error.
+ */
+function noEmploymentService(c: Context) {
+  return c.json(
+    {
+      error: 'hr/employees is not enabled. Payroll reads employment terms from it.',
+      code: 'dependency_unavailable',
+    },
+    503,
+  );
 }
 
 export function payrollRoutes(ctx: ExtensionContext): Hono {
@@ -265,7 +282,9 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
     // Who gets paid, and on what terms — the contract's, when there is one.
     // A suspended contract is excluded by the service, so somebody on parental
     // leave no longer lands on the run at full salary.
-    const subjects = await employment(ctx).payrollSubjects();
+    const svc = employment(ctx);
+    if (!svc) return noEmploymentService(c);
+    const subjects = await svc.payrollSubjects();
 
     // Loaded once for the run: every entry in a period is computed with the same
     // rates, and the row each entry stores records which ones those were.
@@ -419,7 +438,9 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const d = c.req.valid('json');
     // Sick leave: 75% of base salary per day (RO statutory)
-    const terms = await employment(ctx).currentTerms(d.employee_id);
+    const svc = employment(ctx);
+    if (!svc) return noEmploymentService(c);
+    const terms = await svc.currentTerms(d.employee_id);
     const dailyGross = terms?.salary ? +terms.salary / 21.75 : 0;
     const amount = dailyGross * d.days * 0.75;
     const row = await sql`
@@ -457,7 +478,9 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
     description: z.string().optional(),
   })), async (c) => {
     const d = c.req.valid('json');
-    const terms = await employment(ctx).currentTerms(d.employee_id);
+    const svc = employment(ctx);
+    if (!svc) return noEmploymentService(c);
+    const terms = await svc.currentTerms(d.employee_id);
     // The hourly rate follows the CONTRACTED norm, not a fixed 168 hours.
     // Dividing a part-time salary by a full month made overtime cheaper the
     // fewer hours somebody was contracted for — backwards, and invisible while
@@ -515,7 +538,9 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
 
   // ── ReviSal CSV export ─────────────────────────────────────────
   app.get('/revisal', async (c) => {
-    const subjects = await employment(ctx).payrollSubjects();
+    const svc = employment(ctx);
+    if (!svc) return noEmploymentService(c);
+    const subjects = await svc.payrollSubjects();
     const csv = generateRevisalCsv(ctx.internals, subjects as any[]);
     return new Response(csv, { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': `attachment; filename="ReviSal_${new Date().toISOString().slice(0, 10)}.csv"` } });
   });
