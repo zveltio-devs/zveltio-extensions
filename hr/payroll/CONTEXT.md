@@ -48,6 +48,42 @@ Verificat în patru direcții: un utilizator cu drepturi obișnuite de `payroll`
 primește 403 și la aprobare și la plată; administratorul primește 200 la
 amândouă.
 
+## Salarizarea citește contractul, nu tabelul altei extensii (pasul doi)
+
+`hr/payroll` rula `SELECT * FROM zvd_employees` în **patru** locuri și lua
+`salary` de pe rând. Tabelul e al altei extensii — și e și motivul pentru care
+salarizarea nu putea vedea un contract: citea proiecția, nu lucrul proiectat.
+Norma parțială, suspendarea și actul adițional erau toate invizibile aici.
+
+Acum trece prin `hr.employment`, serviciu expus de `hr/employees` pe
+`ctx.services` — același mecanism ca `identity.nationalId`. Modulul care deține
+datele răspunde la întrebări despre ele; nimeni altcineva nu deschide tabelul.
+Serviciul e îngust deliberat: cine se plătește luna asta, și în ce termeni.
+
+Trei schimbări de comportament, toate măsurate:
+
+**Ora suplimentară urmează norma contractată.** Rata orară era `salariu / 168`,
+un număr fix. Deci pentru cineva cu 20 de ore pe săptămână ora suplimentară
+valora jumătate — cu cât erai contractat mai puțin, cu atât ora ta era mai
+ieftină, ceea ce e pe dos. Măsurat: 6000 lei la 40h și 3000 lei la 20h dădeau
+35.71 față de 17.86; acum dau **34.62 amândoi**, ceea ce e corect, fiindcă
+salariul part-time e deja proporțional.
+
+**Contractul suspendat iese de pe stat.** Cineva în concediu de creștere e încă
+angajat, dar nu primește salariu de la angajator. Măsurat: august generează 1
+intrare în loc de 2, iar după revenire septembrie generează iar 2.
+
+**Ce nu se poate calcula e sărit cu motiv, nu tăcut.** Un contract cu plata pe
+oră nu poate produce brutul unei luni fără orele efectiv lucrate, care stau în
+`hr/time-tracking`. Răspunsul întoarce acum `skipped: [{employee, reason}]` — un
+stat care produce tăcut mai puține fluturași decât are firma angajați e genul de
+lucru care se observă abia când cineva nu e plătit.
+
+Câmpurile plate de pe `zvd_employees` rămân deocamdată: serviciul face
+`COALESCE(contract, angajat)`, deci o instalare care n-a creat încă niciun
+contract se plătește ca înainte. Ștergerea coloanelor e pasul trei, după ce toți
+consumatorii trec pe contract.
+
 ## Trei reguli care par greșite — de confirmat cu un contabil
 
 Nu le-am modificat. Legislația fiscală se schimbă anual, cunoștințele mele au o

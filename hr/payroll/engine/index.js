@@ -19583,16 +19583,22 @@ function generateD112Xml(period, entries) {
 }
 function generateRevisalCsv(internals, employees) {
   const header = "CNP,Nume,Prenume,DataAngajare,FunctieId,Salariu,ContractTip,DataSfarsit";
-  const rows = employees.map((e) => [
-    e.national_id ?? "",
-    e.last_name,
-    e.first_name,
-    e.hire_date,
-    e.position_id ?? "",
-    e.salary ?? 0,
-    e.employment_type,
-    e.end_date ?? ""
-  ].map((v) => internals.csvCell(v)).join(","));
+  const rows = employees.map((e) => {
+    const name = String(e.employee_name ?? "").trim();
+    const cut = name.lastIndexOf(" ");
+    const first = cut === -1 ? name : name.slice(0, cut);
+    const last = cut === -1 ? "" : name.slice(cut + 1);
+    return [
+      e.national_id ?? "",
+      last,
+      first,
+      e.hire_date ?? "",
+      e.contract_id ?? "",
+      e.salary ?? 0,
+      e.salary_period ?? "",
+      e.end_date ?? ""
+    ].map((v) => internals.csvCell(v)).join(",");
+  });
   return [header, ...rows].join(`
 `);
 }
@@ -19614,6 +19620,13 @@ async function mayDecidePayroll(ctx, user, action) {
   if (await ctx.checkPermission(user.id, "payroll", action).catch(() => false))
     return true;
   return ctx.checkPermission(user.id, "admin", "*").catch(() => false);
+}
+function employment(ctx) {
+  const svc = ctx.services.get("hr.employment");
+  if (!svc) {
+    throw new Error("hr.employment service not registered \u2014 enable hr/employees (a declared dependency of hr/payroll)");
+  }
+  return svc;
 }
 function payrollRoutes(ctx) {
   const { db, auth } = ctx;
@@ -19659,16 +19672,19 @@ function payrollRoutes(ctx) {
     if (!period.rows.length)
       return c.json({ error: "Period not found or not open" }, 400);
     const p = period.rows[0];
-    const employees = await sql`
-      SELECT * FROM zvd_employees WHERE status = 'active' AND employment_type != 'contractor'
-    `.execute(db);
+    const subjects = await employment(ctx).payrollSubjects();
     const rates = await loadRates(db);
     let generated = 0;
-    for (const emp of employees.rows) {
+    const skipped = [];
+    for (const emp of subjects) {
+      if (emp.salary_period !== "month") {
+        skipped.push({ employee: emp.employee_name, reason: `salary_period=${emp.salary_period}` });
+        continue;
+      }
       const gross = +(emp.salary ?? 0);
       const adjs = await sql`
         SELECT * FROM zvd_payroll_adjustments WHERE entry_id IN (
-          SELECT id FROM zvd_payroll_entries WHERE period_id = ${p.id} AND employee_id = ${emp.id}
+          SELECT id FROM zvd_payroll_entries WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id}
         )
       `.execute(db);
       let taxable_bonuses = 0;
@@ -19681,22 +19697,22 @@ function payrollRoutes(ctx) {
       }
       const sick = await sql`
         SELECT COALESCE(SUM(days), 0) as days, COALESCE(SUM(amount), 0) as amount
-        FROM zvd_payroll_sick_leave WHERE period_id = ${p.id} AND employee_id = ${emp.id}
+        FROM zvd_payroll_sick_leave WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id}
       `.execute(db);
       const sickDays = +sick.rows[0].days;
       const sickAmount = +sick.rows[0].amount;
       const vouchers = await sql`
         SELECT COALESCE(SUM(total_value), 0) as total FROM zvd_payroll_meal_vouchers
-        WHERE period_id = ${p.id} AND employee_id = ${emp.id}
+        WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id}
       `.execute(db);
       const mealVouchersAmount = +vouchers.rows[0].total;
       const overtime = await sql`
         SELECT COALESCE(SUM(amount), 0) as amount FROM zvd_payroll_overtime
-        WHERE period_id = ${p.id} AND employee_id = ${emp.id} AND is_night_shift = false
+        WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id} AND is_night_shift = false
       `.execute(db);
       const nightShift = await sql`
         SELECT COALESCE(SUM(amount), 0) as amount FROM zvd_payroll_overtime
-        WHERE period_id = ${p.id} AND employee_id = ${emp.id} AND is_night_shift = true
+        WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id} AND is_night_shift = true
       `.execute(db);
       const overtimeAmt = +overtime.rows[0].amount;
       const nightShiftAmt = +nightShift.rows[0].amount;
@@ -19718,7 +19734,7 @@ function payrollRoutes(ctx) {
           cas_employer_rate, cam_rate, cas_employer, cam, total_employer_cost,
           sick_leave_days, sick_leave_amount, meal_vouchers_amount, overtime_amount, night_shift_bonus
         ) VALUES (
-          ${p.id}, ${emp.id}, ${emp.first_name + " " + emp.last_name}, ${calc.gross}, ${mealVouchersAmount}, 0,
+          ${p.id}, ${emp.employee_id}, ${emp.employee_name}, ${calc.gross}, ${mealVouchersAmount}, 0,
           -- The rates this payslip was ACTUALLY computed with, not the built-in
           -- constants. They were the same thing while the constants were the
           -- only source; now that an accountant can correct them, writing the
@@ -19747,7 +19763,7 @@ function payrollRoutes(ctx) {
       generated++;
     }
     await sql`UPDATE zvd_payroll_periods SET status = 'calculated', updated_at = NOW() WHERE id = ${p.id}`.execute(db);
-    return c.json({ data: { generated } });
+    return c.json({ data: { generated, skipped } });
   });
   app.post("/periods/:id/approve", async (c) => {
     const user = c.get("user");
@@ -19795,8 +19811,8 @@ function payrollRoutes(ctx) {
     notes: exports_external.string().optional()
   })), async (c) => {
     const d = c.req.valid("json");
-    const emp = await sql`SELECT salary FROM zvd_employees WHERE id = ${d.employee_id}`.execute(db);
-    const dailyGross = emp.rows.length ? +emp.rows[0].salary / 21.75 : 0;
+    const terms = await employment(ctx).currentTerms(d.employee_id);
+    const dailyGross = terms?.salary ? +terms.salary / 21.75 : 0;
     const amount = dailyGross * d.days * 0.75;
     const row = await sql`
       INSERT INTO zvd_payroll_sick_leave (period_id, employee_id, days, amount, leave_request_id, notes)
@@ -19829,8 +19845,9 @@ function payrollRoutes(ctx) {
     description: exports_external.string().optional()
   })), async (c) => {
     const d = c.req.valid("json");
-    const emp = await sql`SELECT salary FROM zvd_employees WHERE id = ${d.employee_id}`.execute(db);
-    const hourlyRate = emp.rows.length ? +emp.rows[0].salary / 168 : 0;
+    const terms = await employment(ctx).currentTerms(d.employee_id);
+    const monthlyHours = (terms?.weekly_hours ?? 40) * 52 / 12;
+    const hourlyRate = terms?.salary ? +terms.salary / monthlyHours : 0;
     const amount = hourlyRate * d.hours * d.rate_multiplier;
     const row = await sql`
       INSERT INTO zvd_payroll_overtime (period_id, employee_id, hours, rate_multiplier, amount, is_night_shift, description)
@@ -19876,8 +19893,8 @@ function payrollRoutes(ctx) {
     return new Response(xml, { headers: { "Content-Type": "application/xml", "Content-Disposition": `attachment; filename="D112_${period.rows[0].year}_${String(period.rows[0].month).padStart(2, "0")}.xml"` } });
   });
   app.get("/revisal", async (c) => {
-    const employees = await sql`SELECT * FROM zvd_employees WHERE status = 'active'`.execute(db);
-    const csv = generateRevisalCsv(ctx.internals, employees.rows);
+    const subjects = await employment(ctx).payrollSubjects();
+    const csv = generateRevisalCsv(ctx.internals, subjects);
     return new Response(csv, { headers: { "Content-Type": "text/csv", "Content-Disposition": `attachment; filename="ReviSal_${new Date().toISOString().slice(0, 10)}.csv"` } });
   });
   app.post("/simulate", zValidator("json", exports_external.object({

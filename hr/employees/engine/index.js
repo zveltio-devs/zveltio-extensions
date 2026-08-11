@@ -20298,6 +20298,59 @@ function contractRoutes(ctx) {
   return app;
 }
 
+// hr/employees/engine/employment-service.ts
+function buildEmploymentService(ctx) {
+  const { db } = ctx;
+  return {
+    async payrollSubjects() {
+      const rows = await sql`
+        SELECT
+          e.id AS employee_id,
+          e.first_name || ' ' || e.last_name AS employee_name,
+          c.id AS contract_id,
+          COALESCE(c.salary, e.salary) AS salary,
+          COALESCE(c.currency, e.currency, 'RON') AS currency,
+          COALESCE(c.salary_period, 'month') AS salary_period,
+          COALESCE(c.weekly_hours, 40) AS weekly_hours,
+          e.national_id, e.iban,
+          COALESCE(c.start_date, e.hire_date) AS hire_date,
+          COALESCE(c.end_date, e.end_date) AS end_date
+        FROM zvd_employees e
+        LEFT JOIN zvd_employment_contracts c
+          ON c.employee_id = e.id AND c.status = 'active'
+        WHERE e.status = 'active'
+          AND e.employment_type <> 'contractor'
+          AND NOT EXISTS (
+            SELECT 1 FROM zvd_employment_contracts s
+             WHERE s.employee_id = e.id AND s.status = 'suspended'
+          )
+        ORDER BY e.last_name, e.first_name
+      `.execute(db);
+      return rows.rows;
+    },
+    async currentTerms(employeeId) {
+      const rows = await sql`
+        SELECT
+          e.id AS employee_id,
+          e.first_name || ' ' || e.last_name AS employee_name,
+          c.id AS contract_id,
+          COALESCE(c.salary, e.salary) AS salary,
+          COALESCE(c.currency, e.currency, 'RON') AS currency,
+          COALESCE(c.salary_period, 'month') AS salary_period,
+          COALESCE(c.weekly_hours, 40) AS weekly_hours,
+          e.national_id, e.iban,
+          COALESCE(c.start_date, e.hire_date) AS hire_date,
+          COALESCE(c.end_date, e.end_date) AS end_date
+        FROM zvd_employees e
+        LEFT JOIN zvd_employment_contracts c
+          ON c.employee_id = e.id AND c.status = 'active'
+        WHERE e.id = ${employeeId}
+      `.execute(db);
+      return rows.rows[0] ?? null;
+    }
+  };
+}
+
 // hr/employees/engine/index.ts
 var extension = {
   name: "hr/employees",
@@ -20313,6 +20366,7 @@ var extension = {
     ];
   },
   async register(app, ctx) {
+    ctx.services.register("hr.employment", buildEmploymentService(ctx));
     app.route("/", contractRoutes(ctx));
     app.route("/", employeesRoutes(ctx));
     ctx.services.register("employees.lookup", async (id) => {
