@@ -8,6 +8,24 @@ import { permissionGate } from '@zveltio/sdk/extension';
 const POINTS_PER_CURRENCY_UNIT = 1; // 1 RON = 1 point
 const POINT_VALUE = 0.01; // 1 point = 0.01 RON
 
+/**
+ * May this user refund a completed order?
+ *
+ * The oldest till fraud there is: ring up a sale, refund it, keep the cash. The
+ * route ran behind one `pos` permission — the same permission a cashier needs to
+ * sell anything — and asked nothing else. A refund is money leaving the drawer,
+ * and it is the one till operation that should need a second person.
+ *
+ * `pos:refund`, granted deliberately, with `admin` still sufficient so an
+ * existing install keeps working before anyone edits policies. A shop that wants
+ * every cashier to refund can grant it to the cashier role in one step — the
+ * point is that it becomes a decision somebody made.
+ */
+async function mayRefund(ctx: ExtensionContext, user: any): Promise<boolean> {
+  if (await ctx.checkPermission(user.id, 'pos', 'refund').catch(() => false)) return true;
+  return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
+}
+
 export function posRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
@@ -296,6 +314,10 @@ export function posRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/orders/:id/refund', async (c) => {
+    const user = c.get('user') as any;
+    if (!(await mayRefund(ctx, user))) {
+      return c.json({ error: 'You may not refund orders' }, 403);
+    }
     const order = await sql`SELECT * FROM zvd_pos_orders WHERE id = ${c.req.param('id')} AND status = 'completed'`.execute(db);
     if (!order.rows.length) return c.json({ error: 'Order not found or not completed' }, 400);
     const o = order.rows[0] as any;

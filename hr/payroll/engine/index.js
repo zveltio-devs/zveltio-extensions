@@ -19610,6 +19610,11 @@ async function loadRates(dbh) {
     personal_deduction_base: Number(r.personal_deduction_base)
   };
 }
+async function mayDecidePayroll(ctx, user, action) {
+  if (await ctx.checkPermission(user.id, "payroll", action).catch(() => false))
+    return true;
+  return ctx.checkPermission(user.id, "admin", "*").catch(() => false);
+}
 function payrollRoutes(ctx) {
   const { db, auth } = ctx;
   const app = new Hono2;
@@ -19746,6 +19751,9 @@ function payrollRoutes(ctx) {
   });
   app.post("/periods/:id/approve", async (c) => {
     const user = c.get("user");
+    if (!await mayDecidePayroll(ctx, user, "approve")) {
+      return c.json({ error: "You may not approve a payroll period" }, 403);
+    }
     await sql`UPDATE zvd_payroll_entries SET status = 'approved', updated_at = NOW() WHERE period_id = ${c.req.param("id")} AND status = 'draft'`.execute(db);
     const row = await sql`
       UPDATE zvd_payroll_periods SET status = 'calculated', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
@@ -19756,6 +19764,10 @@ function payrollRoutes(ctx) {
     return c.json({ data: row.rows[0] });
   });
   app.post("/periods/:id/pay", async (c) => {
+    const user = c.get("user");
+    if (!await mayDecidePayroll(ctx, user, "pay")) {
+      return c.json({ error: "You may not mark a payroll period paid" }, 403);
+    }
     await sql`UPDATE zvd_payroll_entries SET paid_at = NOW(), updated_at = NOW() WHERE period_id = ${c.req.param("id")} AND status = 'approved'`.execute(db);
     const row = await sql`
       UPDATE zvd_payroll_periods SET status = 'closed', paid_at = NOW(), updated_at = NOW()
