@@ -32,12 +32,12 @@ numerice au driftat față de fișiere. Coloana `stare` e singura de încredere.
 | `content/document-templates` | 14 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
 | `content/documents` | 12 | 3 | 0 | 0 | 5 | 0 | 1 | cod | da | neverificat |
 | `content/drafts` | 18 | 2 | 0 | 0 | 2 | 0 | 1 | SDUI | da | neverificat |
-| `content/media` | 0 | 2 | 0 | 0 | 1 | 0 | 1 | cod | da | neverificat |
+| `content/media` | 27 | 2 | 0 | 0 | 1 | 0 | 1 | cod | da | **reparat 2026-08-11 — G nepresat** |
 | `content/page-builder` | 25 | 4 | 0 | 0 | 3 | 2 | 1 | cod | da | neverificat |
 | `content/pdf-viewer` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | nu | neverificat |
 | `crm` | 15 | 2 | 5 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
-| `data/export` | 11 | 2 | 0 | 0 | 2 | 0 | 1 | SDUI | da | neverificat |
-| `data/import` | 11 | 2 | 0 | 0 | 3 | 0 | 1 | SDUI | da | neverificat |
+| `data/export` | 11 | 2 | 0 | 0 | 2 | 0 | 1 | SDUI | da | **reparat 2026-08-11 — G nepresat** |
+| `data/import` | 11 | 3 | 0 | 0 | 3 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
 | `developer/api-docs` | 0 | 2 | 0 | 0 | 1 | 4 | 1 | cod | da | neverificat |
 | `developer/byod` | 0 | 2 | 0 | 0 | 5 | 0 | 1 | cod | da | neverificat |
 | `developer/database` | 0 | 4 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat** |
