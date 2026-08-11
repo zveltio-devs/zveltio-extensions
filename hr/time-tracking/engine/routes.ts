@@ -411,6 +411,14 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/timesheets/:id/submit', async (c) => {
+    const _u = c.get('user') as any;
+    // Self-service, like the expense submit: what this stops is handing in
+    // somebody else's unfinished week for them.
+    const _sheet = await sql`SELECT employee_id FROM zvd_timesheets WHERE id = ${c.req.param('id')}`.execute(db);
+    if (!_sheet.rows.length) return c.json({ error: 'Timesheet not found' }, 404);
+    if (!(await mayActFor(db, ctx, _u, (_sheet.rows[0] as any).employee_id))) {
+      return c.json({ error: 'You may only submit your own timesheet' }, 403);
+    }
     const row = await sql`
       UPDATE zvd_timesheets SET status = 'submitted', submitted_at = NOW()
       WHERE id = ${c.req.param('id')} AND status = 'draft' RETURNING *

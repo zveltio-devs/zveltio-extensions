@@ -19703,6 +19703,14 @@ function expensesRoutes(ctx) {
     return c.json({ data: row.rows[0] }, 201);
   });
   app.post("/reports/:id/submit", async (c) => {
+    const _u = c.get("user");
+    const _own = await sql`SELECT employee_id FROM zvd_expense_reports WHERE id = ${c.req.param("id")}`.execute(db);
+    if (!_own.rows.length)
+      return c.json({ error: "Report not found" }, 404);
+    const _owner = _own.rows[0].employee_id;
+    if (_owner !== _u.id && !await ctx.checkPermission(_u.id, "admin", "*").catch(() => false)) {
+      return c.json({ error: "You may only submit your own report" }, 403);
+    }
     const row = await sql`
       UPDATE zvd_expense_reports SET status = 'submitted', submitted_at = NOW(), updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND status = 'draft' RETURNING *

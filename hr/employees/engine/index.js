@@ -19981,6 +19981,10 @@ function employeesRoutes(ctx) {
     return c.json({ data: row.rows[0] }, 201);
   });
   app.post("/performance/cycles/:id/close", async (c) => {
+    const user = c.get("user");
+    if (!await ctx.checkPermission(user.id, "employees", "close").catch(() => false) && !await ctx.checkPermission(user.id, "admin", "*").catch(() => false)) {
+      return c.json({ error: "You may not close a performance cycle" }, 403);
+    }
     const row = await sql`UPDATE zvd_performance_cycles SET status = 'closed' WHERE id = ${c.req.param("id")} RETURNING *`.execute(db);
     if (!row.rows.length)
       return c.json({ error: "Not found" }, 404);

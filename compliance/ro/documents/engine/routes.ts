@@ -29,6 +29,23 @@ const DEFAULT_PREFIX: Record<(typeof DOC_TYPES)[number], string> = {
   other: 'DOC',
 };
 
+/**
+ * May this user take the decision this module exists to record?
+ *
+ * Semnarea unui document. Semnătura e chiar actul; cine o poate aplica în numele firmei nu poate fi „oricine are acces la modul”.
+ *
+ * It sat behind one `ro-documents` permission — the same one needed to look at the
+ * list — and asked nothing else. Found by `scripts/check-decision-routes.ts`,
+ * which was written after the same shape turned up in four extensions in a row.
+ *
+ * `ro-documents:sign`, granted deliberately, with `admin` still sufficient so an
+ * existing install keeps working before anyone edits policies.
+ */
+async function mayDecide(ctx: ExtensionContext, user: any): Promise<boolean> {
+  if (await ctx.checkPermission(user.id, 'ro-documents', 'sign').catch(() => false)) return true;
+  return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
+}
+
 export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
@@ -268,6 +285,8 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
 
   // PATCH /:id/sign — mark as signed
   app.patch('/:id/sign', async (c) => {
+    const _u = c.get('user') as any;
+    if (!(await mayDecide(ctx, _u))) return c.json({ error: 'Not allowed' }, 403);
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
@@ -364,6 +383,9 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const user = await getUser(c, auth);
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
+      // The bulk door needs the same key as the single one. Guarding `/:id/sign`
+      // and leaving this open would only mean signing fifty at a time instead.
+      if (!(await mayDecide(ctx, user))) return c.json({ error: 'Not allowed' }, 403);
 
       const result = await sql<any>`
         UPDATE zv_ro_documents

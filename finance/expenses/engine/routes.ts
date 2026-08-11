@@ -251,6 +251,17 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
 
   // ── Workflow ──────────────────────────────────────────────────
   app.post('/reports/:id/submit', async (c) => {
+    const _u = c.get('user') as any;
+    // Submitting is self-service — it is your own report you are handing in —
+    // so this is not the approve gate. What it stops is submitting SOMEBODY
+    // ELSE's draft, which pushes their unfinished expenses into review under
+    // their name.
+    const _own = await sql`SELECT employee_id FROM zvd_expense_reports WHERE id = ${c.req.param('id')}`.execute(db);
+    if (!_own.rows.length) return c.json({ error: 'Report not found' }, 404);
+    const _owner = (_own.rows[0] as any).employee_id;
+    if (_owner !== _u.id && !(await ctx.checkPermission(_u.id, 'admin', '*').catch(() => false))) {
+      return c.json({ error: 'You may only submit your own report' }, 403);
+    }
     const row = await sql`
       UPDATE zvd_expense_reports SET status = 'submitted', submitted_at = NOW(), updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND status = 'draft' RETURNING *

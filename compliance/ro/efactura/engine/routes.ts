@@ -117,6 +117,23 @@ function toInvoiceData(row: any, lines: any[]): Parameters<typeof generateUBLXML
   };
 }
 
+/**
+ * May this user take the decision this module exists to record?
+ *
+ * Trimiterea facturii la ANAF. Ireversibilă și cu greutate legală: odată depusă, factura există în sistemul fiscal și se corectează prin storno, nu prin ștergere.
+ *
+ * It sat behind one `efactura` permission — the same one needed to look at the
+ * list — and asked nothing else. Found by `scripts/check-decision-routes.ts`,
+ * which was written after the same shape turned up in four extensions in a row.
+ *
+ * `efactura:submit`, granted deliberately, with `admin` still sufficient so an
+ * existing install keeps working before anyone edits policies.
+ */
+async function mayDecide(ctx: ExtensionContext, user: any): Promise<boolean> {
+  if (await ctx.checkPermission(user.id, 'efactura', 'submit').catch(() => false)) return true;
+  return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
+}
+
 export function efacturaRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
   const app = new Hono();
@@ -685,6 +702,8 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
 
 
   app.post('/:id/submit', async (c) => {
+    const _u = c.get('user') as any;
+    if (!(await mayDecide(ctx, _u))) return c.json({ error: 'Not allowed' }, 403);
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
@@ -893,6 +912,9 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const user = await getUser(c, auth);
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
+      // Same key as `/:id/submit`. Twenty invoices to ANAF in one call is not a
+      // smaller decision than one.
+      if (!(await mayDecide(ctx, user))) return c.json({ error: 'Not allowed' }, 403);
 
       const { ids } = c.req.valid('json');
       const results: { id: string; success: boolean; error?: string }[] = [];

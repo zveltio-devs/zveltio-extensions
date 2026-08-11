@@ -144,6 +144,12 @@ export function posRoutes(ctx: ExtensionContext): Hono {
     closing_float: z.number().min(0),
     notes: z.string().optional(),
   })), async (c) => {
+    const user = c.get('user') as any;
+    // Closing a till session is the cash reconciliation — it fixes what the
+    // drawer is said to have held. Same grant as a refund.
+    if (!(await mayRefund(ctx, user))) {
+      return c.json({ error: 'You may not close a till session' }, 403);
+    }
     const d = c.req.valid('json');
     const totals = await sql`
       SELECT

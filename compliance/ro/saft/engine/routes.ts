@@ -52,6 +52,23 @@ function isoDay(value: unknown): string {
   return String(value ?? '').slice(0, 10);
 }
 
+/**
+ * May this user take the decision this module exists to record?
+ *
+ * Depunerea declarației D406. La fel: o depunere e o afirmație către autoritate, nu o operațiune internă.
+ *
+ * It sat behind one `saft` permission — the same one needed to look at the
+ * list — and asked nothing else. Found by `scripts/check-decision-routes.ts`,
+ * which was written after the same shape turned up in four extensions in a row.
+ *
+ * `saft:submit`, granted deliberately, with `admin` still sufficient so an
+ * existing install keeps working before anyone edits policies.
+ */
+async function mayDecide(ctx: ExtensionContext, user: any): Promise<boolean> {
+  if (await ctx.checkPermission(user.id, 'saft', 'submit').catch(() => false)) return true;
+  return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
+}
+
 export function saftRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
@@ -226,6 +243,8 @@ export function saftRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/:id/submit', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
+    const _u = c.get('user') as any;
+    if (!(await mayDecide(ctx, _u))) return c.json({ error: 'Not allowed' }, 403);
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 

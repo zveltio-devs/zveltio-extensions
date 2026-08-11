@@ -52,6 +52,23 @@ function emptyOnFailure(label: string) {
   };
 }
 
+/**
+ * May this user take the decision this module exists to record?
+ *
+ * Aprobarea unei comenzi de achiziție. În achiziții publice aprobarea e pasul care angajează bani publici.
+ *
+ * It sat behind one `procurement` permission — the same one needed to look at the
+ * list — and asked nothing else. Found by `scripts/check-decision-routes.ts`,
+ * which was written after the same shape turned up in four extensions in a row.
+ *
+ * `procurement:approve`, granted deliberately, with `admin` still sufficient so an
+ * existing install keeps working before anyone edits policies.
+ */
+async function mayDecide(ctx: ExtensionContext, user: any): Promise<boolean> {
+  if (await ctx.checkPermission(user.id, 'procurement', 'approve').catch(() => false)) return true;
+  return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
+}
+
 export function roProcurementRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
@@ -238,6 +255,8 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
   );
 
   app.post('/orders/:id/approve', async (c) => {
+    const _u = c.get('user') as any;
+    if (!(await mayDecide(ctx, _u))) return c.json({ error: 'Not allowed' }, 403);
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
@@ -275,6 +294,8 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const user = await getUser(c, auth);
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
+      // Cancelling a purchase order is the other half of approving one.
+      if (!(await mayDecide(ctx, user))) return c.json({ error: 'Not allowed' }, 403);
 
       const { reason } = c.req.valid('json');
       const order = await db
