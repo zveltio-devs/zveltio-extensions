@@ -353,7 +353,11 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
             ${body.model || 'embedding'},
             NOW()
           )
-          ON CONFLICT (collection, record_id, field) DO UPDATE SET
+          -- tenant_id leads the target, matching the unique key as migration 006
+          -- widened it. It needs no place in the column list: the DEFAULT supplies
+          -- the value, and inference matches the index, not what was written
+          -- explicitly.
+          ON CONFLICT (tenant_id, collection, record_id, field) DO UPDATE SET
             text_content = EXCLUDED.text_content,
             embedding    = EXCLUDED.embedding,
             model        = EXCLUDED.model,
