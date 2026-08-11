@@ -143,6 +143,31 @@ async function loadRates(dbh: any): Promise<typeof RO_RATES> {
   };
 }
 
+/**
+ * May this user approve or pay an entire payroll run?
+ *
+ * `POST /periods/:id/approve` and `POST /periods/:id/pay` sat behind one
+ * `payroll` permission — the same one needed to look at a payslip — and asked
+ * nothing else. Approving a period fixes what every employee is owed; paying it
+ * marks the money as gone out. Neither should be available to everyone who can
+ * read the module, and the person who generates a run should not be the one who
+ * signs it off.
+ *
+ * Missed on the first pass over this extension: the routes were pressed as an
+ * administrator and answered 200, which says nothing about who else could have
+ * pressed them. Found afterwards by a detector over the whole catalogue —
+ * extensions with a `permissionGate` and zero `checkPermission` that still have
+ * routes deciding something.
+ */
+async function mayDecidePayroll(
+  ctx: ExtensionContext,
+  user: any,
+  action: 'approve' | 'pay',
+): Promise<boolean> {
+  if (await ctx.checkPermission(user.id, 'payroll', action).catch(() => false)) return true;
+  return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
+}
+
 export function payrollRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
   const app = new Hono();
@@ -293,6 +318,9 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
 
   app.post('/periods/:id/approve', async (c) => {
     const user = c.get('user') as any;
+    if (!(await mayDecidePayroll(ctx, user, 'approve'))) {
+      return c.json({ error: 'You may not approve a payroll period' }, 403);
+    }
     await sql`UPDATE zvd_payroll_entries SET status = 'approved', updated_at = NOW() WHERE period_id = ${c.req.param('id')} AND status = 'draft'`.execute(db);
     const row = await sql`
       UPDATE zvd_payroll_periods SET status = 'calculated', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
@@ -303,6 +331,10 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/periods/:id/pay', async (c) => {
+    const user = c.get('user') as any;
+    if (!(await mayDecidePayroll(ctx, user, 'pay'))) {
+      return c.json({ error: 'You may not mark a payroll period paid' }, 403);
+    }
     await sql`UPDATE zvd_payroll_entries SET paid_at = NOW(), updated_at = NOW() WHERE period_id = ${c.req.param('id')} AND status = 'approved'`.execute(db);
     const row = await sql`
       UPDATE zvd_payroll_periods SET status = 'closed', paid_at = NOW(), updated_at = NOW()

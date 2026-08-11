@@ -31,6 +31,23 @@ face tabela sigură **fără datare pe intervale**: o perioadă închisă își 
 cifrele. Verificat: perioada generată înainte de corecție rămâne la 0.0400 /
 5312.50 după ce cota s-a schimbat.
 
+## Aprobarea și plata statului nu verificau nimic (găsit ulterior)
+
+`POST /periods/:id/approve` și `POST /periods/:id/pay` stăteau după singura
+permisiune `payroll` — aceeași care trebuie ca să te uiți la un fluturaș — și nu
+întrebau nimic altceva. Aprobarea fixează ce datorează firma fiecărui angajat;
+plata marchează banii ca ieșiți.
+
+**Ratat la prima trecere peste extensie.** Am apăsat rutele ca administrator și
+au răspuns 200, ceea ce nu spune nimic despre cine ALTCINEVA le putea apăsa. Le-a
+găsit un detector rulat peste tot catalogul după a treia extensie cu aceeași
+formă: `permissionGate` prezent, `checkPermission` absent, rute care decid ceva.
+Detectorul e acum `scripts/check-decision-routes.ts`.
+
+Verificat în patru direcții: un utilizator cu drepturi obișnuite de `payroll`
+primește 403 și la aprobare și la plată; administratorul primește 200 la
+amândouă.
+
 ## Trei reguli care par greșite — de confirmat cu un contabil
 
 Nu le-am modificat. Legislația fiscală se schimbă anual, cunoștințele mele au o
