@@ -27145,9 +27145,10 @@ async function ldapAuthenticate(config2, username, password) {
   if (!username || !password)
     throw new Error("Username and password are required");
   const filter = config2.searchFilter.replace(/\{\{username\}\}/g, escapeLdap(username));
+  const isLdaps = config2.url.toLowerCase().trim().startsWith("ldaps://");
   const client = new Client({
     url: config2.url,
-    tlsOptions: config2.tlsVerify ? {} : { rejectUnauthorized: false },
+    ...isLdaps && !config2.tlsVerify ? { tlsOptions: { rejectUnauthorized: false } } : {},
     timeout: 1e4,
     connectTimeout: 1e4
   });
@@ -27192,6 +27193,16 @@ var LdapConfigSchema = exports_external.object({
   nameAttribute: exports_external.string().default("cn"),
   tlsVerify: exports_external.boolean().default(true)
 });
+var LdapConfigSaveSchema = LdapConfigSchema.extend({
+  bindPassword: exports_external.string().optional()
+});
+
+class LdapConfigUnreadable extends Error {
+  constructor(cause) {
+    super(`Stored LDAP configuration could not be read: ${cause?.message ?? cause}`);
+    this.name = "LdapConfigUnreadable";
+  }
+}
 var LoginSchema = exports_external.object({
   username: exports_external.string().min(1),
   password: exports_external.string().min(1)
@@ -27201,28 +27212,28 @@ var TestSchema = exports_external.object({
   password: exports_external.string().min(1)
 });
 async function getLdapConfig(db, decryptSecret) {
+  const row = await db.selectFrom("zvd_ldap_config").select("config").executeTakeFirst();
+  if (!row)
+    return null;
   try {
-    const row = await db.selectFrom("zv_settings").select("value").where("key", "=", "ldap_config").executeTakeFirst();
-    if (!row)
-      return null;
-    const raw2 = typeof row.value === "string" ? JSON.parse(row.value) : row.value;
+    const raw2 = typeof row.config === "string" ? JSON.parse(row.config) : row.config;
     const parsed = LdapConfigSchema.parse(raw2);
     if (parsed.bindPassword) {
       parsed.bindPassword = await decryptSecret(parsed.bindPassword);
     }
     return parsed;
-  } catch {
-    return null;
+  } catch (err) {
+    throw new LdapConfigUnreadable(err);
   }
 }
 async function upsertLdapConfig(db, config2, encryptSecret) {
   const toStore = { ...config2, bindPassword: await encryptSecret(config2.bindPassword) };
-  const value = JSON.stringify(toStore);
-  const existing = await db.selectFrom("zv_settings").select("key").where("key", "=", "ldap_config").executeTakeFirst();
+  const value = sql`${JSON.stringify(toStore)}::text::jsonb`;
+  const existing = await db.selectFrom("zvd_ldap_config").select("tenant_id").executeTakeFirst();
   if (existing) {
-    await db.updateTable("zv_settings").set({ value, updated_at: new Date }).where("key", "=", "ldap_config").execute();
+    await db.updateTable("zvd_ldap_config").set({ config: value, updated_at: new Date }).execute();
   } else {
-    await db.insertInto("zv_settings").values({ key: "ldap_config", value, created_at: new Date, updated_at: new Date }).execute();
+    await db.insertInto("zvd_ldap_config").values({ config: value }).execute();
   }
 }
 async function findOrCreateSsoUser(dbh, email3, displayName) {
@@ -27264,8 +27275,19 @@ function ldapRoutes(ctx) {
     return isAdmin ? session.user : null;
   }
   const router = new Hono2;
+  async function loadConfig(c) {
+    try {
+      return { config: await getLdapConfig(db, internals.decryptSecret), error: null };
+    } catch (err) {
+      console.error("[ldap] config unreadable:", err.message);
+      return { config: null, error: c.json({ error: err.message }, 500) };
+    }
+  }
   router.post("/login", zValidator("json", LoginSchema), async (c) => {
-    const config2 = await getLdapConfig(db, internals.decryptSecret);
+    const loaded = await loadConfig(c);
+    if (loaded.error)
+      return loaded.error;
+    const config2 = loaded.config;
     if (!config2?.enabled)
       return c.json({ error: "LDAP authentication is not configured or disabled" }, 503);
     try {
@@ -27328,14 +27350,16 @@ function ldapRoutes(ctx) {
     const admin = await requireAdmin(c);
     if (!admin)
       return c.json({ error: "Unauthorized" }, 401);
-    const config2 = await getLdapConfig(db, internals.decryptSecret);
-    if (config2) {
-      const { bindPassword: _bp, ...safe } = config2;
+    const loaded = await loadConfig(c);
+    if (loaded.error)
+      return loaded.error;
+    if (loaded.config) {
+      const { bindPassword: _bp, ...safe } = loaded.config;
       return c.json({ config: safe });
     }
     return c.json({ config: null });
   });
-  router.post("/config", zValidator("json", LdapConfigSchema), async (c) => {
+  router.post("/config", zValidator("json", LdapConfigSaveSchema), async (c) => {
     const admin = await requireAdmin(c);
     if (!admin)
       return c.json({ error: "Unauthorized" }, 401);
@@ -27345,8 +27369,18 @@ function ldapRoutes(ctx) {
     } catch (err) {
       return c.json({ error: err.message }, 400);
     }
+    let bindPassword = data.bindPassword;
+    if (!bindPassword) {
+      const loaded = await loadConfig(c);
+      if (loaded.error)
+        return loaded.error;
+      bindPassword = loaded.config?.bindPassword;
+      if (!bindPassword) {
+        return c.json({ error: "bindPassword is required \u2014 there is no stored password to keep." }, 400);
+      }
+    }
     try {
-      await upsertLdapConfig(db, data, internals.encryptSecret);
+      await upsertLdapConfig(db, { ...data, bindPassword }, internals.encryptSecret);
     } catch (err) {
       return c.json({ error: `Cannot store bindPassword: ${err.message}` }, 500);
     }
@@ -27356,7 +27390,10 @@ function ldapRoutes(ctx) {
     const admin = await requireAdmin(c);
     if (!admin)
       return c.json({ error: "Unauthorized" }, 401);
-    const config2 = await getLdapConfig(db, internals.decryptSecret);
+    const loaded = await loadConfig(c);
+    if (loaded.error)
+      return loaded.error;
+    const config2 = loaded.config;
     if (!config2)
       return c.json({ error: "LDAP not configured" }, 503);
     try {
@@ -27384,7 +27421,8 @@ var extension = {
     return [
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
-      join(import.meta.dir, "migrations/003_tenant_scoped_unique_keys.sql")
+      join(import.meta.dir, "migrations/003_tenant_scoped_unique_keys.sql"),
+      join(import.meta.dir, "migrations/004_config_own_table.sql")
     ];
   },
   async register(app, ctx) {

@@ -3,12 +3,22 @@
 Generat automat. `verificat` = cineva a parcurs secțiunea G din REVIEW-CHECKLIST.md
 — adică a apăsat butoanele, nu a citit codul.
 
+`presat — RUPT` = cineva a parcurs G și extensia **nu funcționează**. Detaliile
+sunt în `CONTEXT.md`-ul extensiei; nu o marca „verificat" până nu trec rutele.
+
+`reparat — G nepresat` = codul a fost citit integral, ce s-a găsit a fost reparat
+și verificat contra unei baze reale, dar secțiunea G n-a fost parcursă — de obicei
+fiindcă lipsește o dependință externă. Nu e „verificat" și nu se promovează fără G.
+
+„Generat automat" e o intenție, nu un fapt: nu există generator, iar coloanele
+numerice au driftat față de fișiere. Coloana `stare` e singura de încredere.
+
 | extensie | rute | migr | serv | ascult | catch | ext | pagini | UI | teste | stare |
 |---|--:|--:|--:|--:|--:|--:|--:|---|---|---|
-| `ai` | 0 | 4 | 5 | 2 | 0 | 0 | 1 | cod | da | neverificat |
+| `ai` | 0 | 6 | 5 | 2 | 0 | 0 | 1 | cod | da | **reparat 2026-08-11 — G nepresat** |
 | `analytics/dashboard` | 6 | 2 | 0 | 0 | 5 | 0 | 1 | cod | da | **verificat** |
 | `analytics/quality` | 21 | 3 | 0 | 1 | 3 | 0 | 1 | cod | da | **verificat** |
-| `auth/ldap` | 0 | 2 | 0 | 0 | 0 | 0 | 1 | SDUI | da | neverificat |
+| `auth/ldap` | 4 | 4 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **reparat 2026-08-11 — G nepresat** |
 | `auth/saml` | 0 | 2 | 0 | 0 | 0 | 4 | 1 | SDUI | da | neverificat |
 | `auth/scim` | 10 | 2 | 0 | 0 | 9 | 0 | 1 | SDUI | da | **verificat** |
 | `billing` | 6 | 2 | 0 | 0 | 0 | 0 | 2 | cod | da | neverificat |
