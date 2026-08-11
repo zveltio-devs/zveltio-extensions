@@ -948,6 +948,11 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/invoices/:id/pay', async (c) => {
+    const _u = c.get('user') as any;
+    // The shorthand beside `/payments`, and it settles an invoice just the same.
+    if (!(await mayDecideInvoice(ctx, _u, 'settle'))) {
+      return c.json({ error: 'You may not settle invoices' }, 403);
+    }
     const row = await sql`
       UPDATE zvd_invoices SET status = 'paid', paid_at = NOW(), amount_paid = total, updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND status IN ('sent','overdue','partially_paid') RETURNING *

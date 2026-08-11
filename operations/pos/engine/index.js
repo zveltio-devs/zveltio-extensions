@@ -19616,6 +19616,10 @@ function posRoutes(ctx) {
     closing_float: exports_external.number().min(0),
     notes: exports_external.string().optional()
   })), async (c) => {
+    const user = c.get("user");
+    if (!await mayRefund(ctx, user)) {
+      return c.json({ error: "You may not close a till session" }, 403);
+    }
     const d = c.req.valid("json");
     const totals = await sql`
       SELECT

@@ -33,6 +33,23 @@ const declarationSchema = z.object({
   purpose: z.enum(['commercial', 'personal', 'return']).default('commercial'),
 });
 
+/**
+ * May this user take the decision this module exists to record?
+ *
+ * Anularea unui transport declarat. Un transport în derulare cu declarația anulată e o amendă la primul control.
+ *
+ * It sat behind one `etransport` permission — the same one needed to look at the
+ * list — and asked nothing else. Found by `scripts/check-decision-routes.ts`,
+ * which was written after the same shape turned up in four extensions in a row.
+ *
+ * `etransport:cancel`, granted deliberately, with `admin` still sufficient so an
+ * existing install keeps working before anyone edits policies.
+ */
+async function mayDecide(ctx: ExtensionContext, user: any): Promise<boolean> {
+  if (await ctx.checkPermission(user.id, 'etransport', 'cancel').catch(() => false)) return true;
+  return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
+}
+
 export function etransportRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
@@ -244,6 +261,8 @@ export function etransportRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/:id/cancel', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
+    const _u = c.get('user') as any;
+    if (!(await mayDecide(ctx, _u))) return c.json({ error: 'Not allowed' }, 403);
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 

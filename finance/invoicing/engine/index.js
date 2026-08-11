@@ -20117,6 +20117,10 @@ function invoicingRoutes(ctx) {
     return c.json({ data: payment.rows[0] }, 201);
   });
   app.post("/invoices/:id/pay", async (c) => {
+    const _u = c.get("user");
+    if (!await mayDecideInvoice(ctx, _u, "settle")) {
+      return c.json({ error: "You may not settle invoices" }, 403);
+    }
     const row = await sql`
       UPDATE zvd_invoices SET status = 'paid', paid_at = NOW(), amount_paid = total, updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND status IN ('sent','overdue','partially_paid') RETURNING *

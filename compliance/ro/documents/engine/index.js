@@ -19524,6 +19524,11 @@ var DEFAULT_PREFIX = {
   notificare: "NOT",
   other: "DOC"
 };
+async function mayDecide(ctx, user) {
+  if (await ctx.checkPermission(user.id, "ro-documents", "sign").catch(() => false))
+    return true;
+  return ctx.checkPermission(user.id, "admin", "*").catch(() => false);
+}
 function roDocumentsRoutes(ctx) {
   const { db, auth } = ctx;
   const app = new Hono2;
@@ -19678,6 +19683,9 @@ function roDocumentsRoutes(ctx) {
     return c.json({ document: doc2 });
   });
   app.patch("/:id/sign", async (c) => {
+    const _u = c.get("user");
+    if (!await mayDecide(ctx, _u))
+      return c.json({ error: "Not allowed" }, 403);
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
@@ -19735,6 +19743,8 @@ function roDocumentsRoutes(ctx) {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
+    if (!await mayDecide(ctx, user))
+      return c.json({ error: "Not allowed" }, 403);
     const result = await sql`
         UPDATE zv_ro_documents
         SET status = 'signed', signed_at = NOW(), updated_at = NOW()
