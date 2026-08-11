@@ -19,7 +19,7 @@ numerice au driftat față de fișiere. Coloana `stare` e singura de încredere.
 | `analytics/dashboard` | 6 | 2 | 0 | 0 | 5 | 0 | 1 | cod | da | **verificat** |
 | `analytics/quality` | 21 | 3 | 0 | 1 | 3 | 0 | 1 | cod | da | **verificat** |
 | `auth/ldap` | 4 | 4 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **reparat 2026-08-11 — G nepresat** |
-| `auth/saml` | 0 | 2 | 0 | 0 | 0 | 4 | 1 | SDUI | da | neverificat |
+| `auth/saml` | 5 | 4 | 0 | 0 | 0 | 4 | 1 | SDUI | da | **reparat 2026-08-11 — G nepresat** |
 | `auth/scim` | 10 | 2 | 0 | 0 | 9 | 0 | 1 | SDUI | da | **verificat** |
 | `billing` | 6 | 2 | 0 | 0 | 0 | 0 | 2 | cod | da | neverificat |
 | `communications/mail` | 43 | 2 | 0 | 0 | 1 | 0 | 1 | cod | da | neverificat |
