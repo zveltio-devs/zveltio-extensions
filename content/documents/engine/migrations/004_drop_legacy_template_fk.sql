@@ -1,0 +1,31 @@
+-- Cheia străină arată către alt tabel decât cel în care stau șabloanele.
+--
+-- `zv_generated_docs` are doi creatori. Migrația ACESTEI extensii îl declară cu
+-- `template_id UUID` simplu și un comentariu care spune de ce:
+-- „soft ref to zv_document_templates (content/document-templates ext)" —
+-- referință slabă, fiindcă șabloanele aparțin altei extensii și pot lipsi.
+--
+-- `001_initial.sql` al engine-ului îl declară cu
+-- `template_id UUID REFERENCES zv_doc_templates(id)`, adică o cheie tare către
+-- `zv_doc_templates` — un tabel vechi, diferit de `zv_document_templates`, și
+-- gol. Migrațiile de core rulează primele, deci pe orice instalare nouă câștigă
+-- forma engine-ului.
+--
+-- Rezultat măsurat pe bază virgină: se creează un șablon (ajunge în
+-- `zv_document_templates`), `content/documents` îl VEDE în `/templates`, iar
+-- `POST /generate/:templateId` răspunde 500 cu
+-- `violates foreign key constraint "zv_generated_docs_template_id_fkey"`.
+-- Generarea unui document din orice șablon real e imposibilă.
+--
+-- Autorul extensiei scrisese deja intenția corectă în comentariul lui. Copia din
+-- engine a suprascris-o — nu prin dezacord, ci fiindcă rulează prima.
+--
+-- Se renunță doar la constrângere, nu la coloană. O referință slabă e ce trebuie
+-- aici: un document generat rămâne valid și după ce șablonul din care a ieșit e
+-- șters, iar șabloanele aparțin unei extensii care poate să nu fie instalată.
+
+ALTER TABLE zv_generated_docs DROP CONSTRAINT IF EXISTS zv_generated_docs_template_id_fkey;
+
+-- DOWN
+-- Nu se pune la loc: ar arăta tot către tabelul greșit, iar rândurile scrise
+-- între timp trimit la șabloane care nu există în el.
