@@ -50,6 +50,34 @@ export function zveltioAIRoutes(ctx: ExtensionContext): Hono {
     },
   );
 
+  /**
+   * Ownership lives on `zv_ai_conversations.user_id`, which is NOT NULL.
+   *
+   * Both routes below used to scope by `zv_ai_messages.user_id` instead. That
+   * column is nullable *by design* — `saveConversation` writes the assistant's
+   * turn with no user, because a model reply has no user — so the filter
+   * silently dropped every answer: reading a conversation returned only the
+   * questions, and clearing one deleted only the questions.
+   *
+   * `getConversationHistory` in lib/zveltio-ai/engine.ts already documented this
+   * exact trap and already did it correctly. These two routes are the copy that
+   * did not get the fix. Returns null when the conversation does not exist OR is
+   * not the caller's — an unowned id must be indistinguishable from an unknown
+   * one, or this becomes an existence oracle for other users' conversations.
+   *
+   * A failed lookup is NOT caught here: "the query broke" must not be reported
+   * as "not yours". It surfaces as a 500, which is the truth.
+   */
+  async function ownedConversation(conversationId: string, userId: string) {
+    const row = await db
+      .selectFrom('zv_ai_conversations')
+      .select(['id'])
+      .where('id', '=', conversationId)
+      .where('user_id', '=', userId)
+      .executeTakeFirst();
+    return row ?? null;
+  }
+
   // GET /conversations/:id — get conversation history
   app.get('/conversations/:id', async (c) => {
     const user = await getUser(c);
@@ -58,15 +86,21 @@ export function zveltioAIRoutes(ctx: ExtensionContext): Hono {
     const conversationId = c.req.param('id');
     const limit = parseInt(c.req.query('limit') || '50');
 
+    if (!(await ownedConversation(conversationId, user.id))) {
+      return c.json({ error: 'Conversation not found' }, 404);
+    }
+
     const messages = await db
       .selectFrom('zv_ai_messages')
       .selectAll()
       .where('conversation_id', '=', conversationId)
-      .where('user_id', '=', user.id)
       .orderBy('created_at', 'asc')
       .limit(Math.min(limit, 200))
       .execute()
-      .catch(() => []);
+      .catch((err: Error) => {
+        console.error('[ai.conversations] history query failed:', err.message);
+        return [];
+      });
 
     return c.json({ conversation_id: conversationId, messages });
   });
@@ -109,12 +143,22 @@ export function zveltioAIRoutes(ctx: ExtensionContext): Hono {
 
     const conversationId = c.req.param('id');
 
-    await db
-      .deleteFrom('zv_ai_messages')
-      .where('conversation_id', '=', conversationId)
-      .where('user_id', '=', user.id)
-      .execute()
-      .catch(() => {});
+    if (!(await ownedConversation(conversationId, user.id))) {
+      return c.json({ error: 'Conversation not found' }, 404);
+    }
+
+    // The conversation row goes too. Deleting only the messages left the thread
+    // listed by `GET /conversations` forever, empty — so "clear" reported
+    // success and the conversation was still there. `zv_ai_messages` cascades
+    // from `zv_ai_conversations`, so this removes both.
+    //
+    // Not swallowed: a delete that fails must not answer `{success:true}`.
+    try {
+      await db.deleteFrom('zv_ai_conversations').where('id', '=', conversationId).execute();
+    } catch (err) {
+      console.error('[ai.conversations] delete failed:', (err as Error).message);
+      return c.json({ error: 'Could not delete the conversation' }, 500);
+    }
 
     return c.json({ success: true });
   });

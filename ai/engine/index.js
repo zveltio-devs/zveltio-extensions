@@ -29831,15 +29831,6 @@ async function decryptApiKey(stored) {
   const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: Buffer.from(ivHex, "hex") }, keyMaterial, Buffer.from(cipherHex, "hex"));
   return new TextDecoder().decode(decrypted);
 }
-function maskApiKey(key) {
-  if (!key)
-    return "";
-  if (key.startsWith("aes256gcm:"))
-    return "***encrypted***";
-  if (key.length <= 8)
-    return "***";
-  return `${key.slice(0, 4)}***${key.slice(-4)}`;
-}
 
 // engine/lib/ai-provider.ts
 var EMBED_TIMEOUT_MS = Number(process.env.AI_EMBED_TIMEOUT_MS ?? 30000);
@@ -30140,25 +30131,39 @@ function aiRoutes(ctx) {
     const isAdmin = await checkPermission(user.id, "admin", "*");
     return isAdmin ? user : null;
   }
+  async function logUsage(row) {
+    let savepointHeld = false;
+    try {
+      await sql.raw("SAVEPOINT zv_ai_usage").execute(db);
+      savepointHeld = true;
+      await db.insertInto("zv_ai_usage").values(row).execute();
+      await sql.raw("RELEASE SAVEPOINT zv_ai_usage").execute(db);
+    } catch (err) {
+      if (savepointHeld) {
+        await sql.raw("ROLLBACK TO SAVEPOINT zv_ai_usage").execute(db).catch(() => {});
+      }
+      console.warn(`[ai] usage accounting failed for ${row.operation}/${row.provider}:`, err.message);
+    }
+  }
   app.get("/providers", async (c) => {
     const user = await requireAuth(c);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const providers = await db.selectFrom("zv_ai_providers").select([
+    const providers = await db.selectFrom("zv_ai_providers").select((eb) => [
       "id",
       "name",
       "label",
       "default_model",
       "base_url",
       "is_default",
-      "is_active"
+      "is_active",
+      eb("api_key", "is not", null).as("has_api_key")
     ]).orderBy("name", "asc").execute();
-    const activeNames = aiProviderManager.list();
+    const loadedNames = new Set(aiProviderManager.list().map((p) => p.name));
     return c.json({
       providers: providers.map((p) => ({
         ...p,
-        api_key: maskApiKey(p.api_key ?? ""),
-        loaded: activeNames.includes(p.name)
+        loaded: loadedNames.has(p.name)
       }))
     });
   });
@@ -30264,7 +30269,7 @@ function aiRoutes(ctx) {
     const start = Date.now();
     const result = await provider.chat(messages, opts);
     const latency = Date.now() - start;
-    await db.insertInto("zv_ai_usage").values({
+    await logUsage({
       provider: provider.name,
       model: result.model,
       operation: "chat",
@@ -30272,7 +30277,7 @@ function aiRoutes(ctx) {
       response_tokens: result.usage.response_tokens,
       latency_ms: latency,
       user_id: user.id
-    }).execute().catch(() => {});
+    });
     return c.json({ result });
   });
   app.post("/embed", zValidator("json", exports_external.object({
@@ -30302,7 +30307,7 @@ function aiRoutes(ctx) {
       embeddings.push(vec.embedding);
     }
     const latency = Date.now() - start;
-    await db.insertInto("zv_ai_usage").values({
+    await logUsage({
       provider: provider.name,
       model: body.model || "embedding",
       operation: "embed",
@@ -30310,7 +30315,7 @@ function aiRoutes(ctx) {
       response_tokens: 0,
       latency_ms: latency,
       user_id: user.id
-    }).execute().catch(() => {});
+    });
     if (body.collection && body.record_id && texts.length === 1) {
       if (!await checkPermission(user.id, body.collection, "update")) {
         return c.json({
@@ -30327,10 +30332,6 @@ function aiRoutes(ctx) {
             ${body.model || "embedding"},
             NOW()
           )
-          -- tenant_id leads the target, matching the unique key as migration 006
-          -- widened it. It needs no place in the column list: the DEFAULT supplies
-          -- the value, and inference matches the index, not what was written
-          -- explicitly.
           ON CONFLICT (tenant_id, collection, record_id, field) DO UPDATE SET
             text_content = EXCLUDED.text_content,
             embedding    = EXCLUDED.embedding,
@@ -30374,7 +30375,10 @@ function aiRoutes(ctx) {
               AND (1 - (embedding <=> ${queryVec}::vector)) > ${threshold}
             ORDER BY embedding <=> ${queryVec}::vector
             LIMIT ${limit}
-          `.execute(tdb).then((r) => r.rows).catch(() => []);
+          `.execute(tdb).then((r) => r.rows).catch((err) => {
+          console.warn("[ai.search] pgvector query failed, falling back:", err.message);
+          return [];
+        });
         if (vecResults.length > 0) {
           return c.json({
             results: vecResults,
@@ -30395,7 +30399,10 @@ function aiRoutes(ctx) {
           AND similarity(text_content, ${query}) > ${threshold}
         ORDER BY score DESC
         LIMIT ${limit}
-      `.execute(tdb).then((r) => r.rows).catch(() => []);
+      `.execute(tdb).then((r) => r.rows).catch((err) => {
+      console.warn("[ai.search] trigram query failed, falling back to ILIKE:", err.message);
+      return [];
+    });
     if (trgmResults.length > 0) {
       return c.json({
         results: trgmResults,
@@ -30432,61 +30439,6 @@ function aiRoutes(ctx) {
       count: fallbackResults.length,
       method: "ilike"
     });
-  });
-  app.get("/prompts", async (c) => {
-    const user = await requireAuth(c);
-    if (!user)
-      return c.json({ error: "Unauthorized" }, 401);
-    const prompts = await db.selectFrom("zv_prompt_templates").selectAll().where("is_active", "=", true).orderBy("name", "asc").execute();
-    return c.json({ prompts });
-  });
-  app.post("/prompts", zValidator("json", exports_external.object({
-    name: exports_external.string().min(1),
-    description: exports_external.string().optional(),
-    system: exports_external.string().optional(),
-    template: exports_external.string().min(1),
-    variables: exports_external.array(exports_external.object({
-      name: exports_external.string(),
-      description: exports_external.string().optional(),
-      required: exports_external.boolean().default(false)
-    })).default([]),
-    category: exports_external.string().optional()
-  })), async (c) => {
-    const user = await requireAuth(c);
-    if (!user)
-      return c.json({ error: "Unauthorized" }, 401);
-    const body = c.req.valid("json");
-    const prompt = await db.insertInto("zv_prompt_templates").values({ ...body, variables: JSON.stringify(body.variables) }).returningAll().executeTakeFirst();
-    return c.json({ prompt }, 201);
-  });
-  app.delete("/prompts/:id", async (c) => {
-    const user = await requireAuth(c);
-    if (!user)
-      return c.json({ error: "Unauthorized" }, 401);
-    await db.updateTable("zv_prompt_templates").set({ is_active: false }).where("id", "=", c.req.param("id")).execute();
-    return c.json({ success: true });
-  });
-  app.post("/prompts/:id/run", zValidator("json", exports_external.record(exports_external.string(), exports_external.string())), async (c) => {
-    const user = await requireAuth(c);
-    if (!user)
-      return c.json({ error: "Unauthorized" }, 401);
-    const prompt = await db.selectFrom("zv_prompt_templates").selectAll().where("id", "=", c.req.param("id")).where("is_active", "=", true).executeTakeFirst();
-    if (!prompt)
-      return c.json({ error: "Prompt not found" }, 404);
-    const vars = c.req.valid("json");
-    let rendered = prompt.template;
-    for (const [k, v] of Object.entries(vars)) {
-      rendered = rendered.replaceAll(`{{${k}}}`, String(v));
-    }
-    const messages = [];
-    if (prompt.system)
-      messages.push({ role: "system", content: prompt.system });
-    messages.push({ role: "user", content: rendered });
-    const provider = aiProviderManager.getDefault();
-    if (!provider)
-      return c.json({ error: "No AI provider configured" }, 503);
-    const result = await provider.chat(messages);
-    return c.json({ result, rendered_prompt: rendered });
   });
   app.get("/admin/features", async (c) => {
     const user = await requireAdmin(c);
@@ -32935,23 +32887,36 @@ function extractText(record2, field, excludedFields) {
   }
   return Object.entries(record2).filter(([k, v]) => !SYSTEM_FIELDS.has(k) && !excludedFields.has(k) && typeof v === "string" && v.length > 0).map(([, v]) => v).join(" ");
 }
+function parseExcludedFields(raw2, collection) {
+  if (raw2 == null)
+    return new Set;
+  if (Array.isArray(raw2))
+    return new Set(raw2.map(String));
+  if (typeof raw2 === "string") {
+    const inner = raw2.trim().replace(/^\{|\}$/g, "");
+    if (inner === "")
+      return new Set;
+    return new Set(inner.split(",").map((s) => s.trim().replace(/^"|"$/g, "")).filter(Boolean));
+  }
+  throw new Error(`collection "${collection}": ai_embed_excluded_fields has an unexpected shape ` + `(${typeof raw2}) \u2014 refusing to embed rather than ignore the exclusion list`);
+}
 async function triggerEmbedding(db, collection, recordId, record2, tenantId = null) {
   const collMeta = await db.selectFrom("zvd_collections").select([
     "ai_search_enabled",
     "ai_search_field",
     "ai_embed_excluded_fields"
-  ]).where("name", "=", collection).executeTakeFirst().catch(() => null);
+  ]).where("name", "=", collection).executeTakeFirst();
   if (!collMeta?.ai_search_enabled)
     return;
   const textField = collMeta.ai_search_field ?? null;
-  const rawExcluded = Array.isArray(collMeta.ai_embed_excluded_fields) ? collMeta.ai_embed_excluded_fields : [];
-  const excludedFields = new Set(rawExcluded);
+  const excludedFields = parseExcludedFields(collMeta.ai_embed_excluded_fields, collection);
   const rawText = extractText(record2, textField, excludedFields);
   if (!rawText.trim())
     return;
   const provider = aiProviderManager.getDefault();
-  if (!provider?.embed)
-    return;
+  if (!provider?.embed) {
+    throw new Error(`collection "${collection}" has ai_search_enabled, but no configured AI provider supports embeddings ` + `(use OpenAI or Ollama, or turn AI Search off for this collection)`);
+  }
   const textToEmbed = rawText.slice(0, 8000);
   const { embedding, model } = await provider.embed(textToEmbed);
   const vectorLiteral = JSON.stringify(embedding);
@@ -32965,12 +32930,22 @@ async function triggerEmbedding(db, collection, recordId, record2, tenantId = nu
       ${rawText.slice(0, 2000)},
       ${vectorLiteral}::vector,
       ${model},
-      ${tenantId},
+      -- Mirrors the column DEFAULT rather than trusting the argument. An
+      -- explicit NULL is not "no tenant" to FORCE RLS: the policy compares
+      -- tenant_id against the GUC, NULL = anything is NULL, and the row is
+      -- refused with a policy violation. A caller that omits the tenant should
+      -- get the session's, not a rejected insert.
+      COALESCE(
+        ${tenantId}::uuid,
+        NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+        '00000000-0000-0000-0000-000000000001'::uuid
+      ),
       NOW()
     )
-    -- tenant_id leads the target, matching the unique key after migration 006.
-    -- It has to move with the constraint or every upsert fails with "no unique
-    -- or exclusion constraint matching the ON CONFLICT specification".
+    -- tenant_id leads the conflict target, matching the unique key after
+    -- migration 006. It has to move with the constraint or every upsert fails
+    -- with "no unique or exclusion constraint matching the ON CONFLICT
+    -- specification".
     ON CONFLICT (tenant_id, collection, record_id, field)
     DO UPDATE SET
       text_content = EXCLUDED.text_content,
@@ -33013,7 +32988,7 @@ var extension = {
         throw new Error("No AI provider is configured.");
       return p.chat(messages, opts);
     });
-    ctx.services.register("ai.triggerEmbedding", triggerEmbedding);
+    ctx.services.register("ai.triggerEmbedding", async (collection, recordId, record2, tenantId = null) => triggerEmbedding(ctx.db, collection, recordId, record2, tenantId));
     ctx.services.register("ai.runBackgroundTask", async (userId, instruction, opts) => {
       const engine = new ZveltioAIEngine(ctx);
       return engine.processBackgroundTask(userId, instruction, opts);
@@ -33021,7 +32996,9 @@ var extension = {
     const onWrite = async (evt) => {
       try {
         await triggerEmbedding(ctx.db, evt.collection, evt.id, evt.record, evt.tenantId ?? null);
-      } catch {}
+      } catch (err) {
+        console.warn(`[ai] auto-embedding failed for ${evt.collection}/${evt.id}:`, err.message);
+      }
     };
     ctx.events.on("record.created", onWrite);
     ctx.events.on("record.updated", onWrite);
