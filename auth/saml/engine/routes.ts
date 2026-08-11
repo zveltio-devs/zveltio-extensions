@@ -14,7 +14,7 @@ import { zValidator } from '@hono/zod-validator';
 import { sql } from 'kysely';
 import { createSamlInstance, validateSamlResponse } from './saml-provider.js';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-// Config schema stored in zv_settings key "saml_config"
+// Config schema stored in `zvd_saml_config`, one row per tenant (migration 004).
 const SamlConfigSchema = z.object({
   enabled: z.boolean().default(false),
   entryPoint: z.string().url('Must be a valid IdP SSO URL'),
@@ -44,21 +44,35 @@ async function getSamlConfig(
   db: any,
   decryptSecret: (v: string) => Promise<string>,
 ): Promise<z.infer<typeof SamlConfigSchema> | null> {
+  // `zvd_saml_config`, not `zv_settings`. See migration 004: `zv_settings` is an
+  // engine system table and `ctx.db` refuses it, so every read here threw.
+  let row: { config: any } | undefined;
   try {
-    const row = await db
-      .selectFrom('zv_settings')
-      .select('value')
-      .where('key', '=', 'saml_config')
-      .executeTakeFirst();
-    if (!row) return null;
-    const raw = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
+    row = await db.selectFrom('zvd_saml_config').select('config').executeTakeFirst();
+  } catch (err) {
+    // Do not answer "not configured" for a failure that is not that.
+    //
+    // One catch used to cover the read, the parse and the decryption alike, so a
+    // refused table, an unapproved capability and a bad key all produced the
+    // same word — which is why an extension that could not authenticate anybody
+    // looked like one nobody had set up yet.
+    console.error('[auth/saml] could not read zvd_saml_config:', err);
+    throw err;
+  }
+  if (!row) return null;
+
+  try {
+    const raw = typeof row.config === 'string' ? JSON.parse(row.config) : row.config;
     const parsed = SamlConfigSchema.parse(raw);
     if (parsed.privateKey) {
       parsed.privateKey = await decryptSecret(parsed.privateKey);
     }
     return parsed;
-  } catch {
-    return null;
+  } catch (err) {
+    // A row exists and cannot be used: malformed, or encrypted under a key this
+    // instance no longer holds. Still not "not configured".
+    console.error('[auth/saml] stored config is unusable:', err);
+    throw err;
   }
 }
 
@@ -77,19 +91,26 @@ async function upsertSamlConfig(
     ...config,
     privateKey: config.privateKey ? await encryptSecret(config.privateKey) : undefined,
   };
-  const value = JSON.stringify(toStore);
-  // Try update first, then insert
-  const existing = await db
-    .selectFrom('zv_settings')
-    .select('key')
-    .where('key', '=', 'saml_config')
-    .executeTakeFirst();
-
-  if (existing) {
-    await db.updateTable('zv_settings').set({ value, updated_at: new Date() }).where('key', '=', 'saml_config').execute();
-  } else {
-    await db.insertInto('zv_settings').values({ key: 'saml_config', value, created_at: new Date(), updated_at: new Date() }).execute();
-  }
+  // One row per tenant, upserted on the tenant key.
+  //
+  // The read-then-write it replaces had two problems beyond the refused table:
+  // it raced itself, and `zv_settings.key` is global — no `tenant_id` — so the
+  // second company on a shared instance could not have its own identity
+  // provider. It would have overwritten the first one's.
+  //
+  // `tenant_id` is left to its column default, which reads the tenant GUC set by
+  // the surrounding transaction, so the row lands in the caller's tenant without
+  // this code naming one.
+  await db
+    .insertInto('zvd_saml_config')
+    .values({ config: JSON.stringify(toStore), updated_at: new Date() })
+    .onConflict((oc: any) =>
+      oc.column('tenant_id').doUpdateSet({
+        config: JSON.stringify(toStore),
+        updated_at: new Date(),
+      }),
+    )
+    .execute();
 }
 
 // Find or create a user by email (for SSO sign-in).
@@ -153,7 +174,19 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
     const relayState = rawRelayState.startsWith('/') && !rawRelayState.startsWith('//')
       ? rawRelayState
       : '/admin';
-    const loginUrl = await saml.getAuthorizeUrlAsync('', c.req.raw.headers.get('host') ?? '', { RelayState: relayState });
+    // `getAuthorizeUrl`, not `getAuthorizeUrlAsync`.
+    //
+    // The `*Async` names belong to a different major of node-saml than the one
+    // this extension pins (`^3.1.0`), where the promise-returning methods lost
+    // the suffix. So the call was `undefined` and the route threw a TypeError —
+    // on the one endpoint that begins SSO.
+    //
+    // It stayed hidden behind two earlier failures: the config lived in a table
+    // `ctx.db` refuses, and this route sat behind the fail-closed `/ext/*` gate.
+    // Both had to be fixed before anything could get far enough to reach a
+    // method name. `/metadata` uses the one call whose name did not change,
+    // which is why the extension answered at all from the outside.
+    const loginUrl = await saml.getAuthorizeUrl('', c.req.raw.headers.get('host') ?? '', { RelayState: relayState });
     return c.redirect(loginUrl);
   });
 
