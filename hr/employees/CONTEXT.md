@@ -61,15 +61,61 @@ aplică imediat, fără repornire. Verificat exact așa:
 și a fost corect refuzat. Dacă rulam doar testul negativ, aș fi raportat succes.
 Controlul pozitiv nu e formalitate.
 
+## Contractul e acum o entitate (2026-08-11)
+
+Ce lega un om de firmă erau `hire_date`, `end_date`, `employment_type` și
+`salary`, plate pe `zvd_employees`. Cu ele nu se poate reprezenta nimic din ce
+conține un dosar de personal: durată determinată prelungită prin act adițional,
+trecere de la 4 la 8 ore, suspendare pentru creșterea copilului și revenire, al
+doilea contract la aceeași firmă, sau pur și simplu **ce** s-a schimbat la 1
+aprilie și pe ce document semnat.
+
+Trei tabele — `zvd_employment_contracts`, `zvd_contract_amendments`,
+`zvd_contract_suspensions` — și rutele care le mișcă.
+
+**Neutru față de țară**, cum cere regula: `contract_type` are cele două forme
+care există peste tot, norma e în ore pe săptămână (nu „normă întreagă"), iar
+temeiul încetării e un **cod liber** al cărui vocabular îl aduce o extensie de
+țară, ca la `identity.nationalId`. Un cod necunoscut e acceptat — o instanță nu
+trebuie să aștepte o extensie ca să poată încheia un contract.
+
+**Câmpurile plate rămân, sincronizate din contractul activ.** `hr/payroll`
+citește `zvd_employees.salary` la fiecare generare de stat; ștergerea coloanelor
+acum ar rupe salarizarea în tăcere. Contractul e sursa de adevăr, câmpurile sunt
+proiecția pentru consumatorii de azi. Ștergerea lor e pasul doi.
+
+Migrația preia automat un contract pentru fiecare angajat existent cu dată de
+angajare — altfel o instalare veche ar arăta zero contracte pentru oameni care
+lucrează de ani de zile.
+
+### Două lucruri prinse la presare, nu la citire
+
+**Actul adițional cădea în tăcere.** Inserarea în istoricul salarial folosea
+`created_by`, dar coloana e `changed_by` — iar eu o înfășurasem în `.catch()`
+„ca să nu blocheze actul". Postgres nu lasă o cerere să continue după o
+instrucțiune eșuată, deci `.catch()` n-a conținut nimic: a ascuns cauza și a
+doborât următoarele două instrucțiuni cu „current transaction is aborted".
+**Exact capcana reparată dimineață în engine, comisă de cine tocmai o reparase.**
+Acum inserarea e negardată: dacă eșuează, actul eșuează zgomotos.
+
+**Cine termină un contract și începe altul rămânea „plecat".** Încetarea marchează
+omul `terminated`, ceea ce e corect când nu-l înlocuiește nimic. Dar o durată
+determinată care se încheie pe 31 și un contract nou de pe 1 sunt o angajare
+continuă — iar sincronizarea nu atingea `status`. Măsurat: contract nou activ,
+salariu propagat, om `terminated`. Adică lipsă din organigramă și din concedii,
+dar plătit. Se repune doar tranziția asta; `on_leave` e o stare aleasă de cineva.
+
+Verificat în 13 direcții pe bază virgină, inclusiv controalele pozitive:
+refuzurile (durată determinată fără termen, al doilea contract activ, a doua
+suspendare, act pe contract încetat) **și** revenirile.
+
 ## Ce lipsește ca să fie o aplicație HR dedicată
 
 Propunerea completă e în conversație; pe scurt, în ordinea în care blochează:
 
-1. **Contractul nu există ca entitate.** `hire_date`, `end_date`,
-   `employment_type`, `salary` sunt câmpuri plate pe angajat. Nu se poate
-   reprezenta contract pe durată determinată prelungit prin act adițional, normă
-   parțială, suspendare pentru creștere copil, sau al doilea contract la aceeași
-   firmă. Istoricul salarial există dar nu e legat de niciun document.
+1. ~~**Contractul nu există ca entitate.**~~ **REZOLVAT** — vezi secțiunea de
+   mai sus. Rămâne pasul doi: mutarea consumatorilor de pe câmpurile plate pe
+   contract, ca acele coloane să poată dispărea.
 2. **Nu există cod COR pe poziții**, iar exportul ReviSal din `hr/payroll` pune
    `position_id` (un UUID) în coloana `FunctieId` și `full_time` în
    `ContractTip`. Fișierul nu e importabil nicăieri. **Amânat deliberat de
