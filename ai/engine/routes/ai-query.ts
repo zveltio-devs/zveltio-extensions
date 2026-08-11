@@ -97,12 +97,8 @@ CURRENT TIMESTAMP: ${new Date().toISOString()}`,
         return c.json({ error: `Unsafe query: ${validation.reason}` }, 400);
       }
 
-      // Execute în READ ONLY transaction — previne DML accidental sau injectat
       const execStart = Date.now();
-      const result = await (db as any).transaction().execute(async (trx: any) => {
-        await sql`SET TRANSACTION READ ONLY`.execute(trx);
-        return sql.raw(generatedSQL).execute(trx);
-      });
+      const result = await runReadOnly(db, generatedSQL);
       const executionMs = Date.now() - execStart;
       const rows = result.rows as any[];
 
@@ -208,10 +204,16 @@ Respond in the same language as the user's question.`,
 
     // Re-validate stored SQL — the stored query may have been tampered with or
     // the user's accessible collections may have changed since it was saved.
+    // The resource is the bare collection name, as it is on the generate path
+    // above and as migration 034 writes it into `zvd_permissions`. This asked for
+    // `data:<name>`, a namespace no policy uses, so nothing ever matched: for
+    // every user who is not `god`, `accessibleCollections` came back empty and
+    // re-running a query they had just run successfully answered
+    // `No access to table "zvd_…"`.
     const allCollections = await DDLManager.getCollections(db);
     const accessibleCollections: any[] = [];
     for (const col of allCollections) {
-      const canRead = await checkPermission(user.id, `data:${col.name}`, 'read');
+      const canRead = await checkPermission(user.id, col.name, 'read');
       if (canRead) accessibleCollections.push(col);
     }
 
@@ -221,10 +223,7 @@ Respond in the same language as the user's question.`,
     }
 
     const execStart = Date.now();
-    const result = await (db as any).transaction().execute(async (trx: any) => {
-      await sql`SET TRANSACTION READ ONLY`.execute(trx);
-      return sql.raw(generated_sql).execute(trx);
-    });
+    const result = await runReadOnly(db, generated_sql);
     return c.json({
       results: result.rows,
       count: (result.rows as any[]).length,
@@ -233,6 +232,61 @@ Respond in the same language as the user's question.`,
   });
 
   return app;
+}
+
+/**
+ * Runs AI-generated SQL with writes refused at the database, then restores the
+ * request's transaction to read-write.
+ *
+ * `SET TRANSACTION READ ONLY` is the last line of defence behind
+ * `validateGeneratedSQL` — a regex allowlist should not be the only thing
+ * between a model's output and a DELETE. It has to stay.
+ *
+ * What it cannot do is live in its own transaction. This was
+ * `db.transaction().execute(…)`, and the host's `ctx.db` JOINS the request's
+ * tenant transaction rather than nesting (Bun SQL has no nested transactions),
+ * so the flag applied to the WHOLE request. Everything after it that writes then
+ * failed:
+ *
+ *   ERROR: cannot execute INSERT in a read-only transaction
+ *
+ * which is what `logQuery` below does — and its `.catch()` swallowed it. Net
+ * effect, verified against Postgres 18: query history recorded only the queries
+ * that were REFUSED (that log call happens before this point) and never one that
+ * ran, `/history` was permanently empty, and `PATCH /:id/save` could never find a
+ * row. The abort also meant the request's COMMIT quietly became a ROLLBACK.
+ *
+ * A savepoint fixes both halves: `SET TRANSACTION` is undone by
+ * `ROLLBACK TO SAVEPOINT`, so the read-only window is exactly this statement and
+ * the outer transaction is writable again afterwards. The rollback discards no
+ * results — the rows are already in JS, and a read changes no state. Confirmed
+ * both ways: an INSERT inside the window is still refused, and an INSERT after it
+ * commits.
+ */
+async function runReadOnly(db: Database, query: string): Promise<{ rows: unknown[] }> {
+  await sql.raw('SAVEPOINT zv_ai_ro').execute(db);
+  try {
+    await sql`SET TRANSACTION READ ONLY`.execute(db);
+    const result = await sql.raw(query).execute(db);
+    return result as { rows: unknown[] };
+  } finally {
+    // Unconditional: on success it drops the read-only flag, on failure it also
+    // clears the aborted state, and either way the caller gets a usable
+    // transaction back. Awaited inside `finally` — a synchronous `finally`
+    // around an async call is how a previous audit lost a whole tenant context.
+    await sql
+      .raw('ROLLBACK TO SAVEPOINT zv_ai_ro')
+      .execute(db)
+      .catch(() => {
+        /* transaction gone entirely; the caller's error is the useful one */
+      });
+    await sql
+      .raw('RELEASE SAVEPOINT zv_ai_ro')
+      .execute(db)
+      .catch(() => {
+        /* released with the rollback, or the transaction is gone */
+      });
+  }
 }
 
 // ── Security validation ──────────────────────────────────────────────────────
@@ -330,9 +384,16 @@ async function logQuery(
   chartConfig: any,
   error: string | null,
 ): Promise<void> {
+  // Named on failure. This was `.catch(() => {})`, which is how the history
+  // stayed empty for as long as `SET TRANSACTION READ ONLY` was leaking into the
+  // request's transaction: the INSERT failed every time and said nothing.
   await sql`
     INSERT INTO zv_ai_queries (user_id, prompt, generated_sql, result_count, execution_ms, ai_analysis, chart_config, error)
     VALUES (${userId}, ${prompt}, ${generatedSql}, ${resultCount}, ${executionMs}, ${analysis},
       ${chartConfig ? JSON.stringify(chartConfig) : null}::jsonb, ${error})
-  `.execute(db).catch(() => { /* non-critical */ });
+  `
+    .execute(db)
+    .catch((err: Error) => {
+      console.warn('[ai.query] could not record query history:', err.message);
+    });
 }
