@@ -17,6 +17,7 @@
   "inventory.form.newWarehouse": "Nouvel entrepôt",
   "inventory.form.price": "Prix",
   "inventory.form.sku": "SKU",
+  "inventory.form.unitPrice": "Unit price",
   "inventory.form.vat": "VAT %",
   "inventory.new.product": "Nouveau produit",
   "inventory.new.warehouse": "Nouvel entrepôt",

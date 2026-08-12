@@ -1,4 +1,13 @@
 {
+  "assets.form.assetCode": "Cod mijloc fix",
+  "assets.form.category": "Categorie",
+  "assets.form.location": "Locație",
+  "assets.form.name": "Nume",
+  "assets.form.purchaseCost": "Cost achiziție",
+  "assets.form.purchaseDate": "Data achiziției",
+  "assets.form.residualValue": "Valoare reziduală",
+  "assets.form.serialNumber": "Serie",
+  "assets.form.usefulLife": "Durata de viață (ani)",
   "operations.assets.btn.create": "Creează",
   "operations.assets.btn.new": "Activ nou",
   "operations.assets.cat.buildings": "Clădiri",

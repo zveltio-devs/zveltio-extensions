@@ -19556,8 +19556,8 @@ function assetsRoutes(ctx) {
   });
   app.post("/", zValidator("json", exports_external.object({
     name: exports_external.string().min(1),
-    asset_code: exports_external.string().optional(),
-    category: exports_external.string().optional(),
+    asset_code: exports_external.string().min(1),
+    category: exports_external.string().default("equipment"),
     description: exports_external.string().optional(),
     serial_number: exports_external.string().optional(),
     location: exports_external.string().optional(),

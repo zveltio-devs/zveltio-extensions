@@ -22,5 +22,16 @@
   "ecommerce.store.ui.processing": "Se procesează",
   "ecommerce.store.ui.shipped": "Expediat",
   "ecommerce.store.ui.short_description": "Descriere scurtă",
-  "ecommerce.store.ui.stock_qty": "Cant. stoc"
+  "ecommerce.store.ui.stock_qty": "Cant. stoc",
+  "store.form.currency": "Monedă",
+  "store.form.name": "Nume",
+  "store.form.price": "Preț",
+  "store.form.shortDescription": "Descriere scurtă",
+  "store.form.sku": "SKU",
+  "store.form.slug": "Slug",
+  "store.form.status": "Stare",
+  "store.form.stockQty": "Stoc",
+  "store.status.active": "Activ",
+  "store.status.archived": "Arhivat",
+  "store.status.draft": "Ciornă"
 }
