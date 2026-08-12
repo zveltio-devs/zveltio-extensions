@@ -19510,23 +19510,8 @@ function permissionGate(ctx, resource, opts = {}) {
   };
 }
 // hr/time-tracking/engine/routes.ts
-async function callerEmployee(dbh, user) {
-  const rows = await sql`
-    SELECT id FROM zvd_employees
-    WHERE user_id = ${user.id} OR email = ${user.email} OR work_email = ${user.email}
-    LIMIT 1
-  `.execute(dbh);
-  return rows.rows[0] ?? null;
-}
-async function mayActFor(dbh, ctx, user, employeeId) {
-  const me = await callerEmployee(dbh, user);
-  if (me && me.id === employeeId)
-    return true;
-  const target = await sql`SELECT manager_id FROM zvd_employees WHERE id = ${employeeId}`.execute(dbh);
-  const managerId = target.rows[0]?.manager_id;
-  if (me && managerId && managerId === me.id)
-    return true;
-  return ctx.checkPermission(user.id, "admin", "*").catch(() => false);
+function employment(ctx) {
+  return ctx.services.get("hr.employment");
 }
 function timeTrackingRoutes(ctx) {
   const { db, auth } = ctx;
@@ -19628,14 +19613,17 @@ function timeTrackingRoutes(ctx) {
   });
   app.get("/timer", async (c) => {
     const user = c.get("user");
-    const emp = await sql`SELECT id FROM zvd_employees WHERE email = ${user.email} OR work_email = ${user.email} LIMIT 1`.execute(db);
-    if (!emp.rows.length)
+    const svc = employment(ctx);
+    if (!svc)
+      return c.json({ error: "hr/employees is not enabled" }, 503);
+    const me = await svc.identify(user);
+    if (!me)
       return c.json({ data: null });
     const timer = await sql`
       SELECT t.*, p.name as project_name, p.hourly_rate,
         EXTRACT(EPOCH FROM (NOW() - t.started_at)) / 60 as elapsed_minutes
       FROM zvd_active_timers t JOIN zvd_time_projects p ON p.id = t.project_id
-      WHERE t.employee_id = ${emp.rows[0].id}
+      WHERE t.employee_id = ${me.id}
     `.execute(db);
     return c.json({ data: timer.rows[0] ?? null });
   });
@@ -19646,15 +19634,18 @@ function timeTrackingRoutes(ctx) {
     notes: exports_external.string().optional(),
     employee_id: exports_external.string().uuid().optional()
   })), async (c) => {
+    const svc = employment(ctx);
+    if (!svc)
+      return c.json({ error: "hr/employees is not enabled" }, 503);
     const user = c.get("user");
     const d = c.req.valid("json");
     let employeeId = d.employee_id;
     if (!employeeId) {
-      const me = await callerEmployee(db, user);
+      const me = await svc.identify(user);
       if (!me)
         return c.json({ error: "Employee record not found" }, 400);
       employeeId = me.id;
-    } else if (!await mayActFor(db, ctx, user, employeeId)) {
+    } else if (!await svc.mayActFor(user, employeeId)) {
       return c.json({ error: "You may only track time for yourself or someone you manage" }, 403);
     }
     const row = await sql`
@@ -19669,10 +19660,13 @@ function timeTrackingRoutes(ctx) {
   });
   app.post("/timer/stop", async (c) => {
     const user = c.get("user");
-    const emp = await sql`SELECT id FROM zvd_employees WHERE email = ${user.email} OR work_email = ${user.email} LIMIT 1`.execute(db);
-    if (!emp.rows.length)
+    const svc = employment(ctx);
+    if (!svc)
+      return c.json({ error: "hr/employees is not enabled" }, 503);
+    const me = await svc.identify(user);
+    if (!me)
       return c.json({ error: "Employee record not found" }, 400);
-    const employeeId = emp.rows[0].id;
+    const employeeId = me.id;
     const timer = await sql`
       SELECT t.*, p.hourly_rate, EXTRACT(EPOCH FROM (NOW() - t.started_at)) / 60 as elapsed_minutes
       FROM zvd_active_timers t JOIN zvd_time_projects p ON p.id = t.project_id
@@ -19727,15 +19721,18 @@ function timeTrackingRoutes(ctx) {
     start_time: exports_external.string().optional(),
     end_time: exports_external.string().optional()
   })), async (c) => {
+    const svc = employment(ctx);
+    if (!svc)
+      return c.json({ error: "hr/employees is not enabled" }, 503);
     const user = c.get("user");
     const d = c.req.valid("json");
     let employeeId = d.employee_id;
     if (!employeeId) {
-      const me = await callerEmployee(db, user);
+      const me = await svc.identify(user);
       if (!me)
         return c.json({ error: "Employee record not found" }, 400);
       employeeId = me.id;
-    } else if (!await mayActFor(db, ctx, user, employeeId)) {
+    } else if (!await svc.mayActFor(user, employeeId)) {
       return c.json({ error: "You may only log time for yourself or someone you manage" }, 403);
     }
     const project = await sql`SELECT hourly_rate FROM zvd_time_projects WHERE id = ${d.project_id}`.execute(db);
@@ -19858,11 +19855,14 @@ function timeTrackingRoutes(ctx) {
     return c.json({ data: row.rows[0] }, 201);
   });
   app.post("/timesheets/:id/submit", async (c) => {
+    const svc = employment(ctx);
+    if (!svc)
+      return c.json({ error: "hr/employees is not enabled" }, 503);
     const _u = c.get("user");
     const _sheet = await sql`SELECT employee_id FROM zvd_timesheets WHERE id = ${c.req.param("id")}`.execute(db);
     if (!_sheet.rows.length)
       return c.json({ error: "Timesheet not found" }, 404);
-    if (!await mayActFor(db, ctx, _u, _sheet.rows[0].employee_id)) {
+    if (!await svc.mayActFor(_u, _sheet.rows[0].employee_id)) {
       return c.json({ error: "You may only submit your own timesheet" }, 403);
     }
     const row = await sql`
@@ -19874,16 +19874,19 @@ function timeTrackingRoutes(ctx) {
     return c.json({ data: row.rows[0] });
   });
   app.post("/timesheets/:id/approve", async (c) => {
+    const svc = employment(ctx);
+    if (!svc)
+      return c.json({ error: "hr/employees is not enabled" }, 503);
     const user = c.get("user");
     const sheet = await sql`SELECT employee_id FROM zvd_timesheets WHERE id = ${c.req.param("id")}`.execute(db);
     if (!sheet.rows.length)
       return c.json({ error: "Timesheet not found" }, 404);
     const employeeId = sheet.rows[0].employee_id;
-    const me = await callerEmployee(db, user);
+    const me = await svc.identify(user);
     if (me && me.id === employeeId) {
       return c.json({ error: "You cannot approve your own timesheet" }, 403);
     }
-    if (!await mayActFor(db, ctx, user, employeeId)) {
+    if (!await svc.mayActFor(user, employeeId)) {
       return c.json({ error: "Only a manager may approve this" }, 403);
     }
     const row = await sql`
@@ -19895,17 +19898,20 @@ function timeTrackingRoutes(ctx) {
     return c.json({ data: row.rows[0] });
   });
   app.post("/timesheets/:id/reject", zValidator("json", exports_external.object({ reason: exports_external.string().min(1) })), async (c) => {
+    const svc = employment(ctx);
+    if (!svc)
+      return c.json({ error: "hr/employees is not enabled" }, 503);
     const { reason } = c.req.valid("json");
     const user = c.get("user");
     const sheet = await sql`SELECT employee_id FROM zvd_timesheets WHERE id = ${c.req.param("id")}`.execute(db);
     if (!sheet.rows.length)
       return c.json({ error: "Timesheet not found" }, 404);
     const employeeId = sheet.rows[0].employee_id;
-    const me = await callerEmployee(db, user);
+    const me = await svc.identify(user);
     if (me && me.id === employeeId) {
       return c.json({ error: "You cannot reject your own timesheet" }, 403);
     }
-    if (!await mayActFor(db, ctx, user, employeeId)) {
+    if (!await svc.mayActFor(user, employeeId)) {
       return c.json({ error: "Only a manager may reject this" }, 403);
     }
     const row = await sql`
