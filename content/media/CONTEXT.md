@@ -43,9 +43,49 @@ Primul 403 pe care l-am primit venea de fapt de la poarta de permisiuni, fiindc�
 sub deny-by-default un utilizator nou n-are deloc acces la media; a trebuit să-i
 acord `*` **ca să ajung** la codul testat.
 
-## Ce e încă deschis
+## Secțiunea G — presată 2026-08-12: 27/27
 
-- Restul de 27 de rute, nepresate.
+Toate cele 27 de rute apăsate pe bază virgină, cu engine viu. Două lucruri
+reparate, ambele găsite doar prin apăsat — citirea codului nu le-ar fi arătat.
+
+### Colecțiile erau imposibil de folosit din orice client
+
+`randomUUID().replace(/-/g, '')` genera id-uri **fără cratime** pentru fișiere,
+dosare și etichete. Coloana e `uuid`, deci Postgres normaliza la stocare — dar
+răspunsul întorcea obiectul construit local, nu rândul salvat. Clientul primea
+`bec8520945ff46c6ba19506735a65fe9` pentru un rând stocat ca
+`bec85209-45ff-46c6-ba19-506735a65fe9`.
+
+Trei endpointuri validează `z.string().uuid()`: `POST /collections`
+(`cover_file_id`), `PATCH /collections/:id` (`cover_file_id`) și
+`POST /collections/:id/files`. **Toate trei respingeau cu 400 exact id-ul pe
+care API-ul tocmai îl dăduse.** Același fișier, scris cu cratime: `{"added":1}`.
+
+Reparat separând cele două lucruri care fuseseră unul: `id`-ul rândului e UUID
+canonic, iar cheia de stocare rămâne fără cratime — numele obiectelor arătau
+mereu așa și fișierele existente sunt denumite astfel. `storage/cloud` făcea
+deja corect (`${id.replace(/-/g,'')}${ext}`); tiparul greșit era doar aici,
+verificat prin căutare în tot repo-ul.
+
+**De ce n-a prins nimic:** niciun test nu ia id-ul dintr-un răspuns și îl trimite
+înapoi. Testele își construiesc propriile UUID-uri, care au cratime.
+
+### Cotele răspundeau 500 la greșeala administratorului
+
+`POST /admin/quotas` cu un `user_id` inexistent sau malformat dădea 500 — o
+încălcare de cheie străină ieșind ca eroare internă. Acum: `.uuid()` în schemă
+prinde forma greșită, iar SQLSTATE `23503` devine 400 cu „Unknown user_id".
+Verificat în toate trei direcțiile, inclusiv că utilizatorul real dă în
+continuare 201.
+
+### Verificat, nu presupus
+
+`DELETE /files/:id` și `POST /files/batch-delete` au fost confirmate separat că
+**șterg efectiv** — primul răspuns pe care-l primisem era 404 pe un fișier deja
+șters de pasul anterior, iar `batch-delete` raportase cândva `deleted:0`. Un cod
+de succes pe o ștergere care nu șterge arată identic cu una care șterge.
+
+## Ce e încă deschis
 - `cc11e15` (engine): „files are the uploader's unless they are library assets" —
   o schimbare de vizibilitate la listare, tot pe copia moartă, **neportată**.
 - `routes/media.ts` din engine (784 linii, 17 rute, toate acoperite de extensie)
