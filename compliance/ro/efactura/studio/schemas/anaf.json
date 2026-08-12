@@ -1,0 +1,81 @@
+{
+  "kind": "settings",
+  "title": "efactura.settings.title",
+  "subtitle": "efactura.settings.subtitle",
+  "dataSource": "/ext/compliance/ro/efactura/settings",
+  "dataPath": "data",
+  "saveEndpoint": "/ext/compliance/ro/efactura/settings",
+  "sections": [
+    {
+      "title": "efactura.settings.env",
+      "fields": [
+        {
+          "name": "environment",
+          "label": "efactura.settings.environment",
+          "type": "select",
+          "colSpan": 1,
+          "default": "test",
+          "options": [
+            {
+              "value": "test",
+              "label": "efactura.settings.envTest"
+            },
+            {
+              "value": "prod",
+              "label": "efactura.settings.envProd"
+            }
+          ]
+        },
+        {
+          "name": "seller_cif",
+          "label": "efactura.settings.sellerCif",
+          "colSpan": 1
+        }
+      ]
+    },
+    {
+      "title": "efactura.settings.oauth",
+      "fields": [
+        {
+          "name": "callback_url",
+          "label": "efactura.settings.callbackUrl",
+          "mono": true,
+          "colSpan": 2,
+          "placeholder": "efactura.settings.callbackHint"
+        },
+        {
+          "name": "client_id",
+          "label": "efactura.settings.clientId",
+          "mono": true,
+          "colSpan": 2
+        },
+        {
+          "name": "client_secret",
+          "label": "efactura.settings.clientSecret",
+          "type": "password",
+          "colSpan": 2,
+          "placeholder": "efactura.settings.leaveBlank"
+        }
+      ]
+    },
+    {
+      "title": "efactura.settings.cert",
+      "fields": [
+        {
+          "name": "cert_path",
+          "label": "efactura.settings.certPath",
+          "mono": true,
+          "colSpan": 2,
+          "placeholder": "efactura.settings.certPathHint"
+        },
+        {
+          "name": "cert_password",
+          "label": "efactura.settings.certPassword",
+          "type": "password",
+          "colSpan": 2,
+          "placeholder": "efactura.settings.leaveBlank"
+        }
+      ]
+    }
+  ]
+}

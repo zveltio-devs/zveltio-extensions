@@ -2,10 +2,27 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
+import type { Context } from 'hono';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
 
-// RO 2024 statutory rates
+/**
+ * Fallback rates, used only until the instance has a row of its own.
+ *
+ * These used to BE the rates: a literal in this file, with
+ * `computeRO(input, rates = RO_RATES)` offering a parameter no call site ever
+ * passed. So the statutory percentages were compiled into the bundle, and a
+ * legislative change — which happens every year — needed a new extension
+ * release shipped through the registry to every installation. An accountant who
+ * KNEW the new rate had nowhere to put it.
+ *
+ * They live in `zvd_payroll_rates` now (migration 006), seeded with exactly
+ * these numbers so nothing moves on upgrade. What changes is that they can be
+ * corrected.
+ *
+ * Left here as the fallback rather than deleted, because a payroll run that
+ * silently used zeroes would be worse than one using last year's figures.
+ */
 const RO_RATES = {
   cas_employee: 0.25,
   cass_employee: 0.10,
@@ -82,22 +99,130 @@ function generateD112Xml(period: any, entries: any[]): string {
 // executed as a formula when the export was opened.
 // biome-ignore lint/suspicious/noExplicitAny: ctx.internals is engine-typed
 function generateRevisalCsv(internals: any, employees: any[]): string {
+  // Fed from the `hr.employment` service now, which gives a single
+  // `employee_name` rather than the two columns this used to read. Split on the
+  // LAST space: a person with two given names has them before the surname here,
+  // and guessing wrong on a legal register is worse than one column being
+  // approximate.
+  //
+  // This export is known to be wrong in ways this change does not touch — it
+  // puts an internal id where a COR occupation code belongs, and `full_time`
+  // where the statutory contract-type nomenclature belongs. Deferred by the
+  // owner: ReviSal is Romania-specific and has moved to REGES-ONLINE, so it is
+  // an integration question rather than a payroll feature.
   const header = 'CNP,Nume,Prenume,DataAngajare,FunctieId,Salariu,ContractTip,DataSfarsit';
-  const rows = employees.map((e) =>
-    [
+  const rows = employees.map((e) => {
+    const name = String(e.employee_name ?? '').trim();
+    const cut = name.lastIndexOf(' ');
+    const first = cut === -1 ? name : name.slice(0, cut);
+    const last = cut === -1 ? '' : name.slice(cut + 1);
+    return [
       e.national_id ?? '',
-      e.last_name,
-      e.first_name,
-      e.hire_date,
-      e.position_id ?? '',
+      last,
+      first,
+      e.hire_date ?? '',
+      e.contract_id ?? '',
       e.salary ?? 0,
-      e.employment_type,
+      e.salary_period ?? '',
       e.end_date ?? '',
     ]
       .map((v) => internals.csvCell(v))
-      .join(','),
-  );
+      .join(',');
+  });
   return [header, ...rows].join('\n');
+}
+
+/**
+ * The instance's current rates, falling back to the built-in defaults.
+ *
+ * Read per calculation rather than cached: a correction made by an accountant
+ * has to apply to the next payroll run, not the next restart.
+ *
+ * Not effective-dated, and that is safe here rather than lucky —
+ * `zvd_payroll_entries` records the rates it was computed with on every row, so
+ * a closed period keeps its own figures when these change. What this table means
+ * is "the rates from now on".
+ */
+async function loadRates(dbh: any): Promise<typeof RO_RATES> {
+  const row = await sql`SELECT * FROM zvd_payroll_rates LIMIT 1`
+    .execute(dbh)
+    .catch(() => ({ rows: [] as any[] }));
+  const r = (row.rows as any[])[0];
+  if (!r) return RO_RATES;
+  return {
+    cas_employee: Number(r.cas_employee),
+    cass_employee: Number(r.cass_employee),
+    income_tax: Number(r.income_tax),
+    cas_employer: Number(r.cas_employer),
+    cam_employer: Number(r.cam_employer),
+    personal_deduction_base: Number(r.personal_deduction_base),
+  };
+}
+
+/**
+ * May this user approve or pay an entire payroll run?
+ *
+ * `POST /periods/:id/approve` and `POST /periods/:id/pay` sat behind one
+ * `payroll` permission — the same one needed to look at a payslip — and asked
+ * nothing else. Approving a period fixes what every employee is owed; paying it
+ * marks the money as gone out. Neither should be available to everyone who can
+ * read the module, and the person who generates a run should not be the one who
+ * signs it off.
+ *
+ * Missed on the first pass over this extension: the routes were pressed as an
+ * administrator and answered 200, which says nothing about who else could have
+ * pressed them. Found afterwards by a detector over the whole catalogue —
+ * extensions with a `permissionGate` and zero `checkPermission` that still have
+ * routes deciding something.
+ */
+async function mayDecidePayroll(
+  ctx: ExtensionContext,
+  user: any,
+  action: 'approve' | 'pay',
+): Promise<boolean> {
+  if (await ctx.checkPermission(user.id, 'payroll', action).catch(() => false)) return true;
+  return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
+}
+
+/**
+ * Employment terms, from the module that owns them.
+ *
+ * This file used to run `SELECT * FROM zvd_employees` in four places — another
+ * extension's table — and take `salary` off the row. That is why payroll could
+ * not see a contract: it was reading the projection rather than the thing being
+ * projected, so a part-time norm, a suspension and an amendment were all
+ * invisible here.
+ *
+ * `hr/employees` is a declared dependency of this extension, so the service is
+ * always there; the throw names what to do if somebody removes that.
+ */
+function employment(ctx: ExtensionContext) {
+  return ctx.services.get<{
+    payrollSubjects(): Promise<any[]>;
+    currentTerms(id: string): Promise<any | null>;
+  }>('hr.employment');
+}
+
+/**
+ * The answer when `hr/employees` is not there.
+ *
+ * The first version threw. `hr/employees` is a declared dependency, so the
+ * service is always present on a real install — but the contract-test harness
+ * loads each extension ON ITS OWN, and a throw made every read route crash
+ * instead of answering. An extension that cannot be looked at in isolation is
+ * one nobody can test in isolation either.
+ *
+ * 503 rather than 500: this is a dependency that is not running, which is a
+ * true statement about the deployment and a fixable one, not an internal error.
+ */
+function noEmploymentService(c: Context) {
+  return c.json(
+    {
+      error: 'hr/employees is not enabled. Payroll reads employment terms from it.',
+      code: 'dependency_unavailable',
+    },
+    503,
+  );
 }
 
 export function payrollRoutes(ctx: ExtensionContext): Hono {
@@ -141,7 +266,7 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       INSERT INTO zvd_payroll_periods (year, month, notes, created_by)
       VALUES (${d.year}, ${d.month}, ${d.notes ?? null}, ${user.id})
-      ON CONFLICT (year, month) DO NOTHING RETURNING *
+      ON CONFLICT (tenant_id, year, month) DO NOTHING RETURNING *
     `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Period already exists' }, 409);
     return c.json({ data: row.rows[0] }, 201);
@@ -154,17 +279,33 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
     if (!period.rows.length) return c.json({ error: 'Period not found or not open' }, 400);
     const p = period.rows[0] as any;
 
-    const employees = await sql`
-      SELECT * FROM zvd_employees WHERE status = 'active' AND employment_type != 'contractor'
-    `.execute(db);
+    // Who gets paid, and on what terms — the contract's, when there is one.
+    // A suspended contract is excluded by the service, so somebody on parental
+    // leave no longer lands on the run at full salary.
+    const svc = employment(ctx);
+    if (!svc) return noEmploymentService(c);
+    const subjects = await svc.payrollSubjects();
+
+    // Loaded once for the run: every entry in a period is computed with the same
+    // rates, and the row each entry stores records which ones those were.
+    const rates = await loadRates(db);
 
     let generated = 0;
-    for (const emp of employees.rows as any[]) {
+    const skipped: Array<{ employee: string; reason: string }> = [];
+    for (const emp of subjects) {
+      // Only a monthly salary can be turned into a month's gross without more
+      // information. An hourly or daily contract needs the hours actually
+      // worked, which lives in hr/time-tracking — so it is SKIPPED with a
+      // reason rather than multiplied by a number nobody agreed to.
+      if (emp.salary_period !== 'month') {
+        skipped.push({ employee: emp.employee_name, reason: `salary_period=${emp.salary_period}` });
+        continue;
+      }
       const gross = +(emp.salary ?? 0);
       // Get adjustments for this employee in this period
       const adjs = await sql`
         SELECT * FROM zvd_payroll_adjustments WHERE entry_id IN (
-          SELECT id FROM zvd_payroll_entries WHERE period_id = ${p.id} AND employee_id = ${emp.id}
+          SELECT id FROM zvd_payroll_entries WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id}
         )
       `.execute(db);
       let taxable_bonuses = 0;
@@ -176,24 +317,24 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
       // Sick leave for this period
       const sick = await sql`
         SELECT COALESCE(SUM(days), 0) as days, COALESCE(SUM(amount), 0) as amount
-        FROM zvd_payroll_sick_leave WHERE period_id = ${p.id} AND employee_id = ${emp.id}
+        FROM zvd_payroll_sick_leave WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id}
       `.execute(db);
       const sickDays = +(sick.rows[0] as any).days;
       const sickAmount = +(sick.rows[0] as any).amount;
       // Meal vouchers
       const vouchers = await sql`
         SELECT COALESCE(SUM(total_value), 0) as total FROM zvd_payroll_meal_vouchers
-        WHERE period_id = ${p.id} AND employee_id = ${emp.id}
+        WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id}
       `.execute(db);
       const mealVouchersAmount = +(vouchers.rows[0] as any).total;
       // Overtime
       const overtime = await sql`
         SELECT COALESCE(SUM(amount), 0) as amount FROM zvd_payroll_overtime
-        WHERE period_id = ${p.id} AND employee_id = ${emp.id} AND is_night_shift = false
+        WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id} AND is_night_shift = false
       `.execute(db);
       const nightShift = await sql`
         SELECT COALESCE(SUM(amount), 0) as amount FROM zvd_payroll_overtime
-        WHERE period_id = ${p.id} AND employee_id = ${emp.id} AND is_night_shift = true
+        WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id} AND is_night_shift = true
       `.execute(db);
       const overtimeAmt = +(overtime.rows[0] as any).amount;
       const nightShiftAmt = +(nightShift.rows[0] as any).amount;
@@ -202,7 +343,7 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
         gross, taxable_bonuses, deductions,
         sick_leave_days: sickDays, sick_leave_amount: sickAmount,
         meal_vouchers: mealVouchersAmount, overtime_amount: overtimeAmt, night_shift_bonus: nightShiftAmt,
-      });
+      }, rates);
 
       await sql`
         INSERT INTO zvd_payroll_entries (
@@ -212,11 +353,20 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
           cas_employer_rate, cam_rate, cas_employer, cam, total_employer_cost,
           sick_leave_days, sick_leave_amount, meal_vouchers_amount, overtime_amount, night_shift_bonus
         ) VALUES (
-          ${p.id}, ${emp.id}, ${emp.first_name + ' ' + emp.last_name}, ${calc.gross}, ${mealVouchersAmount}, 0,
-          ${RO_RATES.cas_employee}, ${RO_RATES.cass_employee}, ${RO_RATES.income_tax},
+          ${p.id}, ${emp.employee_id}, ${emp.employee_name}, ${calc.gross}, ${mealVouchersAmount}, 0,
+          -- The rates this payslip was ACTUALLY computed with, not the built-in
+          -- constants. They were the same thing while the constants were the
+          -- only source; now that an accountant can correct them, writing the
+          -- constants here would make a payslip record a percentage that does
+          -- not match its own amounts. Caught exactly that way: employer cost
+          -- fell to the corrected rate while the stored rate still read 0.0400.
+          --
+          -- These columns are also what makes the rates table safe without
+          -- effective dating — a closed period keeps its own figures.
+          ${rates.cas_employee}, ${rates.cass_employee}, ${rates.income_tax},
           ${calc.cas_emp}, ${calc.cass_emp}, ${calc.personal_deduction}, ${calc.taxable_income},
           ${calc.income_tax}, ${calc.net},
-          ${RO_RATES.cas_employer}, ${RO_RATES.cam_employer}, ${calc.cas_empl}, ${calc.cam_empl},
+          ${rates.cas_employer}, ${rates.cam_employer}, ${calc.cas_empl}, ${calc.cam_empl},
           ${calc.total_employer_cost}, ${sickDays}, ${sickAmount}, ${mealVouchersAmount},
           ${overtimeAmt}, ${nightShiftAmt}
         )
@@ -232,11 +382,17 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
       generated++;
     }
     await sql`UPDATE zvd_payroll_periods SET status = 'calculated', updated_at = NOW() WHERE id = ${p.id}`.execute(db);
-    return c.json({ data: { generated } });
+    // `skipped` is reported rather than swallowed: a run that quietly produced
+    // fewer payslips than there are employees is the kind of thing nobody
+    // notices until somebody is not paid.
+    return c.json({ data: { generated, skipped } });
   });
 
   app.post('/periods/:id/approve', async (c) => {
     const user = c.get('user') as any;
+    if (!(await mayDecidePayroll(ctx, user, 'approve'))) {
+      return c.json({ error: 'You may not approve a payroll period' }, 403);
+    }
     await sql`UPDATE zvd_payroll_entries SET status = 'approved', updated_at = NOW() WHERE period_id = ${c.req.param('id')} AND status = 'draft'`.execute(db);
     const row = await sql`
       UPDATE zvd_payroll_periods SET status = 'calculated', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
@@ -247,6 +403,10 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/periods/:id/pay', async (c) => {
+    const user = c.get('user') as any;
+    if (!(await mayDecidePayroll(ctx, user, 'pay'))) {
+      return c.json({ error: 'You may not mark a payroll period paid' }, 403);
+    }
     await sql`UPDATE zvd_payroll_entries SET paid_at = NOW(), updated_at = NOW() WHERE period_id = ${c.req.param('id')} AND status = 'approved'`.execute(db);
     const row = await sql`
       UPDATE zvd_payroll_periods SET status = 'closed', paid_at = NOW(), updated_at = NOW()
@@ -278,8 +438,10 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const d = c.req.valid('json');
     // Sick leave: 75% of base salary per day (RO statutory)
-    const emp = await sql`SELECT salary FROM zvd_employees WHERE id = ${d.employee_id}`.execute(db);
-    const dailyGross = emp.rows.length ? +(emp.rows[0] as any).salary / 21.75 : 0;
+    const svc = employment(ctx);
+    if (!svc) return noEmploymentService(c);
+    const terms = await svc.currentTerms(d.employee_id);
+    const dailyGross = terms?.salary ? +terms.salary / 21.75 : 0;
     const amount = dailyGross * d.days * 0.75;
     const row = await sql`
       INSERT INTO zvd_payroll_sick_leave (period_id, employee_id, days, amount, leave_request_id, notes)
@@ -316,8 +478,15 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
     description: z.string().optional(),
   })), async (c) => {
     const d = c.req.valid('json');
-    const emp = await sql`SELECT salary FROM zvd_employees WHERE id = ${d.employee_id}`.execute(db);
-    const hourlyRate = emp.rows.length ? +(emp.rows[0] as any).salary / 168 : 0;
+    const svc = employment(ctx);
+    if (!svc) return noEmploymentService(c);
+    const terms = await svc.currentTerms(d.employee_id);
+    // The hourly rate follows the CONTRACTED norm, not a fixed 168 hours.
+    // Dividing a part-time salary by a full month made overtime cheaper the
+    // fewer hours somebody was contracted for — backwards, and invisible while
+    // the norm was not recorded anywhere.
+    const monthlyHours = ((terms?.weekly_hours ?? 40) * 52) / 12;
+    const hourlyRate = terms?.salary ? +terms.salary / monthlyHours : 0;
     const amount = hourlyRate * d.hours * d.rate_multiplier;
     const row = await sql`
       INSERT INTO zvd_payroll_overtime (period_id, employee_id, hours, rate_multiplier, amount, is_night_shift, description)
@@ -369,8 +538,10 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
 
   // ── ReviSal CSV export ─────────────────────────────────────────
   app.get('/revisal', async (c) => {
-    const employees = await sql`SELECT * FROM zvd_employees WHERE status = 'active'`.execute(db);
-    const csv = generateRevisalCsv(ctx.internals, employees.rows as any[]);
+    const svc = employment(ctx);
+    if (!svc) return noEmploymentService(c);
+    const subjects = await svc.payrollSubjects();
+    const csv = generateRevisalCsv(ctx.internals, subjects as any[]);
     return new Response(csv, { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': `attachment; filename="ReviSal_${new Date().toISOString().slice(0, 10)}.csv"` } });
   });
 
@@ -385,11 +556,57 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
     personal_deduction: z.number().min(0).default(500),
   })), async (c) => {
     const d = c.req.valid('json');
-    const calc = computeRO({ gross: d.gross_salary, ...d });
+    const calc = computeRO({ gross: d.gross_salary, ...d }, await loadRates(db));
     return c.json({ data: { ...calc, rates: RO_RATES } });
   });
 
   // ── Stats ──────────────────────────────────────────────────────
+  // ── Statutory rates ──────────────────────────────────────────────
+  //
+  // The percentages change by law, usually once a year and sometimes mid-year.
+  // Until now they were a literal in this file, so following the law meant
+  // waiting for an extension release. These two routes are what an accountant
+  // needs: read what the instance is using, and correct it.
+
+  app.get('/rates', async (c) => {
+    return c.json({ data: await loadRates(db) });
+  });
+
+  app.put('/rates', zValidator('json', z.object({
+    cas_employee: z.number().min(0).max(1).optional(),
+    cass_employee: z.number().min(0).max(1).optional(),
+    income_tax: z.number().min(0).max(1).optional(),
+    // 0 for normal working conditions, which is what most employers owe.
+    cas_employer: z.number().min(0).max(1).optional(),
+    cam_employer: z.number().min(0).max(1).optional(),
+    personal_deduction_base: z.number().min(0).optional(),
+  })), async (c) => {
+    const d = c.req.valid('json');
+    const current = await loadRates(db);
+    const m = { ...current, ...d };
+
+    // `tenant_id` is left to its column default, which reads the tenant GUC of
+    // the surrounding transaction — so the row lands in the caller's tenant.
+    await sql`
+      INSERT INTO zvd_payroll_rates (
+        cas_employee, cass_employee, income_tax, cas_employer, cam_employer, personal_deduction_base, updated_at
+      ) VALUES (
+        ${m.cas_employee}, ${m.cass_employee}, ${m.income_tax},
+        ${m.cas_employer}, ${m.cam_employer}, ${m.personal_deduction_base}, NOW()
+      )
+      ON CONFLICT (tenant_id) DO UPDATE SET
+        cas_employee = EXCLUDED.cas_employee,
+        cass_employee = EXCLUDED.cass_employee,
+        income_tax = EXCLUDED.income_tax,
+        cas_employer = EXCLUDED.cas_employer,
+        cam_employer = EXCLUDED.cam_employer,
+        personal_deduction_base = EXCLUDED.personal_deduction_base,
+        updated_at = NOW()
+    `.execute(db);
+
+    return c.json({ data: await loadRates(db) });
+  });
+
   app.get('/stats', async (c) => {
     const row = await sql`
       SELECT

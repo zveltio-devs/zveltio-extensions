@@ -81,7 +81,7 @@ export function assetsRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
     const row = await sql`
-      INSERT INTO zvd_assets (name, asset_code, category, description, serial_number, location,
+      INSERT INTO zvd_assets (name, code, category, description, serial_number, location,
         purchase_date, purchase_cost, current_value, useful_life_years, residual_value,
         depreciation_method, warranty_expiry, depreciation_account_id, accumulated_dep_account_id, created_by)
       VALUES (${d.name}, ${d.asset_code ?? null}, ${d.category ?? null}, ${d.description ?? null},
@@ -107,7 +107,7 @@ export function assetsRoutes(ctx: ExtensionContext): Hono {
         if (bookValue - amount < d.residual_value) amount = Math.max(bookValue - d.residual_value, 0);
       }
       bookValue = Math.max(bookValue - amount, d.residual_value);
-      await sql`INSERT INTO zvd_asset_depreciation (asset_id, period_date, amount, book_value_after) VALUES (${asset.id}, ${periodDate.toISOString().slice(0, 10)}, ${amount}, ${bookValue})`.execute(db);
+      await sql`INSERT INTO zvd_asset_depreciation (asset_id, period, amount, book_value_after) VALUES (${asset.id}, ${periodDate.toISOString().slice(0, 10)}, ${amount}, ${bookValue})`.execute(db);
     }
     return c.json({ data: asset }, 201);
   });
@@ -252,8 +252,8 @@ export function assetsRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
     const row = await sql`
-      INSERT INTO zvd_asset_maintenance (asset_id, date, type, description, cost, performed_by, next_maintenance_date, created_by)
-      VALUES (${c.req.param('id')}, ${d.date}, ${d.type}, ${d.description}, ${d.cost}, ${d.performed_by ?? null}, ${d.next_maintenance_date ?? null}, ${user.id})
+      INSERT INTO zvd_asset_maintenance (asset_id, scheduled_date, type, description, cost, performed_by, created_by)
+      VALUES (${c.req.param('id')}, ${d.date}, ${d.type}, ${d.description}, ${d.cost}, ${d.performed_by ?? null}, ${user.id})
       RETURNING *
     `.execute(db);
     if (d.next_maintenance_date) {

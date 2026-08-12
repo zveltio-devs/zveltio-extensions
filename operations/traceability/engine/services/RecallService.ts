@@ -50,7 +50,7 @@ export class RecallService {
         ${params.reason},
         ${params.initiatedBy},
         now(),
-        ${JSON.stringify(downstream.affected_lots)}::jsonb,
+        ${JSON.stringify(downstream.affected_lots)}::text::jsonb,
         'active'
       )
       RETURNING *

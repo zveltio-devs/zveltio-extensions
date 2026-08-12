@@ -3,7 +3,7 @@
   "displayName": "Helpdesk",
   "category": "projects",
   "description": "Support ticket management with SLA timers, priorities, assignments and message threads",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-helpdesk",
@@ -33,8 +33,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "0dbbc9e99bdc8420531b4a050a40d7708e168ad5ee4b359c6d7c246a0e727898",
-    "sourceSha256": "4e0973da3d2db3b2f1fc9a3e69d1dc4612fa67a4bf64cc5a62ec4de15ac3bcbf"
+    "engineSha256": "f28c0ab7d32c5dfac5c4325aaaf34fcffb77ffc86a4d1867d7477a6c9e1dd7bd",
+    "sourceSha256": "87612f7268e52f8c8a3a6ffce4865ec74a5725098aef4f701652644d47613f6f"
   },
   "resources": [
     "helpdesk"

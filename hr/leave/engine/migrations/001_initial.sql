@@ -34,7 +34,7 @@ VALUES
   (gen_random_uuid(), 'Annual Leave', 'CO', 21, true, '#069494', true, 'system'),
   (gen_random_uuid(), 'Sick Leave', 'CM', 30, true, '#ef4444', false, 'system'),
   (gen_random_uuid(), 'Unpaid Leave', 'CFP', 30, false, '#94a3b8', true, 'system')
-ON CONFLICT (code) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS zvd_leave_balances (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -97,7 +97,7 @@ INSERT INTO zvd_public_holidays (date, name, year) VALUES
   ('2025-12-01', 'Ziua Națională', 2025),
   ('2025-12-25', 'Crăciun', 2025),
   ('2025-12-26', 'A doua zi de Crăciun', 2025)
-ON CONFLICT (date) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- Leave carry-over rules
 CREATE TABLE IF NOT EXISTS zvd_leave_carryover_rules (

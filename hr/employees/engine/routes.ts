@@ -118,9 +118,34 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
   app.get('/org-chart', async (c) => {
     const rows = await sql`
       WITH RECURSIVE org AS (
-        SELECT id, first_name, last_name, position_id, department_id, manager_id,
-          0 as depth, ARRAY[id] as path
-        FROM zvd_employees WHERE manager_id IS NULL AND status = 'active'
+        SELECT e.id, e.first_name, e.last_name, e.position_id, e.department_id, e.manager_id,
+          0 as depth, ARRAY[e.id] as path
+        -- A root is somebody with no ACTIVE manager, not somebody with no
+        -- manager row.
+        --
+        -- The recursion only ever reaches people through their manager, and the
+        -- join below is restricted to active employees. So an active employee
+        -- whose manager has LEFT was neither a root (they still have a
+        -- manager_id) nor reachable (their manager is not in the tree) — and
+        -- vanished from the chart entirely. Silently: the page just renders
+        -- fewer people.
+        --
+        -- That is not an edge case. It happens every time a manager leaves, to
+        -- everyone who reported to them, until somebody notices and reassigns.
+        -- Measured on a virgin database: four active employees, three on the
+        -- chart.
+        --
+        -- Orphans surface at the top level, which is also the honest rendering:
+        -- these are the people whose reporting line needs a decision.
+        FROM zvd_employees e
+        WHERE e.status = 'active'
+          AND (
+            e.manager_id IS NULL
+            OR NOT EXISTS (
+              SELECT 1 FROM zvd_employees m
+              WHERE m.id = e.manager_id AND m.status = 'active'
+            )
+          )
         UNION ALL
         SELECT e.id, e.first_name, e.last_name, e.position_id, e.department_id, e.manager_id,
           org.depth + 1, org.path || e.id
@@ -218,7 +243,31 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     phone: z.string().optional(),
     birth_date: z.string().optional(),
     gender: z.enum(['m','f','other']).optional(),
-    national_id: z.string().optional(),
+    national_id: z
+      .string()
+      .optional()
+      // Checked by whatever the instance's country extension registered, and
+      // not otherwise.
+      //
+      // A national identifier is not a shape this module can know: a CNP, an NI
+      // number and a social security number share nothing but a column. The
+      // first version of this validated a CNP right here, which quietly made an
+      // HR module that only fits one country — the wrong trade for catching a
+      // typo.
+      //
+      // So the rule lives with the country and is looked up per request, which
+      // also means an extension enabled after this one still applies. Nothing
+      // registered means no format check: an instance outside that country is
+      // not told its identifiers are malformed by a rule written for somebody
+      // else.
+      .refine(
+        (v) => {
+          if (v === undefined || v === '') return true;
+          const validate = ctx.services.get<(value: string) => boolean>('identity.nationalId');
+          return validate ? validate(v) : true;
+        },
+        { message: 'Invalid national identifier for this country / identificator national invalid' },
+      ),
     tax_id: z.string().optional(),
     hire_date: z.string(),
     department_id: z.string().uuid().optional(),
@@ -490,6 +539,12 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/performance/cycles/:id/close', async (c) => {
+    const user = c.get('user') as any;
+    // Closing a review cycle freezes everybody's ratings for that period.
+    if (!(await ctx.checkPermission(user.id, 'employees', 'close').catch(() => false)) &&
+        !(await ctx.checkPermission(user.id, 'admin', '*').catch(() => false))) {
+      return c.json({ error: 'You may not close a performance cycle' }, 403);
+    }
     const row = await sql`UPDATE zvd_performance_cycles SET status = 'closed' WHERE id = ${c.req.param('id')} RETURNING *`.execute(db);
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });

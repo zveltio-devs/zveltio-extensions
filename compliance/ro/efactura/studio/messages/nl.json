@@ -36,5 +36,22 @@
   "compliance.ro.efactura.ui.fac_2026_001": "FAC-2026-001",
   "compliance.ro.efactura.ui.invoice_date": "Factuurdatum",
   "compliance.ro.efactura.ui.invoice_number": "Factuurnummer",
-  "compliance.ro.efactura.ui.new_invoice": "Nieuwe factuur"
+  "compliance.ro.efactura.ui.new_invoice": "Nieuwe factuur",
+  "efactura.settings.callbackHint": "Moet EXACT overeenkomen met wat u bij ANAF hebt geregistreerd",
+  "efactura.settings.callbackUrl": "Callback-URL",
+  "efactura.settings.cert": "Gekwalificeerd certificaat",
+  "efactura.settings.certPassword": "Certificaatwachtwoord",
+  "efactura.settings.certPath": "Certificaatpad op deze server",
+  "efactura.settings.certPathHint": "bijv. /etc/zveltio/anaf.p12 — het bestand blijft op de server",
+  "efactura.settings.clientId": "Client-ID",
+  "efactura.settings.clientSecret": "Client secret",
+  "efactura.settings.env": "Omgeving",
+  "efactura.settings.envProd": "Productie — echt ingediend",
+  "efactura.settings.envTest": "Test — geen fiscaal effect",
+  "efactura.settings.environment": "Doel",
+  "efactura.settings.leaveBlank": "Laat leeg om de opgeslagen waarde te behouden",
+  "efactura.settings.oauth": "OAuth-toepassing",
+  "efactura.settings.sellerCif": "Indienend btw-nummer",
+  "efactura.settings.subtitle": "Inloggegevens voor SPV-indiening",
+  "efactura.settings.title": "ANAF-verbinding"
 }

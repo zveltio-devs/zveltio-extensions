@@ -265,7 +265,17 @@ export function aiSchemaGenRoutes(ctx: ExtensionContext): Hono {
       }
     }
 
-    // Step 4: If seed requested, generate seed data via LLM
+    // Step 4: If seed requested, generate seed data via LLM.
+    //
+    // The rows are returned, NOT inserted, and the response says so. They cannot
+    // be inserted from here: step 3 only ENQUEUES the DDL, so at this point the
+    // tables do not exist yet — an insert would fail on every one of them.
+    //
+    // Previously this option looked like it seeded. It accepted `seed` and
+    // `seed_count`, asked the model for rows, put them in the response body and
+    // wrote nothing, so the caller got a 200 and an empty table. Naming the
+    // behaviour is the fix; making `seed` actually write would mean waiting on the
+    // DDL queue, which is a different feature and belongs behind its own flag.
     let seedRecords: Record<string, any[]> = seed_data || {};
     if (seed && created.length > 0 && !seed_data) {
       try {
@@ -285,8 +295,10 @@ Response format:
 
         const seedJson = seedResult.content.match(/\{[\s\S]*\}/)?.[0];
         if (seedJson) seedRecords = JSON.parse(seedJson);
-      } catch {
-        // Non-fatal: schema was created, seed data just wasn't generated
+      } catch (err) {
+        // Non-fatal: schema was queued, seed rows just weren't generated. Named,
+        // because the caller asked for them and is about to get an empty object.
+        console.warn('[ai-schema-gen] seed generation failed:', (err as Error).message);
       }
     }
 
@@ -296,7 +308,17 @@ Response format:
       skipped,
       job_ids: jobIds,
       seed_data: seedRecords,
-      message: `Created ${created.length} collection(s)${skipped.length > 0 ? `, skipped ${skipped.length} (already exist)` : ''}.`,
+      seed_data_inserted: false,
+      // "Queued", not "Created": step 3 enqueues DDL jobs, and a job can still
+      // fail after this response. Reporting creation for work that has not run
+      // is how a status column ends up disagreeing with the schema.
+      message:
+        `Queued ${created.length} collection(s) for creation` +
+        `${skipped.length > 0 ? `, skipped ${skipped.length} (already exist)` : ''}. ` +
+        `Track them with job_ids.` +
+        (Object.keys(seedRecords).length > 0
+          ? ` Seed rows are returned for review and were NOT inserted — the tables do not exist until the DDL jobs complete.`
+          : ''),
     });
   });
 

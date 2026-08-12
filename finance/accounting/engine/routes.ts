@@ -5,6 +5,32 @@ import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
 
+/**
+ * Is this user allowed to take an accounting decision that cannot be undone?
+ *
+ * Three routes here change the books rather than describe them: voiding a
+ * posted journal entry, closing a fiscal year, and marking a tax report
+ * submitted. All three ran behind one `accounting` permission and no further
+ * question — so anybody who could read the ledger could void an entry in it.
+ *
+ * Voiding is the one that matters most and looks the least dramatic. A posted
+ * entry is the evidence; reversing it without a trace of WHO decided is how a
+ * ledger stops being a record. Closing a year is irreversible by design, and a
+ * tax report marked submitted is a claim to the authorities that it was.
+ *
+ * A named action rather than a role: `accounting:void`, `accounting:close`,
+ * `accounting:submit`, each granted deliberately. `admin` remains sufficient so
+ * an existing install keeps working before anyone edits policies.
+ */
+async function mayDecide(
+  ctx: ExtensionContext,
+  user: any,
+  action: 'void' | 'close' | 'submit',
+): Promise<boolean> {
+  if (await ctx.checkPermission(user.id, 'accounting', action).catch(() => false)) return true;
+  return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
+}
+
 export function accountingRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
@@ -127,6 +153,9 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
 
   app.post('/fiscal-years/:id/close', async (c) => {
     const user = c.get('user') as any;
+    if (!(await mayDecide(ctx, user, 'close'))) {
+      return c.json({ error: 'You may not close a fiscal year' }, 403);
+    }
     // Check no draft entries in this year
     const fy = await sql`SELECT * FROM zvd_fiscal_years WHERE id = ${c.req.param('id')} AND status = 'open'`.execute(db);
     if (!fy.rows.length) return c.json({ error: 'Fiscal year not found or already closed' }, 400);
@@ -167,7 +196,7 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       INSERT INTO zvd_exchange_rates (from_currency, to_currency, rate, date, source)
       VALUES (${d.from_currency}, ${d.to_currency}, ${d.rate}, ${d.date}, ${d.source})
-      ON CONFLICT (from_currency, to_currency, date) DO UPDATE SET rate = EXCLUDED.rate
+      ON CONFLICT (tenant_id, from_currency, to_currency, date) DO UPDATE SET rate = EXCLUDED.rate
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] });
@@ -293,6 +322,9 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
 
   app.post('/journal/:id/void', async (c) => {
     const user = c.get('user') as any;
+    if (!(await mayDecide(ctx, user, 'void'))) {
+      return c.json({ error: 'You may not void journal entries' }, 403);
+    }
     const entry = await sql`SELECT * FROM zvd_journal_entries WHERE id = ${c.req.param('id')} AND status = 'posted'`.execute(db);
     if (!entry.rows.length) return c.json({ error: 'Entry not found or not posted' }, 400);
     const e = entry.rows[0] as any;
@@ -511,6 +543,10 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/tax-reports/:id/submit', async (c) => {
+    const user = c.get('user') as any;
+    if (!(await mayDecide(ctx, user, 'submit'))) {
+      return c.json({ error: 'You may not submit tax reports' }, 403);
+    }
     const row = await sql`
       UPDATE zvd_tax_reports SET status = 'submitted', submitted_at = NOW()
       WHERE id = ${c.req.param('id')} AND status = 'draft' RETURNING *

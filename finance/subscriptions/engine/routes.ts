@@ -21,6 +21,23 @@ function computeProration(
 // Dunning intervals: retry on day 1, 3, 7, 14 after failure
 const DUNNING_DAYS = [1, 3, 7, 14];
 
+/**
+ * May this user take the decision this module exists to record?
+ *
+ * Marcarea unei facturi de abonament ca plătită, și anularea unui abonat. Prima închide o creanță pe o afirmație neverificată; a doua oprește o încasare recurentă.
+ *
+ * It sat behind one `subscriptions` permission — the same one needed to look at the
+ * list — and asked nothing else. Found by `scripts/check-decision-routes.ts`,
+ * which was written after the same shape turned up in four extensions in a row.
+ *
+ * `subscriptions:settle`, granted deliberately, with `admin` still sufficient so an
+ * existing install keeps working before anyone edits policies.
+ */
+async function mayDecide(ctx: ExtensionContext, user: any): Promise<boolean> {
+  if (await ctx.checkPermission(user.id, 'subscriptions', 'settle').catch(() => false)) return true;
+  return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
+}
+
 export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
@@ -154,11 +171,11 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
       ? new Date(Date.now() + p.trial_days * 86400000).toISOString().slice(0, 10)
       : null;
     const row = await sql`
-      INSERT INTO zvd_subscribers (plan_id, contact_id, organization_id, client_name, client_email,
-        start_date, trial_end_date, status, notes, created_by)
+      INSERT INTO zvd_subscribers (plan_id, contact_id, organization_id, name, email,
+        current_period_start, trial_end, status, metadata, created_by)
       VALUES (${d.plan_id}, ${d.contact_id ?? null}, ${d.organization_id ?? null},
         ${d.client_name}, ${d.client_email}, ${startDate}, ${trialEnd},
-        ${trialEnd ? 'trialing' : 'active'}, ${d.notes ?? null}, ${user.id})
+        ${trialEnd ? 'trialing' : 'active'}, ${JSON.stringify(d.notes ? { notes: d.notes } : {})}::jsonb, ${user.id})
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
@@ -223,6 +240,8 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
     reason: z.string().optional(),
     cancel_at_period_end: z.boolean().default(false),
   })), async (c) => {
+    const _u = c.get('user') as any;
+    if (!(await mayDecide(ctx, _u))) return c.json({ error: 'Not allowed' }, 403);
     const { reason, cancel_at_period_end } = c.req.valid('json');
     const status = cancel_at_period_end ? 'cancel_scheduled' : 'cancelled';
     const row = await sql`
@@ -305,6 +324,8 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/invoices/:id/pay', async (c) => {
+    const _u = c.get('user') as any;
+    if (!(await mayDecide(ctx, _u))) return c.json({ error: 'Not allowed' }, 403);
     const row = await sql`
       UPDATE zvd_subscription_invoices SET status = 'paid', paid_at = NOW(), updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND status = 'open' RETURNING *

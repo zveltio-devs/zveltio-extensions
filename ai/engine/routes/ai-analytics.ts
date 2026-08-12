@@ -20,6 +20,26 @@ function parseDays(range: string): number {
   return (map[range] ?? parseInt(range)) || 30;
 }
 
+/**
+ * Keeps the empty fallback, names the failure.
+ *
+ * Every query in this file was `.catch(() => [])` — or, for the summary,
+ * `.catch(() => ({ total_requests: '0', … }))`. An analytics panel is not worth a
+ * 500, so the fallback stays. What it cannot do is stay silent: a broken query and
+ * an instance with no AI usage render the identical screen, and the reading
+ * everybody takes from a wall of zeros is "nobody uses this", not "the query is
+ * wrong". A dashboard elsewhere in this product reported zero collections and zero
+ * webhooks on an instance that had both, for exactly this reason.
+ *
+ * The panel name goes in the log so the failing query is identified, not inferred.
+ */
+function logAndFallback<T>(panel: string, fallback: T): (err: Error) => T {
+  return (err: Error) => {
+    console.warn(`[ai.analytics] "${panel}" query failed, showing empty:`, err.message);
+    return fallback;
+  };
+}
+
 export function aiAnalyticsRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
   const app = new Hono();
@@ -65,7 +85,7 @@ export function aiAnalyticsRoutes(ctx: ExtensionContext): Hono {
         )                                                         AS top_provider
       FROM zv_ai_usage
       WHERE created_at >= ${since.toISOString()}
-    `.execute(db).then((r) => r.rows[0]).catch(() => ({
+    `.execute(db).then((r) => r.rows[0]).catch(logAndFallback('summary', {
       total_requests: '0', total_tokens: '0', avg_latency: '0', top_provider: null,
     }));
 
@@ -95,7 +115,7 @@ export function aiAnalyticsRoutes(ctx: ExtensionContext): Hono {
       WHERE created_at >= ${since.toISOString()}
       GROUP BY provider
       ORDER BY requests DESC
-    `.execute(db).then((r) => r.rows).catch(() => []);
+    `.execute(db).then((r) => r.rows).catch(logAndFallback('by-provider', []));
 
     return c.json({ providers: byProvider });
   });
@@ -121,7 +141,7 @@ export function aiAnalyticsRoutes(ctx: ExtensionContext): Hono {
       WHERE created_at >= ${since.toISOString()}
       GROUP BY DATE_TRUNC('day', created_at)
       ORDER BY date ASC
-    `.execute(db).then((r) => r.rows).catch(() => []);
+    `.execute(db).then((r) => r.rows).catch(logAndFallback('daily', []));
 
     return c.json({ daily });
   });
@@ -149,7 +169,7 @@ export function aiAnalyticsRoutes(ctx: ExtensionContext): Hono {
       WHERE created_at >= ${since.toISOString()}
       GROUP BY operation
       ORDER BY requests DESC
-    `.execute(db).then((r) => r.rows).catch(() => []);
+    `.execute(db).then((r) => r.rows).catch(logAndFallback('by-operation', []));
 
     return c.json({ operations: byOperation });
   });
@@ -180,7 +200,7 @@ export function aiAnalyticsRoutes(ctx: ExtensionContext): Hono {
       GROUP BY u.user_id, usr.name
       ORDER BY total_tokens DESC
       LIMIT ${limit}
-    `.execute(db).then((r) => r.rows).catch(() => []);
+    `.execute(db).then((r) => r.rows).catch(logAndFallback('top-users', []));
 
     return c.json({ users: topUsers });
   });
@@ -207,7 +227,7 @@ export function aiAnalyticsRoutes(ctx: ExtensionContext): Hono {
         AND provider IN ('openai', 'anthropic')
       GROUP BY provider
       HAVING AVG(prompt_tokens + response_tokens) < 200
-    `.execute(db).then((r) => r.rows).catch(() => []);
+    `.execute(db).then((r) => r.rows).catch(logAndFallback('small-cloud-requests', []));
 
     for (const row of smallCloudRequests) {
       recommendations.push({
@@ -228,7 +248,7 @@ export function aiAnalyticsRoutes(ctx: ExtensionContext): Hono {
       WHERE created_at >= NOW() - INTERVAL '7 days'
       GROUP BY provider
       HAVING AVG(latency_ms) > 5000
-    `.execute(db).then((r) => r.rows).catch(() => []);
+    `.execute(db).then((r) => r.rows).catch(logAndFallback('high-latency', []));
 
     for (const row of highLatency) {
       recommendations.push({

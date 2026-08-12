@@ -3,7 +3,7 @@
   "displayName": "Quotes & Proposals",
   "category": "finance",
   "description": "Generate branded PDF quotes and proposals linked to CRM contacts, with convert-to-invoice action",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-quotes",
@@ -43,8 +43,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "0c6f13fb16c674251862ec342ec07de9eac0a5b683cd774c2c5d51ee3e17ac73",
-    "sourceSha256": "d97c519174996dc6c987c6ce96b5086ef0d928074b5f1b55fbb2c74739563d47"
+    "engineSha256": "a062c599380413b2cf6ee990216fd6dfc0a668c7b5245631840c8954b2ffe981",
+    "sourceSha256": "af23822660e0f850902a3df00cb68d4c6bfc4ba58edda3abcefd4847f1c312a8"
   },
   "resources": [
     "quotes"

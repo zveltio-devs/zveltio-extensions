@@ -34,18 +34,22 @@ const CustomDocUpdateSchema = CustomDocCreateSchema.partial();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function getSettingValue(dbh: any, key: string): Promise<any> {
-  try {
-    const row = await (dbh as any)
-      .selectFrom('zv_settings')
-      .select('value')
-      .where('key', '=', key)
-      .executeTakeFirst();
-    if (!row) return null;
-    return typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
-  } catch {
-    return null;
-  }
+/**
+ * Is this tenant's documentation open to anonymous visitors?
+ *
+ * Reads `zvd_api_docs_config`, this extension's own table. It used to read
+ * `zv_settings`, an engine system table that `ctx.db` refuses, behind a
+ * `catch { return null }` — so the answer was always `null`, the caller always
+ * fell through to "needs a session", and the switch could not be turned on from
+ * anywhere. Not a setting left off: one that could not be read. See migration
+ * 004.
+ */
+async function readDocsPublic(dbh: any): Promise<boolean> {
+  const row = await (dbh as any)
+    .selectFrom('zvd_api_docs_config')
+    .select('is_public')
+    .executeTakeFirst();
+  return row?.is_public === true;
 }
 
 async function generateOpenAPISpec(ctx: ExtensionContext, baseUrl: string): Promise<Record<string, any>> {
@@ -264,8 +268,16 @@ async function generateOpenAPISpec(ctx: ExtensionContext, baseUrl: string): Prom
     };
   }
 
-  const branding = await getSettingValue(db, 'branding');
-  const appName = (branding as any)?.company_name || 'Zveltio API';
+  // The title used to come from the engine's `branding` setting, read straight
+  // out of `zv_settings` — a table `ctx.db` refuses, so the read always threw
+  // and the fallback below was the only value this ever produced.
+  //
+  // Left as the fallback rather than papered over with a grant: branding is the
+  // HOST's, an extension has no business reading the instance settings table
+  // (the grant is per table, so it would come with the mail and SSO configs),
+  // and there is no host-side way to ask for branding today. Recorded in
+  // CONTEXT.md as an owner decision rather than invented here.
+  const appName = 'Zveltio API';
 
   return {
     openapi: '3.0.3',
@@ -273,7 +285,10 @@ async function generateOpenAPISpec(ctx: ExtensionContext, baseUrl: string): Prom
       title: `${appName} API`,
       description: `Auto-generated API documentation for ${appName}. This documentation reflects your actual data model.`,
       version: '1.0.0',
-      contact: { email: (branding as any)?.contact_email || 'admin@yourdomain.com' },
+      // Same as `appName`: the contact used to come from the engine's branding
+      // setting, which this extension could never read. The placeholder was
+      // always the value.
+      contact: { email: 'admin@yourdomain.com' },
     },
     servers: [{ url: baseUrl, description: 'API Server' }],
     tags: [
@@ -300,8 +315,7 @@ function resolveBaseUrl(c: any): string {
 }
 
 async function checkDocsAccess(ctx: ExtensionContext, c: any): Promise<boolean> {
-  const docsPublic = await getSettingValue(ctx.db, 'api_docs_public');
-  if (docsPublic === true || docsPublic === 'true') return true;
+  if (await readDocsPublic(ctx.db)) return true;
   const session = await ctx.auth.api.getSession({ headers: c.req.raw.headers });
   return !!session;
 }
@@ -420,6 +434,46 @@ export function apiDocsRoutes(ctx: ExtensionContext): Hono {
       ORDER BY published_at DESC NULLS LAST, created_at DESC
     `.execute(db);
     return c.json({ changelogs: rows.rows });
+  });
+
+  // ── Visibility ────────────────────────────────────────────────────────────
+  //
+  // The switch had no way in. It was read out of `zv_settings`, which only the
+  // engine's own settings UI could write, and read through a helper that could
+  // never succeed — so moving it to this extension's table without a setter
+  // would have taken it from unreadable to unwritable. These two routes are the
+  // setter it never had.
+
+  // GET /visibility — admin only
+  router.get('/visibility', async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
+
+    return c.json({ is_public: await readDocsPublic(db) });
+  });
+
+  // PUT /visibility — admin only
+  router.put('/visibility', zValidator('json', z.object({ is_public: z.boolean() })), async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
+
+    const { is_public } = c.req.valid('json');
+    // `tenant_id` is left to its column default, which reads the tenant GUC of
+    // the surrounding transaction — so the row lands in the caller's tenant
+    // without this code naming one.
+    await (db as any)
+      .insertInto('zvd_api_docs_config')
+      .values({ is_public, updated_at: new Date() })
+      .onConflict((oc: any) =>
+        oc.column('tenant_id').doUpdateSet({ is_public, updated_at: new Date() }),
+      )
+      .execute();
+
+    return c.json({ success: true, is_public });
   });
 
   // POST /changelogs — admin only

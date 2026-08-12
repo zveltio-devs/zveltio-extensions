@@ -1,0 +1,14 @@
+-- The redirect URI, stored rather than inferred.
+--
+-- ANAF fixes the callback at application registration and refuses any
+-- authorization request whose redirect_uri does not match it exactly. The
+-- engine was guessing its own address, which is right only when the instance is
+-- reached on the same URL it thinks it has — not true behind a proxy, a
+-- different hostname, or a path prefix.
+--
+-- Every Zveltio install registers its own application, so this differs per
+-- install and belongs beside the credentials it was registered with. Showing it
+-- back to the operator is the point: it is the exact string they must paste
+-- into ANAF's form, and a mismatch there produces a refusal that explains
+-- nothing.
+ALTER TABLE zv_efactura_settings ADD COLUMN IF NOT EXISTS callback_url TEXT;
