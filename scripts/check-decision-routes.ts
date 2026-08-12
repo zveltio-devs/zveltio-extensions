@@ -32,6 +32,19 @@
  * So the gate reads each handler: from the route registration to the balanced
  * closing brace, and asks whether the question is put THERE.
  *
+ * A guard may also live in ANOTHER module, reached over `ctx.services` — that is
+ * how `hr/leave` and `hr/time-tracking` ask `hr.employment` who somebody is and
+ * whether they manage them. A static reader cannot follow a call resolved at
+ * runtime across an extension boundary, and pretending it can is how a gate
+ * turns into theatre. Those handlers declare it instead, with a marker naming
+ * where the check lives:
+ *
+ *     // permission: delegated to hr.employment.mayActFor
+ *
+ * That is weaker than seeing the call — it is a claim, not a proof. It is also
+ * greppable, reviewable, and forces the delegation to be written down rather
+ * than inferred from a variable called `svc`.
+ *
  * BASELINE: extensions listed below are known to be missing it and are not yet
  * fixed. Removing a name is the only direction this list may move. Adding one
  * requires a very good reason, in review.
@@ -151,11 +164,14 @@ for (const dir of extensionDirs()) {
       if (/checkPermission\s*\(/.test(body)) guards.add(g[1]);
     }
     const asks = new RegExp(`\\b(${[...guards].join('|')})\\s*\\(`);
+    // A declared delegation counts, and must name what it delegates to.
+    const delegates = /\/\/\s*permission:\s*delegated to\s+\S+/;
 
     const re = new RegExp(DECISION, 'gi');
     let m: RegExpExecArray | null;
     while ((m = re.exec(src)) !== null) {
-      if (!asks.test(handlerBody(src, m.index))) unguarded.push(m[2]);
+      const body = handlerBody(src, m.index);
+      if (!asks.test(body) && !delegates.test(body)) unguarded.push(m[2]);
     }
   }
 

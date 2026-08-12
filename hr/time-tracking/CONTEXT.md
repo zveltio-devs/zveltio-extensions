@@ -51,3 +51,19 @@ citirea directă a lui `zvd_employees` de aici — tabelul altei extensii.
 Ca peste tot în familia HR, căutarea se făcea după email deși `zvd_employees` are
 `user_id`. Helper-ul nou încearcă `user_id` întâi. Fără asta, cine are alt email
 de serviciu decât cel de logare nu putea nici măcar să pornească cronometrul.
+
+## Identitatea și autorizarea trec prin `hr.employment` (2026-08-12)
+
+Duplicarea semnalată aici a fost rezolvată: `callerEmployee`/`mayActFor` erau
+aceleași douăzeci de linii ca în `hr/leave`, amândouă deschizând `zvd_employees`.
+Sunt acum pe serviciul lui `hr/employees`; fără el, rutele răspund 503.
+
+Cele două căutări de identitate (cronometru pornit, cronometru oprit) se făceau
+după email — deci cine are alt email de serviciu nu putea porni cronometrul deloc.
+
+**Gate-ul de rute de decizie a trebuit învățat:** o gardă ajunsă prin
+`ctx.services` se rezolvă la execuție, peste graniță de extensie, iar un cititor
+static n-o poate urmări. Handlerele o declară acum explicit:
+`// permission: delegated to hr.employment.mayActFor`. E mai slab decât să vezi
+apelul — o afirmație, nu o dovadă — dar e greppabil și obligă delegarea să fie
+scrisă, nu dedusă.
