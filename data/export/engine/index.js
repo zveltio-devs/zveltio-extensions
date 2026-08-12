@@ -19780,12 +19780,18 @@ function exportRoutes(ctx) {
     const collectionDef = await DDLManager.getCollection(db, collection);
     const allowedFields = new Set((collectionDef?.fields ?? []).map((f) => f.name));
     ["id", "created_at", "updated_at", "status", "created_by", "updated_by"].forEach((f) => allowedFields.add(f));
+    const { getColumnAccess, resolveUserRole, getRlsFilters, applyRlsFilters } = ctx.internals;
+    const colAccess = await getColumnAccess(collection, await resolveUserRole(user));
     let query;
+    const projectable = [...allowedFields].filter((f) => !colAccess.hidden.has(f));
     if (fields) {
-      const requestedFields = fields.split(",").map((f) => f.trim()).filter((f) => allowedFields.has(f));
-      query = requestedFields.length > 0 ? db.selectFrom(tableName).select(requestedFields) : db.selectFrom(tableName).selectAll();
+      const requestedFields = fields.split(",").map((f) => f.trim()).filter((f) => allowedFields.has(f) && !colAccess.hidden.has(f));
+      query = requestedFields.length > 0 ? db.selectFrom(tableName).select(requestedFields) : db.selectFrom(tableName).select(projectable);
     } else {
-      query = db.selectFrom(tableName).selectAll();
+      query = db.selectFrom(tableName).select(projectable);
+    }
+    if (projectable.length === 0) {
+      return c.json({ error: "No exportable columns for this role" }, 403);
     }
     query = query.limit(limit);
     const appliedFilters = {};
@@ -19804,7 +19810,8 @@ function exportRoutes(ctx) {
     if (sort_field && allowedFields.has(sort_field)) {
       query = query.orderBy(sort_field, sort_order === "desc" ? "desc" : "asc");
     }
-    const rows = await query.execute();
+    const rlsFilters = await getRlsFilters(collection, { ...user, role: user.role ?? "" }, c.get("authType") ?? "session");
+    const rows = await applyRlsFilters(query, rlsFilters).execute();
     const serialized = rows.map((row) => {
       const result = { ...row };
       for (const field of collectionDef?.fields || []) {
