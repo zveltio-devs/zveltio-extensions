@@ -41,66 +41,7 @@
           }
         }
       ],
-      "form": {
-        "endpoint": "/ext/finance/accounting/journal",
-        "fields": [
-          {
-            "name": "date",
-            "label": "common.col.date",
-            "type": "date",
-            "default": "today",
-            "required": true
-          },
-          {
-            "name": "reference",
-            "label": "finance.accounting.ui.document"
-          },
-          {
-            "name": "description",
-            "label": "common.col.description",
-            "required": true,
-            "colSpan": 2
-          }
-        ],
-        "repeatable": {
-          "name": "lines",
-          "label": "finance.accounting.ui.lines",
-          "addLabel": "finance.accounting.ui.addLine",
-          "min": 2,
-          "columns": [
-            {
-              "name": "account_id",
-              "label": "common.col.account",
-              "type": "relation",
-              "relation": {
-                "dataSource": "/ext/finance/accounting/accounts",
-                "dataPath": "data",
-                "valueKey": "id",
-                "labelKey": [
-                  "code",
-                  "name"
-                ]
-              }
-            },
-            {
-              "name": "description",
-              "label": "common.col.description"
-            },
-            {
-              "name": "debit",
-              "label": "common.col.debit",
-              "type": "number",
-              "mono": true
-            },
-            {
-              "name": "credit",
-              "label": "common.col.credit",
-              "type": "number",
-              "mono": true
-            }
-          ]
-        }
-      }
+      "readOnlyReason": "a journal entry needs balanced debit/credit lines; a flat form cannot express it, so this resource lists rather than creates. A dedicated page is the fix, not a schema field."
     },
     {
       "id": "accounts",

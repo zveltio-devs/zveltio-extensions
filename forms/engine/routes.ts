@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
+import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 // Simple in-memory rate limiter: 10 submissions per minute per IP
@@ -279,7 +280,16 @@ export function formsRoutes(
       .insertInto('zv_form_submissions')
       .values({
         form_id: form.id,
-        data: JSON.stringify(cleanData),
+        // `::text::jsonb`, not a bare string. `data` is a jsonb column, and a
+        // JS string bound to one arrives AS a jsonb value — so the serialized
+        // document landed as a single string SCALAR and `jsonb_typeof(data)`
+        // read back "string".
+        //
+        // Nothing SQL-side could look inside a submission after that: no
+        // `data->>'field'`, no filtering on an answer. Every reader had to parse
+        // it in JavaScript first, and a page rendering it straight would have
+        // walked the string character by character.
+        data: sql`${JSON.stringify(cleanData)}::text::jsonb`,
         ip_address: ip,
         user_agent: c.req.header('user-agent') ?? null,
       })

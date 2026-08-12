@@ -16193,7 +16193,7 @@ var SearchManager = {
       throw new Error("SearchManager not initialized");
     const indexConfig = await _db.selectFrom("zv_search_indexes").selectAll().where("collection", "=", collection).where("status", "=", "active").executeTakeFirst();
     if (!indexConfig) {
-      throw new Error(`No search index configured for collection "${collection}"`);
+      throw Object.assign(new Error(`No search index configured for collection "${collection}"`), { code: "NO_INDEX" });
     }
     if (indexConfig.provider === "meilisearch") {
       const client = getMeiliClient();
@@ -16310,6 +16310,9 @@ function searchRoutes(ctx) {
       });
       return c.json({ results });
     } catch (err) {
+      if (err?.code === "NO_INDEX") {
+        return c.json({ error: err.message, code: "NO_INDEX", results: [], hits: [] }, 404);
+      }
       return c.json({ error: err.message }, 500);
     }
   });
