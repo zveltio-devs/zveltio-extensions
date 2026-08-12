@@ -83,7 +83,7 @@ doi creatori, engine-ul rulează primul, extensia scrie în forma ei:
 | `operations/assets` | 11 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
 | `operations/inventory` | 20 | 5 | 7 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
 | `operations/pos` | 15 | 4 | 0 | 0 | 1 | 0 | 1 | cod | da | **verificat** |
-| `operations/traceability` | 0 | 3 | 0 | 1 | 0 | 0 | 1 | cod | da | **reparat 2026-08-11 — G nepresat** |
+| `operations/traceability` | 0 | 3 | 0 | 1 | 0 | 0 | 1 | cod | da | **verificat 2026-08-12 — G presat 54/54** |
 | `projects/helpdesk` | 18 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat 2026-08-11** |
 | `projects/management` | 30 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat 2026-08-11** |
 | `search` | 6 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat 2026-08-11** |
