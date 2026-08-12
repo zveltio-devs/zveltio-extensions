@@ -151,7 +151,11 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
     barcode: z.string().optional(),
     category: z.string().optional(),
     description: z.string().optional(),
-    unit: z.string().default('buc'),
+    // The column is `CHECK (unit IN (piece, kg, liter, box, meter, hour, other))` with default `'piece'`. This
+    // defaulted to 'buc' — not in that list — so a product created without an
+    // explicit unit violated the constraint and answered 500. The default was
+    // unreachable and the failure looked like a server fault.
+    unit: z.enum(['piece', 'kg', 'liter', 'box', 'meter', 'hour', 'other']).default('piece'),
     unit_cost: z.number().min(0).default(0),
     unit_price: z.number().min(0).default(0),
     tax_rate: z.number().default(19),

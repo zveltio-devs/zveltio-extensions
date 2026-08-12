@@ -3,7 +3,7 @@
   "displayName": "Search Adapter",
   "category": "search",
   "description": "Full-text search via MeiliSearch or Typesense with automatic record sync",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-search",
@@ -34,7 +34,7 @@
     "fieldTypes": []
   },
   "integrity": {
-    "engineSha256": "53775dbb5374c53c2175b53b4173586fd99b61150ce610cba61c2b6d8adbf5cf",
-    "sourceSha256": "c1f272752c74d86ba4c26c83d78f4fa83e26e6d4f1e830cc4c2aa6d190f87979"
+    "engineSha256": "93af7884891215496088a4bd9159e8d5da7a3001b9ffec98bc865f15649a0220",
+    "sourceSha256": "f913675f340851a2596f91dd3bf5c6b7faa1686c37753fedf8f34de024437d7c"
   }
 }

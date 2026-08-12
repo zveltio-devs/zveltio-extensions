@@ -3,7 +3,7 @@
   "displayName": "Inventory",
   "category": "operations",
   "description": "Warehouses, SKUs, stock movements, reorder alerts and barcode support",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-inventory",
@@ -34,8 +34,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "365b4ae9c5af144edc409643bee28cc38156dbda6f26158db3de26dba4d3f93c",
-    "sourceSha256": "de05d6ebc075ecc60800c60aa49031b61ab888eb3d5017322131f31814ebae18"
+    "engineSha256": "486ab44cb1b922ca0cc214807b61920224d86dfa9016ba654b441d360d1f2282",
+    "sourceSha256": "eeb6cf0dec9c755130ecbcec8dcc23f48ba97e5f0c6504fe0bb82b3a0c36ba62"
   },
   "resources": [
     "inventory"

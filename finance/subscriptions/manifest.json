@@ -3,7 +3,7 @@
   "displayName": "Subscriptions",
   "category": "finance",
   "description": "Recurring billing plans, subscriber management, MRR/ARR tracking and Stripe integration",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-subscriptions",
@@ -34,7 +34,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "e9520c8bd8a921569d746513aefcbf35adf3600bfcb0b80fb323b41e788d3f36",
+    "engineSha256": "be38708a0b958157f3a498b6fd5eceb447d8334eb40fc08057ce92b7ea7948c1",
     "sourceSha256": "5f198ab5538129ebbf694fcb832c0dc64e043362daa3882ca2055626ecc6cc3d"
   },
   "resources": [
