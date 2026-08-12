@@ -132,3 +132,40 @@ query they had just run answered `No access to table "zvd_…"`.
   yet). The response now says so via `seed_data_inserted: false`. Making `seed`
   actually write means waiting on the DDL queue — a separate feature.
 - Section G, unpressed, for want of an embedder.
+
+## Secțiunea G — presată parțial 2026-08-12
+
+Presată cu un **furnizor OpenAI fals, local** (stub determinist, fără model),
+înregistrat în `zv_ai_providers` cu `base_url: http://127.0.0.1:11500/v1`.
+Garda de endpoint permite explicit localhost — Ollama e privat prin proiectare.
+
+**Ce dovedește un stub:** că extensia formulează cererea corect, stochează ce
+primește și tratează forma răspunsului. **Ce nu dovedește:** absolut nimic despre
+calitatea răspunsurilor. Secțiunea G e despre primul lucru.
+
+**21 de rute trec.** Nu marchez extensia „verificat" — vezi mai jos ce lipsește.
+
+### Ce a scos: un bug de ENGINE, nu de extensie
+
+`GET /ext/ai/usage` dădea **500 pe orice instalare**. Proxy-ul `ctx.db` leagă
+orice proprietate-funcție ca să păstreze `this`; `Function.prototype.bind`
+întoarce o funcție nouă **fără proprietățile originalului**. `db.fn` din Kysely e
+apelabil ȘI poartă `count`/`sum`/`avg`/`max` ca proprietăți proprii — deci
+`ctx.db.fn.count` sosea `undefined`.
+
+`eb.fn` dintr-un `select(eb => …)` mergea mereu: acel builder vine de la Kysely
+și nu trece prin proxy. Aceeași scriere, rezultat opus.
+
+**Cauza fusese întâlnită și nerecunoscută**: comentariul din
+`routes/zveltio-ai.ts` consemnează `db.fn.max is not a function`, rescrierea
+acelei singure interogări, și atât. Reparat acum în engine (o singură schimbare
+acoperă toate cele șapte locuri, inclusiv `compliance/ro/procurement`).
+
+### Ce rămâne nepresat
+
+- **Generarea de schemă** (`POST /preview-schema`, `POST /generate-schema`) —
+  răspund 422 „LLM did not return valid JSON", ceea ce e **corect**: stub-ul meu
+  întoarce text. Presarea onestă cere un stub care întoarce scheme JSON valide.
+- **`POST /query`, `/alchemist/analyze`, `/admin/templates`** — 400/500 cu
+  payload-urile mele; schemele reale n-au fost încă citite. Nu le raporta ca
+  defecte până nu sunt.
