@@ -1,9 +1,39 @@
 # communications/mail — context
 
-Reparat 2026-08-11. **G nepresat**: crearea unui cont validează conexiunea IMAP
-înainte să salveze, deci ~30 din cele 43 de rute (foldere, mesaje, sync, filtre,
-identități, trimitere) cer un server IMAP real. Ce se putea apăsa fără el a fost
-apăsat.
+Presat 2026-08-12 cu **un server IMAP + SMTP scris pentru asta**, nu cu un mock:
+`AUTHENTICATE PLAIN` (SASL, cu și fără initial-response), `LIST`, `SELECT`,
+`UID FETCH` cu `ENVELOPE` și literale numărate **în octeți**, `LOGOUT`; SMTP cu
+`EHLO`/`AUTH`/`DATA`. Clientul e `imapflow` real, cel din producție.
+
+**Ce dovedește:** că drumurile IMAP/SMTP ale extensiei sunt corect legate și
+tratează răspunsuri de protocol adevărate. **Ce nu dovedește:** interoperarea cu
+Dovecot, Exchange sau Gmail. O rută care merge aici poate încă pica pe un server
+real; una care pică aici e ruptă oricum.
+
+Controlul care contează: **parolă greșită ⇒ 400**, cont necreat. Validarea chiar
+se execută, nu e ocolită.
+
+## Parola cifrată era trimisă ca parolă IMAP
+
+`lib/imap-operations.ts` construia clientul cu `account.imap_password` **direct**,
+pe când `lib/imap-client.ts` apela `decryptPassword()`. Fiecare apelant îi dă un
+rând `SELECT *` din `zv_mail_accounts`, unde parola e ce a scris `encryptPassword`
+— deci pleca **textul cifrat** spre server, care răspundea AUTHENTICATIONFAILED.
+
+Cele două căi divergaseră: sincronizarea mergea prin `imap-client.ts` și
+funcționa, iar cota, descărcarea `.eml` și **toate operațiile pe foldere**
+treceau pe aici și dădeau 500 pe orice cont creat după ce parolele au început să
+fie cifrate — adică pe toate. **Șase apeluri, o singură cauză.** Reparat în
+punctul unic, nu în șase locuri.
+
+Verificat: cele trei rute care dădeau 500 răspund acum 200; trimiterea prin SMTP
+ajunge efectiv la server (`success:true` + mesaj primit); ciorna parcurge
+creare → citire → trimitere → ștergere.
+
+## Ce a rămas neapăsat
+
+Rutele AI de rezumat și context de răspuns — cer un furnizor AI, nu un server de
+mail. Restul celor 43 au fost apăsate.
 
 ## Două salvări de setări ștergeau toată configurația de mail
 
