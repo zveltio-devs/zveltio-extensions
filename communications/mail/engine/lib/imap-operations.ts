@@ -9,6 +9,7 @@
 import { ImapFlow } from 'imapflow';
 
 import { sql } from 'kysely';
+import { decryptPassword } from './crypto.js';
 import type { Database } from '@zveltio/engine-db';
 
 export interface ImapAccountConfig {
@@ -34,7 +35,20 @@ async function getImapClient(account: ImapAccountConfig): Promise<any> {
   if (account.oauth2_provider && account.oauth2_access_token) {
     config.auth = { user: account.imap_user, accessToken: account.oauth2_access_token };
   } else {
-    config.auth = { user: account.imap_user, pass: account.imap_password };
+    // Decrypt, like `imap-client.ts` has always done. Every caller here hands
+    // over a `SELECT *` row from `zv_mail_accounts`, where the password is
+    // whatever `encryptPassword` stored — so passing it straight through sent
+    // the ciphertext as the IMAP password and the server answered
+    // AUTHENTICATIONFAILED.
+    //
+    // The two paths had drifted: sync went through `imap-client.ts` and worked,
+    // while quota, raw-message download and every folder operation came through
+    // here and returned 500 on any account created after passwords began being
+    // encrypted — which is all of them. Six call sites, one cause.
+    //
+    // `decryptPassword` passes an unrecognised envelope through unchanged, so
+    // accounts predating encryption keep working.
+    config.auth = { user: account.imap_user, pass: await decryptPassword(account.imap_password) };
   }
 
   const client = new ImapFlow(config);
