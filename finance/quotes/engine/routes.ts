@@ -25,6 +25,23 @@ async function saveRevision(dbh: any, quoteId: string, userId: string, changeNot
   `.execute(dbh);
 }
 
+/**
+ * May this user take the decision this module exists to record?
+ *
+ * Aprobarea internă a unei oferte — prețul cu care firma se leagă în fața clientului.
+ *
+ * It sat behind one `quotes` permission — the same one needed to look at the
+ * list — and asked nothing else. Found by `scripts/check-decision-routes.ts`,
+ * which was written after the same shape turned up in four extensions in a row.
+ *
+ * `quotes:approve`, granted deliberately, with `admin` still sufficient so an
+ * existing install keeps working before anyone edits policies.
+ */
+async function mayDecide(ctx: ExtensionContext, user: any): Promise<boolean> {
+  if (await ctx.checkPermission(user.id, 'quotes', 'approve').catch(() => false)) return true;
+  return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
+}
+
 export function quotesRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
@@ -204,6 +221,8 @@ export function quotesRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/:id/approve-internal', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
+    const _u = c.get('user') as any;
+    if (!(await mayDecide(ctx, _u))) return c.json({ error: 'Not allowed' }, 403);
     const user = c.get('user') as any;
     await sql`UPDATE zvd_quote_approvals SET status = 'approved', approved_by = ${user.id}, approved_at = NOW() WHERE quote_id = ${c.req.param('id')} AND status = 'pending'`.execute(db);
     const row = await sql`UPDATE zvd_quotes SET approval_status = 'approved', updated_at = NOW() WHERE id = ${c.req.param('id')} RETURNING *`.execute(db);
@@ -223,6 +242,8 @@ export function quotesRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/:id/reject', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
+    const _u = c.get('user') as any;
+    if (!(await mayDecide(ctx, _u))) return c.json({ error: 'Not allowed' }, 403);
     const row = await sql`UPDATE zvd_quotes SET status='rejected', updated_at=NOW() WHERE id=${c.req.param('id')} RETURNING *`.execute(db);
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });

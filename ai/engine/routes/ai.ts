@@ -9,7 +9,7 @@ import {
   AnthropicProvider,
   OllamaProvider,
 } from '../lib/ai-provider.js';
-import { encryptApiKey, decryptApiKey, maskApiKey } from '../lib/ai-crypto.js';
+import { encryptApiKey, decryptApiKey } from '../lib/ai-crypto.js';
 import { assertNonMetadataUrl } from '../lib/endpoint-guard.js';
 
 export function aiRoutes(ctx: ExtensionContext): Hono {
@@ -38,6 +38,43 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
     return isAdmin ? user : null;
   }
 
+  /**
+   * Records one call in `zv_ai_usage` without letting that record's failure
+   * damage the request.
+   *
+   * A plain try/catch is NOT enough: in Postgres a failed statement aborts the
+   * entire transaction, and `ctx.db` is the request's tenant transaction. So a
+   * swallowed INSERT error left every later statement failing with 25P02 and the
+   * final COMMIT silently rolling back — a 200 response over work that was
+   * discarded. The savepoint scopes the damage to this one statement, which is
+   * the same thing the engine's event bus does around extension listeners.
+   *
+   * Accounting is worth attempting and never worth failing a completion for, so
+   * a failure is logged with the reason and the request continues.
+   */
+  async function logUsage(row: Record<string, unknown>): Promise<void> {
+    let savepointHeld = false;
+    try {
+      await sql.raw('SAVEPOINT zv_ai_usage').execute(db);
+      savepointHeld = true;
+      await (db as any).insertInto('zv_ai_usage').values(row).execute();
+      await sql.raw('RELEASE SAVEPOINT zv_ai_usage').execute(db);
+    } catch (err) {
+      if (savepointHeld) {
+        await sql
+          .raw('ROLLBACK TO SAVEPOINT zv_ai_usage')
+          .execute(db)
+          .catch(() => {
+            /* transaction is gone entirely; nothing left to salvage */
+          });
+      }
+      console.warn(
+        `[ai] usage accounting failed for ${row.operation}/${row.provider}:`,
+        (err as Error).message,
+      );
+    }
+  }
+
   // ─── Providers ────────────────────────────────────────────────
 
   // GET /providers — list configured providers
@@ -45,9 +82,17 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
+    // `api_key` is deliberately NOT selected — the key never leaves the server,
+    // not even masked. What the settings page actually needs is whether one is
+    // stored, so that is what the query answers.
+    //
+    // This used to select every column except `api_key` and then call
+    // `maskApiKey(p.api_key ?? '')` on the field it had just omitted, which is
+    // always `undefined` → always `''`. The UI could not tell a provider with a
+    // key from one without.
     const providers = await db
       .selectFrom('zv_ai_providers')
-      .select([
+      .select((eb) => [
         'id',
         'name',
         'label',
@@ -55,17 +100,20 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
         'base_url',
         'is_default',
         'is_active',
+        eb('api_key', 'is not', null).as('has_api_key'),
       ])
       .orderBy('name', 'asc')
       .execute();
 
-    const activeNames = aiProviderManager.list();
+    // `list()` returns objects, not names: `includes(p.name)` on it was always
+    // false, so every provider reported `loaded: false` even while serving
+    // requests.
+    const loadedNames = new Set(aiProviderManager.list().map((p) => p.name));
 
     return c.json({
       providers: providers.map((p: any) => ({
         ...p,
-        api_key: maskApiKey(p.api_key ?? ''), // never return the key in plain text
-        loaded: activeNames.includes(p.name),
+        loaded: loadedNames.has(p.name),
       })),
     });
   });
@@ -245,20 +293,21 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
       const result = await provider.chat(messages, opts);
       const latency = Date.now() - start;
 
-      // Log usage
-      await db
-        .insertInto('zv_ai_usage')
-        .values({
-          provider: provider.name,
-          model: result.model,
-          operation: 'chat',
-          prompt_tokens: result.usage.prompt_tokens,
-          response_tokens: result.usage.response_tokens,
-          latency_ms: latency,
-          user_id: user.id,
-        })
-        .execute()
-        .catch(() => {});
+      // Log usage. Failure must not fail the completion the user already paid
+      // for, but it must be visible: a silent `.catch(() => {})` here meant
+      // usage analytics could read zero on an instance answering every request,
+      // and — because a failed statement aborts the whole Postgres transaction,
+      // not just itself — anything later in this request would fail on a
+      // connection already poisoned by an error nobody logged.
+      await logUsage({
+        provider: provider.name,
+        model: result.model,
+        operation: 'chat',
+        prompt_tokens: result.usage.prompt_tokens,
+        response_tokens: result.usage.response_tokens,
+        latency_ms: latency,
+        user_id: user.id,
+      });
 
       return c.json({ result });
     },
@@ -308,22 +357,15 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
 
       const latency = Date.now() - start;
 
-      await db
-        .insertInto('zv_ai_usage')
-        .values({
-          provider: provider.name,
-          model: body.model || 'embedding',
-          operation: 'embed',
-          prompt_tokens: texts.reduce(
-            (acc, t) => acc + t.split(/\s+/).length,
-            0,
-          ),
-          response_tokens: 0,
-          latency_ms: latency,
-          user_id: user.id,
-        })
-        .execute()
-        .catch(() => {});
+      await logUsage({
+        provider: provider.name,
+        model: body.model || 'embedding',
+        operation: 'embed',
+        prompt_tokens: texts.reduce((acc, t) => acc + t.split(/\s+/).length, 0),
+        response_tokens: 0,
+        latency_ms: latency,
+        user_id: user.id,
+      });
 
       // Optionally persist embedding for later semantic search.
       //
@@ -344,6 +386,15 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
         // (see migration 009), so running this INSERT inside the tenant
         // transaction tags the row with the active tenant automatically.
         // FORCE RLS on the table then prevents cross-tenant reads.
+        //
+        // The conflict target names tenant_id first, matching the unique key as
+        // migration 006 widened it. It does not need to appear in the column list
+        // for that: the DEFAULT supplies the value, and inference matches on the
+        // index, not on what was written explicitly. Before 006 the key was
+        // instance-wide, so a second company indexing the same
+        // (collection, record_id, field) — and `record_id` is a free-form string
+        // from this very request body — hit an RLS error naming a row it could
+        // not see.
         await sql`
           INSERT INTO zvd_ai_embeddings (collection, record_id, field, text_content, embedding, model, updated_at)
           VALUES (
@@ -353,7 +404,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
             ${body.model || 'embedding'},
             NOW()
           )
-          ON CONFLICT (collection, record_id, field) DO UPDATE SET
+          ON CONFLICT (tenant_id, collection, record_id, field) DO UPDATE SET
             text_content = EXCLUDED.text_content,
             embedding    = EXCLUDED.embedding,
             model        = EXCLUDED.model,
@@ -428,7 +479,15 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
           `
             .execute(tdb)
             .then((r) => r.rows)
-            .catch(() => []);
+            // Named. Silent here meant a missing pgvector extension, a dimension
+            // mismatch, or an empty index all produced the same thing: zero
+            // results, a quiet fall through to trigram, and then to ILIKE — so
+            // semantic search could be broken for months while the endpoint kept
+            // answering 200 with `method: "ilike"`.
+            .catch((err: Error) => {
+              console.warn('[ai.search] pgvector query failed, falling back:', err.message);
+              return [];
+            });
 
           if (vecResults.length > 0) {
             return c.json({
@@ -454,7 +513,12 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
       `
         .execute(tdb)
         .then((r) => r.rows)
-        .catch(() => []);
+        // `similarity()` needs pg_trgm. Without the log, an instance missing the
+        // extension looked like an instance with nothing indexed.
+        .catch((err: Error) => {
+          console.warn('[ai.search] trigram query failed, falling back to ILIKE:', err.message);
+          return [];
+        });
 
       if (trgmResults.length > 0) {
         return c.json({
@@ -505,105 +569,26 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
   );
 
   // ─── Prompt templates ──────────────────────────────────────────
-
-  app.get('/prompts', async (c) => {
-    const user = await requireAuth(c);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
-
-    const prompts = await db
-      .selectFrom('zv_prompt_templates')
-      .selectAll()
-      .where('is_active', '=', true)
-      .orderBy('name', 'asc')
-      .execute();
-
-    return c.json({ prompts });
-  });
-
-  app.post(
-    '/prompts',
-    zValidator(
-      'json',
-      z.object({
-        name: z.string().min(1),
-        description: z.string().optional(),
-        system: z.string().optional(),
-        template: z.string().min(1),
-        variables: z
-          .array(
-            z.object({
-              name: z.string(),
-              description: z.string().optional(),
-              required: z.boolean().default(false),
-            }),
-          )
-          .default([]),
-        category: z.string().optional(),
-      }),
-    ),
-    async (c) => {
-      const user = await requireAuth(c);
-      if (!user) return c.json({ error: 'Unauthorized' }, 401);
-
-      const body = c.req.valid('json');
-      const prompt = await db
-        .insertInto('zv_prompt_templates')
-        .values({ ...body, variables: JSON.stringify(body.variables) })
-        .returningAll()
-        .executeTakeFirst();
-
-      return c.json({ prompt }, 201);
-    },
-  );
-
-  app.delete('/prompts/:id', async (c) => {
-    const user = await requireAuth(c);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
-
-    await db
-      .updateTable('zv_prompt_templates')
-      .set({ is_active: false })
-      .where('id', '=', c.req.param('id'))
-      .execute();
-
-    return c.json({ success: true });
-  });
-
-  // POST /prompts/:id/run — render template and run
-  app.post(
-    '/prompts/:id/run',
-    zValidator('json', z.record(z.string(), z.string())),
-    async (c) => {
-      const user = await requireAuth(c);
-      if (!user) return c.json({ error: 'Unauthorized' }, 401);
-
-      const prompt = await db
-        .selectFrom('zv_prompt_templates')
-        .selectAll()
-        .where('id', '=', c.req.param('id'))
-        .where('is_active', '=', true)
-        .executeTakeFirst();
-
-      if (!prompt) return c.json({ error: 'Prompt not found' }, 404);
-
-      const vars = c.req.valid('json');
-      let rendered = prompt.template;
-      for (const [k, v] of Object.entries(vars)) {
-        rendered = rendered.replaceAll(`{{${k}}}`, String(v));
-      }
-
-      const messages: any[] = [];
-      if (prompt.system)
-        messages.push({ role: 'system', content: prompt.system });
-      messages.push({ role: 'user', content: rendered });
-
-      const provider = aiProviderManager.getDefault();
-      if (!provider) return c.json({ error: 'No AI provider configured' }, 503);
-
-      const result = await provider.chat(messages);
-      return c.json({ result, rendered_prompt: rendered });
-    },
-  );
+  //
+  // Deliberately NOT here. `ai-chats.ts` owns this surface — `GET /templates`,
+  // `POST /templates/:id/run`, `POST /admin/templates`, `DELETE
+  // /admin/templates/:id` — and it is what the Studio page calls.
+  //
+  // A second implementation lived here, mounted at the same `/` prefix, under
+  // `/prompts`. It could not work: it wrote and read `system` and `template`,
+  // while `zv_prompt_templates` has `system_prompt` (NOT NULL) and
+  // `user_template`. Verified against the migration:
+  //
+  //   ERROR: column "system" of relation "zv_prompt_templates" does not exist
+  //
+  // so creating a prompt always 500'd, and `/prompts/:id/run` read two columns
+  // that do not exist — `undefined` as the rendered prompt — including on the
+  // three templates 001_initial.sql seeds. It also had no admin gate on create
+  // or delete, which the surviving routes do have. Nothing referenced it: no
+  // Studio call, no other extension, no engine route.
+  //
+  // Deleted rather than repaired: renaming its columns would produce a second
+  // way to do the same thing, differing from the first in some unobserved way.
 
   // ─── Admin: AI Features ────────────────────────────────────────
 

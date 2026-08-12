@@ -119,37 +119,86 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
     // Audit row is written BEFORE the delete so the audit survives —
     // event_type matches the engine's auditLog() schema (not the
     // legacy `action` column the older code used).
+    // Tables that could not be cleared, so the answer can say so rather than
+    // claiming a completeness it did not achieve.
+    const skipped: string[] = [];
     try {
       await (db as any).transaction().execute(async (trx: any) => {
         await sql`
           INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, created_at)
           VALUES ('gdpr.account_deleted', ${userId}, 'user', ${JSON.stringify({ gdpr: true, requested_at: new Date().toISOString() })}::jsonb, NOW())
         `.execute(trx);
-        // Better-Auth tables — ON DELETE CASCADE in 001_auth.sql
-        // covers session/account/twoFactor from user, but be explicit
-        // for defence in depth in case the cascade isn't set on a
-        // specific column.
-        await sql`DELETE FROM session WHERE "userId" = ${userId}`.execute(trx).catch(() => {});
-        await sql`DELETE FROM account WHERE "userId" = ${userId}`.execute(trx).catch(() => {});
-        await sql`DELETE FROM "twoFactor" WHERE "userId" = ${userId}`.execute(trx).catch(() => {});
-        // Zveltio user-owned rows
-        await sql`DELETE FROM zv_api_keys WHERE created_by = ${userId}`.execute(trx).catch(() => {});
-        await sql`DELETE FROM zv_notifications WHERE user_id = ${userId}`.execute(trx).catch(() => {});
-        // GDPR-specific user data
-        await sql`DELETE FROM zvd_gdpr_consents WHERE user_id = ${userId}`.execute(trx).catch(() => {});
+        // Each optional delete inside a SAVEPOINT, because a try/catch is not
+        // isolation in Postgres.
+        //
+        // These were `.catch(() => {})`, which reads as "best effort, carry
+        // on". It is not: a failed statement aborts the whole transaction, so
+        // every later delete — including the user row — fails too, and the
+        // caller received "Account deletion failed — referential integrity"
+        // with a detail reading "current transaction is aborted". That names
+        // the wrong cause entirely. The erasure did not fail on referential
+        // integrity; it failed because a table that may not even exist on this
+        // install could not be deleted from, and nothing said which one.
+        //
+        // With a savepoint the intent finally holds: a peripheral table that is
+        // absent or empty no longer stops the erasure, and the ones that DO
+        // fail are collected and returned. An erasure that only partly happened
+        // must say so — under GDPR the difference between "deleted" and "mostly
+        // deleted" is the whole obligation.
+        const optional: Array<[string, () => Promise<unknown>]> = [
+          ['session', () => sql`DELETE FROM session WHERE "userId" = ${userId}`.execute(trx)],
+          ['account', () => sql`DELETE FROM account WHERE "userId" = ${userId}`.execute(trx)],
+          ['twoFactor', () => sql`DELETE FROM "twoFactor" WHERE "userId" = ${userId}`.execute(trx)],
+          ['zv_api_keys', () => sql`DELETE FROM zv_api_keys WHERE created_by = ${userId}`.execute(trx)],
+          ['zv_notifications', () => sql`DELETE FROM zv_notifications WHERE user_id = ${userId}`.execute(trx)],
+          ['zvd_gdpr_consents', () => sql`DELETE FROM zvd_gdpr_consents WHERE user_id = ${userId}`.execute(trx)],
+        ];
+        for (const [index, [label, run]] of optional.entries()) {
+          const sp = `zv_gdpr_${index}`;
+          await sql.raw(`SAVEPOINT ${sp}`).execute(trx);
+          try {
+            await run();
+            await sql.raw(`RELEASE SAVEPOINT ${sp}`).execute(trx);
+          } catch (err) {
+            await sql.raw(`ROLLBACK TO SAVEPOINT ${sp}`).execute(trx).catch(() => {});
+            skipped.push(`${label}: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
         // Finally the user row itself — anything still FK-referencing
         // it will fail loudly here, which is what we want (better an
         // error to the caller than a silently incomplete erasure).
         await sql`DELETE FROM "user" WHERE id = ${userId}`.execute(trx);
       });
     } catch (err) {
+      // Logged, because the caller never sees it. The envelope strips `detail`,
+      // so for anyone operating this the message was always the generic
+      // "referential integrity" sentence — which is a guess about the cause,
+      // not the cause. An erasure that fails is a legal obligation left
+      // unfinished; whoever has to finish it needs the actual reason.
+      console.error(
+        '[gdpr] erasure failed for', userId,
+        '| skipped so far:', skipped,
+        '| cause:', err instanceof Error ? err.message : String(err),
+      );
       return c.json({
-        error: 'Account deletion failed — referential integrity. Contact support to complete erasure.',
-        detail: (err as Error).message,
+        error: 'Account deletion failed. The erasure did NOT complete — see the server log for the cause.',
+        detail: err instanceof Error ? err.message : String(err),
+        skipped,
       }, 500);
     }
 
-    return c.json({ success: true, message: 'Account and all associated data has been deleted' });
+    if (skipped.length > 0) {
+      // Reported, not hidden. Somebody has to finish this by hand, and they
+      // cannot if the response says it is done.
+      console.error('[gdpr] erasure incomplete for', userId, skipped);
+      return c.json({
+        success: true,
+        complete: false,
+        message: 'Account deleted, but some data could not be cleared and still requires manual erasure.',
+        skipped,
+      });
+    }
+    return c.json({ success: true, complete: true, message: 'Account and all associated data has been deleted' });
   });
 
   // ─── Consents ───────────────────────────────────────────────────

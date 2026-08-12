@@ -13,6 +13,34 @@ import { encryptPassword, decryptPassword } from './lib/crypto.js';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 /**
+ * The stored mail config, as an object, whatever shape it is on disk.
+ *
+ * `zv_settings.value` is `jsonb`, and the save path used to write a jsonb STRING
+ * SCALAR into it (see the `::text::jsonb` note below). Reading that back gave
+ * the caller a string where it expected an object — the admin page got a
+ * character blob, and the next save spread the string into one key per
+ * character and destroyed the settings.
+ *
+ * Parsing here rather than only fixing the write, because the write fix does
+ * nothing for an install that already saved once. That one recovers on the next
+ * read; an install that saved twice has nothing left to parse.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: raw row from a jsonb column
+function readMailConfig(row: any): Record<string, unknown> {
+  const value = row?.value;
+  if (value == null) return {};
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return typeof value === 'object' ? value : {};
+}
+
+/**
  * Mail Client routes — IMAP sync + SMTP send + AI features.
  * Mounted at /ext/communications/mail
  */
@@ -1018,7 +1046,7 @@ Please draft a reply to this email.`,
     if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
 
     const config = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
-    return c.json({ config: config.rows[0] ? (config.rows[0] as any).value : {} });
+    return c.json({ config: readMailConfig(config.rows[0]) });
   });
 
   // PUT /ext/communications/mail/admin/config
@@ -1046,12 +1074,30 @@ Please draft a reply to this email.`,
     if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
 
     const current = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
-    const existing = current.rows[0] ? (current.rows[0] as any).value : {};
+    const existing = readMailConfig(current.rows[0]);
     const merged = { ...existing, ...c.req.valid('json') };
 
+    // `::text::jsonb`, not `::jsonb`.
+    //
+    // A string parameter cast straight to `jsonb` is a no-op: the driver sends
+    // it AS a jsonb value, so a JSON document arrives as a jsonb STRING SCALAR —
+    // the whole config wrapped in quotes rather than parsed. Going through
+    // `text` first makes Postgres parse it, which is what was meant.
+    //
+    // The damage compounded, which is why this is worth the paragraph. The first
+    // save stored the string. The second read it back, and `{ ...existing }`
+    // spread over a STRING gives one key per character: the config came out as
+    // `{"0":"{","1":"\"","2":"e", …}` and every mail setting on the instance was
+    // gone. Two saves from an admin, no error at any point, `success: true` both
+    // times. Measured on a virgin database.
+    //
+    // `readMailConfig` above recovers the single-save case by parsing a stored
+    // string, so an install that saved once comes back on the next read. An
+    // install that saved twice has nothing left to recover and has to be set up
+    // again.
     await sql`
       INSERT INTO zv_settings (key, value, description, is_public)
-      VALUES ('mail', ${JSON.stringify(merged)}::jsonb, 'Mail client configuration (admin)', false)
+      VALUES ('mail', ${JSON.stringify(merged)}::text::jsonb, 'Mail client configuration (admin)', false)
       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
     `.execute(db);
 

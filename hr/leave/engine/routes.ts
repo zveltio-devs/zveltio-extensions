@@ -24,6 +24,57 @@ async function countWorkingDays(dbh: any, startDate: string, endDate: string, is
   return days;
 }
 
+/**
+ * The employee record behind the signed-in user, or null.
+ *
+ * `user_id` first, because that is the link the schema actually declares.
+ * Email is the fallback the rest of this file used on its own, and it is the
+ * weaker one: a person whose work address differs from their login sees an
+ * empty "my requests" and looks like they have never taken a day off.
+ */
+async function callerEmployee(dbh: any, user: any): Promise<any | null> {
+  const rows = await sql`
+    SELECT id, manager_id FROM zvd_employees
+    WHERE user_id = ${user.id} OR email = ${user.email} OR work_email = ${user.email}
+    LIMIT 1
+  `.execute(dbh);
+  return (rows.rows[0] as any) ?? null;
+}
+
+/**
+ * May this user act on leave belonging to `employeeId`?
+ *
+ * Three ways in, and the order is the point: it is your own leave, you manage
+ * the person, or you administer the instance.
+ *
+ * Everything here used to sit behind one `leave` permission and nothing else.
+ * `employee_id` arrived in the request body and was never compared to the
+ * caller, and approval checked nothing at all — so anyone granted access to the
+ * module could file leave against a colleague's balance and approve it in the
+ * same breath. Pressed on a virgin instance before the fix: an ordinary user
+ * filed two days against another employee and approved them, both 200.
+ *
+ * Leave is money. Unused days are paid out on termination, so spending someone
+ * else's balance is spending their severance.
+ */
+async function mayActOnLeaveOf(
+  dbh: any,
+  ctx: ExtensionContext,
+  user: any,
+  employeeId: string,
+): Promise<boolean> {
+  const me = await callerEmployee(dbh, user);
+  if (me && me.id === employeeId) return true;
+
+  const target = await sql`SELECT manager_id FROM zvd_employees WHERE id = ${employeeId}`.execute(
+    dbh,
+  );
+  const managerId = (target.rows[0] as any)?.manager_id;
+  if (me && managerId && managerId === me.id) return true;
+
+  return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
+}
+
 export function leaveRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
@@ -59,7 +110,7 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     const row = await sql`
       INSERT INTO zvd_public_holidays (date, name, year) VALUES (${d.date}, ${d.name}, ${d.year})
-      ON CONFLICT (date) DO UPDATE SET name = EXCLUDED.name
+      ON CONFLICT (tenant_id, date) DO UPDATE SET name = EXCLUDED.name
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
@@ -233,6 +284,12 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
     reason: z.string().optional(),
   })), async (c) => {
     const d = c.req.valid('json');
+    const user = c.get('user') as any;
+    // Whose leave is this? `employee_id` comes from the body, so without this a
+    // colleague's balance is one field away.
+    if (!(await mayActOnLeaveOf(db, ctx, user, d.employee_id))) {
+      return c.json({ error: 'You may only request leave for yourself or someone you manage' }, 403);
+    }
     const start = new Date(d.start_date);
     const end = new Date(d.end_date);
     if (end < start) return c.json({ error: 'end_date must be >= start_date' }, 400);
@@ -289,6 +346,22 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
     const req = await sql`SELECT * FROM zvd_leave_requests WHERE id = ${c.req.param('id')} AND status = 'pending'`.execute(db);
     if (!req.rows.length) return c.json({ error: 'Request not found or not pending' }, 400);
     const r = req.rows[0] as any;
+
+    // Approval is a manager's act, and it is not self-service.
+    //
+    // `mayActOnLeaveOf` allows the employee themselves, which is right for
+    // FILING and wrong here — so the own-leave case is excluded explicitly
+    // rather than by leaving the check out, which is how it was missed.
+    const me = await callerEmployee(db, user);
+    const isSelf = !!me && me.id === r.employee_id;
+    const allowed = !isSelf && (await mayActOnLeaveOf(db, ctx, user, r.employee_id));
+    if (!allowed) {
+      return c.json(
+        { error: isSelf ? 'You cannot approve your own leave' : 'Only a manager may approve this' },
+        403,
+      );
+    }
+
     const year = new Date(r.start_date).getFullYear();
     await sql`UPDATE zvd_leave_requests SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW() WHERE id = ${r.id}`.execute(db);
     await sql`
@@ -303,9 +376,22 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
 
   app.post('/requests/:id/reject', zValidator('json', z.object({ reason: z.string().min(1) })), async (c) => {
     const { reason } = c.req.valid('json');
+    const user = c.get('user') as any;
     const req = await sql`SELECT * FROM zvd_leave_requests WHERE id = ${c.req.param('id')} AND status = 'pending'`.execute(db);
     if (!req.rows.length) return c.json({ error: 'Request not found or not pending' }, 400);
     const r = req.rows[0] as any;
+
+    // Same gate as approve. Refusing somebody's leave is a manager's act too —
+    // and left open it is the more useful one to abuse, since it needs no
+    // balance and leaves the victim with a rejection they never saw coming.
+    const me = await callerEmployee(db, user);
+    if (me && me.id === r.employee_id) {
+      return c.json({ error: 'Cancel your own request rather than rejecting it' }, 403);
+    }
+    if (!(await mayActOnLeaveOf(db, ctx, user, r.employee_id))) {
+      return c.json({ error: 'Only a manager may reject this' }, 403);
+    }
+
     const year = new Date(r.start_date).getFullYear();
     await sql`UPDATE zvd_leave_requests SET status = 'rejected', rejection_reason = ${reason}, updated_at = NOW() WHERE id = ${r.id}`.execute(db);
     await sql`
@@ -316,9 +402,19 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/requests/:id/cancel', async (c) => {
+    const user = c.get('user') as any;
     const req = await sql`SELECT * FROM zvd_leave_requests WHERE id = ${c.req.param('id')} AND status IN ('pending','approved')`.execute(db);
     if (!req.rows.length) return c.json({ error: 'Request not found or cannot be cancelled' }, 400);
     const r = req.rows[0] as any;
+
+    // Cancelling IS self-service — it is your own leave you are giving back —
+    // so this is the one place `mayActOnLeaveOf` is used as-is, own-leave case
+    // included. What it still stops is cancelling a stranger's approved leave,
+    // which silently returns days to a balance nobody asked to change.
+    if (!(await mayActOnLeaveOf(db, ctx, user, r.employee_id))) {
+      return c.json({ error: 'You may only cancel your own leave or that of someone you manage' }, 403);
+    }
+
     const year = new Date(r.start_date).getFullYear();
     await sql`UPDATE zvd_leave_requests SET status = 'cancelled', updated_at = NOW() WHERE id = ${r.id}`.execute(db);
     if (r.status === 'approved') {

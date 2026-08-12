@@ -1,0 +1,11 @@
+-- Currency on a product price.
+--
+-- `ecommerce/store` writes prices into `zvd_products` — inventory's table, and
+-- rightly so, since a shop sells what the warehouse holds — but it also writes
+-- a currency, which had nowhere to go. A shop selling in EUR while the ledger
+-- runs in RON is ordinary, and a price without its currency is a number that
+-- means whatever the reader assumes.
+--
+-- Added here rather than by the shop, because this table belongs to inventory.
+-- An extension migrating another extension's table is how ownership dissolves.
+ALTER TABLE zvd_products ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'RON';

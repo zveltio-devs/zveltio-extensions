@@ -40,6 +40,20 @@ async function resolveCollection(ctx: ExtensionContext, userId: string, collecti
   return tableName;
 }
 
+/**
+ * Keep the empty list, never lose the reason.
+ *
+ * An empty result from these reads renders as "no crossings", "no positions",
+ * "no rules" — all believable, none distinguishable from a query that broke.
+ * The fallback is the right behaviour; being quiet about it is not.
+ */
+function emptyOnFailure(label: string) {
+  return (err: unknown) => {
+    console.error(`[postgis] ${label} failed: ${err instanceof Error ? err.message : String(err)}`);
+    return { rows: [] as any[] };
+  };
+}
+
 const latLng = z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) });
 
 export function postgisRoutes(ctx: ExtensionContext): Hono {
@@ -329,28 +343,49 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
         RETURNING id, entity_type, entity_id, recorded_at
       `.execute(db);
 
-      // Check geofence rules asynchronously
-      sql<any>`
+      // Geofence crossings, recorded before this request answers.
+      //
+      // This was launched and not awaited — "check geofence rules
+      // asynchronously" — with the query and every insert ending in
+      // `.catch(() => {})`. Three faults in one shape.
+      //
+      // The writes run on the request's tenant transaction, which the engine
+      // closes when the handler returns. Detached work on a closed transaction
+      // fails with "Transaction is already committed", so whether a crossing got
+      // recorded came down to whether the spatial query happened to finish
+      // first. It usually does — which is the worst kind of race, because it
+      // passes every time you watch it.
+      //
+      // The two catches then made losing that race indistinguishable from
+      // winning it. Silence is the wrong answer here: the crossing IS the
+      // product. A vehicle leaving a zone with nothing written is a missed
+      // alert, and nothing gives it away — the position row is stored perfectly.
+      //
+      // Awaited now, so a crossing lands in the same transaction as the position
+      // that caused it: either both are there or neither is. One spatial query
+      // and a handful of narrow inserts, which is well within the cost of being
+      // right.
+      const fences = await sql<any>`
         SELECT g.id AS geofence_id, g.name,
                ST_Within(${point}::geometry, g.zone::geometry) AS inside
         FROM zv_geofences g WHERE g.is_active = true
-      `.execute(db).then(async (fences: any) => {
-        for (const fence of fences.rows) {
-          await sql`
-            INSERT INTO zv_geofence_events (geofence_id, entity_type, entity_id, event_type, location)
-            SELECT ${fence.geofence_id}::uuid, ${body.entity_type}, ${body.entity_id},
-                   CASE WHEN ${fence.inside} THEN 'enter' ELSE 'exit' END,
-                   ${point}::geography
-            WHERE NOT EXISTS (
-              SELECT 1 FROM zv_geofence_events
-              WHERE geofence_id = ${fence.geofence_id}::uuid
-                AND entity_id = ${body.entity_id}
-                AND event_type = CASE WHEN ${fence.inside} THEN 'enter' ELSE 'exit' END
-                AND occurred_at > NOW() - INTERVAL '5 minutes'
-            )
-          `.execute(db).catch(() => {});
-        }
-      }).catch(() => {});
+      `.execute(db);
+
+      for (const fence of fences.rows) {
+        await sql`
+          INSERT INTO zv_geofence_events (geofence_id, entity_type, entity_id, event_type, location)
+          SELECT ${fence.geofence_id}::uuid, ${body.entity_type}, ${body.entity_id},
+                 CASE WHEN ${fence.inside} THEN 'enter' ELSE 'exit' END,
+                 ${point}::geography
+          WHERE NOT EXISTS (
+            SELECT 1 FROM zv_geofence_events
+            WHERE geofence_id = ${fence.geofence_id}::uuid
+              AND entity_id = ${body.entity_id}
+              AND event_type = CASE WHEN ${fence.inside} THEN 'enter' ELSE 'exit' END
+              AND occurred_at > NOW() - INTERVAL '5 minutes'
+          )
+        `.execute(db);
+      }
 
       return c.json({ location: entry.rows[0] }, 201);
     },

@@ -313,7 +313,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
         INSERT INTO zvd_translation_glossary (term, locale, translation, definition, forbidden, created_by)
         VALUES (${c.req.valid('json').term}, ${c.req.valid('json').locale}, ${c.req.valid('json').translation},
                 ${c.req.valid('json').definition ?? null}, ${c.req.valid('json').forbidden}, ${user.id})
-        ON CONFLICT (term, locale) DO UPDATE SET translation = EXCLUDED.translation, definition = EXCLUDED.definition
+        ON CONFLICT (tenant_id, term, locale) DO UPDATE SET translation = EXCLUDED.translation, definition = EXCLUDED.definition
         RETURNING *
       `.execute(db);
       return c.json({ term: term.rows[0] }, 201);

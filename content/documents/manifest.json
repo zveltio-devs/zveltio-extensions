@@ -3,7 +3,7 @@
   "displayName": "Document Generator",
   "category": "content",
   "description": "Generate PDF documents from templates with data binding",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "dependencies": [
     {
       "name": "content/document-templates",
@@ -43,7 +43,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "e0d076695fc54916c3306b72882f33dbedaeb5f73edd173108bb5cb25d866a4b",
-    "sourceSha256": "88986d3a855123138daff79b76c22e7aeaab23293908565e1884268ce78a59cf"
+    "engineSha256": "f941663960d27c1336f14a49eee91dcb3ba1bb1a228afd9e1c0ccab1265c7c42",
+    "sourceSha256": "3d71da0f2ee011e35be54ef1bf2dc2e1b58ae85e45d6a183aa1a630f6bb0e5a4"
   }
 }

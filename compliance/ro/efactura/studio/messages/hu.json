@@ -36,5 +36,22 @@
   "compliance.ro.efactura.ui.fac_2026_001": "FAC-2026-001",
   "compliance.ro.efactura.ui.invoice_date": "Számla dátuma",
   "compliance.ro.efactura.ui.invoice_number": "Számlaszám",
-  "compliance.ro.efactura.ui.new_invoice": "Új számla"
+  "compliance.ro.efactura.ui.new_invoice": "Új számla",
+  "efactura.settings.callbackHint": "PONTOSAN egyeznie kell az ANAF-nál regisztrálttal",
+  "efactura.settings.callbackUrl": "Visszahívási URL",
+  "efactura.settings.cert": "Minősített tanúsítvány",
+  "efactura.settings.certPassword": "Tanúsítvány jelszava",
+  "efactura.settings.certPath": "Tanúsítvány útvonala a szerveren",
+  "efactura.settings.certPathHint": "pl. /etc/zveltio/anaf.p12 — a fájl a szerveren marad",
+  "efactura.settings.clientId": "Kliensazonosító",
+  "efactura.settings.clientSecret": "Kliens titok",
+  "efactura.settings.env": "Környezet",
+  "efactura.settings.envProd": "Éles — valós beküldés",
+  "efactura.settings.envTest": "Teszt — adóhatás nélkül",
+  "efactura.settings.environment": "Cél",
+  "efactura.settings.leaveBlank": "Hagyd üresen a mentett érték megtartásához",
+  "efactura.settings.oauth": "OAuth-alkalmazás",
+  "efactura.settings.sellerCif": "Beküldő adószám",
+  "efactura.settings.subtitle": "Hitelesítő adatok az SPV-beküldéshez",
+  "efactura.settings.title": "ANAF-kapcsolat"
 }

@@ -67,7 +67,36 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   // a handler is therefore already RLS-scoped — there is one spelling, so there
   // is none to forget.
 
-  const { moveToTrash, scheduleFileIndexing } = ctx.internals;
+  const { moveToTrash, scheduleFileIndexing, isTenantAdmin } = ctx.internals;
+
+  /**
+   * May this user delete this file?
+   *
+   * The router requires only a session, and `moveToTrash` filters by id,
+   * `deleted_at` and tenant — no owner check anywhere. So ANY authenticated user
+   * could trash ANY file in their tenant by naming its id, through either door
+   * below.
+   *
+   * Owner or tenant admin. Deliberately not "anyone who can read it": reading a
+   * shared file and destroying it are different acts.
+   *
+   * The engine's `/api/media` was given this on 2026-07-31. Nothing calls that
+   * route — the Studio reaches media through this extension — so the fix has
+   * been sitting on the copy nobody runs while this one stayed open.
+   */
+  async function mayDeleteFile(fileId: string, userId: string): Promise<boolean> {
+    const row = await (db as any)
+      .selectFrom('zv_media_files')
+      .select(['created_by'])
+      .where('id', '=', fileId)
+      .executeTakeFirst()
+      .catch(() => undefined);
+    // Absent file: let moveToTrash produce the not-found path rather than
+    // reporting "forbidden", which would confirm the id exists elsewhere.
+    if (!row) return true;
+    if (row.created_by === userId) return true;
+    return isTenantAdmin(userId).catch(() => false);
+  }
 
   const router = new Hono();
 
@@ -395,6 +424,10 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user' as never) as any;
     const id = c.req.param('id');
 
+    if (!(await mayDeleteFile(id, user.id))) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+
     try {
       await moveToTrash(db, id, user.id);
       return c.json({ success: true });
@@ -412,7 +445,15 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
       const { ids } = c.req.valid('json');
 
       let moved = 0;
+      let refused = 0;
       for (const id of ids) {
+        // The batch door is the one worth naming: it took an arbitrary list of
+        // ids and trashed every one of them, so the single-file check would have
+        // been a formality without this.
+        if (!(await mayDeleteFile(id, user.id))) {
+          refused++;
+          continue;
+        }
         try {
           await moveToTrash(db, id, user.id);
           moved++;
@@ -421,7 +462,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
         }
       }
 
-      return c.json({ success: true, deleted: moved });
+      return c.json({ success: true, deleted: moved, ...(refused ? { refused } : {}) });
     },
   );
 

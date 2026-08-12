@@ -189,7 +189,7 @@ export function productionRouter(ctx: ExtensionContext): Hono {
     const row = await sql`
       UPDATE trace_production_orders
       SET status = 'completed', actual_quantity = ${d.actual_quantity},
-          completed_at = now(), haccp_checks = ${JSON.stringify(d.haccp_checks)}::jsonb
+          completed_at = now(), haccp_checks = ${JSON.stringify(d.haccp_checks)}::text::jsonb
       WHERE id = ${id}
       RETURNING *
     `.execute(db);
@@ -238,9 +238,22 @@ export function productionRouter(ctx: ExtensionContext): Hono {
     const { check } = c.req.valid('json');
     const id = c.req.param('id');
 
+    // `::text::jsonb`, not `::jsonb`.
+    //
+    // A string parameter cast straight to `jsonb` is a no-op — the driver sends
+    // it AS a jsonb value, so a JSON document arrives as a jsonb STRING SCALAR
+    // rather than being parsed. Verified against Postgres:
+    //
+    //   '{"a":1}'::jsonb || '"str"'::jsonb  →  [{"a": 1}, "str"]
+    //
+    // So this line appended the raw serialized text to the array instead of the
+    // check object, and `haccp_checks` filled up with strings. These are the
+    // food-safety records an ANSVSA inspection asks for; they looked present and
+    // were unreadable as objects. The sibling write above had the same cast, so
+    // the column started life as a string scalar too.
     const row = await sql`
       UPDATE trace_production_orders
-      SET haccp_checks = haccp_checks || ${JSON.stringify({ ...check, checked_by: user.id })}::jsonb
+      SET haccp_checks = haccp_checks || ${JSON.stringify({ ...check, checked_by: user.id })}::text::jsonb
       WHERE id = ${id}
       RETURNING haccp_checks
     `.execute(db);

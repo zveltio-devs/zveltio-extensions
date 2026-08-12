@@ -119,7 +119,7 @@ VALUES
     'Summarize the following text in {{length}} words:\n\n{{text}}',
     'general'
   )
-ON CONFLICT (name) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- ── from 002_embeddings.sql ──
 -- 032_ai_embeddings.sql
