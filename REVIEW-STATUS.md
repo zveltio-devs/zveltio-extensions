@@ -51,7 +51,7 @@ doi creatori, engine-ul rulează primul, extensia scrie în forma ei:
 | `content/document-templates` | 14 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
 | `content/documents` | 12 | 3 | 0 | 0 | 5 | 0 | 1 | cod | da | **verificat 2026-08-11** |
 | `content/drafts` | 18 | 2 | 0 | 0 | 2 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
-| `content/media` | 27 | 2 | 0 | 0 | 1 | 0 | 1 | cod | da | **reparat 2026-08-11 — G nepresat** |
+| `content/media` | 27 | 2 | 0 | 0 | 1 | 0 | 1 | cod | da | **verificat 2026-08-12 — G presat 27/27** |
 | `content/page-builder` | 25 | 4 | 0 | 0 | 3 | 2 | 1 | cod | da | **verificat 2026-08-11** |
 | `content/pdf-viewer` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | nu | **verificat 2026-08-11** |
 | `crm` | 15 | 2 | 5 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |

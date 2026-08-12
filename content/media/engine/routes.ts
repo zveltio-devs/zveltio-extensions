@@ -134,7 +134,11 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
       const user = c.get('user' as never) as any;
       const data = c.req.valid('json');
       const folder = {
-        id: randomUUID().replace(/-/g, ''),
+        // Canonical UUID, dashes included. The column is `uuid`, so Postgres
+        // accepts the 32-hex form and normalises it on the way in — but the
+        // response echoes this object rather than what was stored, so stripping
+        // the dashes handed the caller an id the database had already rewritten.
+        id: randomUUID(),
         name: data.name,
         parent_id: data.parent_id || null,
         description: data.description || null,
@@ -312,9 +316,14 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'Storage quota exceeded' }, 413);
     }
 
-    const fileId = randomUUID().replace(/-/g, '');
+    // Two different things that used to be one. The row id has to be a
+    // canonical UUID because that is what the column stores and what callers
+    // send back; the storage key stays dash-free because that is what object
+    // keys have always looked like here and existing files are named that way.
+    const fileId = randomUUID();
+    const storageKey = fileId.replace(/-/g, '');
     const ext = file.name.split('.').pop();
-    const filename = `${fileId}.${ext}`;
+    const filename = `${storageKey}.${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
 
     let width: number | null = null;
@@ -337,7 +346,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
             .webp({ quality: 80 })
             .toBuffer();
 
-          const thumbnailKey = `thumbnails/${fileId}.webp`;
+          const thumbnailKey = `thumbnails/${storageKey}.webp`;
           const awsClient = getAws();
           if (awsClient) {
             await awsClient.fetch(s3Url(thumbnailKey), {
@@ -487,7 +496,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     })),
     async (c) => {
       const data = c.req.valid('json');
-      const tag = { id: randomUUID().replace(/-/g, ''), name: data.name, color: data.color || null };
+      const tag = { id: randomUUID(), name: data.name, color: data.color || null };
       try {
         await (db as any).insertInto('zv_media_tags').values(tag).execute();
         return c.json({ tag }, 201);
@@ -707,7 +716,10 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   });
 
   router.post('/admin/quotas', zValidator('json', z.object({
-    user_id: z.string().optional(),
+    // `.uuid()` because the column is one. Without it a typo reached Postgres
+    // as a malformed literal and came back as a 500 — an administrator
+    // mistyping an id was told the server had broken.
+    user_id: z.string().uuid().optional(),
     role_name: z.string().optional(),
     quota_bytes: z.number().int().positive(),
     max_file_size_bytes: z.number().int().positive().default(104857600),
@@ -715,15 +727,27 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   }).refine(d => d.user_id || d.role_name, { message: 'user_id or role_name required' })), async (c) => {
     const user = c.get('user' as never) as any;
     const data = c.req.valid('json');
-    const quota = await (db as any)
-      .insertInto('zv_storage_quotas')
-      .values({ ...data, created_by: user.id })
-      .onConflict((oc: any) => oc
-        .columns(data.user_id ? ['user_id'] : ['role_name'])
-        .doUpdateSet({ quota_bytes: data.quota_bytes, max_file_size_bytes: data.max_file_size_bytes, allowed_extensions: data.allowed_extensions, updated_at: new Date() })
-      )
-      .returningAll()
-      .executeTakeFirst();
+    let quota: unknown;
+    try {
+      quota = await (db as any)
+        .insertInto('zv_storage_quotas')
+        .values({ ...data, created_by: user.id })
+        .onConflict((oc: any) => oc
+          .columns(data.user_id ? ['user_id'] : ['role_name'])
+          .doUpdateSet({ quota_bytes: data.quota_bytes, max_file_size_bytes: data.max_file_size_bytes, allowed_extensions: data.allowed_extensions, updated_at: new Date() })
+        )
+        .returningAll()
+        .executeTakeFirst();
+    } catch (err: unknown) {
+      // A well-formed uuid for a user who does not exist is the caller's
+      // mistake, not the server's. SQLSTATE 23503 is the foreign key
+      // violation; it arrives on `errno` under Bun's SQL driver, since `code`
+      // carries a generic ERR_POSTGRES_SERVER_ERROR for every server error.
+      if ((err as { errno?: unknown } | null)?.errno === '23503') {
+        return c.json({ error: 'Unknown user_id — no such user' }, 400);
+      }
+      throw err;
+    }
     return c.json({ quota }, 201);
   });
 
