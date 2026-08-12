@@ -753,9 +753,22 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
     const insertedLines: any[] = [];
     for (const line of d.lines) {
       const lineTotal = line.quantity * line.unit_price * (1 - d.discount_percent / 100) * (1 + line.tax_rate / 100);
+      // `::text::jsonb`, not `::jsonb`. A string parameter cast straight to
+      // jsonb is a no-op — the driver sends it AS a jsonb value, so the
+      // document arrives as a jsonb STRING SCALAR instead of being parsed, and
+      // `jsonb_typeof(metadata)` reads back "string".
+      //
+      // The JS readers here never noticed: both of them do
+      // `typeof x === 'string' ? JSON.parse(x) : x`, so they compensate for it.
+      // A SQL reader cannot compensate. `operations/traceability` subscribes to
+      // record.created and looks for lines with `metadata->>'lot_id'` to raise a
+      // pending dispatch — on a string scalar that operator returns NULL, its
+      // query matched zero rows, and the invoice-to-dispatch handover has never
+      // once fired. Every route that acts on a pending dispatch was unreachable
+      // as a result.
       const lineRow = await sql`
         INSERT INTO zvd_invoice_lines (invoice_id, description, quantity, unit, unit_price, tax_rate, total, sort_order, metadata)
-        VALUES (${invId}, ${line.description}, ${line.quantity}, ${line.unit ?? null}, ${line.unit_price}, ${line.tax_rate}, ${lineTotal}, ${line.sort_order}, ${JSON.stringify({ ...(line.metadata ?? {}), ...(line.catalogue_item ? { catalogue_item: line.catalogue_item } : {}) })}::jsonb)
+        VALUES (${invId}, ${line.description}, ${line.quantity}, ${line.unit ?? null}, ${line.unit_price}, ${line.tax_rate}, ${lineTotal}, ${line.sort_order}, ${JSON.stringify({ ...(line.metadata ?? {}), ...(line.catalogue_item ? { catalogue_item: line.catalogue_item } : {}) })}::text::jsonb)
         RETURNING *
       `.execute(db);
       insertedLines.push(lineRow.rows[0]);
