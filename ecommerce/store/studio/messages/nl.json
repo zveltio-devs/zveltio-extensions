@@ -22,5 +22,16 @@
   "ecommerce.store.ui.processing": "Verwerken",
   "ecommerce.store.ui.shipped": "Verzonden",
   "ecommerce.store.ui.short_description": "Korte beschrijving",
-  "ecommerce.store.ui.stock_qty": "Voorraadaantal"
+  "ecommerce.store.ui.stock_qty": "Voorraadaantal",
+  "store.form.currency": "Currency",
+  "store.form.name": "Name",
+  "store.form.price": "Price",
+  "store.form.shortDescription": "Short description",
+  "store.form.sku": "SKU",
+  "store.form.slug": "Slug",
+  "store.form.status": "Status",
+  "store.form.stockQty": "Stock",
+  "store.status.active": "Active",
+  "store.status.archived": "Archived",
+  "store.status.draft": "Draft"
 }

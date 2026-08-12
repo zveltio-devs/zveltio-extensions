@@ -3,7 +3,7 @@
   "displayName": "CRM",
   "category": "business",
   "description": "Contacts, Organizations, and Transactions — core Business OS data layer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-crm",
@@ -34,8 +34,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "6df754055c6eaafc0b84cfb58578e03bde8b66271d8e5d74ead357d54e924736",
-    "sourceSha256": "4d3d9dd951721fd45142b7181ae8f309bfa2beb98f05892703c7de9ddbd2a567"
+    "engineSha256": "6b4b67c38cc0fcaa2fa5ca6d299a8a7332752dacfea3554d4fead94b9f95bcae",
+    "sourceSha256": "c4dd245e9994f781c70a3877554ac50cf4db3c41f276c8696d8f298a09e7e962"
   },
   "resources": [
     "crm"

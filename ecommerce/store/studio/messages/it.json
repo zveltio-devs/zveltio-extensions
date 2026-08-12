@@ -22,5 +22,16 @@
   "ecommerce.store.ui.processing": "Elaborazione",
   "ecommerce.store.ui.shipped": "Spedito",
   "ecommerce.store.ui.short_description": "Descrizione breve",
-  "ecommerce.store.ui.stock_qty": "Qtà scorte"
+  "ecommerce.store.ui.stock_qty": "Qtà scorte",
+  "store.form.currency": "Currency",
+  "store.form.name": "Name",
+  "store.form.price": "Price",
+  "store.form.shortDescription": "Short description",
+  "store.form.sku": "SKU",
+  "store.form.slug": "Slug",
+  "store.form.status": "Status",
+  "store.form.stockQty": "Stock",
+  "store.status.active": "Active",
+  "store.status.archived": "Archived",
+  "store.status.draft": "Draft"
 }

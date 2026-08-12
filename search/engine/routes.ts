@@ -47,6 +47,13 @@ export function searchRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
       });
       return c.json({ results });
     } catch (err: any) {
+      // A collection with no index is a configuration state, not a fault. 404
+      // says "there is nothing here to search" — true, and something the page
+      // can render as an empty state with a prompt, rather than an error toast
+      // that reads like the server fell over.
+      if (err?.code === 'NO_INDEX') {
+        return c.json({ error: err.message, code: 'NO_INDEX', results: [], hits: [] }, 404);
+      }
       return c.json({ error: err.message }, 500);
     }
   });

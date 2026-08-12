@@ -260,49 +260,70 @@
       "dataPath": "data",
       "search": {
         "fields": [
-          "title"
+          "number"
         ],
         "placeholder": "common.search"
       },
       "columns": [
         {
-          "key": "title",
-          "label": "crm.col.title"
+          "key": "number",
+          "label": "crm.col.number"
         },
         {
-          "key": "stage",
-          "label": "crm.col.stage",
+          "key": "type",
+          "label": "crm.col.type",
           "type": "badge",
           "badge": {
             "colors": {
-              "prospecting": "badge-ghost",
-              "qualification": "badge-info",
-              "proposal": "badge-warning",
-              "negotiation": "badge-warning",
-              "closed_won": "badge-success",
-              "closed_lost": "badge-error"
+              "invoice": "badge-info",
+              "payment": "badge-success",
+              "credit_note": "badge-warning",
+              "expense": "badge-ghost",
+              "transfer": "badge-ghost",
+              "other": "badge-ghost"
             },
             "labels": {
-              "prospecting": "crm.stage.prospecting",
-              "qualification": "crm.stage.qualification",
-              "proposal": "crm.stage.proposal",
-              "negotiation": "crm.stage.negotiation",
-              "closed_won": "crm.stage.closed_won",
-              "closed_lost": "crm.stage.closed_lost"
+              "invoice": "crm.txType.invoice",
+              "payment": "crm.txType.payment",
+              "credit_note": "crm.txType.credit_note",
+              "expense": "crm.txType.expense",
+              "transfer": "crm.txType.transfer",
+              "other": "crm.txType.other"
             }
           }
         },
         {
-          "key": "value",
-          "label": "crm.col.value",
-          "type": "currency",
-          "currency": {
-            "codeKey": "currency"
+          "key": "status",
+          "label": "crm.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "draft": "badge-ghost",
+              "pending": "badge-warning",
+              "completed": "badge-success",
+              "cancelled": "badge-error",
+              "refunded": "badge-info"
+            },
+            "labels": {
+              "draft": "crm.txStatus.draft",
+              "pending": "crm.txStatus.pending",
+              "completed": "crm.txStatus.completed",
+              "cancelled": "crm.txStatus.cancelled",
+              "refunded": "crm.txStatus.refunded"
+            }
           }
         },
         {
-          "key": "expected_close_date",
-          "label": "crm.col.closeDate",
+          "key": "total_amount",
+          "label": "crm.col.amount"
+        },
+        {
+          "key": "currency",
+          "label": "common.col.currency"
+        },
+        {
+          "key": "due_date",
+          "label": "crm.col.dueDate",
           "type": "date"
         },
         {
@@ -326,61 +347,108 @@
         "endpoint": "/ext/crm/transactions",
         "fields": [
           {
-            "name": "title",
-            "label": "crm.col.title",
-            "required": true,
-            "colSpan": 2
-          },
-          {
-            "name": "stage",
-            "label": "crm.form.stage",
+            "name": "type",
+            "label": "crm.form.type",
             "type": "select",
-            "default": "prospecting",
+            "required": true,
+            "default": "invoice",
             "colSpan": 1,
             "options": [
               {
-                "value": "prospecting",
-                "label": "crm.stage.prospecting"
+                "value": "invoice",
+                "label": "crm.txType.invoice"
               },
               {
-                "value": "qualification",
-                "label": "crm.stage.qualification"
+                "value": "payment",
+                "label": "crm.txType.payment"
               },
               {
-                "value": "proposal",
-                "label": "crm.stage.proposal"
+                "value": "credit_note",
+                "label": "crm.txType.credit_note"
               },
               {
-                "value": "negotiation",
-                "label": "crm.stage.negotiation"
+                "value": "expense",
+                "label": "crm.txType.expense"
               },
               {
-                "value": "closed_won",
-                "label": "crm.stage.closed_won"
+                "value": "transfer",
+                "label": "crm.txType.transfer"
               },
               {
-                "value": "closed_lost",
-                "label": "crm.stage.closed_lost"
+                "value": "other",
+                "label": "crm.txType.other"
               }
             ]
           },
           {
-            "name": "value",
-            "label": "crm.col.value",
+            "name": "status",
+            "label": "crm.form.status",
+            "type": "select",
+            "default": "draft",
+            "colSpan": 1,
+            "options": [
+              {
+                "value": "draft",
+                "label": "crm.txStatus.draft"
+              },
+              {
+                "value": "pending",
+                "label": "crm.txStatus.pending"
+              },
+              {
+                "value": "completed",
+                "label": "crm.txStatus.completed"
+              },
+              {
+                "value": "cancelled",
+                "label": "crm.txStatus.cancelled"
+              },
+              {
+                "value": "refunded",
+                "label": "crm.txStatus.refunded"
+              }
+            ]
+          },
+          {
+            "name": "number",
+            "label": "crm.form.number",
+            "colSpan": 2
+          },
+          {
+            "name": "amount",
+            "label": "crm.form.amount",
+            "type": "number",
+            "colSpan": 1
+          },
+          {
+            "name": "tax_amount",
+            "label": "crm.form.taxAmount",
+            "type": "number",
+            "colSpan": 1
+          },
+          {
+            "name": "total_amount",
+            "label": "crm.form.totalAmount",
             "type": "number",
             "colSpan": 1
           },
           {
             "name": "currency",
-            "label": "common.col.currency",
+            "label": "crm.form.currency",
             "default": "RON",
             "colSpan": 1
           },
           {
-            "name": "expected_close_date",
-            "label": "crm.col.closeDate",
+            "name": "due_date",
+            "label": "crm.form.dueDate",
             "type": "date",
             "colSpan": 1
+          },
+          {
+            "name": "notes",
+            "label": "crm.form.notes",
+            "type": "textarea",
+            "colSpan": 2
           }
         ]
       }

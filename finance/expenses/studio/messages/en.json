@@ -1,4 +1,7 @@
 {
+  "expenses.form.currency": "Currency",
+  "expenses.form.notes": "Notes",
+  "expenses.form.title": "Report title",
   "finance.expenses.action.approve": "Approve",
   "finance.expenses.category.meals": "Meals",
   "finance.expenses.category.office": "Office",

@@ -16,5 +16,11 @@
   "finance.quotes.ui.service_or_product": "Serviciu sau produs",
   "finance.quotes.ui.unit_price": "Preț unitar",
   "finance.quotes.ui.valid_days": "Zile de valabilitate",
+  "quotes.form.clientEmail": "Email client",
+  "quotes.form.clientName": "Client",
+  "quotes.form.currency": "Monedă",
+  "quotes.form.notes": "Observații",
+  "quotes.form.title": "Titlu",
+  "quotes.form.validUntil": "Valabil până la",
   "quotes.new": "Ofertă nouă"
 }
