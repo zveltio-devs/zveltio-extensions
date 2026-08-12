@@ -41,7 +41,7 @@ doi creatori, engine-ul rulează primul, extensia scrie în forma ei:
 | `auth/saml` | 5 | 4 | 0 | 0 | 0 | 4 | 1 | SDUI | da | **reparat 2026-08-11 — G nepresat** |
 | `auth/scim` | 10 | 2 | 0 | 0 | 9 | 0 | 1 | SDUI | da | **verificat** |
 | `billing` | 6 | 2 | 0 | 0 | 0 | 0 | 2 | cod | da | **verificat 2026-08-11** |
-| `communications/mail` | 43 | 2 | 0 | 0 | 1 | 0 | 1 | cod | da | **reparat 2026-08-11 — G nepresat** |
+| `communications/mail` | 43 | 2 | 0 | 0 | 1 | 0 | 1 | cod | da | **verificat 2026-08-12 — G presat cu IMAP/SMTP real** |
 | `compliance/gdpr` | 16 | 2 | 0 | 0 | 14 | 0 | 1 | SDUI | da | **verificat** |
 | `compliance/ro/documents` | 12 | 4 | 0 | 0 | 2 | 0 | 1 | SDUI | da | **verificat** |
 | `compliance/ro/efactura` | 23 | 6 | 2 | 1 | 6 | 6 | 2 | SDUI | da | **verificat** |
