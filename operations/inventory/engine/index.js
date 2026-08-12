@@ -19636,7 +19636,7 @@ function inventoryRoutes(ctx) {
     barcode: exports_external.string().optional(),
     category: exports_external.string().optional(),
     description: exports_external.string().optional(),
-    unit: exports_external.string().default("buc"),
+    unit: exports_external.enum(["piece", "kg", "liter", "box", "meter", "hour", "other"]).default("piece"),
     unit_cost: exports_external.number().min(0).default(0),
     unit_price: exports_external.number().min(0).default(0),
     tax_rate: exports_external.number().default(19),

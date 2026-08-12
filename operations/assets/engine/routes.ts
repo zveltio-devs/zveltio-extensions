@@ -64,8 +64,20 @@ export function assetsRoutes(ctx: ExtensionContext): Hono {
 
   app.post('/', zValidator('json', z.object({
     name: z.string().min(1),
-    asset_code: z.string().optional(),
-    category: z.string().optional(),
+    // Required, because the column is: `code TEXT NOT NULL UNIQUE`. Declared
+    // optional here, an omitted code reached Postgres as null and came back as
+    // a 500 — the caller was told the server broke when they had simply left a
+    // mandatory field empty. Creating an asset without one has never worked.
+    asset_code: z.string().min(1),
+    // Defaulted here to the same value the column defaults to.
+    //
+    // The insert passes `d.category ?? null` — an explicit NULL, which OVERRIDES
+    // a column default rather than falling back to it. `category` is
+    // `NOT NULL DEFAULT 'equipment'`, so omitting it from the request produced a
+    // constraint violation and a 500: the default existed and could never be
+    // reached. Giving zod the same default keeps the two definitions saying one
+    // thing.
+    category: z.string().default('equipment'),
     description: z.string().optional(),
     serial_number: z.string().optional(),
     location: z.string().optional(),

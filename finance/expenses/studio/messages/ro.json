@@ -1,4 +1,7 @@
 {
+  "expenses.form.currency": "Monedă",
+  "expenses.form.notes": "Observații",
+  "expenses.form.title": "Titlul notei",
   "finance.expenses.action.approve": "Aprobă",
   "finance.expenses.category.meals": "Mese",
   "finance.expenses.category.office": "Birou",

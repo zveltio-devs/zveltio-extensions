@@ -16,5 +16,11 @@
   "finance.quotes.ui.service_or_product": "Usługa lub produkt",
   "finance.quotes.ui.unit_price": "Cena jednostkowa",
   "finance.quotes.ui.valid_days": "Dni ważności",
+  "quotes.form.clientEmail": "Client email",
+  "quotes.form.clientName": "Client",
+  "quotes.form.currency": "Currency",
+  "quotes.form.notes": "Notes",
+  "quotes.form.title": "Title",
+  "quotes.form.validUntil": "Valid until",
   "quotes.new": "Nowa oferta"
 }

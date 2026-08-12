@@ -16,5 +16,11 @@
   "finance.quotes.ui.service_or_product": "Szolgáltatás vagy termék",
   "finance.quotes.ui.unit_price": "Egységár",
   "finance.quotes.ui.valid_days": "Érvényességi napok",
+  "quotes.form.clientEmail": "Client email",
+  "quotes.form.clientName": "Client",
+  "quotes.form.currency": "Currency",
+  "quotes.form.notes": "Notes",
+  "quotes.form.title": "Title",
+  "quotes.form.validUntil": "Valid until",
   "quotes.new": "Új árajánlat"
 }

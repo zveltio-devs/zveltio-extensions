@@ -17,5 +17,8 @@
   "hr.payroll.ui.name_e_g_november_2026": "Name (e.g. November 2026)",
   "hr.payroll.ui.new_payroll_period": "Nuevo período de nómina",
   "hr.payroll.ui.no_entries_click_generate": "Sin entradas: haz clic en Generar.",
-  "hr.payroll.ui.pay_date": "Pay date"
+  "hr.payroll.ui.pay_date": "Pay date",
+  "payroll.form.month": "Month (1-12)",
+  "payroll.form.notes": "Notes",
+  "payroll.form.year": "Year"
 }

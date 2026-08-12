@@ -63,98 +63,56 @@
         "fields": [
           {
             "name": "name",
-            "label": "content.document-templates.ui.name",
-            "colSpan": 2,
+            "label": "assets.form.name",
+            "required": true,
+            "colSpan": 2
+          },
+          {
+            "name": "asset_code",
+            "label": "assets.form.assetCode",
+            "colSpan": 1,
             "required": true
           },
           {
-            "name": "code",
-            "label": "operations.assets.ui.code_tag",
-            "colSpan": 1
-          },
-          {
             "name": "serial_number",
-            "label": "operations.assets.ui.serial_number",
+            "label": "assets.form.serialNumber",
             "colSpan": 1
           },
           {
             "name": "category",
-            "label": "common.col.category",
-            "type": "select",
-            "colSpan": 1,
-            "options": [
-              {
-                "value": "IT Equipment",
-                "label": "operations.assets.cat.itEquipment"
-              },
-              {
-                "value": "Furniture",
-                "label": "operations.assets.cat.furniture"
-              },
-              {
-                "value": "Vehicles",
-                "label": "operations.assets.cat.vehicles"
-              },
-              {
-                "value": "Machinery",
-                "label": "operations.assets.cat.machinery"
-              },
-              {
-                "value": "Buildings",
-                "label": "operations.assets.cat.buildings"
-              },
-              {
-                "value": "Other",
-                "label": "common.other"
-              }
-            ]
-          },
-          {
-            "name": "status",
-            "label": "common.col.status",
-            "type": "select",
-            "colSpan": 1,
-            "default": "active",
-            "options": [
-              {
-                "value": "active",
-                "label": "active"
-              },
-              {
-                "value": "inactive",
-                "label": "inactive"
-              },
-              {
-                "value": "disposed",
-                "label": "disposed"
-              },
-              {
-                "value": "under_maintenance",
-                "label": "operations.assets.status.underMaintenance"
-              }
-            ]
-          },
-          {
-            "name": "acquisition_cost",
-            "label": "operations.assets.ui.acquisition_cost",
-            "type": "number",
-            "colSpan": 1
-          },
-          {
-            "name": "currency",
-            "label": "common.col.currency",
-            "colSpan": 1,
-            "default": "RON"
-          },
-          {
-            "name": "acquisition_date",
-            "label": "operations.assets.ui.acquisition_date",
-            "type": "date",
+            "label": "assets.form.category",
             "colSpan": 1
           },
           {
             "name": "location",
-            "label": "operations.assets.ui.location",
+            "label": "assets.form.location",
+            "colSpan": 1
+          },
+          {
+            "name": "purchase_date",
+            "label": "assets.form.purchaseDate",
+            "type": "date",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "purchase_cost",
+            "label": "assets.form.purchaseCost",
+            "type": "number",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "useful_life_years",
+            "label": "assets.form.usefulLife",
+            "type": "number",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "residual_value",
+            "label": "assets.form.residualValue",
+            "type": "number",
             "colSpan": 1
           }
         ]

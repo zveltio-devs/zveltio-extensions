@@ -69,5 +69,14 @@
     ]
   },
   "include": ["**/*.svelte", "**/*.ts", "**/*.d.ts", "types/**/*.d.ts"],
-  "exclude": ["**/node_modules", "**/dist", "**/*.test.ts", "testing"]
+  "exclude": [
+    /* Studio page sources compile inside the Studio's module graph, not this
+     * one: they resolve SvelteKit aliases (`$app/paths`) and import from
+     * `@sveltejs/kit`, neither of which exists here. The `.svelte` pages have
+     * always been exempt in practice — `tsc` does not parse them — and a
+     * `+page.ts` redirect is the same kind of file with the same dependencies,
+     * so it is exempt explicitly rather than by accident. They are typechecked
+     * where they are built, by `packages/studio`. */
+    "**/studio/pages/**/*.ts",
+    "**/node_modules", "**/dist", "**/*.test.ts", "testing"]
 }

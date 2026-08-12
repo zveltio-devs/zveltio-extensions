@@ -3,7 +3,7 @@
   "displayName": "Payroll RO",
   "category": "hr",
   "description": "Romanian payroll: CAS, CASS, income tax calculations, meal vouchers and Revisal XML export",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-payroll",
@@ -40,7 +40,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "5961ebfa3ff5ad4b6478415ffc8558dc3866e5e285b8da077d13c2682922832b",
+    "engineSha256": "7e3f693de4432098c2c16b66f244d084dde2d1607936479988104541c610da75",
     "sourceSha256": "88c7b8bc502cae5cf201df2b4d58522f86ae70b4799a7bb7eeaac7f09745aaa4"
   },
   "resources": [

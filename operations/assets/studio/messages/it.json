@@ -1,4 +1,13 @@
 {
+  "assets.form.assetCode": "Asset code",
+  "assets.form.category": "Category",
+  "assets.form.location": "Location",
+  "assets.form.name": "Name",
+  "assets.form.purchaseCost": "Purchase cost",
+  "assets.form.purchaseDate": "Purchase date",
+  "assets.form.residualValue": "Residual value",
+  "assets.form.serialNumber": "Serial number",
+  "assets.form.usefulLife": "Useful life (years)",
   "operations.assets.btn.create": "Crea",
   "operations.assets.btn.new": "Nuovo cespite",
   "operations.assets.cat.buildings": "Edifici",
