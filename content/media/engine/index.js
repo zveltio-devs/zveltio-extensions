@@ -16485,7 +16485,7 @@ function mediaRoutes(ctx) {
     const user = c.get("user");
     const data = c.req.valid("json");
     const folder = {
-      id: randomUUID().replace(/-/g, ""),
+      id: randomUUID(),
       name: data.name,
       parent_id: data.parent_id || null,
       description: data.description || null,
@@ -16581,9 +16581,10 @@ function mediaRoutes(ctx) {
     if (usedBytes + file2.size > quotaBytes) {
       return c.json({ error: "Storage quota exceeded" }, 413);
     }
-    const fileId = randomUUID().replace(/-/g, "");
+    const fileId = randomUUID();
+    const storageKey = fileId.replace(/-/g, "");
     const ext = file2.name.split(".").pop();
-    const filename = `${fileId}.${ext}`;
+    const filename = `${storageKey}.${ext}`;
     const buffer = Buffer.from(await file2.arrayBuffer());
     let width = null;
     let height = null;
@@ -16597,7 +16598,7 @@ function mediaRoutes(ctx) {
           width = metadata.width || null;
           height = metadata.height || null;
           const thumbnailBuffer = await sharp(buffer).resize(300, 300, { fit: "inside" }).webp({ quality: 80 }).toBuffer();
-          const thumbnailKey = `thumbnails/${fileId}.webp`;
+          const thumbnailKey = `thumbnails/${storageKey}.webp`;
           const awsClient2 = getAws();
           if (awsClient2) {
             await awsClient2.fetch(s3Url(thumbnailKey), {
@@ -16702,7 +16703,7 @@ function mediaRoutes(ctx) {
     color: exports_external.string().optional()
   })), async (c) => {
     const data = c.req.valid("json");
-    const tag = { id: randomUUID().replace(/-/g, ""), name: data.name, color: data.color || null };
+    const tag = { id: randomUUID(), name: data.name, color: data.color || null };
     try {
       await db.insertInto("zv_media_tags").values(tag).execute();
       return c.json({ tag }, 201);
@@ -16834,7 +16835,7 @@ function mediaRoutes(ctx) {
     return c.json({ quotas });
   });
   router.post("/admin/quotas", zValidator("json", exports_external.object({
-    user_id: exports_external.string().optional(),
+    user_id: exports_external.string().uuid().optional(),
     role_name: exports_external.string().optional(),
     quota_bytes: exports_external.number().int().positive(),
     max_file_size_bytes: exports_external.number().int().positive().default(104857600),
@@ -16842,7 +16843,15 @@ function mediaRoutes(ctx) {
   }).refine((d) => d.user_id || d.role_name, { message: "user_id or role_name required" })), async (c) => {
     const user = c.get("user");
     const data = c.req.valid("json");
-    const quota = await db.insertInto("zv_storage_quotas").values({ ...data, created_by: user.id }).onConflict((oc) => oc.columns(data.user_id ? ["user_id"] : ["role_name"]).doUpdateSet({ quota_bytes: data.quota_bytes, max_file_size_bytes: data.max_file_size_bytes, allowed_extensions: data.allowed_extensions, updated_at: new Date })).returningAll().executeTakeFirst();
+    let quota;
+    try {
+      quota = await db.insertInto("zv_storage_quotas").values({ ...data, created_by: user.id }).onConflict((oc) => oc.columns(data.user_id ? ["user_id"] : ["role_name"]).doUpdateSet({ quota_bytes: data.quota_bytes, max_file_size_bytes: data.max_file_size_bytes, allowed_extensions: data.allowed_extensions, updated_at: new Date })).returningAll().executeTakeFirst();
+    } catch (err) {
+      if (err?.errno === "23503") {
+        return c.json({ error: "Unknown user_id \u2014 no such user" }, 400);
+      }
+      throw err;
+    }
     return c.json({ quota }, 201);
   });
   router.delete("/admin/quotas/:id", async (c) => {
