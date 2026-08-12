@@ -77,6 +77,57 @@ export function buildEmploymentService(ctx: ExtensionContext) {
     },
 
     /**
+     * The employee behind a signed-in user, with their manager.
+     *
+     * `hr/leave` and `hr/time-tracking` each grew their own copy of this — the
+     * same twenty lines, both opening `zvd_employees` directly. Two copies is a
+     * duplication; a third would be a pattern, and the rule for that was
+     * already written down. This is the third caller, so it lives here now.
+     *
+     * `user_id` first, because that is the link the schema declares. Email is
+     * the fallback both copies used on their own, and it is the weaker one:
+     * somebody whose work address differs from their login could not file leave
+     * or start a timer at all.
+     */
+    async identify(user: {
+      id: string;
+      email?: string;
+    }): Promise<{ id: string; manager_id: string | null } | null> {
+      const rows = await sql<{ id: string; manager_id: string | null }>`
+        SELECT id, manager_id FROM zvd_employees
+         WHERE user_id = ${user.id} OR email = ${user.email ?? ''} OR work_email = ${user.email ?? ''}
+         LIMIT 1
+      `.execute(db);
+      return rows.rows[0] ?? null;
+    },
+
+    /**
+     * May this user act on behalf of `employeeId`?
+     *
+     * Three ways in, and the order is the point: it is you, you manage the
+     * person, or you administer the instance.
+     *
+     * Callers that must EXCLUDE the own-record case — approving your own leave,
+     * approving your own timesheet — call `identify()` and refuse before asking
+     * this. That is left to the caller deliberately: submitting your own
+     * timesheet and approving it are different acts, and one helper deciding
+     * for both would get one of them wrong.
+     */
+    async mayActFor(user: { id: string; email?: string }, employeeId: string): Promise<boolean> {
+      const me = await this.identify(user);
+      if (me && me.id === employeeId) return true;
+
+      const target = await sql<{ manager_id: string | null }>`
+        SELECT manager_id FROM zvd_employees WHERE id = ${employeeId}
+      `.execute(db);
+      const managerId = target.rows[0]?.manager_id;
+      if (me && managerId && managerId === me.id) return true;
+
+      return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
+    },
+
+
+    /**
      * One person's current terms, or null if there is no such employee.
      *
      * Written out rather than sharing a SELECT string with the query above:

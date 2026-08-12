@@ -20328,6 +20328,26 @@ function buildEmploymentService(ctx) {
       `.execute(db);
       return rows.rows;
     },
+    async identify(user) {
+      const rows = await sql`
+        SELECT id, manager_id FROM zvd_employees
+         WHERE user_id = ${user.id} OR email = ${user.email ?? ""} OR work_email = ${user.email ?? ""}
+         LIMIT 1
+      `.execute(db);
+      return rows.rows[0] ?? null;
+    },
+    async mayActFor(user, employeeId) {
+      const me = await this.identify(user);
+      if (me && me.id === employeeId)
+        return true;
+      const target = await sql`
+        SELECT manager_id FROM zvd_employees WHERE id = ${employeeId}
+      `.execute(db);
+      const managerId = target.rows[0]?.manager_id;
+      if (me && managerId && managerId === me.id)
+        return true;
+      return ctx.checkPermission(user.id, "admin", "*").catch(() => false);
+    },
     async currentTerms(employeeId) {
       const rows = await sql`
         SELECT

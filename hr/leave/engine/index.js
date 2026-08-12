@@ -19529,23 +19529,8 @@ async function countWorkingDays(dbh, startDate, endDate, isHalfDay = false) {
   }
   return days;
 }
-async function callerEmployee(dbh, user) {
-  const rows = await sql`
-    SELECT id, manager_id FROM zvd_employees
-    WHERE user_id = ${user.id} OR email = ${user.email} OR work_email = ${user.email}
-    LIMIT 1
-  `.execute(dbh);
-  return rows.rows[0] ?? null;
-}
-async function mayActOnLeaveOf(dbh, ctx, user, employeeId) {
-  const me = await callerEmployee(dbh, user);
-  if (me && me.id === employeeId)
-    return true;
-  const target = await sql`SELECT manager_id FROM zvd_employees WHERE id = ${employeeId}`.execute(dbh);
-  const managerId = target.rows[0]?.manager_id;
-  if (me && managerId && managerId === me.id)
-    return true;
-  return ctx.checkPermission(user.id, "admin", "*").catch(() => false);
+function employment(ctx) {
+  return ctx.services.get("hr.employment");
 }
 function leaveRoutes(ctx) {
   const { db, auth } = ctx;
@@ -19710,13 +19695,16 @@ function leaveRoutes(ctx) {
   });
   app.get("/requests/my", async (c) => {
     const user = c.get("user");
-    const emp = await sql`SELECT id FROM zvd_employees WHERE email = ${user.email} OR work_email = ${user.email}`.execute(db);
-    if (!emp.rows.length)
+    const svc = employment(ctx);
+    if (!svc)
+      return c.json({ error: "hr/employees is not enabled" }, 503);
+    const me = await svc.identify(user);
+    if (!me)
       return c.json({ data: [] });
     const rows = await sql`
       SELECT r.*, t.name as leave_type_name, t.code, t.color
       FROM zvd_leave_requests r JOIN zvd_leave_types t ON t.id = r.leave_type_id
-      WHERE r.employee_id = ${emp.rows[0].id}
+      WHERE r.employee_id = ${me.id}
       ORDER BY r.created_at DESC
     `.execute(db);
     return c.json({ data: rows.rows });
@@ -19733,7 +19721,10 @@ function leaveRoutes(ctx) {
   })), async (c) => {
     const d = c.req.valid("json");
     const user = c.get("user");
-    if (!await mayActOnLeaveOf(db, ctx, user, d.employee_id)) {
+    const svc = employment(ctx);
+    if (!svc)
+      return c.json({ error: "hr/employees is not enabled" }, 503);
+    if (!await svc.mayActFor(user, d.employee_id)) {
       return c.json({ error: "You may only request leave for yourself or someone you manage" }, 403);
     }
     const start = new Date(d.start_date);
@@ -19791,9 +19782,12 @@ function leaveRoutes(ctx) {
     if (!req.rows.length)
       return c.json({ error: "Request not found or not pending" }, 400);
     const r = req.rows[0];
-    const me = await callerEmployee(db, user);
+    const svc = employment(ctx);
+    if (!svc)
+      return c.json({ error: "hr/employees is not enabled" }, 503);
+    const me = await svc.identify(user);
     const isSelf = !!me && me.id === r.employee_id;
-    const allowed = !isSelf && await mayActOnLeaveOf(db, ctx, user, r.employee_id);
+    const allowed = !isSelf && await svc.mayActFor(user, r.employee_id);
     if (!allowed) {
       return c.json({ error: isSelf ? "You cannot approve your own leave" : "Only a manager may approve this" }, 403);
     }
@@ -19815,11 +19809,14 @@ function leaveRoutes(ctx) {
     if (!req.rows.length)
       return c.json({ error: "Request not found or not pending" }, 400);
     const r = req.rows[0];
-    const me = await callerEmployee(db, user);
+    const svc = employment(ctx);
+    if (!svc)
+      return c.json({ error: "hr/employees is not enabled" }, 503);
+    const me = await svc.identify(user);
     if (me && me.id === r.employee_id) {
       return c.json({ error: "Cancel your own request rather than rejecting it" }, 403);
     }
-    if (!await mayActOnLeaveOf(db, ctx, user, r.employee_id)) {
+    if (!await svc.mayActFor(user, r.employee_id)) {
       return c.json({ error: "Only a manager may reject this" }, 403);
     }
     const year = new Date(r.start_date).getFullYear();
@@ -19836,7 +19833,10 @@ function leaveRoutes(ctx) {
     if (!req.rows.length)
       return c.json({ error: "Request not found or cannot be cancelled" }, 400);
     const r = req.rows[0];
-    if (!await mayActOnLeaveOf(db, ctx, user, r.employee_id)) {
+    const svc = employment(ctx);
+    if (!svc)
+      return c.json({ error: "hr/employees is not enabled" }, 503);
+    if (!await svc.mayActFor(user, r.employee_id)) {
       return c.json({ error: "You may only cancel your own leave or that of someone you manage" }, 403);
     }
     const year = new Date(r.start_date).getFullYear();
