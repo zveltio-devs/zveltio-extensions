@@ -48,7 +48,7 @@ INSERT INTO zv_ai_features (feature_key, display_name, description, is_enabled) 
   ('generate', 'Generative actions',  'AI-assisted record generation and bulk fill', true),
   ('decide',   'Decision step',       'AI decision branch in automation flows', true),
   ('embed',    'Embeddings',          'Background embedding generation for RAG', true)
-ON CONFLICT (feature_key) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS zv_ai_usage (
   id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),

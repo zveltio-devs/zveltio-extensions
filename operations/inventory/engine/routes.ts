@@ -60,7 +60,7 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
-    const row = await sql`INSERT INTO zvd_warehouses (name, address, notes, created_by) VALUES (${d.name}, ${d.address ?? null}, ${d.notes ?? null}, ${user.id}) RETURNING *`.execute(db);
+    const row = await sql`INSERT INTO zvd_warehouses (name, location, notes, created_by) VALUES (${d.name}, ${d.address ?? null}, ${d.notes ?? null}, ${user.id}) RETURNING *`.execute(db);
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -167,7 +167,7 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
     const row = await sql`
-      INSERT INTO zvd_products (name, sku, barcode, category, description, unit, unit_cost, unit_price, tax_rate, reorder_point, reorder_quantity, avg_cost, created_by)
+      INSERT INTO zvd_products (name, sku, barcode, category, description, unit, cost_price, sale_price, tax_rate, reorder_point, reorder_qty, avg_cost, created_by)
       VALUES (${d.name}, ${d.sku ?? null}, ${d.barcode ?? null}, ${d.category ?? null}, ${d.description ?? null},
         ${d.unit}, ${d.unit_cost}, ${d.unit_price}, ${d.tax_rate}, ${d.reorder_point}, ${d.reorder_quantity}, ${d.unit_cost}, ${user.id})
       RETURNING *
@@ -358,7 +358,7 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
       await updateAvgCost(db, d.product_id, d.quantity, d.unit_cost);
     }
     const movement = await sql`
-      INSERT INTO zvd_stock_movements (product_id, warehouse_id, destination_warehouse_id, type, quantity, unit_cost, reference, notes, created_by)
+      INSERT INTO zvd_stock_movements (product_id, warehouse_id, destination_warehouse_id, type, quantity, unit_cost, reference, note, created_by)
       VALUES (${d.product_id}, ${d.warehouse_id}, ${d.destination_warehouse_id ?? null}, ${d.type}, ${d.quantity}, ${d.unit_cost ?? null}, ${d.reference ?? null}, ${d.notes ?? null}, ${user.id})
       RETURNING *
     `.execute(db);

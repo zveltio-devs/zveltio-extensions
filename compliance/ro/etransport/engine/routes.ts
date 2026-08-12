@@ -33,6 +33,23 @@ const declarationSchema = z.object({
   purpose: z.enum(['commercial', 'personal', 'return']).default('commercial'),
 });
 
+/**
+ * May this user take the decision this module exists to record?
+ *
+ * Anularea unui transport declarat. Un transport în derulare cu declarația anulată e o amendă la primul control.
+ *
+ * It sat behind one `etransport` permission — the same one needed to look at the
+ * list — and asked nothing else. Found by `scripts/check-decision-routes.ts`,
+ * which was written after the same shape turned up in four extensions in a row.
+ *
+ * `etransport:cancel`, granted deliberately, with `admin` still sufficient so an
+ * existing install keeps working before anyone edits policies.
+ */
+async function mayDecide(ctx: ExtensionContext, user: any): Promise<boolean> {
+  if (await ctx.checkPermission(user.id, 'etransport', 'cancel').catch(() => false)) return true;
+  return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
+}
+
 export function etransportRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
@@ -148,22 +165,86 @@ export function etransportRoutes(ctx: ExtensionContext): Hono {
     if (!decl) return c.json({ error: 'Declaration not found' }, 404);
     if (decl.status !== 'draft') return c.json({ error: 'Only draft declarations can be declared' }, 400);
 
-    // Stub: in production call ANAF e-Transport API
-    const uit = `RO${Date.now()}`;
-    const anafResponse = {
-      dateResponse: new Date().toISOString(),
-      ExecutionStatus: '0',
-      UIT: uit,
-    };
-
-    await db
-      .updateTable('zv_etransport_declarations')
-      .set({ uit, status: 'declared', anaf_response: JSON.stringify(anafResponse), updated_at: new Date() })
-      .where('id', '=', decl.id)
-      .execute();
-
-    return c.json({ message: 'Declaration submitted to ANAF', uit, response: anafResponse });
+    // No UIT is invented here, and that is the entire point of this branch.
+    //
+    // This route used to FABRICATE one: `RO` followed by the current
+    // timestamp. It stored that as the UIT, moved the declaration to
+    // `declared`, saved a made-up ANAF response with `ExecutionStatus: '0'`,
+    // and replied "Declaration submitted to ANAF". Nothing was ever sent —
+    // there is no call to anaf.ro anywhere in this extension, and no XML
+    // generator to send.
+    //
+    // A fabricated e-Factura index costs somebody a penalty months later. A
+    // fabricated UIT costs them the same afternoon: the code travels WITH the
+    // goods, the driver is required to have it, and it is checked at the
+    // roadside. A number that does not exist in ANAF's system means a fine and
+    // seized goods, for a driver who was told the paperwork was done.
+    //
+    // What is missing, so nobody has to rediscover it: the declaration XML
+    // (ANAF's e-Transport v2 XSD), the OAuth client, and several mandatory
+    // fields this table cannot hold — customs codes (NC) per goods line, net
+    // weight alongside gross, and the partner's identification.
+    return c.json(
+      {
+        code: 'anaf_etransport_not_implemented',
+        error:
+          'Declaring to ANAF is not implemented: this build has no e-Transport XML generator and no SPV integration. ' +
+          'NO UIT was issued and the declaration is unchanged. A UIT can only come from ANAF — obtain it in SPV and ' +
+          'record it here, because a code that did not come from them is not a UIT.',
+        declared: false,
+      },
+      501,
+    );
   });
+
+
+  /**
+   * Record a UIT obtained in SPV by hand.
+   *
+   * Until this extension can talk to ANAF, the declaration still has to travel
+   * with the goods — so the useful thing is not to pretend, but to let somebody
+   * who got the code the manual way keep it where the rest of the transport
+   * lives. That turns the extension from something that fabricates into a
+   * register that is merely incomplete, which is a different kind of thing.
+   *
+   * The format is checked only for shape, not validity: only ANAF can say
+   * whether a UIT is real, and refusing a correctly-shaped code because this
+   * codebase does not recognise it would be the same overconfidence in reverse.
+   */
+  app.post('/:id/record-uit',
+    zValidator('param', z.object({ id: z.string().uuid() })),
+    zValidator('json', z.object({
+      uit: z.string().trim().min(4).max(64),
+      /** Where it came from, since it did not come from here. */
+      note: z.string().optional(),
+    })),
+    async (c) => {
+      const user = await getUser(c, auth);
+      if (!user) return c.json({ error: 'Unauthorized' }, 401);
+      const d = c.req.valid('json');
+
+      const row = await db
+        .updateTable('zv_etransport_declarations')
+        .set({
+          uit: d.uit,
+          status: 'declared',
+          anaf_response: JSON.stringify({
+            source: 'manual',
+            recorded_by: user.id,
+            recorded_at: new Date().toISOString(),
+            note: d.note ?? null,
+          }),
+          updated_at: new Date(),
+        })
+        .where('id', '=', c.req.param('id'))
+        .where('status', '=', 'draft')
+        .returning(['id', 'uit', 'status'])
+        .execute();
+
+      if (!row.length) return c.json({ error: 'Declaration not found, or not a draft' }, 404);
+      return c.json({ data: row[0] });
+    },
+  );
 
   app.post('/:id/complete', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const user = await getUser(c, auth);
@@ -180,6 +261,8 @@ export function etransportRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/:id/cancel', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
+    const _u = c.get('user') as any;
+    if (!(await mayDecide(ctx, _u))) return c.json({ error: 'Not allowed' }, 403);
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 

@@ -263,9 +263,9 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
         } else {
           // Create canonical product directly via the extension's writable db
           const create = await sql<any>`
-            INSERT INTO zvd_products (sku, name, description, price, currency, tax_rate, is_active)
+            INSERT INTO zvd_products (sku, name, description, sale_price, currency, tax_rate, is_active)
             VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === 'active'})
-            ON CONFLICT (sku) DO UPDATE SET name = EXCLUDED.name
+            ON CONFLICT (tenant_id, sku) DO UPDATE SET name = EXCLUDED.name
             RETURNING id
           `.execute(db).catch(() => null);
           canonicalProductId = create?.rows[0]?.id ?? null;
@@ -279,7 +279,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
       VALUES (${d.name}, ${d.slug}, ${d.sku}, ${canonicalProductId}, ${d.description ?? null}, ${d.short_description ?? null}, ${d.category_id ?? null},
         ${d.price}, ${d.compare_price ?? null}, ${d.cost ?? null}, ${d.currency}, ${d.tax_rate},
         ${d.stock_qty}, ${d.track_stock}, ${d.allow_backorder}, ${d.weight ?? null},
-        ${JSON.stringify(d.images)}, ${JSON.stringify(d.tags)}, '{}', ${d.status}, ${d.is_featured},
+        ${JSON.stringify(d.images)}::text::jsonb, ${d.tags}, '{}', ${d.status}, ${d.is_featured},
         ${d.digital_file_url ?? null}, ${user.id})
       RETURNING *
     `.execute(db);
@@ -309,8 +309,8 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
         stock_qty = COALESCE(${d.stock_qty ?? null}, stock_qty),
         status = COALESCE(${d.status ?? null}, status),
         is_featured = COALESCE(${d.is_featured ?? null}, is_featured),
-        images = COALESCE(${d.images ? JSON.stringify(d.images) : null}::jsonb, images),
-        tags = COALESCE(${d.tags ? JSON.stringify(d.tags) : null}::text[], tags),
+        images = COALESCE(${d.images ? JSON.stringify(d.images) : null}::text::jsonb, images),
+        tags = COALESCE(${d.tags ?? null}, tags),
         category_id = COALESCE(${d.category_id ?? null}, category_id),
         tax_rate = COALESCE(${d.tax_rate ?? null}, tax_rate),
         updated_at = NOW()
@@ -439,7 +439,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       INSERT INTO zvd_ec_tax_rules (name, country, region, rate, applies_to)
       VALUES (${d.name}, ${d.country}, ${d.region ?? null}, ${d.rate}, ${d.applies_to})
-      ON CONFLICT (country, region, applies_to) DO UPDATE SET rate = ${d.rate}, name = ${d.name}
+      ON CONFLICT (tenant_id, country, region, applies_to) DO UPDATE SET rate = ${d.rate}, name = ${d.name}
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);

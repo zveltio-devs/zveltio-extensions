@@ -62,7 +62,13 @@ export async function validateSamlResponse(
   saml: any,
   body: Record<string, string>,
 ): Promise<SamlProfile> {
-  const { profile } = await saml.validatePostResponseAsync(body);
+  // `validatePostResponse`, not `validatePostResponseAsync` — the same major
+  // mismatch as `getAuthorizeUrl` in routes.ts. node-saml `^3.1.0`, which this
+  // extension pins, dropped the `*Async` suffix from the promise-returning
+  // methods. So the assertion callback threw a TypeError on the line that
+  // validates the assertion: the IdP could post a perfectly good response and
+  // nobody was ever signed in.
+  const { profile } = await saml.validatePostResponse(body);
   if (!profile) throw new Error('SAML validation returned empty profile');
 
   return {

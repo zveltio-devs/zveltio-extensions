@@ -754,7 +754,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
         (${body.collection}, ${body.field},
          ${body.allowed_roles as any}, ${body.deny_roles as any},
          ${session.user.id})
-      ON CONFLICT (collection, field) DO UPDATE
+      ON CONFLICT (tenant_id, collection, field) DO UPDATE
         SET allowed_roles = EXCLUDED.allowed_roles,
             deny_roles = EXCLUDED.deny_roles
       RETURNING *

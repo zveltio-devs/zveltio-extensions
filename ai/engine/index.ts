@@ -10,13 +10,24 @@ import { ZveltioAIEngine } from './lib/zveltio-ai/engine.js';
  * schema generation, agentic workflows.
  *
  * Publishes the following inter-extension services:
- *   ai.providers           — the AIProviderManager singleton (full API)
- *   ai.embed(text, opts)   — single-shot embedding helper
- *   ai.chat(messages,opts) — single-shot chat helper
- *   ai.triggerEmbedding    — re-index a record's embedding (used by data layer)
+ *   ai.providers                    — the AIProviderManager (full API)
+ *   ai.embed(text, model?)          — single-shot embedding helper
+ *   ai.chat(messages, opts?)        — single-shot chat helper
+ *   ai.triggerEmbedding(collection, recordId, record, tenantId?)
+ *                                   — re-index one record's embedding
+ *   ai.runBackgroundTask(userId, instruction, opts)
+ *                                   — agentic task, consumed by flow-scheduler
  *
  * Other extensions consume these via `ctx.services.get('ai.providers')` etc.
  * Consumers should declare a manifest dependency: { "name": "ai" }.
+ *
+ * The signatures above are now what a caller can actually pass. Two were not:
+ * `ai.embed` was documented taking `opts` and takes a model name, and
+ * `ai.triggerEmbedding` was registered as the raw internal function, whose first
+ * parameter is a database handle no consumer has any way to supply — any call
+ * would have thrown on `db.selectFrom is not a function`. Nothing broke, because
+ * nothing outside this extension has ever called either: `ai.providers` has four
+ * consumers and `ai.runBackgroundTask` one, and those are the only two exercised.
  */
 const extension: ZveltioExtension = {
   name: 'ai',
@@ -32,6 +43,8 @@ const extension: ZveltioExtension = {
       join(import.meta.dir, 'migrations/002_ai_complete.sql'),
       join(import.meta.dir, 'migrations/003_ai_memory_columns.sql'),
       join(import.meta.dir, 'migrations/004_tenant_rls.sql'),
+      join(import.meta.dir, 'migrations/005_tenant_scoped_unique_keys.sql'),
+      join(import.meta.dir, 'migrations/006_remaining_tenant_unique_keys.sql'),
     ];
   },
 
@@ -57,7 +70,18 @@ const extension: ZveltioExtension = {
       if (!p?.chat) throw new Error('No AI provider is configured.');
       return p.chat(messages, opts);
     });
-    ctx.services.register('ai.triggerEmbedding', triggerEmbedding);
+    // Closed over `ctx.db` — the internal function takes the handle first, which
+    // is not something a consumer in another extension can be expected to hand
+    // over (and its own restricted handle would be the wrong one anyway).
+    ctx.services.register(
+      'ai.triggerEmbedding',
+      async (
+        collection: string,
+        recordId: string,
+        record: Record<string, any>,
+        tenantId: string | null = null,
+      ) => triggerEmbedding(ctx.db, collection, recordId, record, tenantId),
+    );
 
     // Background AI task runner — used by flow-scheduler for `ai_task` flows.
     ctx.services.register('ai.runBackgroundTask', async (userId: string, instruction: string, opts: any) => {
@@ -65,16 +89,37 @@ const extension: ZveltioExtension = {
       return engine.processBackgroundTask(userId, instruction, opts);
     });
 
-    // Subscribe to record lifecycle for auto-embedding (when collection has
-    // ai_search_enabled = true). Failures are swallowed so a bad embedding
-    // request never blocks data writes. `tenantId` is plumbed through from
-    // `engineEvents.emit` in data.ts; we pass it explicitly to
-    // `triggerEmbedding` because the hook runs on the GLOBAL pool (NOT
-    // inside the request's tenant transaction), so the
-    // `zveltio.current_tenant` GUC is unset and the column DEFAULT would
-    // tag the embedding row with NULL tenant_id, leaking it cross-tenant.
+    // Subscribe to record lifecycle for auto-embedding (when the collection has
+    // ai_search_enabled = true).
+    //
+    // `tenantId` comes from the event payload and is passed explicitly rather
+    // than left to the column DEFAULT. The reason recorded here used to be that
+    // the hook runs on the global pool outside the request's transaction — that
+    // is no longer true, and the note mattered enough to correct rather than
+    // delete. Two host changes landed since: the bus now uses `emitAsync`, so
+    // this listener is awaited inside the transaction that triggered it, and
+    // `ctx.db` (H-12) resolves that same tenant transaction. So the GUC IS set
+    // and the DEFAULT would resolve correctly on its own.
+    //
+    // Passing it stays right for a different reason: it is the tenant of the
+    // write that caused this embedding, stated at the call site, and it does not
+    // depend on which connection the hook happens to run on. It must keep
+    // matching the GUC — FORCE RLS on `zvd_ai_embeddings` rejects any other
+    // value, including NULL, which is exactly what we want if these two ever
+    // disagree again.
+    //
+    // Failures are logged and dropped: an embedding is worth attempting and
+    // never worth failing a data write for. The bus wraps each listener in its
+    // own SAVEPOINT, so a throw here cannot poison the caller's transaction.
     const onWrite = async (evt: { collection: string; id: string; record: Record<string, any>; tenantId?: string | null }) => {
-      try { await triggerEmbedding(ctx.db, evt.collection, evt.id, evt.record, evt.tenantId ?? null); } catch { /* non-fatal */ }
+      try {
+        await triggerEmbedding(ctx.db, evt.collection, evt.id, evt.record, evt.tenantId ?? null);
+      } catch (err) {
+        console.warn(
+          `[ai] auto-embedding failed for ${evt.collection}/${evt.id}:`,
+          (err as Error).message,
+        );
+      }
     };
     ctx.events.on('record.created', onWrite);
     ctx.events.on('record.updated', onWrite);

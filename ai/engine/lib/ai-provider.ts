@@ -7,6 +7,7 @@
  */
 
 import { assertNonMetadataUrl } from './endpoint-guard.js';
+import { decryptApiKey } from './ai-crypto.js';
 
 /**
  * Every embedding call is fired from a write hook, so it needs a deadline.
@@ -286,6 +287,14 @@ export class OllamaProvider implements AIProvider {
       body: JSON.stringify({ model: useModel, input: text }),
       signal: AbortSignal.timeout(EMBED_TIMEOUT_MS),
     });
+
+    // Without this, a 404 from a model Ollama has not pulled surfaced as
+    // "Cannot read properties of undefined (reading '0')" from the line below —
+    // which names neither Ollama nor the model.
+    if (!res.ok) {
+      throw new Error(`Ollama embeddings error ${res.status} for model "${useModel}": ${await res.text()}`);
+    }
+
     const data: any = await res.json();
     return { embedding: data.embeddings[0], model: useModel };
   }
@@ -347,6 +356,35 @@ export async function initAIProviders(db: any): Promise<void> {
   for (const row of rows as any[]) {
     let provider: AIProvider | null = null;
 
+    // The column holds `aes256gcm:iv:ciphertext` — `PUT /providers/:name`
+    // encrypts on write. This function is the OTHER reader of that column and
+    // did not decrypt, so every provider built at boot carried the ciphertext
+    // as its API key and sent `Authorization: Bearer aes256gcm:…`.
+    //
+    // Only a restart exposed it: the same route hot-reloads the provider it just
+    // saved and DOES decrypt, so configuring a key worked and kept working for
+    // the rest of the process lifetime. The next boot broke every AI call in the
+    // product with a 401 from the provider — on every install, and invisible in
+    // any session that never restarted.
+    //
+    // `decryptApiKey` returns its input unchanged when the value lacks the
+    // `aes256gcm:` prefix, so rows written before encryption existed still load.
+    let apiKey: string | null = row.api_key ?? null;
+    if (apiKey) {
+      try {
+        apiKey = await decryptApiKey(apiKey);
+      } catch (err) {
+        // A key that cannot be decrypted (rotated AI_KEY_ENCRYPTION_KEY, copied
+        // database) must not silently become a garbage bearer token. Skip the
+        // row and name it, so the operator sees which provider to re-enter.
+        console.error(
+          `[ai] refusing provider "${row.name}": stored API key could not be decrypted ` +
+            `(AI_KEY_ENCRYPTION_KEY changed?) — re-enter it in AI Settings. ${(err as Error).message}`,
+        );
+        continue;
+      }
+    }
+
     // A provider base URL may legitimately be private (self-hosted Ollama /
     // gateway), but must never be cloud metadata — that would turn this config
     // field into instance-credential exfiltration. Skip the row rather than
@@ -362,13 +400,13 @@ export async function initAIProviders(db: any): Promise<void> {
 
     switch (row.name) {
       case 'openai':
-        if (row.api_key) {
-          provider = new OpenAIProvider(row.api_key, row.base_url || undefined, row.default_model || undefined);
+        if (apiKey) {
+          provider = new OpenAIProvider(apiKey, row.base_url || undefined, row.default_model || undefined);
         }
         break;
       case 'anthropic':
-        if (row.api_key) {
-          provider = new AnthropicProvider(row.api_key, row.default_model || undefined);
+        if (apiKey) {
+          provider = new AnthropicProvider(apiKey, row.default_model || undefined);
         }
         break;
       case 'ollama':
@@ -376,9 +414,20 @@ export async function initAIProviders(db: any): Promise<void> {
         break;
       default:
         // OpenAI-compatible custom provider
-        if (row.api_key && row.base_url) {
-          provider = new OpenAIProvider(row.api_key, row.base_url, row.default_model || 'gpt-4o-mini', row.name, row.label || row.name);
+        if (apiKey && row.base_url) {
+          provider = new OpenAIProvider(apiKey, row.base_url, row.default_model || 'gpt-4o-mini', row.name, row.label || row.name);
         }
+    }
+
+    // A configured row that produces no provider is a dead setting the admin
+    // cannot see: `PUT /providers/:name` answers `{success:true}` for any name,
+    // and the label map offers "gemini", for which no class exists. Say so.
+    if (!provider) {
+      console.warn(
+        `[ai] provider "${row.name}" is active in zv_ai_providers but was not loaded — ` +
+          `either the name has no implementation (supported: openai, anthropic, ollama, ` +
+          `or any OpenAI-compatible name with both api_key and base_url set), or its API key is missing.`,
+      );
     }
 
     if (provider) {

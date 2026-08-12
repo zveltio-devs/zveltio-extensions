@@ -2,6 +2,8 @@ import type { ZveltioExtension } from '@zveltio/sdk/extension';
 import { join } from 'path';
 import { sql } from 'kysely';
 import { employeesRoutes } from './routes.js';
+import { contractRoutes } from './contracts.js';
+import { buildEmploymentService } from './employment-service.js';
 
 /**
  * HR Employees extension — canonical owner of `zvd_employees`, `zvd_departments`,
@@ -32,10 +34,21 @@ const extension: ZveltioExtension = {
       join(import.meta.dir, 'migrations/001_initial.sql'),
       join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
       join(import.meta.dir, 'migrations/003_user_ref_text.sql'),
+      join(import.meta.dir, 'migrations/004_tenant_scoped_unique_keys.sql'),
+      join(import.meta.dir, 'migrations/005_employment_contracts.sql'),
     ];
   },
 
   async register(app, ctx) {
+    // Contracts mount FIRST so `/contracts/:cid` is not swallowed by the
+    // employee routes' `/:id`. Hono matches in registration order, and
+    // `/:id` would happily take `contracts` for an employee id.
+    // What sibling HR modules may ask about employment, so none of them has to
+    // open this extension's tables. `hr/payroll` was reading `zvd_employees`
+    // directly in four places.
+    ctx.services.register('hr.employment', buildEmploymentService(ctx));
+
+    app.route('/', contractRoutes(ctx));
     app.route('/', employeesRoutes(ctx));
 
     ctx.services.register('employees.lookup', async (id: string) => {

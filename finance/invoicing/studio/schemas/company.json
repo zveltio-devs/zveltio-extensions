@@ -1,0 +1,120 @@
+{
+  "kind": "settings",
+  "title": "invoicing.settings.title",
+  "subtitle": "invoicing.settings.subtitle",
+  "dataSource": "/ext/finance/invoicing/company",
+  "dataPath": "data",
+  "saveEndpoint": "/ext/finance/invoicing/company",
+  "sections": [
+    {
+      "title": "invoicing.settings.identity",
+      "fields": [
+        {
+          "name": "name",
+          "label": "invoicing.settings.name",
+          "required": true,
+          "colSpan": 2
+        },
+        {
+          "name": "legal_name",
+          "label": "invoicing.form.legalName",
+          "colSpan": 1
+        },
+        {
+          "name": "tax_id",
+          "label": "invoicing.form.clientTaxId",
+          "colSpan": 1
+        },
+        {
+          "name": "reg_no",
+          "label": "invoicing.form.clientRegNo",
+          "colSpan": 1
+        },
+        {
+          "name": "share_capital",
+          "label": "invoicing.settings.shareCapital",
+          "colSpan": 1
+        },
+        {
+          "name": "vat_payer",
+          "label": "invoicing.settings.vatPayer",
+          "type": "boolean",
+          "colSpan": 1
+        },
+        {
+          "name": "vat_on_collection",
+          "label": "invoicing.vat.onCollection",
+          "type": "boolean",
+          "colSpan": 1
+        }
+      ]
+    },
+    {
+      "title": "invoicing.settings.address",
+      "fields": [
+        {
+          "name": "address",
+          "label": "invoicing.form.clientAddress",
+          "colSpan": 2
+        },
+        {
+          "name": "city",
+          "label": "invoicing.settings.city",
+          "colSpan": 1
+        },
+        {
+          "name": "county",
+          "label": "invoicing.settings.county",
+          "colSpan": 1
+        },
+        {
+          "name": "country",
+          "label": "invoicing.settings.country",
+          "colSpan": 1
+        }
+      ]
+    },
+    {
+      "title": "invoicing.settings.banking",
+      "fields": [
+        {
+          "name": "iban",
+          "label": "invoicing.settings.iban",
+          "mono": true,
+          "colSpan": 1
+        },
+        {
+          "name": "bank",
+          "label": "invoicing.settings.bank",
+          "colSpan": 1
+        }
+      ]
+    },
+    {
+      "title": "invoicing.settings.contact",
+      "fields": [
+        {
+          "name": "email",
+          "label": "invoicing.form.clientEmail",
+          "type": "email",
+          "colSpan": 1
+        },
+        {
+          "name": "phone",
+          "label": "invoicing.settings.phone",
+          "colSpan": 1
+        },
+        {
+          "name": "website",
+          "label": "invoicing.settings.website",
+          "colSpan": 1
+        },
+        {
+          "name": "logo_url",
+          "label": "invoicing.settings.logoUrl",
+          "colSpan": 2
+        }
+      ]
+    }
+  ]
+}

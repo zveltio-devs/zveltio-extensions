@@ -36,5 +36,22 @@
   "compliance.ro.efactura.ui.fac_2026_001": "FAC-2026-001",
   "compliance.ro.efactura.ui.invoice_date": "Data facturii",
   "compliance.ro.efactura.ui.invoice_number": "Număr factură",
-  "compliance.ro.efactura.ui.new_invoice": "Factură nouă"
+  "compliance.ro.efactura.ui.new_invoice": "Factură nouă",
+  "efactura.settings.callbackHint": "Trebuie să fie IDENTIC cu ce ai înregistrat la ANAF, ex. https://domeniul-tau/admin/anaf/callback",
+  "efactura.settings.callbackUrl": "URL de callback",
+  "efactura.settings.cert": "Certificat calificat",
+  "efactura.settings.certPassword": "Parola certificatului",
+  "efactura.settings.certPath": "Calea certificatului pe acest server",
+  "efactura.settings.certPathHint": "ex. /etc/zveltio/anaf.p12 — fișierul rămâne pe server",
+  "efactura.settings.clientId": "Client ID",
+  "efactura.settings.clientSecret": "Client secret",
+  "efactura.settings.env": "Mediu",
+  "efactura.settings.envProd": "Producție — se depune efectiv",
+  "efactura.settings.envTest": "Test — fără efect fiscal",
+  "efactura.settings.environment": "Destinație",
+  "efactura.settings.leaveBlank": "Lasă gol ca să păstrezi valoarea salvată",
+  "efactura.settings.oauth": "Aplicație OAuth",
+  "efactura.settings.sellerCif": "CIF depunător",
+  "efactura.settings.subtitle": "Credențiale pentru depunerea facturilor în SPV",
+  "efactura.settings.title": "Conexiune ANAF"
 }

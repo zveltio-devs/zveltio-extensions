@@ -26,6 +26,37 @@ const LdapConfigSchema = z.object({
   tlsVerify: z.boolean().default(true),
 });
 
+/**
+ * What the SAVE endpoint accepts, which is not the same shape as what is stored.
+ *
+ * `bindPassword` is optional here because `GET /config` never returns it — so
+ * the settings form loads with that field empty and posts it back empty. Under
+ * the stored schema (`min(1)`) that was a bare 400 with no field named, which
+ * meant an administrator could not change the TLS checkbox without retyping the
+ * directory password. Empty now means "keep the stored one", the same
+ * convention `compliance/ro/efactura` uses for its certificate password.
+ */
+const LdapConfigSaveSchema = LdapConfigSchema.extend({
+  bindPassword: z.string().optional(),
+});
+
+/**
+ * Raised when the config row exists but cannot be read — a decrypt failure, a
+ * denied capability, a refused table.
+ *
+ * It exists because all four routes used to funnel every one of those through a
+ * bare `catch { return null }`, which reports "LDAP is not configured" to an
+ * administrator whose config is sitting right there. That is the same wrong
+ * signpost `auth/scim` gives when its capabilities are unapproved: the symptom
+ * says "set it up", the cause is "approve it" or "fix the key".
+ */
+class LdapConfigUnreadable extends Error {
+  constructor(cause: unknown) {
+    super(`Stored LDAP configuration could not be read: ${(cause as Error)?.message ?? cause}`);
+    this.name = 'LdapConfigUnreadable';
+  }
+}
+
 const LoginSchema = z.object({
   username: z.string().min(1),
   password: z.string().min(1),
@@ -40,33 +71,43 @@ const TestSchema = z.object({
  * Read the LDAP config, decrypting bindPassword if it was stored encrypted.
  * Older configs persisted before the encryption rollout are still readable —
  * decryptSecret returns the value untouched when there is no `enc:v1:` prefix.
+ *
+ * `null` means one thing only: no configuration has been saved. Anything else
+ * throws, because "nothing is there" and "what is there cannot be read" send an
+ * operator to opposite places. Storage is `zvd_ldap_config`, the extension's own
+ * table — `zv_settings` belongs to the engine and `ctx.db` refuses it.
  */
 async function getLdapConfig(
   db: any,
   decryptSecret: (v: string) => Promise<string>,
 ): Promise<z.infer<typeof LdapConfigSchema> | null> {
+  const row = await db
+    .selectFrom('zvd_ldap_config')
+    .select('config')
+    .executeTakeFirst();
+  if (!row) return null;
+
   try {
-    const row = await db
-      .selectFrom('zv_settings')
-      .select('value')
-      .where('key', '=', 'ldap_config')
-      .executeTakeFirst();
-    if (!row) return null;
-    const raw = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
+    const raw = typeof row.config === 'string' ? JSON.parse(row.config) : row.config;
     const parsed = LdapConfigSchema.parse(raw);
     if (parsed.bindPassword) {
       parsed.bindPassword = await decryptSecret(parsed.bindPassword);
     }
     return parsed;
-  } catch {
-    return null;
+  } catch (err) {
+    throw new LdapConfigUnreadable(err);
   }
 }
 
 /**
  * Store the LDAP config with bindPassword encrypted via the engine's AES key.
- * Previously this column held plaintext JSON — anyone with `SELECT *` on
- * zv_settings could read the directory bind credential.
+ * The row is keyed by tenant, so each company on a shared instance points at its
+ * own directory.
+ *
+ * The JSON is cast explicitly rather than handed over as a string: the previous
+ * code passed `JSON.stringify(...)` straight into a `jsonb` column and the
+ * driver stored it as a JSON *string* containing JSON, which every reader then
+ * had to unwrap twice.
  */
 async function upsertLdapConfig(
   db: any,
@@ -74,17 +115,21 @@ async function upsertLdapConfig(
   encryptSecret: (v: string) => Promise<string>,
 ) {
   const toStore = { ...config, bindPassword: await encryptSecret(config.bindPassword) };
-  const value = JSON.stringify(toStore);
-  const existing = await db
-    .selectFrom('zv_settings')
-    .select('key')
-    .where('key', '=', 'ldap_config')
-    .executeTakeFirst();
+  // `::text::jsonb`, not `::jsonb`. The driver binds a JS string destined for a
+  // jsonb column as a JSON *string*, so a plain `::jsonb` cast is a no-op on a
+  // value that is already jsonb — and the row ends up holding `"{\"url\":…}"`,
+  // a string containing JSON, which every reader then has to unwrap twice.
+  // Going through `text` forces Postgres to parse it into an object.
+  const value = sql`${JSON.stringify(toStore)}::text::jsonb`;
+
+  // `ctx.db` is tenant-scoped, so both statements already see only this tenant's
+  // row — no explicit tenant predicate to forget.
+  const existing = await db.selectFrom('zvd_ldap_config').select('tenant_id').executeTakeFirst();
 
   if (existing) {
-    await db.updateTable('zv_settings').set({ value, updated_at: new Date() }).where('key', '=', 'ldap_config').execute();
+    await db.updateTable('zvd_ldap_config').set({ config: value, updated_at: new Date() }).execute();
   } else {
-    await db.insertInto('zv_settings').values({ key: 'ldap_config', value, created_at: new Date(), updated_at: new Date() }).execute();
+    await db.insertInto('zvd_ldap_config').values({ config: value }).execute();
   }
 }
 
@@ -160,9 +205,27 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
 
   const router = new Hono();
 
+  /**
+   * Read the config for a request, turning an unreadable one into a 500 that
+   * says so. Every route needs the same split, and getting it wrong is what made
+   * three of the four lie about being unconfigured.
+   */
+  async function loadConfig(
+    c: any,
+  ): Promise<{ config: z.infer<typeof LdapConfigSchema> | null; error: Response | null }> {
+    try {
+      return { config: await getLdapConfig(db, internals.decryptSecret), error: null };
+    } catch (err) {
+      console.error('[ldap] config unreadable:', (err as Error).message);
+      return { config: null, error: c.json({ error: (err as Error).message }, 500) };
+    }
+  }
+
   // POST /login — authenticate user via LDAP
   router.post('/login', zValidator('json', LoginSchema), async (c) => {
-    const config = await getLdapConfig(db, internals.decryptSecret);
+    const loaded = await loadConfig(c);
+    if (loaded.error) return loaded.error;
+    const config = loaded.config;
     if (!config?.enabled) return c.json({ error: 'LDAP authentication is not configured or disabled' }, 503);
     try { assertLdapTransportSafe(config.url); } catch (err) {
       return c.json({ error: (err as Error).message }, 503);
@@ -241,17 +304,18 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
     const admin = await requireAdmin(c);
     if (!admin) return c.json({ error: 'Unauthorized' }, 401);
 
-    const config = await getLdapConfig(db, internals.decryptSecret);
-    if (config) {
+    const loaded = await loadConfig(c);
+    if (loaded.error) return loaded.error;
+    if (loaded.config) {
       // Never expose bind password to client
-      const { bindPassword: _bp, ...safe } = config;
+      const { bindPassword: _bp, ...safe } = loaded.config;
       return c.json({ config: safe });
     }
     return c.json({ config: null });
   });
 
   // POST /config — save LDAP config (admin)
-  router.post('/config', zValidator('json', LdapConfigSchema), async (c) => {
+  router.post('/config', zValidator('json', LdapConfigSaveSchema), async (c) => {
     const admin = await requireAdmin(c);
     if (!admin) return c.json({ error: 'Unauthorized' }, 401);
 
@@ -259,8 +323,25 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
     try { assertLdapTransportSafe(data.url); } catch (err) {
       return c.json({ error: (err as Error).message }, 400);
     }
+
+    // An omitted or empty bindPassword means "keep the stored one" — the form
+    // never receives it back, so it cannot send it. Only a first save has
+    // nothing to fall back to, and that one has to say what is missing.
+    let bindPassword = data.bindPassword;
+    if (!bindPassword) {
+      const loaded = await loadConfig(c);
+      if (loaded.error) return loaded.error;
+      bindPassword = loaded.config?.bindPassword;
+      if (!bindPassword) {
+        return c.json(
+          { error: 'bindPassword is required — there is no stored password to keep.' },
+          400,
+        );
+      }
+    }
+
     try {
-      await upsertLdapConfig(db, data, internals.encryptSecret);
+      await upsertLdapConfig(db, { ...data, bindPassword }, internals.encryptSecret);
     } catch (err: any) {
       // upsert may throw if FIELD_ENCRYPTION_KEY isn't set —
       // surface that explicitly rather than persisting plaintext.
@@ -274,7 +355,9 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
     const admin = await requireAdmin(c);
     if (!admin) return c.json({ error: 'Unauthorized' }, 401);
 
-    const config = await getLdapConfig(db, internals.decryptSecret);
+    const loaded = await loadConfig(c);
+    if (loaded.error) return loaded.error;
+    const config = loaded.config;
     if (!config) return c.json({ error: 'LDAP not configured' }, 503);
     try { assertLdapTransportSafe(config.url); } catch (err) {
       return c.json({ error: (err as Error).message }, 503);

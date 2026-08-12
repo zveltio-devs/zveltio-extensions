@@ -91,7 +91,15 @@ async function readLayout(dbh: Db, scope: 'role' | 'user', owner: string): Promi
     SELECT widgets FROM zv_dashboard_layouts WHERE scope = ${scope} AND owner = ${owner} LIMIT 1
   `
     .execute(dbh)
-    .catch(() => ({ rows: [] as Array<{ widgets: unknown }> }));
+    .catch((err) => {
+      // Falling back to the default layout is the right behaviour, but doing it
+      // silently looks exactly like "my saved layout won't stick" from the
+      // outside — with nothing anywhere to explain why.
+      console.error(
+        `[dashboard] reading the ${scope} layout failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return { rows: [] as Array<{ widgets: unknown }> };
+    });
   const raw = r.rows[0]?.widgets;
   if (!Array.isArray(raw)) return null;
   return normalise(raw);
@@ -121,16 +129,28 @@ async function writeLayout(
   }
 }
 
+// No `.catch()` here on purpose. Deleting a layout that was never saved is a
+// no-op in SQL, not an error, so the only way this rejects is a genuine
+// failure — and swallowing it would answer "reset done" to a user whose
+// layout is still on screen. A write that failed must not report success.
 async function deleteUserLayout(dbh: Db, userId: string): Promise<void> {
-  await sql`DELETE FROM zv_dashboard_layouts WHERE scope = 'user' AND owner = ${userId}`
-    .execute(dbh)
-    .catch(() => undefined);
+  await sql`DELETE FROM zv_dashboard_layouts WHERE scope = 'user' AND owner = ${userId}`.execute(
+    dbh,
+  );
 }
 
 // ── Resolution ───────────────────────────────────────────────────────
 
 async function roleUnion(dbh: Db, userId: string, getUserRoles: GetUserRoles): Promise<WidgetId[] | null> {
-  const roles = await getUserRoles(userId).catch(() => [] as string[]);
+  // No roles means the caller falls through to the permission-derived default
+  // rather than their configured layout — a visible difference that deserves a
+  // line in the log when it is caused by a failure rather than by having none.
+  const roles = await getUserRoles(userId).catch((err) => {
+    console.error(
+      `[dashboard] reading roles for the layout failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return [] as string[];
+  });
   const acc = new Set<WidgetId>();
   let any = false;
   for (const role of roles) {
@@ -182,8 +202,28 @@ async function setUserLayout(
 
 // ── Widget data (only for the requested widgets) ─────────────────────
 
-const countOf = (p: Promise<{ rows: Array<{ count: string }> }>) =>
-  p.then((r) => Number(r.rows[0]?.count ?? 0)).catch(() => 0);
+/**
+ * A widget's count, with a failure that says so.
+ *
+ * The fallback stays — one broken widget must not take the dashboard down —
+ * but the silence does not. This swallowed a query against `zv_collections`, a
+ * table that does not exist (the schema has `zvd_collections`), into a
+ * confident zero. The card read "0 collections" on an instance that had them,
+ * which looks like an empty install rather than a broken query, and the engine's
+ * own admin stats carried the identical mistake against the identical table.
+ *
+ * `label` names which count failed, because "a widget is wrong" is not
+ * something anyone can act on.
+ */
+const countOf = (label: string, p: Promise<{ rows: Array<{ count: string }> }>) =>
+  p
+    .then((r) => Number(r.rows[0]?.count ?? 0))
+    .catch((err) => {
+      console.error(
+        `[dashboard] widget count "${label}" failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return 0;
+    });
 
 /** The implicit tenant on a single-tenant install — see the `people` widget. */
 const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
@@ -221,7 +261,12 @@ async function computeWidgetData(
           }
           return { organization: org ?? 'Your organization' };
         })
-        .catch(() => ({ organization: 'Your organization' })),
+        .catch((err) => {
+          console.error(
+            `[dashboard] widget "welcome" failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          return { organization: 'Your organization' };
+        }),
     );
   }
 
@@ -247,17 +292,17 @@ async function computeWidgetData(
     // instance, which is the same thing.
     const isDefault = tenantId === DEFAULT_TENANT_ID;
     const total = isDefault
-      ? countOf(sql<{ count: string }>`SELECT COUNT(*) AS count FROM "user"`.execute(db))
-      : countOf(sql<{ count: string }>`
+      ? countOf('user', sql<{ count: string }>`SELECT COUNT(*) AS count FROM "user"`.execute(db))
+      : countOf('zv_tenant_users', sql<{ count: string }>`
           SELECT COUNT(*) AS count FROM zv_tenant_users WHERE tenant_id = ${tenantId}::uuid
         `.execute(db));
     // "admins" now means admins OF THIS TENANT. The number of instance-wide
     // superusers is not a fact a tenant dashboard should be reporting.
     const admins = isDefault
-      ? countOf(sql<{ count: string }>`
+      ? countOf('user', sql<{ count: string }>`
           SELECT COUNT(*) AS count FROM "user" WHERE role IN ('god', 'admin')
         `.execute(db))
-      : countOf(sql<{ count: string }>`
+      : countOf('zv_tenant_users', sql<{ count: string }>`
           SELECT COUNT(*) AS count FROM zv_tenant_users
            WHERE tenant_id = ${tenantId}::uuid AND role IN ('owner', 'admin')
         `.execute(db));
@@ -270,13 +315,13 @@ async function computeWidgetData(
       Promise.all([
         // Fast planner estimate across collection tables (`zvd_*`) — order of
         // magnitude, not a live per-table COUNT.
-        countOf(
+        countOf('pg_class', 
           sql<{ count: string }>`
             SELECT COALESCE(SUM(reltuples), 0)::bigint AS count
             FROM pg_class WHERE relkind = 'r' AND relname LIKE 'zvd_%'
           `.execute(db),
         ),
-        countOf(sql<{ count: string }>`SELECT COUNT(*) AS count FROM zv_collections`.execute(db)),
+        countOf('zvd_collections', sql<{ count: string }>`SELECT COUNT(*) AS count FROM zvd_collections`.execute(db)),
       ]).then(([records_estimate, collections]) => ({ records_estimate, collections })),
     );
   }
@@ -285,7 +330,7 @@ async function computeWidgetData(
     set(
       'activity',
       Promise.all([
-        countOf(
+        countOf('zv_audit_log', 
           sql<{ count: string }>`SELECT COUNT(*) AS count FROM zv_audit_log WHERE created_at >= CURRENT_DATE`.execute(
             db,
           ),
@@ -302,25 +347,51 @@ async function computeWidgetData(
         `
           .execute(db)
           .then((r) => r.rows)
-          .catch(() => []),
+          .catch((err) => {
+            // "Nothing happened here recently" is a claim about the audit log,
+            // and it must not be made because reading the audit log failed.
+            console.error(
+              `[dashboard] recent activity failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
+            return [];
+          }),
       ]).then(([today, recent]) => ({ today, recent })),
     );
   }
 
   if (want.has('trust')) {
-    set(
-      'trust',
-      sql<{ ts: string }>`SELECT MAX(created_at)::text AS ts FROM zv_backups`
+    // This widget is read by the people who have to attest that the controls
+    // exist, so every field here has to be evidence rather than an assertion.
+    //
+    // `audit_log` used to be the literal `true`. It would have kept saying yes
+    // with the table dropped, the writer broken or the log empty — a reassurance
+    // that could not fail, on the one screen where a false yes is expensive.
+    // It now reports whether the log is actually readable and has entries, and
+    // carries the timestamp of the last one so a stalled writer is visible too.
+    const lastOf = (label: string, table: 'zv_backups' | 'zv_audit_log') =>
+      sql<{ ts: string | null }>`SELECT MAX(created_at)::text AS ts FROM ${sql.raw(table)}`
         .execute(db)
         .then((r) => r.rows[0]?.ts ?? null)
-        .catch(() => null)
-        .then((last_backup) => ({
+        .catch((err) => {
+          console.error(
+            `[dashboard] trust "${label}" failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          return null;
+        });
+
+    set(
+      'trust',
+      Promise.all([lastOf('last_backup', 'zv_backups'), lastOf('audit_log', 'zv_audit_log')]).then(
+        ([last_backup, last_audit_entry]) => ({
           // The invisible safeguards, made visible for a board / auditor.
           encryption: config?.encryptionConfigured ?? false,
-          audit_log: true,
+          audit_log: last_audit_entry !== null,
+          last_audit_entry,
+          // True by construction: this product only ships self-hosted.
           self_hosted: true,
           last_backup,
-        })),
+        }),
+      ),
     );
   }
 
@@ -409,7 +480,15 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
       SELECT DISTINCT v1 AS role FROM zvd_permissions WHERE ptype = 'g' AND v1 IS NOT NULL
     `
       .execute(db)
-      .catch(() => ({ rows: [] as Array<{ role: string }> }));
+      .catch((err) => {
+        // An empty list here renders as "this instance has no roles", which is
+        // indistinguishable from a broken query on the screen where IT is about
+        // to configure per-role layouts.
+        console.error(
+          `[dashboard] listing roles failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return { rows: [] as Array<{ role: string }> };
+      });
     const roles = rolesRes.rows.map((r) => r.role).filter(Boolean);
     return c.json({
       catalog: WIDGET_CATALOG.map((w) => ({ id: w.id, removable: w.removable, permission: w.permission })),

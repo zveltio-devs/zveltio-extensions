@@ -36,9 +36,20 @@ export async function ldapAuthenticate(
 
   const filter = config.searchFilter.replace(/\{\{username\}\}/g, escapeLdap(username));
 
+  // ldapts decides the transport with
+  //   secure = isSecureProtocol || !!clientOptions.tlsOptions
+  // so passing `tlsOptions` AT ALL forces a TLS handshake — `{}` is truthy too.
+  // Sending it unconditionally meant an `ldap://` URL opened a TLS ClientHello
+  // against a cleartext directory port, which answers nothing, so every attempt
+  // died on `connectTimeout` after 10s reporting "Connection timeout". Plain
+  // `ldap://` could never connect — including the `ldap://ldap.example.com:389`
+  // the settings form suggests.
+  //
+  // Only ldaps:// needs the option, and only to relax verification.
+  const isLdaps = config.url.toLowerCase().trim().startsWith('ldaps://');
   const client = new Client({
     url: config.url,
-    tlsOptions: config.tlsVerify ? {} : { rejectUnauthorized: false },
+    ...(isLdaps && !config.tlsVerify ? { tlsOptions: { rejectUnauthorized: false } } : {}),
     timeout: 10000,
     connectTimeout: 10000,
   });

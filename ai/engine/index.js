@@ -29807,6 +29807,31 @@ function assertNonMetadataUrl(rawUrl, label = "Endpoint") {
   }
 }
 
+// engine/lib/ai-crypto.ts
+function getKey() {
+  const key = process.env.AI_KEY_ENCRYPTION_KEY || process.env.MAIL_ENCRYPTION_KEY;
+  if (!key || key.length < 32) {
+    throw new Error("AI_KEY_ENCRYPTION_KEY env var must be set. Generate: openssl rand -hex 32");
+  }
+  return key;
+}
+async function encryptApiKey(plaintext) {
+  if (!plaintext)
+    return "";
+  const keyMaterial = await crypto.subtle.importKey("raw", Buffer.from(getKey().slice(0, 64), "hex"), { name: "AES-GCM" }, false, ["encrypt"]);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, keyMaterial, new TextEncoder().encode(plaintext));
+  return `aes256gcm:${Buffer.from(iv).toString("hex")}:${Buffer.from(encrypted).toString("hex")}`;
+}
+async function decryptApiKey(stored) {
+  if (!stored || !stored.startsWith("aes256gcm:"))
+    return stored;
+  const [, ivHex, cipherHex] = stored.split(":");
+  const keyMaterial = await crypto.subtle.importKey("raw", Buffer.from(getKey().slice(0, 64), "hex"), { name: "AES-GCM" }, false, ["decrypt"]);
+  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: Buffer.from(ivHex, "hex") }, keyMaterial, Buffer.from(cipherHex, "hex"));
+  return new TextDecoder().decode(decrypted);
+}
+
 // engine/lib/ai-provider.ts
 var EMBED_TIMEOUT_MS = Number(process.env.AI_EMBED_TIMEOUT_MS ?? 30000);
 
@@ -29994,6 +30019,9 @@ class OllamaProvider {
       body: JSON.stringify({ model: useModel, input: text }),
       signal: AbortSignal.timeout(EMBED_TIMEOUT_MS)
     });
+    if (!res.ok) {
+      throw new Error(`Ollama embeddings error ${res.status} for model "${useModel}": ${await res.text()}`);
+    }
     const data = await res.json();
     return { embedding: data.embeddings[0], model: useModel };
   }
@@ -30034,6 +30062,15 @@ async function initAIProviders(db) {
   const rows = await db.selectFrom("zv_ai_providers").selectAll().where("is_active", "=", true).execute().catch(() => []);
   for (const row of rows) {
     let provider = null;
+    let apiKey = row.api_key ?? null;
+    if (apiKey) {
+      try {
+        apiKey = await decryptApiKey(apiKey);
+      } catch (err) {
+        console.error(`[ai] refusing provider "${row.name}": stored API key could not be decrypted ` + `(AI_KEY_ENCRYPTION_KEY changed?) \u2014 re-enter it in AI Settings. ${err.message}`);
+        continue;
+      }
+    }
     if (row.base_url) {
       try {
         assertNonMetadataUrl(row.base_url, `AI provider "${row.name}" base_url`);
@@ -30044,22 +30081,25 @@ async function initAIProviders(db) {
     }
     switch (row.name) {
       case "openai":
-        if (row.api_key) {
-          provider = new OpenAIProvider(row.api_key, row.base_url || undefined, row.default_model || undefined);
+        if (apiKey) {
+          provider = new OpenAIProvider(apiKey, row.base_url || undefined, row.default_model || undefined);
         }
         break;
       case "anthropic":
-        if (row.api_key) {
-          provider = new AnthropicProvider(row.api_key, row.default_model || undefined);
+        if (apiKey) {
+          provider = new AnthropicProvider(apiKey, row.default_model || undefined);
         }
         break;
       case "ollama":
         provider = new OllamaProvider(row.base_url || undefined, row.default_model || undefined);
         break;
       default:
-        if (row.api_key && row.base_url) {
-          provider = new OpenAIProvider(row.api_key, row.base_url, row.default_model || "gpt-4o-mini", row.name, row.label || row.name);
+        if (apiKey && row.base_url) {
+          provider = new OpenAIProvider(apiKey, row.base_url, row.default_model || "gpt-4o-mini", row.name, row.label || row.name);
         }
+    }
+    if (!provider) {
+      console.warn(`[ai] provider "${row.name}" is active in zv_ai_providers but was not loaded \u2014 ` + `either the name has no implementation (supported: openai, anthropic, ollama, ` + `or any OpenAI-compatible name with both api_key and base_url set), or its API key is missing.`);
     }
     if (provider) {
       aiProviderManager.register(provider, row.is_default);
@@ -30074,40 +30114,6 @@ async function initAIProviders(db) {
       aiProviderManager.register(new OllamaProvider(process.env.OLLAMA_URL, process.env.OLLAMA_MODEL), true);
     }
   }
-}
-
-// engine/lib/ai-crypto.ts
-function getKey() {
-  const key = process.env.AI_KEY_ENCRYPTION_KEY || process.env.MAIL_ENCRYPTION_KEY;
-  if (!key || key.length < 32) {
-    throw new Error("AI_KEY_ENCRYPTION_KEY env var must be set. Generate: openssl rand -hex 32");
-  }
-  return key;
-}
-async function encryptApiKey(plaintext) {
-  if (!plaintext)
-    return "";
-  const keyMaterial = await crypto.subtle.importKey("raw", Buffer.from(getKey().slice(0, 64), "hex"), { name: "AES-GCM" }, false, ["encrypt"]);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, keyMaterial, new TextEncoder().encode(plaintext));
-  return `aes256gcm:${Buffer.from(iv).toString("hex")}:${Buffer.from(encrypted).toString("hex")}`;
-}
-async function decryptApiKey(stored) {
-  if (!stored || !stored.startsWith("aes256gcm:"))
-    return stored;
-  const [, ivHex, cipherHex] = stored.split(":");
-  const keyMaterial = await crypto.subtle.importKey("raw", Buffer.from(getKey().slice(0, 64), "hex"), { name: "AES-GCM" }, false, ["decrypt"]);
-  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: Buffer.from(ivHex, "hex") }, keyMaterial, Buffer.from(cipherHex, "hex"));
-  return new TextDecoder().decode(decrypted);
-}
-function maskApiKey(key) {
-  if (!key)
-    return "";
-  if (key.startsWith("aes256gcm:"))
-    return "***encrypted***";
-  if (key.length <= 8)
-    return "***";
-  return `${key.slice(0, 4)}***${key.slice(-4)}`;
 }
 
 // engine/routes/ai.ts
@@ -30125,25 +30131,39 @@ function aiRoutes(ctx) {
     const isAdmin = await checkPermission(user.id, "admin", "*");
     return isAdmin ? user : null;
   }
+  async function logUsage(row) {
+    let savepointHeld = false;
+    try {
+      await sql.raw("SAVEPOINT zv_ai_usage").execute(db);
+      savepointHeld = true;
+      await db.insertInto("zv_ai_usage").values(row).execute();
+      await sql.raw("RELEASE SAVEPOINT zv_ai_usage").execute(db);
+    } catch (err) {
+      if (savepointHeld) {
+        await sql.raw("ROLLBACK TO SAVEPOINT zv_ai_usage").execute(db).catch(() => {});
+      }
+      console.warn(`[ai] usage accounting failed for ${row.operation}/${row.provider}:`, err.message);
+    }
+  }
   app.get("/providers", async (c) => {
     const user = await requireAuth(c);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const providers = await db.selectFrom("zv_ai_providers").select([
+    const providers = await db.selectFrom("zv_ai_providers").select((eb) => [
       "id",
       "name",
       "label",
       "default_model",
       "base_url",
       "is_default",
-      "is_active"
+      "is_active",
+      eb("api_key", "is not", null).as("has_api_key")
     ]).orderBy("name", "asc").execute();
-    const activeNames = aiProviderManager.list();
+    const loadedNames = new Set(aiProviderManager.list().map((p) => p.name));
     return c.json({
       providers: providers.map((p) => ({
         ...p,
-        api_key: maskApiKey(p.api_key ?? ""),
-        loaded: activeNames.includes(p.name)
+        loaded: loadedNames.has(p.name)
       }))
     });
   });
@@ -30249,7 +30269,7 @@ function aiRoutes(ctx) {
     const start = Date.now();
     const result = await provider.chat(messages, opts);
     const latency = Date.now() - start;
-    await db.insertInto("zv_ai_usage").values({
+    await logUsage({
       provider: provider.name,
       model: result.model,
       operation: "chat",
@@ -30257,7 +30277,7 @@ function aiRoutes(ctx) {
       response_tokens: result.usage.response_tokens,
       latency_ms: latency,
       user_id: user.id
-    }).execute().catch(() => {});
+    });
     return c.json({ result });
   });
   app.post("/embed", zValidator("json", exports_external.object({
@@ -30287,7 +30307,7 @@ function aiRoutes(ctx) {
       embeddings.push(vec.embedding);
     }
     const latency = Date.now() - start;
-    await db.insertInto("zv_ai_usage").values({
+    await logUsage({
       provider: provider.name,
       model: body.model || "embedding",
       operation: "embed",
@@ -30295,7 +30315,7 @@ function aiRoutes(ctx) {
       response_tokens: 0,
       latency_ms: latency,
       user_id: user.id
-    }).execute().catch(() => {});
+    });
     if (body.collection && body.record_id && texts.length === 1) {
       if (!await checkPermission(user.id, body.collection, "update")) {
         return c.json({
@@ -30312,7 +30332,7 @@ function aiRoutes(ctx) {
             ${body.model || "embedding"},
             NOW()
           )
-          ON CONFLICT (collection, record_id, field) DO UPDATE SET
+          ON CONFLICT (tenant_id, collection, record_id, field) DO UPDATE SET
             text_content = EXCLUDED.text_content,
             embedding    = EXCLUDED.embedding,
             model        = EXCLUDED.model,
@@ -30355,7 +30375,10 @@ function aiRoutes(ctx) {
               AND (1 - (embedding <=> ${queryVec}::vector)) > ${threshold}
             ORDER BY embedding <=> ${queryVec}::vector
             LIMIT ${limit}
-          `.execute(tdb).then((r) => r.rows).catch(() => []);
+          `.execute(tdb).then((r) => r.rows).catch((err) => {
+          console.warn("[ai.search] pgvector query failed, falling back:", err.message);
+          return [];
+        });
         if (vecResults.length > 0) {
           return c.json({
             results: vecResults,
@@ -30376,7 +30399,10 @@ function aiRoutes(ctx) {
           AND similarity(text_content, ${query}) > ${threshold}
         ORDER BY score DESC
         LIMIT ${limit}
-      `.execute(tdb).then((r) => r.rows).catch(() => []);
+      `.execute(tdb).then((r) => r.rows).catch((err) => {
+      console.warn("[ai.search] trigram query failed, falling back to ILIKE:", err.message);
+      return [];
+    });
     if (trgmResults.length > 0) {
       return c.json({
         results: trgmResults,
@@ -30413,61 +30439,6 @@ function aiRoutes(ctx) {
       count: fallbackResults.length,
       method: "ilike"
     });
-  });
-  app.get("/prompts", async (c) => {
-    const user = await requireAuth(c);
-    if (!user)
-      return c.json({ error: "Unauthorized" }, 401);
-    const prompts = await db.selectFrom("zv_prompt_templates").selectAll().where("is_active", "=", true).orderBy("name", "asc").execute();
-    return c.json({ prompts });
-  });
-  app.post("/prompts", zValidator("json", exports_external.object({
-    name: exports_external.string().min(1),
-    description: exports_external.string().optional(),
-    system: exports_external.string().optional(),
-    template: exports_external.string().min(1),
-    variables: exports_external.array(exports_external.object({
-      name: exports_external.string(),
-      description: exports_external.string().optional(),
-      required: exports_external.boolean().default(false)
-    })).default([]),
-    category: exports_external.string().optional()
-  })), async (c) => {
-    const user = await requireAuth(c);
-    if (!user)
-      return c.json({ error: "Unauthorized" }, 401);
-    const body = c.req.valid("json");
-    const prompt = await db.insertInto("zv_prompt_templates").values({ ...body, variables: JSON.stringify(body.variables) }).returningAll().executeTakeFirst();
-    return c.json({ prompt }, 201);
-  });
-  app.delete("/prompts/:id", async (c) => {
-    const user = await requireAuth(c);
-    if (!user)
-      return c.json({ error: "Unauthorized" }, 401);
-    await db.updateTable("zv_prompt_templates").set({ is_active: false }).where("id", "=", c.req.param("id")).execute();
-    return c.json({ success: true });
-  });
-  app.post("/prompts/:id/run", zValidator("json", exports_external.record(exports_external.string(), exports_external.string())), async (c) => {
-    const user = await requireAuth(c);
-    if (!user)
-      return c.json({ error: "Unauthorized" }, 401);
-    const prompt = await db.selectFrom("zv_prompt_templates").selectAll().where("id", "=", c.req.param("id")).where("is_active", "=", true).executeTakeFirst();
-    if (!prompt)
-      return c.json({ error: "Prompt not found" }, 404);
-    const vars = c.req.valid("json");
-    let rendered = prompt.template;
-    for (const [k, v] of Object.entries(vars)) {
-      rendered = rendered.replaceAll(`{{${k}}}`, String(v));
-    }
-    const messages = [];
-    if (prompt.system)
-      messages.push({ role: "system", content: prompt.system });
-    messages.push({ role: "user", content: rendered });
-    const provider = aiProviderManager.getDefault();
-    if (!provider)
-      return c.json({ error: "No AI provider configured" }, 503);
-    const result = await provider.chat(messages);
-    return c.json({ result, rendered_prompt: rendered });
   });
   app.get("/admin/features", async (c) => {
     const user = await requireAdmin(c);
@@ -30903,7 +30874,9 @@ Response format:
         const seedJson = seedResult.content.match(/\{[\s\S]*\}/)?.[0];
         if (seedJson)
           seedRecords = JSON.parse(seedJson);
-      } catch {}
+      } catch (err) {
+        console.warn("[ai-schema-gen] seed generation failed:", err.message);
+      }
     }
     return c.json({
       success: true,
@@ -30911,7 +30884,8 @@ Response format:
       skipped,
       job_ids: jobIds,
       seed_data: seedRecords,
-      message: `Created ${created.length} collection(s)${skipped.length > 0 ? `, skipped ${skipped.length} (already exist)` : ""}.`
+      seed_data_inserted: false,
+      message: `Queued ${created.length} collection(s) for creation` + `${skipped.length > 0 ? `, skipped ${skipped.length} (already exist)` : ""}. ` + `Track them with job_ids.` + (Object.keys(seedRecords).length > 0 ? ` Seed rows are returned for review and were NOT inserted \u2014 the tables do not exist until the DDL jobs complete.` : "")
     });
   });
   router.get("/generate-schema/field-types", (c) => {
@@ -31142,6 +31116,8 @@ RESPONSE FORMAT (JSON only):
           continue;
         const SAFE_COL_RE = /^[a-z][a-z0-9_]*$/;
         let inserted = 0;
+        let failed = 0;
+        let firstError = null;
         for (const row of rows) {
           try {
             const cleanRow = {};
@@ -31161,9 +31137,16 @@ RESPONSE FORMAT (JSON only):
             const valParts = sql.join(vals.map((v) => sql`${v}`));
             await sql`INSERT INTO ${sql.id(tableName)} (${colParts}) VALUES (${valParts})`.execute(db);
             inserted++;
-          } catch {}
+          } catch (err) {
+            failed++;
+            if (!firstError)
+              firstError = err.message;
+          }
         }
         results.records_inserted[colName] = inserted;
+        if (failed > 0) {
+          results.errors.push(`${colName}: ${failed} of ${rows.length} row(s) rejected \u2014 ${firstError}`);
+        }
       }
     }
     try {
@@ -31172,10 +31155,13 @@ RESPONSE FORMAT (JSON only):
       if (cache)
         await cache.del(`alchemist:${session_id}`);
     } catch {}
+    const totalRows = Object.values(results.records_inserted).reduce((a, b) => a + b, 0);
+    const collectionsWithRows = Object.values(results.records_inserted).filter((n) => n > 0).length;
     return c.json({
-      success: true,
+      success: results.errors.length === 0,
       ...results,
-      message: `Created ${results.collections_created.length} collection(s), inserted data into ${Object.keys(results.records_inserted).length} collection(s)`
+      rows_inserted_total: totalRows,
+      message: `Created ${results.collections_created.length} collection(s), inserted ${totalRows} row(s) into ${collectionsWithRows} collection(s)` + (results.errors.length > 0 ? `, ${results.errors.length} problem(s) \u2014 see errors` : "")
     });
   });
   app.get("/sessions/:id", async (c) => {
@@ -31270,10 +31256,7 @@ CURRENT TIMESTAMP: ${new Date().toISOString()}`
         return c.json({ error: `Unsafe query: ${validation.reason}` }, 400);
       }
       const execStart = Date.now();
-      const result = await db.transaction().execute(async (trx) => {
-        await sql`SET TRANSACTION READ ONLY`.execute(trx);
-        return sql.raw(generatedSQL).execute(trx);
-      });
+      const result = await runReadOnly(db, generatedSQL);
       const executionMs = Date.now() - execStart;
       const rows = result.rows;
       let analysis = null;
@@ -31365,7 +31348,7 @@ Respond in the same language as the user's question.`
     const allCollections = await DDLManager.getCollections(db);
     const accessibleCollections = [];
     for (const col of allCollections) {
-      const canRead = await checkPermission(user.id, `data:${col.name}`, "read");
+      const canRead = await checkPermission(user.id, col.name, "read");
       if (canRead)
         accessibleCollections.push(col);
     }
@@ -31374,10 +31357,7 @@ Respond in the same language as the user's question.`
       return c.json({ error: `Unsafe stored query: ${validation.reason}` }, 400);
     }
     const execStart = Date.now();
-    const result = await db.transaction().execute(async (trx) => {
-      await sql`SET TRANSACTION READ ONLY`.execute(trx);
-      return sql.raw(generated_sql).execute(trx);
-    });
+    const result = await runReadOnly(db, generated_sql);
     return c.json({
       results: result.rows,
       count: result.rows.length,
@@ -31385,6 +31365,17 @@ Respond in the same language as the user's question.`
     });
   });
   return app;
+}
+async function runReadOnly(db, query) {
+  await sql.raw("SAVEPOINT zv_ai_ro").execute(db);
+  try {
+    await sql`SET TRANSACTION READ ONLY`.execute(db);
+    const result = await sql.raw(query).execute(db);
+    return result;
+  } finally {
+    await sql.raw("ROLLBACK TO SAVEPOINT zv_ai_ro").execute(db).catch(() => {});
+    await sql.raw("RELEASE SAVEPOINT zv_ai_ro").execute(db).catch(() => {});
+  }
 }
 function validateGeneratedSQL(query, accessibleCollections) {
   const upper = query.toUpperCase().trim();
@@ -31463,13 +31454,21 @@ async function logQuery(db, userId, prompt, generatedSql, resultCount, execution
     INSERT INTO zv_ai_queries (user_id, prompt, generated_sql, result_count, execution_ms, ai_analysis, chart_config, error)
     VALUES (${userId}, ${prompt}, ${generatedSql}, ${resultCount}, ${executionMs}, ${analysis},
       ${chartConfig ? JSON.stringify(chartConfig) : null}::jsonb, ${error51})
-  `.execute(db).catch(() => {});
+  `.execute(db).catch((err) => {
+    console.warn("[ai.query] could not record query history:", err.message);
+  });
 }
 
 // engine/routes/ai-analytics.ts
 function parseDays(range) {
   const map2 = { "7d": 7, "30d": 30, "90d": 90 };
   return (map2[range] ?? parseInt(range)) || 30;
+}
+function logAndFallback(panel, fallback) {
+  return (err) => {
+    console.warn(`[ai.analytics] "${panel}" query failed, showing empty:`, err.message);
+    return fallback;
+  };
 }
 function aiAnalyticsRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
@@ -31507,7 +31506,7 @@ function aiAnalyticsRoutes(ctx) {
         )                                                         AS top_provider
       FROM zv_ai_usage
       WHERE created_at >= ${since.toISOString()}
-    `.execute(db).then((r) => r.rows[0]).catch(() => ({
+    `.execute(db).then((r) => r.rows[0]).catch(logAndFallback("summary", {
       total_requests: "0",
       total_tokens: "0",
       avg_latency: "0",
@@ -31531,7 +31530,7 @@ function aiAnalyticsRoutes(ctx) {
       WHERE created_at >= ${since.toISOString()}
       GROUP BY provider
       ORDER BY requests DESC
-    `.execute(db).then((r) => r.rows).catch(() => []);
+    `.execute(db).then((r) => r.rows).catch(logAndFallback("by-provider", []));
     return c.json({ providers: byProvider });
   });
   app.get("/daily", async (c) => {
@@ -31549,7 +31548,7 @@ function aiAnalyticsRoutes(ctx) {
       WHERE created_at >= ${since.toISOString()}
       GROUP BY DATE_TRUNC('day', created_at)
       ORDER BY date ASC
-    `.execute(db).then((r) => r.rows).catch(() => []);
+    `.execute(db).then((r) => r.rows).catch(logAndFallback("daily", []));
     return c.json({ daily });
   });
   app.get("/by-operation", async (c) => {
@@ -31568,7 +31567,7 @@ function aiAnalyticsRoutes(ctx) {
       WHERE created_at >= ${since.toISOString()}
       GROUP BY operation
       ORDER BY requests DESC
-    `.execute(db).then((r) => r.rows).catch(() => []);
+    `.execute(db).then((r) => r.rows).catch(logAndFallback("by-operation", []));
     return c.json({ operations: byOperation });
   });
   app.get("/top-users", async (c) => {
@@ -31590,7 +31589,7 @@ function aiAnalyticsRoutes(ctx) {
       GROUP BY u.user_id, usr.name
       ORDER BY total_tokens DESC
       LIMIT ${limit}
-    `.execute(db).then((r) => r.rows).catch(() => []);
+    `.execute(db).then((r) => r.rows).catch(logAndFallback("top-users", []));
     return c.json({ users: topUsers });
   });
   app.get("/recommendations", async (c) => {
@@ -31607,7 +31606,7 @@ function aiAnalyticsRoutes(ctx) {
         AND provider IN ('openai', 'anthropic')
       GROUP BY provider
       HAVING AVG(prompt_tokens + response_tokens) < 200
-    `.execute(db).then((r) => r.rows).catch(() => []);
+    `.execute(db).then((r) => r.rows).catch(logAndFallback("small-cloud-requests", []));
     for (const row of smallCloudRequests) {
       recommendations.push({
         type: "provider_optimization",
@@ -31624,7 +31623,7 @@ function aiAnalyticsRoutes(ctx) {
       WHERE created_at >= NOW() - INTERVAL '7 days'
       GROUP BY provider
       HAVING AVG(latency_ms) > 5000
-    `.execute(db).then((r) => r.rows).catch(() => []);
+    `.execute(db).then((r) => r.rows).catch(logAndFallback("high-latency", []));
     for (const row of highLatency) {
       recommendations.push({
         type: "performance",
@@ -32814,13 +32813,23 @@ function zveltioAIRoutes(ctx) {
     });
     return c.json(response);
   });
+  async function ownedConversation(conversationId, userId) {
+    const row = await db.selectFrom("zv_ai_conversations").select(["id"]).where("id", "=", conversationId).where("user_id", "=", userId).executeTakeFirst();
+    return row ?? null;
+  }
   app.get("/conversations/:id", async (c) => {
     const user = await getUser(c);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const conversationId = c.req.param("id");
     const limit = parseInt(c.req.query("limit") || "50");
-    const messages = await db.selectFrom("zv_ai_messages").selectAll().where("conversation_id", "=", conversationId).where("user_id", "=", user.id).orderBy("created_at", "asc").limit(Math.min(limit, 200)).execute().catch(() => []);
+    if (!await ownedConversation(conversationId, user.id)) {
+      return c.json({ error: "Conversation not found" }, 404);
+    }
+    const messages = await db.selectFrom("zv_ai_messages").selectAll().where("conversation_id", "=", conversationId).orderBy("created_at", "asc").limit(Math.min(limit, 200)).execute().catch((err) => {
+      console.error("[ai.conversations] history query failed:", err.message);
+      return [];
+    });
     return c.json({ conversation_id: conversationId, messages });
   });
   app.get("/conversations", async (c) => {
@@ -32835,7 +32844,15 @@ function zveltioAIRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const conversationId = c.req.param("id");
-    await db.deleteFrom("zv_ai_messages").where("conversation_id", "=", conversationId).where("user_id", "=", user.id).execute().catch(() => {});
+    if (!await ownedConversation(conversationId, user.id)) {
+      return c.json({ error: "Conversation not found" }, 404);
+    }
+    try {
+      await db.deleteFrom("zv_ai_conversations").where("id", "=", conversationId).execute();
+    } catch (err) {
+      console.error("[ai.conversations] delete failed:", err.message);
+      return c.json({ error: "Could not delete the conversation" }, 500);
+    }
     return c.json({ success: true });
   });
   return app;
@@ -32870,23 +32887,36 @@ function extractText(record2, field, excludedFields) {
   }
   return Object.entries(record2).filter(([k, v]) => !SYSTEM_FIELDS.has(k) && !excludedFields.has(k) && typeof v === "string" && v.length > 0).map(([, v]) => v).join(" ");
 }
+function parseExcludedFields(raw2, collection) {
+  if (raw2 == null)
+    return new Set;
+  if (Array.isArray(raw2))
+    return new Set(raw2.map(String));
+  if (typeof raw2 === "string") {
+    const inner = raw2.trim().replace(/^\{|\}$/g, "");
+    if (inner === "")
+      return new Set;
+    return new Set(inner.split(",").map((s) => s.trim().replace(/^"|"$/g, "")).filter(Boolean));
+  }
+  throw new Error(`collection "${collection}": ai_embed_excluded_fields has an unexpected shape ` + `(${typeof raw2}) \u2014 refusing to embed rather than ignore the exclusion list`);
+}
 async function triggerEmbedding(db, collection, recordId, record2, tenantId = null) {
   const collMeta = await db.selectFrom("zvd_collections").select([
     "ai_search_enabled",
     "ai_search_field",
     "ai_embed_excluded_fields"
-  ]).where("name", "=", collection).executeTakeFirst().catch(() => null);
+  ]).where("name", "=", collection).executeTakeFirst();
   if (!collMeta?.ai_search_enabled)
     return;
   const textField = collMeta.ai_search_field ?? null;
-  const rawExcluded = Array.isArray(collMeta.ai_embed_excluded_fields) ? collMeta.ai_embed_excluded_fields : [];
-  const excludedFields = new Set(rawExcluded);
+  const excludedFields = parseExcludedFields(collMeta.ai_embed_excluded_fields, collection);
   const rawText = extractText(record2, textField, excludedFields);
   if (!rawText.trim())
     return;
   const provider = aiProviderManager.getDefault();
-  if (!provider?.embed)
-    return;
+  if (!provider?.embed) {
+    throw new Error(`collection "${collection}" has ai_search_enabled, but no configured AI provider supports embeddings ` + `(use OpenAI or Ollama, or turn AI Search off for this collection)`);
+  }
   const textToEmbed = rawText.slice(0, 8000);
   const { embedding, model } = await provider.embed(textToEmbed);
   const vectorLiteral = JSON.stringify(embedding);
@@ -32900,10 +32930,23 @@ async function triggerEmbedding(db, collection, recordId, record2, tenantId = nu
       ${rawText.slice(0, 2000)},
       ${vectorLiteral}::vector,
       ${model},
-      ${tenantId},
+      -- Mirrors the column DEFAULT rather than trusting the argument. An
+      -- explicit NULL is not "no tenant" to FORCE RLS: the policy compares
+      -- tenant_id against the GUC, NULL = anything is NULL, and the row is
+      -- refused with a policy violation. A caller that omits the tenant should
+      -- get the session's, not a rejected insert.
+      COALESCE(
+        ${tenantId}::uuid,
+        NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+        '00000000-0000-0000-0000-000000000001'::uuid
+      ),
       NOW()
     )
-    ON CONFLICT (collection, record_id, field)
+    -- tenant_id leads the conflict target, matching the unique key after
+    -- migration 006. It has to move with the constraint or every upsert fails
+    -- with "no unique or exclusion constraint matching the ON CONFLICT
+    -- specification".
+    ON CONFLICT (tenant_id, collection, record_id, field)
     DO UPDATE SET
       text_content = EXCLUDED.text_content,
       embedding    = EXCLUDED.embedding,
@@ -32923,7 +32966,9 @@ var extension = {
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_ai_complete.sql"),
       join(import.meta.dir, "migrations/003_ai_memory_columns.sql"),
-      join(import.meta.dir, "migrations/004_tenant_rls.sql")
+      join(import.meta.dir, "migrations/004_tenant_rls.sql"),
+      join(import.meta.dir, "migrations/005_tenant_scoped_unique_keys.sql"),
+      join(import.meta.dir, "migrations/006_remaining_tenant_unique_keys.sql")
     ];
   },
   async register(app, ctx) {
@@ -32943,7 +32988,7 @@ var extension = {
         throw new Error("No AI provider is configured.");
       return p.chat(messages, opts);
     });
-    ctx.services.register("ai.triggerEmbedding", triggerEmbedding);
+    ctx.services.register("ai.triggerEmbedding", async (collection, recordId, record2, tenantId = null) => triggerEmbedding(ctx.db, collection, recordId, record2, tenantId));
     ctx.services.register("ai.runBackgroundTask", async (userId, instruction, opts) => {
       const engine = new ZveltioAIEngine(ctx);
       return engine.processBackgroundTask(userId, instruction, opts);
@@ -32951,7 +32996,9 @@ var extension = {
     const onWrite = async (evt) => {
       try {
         await triggerEmbedding(ctx.db, evt.collection, evt.id, evt.record, evt.tenantId ?? null);
-      } catch {}
+      } catch (err) {
+        console.warn(`[ai] auto-embedding failed for ${evt.collection}/${evt.id}:`, err.message);
+      }
     };
     ctx.events.on("record.created", onWrite);
     ctx.events.on("record.updated", onWrite);
