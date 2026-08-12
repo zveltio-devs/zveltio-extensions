@@ -33,3 +33,27 @@ extensie regională.
 Numerotarea e revendicare atomică per firmă. **Nu adăuga un număr de rezervă**
 dacă revendicarea eșuează — registrul ori dă următorul număr, ori documentul nu
 se creează. Vezi ce a pățit registrul de documente cu `Date.now()`.
+
+## Metadata liniei era scalar-șir, nu obiect (reparat 2026-08-12)
+
+Găsit presând `operations/traceability`, nu citind invoicing.
+
+`${JSON.stringify(...)}::jsonb` pe linia de factură arăta ca și cum parsează
+documentul. Nu o face: driverul trimite deja parametrul CA valoare jsonb, deci
+cast-ul e un no-op și tot șirul serializat aterizează ca **un singur scalar**.
+`jsonb_typeof(metadata)` citea `string`.
+
+Cei doi cititori JavaScript de aici n-au observat niciodată, fiindcă amândoi fac
+`typeof x === 'string' ? JSON.parse(x) : x`. **Un cititor SQL nu poate.**
+`operations/traceability` caută linii cu `metadata->>'lot_id'` ca să ridice o
+expediere `pending`; pe un scalar-șir operatorul dă NULL, interogarea găsea zero
+rânduri, iar predarea factură→expediere **nu s-a produs niciodată**. Patru rute
+din traceability erau inaccesibile în consecință.
+
+Reparat cu `::text::jsonb` + migrația 011, care convertește și rândurile deja
+scrise — verificat pe o bază care le conținea: `string` → `object`, iar
+`->>'lot_id'` devine vizibil.
+
+**`vat_breakdown` (linia 746) are aceeași formă greșită și rămâne neatinsă** —
+consumatorul ei face `JSON.parse` explicit, deci funcționează. Nu o schimba fără
+să-i citești întâi consumatorul.
