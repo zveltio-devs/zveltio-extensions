@@ -72,3 +72,21 @@ vedea o listă goală și părea că n-a luat concediu niciodată. Helper-ul nou
   `/calendar`, dar nu e legat de ierarhie).
 - Fără perioade blocate (blackout), fără concediu în avans, fără fracțiuni mai
   mici de jumătate de zi.
+
+## Identitatea și autorizarea trec prin `hr.employment` (2026-08-12)
+
+Helperii `callerEmployee`/`mayActOnLeaveOf` existau identic și în
+`hr/time-tracking`, amândoi deschizând `zvd_employees` — tabelul altei extensii.
+Sunt acum o singură implementare, pe serviciul expus de `hr/employees`.
+
+Tot ce **decide** trece prin el: cine e apelantul, cine pe cine conduce, cine
+poate acționa pentru cine. Fără `hr/employees` activat, rutele răspund **503**, nu
+crapă.
+
+`/requests/my` căuta după email; acum `identify()` încearcă `user_id` întâi — cine
+are alt email de serviciu decât cel de logare vedea o listă goală.
+
+**Ce rămâne, deliberat:** JOIN-urile care pun numele omului lângă cerere, și un
+`SELECT id` care listează cui i se inițializează soldurile. Sunt citiri de
+afișare; trecerea lor prin serviciu ar însemna N+1 sau o metodă care re-expune
+tabelul. Marcate în sursă.
