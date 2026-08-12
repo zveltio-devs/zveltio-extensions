@@ -262,12 +262,30 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
           canonicalProductId = existing.id;
         } else {
           // Create canonical product directly via the extension's writable db
+          // Best-effort, and therefore inside a SAVEPOINT.
+          //
+          // The `.catch(() => null)` below looks like it contains a failure. It
+          // does not: a statement that errors inside a transaction ABORTS that
+          // transaction, so the catch swallowed the cause and the NEXT insert —
+          // the storefront row this endpoint exists to write — died with
+          // "current transaction is aborted". Creating a product answered 500
+          // while the comment promised a storefront-only product was fine.
+          //
+          // It also writes another extension's table with columns that table may
+          // not have, which is how it fails at all. The savepoint makes the
+          // fallback actually fall back; the coupling is worth revisiting.
+          await sql`SAVEPOINT canonical_product`.execute(db);
           const create = await sql<any>`
             INSERT INTO zvd_products (sku, name, description, sale_price, currency, tax_rate, is_active)
             VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === 'active'})
             ON CONFLICT (tenant_id, sku) DO UPDATE SET name = EXCLUDED.name
             RETURNING id
           `.execute(db).catch(() => null);
+          if (create === null) {
+            await sql`ROLLBACK TO SAVEPOINT canonical_product`.execute(db);
+          } else {
+            await sql`RELEASE SAVEPOINT canonical_product`.execute(db);
+          }
           canonicalProductId = create?.rows[0]?.id ?? null;
         }
       } catch { /* inventory may be unavailable; storefront-only product is fine */ }

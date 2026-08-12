@@ -39,7 +39,14 @@ export const SearchManager = {
       .executeTakeFirst();
 
     if (!indexConfig) {
-      throw new Error(`No search index configured for collection "${collection}"`);
+      // Typed, so the route can answer 4xx. "No index configured" is a thing
+      // the caller can fix — configure one — and answering 500 told them the
+      // server had broken instead, which sends the search for the cause to the
+      // wrong side entirely.
+      throw Object.assign(
+        new Error(`No search index configured for collection "${collection}"`),
+        { code: 'NO_INDEX' },
+      );
     }
 
     if (indexConfig.provider === 'meilisearch') {
