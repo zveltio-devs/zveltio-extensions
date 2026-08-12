@@ -509,19 +509,38 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
         (f) => allowedFields.add(f),
       );
 
+      // The same two guards `runExportJob` applies. They were added there on
+      // 2026-08-11 and this route was left behind — so the synchronous export
+      // still answered with `selectAll()`, which returns every physical column:
+      // the ones a role is forbidden to read, plus internals the collection
+      // never declared (`search_vector`, `search_text`, `tenant_id`).
+      //
+      // Proven side by side rather than reasoned about: for one user in one
+      // session, `/api/data/:collection` hid `secret_note` while this route
+      // returned it. A boundary only one route honours is not a boundary — the
+      // comment saying so was already in this file, twenty lines up, about the
+      // other handler.
+      const { getColumnAccess, resolveUserRole, getRlsFilters, applyRlsFilters } =
+        ctx.internals;
+      const colAccess = await getColumnAccess(collection, await resolveUserRole(user));
+
       // Build select — optional field projection
       let query: any;
+      const projectable = [...allowedFields].filter((f) => !colAccess.hidden.has(f));
       if (fields) {
         const requestedFields = fields
           .split(',')
           .map((f) => f.trim())
-          .filter((f) => allowedFields.has(f));
+          .filter((f) => allowedFields.has(f) && !colAccess.hidden.has(f));
         query =
           requestedFields.length > 0
             ? (db as any).selectFrom(tableName).select(requestedFields)
-            : (db as any).selectFrom(tableName).selectAll();
+            : (db as any).selectFrom(tableName).select(projectable);
       } else {
-        query = (db as any).selectFrom(tableName).selectAll();
+        query = (db as any).selectFrom(tableName).select(projectable);
+      }
+      if (projectable.length === 0) {
+        return c.json({ error: 'No exportable columns for this role' }, 403);
       }
 
       query = query.limit(limit);
@@ -547,7 +566,19 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
         query = query.orderBy(sort_field as any, sort_order === 'desc' ? 'desc' : 'asc');
       }
 
-      const rows = await query.execute();
+      // Row policies, same as the job path. Today every caller here is an
+      // administrator — the guard above this handler demands it — and RLS
+      // exempts administrators, so this changes nothing observable from
+      // outside. It is applied anyway: the reason it is unobservable is a
+      // property of who may call the route, not of what the route promises, and
+      // the day that gate loosens is not the day to find out the filter was
+      // never wired.
+      const rlsFilters = await getRlsFilters(
+        collection,
+        { ...user, role: user.role ?? '' },
+        (c.get('authType') as 'session' | 'api_key') ?? 'session',
+      );
+      const rows = await applyRlsFilters(query, rlsFilters).execute();
 
       // Serialize via field type registry
       const serialized = rows.map((row: any) => {
