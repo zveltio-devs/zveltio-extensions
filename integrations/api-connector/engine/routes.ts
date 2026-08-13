@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
+import { generateIncomingWebhookSecret } from './incoming-webhooks.js';
 
 const ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
 
@@ -102,6 +103,37 @@ async function resolveOAuth2Token(safeFetch: SafeFetch, dbh: any, connectionId: 
     throw new Error('OAuth2 token request failed');
   }
   return authConfig.access_token ?? '';
+}
+
+/** HMAC-SHA256 of `body` under `secret`, hex — the shape senders put in the header. */
+async function hmacHex(secret: string, body: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(body));
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
+ * Constant-time comparison of two hex strings.
+ *
+ * `a === b` returns at the first differing character, which leaks how much of a
+ * forged signature was right — enough, over many attempts, to build one a byte
+ * at a time. The length is compared first because returning early there leaks
+ * only the length, which the algorithm already fixes at 64 characters.
+ */
+function secretsMatch(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
 }
 
 export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
@@ -376,12 +408,22 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
+    // Always sign incoming deliveries — same contract as engine outbound webhooks.
+    const secret = d.secret ?? generateIncomingWebhookSecret();
     const row = await sql`
       INSERT INTO zvd_incoming_webhooks (name, endpoint_path, description, secret, connection_id, created_by)
-      VALUES (${d.name}, ${d.endpoint_path}, ${d.description ?? null}, ${d.secret ?? null}, ${d.connection_id ?? null}, ${user.id})
+      VALUES (${d.name}, ${d.endpoint_path}, ${d.description ?? null}, ${secret}, ${d.connection_id ?? null}, ${user.id})
       RETURNING *
     `.execute(db);
-    return c.json({ data: row.rows[0] }, 201);
+    const created = row.rows[0] as Record<string, unknown>;
+    return c.json(
+      {
+        data: { ...created, secret: '••••••••' },
+        secret,
+        _secret_shown_once: true,
+      },
+      201,
+    );
   });
 
   app.delete('/webhooks/:id', async (c) => {
@@ -394,43 +436,30 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
     const path = '/' + c.req.param('path');
     const webhook = await sql`SELECT * FROM zvd_incoming_webhooks WHERE endpoint_path = ${path} AND is_active = true`.execute(db);
     if (!webhook.rows.length) return c.json({ error: 'Webhook not found' }, 404);
-    const w = webhook.rows[0] as any;
-    // Verify the HMAC signature when the webhook carries a secret.
-    //
-    // This used to check that the header was PRESENT and stop there, with a
-    // note saying real verification would need the crypto module. So the
-    // endpoint accepted any payload from anyone who knew the path, as long as
-    // they sent `x-hub-signature-256: anything` — and the signature check
-    // being visibly "there" is what stopped anyone looking again. Configuring
-    // a secret bought nothing.
-    let rawBody = '';
-    if (w.secret) {
-      const sig = c.req.header('x-hub-signature-256') ?? c.req.header('x-webhook-signature');
-      if (!sig) return c.json({ error: 'Missing signature' }, 401);
-      // The signature covers the bytes as sent. Parsing to JSON and
-      // re-serialising would change key order and whitespace, so the body is
-      // read once as text and reused below.
-      rawBody = await c.req.text();
-      const { createHmac, timingSafeEqual } = await import('node:crypto');
-      const expected = createHmac('sha256', w.secret).update(rawBody).digest('hex');
-      // GitHub-style `sha256=<hex>`; also accept a bare hex digest, which is
-      // what most other senders emit.
-      const provided = sig.startsWith('sha256=') ? sig.slice(7) : sig;
-      const a = Buffer.from(provided.toLowerCase(), 'hex');
-      const b = Buffer.from(expected, 'hex');
-      if (a.length !== b.length || !timingSafeEqual(a, b)) {
-        return c.json({ error: 'Invalid signature' }, 401);
-      }
+    const w = webhook.rows[0] as { id: string; secret?: string | null };
+    // Unsigned receive was SEC-04b: knowing the path was enough. repairUnsigned…
+    // backfills legacy rows at load; anything still missing a secret is refused.
+    if (!w.secret) {
+      return c.json({ error: 'Webhook has no signing secret configured' }, 401);
     }
-    const payload = w.secret
-      ? ((): unknown => {
-          try {
-            return JSON.parse(rawBody);
-          } catch {
-            return {};
-          }
-        })()
-      : await c.req.json().catch(() => ({}));
+    const sig = c.req.header('x-hub-signature-256') ?? c.req.header('x-webhook-signature');
+    if (!sig) return c.json({ error: 'Missing signature' }, 401);
+    const rawBody = await c.req.text();
+    // WebCrypto rather than `node:crypto`, which would be the only `node:*`
+    // import across all 57 extensions — the engine signs its own webhooks this
+    // way, and keeping extensions off node builtins is what leaves the runtime
+    // question (worker isolation, WASM) open rather than foreclosed.
+    const expected = await hmacHex(w.secret, rawBody);
+    const provided = (sig.startsWith('sha256=') ? sig.slice(7) : sig).toLowerCase();
+    if (!secretsMatch(provided, expected)) {
+      return c.json({ error: 'Invalid signature' }, 401);
+    }
+    let payload: unknown = {};
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      payload = {};
+    }
     const headers: Record<string, string> = {};
     c.req.raw.headers.forEach((v, k) => { headers[k] = v; });
     await sql`
