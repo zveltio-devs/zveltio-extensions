@@ -141,7 +141,7 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
   // The engine's DNS-aware SSRF guards. `safeFetch` re-validates every redirect
   // hop; `assertPublicUrl` resolves the hostname before deciding, so a name that
   // points at 169.254.169.254 is refused whatever it is spelled.
-  const { safeFetch, assertPublicUrl } = ctx.internals;
+  const { safeFetch, assertPublicUrl, maybeEncrypt, maybeDecrypt } = ctx.internals;
 
   // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
   // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
@@ -410,9 +410,30 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     // Always sign incoming deliveries — same contract as engine outbound webhooks.
     const secret = d.secret ?? generateIncomingWebhookSecret();
+
+    // Encrypted at rest, for the same reason the engine encrypts the secret on
+    // its OUTBOUND webhooks: this value is what separates a genuine delivery
+    // from a forged one, so anyone who can read the database can forge
+    // deliveries into this system. In clear, the signature check would verify
+    // only that the sender had read access.
+    //
+    // `maybeEncrypt` throws when FIELD_ENCRYPTION_KEY is unset rather than
+    // downgrading quietly — the engine's posture on every field an operator
+    // marked sensitive. Refusing the create is the honest outcome; the
+    // alternative is a webhook that looks signed and is not.
+    let storedSecret: string;
+    try {
+      storedSecret = (await maybeEncrypt(secret, true)) as string;
+    } catch (e: any) {
+      return c.json(
+        { error: `Cannot store a webhook signing secret: ${e?.message ?? String(e)}` },
+        500,
+      );
+    }
+
     const row = await sql`
       INSERT INTO zvd_incoming_webhooks (name, endpoint_path, description, secret, connection_id, created_by)
-      VALUES (${d.name}, ${d.endpoint_path}, ${d.description ?? null}, ${secret}, ${d.connection_id ?? null}, ${user.id})
+      VALUES (${d.name}, ${d.endpoint_path}, ${d.description ?? null}, ${storedSecret}, ${d.connection_id ?? null}, ${user.id})
       RETURNING *
     `.execute(db);
     const created = row.rows[0] as Record<string, unknown>;
@@ -449,7 +470,11 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
     // import across all 57 extensions — the engine signs its own webhooks this
     // way, and keeping extensions off node builtins is what leaves the runtime
     // question (worker isolation, WASM) open rather than foreclosed.
-    const expected = await hmacHex(w.secret, rawBody);
+    // Decrypted per request. `maybeDecrypt` passes through anything without the
+    // `enc:v1:` prefix, so rows written before this column was encrypted keep
+    // verifying instead of breaking on upgrade.
+    const signingSecret = (await maybeDecrypt(w.secret, true)) as string;
+    const expected = await hmacHex(signingSecret, rawBody);
     const provided = (sig.startsWith('sha256=') ? sig.slice(7) : sig).toLowerCase();
     if (!secretsMatch(provided, expected)) {
       return c.json({ error: 'Invalid signature' }, 401);
