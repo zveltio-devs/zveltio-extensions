@@ -17401,10 +17401,10 @@ var SelectQueryNode = freeze({
       offset
     });
   },
-  cloneWithFetch(selectNode, fetch2) {
+  cloneWithFetch(selectNode, fetch) {
     return freeze({
       ...selectNode,
-      fetch: fetch2
+      fetch
     });
   },
   cloneWithHaving(selectNode, operation) {
@@ -19512,18 +19512,7 @@ function permissionGate(ctx, resource, opts = {}) {
 }
 // ../zveltio-extensions/integrations/api-connector/engine/routes.ts
 var ALLOWED_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
-function validateUrl(url2) {
-  const parsed = new URL(url2);
-  const hostname3 = parsed.hostname.toLowerCase();
-  if (hostname3 === "localhost" || hostname3.endsWith(".local") || /^127\./.test(hostname3) || /^10\./.test(hostname3) || /^192\.168\./.test(hostname3) || /^172\.(1[6-9]|2\d|3[01])\./.test(hostname3) || /^169\.254\./.test(hostname3) || hostname3 === "0.0.0.0" || hostname3 === "::1") {
-    throw new Error("SSRF: Private/loopback addresses are not allowed");
-  }
-}
-async function safeFetch(url2, options) {
-  validateUrl(url2);
-  return fetch(url2, options);
-}
-async function fetchWithRetry(url2, options, maxRetries, timeoutMs) {
+async function fetchWithRetry(safeFetch, url2, options, maxRetries, timeoutMs) {
   let lastError = null;
   for (let attempt = 0;attempt <= maxRetries; attempt++) {
     if (attempt > 0) {
@@ -19542,7 +19531,7 @@ async function fetchWithRetry(url2, options, maxRetries, timeoutMs) {
   }
   return { res: null, retries: maxRetries, error: lastError };
 }
-async function resolveOAuth2Token(dbh, connectionId, authConfig) {
+async function resolveOAuth2Token(safeFetch, dbh, connectionId, authConfig) {
   const cached2 = await sql`SELECT * FROM zvd_api_oauth_tokens WHERE connection_id = ${connectionId}`.execute(dbh);
   if (cached2.rows.length) {
     const tok = cached2.rows[0];
@@ -19551,7 +19540,7 @@ async function resolveOAuth2Token(dbh, connectionId, authConfig) {
       return tok.access_token;
     if (tok.refresh_token && authConfig.token_url) {
       try {
-        const res = await fetch(authConfig.token_url, {
+        const res = await safeFetch(authConfig.token_url, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: tok.refresh_token, client_id: authConfig.client_id ?? "", client_secret: authConfig.client_secret ?? "" })
@@ -19570,7 +19559,7 @@ async function resolveOAuth2Token(dbh, connectionId, authConfig) {
     }
   }
   if (authConfig.token_url && authConfig.client_id) {
-    const res = await fetch(authConfig.token_url, {
+    const res = await safeFetch(authConfig.token_url, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ grant_type: "client_credentials", client_id: authConfig.client_id, client_secret: authConfig.client_secret ?? "", scope: authConfig.scope ?? "" })
@@ -19591,6 +19580,7 @@ async function resolveOAuth2Token(dbh, connectionId, authConfig) {
 }
 function apiConnectorRoutes(ctx) {
   const { db, auth } = ctx;
+  const { safeFetch, assertPublicUrl } = ctx.internals;
   const app = new Hono2;
   const isPublicWebhook = (c) => c.req.path.includes("/webhooks/receive/");
   app.use("*", async (c, next) => {
@@ -19630,7 +19620,7 @@ function apiConnectorRoutes(ctx) {
     const user = c.get("user");
     const d = c.req.valid("json");
     try {
-      validateUrl(d.base_url);
+      await assertPublicUrl(d.base_url);
     } catch (e) {
       return c.json({ error: e.message }, 400);
     }
@@ -19771,14 +19761,14 @@ function apiConnectorRoutes(ctx) {
       headers["Authorization"] = `Basic ${btoa(`${authConfig.username}:${authConfig.password}`)}`;
     } else if (endpoint.auth_type === "oauth2") {
       try {
-        const token = await resolveOAuth2Token(db, endpoint.connection_id, authConfig);
+        const token = await resolveOAuth2Token(safeFetch, db, endpoint.connection_id, authConfig);
         headers["Authorization"] = `Bearer ${token}`;
       } catch (e) {
         return c.json({ error: "OAuth2 token error: " + e.message }, 502);
       }
     }
     const startedAt = Date.now();
-    const { res, retries, error: fetchError } = await fetchWithRetry(url2, {
+    const { res, retries, error: fetchError } = await fetchWithRetry(safeFetch, url2, {
       method: endpoint.method,
       headers,
       body: ["GET", "HEAD"].includes(endpoint.method) ? undefined : JSON.stringify(d.body)
