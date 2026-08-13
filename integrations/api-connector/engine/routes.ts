@@ -8,27 +8,27 @@ import { permissionGate } from '@zveltio/sdk/extension';
 
 const ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
 
-// SSRF protection
-function validateUrl(url: string): void {
-  const parsed = new URL(url);
-  const hostname = parsed.hostname.toLowerCase();
-  if (
-    hostname === 'localhost' || hostname.endsWith('.local') ||
-    /^127\./.test(hostname) || /^10\./.test(hostname) ||
-    /^192\.168\./.test(hostname) || /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
-    /^169\.254\./.test(hostname) || hostname === '0.0.0.0' || hostname === '::1'
-  ) {
-    throw new Error('SSRF: Private/loopback addresses are not allowed');
-  }
-}
-
-async function safeFetch(url: string, options: RequestInit): Promise<Response> {
-  validateUrl(url);
-  return fetch(url, options);
-}
+/**
+ * SSRF protection comes from the engine now, through `ctx.internals`.
+ *
+ * What used to be here was a literal-hostname blocklist: it compared the string
+ * in the URL against `localhost`, `127.`, `10.`, `192.168.`, `169.254.` and a
+ * few more. That stops an attacker who types the address and nobody else. It
+ * does not stop a hostname the attacker controls that RESOLVES to
+ * 169.254.169.254, nor `http://2852039166/`, nor a public host that answers 302
+ * pointing at the metadata service — `fetch` follows redirects, and the check
+ * had already been made on the original URL.
+ *
+ * The engine replaced exactly this guard with a DNS-aware one that re-validates
+ * every redirect hop, and exposed it on `ctx.internals` with a comment naming
+ * this extension as the reason. It was never adopted. Threading the engine's
+ * version in as a parameter, rather than importing it, because these helpers
+ * are module-level and the context arrives at `apiConnectorRoutes`.
+ */
+type SafeFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 // Exponential backoff retry
-async function fetchWithRetry(url: string, options: RequestInit, maxRetries: number, timeoutMs: number): Promise<{ res: Response | null; retries: number; error: string | null }> {
+async function fetchWithRetry(safeFetch: SafeFetch, url: string, options: RequestInit, maxRetries: number, timeoutMs: number): Promise<{ res: Response | null; retries: number; error: string | null }> {
   let lastError: string | null = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     if (attempt > 0) {
@@ -50,7 +50,12 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries: num
 }
 
 // Resolve OAuth2 token (with refresh if expired)
-async function resolveOAuth2Token(dbh: any, connectionId: string, authConfig: any): Promise<string> {
+/**
+ * `token_url` is attacker-reachable in the same way `base_url` is: it is stored
+ * on the connection and fetched by the server. Both calls below were on bare
+ * `fetch`, so the guard that did exist never applied to them at all.
+ */
+async function resolveOAuth2Token(safeFetch: SafeFetch, dbh: any, connectionId: string, authConfig: any): Promise<string> {
   const cached = await sql`SELECT * FROM zvd_api_oauth_tokens WHERE connection_id = ${connectionId}`.execute(dbh);
   if (cached.rows.length) {
     const tok = cached.rows[0] as any;
@@ -59,7 +64,7 @@ async function resolveOAuth2Token(dbh: any, connectionId: string, authConfig: an
     // Try refresh
     if (tok.refresh_token && authConfig.token_url) {
       try {
-        const res = await fetch(authConfig.token_url, {
+        const res = await safeFetch(authConfig.token_url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: tok.refresh_token, client_id: authConfig.client_id ?? '', client_secret: authConfig.client_secret ?? '' }),
@@ -79,7 +84,7 @@ async function resolveOAuth2Token(dbh: any, connectionId: string, authConfig: an
   }
   // Client credentials flow
   if (authConfig.token_url && authConfig.client_id) {
-    const res = await fetch(authConfig.token_url, {
+    const res = await safeFetch(authConfig.token_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ grant_type: 'client_credentials', client_id: authConfig.client_id, client_secret: authConfig.client_secret ?? '', scope: authConfig.scope ?? '' }),
@@ -101,6 +106,10 @@ async function resolveOAuth2Token(dbh: any, connectionId: string, authConfig: an
 
 export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
+  // The engine's DNS-aware SSRF guards. `safeFetch` re-validates every redirect
+  // hop; `assertPublicUrl` resolves the hostname before deciding, so a name that
+  // points at 169.254.169.254 is refused whatever it is spelled.
+  const { safeFetch, assertPublicUrl } = ctx.internals;
 
   // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
   // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
@@ -156,7 +165,7 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
-    try { validateUrl(d.base_url); } catch (e: any) {
+    try { await assertPublicUrl(d.base_url); } catch (e: any) {
       return c.json({ error: e.message }, 400);
     }
     const row = await sql`
@@ -306,7 +315,7 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
       headers['Authorization'] = `Basic ${btoa(`${authConfig.username}:${authConfig.password}`)}`;
     } else if (endpoint.auth_type === 'oauth2') {
       try {
-        const token = await resolveOAuth2Token(db, endpoint.connection_id, authConfig);
+        const token = await resolveOAuth2Token(safeFetch, db, endpoint.connection_id, authConfig);
         headers['Authorization'] = `Bearer ${token}`;
       } catch (e: any) {
         return c.json({ error: 'OAuth2 token error: ' + e.message }, 502);
@@ -314,7 +323,7 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
     }
 
     const startedAt = Date.now();
-    const { res, retries, error: fetchError } = await fetchWithRetry(url, {
+    const { res, retries, error: fetchError } = await fetchWithRetry(safeFetch, url, {
       method: endpoint.method,
       headers,
       body: ['GET', 'HEAD'].includes(endpoint.method) ? undefined : JSON.stringify(d.body),
