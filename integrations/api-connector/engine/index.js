@@ -3403,16 +3403,22 @@ function generateIncomingWebhookSecret() {
   crypto.getRandomValues(bytes);
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
-async function repairUnsignedIncomingWebhooksAtLoad(db) {
+async function repairUnsignedIncomingWebhooksAtLoad(db, encrypt) {
   try {
     const { rows } = await sql`
       SELECT id, name FROM zvd_incoming_webhooks WHERE secret IS NULL OR secret = ''
     `.execute(db);
     if (rows.length === 0)
       return 0;
+    try {
+      await encrypt("probe", true);
+    } catch (err) {
+      console.warn(`\u26A0\uFE0F  [api-connector] ${rows.length} incoming webhook(s) have no signing secret and will ` + "keep accepting unauthenticated payloads: a secret cannot be stored because " + `${err.message}`);
+      return 0;
+    }
     let repaired = 0;
     for (const row of rows) {
-      const secret = generateIncomingWebhookSecret();
+      const secret = await encrypt(generateIncomingWebhookSecret(), true);
       await sql`UPDATE zvd_incoming_webhooks SET secret = ${secret} WHERE id = ${row.id}`.execute(db);
       repaired++;
       console.warn(`\u26A0\uFE0F  [api-connector] incoming webhook "${row.name ?? row.id}" had no signing secret ` + "and accepted unauthenticated payloads. A secret has been generated \u2014 fetch it from " + "the admin UI and configure the sender to sign with x-hub-signature-256.");
@@ -19620,7 +19626,7 @@ function secretsMatch(a, b) {
 }
 function apiConnectorRoutes(ctx) {
   const { db, auth } = ctx;
-  const { safeFetch, assertPublicUrl } = ctx.internals;
+  const { safeFetch, assertPublicUrl, maybeEncrypt, maybeDecrypt } = ctx.internals;
   const app = new Hono2;
   const isPublicWebhook = (c) => c.req.path.includes("/webhooks/receive/");
   app.use("*", async (c, next) => {
@@ -19857,9 +19863,15 @@ function apiConnectorRoutes(ctx) {
     const user = c.get("user");
     const d = c.req.valid("json");
     const secret = d.secret ?? generateIncomingWebhookSecret();
+    let storedSecret;
+    try {
+      storedSecret = await maybeEncrypt(secret, true);
+    } catch (e) {
+      return c.json({ error: `Cannot store a webhook signing secret: ${e?.message ?? String(e)}` }, 500);
+    }
     const row = await sql`
       INSERT INTO zvd_incoming_webhooks (name, endpoint_path, description, secret, connection_id, created_by)
-      VALUES (${d.name}, ${d.endpoint_path}, ${d.description ?? null}, ${secret}, ${d.connection_id ?? null}, ${user.id})
+      VALUES (${d.name}, ${d.endpoint_path}, ${d.description ?? null}, ${storedSecret}, ${d.connection_id ?? null}, ${user.id})
       RETURNING *
     `.execute(db);
     const created = row.rows[0];
@@ -19886,7 +19898,8 @@ function apiConnectorRoutes(ctx) {
     if (!sig)
       return c.json({ error: "Missing signature" }, 401);
     const rawBody = await c.req.text();
-    const expected = await hmacHex(w.secret, rawBody);
+    const signingSecret = await maybeDecrypt(w.secret, true);
+    const expected = await hmacHex(signingSecret, rawBody);
     const provided = (sig.startsWith("sha256=") ? sig.slice(7) : sig).toLowerCase();
     if (!secretsMatch(provided, expected)) {
       return c.json({ error: "Invalid signature" }, 401);
@@ -19932,7 +19945,7 @@ var extension = {
     ];
   },
   async register(app, ctx) {
-    await repairUnsignedIncomingWebhooksAtLoad(ctx.db);
+    await repairUnsignedIncomingWebhooksAtLoad(ctx.db, ctx.internals.maybeEncrypt);
     app.route("/", apiConnectorRoutes(ctx));
   }
 };
