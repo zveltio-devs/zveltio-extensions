@@ -18,7 +18,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    await repairUnsignedIncomingWebhooksAtLoad(ctx.db);
+    await repairUnsignedIncomingWebhooksAtLoad(ctx.db, ctx.internals.maybeEncrypt);
     app.route('/', apiConnectorRoutes(ctx));
   },
 };
