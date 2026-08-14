@@ -19672,17 +19672,18 @@ function bankingRoutes(ctx) {
     return c.json({ data: row.rows[0] }, 201);
   });
   app.post("/accounts/:id/import/mt940", zValidator("json", exports_external.object({
-    content: exports_external.string().min(10)
+    content: exports_external.string().min(10),
+    filename: exports_external.string().max(255).optional()
   })), async (c) => {
     const user = c.get("user");
-    const { content } = c.req.valid("json");
+    const { content, filename } = c.req.valid("json");
     const accountId = c.req.param("id");
     const transactions = parseMT940(content);
     if (!transactions.length)
       return c.json({ error: "No transactions found in MT940 content" }, 400);
     const importRow = await sql`
-      INSERT INTO zvd_bank_imports (account_id, source, rows_imported, imported_by)
-      VALUES (${accountId}, 'mt940', ${transactions.length}, ${user.id}) RETURNING id
+      INSERT INTO zvd_bank_imports (account_id, source, filename, rows_imported, imported_by)
+      VALUES (${accountId}, 'mt940', ${filename ?? null}, ${transactions.length}, ${user.id}) RETURNING id
     `.execute(db);
     const importId = importRow.rows[0].id;
     let imported = 0;
@@ -19704,6 +19705,7 @@ function bankingRoutes(ctx) {
   });
   app.post("/accounts/:id/import", zValidator("json", exports_external.object({
     source: exports_external.string().default("csv"),
+    filename: exports_external.string().max(255).optional(),
     transactions: exports_external.array(exports_external.object({
       date: exports_external.string(),
       type: exports_external.enum(["credit", "debit"]),
@@ -19717,8 +19719,8 @@ function bankingRoutes(ctx) {
     const d = c.req.valid("json");
     const accountId = c.req.param("id");
     const importRow = await sql`
-      INSERT INTO zvd_bank_imports (account_id, source, rows_imported, imported_by)
-      VALUES (${accountId}, ${d.source}, ${d.transactions.length}, ${user.id}) RETURNING id
+      INSERT INTO zvd_bank_imports (account_id, source, filename, rows_imported, imported_by)
+      VALUES (${accountId}, ${d.source}, ${d.filename ?? null}, ${d.transactions.length}, ${user.id}) RETURNING id
     `.execute(db);
     const importId = importRow.rows[0].id;
     let balance_delta = 0;
@@ -19883,7 +19885,8 @@ var extension = {
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
       join(import.meta.dir, "migrations/003_user_ref_text.sql"),
-      join(import.meta.dir, "migrations/004_import_provenance.sql")
+      join(import.meta.dir, "migrations/004_import_provenance.sql"),
+      join(import.meta.dir, "migrations/005_import_filename_optional.sql")
     ];
   },
   async register(app, ctx) {

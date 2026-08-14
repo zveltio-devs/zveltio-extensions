@@ -19528,8 +19528,16 @@ function accountingRoutes(ctx) {
   app.use("*", permissionGate(ctx, "accounting"));
   app.get("/accounts", async (c) => {
     const rows = await sql`
+      -- Third instance of the same defect, in the same file, found by probing
+      -- the siblings after fixing the two the audit named. The chart of accounts
+      -- shows a balance per account, and it counted draft and voided entries
+      -- for exactly the reason the trial balance did: the posted predicate is in
+      -- the ON clause of a LEFT JOIN, so it chooses whether the join matches,
+      -- not whether the row survives.
       SELECT a.*, p.name as parent_name,
-        COALESCE(SUM(l.debit) - SUM(l.credit), 0) as balance
+        COALESCE(
+          SUM(l.debit) FILTER (WHERE e.id IS NOT NULL)
+            - SUM(l.credit) FILTER (WHERE e.id IS NOT NULL), 0) as balance
       FROM zvd_accounts a
       LEFT JOIN zvd_accounts p ON p.id = a.parent_id
       LEFT JOIN zvd_journal_lines l ON l.account_id = a.id
@@ -19889,10 +19897,23 @@ function accountingRoutes(ctx) {
   app.get("/reports/trial-balance", async (c) => {
     const { fiscal_year_id, as_of } = c.req.query();
     const rows = await sql`
+      -- FILTER (WHERE e.id IS NOT NULL) is what makes the status and date
+      -- predicates below actually filter. They sit in the ON clause of a LEFT
+      -- JOIN, where they decide whether the join MATCHES \u2014 not whether the row
+      -- survives. A draft or voided entry simply left e NULL while its journal
+      -- line went on contributing to these sums, so the trial balance included
+      -- money nobody had posted.
+      --
+      -- The join stays LEFT because this report lists every active account,
+      -- including ones with no movement; making it INNER would silently drop
+      -- them. e.id IS NOT NULL means "this line belongs to an entry that met
+      -- the conditions", which is what the ON clause was believed to say.
       SELECT a.id, a.code, a.name, a.type,
-        COALESCE(SUM(l.debit), 0) as total_debit,
-        COALESCE(SUM(l.credit), 0) as total_credit,
-        COALESCE(SUM(l.debit) - SUM(l.credit), 0) as balance
+        COALESCE(SUM(l.debit) FILTER (WHERE e.id IS NOT NULL), 0) as total_debit,
+        COALESCE(SUM(l.credit) FILTER (WHERE e.id IS NOT NULL), 0) as total_credit,
+        COALESCE(
+          SUM(l.debit) FILTER (WHERE e.id IS NOT NULL)
+            - SUM(l.credit) FILTER (WHERE e.id IS NOT NULL), 0) as balance
       FROM zvd_accounts a
       LEFT JOIN zvd_journal_lines l ON l.account_id = a.id
       LEFT JOIN zvd_journal_entries e ON e.id = l.entry_id AND e.status = 'posted'
@@ -19909,8 +19930,21 @@ function accountingRoutes(ctx) {
     const fromDate = from ?? new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10);
     const toDate = to ?? new Date().toISOString().slice(0, 10);
     const rows = await sql`
+      -- Signed by account type. SUM(credit) - SUM(debit) is right for a
+      -- credit-normal revenue account and inverted for a debit-normal expense
+      -- one, so every expense came back NEGATIVE \u2014 and net = revenue - expense
+      -- below then ADDED them: 1000 of revenue against 400 of costs was reported
+      -- as 1400 profit rather than 600.
+      --
+      -- Fixed at the sign rather than at the subtraction, because the breakdown
+      -- is read by people too, and an expense line showing -400 invites exactly
+      -- the reading that produced this.
       SELECT a.code, a.name, a.type,
-        COALESCE(SUM(l.credit) - SUM(l.debit), 0) as amount
+        COALESCE(
+          CASE WHEN a.type = 'expense'
+            THEN SUM(l.debit) - SUM(l.credit)
+            ELSE SUM(l.credit) - SUM(l.debit)
+          END, 0) as amount
       FROM zvd_accounts a
       JOIN zvd_journal_lines l ON l.account_id = a.id
         AND (${cost_center_id ? sql`l.cost_center_id = ${cost_center_id}` : sql`TRUE`})
@@ -19927,8 +19961,13 @@ function accountingRoutes(ctx) {
   app.get("/reports/balance-sheet", async (c) => {
     const { as_of } = c.req.query();
     const rows = await sql`
+      -- Same defect as the trial balance: the posted predicate is in the ON
+      -- clause of a LEFT JOIN and therefore never removed a row. A balance sheet
+      -- that counts unposted entries is not a balance sheet.
       SELECT a.type, a.code, a.name,
-        COALESCE(SUM(l.debit) - SUM(l.credit), 0) as balance
+        COALESCE(
+          SUM(l.debit) FILTER (WHERE e.id IS NOT NULL)
+            - SUM(l.credit) FILTER (WHERE e.id IS NOT NULL), 0) as balance
       FROM zvd_accounts a
       LEFT JOIN zvd_journal_lines l ON l.account_id = a.id
       LEFT JOIN zvd_journal_entries e ON e.id = l.entry_id AND e.status = 'posted'

@@ -539,7 +539,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const table  = c.req.param('table');
       const policy = c.req.param('policy');
       try {
-        await sql.raw(`DROP POLICY IF EXISTS "${policy}" ON ${q(table)}`).execute(db);
+        await sql.raw(`DROP POLICY IF EXISTS ${q(policy)} ON ${q(table)}`).execute(db);
         return c.json({ success: true });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to drop policy' }, 400);
