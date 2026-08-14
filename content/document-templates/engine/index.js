@@ -19447,9 +19447,9 @@ var DocumentTemplateSchema = exports_external.object({
   description: exports_external.string().optional(),
   template_type: exports_external.enum(["html", "markdown", "handlebars", "mustache"]).default("html"),
   output_format: exports_external.enum(["pdf", "docx", "html", "markdown", "txt"]).default("pdf"),
-  content: exports_external.string().min(1),
+  html_body: exports_external.string().min(1),
   variables: exports_external.record(exports_external.string(), exports_external.string()).optional().default({}),
-  style_config: exports_external.record(exports_external.string(), exports_external.any()).optional().default({}),
+  pdf_options: exports_external.record(exports_external.string(), exports_external.any()).optional().default({}),
   is_active: exports_external.boolean().default(true),
   tags: exports_external.array(exports_external.string()).optional().default([])
 });
@@ -19552,9 +19552,9 @@ function documentTemplatesRoutes(ctx) {
     const user = c.get("user");
     const data = c.req.valid("json");
     const result = await sql`
-      INSERT INTO zv_document_templates (name, description, template_type, output_format, content, variables, style_config, is_active, tags, created_by)
+      INSERT INTO zv_document_templates (name, description, template_type, output_format, html_body, variables, pdf_options, is_active, tags, created_by)
       VALUES (${data.name}, ${data.description || null}, ${data.template_type}, ${data.output_format},
-              ${data.content}, ${JSON.stringify(data.variables)}::jsonb, ${JSON.stringify(data.style_config)}::jsonb,
+              ${data.html_body}, ${JSON.stringify(data.variables)}::jsonb, ${JSON.stringify(data.pdf_options)}::jsonb,
               ${data.is_active}, ${data.tags}, ${user.id})
       RETURNING *
     `.execute(db);
@@ -19570,7 +19570,7 @@ function documentTemplatesRoutes(ctx) {
     for (const [key, value] of Object.entries(data)) {
       if (value === undefined)
         continue;
-      if (key === "variables" || key === "style_config") {
+      if (key === "variables" || key === "pdf_options") {
         updateFields[key] = JSON.stringify(value);
       } else {
         updateFields[key] = value;
@@ -19595,8 +19595,8 @@ function documentTemplatesRoutes(ctx) {
       return c.json({ error: "Template not found" }, 404);
     if (!template.is_active)
       return c.json({ error: "Template is not active" }, 400);
-    const populated = populatePlaceholders(template.content, data.variables || {});
-    const pdfBuffer = await generatePDFAsync(populated, template.style_config ?? {});
+    const populated = populatePlaceholders(template.html_body, data.variables || {});
+    const pdfBuffer = await generatePDFAsync(populated, template.pdf_options ?? {});
     await db.updateTable("zv_document_templates").set({
       usage_count: sql`usage_count + 1`,
       last_used_at: new Date
@@ -19631,7 +19631,7 @@ function documentTemplatesRoutes(ctx) {
     const user = c.get("user");
     const templateId = c.req.param("id");
     const data = c.req.valid("json");
-    const template = await db.selectFrom("zv_document_templates").select(["id", "content", "style_config", "variables", "version_number"]).where("id", "=", templateId).executeTakeFirst();
+    const template = await db.selectFrom("zv_document_templates").select(["id", "html_body", "pdf_options", "variables", "version_number"]).where("id", "=", templateId).executeTakeFirst();
     if (!template)
       return c.json({ error: "Template not found" }, 404);
     const maxVersionResult = await db.selectFrom("zv_document_template_versions").select((eb) => eb.fn.max("version_number").as("max_version")).where("template_id", "=", templateId).executeTakeFirst();
@@ -19639,7 +19639,7 @@ function documentTemplatesRoutes(ctx) {
     const version2 = await db.insertInto("zv_document_template_versions").values({
       template_id: templateId,
       version_number: nextVersion,
-      html_body: template.content || "",
+      html_body: template.html_body || "",
       css_styles: null,
       variables: JSON.stringify(typeof template.variables === "string" ? JSON.parse(template.variables) : template.variables || {}),
       change_notes: data.change_notes || null,
@@ -19656,14 +19656,14 @@ function documentTemplatesRoutes(ctx) {
     const version2 = await db.selectFrom("zv_document_template_versions").selectAll().where("template_id", "=", templateId).where("version_number", "=", versionNumber).executeTakeFirst();
     if (!version2)
       return c.json({ error: "Version not found" }, 404);
-    const current = await db.selectFrom("zv_document_templates").select(["content", "style_config", "variables", "version_number"]).where("id", "=", templateId).executeTakeFirst();
+    const current = await db.selectFrom("zv_document_templates").select(["html_body", "pdf_options", "variables", "version_number"]).where("id", "=", templateId).executeTakeFirst();
     if (current) {
       const maxVersionResult = await db.selectFrom("zv_document_template_versions").select((eb) => eb.fn.max("version_number").as("max_version")).where("template_id", "=", templateId).executeTakeFirst();
       const nextVersion = Number(maxVersionResult?.max_version || 0) + 1;
       await db.insertInto("zv_document_template_versions").values({
         template_id: templateId,
         version_number: nextVersion,
-        html_body: current.content || "",
+        html_body: current.html_body || "",
         css_styles: null,
         variables: JSON.stringify(typeof current.variables === "string" ? JSON.parse(current.variables) : current.variables || {}),
         change_notes: `Auto-snapshot before restore to v${versionNumber}`,
@@ -19671,7 +19671,7 @@ function documentTemplatesRoutes(ctx) {
       }).execute();
     }
     const template = await db.updateTable("zv_document_templates").set({
-      content: version2.html_body,
+      html_body: version2.html_body,
       variables: JSON.stringify(typeof version2.variables === "string" ? JSON.parse(version2.variables) : version2.variables || {}),
       updated_at: new Date
     }).where("id", "=", templateId).returningAll().executeTakeFirst();
@@ -19689,7 +19689,8 @@ var extension = {
     return [
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
-      join(import.meta.dir, "migrations/003_created_by.sql")
+      join(import.meta.dir, "migrations/003_created_by.sql"),
+      join(import.meta.dir, "migrations/004_template_type_and_output_format.sql")
     ];
   },
   async register(app, ctx) {

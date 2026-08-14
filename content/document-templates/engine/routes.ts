@@ -29,9 +29,17 @@ const DocumentTemplateSchema = z.object({
   description: z.string().optional(),
   template_type: z.enum(['html', 'markdown', 'handlebars', 'mustache']).default('html'),
   output_format: z.enum(['pdf', 'docx', 'html', 'markdown', 'txt']).default('pdf'),
-  content: z.string().min(1),
+  // `html_body`, not `content`. The table's body column has always been
+  // `html_body`, the versions table uses that name too, and GET returns
+  // `selectAll()` — so clients have always RECEIVED `html_body` while this
+  // schema asked them to SEND `content`. One vocabulary now.
+  html_body: z.string().min(1),
   variables: z.record(z.string(), z.string()).optional().default({}),
-  style_config: z.record(z.string(), z.any()).optional().default({}),
+  // `pdf_options`, not `style_config`. Its value is handed straight to
+  // `generatePDFAsync(html, options)` — page size and margins — which is what
+  // `pdf_options` holds. (It is NOT `css_styles`, a TEXT column of stylesheet
+  // text; mapping it there would have type-mismatched as well as mis-meant.)
+  pdf_options: z.record(z.string(), z.any()).optional().default({}),
   is_active: z.boolean().default(true),
   tags: z.array(z.string()).optional().default([]),
 });
@@ -204,9 +212,9 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user');
     const data = c.req.valid('json');
     const result = await sql<any>`
-      INSERT INTO zv_document_templates (name, description, template_type, output_format, content, variables, style_config, is_active, tags, created_by)
+      INSERT INTO zv_document_templates (name, description, template_type, output_format, html_body, variables, pdf_options, is_active, tags, created_by)
       VALUES (${data.name}, ${data.description || null}, ${data.template_type}, ${data.output_format},
-              ${data.content}, ${JSON.stringify(data.variables)}::jsonb, ${JSON.stringify(data.style_config)}::jsonb,
+              ${data.html_body}, ${JSON.stringify(data.variables)}::jsonb, ${JSON.stringify(data.pdf_options)}::jsonb,
               ${data.is_active}, ${data.tags as any}, ${user.id})
       RETURNING *
     `.execute(db);
@@ -228,7 +236,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
     const updateFields: Record<string, any> = { updated_at: new Date() };
     for (const [key, value] of Object.entries(data)) {
       if (value === undefined) continue;
-      if (key === 'variables' || key === 'style_config') {
+      if (key === 'variables' || key === 'pdf_options') {
         updateFields[key] = JSON.stringify(value) as any;
       } else {
         updateFields[key] = value;
@@ -266,8 +274,8 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
     if (!template) return c.json({ error: 'Template not found' }, 404);
     if (!template.is_active) return c.json({ error: 'Template is not active' }, 400);
 
-    const populated = populatePlaceholders(template.content, data.variables || {});
-    const pdfBuffer = await generatePDFAsync(populated, template.style_config ?? {}) as Buffer;
+    const populated = populatePlaceholders(template.html_body, data.variables || {});
+    const pdfBuffer = await generatePDFAsync(populated, template.pdf_options ?? {}) as Buffer;
 
     // Increment usage_count and last_used_at
     await (db as any)
@@ -338,7 +346,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
 
     const template = await (db as any)
       .selectFrom('zv_document_templates')
-      .select(['id', 'content', 'style_config', 'variables', 'version_number'])
+      .select(['id', 'html_body', 'pdf_options', 'variables', 'version_number'])
       .where('id', '=', templateId)
       .executeTakeFirst();
 
@@ -358,7 +366,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
       .values({
         template_id: templateId,
         version_number: nextVersion,
-        html_body: template.content || '',
+        html_body: template.html_body || '',
         css_styles: null,
         variables: JSON.stringify(
           typeof template.variables === 'string'
@@ -394,7 +402,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
     // Snapshot current state before restoring
     const current = await (db as any)
       .selectFrom('zv_document_templates')
-      .select(['content', 'style_config', 'variables', 'version_number'])
+      .select(['html_body', 'pdf_options', 'variables', 'version_number'])
       .where('id', '=', templateId)
       .executeTakeFirst();
 
@@ -412,7 +420,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
         .values({
           template_id: templateId,
           version_number: nextVersion,
-          html_body: current.content || '',
+          html_body: current.html_body || '',
           css_styles: null,
           variables: JSON.stringify(
             typeof current.variables === 'string'
@@ -429,7 +437,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
     const template = await (db as any)
       .updateTable('zv_document_templates')
       .set({
-        content: version.html_body,
+        html_body: version.html_body,
         variables: JSON.stringify(
           typeof version.variables === 'string'
             ? JSON.parse(version.variables)
