@@ -4,8 +4,31 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 
+/**
+ * Quote a Postgres identifier.
+ *
+ * This existed as a local inside one handler, with a comment explaining that
+ * its identifiers came from the catalog rather than the request — true there,
+ * and the reason nobody carried it to the other eleven sites, which interpolate
+ * request-supplied names into a bare quoted string directly. A name containing a double
+ * quote breaks out of the quoting there; the route is instance-admin-only so it
+ * is not an escalation, but "the caller was already privileged" is a reason to
+ * expect correct SQL, not a reason to accept broken SQL.
+ *
+ * Doubling `"` is the whole rule for a quoted identifier: inside quotes, `""`
+ * is a literal quote and nothing else is special.
+ */
+function q(s: string): string {
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
 export function databaseRoutes(ctx: ExtensionContext): Hono {
-  const { db, auth, checkPermission } = ctx;
+  const { db, auth } = ctx;
+  // Instance admin, not tenant admin. `checkPermission(uid, 'admin', '*')` is
+  // TRUE for a delegated tenant owner inside their own domain, because the
+  // `tenant_owner` policy is ('*','*','*') there — so this route, which runs
+  // raw SQL against the instance, was reachable by anyone who owned any tenant.
+  const { requireInstanceAdmin } = ctx.internals;
 
   // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
   // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
@@ -23,7 +46,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const session = await auth.api.getSession({ headers: c.req.raw.headers });
       if (!session) return c.json({ error: 'Unauthorized' }, 401);
       c.set('user', session.user);
-      const hasAdmin = await checkPermission(session.user.id, 'admin', '*');
+      const hasAdmin = await requireInstanceAdmin(session.user.id);
       if (!hasAdmin) return c.json({ error: 'Admin access required' }, 403);
       await next();
     })
@@ -88,7 +111,6 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const limit = Math.min(Math.max(Number(c.req.query('limit')) || 100, 1), 500);
       // These identifiers came out of the catalog query above, never off the
       // request, and are additionally quote-escaped.
-      const q = (s: string) => `"${s.replace(/"/g, '""')}"`;
       const ref = sql.raw(`${q(schema)}.${q(name)}`);
 
       const rows = await sql`SELECT * FROM ${ref} LIMIT ${limit}`.execute(db);
@@ -158,7 +180,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
         return c.json({ error: 'Cannot drop system functions' }, 403);
       }
       try {
-        await sql.raw(`DROP FUNCTION IF EXISTS "${schema}"."${name}" ${cascade ? 'CASCADE' : 'RESTRICT'}`).execute(db);
+        await sql.raw(`DROP FUNCTION IF EXISTS ${q(schema)}.${q(name)} ${cascade ? 'CASCADE' : 'RESTRICT'}`).execute(db);
         return c.json({ success: true });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to drop function' }, 400);
@@ -215,7 +237,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const name  = c.req.param('name');
       const { enabled } = c.req.valid('json');
       try {
-        await sql.raw(`ALTER TABLE "${table}" ${enabled ? 'ENABLE' : 'DISABLE'} TRIGGER "${name}"`).execute(db);
+        await sql.raw(`ALTER TABLE ${q(table)} ${enabled ? 'ENABLE' : 'DISABLE'} TRIGGER ${q(name)}`).execute(db);
         return c.json({ success: true });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to toggle trigger' }, 400);
@@ -227,7 +249,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const name    = c.req.param('name');
       const cascade = c.req.query('cascade') === 'true';
       try {
-        await sql.raw(`DROP TRIGGER IF EXISTS "${name}" ON "${table}" ${cascade ? 'CASCADE' : 'RESTRICT'}`).execute(db);
+        await sql.raw(`DROP TRIGGER IF EXISTS ${q(name)} ON ${q(table)} ${cascade ? 'CASCADE' : 'RESTRICT'}`).execute(db);
         return c.json({ success: true });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to drop trigger' }, 400);
@@ -274,7 +296,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const { name, values, schema } = c.req.valid('json');
       const valuesSQL = values.map(v => `'${v.replace(/'/g, "''")}'`).join(', ');
       try {
-        await sql.raw(`CREATE TYPE "${schema}"."${name}" AS ENUM (${valuesSQL})`).execute(db);
+        await sql.raw(`CREATE TYPE ${q(schema)}.${q(name)} AS ENUM (${valuesSQL})`).execute(db);
         return c.json({ success: true }, 201);
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to create enum' }, 400);
@@ -286,7 +308,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const name   = c.req.param('name');
       const { value } = c.req.valid('json');
       try {
-        await sql.raw(`ALTER TYPE "${schema}"."${name}" ADD VALUE IF NOT EXISTS '${value.replace(/'/g, "''")}'`).execute(db);
+        await sql.raw(`ALTER TYPE ${q(schema)}.${q(name)} ADD VALUE IF NOT EXISTS '${value.replace(/'/g, "''")}'`).execute(db);
         return c.json({ success: true });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to add enum value' }, 400);
@@ -298,7 +320,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const name   = c.req.param('name');
       if (schema === 'pg_catalog') return c.json({ error: 'Cannot drop system enums' }, 403);
       try {
-        await sql.raw(`DROP TYPE IF EXISTS "${schema}"."${name}" CASCADE`).execute(db);
+        await sql.raw(`DROP TYPE IF EXISTS ${q(schema)}.${q(name)} CASCADE`).execute(db);
         return c.json({ success: true });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to drop enum' }, 400);
@@ -342,7 +364,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       ];
       if (!ALLOWED.includes(name)) return c.json({ error: `Extension "${name}" not in allowed list` }, 403);
       try {
-        await sql.raw(`CREATE EXTENSION IF NOT EXISTS "${name}"`).execute(db);
+        await sql.raw(`CREATE EXTENSION IF NOT EXISTS ${q(name)}`).execute(db);
         return c.json({ success: true });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to enable extension' }, 400);
@@ -354,7 +376,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const PROTECTED = ['pgvector', 'uuid-ossp'];
       if (PROTECTED.includes(name)) return c.json({ error: `Extension "${name}" is protected and cannot be disabled` }, 403);
       try {
-        await sql.raw(`DROP EXTENSION IF EXISTS "${name}" CASCADE`).execute(db);
+        await sql.raw(`DROP EXTENSION IF EXISTS ${q(name)} CASCADE`).execute(db);
         return c.json({ success: true });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to disable extension' }, 400);
@@ -427,7 +449,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const PROTECTED = ['postgres', 'pg_monitor', 'pg_read_all_settings'];
       if (PROTECTED.includes(name) || name.startsWith('pg_')) return c.json({ error: 'Cannot drop system role' }, 403);
       try {
-        await sql.raw(`DROP ROLE IF EXISTS "${name}"`).execute(db);
+        await sql.raw(`DROP ROLE IF EXISTS ${q(name)}`).execute(db);
         return c.json({ success: true });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to drop role' }, 400);
@@ -481,9 +503,9 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const table = c.req.param('table');
       const { enabled, forced } = c.req.valid('json');
       try {
-        await sql.raw(`ALTER TABLE "${table}" ${enabled ? 'ENABLE' : 'DISABLE'} ROW LEVEL SECURITY`).execute(db);
+        await sql.raw(`ALTER TABLE ${q(table)} ${enabled ? 'ENABLE' : 'DISABLE'} ROW LEVEL SECURITY`).execute(db);
         if (forced !== undefined) {
-          await sql.raw(`ALTER TABLE "${table}" ${forced ? 'FORCE' : 'NO FORCE'} ROW LEVEL SECURITY`).execute(db);
+          await sql.raw(`ALTER TABLE ${q(table)} ${forced ? 'FORCE' : 'NO FORCE'} ROW LEVEL SECURITY`).execute(db);
         }
         return c.json({ success: true });
       } catch (error) {
@@ -517,7 +539,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const table  = c.req.param('table');
       const policy = c.req.param('policy');
       try {
-        await sql.raw(`DROP POLICY IF EXISTS "${policy}" ON "${table}"`).execute(db);
+        await sql.raw(`DROP POLICY IF EXISTS "${policy}" ON ${q(table)}`).execute(db);
         return c.json({ success: true });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to drop policy' }, 400);
