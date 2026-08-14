@@ -154,8 +154,22 @@
         <div class="alert alert-error text-sm">{preview.error}</div>
       {:else if preview.view.view_type === 'calendar'}
         <CalendarView items={preview.rows} />
-      {:else if preview.view.view_type === 'card' || preview.view.view_type === 'kanban'}
+      {:else if preview.view.view_type === 'card'}
         <CardView items={preview.rows} columns={previewColumns(preview.view)} />
+      {:else if preview.view.view_type === 'board' || preview.view.view_type === 'kanban' || preview.view.view_type === 'map'}
+        <!--
+          The dropdown offers "Kanban board" and "Map" and there is no renderer
+          for either — only List, Card and Calendar exist. This fell through to
+          the list, so choosing Kanban produced a plain list with nothing to say
+          anything was missing. The branch that did exist keyed on `kanban`
+          while the dropdown emits `board`, so it never matched at all.
+
+          Saying so is the honest state. Rendering a card grid and calling it a
+          board would be the same untruth one layer down.
+        -->
+        <div class="alert alert-warning text-sm">
+          {m['developer.views.ui.unsupported_view_type']()}
+        </div>
       {:else}
         <ListView items={preview.rows} columns={previewColumns(preview.view)} />
       {/if}
@@ -180,8 +194,8 @@
     <div class="modal-box max-w-lg">
       <div class="flex items-center justify-between mb-4"><h3 class="font-semibold">{m['developer.views.ui.new_view']()}</h3><button class="btn btn-ghost btn-xs" onclick={() => (showForm = false)}><X size={14} /></button></div>
       <div class="space-y-3">
-        <div class="form-control"><label class="label py-0"><span class="label-text text-xs">{m['content.document-templates.ui.name']()}</span></label><input class="input input-sm" bind:value={form.name} /></div>
-        <div class="form-control"><label class="label py-0"><span class="label-text text-xs">{m['developer.validation.ui.collection']()}</span></label>
+        <div class="form-control"><label class="label py-0"><span class="label-text text-xs">{m['developer.views.ui.name']()}</span></label><input class="input input-sm" bind:value={form.name} /></div>
+        <div class="form-control"><label class="label py-0"><span class="label-text text-xs">{m['developer.views.ui.collection']()}</span></label>
           <select class="select select-sm" bind:value={form.collection}>
             <option value="">—</option>
             {#each collections as c (c.name)}<option value={c.name}>{c.display_name ?? c.name}</option>{/each}
@@ -196,7 +210,7 @@
             <option value="map">{m['developer.views.ui.map_requires_postgis']()}</option>
           </select>
         </div>
-        <div class="form-control"><label class="label py-0"><span class="label-text text-xs">{m['developer.validation.ui.config_json']()}</span></label><textarea class="textarea textarea-sm font-mono text-xs" rows="7" bind:value={form.config}></textarea></div>
+        <div class="form-control"><label class="label py-0"><span class="label-text text-xs">{m['developer.views.ui.config_json']()}</span></label><textarea class="textarea textarea-sm font-mono text-xs" rows="7" bind:value={form.config}></textarea></div>
       </div>
       <div class="modal-action">
         <button class="btn btn-ghost btn-sm" onclick={() => (showForm = false)}>{m['common.cancel']()}</button>
