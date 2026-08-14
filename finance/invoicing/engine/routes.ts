@@ -1025,16 +1025,24 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
     const newInv = await sql`
       INSERT INTO zvd_invoices (number, series, doc_type, delegate_name, delegate_id_card, delegate_vehicle,
         client_id, client_type, client_name, client_email, client_address,
-        client_tax_id, client_reg_no, client_country,
-        seller_name, seller_tax_id, seller_reg_no, seller_address, seller_iban, seller_bank,
+        client_tax_id, client_reg_no, client_city, client_county, client_country,
+        seller_name, seller_tax_id, seller_reg_no, seller_address,
+        seller_city, seller_county, seller_country, seller_iban, seller_bank,
         issue_date, due_date, currency, subtotal, tax_rate, tax_amount, total, discount_amount, discount_percent,
-        notes, footer_notes, recurring_interval, amount_paid, created_by)
-      VALUES (${claimed.number}, ${claimed.series}, ${i.client_id}, ${i.client_type}, ${i.client_name}, ${i.client_email}, ${i.client_address},
-        ${i.client_tax_id}, ${i.client_reg_no}, ${i.client_country},
-        ${i.seller_name}, ${i.seller_tax_id}, ${i.seller_reg_no}, ${i.seller_address}, ${i.seller_iban}, ${i.seller_bank},
+        vat_breakdown, vat_regime, vat_exemption_reason, exchange_rate, exchange_date, tax_amount_ron,
+        notes, footer_notes, po_number, recurring_interval, amount_paid, created_by)
+      VALUES (${claimed.number}, ${claimed.series}, ${i.doc_type},
+        ${null}, ${null}, ${null},
+        ${i.client_id}, ${i.client_type}, ${i.client_name}, ${i.client_email}, ${i.client_address},
+        ${i.client_tax_id}, ${i.client_reg_no}, ${i.client_city}, ${i.client_county}, ${i.client_country},
+        ${i.seller_name}, ${i.seller_tax_id}, ${i.seller_reg_no}, ${i.seller_address},
+        ${i.seller_city}, ${i.seller_county}, ${i.seller_country}, ${i.seller_iban}, ${i.seller_bank},
         ${newIssue.toISOString().slice(0,10)}, ${newDue.toISOString().slice(0,10)},
         ${i.currency}, ${i.subtotal}, ${i.tax_rate}, ${i.tax_amount}, ${i.total},
-        ${i.discount_amount}, ${i.discount_percent}, ${i.notes}, ${i.footer_notes}, ${i.recurring_interval}, 0, ${user.id})
+        ${i.discount_amount}, ${i.discount_percent},
+        ${i.vat_breakdown}, ${i.vat_regime}, ${i.vat_exemption_reason},
+        ${i.exchange_rate}, ${i.exchange_date}, ${i.tax_amount_ron},
+        ${i.notes}, ${i.footer_notes}, ${i.po_number}, ${i.recurring_interval}, 0, ${user.id})
       RETURNING *
     `.execute(db);
     const newId = (newInv.rows[0] as any).id;

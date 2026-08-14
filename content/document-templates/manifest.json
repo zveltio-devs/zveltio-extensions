@@ -3,7 +3,7 @@
   "displayName": "Document Templates",
   "category": "content",
   "description": "Admin-managed HTML/PDF templates with variable interpolation and async generation",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-document-templates",
@@ -35,7 +35,6 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "32ae0f74195c346fb53e6a07e8aa33b2df0f324641cfcd8832038b54510bb962",
-    "sourceSha256": "604af28da61b6048f7e54555201b2633663e392c4925c2829e33723443167e8c"
+    "engineSha256": "4f345d268c2dc6b2055dff668265151aea417eae0ea0ae4e21ed1eab4d64dce5"
   }
 }
