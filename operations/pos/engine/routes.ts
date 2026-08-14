@@ -26,6 +26,41 @@ async function mayRefund(ctx: ExtensionContext, user: any): Promise<boolean> {
   return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
 }
 
+/**
+ * Claim the next receipt number for the current tenant.
+ *
+ * `UPDATE … RETURNING` in one statement: two concurrent checkouts cannot read
+ * the same counter, because the second blocks on the row lock and reads the
+ * value the first already moved past.
+ *
+ * The seeding INSERT creates the tenant's row on its first sale. `tenant_id`
+ * comes from the column DEFAULT, which reads the transaction GUC — the same
+ * source RLS checks against — so a row can only appear for the tenant making
+ * the request.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: extension db handle is Kysely-shaped
+async function claimOrderNumber(dbh: any): Promise<string> {
+  await sql`
+    INSERT INTO zvd_pos_order_counters DEFAULT VALUES
+    ON CONFLICT (tenant_id) DO NOTHING
+  `.execute(dbh);
+
+  const row = await sql<{ next_number: string; prefix: string; padding: number }>`
+    UPDATE zvd_pos_order_counters
+       SET next_number = next_number + 1, updated_at = NOW()
+     RETURNING prefix, next_number - 1 AS next_number, padding
+  `.execute(dbh);
+
+  const r = row.rows[0];
+  if (!r) {
+    // RLS filtered every row, meaning this transaction has no tenant context.
+    // Inventing a number here would write a receipt nobody can account for, so
+    // the sale fails instead.
+    throw new Error('Cannot allocate a POS order number: no tenant context.');
+  }
+  return `${r.prefix}-${String(r.next_number).padStart(r.padding, '0')}`;
+}
+
 export function posRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
@@ -117,7 +152,7 @@ export function posRoutes(ctx: ExtensionContext): Hono {
     const rows = await sql`
       SELECT s.*, COUNT(o.id) as order_count, COALESCE(SUM(o.total), 0) as total_sales
       FROM zvd_pos_sessions s
-      LEFT JOIN zvd_pos_orders o ON o.session_id = s.id AND o.status = 'completed'
+      LEFT JOIN zvd_pos_orders o ON o.session_id = s.id AND o.status = 'paid'
       WHERE (${status ? sql`s.status = ${status}` : sql`TRUE`})
       GROUP BY s.id ORDER BY s.opened_at DESC LIMIT ${lim} OFFSET ${offset}
     `.execute(db);
@@ -153,12 +188,12 @@ export function posRoutes(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     const totals = await sql`
       SELECT
-        COALESCE(SUM(total) FILTER (WHERE status = 'completed'), 0) as total_sales,
-        COALESCE(SUM(total) FILTER (WHERE status = 'completed' AND payment_method = 'cash'), 0) as cash_sales,
-        COALESCE(SUM(total) FILTER (WHERE status = 'completed' AND payment_method = 'card'), 0) as card_sales,
+        COALESCE(SUM(total) FILTER (WHERE status = 'paid'), 0) as total_sales,
+        COALESCE(SUM(total) FILTER (WHERE status = 'paid' AND payment_method = 'cash'), 0) as cash_sales,
+        COALESCE(SUM(total) FILTER (WHERE status = 'paid' AND payment_method = 'card'), 0) as card_sales,
         COALESCE(SUM(total) FILTER (WHERE status = 'refunded'), 0) as refunds,
-        COUNT(*) FILTER (WHERE status = 'completed') as order_count,
-        COALESCE(SUM(tax_amount) FILTER (WHERE status = 'completed'), 0) as tax_amount
+        COUNT(*) FILTER (WHERE status = 'paid') as order_count,
+        COALESCE(SUM(tax_amount) FILTER (WHERE status = 'paid'), 0) as tax_amount
       FROM zvd_pos_orders WHERE session_id = ${c.req.param('id')}
     `.execute(db);
     const t = totals.rows[0] as any;
@@ -275,9 +310,18 @@ export function posRoutes(ctx: ExtensionContext): Hono {
       customerName = c2.rows[0]?.name ?? null;
     }
 
+    // `order_number` is NOT NULL and was not supplied at all, so every sale
+    // failed on the constraint — the till could not record a single transaction
+    // on any install. Claimed with UPDATE … RETURNING so two tills ringing up at
+    // the same moment cannot take the same number.
+    const orderNumber = await claimOrderNumber(db);
+
+    // `'paid'`, not `'completed'`. The CHECK admits ('open','paid','voided'),
+    // so the value the handler used could never be written — the second of the
+    // two independent failures on this one statement.
     const order = await sql`
-      INSERT INTO zvd_pos_orders (session_id, created_by, payment_method, customer_id, customer_name, canonical_contact_id, subtotal, tax_amount, total, loyalty_discount, loyalty_points_earned, loyalty_points_redeemed, notes, status)
-      VALUES (${d.session_id}, ${user.id}, ${d.payment_method}, ${d.customer_id ?? null}, ${customerName}, ${canonicalContactId}, ${subtotal}, ${tax_amount}, ${total}, ${loyalty_discount}, ${earnedPoints}, ${redeemedPoints}, ${d.notes ?? null}, 'completed')
+      INSERT INTO zvd_pos_orders (session_id, order_number, created_by, payment_method, customer_id, customer_name, canonical_contact_id, subtotal, tax_amount, total, loyalty_discount, loyalty_points_earned, loyalty_points_redeemed, notes, status)
+      VALUES (${d.session_id}, ${orderNumber}, ${user.id}, ${d.payment_method}, ${d.customer_id ?? null}, ${customerName}, ${canonicalContactId}, ${subtotal}, ${tax_amount}, ${total}, ${loyalty_discount}, ${earnedPoints}, ${redeemedPoints}, ${d.notes ?? null}, 'paid')
       RETURNING *
     `.execute(db);
     const orderId = (order.rows[0] as any).id;
@@ -324,7 +368,7 @@ export function posRoutes(ctx: ExtensionContext): Hono {
     if (!(await mayRefund(ctx, user))) {
       return c.json({ error: 'You may not refund orders' }, 403);
     }
-    const order = await sql`SELECT * FROM zvd_pos_orders WHERE id = ${c.req.param('id')} AND status = 'completed'`.execute(db);
+    const order = await sql`SELECT * FROM zvd_pos_orders WHERE id = ${c.req.param('id')} AND status = 'paid'`.execute(db);
     if (!order.rows.length) return c.json({ error: 'Order not found or not completed' }, 400);
     const o = order.rows[0] as any;
     await sql`UPDATE zvd_pos_orders SET status = 'refunded', updated_at = NOW() WHERE id = ${o.id}`.execute(db);
@@ -343,12 +387,12 @@ export function posRoutes(ctx: ExtensionContext): Hono {
     if (!row.rows.length) {
       // Generate on-the-fly
       const totals = await sql`
-        SELECT COALESCE(SUM(total) FILTER (WHERE status='completed'), 0) as total_sales,
+        SELECT COALESCE(SUM(total) FILTER (WHERE status='paid'), 0) as total_sales,
           COALESCE(SUM(total) FILTER (WHERE status='refunded'), 0) as refunds,
-          COALESCE(SUM(total) FILTER (WHERE status='completed' AND payment_method='cash'), 0) as cash_sales,
-          COALESCE(SUM(total) FILTER (WHERE status='completed' AND payment_method='card'), 0) as card_sales,
-          COUNT(*) FILTER (WHERE status='completed') as order_count,
-          COALESCE(SUM(tax_amount) FILTER (WHERE status='completed'), 0) as tax_amount
+          COALESCE(SUM(total) FILTER (WHERE status='paid' AND payment_method='cash'), 0) as cash_sales,
+          COALESCE(SUM(total) FILTER (WHERE status='paid' AND payment_method='card'), 0) as card_sales,
+          COUNT(*) FILTER (WHERE status='paid') as order_count,
+          COALESCE(SUM(tax_amount) FILTER (WHERE status='paid'), 0) as tax_amount
         FROM zvd_pos_orders WHERE session_id = ${c.req.param('id')}
       `.execute(db);
       return c.json({ data: totals.rows[0] });
@@ -367,7 +411,7 @@ export function posRoutes(ctx: ExtensionContext): Hono {
         COUNT(*) FILTER (WHERE payment_method = 'cash') as cash_orders,
         COUNT(*) FILTER (WHERE payment_method = 'card') as card_orders,
         COUNT(DISTINCT customer_id) as unique_customers
-      FROM zvd_pos_orders WHERE status = 'completed' AND created_at::date BETWEEN ${fromDate} AND ${toDate}
+      FROM zvd_pos_orders WHERE status = 'paid' AND created_at::date BETWEEN ${fromDate} AND ${toDate}
     `.execute(db);
     return c.json({ data: row.rows[0] });
   });
