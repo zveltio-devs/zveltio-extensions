@@ -19870,7 +19870,7 @@ function databaseRoutes(ctx) {
     const table = c.req.param("table");
     const policy = c.req.param("policy");
     try {
-      await sql.raw(`DROP POLICY IF EXISTS "${policy}" ON ${q(table)}`).execute(db);
+      await sql.raw(`DROP POLICY IF EXISTS ${q(policy)} ON ${q(table)}`).execute(db);
       return c.json({ success: true });
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to drop policy" }, 400);
