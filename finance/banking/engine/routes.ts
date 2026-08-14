@@ -170,15 +170,20 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
   // ── MT940 Import ──────────────────────────────────────────────
   app.post('/accounts/:id/import/mt940', zValidator('json', z.object({
     content: z.string().min(10),
+    // Optional because this endpoint takes the statement as a string, not an
+    // upload — a UI that read a file has the name, a script pasting content
+    // does not. `filename` is nullable (migration 005) rather than defaulted,
+    // so an import with no file records no name instead of an invented one.
+    filename: z.string().max(255).optional(),
   })), async (c) => {
     const user = c.get('user') as any;
-    const { content } = c.req.valid('json');
+    const { content, filename } = c.req.valid('json');
     const accountId = c.req.param('id');
     const transactions = parseMT940(content);
     if (!transactions.length) return c.json({ error: 'No transactions found in MT940 content' }, 400);
     const importRow = await sql`
-      INSERT INTO zvd_bank_imports (account_id, source, rows_imported, imported_by)
-      VALUES (${accountId}, 'mt940', ${transactions.length}, ${user.id}) RETURNING id
+      INSERT INTO zvd_bank_imports (account_id, source, filename, rows_imported, imported_by)
+      VALUES (${accountId}, 'mt940', ${filename ?? null}, ${transactions.length}, ${user.id}) RETURNING id
     `.execute(db);
     const importId = (importRow.rows[0] as any).id;
     let imported = 0;
@@ -202,6 +207,9 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
   // ── CSV Import ────────────────────────────────────────────────
   app.post('/accounts/:id/import', zValidator('json', z.object({
     source: z.string().default('csv'),
+    // Same reasoning as the MT940 route: this takes parsed transactions, not a
+    // file, so the name is only available when a UI did the parsing.
+    filename: z.string().max(255).optional(),
     transactions: z.array(z.object({
       date: z.string(),
       type: z.enum(['credit','debit']),
@@ -215,8 +223,8 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     const accountId = c.req.param('id');
     const importRow = await sql`
-      INSERT INTO zvd_bank_imports (account_id, source, rows_imported, imported_by)
-      VALUES (${accountId}, ${d.source}, ${d.transactions.length}, ${user.id}) RETURNING id
+      INSERT INTO zvd_bank_imports (account_id, source, filename, rows_imported, imported_by)
+      VALUES (${accountId}, ${d.source}, ${d.filename ?? null}, ${d.transactions.length}, ${user.id}) RETURNING id
     `.execute(db);
     const importId = (importRow.rows[0] as any).id;
     let balance_delta = 0;

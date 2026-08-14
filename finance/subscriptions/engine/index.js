@@ -19522,6 +19522,16 @@ async function mayDecide(ctx, user) {
     return true;
   return ctx.checkPermission(user.id, "admin", "*").catch(() => false);
 }
+function addInterval(start, interval) {
+  const d = new Date(start);
+  if (interval === "yearly")
+    d.setFullYear(d.getFullYear() + 1);
+  else if (interval === "quarterly")
+    d.setMonth(d.getMonth() + 3);
+  else
+    d.setMonth(d.getMonth() + 1);
+  return d.toISOString().slice(0, 10);
+}
 function subscriptionsRoutes(ctx) {
   const { db, auth } = ctx;
   const app = new Hono2;
@@ -19640,11 +19650,12 @@ function subscriptionsRoutes(ctx) {
     const p = plan.rows[0];
     const startDate = d.start_date ?? new Date().toISOString().slice(0, 10);
     const trialEnd = p.trial_days > 0 ? new Date(Date.now() + p.trial_days * 86400000).toISOString().slice(0, 10) : null;
+    const periodEnd = addInterval(startDate, p.interval);
     const row = await sql`
       INSERT INTO zvd_subscribers (plan_id, contact_id, organization_id, name, email,
-        current_period_start, trial_end, status, metadata, created_by)
+        current_period_start, current_period_end, trial_end, status, metadata, created_by)
       VALUES (${d.plan_id}, ${d.contact_id ?? null}, ${d.organization_id ?? null},
-        ${d.client_name}, ${d.client_email}, ${startDate}, ${trialEnd},
+        ${d.client_name}, ${d.client_email}, ${startDate}, ${periodEnd}, ${trialEnd},
         ${trialEnd ? "trialing" : "active"}, ${JSON.stringify(d.notes ? { notes: d.notes } : {})}::jsonb, ${user.id})
       RETURNING *
     `.execute(db);
@@ -19760,7 +19771,7 @@ function subscriptionsRoutes(ctx) {
   app.post("/subscribers/:id/invoices", async (c) => {
     const user = c.get("user");
     const sub = await sql`
-      SELECT s.*, p.price, p.currency, p.usage_billing, p.usage_unit_price
+      SELECT s.*, p.price, p.currency, p.usage_billing, p.usage_unit_price, p.interval
       FROM zvd_subscribers s JOIN zvd_subscription_plans p ON p.id = s.plan_id
       WHERE s.id = ${c.req.param("id")} AND s.status = 'active'
     `.execute(db);
@@ -19768,6 +19779,7 @@ function subscriptionsRoutes(ctx) {
       return c.json({ error: "Subscriber not found or not active" }, 400);
     const s = sub.rows[0];
     const periodStart = new Date().toISOString().slice(0, 10);
+    const periodEnd = addInterval(periodStart, s.interval);
     const dueDate = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
     let usageAmount = 0;
     if (s.usage_billing) {
@@ -19781,8 +19793,8 @@ function subscriptionsRoutes(ctx) {
     }
     const totalAmount = s.price + usageAmount;
     const row = await sql`
-      INSERT INTO zvd_subscription_invoices (subscriber_id, amount, usage_amount, total_amount, currency, period_start, due_date, created_by)
-      VALUES (${s.id}, ${s.price}, ${usageAmount}, ${totalAmount}, ${s.currency}, ${periodStart}, ${dueDate}, ${user.id})
+      INSERT INTO zvd_subscription_invoices (subscriber_id, plan_id, amount, usage_amount, total_amount, currency, period_start, period_end, due_date, created_by)
+      VALUES (${s.id}, ${s.plan_id}, ${s.price}, ${usageAmount}, ${totalAmount}, ${s.currency}, ${periodStart}, ${periodEnd}, ${dueDate}, ${user.id})
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);

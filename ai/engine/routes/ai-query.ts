@@ -351,26 +351,75 @@ function validateGeneratedSQL(
     return { safe: false, reason: 'Access to system catalogs is not allowed' };
   }
 
-  // Block zv_ system tables (but allow zvd_ user tables)
-  const systemMatch = query.match(/\bzv_([a-z_]+)\b/gi);
-  if (systemMatch) {
-    for (const m of systemMatch) {
-      if (!m.startsWith('zvd_')) {
-        return { safe: false, reason: `Access to system table "${m}" is not allowed` };
-      }
-    }
-  }
+  // ── Table references: ALLOWLIST ─────────────────────────────────────────────
+  //
+  // The checks above denylist `zv_*`, `pg_*` and `information_schema`, and had
+  // no rule at all for UNPREFIXED tables — which is where Better-Auth keeps
+  // `user`, `session`, `account`, `verification` and `twoFactor`, none of them
+  // with RLS. Any authenticated user with read on ONE collection could ask, in
+  // natural language, for session tokens or password hashes, and the model was
+  // free to write the query. The system prompt telling it not to is not an
+  // access control.
+  //
+  // The permitted set already existed — `accessibleCollections`, the caller's
+  // own collections — and was applied only to references that happened to start
+  // `zvd_`. It applies to every table reference now: anything not on the list is
+  // refused because it was never permitted, rather than because someone
+  // remembered to forbid it.
+  const permitted = new Set(accessibleCollections.map((c: any) => `zvd_${c.name}`.toLowerCase()));
+  const cteNames = collectCteNames(query);
 
-  // Verify all zvd_ tables are accessible by the current user
-  const tableRefs = query.match(/\bzvd_([a-z_]+)\b/gi) || [];
-  const accessibleNames = new Set(accessibleCollections.map((c: any) => `zvd_${c.name}`));
-  for (const ref of tableRefs) {
-    if (!accessibleNames.has(ref.toLowerCase())) {
-      return { safe: false, reason: `No access to table "${ref}"` };
+  for (const ref of tableReferences(query)) {
+    if (cteNames.has(ref.table)) continue;
+    if (ref.schema !== null && ref.schema !== 'public') {
+      return {
+        safe: false,
+        reason: `Access to "${ref.schema}.${ref.table}" is not allowed`,
+      };
+    }
+    if (!permitted.has(ref.table)) {
+      return { safe: false, reason: `No access to table "${ref.table}"` };
     }
   }
 
   return { safe: true };
+}
+
+/**
+ * Names bound by `WITH … AS (…)` in this statement — not tables.
+ *
+ * Unreachable today: the check at the top of `validateGeneratedSQL` refuses any
+ * query that does not start with `SELECT`, so a `WITH` never gets this far.
+ * Kept because the allowlist below would otherwise refuse a legitimate CTE the
+ * moment that restriction is relaxed, and said out loud so nobody reads this as
+ * evidence that CTEs work here. They do not.
+ */
+function collectCteNames(query: string): Set<string> {
+  const out = new Set<string>();
+  const re = /(?:\bwith\s+(?:recursive\s+)?|,\s*)("?[A-Za-z_][A-Za-z0-9_$]*"?)\s+as\s*\(/gi;
+  for (const m of query.matchAll(re)) out.add(m[1]!.replace(/^"|"$/g, '').toLowerCase());
+  return out;
+}
+
+/**
+ * Every identifier in a TABLE position.
+ *
+ * Keyed off the words that introduce one rather than by parsing SQL. It does
+ * not need to be a complete parser to be a sound allowlist: a reference it
+ * fails to recognise is simply not on the permitted list, so the query is
+ * refused rather than allowed.
+ */
+function tableReferences(query: string): Array<{ schema: string | null; table: string }> {
+  const IDENT = '(?:"[^"]+"|[A-Za-z_][A-Za-z0-9_$]*)';
+  const re = new RegExp(`\\b(?:from|join)\\s+(${IDENT})(?:\\s*\\.\\s*(${IDENT}))?`, 'gi');
+  const unq = (x: string) => x.replace(/^"|"$/g, '').toLowerCase();
+  const out: Array<{ schema: string | null; table: string }> = [];
+  for (const m of query.matchAll(re)) {
+    const a = unq(m[1]!);
+    const b = m[2] ? unq(m[2]) : null;
+    out.push(b === null ? { schema: null, table: a } : { schema: a, table: b });
+  }
+  return out;
 }
 
 async function logQuery(
