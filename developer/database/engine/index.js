@@ -19442,14 +19442,18 @@ function parseParameter(param) {
   return parseValueExpression(param);
 }
 // ../zveltio-extensions/developer/database/engine/routes.ts
+function q(s) {
+  return `"${s.replace(/"/g, '""')}"`;
+}
 function databaseRoutes(ctx) {
-  const { db, auth, checkPermission } = ctx;
+  const { db, auth } = ctx;
+  const { requireInstanceAdmin } = ctx.internals;
   const router = new Hono2().use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session)
       return c.json({ error: "Unauthorized" }, 401);
     c.set("user", session.user);
-    const hasAdmin = await checkPermission(session.user.id, "admin", "*");
+    const hasAdmin = await requireInstanceAdmin(session.user.id);
     if (!hasAdmin)
       return c.json({ error: "Admin access required" }, 403);
     await next();
@@ -19490,7 +19494,6 @@ function databaseRoutes(ctx) {
         ORDER BY ordinal_position
       `.execute(db);
     const limit = Math.min(Math.max(Number(c.req.query("limit")) || 100, 1), 500);
-    const q = (s) => `"${s.replace(/"/g, '""')}"`;
     const ref = sql.raw(`${q(schema)}.${q(name)}`);
     const rows = await sql`SELECT * FROM ${ref} LIMIT ${limit}`.execute(db);
     const total = await sql`
@@ -19546,7 +19549,7 @@ function databaseRoutes(ctx) {
       return c.json({ error: "Cannot drop system functions" }, 403);
     }
     try {
-      await sql.raw(`DROP FUNCTION IF EXISTS "${schema}"."${name}" ${cascade ? "CASCADE" : "RESTRICT"}`).execute(db);
+      await sql.raw(`DROP FUNCTION IF EXISTS ${q(schema)}.${q(name)} ${cascade ? "CASCADE" : "RESTRICT"}`).execute(db);
       return c.json({ success: true });
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to drop function" }, 400);
@@ -19591,7 +19594,7 @@ function databaseRoutes(ctx) {
     const name = c.req.param("name");
     const { enabled } = c.req.valid("json");
     try {
-      await sql.raw(`ALTER TABLE "${table}" ${enabled ? "ENABLE" : "DISABLE"} TRIGGER "${name}"`).execute(db);
+      await sql.raw(`ALTER TABLE ${q(table)} ${enabled ? "ENABLE" : "DISABLE"} TRIGGER ${q(name)}`).execute(db);
       return c.json({ success: true });
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to toggle trigger" }, 400);
@@ -19601,7 +19604,7 @@ function databaseRoutes(ctx) {
     const name = c.req.param("name");
     const cascade = c.req.query("cascade") === "true";
     try {
-      await sql.raw(`DROP TRIGGER IF EXISTS "${name}" ON "${table}" ${cascade ? "CASCADE" : "RESTRICT"}`).execute(db);
+      await sql.raw(`DROP TRIGGER IF EXISTS ${q(name)} ON ${q(table)} ${cascade ? "CASCADE" : "RESTRICT"}`).execute(db);
       return c.json({ success: true });
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to drop trigger" }, 400);
@@ -19640,7 +19643,7 @@ function databaseRoutes(ctx) {
     const { name, values, schema } = c.req.valid("json");
     const valuesSQL = values.map((v) => `'${v.replace(/'/g, "''")}'`).join(", ");
     try {
-      await sql.raw(`CREATE TYPE "${schema}"."${name}" AS ENUM (${valuesSQL})`).execute(db);
+      await sql.raw(`CREATE TYPE ${q(schema)}.${q(name)} AS ENUM (${valuesSQL})`).execute(db);
       return c.json({ success: true }, 201);
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to create enum" }, 400);
@@ -19650,7 +19653,7 @@ function databaseRoutes(ctx) {
     const name = c.req.param("name");
     const { value } = c.req.valid("json");
     try {
-      await sql.raw(`ALTER TYPE "${schema}"."${name}" ADD VALUE IF NOT EXISTS '${value.replace(/'/g, "''")}'`).execute(db);
+      await sql.raw(`ALTER TYPE ${q(schema)}.${q(name)} ADD VALUE IF NOT EXISTS '${value.replace(/'/g, "''")}'`).execute(db);
       return c.json({ success: true });
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to add enum value" }, 400);
@@ -19661,7 +19664,7 @@ function databaseRoutes(ctx) {
     if (schema === "pg_catalog")
       return c.json({ error: "Cannot drop system enums" }, 403);
     try {
-      await sql.raw(`DROP TYPE IF EXISTS "${schema}"."${name}" CASCADE`).execute(db);
+      await sql.raw(`DROP TYPE IF EXISTS ${q(schema)}.${q(name)} CASCADE`).execute(db);
       return c.json({ success: true });
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to drop enum" }, 400);
@@ -19710,7 +19713,7 @@ function databaseRoutes(ctx) {
     if (!ALLOWED.includes(name))
       return c.json({ error: `Extension "${name}" not in allowed list` }, 403);
     try {
-      await sql.raw(`CREATE EXTENSION IF NOT EXISTS "${name}"`).execute(db);
+      await sql.raw(`CREATE EXTENSION IF NOT EXISTS ${q(name)}`).execute(db);
       return c.json({ success: true });
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to enable extension" }, 400);
@@ -19721,7 +19724,7 @@ function databaseRoutes(ctx) {
     if (PROTECTED.includes(name))
       return c.json({ error: `Extension "${name}" is protected and cannot be disabled` }, 403);
     try {
-      await sql.raw(`DROP EXTENSION IF EXISTS "${name}" CASCADE`).execute(db);
+      await sql.raw(`DROP EXTENSION IF EXISTS ${q(name)} CASCADE`).execute(db);
       return c.json({ success: true });
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to disable extension" }, 400);
@@ -19789,7 +19792,7 @@ function databaseRoutes(ctx) {
     if (PROTECTED.includes(name) || name.startsWith("pg_"))
       return c.json({ error: "Cannot drop system role" }, 403);
     try {
-      await sql.raw(`DROP ROLE IF EXISTS "${name}"`).execute(db);
+      await sql.raw(`DROP ROLE IF EXISTS ${q(name)}`).execute(db);
       return c.json({ success: true });
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to drop role" }, 400);
@@ -19833,9 +19836,9 @@ function databaseRoutes(ctx) {
     const table = c.req.param("table");
     const { enabled, forced } = c.req.valid("json");
     try {
-      await sql.raw(`ALTER TABLE "${table}" ${enabled ? "ENABLE" : "DISABLE"} ROW LEVEL SECURITY`).execute(db);
+      await sql.raw(`ALTER TABLE ${q(table)} ${enabled ? "ENABLE" : "DISABLE"} ROW LEVEL SECURITY`).execute(db);
       if (forced !== undefined) {
-        await sql.raw(`ALTER TABLE "${table}" ${forced ? "FORCE" : "NO FORCE"} ROW LEVEL SECURITY`).execute(db);
+        await sql.raw(`ALTER TABLE ${q(table)} ${forced ? "FORCE" : "NO FORCE"} ROW LEVEL SECURITY`).execute(db);
       }
       return c.json({ success: true });
     } catch (error51) {
@@ -19867,7 +19870,7 @@ function databaseRoutes(ctx) {
     const table = c.req.param("table");
     const policy = c.req.param("policy");
     try {
-      await sql.raw(`DROP POLICY IF EXISTS "${policy}" ON "${table}"`).execute(db);
+      await sql.raw(`DROP POLICY IF EXISTS "${policy}" ON ${q(table)}`).execute(db);
       return c.json({ success: true });
     } catch (error51) {
       return c.json({ error: error51 instanceof Error ? error51.message : "Failed to drop policy" }, 400);
