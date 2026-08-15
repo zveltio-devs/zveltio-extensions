@@ -77486,7 +77486,12 @@ async function buildReplyContext(db, messageId, type, userId) {
     originalMessageId: messageId
   };
 }
-async function saveDraft(db, draftId, accountId, data) {
+async function saveDraft(db, draftId, accountId, userId, data) {
+  const owned = await sql`
+    SELECT 1 FROM zv_mail_accounts WHERE id = ${accountId} AND user_id = ${userId}
+  `.execute(db);
+  if (!owned.rows.length)
+    throw new Error("Account not found");
   const toJson = (v) => JSON.stringify(v ?? []);
   if (draftId) {
     await sql`
@@ -77508,6 +77513,7 @@ async function saveDraft(db, draftId, accountId, data) {
         auto_saved_at   = NOW(),
         updated_at      = NOW()
       WHERE id = ${draftId}
+        AND account_id IN (SELECT id FROM zv_mail_accounts WHERE user_id = ${userId})
     `.execute(db);
     return draftId;
   }
@@ -77712,6 +77718,16 @@ function mailRoutes(ctx) {
     if (!session?.user)
       return c.json({ error: "Unauthorized" }, 401);
     c.set("user", session.user);
+    await next();
+  });
+  app.use("/accounts/:accountId/*", async (c, next) => {
+    const user = c.get("user");
+    const accountId = c.req.param("accountId");
+    const owned = await sql`
+      SELECT 1 FROM zv_mail_accounts WHERE id = ${accountId} AND user_id = ${user.id}
+    `.execute(db);
+    if (!owned.rows.length)
+      return c.json({ error: "Account not found" }, 404);
     await next();
   });
   app.get("/accounts", async (c) => {
@@ -78254,7 +78270,13 @@ Please draft a reply to this email.`
     attachments: exports_external.array(exports_external.any()).default([])
   })), async (c) => {
     const data = c.req.valid("json");
-    const draftId = await saveDraft(db, data.draft_id ?? null, data.account_id, {
+    const user = c.get("user");
+    const ownsAccount = await sql`
+      SELECT 1 FROM zv_mail_accounts WHERE id = ${data.account_id} AND user_id = ${user.id}
+    `.execute(db);
+    if (!ownsAccount.rows.length)
+      return c.json({ error: "Account not found" }, 404);
+    const draftId = await saveDraft(db, data.draft_id ?? null, data.account_id, user.id, {
       identityId: data.identity_id,
       to: data.to,
       cc: data.cc,
@@ -78282,7 +78304,15 @@ Please draft a reply to this email.`
     }
   });
   app.delete("/drafts/:id", async (c) => {
-    await sql`DELETE FROM zv_mail_drafts WHERE id = ${c.req.param("id")}`.execute(db);
+    const user = c.get("user");
+    const gone = await sql`
+      DELETE FROM zv_mail_drafts d
+      USING zv_mail_accounts a
+      WHERE d.account_id = a.id AND d.id = ${c.req.param("id")} AND a.user_id = ${user.id}
+      RETURNING d.id
+    `.execute(db);
+    if (!gone.rows.length)
+      return c.json({ error: "Draft not found" }, 404);
     return c.json({ success: true });
   });
   app.get("/accounts/:accountId/identities", async (c) => {
