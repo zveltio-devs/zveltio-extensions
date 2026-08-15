@@ -3,7 +3,7 @@
   "displayName": "Leave Management",
   "category": "hr",
   "description": "Vacation and leave requests with balance tracking, approval workflow and calendar view",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-leave",
@@ -40,8 +40,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "32e47b9c26e34c6d5e588ceaa4fa08f93a0a0fc8947fc94f02892004b80c3012",
-    "sourceSha256": "e2d2ab38e5eeebfce488d3c690fd3feb45cfba354ce78ea59a2edd4bb2cd0091"
+    "engineSha256": "b3c4371f9ace73f18b07d5a1653ad4253f71c10d24c5d5e1bdc6952762e0fb8c",
+    "sourceSha256": "c247943cd54a79f3b4437ef67de006e5b3b48f80f3eeaabf38da550c846b79f5"
   },
   "resources": [
     "leave"
