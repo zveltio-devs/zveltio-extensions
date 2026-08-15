@@ -19761,6 +19761,13 @@ function accountingRoutes(ctx) {
       const fy = await sql`SELECT id FROM zvd_fiscal_years WHERE ${d.date} BETWEEN start_date AND end_date AND status = 'open'`.execute(db);
       fyId = fy.rows[0]?.id ?? null;
     }
+    const closed = await sql`
+      SELECT year FROM zvd_fiscal_years
+      WHERE ${d.date} BETWEEN start_date AND end_date AND status = 'closed' LIMIT 1
+    `.execute(db);
+    if (closed.rows.length) {
+      return c.json({ error: `Fiscal year ${closed.rows[0].year} is closed \u2014 reopen it or date the entry outside it` }, 409);
+    }
     const entry = await sql`
       INSERT INTO zvd_journal_entries (date, description, reference, fiscal_year_id, created_by)
       VALUES (${d.date}, ${d.description}, ${d.reference ?? null}, ${fyId}, ${user.id})

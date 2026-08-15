@@ -308,6 +308,21 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
       const fy = await sql`SELECT id FROM zvd_fiscal_years WHERE ${d.date} BETWEEN start_date AND end_date AND status = 'open'`.execute(db);
       fyId = (fy.rows[0] as any)?.id ?? null;
     }
+
+    // A closed year is refused by a trigger on the table (migration 006), so no
+    // route can forget it. Asking here as well is not redundant: the trigger
+    // raises a database error, and an accountant deserves a sentence rather than
+    // an SQLSTATE. The trigger is the guarantee; this is the manners.
+    const closed = await sql`
+      SELECT year FROM zvd_fiscal_years
+      WHERE ${d.date} BETWEEN start_date AND end_date AND status = 'closed' LIMIT 1
+    `.execute(db);
+    if (closed.rows.length) {
+      return c.json(
+        { error: `Fiscal year ${(closed.rows[0] as any).year} is closed — reopen it or date the entry outside it` },
+        409,
+      );
+    }
     const entry = await sql`
       INSERT INTO zvd_journal_entries (date, description, reference, fiscal_year_id, created_by)
       VALUES (${d.date}, ${d.description}, ${d.reference ?? null}, ${fyId}, ${user.id})
