@@ -16,8 +16,15 @@
   "projects.management.subtitle": "Kanban-tábla és feladatkezelés",
   "projects.management.title": "Projektek",
   "projects.management.ui.end_date": "Befejezés dátuma",
+  "projects.management.ui.high": "Magas",
+  "projects.management.ui.low": "Alacsony",
+  "projects.management.ui.medium": "Közepes",
+  "projects.management.ui.name": "Név *",
   "projects.management.ui.new_project": "Új projekt",
   "projects.management.ui.new_task": "Új feladat",
   "projects.management.ui.no_tasks": "Nincsenek feladatok.",
-  "projects.management.ui.start_date": "Kezdés dátuma"
+  "projects.management.ui.priority": "Prioritás",
+  "projects.management.ui.start_date": "Kezdés dátuma",
+  "projects.management.ui.title": "Cím *",
+  "projects.management.ui.urgent": "Sürgős"
 }

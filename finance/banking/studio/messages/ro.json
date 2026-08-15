@@ -3,6 +3,7 @@
   "finance.banking.empty.accounts": "Niciun cont bancar încă.",
   "finance.banking.empty.transactions": "Nicio tranzacție încă.",
   "finance.banking.empty.unreconciled": "Nicio tranzacție nereconciliată.",
+  "finance.banking.form.currency": "Monedă",
   "finance.banking.newAccount": "Cont nou",
   "finance.banking.section.openInvoices": "Facturi deschise (trimise)",
   "finance.banking.section.unreconciled": "Tranzacții nereconciliate",
