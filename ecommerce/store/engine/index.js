@@ -19916,6 +19916,7 @@ function ecommerceRoutes(ctx) {
     })).min(1)
   })), async (c) => {
     const d = c.req.valid("json");
+    const user = c.get("user");
     let subtotal = 0;
     const lineData = [];
     for (const line of d.lines) {
@@ -19985,11 +19986,13 @@ function ecommerceRoutes(ctx) {
               first_name: first_name || d.customer_email,
               last_name: rest.join(" ") || null,
               email: d.customer_email,
-              created_by: "system"
+              created_by: user?.id
             });
           }
           canonicalContactId = contact?.id ?? null;
-        } catch {}
+        } catch (err) {
+          console.warn(`[ecommerce/store] could not link ${d.customer_email} to a CRM contact; the order is recorded without one:`, err instanceof Error ? err.message : err);
+        }
       }
     }
     const order = await sql`

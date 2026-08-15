@@ -77,7 +77,15 @@ export function assetsRoutes(ctx: ExtensionContext): Hono {
     // constraint violation and a 500: the default existed and could never be
     // reached. Giving zod the same default keeps the two definitions saying one
     // thing.
-    category: z.string().default('equipment'),
+    // `z.enum`, not `z.string()`. `zvd_assets.category` carries a CHECK listing
+    // exactly these seven values, and an open validator let anything else
+    // through to PostgreSQL — measured live: `"category":"IT"` answered 500 with
+    // 23514, while `"equipment"` answered 201. A closed domain in the database
+    // and an open one in the validator means the API's contract is whatever the
+    // schema happens to be, discovered by the caller as a server error.
+    category: z
+      .enum(['building', 'equipment', 'vehicle', 'furniture', 'software', 'land', 'other'])
+      .default('equipment'),
     description: z.string().optional(),
     serial_number: z.string().optional(),
     location: z.string().optional(),
