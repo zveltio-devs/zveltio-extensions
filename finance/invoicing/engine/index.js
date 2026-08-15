@@ -20423,6 +20423,28 @@ var extension = {
       const r = await sql`SELECT * FROM zvd_invoices WHERE number = ${number4} LIMIT 1`.execute(ctx.db);
       return r.rows[0] ?? null;
     });
+    ctx.services.register("invoicing.recordPayment", async (input) => {
+      const inv = await sql`
+          SELECT id, total, amount_paid FROM zvd_invoices
+          WHERE id = ${input.invoiceId} AND status IN ('sent','overdue','partially_paid')
+          LIMIT 1
+        `.execute(ctx.db);
+      if (!inv.rows[0])
+        return null;
+      const invoice = inv.rows[0];
+      await sql`
+          INSERT INTO zvd_invoice_payments (invoice_id, amount, payment_date, payment_method, reference, notes, created_by)
+          VALUES (${input.invoiceId}, ${input.amount}, ${input.paymentDate ?? new Date().toISOString().slice(0, 10)},
+            ${input.method ?? "transfer"}, ${input.reference ?? null}, ${input.notes ?? null}, ${input.userId})
+        `.execute(ctx.db);
+      const newPaid = +invoice.amount_paid + input.amount;
+      const newStatus = newPaid >= +invoice.total ? "paid" : "partially_paid";
+      const row = await sql`
+          UPDATE zvd_invoices SET amount_paid = ${newPaid}, status = ${newStatus}, updated_at = NOW()
+          WHERE id = ${input.invoiceId} RETURNING id, number, status, amount_paid, total
+        `.execute(ctx.db);
+      return row.rows[0] ?? null;
+    });
     ctx.services.register("invoicing.listByClient", async (clientId) => {
       const r = await sql`
         SELECT * FROM zvd_invoices WHERE client_id = ${clientId}::uuid ORDER BY issue_date DESC

@@ -61,6 +61,60 @@ const extension: ZveltioExtension = {
       return r.rows[0] ?? null;
     });
 
+    /**
+     * Record a payment against an invoice.
+     *
+     * Published because `finance/banking` needed it and had no way to ask.
+     * Reconciling a bank transaction against an invoice set `is_reconciled` on
+     * the bank side and never touched the invoice — so it stayed `sent`, aged
+     * into `overdue`, kept appearing in the cash-flow forecast as expected
+     * inflow, and kept appearing in the very suggest-matches list it had just
+     * been matched from.
+     *
+     * The alternative was for banking to UPDATE `zvd_invoices` directly. That is
+     * the coupling that produced H-6 in `ecommerce/store`, where one extension
+     * wrote another's table and silently violated a NOT NULL for the life of the
+     * feature. One owner, one write path.
+     *
+     * Same arithmetic as `POST /invoices/:id/payments`, deliberately — this is
+     * that route's body, reachable by name.
+     */
+    ctx.services.register(
+      'invoicing.recordPayment',
+      async (input: {
+        invoiceId: string;
+        amount: number;
+        paymentDate?: string;
+        method?: string;
+        reference?: string;
+        notes?: string;
+        userId: string;
+      }) => {
+        const inv = await sql<any>`
+          SELECT id, total, amount_paid FROM zvd_invoices
+          WHERE id = ${input.invoiceId} AND status IN ('sent','overdue','partially_paid')
+          LIMIT 1
+        `.execute(ctx.db);
+        if (!inv.rows[0]) return null;
+        const invoice = inv.rows[0];
+        await sql`
+          INSERT INTO zvd_invoice_payments (invoice_id, amount, payment_date, payment_method, reference, notes, created_by)
+          VALUES (${input.invoiceId}, ${input.amount}, ${input.paymentDate ?? new Date().toISOString().slice(0, 10)},
+            ${input.method ?? 'transfer'}, ${input.reference ?? null}, ${input.notes ?? null}, ${input.userId})
+        `.execute(ctx.db);
+        // `amount_paid` and `total` are NUMERIC, which the driver hands back as
+        // strings; `+` on those concatenates. The unary `+` is what makes this
+        // addition rather than "049.00".
+        const newPaid = +invoice.amount_paid + input.amount;
+        const newStatus = newPaid >= +invoice.total ? 'paid' : 'partially_paid';
+        const row = await sql<any>`
+          UPDATE zvd_invoices SET amount_paid = ${newPaid}, status = ${newStatus}, updated_at = NOW()
+          WHERE id = ${input.invoiceId} RETURNING id, number, status, amount_paid, total
+        `.execute(ctx.db);
+        return row.rows[0] ?? null;
+      },
+    );
+
     ctx.services.register('invoicing.listByClient', async (clientId: string) => {
       const r = await sql<any>`
         SELECT * FROM zvd_invoices WHERE client_id = ${clientId}::uuid ORDER BY issue_date DESC

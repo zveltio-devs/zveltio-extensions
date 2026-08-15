@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import { createHash } from 'node:crypto';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { permissionGate } from '@zveltio/sdk/extension';
+import { permissionGate, toNumber } from '@zveltio/sdk/extension';
 
 // Minimal MT940 parser — handles :60F:, :61:, :86: tags
 function parseMT940(text: string): Array<{date: string, type: 'credit'|'debit', amount: number, description: string, reference: string}> {
@@ -336,7 +336,61 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
       ON CONFLICT (transaction_id) DO UPDATE SET linked_type = EXCLUDED.linked_type, linked_id = EXCLUDED.linked_id, notes = EXCLUDED.notes
       RETURNING *
     `.execute(db);
-    return c.json({ data: rec.rows[0] });
+
+    // Reconciling against an invoice has to PAY the invoice.
+    //
+    // This route used to set `is_reconciled` on the bank side and stop. The
+    // invoice stayed `sent`, aged into `overdue`, kept appearing in the
+    // cash-flow forecast as expected inflow — `GET /cash-flow` selects
+    // `status IN ('sent','overdue')` — and kept appearing in the very
+    // suggest-matches list it had just been matched from, because that list
+    // filters on the same statuses. The user does the workflow the manifest
+    // advertises, and nothing on the other side moves.
+    //
+    // Through the service rather than an UPDATE on `zvd_invoices`: that table
+    // belongs to `finance/invoicing`, and one extension writing another's table
+    // is what produced H-6 in `ecommerce/store` — a NOT NULL violated silently
+    // for the life of the feature. When invoicing is not installed there is
+    // nothing to pay and the reconciliation still stands on its own.
+    let paid: unknown = null;
+    if (d.linked_type === 'invoice' && d.linked_id) {
+      const recordPayment = ctx.services.get<
+        (input: {
+          invoiceId: string;
+          amount: number;
+          paymentDate?: string;
+          method?: string;
+          reference?: string;
+          notes?: string;
+          userId: string;
+        }) => Promise<unknown>
+      >('invoicing.recordPayment');
+      if (recordPayment) {
+        const t = tx.rows[0] as any;
+        try {
+          paid = await recordPayment({
+            invoiceId: d.linked_id,
+            amount: Math.abs(toNumber(t.amount, 0, 'transaction.amount')),
+            paymentDate: t.date instanceof Date ? t.date.toISOString().slice(0, 10) : String(t.date),
+            method: 'transfer',
+            reference: t.reference ?? null ? String(t.reference) : undefined,
+            notes: d.notes,
+            userId: user.id,
+          });
+        } catch (err) {
+          // Not silent. The reconciliation is recorded either way — that is the
+          // bank's own bookkeeping and it is true — but an operator who thinks
+          // an invoice was settled and finds it open deserves to know which half
+          // failed.
+          console.warn(
+            `[banking] reconciled transaction ${c.req.param('txId')} but could not record the payment on invoice ${d.linked_id}:`,
+            err instanceof Error ? err.message : err,
+          );
+        }
+      }
+    }
+
+    return c.json({ data: rec.rows[0], invoice: paid });
   });
 
   // Suggest unreconciled invoice matches
