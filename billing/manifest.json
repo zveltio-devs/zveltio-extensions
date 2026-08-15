@@ -3,7 +3,7 @@
   "displayName": "Billing & Usage",
   "category": "billing",
   "description": "Usage metering and Stripe billing integration",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-billing",
@@ -27,12 +27,6 @@
         "component": "./studio/src/pages/BillingPage.svelte",
         "label": "Billing",
         "icon": "credit-card"
-      },
-      {
-        "path": "/admin/billing/usage",
-        "component": "./studio/src/pages/UsagePage.svelte",
-        "label": "Usage",
-        "icon": "bar-chart"
       }
     ],
     "navGroup": "finance"
