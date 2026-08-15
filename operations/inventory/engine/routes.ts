@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { permissionGate } from '@zveltio/sdk/extension';
+import { permissionGate, toNumber } from '@zveltio/sdk/extension';
 
 // Top-level helpers: keep `db: any` parameter intact. Callers in
 // handlers pass `db` so the queries run inside the tenant trx.
@@ -325,8 +325,24 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
     }
     // Determine new status
     const allLines = await sql`SELECT quantity_ordered, quantity_received FROM zvd_purchase_order_lines WHERE po_id = ${poData.id}`.execute(db);
-    const allReceived = (allLines.rows as any[]).every(l => l.quantity_received >= l.quantity_ordered);
-    const anyReceived = (allLines.rows as any[]).some(l => l.quantity_received > 0);
+    // Both columns are NUMERIC(10,4) and PostgreSQL sends NUMERIC as a string, so
+    // this compared two STRINGS — lexicographically. `"9.0000" >= "10.0000"` is
+    // true. Order 10, receive 9, and the order is stamped `received`; the receive
+    // handler then refuses any PO already in that state, so the outstanding unit
+    // can never be received. The shortfall disappears and the supplier reads as
+    // having delivered in full. Any pair that sorts wrong as text hits it: 9 vs
+    // 10, 90 vs 100, 5 vs 20.
+    //
+    // Note this is NOT the `+` case. A comparison with a number on one side
+    // coerces and is fine; a comparison with a string on BOTH sides never does.
+    const allReceived = (allLines.rows as any[]).every(
+      (l) =>
+        toNumber(l.quantity_received, 0, 'quantity_received') >=
+        toNumber(l.quantity_ordered, 0, 'quantity_ordered'),
+    );
+    const anyReceived = (allLines.rows as any[]).some(
+      (l) => toNumber(l.quantity_received, 0, 'quantity_received') > 0,
+    );
     const newStatus = allReceived ? 'received' : anyReceived ? 'partial' : 'sent';
     await sql`UPDATE zvd_purchase_orders SET status = ${newStatus}, received_date = ${receivedDate}, updated_at = NOW() WHERE id = ${poData.id}`.execute(db);
     return c.json({ data: { status: newStatus } });
@@ -350,10 +366,29 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
     await sql`INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity) VALUES (${d.product_id}, ${d.warehouse_id}, 0) ON CONFLICT (product_id, warehouse_id) DO NOTHING`.execute(db);
     const delta = (d.type === 'in' || d.type === 'adjustment') ? d.quantity : -d.quantity;
     if (d.type === 'out' || d.type === 'transfer') {
-      const current = await sql`SELECT quantity FROM zvd_stock_levels WHERE product_id = ${d.product_id} AND warehouse_id = ${d.warehouse_id}`.execute(db);
-      if ((current.rows[0] as any)?.quantity < d.quantity) return c.json({ error: 'Insufficient stock' }, 400);
+      // Deliberately NOT a SELECT here any more.
+      //
+      // Reading the level, deciding in JavaScript, then updating is two
+      // statements with a gap between them. Two simultaneous sales of the last
+      // unit both read 1, both decide there is enough, and both decrement:
+      // quantity goes to -1 and the product is oversold with no error anywhere.
+      // The window is small and a point of sale is exactly where two people hit
+      // it at once.
+      //
+      // PostgreSQL takes a row lock on UPDATE, so putting the condition IN the
+      // statement makes the check and the decrement one atomic act: the second
+      // transaction waits, re-evaluates against the committed value, matches no
+      // rows, and is refused. The `numAffectedRows` is the answer.
+      const applied = await sql`
+        UPDATE zvd_stock_levels SET quantity = quantity + ${delta}, updated_at = NOW()
+        WHERE product_id = ${d.product_id} AND warehouse_id = ${d.warehouse_id}
+          AND quantity >= ${d.quantity}
+        RETURNING quantity
+      `.execute(db);
+      if (applied.rows.length === 0) return c.json({ error: 'Insufficient stock' }, 400);
+    } else {
+      await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${delta}, updated_at = NOW() WHERE product_id = ${d.product_id} AND warehouse_id = ${d.warehouse_id}`.execute(db);
     }
-    await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${delta}, updated_at = NOW() WHERE product_id = ${d.product_id} AND warehouse_id = ${d.warehouse_id}`.execute(db);
     if (d.type === 'transfer' && d.destination_warehouse_id) {
       await sql`INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity) VALUES (${d.product_id}, ${d.destination_warehouse_id}, 0) ON CONFLICT (product_id, warehouse_id) DO NOTHING`.execute(db);
       await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${d.quantity}, updated_at = NOW() WHERE product_id = ${d.product_id} AND warehouse_id = ${d.destination_warehouse_id}`.execute(db);
