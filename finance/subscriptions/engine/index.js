@@ -19509,6 +19509,46 @@ function permissionGate(ctx, resource, opts = {}) {
     await next();
   };
 }
+// packages/sdk/src/extension/numeric.ts
+class NumericConversionError extends Error {
+  value;
+  constructor(value, label) {
+    super(`${label ? `${label}: ` : ""}expected a finite number, got ${typeof value === "string" ? JSON.stringify(value) : String(value)}`);
+    this.value = value;
+    this.name = "NumericConversionError";
+  }
+}
+function toNumber(value, fallback = 0, label) {
+  if (value === null || value === undefined)
+    return fallback;
+  if (typeof value === "bigint") {
+    if (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER) {
+      throw new NumericConversionError(value, label);
+    }
+    return Number(value);
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value))
+      throw new NumericConversionError(value, label);
+    return value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "")
+      throw new NumericConversionError(value, label);
+    const n = Number(trimmed);
+    if (!Number.isFinite(n))
+      throw new NumericConversionError(value, label);
+    return n;
+  }
+  throw new NumericConversionError(value, label);
+}
+function roundMoney(value, decimals = 2) {
+  if (!Number.isFinite(value))
+    throw new NumericConversionError(value, "roundMoney");
+  const factor = 10 ** decimals;
+  return Math.round((value + Number.EPSILON) * factor) / factor;
+}
 // ../zveltio-extensions/finance/subscriptions/engine/routes.ts
 function computeProration(oldPrice, newPrice, interval, daysRemaining) {
   const daysInPeriod = interval === "monthly" ? 30 : interval === "quarterly" ? 91 : 365;
@@ -19791,10 +19831,11 @@ function subscriptionsRoutes(ctx) {
       usageAmount = +usage.rows[0].total;
       await sql`UPDATE zvd_subscription_usage SET is_billed = true WHERE subscriber_id = ${s.id} AND is_billed = false`.execute(db);
     }
-    const totalAmount = s.price + usageAmount;
+    const planPrice = toNumber(s.price, 0, "plan.price");
+    const totalAmount = roundMoney(planPrice + usageAmount);
     const row = await sql`
       INSERT INTO zvd_subscription_invoices (subscriber_id, plan_id, amount, usage_amount, total_amount, currency, period_start, period_end, due_date, created_by)
-      VALUES (${s.id}, ${s.plan_id}, ${s.price}, ${usageAmount}, ${totalAmount}, ${s.currency}, ${periodStart}, ${periodEnd}, ${dueDate}, ${user.id})
+      VALUES (${s.id}, ${s.plan_id}, ${planPrice}, ${usageAmount}, ${totalAmount}, ${s.currency}, ${periodStart}, ${periodEnd}, ${dueDate}, ${user.id})
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);

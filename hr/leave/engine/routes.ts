@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { permissionGate } from '@zveltio/sdk/extension';
+import { permissionGate, toNumber } from '@zveltio/sdk/extension';
 
 async function countWorkingDays(dbh: any, startDate: string, endDate: string, isHalfDay = false): Promise<number> {
   if (isHalfDay) return 0.5;
@@ -193,8 +193,20 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
     for (const b of balances.rows as any[]) {
       const rule = ruleMap.get(b.leave_type_id);
       if (!rule || rule.max_carry_days === 0) continue;
-      const remaining = b.allocated_days + b.carried_over_days - b.used_days - b.pending_days;
-      if (remaining <= 0) continue;
+      // Every one of these is NUMERIC, and PostgreSQL sends NUMERIC as a string.
+      // `"21.0" + "0.0"` is `"21.00.0"`, and the first `-` after it gives NaN —
+      // measured on a real balance of 21 allocated / 5 used, which should carry
+      // 16 and instead carried NaN. `NaN <= 0` is false, so the guard below did
+      // not skip the row: it wrote NaN into next year's `carried_over_days`,
+      // PostgreSQL accepted it, and from then on that employee's remaining
+      // balance was NaN — which compares as LARGER than any number of days
+      // requested. The approval guard said yes to 200 days.
+      const remaining =
+        toNumber(b.allocated_days, 0, 'allocated_days') +
+        toNumber(b.carried_over_days, 0, 'carried_over_days') -
+        toNumber(b.used_days, 0, 'used_days') -
+        toNumber(b.pending_days, 0, 'pending_days');
+      if (!Number.isFinite(remaining) || remaining <= 0) continue;
       const carryDays = Math.min(remaining, rule.max_carry_days);
       const expiresAt = new Date(`${toYear}-01-01`);
       expiresAt.setMonth(expiresAt.getMonth() + rule.expiry_months);
@@ -299,7 +311,19 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
       WHERE employee_id = ${d.employee_id} AND leave_type_id = ${d.leave_type_id} AND year = ${year}
     `.execute(db);
     if (!balance.rows.length) return c.json({ error: 'No leave balance for this type/year' }, 400);
-    if ((balance.rows[0] as any).remaining < workingDays) return c.json({ error: 'Insufficient leave balance' }, 400);
+    // `remaining` is computed in SQL over NUMERIC columns, so it arrives as a
+    // string — and if any of those columns holds NaN, so does this. The
+    // comparison `"NaN" < workingDays` is false in JavaScript, which read as
+    // "there is enough balance" and approved the request. Convert first, and
+    // treat a value that will not convert as no balance at all: a row we cannot
+    // evaluate must not be a row that grants leave.
+    let remainingDays: number;
+    try {
+      remainingDays = toNumber((balance.rows[0] as any).remaining, 0, 'remaining');
+    } catch {
+      return c.json({ error: 'Leave balance is corrupt for this type/year' }, 409);
+    }
+    if (remainingDays < workingDays) return c.json({ error: 'Insufficient leave balance' }, 400);
 
     const type = await sql`SELECT requires_approval FROM zvd_leave_types WHERE id = ${d.leave_type_id}`.execute(db);
     const status = (type.rows[0] as any)?.requires_approval ? 'pending' : 'approved';
