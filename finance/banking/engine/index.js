@@ -19512,6 +19512,40 @@ function permissionGate(ctx, resource, opts = {}) {
     await next();
   };
 }
+// packages/sdk/src/extension/numeric.ts
+class NumericConversionError extends Error {
+  value;
+  constructor(value, label) {
+    super(`${label ? `${label}: ` : ""}expected a finite number, got ${typeof value === "string" ? JSON.stringify(value) : String(value)}`);
+    this.value = value;
+    this.name = "NumericConversionError";
+  }
+}
+function toNumber(value, fallback = 0, label) {
+  if (value === null || value === undefined)
+    return fallback;
+  if (typeof value === "bigint") {
+    if (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER) {
+      throw new NumericConversionError(value, label);
+    }
+    return Number(value);
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value))
+      throw new NumericConversionError(value, label);
+    return value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "")
+      throw new NumericConversionError(value, label);
+    const n = Number(trimmed);
+    if (!Number.isFinite(n))
+      throw new NumericConversionError(value, label);
+    return n;
+  }
+  throw new NumericConversionError(value, label);
+}
 // ../zveltio-extensions/finance/banking/engine/routes.ts
 function parseMT940(text) {
   const lines = text.replace(/\r\n/g, `
@@ -19804,7 +19838,27 @@ function bankingRoutes(ctx) {
       ON CONFLICT (transaction_id) DO UPDATE SET linked_type = EXCLUDED.linked_type, linked_id = EXCLUDED.linked_id, notes = EXCLUDED.notes
       RETURNING *
     `.execute(db);
-    return c.json({ data: rec.rows[0] });
+    let paid = null;
+    if (d.linked_type === "invoice" && d.linked_id) {
+      const recordPayment = ctx.services.get("invoicing.recordPayment");
+      if (recordPayment) {
+        const t = tx.rows[0];
+        try {
+          paid = await recordPayment({
+            invoiceId: d.linked_id,
+            amount: Math.abs(toNumber(t.amount, 0, "transaction.amount")),
+            paymentDate: t.date instanceof Date ? t.date.toISOString().slice(0, 10) : String(t.date),
+            method: "transfer",
+            reference: t.reference ?? null ? String(t.reference) : undefined,
+            notes: d.notes,
+            userId: user.id
+          });
+        } catch (err) {
+          console.warn(`[banking] reconciled transaction ${c.req.param("txId")} but could not record the payment on invoice ${d.linked_id}:`, err instanceof Error ? err.message : err);
+        }
+      }
+    }
+    return c.json({ data: rec.rows[0], invoice: paid });
   });
   app.get("/accounts/:id/suggest-matches", async (c) => {
     const txns = await sql`
