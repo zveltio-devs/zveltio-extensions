@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { permissionGate } from '@zveltio/sdk/extension';
+import { permissionGate, roundMoney, toNumber } from '@zveltio/sdk/extension';
 
 // Compute proration when changing plans mid-cycle
 function computeProration(
@@ -347,10 +347,17 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
       usageAmount = +(usage.rows[0] as any).total;
       await sql`UPDATE zvd_subscription_usage SET is_billed = true WHERE subscriber_id = ${s.id} AND is_billed = false`.execute(db);
     }
-    const totalAmount = s.price + usageAmount;
+    // `s.price` comes from `zvd_subscription_plans.price`, which is NUMERIC —
+    // and PostgreSQL sends NUMERIC as a string. `"49.00" + 10` is the string
+    // "49.0010", which PostgreSQL then accepts into `total_amount NUMERIC(14,2)`
+    // and rounds to 49.00. Measured: a 49.00 plan with 10.00 of metered usage
+    // invoiced the customer 49.00 and lost the usage entirely. Nothing errors,
+    // and the invoice looks like a perfectly ordinary one.
+    const planPrice = toNumber(s.price, 0, 'plan.price');
+    const totalAmount = roundMoney(planPrice + usageAmount);
     const row = await sql`
       INSERT INTO zvd_subscription_invoices (subscriber_id, plan_id, amount, usage_amount, total_amount, currency, period_start, period_end, due_date, created_by)
-      VALUES (${s.id}, ${s.plan_id}, ${s.price}, ${usageAmount}, ${totalAmount}, ${s.currency}, ${periodStart}, ${periodEnd}, ${dueDate}, ${user.id})
+      VALUES (${s.id}, ${s.plan_id}, ${planPrice}, ${usageAmount}, ${totalAmount}, ${s.currency}, ${periodStart}, ${periodEnd}, ${dueDate}, ${user.id})
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
