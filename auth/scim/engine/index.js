@@ -19523,6 +19523,10 @@ function buildScimApp(ctx) {
     `.execute(db);
     return (r.rows[0]?.n ?? 0) > 0;
   }
+  async function instanceIsSingleTenant() {
+    const t = await sql`SELECT COUNT(*)::int AS n FROM zv_tenants`.execute(db);
+    return (t.rows[0]?.n ?? 0) <= 1;
+  }
   app.use("*", async (c, next) => {
     const header = c.req.header("authorization") ?? "";
     const raw2 = header.startsWith("Bearer ") ? header.slice(7) : "";
@@ -19566,6 +19570,7 @@ function buildScimApp(ctx) {
   }
   app.get("/Users", async (c) => {
     const tenantId = tenantOf(c);
+    const soloInstance = await instanceIsSingleTenant();
     const filter = c.req.query("filter") ?? "";
     const startIndex = Math.max(1, parseInt(c.req.query("startIndex") ?? "1", 10) || 1);
     const count = Math.min(200, Math.max(0, parseInt(c.req.query("count") ?? "100", 10) || 100));
@@ -19576,7 +19581,7 @@ function buildScimApp(ctx) {
         SELECT u.id, u.email, u.name, u."createdAt", u."updatedAt"
           FROM "user" u
          WHERE lower(u.email) = ${m[1].toLowerCase()}
-           AND (${tenantId} = ${DEFAULT_TENANT_ID} OR EXISTS (
+           AND (${soloInstance} OR EXISTS (
                  SELECT 1 FROM zv_tenant_users tu
                   WHERE tu.user_id = u.id AND tu.tenant_id = ${tenantId}::uuid))
       `.execute(db);
@@ -19585,7 +19590,7 @@ function buildScimApp(ctx) {
       const r = await sql`
         SELECT u.id, u.email, u.name, u."createdAt", u."updatedAt"
           FROM "user" u
-         WHERE (${tenantId} = ${DEFAULT_TENANT_ID} OR EXISTS (
+         WHERE (${soloInstance} OR EXISTS (
                  SELECT 1 FROM zv_tenant_users tu
                   WHERE tu.user_id = u.id AND tu.tenant_id = ${tenantId}::uuid))
          ORDER BY u."createdAt" LIMIT ${count} OFFSET ${startIndex - 1}
@@ -19603,12 +19608,13 @@ function buildScimApp(ctx) {
   });
   app.get("/Users/:id", async (c) => {
     const tenantId = tenantOf(c);
+    const soloInstance = await instanceIsSingleTenant();
     const id = c.req.param("id");
     const r = await sql`
       SELECT u.id, u.email, u.name, u."createdAt", u."updatedAt"
         FROM "user" u
        WHERE u.id = ${id}
-         AND (${tenantId} = ${DEFAULT_TENANT_ID} OR EXISTS (
+         AND (${soloInstance} OR EXISTS (
                SELECT 1 FROM zv_tenant_users tu
                 WHERE tu.user_id = u.id AND tu.tenant_id = ${tenantId}::uuid))
     `.execute(db);
