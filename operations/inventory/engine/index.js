@@ -19985,7 +19985,13 @@ var extension = {
     });
     ctx.services.register("inventory.stock.level", async (productId, warehouseId) => {
       const r = await sql`
-        SELECT COALESCE(SUM(quantity), 0)::int AS qty
+        -- NOT ::int. The quantity column is NUMERIC(10,3) and the product unit
+        -- CHECK permits kg, liter and meter \u2014 fractional by nature. Casting to int
+        -- rounded, so 2.5 kg read back as 3 kg to every other extension: the
+        -- service over-reported, an availability check passed, and the shortfall
+        -- surfaced at the shelf. Below 0.5 it rounded the other way and 0.4 kg
+        -- read as out of stock.
+        SELECT COALESCE(SUM(quantity), 0)::text AS qty
         FROM zvd_stock_levels
         WHERE product_id = ${productId}::uuid
           ${warehouseId ? sql`AND warehouse_id = ${warehouseId}::uuid` : sql``}
@@ -20027,10 +20033,11 @@ var extension = {
       };
     });
     ctx.services.register("inventory.stock.move", async (input) => {
+      const movementType = input.type === "adjust" ? "adjustment" : input.type;
       await sql`
         INSERT INTO zvd_stock_movements (product_id, warehouse_id, quantity, type, reference, note, created_by)
         VALUES (${input.productId}::uuid, ${input.warehouseId}::uuid, ${input.qty},
-                ${input.type}, ${input.reference ?? null}, ${input.reason ?? null},
+                ${movementType}, ${input.reference ?? null}, ${input.reason ?? null},
                 ${input.userId ?? "system"})
       `.execute(ctx.db);
       const delta = input.type === "out" ? -Math.abs(input.qty) : Math.abs(input.qty);
