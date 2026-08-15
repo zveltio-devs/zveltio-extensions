@@ -3,7 +3,7 @@
   "displayName": "Mail Client",
   "category": "communications",
   "description": "Full IMAP/SMTP email client with AI features, Sieve filtering, and contacts",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-mail",
@@ -46,7 +46,7 @@
     "bundlePeers": true
   },
   "integrity": {
-    "engineSha256": "6285f31e68136f0b394230bdcd70aec14d2de1b7bb283e9c846a5564d597151d",
-    "sourceSha256": "c21b3d19c2d5591f71b409f9cdc5a56786593864e6ce92a7fc31b409f5ca297b"
+    "engineSha256": "0d10d8e083d9ecdccba441a7f81a6f1c44f3eccc92479d5c92b574c343e43d2a",
+    "sourceSha256": "052c7ee015d247e4bee05f49b6f1eec78278d24774c910344341021c2f52f909"
   }
 }
