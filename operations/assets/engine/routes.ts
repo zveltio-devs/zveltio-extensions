@@ -144,7 +144,9 @@ export function assetsRoutes(ctx: ExtensionContext): Hono {
       UPDATE zvd_assets SET
         name = COALESCE(${d.name ?? null}, name), location = COALESCE(${d.location ?? null}, location),
         status = COALESCE(${d.status ?? null}, status), current_value = COALESCE(${d.current_value ?? null}, current_value),
-        notes = COALESCE(${d.notes ?? null}, notes), updated_at = NOW()
+        -- The API field is notes; the column is description, which is what the
+        -- create route writes. Assigning notes 500'd every asset edit.
+        description = COALESCE(${d.notes ?? null}, description), updated_at = NOW()
       WHERE id = ${c.req.param('id')} RETURNING *
     `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
@@ -190,7 +192,11 @@ export function assetsRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const d = c.req.valid('json');
     const row = await sql`
-      UPDATE zvd_assets SET status = 'disposed', disposal_date = ${d.disposal_date},
+      -- disposed_at, not disposal_date — that is the name the table uses and the
+      -- rest of this module reads. disposal_reason genuinely had no column and
+      -- gets one in migration 003; disposing of an asset answered 500 either
+      -- way, so this endpoint has never worked.
+      UPDATE zvd_assets SET status = 'disposed', disposed_at = ${d.disposal_date},
         disposal_value = ${d.disposal_value}, disposal_reason = ${d.reason ?? null}, current_value = 0, updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND status != 'disposed' RETURNING *
     `.execute(db);

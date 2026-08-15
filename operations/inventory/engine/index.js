@@ -19708,10 +19708,15 @@ function inventoryRoutes(ctx) {
   })), async (c) => {
     const d = c.req.valid("json");
     const row = await sql`
+      -- The API calls these unit_cost / unit_price / reorder_quantity; the
+      -- columns are cost_price / sale_price / reorder_qty. The create route two
+      -- screens up maps them correctly and this one used the API names as column
+      -- names, so EVERY edit of a product answered 500 \u2014 the endpoint has never
+      -- worked. Nothing caught it because the seam gate only read INSERTs.
       UPDATE zvd_products SET
         name = COALESCE(${d.name ?? null}, name), category = COALESCE(${d.category ?? null}, category),
-        unit_cost = COALESCE(${d.unit_cost ?? null}, unit_cost), unit_price = COALESCE(${d.unit_price ?? null}, unit_price),
-        reorder_point = COALESCE(${d.reorder_point ?? null}, reorder_point), reorder_quantity = COALESCE(${d.reorder_quantity ?? null}, reorder_quantity),
+        cost_price = COALESCE(${d.unit_cost ?? null}, cost_price), sale_price = COALESCE(${d.unit_price ?? null}, sale_price),
+        reorder_point = COALESCE(${d.reorder_point ?? null}, reorder_point), reorder_qty = COALESCE(${d.reorder_quantity ?? null}, reorder_qty),
         is_active = COALESCE(${d.is_active ?? null}, is_active), updated_at = NOW()
       WHERE id = ${c.req.param("id")} RETURNING *
     `.execute(db);
