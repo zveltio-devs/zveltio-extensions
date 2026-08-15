@@ -3,7 +3,7 @@
   "displayName": "Banking Sync",
   "category": "finance",
   "description": "Import bank statements, auto-reconcile transactions with invoices and track cash flow",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-banking",
@@ -39,7 +39,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "45dd4006accb3f9942d41497742d742aafde77f05d1d0a23137d3ae68fa2fc3b"
+    "engineSha256": "4a24667a6a527046f29f193b8d014193fb5cab0db655579e3b5a10347ae1bccf",
+    "sourceSha256": "d9fa6328ac8fd3f17779e960494b173829905cebd2a87c9b99347e63ae41f450"
   },
   "resources": [
     "banking"

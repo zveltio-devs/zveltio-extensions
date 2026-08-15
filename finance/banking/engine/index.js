@@ -19441,6 +19441,9 @@ function parseParameter(param) {
   }
   return parseValueExpression(param);
 }
+// ../zveltio-extensions/finance/banking/engine/routes.ts
+import { createHash } from "crypto";
+
 // packages/sdk/src/extension/permission-gate.ts
 async function refuse(ctx, c, resource, action) {
   let denial = null;
@@ -19579,6 +19582,9 @@ async function applyRules(dbh, accountId, tx) {
   }
   return null;
 }
+function transactionFingerprint(accountId, t) {
+  return createHash("sha256").update([accountId, String(t.date), t.type, String(t.amount), t.description ?? "", t.reference ?? ""].join("\x00")).digest("hex");
+}
 function bankingRoutes(ctx) {
   const { db, auth } = ctx;
   const app = new Hono2;
@@ -19691,8 +19697,8 @@ function bankingRoutes(ctx) {
     for (const t of transactions) {
       const autoCategory = await applyRules(db, accountId, t);
       const result = await sql`
-        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, category, auto_categorized, created_by)
-        VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description}, ${t.reference}, ${autoCategory}, ${!!autoCategory}, ${user.id})
+        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, category, auto_categorized, created_by, import_hash)
+        VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description}, ${t.reference}, ${autoCategory}, ${!!autoCategory}, ${user.id}, ${transactionFingerprint(accountId, t)})
         ON CONFLICT DO NOTHING RETURNING id
       `.execute(db);
       if (result.rows.length) {
@@ -19728,9 +19734,10 @@ function bankingRoutes(ctx) {
     for (const t of d.transactions) {
       const autoCategory = await applyRules(db, accountId, t);
       const result = await sql`
-        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, counterparty_name, category, auto_categorized, created_by)
+        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, counterparty_name, category, auto_categorized, created_by, import_hash)
         VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description},
-          ${t.reference ?? null}, ${t.counterparty_name ?? null}, ${autoCategory}, ${!!autoCategory}, ${user.id})
+          ${t.reference ?? null}, ${t.counterparty_name ?? null}, ${autoCategory}, ${!!autoCategory}, ${user.id},
+          ${transactionFingerprint(accountId, t)})
         ON CONFLICT DO NOTHING RETURNING id
       `.execute(db);
       if (result.rows.length) {
@@ -19822,7 +19829,10 @@ function bankingRoutes(ctx) {
       SELECT due_date as expected_date, 'inflow' as type, total - amount_paid as amount, 'Invoice ' || number as description, 'accounts_receivable' as category
       FROM zvd_invoices WHERE status IN ('sent','overdue') AND due_date BETWEEN ${fromDate} AND ${toDate}
     `.execute(db).catch(() => ({ rows: [] }));
-    return c.json({ data: [...forecast.rows, ...invoices.rows].sort((a, b) => a.expected_date.localeCompare(b.expected_date)) });
+    const toTime = (v) => v instanceof Date ? v.getTime() : new Date(String(v)).getTime();
+    return c.json({
+      data: [...forecast.rows, ...invoices.rows].sort((a, b) => toTime(a.expected_date) - toTime(b.expected_date))
+    });
   });
   app.post("/cash-flow", zValidator("json", exports_external.object({
     account_id: exports_external.string().uuid().optional(),

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
+import { createHash } from 'node:crypto';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
 
@@ -59,6 +60,32 @@ async function applyRules(dbh: any, accountId: string, tx: any): Promise<string 
     if (matches) return rule.category;
   }
   return null;
+}
+
+/**
+ * A stable fingerprint for one imported bank transaction.
+ *
+ * `zvd_bank_transactions.import_hash` has carried a UNIQUE constraint since the
+ * table was created, and both import routes end `ON CONFLICT DO NOTHING` — so
+ * the deduplication reads as implemented. It never ran: neither INSERT supplied
+ * the column, and PostgreSQL does not consider two NULLs equal, so every row
+ * conflicted with nothing. Re-importing the same statement inserted every
+ * transaction again AND added the whole file's delta to the account balance a
+ * second time, because `imported` counts rows returned by RETURNING.
+ *
+ * The fields are the ones a bank restates identically across two downloads of
+ * the same statement. Deliberately NOT the import id or the row's own id: those
+ * differ per upload, which is exactly the case this has to catch.
+ */
+function transactionFingerprint(
+  accountId: string,
+  t: { date: string; type: string; amount: number; description?: string | null; reference?: string | null },
+): string {
+  return createHash('sha256')
+    .update(
+      [accountId, String(t.date), t.type, String(t.amount), t.description ?? '', t.reference ?? ''].join('\u0000'),
+    )
+    .digest('hex');
 }
 
 export function bankingRoutes(ctx: ExtensionContext): Hono {
@@ -191,8 +218,8 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     for (const t of transactions) {
       const autoCategory = await applyRules(db, accountId, t);
       const result = await sql`
-        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, category, auto_categorized, created_by)
-        VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description}, ${t.reference}, ${autoCategory}, ${!!autoCategory}, ${user.id})
+        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, category, auto_categorized, created_by, import_hash)
+        VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description}, ${t.reference}, ${autoCategory}, ${!!autoCategory}, ${user.id}, ${transactionFingerprint(accountId, t)})
         ON CONFLICT DO NOTHING RETURNING id
       `.execute(db);
       if (result.rows.length) {
@@ -232,9 +259,10 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     for (const t of d.transactions) {
       const autoCategory = await applyRules(db, accountId, t);
       const result = await sql`
-        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, counterparty_name, category, auto_categorized, created_by)
+        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, counterparty_name, category, auto_categorized, created_by, import_hash)
         VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description},
-          ${t.reference ?? null}, ${t.counterparty_name ?? null}, ${autoCategory}, ${!!autoCategory}, ${user.id})
+          ${t.reference ?? null}, ${t.counterparty_name ?? null}, ${autoCategory}, ${!!autoCategory}, ${user.id},
+          ${transactionFingerprint(accountId, t)})
         ON CONFLICT DO NOTHING RETURNING id
       `.execute(db);
       if (result.rows.length) {
@@ -338,7 +366,19 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
       SELECT due_date as expected_date, 'inflow' as type, total - amount_paid as amount, 'Invoice ' || number as description, 'accounts_receivable' as category
       FROM zvd_invoices WHERE status IN ('sent','overdue') AND due_date BETWEEN ${fromDate} AND ${toDate}
     `.execute(db).catch(() => ({ rows: [] }));
-    return c.json({ data: [...forecast.rows, ...invoices.rows].sort((a: any, b: any) => a.expected_date.localeCompare(b.expected_date)) });
+    // `expected_date` is a DATE column and Bun's driver returns DATE as a
+    // JavaScript `Date`, which has no `localeCompare`. `Array.prototype.sort`
+    // does not call the comparator for arrays of length 0 or 1, so this answered
+    // 200 while the tenant had at most one cash-flow row and threw a TypeError
+    // from the moment it had two — permanently, with no way back to a 200
+    // except deleting data.
+    const toTime = (v: unknown): number =>
+      v instanceof Date ? v.getTime() : new Date(String(v)).getTime();
+    return c.json({
+      data: [...forecast.rows, ...invoices.rows].sort(
+        (a: any, b: any) => toTime(a.expected_date) - toTime(b.expected_date),
+      ),
+    });
   });
 
   app.post('/cash-flow', zValidator('json', z.object({
