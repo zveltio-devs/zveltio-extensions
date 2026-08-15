@@ -19560,6 +19560,7 @@ function posRoutes(ctx) {
     notes: exports_external.string().optional()
   })), async (c) => {
     const d = c.req.valid("json");
+    const user = c.get("user");
     let canonicalContactId = null;
     if (d.email) {
       const lookup = ctx.services.get("crm.contacts.findByEmail");
@@ -19574,11 +19575,13 @@ function posRoutes(ctx) {
               last_name: rest.join(" ") || null,
               email: d.email,
               phone: d.phone,
-              created_by: "system"
+              created_by: user?.id
             });
           }
           canonicalContactId = contact?.id ?? null;
-        } catch {}
+        } catch (err) {
+          console.warn(`[pos] could not link customer ${d.email} to a CRM contact; the sale is recorded without one:`, err instanceof Error ? err.message : err);
+        }
       }
     }
     const row = await sql`

@@ -482,6 +482,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     })).min(1),
   })), async (c) => {
     const d = c.req.valid('json');
+    const user = c.get('user') as any;
     let subtotal = 0;
     const lineData: any[] = [];
     for (const line of d.lines) {
@@ -554,11 +555,23 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
               first_name: first_name || d.customer_email,
               last_name: rest.join(' ') || null,
               email: d.customer_email,
-              created_by: 'system',
+              // See the same site in operations/pos. 'system' is not a user id,
+              // and `zvd_contacts.created_by` references "user"(id) on any install
+              // whose contacts table came through the engine's DDL manager.
+              created_by: user?.id,
             });
           }
           canonicalContactId = contact?.id ?? null;
-        } catch { /* CRM may be temporarily unavailable */ }
+        } catch (err) {
+          // Not silent. A database error here aborts the request transaction, so
+          // the next statement answers 25P02 and the order fails entirely — the
+          // opposite of the graceful degradation this catch was written for. The
+          // log is what tells an operator which of the two happened.
+          console.warn(
+            `[ecommerce/store] could not link ${d.customer_email} to a CRM contact; the order is recorded without one:`,
+            err instanceof Error ? err.message : err,
+          );
+        }
       }
     }
 
