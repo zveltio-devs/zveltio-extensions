@@ -271,13 +271,21 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
           // "current transaction is aborted". Creating a product answered 500
           // while the comment promised a storefront-only product was fine.
           //
-          // It also writes another extension's table with columns that table may
-          // not have, which is how it fails at all. The savepoint makes the
+          // And the reason it failed at all: `zvd_products.created_by` is NOT
+          // NULL with no default, and this INSERT never supplied it. So the
+          // canonical product was never created, the storefront product was
+          // never linked to inventory, and the savepoint quietly rolled it back
+          // every single time — the feature this block exists for has never
+          // worked on any install.
+          //
+          // Writing another extension's table directly is what makes that
+          // possible: `inventory` owns this schema, and nothing checks that a
+          // caller from outside still satisfies it. The savepoint makes the
           // fallback actually fall back; the coupling is worth revisiting.
           await sql`SAVEPOINT canonical_product`.execute(db);
           const create = await sql<any>`
-            INSERT INTO zvd_products (sku, name, description, sale_price, currency, tax_rate, is_active)
-            VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === 'active'})
+            INSERT INTO zvd_products (sku, name, description, sale_price, currency, tax_rate, is_active, created_by)
+            VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === 'active'}, ${user.id})
             ON CONFLICT (tenant_id, sku) DO UPDATE SET name = EXCLUDED.name
             RETURNING id
           `.execute(db).catch(() => null);
