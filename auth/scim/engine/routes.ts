@@ -168,6 +168,25 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     return (r.rows[0]?.n ?? 0) > 0;
   }
 
+
+  /**
+   * Is this a single-tenant instance?
+   *
+   * `isMember` asks this before it lets a default-tenant token stand in for
+   * membership, and its comment says exactly why: the default tenant exists on a
+   * multi-tenant install too, so keying off it alone turns any token issued
+   * there into an instance-wide credential.
+   *
+   * The three read paths did not call `isMember` — they inlined
+   * `tenantId = DEFAULT_TENANT_ID OR EXISTS(membership)`, which is that
+   * forbidden shortcut, in the module that documents why it is forbidden. This
+   * gives them the same question in a form a set query can use.
+   */
+  async function instanceIsSingleTenant(): Promise<boolean> {
+    const t = await sql<{ n: number }>`SELECT COUNT(*)::int AS n FROM zv_tenants`.execute(db);
+    return (t.rows[0]?.n ?? 0) <= 1;
+  }
+
   // Bearer-token gate for every SCIM call.
   app.use('*', async (c, next) => {
     const header = c.req.header('authorization') ?? '';
@@ -223,6 +242,7 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
   // GET /Users — list; supports the `userName eq "email"` probe every IdP does.
   app.get('/Users', async (c) => {
     const tenantId = tenantOf(c);
+    const soloInstance = await instanceIsSingleTenant();
     const filter = c.req.query('filter') ?? '';
     const startIndex = Math.max(1, parseInt(c.req.query('startIndex') ?? '1', 10) || 1);
     const count = Math.min(200, Math.max(0, parseInt(c.req.query('count') ?? '100', 10) || 100));
@@ -238,7 +258,7 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
         SELECT u.id, u.email, u.name, u."createdAt", u."updatedAt"
           FROM "user" u
          WHERE lower(u.email) = ${m[1]!.toLowerCase()}
-           AND (${tenantId} = ${DEFAULT_TENANT_ID} OR EXISTS (
+           AND (${soloInstance} OR EXISTS (
                  SELECT 1 FROM zv_tenant_users tu
                   WHERE tu.user_id = u.id AND tu.tenant_id = ${tenantId}::uuid))
       `.execute(db);
@@ -247,7 +267,7 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
       const r = await sql<Record<string, unknown>>`
         SELECT u.id, u.email, u.name, u."createdAt", u."updatedAt"
           FROM "user" u
-         WHERE (${tenantId} = ${DEFAULT_TENANT_ID} OR EXISTS (
+         WHERE (${soloInstance} OR EXISTS (
                  SELECT 1 FROM zv_tenant_users tu
                   WHERE tu.user_id = u.id AND tu.tenant_id = ${tenantId}::uuid))
          ORDER BY u."createdAt" LIMIT ${count} OFFSET ${startIndex - 1}
@@ -268,6 +288,7 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
 
   app.get('/Users/:id', async (c) => {
     const tenantId = tenantOf(c);
+    const soloInstance = await instanceIsSingleTenant();
     const id = c.req.param('id');
     // 404, not 403: whether a user id exists on some other tenant is itself
     // information this caller is not entitled to.
@@ -275,7 +296,7 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
       SELECT u.id, u.email, u.name, u."createdAt", u."updatedAt"
         FROM "user" u
        WHERE u.id = ${id}
-         AND (${tenantId} = ${DEFAULT_TENANT_ID} OR EXISTS (
+         AND (${soloInstance} OR EXISTS (
                SELECT 1 FROM zv_tenant_users tu
                 WHERE tu.user_id = u.id AND tu.tenant_id = ${tenantId}::uuid))
     `.execute(db);
