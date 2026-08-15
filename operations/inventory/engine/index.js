@@ -19509,6 +19509,40 @@ function permissionGate(ctx, resource, opts = {}) {
     await next();
   };
 }
+// packages/sdk/src/extension/numeric.ts
+class NumericConversionError extends Error {
+  value;
+  constructor(value, label) {
+    super(`${label ? `${label}: ` : ""}expected a finite number, got ${typeof value === "string" ? JSON.stringify(value) : String(value)}`);
+    this.value = value;
+    this.name = "NumericConversionError";
+  }
+}
+function toNumber(value, fallback = 0, label) {
+  if (value === null || value === undefined)
+    return fallback;
+  if (typeof value === "bigint") {
+    if (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER) {
+      throw new NumericConversionError(value, label);
+    }
+    return Number(value);
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value))
+      throw new NumericConversionError(value, label);
+    return value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "")
+      throw new NumericConversionError(value, label);
+    const n = Number(trimmed);
+    if (!Number.isFinite(n))
+      throw new NumericConversionError(value, label);
+    return n;
+  }
+  throw new NumericConversionError(value, label);
+}
 // ../zveltio-extensions/operations/inventory/engine/routes.ts
 var poCounter = 0;
 async function nextPONumber(dbh) {
@@ -19799,8 +19833,8 @@ function inventoryRoutes(ctx) {
       await updateAvgCost(db, l.product_id, recv.quantity_received, l.unit_cost);
     }
     const allLines = await sql`SELECT quantity_ordered, quantity_received FROM zvd_purchase_order_lines WHERE po_id = ${poData.id}`.execute(db);
-    const allReceived = allLines.rows.every((l) => l.quantity_received >= l.quantity_ordered);
-    const anyReceived = allLines.rows.some((l) => l.quantity_received > 0);
+    const allReceived = allLines.rows.every((l) => toNumber(l.quantity_received, 0, "quantity_received") >= toNumber(l.quantity_ordered, 0, "quantity_ordered"));
+    const anyReceived = allLines.rows.some((l) => toNumber(l.quantity_received, 0, "quantity_received") > 0);
     const newStatus = allReceived ? "received" : anyReceived ? "partial" : "sent";
     await sql`UPDATE zvd_purchase_orders SET status = ${newStatus}, received_date = ${receivedDate}, updated_at = NOW() WHERE id = ${poData.id}`.execute(db);
     return c.json({ data: { status: newStatus } });
@@ -19823,11 +19857,17 @@ function inventoryRoutes(ctx) {
     await sql`INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity) VALUES (${d.product_id}, ${d.warehouse_id}, 0) ON CONFLICT (product_id, warehouse_id) DO NOTHING`.execute(db);
     const delta = d.type === "in" || d.type === "adjustment" ? d.quantity : -d.quantity;
     if (d.type === "out" || d.type === "transfer") {
-      const current = await sql`SELECT quantity FROM zvd_stock_levels WHERE product_id = ${d.product_id} AND warehouse_id = ${d.warehouse_id}`.execute(db);
-      if (current.rows[0]?.quantity < d.quantity)
+      const applied = await sql`
+        UPDATE zvd_stock_levels SET quantity = quantity + ${delta}, updated_at = NOW()
+        WHERE product_id = ${d.product_id} AND warehouse_id = ${d.warehouse_id}
+          AND quantity >= ${d.quantity}
+        RETURNING quantity
+      `.execute(db);
+      if (applied.rows.length === 0)
         return c.json({ error: "Insufficient stock" }, 400);
+    } else {
+      await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${delta}, updated_at = NOW() WHERE product_id = ${d.product_id} AND warehouse_id = ${d.warehouse_id}`.execute(db);
     }
-    await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${delta}, updated_at = NOW() WHERE product_id = ${d.product_id} AND warehouse_id = ${d.warehouse_id}`.execute(db);
     if (d.type === "transfer" && d.destination_warehouse_id) {
       await sql`INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity) VALUES (${d.product_id}, ${d.destination_warehouse_id}, 0) ON CONFLICT (product_id, warehouse_id) DO NOTHING`.execute(db);
       await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${d.quantity}, updated_at = NOW() WHERE product_id = ${d.product_id} AND warehouse_id = ${d.destination_warehouse_id}`.execute(db);
