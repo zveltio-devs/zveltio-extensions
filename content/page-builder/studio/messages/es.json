@@ -6,6 +6,7 @@
   "content.page-builder.ui.meta_description": "Metadescripción",
   "content.page-builder.ui.meta_title": "Metatítulo",
   "content.page-builder.ui.slug": "Slug",
+  "content.pageBuilder.col.title": "Título",
   "content.pageBuilder.confirmDelete": "¿Eliminar esta página?",
   "content.pageBuilder.empty.blocks": "Aún no hay bloques. Añade uno arriba.",
   "content.pageBuilder.empty.pages": "Aún no hay páginas. Crea la primera.",

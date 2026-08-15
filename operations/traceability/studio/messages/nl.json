@@ -1,6 +1,7 @@
 {
   "operations.traceability.action.details": "Details",
   "operations.traceability.addConsumedMaterial": "Verbruikt materiaal toevoegen",
+  "operations.traceability.btn.back": "← Back",
   "operations.traceability.col.expiry": "Vervaldatum",
   "operations.traceability.col.location": "Locatie",
   "operations.traceability.col.lotNumber": "Partijnummer",
@@ -112,6 +113,7 @@
   "operations.traceability.ui.epuizat": "Depleted",
   "operations.traceability.ui.ex_inv_00123": "ex: INV-00123",
   "operations.traceability.ui.finalizat": "Completed",
+  "operations.traceability.ui.furnizor": "Supplier",
   "operations.traceability.ui.internal_f_r_distribu_ie_extern": "Internal (no external distribution)",
   "operations.traceability.ui.jurnal_consumuri": "Consumption log",
   "operations.traceability.ui.jurnal_recep_ii": "Reception log",

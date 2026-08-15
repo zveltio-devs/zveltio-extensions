@@ -3,6 +3,7 @@
   "finance.banking.empty.accounts": "Aún no hay cuentas bancarias.",
   "finance.banking.empty.transactions": "Aún no hay transacciones.",
   "finance.banking.empty.unreconciled": "No hay transacciones sin conciliar.",
+  "finance.banking.form.currency": "Moneda",
   "finance.banking.newAccount": "Nueva cuenta",
   "finance.banking.section.openInvoices": "Facturas abiertas (enviadas)",
   "finance.banking.section.unreconciled": "Transacciones no conciliadas",

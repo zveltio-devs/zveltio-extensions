@@ -6,6 +6,7 @@
   "content.page-builder.ui.meta_description": "Meta descriere",
   "content.page-builder.ui.meta_title": "Meta titlu",
   "content.page-builder.ui.slug": "Slug",
+  "content.pageBuilder.col.title": "Titlu",
   "content.pageBuilder.confirmDelete": "Ștergeți această pagină?",
   "content.pageBuilder.empty.blocks": "Niciun bloc încă. Adaugă unul mai sus.",
   "content.pageBuilder.empty.pages": "Nicio pagină încă. Creează prima.",

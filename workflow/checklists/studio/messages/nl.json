@@ -27,5 +27,6 @@
   "workflow.checklists.title": "Checklists",
   "workflow.checklists.toast.saved": "Checklist opgeslagen.",
   "workflow.checklists.ui.e_g_onboarding_checklist": "e.g. Onboarding Checklist",
+  "workflow.checklists.ui.name": "Naam *",
   "workflow.checklists.ui.new_item_text": "New item text…"
 }

@@ -16,8 +16,15 @@
   "projects.management.subtitle": "Tablica Kanban i zarządzanie zadaniami",
   "projects.management.title": "Projekty",
   "projects.management.ui.end_date": "Data zakończenia",
+  "projects.management.ui.high": "Wysoki",
+  "projects.management.ui.low": "Niski",
+  "projects.management.ui.medium": "Średni",
+  "projects.management.ui.name": "Nazwa *",
   "projects.management.ui.new_project": "Nowy projekt",
   "projects.management.ui.new_task": "Nowe zadanie",
   "projects.management.ui.no_tasks": "Brak zadań.",
-  "projects.management.ui.start_date": "Data rozpoczęcia"
+  "projects.management.ui.priority": "Priorytet",
+  "projects.management.ui.start_date": "Data rozpoczęcia",
+  "projects.management.ui.title": "Tytuł *",
+  "projects.management.ui.urgent": "Pilne"
 }

@@ -3,6 +3,7 @@
   "finance.banking.empty.accounts": "Aucun compte bancaire pour l'instant.",
   "finance.banking.empty.transactions": "Aucune transaction pour l'instant.",
   "finance.banking.empty.unreconciled": "Aucune transaction non rapprochée.",
+  "finance.banking.form.currency": "Devise",
   "finance.banking.newAccount": "Nouveau compte",
   "finance.banking.section.openInvoices": "Factures ouvertes (envoyées)",
   "finance.banking.section.unreconciled": "Transactions non rapprochées",
