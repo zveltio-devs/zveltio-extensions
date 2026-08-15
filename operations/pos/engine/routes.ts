@@ -98,6 +98,7 @@ export function posRoutes(ctx: ExtensionContext): Hono {
     notes: z.string().optional(),
   })), async (c) => {
     const d = c.req.valid('json');
+    const user = c.get('user') as any;
 
     // If CRM is active, look up an existing canonical contact by email.
     // If none exists, create one. Then link it on the POS customer.
@@ -115,12 +116,31 @@ export function posRoutes(ctx: ExtensionContext): Hono {
               last_name: rest.join(' ') || null,
               email: d.email,
               phone: d.phone,
-              created_by: 'system',
+              // The cashier who served this customer, not the literal string
+              // 'system'. `zvd_contacts.created_by` is a TEXT column that
+              // REFERENCES "user"(id) whenever the table was created through the
+              // engine's DDL manager, so 'system' raised 23503 and took the whole
+              // request to a 500. Where the table came from this extension's own
+              // migration there is no foreign key, so it inserted — and wrote an
+              // authorship value naming a user who does not exist, which is what
+              // every "own records" RLS policy reads.
+              created_by: user?.id,
             });
           }
           canonicalContactId = contact?.id ?? null;
-        } catch {
-          // CRM call failed — POS still functional, just unlinked
+        } catch (err) {
+          // Degrading gracefully is the right intent — a POS sale must not fail
+          // because CRM is unavailable — but a silent catch does not achieve it.
+          // A PostgreSQL error inside a request transaction aborts that
+          // transaction, and every statement after it answers 25P02 regardless of
+          // what this handler does; the catch turns a missing LINK into a total
+          // failure of the request, and destroys the only evidence of why. Saying
+          // it out loud costs one line and is the difference between a diagnosable
+          // outage and a 500 with a masking SQLSTATE.
+          console.warn(
+            `[pos] could not link customer ${d.email} to a CRM contact; the sale is recorded without one:`,
+            err instanceof Error ? err.message : err,
+          );
         }
       }
     }
