@@ -3,7 +3,7 @@
   "displayName": "Billing & Usage",
   "category": "billing",
   "description": "Usage metering and Stripe billing integration",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-billing",
@@ -43,7 +43,7 @@
     "fieldTypes": []
   },
   "integrity": {
-    "engineSha256": "59f2cf26bab0b86eaf2dcf62e1c88b74afca50e11f36566b89c472d5295801df",
-    "sourceSha256": "faabf4fca1f1c7fc65f36632874e5b68cf974f3bccf534c7c27841d262758c65"
+    "engineSha256": "898f456d8b9876c7aae23d3752bbb82404629342e4e65d125e2d6081f2a84891",
+    "sourceSha256": "56358a778c46614cee053aee50f854a6184a8ea1acc6b1a489e8991f861d86f4"
   }
 }
