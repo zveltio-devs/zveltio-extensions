@@ -19777,6 +19777,10 @@ function accountingRoutes(ctx) {
     return c.json({ data: entry.rows[0] }, 201);
   });
   app.post("/journal/:id/post", async (c) => {
+    const actor = c.get("user");
+    if (!await mayDecide(ctx, actor, "post")) {
+      return c.json({ error: "Posting a journal entry requires accounting:post" }, 403);
+    }
     const row = await sql`
       UPDATE zvd_journal_entries SET status = 'posted', updated_at = NOW()
       WHERE id = ${c.req.param("id")} AND status = 'draft' RETURNING *
@@ -19990,7 +19994,15 @@ function accountingRoutes(ctx) {
           FROM zvd_journal_lines l
           JOIN zvd_journal_entries e ON e.id = l.entry_id AND e.status = 'posted'
             AND e.fiscal_year_id = b.fiscal_year_id
-            AND (${sql`b.month IS NOT NULL`} AND EXTRACT(MONTH FROM e.date) = b.month OR b.month IS NULL)
+            -- Parenthesised explicitly. The precedence was already correct here
+            -- (AND binds tighter, so this reads "the month matches, or the
+            -- budget row is annual") but the D300 join one screen down had the
+            -- identical shape and was NOT correct, and an auditor flagged both.
+            -- Spelling it out stops the next reader working out which is which.
+            AND (
+              (${sql`b.month IS NOT NULL`} AND EXTRACT(MONTH FROM e.date) = b.month)
+              OR b.month IS NULL
+            )
           WHERE l.account_id = b.account_id
         ), 0) as actual
       FROM zvd_budgets b
@@ -20016,9 +20028,18 @@ function accountingRoutes(ctx) {
       FROM zvd_journal_lines l
       JOIN zvd_journal_entries e ON e.id = l.entry_id AND e.status = 'posted'
         AND e.date BETWEEN ${period_from} AND ${period_to}
-      JOIN zvd_accounts a ON a.id = l.account_id AND a.code LIKE '4427%' OR a.code LIKE '4426%'
+      -- The parentheses are load-bearing. AND binds tighter than OR, so
+      --   a.id = l.account_id AND a.code LIKE '4427%' OR a.code LIKE '4426%'
+      -- parses as
+      --   (a.id = l.account_id AND a.code LIKE '4427%') OR (a.code LIKE '4426%')
+      -- and the join key disappears for every 4426 account, which is then
+      -- cross-joined to every posted line in the period. Because the books
+      -- balance, that sum is always about zero: deductible VAT was reported to
+      -- ANAF as 0.00 whatever was actually paid. Measured on a real 190.00 debit
+      -- to 4426 \u2014 6 lines joined, amount 0.00, against a correct -190.00 over 1.
+      JOIN zvd_accounts a ON a.id = l.account_id AND (a.code LIKE '4427%' OR a.code LIKE '4426%')
       GROUP BY a.id, a.code, a.name, a.type
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Declaration xmlns="mfp:anaf:dgti:d300:declaratie:v2">
   <Declarant/>

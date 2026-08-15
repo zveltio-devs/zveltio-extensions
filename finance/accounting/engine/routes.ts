@@ -8,10 +8,15 @@ import { permissionGate } from '@zveltio/sdk/extension';
 /**
  * Is this user allowed to take an accounting decision that cannot be undone?
  *
- * Three routes here change the books rather than describe them: voiding a
- * posted journal entry, closing a fiscal year, and marking a tax report
- * submitted. All three ran behind one `accounting` permission and no further
+ * Four routes here change the books rather than describe them: posting a draft
+ * journal entry, voiding a posted one, closing a fiscal year, and marking a tax
+ * report submitted. All ran behind one `accounting` permission and no further
  * question — so anybody who could read the ledger could void an entry in it.
+ *
+ * `post` was added last and is the one that was easiest to miss: it turns a
+ * draft into a book entry, after which the entry can no longer be deleted, only
+ * reversed. The three dramatic-sounding actions were gated and the one that
+ * creates the evidence was not.
  *
  * Voiding is the one that matters most and looks the least dramatic. A posted
  * entry is the evidence; reversing it without a trace of WHO decided is how a
@@ -19,13 +24,13 @@ import { permissionGate } from '@zveltio/sdk/extension';
  * tax report marked submitted is a claim to the authorities that it was.
  *
  * A named action rather than a role: `accounting:void`, `accounting:close`,
- * `accounting:submit`, each granted deliberately. `admin` remains sufficient so
+ * `accounting:submit`, `accounting:post`, each granted deliberately. `admin` remains sufficient so
  * an existing install keeps working before anyone edits policies.
  */
 async function mayDecide(
   ctx: ExtensionContext,
   user: any,
-  action: 'void' | 'close' | 'submit',
+  action: 'void' | 'close' | 'post' | 'submit',
 ): Promise<boolean> {
   if (await ctx.checkPermission(user.id, 'accounting', action).catch(() => false)) return true;
   return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
@@ -320,6 +325,10 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/journal/:id/post', async (c) => {
+    const actor = c.get('user') as any;
+    if (!(await mayDecide(ctx, actor, 'post'))) {
+      return c.json({ error: 'Posting a journal entry requires accounting:post' }, 403);
+    }
     const row = await sql`
       UPDATE zvd_journal_entries SET status = 'posted', updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND status = 'draft' RETURNING *
@@ -534,7 +543,15 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
           FROM zvd_journal_lines l
           JOIN zvd_journal_entries e ON e.id = l.entry_id AND e.status = 'posted'
             AND e.fiscal_year_id = b.fiscal_year_id
-            AND (${sql`b.month IS NOT NULL`} AND EXTRACT(MONTH FROM e.date) = b.month OR b.month IS NULL)
+            -- Parenthesised explicitly. The precedence was already correct here
+            -- (AND binds tighter, so this reads "the month matches, or the
+            -- budget row is annual") but the D300 join one screen down had the
+            -- identical shape and was NOT correct, and an auditor flagged both.
+            -- Spelling it out stops the next reader working out which is which.
+            AND (
+              (${sql`b.month IS NOT NULL`} AND EXTRACT(MONTH FROM e.date) = b.month)
+              OR b.month IS NULL
+            )
           WHERE l.account_id = b.account_id
         ), 0) as actual
       FROM zvd_budgets b
@@ -564,9 +581,18 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
       FROM zvd_journal_lines l
       JOIN zvd_journal_entries e ON e.id = l.entry_id AND e.status = 'posted'
         AND e.date BETWEEN ${period_from} AND ${period_to}
-      JOIN zvd_accounts a ON a.id = l.account_id AND a.code LIKE '4427%' OR a.code LIKE '4426%'
+      -- The parentheses are load-bearing. AND binds tighter than OR, so
+      --   a.id = l.account_id AND a.code LIKE '4427%' OR a.code LIKE '4426%'
+      -- parses as
+      --   (a.id = l.account_id AND a.code LIKE '4427%') OR (a.code LIKE '4426%')
+      -- and the join key disappears for every 4426 account, which is then
+      -- cross-joined to every posted line in the period. Because the books
+      -- balance, that sum is always about zero: deductible VAT was reported to
+      -- ANAF as 0.00 whatever was actually paid. Measured on a real 190.00 debit
+      -- to 4426 — 6 lines joined, amount 0.00, against a correct -190.00 over 1.
+      JOIN zvd_accounts a ON a.id = l.account_id AND (a.code LIKE '4427%' OR a.code LIKE '4426%')
       GROUP BY a.id, a.code, a.name, a.type
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Declaration xmlns="mfp:anaf:dgti:d300:declaratie:v2">
   <Declarant/>
