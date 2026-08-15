@@ -11,6 +11,8 @@
   "projects.helpdesk.title": "Pomoc techniczna",
   "projects.helpdesk.toast.resolved": "Zgłoszenie rozwiązane.",
   "projects.helpdesk.ui.description": "Opis *",
+  "projects.helpdesk.ui.high": "Wysoki",
+  "projects.helpdesk.ui.low": "Niski",
   "projects.helpdesk.ui.medium": "Średni",
   "projects.helpdesk.ui.new_ticket": "Nowe zgłoszenie",
   "projects.helpdesk.ui.priority": "Priorytet",

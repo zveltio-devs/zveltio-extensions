@@ -11,6 +11,8 @@
   "projects.helpdesk.title": "Ügyfélszolgálat",
   "projects.helpdesk.toast.resolved": "Jegy megoldva.",
   "projects.helpdesk.ui.description": "Leírás *",
+  "projects.helpdesk.ui.high": "Magas",
+  "projects.helpdesk.ui.low": "Alacsony",
   "projects.helpdesk.ui.medium": "Közepes",
   "projects.helpdesk.ui.new_ticket": "Új jegy",
   "projects.helpdesk.ui.priority": "Prioritás",

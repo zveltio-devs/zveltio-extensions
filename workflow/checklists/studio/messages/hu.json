@@ -27,5 +27,6 @@
   "workflow.checklists.title": "Ellenőrzőlisták",
   "workflow.checklists.toast.saved": "Ellenőrzőlista mentve.",
   "workflow.checklists.ui.e_g_onboarding_checklist": "e.g. Onboarding Checklist",
+  "workflow.checklists.ui.name": "Név *",
   "workflow.checklists.ui.new_item_text": "New item text…"
 }

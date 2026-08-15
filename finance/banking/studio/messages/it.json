@@ -3,6 +3,7 @@
   "finance.banking.empty.accounts": "Ancora nessun conto bancario.",
   "finance.banking.empty.transactions": "Ancora nessuna transazione.",
   "finance.banking.empty.unreconciled": "Nessuna transazione non riconciliata.",
+  "finance.banking.form.currency": "Valuta",
   "finance.banking.newAccount": "Nuovo account",
   "finance.banking.section.openInvoices": "Fatture aperte (inviate)",
   "finance.banking.section.unreconciled": "Transazioni non riconciliate",

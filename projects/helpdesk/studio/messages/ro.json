@@ -11,6 +11,8 @@
   "projects.helpdesk.title": "Helpdesk",
   "projects.helpdesk.toast.resolved": "Tichet rezolvat.",
   "projects.helpdesk.ui.description": "Descriere *",
+  "projects.helpdesk.ui.high": "Ridicat",
+  "projects.helpdesk.ui.low": "Scăzut",
   "projects.helpdesk.ui.medium": "Mediu",
   "projects.helpdesk.ui.new_ticket": "Tichet nou",
   "projects.helpdesk.ui.priority": "Prioritate",

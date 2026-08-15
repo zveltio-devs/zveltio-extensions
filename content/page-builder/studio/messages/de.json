@@ -6,6 +6,7 @@
   "content.page-builder.ui.meta_description": "Meta-Beschreibung",
   "content.page-builder.ui.meta_title": "Meta-Titel",
   "content.page-builder.ui.slug": "Slug",
+  "content.pageBuilder.col.title": "Titel",
   "content.pageBuilder.confirmDelete": "Diese Seite löschen?",
   "content.pageBuilder.empty.blocks": "Noch keine Blöcke. Fügen Sie oben einen hinzu.",
   "content.pageBuilder.empty.pages": "Noch keine Seiten. Erstellen Sie die erste.",

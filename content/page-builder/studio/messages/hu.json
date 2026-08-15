@@ -6,6 +6,7 @@
   "content.page-builder.ui.meta_description": "Meta leírás",
   "content.page-builder.ui.meta_title": "Meta cím",
   "content.page-builder.ui.slug": "Slug",
+  "content.pageBuilder.col.title": "Cím",
   "content.pageBuilder.confirmDelete": "Törli ezt az oldalt?",
   "content.pageBuilder.empty.blocks": "Még nincsenek blokkok. Adj hozzá egyet fentebb.",
   "content.pageBuilder.empty.pages": "Még nincsenek oldalak. Hozd létre az elsőt.",

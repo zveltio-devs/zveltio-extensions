@@ -1,6 +1,7 @@
 {
   "operations.traceability.action.details": "Részletek",
   "operations.traceability.addConsumedMaterial": "Felhasznált anyag hozzáadása",
+  "operations.traceability.btn.back": "← Back",
   "operations.traceability.col.expiry": "Lejárat",
   "operations.traceability.col.location": "Hely",
   "operations.traceability.col.lotNumber": "Tételszám",
@@ -112,6 +113,7 @@
   "operations.traceability.ui.epuizat": "Depleted",
   "operations.traceability.ui.ex_inv_00123": "ex: INV-00123",
   "operations.traceability.ui.finalizat": "Completed",
+  "operations.traceability.ui.furnizor": "Supplier",
   "operations.traceability.ui.internal_f_r_distribu_ie_extern": "Internal (no external distribution)",
   "operations.traceability.ui.jurnal_consumuri": "Consumption log",
   "operations.traceability.ui.jurnal_recep_ii": "Reception log",
