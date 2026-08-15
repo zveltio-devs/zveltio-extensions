@@ -19552,19 +19552,22 @@ async function countWorkingDays(dbh, startDate, endDate, isHalfDay = false) {
   `.execute(dbh);
   const holidaySet = new Set(holidays.rows.map((h) => h.date instanceof Date ? h.date.toISOString().slice(0, 10) : h.date));
   let days = 0;
-  const cur = new Date(startDate);
-  const end = new Date(endDate);
+  const cur = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
   while (cur <= end) {
-    const dow = cur.getDay();
+    const dow = cur.getUTCDay();
     const dateStr = cur.toISOString().slice(0, 10);
     if (dow !== 0 && dow !== 6 && !holidaySet.has(dateStr))
       days++;
-    cur.setDate(cur.getDate() + 1);
+    cur.setUTCDate(cur.getUTCDate() + 1);
   }
   return days;
 }
 function employment(ctx) {
   return ctx.services.get("hr.employment");
+}
+function yearOf(isoDate) {
+  return Number.parseInt(String(isoDate).slice(0, 4), 10);
 }
 function leaveRoutes(ctx) {
   const { db, auth } = ctx;
@@ -19779,7 +19782,7 @@ function leaveRoutes(ctx) {
     const workingDays = await countWorkingDays(db, d.start_date, d.end_date, d.is_half_day);
     if (workingDays === 0)
       return c.json({ error: "No working days in selected range" }, 400);
-    const year = start.getFullYear();
+    const year = yearOf(d.start_date);
     const balance = await sql`
       SELECT *, (allocated_days + carried_over_days - used_days - pending_days) as remaining
       FROM zvd_leave_balances
@@ -19831,7 +19834,7 @@ function leaveRoutes(ctx) {
     if (!allowed) {
       return c.json({ error: isSelf ? "You cannot approve your own leave" : "Only a manager may approve this" }, 403);
     }
-    const year = new Date(r.start_date).getFullYear();
+    const year = yearOf(r.start_date);
     await sql`UPDATE zvd_leave_requests SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW() WHERE id = ${r.id}`.execute(db);
     await sql`
       UPDATE zvd_leave_balances SET
@@ -19859,7 +19862,7 @@ function leaveRoutes(ctx) {
     if (!await svc.mayActFor(user, r.employee_id)) {
       return c.json({ error: "Only a manager may reject this" }, 403);
     }
-    const year = new Date(r.start_date).getFullYear();
+    const year = yearOf(r.start_date);
     await sql`UPDATE zvd_leave_requests SET status = 'rejected', rejection_reason = ${reason}, updated_at = NOW() WHERE id = ${r.id}`.execute(db);
     await sql`
       UPDATE zvd_leave_balances SET pending_days = GREATEST(0, pending_days - ${r.working_days}), updated_at = NOW()
@@ -19879,7 +19882,7 @@ function leaveRoutes(ctx) {
     if (!await svc.mayActFor(user, r.employee_id)) {
       return c.json({ error: "You may only cancel your own leave or that of someone you manage" }, 403);
     }
-    const year = new Date(r.start_date).getFullYear();
+    const year = yearOf(r.start_date);
     await sql`UPDATE zvd_leave_requests SET status = 'cancelled', updated_at = NOW() WHERE id = ${r.id}`.execute(db);
     if (r.status === "approved") {
       await sql`
