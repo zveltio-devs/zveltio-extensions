@@ -21,6 +21,35 @@ const ImportBodySchema = z.object({
   exclude: z.array(z.string()).default([]),
 });
 
+
+/**
+ * A schema name a caller is allowed to introspect.
+ *
+ * The name was bound as a parameter — no injection — but restricted to nothing,
+ * and `information_schema` and `pg_catalog` are perfectly valid values. The
+ * import filter refuses tables by prefix (`zv_`, `zvd_`, `_zv_`, `pg_`), which
+ * catches `pg_catalog`'s relations by name and does NOT catch
+ * `information_schema`'s: `columns`, `tables`, `routines`, `role_table_grants`
+ * are all clean of every prefix, so importing that schema registered the
+ * database's own metadata as ordinary collections.
+ *
+ * Worse on a deployment using per-tenant schemas, where `{"schema":"tenant_b"}`
+ * reads another company's tables by name.
+ *
+ * PostgreSQL's own reserved namespaces are refused outright. Everything else is
+ * still allowed, because bringing your own database is what this extension is
+ * for — and `pg_temp_*` / `pg_toast_*` are covered by the `pg_` rule.
+ */
+const RESERVED_SCHEMAS = new Set(['information_schema', 'pg_catalog', 'pg_toast']);
+
+function assertImportableSchema(name: string): string | null {
+  const lower = name.toLowerCase();
+  if (RESERVED_SCHEMAS.has(lower) || lower.startsWith('pg_')) {
+    return `Schema "${name}" is PostgreSQL's own; it cannot be imported as collections.`;
+  }
+  return null;
+}
+
 // ── Auth + admin middleware ────────────────────────────────────────────────────
 
 export function introspectRoutes(ctx: ExtensionContext): Hono {
@@ -49,6 +78,8 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
   // Query params: schema (default: public), exclude (comma-separated substrings)
   router.get('/preview', async (c) => {
     const schema = c.req.query('schema') || 'public';
+    const refusal = assertImportableSchema(schema);
+    if (refusal) return c.json({ error: refusal }, 400);
     const exclude = c.req.query('exclude')?.split(',').filter(Boolean) ?? [];
 
     try {
@@ -66,6 +97,8 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
     const body = c.req.valid('json');
     const schema: string = body.schema;
     const exclude: string[] = body.exclude;
+    const refusal = assertImportableSchema(schema);
+    if (refusal) return c.json({ error: refusal }, 400);
 
     try {
       const tables = await introspectSchema(db, schema, exclude, false);

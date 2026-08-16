@@ -1,4 +1,5 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
+import { permissionGate } from '@zveltio/sdk/extension';
 import { join } from 'path';
 import { sql } from 'kysely';
 import { employeesRoutes } from './routes.js';
@@ -47,6 +48,27 @@ const extension: ZveltioExtension = {
     // open this extension's tables. `hr/payroll` was reading `zvd_employees`
     // directly in four places.
     ctx.services.register('hr.employment', buildEmploymentService(ctx));
+
+    // Authentication and the RBAC gate go on THIS app, above both route sets.
+    //
+    // They used to live inside `employeesRoutes` as `app.use('*', …)`, and this
+    // file registers `contractRoutes` FIRST — deliberately, so `/contracts/:cid`
+    // is not shadowed by `/:id`. Hono composes matched handlers in registration
+    // order, so for a contract path the contract handler ran first, returned a
+    // Response, and never called `next()`. The session check and
+    // `permissionGate(ctx, 'employees')` never executed: every contract route —
+    // salary history included — was reachable without either.
+    //
+    // The ordering below is still needed and still correct. What was wrong was
+    // attaching the guard to one of the two things being ordered.
+    const { auth } = ctx;
+    app.use('*', async (c, next) => {
+      const session = await auth.api.getSession({ headers: c.req.raw.headers });
+      if (!session) return c.json({ error: 'Unauthorized' }, 401);
+      c.set('user', session.user);
+      await next();
+    });
+    app.use('*', permissionGate(ctx, 'employees'));
 
     app.route('/', contractRoutes(ctx));
     app.route('/', employeesRoutes(ctx));
