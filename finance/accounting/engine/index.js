@@ -19509,6 +19509,46 @@ function permissionGate(ctx, resource, opts = {}) {
     await next();
   };
 }
+// packages/sdk/src/extension/numeric.ts
+class NumericConversionError extends Error {
+  value;
+  constructor(value, label) {
+    super(`${label ? `${label}: ` : ""}expected a finite number, got ${typeof value === "string" ? JSON.stringify(value) : String(value)}`);
+    this.value = value;
+    this.name = "NumericConversionError";
+  }
+}
+function toNumber(value, fallback = 0, label) {
+  if (value === null || value === undefined)
+    return fallback;
+  if (typeof value === "bigint") {
+    if (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER) {
+      throw new NumericConversionError(value, label);
+    }
+    return Number(value);
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value))
+      throw new NumericConversionError(value, label);
+    return value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "")
+      throw new NumericConversionError(value, label);
+    const n = Number(trimmed);
+    if (!Number.isFinite(n))
+      throw new NumericConversionError(value, label);
+    return n;
+  }
+  throw new NumericConversionError(value, label);
+}
+function roundMoney(value, decimals = 2) {
+  if (!Number.isFinite(value))
+    throw new NumericConversionError(value, "roundMoney");
+  const factor = 10 ** decimals;
+  return Math.round((value + Number.EPSILON) * factor) / factor;
+}
 // ../zveltio-extensions/finance/accounting/engine/routes.ts
 async function mayDecide(ctx, user, action) {
   if (await ctx.checkPermission(user.id, "accounting", action).catch(() => false))
@@ -19740,8 +19780,8 @@ function accountingRoutes(ctx) {
     fiscal_year_id: exports_external.string().uuid().optional(),
     lines: exports_external.array(exports_external.object({
       account_id: exports_external.string().uuid(),
-      debit: exports_external.number().min(0).default(0),
-      credit: exports_external.number().min(0).default(0),
+      debit: exports_external.number().min(0).multipleOf(0.01).default(0),
+      credit: exports_external.number().min(0).multipleOf(0.01).default(0),
       description: exports_external.string().optional(),
       currency: exports_external.string().default("RON"),
       exchange_rate: exports_external.number().positive().default(1),
@@ -19852,8 +19892,8 @@ function accountingRoutes(ctx) {
     end_date: exports_external.string().optional(),
     lines: exports_external.array(exports_external.object({
       account_id: exports_external.string().uuid(),
-      debit: exports_external.number().min(0).default(0),
-      credit: exports_external.number().min(0).default(0),
+      debit: exports_external.number().min(0).multipleOf(0.01).default(0),
+      credit: exports_external.number().min(0).multipleOf(0.01).default(0),
       description: exports_external.string().optional()
     })).min(2)
   })), async (c) => {
@@ -19987,7 +20027,35 @@ function accountingRoutes(ctx) {
       GROUP BY a.id, a.code, a.name, a.type
       ORDER BY a.type, a.code
     `.execute(db);
-    return c.json({ data: rows.rows });
+    const result = await sql`
+      SELECT
+        COALESCE(SUM(CASE WHEN a.type = 'revenue' THEN l.credit - l.debit ELSE 0 END), 0) AS revenue,
+        COALESCE(SUM(CASE WHEN a.type = 'expense' THEN l.debit - l.credit ELSE 0 END), 0) AS expenses
+      FROM zvd_journal_lines l
+      JOIN zvd_accounts a ON a.id = l.account_id
+      JOIN zvd_journal_entries e ON e.id = l.entry_id AND e.status = 'posted'
+        AND (${as_of ? sql`e.date <= ${as_of}` : sql`TRUE`})
+      WHERE a.type IN ('revenue','expense')
+    `.execute(db);
+    const r = result.rows[0];
+    const periodResult = roundMoney(toNumber(r?.revenue, 0) - toNumber(r?.expenses, 0));
+    const rowsByType = (t) => rows.rows.filter((x) => x.type === t).reduce((sum, x) => sum + toNumber(x.balance, 0), 0);
+    const assets = roundMoney(rowsByType("asset"));
+    const liabilities = roundMoney(-rowsByType("liability"));
+    const equity = roundMoney(-rowsByType("equity") + periodResult);
+    const difference = roundMoney(assets - (liabilities + equity));
+    return c.json({
+      data: rows.rows,
+      totals: {
+        assets,
+        liabilities,
+        equity,
+        period_result: periodResult,
+        liabilities_and_equity: roundMoney(liabilities + equity),
+        difference,
+        balanced: Math.abs(difference) < 0.005
+      }
+    });
   });
   app.get("/reports/budget-vs-actual", async (c) => {
     const { fiscal_year_id } = c.req.query();
