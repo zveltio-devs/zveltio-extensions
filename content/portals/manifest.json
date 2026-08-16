@@ -1,0 +1,47 @@
+{
+  "name": "content/portals",
+  "displayName": "Portals (Zones)",
+  "category": "content",
+  "description": "Authenticated portals: a base path, its own navigation and branding, access by role, and pages composed of saved views over your collections.",
+  "version": "1.0.0",
+  "zveltioMinVersion": "1.0.0",
+  "zveltioMaxVersion": "4.0.0",
+  "package": "@zveltio/ext-portals",
+  "permissions": [
+    "database"
+  ],
+  "resources": [
+    "zones"
+  ],
+  "studio": {
+    "pages": [
+      {
+        "path": "/admin/portals",
+        "label": "Portals",
+        "icon": "LayoutGrid"
+      }
+    ],
+    "navGroup": "content"
+  },
+  "contributes": {
+    "engine": true,
+    "studio": true,
+    "client": false,
+    "studioComponents": [
+      "CalendarView",
+      "CardView",
+      "ListView"
+    ]
+  },
+  "engine": {
+    "entry": "engine/index.js",
+    "format": "esm",
+    "target": "bun",
+    "bundled": true,
+    "bundlePeers": false
+  },
+  "integrity": {
+    "engineSha256": "74556747c28fc1c8eead4874eb0d82576c3b382e42d7d0299ccc10c4b42f40b4",
+    "sourceSha256": "6dd361b94ad14dd05f46b4bd8969d2bd9c12a67687525f97d462df9855689b2c"
+  }
+}
