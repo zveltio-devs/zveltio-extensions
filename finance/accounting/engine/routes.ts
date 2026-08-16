@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { permissionGate } from '@zveltio/sdk/extension';
+import { permissionGate, roundMoney, toNumber } from '@zveltio/sdk/extension';
 
 /**
  * Is this user allowed to take an accounting decision that cannot be undone?
@@ -286,8 +286,15 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
     fiscal_year_id: z.string().uuid().optional(),
     lines: z.array(z.object({
       account_id: z.string().uuid(),
-      debit: z.number().min(0).default(0),
-      credit: z.number().min(0).default(0),
+      // `.multipleOf(0.01)`, because the columns are NUMERIC(15,2).
+      //
+      // Unbounded scale let the balance check pass on numbers that were never
+      // written: two lines of 10.005 sum to 20.01 in JavaScript and pass against
+      // a credit of 20.01, then PostgreSQL rounds each line to 10.01 and stores
+      // 20.02 against 20.01. The ledger is out by a cent and every check that
+      // ran said it balanced.
+      debit: z.number().min(0).multipleOf(0.01).default(0),
+      credit: z.number().min(0).multipleOf(0.01).default(0),
       description: z.string().optional(),
       currency: z.string().default('RON'),
       exchange_rate: z.number().positive().default(1),
@@ -410,8 +417,15 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
     end_date: z.string().optional(),
     lines: z.array(z.object({
       account_id: z.string().uuid(),
-      debit: z.number().min(0).default(0),
-      credit: z.number().min(0).default(0),
+      // `.multipleOf(0.01)`, because the columns are NUMERIC(15,2).
+      //
+      // Unbounded scale let the balance check pass on numbers that were never
+      // written: two lines of 10.005 sum to 20.01 in JavaScript and pass against
+      // a credit of 20.01, then PostgreSQL rounds each line to 10.01 and stores
+      // 20.02 against 20.01. The ledger is out by a cent and every check that
+      // ran said it balanced.
+      debit: z.number().min(0).multipleOf(0.01).default(0),
+      credit: z.number().min(0).multipleOf(0.01).default(0),
       description: z.string().optional(),
     })).min(2),
   })), async (c) => {
@@ -544,7 +558,56 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
       GROUP BY a.id, a.code, a.name, a.type
       ORDER BY a.type, a.code
     `.execute(db);
-    return c.json({ data: rows.rows });
+
+    // A balance sheet has to balance, and this returned a flat list of accounts
+    // with no totals and nothing asserting that assets equal liabilities plus
+    // equity. Nobody reading it could tell whether the books were consistent —
+    // which is the single question the statement exists to answer.
+    //
+    // The period result is computed here rather than read from retained
+    // earnings, because `/fiscal-years/:id/close` flips a status and performs no
+    // closing entry, so retained earnings is never credited with the year's
+    // profit. Without this line assets differ from liabilities plus equity by
+    // exactly that profit, by construction, forever. Emitting it as a synthetic
+    // equity row is what a closing entry would have done.
+    const result = await sql`
+      SELECT
+        COALESCE(SUM(CASE WHEN a.type = 'revenue' THEN l.credit - l.debit ELSE 0 END), 0) AS revenue,
+        COALESCE(SUM(CASE WHEN a.type = 'expense' THEN l.debit - l.credit ELSE 0 END), 0) AS expenses
+      FROM zvd_journal_lines l
+      JOIN zvd_accounts a ON a.id = l.account_id
+      JOIN zvd_journal_entries e ON e.id = l.entry_id AND e.status = 'posted'
+        AND (${as_of ? sql`e.date <= ${as_of}` : sql`TRUE`})
+      WHERE a.type IN ('revenue','expense')
+    `.execute(db);
+    const r = result.rows[0] as any;
+    const periodResult = roundMoney(toNumber(r?.revenue, 0) - toNumber(r?.expenses, 0));
+
+    // Assets carry a debit balance and the other two a credit balance, so the
+    // sign flips. Summed with toNumber because these are NUMERIC and arrive as
+    // strings — `+` on them concatenates.
+    const rowsByType = (t: string) =>
+      (rows.rows as any[]).filter((x) => x.type === t).reduce((sum, x) => sum + toNumber(x.balance, 0), 0);
+    const assets = roundMoney(rowsByType('asset'));
+    const liabilities = roundMoney(-rowsByType('liability'));
+    const equity = roundMoney(-rowsByType('equity') + periodResult);
+    const difference = roundMoney(assets - (liabilities + equity));
+
+    return c.json({
+      data: rows.rows,
+      totals: {
+        assets,
+        liabilities,
+        equity,
+        period_result: periodResult,
+        liabilities_and_equity: roundMoney(liabilities + equity),
+        // Zero means the books are consistent. It is reported rather than
+        // asserted: a balance sheet that refuses to render tells an accountant
+        // less than one that shows them the gap.
+        difference,
+        balanced: Math.abs(difference) < 0.005,
+      },
+    });
   });
 
   app.get('/reports/budget-vs-actual', async (c) => {
