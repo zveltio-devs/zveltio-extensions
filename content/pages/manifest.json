@@ -59,7 +59,7 @@
     "/robots.txt"
   ],
   "integrity": {
-    "engineSha256": "d6f257714c6b10a705bcb336305cbeb956ce4b744cd14bd03e1e238e0bfa694e",
-    "sourceSha256": "c0db8801567bcf2cc4cb3b7a8adaa4d4fd2c1909459e7dff6836becebd603fa3"
+    "engineSha256": "9eff853fad129dee6b608164d7995920eb8a5af9131f6cd11fe6e76d79fa9f4c",
+    "sourceSha256": "363a6a582f47058ec83adf6335584326d1b27701a27b6f823bc56ec3f995a9e9"
   }
 }

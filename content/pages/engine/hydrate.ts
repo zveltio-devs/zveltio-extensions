@@ -408,6 +408,12 @@ export async function resolveBlocks(
  *     `public_collections`; a signed-in one goes through `checkAccess`
  *   * row policies and the column mask are applied
  *
+ * `recordFilter` is the page's own answer to WHICH rows it will resolve — the
+ * same list of `{ field, op, value }` a data block carries, compiled the same
+ * way. Without it every row of a published collection had an address, so a
+ * homepage table filtered to `status = active` still answered for the archived
+ * ones by URL. Empty means every row, which is what a page without one did.
+ *
  * Returns null when there is no such record, which the routes turn into a 404 —
  * a record page with no record is not a page.
  */
@@ -417,6 +423,7 @@ export async function resolveRecord(
   collection: string,
   keyField: string,
   keyValue: string,
+  recordFilter?: unknown,
 ): Promise<Record<string, Any> | null> {
   const lookup = createCollectionCache(deps);
   const meta = await lookup(collection);
@@ -429,6 +436,32 @@ export async function resolveRecord(
 
   let q = deps.db.selectFrom(meta.table).selectAll().where(field, '=', keyValue);
   if (meta.columns.has('tenant_id')) q = q.where('tenant_id', '=', audience.tenantId);
+
+  // The page's filter, applied before row policies rather than after: a row this
+  // page does not answer for should not exist for the rest of the pipeline
+  // either.
+  //
+  // A filter naming a column the collection does not have REFUSES the page,
+  // where the data-block path drops it. The two differ because the consequence
+  // does. A dropped filter on a block renders a wider table — visibly wrong, on
+  // a page someone is looking at. A dropped filter here silently restores an
+  // address for every row the author excluded, and puts them all back in the
+  // sitemap, where nobody is looking. Renaming the column turns these pages into
+  // 404s, which is loud and recoverable; the other way round is quiet and is the
+  // exact failure this column was added to close.
+  //
+  // The same argument covers a filter `parseFilterList` cannot read — a
+  // malformed entry, an operator it does not implement. It drops those, and one
+  // dropped entry here is one restriction gone. So an entry that does not
+  // survive parsing refuses the page too, which is why this counts them.
+  const declared = typeof recordFilter === 'string' ? safeParse(recordFilter) : recordFilter;
+  const declaredCount = Array.isArray(declared) ? declared.length : 0;
+  const filters = parseFilterList(recordFilter);
+  if (filters.length !== declaredCount) return null;
+  for (const f of filters) {
+    if (!meta.columns.has(f.field)) return null;
+    q = q.where(deps.engine.buildCondition(f.field, { op: f.op, value: f.value }));
+  }
 
   if (audience.user) {
     const rls = await deps.engine
@@ -535,12 +568,23 @@ const KNOWN_OPS = new Set([
 ]);
 
 function parseFilters(content: Any): ParsedFilter[] {
-  const raw = content.filters;
+  return parseFilterList(content.filters);
+}
+
+/**
+ * The filter shape, wherever it is stored.
+ *
+ * A data block keeps its filters in `content.filters`; a record page keeps its
+ * own in the `record_filter` column. Same list, same operators, same aliasing —
+ * an author who has written one has written the other, and there is one place
+ * where an unknown operator is dropped rather than two that disagree.
+ */
+export function parseFilterList(raw: unknown): ParsedFilter[] {
   const list = typeof raw === 'string' ? safeParse(raw) : raw;
   if (!Array.isArray(list)) return [];
 
   const out: ParsedFilter[] = [];
-  for (const f of list) {
+  for (const f of list as Any[]) {
     if (!f || typeof f !== 'object') continue;
     if (typeof f.field !== 'string' || typeof f.op !== 'string') continue;
     const op = OP_ALIASES[f.op] ?? f.op;
