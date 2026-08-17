@@ -28,6 +28,7 @@ import { z } from 'zod';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { findBlockById, resolveBlockAt, resolveBlocks } from './hydrate.js';
 import { sanitizeBlocks } from './sanitize.js';
+import { jsonb } from './jsonb.js';
 
 // biome-ignore lint/suspicious/noExplicitAny: the internals bag is typed engine-side
 type Any = any;
@@ -73,6 +74,13 @@ const PageCreateSchema = z.object({
   sort_order: z.number().int().min(0).optional(),
   status: z.enum(['draft', 'published', 'archived']).optional(),
   blocks: z.array(z.any()).optional(),
+  kind: z.enum(['page', 'popup']).optional(),
+  /**
+   * When and where a popup appears. Free-form on purpose: these are read as a
+   * whole by one component and never queried on. The renderer clamps every
+   * number it uses, so a hostile value costs nothing.
+   */
+  popup_config: z.record(z.string(), z.any()).optional(),
 });
 
 const PageUpdateSchema = PageCreateSchema.partial();
@@ -323,7 +331,9 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
         parent_id: data.parent_id ?? null,
         sort_order: data.sort_order ?? 0,
         status: data.status ?? 'draft',
-        blocks: JSON.stringify(sanitizeBlocks(data.blocks ?? [])),
+        kind: data.kind ?? 'page',
+        popup_config: jsonb(data.popup_config ?? {}),
+        blocks: jsonb(sanitizeBlocks(data.blocks ?? [])),
         created_by: user?.id ?? null,
         updated_by: user?.id ?? null,
         tenant_id: tenantId(c),
@@ -360,7 +370,8 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
     };
     // Blocks land on a page an audience reads, so they are scrubbed on the way
     // in as well as on the way out.
-    if (data.blocks !== undefined) patch.blocks = JSON.stringify(sanitizeBlocks(data.blocks));
+    if (data.blocks !== undefined) patch.blocks = jsonb(sanitizeBlocks(data.blocks));
+    if (data.popup_config !== undefined) patch.popup_config = jsonb(data.popup_config);
 
     const page = await db
       .updateTable('zv_pages')
@@ -484,6 +495,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
       .where('slug', '=', c.req.param('pageSlug'))
       .where('is_active', '=', true)
       .where('status', '=', 'published')
+      .where('kind', '=', 'page')
       .executeTakeFirst();
 
     if (!page) return c.json({ error: 'Page not found' }, 404);
@@ -557,6 +569,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
       .where('slug', '=', c.req.param('pageSlug'))
       .where('is_active', '=', true)
       .where('status', '=', 'published')
+      .where('kind', '=', 'page')
       .executeTakeFirst();
 
     if (!page) return c.json({ error: 'Page not found' }, 404);

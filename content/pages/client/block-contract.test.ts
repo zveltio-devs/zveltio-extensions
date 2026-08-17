@@ -49,12 +49,22 @@ describe('block vocabulary', () => {
     expect(undrawn).toEqual([]);
   });
 
-  test('the block-type library seeded by the migration matches', async () => {
-    const sql = await read('../engine/migrations/001_initial.sql');
-    const seedBlock = sql.slice(sql.indexOf('INSERT INTO zv_page_block_types'));
-    const seeded = new Set(
-      [...seedBlock.matchAll(/^\s*\('([a-z_]+)',/gm)].map((m) => m[1]),
-    );
+  test('the block-type library seeded by the migrations matches', async () => {
+    // Every migration, not just the first: block types are seeded wherever they
+    // were introduced, and a test that reads only 001 starts lying the moment a
+    // type ships in 003.
+    const dir = join(HERE, '../engine/migrations');
+    const { readdirSync } = await import('node:fs');
+    const seeded = new Set<string>();
+    for (const file of readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()) {
+      const sql = await Bun.file(join(dir, file)).text();
+      let at = sql.indexOf('INSERT INTO zv_page_block_types');
+      while (at !== -1) {
+        const chunk = sql.slice(at, sql.indexOf(';', at));
+        for (const m of chunk.matchAll(/^\s*\('([a-z_]+)',/gm)) seeded.add(m[1]);
+        at = sql.indexOf('INSERT INTO zv_page_block_types', at + 1);
+      }
+    }
 
     // The seed is the picker's reference library; it should name every current
     // block type. Legacy names are deliberately absent — they are readable, not
@@ -62,5 +72,42 @@ describe('block vocabulary', () => {
     const missing = BLOCK_TYPES.filter((t) => !seeded.has(t));
     expect(missing).toEqual([]);
     for (const legacy of LEGACY_BLOCK_TYPES) expect(seeded.has(legacy)).toBe(false);
+  });
+});
+
+describe('the curated icon set', () => {
+  test('every icon is a path, and the picker offers exactly those', async () => {
+    const { ICONS, ICON_NAMES } = await import('./icons.js');
+    expect(ICON_NAMES.length).toBeGreaterThan(20);
+    expect(new Set(ICON_NAMES)).toEqual(new Set(Object.keys(ICONS)));
+    for (const [name, d] of Object.entries(ICONS)) {
+      // A path, not markup: the renderer puts it in a `d` attribute.
+      expect(typeof d).toBe('string');
+      expect(d.length).toBeGreaterThan(5);
+      expect(d).not.toContain('<');
+    }
+  });
+});
+
+describe('motion settings', () => {
+  test('clamps values a mistyped form could produce', async () => {
+    const { motionAttrs } = await import('./motion.js');
+    // 30 seconds of delay is a block that never appears.
+    const out = motionAttrs({ motion: { type: 'fade', duration: 99999, delay: 99999 } });
+    expect(out.style).toContain('--zv-anim-dur:3000ms');
+    expect(out.style).toContain('--zv-anim-delay:2000ms');
+  });
+
+  test('an unknown animation contributes no class', async () => {
+    const { motionAttrs } = await import('./motion.js');
+    expect(motionAttrs({ motion: { type: 'explode' } }).class).toBe('');
+    expect(motionAttrs({}).class).toBe('');
+  });
+
+  test('sticky is a class plus a clamped offset', async () => {
+    const { motionAttrs } = await import('./motion.js');
+    const out = motionAttrs({ motion: { sticky: true, stickyOffset: 9999 } });
+    expect(out.class).toContain('zv-sticky');
+    expect(out.style).toContain('--zv-sticky-top:400px');
   });
 });

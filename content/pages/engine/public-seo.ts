@@ -40,6 +40,9 @@ export function registerPublicSeoRoutes(ctx: ExtensionContext): void {
           -- hands an anonymous crawler the shape of a private portal, and the
           -- pages themselves 401 when it follows them.
           AND COALESCE(p.auth_required, false) = false
+          -- A popup has a slug but no address. Listing it would send crawlers
+          -- to a page that is only ever drawn over another one.
+          AND COALESCE(p.kind, 'page') = 'page'
           AND s.is_public = true
           AND s.is_active = true
           AND (sc.include_in_sitemap = true OR sc.page_id IS NULL)

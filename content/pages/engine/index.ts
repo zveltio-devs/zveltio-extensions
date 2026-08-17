@@ -42,6 +42,8 @@ const extension: ZveltioExtension = {
     return [
       join(import.meta.dir, 'migrations/001_initial.sql'),
       join(import.meta.dir, 'migrations/002_saved_templates.sql'),
+      join(import.meta.dir, 'migrations/003_popups_and_blocks.sql'),
+      join(import.meta.dir, 'migrations/004_jsonb_not_text.sql'),
     ];
   },
 
