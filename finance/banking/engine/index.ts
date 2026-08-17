@@ -15,6 +15,7 @@ const extension: ZveltioExtension = {
       join(import.meta.dir, 'migrations/003_user_ref_text.sql'),
       join(import.meta.dir, 'migrations/004_import_provenance.sql'),
       join(import.meta.dir, 'migrations/005_import_filename_optional.sql'),
+      join(import.meta.dir, 'migrations/006_import_hash_per_tenant.sql'),
     ];
   },
 
