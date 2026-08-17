@@ -395,6 +395,57 @@ export async function resolveBlocks(
 }
 
 /**
+ * The one record a record page shows.
+ *
+ * Every rule a data block obeys, obeyed here — because it is the same question
+ * asked about one row instead of many, and a second answer to it is how this
+ * area produced a leak in the first place:
+ *
+ *   * the collection must be a row in `zvd_collections`; the table is derived,
+ *     never taken from input
+ *   * the key column must be a real column of it
+ *   * an anonymous caller needs the collection in the site's
+ *     `public_collections`; a signed-in one goes through `checkAccess`
+ *   * row policies and the column mask are applied
+ *
+ * Returns null when there is no such record, which the routes turn into a 404 —
+ * a record page with no record is not a page.
+ */
+export async function resolveRecord(
+  deps: HydrateDeps,
+  audience: HydrateAudience,
+  collection: string,
+  keyField: string,
+  keyValue: string,
+): Promise<Record<string, Any> | null> {
+  const lookup = createCollectionCache(deps);
+  const meta = await lookup(collection);
+  if (!meta) return null;
+
+  if (await refuseReason(deps, audience, meta.name)) return null;
+
+  const field = meta.columns.has(keyField) ? keyField : null;
+  if (!field) return null;
+
+  let q = deps.db.selectFrom(meta.table).selectAll().where(field, '=', keyValue);
+  if (meta.columns.has('tenant_id')) q = q.where('tenant_id', '=', audience.tenantId);
+
+  if (audience.user) {
+    const rls = await deps.engine
+      .getRlsFilters(meta.name, audience.user, audience.authType ?? 'session')
+      .catch(() => []);
+    q = deps.engine.applyRlsFilters(q, rls);
+  }
+
+  const row = await q.limit(1).executeTakeFirst();
+  if (!row) return null;
+
+  const role = await deps.engine.resolveUserRole(audience.user ?? {}).catch(() => 'public');
+  const colAccess = await deps.engine.getColumnAccess(meta.name, role).catch(() => null);
+  return colAccess ? deps.engine.applyColumnAccess(row, colAccess) : row;
+}
+
+/**
  * Find a block by id anywhere on a page, containers included.
  *
  * The paging routes used `blocks.find(...)`, which stops at the top level — so a
