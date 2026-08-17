@@ -10,8 +10,9 @@
 
 import { Hono } from 'hono';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { findBlockById, resolveBlockAt, resolveBlocks } from './hydrate.js';
+import { findBlockById, resolveBlockAt, resolveBlocks, resolveRecord } from './hydrate.js';
 import { sanitizeBlocks } from './sanitize.js';
+import { placeholdersIn } from '../client/bind.js';
 
 // biome-ignore lint/suspicious/noExplicitAny: page rows and blocks are untyped JSON
 type Any = any;
@@ -197,8 +198,17 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
     });
   });
 
-  /** GET /cms/:slug — one published page with its blocks resolved. */
-  router.get('/:slug', async (c) => {
+  /**
+   * GET /cms/:slug          — a page
+   * GET /cms/:slug/:key     — a RECORD page, showing one row
+   *
+   * A record page names a collection and the column its URL segment matches, so
+   * `/products/chair` is the `products` row whose `slug` is `chair`. The record
+   * travels in the payload and the renderer substitutes `{{field}}` across every
+   * block — the same substitution an item template already uses, which is why
+   * this needed a resolver and a route rather than a second mechanism.
+   */
+  async function servePage(c: Any, slug: string, recordKey?: string) {
     const site = await publicSite(c);
     if (!site) return c.json({ error: 'Page not found' }, 404);
 
@@ -206,7 +216,7 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
       .selectFrom('zv_pages')
       .selectAll()
       .where('site_id', '=', site.id)
-      .where('slug', '=', c.req.param('slug'))
+      .where('slug', '=', slug)
       .where('status', '=', 'published')
       .where('is_active', '=', true)
       .where('auth_required', '=', false)
@@ -217,17 +227,49 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
 
     if (!page) return c.json({ error: 'Page not found' }, 404);
 
+    // A record page without a key has no record to show, and an ordinary page
+    // with a key was addressed with a segment it does not have. Both are 404s
+    // rather than a page rendered with blank placeholders.
     const raw: Any[] = typeof page.blocks === 'string' ? JSON.parse(page.blocks) : (page.blocks ?? []);
+
+    const audience = {
+      user: null,
+      tenantId: tenantId(c),
+      publicCollections: site.public_collections ?? [],
+    };
+    let record: Record<string, Any> | null = null;
+    if (page.record_collection) {
+      if (!recordKey) return c.json({ error: 'Page not found' }, 404);
+      record = await resolveRecord(
+        { db, engine },
+        audience,
+        page.record_collection,
+        page.record_field || 'slug',
+        recordKey,
+      );
+      if (!record) return c.json({ error: 'Page not found' }, 404);
+
+      // ONLY the fields the page actually names.
+      //
+      // The whole row resolved cleanly — permission, row policies, column mask —
+      // and sending all of it would still hand an anonymous visitor every column
+      // the page never draws, in the JSON behind it. A page showing a person's
+      // name and company would ship their private notes to anyone who opened
+      // devtools. The page's own `{{field}}` references are the exact list of
+      // what it needs, so that is what it gets.
+      const named = new Set(placeholdersIn(raw));
+      record = Object.fromEntries(
+        Object.entries(record).filter(([k]) => named.has(k)),
+      );
+    } else if (recordKey) {
+      return c.json({ error: 'Page not found' }, 404);
+    }
 
     // No user, deliberately: this endpoint never reads a session, so a data
     // block here is judged only against the site's published collection list.
     const resolved = await resolveBlocks(
       { db, engine },
-      {
-        user: null,
-        tenantId: tenantId(c),
-        publicCollections: site.public_collections ?? [],
-      },
+      audience,
       raw,
     );
 
@@ -244,6 +286,10 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
         is_homepage: page.is_homepage === true,
         ...metaOf(page),
       },
+      // Present only on a record page. The renderer substitutes it into every
+      // block; a payload without it leaves `{{field}}` untouched, which is what
+      // an ordinary page wants.
+      record,
       site: {
         name: site.site_name ?? site.name,
         logo_url: site.site_logo_url,
@@ -253,7 +299,39 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
       blocks,
       popups: await popupsFor(c, site, page.slug),
     });
+  }
+
+  /**
+   * GET /cms/_home — whatever page the site flags as its homepage.
+   *
+   * The reference client asked for the slug `home`, literally, so ticking
+   * "homepage" on any other page changed nothing: the flag existed and the
+   * landing page ignored it. This resolves the flag, and falls back to the slug
+   * `home` so an existing site keeps working.
+   *
+   * `_home` cannot collide with a page: slugs are validated `^[a-z0-9-/]+$`, so
+   * no slug can contain an underscore.
+   */
+  router.get('/_home', async (c) => {
+    const site = await publicSite(c);
+    if (!site) return c.json({ error: 'Page not found' }, 404);
+
+    const flagged = await db
+      .selectFrom('zv_pages')
+      .select(['slug'])
+      .where('site_id', '=', site.id)
+      .where('kind', '=', 'page')
+      .where('is_homepage', '=', true)
+      .where('status', '=', 'published')
+      .where('is_active', '=', true)
+      .where('auth_required', '=', false)
+      .executeTakeFirst();
+
+    return servePage(c, flagged?.slug ?? 'home');
   });
+
+  router.get('/:slug', (c) => servePage(c, c.req.param('slug')));
+  router.get('/:slug/:key', (c) => servePage(c, c.req.param('slug'), c.req.param('key')));
 
   return router;
 }
