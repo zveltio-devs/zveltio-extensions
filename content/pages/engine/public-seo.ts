@@ -6,6 +6,7 @@
 
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { parseFilterList } from './hydrate.js';
 
 // biome-ignore lint/suspicious/noExplicitAny: Hono context via PublicRouteSpec
 type Ctx = any;
@@ -18,6 +19,8 @@ function baseUrl(c: Ctx): string {
 
 export function registerPublicSeoRoutes(ctx: ExtensionContext): void {
   const { db } = ctx;
+  // biome-ignore lint/suspicious/noExplicitAny: the internals bag is typed engine-side
+  const engine = ctx.internals as any;
 
   ctx.registerPublicRoute({
     method: 'GET',
@@ -30,10 +33,11 @@ export function registerPublicSeoRoutes(ctx: ExtensionContext): void {
         priority: number | null;
         record_collection: string | null;
         record_field: string | null;
+        record_filter: unknown;
         public_collections: string[] | null;
       }>`
         SELECT p.slug, p.updated_at, sc.change_freq, sc.priority,
-               p.record_collection, p.record_field, s.public_collections
+               p.record_collection, p.record_field, p.record_filter, s.public_collections
         FROM zv_pages p
         JOIN zv_page_sites s ON s.id = p.site_id
         LEFT JOIN zv_page_sitemap_config sc ON sc.page_id = p.id
@@ -86,13 +90,36 @@ export function registerPublicSeoRoutes(ctx: ExtensionContext): void {
         const names = new Set(cols.rows.map((r) => r.column_name));
         if (!names.has(field)) return [];
 
-        const keys = await sql<{ k: string }>`
-          SELECT ${sql.id(field)}::text AS k
-          FROM ${sql.id(`zvd_${row.record_collection}`)}
-          WHERE ${sql.id(field)} IS NOT NULL
-          LIMIT ${RECORD_CAP}
-        `.execute(db);
-        return keys.rows.map((r) => `${row.slug}/${r.k}`);
+        /**
+         * The page's own filter, applied to the address list.
+         *
+         * A sitemap that advertises a URL the page answers 404 for is worse
+         * than one that omits it, and before `record_filter` existed this
+         * listed every row of a published collection — including the archived
+         * ones the site was visibly not showing. Kysely rather than a template
+         * here so the condition comes from `buildCondition`, the same compiler
+         * `resolveRecord` uses: two hand-written filter loops that disagree is
+         * how the crawler ends up with a different answer from the visitor.
+         *
+         * Unreadable or unknown-column filters produce NO addresses, matching
+         * `resolveRecord` refusing the page. Both directions of that choice are
+         * safe: the crawler is told about nothing rather than about rows the
+         * author excluded.
+         */
+        const filters = parseFilterList(row.record_filter);
+        const declared = Array.isArray(row.record_filter) ? row.record_filter.length : 0;
+        if (filters.length !== declared) return [];
+        if (filters.some((f) => !names.has(f.field))) return [];
+
+        let q = db
+          .selectFrom(`zvd_${row.record_collection}`)
+          .select(sql<string>`${sql.id(field)}::text`.as('k'))
+          .where(field, 'is not', null);
+        for (const f of filters) {
+          q = q.where(engine.buildCondition(f.field, { op: f.op, value: f.value }));
+        }
+        const keys = await q.limit(RECORD_CAP).execute();
+        return keys.map((r: { k: string }) => `${row.slug}/${r.k}`);
       }
 
       const urls = (
