@@ -121,7 +121,6 @@
   "content.pages.field.accessRoles": "Roles that may enter",
   "content.pages.field.active": "Active",
   "content.pages.field.allowedRoles": "Allowed roles",
-  "content.pages.field.authRequired": "Requires sign-in",
   "content.pages.field.basePath": "Base path",
   "content.pages.field.isPublic": "Public site (anonymous visitors)",
   "content.pages.field.logoUrl": "Logo URL",
@@ -225,5 +224,10 @@
   "content.pages.title": "Pages",
   "content.pages.toast.restored": "Version restored",
   "content.pages.toast.saved": "Saved",
-  "content.pages.unpublish": "Unpublish"
+  "content.pages.unpublish": "Unpublish",
+  "content.pages.visibility.label": "Who can see it",
+  "content.pages.visibility.private": "Private",
+  "content.pages.visibility.privateHint": "Requires signing in. Never listed and never in the sitemap.",
+  "content.pages.visibility.public": "Public",
+  "content.pages.visibility.publicHint": "Anyone can open it, and it appears in the sitemap."
 }
