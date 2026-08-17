@@ -83,6 +83,30 @@ const PageCreateSchema = z.object({
   record_collection: z.string().max(100).nullable().optional(),
   record_field: z.string().max(100).nullable().optional(),
   /**
+   * Which rows of that collection the page will answer for — the same
+   * `{ field, op, value }` list a data block carries.
+   *
+   * The operator is an enum rather than a string on purpose. `resolveRecord`
+   * refuses a page whose filter it cannot read, because a dropped restriction
+   * is a restored address; enumerating the operators here means a typo comes
+   * back as a 400 naming the field, instead of every record page on the site
+   * going dark at the next request.
+   */
+  record_filter: z
+    .array(
+      z.object({
+        field: z.string().min(1).max(100),
+        op: z.enum([
+          'eq', 'neq', 'ne', 'lt', 'lte', 'gt', 'gte',
+          'like', 'ilike', 'contains', 'in', 'not_in',
+          'null', 'not_null', 'is_null', 'is_not_null',
+        ]),
+        value: z.any().optional(),
+      }),
+    )
+    .max(20)
+    .optional(),
+  /**
    * When and where a popup appears. Free-form on purpose: these are read as a
    * whole by one component and never queried on. The renderer clamps every
    * number it uses, so a hostile value costs nothing.
@@ -341,6 +365,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
         kind: data.kind ?? 'page',
         record_collection: data.record_collection ?? null,
         record_field: data.record_field ?? null,
+        record_filter: jsonb(data.record_filter ?? []),
         popup_config: jsonb(data.popup_config ?? {}),
         blocks: jsonb(sanitizeBlocks(data.blocks ?? [])),
         created_by: user?.id ?? null,
@@ -381,6 +406,10 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
     // in as well as on the way out.
     if (data.blocks !== undefined) patch.blocks = jsonb(sanitizeBlocks(data.blocks));
     if (data.popup_config !== undefined) patch.popup_config = jsonb(data.popup_config);
+    // Same treatment as the other two JSONB columns: without the cast the array
+    // is stored as a JSON string and reads back as text, which `parseFilterList`
+    // then parses into nothing — a silently unfiltered record page.
+    if (data.record_filter !== undefined) patch.record_filter = jsonb(data.record_filter);
 
     const page = await db
       .updateTable('zv_pages')
@@ -614,6 +643,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
         page.record_collection,
         page.record_field || 'slug',
         recordKey,
+        page.record_filter,
       );
       if (!record) return c.json({ error: 'Page not found' }, 404);
     } else if (recordKey) {

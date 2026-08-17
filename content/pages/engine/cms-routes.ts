@@ -246,6 +246,7 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
         page.record_collection,
         page.record_field || 'slug',
         recordKey,
+        page.record_filter,
       );
       if (!record) return c.json({ error: 'Page not found' }, 404);
 

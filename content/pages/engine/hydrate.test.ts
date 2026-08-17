@@ -40,6 +40,8 @@ function makeDb(opts: {
     selectedFields: [] as string[][],
     selectedAll: 0,
     wheres: [] as Array<[string, string, unknown]>,
+    /** Conditions passed as objects — i.e. what `buildCondition` produced. */
+    conditions: [] as Any[],
     orderBy: [] as Array<[string, string]>,
     limit: [] as number[],
     offset: [] as number[],
@@ -66,6 +68,8 @@ function makeDb(opts: {
         if (typeof a === 'string') {
           localWheres.push([a, op, v]);
           if (!isMeta) calls.wheres.push([a, op, v]);
+        } else if (a && typeof a === 'object') {
+          if (!isMeta) calls.conditions.push(a);
         } else if (typeof a === 'function') {
           // Kysely calls the callback with an expression builder. The resolver
           // uses that form for the visitor's search (`eb.or([...])`), so a stub
@@ -99,7 +103,11 @@ function makeDb(opts: {
           const name = localWheres.find(([col]) => col === 'name')?.[2];
           return collections.includes(String(name)) ? { name } : undefined;
         }
-        return undefined;
+        // `resolveRecord` reads one row this way. The stub does not evaluate
+        // conditions — a filter reaching the query is proved by `calls`, and
+        // one that never should have got there is proved by a null return
+        // before any query is built.
+        return rows[0];
       },
     };
     return b;
@@ -669,5 +677,136 @@ describe('what a visitor may vary', () => {
     );
     expect(out.content._error).toContain('not published');
     expect(out.content._data).toEqual([]);
+  });
+});
+
+/**
+ * `record_filter` — which rows a record page will answer for.
+ *
+ * The gap these hold closed was found on a live instance: a homepage table
+ * filtered to `status = active` still served the archived contact at
+ * `/team/maria-radu`, and the sitemap advertised it. `public_collections` is
+ * still the gate and nothing unpublished leaked, but a block's filter is
+ * presentation — it decides what one block draws, never what the site answers
+ * for. So the page carries its own.
+ *
+ * The direction that matters most is what happens to a filter the server cannot
+ * apply. Dropping one is not a smaller restriction, it is NO restriction: every
+ * row the author excluded gets its address back, quietly, and goes into the
+ * sitemap. So an unreadable filter refuses the page instead.
+ */
+describe('a record page filters which rows have an address', () => {
+  const audience = { user: null, tenantId: 't1', publicCollections: ['contacts'] };
+
+  async function resolve(recordFilter?: unknown) {
+    const { db, calls } = makeDb({
+      collections: ['contacts'],
+      columns: ['id', 'tenant_id', 'slug', 'status', 'first_name'],
+      rows: [{ id: '1', slug: 'maria-radu', status: 'archived', first_name: 'Maria' }],
+    });
+    const { resolveRecord } = await import('./hydrate.js');
+    const row = await resolveRecord(
+      { db, engine: makeEngine() },
+      audience,
+      'contacts',
+      'slug',
+      'maria-radu',
+      recordFilter,
+    );
+    return { row, calls };
+  }
+
+  test('no filter answers for every row — the behaviour before this existed', async () => {
+    const { row } = await resolve(undefined);
+    expect(row).not.toBeNull();
+  });
+
+  test('a filter reaches the query through the engine compiler', async () => {
+    const { row, calls } = await resolve([{ field: 'status', op: 'eq', value: 'active' }]);
+    expect(row).not.toBeNull();
+    // `makeEngine().buildCondition` returns `{ field, cond }`, so its presence
+    // among the conditions is proof the filter was compiled rather than
+    // hand-rolled into a `where(col, op, val)` of this module's own.
+    expect(calls.conditions).toContainEqual({
+      field: 'status',
+      cond: { op: 'eq', value: 'active' },
+    });
+  });
+
+  test('the key and the tenant are still constrained alongside it', async () => {
+    const { calls } = await resolve([{ field: 'status', op: 'eq', value: 'active' }]);
+    expect(calls.wheres).toContainEqual(['slug', '=', 'maria-radu']);
+    expect(calls.wheres).toContainEqual(['tenant_id', '=', 't1']);
+  });
+
+  test('a filter stored as text — not jsonb — still applies', async () => {
+    // The trap migration 004 was written for. A column holding a JSON *string*
+    // parses to a list here; if it did not, the page would answer for every row
+    // while looking filtered in Studio.
+    const { row, calls } = await resolve(JSON.stringify([{ field: 'status', op: 'eq', value: 'active' }]));
+    expect(row).not.toBeNull();
+    expect(calls.conditions).toHaveLength(1);
+  });
+
+  test('a filter naming a column the collection does not have REFUSES the page', async () => {
+    const { row, calls } = await resolve([{ field: 'nonexistent', op: 'eq', value: 'x' }]);
+    expect(row).toBeNull();
+    expect(calls.conditions).toEqual([]);
+  });
+
+  test('an operator the compiler does not implement REFUSES the page', async () => {
+    // The failure mode without this: `parseFilterList` drops the entry, the
+    // loop applies nothing, and the page silently answers for every row.
+    const { row } = await resolve([{ field: 'status', op: 'sounds_like', value: 'active' }]);
+    expect(row).toBeNull();
+  });
+
+  test('a malformed entry REFUSES the page', async () => {
+    for (const bad of [[null], ['status = active'], [{ field: 'status' }], [{ op: 'eq' }]]) {
+      const { row } = await resolve(bad);
+      expect(row).toBeNull();
+    }
+  });
+
+  test('page-builder operator spellings are translated, not refused', async () => {
+    // `is_null` and `contains` are the older names; the resolver aliases them
+    // onto `null` and `ilike`. Refusing them would turn a filter written in the
+    // old Studio into a dead page.
+    for (const [op, expected] of [
+      ['is_null', 'null'],
+      ['is_not_null', 'not_null'],
+      ['contains', 'ilike'],
+      ['ne', 'neq'],
+    ] as const) {
+      const { row, calls } = await resolve([{ field: 'status', op, value: 'x' }]);
+      expect(row).not.toBeNull();
+      expect(calls.conditions[0].cond.op).toBe(expected);
+    }
+  });
+
+  test('every filter must pass — they are ANDed, not ORed', async () => {
+    const { row, calls } = await resolve([
+      { field: 'status', op: 'eq', value: 'active' },
+      { field: 'first_name', op: 'not_null' },
+    ]);
+    expect(row).not.toBeNull();
+    expect(calls.conditions).toHaveLength(2);
+  });
+
+  test('the collection gate still comes first', async () => {
+    // A filter is not a substitute for permission: an unpublished collection is
+    // refused before the filter is even read.
+    const { db, calls } = makeDb({ collections: ['contacts'] });
+    const { resolveRecord } = await import('./hydrate.js');
+    const row = await resolveRecord(
+      { db, engine: makeEngine() },
+      { user: null, tenantId: 't1', publicCollections: [] },
+      'contacts',
+      'slug',
+      'maria-radu',
+      [{ field: 'status', op: 'eq', value: 'active' }],
+    );
+    expect(row).toBeNull();
+    expect(calls.conditions).toEqual([]);
   });
 });
