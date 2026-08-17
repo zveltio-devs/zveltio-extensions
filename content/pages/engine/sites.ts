@@ -318,6 +318,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
       .selectFrom('zv_pages')
       .selectAll()
       .where('site_id', '=', site.id)
+      .where('tenant_id', '=', tenantId(c))
       .orderBy('sort_order asc')
       .orderBy('created_at asc')
       .execute();
@@ -343,6 +344,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
         .updateTable('zv_pages')
         .set({ is_homepage: false })
         .where('site_id', '=', site.id)
+        .where('tenant_id', '=', tenantId(c))
         .where('is_homepage', '=', true)
         .execute();
     }
@@ -393,6 +395,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
         .updateTable('zv_pages')
         .set({ is_homepage: false })
         .where('site_id', '=', site.id)
+        .where('tenant_id', '=', tenantId(c))
         .where('is_homepage', '=', true)
         .execute();
     }
@@ -415,6 +418,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
       .updateTable('zv_pages')
       .set(patch)
       .where('site_id', '=', site.id)
+      .where('tenant_id', '=', tenantId(c))
       .where('slug', '=', c.req.param('pageSlug'))
       .returningAll()
       .executeTakeFirst();
@@ -433,6 +437,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
     await db
       .deleteFrom('zv_pages')
       .where('site_id', '=', site.id)
+      .where('tenant_id', '=', tenantId(c))
       .where('slug', '=', c.req.param('pageSlug'))
       .execute();
 
@@ -488,6 +493,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
       .selectFrom('zv_pages')
       .select(['id', 'title', 'slug', 'icon', 'parent_id', 'sort_order', 'is_homepage'])
       .where('site_id', '=', site.id)
+      .where('tenant_id', '=', tenantId(c))
       .where('is_active', '=', true)
       .where('status', '=', 'published')
       .orderBy('sort_order asc')
@@ -530,6 +536,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
       .selectFrom('zv_pages')
       .selectAll()
       .where('site_id', '=', site.id)
+      .where('tenant_id', '=', tenantId(c))
       .where('slug', '=', c.req.param('pageSlug'))
       .where('is_active', '=', true)
       .where('status', '=', 'published')
@@ -611,6 +618,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
       .selectFrom('zv_pages')
       .selectAll()
       .where('site_id', '=', site.id)
+      .where('tenant_id', '=', tenantId(c))
       .where('slug', '=', c.req.param('pageSlug'))
       .where('is_active', '=', true)
       .where('status', '=', 'published')
