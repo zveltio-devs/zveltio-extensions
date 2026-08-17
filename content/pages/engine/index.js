@@ -31301,7 +31301,7 @@ function sitesRoutes(ctx) {
     const site = await siteBySlug(c);
     if (!site)
       return c.json({ error: "Site not found" }, 404);
-    const pages = await db.selectFrom("zv_pages").selectAll().where("site_id", "=", site.id).orderBy("sort_order asc").orderBy("created_at asc").execute();
+    const pages = await db.selectFrom("zv_pages").selectAll().where("site_id", "=", site.id).where("tenant_id", "=", tenantId(c)).orderBy("sort_order asc").orderBy("created_at asc").execute();
     return c.json({ pages });
   });
   app.post("/:slug/pages", zValidator("json", PageCreateSchema), async (c) => {
@@ -31314,7 +31314,7 @@ function sitesRoutes(ctx) {
     const data = c.req.valid("json");
     const user = c.get("user");
     if (data.is_homepage) {
-      await db.updateTable("zv_pages").set({ is_homepage: false }).where("site_id", "=", site.id).where("is_homepage", "=", true).execute();
+      await db.updateTable("zv_pages").set({ is_homepage: false }).where("site_id", "=", site.id).where("tenant_id", "=", tenantId(c)).where("is_homepage", "=", true).execute();
     }
     const page = await db.insertInto("zv_pages").values({
       site_id: site.id,
@@ -31351,7 +31351,7 @@ function sitesRoutes(ctx) {
     const data = c.req.valid("json");
     const user = c.get("user");
     if (data.is_homepage) {
-      await db.updateTable("zv_pages").set({ is_homepage: false }).where("site_id", "=", site.id).where("is_homepage", "=", true).execute();
+      await db.updateTable("zv_pages").set({ is_homepage: false }).where("site_id", "=", site.id).where("tenant_id", "=", tenantId(c)).where("is_homepage", "=", true).execute();
     }
     const patch = {
       ...data,
@@ -31364,7 +31364,7 @@ function sitesRoutes(ctx) {
       patch.popup_config = jsonb(data.popup_config);
     if (data.record_filter !== undefined)
       patch.record_filter = jsonb(data.record_filter);
-    const page = await db.updateTable("zv_pages").set(patch).where("site_id", "=", site.id).where("slug", "=", c.req.param("pageSlug")).returningAll().executeTakeFirst();
+    const page = await db.updateTable("zv_pages").set(patch).where("site_id", "=", site.id).where("tenant_id", "=", tenantId(c)).where("slug", "=", c.req.param("pageSlug")).returningAll().executeTakeFirst();
     if (!page)
       return c.json({ error: "Page not found" }, 404);
     return c.json({ page });
@@ -31376,7 +31376,7 @@ function sitesRoutes(ctx) {
     const site = await siteBySlug(c);
     if (!site)
       return c.json({ error: "Site not found" }, 404);
-    await db.deleteFrom("zv_pages").where("site_id", "=", site.id).where("slug", "=", c.req.param("pageSlug")).execute();
+    await db.deleteFrom("zv_pages").where("site_id", "=", site.id).where("tenant_id", "=", tenantId(c)).where("slug", "=", c.req.param("pageSlug")).execute();
     return c.json({ success: true });
   });
   app.post("/:slug/pages/reorder", zValidator("json", ReorderSchema), async (c) => {
@@ -31402,7 +31402,7 @@ function sitesRoutes(ctx) {
         return c.json({ error: "Insufficient role" }, 403);
       }
     }
-    const pages = await db.selectFrom("zv_pages").select(["id", "title", "slug", "icon", "parent_id", "sort_order", "is_homepage"]).where("site_id", "=", site.id).where("is_active", "=", true).where("status", "=", "published").orderBy("sort_order asc").execute();
+    const pages = await db.selectFrom("zv_pages").select(["id", "title", "slug", "icon", "parent_id", "sort_order", "is_homepage"]).where("site_id", "=", site.id).where("tenant_id", "=", tenantId(c)).where("is_active", "=", true).where("status", "=", "published").orderBy("sort_order asc").execute();
     const nav = pages.filter((p) => !p.parent_id).map((p) => ({ ...p, children: pages.filter((k) => k.parent_id === p.id) }));
     return c.json({ site, nav });
   });
@@ -31418,7 +31418,7 @@ function sitesRoutes(ctx) {
         return c.json({ error: "Insufficient role" }, 403);
       }
     }
-    const page = await db.selectFrom("zv_pages").selectAll().where("site_id", "=", site.id).where("slug", "=", c.req.param("pageSlug")).where("is_active", "=", true).where("status", "=", "published").where("kind", "=", "page").executeTakeFirst();
+    const page = await db.selectFrom("zv_pages").selectAll().where("site_id", "=", site.id).where("tenant_id", "=", tenantId(c)).where("slug", "=", c.req.param("pageSlug")).where("is_active", "=", true).where("status", "=", "published").where("kind", "=", "page").executeTakeFirst();
     if (!page)
       return c.json({ error: "Page not found" }, 404);
     if (page.auth_required) {
@@ -31465,7 +31465,7 @@ function sitesRoutes(ctx) {
         return c.json({ error: "Insufficient role" }, 403);
       }
     }
-    const page = await db.selectFrom("zv_pages").selectAll().where("site_id", "=", site.id).where("slug", "=", c.req.param("pageSlug")).where("is_active", "=", true).where("status", "=", "published").where("kind", "=", "page").executeTakeFirst();
+    const page = await db.selectFrom("zv_pages").selectAll().where("site_id", "=", site.id).where("tenant_id", "=", tenantId(c)).where("slug", "=", c.req.param("pageSlug")).where("is_active", "=", true).where("status", "=", "published").where("kind", "=", "page").executeTakeFirst();
     if (!page)
       return c.json({ error: "Page not found" }, 404);
     if (page.auth_required) {
@@ -32093,7 +32093,7 @@ function publicPagesRoutes(ctx) {
     return db.selectFrom("zv_page_sites").selectAll().where("tenant_id", "=", tenantId3(c)).where("is_public", "=", true).where("is_active", "=", true).orderBy("created_at asc").executeTakeFirst();
   }
   async function popupsFor(c, site, pageSlug) {
-    const rows = await db.selectFrom("zv_pages").select(["id", "title", "blocks", "popup_config"]).where("site_id", "=", site.id).where("kind", "=", "popup").where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).execute();
+    const rows = await db.selectFrom("zv_pages").select(["id", "title", "blocks", "popup_config"]).where("site_id", "=", site.id).where("tenant_id", "=", tenantId3(c)).where("kind", "=", "popup").where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).execute();
     const out = [];
     for (const row of rows) {
       const cfg = typeof row.popup_config === "string" ? JSON.parse(row.popup_config || "{}") : row.popup_config ?? {};
@@ -32110,7 +32110,7 @@ function publicPagesRoutes(ctx) {
     const site = await publicSite(c);
     if (!site)
       return c.json({ pages: [] });
-    const pages = await db.selectFrom("zv_pages").select(["id", "title", "slug", "is_homepage"]).where("site_id", "=", site.id).where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).where("kind", "=", "page").orderBy("is_homepage desc").orderBy("title asc").execute();
+    const pages = await db.selectFrom("zv_pages").select(["id", "title", "slug", "is_homepage"]).where("site_id", "=", site.id).where("tenant_id", "=", tenantId3(c)).where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).where("kind", "=", "page").orderBy("is_homepage desc").orderBy("title asc").execute();
     return c.json({ pages });
   });
   router.get("/nav", async (c) => {
@@ -32127,7 +32127,7 @@ function publicPagesRoutes(ctx) {
     const site = await publicSite(c);
     if (!site)
       return c.json({ error: "Page not found" }, 404);
-    const page = await db.selectFrom("zv_pages").select(["blocks"]).where("site_id", "=", site.id).where("slug", "=", c.req.param("slug")).where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).executeTakeFirst();
+    const page = await db.selectFrom("zv_pages").select(["blocks"]).where("site_id", "=", site.id).where("tenant_id", "=", tenantId3(c)).where("slug", "=", c.req.param("slug")).where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).executeTakeFirst();
     if (!page)
       return c.json({ error: "Page not found" }, 404);
     const raw2 = typeof page.blocks === "string" ? JSON.parse(page.blocks) : page.blocks ?? [];
@@ -32154,7 +32154,7 @@ function publicPagesRoutes(ctx) {
     const site = await publicSite(c);
     if (!site)
       return c.json({ error: "Page not found" }, 404);
-    const page = await db.selectFrom("zv_pages").selectAll().where("site_id", "=", site.id).where("slug", "=", slug).where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).where("kind", "=", "page").executeTakeFirst();
+    const page = await db.selectFrom("zv_pages").selectAll().where("site_id", "=", site.id).where("tenant_id", "=", tenantId3(c)).where("slug", "=", slug).where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).where("kind", "=", "page").executeTakeFirst();
     if (!page)
       return c.json({ error: "Page not found" }, 404);
     const raw2 = typeof page.blocks === "string" ? JSON.parse(page.blocks) : page.blocks ?? [];
@@ -32200,7 +32200,7 @@ function publicPagesRoutes(ctx) {
     const site = await publicSite(c);
     if (!site)
       return c.json({ error: "Page not found" }, 404);
-    const flagged = await db.selectFrom("zv_pages").select(["slug"]).where("site_id", "=", site.id).where("kind", "=", "page").where("is_homepage", "=", true).where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).executeTakeFirst();
+    const flagged = await db.selectFrom("zv_pages").select(["slug"]).where("site_id", "=", site.id).where("tenant_id", "=", tenantId3(c)).where("kind", "=", "page").where("is_homepage", "=", true).where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).executeTakeFirst();
     return servePage(c, flagged?.slug ?? "home");
   });
   router.get("/:slug", (c) => servePage(c, c.req.param("slug")));
