@@ -39,8 +39,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "dfbdc279d105f429300d4f6bf5416af76afba3546dd150bdada6a38b548affa3",
-    "sourceSha256": "4e09871ce37bc7c69a48e7db99cf258788d27b6137860b5b2a8aa35e076f408a"
+    "engineSha256": "76f6bc293f9ddbecd78dc3dd20472ffad644ed570be454bafb0097f62fe781e4",
+    "sourceSha256": "daa0e43a65df826ab2fcb235e0d9d1876e5b791ee3bb77225d0aa4e0c8b39a9b"
   },
   "resources": [
     "banking"
