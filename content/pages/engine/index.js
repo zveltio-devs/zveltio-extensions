@@ -27485,6 +27485,30 @@ async function resolveBlocks(deps, audience, blocks) {
   const lookup = createCollectionCache(deps);
   return Promise.all(blocks.map((b) => resolveBlock(deps, audience, lookup, b)));
 }
+async function resolveRecord(deps, audience, collection, keyField, keyValue) {
+  const lookup = createCollectionCache(deps);
+  const meta3 = await lookup(collection);
+  if (!meta3)
+    return null;
+  if (await refuseReason(deps, audience, meta3.name))
+    return null;
+  const field = meta3.columns.has(keyField) ? keyField : null;
+  if (!field)
+    return null;
+  let q = deps.db.selectFrom(meta3.table).selectAll().where(field, "=", keyValue);
+  if (meta3.columns.has("tenant_id"))
+    q = q.where("tenant_id", "=", audience.tenantId);
+  if (audience.user) {
+    const rls = await deps.engine.getRlsFilters(meta3.name, audience.user, audience.authType ?? "session").catch(() => []);
+    q = deps.engine.applyRlsFilters(q, rls);
+  }
+  const row = await q.limit(1).executeTakeFirst();
+  if (!row)
+    return null;
+  const role = await deps.engine.resolveUserRole(audience.user ?? {}).catch(() => "public");
+  const colAccess = await deps.engine.getColumnAccess(meta3.name, role).catch(() => null);
+  return colAccess ? deps.engine.applyColumnAccess(row, colAccess) : row;
+}
 function findBlockById(blocks, id) {
   if (!Array.isArray(blocks))
     return null;
@@ -27676,6 +27700,31 @@ function sanitizeBlocks(blocks) {
     }
     return { ...b, content: next };
   });
+}
+
+// ../zveltio-extensions/content/pages/client/bind.ts
+var PLACEHOLDER = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
+var HTML_KEYS = new Set(["content", "html", "code", "items"]);
+function placeholdersIn(block) {
+  const found = new Set;
+  walk(block);
+  return [...found];
+  function walk(node) {
+    if (typeof node === "string") {
+      for (const m of node.matchAll(PLACEHOLDER))
+        found.add(m[1]);
+      return;
+    }
+    if (Array.isArray(node)) {
+      for (const v of node)
+        walk(v);
+      return;
+    }
+    if (node && typeof node === "object") {
+      for (const v of Object.values(node))
+        walk(v);
+    }
+  }
 }
 
 // ../zveltio-extensions/node_modules/kysely/dist/util/object-utils.js
@@ -31097,6 +31146,8 @@ var PageCreateSchema = exports_external.object({
   status: exports_external.enum(["draft", "published", "archived"]).optional(),
   blocks: exports_external.array(exports_external.any()).optional(),
   kind: exports_external.enum(["page", "popup"]).optional(),
+  record_collection: exports_external.string().max(100).nullable().optional(),
+  record_field: exports_external.string().max(100).nullable().optional(),
   popup_config: exports_external.record(exports_external.string(), exports_external.any()).optional()
 });
 var PageUpdateSchema = PageCreateSchema.partial();
@@ -31245,6 +31296,8 @@ function sitesRoutes(ctx) {
       sort_order: data.sort_order ?? 0,
       status: data.status ?? "draft",
       kind: data.kind ?? "page",
+      record_collection: data.record_collection ?? null,
+      record_field: data.record_field ?? null,
       popup_config: jsonb(data.popup_config ?? {}),
       blocks: jsonb(sanitizeBlocks(data.blocks ?? [])),
       created_by: user?.id ?? null,
@@ -31363,7 +31416,7 @@ function sitesRoutes(ctx) {
       error: rc._error ?? null
     });
   });
-  app.get("/:slug/render/:pageSlug", async (c) => {
+  app.get("/:slug/render/:pageSlug/:key?", async (c) => {
     const site = await db.selectFrom("zv_page_sites").selectAll().where("slug", "=", c.req.param("slug")).where("is_active", "=", true).where("tenant_id", "=", tenantId(c)).executeTakeFirst();
     if (!site)
       return c.json({ error: "Site not found" }, 404);
@@ -31385,13 +31438,29 @@ function sitesRoutes(ctx) {
         return c.json({ error: "Insufficient role" }, 403);
       }
     }
-    const raw2 = typeof page.blocks === "string" ? JSON.parse(page.blocks) : page.blocks ?? [];
-    const blocks = sanitizeBlocks(await resolveBlocks({ db, engine }, {
+    const audience = {
       user,
       authType: c.get("authType") ?? "session",
       tenantId: tenantId(c),
       publicCollections: site.public_collections ?? []
-    }, raw2));
+    };
+    const recordKey = c.req.param("key");
+    let record2 = null;
+    if (page.record_collection) {
+      if (!recordKey)
+        return c.json({ error: "Page not found" }, 404);
+      record2 = await resolveRecord({ db, engine }, audience, page.record_collection, page.record_field || "slug", recordKey);
+      if (!record2)
+        return c.json({ error: "Page not found" }, 404);
+    } else if (recordKey) {
+      return c.json({ error: "Page not found" }, 404);
+    }
+    const raw2 = typeof page.blocks === "string" ? JSON.parse(page.blocks) : page.blocks ?? [];
+    if (record2) {
+      const named = new Set(placeholdersIn(raw2));
+      record2 = Object.fromEntries(Object.entries(record2).filter(([k]) => named.has(k)));
+    }
+    const blocks = sanitizeBlocks(await resolveBlocks({ db, engine }, audience, raw2));
     return c.json({
       site: {
         id: site.id,
@@ -31406,6 +31475,7 @@ function sitesRoutes(ctx) {
         show_breadcrumbs: site.show_breadcrumbs
       },
       page: { ...page, blocks: undefined },
+      record: record2,
       blocks
     });
   });
@@ -32043,19 +32113,32 @@ function publicPagesRoutes(ctx) {
       error: rc._error ?? null
     });
   });
-  router.get("/:slug", async (c) => {
+  async function servePage(c, slug, recordKey) {
     const site = await publicSite(c);
     if (!site)
       return c.json({ error: "Page not found" }, 404);
-    const page = await db.selectFrom("zv_pages").selectAll().where("site_id", "=", site.id).where("slug", "=", c.req.param("slug")).where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).where("kind", "=", "page").executeTakeFirst();
+    const page = await db.selectFrom("zv_pages").selectAll().where("site_id", "=", site.id).where("slug", "=", slug).where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).where("kind", "=", "page").executeTakeFirst();
     if (!page)
       return c.json({ error: "Page not found" }, 404);
     const raw2 = typeof page.blocks === "string" ? JSON.parse(page.blocks) : page.blocks ?? [];
-    const resolved = await resolveBlocks({ db, engine }, {
+    const audience = {
       user: null,
       tenantId: tenantId3(c),
       publicCollections: site.public_collections ?? []
-    }, raw2);
+    };
+    let record2 = null;
+    if (page.record_collection) {
+      if (!recordKey)
+        return c.json({ error: "Page not found" }, 404);
+      record2 = await resolveRecord({ db, engine }, audience, page.record_collection, page.record_field || "slug", recordKey);
+      if (!record2)
+        return c.json({ error: "Page not found" }, 404);
+      const named = new Set(placeholdersIn(raw2));
+      record2 = Object.fromEntries(Object.entries(record2).filter(([k]) => named.has(k)));
+    } else if (recordKey) {
+      return c.json({ error: "Page not found" }, 404);
+    }
+    const resolved = await resolveBlocks({ db, engine }, audience, raw2);
     const blocks = sanitizeBlocks(resolved);
     return c.json({
       page: {
@@ -32065,6 +32148,7 @@ function publicPagesRoutes(ctx) {
         is_homepage: page.is_homepage === true,
         ...metaOf(page)
       },
+      record: record2,
       site: {
         name: site.site_name ?? site.name,
         logo_url: site.site_logo_url,
@@ -32074,7 +32158,16 @@ function publicPagesRoutes(ctx) {
       blocks,
       popups: await popupsFor(c, site, page.slug)
     });
+  }
+  router.get("/_home", async (c) => {
+    const site = await publicSite(c);
+    if (!site)
+      return c.json({ error: "Page not found" }, 404);
+    const flagged = await db.selectFrom("zv_pages").select(["slug"]).where("site_id", "=", site.id).where("kind", "=", "page").where("is_homepage", "=", true).where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).executeTakeFirst();
+    return servePage(c, flagged?.slug ?? "home");
   });
+  router.get("/:slug", (c) => servePage(c, c.req.param("slug")));
+  router.get("/:slug/:key", (c) => servePage(c, c.req.param("slug"), c.req.param("key")));
   return router;
 }
 
@@ -32091,7 +32184,8 @@ function registerPublicSeoRoutes(ctx) {
     path: "/sitemap.xml",
     handler: async (c) => {
       const result = await sql`
-        SELECT p.slug, p.updated_at, sc.change_freq, sc.priority
+        SELECT p.slug, p.updated_at, sc.change_freq, sc.priority,
+               p.record_collection, p.record_field, s.public_collections
         FROM zv_pages p
         JOIN zv_page_sites s ON s.id = p.site_id
         LEFT JOIN zv_page_sitemap_config sc ON sc.page_id = p.id
@@ -32110,13 +32204,40 @@ function registerPublicSeoRoutes(ctx) {
           AND (sc.include_in_sitemap = true OR sc.page_id IS NULL)
       `.execute(db);
       const base = baseUrl(c);
-      const urls = result.rows.map((p) => `
+      const RECORD_CAP = 500;
+      async function addressesFor(row) {
+        if (!row.record_collection)
+          return [row.slug === "home" ? "" : row.slug];
+        const published = row.public_collections ?? [];
+        if (!published.includes(row.record_collection))
+          return [];
+        const field = row.record_field || "slug";
+        const cols = await sql`
+          SELECT column_name FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = ${`zvd_${row.record_collection}`}
+        `.execute(db);
+        const names = new Set(cols.rows.map((r) => r.column_name));
+        if (!names.has(field))
+          return [];
+        const keys = await sql`
+          SELECT ${sql.id(field)}::text AS k
+          FROM ${sql.id(`zvd_${row.record_collection}`)}
+          WHERE ${sql.id(field)} IS NOT NULL
+          LIMIT ${RECORD_CAP}
+        `.execute(db);
+        return keys.rows.map((r) => `${row.slug}/${r.k}`);
+      }
+      const urls = (await Promise.all(result.rows.map(async (p) => {
+        const paths = await addressesFor(p);
+        const lastmod = new Date(p.updated_at).toISOString().split("T")[0];
+        return paths.map((path) => `
   <url>
-    <loc>${base}/${p.slug === "home" ? "" : p.slug}</loc>
-    <lastmod>${new Date(p.updated_at).toISOString().split("T")[0]}</lastmod>
+    <loc>${base}/${path}</loc>
+    <lastmod>${lastmod}</lastmod>
     <changefreq>${p.change_freq || "weekly"}</changefreq>
     <priority>${p.priority ?? 0.5}</priority>
   </url>`).join("");
+      }))).join("");
       c.header("Content-Type", "application/xml");
       return c.body(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}
@@ -32150,7 +32271,8 @@ var extension = {
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_saved_templates.sql"),
       join(import.meta.dir, "migrations/003_popups_and_blocks.sql"),
-      join(import.meta.dir, "migrations/004_jsonb_not_text.sql")
+      join(import.meta.dir, "migrations/004_jsonb_not_text.sql"),
+      join(import.meta.dir, "migrations/005_record_pages.sql")
     ];
   },
   async register(app, ctx) {

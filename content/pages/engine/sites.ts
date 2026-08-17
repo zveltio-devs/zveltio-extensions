@@ -26,8 +26,9 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { findBlockById, resolveBlockAt, resolveBlocks } from './hydrate.js';
+import { findBlockById, resolveBlockAt, resolveBlocks, resolveRecord } from './hydrate.js';
 import { sanitizeBlocks } from './sanitize.js';
+import { placeholdersIn } from '../client/bind.js';
 import { jsonb } from './jsonb.js';
 
 // biome-ignore lint/suspicious/noExplicitAny: the internals bag is typed engine-side
@@ -75,6 +76,12 @@ const PageCreateSchema = z.object({
   status: z.enum(['draft', 'published', 'archived']).optional(),
   blocks: z.array(z.any()).optional(),
   kind: z.enum(['page', 'popup']).optional(),
+  /**
+   * The collection this page shows ONE row of, and the column its URL segment
+   * matches. Both null for an ordinary page.
+   */
+  record_collection: z.string().max(100).nullable().optional(),
+  record_field: z.string().max(100).nullable().optional(),
   /**
    * When and where a popup appears. Free-form on purpose: these are read as a
    * whole by one component and never queried on. The renderer clamps every
@@ -332,6 +339,8 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
         sort_order: data.sort_order ?? 0,
         status: data.status ?? 'draft',
         kind: data.kind ?? 'page',
+        record_collection: data.record_collection ?? null,
+        record_field: data.record_field ?? null,
         popup_config: jsonb(data.popup_config ?? {}),
         blocks: jsonb(sanitizeBlocks(data.blocks ?? [])),
         created_by: user?.id ?? null,
@@ -542,8 +551,15 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
     });
   });
 
-  /** One page with its blocks resolved. */
-  app.get('/:slug/render/:pageSlug', async (c) => {
+  /**
+   * One page with its blocks resolved.
+   *
+   * `/:key` addresses a RECORD page — the same mechanism the public site has,
+   * behind this site's roles. A portal listing invoices can link each row to a
+   * page showing that invoice, and the record is resolved through `checkAccess`
+   * for the signed-in viewer rather than for the page's author.
+   */
+  app.get('/:slug/render/:pageSlug/:key?', async (c) => {
     const site = await db
       .selectFrom('zv_page_sites')
       .selectAll()
@@ -581,19 +597,39 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
       }
     }
 
-    const raw: Any[] = typeof page.blocks === 'string' ? JSON.parse(page.blocks) : (page.blocks ?? []);
-    const blocks = sanitizeBlocks(
-      await resolveBlocks(
+    const audience = {
+      user,
+      authType: c.get('authType') ?? 'session',
+      tenantId: tenantId(c),
+      publicCollections: site.public_collections ?? [],
+    };
+
+    const recordKey = c.req.param('key');
+    let record: Record<string, Any> | null = null;
+    if (page.record_collection) {
+      if (!recordKey) return c.json({ error: 'Page not found' }, 404);
+      record = await resolveRecord(
         { db, engine },
-        {
-          user,
-          authType: c.get('authType') ?? 'session',
-          tenantId: tenantId(c),
-          publicCollections: site.public_collections ?? [],
-        },
-        raw,
-      ),
-    );
+        audience,
+        page.record_collection,
+        page.record_field || 'slug',
+        recordKey,
+      );
+      if (!record) return c.json({ error: 'Page not found' }, 404);
+    } else if (recordKey) {
+      return c.json({ error: 'Page not found' }, 404);
+    }
+
+    const raw: Any[] = typeof page.blocks === 'string' ? JSON.parse(page.blocks) : (page.blocks ?? []);
+
+    // Only the fields the page names — see the same note on the public path. A
+    // portal viewer is signed in, but "signed in" is not "entitled to every
+    // column of that row", and the page's own references are the honest list.
+    if (record) {
+      const named = new Set(placeholdersIn(raw));
+      record = Object.fromEntries(Object.entries(record).filter(([k]) => named.has(k)));
+    }
+    const blocks = sanitizeBlocks(await resolveBlocks({ db, engine }, audience, raw));
 
     return c.json({
       site: {
@@ -609,6 +645,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
         show_breadcrumbs: site.show_breadcrumbs,
       },
       page: { ...page, blocks: undefined },
+      record,
       blocks,
     });
   });
