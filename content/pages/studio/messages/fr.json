@@ -121,7 +121,6 @@
   "content.pages.field.accessRoles": "Rôles autorisés à entrer",
   "content.pages.field.active": "Actif",
   "content.pages.field.allowedRoles": "Rôles autorisés",
-  "content.pages.field.authRequired": "Connexion requise",
   "content.pages.field.basePath": "Chemin de base",
   "content.pages.field.isPublic": "Site public (visiteurs anonymes)",
   "content.pages.field.logoUrl": "URL du logo",
@@ -225,5 +224,10 @@
   "content.pages.title": "Pages",
   "content.pages.toast.restored": "Version restaurée",
   "content.pages.toast.saved": "Enregistré",
-  "content.pages.unpublish": "Dépublier"
+  "content.pages.unpublish": "Dépublier",
+  "content.pages.visibility.label": "Qui peut la voir",
+  "content.pages.visibility.private": "Privée",
+  "content.pages.visibility.privateHint": "Nécessite une connexion. Jamais listée ni dans le plan du site.",
+  "content.pages.visibility.public": "Publique",
+  "content.pages.visibility.publicHint": "Tout le monde peut l’ouvrir, et elle figure dans le plan du site."
 }

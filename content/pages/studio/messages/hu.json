@@ -121,7 +121,6 @@
   "content.pages.field.accessRoles": "Belépésre jogosult szerepkörök",
   "content.pages.field.active": "Aktív",
   "content.pages.field.allowedRoles": "Engedélyezett szerepkörök",
-  "content.pages.field.authRequired": "Bejelentkezés szükséges",
   "content.pages.field.basePath": "Alapútvonal",
   "content.pages.field.isPublic": "Nyilvános webhely (névtelen látogatók)",
   "content.pages.field.logoUrl": "Logó URL",
@@ -225,5 +224,10 @@
   "content.pages.title": "Oldalak",
   "content.pages.toast.restored": "Verzió visszaállítva",
   "content.pages.toast.saved": "Mentve",
-  "content.pages.unpublish": "Közzététel visszavonása"
+  "content.pages.unpublish": "Közzététel visszavonása",
+  "content.pages.visibility.label": "Ki láthatja",
+  "content.pages.visibility.private": "Privát",
+  "content.pages.visibility.privateHint": "Bejelentkezést igényel. Soha nem szerepel a listában vagy a webhelytérképen.",
+  "content.pages.visibility.public": "Nyilvános",
+  "content.pages.visibility.publicHint": "Bárki megnyithatja, és megjelenik a webhelytérképen."
 }

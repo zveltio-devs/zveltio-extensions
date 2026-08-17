@@ -121,7 +121,6 @@
   "content.pages.field.accessRoles": "Ruoli che possono entrare",
   "content.pages.field.active": "Attivo",
   "content.pages.field.allowedRoles": "Ruoli consentiti",
-  "content.pages.field.authRequired": "Richiede l'accesso",
   "content.pages.field.basePath": "Percorso base",
   "content.pages.field.isPublic": "Sito pubblico (visitatori anonimi)",
   "content.pages.field.logoUrl": "URL del logo",
@@ -225,5 +224,10 @@
   "content.pages.title": "Pagine",
   "content.pages.toast.restored": "Versione ripristinata",
   "content.pages.toast.saved": "Salvato",
-  "content.pages.unpublish": "Rimuovi pubblicazione"
+  "content.pages.unpublish": "Rimuovi pubblicazione",
+  "content.pages.visibility.label": "Chi può vederla",
+  "content.pages.visibility.private": "Privata",
+  "content.pages.visibility.privateHint": "Richiede l’accesso. Mai elencata né nella mappa del sito.",
+  "content.pages.visibility.public": "Pubblica",
+  "content.pages.visibility.publicHint": "Chiunque può aprirla e compare nella mappa del sito."
 }
