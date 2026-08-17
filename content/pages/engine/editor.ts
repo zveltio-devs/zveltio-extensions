@@ -14,6 +14,9 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { sanitizeBlocks } from './sanitize.js';
+import { jsonb } from './jsonb.js';
+import { ICON_NAMES } from '../client/icons.js';
+import { MOTION_TYPES } from '../client/motion.js';
 import { resolveBlocks } from './hydrate.js';
 
 // biome-ignore lint/suspicious/noExplicitAny: Hono context in a self-contained extension
@@ -208,17 +211,19 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
     if (!['main', 'footer'].includes(key)) {
       return c.json({ error: "menu key must be 'main' or 'footer'" }, 400);
     }
+    // `::text::jsonb`, not `::jsonb` — see jsonb.ts. A single cast on a string
+    // parameter is a no-op and stores the text as a JSON string scalar.
     const items = JSON.stringify(c.req.valid('json').items);
     // Update-then-insert (no ON CONFLICT): under RLS the UPDATE only touches
     // this tenant's row, and the INSERT stamps tenant_id via column DEFAULT.
     const updated = await sql<{ id: string }>`
-      UPDATE zv_page_menus SET items = ${items}::jsonb, updated_by = ${user.id}, updated_at = NOW()
+      UPDATE zv_page_menus SET items = ${items}::text::jsonb, updated_by = ${user.id}, updated_at = NOW()
       WHERE menu_key = ${key} RETURNING id
     `.execute(db);
     if (updated.rows.length === 0) {
       await sql`
         INSERT INTO zv_page_menus (menu_key, items, updated_by)
-        VALUES (${key}, ${items}::jsonb, ${user.id})
+        VALUES (${key}, ${items}::text::jsonb, ${user.id})
       `.execute(db);
     }
     return c.json({ menu_key: key, items: c.req.valid('json').items });
@@ -312,6 +317,21 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
     },
   );
 
+  /**
+   * The vocabularies the editor picks from, served rather than duplicated.
+   *
+   * `icons.ts` and `motion.ts` live beside the renderer, which is where they
+   * belong — but a file under `studio/src/` cannot import outside it, because
+   * the sync that copies extension pages into the Studio strips that prefix.
+   * Rather than a third hand-kept copy, the engine (which CAN import them)
+   * hands the lists over. One source, no parity test needed.
+   */
+  app.get('/vocabulary', async (c) => {
+    const user = await requireAuth(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ icons: ICON_NAMES, motion: MOTION_TYPES });
+  });
+
   // ─── Saved templates ──────────────────────────────────────────────────────
   //
   // A section an author liked, kept by name and dropped into the next page.
@@ -352,7 +372,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
             // Scrubbed on the way in like any other authored blocks — a template
             // is stored once and pasted many times, so markup that slipped
             // through would be multiplied rather than contained.
-            blocks: JSON.stringify(sanitizeBlocks(data.blocks)),
+            blocks: jsonb(sanitizeBlocks(data.blocks)),
             created_by: user.id,
           })
           .returningAll()
@@ -465,8 +485,8 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
       .insertInto('zv_pages')
       .values({
         ...body,
-        blocks: JSON.stringify(sanitizeBlocks(body.blocks)),
-        meta: JSON.stringify(body.meta),
+        blocks: jsonb(sanitizeBlocks(body.blocks)),
+        meta: jsonb(body.meta),
         created_by: user.id,
         updated_by: user.id,
       })
@@ -490,14 +510,19 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
       .where('id', '=', id)
       .executeTakeFirst();
     if (current) {
-      // pg serializes JS ARRAYS as Postgres array literals (`{...}`), not JSON —
-      // inserting the parsed `blocks` array raw makes EVERY update 500 with
-      // `invalid input syntax for type json`. Stringify explicitly.
-      const snapBlocks = typeof current.blocks === 'string' ? current.blocks : JSON.stringify(current.blocks ?? []);
-      const snapMeta = typeof current.meta === 'string' ? current.meta : JSON.stringify(current.meta ?? {});
+      // Rows written before `jsonb.ts` existed hold their JSON as TEXT, so the
+      // driver hands them back as a string. Parse those before writing, or the
+      // snapshot is the text of the text.
+      const parse = (v: unknown, fallback: unknown) =>
+        typeof v === 'string' ? JSON.parse(v || 'null') ?? fallback : (v ?? fallback);
       await db
         .insertInto('zv_page_revisions')
-        .values({ page_id: id, blocks: snapBlocks, meta: snapMeta, created_by: user.id })
+        .values({
+          page_id: id,
+          blocks: jsonb(parse(current.blocks, [])),
+          meta: jsonb(parse(current.meta, {})),
+          created_by: user.id,
+        })
         .execute();
     }
 
@@ -507,8 +532,8 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
     if (body.description !== undefined) updates.description = body.description;
     if (body.template !== undefined) updates.template = body.template;
     if (body.site_id !== undefined) updates.site_id = body.site_id;
-    if (body.blocks !== undefined) updates.blocks = JSON.stringify(sanitizeBlocks(body.blocks));
-    if (body.meta !== undefined) updates.meta = JSON.stringify(body.meta);
+    if (body.blocks !== undefined) updates.blocks = jsonb(sanitizeBlocks(body.blocks));
+    if (body.meta !== undefined) updates.meta = jsonb(body.meta);
     if (body.locale !== undefined) updates.locale = body.locale;
     if (body.meta_title !== undefined) updates.meta_title = body.meta_title;
     if (body.meta_description !== undefined) updates.meta_description = body.meta_description;
@@ -597,18 +622,16 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
       .executeTakeFirst();
     if (!current) return c.json({ error: 'Page not found' }, 404);
 
-    // pg serializes a JS ARRAY as a Postgres array literal, not as JSON —
-    // handing the parsed value straight back makes the write fail with
-    // `invalid input syntax for type json`. Stringify explicitly, both ways.
-    const asJson = (v: unknown, fallback: string) =>
-      typeof v === 'string' ? v : JSON.stringify(v ?? JSON.parse(fallback));
+    // Same shape question as above: an older row hands back a string.
+    const asValue = (v: unknown, fallback: unknown) =>
+      typeof v === 'string' ? JSON.parse(v || 'null') ?? fallback : (v ?? fallback);
 
     await db
       .insertInto('zv_page_revisions')
       .values({
         page_id: id,
-        blocks: asJson(current.blocks, '[]'),
-        meta: asJson(current.meta, '{}'),
+        blocks: jsonb(asValue(current.blocks, [])),
+        meta: jsonb(asValue(current.meta, {})),
         created_by: user.id,
       })
       .execute();
@@ -623,8 +646,8 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
         // Scrubbed again on the way back in: the revision was stored before
         // today's sanitiser reached `richtext` and nested blocks, so an old
         // snapshot can carry markup a current save would never accept.
-        blocks: JSON.stringify(sanitizeBlocks(restoredBlocks)),
-        meta: asJson(revision.meta, '{}'),
+        blocks: jsonb(sanitizeBlocks(restoredBlocks)),
+        meta: jsonb(asValue(revision.meta, {})),
         updated_at: new Date(),
         updated_by: user.id,
       })
@@ -698,7 +721,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
         meta_description_score: metaScore,
         heading_score: headingScore,
         image_alt_score: imageAltScore,
-        issues: JSON.stringify(issues),
+        issues: jsonb(issues),
       })
       .returningAll()
       .executeTakeFirst();
@@ -735,7 +758,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
         .values({
           page_id: c.req.param('id'),
           ...data,
-          blocks: JSON.stringify(sanitizeBlocks(data.blocks)),
+          blocks: jsonb(sanitizeBlocks(data.blocks)),
           created_by: user.id,
         })
         .returningAll()

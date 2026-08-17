@@ -61,6 +61,47 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
       .executeTakeFirst();
   }
 
+  /**
+   * The popups that belong on this page.
+   *
+   * A popup is a page with `kind = 'popup'`, so its blocks resolve through the
+   * SAME resolver with the same audience — a data block inside a popup is judged
+   * exactly as one on the page behind it. Elementor keeps popups in a separate
+   * builder with a separate conditions engine; here they are pages, which is why
+   * they inherit the authorisation instead of needing their own.
+   *
+   * `targets` empty means every page of the site; otherwise it lists slugs.
+   */
+  async function popupsFor(c: Any, site: Any, pageSlug: string): Promise<Any[]> {
+    const rows = await db
+      .selectFrom('zv_pages')
+      .select(['id', 'title', 'blocks', 'popup_config'])
+      .where('site_id', '=', site.id)
+      .where('kind', '=', 'popup')
+      .where('status', '=', 'published')
+      .where('is_active', '=', true)
+      .where('auth_required', '=', false)
+      .execute();
+
+    const out: Any[] = [];
+    for (const row of rows) {
+      const cfg = typeof row.popup_config === 'string'
+        ? JSON.parse(row.popup_config || '{}')
+        : (row.popup_config ?? {});
+      const targets: string[] = Array.isArray(cfg.targets) ? cfg.targets : [];
+      if (targets.length > 0 && !targets.includes(pageSlug)) continue;
+
+      const raw: Any[] = typeof row.blocks === 'string' ? JSON.parse(row.blocks) : (row.blocks ?? []);
+      const resolved = await resolveBlocks(
+        { db, engine },
+        { user: null, tenantId: tenantId(c), publicCollections: site.public_collections ?? [] },
+        raw,
+      );
+      out.push({ id: row.id, title: row.title, config: cfg, blocks: sanitizeBlocks(resolved) });
+    }
+    return out;
+  }
+
   /** GET /cms — published pages of the public site. */
   router.get('/', async (c) => {
     const site = await publicSite(c);
@@ -75,6 +116,7 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
       // A page behind a role is not part of the public site even when it lives
       // on one, so it is not listed and `/cms/:slug` will not serve it either.
       .where('auth_required', '=', false)
+      .where('kind', '=', 'page')
       .orderBy('is_homepage desc')
       .orderBy('title asc')
       .execute();
@@ -168,6 +210,9 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
       .where('status', '=', 'published')
       .where('is_active', '=', true)
       .where('auth_required', '=', false)
+      // A popup is a page by storage and not by navigation: it is never served
+      // at its own slug, never listed, never in the sitemap.
+      .where('kind', '=', 'page')
       .executeTakeFirst();
 
     if (!page) return c.json({ error: 'Page not found' }, 404);
@@ -206,6 +251,7 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
         custom_css: site.custom_css,
       },
       blocks,
+      popups: await popupsFor(c, site, page.slug),
     });
   });
 
