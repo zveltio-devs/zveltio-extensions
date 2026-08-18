@@ -1,3 +1,4 @@
+import { readMultipart, MULTIPART_REQUIRED } from '@zveltio/sdk/extension';
 /**
  * SAML 2.0 SSO routes
  *
@@ -197,7 +198,8 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
 
     let body: Record<string, string>;
     try {
-      const formData = await c.req.formData();
+      const formData = await readMultipart(c);
+      if (!formData) return c.json(MULTIPART_REQUIRED, 400);
       body = Object.fromEntries(formData.entries()) as Record<string, string>;
     } catch {
       return c.json({ error: 'Invalid form data in SAML callback' }, 400);
