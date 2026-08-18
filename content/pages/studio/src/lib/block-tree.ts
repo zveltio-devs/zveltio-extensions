@@ -1,3 +1,4 @@
+import type { Block } from './builder-types.js';
 /**
  * Moving blocks around a tree.
  *
@@ -17,14 +18,17 @@
 // biome-ignore lint/suspicious/noExplicitAny: block content is untyped JSON
 type Any = any;
 
-export interface TreeBlock {
-  id: string;
-  type: string;
-  content?: Record<string, Any>;
-  style?: Record<string, Any>;
-  col_span?: number;
-  [k: string]: Any;
-}
+/**
+ * The block shape this module walks.
+ *
+ * It used to be a second declaration of the same concept, and the two did not
+ * assign to each other: `content` was optional here and required in `Block`, so
+ * every call from `BlockList.svelte` was a type error. Six of them, standing
+ * long enough to be scenery — which is the real cost, because a genuine
+ * divergence between the editor's shape and the tree's would have looked exactly
+ * the same.
+ */
+export type TreeBlock = Block;
 
 /** The block type that holds a list of other blocks. */
 export const CONTAINER_TYPE = 'container';

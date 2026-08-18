@@ -13,6 +13,24 @@ export interface BlockStyle {
   textAlign?: 'left' | 'center' | 'right';
 }
 
+/**
+ * How a block enters and behaves as the visitor scrolls.
+ *
+ * The editor has written this since the builder was rewired, through
+ * `onPatch(b => ({ ...b, motion: { ...(b as any).motion, [key]: value } }))` —
+ * the cast is why the write compiled and every READ of `block.motion` did not.
+ * The vocabulary is the engine's (`GET /pages/vocabulary` → `MOTION_TYPES`), so
+ * `type` is deliberately a plain string rather than a union that would have to be
+ * kept in step with a file in the other half of the extension.
+ */
+export interface BlockMotion {
+  type?: string;
+  duration?: number;
+  delay?: number;
+  sticky?: boolean;
+  stickyOffset?: number;
+}
+
 export interface Block {
   id: string;
   type: string;
@@ -29,6 +47,22 @@ export interface Block {
    * `col_span` and a page's arrangement was entirely made of them.
    */
   col_span?: number;
+  /** Entrance animation and sticky behaviour. See `BlockMotion`. */
+  motion?: BlockMotion;
+  /**
+   * A block carries fields this interface does not name.
+   *
+   * `block-tree.ts` declared its own `TreeBlock` with an index signature for
+   * exactly that reason, and the two types then refused to assign to each other
+   * — six errors in `BlockList.svelte` alone, all of the form "TreeBlock is not
+   * assignable to Block". Two declarations of one concept do not merely annoy
+   * the compiler: any REAL divergence between them is invisible, because the
+   * error is already there and already ignored.
+   *
+   * `TreeBlock` is now an alias of this type, so there is one shape.
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: an open payload, by design
+  [k: string]: any;
 }
 
 export interface LibraryBlock {
