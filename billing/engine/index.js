@@ -19680,7 +19680,7 @@ function billingRoutes(ctx) {
     const signature = c.req.header("stripe-signature") ?? "";
     const secret = process.env.STRIPE_WEBHOOK_SECRET ?? "";
     if (!secret) {
-      return c.json({ error: "Webhook secret not configured" }, 500);
+      return c.json({ error: "Webhook secret not configured" }, 503);
     }
     const rawBody = await c.req.text();
     const result = await handleWebhook(rawBody, signature, secret);

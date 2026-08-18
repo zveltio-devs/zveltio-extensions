@@ -167,7 +167,15 @@ export function billingRoutes(
     const signature = c.req.header('stripe-signature') ?? '';
     const secret = process.env.STRIPE_WEBHOOK_SECRET ?? '';
     if (!secret) {
-      return c.json({ error: 'Webhook secret not configured' }, 500);
+      // 503, not 500. The distinction is not cosmetic here: Stripe retries a
+      // webhook on any 5xx, so either code keeps the event queued for redelivery
+      // — which is what we want, because the event is real and will be
+      // deliverable the moment STRIPE_WEBHOOK_SECRET is set. What 500 gets wrong
+      // is everyone else: it tells uptime checks and error trackers the server
+      // is faulting, so an instance that simply has not configured billing pages
+      // an operator for a crash that never happened. 503 says "not available
+      // yet", which is exactly true.
+      return c.json({ error: 'Webhook secret not configured' }, 503);
     }
     const rawBody = await c.req.text();
     const result = await handleWebhook(rawBody, signature, secret);

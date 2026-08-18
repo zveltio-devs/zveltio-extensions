@@ -132,7 +132,9 @@ export function smsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any 
   app.post('/webhook/twilio', async (c) => {
     const authToken = process.env.TWILIO_AUTH_TOKEN ?? '';
     if (!authToken) {
-      return c.json({ error: 'Webhook not configured' }, 500);
+      // 503 for the same reason as the Stripe webhook in `billing`: Twilio still
+      // retries, but an unconfigured instance stops reporting itself as broken.
+      return c.json({ error: 'Webhook not configured' }, 503);
     }
 
     const body = await c.req.formData().catch(() => null);
