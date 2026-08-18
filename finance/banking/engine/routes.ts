@@ -5,37 +5,7 @@ import { sql } from 'kysely';
 import { createHash } from 'node:crypto';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate, toNumber } from '@zveltio/sdk/extension';
-
-// Minimal MT940 parser — handles :60F:, :61:, :86: tags
-function parseMT940(text: string): Array<{date: string, type: 'credit'|'debit', amount: number, description: string, reference: string}> {
-  const lines = text.replace(/\r\n/g, '\n').split('\n');
-  const transactions: any[] = [];
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
-    if (line.startsWith(':61:')) {
-      // Format: :61:YYMMDD[MMDD]C/D<Amount>N<TxType><TxRef>
-      const match = line.match(/:61:(\d{6})(\d{4})?(C|D)(\d+,\d+)N(\w+)(.*)?/);
-      if (match) {
-        const yy = match[1].slice(0, 2), mm = match[1].slice(2, 4), dd = match[1].slice(4, 6);
-        const year = parseInt(yy) < 50 ? `20${yy}` : `19${yy}`;
-        const date = `${year}-${mm}-${dd}`;
-        const type = match[3] === 'C' ? 'credit' : 'debit';
-        const amount = parseFloat(match[4].replace(',', '.'));
-        const reference = match[5] ?? '';
-        let description = '';
-        // Next line(s) starting with :86: are the narrative
-        if (lines[i + 1]?.startsWith(':86:')) {
-          description = lines[i + 1].slice(4).trim();
-          i++;
-        }
-        transactions.push({ date, type, amount, description, reference });
-      }
-    }
-    i++;
-  }
-  return transactions;
-}
+import { parseMT940 } from './mt940.js';
 
 // Apply categorization rules to a transaction
 async function applyRules(dbh: any, accountId: string, tx: any): Promise<string | null> {
@@ -206,7 +176,22 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const { content, filename } = c.req.valid('json');
     const accountId = c.req.param('id');
-    const transactions = parseMT940(content);
+    // A statement line the parser cannot read is refused, not skipped. Importing
+    // the rest would balance the account against a total that was never right,
+    // and the operator would reconcile against it believing it complete.
+    const parsed = parseMT940(content);
+    if (parsed.unparsed.length > 0) {
+      return c.json(
+        {
+          error:
+            `${parsed.unparsed.length} statement line(s) could not be read. Nothing was imported — ` +
+            'importing the rest would leave the balance wrong with no record of what was missed.',
+          unparsed: parsed.unparsed.slice(0, 10),
+        },
+        400,
+      );
+    }
+    const transactions = parsed.transactions;
     if (!transactions.length) return c.json({ error: 'No transactions found in MT940 content' }, 400);
     const importRow = await sql`
       INSERT INTO zvd_bank_imports (account_id, source, filename, rows_imported, imported_by)
