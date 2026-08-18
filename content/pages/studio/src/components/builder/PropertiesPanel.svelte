@@ -97,7 +97,7 @@
    * that setting would be three chances to leave two of them wrong.
    */
   function patchMotion(key: string, value: any) {
-    onPatch(b => ({ ...b, motion: { ...((b as any).motion ?? {}), [key]: value } }));
+    onPatch(b => ({ ...b, motion: { ...(b.motion ?? {}), [key]: value } }));
   }
 
   function patchItems(items: any[]) {

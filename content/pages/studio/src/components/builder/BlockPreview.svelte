@@ -1,6 +1,7 @@
 <script lang="ts">
   import { m } from '$lib/i18n.svelte.js';
   import type { Block, BlockStyle } from '../../lib/builder-types.js';
+  import { safeHtml } from '../../lib/sanitize.js';
 
   let { block }: { block: Block } = $props();
 
@@ -151,6 +152,56 @@
         <span>&lt;/&gt;</span> HTML / Embed
       </div>
     {/if}
+
+  {:else if block.type === 'button'}
+    <!--
+      A neutral button, not the variant's real classes. Those live in the public
+      renderer, and copying the map here would make a second one to keep in
+      step — which is the defect this whole file was part of. The canvas shows
+      that a button is here and what it says; how it is skinned is the renderer's
+      answer.
+    -->
+    <div class="p-3">
+      <span class="btn btn-primary btn-sm pointer-events-none">
+        {p.label ?? p.text ?? 'Button'}
+      </span>
+      {#if p.variant}<span class="ml-2 text-[10px] font-mono opacity-40">{p.variant}</span>{/if}
+    </div>
+
+  {:else if block.type === 'icon'}
+    <!--
+      The name and size, not the glyph. The icon paths are `client/icons.ts`,
+      which ships with the RENDERER and is not synced into the Studio — the
+      editor only ever receives the names, from `GET /pages/vocabulary`. Drawing
+      the real glyph here would mean a second copy of the icon set.
+    -->
+    <div class="p-3 flex items-center gap-2 text-base-content/60">
+      <span class="inline-flex items-center justify-center rounded border border-dashed"
+        style="width:{Math.min(Number(p.size) || 32, 48)}px;height:{Math.min(Number(p.size) || 32, 48)}px;color:{p.color || 'currentColor'}">
+        <span class="text-[9px] font-mono">icon</span>
+      </span>
+      <span class="text-xs font-mono">{p.name ?? 'star'}</span>
+      {#if p.label}<span class="text-sm">{p.label}</span>{/if}
+    </div>
+
+  <!--
+    Legacy types. The builder cannot add these, but stored pages contain them —
+    they came from the textarea editor this builder replaced — and the public
+    renderer draws them. The canvas showed a grey box with the type name instead,
+    so an author editing an older page saw a placeholder where a visitor saw
+    content, with no way to tell that apart from a block that was broken.
+  -->
+  {:else if block.type === 'heading'}
+    <div class="p-3"><span class="text-xl font-bold">{p.text ?? p.content ?? 'Heading'}</span></div>
+
+  {:else if block.type === 'text'}
+    <div class="p-3 text-sm opacity-80">{p.text ?? p.content ?? ''}</div>
+
+  {:else if block.type === 'html'}
+    <div class="p-3">
+      <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+      {@html safeHtml(String(p.html ?? p.content ?? ''))}
+    </div>
 
   {:else if block.type === 'container'}
     <!-- Reached only if a container is previewed outside the canvas; the canvas
