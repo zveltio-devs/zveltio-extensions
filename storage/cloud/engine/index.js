@@ -16,7 +16,15 @@ var __export = (target, all) => {
 
 // ../zveltio-extensions/storage/cloud/engine/index.ts
 import { join } from "path";
-
+// packages/sdk/src/extension/multipart.ts
+var MULTIPART_REQUIRED = { error: "Expected a multipart/form-data body." };
+async function readMultipart(c) {
+  try {
+    return await c.req.formData();
+  } catch {
+    return null;
+  }
+}
 // node_modules/.bun/hono@4.12.28/node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
@@ -20102,7 +20110,9 @@ function cloudRoutes(ctx) {
   app.post("/files/:id/versions", requireAuth, async (c) => {
     const fileId = c.req.param("id");
     const user = c.get("user");
-    const formData = await c.req.formData();
+    const formData = await readMultipart(c);
+    if (!formData)
+      return c.json(MULTIPART_REQUIRED, 400);
     const file2 = formData.get("file");
     if (!file2)
       return c.json({ error: "No file provided" }, 400);
@@ -20294,7 +20304,9 @@ function cloudRoutes(ctx) {
   });
   app.post("/upload", requireAuth, async (c) => {
     const user = c.get("user");
-    const form = await c.req.formData();
+    const form = await readMultipart(c);
+    if (!form)
+      return c.json(MULTIPART_REQUIRED, 400);
     const file2 = form.get("file");
     if (!file2)
       return c.json({ error: "No file provided" }, 400);

@@ -8,7 +8,7 @@ import type {
   ExtensionContext,
   ObjectStorageConfig,
 } from '@zveltio/sdk/extension';
-import { permissionGate } from '@zveltio/sdk/extension';
+import { permissionGate, readMultipart, MULTIPART_REQUIRED } from '@zveltio/sdk/extension';
 
 // Lazy aws4fetch client — mirrors the CORE media routes exactly
 // (packages/engine/src/routes/media.ts). Returns null when object storage is
@@ -289,7 +289,8 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
 
   router.post('/upload', async (c) => {
     const user = c.get('user' as never) as any;
-    const formData = await c.req.formData();
+    const formData = await readMultipart(c);
+    if (!formData) return c.json(MULTIPART_REQUIRED, 400);
     const file = formData.get('file') as File;
     const folderId = formData.get('folder_id') as string | null;
     const title = formData.get('title') as string | null;
