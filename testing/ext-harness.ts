@@ -12,7 +12,17 @@
  *      with a reason instead of failing);
  *   3. `register(app, ctx)` mounts without throwing on a tolerant mock ctx;
  *   4. no parameterless GET route crashes (status < 500) for an authenticated
- *      admin session, and the first GET route doesn't crash unauthenticated.
+ *      admin session, and the first GET route doesn't crash unauthenticated;
+ *   5. no parameterless POST route crashes on an empty body.
+ *
+ * Check 5 exists because checks 1-4 never touched a write path. Across 57
+ * extensions this suite was green while `created_by` was being stripped from
+ * every insert, `tenant_id` was being taken from the request body, and a POS
+ * sale could not be written at all — none of which a GET can see. An empty body
+ * is the one request that can be sent to any route without knowing what it
+ * wants, and a 5xx answer to it means the handler either does not validate
+ * before it reaches SQL, or reaches SQL that does not match the schema. Both
+ * were live defects found by hand in this audit.
  *
  * Deliberate constraints:
  *   - `hono` and `kysely` are loaded via explicit file paths, NOT bare
@@ -278,6 +288,10 @@ export interface ContractOptions {
   skipRoutes?: string[];
   /** GET paths allowed to return 5xx (documented per-extension exceptions). */
   allow500?: string[];
+  /** POST paths allowed to return 5xx on an empty body (documented exceptions). */
+  allow500Post?: string[];
+  /** POST paths to skip entirely in the write smoke (e.g. ones that call out). */
+  skipPostRoutes?: string[];
   /**
    * Extensions whose migrations must be applied first (repo-relative names,
    * e.g. 'hr/employees'). Mirrors a real cross-extension data dependency.
@@ -349,6 +363,8 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
   const name = relative(REPO, extDir); // e.g. "hr/employees"
   const skip = new Set(opts.skipRoutes ?? []);
   const allow500 = new Set(opts.allow500 ?? []);
+  const allow500Post = new Set(opts.allow500Post ?? []);
+  const skipPost = new Set(opts.skipPostRoutes ?? []);
 
   d(`extension contract: ${name}`, () => {
     let ext: any;
@@ -410,6 +426,42 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
         if ([500, 502, 504].includes(res.status) && !allow500.has(p)) {
           throw new Error(`${name} GET ${p} → ${res.status}: ${(await res.text()).slice(0, 300)}`);
         }
+      }
+    });
+
+    it('no parameterless POST route crashes on an empty body', async () => {
+      if (envUnsupported) return; // migrations env-skipped → tables absent by design
+      const { Hono } = (await honoP) as any;
+      const db = await getDb();
+      const app = new Hono();
+      await ext.register(app, makeCtx(db, { authed: true, admin: true }));
+      const posts: string[] = [
+        ...new Set(
+          (app.routes as Array<{ method: string; path: string }>)
+            .filter((r) => r.method === 'POST' && !r.path.includes(':') && !r.path.includes('*'))
+            .map((r) => r.path),
+        ),
+      ]
+        .filter((p) => !skipPost.has(p))
+        .slice(0, 20);
+      const broken: string[] = [];
+      for (const p of posts) {
+        if (allow500Post.has(p)) continue;
+        const res = await app.request(p, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: '{}',
+        });
+        // 400/422 is the CORRECT answer here — the body is empty on purpose, and
+        // a route that says so is a route that validates. 401/403/404/409 are
+        // fine too. Only a crash is a defect: it means the missing fields
+        // travelled as far as the database.
+        if (res.status >= 500 && res.status !== 501 && res.status !== 503) {
+          broken.push(`POST ${p} → ${res.status}: ${(await res.text()).slice(0, 200)}`);
+        }
+      }
+      if (broken.length > 0) {
+        throw new Error(`${name} does not survive an empty body:\n  ${broken.join('\n  ')}`);
       }
     });
 
