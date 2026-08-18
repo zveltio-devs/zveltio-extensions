@@ -165,12 +165,16 @@ export function billingRoutes(
   // POST /webhook/stripe — Stripe webhook (no auth, verified by HMAC)
   app.post('/webhook/stripe', async (c) => {
     const signature = c.req.header('stripe-signature') ?? '';
-    const secret = process.env.STRIPE_WEBHOOK_SECRET ?? '';
+    // `ZVELTIO_EXT_BILLING_STRIPE_WEBHOOK_SECRET`. Read through the host's slice
+    // of the environment rather than `process.env`, which from inside an
+    // in-process extension is the ENGINE's environment entire — DATABASE_URL,
+    // BETTER_AUTH_SECRET, FIELD_ENCRYPTION_KEY and all.
+    const secret = ctx.config.vars.STRIPE_WEBHOOK_SECRET ?? '';
     if (!secret) {
       // 503, not 500. The distinction is not cosmetic here: Stripe retries a
       // webhook on any 5xx, so either code keeps the event queued for redelivery
       // — which is what we want, because the event is real and will be
-      // deliverable the moment STRIPE_WEBHOOK_SECRET is set. What 500 gets wrong
+      // deliverable the moment the secret is set. What 500 gets wrong
       // is everyone else: it tells uptime checks and error trackers the server
       // is faulting, so an instance that simply has not configured billing pages
       // an operator for a crash that never happened. 503 says "not available
