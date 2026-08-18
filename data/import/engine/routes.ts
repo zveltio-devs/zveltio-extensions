@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { permissionGate } from '@zveltio/sdk/extension';
+import { permissionGate, readMultipart, MULTIPART_REQUIRED } from '@zveltio/sdk/extension';
 // ─── CSV parsing ──────────────────────────────────────────────────────────────
 
 function parseCSVLine(line: string, delimiter: string): string[] {
@@ -492,7 +492,8 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
     let rows: Record<string, any>[] = [];
 
     if (contentType.includes('multipart/form-data')) {
-      const formData = await c.req.formData();
+      const formData = await readMultipart(c);
+      if (!formData) return c.json(MULTIPART_REQUIRED, 400);
       const file = formData.get('file') as File | null;
       if (!file) return c.json({ error: 'No file provided' }, 400);
       const text = await file.text();
@@ -536,7 +537,8 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
     let onDuplicate = 'skip';
 
     if (contentType.includes('multipart/form-data')) {
-      const formData = await c.req.formData();
+      const formData = await readMultipart(c);
+      if (!formData) return c.json(MULTIPART_REQUIRED, 400);
       const file = formData.get('file') as File | null;
       if (!file) return c.json({ error: 'No file provided' }, 400);
 

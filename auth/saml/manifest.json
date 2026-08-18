@@ -3,7 +3,7 @@
   "displayName": "SAML 2.0 SSO",
   "category": "auth",
   "description": "SAML 2.0 Single Sign-On with external Identity Providers (Okta, Azure AD, Google Workspace)",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-auth-saml",
@@ -39,8 +39,8 @@
     "bundlePeers": true
   },
   "integrity": {
-    "engineSha256": "a7693795ca3ed198e9be215c3313ffd70f78a0693bc6319fcf984a136cf8682b",
-    "sourceSha256": "b5038b06f45eec1488e838634bc093ea021eaee0ef4b0952c6a4a4413295726d"
+    "engineSha256": "e3cb949e0c297a99d4e91519cd6d7b47774710f259e7d1588eea9a1b8ef6c203",
+    "sourceSha256": "e77617573502845db535db8981b9aea0a6ac24dbde2b0cda7342c7fee2177307"
   },
   "publicRoutes": [
     "/login",
