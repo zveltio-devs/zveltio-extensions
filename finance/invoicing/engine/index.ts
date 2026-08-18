@@ -1,4 +1,4 @@
-import type { ZveltioExtension } from '@zveltio/sdk/extension';
+import { type ZveltioExtension, toNumber } from '@zveltio/sdk/extension';
 import { join } from 'path';
 import { sql } from 'kysely';
 import { invoicingRoutes } from './routes.js';
@@ -103,10 +103,21 @@ const extension: ZveltioExtension = {
             ${input.method ?? 'transfer'}, ${input.reference ?? null}, ${input.notes ?? null}, ${input.userId})
         `.execute(ctx.db);
         // `amount_paid` and `total` are NUMERIC, which the driver hands back as
-        // strings; `+` on those concatenates. The unary `+` is what makes this
-        // addition rather than "049.00".
-        const newPaid = +invoice.amount_paid + input.amount;
-        const newStatus = newPaid >= +invoice.total ? 'paid' : 'partially_paid';
+        // strings; `+` on those concatenates rather than adds.
+        //
+        // Both operands are converted, not just the column. `input` arrives
+        // through `ctx.services`, whose `get<T>()` is an unchecked cast — the
+        // `amount: number` declared above is a claim by the caller, not a
+        // guarantee. One caller passing the string it read from its own NUMERIC
+        // column turns `49 + '5'` into `'495'`, and that is what gets written as
+        // the amount paid. `toNumber` also refuses NaN, which PostgreSQL would
+        // otherwise accept into the column and then compare as larger than every
+        // number, so `newPaid >= total` would mark the invoice paid.
+        const newPaid =
+          toNumber(invoice.amount_paid, 0, 'zvd_invoices.amount_paid') +
+          toNumber(input.amount, 0, 'invoicing.recordPayment#amount');
+        const newStatus =
+          newPaid >= toNumber(invoice.total, 0, 'zvd_invoices.total') ? 'paid' : 'partially_paid';
         const row = await sql<any>`
           UPDATE zvd_invoices SET amount_paid = ${newPaid}, status = ${newStatus}, updated_at = NOW()
           WHERE id = ${input.invoiceId} RETURNING id, number, status, amount_paid, total

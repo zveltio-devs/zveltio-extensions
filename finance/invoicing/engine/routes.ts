@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { permissionGate } from '@zveltio/sdk/extension';
+import { permissionGate, toNumber } from '@zveltio/sdk/extension';
 
 // These helpers receive an already-scoped db (the caller passes
 // `db`), so they use that parameter directly. They're declared
@@ -950,7 +950,11 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
       VALUES (${invoice.id}, ${d.amount}, ${d.payment_date}, ${d.payment_method}, ${d.reference ?? null}, ${d.notes ?? null}, ${user.id})
       RETURNING *
     `.execute(db);
-    const newPaid = +invoice.amount_paid + d.amount;
+    // Same conversion as the `invoicing.recordPayment` service, which is this
+    // route's body reachable by name. Two write paths onto one column that read
+    // it differently is how they drift apart. `d.amount` is a validated number
+    // here, so only the column needs converting.
+    const newPaid = toNumber(invoice.amount_paid, 0, 'zvd_invoices.amount_paid') + d.amount;
     const newStatus = newPaid >= invoice.total ? 'paid' : 'partially_paid';
     await sql`
       UPDATE zvd_invoices SET amount_paid = ${newPaid}, status = ${newStatus},

@@ -14,6 +14,108 @@ var __export = (target, all) => {
     });
 };
 
+// packages/sdk/src/extension/permission-gate.ts
+async function refuse(ctx, c, resource, action) {
+  let denial = null;
+  try {
+    denial = await ctx.describeDenial?.(resource, action) ?? null;
+  } catch {}
+  const names = denial?.canGrant.map((g) => g.name) ?? [];
+  const who = names.length === 0 ? "An administrator of this workspace" : names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
+  const what = denial?.confidential ? `${resource} is confidential` : `you do not have access to ${resource}`;
+  const detail = names.length === 0 ? `${what}. ${who} can grant it.` : `${what}. ${who} can give you access.`;
+  return c.json({
+    type: "about:blank",
+    title: "Forbidden",
+    status: 403,
+    code: "permission_required",
+    detail,
+    resource,
+    action,
+    confidential: denial?.confidential ?? false,
+    can_grant: names.map((name) => ({ name }))
+  }, 403);
+}
+function methodToAction(method) {
+  const m = method.toUpperCase();
+  switch (m) {
+    case "GET":
+    case "HEAD":
+    case "OPTIONS":
+      return "read";
+    case "POST":
+      return "create";
+    case "PATCH":
+    case "PUT":
+      return "update";
+    case "DELETE":
+      return "delete";
+    default:
+      return "delete";
+  }
+}
+function rbacMode() {
+  const v = globalThis.process?.env?.EXTENSION_RBAC;
+  return v === "permissive" ? "permissive" : "strict";
+}
+function permissionGate(ctx, resource, opts = {}) {
+  return async (c, next) => {
+    if (c.req.method === "OPTIONS") {
+      await next();
+      return;
+    }
+    const user = c.get("user");
+    if (!user?.id) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+    const methodKey = c.req.method.toUpperCase();
+    const action = opts.actionOverrides?.[methodKey] ?? methodToAction(methodKey);
+    const allowed = await ctx.checkPermission(user.id, resource, action);
+    if (!allowed) {
+      if (rbacMode() === "permissive") {
+        console.warn(`[permissionGate] WOULD DENY user=${user.id} ${c.req.method} ${c.req.path} \u2192 ${resource}:${action} (EXTENSION_RBAC=permissive \u2014 gate bypassed)`);
+        await next();
+        return;
+      }
+      return refuse(ctx, c, resource, action);
+    }
+    await next();
+  };
+}
+// packages/sdk/src/extension/numeric.ts
+class NumericConversionError extends Error {
+  value;
+  constructor(value, label) {
+    super(`${label ? `${label}: ` : ""}expected a finite number, got ${typeof value === "string" ? JSON.stringify(value) : String(value)}`);
+    this.value = value;
+    this.name = "NumericConversionError";
+  }
+}
+function toNumber(value, fallback = 0, label) {
+  if (value === null || value === undefined)
+    return fallback;
+  if (typeof value === "bigint") {
+    if (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER) {
+      throw new NumericConversionError(value, label);
+    }
+    return Number(value);
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value))
+      throw new NumericConversionError(value, label);
+    return value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "")
+      throw new NumericConversionError(value, label);
+    const n = Number(trimmed);
+    if (!Number.isFinite(n))
+      throw new NumericConversionError(value, label);
+    return n;
+  }
+  throw new NumericConversionError(value, label);
+}
 // ../zveltio-extensions/finance/invoicing/engine/index.ts
 import { join } from "path";
 
@@ -19441,74 +19543,6 @@ function date4(params) {
 
 // node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
 config(en_default());
-// packages/sdk/src/extension/permission-gate.ts
-async function refuse(ctx, c, resource, action) {
-  let denial = null;
-  try {
-    denial = await ctx.describeDenial?.(resource, action) ?? null;
-  } catch {}
-  const names = denial?.canGrant.map((g) => g.name) ?? [];
-  const who = names.length === 0 ? "An administrator of this workspace" : names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
-  const what = denial?.confidential ? `${resource} is confidential` : `you do not have access to ${resource}`;
-  const detail = names.length === 0 ? `${what}. ${who} can grant it.` : `${what}. ${who} can give you access.`;
-  return c.json({
-    type: "about:blank",
-    title: "Forbidden",
-    status: 403,
-    code: "permission_required",
-    detail,
-    resource,
-    action,
-    confidential: denial?.confidential ?? false,
-    can_grant: names.map((name) => ({ name }))
-  }, 403);
-}
-function methodToAction(method) {
-  const m = method.toUpperCase();
-  switch (m) {
-    case "GET":
-    case "HEAD":
-    case "OPTIONS":
-      return "read";
-    case "POST":
-      return "create";
-    case "PATCH":
-    case "PUT":
-      return "update";
-    case "DELETE":
-      return "delete";
-    default:
-      return "delete";
-  }
-}
-function rbacMode() {
-  const v = globalThis.process?.env?.EXTENSION_RBAC;
-  return v === "permissive" ? "permissive" : "strict";
-}
-function permissionGate(ctx, resource, opts = {}) {
-  return async (c, next) => {
-    if (c.req.method === "OPTIONS") {
-      await next();
-      return;
-    }
-    const user = c.get("user");
-    if (!user?.id) {
-      return c.json({ error: "Unauthorized" }, 401);
-    }
-    const methodKey = c.req.method.toUpperCase();
-    const action = opts.actionOverrides?.[methodKey] ?? methodToAction(methodKey);
-    const allowed = await ctx.checkPermission(user.id, resource, action);
-    if (!allowed) {
-      if (rbacMode() === "permissive") {
-        console.warn(`[permissionGate] WOULD DENY user=${user.id} ${c.req.method} ${c.req.path} \u2192 ${resource}:${action} (EXTENSION_RBAC=permissive \u2014 gate bypassed)`);
-        await next();
-        return;
-      }
-      return refuse(ctx, c, resource, action);
-    }
-    await next();
-  };
-}
 // ../zveltio-extensions/finance/invoicing/engine/routes.ts
 async function claimNumber(dbh, docType, series) {
   const row = await sql`
@@ -20107,7 +20141,7 @@ function invoicingRoutes(ctx) {
       VALUES (${invoice.id}, ${d.amount}, ${d.payment_date}, ${d.payment_method}, ${d.reference ?? null}, ${d.notes ?? null}, ${user.id})
       RETURNING *
     `.execute(db);
-    const newPaid = +invoice.amount_paid + d.amount;
+    const newPaid = toNumber(invoice.amount_paid, 0, "zvd_invoices.amount_paid") + d.amount;
     const newStatus = newPaid >= invoice.total ? "paid" : "partially_paid";
     await sql`
       UPDATE zvd_invoices SET amount_paid = ${newPaid}, status = ${newStatus},
@@ -20437,8 +20471,8 @@ var extension = {
           VALUES (${input.invoiceId}, ${input.amount}, ${input.paymentDate ?? new Date().toISOString().slice(0, 10)},
             ${input.method ?? "transfer"}, ${input.reference ?? null}, ${input.notes ?? null}, ${input.userId})
         `.execute(ctx.db);
-      const newPaid = +invoice.amount_paid + input.amount;
-      const newStatus = newPaid >= +invoice.total ? "paid" : "partially_paid";
+      const newPaid = toNumber(invoice.amount_paid, 0, "zvd_invoices.amount_paid") + toNumber(input.amount, 0, "invoicing.recordPayment#amount");
+      const newStatus = newPaid >= toNumber(invoice.total, 0, "zvd_invoices.total") ? "paid" : "partially_paid";
       const row = await sql`
           UPDATE zvd_invoices SET amount_paid = ${newPaid}, status = ${newStatus}, updated_at = NOW()
           WHERE id = ${input.invoiceId} RETURNING id, number, status, amount_paid, total
