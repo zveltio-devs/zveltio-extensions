@@ -29808,32 +29808,29 @@ function assertNonMetadataUrl(rawUrl, label = "Endpoint") {
 }
 
 // ../zveltio-extensions/ai/engine/lib/ai-crypto.ts
-function getKey() {
-  const key = process.env.AI_KEY_ENCRYPTION_KEY || process.env.MAIL_ENCRYPTION_KEY;
-  if (!key || key.length < 32) {
-    throw new Error("AI_KEY_ENCRYPTION_KEY env var must be set. Generate: openssl rand -hex 32");
+var _internals;
+function setInternals(internals) {
+  _internals = internals;
+}
+function internals() {
+  if (!_internals) {
+    throw new Error("[ai] host internals not wired \u2014 setInternals(ctx.internals) must run in register()");
   }
-  return key;
+  return _internals;
 }
 async function encryptApiKey(plaintext) {
   if (!plaintext)
     return "";
-  const keyMaterial = await crypto.subtle.importKey("raw", Buffer.from(getKey().slice(0, 64), "hex"), { name: "AES-GCM" }, false, ["encrypt"]);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, keyMaterial, new TextEncoder().encode(plaintext));
-  return `aes256gcm:${Buffer.from(iv).toString("hex")}:${Buffer.from(encrypted).toString("hex")}`;
+  return internals().encryptSecret(plaintext, { keyring: "ai" });
 }
 async function decryptApiKey(stored) {
-  if (!stored || !stored.startsWith("aes256gcm:"))
-    return stored;
-  const [, ivHex, cipherHex] = stored.split(":");
-  const keyMaterial = await crypto.subtle.importKey("raw", Buffer.from(getKey().slice(0, 64), "hex"), { name: "AES-GCM" }, false, ["decrypt"]);
-  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: Buffer.from(ivHex, "hex") }, keyMaterial, Buffer.from(cipherHex, "hex"));
-  return new TextDecoder().decode(decrypted);
+  if (!stored)
+    return "";
+  return internals().decryptSecret(stored, { keyring: "ai" });
 }
 
 // ../zveltio-extensions/ai/engine/lib/ai-provider.ts
-var EMBED_TIMEOUT_MS = Number(process.env.AI_EMBED_TIMEOUT_MS ?? 30000);
+var EMBED_TIMEOUT_MS = 30000;
 
 class OpenAIProvider {
   apiKey;
@@ -30103,15 +30100,6 @@ async function initAIProviders(db) {
     }
     if (provider) {
       aiProviderManager.register(provider, row.is_default);
-    }
-  }
-  if (!aiProviderManager.getDefault()) {
-    if (process.env.OPENAI_API_KEY) {
-      aiProviderManager.register(new OpenAIProvider(process.env.OPENAI_API_KEY, undefined, process.env.OPENAI_MODEL || "gpt-4o-mini"), true);
-    } else if (process.env.ANTHROPIC_API_KEY) {
-      aiProviderManager.register(new AnthropicProvider(process.env.ANTHROPIC_API_KEY, process.env.ANTHROPIC_MODEL), true);
-    } else if (process.env.OLLAMA_URL) {
-      aiProviderManager.register(new OllamaProvider(process.env.OLLAMA_URL, process.env.OLLAMA_MODEL), true);
     }
   }
 }
@@ -30730,8 +30718,8 @@ RESPONSE FORMAT (JSON only, no markdown):
 Generate realistic, complete schemas. Keep to 2-6 collections unless the description demands more.`;
 }
 function aiSchemaGenRoutes(ctx) {
-  const { db, auth, checkPermission, DDLManager, fieldTypeRegistry, internals } = ctx;
-  const enqueueDDLJob = internals.enqueueDDLJob;
+  const { db, auth, checkPermission, DDLManager, fieldTypeRegistry, internals: internals2 } = ctx;
+  const enqueueDDLJob = internals2.enqueueDDLJob;
   const router = new Hono2;
   const adminOnly = async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -30921,8 +30909,8 @@ function generateId(size = 21) {
 
 // ../zveltio-extensions/ai/engine/routes/ai-alchemist.ts
 function aiAlchemistRoutes(ctx) {
-  const { db, auth, checkPermission, DDLManager, fieldTypeRegistry, internals } = ctx;
-  const extractTextFromFile = internals.extractTextFromFile;
+  const { db, auth, checkPermission, DDLManager, fieldTypeRegistry, internals: internals2 } = ctx;
+  const extractTextFromFile = internals2.extractTextFromFile;
   const app = new Hono2;
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -33001,6 +32989,7 @@ var extension = {
     ];
   },
   async register(app, ctx) {
+    setInternals(ctx.internals);
     await initAIProviders(ctx.db).catch((err) => {
       console.warn("[ai extension] initAIProviders failed (non-fatal):", err.message);
     });

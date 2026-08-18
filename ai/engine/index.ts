@@ -2,6 +2,7 @@ import type { ZveltioExtension } from '@zveltio/sdk/extension';
 import { join } from 'path';
 import { buildAIRoutes } from './routes/index.js';
 import { aiProviderManager, initAIProviders } from './lib/ai-provider.js';
+import { setInternals } from './lib/ai-crypto.js';
 import { triggerEmbedding } from './lib/ai-embed-hook.js';
 import { ZveltioAIEngine } from './lib/zveltio-ai/engine.js';
 
@@ -49,6 +50,11 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
+    // Before anything that could touch a provider key. `initAIProviders` decrypts
+    // every configured key, so wiring this after it would make the first boot
+    // fail on a message about internals not being wired.
+    setInternals(ctx.internals);
+
     // Load configured AI providers from zv_ai_providers (extension-owned table).
     // Non-fatal: if no providers are configured, the extension stays loaded but
     // routes return 503 / "AI not configured" responses.

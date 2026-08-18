@@ -278,6 +278,29 @@ function makeCtx(db: any, opts: { authed: boolean; admin: boolean }, publicRoute
     queryAlter: { register() {} },
     fieldTypeRegistry: { register() {}, get: () => undefined, getAll: () => [], list: () => [] },
     DDLManager: anyStub(),
+    /**
+     * The host builds this on every load, so an extension that reads
+     * `ctx.config.vars.SOMETHING` is reading a real object in production. The
+     * mock had no `config` at all, which is why several extensions reach for it
+     * as `ctx.config?.x` — defensiveness against a shape only this file ever
+     * produced. Giving it the real shape means those can stop, and means an
+     * extension that reads `ctx.config.vars` is exercised rather than throwing
+     * on the first line of `register()`.
+     *
+     * `vars` is empty on purpose: the contract suite runs an extension as an
+     * instance that has configured nothing, which is the state a fresh install
+     * is in and the one where "not configured" handling has to be right.
+     */
+    config: Object.freeze({
+      vars: Object.freeze({}),
+      env: 'test' as const,
+      isProduction: false,
+      publicUrl: undefined,
+      encryptionConfigured: Boolean(process.env.FIELD_ENCRYPTION_KEY),
+      crossDomainAuth: false,
+      allowInsecureLdap: false,
+      objectStorage: undefined,
+    }),
     env: {},
     log: console,
   };

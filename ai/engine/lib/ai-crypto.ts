@@ -1,58 +1,61 @@
 /**
- * AES-256-GCM encryption for AI API keys.
- * Requires env var: AI_KEY_ENCRYPTION_KEY (32 bytes hex)
- * Falls back to MAIL_ENCRYPTION_KEY if AI_KEY_ENCRYPTION_KEY is not set.
+ * AES-256-GCM for AI provider API keys, performed by the host.
+ *
+ * This used to read `AI_KEY_ENCRYPTION_KEY` (falling back to
+ * `MAIL_ENCRYPTION_KEY`) from the environment and do the crypto here. In-process
+ * that meant the extension could reach the ENGINE's whole environment —
+ * `DATABASE_URL`, `BETTER_AUTH_SECRET`, `FIELD_ENCRYPTION_KEY` — so it held the
+ * `secrets` capability in practice while its manifest did not declare it, and
+ * the capability gate had nothing to enforce.
+ *
+ * The host now holds the key, under the same `AI_KEY_ENCRYPTION_KEY`, on its own
+ * `ai` keyring — so rotating it still does not touch field data or mail
+ * passwords, which is the reason a separate key existed in the first place.
+ *
+ * The envelope changed from `aes256gcm:` to `aes256gcm-ai:`. The host picks the
+ * decryption key from the envelope rather than from the caller's argument, and
+ * two keyrings sharing one prefix would defeat that — an AI key would be handed
+ * to the mail key and fail as though it were corrupt.
  */
-function getKey(): string {
-  const key =
-    process.env.AI_KEY_ENCRYPTION_KEY || process.env.MAIL_ENCRYPTION_KEY;
-  if (!key || key.length < 32) {
+
+// biome-ignore lint/suspicious/noExplicitAny: ctx.internals is engine-typed
+type Internals = any;
+
+let _internals: Internals | undefined;
+
+/** Wired from `register()` before any route can run. */
+export function setInternals(internals: Internals): void {
+  _internals = internals;
+}
+
+function internals(): Internals {
+  if (!_internals) {
     throw new Error(
-      'AI_KEY_ENCRYPTION_KEY env var must be set. Generate: openssl rand -hex 32',
+      '[ai] host internals not wired — setInternals(ctx.internals) must run in register()',
     );
   }
-  return key;
+  return _internals;
 }
 
 export async function encryptApiKey(plaintext: string): Promise<string> {
   if (!plaintext) return '';
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    Buffer.from(getKey().slice(0, 64), 'hex'),
-    { name: 'AES-GCM' },
-    false,
-    ['encrypt'],
-  );
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    keyMaterial,
-    new TextEncoder().encode(plaintext),
-  );
-  return `aes256gcm:${Buffer.from(iv).toString('hex')}:${Buffer.from(encrypted).toString('hex')}`;
+  return internals().encryptSecret(plaintext, { keyring: 'ai' });
 }
 
 export async function decryptApiKey(stored: string): Promise<string> {
-  if (!stored || !stored.startsWith('aes256gcm:')) return stored;
-  const [, ivHex, cipherHex] = stored.split(':');
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    Buffer.from(getKey().slice(0, 64), 'hex'),
-    { name: 'AES-GCM' },
-    false,
-    ['decrypt'],
-  );
-  const decrypted = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: Buffer.from(ivHex, 'hex') },
-    keyMaterial,
-    Buffer.from(cipherHex, 'hex'),
-  );
-  return new TextDecoder().decode(decrypted);
+  if (!stored) return '';
+  // A provider row saved before this extension encrypted anything holds a bare
+  // key. The host passes an unrecognised envelope through unchanged, so those
+  // keep working instead of failing at the first chat request.
+  return internals().decryptSecret(stored, { keyring: 'ai' });
 }
 
 export function maskApiKey(key: string): string {
   if (!key) return '';
-  if (key.startsWith('aes256gcm:')) return '***encrypted***';
+  // Both envelopes: rows written before the move to the host keyring carry the
+  // old `aes256gcm:` prefix, and showing one of those as a partial key would put
+  // ciphertext on screen where an administrator expects a masked secret.
+  if (key.startsWith('aes256gcm:') || key.startsWith('aes256gcm-ai:')) return '***encrypted***';
   if (key.length <= 8) return '***';
   return `${key.slice(0, 4)}***${key.slice(-4)}`;
 }
