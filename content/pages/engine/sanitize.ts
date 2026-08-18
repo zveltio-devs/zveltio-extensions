@@ -139,3 +139,52 @@ export function sanitizeBlocks(blocks: any[]): any[] {
     return { ...b, content: next };
   });
 }
+
+/**
+ * Give every block an `id`, so the parts that address a block by id work.
+ *
+ * The Studio assigns `crypto.randomUUID()` to each block it creates
+ * (`BlockLibrary`, `BlockList`, `PropertiesPanel`, and `block-tree.ts` backfills
+ * `b.id ?? crypto.randomUUID()`). The API did not, and stored whatever it was
+ * given. So a page created through `POST /sites/:slug/pages` came back with
+ * blocks that have no id, and `findBlockById` — which matches on `b.id` — could
+ * never find them.
+ *
+ * The consequence was silent rather than loud. `BlockRenderer` guards with
+ * `block.id ? rowsUrl : …`, so a data block without an id renders its first page
+ * of rows and simply never gets a rows URL: no load-more, no server-side sort,
+ * no search. The feature those endpoints exist for is absent and nothing says so.
+ *
+ * WRITE ONLY. `sanitizeBlocks` also runs on the render path, and assigning ids
+ * there would hand the client a fresh id on every request — a URL pointing at a
+ * block that does not exist under that id in storage, which is worse than no URL
+ * at all. Existing rows keep their missing ids until something rewrites them,
+ * which is honest: the id has to be the one that was persisted.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: JSONB block payload
+export function assignBlockIds(blocks: any[]): any[] {
+  if (!Array.isArray(blocks)) return blocks;
+  // biome-ignore lint/suspicious/noExplicitAny: JSONB block payload
+  return blocks.map((b: any) => {
+    if (!b || typeof b !== 'object') return b;
+    const next = { ...b, id: b.id ?? crypto.randomUUID() };
+    const content = next.content;
+    if (content && typeof content === 'object') {
+      const c = { ...content };
+      if (Array.isArray(c.children)) c.children = assignBlockIds(c.children);
+      if (c.item_template) c.item_template = assignBlockIds([c.item_template])[0];
+      next.content = c;
+    }
+    return next;
+  });
+}
+
+/**
+ * What every WRITE path passes its blocks through: scrub, then make sure each
+ * one can be addressed. One name to grep for, so route number nine cannot use
+ * only half of it.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: JSONB block payload
+export function sanitizeBlocksForWrite(blocks: any[]): any[] {
+  return assignBlockIds(sanitizeBlocks(blocks));
+}

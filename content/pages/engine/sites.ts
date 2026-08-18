@@ -27,7 +27,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { findBlockById, resolveBlockAt, resolveBlocks, resolveRecord } from './hydrate.js';
-import { sanitizeBlocks } from './sanitize.js';
+import { sanitizeBlocks, sanitizeBlocksForWrite } from './sanitize.js';
 import { placeholdersIn } from '../client/bind.js';
 import { jsonb } from './jsonb.js';
 
@@ -369,7 +369,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
         record_field: data.record_field ?? null,
         record_filter: jsonb(data.record_filter ?? []),
         popup_config: jsonb(data.popup_config ?? {}),
-        blocks: jsonb(sanitizeBlocks(data.blocks ?? [])),
+        blocks: jsonb(sanitizeBlocksForWrite(data.blocks ?? [])),
         created_by: user?.id ?? null,
         updated_by: user?.id ?? null,
         tenant_id: tenantId(c),
@@ -407,7 +407,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
     };
     // Blocks land on a page an audience reads, so they are scrubbed on the way
     // in as well as on the way out.
-    if (data.blocks !== undefined) patch.blocks = jsonb(sanitizeBlocks(data.blocks));
+    if (data.blocks !== undefined) patch.blocks = jsonb(sanitizeBlocksForWrite(data.blocks));
     if (data.popup_config !== undefined) patch.popup_config = jsonb(data.popup_config);
     // Same treatment as the other two JSONB columns: without the cast the array
     // is stored as a JSON string and reads back as text, which `parseFilterList`
