@@ -49,6 +49,30 @@ describe('block vocabulary', () => {
     expect(undrawn).toEqual([]);
   });
 
+  /**
+   * The Studio canvas is a fifth place the vocabulary lives, and it was the one
+   * nobody checked.
+   *
+   * `BlockRenderer.svelte` drew eighteen types; `BlockPreview.svelte` drew
+   * thirteen. The five it missed included `button` and `icon` — both OFFERED by
+   * the block library — so an author could add a button, set its label and link
+   * in the properties panel, and see a grey box with the word "button" on the
+   * canvas while the public page rendered it correctly. The other three were
+   * `heading`, `text` and `html`, which every page authored before this builder
+   * is made of.
+   *
+   * A placeholder is not a harmless fallback here: it looks exactly like a block
+   * that is broken, on the one screen whose whole job is showing what the
+   * visitor will see.
+   */
+  test('the Studio canvas previews every type the public renderer draws', async () => {
+    const src = await read('../studio/src/components/builder/BlockPreview.svelte');
+    const handled = new Set([...src.matchAll(/block\.type === '([a-z_]+)'/g)].map((m) => m[1]));
+
+    const unpreviewed = ALL_BLOCK_TYPES.filter((t) => !handled.has(t));
+    expect(unpreviewed).toEqual([]);
+  });
+
   test('the block-type library seeded by the migrations matches', async () => {
     // Every migration, not just the first: block types are seeded wherever they
     // were introduced, and a test that reads only 001 starts lying the moment a

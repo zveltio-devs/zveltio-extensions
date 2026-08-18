@@ -1034,7 +1034,7 @@
             <ArrowLeft size={12} /> {m['content.pages.openPages']()}
           </button>
           <button class="btn btn-ghost btn-xs gap-1"
-            onclick={() => savePage(selected.status === 'published' ? 'draft' : 'published')}>
+            onclick={() => savePage(selected?.status === 'published' ? 'draft' : 'published')}>
             <Globe size={12} />
             {selected.status === 'published' ? m['content.pages.unpublish']() : m['common.publish']()}
           </button>
