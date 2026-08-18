@@ -3,7 +3,7 @@
   "displayName": "Invoicing",
   "category": "finance",
   "description": "Recurring invoices, payment tracking and overdue management",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-invoicing",
@@ -46,8 +46,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "1428b1f6557366bcfab9a85de6b4a503a3cf078118afde98d5bbbcc3ca5069ac",
-    "sourceSha256": "3ca07298568db1636a30230bf0e58aa6567d6d66d5263d2b7d1e49755bdba077"
+    "engineSha256": "5ddff3726c4c91ee19009b66c27a08a85dbf9dad7b73682527e1acc329f322ed",
+    "sourceSha256": "0a3362fbf57e80d6cbc44c2ad3d2e6d642ab06cdb7ad09c9f3f4ba5cf620b7fa"
   },
   "resources": [
     "invoices"
