@@ -13,7 +13,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { sanitizeBlocks } from './sanitize.js';
+import { sanitizeBlocks, sanitizeBlocksForWrite } from './sanitize.js';
 import { jsonb } from './jsonb.js';
 import { ICON_NAMES } from '../client/icons.js';
 import { MOTION_TYPES } from '../client/motion.js';
@@ -372,7 +372,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
             // Scrubbed on the way in like any other authored blocks — a template
             // is stored once and pasted many times, so markup that slipped
             // through would be multiplied rather than contained.
-            blocks: jsonb(sanitizeBlocks(data.blocks)),
+            blocks: jsonb(sanitizeBlocksForWrite(data.blocks)),
             created_by: user.id,
           })
           .returningAll()
@@ -485,7 +485,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
       .insertInto('zv_pages')
       .values({
         ...body,
-        blocks: jsonb(sanitizeBlocks(body.blocks)),
+        blocks: jsonb(sanitizeBlocksForWrite(body.blocks)),
         meta: jsonb(body.meta),
         created_by: user.id,
         updated_by: user.id,
@@ -532,7 +532,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
     if (body.description !== undefined) updates.description = body.description;
     if (body.template !== undefined) updates.template = body.template;
     if (body.site_id !== undefined) updates.site_id = body.site_id;
-    if (body.blocks !== undefined) updates.blocks = jsonb(sanitizeBlocks(body.blocks));
+    if (body.blocks !== undefined) updates.blocks = jsonb(sanitizeBlocksForWrite(body.blocks));
     if (body.meta !== undefined) updates.meta = jsonb(body.meta);
     if (body.locale !== undefined) updates.locale = body.locale;
     if (body.meta_title !== undefined) updates.meta_title = body.meta_title;
@@ -646,7 +646,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
         // Scrubbed again on the way back in: the revision was stored before
         // today's sanitiser reached `richtext` and nested blocks, so an old
         // snapshot can carry markup a current save would never accept.
-        blocks: jsonb(sanitizeBlocks(restoredBlocks)),
+        blocks: jsonb(sanitizeBlocksForWrite(restoredBlocks)),
         meta: jsonb(asValue(revision.meta, {})),
         updated_at: new Date(),
         updated_by: user.id,
@@ -758,7 +758,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
         .values({
           page_id: c.req.param('id'),
           ...data,
-          blocks: jsonb(sanitizeBlocks(data.blocks)),
+          blocks: jsonb(sanitizeBlocksForWrite(data.blocks)),
           created_by: user.id,
         })
         .returningAll()
