@@ -20491,6 +20491,21 @@ var extension = {
         `.execute(ctx.db);
       return row.rows[0] ?? null;
     });
+    ctx.services.register("invoicing.openReceivables", async (window) => {
+      const r = await sql`
+          SELECT
+            due_date                        AS expected_date,
+            'inflow'                        AS type,
+            (total - amount_paid)           AS amount,
+            'Invoice ' || number            AS description,
+            'accounts_receivable'           AS category
+          FROM zvd_invoices
+          WHERE status IN ('sent', 'overdue')
+            AND due_date BETWEEN ${window.from} AND ${window.to}
+          ORDER BY due_date
+        `.execute(ctx.db);
+      return r.rows;
+    });
     ctx.services.register("invoicing.listByClient", async (clientId) => {
       const r = await sql`
         SELECT * FROM zvd_invoices WHERE client_id = ${clientId}::uuid ORDER BY issue_date DESC

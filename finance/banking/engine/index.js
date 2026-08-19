@@ -19909,13 +19909,18 @@ function bankingRoutes(ctx) {
       WHERE expected_date BETWEEN ${fromDate} AND ${toDate}
       ORDER BY expected_date
     `.execute(db);
-    const invoices = await sql`
-      SELECT due_date as expected_date, 'inflow' as type, total - amount_paid as amount, 'Invoice ' || number as description, 'accounts_receivable' as category
-      FROM zvd_invoices WHERE status IN ('sent','overdue') AND due_date BETWEEN ${fromDate} AND ${toDate}
-    `.execute(db);
+    const openReceivables = ctx.services.get("invoicing.openReceivables");
+    let receivables = [];
+    const unavailable = [];
+    if (openReceivables) {
+      receivables = await openReceivables({ from: fromDate, to: toDate });
+    } else {
+      unavailable.push("accounts_receivable");
+    }
     const toTime = (v) => v instanceof Date ? v.getTime() : new Date(String(v)).getTime();
     return c.json({
-      data: [...forecast.rows, ...invoices.rows].sort((a, b) => toTime(a.expected_date) - toTime(b.expected_date))
+      data: [...forecast.rows, ...receivables].sort((a, b) => toTime(a.expected_date) - toTime(b.expected_date)),
+      unavailable
     });
   });
   app.post("/cash-flow", zValidator("json", exports_external.object({
