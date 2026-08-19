@@ -241,7 +241,23 @@ DO $$
 DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
-    'zv_pages','zv_page_sites','zv_page_block_types','zv_page_revisions',
+    -- `zv_page_block_types` is deliberately NOT in this list.
+    --
+    -- It is the block picker's reference library: fourteen rows describing what a
+    -- `hero` or a `richtext` block IS, seeded once and identical for every company.
+    -- Putting it through this loop gave it a `tenant_id`, RLS, and a
+    -- `zveltio_tenant_scope_ok(tenant_id)` policy — while the seed below wrote every
+    -- row against the DEFAULT tenant. Measured as the `zveltio_rls` role a tenant
+    -- request actually runs as:
+    --
+    --   firma seed   -> 14 randuri
+    --   a doua firma ->  0 randuri
+    --
+    -- So the second company an instance creates opens the page builder to an empty
+    -- library and `GET /block-types` answers `{"block_types": []}`. The vocabulary
+    -- itself lives in `client/block-types.ts`; this table is its display metadata,
+    -- and there is nothing per-company about it.
+    'zv_pages','zv_page_sites','zv_page_revisions',
     'zv_page_seo_scores','zv_page_ab_variants','zv_page_metrics',
     'zv_page_redirects','zv_page_sitemap_config','zv_page_menus'
   ] LOOP
@@ -293,9 +309,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_zv_pages_site_slug
 CREATE UNIQUE INDEX IF NOT EXISTS uq_zv_pages_site_homepage
   ON zv_pages (tenant_id, site_id) NULLS NOT DISTINCT WHERE is_homepage = true;
 
-UPDATE zv_page_block_types SET tenant_id = '00000000-0000-0000-0000-000000000001'::uuid WHERE tenant_id IS NULL;
+-- One row per block type, for the whole instance. This was UNIQUE (tenant_id,
+-- name), which is what a per-company catalogue would need and this is not one.
 ALTER TABLE zv_page_block_types DROP CONSTRAINT IF EXISTS zv_page_block_types_name_key;
-ALTER TABLE zv_page_block_types ADD CONSTRAINT zv_page_block_types_name_key UNIQUE (tenant_id, name);
+ALTER TABLE zv_page_block_types ADD CONSTRAINT zv_page_block_types_name_key UNIQUE (name);
 
 UPDATE zv_page_redirects SET tenant_id = '00000000-0000-0000-0000-000000000001'::uuid WHERE tenant_id IS NULL;
 ALTER TABLE zv_page_redirects DROP CONSTRAINT IF EXISTS zv_page_redirects_from_path_key;
@@ -311,20 +328,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_zv_page_sites_tenant_slug ON zv_page_sites 
 -- rendered but never listed, so it could not be added from the block picker —
 -- the only way to get one was to write the JSON by hand.
 
-INSERT INTO zv_page_block_types (name, display_name, description, icon, schema, default_props, tenant_id) VALUES
-  ('hero', 'Hero', 'Full-width hero section with heading and CTA', 'Image', '{"title": "string", "subtitle": "string", "image_url": "string", "cta_text": "string", "cta_url": "string", "align": "string"}', '{"title": "Welcome", "subtitle": "", "align": "center", "cta_text": "Get Started", "cta_url": "/"}', '00000000-0000-0000-0000-000000000001'),
-  ('richtext', 'Rich Text', 'WYSIWYG text content block', 'Type', '{"content": "string"}', '{"content": "<p>Start writing...</p>"}', '00000000-0000-0000-0000-000000000001'),
-  ('image', 'Image', 'Single image with caption', 'ImageIcon', '{"url": "string", "alt": "string", "caption": "string", "width": "string"}', '{"url": "", "alt": "", "caption": "", "width": "100%"}', '00000000-0000-0000-0000-000000000001'),
-  ('container', 'Container', 'Holds other blocks side by side', 'Columns', '{"children": "array", "gap": "string"}', '{"children": [], "gap": "md"}', '00000000-0000-0000-0000-000000000001'),
-  ('cta', 'Call to Action', 'Highlighted call-to-action section', 'Megaphone', '{"heading": "string", "text": "string", "button_text": "string", "button_url": "string", "style": "string"}', '{"heading": "Ready to get started?", "text": "", "button_text": "Contact Us", "button_url": "/contact", "style": "primary"}', '00000000-0000-0000-0000-000000000001'),
-  ('embed', 'Embed', 'Arbitrary HTML or iframe embed', 'Code', '{"html": "string"}', '{"html": ""}', '00000000-0000-0000-0000-000000000001'),
-  ('spacer', 'Spacer', 'Vertical whitespace', 'Minus', '{"height": "number"}', '{"height": 48}', '00000000-0000-0000-0000-000000000001'),
-  ('collection_list', 'Collection Data', 'Live rows from one of your collections, filtered and sorted', 'Table', '{"collection": "string", "view_type": "string", "display_fields": "string", "filters": "array", "sort_field": "string", "sort_dir": "string", "limit": "number"}', '{"collection": "", "view_type": "list", "display_fields": "", "filters": [], "sort_dir": "desc", "limit": 10}', '00000000-0000-0000-0000-000000000001'),
-  ('divider', 'Divider', 'Horizontal separator', 'Minus', '{"color": "string", "thickness": "number", "line_style": "string"}', '{"color": "#e5e7eb", "thickness": 1, "line_style": "solid"}', '00000000-0000-0000-0000-000000000001'),
-  ('stats', 'Stats', 'Key metrics display', 'BarChart', '{"items": "array", "columns": "number"}', '{"items": [{"value": "100+", "label": "Users"}], "columns": 4}', '00000000-0000-0000-0000-000000000001'),
-  ('video', 'Video', 'YouTube / Vimeo embed', 'Play', '{"url": "string", "caption": "string"}', '{"url": "", "caption": ""}', '00000000-0000-0000-0000-000000000001'),
-  ('gallery', 'Gallery', 'Image grid', 'Grid', '{"images": "array", "columns": "number"}', '{"images": [], "columns": 3}', '00000000-0000-0000-0000-000000000001')
-ON CONFLICT (tenant_id, name) DO NOTHING;
+INSERT INTO zv_page_block_types (name, display_name, description, icon, schema, default_props) VALUES
+  ('hero', 'Hero', 'Full-width hero section with heading and CTA', 'Image', '{"title": "string", "subtitle": "string", "image_url": "string", "cta_text": "string", "cta_url": "string", "align": "string"}', '{"title": "Welcome", "subtitle": "", "align": "center", "cta_text": "Get Started", "cta_url": "/"}'),
+  ('richtext', 'Rich Text', 'WYSIWYG text content block', 'Type', '{"content": "string"}', '{"content": "<p>Start writing...</p>"}'),
+  ('image', 'Image', 'Single image with caption', 'ImageIcon', '{"url": "string", "alt": "string", "caption": "string", "width": "string"}', '{"url": "", "alt": "", "caption": "", "width": "100%"}'),
+  ('container', 'Container', 'Holds other blocks side by side', 'Columns', '{"children": "array", "gap": "string"}', '{"children": [], "gap": "md"}'),
+  ('cta', 'Call to Action', 'Highlighted call-to-action section', 'Megaphone', '{"heading": "string", "text": "string", "button_text": "string", "button_url": "string", "style": "string"}', '{"heading": "Ready to get started?", "text": "", "button_text": "Contact Us", "button_url": "/contact", "style": "primary"}'),
+  ('embed', 'Embed', 'Arbitrary HTML or iframe embed', 'Code', '{"html": "string"}', '{"html": ""}'),
+  ('spacer', 'Spacer', 'Vertical whitespace', 'Minus', '{"height": "number"}', '{"height": 48}'),
+  ('collection_list', 'Collection Data', 'Live rows from one of your collections, filtered and sorted', 'Table', '{"collection": "string", "view_type": "string", "display_fields": "string", "filters": "array", "sort_field": "string", "sort_dir": "string", "limit": "number"}', '{"collection": "", "view_type": "list", "display_fields": "", "filters": [], "sort_dir": "desc", "limit": 10}'),
+  ('divider', 'Divider', 'Horizontal separator', 'Minus', '{"color": "string", "thickness": "number", "line_style": "string"}', '{"color": "#e5e7eb", "thickness": 1, "line_style": "solid"}'),
+  ('stats', 'Stats', 'Key metrics display', 'BarChart', '{"items": "array", "columns": "number"}', '{"items": [{"value": "100+", "label": "Users"}], "columns": 4}'),
+  ('video', 'Video', 'YouTube / Vimeo embed', 'Play', '{"url": "string", "caption": "string"}', '{"url": "", "caption": ""}'),
+  ('gallery', 'Gallery', 'Image grid', 'Grid', '{"images": "array", "columns": "number"}', '{"images": [], "columns": 3}')
+ON CONFLICT (name) DO NOTHING;
 
 -- ── 7. Migrate zones, zone pages and views ──────────────────────────────────
 --
