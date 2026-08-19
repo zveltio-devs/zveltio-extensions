@@ -55,10 +55,10 @@ CREATE INDEX IF NOT EXISTS idx_zv_pages_kind ON zv_pages (site_id, kind)
 -- the builder never listed it, so a page could contain one and no one could add
 -- one. It joins the library rather than staying a legacy name.
 
-INSERT INTO zv_page_block_types (name, display_name, description, icon, schema, default_props, tenant_id) VALUES
-  ('icon', 'Icon', 'A single icon at any size', 'Star', '{"name": "string", "size": "number", "color": "string", "label": "string"}', '{"name": "star", "size": 32, "label": ""}', '00000000-0000-0000-0000-000000000001'),
-  ('button', 'Button', 'A link styled as a button', 'MousePointerClick', '{"label": "string", "href": "string", "variant": "string"}', '{"label": "Click here", "href": "/", "variant": "primary"}', '00000000-0000-0000-0000-000000000001')
-ON CONFLICT (tenant_id, name) DO NOTHING;
+INSERT INTO zv_page_block_types (name, display_name, description, icon, schema, default_props) VALUES
+  ('icon', 'Icon', 'A single icon at any size', 'Star', '{"name": "string", "size": "number", "color": "string", "label": "string"}', '{"name": "star", "size": 32, "label": ""}'),
+  ('button', 'Button', 'A link styled as a button', 'MousePointerClick', '{"label": "string", "href": "string", "variant": "string"}', '{"label": "Click here", "href": "/", "variant": "primary"}')
+ON CONFLICT (name) DO NOTHING;
 
 -- DOWN
 -- The column stays: dropping it would take every popup with it, and a popup is
