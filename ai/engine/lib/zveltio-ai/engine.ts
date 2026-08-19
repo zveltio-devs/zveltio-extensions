@@ -1004,33 +1004,36 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
     }
   }
 
+  /**
+   * What the assistant can actually count.
+   *
+   * This used to report three numbers and two of them were always zero. It read
+   * `user` and `zv_audit_log` directly, and an extension may read neither — the
+   * engine's proxy refuses both — but each query carried
+   * `.catch(() => ({ count: 0 }))`, so the refusal came back as the number 0 and
+   * the assistant told the operator "0 users, 0 recent activity" on an instance
+   * with thousands of each. A tool that answers a question it cannot answer is
+   * worse than one that declines: nobody re-checks a number.
+   *
+   * `zvd_collections` is the extension's to read, so it is still reported.
+   */
   private async toolGetSystemStats() {
-    const [collections, users, recentActivity] = await Promise.all([
-      this.db
-        .selectFrom('zvd_collections')
-        .select(this.db.fn.count('name').as('count'))
-        .executeTakeFirst()
-        .catch(() => ({ count: 0 })),
-      this.db
-        .selectFrom('user')
-        .select(this.db.fn.count('id').as('count'))
-        .executeTakeFirst()
-        .catch(() => ({ count: 0 })),
-      this.db
-        .selectFrom('zv_audit_log')
-        .select(this.db.fn.count('id').as('count'))
-        .executeTakeFirst()
-        .catch(() => ({ count: 0 })),
-    ]);
+    const collections = await this.db
+      .selectFrom('zvd_collections')
+      .select(this.db.fn.count('name').as('count'))
+      .executeTakeFirst();
 
+    const n = Number(collections?.count ?? 0);
     return {
       success: true,
-      stats: {
-        collections: Number(collections?.count ?? 0),
-        users: Number(users?.count ?? 0),
-        recentActivity: Number(recentActivity?.count ?? 0),
+      stats: { collections: n },
+      unavailable: {
+        users: 'the user directory is engine-owned and not readable by an extension',
+        recentActivity: 'the audit log is engine-owned and not readable by an extension',
       },
-      message: `Platform stats: ${collections?.count ?? 0} collections, ${users?.count ?? 0} users`,
+      message:
+        `Platform stats: ${n} collections. User and audit-activity counts are not ` +
+        `available to this assistant — they live in engine-owned tables.`,
     };
   }
 
