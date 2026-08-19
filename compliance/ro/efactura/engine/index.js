@@ -19888,7 +19888,7 @@ function efacturaRoutes(ctx) {
         WHERE EXTRACT(YEAR FROM invoice_date) = ${currentYear}
           ${seller_cui ? sql`AND seller_cui = ${seller_cui}` : sql``}
         GROUP BY status
-      `.execute(db).catch(() => ({ rows: [] })),
+      `.execute(db),
       sql`
         SELECT TO_CHAR(invoice_date, 'YYYY-MM') AS month,
                COUNT(*)::int AS count, SUM(total) AS total, SUM(vat_total) AS vat
@@ -19896,7 +19896,7 @@ function efacturaRoutes(ctx) {
         WHERE EXTRACT(YEAR FROM invoice_date) = ${currentYear}
           ${seller_cui ? sql`AND seller_cui = ${seller_cui}` : sql``}
         GROUP BY month ORDER BY month
-      `.execute(db).catch(() => ({ rows: [] }))
+      `.execute(db)
     ]);
     return c.json({ year: currentYear, by_status: statusStats.rows, by_month: monthlyStats.rows });
   });
@@ -20158,7 +20158,7 @@ function efacturaRoutes(ctx) {
       SELECT * FROM zv_efactura_status_log
       WHERE invoice_id = ${c.req.param("id")}::uuid
       ORDER BY created_at ASC
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
     return c.json({ log: logs.rows });
   });
   app.post("/", zValidator("json", invoiceSchema), async (c) => {
@@ -20405,7 +20405,17 @@ function efacturaRoutes(ctx) {
     const { ids } = c.req.valid("json");
     const results = [];
     for (const id of ids) {
-      const inv = await db.selectFrom("zv_efactura_invoices").select(["id", "status", "xml_content", "seller_cui", "total", "vat_total"]).where("id", "=", id).executeTakeFirst().catch(() => null);
+      let inv;
+      try {
+        inv = await db.selectFrom("zv_efactura_invoices").select(["id", "status", "xml_content", "seller_cui", "total", "vat_total"]).where("id", "=", id).executeTakeFirst();
+      } catch (err) {
+        results.push({
+          id,
+          success: false,
+          error: `Could not be read: ${err instanceof Error ? err.message : String(err)}`
+        });
+        continue;
+      }
       if (!inv) {
         results.push({ id, success: false, error: "Not found" });
         continue;

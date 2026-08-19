@@ -188,7 +188,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
         WHERE EXTRACT(YEAR FROM invoice_date) = ${currentYear}
           ${seller_cui ? sql`AND seller_cui = ${seller_cui}` : sql``}
         GROUP BY status
-      `.execute(db).catch(() => ({ rows: [] })),
+      `.execute(db),
       sql<any>`
         SELECT TO_CHAR(invoice_date, 'YYYY-MM') AS month,
                COUNT(*)::int AS count, SUM(total) AS total, SUM(vat_total) AS vat
@@ -196,7 +196,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
         WHERE EXTRACT(YEAR FROM invoice_date) = ${currentYear}
           ${seller_cui ? sql`AND seller_cui = ${seller_cui}` : sql``}
         GROUP BY month ORDER BY month
-      `.execute(db).catch(() => ({ rows: [] })),
+      `.execute(db),
     ]);
 
     return c.json({ year: currentYear, by_status: statusStats.rows, by_month: monthlyStats.rows });
@@ -575,7 +575,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
       SELECT * FROM zv_efactura_status_log
       WHERE invoice_id = ${c.req.param('id')}::uuid
       ORDER BY created_at ASC
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
 
     return c.json({ log: logs.rows });
   });
@@ -920,7 +920,35 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
       const results: { id: string; success: boolean; error?: string }[] = [];
 
       for (const id of ids) {
-        const inv = await db.selectFrom('zv_efactura_invoices').select(['id', 'status', 'xml_content', 'seller_cui', 'total', 'vat_total']).where('id', '=', id).executeTakeFirst().catch(() => null);
+        // A read failure used to arrive at the `if (!inv)` below and be recorded as
+        // "Not found" against that invoice — so a batch run over a database blip
+        // reported, per invoice, that it does not exist. The operator then goes looking
+        // for invoices that are sitting right there.
+        //
+        // Caught per item on purpose: this is a batch, and one unreadable row must not
+        // abandon the rest of the list.
+        let inv: {
+          id: string;
+          status: string;
+          xml_content: string | null;
+          seller_cui: string | null;
+          total: unknown;
+          vat_total: unknown;
+        } | undefined;
+        try {
+          inv = await db
+            .selectFrom('zv_efactura_invoices')
+            .select(['id', 'status', 'xml_content', 'seller_cui', 'total', 'vat_total'])
+            .where('id', '=', id)
+            .executeTakeFirst();
+        } catch (err) {
+          results.push({
+            id,
+            success: false,
+            error: `Could not be read: ${err instanceof Error ? err.message : String(err)}`,
+          });
+          continue;
+        }
         if (!inv) { results.push({ id, success: false, error: 'Not found' }); continue; }
         if (!inv.xml_content) { results.push({ id, success: false, error: 'XML not generated' }); continue; }
 

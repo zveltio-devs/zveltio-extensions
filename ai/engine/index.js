@@ -30056,7 +30056,7 @@ class AIProviderManager {
 }
 var aiProviderManager = new AIProviderManager;
 async function initAIProviders(db) {
-  const rows = await db.selectFrom("zv_ai_providers").selectAll().where("is_active", "=", true).execute().catch(() => []);
+  const rows = await db.selectFrom("zv_ai_providers").selectAll().where("is_active", "=", true).execute();
   for (const row of rows) {
     let provider = null;
     let apiKey = row.api_key ?? null;
@@ -30418,7 +30418,7 @@ function aiRoutes(ctx) {
           FROM ${sql.id(tableName)}
           WHERE ${sql.id(field)} ILIKE ${"%" + query + "%"}
           LIMIT ${limit}
-        `.execute(db).then((r) => r.rows).catch(() => []);
+        `.execute(db).then((r) => r.rows);
     } catch {}
     return c.json({
       results: fallbackResults,
@@ -30432,7 +30432,7 @@ function aiRoutes(ctx) {
     const user = await requireAdmin(c);
     if (!user)
       return c.json({ error: "Admin access required" }, 403);
-    const features = await db.selectFrom("zv_ai_features").selectAll().orderBy("feature_key", "asc").execute().catch(() => []);
+    const features = await db.selectFrom("zv_ai_features").selectAll().orderBy("feature_key", "asc").execute();
     return c.json({ features });
   });
   app.put("/admin/features/:featureKey", zValidator("json", exports_external.object({
@@ -30446,7 +30446,7 @@ function aiRoutes(ctx) {
       return c.json({ error: "Admin access required" }, 403);
     const featureKey = c.req.param("featureKey");
     const body = c.req.valid("json");
-    const existing = await db.selectFrom("zv_ai_features").select("id").where("feature_key", "=", featureKey).executeTakeFirst().catch(() => null);
+    const existing = await db.selectFrom("zv_ai_features").select("id").where("feature_key", "=", featureKey).executeTakeFirst();
     if (!existing)
       return c.json({ error: "Feature not found" }, 404);
     const updateFields = { updated_at: new Date };
@@ -32469,7 +32469,7 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
     };
   }
   async toolListCollections() {
-    const collections = await this.db.selectFrom("zvd_collections").select(["name", "display_name", "fields"]).orderBy("display_name", "asc").execute().catch(() => []);
+    const collections = await this.db.selectFrom("zvd_collections").select(["name", "display_name", "fields"]).orderBy("display_name", "asc").execute();
     const mapped = collections.map((c) => {
       let fieldCount = 0;
       try {
@@ -32490,7 +32490,7 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
   }
   async toolGetCollectionSchema(args) {
     const { collection } = args;
-    const colDef = await this.db.selectFrom("zvd_collections").selectAll().where("name", "=", collection).executeTakeFirst().catch(() => null);
+    const colDef = await this.db.selectFrom("zvd_collections").selectAll().where("name", "=", collection).executeTakeFirst();
     if (!colDef)
       throw new Error(`Collection '${collection}' not found`);
     let fields = [];
@@ -32641,6 +32641,7 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
     };
   }
   async toolRecallFacts(args, request) {
+    const recallErrors = [];
     const { query, limit = 5 } = args;
     try {
       let rows = [];
@@ -32650,12 +32651,28 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
           const queryEmbedding = await provider.embed(query, "text-embedding-3-small");
           rows = await this.db.selectFrom("zv_ai_memory").selectAll().where("user_id", "=", request.userId).where("embedding", "is not", null).orderBy(sql`embedding <=> ${JSON.stringify(queryEmbedding)}::vector`).limit(limit).execute();
         }
-      } catch {}
-      if (rows.length === 0) {
-        rows = await this.db.selectFrom("zv_ai_memory").selectAll().where("user_id", "=", request.userId).where(this.db.raw(`to_tsvector('english', content) @@ plainto_tsquery('english', ?)`, [query])).orderBy("importance", "desc").orderBy("updated_at", "desc").limit(limit).execute().catch(() => []);
+      } catch (err) {
+        recallErrors.push(err instanceof Error ? err.message : String(err));
       }
       if (rows.length === 0) {
-        rows = await this.db.selectFrom("zv_ai_memory").selectAll().where("user_id", "=", request.userId).orderBy("importance", "desc").orderBy("updated_at", "desc").limit(limit).execute().catch(() => []);
+        rows = await this.db.selectFrom("zv_ai_memory").selectAll().where("user_id", "=", request.userId).where(this.db.raw(`to_tsvector('english', content) @@ plainto_tsquery('english', ?)`, [query])).orderBy("importance", "desc").orderBy("updated_at", "desc").limit(limit).execute().catch((err) => {
+          recallErrors.push(err.message);
+          return [];
+        });
+      }
+      if (rows.length === 0) {
+        rows = await this.db.selectFrom("zv_ai_memory").selectAll().where("user_id", "=", request.userId).orderBy("importance", "desc").orderBy("updated_at", "desc").limit(limit).execute().catch((err) => {
+          recallErrors.push(err.message);
+          return [];
+        });
+      }
+      if (rows.length === 0 && recallErrors.length > 0) {
+        console.error("[zveltio-ai] memory recall failed on every tier:", recallErrors);
+        return {
+          success: false,
+          facts: [],
+          message: "Memory could not be read, so this answer is without it."
+        };
       }
       if (rows.length === 0) {
         return {
@@ -32849,7 +32866,7 @@ function zveltioAIRoutes(ctx) {
     const user = await getUser(c);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const conversations = await db.selectFrom("zv_ai_conversations").select(["id as conversation_id", "title", "updated_at as last_message_at"]).where("user_id", "=", user.id).orderBy("updated_at", "desc").limit(20).execute().catch(() => []);
+    const conversations = await db.selectFrom("zv_ai_conversations").select(["id as conversation_id", "title", "updated_at as last_message_at"]).where("user_id", "=", user.id).orderBy("updated_at", "desc").limit(20).execute();
     return c.json({ conversations });
   });
   app.delete("/conversations/:id", async (c) => {

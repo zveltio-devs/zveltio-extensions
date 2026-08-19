@@ -155,8 +155,10 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
         .distinctOn(['collection'])
         .orderBy('collection')
         .orderBy('started_at', 'desc')
-        .execute()
-        .catch(() => []),
+        .execute(),
+        // No `.catch(() => [])`. Its sibling in the same `Promise.all` has none, so
+        // one half of this screen threw on a failed read and the other rendered as
+        // "no scans have ever run" — the answer a fresh install gives.
     ]);
 
     return c.json({ summary, latest_scans: latestScans });
@@ -319,8 +321,10 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
         .selectFrom('zvd_quality_sla_targets')
         .select(['collection', 'max_critical_issues', 'max_error_issues', 'is_active'])
         .where('is_active', '=', true)
-        .execute()
-        .catch(() => []),
+        .execute(),
+        // No `.catch(() => [])`. Its sibling in the same `Promise.all` has none, so
+        // one half of this screen threw on a failed read and the other rendered as
+        // "no scans have ever run" — the answer a fresh install gives.
     ]);
 
     return c.json({
