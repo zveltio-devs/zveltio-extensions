@@ -19897,7 +19897,7 @@ function bankingRoutes(ctx) {
       JOIN zvd_invoices i ON ABS(i.total - t.amount) < 0.01 AND i.status IN ('sent','overdue')
       WHERE t.account_id = ${c.req.param("id")} AND t.is_reconciled = false AND t.type = 'credit'
       ORDER BY t.date DESC LIMIT 50
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
     return c.json({ data: txns.rows });
   });
   app.get("/cash-flow", async (c) => {
@@ -19912,7 +19912,7 @@ function bankingRoutes(ctx) {
     const invoices = await sql`
       SELECT due_date as expected_date, 'inflow' as type, total - amount_paid as amount, 'Invoice ' || number as description, 'accounts_receivable' as category
       FROM zvd_invoices WHERE status IN ('sent','overdue') AND due_date BETWEEN ${fromDate} AND ${toDate}
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
     const toTime = (v) => v instanceof Date ? v.getTime() : new Date(String(v)).getTime();
     return c.json({
       data: [...forecast.rows, ...invoices.rows].sort((a, b) => toTime(a.expected_date) - toTime(b.expected_date))

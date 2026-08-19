@@ -380,13 +380,16 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
 
   // Suggest unreconciled invoice matches
   app.get('/accounts/:id/suggest-matches', async (c) => {
+    // An empty list here reads as "nothing to reconcile", which is the answer an
+    // operator acts on by closing the screen. A failed query must not look like a
+    // clean bank account.
     const txns = await sql`
       SELECT t.*, i.id as invoice_id, i.number as invoice_number, i.total as invoice_total
       FROM zvd_bank_transactions t
       JOIN zvd_invoices i ON ABS(i.total - t.amount) < 0.01 AND i.status IN ('sent','overdue')
       WHERE t.account_id = ${c.req.param('id')} AND t.is_reconciled = false AND t.type = 'credit'
       ORDER BY t.date DESC LIMIT 50
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
     return c.json({ data: txns.rows });
   });
 
@@ -401,10 +404,15 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
       ORDER BY expected_date
     `.execute(db);
     // Also include expected payments from open invoices
+    // No `.catch(() => ({ rows: [] }))`. This is the expected-inflow half of a cash
+    // flow FORECAST, and the other half — `zvd_cash_flow_entries`, three lines up —
+    // already throws. Swallowing only this one rendered the forecast successfully
+    // with an entire category missing, so an operator read a cash position that was
+    // wrong by every open invoice in the window and had no way to tell.
     const invoices = await sql`
       SELECT due_date as expected_date, 'inflow' as type, total - amount_paid as amount, 'Invoice ' || number as description, 'accounts_receivable' as category
       FROM zvd_invoices WHERE status IN ('sent','overdue') AND due_date BETWEEN ${fromDate} AND ${toDate}
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
     // `expected_date` is a DATE column and Bun's driver returns DATE as a
     // JavaScript `Date`, which has no `localeCompare`. `Array.prototype.sort`
     // does not call the comparator for arrays of length 0 or 1, so this answered
