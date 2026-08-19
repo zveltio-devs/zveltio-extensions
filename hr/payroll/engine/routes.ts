@@ -144,10 +144,31 @@ function generateRevisalCsv(internals: any, employees: any[]): string {
  * is "the rates from now on".
  */
 async function loadRates(dbh: any): Promise<typeof RO_RATES> {
-  const row = await sql`SELECT * FROM zvd_payroll_rates LIMIT 1`
-    .execute(dbh)
-    .catch(() => ({ rows: [] as any[] }));
-  const r = (row.rows as any[])[0];
+  // An EMPTY table and an UNREADABLE one are not the same answer.
+  //
+  // This read used to end `.catch(() => ({ rows: [] }))`, which falls through to
+  // `return RO_RATES` — the built-in defaults. So a permission error, a timeout
+  // or a dropped connection made payroll compute at the shipped percentages
+  // instead of the ones an accountant had entered, and the run stamped those
+  // figures onto every `zvd_payroll_entries` row as if they were correct. Nobody
+  // is told; the payslips are simply wrong, and the period keeps its own wrong
+  // rates forever by design.
+  //
+  // "The table does not exist" is a true statement — the rate table was never
+  // created, so the defaults ARE the configuration. That is 42P01 and nothing
+  // else. Anything else means the rates are unknown, and payroll must not be
+  // computed on a guess.
+  let rows: any[];
+  try {
+    const result = await sql`SELECT * FROM zvd_payroll_rates LIMIT 1`.execute(dbh);
+    rows = result.rows as any[];
+  } catch (err) {
+    const code = (err as { errno?: string; code?: string }).errno ??
+      (err as { code?: string }).code ?? '';
+    if (code !== '42P01') throw err;
+    rows = [];
+  }
+  const r = rows[0];
   if (!r) return RO_RATES;
   return {
     cas_employee: Number(r.cas_employee),
