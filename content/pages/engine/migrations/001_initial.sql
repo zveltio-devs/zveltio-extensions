@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS zv_pages (
   created_by  TEXT,
   updated_by  TEXT,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  tenant_id    UUID
 );
 
 ALTER TABLE zv_pages ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'draft';
@@ -94,7 +95,8 @@ CREATE TABLE IF NOT EXISTS zv_page_revisions (
   blocks     JSONB NOT NULL,
   meta       JSONB NOT NULL DEFAULT '{}',
   created_by TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  tenant_id    UUID
 );
 
 CREATE TABLE IF NOT EXISTS zv_page_seo_scores (
@@ -106,7 +108,8 @@ CREATE TABLE IF NOT EXISTS zv_page_seo_scores (
   heading_score INT NOT NULL DEFAULT 0,
   image_alt_score INT NOT NULL DEFAULT 0,
   issues JSONB NOT NULL DEFAULT '[]',
-  analyzed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  analyzed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  tenant_id    UUID
 );
 
 CREATE TABLE IF NOT EXISTS zv_page_ab_variants (
@@ -119,7 +122,8 @@ CREATE TABLE IF NOT EXISTS zv_page_ab_variants (
   views INT NOT NULL DEFAULT 0,
   conversions INT NOT NULL DEFAULT 0,
   created_by TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  tenant_id    UUID
 );
 
 CREATE TABLE IF NOT EXISTS zv_page_metrics (
@@ -129,7 +133,8 @@ CREATE TABLE IF NOT EXISTS zv_page_metrics (
   unique_visitors INT NOT NULL DEFAULT 0,
   avg_time_on_page_seconds INT NOT NULL DEFAULT 0,
   bounce_rate NUMERIC(5,2) NOT NULL DEFAULT 0,
-  PRIMARY KEY (page_id, date)
+  PRIMARY KEY (page_id, date),
+  tenant_id    UUID
 );
 
 CREATE TABLE IF NOT EXISTS zv_page_redirects (
@@ -140,7 +145,8 @@ CREATE TABLE IF NOT EXISTS zv_page_redirects (
   is_active BOOLEAN NOT NULL DEFAULT true,
   hit_count INT NOT NULL DEFAULT 0,
   created_by TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  tenant_id    UUID
 );
 
 CREATE TABLE IF NOT EXISTS zv_page_sitemap_config (
@@ -148,7 +154,8 @@ CREATE TABLE IF NOT EXISTS zv_page_sitemap_config (
   include_in_sitemap BOOLEAN NOT NULL DEFAULT true,
   change_freq TEXT NOT NULL DEFAULT 'weekly' CHECK (change_freq IN ('always','hourly','daily','weekly','monthly','yearly','never')),
   priority NUMERIC(2,1) NOT NULL DEFAULT 0.5 CHECK (priority BETWEEN 0 AND 1),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  tenant_id    UUID
 );
 
 CREATE TABLE IF NOT EXISTS zv_page_menus (
@@ -156,7 +163,8 @@ CREATE TABLE IF NOT EXISTS zv_page_menus (
   menu_key   TEXT NOT NULL,
   items      JSONB NOT NULL DEFAULT '[]',
   updated_by TEXT,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  tenant_id    UUID
 );
 
 CREATE INDEX IF NOT EXISTS idx_pages_slug ON zv_pages(slug);
@@ -234,6 +242,21 @@ ALTER TABLE zv_pages ADD COLUMN IF NOT EXISTS legacy_zone_page_id UUID;
 ALTER TABLE zv_pages ADD COLUMN IF NOT EXISTS layout TEXT NOT NULL DEFAULT 'default';
 
 CREATE INDEX IF NOT EXISTS idx_zv_pages_site ON zv_pages(site_id, sort_order);
+
+-- `tenant_id` is also declared on each CREATE TABLE above.
+--
+-- The loop below adds it with `ADD COLUMN IF NOT EXISTS`, which is what an
+-- existing database needs — but a column that only ever appears inside
+-- `EXECUTE format(...)` is invisible to anything reading the migration as SQL.
+-- `schema-drift-check.ts` reported `zv_pages.tenant_id` and
+-- `zv_page_menus.tenant_id` as columns the code references and the schema does
+-- not declare, and it exits 1, so `bun run prepush` refused a schema that was
+-- in fact correct — verified on a freshly built database, where both columns are
+-- present. A gate that fails on correct code is one somebody eventually turns
+-- off.
+--
+-- Declaring them statically costs nothing (`IF NOT EXISTS` still handles the
+-- upgrade path) and makes the table say what it is.
 
 -- ── 4. Tenant defaults and RLS on everything this extension owns ────────────
 
