@@ -130,8 +130,11 @@ export function aiSchemaGenRoutes(ctx: ExtensionContext): Hono {
     if (!session) return c.json({ error: 'Unauthorized' }, 401);
     const isAdmin = await checkPermission(session.user.id, 'admin', '*');
     if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
-    const row = await db.selectFrom('user' as any).select(['role'] as any).where('id' as any, '=', session.user.id).executeTakeFirst() as any;
-    c.set('user', { ...session.user, role: row?.role ?? (session.user as any).role });
+    // The role came from the session all along — the fallback on the line that
+    // followed was already using it. Reading the `user` table for it meant an
+    // extension touching the Better-Auth directory, which the engine now
+    // refuses, to learn something it had been handed.
+    c.set('user', session.user);
     await next();
   };
   router.use('/preview-schema', adminOnly);

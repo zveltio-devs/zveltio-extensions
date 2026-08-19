@@ -38,78 +38,37 @@ import { createHmac } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
 import { basename, dirname, join, relative } from 'path';
 
-// ── Host crypto, reproduced for the harness ──────────────────────────────────
-// Kept byte-identical to packages/engine/src/lib/security/keyring.ts so a
-// contract test exercises what production does. If those envelopes change,
-// the engine's keyring-compat tests fail first and point here.
-
-function harnessKeyHex(keyring: 'field' | 'mail'): string {
-  const raw = keyring === 'mail' ? process.env.MAIL_ENCRYPTION_KEY : process.env.FIELD_ENCRYPTION_KEY;
-  return (raw ?? '').trim().slice(0, 64);
-}
-
-function hexToBytes(hex: string): Uint8Array {
-  const pairs = hex.match(/../g) ?? [];
-  const out = new Uint8Array(pairs.length);
-  for (let i = 0; i < pairs.length; i++) out[i] = Number.parseInt(pairs[i], 16);
-  return out;
-}
-
-function bytesToHex(bytes: Uint8Array): string {
-  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-async function harnessKey(keyring: 'field' | 'mail', usage: KeyUsage[]): Promise<CryptoKey> {
-  const hex = harnessKeyHex(keyring);
-  if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
-    throw new Error(
-      `${keyring === 'mail' ? 'MAIL' : 'FIELD'}_ENCRYPTION_KEY must be 64 hex chars for the harness`,
-    );
-  }
-  return crypto.subtle.importKey('raw', hexToBytes(hex), { name: 'AES-GCM' }, false, usage);
-}
-
-async function harnessEncrypt(plaintext: string, keyring: 'field' | 'mail'): Promise<string> {
-  const key = await harnessKey(keyring, ['encrypt']);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = new Uint8Array(
-    await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plaintext)),
+// ── Host crypto ──────────────────────────────────────────────────────────────
+//
+// The engine's real keyring, imported by path, NOT reproduced.
+//
+// This file used to carry a byte-identical copy with a comment saying it was
+// kept in step by hand. It was not: the copy knew `field` and `mail`, and when a
+// third keyring (`ai`) arrived with its own envelope, `keyring === 'mail' ?
+// 'mail' : 'field'` silently encrypted AI provider keys under the FIELD key.
+// The round trip still worked inside the harness, so nothing failed — it just
+// tested something the product does not do.
+//
+// A contract harness whose idea of the contract is its own copy is worth
+// nothing. There is one implementation now.
+// Resolved on first use, not at module load: this block sits above `REPO`, and
+// a top-level `import(join(REPO, …))` here reads it in the temporal dead zone.
+let _keyringP: Promise<any> | null = null;
+function keyring(): Promise<any> {
+  _keyringP ??= import(
+    join(REPO, '..', 'zveltio', 'packages', 'engine', 'src', 'lib', 'security', 'keyring.js')
   );
-  if (keyring === 'mail') return `aes256gcm:${bytesToHex(iv)}:${bytesToHex(ct)}`;
-  const combined = new Uint8Array(iv.length + ct.length);
-  combined.set(iv, 0);
-  combined.set(ct, iv.length);
-  return `enc:v1:${btoa(String.fromCharCode(...combined))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '')}`;
+  return _keyringP;
 }
 
-async function harnessDecrypt(value: string, keyring: 'field' | 'mail'): Promise<string> {
-  if (typeof value !== 'string') return value;
-  if (value.startsWith('aes256gcm:')) {
-    const [, ivHex, ctHex] = value.split(':');
-    const key = await harnessKey('mail', ['decrypt']);
-    return new TextDecoder().decode(
-      await crypto.subtle.decrypt({ name: 'AES-GCM', iv: hexToBytes(ivHex) }, key, hexToBytes(ctHex)),
-    );
-  }
-  if (value.startsWith('enc:v1:')) {
-    const b64 = value.slice(7).replace(/-/g, '+').replace(/_/g, '/');
-    const bin = atob(b64);
-    const combined = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) combined[i] = bin.charCodeAt(i);
-    const key = await harnessKey(keyring, ['decrypt']);
-    return new TextDecoder().decode(
-      await crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv: new Uint8Array(combined.slice(0, 12)) },
-        key,
-        new Uint8Array(combined.slice(12)),
-      ),
-    );
-  }
-  // Unknown envelope (or plaintext predating encryption) passes through.
-  return value;
+async function harnessEncrypt(plaintext: string, keyringName: string): Promise<string> {
+  const { encryptWithKeyring } = (await keyring()) as any;
+  return encryptWithKeyring(plaintext, keyringName);
+}
+
+async function harnessDecrypt(value: string, keyringName: string): Promise<string> {
+  const { decryptWithKeyring } = (await keyring()) as any;
+  return decryptWithKeyring(value, keyringName);
 }
 
 const FORMULA_START = /^[=+\-@\t\r]/;
@@ -134,6 +93,70 @@ const REPO = dirname(import.meta.dir); // testing/ -> repo root
 // Path-based imports (immune to tsconfig `paths` at runtime).
 const honoP = import(join(REPO, 'node_modules/hono/dist/index.js'));
 const kyselyP = import(join(REPO, 'node_modules/kysely/dist/index.js'));
+
+/**
+ * The engine's OWN restriction code, not a copy of it.
+ *
+ * `ctx.db` here used to be the raw Kysely handle. In production it is a proxy
+ * from `createRestrictedDb` that throws on any `zv_*` table outside the
+ * extension's own namespace, and `ctx.internals` is a proxy from `gateInternals`
+ * that throws on any member whose capability the manifest does not declare. So
+ * the suite ran every extension with strictly more power than it has in the
+ * product, and could not fail on either boundary — the `ai` extension had been
+ * calling `encryptSecret` without declaring `secrets` for as long as the code
+ * existed, and this suite was green on it.
+ *
+ * Imported by path from the sibling engine checkout, the way `hono` and `kysely`
+ * are. Reimplementing either check here would produce a second copy that drifts,
+ * and a contract harness whose idea of the contract is its own is worth nothing.
+ */
+const ENGINE_LIB = join(REPO, '..', 'zveltio', 'packages', 'engine', 'src', 'lib', 'extensions');
+const restrictP = import(join(ENGINE_LIB, 'extension-context.js'));
+const capsP = import(join(ENGINE_LIB, 'capabilities.js'));
+const registerP = import(join(ENGINE_LIB, 'register.js'));
+
+/**
+ * The wiring production gives an extension: its name, the tables it may touch,
+ * and the capabilities its manifest declares.
+ *
+ * `buildAllowedTables` is the engine's own — it reads the extension's migrations
+ * for `CREATE TABLE` and adds whatever `EXTENSION_TABLE_GRANTS` allows it to
+ * reach in the engine's own schema. Deriving that here instead would be a third
+ * copy of a rule that already has two consumers.
+ */
+async function productionWiring(
+  extDir: string,
+  extName: string,
+  ext: any,
+): Promise<{ extName: string; allowedTables: Set<string>; capabilities: readonly string[] }> {
+  const { buildAllowedTables, EXTENSION_TABLE_GRANTS } = (await registerP) as any;
+  const paths: string[] = typeof ext?.getMigrations === 'function' ? ext.getMigrations() : [];
+  let allowedTables = new Set<string>();
+  try {
+    allowedTables = await buildAllowedTables(paths, extName);
+    // The second step, and it is not optional: `buildAllowedTables` only returns
+    // tables it finds in the extension's OWN migrations, so a grant for a table
+    // the extension does not itself declare — which is most of them, since these
+    // are features that started in the engine — never comes out of it. `load.ts`
+    // adds the grant list separately right after the call. Reproducing only the
+    // first half made four extensions fail here on tables they are allowed to
+    // read in production.
+    for (const t of (EXTENSION_TABLE_GRANTS?.[extName] ?? []) as string[]) allowedTables.add(t);
+  } catch {
+    // buildAllowedTables reads the engine's own schema to decide what an
+    // extension may NOT create. Without a database it cannot, and refusing to
+    // run the whole suite over that would be worse than running it with the
+    // prefix rules alone — which are the ones that matter here.
+  }
+  let capabilities: readonly string[] = [];
+  try {
+    const manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'));
+    capabilities = Array.isArray(manifest?.permissions) ? manifest.permissions : [];
+  } catch {
+    /* a manifest that will not parse fails its own check, one test up */
+  }
+  return { extName, allowedTables, capabilities };
+}
 
 const DB_URL = process.env.TEST_DATABASE_URL ?? '';
 const d = DB_URL ? describe : describe.skip;
@@ -171,7 +194,12 @@ afterAll(async () => {
 type Session = { user: { id: string; role: string; email: string; name: string } } | null;
 
 /** Tolerant ctx mock covering every member the 48 extensions actually use. */
-function makeCtx(db: any, opts: { authed: boolean; admin: boolean }, publicRoutes?: any[]): any {
+async function makeCtx(
+  db: any,
+  opts: { authed: boolean; admin: boolean },
+  publicRoutes?: any[],
+  wiring?: { extName?: string; allowedTables?: Set<string>; capabilities?: readonly string[] },
+): Promise<any> {
   const services = new Map<string, unknown>();
   const session: Session = opts.authed
     ? {
@@ -206,10 +234,24 @@ function makeCtx(db: any, opts: { authed: boolean; admin: boolean }, publicRoute
       construct: () => anyStub(),
     });
   }
+  const { createRestrictedDb } = (await restrictP) as any;
+  const { gateInternals } = (await capsP) as any;
+  const extName = wiring?.extName ?? 'harness';
+  const allowedTables = wiring?.allowedTables ?? new Set<string>();
+  const capabilities = wiring?.capabilities ?? [];
+
+  // The same proxy production hands over: `zvd_*` and this extension's own
+  // `zv_<name>_*` namespace, plus whatever its migrations created. Anything else
+  // throws here exactly as it would in the engine.
+  const restrictedDb = createRestrictedDb(db, extName, allowedTables);
+
   return {
-    db,
-    adminDb: db,
-    reqDb: () => db,
+    db: restrictedDb,
+    // `adminDb` is the deliberate cross-tenant handle. Production gates it on
+    // the `db:admin` capability; an extension without it gets the restricted
+    // handle rather than a second unrestricted one.
+    adminDb: capabilities.includes('db:admin') ? db : restrictedDb,
+    reqDb: () => restrictedDb,
     auth: {
       api: {
         getSession: async () => session,
@@ -245,11 +287,11 @@ function makeCtx(db: any, opts: { authed: boolean; admin: boolean }, publicRoute
     // packages/engine/src/lib/security/keyring.ts and its compatibility tests.
     // NOTE: anyStub()'s `get` trap ignores its target, so Object.assign onto it
     // is invisible. The real members have to be consulted BEFORE falling back.
-    internals: realInternals({
+    internals: gateInternals(extName, realInternals({
       encryptSecret: async (plaintext: string, o?: { keyring?: string }) =>
-        harnessEncrypt(plaintext, o?.keyring === 'mail' ? 'mail' : 'field'),
+        harnessEncrypt(plaintext, o?.keyring ?? 'field'),
       decryptSecret: async (value: string, o?: { keyring?: string }) =>
-        harnessDecrypt(value, o?.keyring === 'mail' ? 'mail' : 'field'),
+        harnessDecrypt(value, o?.keyring ?? 'field'),
       deriveTokenHash: async (raw: string) =>
         createHmac('sha256', process.env.BETTER_AUTH_SECRET ?? '').update(raw).digest('hex'),
       csvCell: harnessCsvCell,
@@ -269,7 +311,7 @@ function makeCtx(db: any, opts: { authed: boolean; admin: boolean }, publicRoute
         const rows = records.map((r) => keys.map((k) => harnessCsvCell(r[k])).join(','));
         return [header, ...rows].join('\r\n');
       },
-    }),
+    }), capabilities, []),
     registerPublicRoute(spec: any) {
       publicRoutes?.push(spec);
     },
@@ -373,7 +415,11 @@ export async function mountForTest(
   const migrated = await applyMigrations(mod.default);
   const app = new Hono();
   const publicRoutes: any[] = [];
-  await mod.default.register(app, makeCtx(db, { authed, admin }, publicRoutes));
+  // `mountForTest` receives the ENGINE dir; the extension is its parent, which
+  // is what names it and where its manifest lives.
+  const extDir = dirname(engineDir);
+  const wiring = await productionWiring(extDir, relative(REPO, extDir), mod.default);
+  await mod.default.register(app, await makeCtx(db, { authed, admin }, publicRoutes, wiring));
   // Mount collected root-level public routes on the same app so tests can hit
   // them at their absolute paths (mirrors the engine mounting them globally).
   for (const spec of publicRoutes) app.on(spec.method, spec.path, spec.handler);
@@ -425,7 +471,7 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
       const { Hono } = (await honoP) as any;
       const db = await getDb();
       const app = new Hono();
-      await ext.register(app, makeCtx(db, { authed: true, admin: true }));
+      await ext.register(app, await makeCtx(db, { authed: true, admin: true }, undefined, await productionWiring(extDir, name, ext)));
       expect(Array.isArray(app.routes)).toBe(true);
     });
 
@@ -434,7 +480,7 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
       const { Hono } = (await honoP) as any;
       const db = await getDb();
       const app = new Hono();
-      await ext.register(app, makeCtx(db, { authed: true, admin: true }));
+      await ext.register(app, await makeCtx(db, { authed: true, admin: true }, undefined, await productionWiring(extDir, name, ext)));
       const gets: string[] = [
         ...new Set(
           (app.routes as Array<{ method: string; path: string }>)
@@ -457,7 +503,7 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
       const { Hono } = (await honoP) as any;
       const db = await getDb();
       const app = new Hono();
-      await ext.register(app, makeCtx(db, { authed: true, admin: true }));
+      await ext.register(app, await makeCtx(db, { authed: true, admin: true }, undefined, await productionWiring(extDir, name, ext)));
       const posts: string[] = [
         ...new Set(
           (app.routes as Array<{ method: string; path: string }>)
@@ -493,7 +539,7 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
       const { Hono } = (await honoP) as any;
       const db = await getDb();
       const app = new Hono();
-      await ext.register(app, makeCtx(db, { authed: false, admin: false }));
+      await ext.register(app, await makeCtx(db, { authed: false, admin: false }, undefined, await productionWiring(extDir, name, ext)));
       const first = (app.routes as Array<{ method: string; path: string }>).find(
         (r) => r.method === 'GET' && !r.path.includes(':') && !r.path.includes('*'),
       );
