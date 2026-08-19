@@ -149,6 +149,28 @@ async function mayDecideInvoice(
   return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
 }
 
+/**
+ * A unique-constraint violation, and only that.
+ *
+ * Two create routes used `.execute(db).catch(() => null)` to mean "the row
+ * already exists", because that is what the failure usually is. It catches
+ * everything, though: a dropped connection, a NOT NULL violation, a check
+ * constraint, a permission error all came back as
+ * `Series "X" already exists` or `Code "Y" already exists` — sending whoever
+ * hit it to look for a duplicate that is not there, while the real fault goes
+ * unreported.
+ *
+ * 23505 is unique_violation. SQLSTATE arrives on `errno` under the Bun driver
+ * and `code` under node-postgres, so both are read.
+ */
+function isUniqueViolation(err: unknown): boolean {
+  const code =
+    (err as { errno?: string; code?: string }).errno ??
+    (err as { code?: string }).code ??
+    '';
+  return code === '23505';
+}
+
 export function invoicingRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
   const app = new Hono();
@@ -271,7 +293,10 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
         INSERT INTO zvd_document_series (doc_type, series, next_number, padding, is_default)
         VALUES (${d.doc_type}, ${d.series}, ${d.next_number}, ${d.padding}, ${d.is_default})
         RETURNING *
-      `.execute(db).catch(() => null);
+      `.execute(db).catch((err: unknown) => {
+        if (!isUniqueViolation(err)) throw err;
+        return null;
+      });
       if (!row?.rows.length) {
         return c.json({ error: `Series "${d.series}" already exists for ${d.doc_type}` }, 400);
       }
@@ -368,7 +393,10 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
         VALUES (${d.code ?? null}, ${d.name}, ${d.description ?? null}, ${d.kind},
                 ${d.unit}, ${d.unit_price}, ${d.currency}, ${d.tax_rate})
         RETURNING *
-      `.execute(db).catch(() => null);
+      `.execute(db).catch((err: unknown) => {
+        if (!isUniqueViolation(err)) throw err;
+        return null;
+      });
       if (!row?.rows.length) return c.json({ error: `Code "${d.code}" already exists` }, 400);
       return c.json({ data: row.rows[0] }, 201);
     },

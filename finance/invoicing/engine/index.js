@@ -19603,6 +19603,10 @@ async function mayDecideInvoice(ctx, user, action) {
     return true;
   return ctx.checkPermission(user.id, "admin", "*").catch(() => false);
 }
+function isUniqueViolation(err) {
+  const code = err.errno ?? err.code ?? "";
+  return code === "23505";
+}
 function invoicingRoutes(ctx) {
   const { db, auth } = ctx;
   const app = new Hono2;
@@ -19692,7 +19696,11 @@ function invoicingRoutes(ctx) {
         INSERT INTO zvd_document_series (doc_type, series, next_number, padding, is_default)
         VALUES (${d.doc_type}, ${d.series}, ${d.next_number}, ${d.padding}, ${d.is_default})
         RETURNING *
-      `.execute(db).catch(() => null);
+      `.execute(db).catch((err) => {
+      if (!isUniqueViolation(err))
+        throw err;
+      return null;
+    });
     if (!row?.rows.length) {
       return c.json({ error: `Series "${d.series}" already exists for ${d.doc_type}` }, 400);
     }
@@ -19748,7 +19756,11 @@ function invoicingRoutes(ctx) {
         VALUES (${d.code ?? null}, ${d.name}, ${d.description ?? null}, ${d.kind},
                 ${d.unit}, ${d.unit_price}, ${d.currency}, ${d.tax_rate})
         RETURNING *
-      `.execute(db).catch(() => null);
+      `.execute(db).catch((err) => {
+      if (!isUniqueViolation(err))
+        throw err;
+      return null;
+    });
     if (!row?.rows.length)
       return c.json({ error: `Code "${d.code}" already exists` }, 400);
     return c.json({ data: row.rows[0] }, 201);
