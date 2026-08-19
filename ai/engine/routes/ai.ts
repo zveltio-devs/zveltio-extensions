@@ -545,6 +545,10 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
       }
       try {
         const tableName = `zvd_${collection}`;
+        // No `.catch(() => [])` here — it made the `catch { /* table may not exist */ }`
+        // two lines below unreachable, which is the handler that was written for this.
+        // An empty result reads as "no matches for your search", so a failed scan
+        // answered the user with silence instead of falling to the outer handler.
         fallbackResults = await sql<any>`
           SELECT *, 0.5 AS score
           FROM ${sql.id(tableName)}
@@ -552,8 +556,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
           LIMIT ${limit}
         `
           .execute(db)
-          .then((r) => r.rows)
-          .catch(() => []);
+          .then((r) => r.rows);
       } catch {
         /* table may not exist */
       }
@@ -602,7 +605,9 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
       .selectAll()
       .orderBy('feature_key', 'asc')
       .execute()
-      .catch(() => []);
+      // No `.catch(() => [])`. This is the admin list of AI features; an empty array
+      // renders as "nothing configured", which is what an instance that has never
+      // been set up looks like. A failed read must not look like a fresh install.
 
     return c.json({ features });
   });
@@ -631,7 +636,9 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
         .select('id')
         .where('feature_key', '=', featureKey)
         .executeTakeFirst()
-        .catch(() => null);
+        // No `.catch(() => null)`. It fell straight into the `if (!existing)` below,
+        // so a failed read answered 404 "Feature not found" for a feature that is
+        // there — and the admin's next move is to create a duplicate.
 
       if (!existing) return c.json({ error: 'Feature not found' }, 404);
 

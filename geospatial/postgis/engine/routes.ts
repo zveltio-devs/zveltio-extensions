@@ -29,11 +29,23 @@ async function resolveCollection(ctx: ExtensionContext, userId: string, collecti
   const shortName = collection.startsWith('zvd_') ? collection.slice(4) : collection;
   if (!/^[a-z][a-z0-9_]*$/.test(shortName)) return null;
   const tableName = `zvd_${shortName}`;
-  const exists = await sql<{ exists: boolean }>`
-    SELECT EXISTS (
-      SELECT 1 FROM information_schema.tables WHERE table_name = ${tableName}
-    ) AS exists
-  `.execute(ctx.db).then(r => r.rows[0]?.exists ?? false).catch(() => false);
+  // Whether the collection's table is there at all. A check that cannot run
+  // refuses the table rather than granting it — `if (!exists) return null` below
+  // is the refusal, and it is the direction an unreadable answer has to take.
+  let exists = false;
+  try {
+    const r = await sql<{ exists: boolean }>`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables WHERE table_name = ${tableName}
+      ) AS exists
+    `.execute(ctx.db);
+    exists = r.rows[0]?.exists ?? false;
+  } catch (err) {
+    console.warn(
+      `[postgis] could not check whether ${tableName} exists; refusing access:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
   if (!exists) return null;
   const canRead = await (ctx.checkPermission as any)(userId, `data:${shortName}`, 'read').catch(() => false);
   if (!canRead) return null;
@@ -270,7 +282,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
         ${entity_type ? sql`AND entity_type = ${entity_type}` : sql``}
       ORDER BY occurred_at DESC
       LIMIT ${parseInt(limit, 10)}
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
 
     return c.json({ events: events.rows });
   });
@@ -407,7 +419,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
         ${to ? sql`AND recorded_at <= ${to}::timestamptz` : sql``}
       ORDER BY recorded_at DESC
       LIMIT ${parseInt(limit, 10)}
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
 
     return c.json({ history: history.rows });
   });
@@ -471,7 +483,7 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
 
     const rules = await sql<any>`
       SELECT * FROM zv_geofence_rules WHERE geofence_id = ${c.req.param('id')}::uuid ORDER BY created_at
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
 
     return c.json({ rules: rules.rows });
   });
