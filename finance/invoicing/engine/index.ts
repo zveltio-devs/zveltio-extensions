@@ -126,6 +126,39 @@ const extension: ZveltioExtension = {
       },
     );
 
+    /**
+     * Open receivables in a date window — what `finance/banking` needs to draw
+     * the accounts-receivable half of its cash-flow forecast.
+     *
+     * It exists because banking was reading `zvd_invoices` directly. That is one
+     * extension reading another's table, which is the coupling that produced H-6
+     * in `ecommerce/store`, and it had a second cost: on an instance without this
+     * extension installed the table simply is not there, so
+     * `GET /banking/cash-flow` answered 500 rather than a forecast. A service can
+     * be absent; a table cannot be asked whether it exists without saying so.
+     *
+     * `total - amount_paid` is the outstanding balance. Both are NUMERIC, so the
+     * driver returns strings and the subtraction happens in PostgreSQL, not here.
+     */
+    ctx.services.register(
+      'invoicing.openReceivables',
+      async (window: { from: string; to: string }) => {
+        const r = await sql<any>`
+          SELECT
+            due_date                        AS expected_date,
+            'inflow'                        AS type,
+            (total - amount_paid)           AS amount,
+            'Invoice ' || number            AS description,
+            'accounts_receivable'           AS category
+          FROM zvd_invoices
+          WHERE status IN ('sent', 'overdue')
+            AND due_date BETWEEN ${window.from} AND ${window.to}
+          ORDER BY due_date
+        `.execute(ctx.db);
+        return r.rows;
+      },
+    );
+
     ctx.services.register('invoicing.listByClient', async (clientId: string) => {
       const r = await sql<any>`
         SELECT * FROM zvd_invoices WHERE client_id = ${clientId}::uuid ORDER BY issue_date DESC

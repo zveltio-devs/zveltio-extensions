@@ -403,28 +403,44 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
       WHERE expected_date BETWEEN ${fromDate} AND ${toDate}
       ORDER BY expected_date
     `.execute(db);
-    // Also include expected payments from open invoices
-    // No `.catch(() => ({ rows: [] }))`. This is the expected-inflow half of a cash
-    // flow FORECAST, and the other half — `zvd_cash_flow_entries`, three lines up —
-    // already throws. Swallowing only this one rendered the forecast successfully
-    // with an entire category missing, so an operator read a cash position that was
-    // wrong by every open invoice in the window and had no way to tell.
-    const invoices = await sql`
-      SELECT due_date as expected_date, 'inflow' as type, total - amount_paid as amount, 'Invoice ' || number as description, 'accounts_receivable' as category
-      FROM zvd_invoices WHERE status IN ('sent','overdue') AND due_date BETWEEN ${fromDate} AND ${toDate}
-    `.execute(db);
-    // `expected_date` is a DATE column and Bun's driver returns DATE as a
-    // JavaScript `Date`, which has no `localeCompare`. `Array.prototype.sort`
-    // does not call the comparator for arrays of length 0 or 1, so this answered
-    // 200 while the tenant had at most one cash-flow row and threw a TypeError
-    // from the moment it had two — permanently, with no way back to a 200
-    // except deleting data.
+    // The accounts-receivable half of the forecast.
+    //
+    // This read `zvd_invoices` directly — a table `finance/invoicing` owns. Two
+    // things were wrong with that, and dropping the `.catch(() => ({ rows: [] }))`
+    // that used to sit here fixed one and exposed the other:
+    //
+    //   * silently: a swallowed failure rendered the forecast successfully with an
+    //     entire category missing, so an operator read a cash position that was
+    //     wrong by every open invoice in the window;
+    //   * loudly: without the swallow, an instance that does not have
+    //     `finance/invoicing` installed has no `zvd_invoices` at all, so the whole
+    //     forecast answered 500. That is what the contract suite caught:
+    //     `finance/banking GET /cash-flow -> 500`.
+    //
+    // Neither is the right answer. The forecast asks invoicing for its own numbers
+    // now, the same way the reconcile path above asks it to record a payment, and an
+    // absent extension is reported rather than guessed at.
+    const openReceivables = ctx.services.get<
+      (window: { from: string; to: string }) => Promise<Array<Record<string, unknown>>>
+    >('invoicing.openReceivables');
+
+    let receivables: Array<Record<string, unknown>> = [];
+    const unavailable: string[] = [];
+    if (openReceivables) {
+      receivables = await openReceivables({ from: fromDate, to: toDate });
+    } else {
+      unavailable.push('accounts_receivable');
+    }
+
     const toTime = (v: unknown): number =>
       v instanceof Date ? v.getTime() : new Date(String(v)).getTime();
     return c.json({
-      data: [...forecast.rows, ...invoices.rows].sort(
+      data: [...forecast.rows, ...receivables].sort(
         (a: any, b: any) => toTime(a.expected_date) - toTime(b.expected_date),
       ),
+      // Empty on a complete forecast. Named when a category could not be
+      // included, so a caller cannot draw a total that silently omits one.
+      unavailable,
     });
   });
 
