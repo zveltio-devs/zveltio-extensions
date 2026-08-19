@@ -46,6 +46,7 @@ const extension: ZveltioExtension = {
       join(import.meta.dir, 'migrations/004_jsonb_not_text.sql'),
       join(import.meta.dir, 'migrations/005_record_pages.sql'),
       join(import.meta.dir, 'migrations/006_record_filter.sql'),
+      join(import.meta.dir, 'migrations/007_block_types_are_a_catalogue.sql'),
     ];
   },
 

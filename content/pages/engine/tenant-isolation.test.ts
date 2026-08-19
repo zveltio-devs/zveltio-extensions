@@ -52,6 +52,15 @@ const OTHER = 't-theirs';
  * (`zv_page_block_types` is a global registry), so a blanket rule here would be
  * wrong as well as noisy.
  *
+ * That parenthesis used to be false. `zv_page_block_types` DID have a
+ * `tenant_id`, RLS forced, and a `zveltio_tenant_scope_ok` policy — 001 ran it
+ * through the loop that scopes the page tables — while its fourteen seeded rows
+ * all belonged to the default tenant. As `zveltio_rls`: the seed tenant saw 14,
+ * every other tenant saw 0, and the second company an instance created opened
+ * the page builder with an empty library. Migration 007 makes the sentence true:
+ * the column, the policy and the RLS are gone, and the catalogue is one row per
+ * block type for the whole instance.
+ *
  * What this file holds is the surface the IDOR was found on, where the module
  * already states its own rule — predicates as defence in depth, not as the only
  * guard — and now keeps it uniformly.
