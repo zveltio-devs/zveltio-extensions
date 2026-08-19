@@ -30728,8 +30728,7 @@ function aiSchemaGenRoutes(ctx) {
     const isAdmin = await checkPermission(session.user.id, "admin", "*");
     if (!isAdmin)
       return c.json({ error: "Admin required" }, 403);
-    const row = await db.selectFrom("user").select(["role"]).where("id", "=", session.user.id).executeTakeFirst();
-    c.set("user", { ...session.user, role: row?.role ?? session.user.role });
+    c.set("user", session.user);
     await next();
   };
   router.use("/preview-schema", adminOnly);
@@ -32598,19 +32597,16 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
     }
   }
   async toolGetSystemStats() {
-    const [collections, users, recentActivity] = await Promise.all([
-      this.db.selectFrom("zvd_collections").select(this.db.fn.count("name").as("count")).executeTakeFirst().catch(() => ({ count: 0 })),
-      this.db.selectFrom("user").select(this.db.fn.count("id").as("count")).executeTakeFirst().catch(() => ({ count: 0 })),
-      this.db.selectFrom("zv_audit_log").select(this.db.fn.count("id").as("count")).executeTakeFirst().catch(() => ({ count: 0 }))
-    ]);
+    const collections = await this.db.selectFrom("zvd_collections").select(this.db.fn.count("name").as("count")).executeTakeFirst();
+    const n = Number(collections?.count ?? 0);
     return {
       success: true,
-      stats: {
-        collections: Number(collections?.count ?? 0),
-        users: Number(users?.count ?? 0),
-        recentActivity: Number(recentActivity?.count ?? 0)
+      stats: { collections: n },
+      unavailable: {
+        users: "the user directory is engine-owned and not readable by an extension",
+        recentActivity: "the audit log is engine-owned and not readable by an extension"
       },
-      message: `Platform stats: ${collections?.count ?? 0} collections, ${users?.count ?? 0} users`
+      message: `Platform stats: ${n} collections. User and audit-activity counts are not ` + `available to this assistant \u2014 they live in engine-owned tables.`
     };
   }
   async toolRememberFact(args, request) {
