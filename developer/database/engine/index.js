@@ -19446,14 +19446,13 @@ function q(s) {
   return `"${s.replace(/"/g, '""')}"`;
 }
 function databaseRoutes(ctx) {
-  const { db, auth } = ctx;
-  const { requireInstanceAdmin } = ctx.internals;
+  const { db, auth, checkPermission } = ctx;
   const router = new Hono2().use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session)
       return c.json({ error: "Unauthorized" }, 401);
     c.set("user", session.user);
-    const hasAdmin = await requireInstanceAdmin(session.user.id);
+    const hasAdmin = await checkPermission(session.user.id, "admin", "*");
     if (!hasAdmin)
       return c.json({ error: "Admin access required" }, 403);
     await next();
