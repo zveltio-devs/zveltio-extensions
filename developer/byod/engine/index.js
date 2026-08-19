@@ -19652,16 +19652,16 @@ function introspectRoutes(ctx) {
     const [importedRes, lastScanRes, profilesRes] = await Promise.all([
       sql`
         SELECT COUNT(*)::int AS total
-        FROM zv_collections
+        FROM zvd_collections
         WHERE is_managed = false
-      `.execute(db).catch(() => ({ rows: [{ total: 0 }] })),
+      `.execute(db),
       sql`
         SELECT created_at FROM zvd_byod_scan_history
         ORDER BY created_at DESC LIMIT 1
-      `.execute(db).catch(() => ({ rows: [] })),
+      `.execute(db),
       sql`
         SELECT COUNT(*)::int AS total FROM zvd_byod_scan_profiles
-      `.execute(db).catch(() => ({ rows: [{ total: 0 }] }))
+      `.execute(db)
     ]);
     return c.json({
       imported_tables: importedRes.rows[0]?.total ?? 0,

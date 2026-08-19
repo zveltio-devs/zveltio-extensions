@@ -19519,7 +19519,7 @@ function qualityRoutes(ctx) {
       return c.json({ error: "Forbidden" }, 403);
     const [summary, latestScans] = await Promise.all([
       sql`SELECT i.collection, i.severity, COUNT(i.id) as count FROM zv_quality_issues i WHERE i.dismissed = false GROUP BY i.collection, i.severity`.execute(db).then((r) => r.rows),
-      db.selectFrom("zv_quality_scans").select(["collection", "status", "issues_found", "completed_at"]).distinctOn(["collection"]).orderBy("collection").orderBy("started_at", "desc").execute().catch(() => [])
+      db.selectFrom("zv_quality_scans").select(["collection", "status", "issues_found", "completed_at"]).distinctOn(["collection"]).orderBy("collection").orderBy("started_at", "desc").execute()
     ]);
     return c.json({ summary, latest_scans: latestScans });
   });
@@ -19642,7 +19642,7 @@ function qualityRoutes(ctx) {
         SELECT collection, COUNT(*)::text AS total, SUM(CASE WHEN dismissed THEN 1 ELSE 0 END)::text AS dismissed
         FROM zv_quality_issues GROUP BY collection ORDER BY total DESC LIMIT 10
       `.execute(db),
-      db.selectFrom("zvd_quality_sla_targets").select(["collection", "max_critical_issues", "max_error_issues", "is_active"]).where("is_active", "=", true).execute().catch(() => [])
+      db.selectFrom("zvd_quality_sla_targets").select(["collection", "max_critical_issues", "max_error_issues", "is_active"]).where("is_active", "=", true).execute()
     ]);
     return c.json({
       scans_last_30_days: parseInt(scansCount.rows[0]?.count || "0"),

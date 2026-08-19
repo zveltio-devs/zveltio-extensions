@@ -74,7 +74,7 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
   });
 
   // ── GET /preview ──────────────────────────────────────────────────────────
-  // Dry-run: returns tables found without writing to zv_collections.
+  // Dry-run: returns tables found without writing to zvd_collections.
   // Query params: schema (default: public), exclude (comma-separated substrings)
   router.get('/preview', async (c) => {
     const schema = c.req.query('schema') || 'public';
@@ -311,20 +311,31 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
 
   // ── GET /stats ────────────────────────────────────────────────────────────
 
+  // The first query said `FROM zv_collections`. There is no such table — the
+  // engine's is `zvd_collections` — so it threw on every request ever made, the
+  // swallow turned that into `total: 0`, and `imported_tables` has read zero on
+  // every install since this endpoint was written. Nobody questioned it because
+  // zero is also what a correct answer looks like before you import anything.
+  //
+  // No `.catch(() => ({ rows: [{ total: 0 }] }))` on any of the three. This screen
+  // answers "how much of my own database have I brought in, and when did I last
+  // look". Zero imported tables with a null last-scan is exactly what a fresh
+  // install looks like, so a failed read rendered the same screen as a correct one
+  // — and the operator's next move is to run an import that is already done.
   router.get('/stats', async (c) => {
     const [importedRes, lastScanRes, profilesRes] = await Promise.all([
       sql<any>`
         SELECT COUNT(*)::int AS total
-        FROM zv_collections
+        FROM zvd_collections
         WHERE is_managed = false
-      `.execute(db).catch(() => ({ rows: [{ total: 0 }] })),
+      `.execute(db),
       sql<any>`
         SELECT created_at FROM zvd_byod_scan_history
         ORDER BY created_at DESC LIMIT 1
-      `.execute(db).catch(() => ({ rows: [] })),
+      `.execute(db),
       sql<any>`
         SELECT COUNT(*)::int AS total FROM zvd_byod_scan_profiles
-      `.execute(db).catch(() => ({ rows: [{ total: 0 }] })),
+      `.execute(db),
     ]);
 
     return c.json({

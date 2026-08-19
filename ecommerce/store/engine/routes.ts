@@ -288,7 +288,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
             VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === 'active'}, ${user.id})
             ON CONFLICT (tenant_id, sku) DO UPDATE SET name = EXCLUDED.name
             RETURNING id
-          `.execute(db).catch(() => null);
+          `.execute(db);
           if (create === null) {
             await sql`ROLLBACK TO SAVEPOINT canonical_product`.execute(db);
           } else {

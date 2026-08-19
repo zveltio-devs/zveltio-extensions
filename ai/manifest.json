@@ -3,7 +3,7 @@
   "displayName": "AI",
   "category": "intelligence",
   "description": "AI capabilities: providers, chat, embeddings, semantic search, text-to-SQL, schema generation, agentic workflows.",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ai",
@@ -43,7 +43,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "b72da0d73bfbf56a1682b1996a953de10c4b03fb32c017e31a8b04f5db6cbb71",
-    "sourceSha256": "b737dbfd62ea3adb449c8a00c561c907f7fec690bffc68a71c49818a2ad2807f"
+    "engineSha256": "f5e56bfb6c8f3213e9cecea966eb303e502f123c492ce94f0256584588e893a7",
+    "sourceSha256": "91a0e59667675de7e085393fe5ca06feb963b6fa7971dd1a9b3abb58b0e4f8a3"
   }
 }

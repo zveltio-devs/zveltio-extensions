@@ -353,8 +353,11 @@ export async function initAIProviders(db: any): Promise<void> {
     .selectFrom('zv_ai_providers' as any)
     .selectAll()
     .where('is_active' as any, '=', true)
-    .execute()
-    .catch(() => []);
+    .execute();
+    // No `.catch(() => [])`. An empty provider list means "AI is not configured",
+    // so a failed read turned every AI feature off and said nothing. `register()`
+    // already wraps this call and logs `initAIProviders failed (non-fatal)` — that
+    // handler was written for exactly this and the swallow made it unreachable.
 
   for (const row of rows as any[]) {
     let provider: AIProvider | null = null;
