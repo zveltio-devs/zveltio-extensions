@@ -77344,6 +77344,7 @@ async function decryptPassword(stored) {
 }
 
 // ../zveltio-extensions/communications/mail/engine/lib/imap-client.ts
+var FIRST_SYNC_LIMIT = 50;
 async function syncImapAccount(db, account) {
   const imapPassword = await decryptPassword(account.imap_password);
   const client = new import_imapflow.ImapFlow({
@@ -77374,7 +77375,9 @@ async function syncImapAccount(db, account) {
       try {
         const lock = await client.getMailboxLock(folder.path);
         try {
-          const since = folder.last_uid > 0 ? `${folder.last_uid + 1}:*` : "1:50";
+          const firstSync = folder.last_uid === 0;
+          const since = firstSync ? `1:${FIRST_SYNC_LIMIT}` : `${folder.last_uid + 1}:*`;
+          let highestSeen = 0;
           for await (const msg of client.fetch(since, {
             uid: true,
             envelope: true,
@@ -77383,6 +77386,8 @@ async function syncImapAccount(db, account) {
           })) {
             if (msg.uid <= folder.last_uid)
               continue;
+            if (msg.uid > highestSeen)
+              highestSeen = msg.uid;
             const parsed = parseEnvelope(msg);
             const inserted = await sql`
               INSERT INTO zv_mail_messages (
@@ -77412,10 +77417,12 @@ async function syncImapAccount(db, account) {
             results.synced++;
           }
           const status = client.mailbox;
+          const caughtUp = !firstSync && status?.uidNext ? status.uidNext - 1 : 0;
+          const nextLastUid = Math.max(folder.last_uid, highestSeen, caughtUp);
           if (status?.uidNext) {
             await sql`
               UPDATE zv_mail_folders
-              SET last_uid = ${status.uidNext - 1},
+              SET last_uid = ${nextLastUid},
                   unread_count = ${status.unseen ?? 0},
                   total_count = ${status.exists ?? 0}
               WHERE id = ${folder.id}
