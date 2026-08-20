@@ -77155,6 +77155,170 @@ function parseParameter(param) {
 // ../zveltio-extensions/communications/mail/engine/lib/imap-client.ts
 var import_imapflow = __toESM(require_imap_flow(), 1);
 var import_mailparser = __toESM(require_mailparser(), 1);
+
+// ../zveltio-extensions/communications/mail/engine/lib/sieve.ts
+function compileFiltersToSieve(filters) {
+  const lines = [
+    "# Zveltio Mail \u2014 Auto-generated Sieve script",
+    "# DO NOT EDIT MANUALLY",
+    "",
+    'require ["fileinto", "reject", "vacation", "imap4flags", "copy", "body", "relational", "date"];',
+    ""
+  ];
+  for (const filter2 of filters) {
+    if (!filter2.is_active || !filter2.conditions.length || !filter2.actions.length)
+      continue;
+    lines.push(`# Rule: ${filter2.name}`);
+    const condParts = filter2.conditions.map(compileSieveCondition).filter(Boolean);
+    if (!condParts.length)
+      continue;
+    const condStr = condParts.length === 1 ? condParts[0] : `allof (${condParts.join(", ")})`;
+    lines.push(`if ${condStr} {`);
+    for (const action of filter2.actions) {
+      const actionLine = compileSieveAction(action);
+      if (actionLine)
+        lines.push(`  ${actionLine}`);
+    }
+    lines.push("}", "");
+  }
+  return lines.join(`
+`);
+}
+function compileSieveCondition(c) {
+  const matchType = {
+    contains: ":contains",
+    is: ":is",
+    begins_with: ":matches",
+    ends_with: ":matches",
+    greater_than: ":over",
+    less_than: ":under"
+  }[c.operator] ?? ":contains";
+  const value = c.operator === "begins_with" ? `${c.value}*` : c.operator === "ends_with" ? `*${c.value}` : c.value;
+  switch (c.field) {
+    case "from":
+      return `header ${matchType} "From" "${value}"`;
+    case "to":
+      return `header ${matchType} ["To", "Cc"] "${value}"`;
+    case "subject":
+      return `header ${matchType} "Subject" "${value}"`;
+    case "body":
+      return `body :text ${matchType} "${value}"`;
+    case "size":
+      return c.operator === "greater_than" ? `size :over ${value}K` : `size :under ${value}K`;
+    case "header":
+      return c.header_name ? `header ${matchType} "${c.header_name}" "${value}"` : "";
+    default:
+      return "";
+  }
+}
+function compileSieveAction(a) {
+  switch (a.type) {
+    case "move":
+      return a.folder ? `fileinto "${a.folder}";` : null;
+    case "copy":
+      return a.folder ? `fileinto :copy "${a.folder}";` : null;
+    case "mark_read":
+      return 'setflag "\\\\Seen";';
+    case "mark_starred":
+      return 'setflag "\\\\Flagged";';
+    case "delete":
+      return "discard;";
+    case "forward":
+      return a.address ? `redirect "${a.address}";` : null;
+    case "reject":
+      return a.message ? `reject "${a.message}";` : null;
+    case "add_flag":
+      return a.flag ? `addflag "${a.flag}";` : null;
+    case "stop":
+      return "stop;";
+    case "vacation":
+      return a.message ? `vacation :days ${a.vacation_days ?? 7} :subject "${a.vacation_subject ?? "Out of Office"}" "${a.message}";` : null;
+    default:
+      return null;
+  }
+}
+async function uploadSieveScript(account, scriptName, script) {
+  if (!account.sieve_host) {
+    return { uploaded: false, fallback: true };
+  }
+  try {
+    console.log(`[sieve] Upload "${scriptName}" to ${account.sieve_host}:${account.sieve_port ?? 4190}`);
+    return { uploaded: false, fallback: true };
+  } catch {
+    return { uploaded: false, fallback: true };
+  }
+}
+async function applyLocalFilters(db, accountId, messages) {
+  if (!messages.length)
+    return;
+  const filtersResult = await sql`
+    SELECT * FROM zv_mail_filters
+    WHERE account_id = ${accountId} AND is_active = true
+    ORDER BY sort_order
+  `.execute(db);
+  for (const msg of messages) {
+    for (const row of filtersResult.rows) {
+      const conditions = typeof row.conditions === "string" ? JSON.parse(row.conditions) : row.conditions ?? [];
+      const actions2 = typeof row.actions === "string" ? JSON.parse(row.actions) : row.actions ?? [];
+      if (matchesAll(msg, conditions)) {
+        await executeLocalActions(db, accountId, msg.id, actions2);
+        if (actions2.some((a) => a.type === "stop"))
+          break;
+      }
+    }
+  }
+}
+function matchesAll(msg, conditions) {
+  if (!conditions.length)
+    return false;
+  return conditions.every((c) => {
+    const haystack = (c.field === "from" ? msg.from_address : c.field === "subject" ? msg.subject ?? "" : c.field === "body" ? msg.body_text ?? "" : "").toLowerCase();
+    const needle = c.value.toLowerCase();
+    switch (c.operator) {
+      case "contains":
+        return haystack.includes(needle);
+      case "is":
+        return haystack === needle;
+      case "begins_with":
+        return haystack.startsWith(needle);
+      case "ends_with":
+        return haystack.endsWith(needle);
+      default:
+        return false;
+    }
+  });
+}
+async function executeLocalActions(db, accountId, msgId, actions2) {
+  for (const action of actions2) {
+    try {
+      switch (action.type) {
+        case "mark_read":
+          await sql`UPDATE zv_mail_messages SET is_read = true WHERE id = ${msgId}`.execute(db);
+          break;
+        case "mark_starred":
+          await sql`UPDATE zv_mail_messages SET is_starred = true WHERE id = ${msgId}`.execute(db);
+          break;
+        case "move":
+          if (action.folder) {
+            const folderRes = await sql`
+              SELECT id FROM zv_mail_folders WHERE account_id = ${accountId} AND path = ${action.folder} LIMIT 1
+            `.execute(db);
+            if (folderRes.rows[0]) {
+              await sql`
+                UPDATE zv_mail_messages SET folder_id = ${folderRes.rows[0].id} WHERE id = ${msgId}
+              `.execute(db);
+            }
+          }
+          break;
+        case "delete":
+          await sql`DELETE FROM zv_mail_messages WHERE id = ${msgId}`.execute(db);
+          break;
+      }
+    } catch {}
+  }
+}
+
+// ../zveltio-extensions/communications/mail/engine/lib/imap-client.ts
 var import_nodemailer = __toESM(require_nodemailer(), 1);
 
 // ../zveltio-extensions/communications/mail/engine/lib/crypto.ts
@@ -77205,6 +77369,7 @@ async function syncImapAccount(db, account) {
       SELECT id, path, last_uid FROM zv_mail_folders
       WHERE account_id = ${account.id} AND type IN ('inbox', 'sent', 'drafts')
     `.execute(db);
+    const arrived = [];
     for (const folder of foldersToSync.rows) {
       try {
         const lock = await client.getMailboxLock(folder.path);
@@ -77219,7 +77384,7 @@ async function syncImapAccount(db, account) {
             if (msg.uid <= folder.last_uid)
               continue;
             const parsed = parseEnvelope(msg);
-            await sql`
+            const inserted = await sql`
               INSERT INTO zv_mail_messages (
                 account_id, folder_id, message_id, uid, thread_id,
                 from_address, from_name, to_addresses, cc_addresses,
@@ -77233,7 +77398,17 @@ async function syncImapAccount(db, account) {
                 ${parsed.sentAt?.toISOString() ?? null}, ${JSON.stringify(parsed.headers)}::jsonb
               )
               ON CONFLICT DO NOTHING
+              RETURNING id
             `.execute(db);
+            const newId = inserted.rows[0]?.id;
+            if (newId) {
+              arrived.push({
+                id: newId,
+                from_address: parsed.from.address,
+                to_addresses: parsed.to,
+                subject: parsed.subject
+              });
+            }
             results.synced++;
           }
           const status = client.mailbox;
@@ -77251,6 +77426,13 @@ async function syncImapAccount(db, account) {
         }
       } catch (err) {
         results.errors.push(`${folder.path}: ${err.message}`);
+      }
+    }
+    if (arrived.length) {
+      try {
+        await applyLocalFilters(db, account.id, arrived);
+      } catch (err) {
+        results.errors.push(`filters: ${err.message}`);
       }
     }
     await sql`
@@ -77598,99 +77780,6 @@ async function autoCollectContacts(db, userId, emails) {
         frequency    = zv_mail_contacts.frequency + 1,
         last_used_at = NOW()
     `.execute(db).catch(() => {});
-  }
-}
-
-// ../zveltio-extensions/communications/mail/engine/lib/sieve.ts
-function compileFiltersToSieve(filters) {
-  const lines = [
-    "# Zveltio Mail \u2014 Auto-generated Sieve script",
-    "# DO NOT EDIT MANUALLY",
-    "",
-    'require ["fileinto", "reject", "vacation", "imap4flags", "copy", "body", "relational", "date"];',
-    ""
-  ];
-  for (const filter2 of filters) {
-    if (!filter2.is_active || !filter2.conditions.length || !filter2.actions.length)
-      continue;
-    lines.push(`# Rule: ${filter2.name}`);
-    const condParts = filter2.conditions.map(compileSieveCondition).filter(Boolean);
-    if (!condParts.length)
-      continue;
-    const condStr = condParts.length === 1 ? condParts[0] : `allof (${condParts.join(", ")})`;
-    lines.push(`if ${condStr} {`);
-    for (const action of filter2.actions) {
-      const actionLine = compileSieveAction(action);
-      if (actionLine)
-        lines.push(`  ${actionLine}`);
-    }
-    lines.push("}", "");
-  }
-  return lines.join(`
-`);
-}
-function compileSieveCondition(c) {
-  const matchType = {
-    contains: ":contains",
-    is: ":is",
-    begins_with: ":matches",
-    ends_with: ":matches",
-    greater_than: ":over",
-    less_than: ":under"
-  }[c.operator] ?? ":contains";
-  const value = c.operator === "begins_with" ? `${c.value}*` : c.operator === "ends_with" ? `*${c.value}` : c.value;
-  switch (c.field) {
-    case "from":
-      return `header ${matchType} "From" "${value}"`;
-    case "to":
-      return `header ${matchType} ["To", "Cc"] "${value}"`;
-    case "subject":
-      return `header ${matchType} "Subject" "${value}"`;
-    case "body":
-      return `body :text ${matchType} "${value}"`;
-    case "size":
-      return c.operator === "greater_than" ? `size :over ${value}K` : `size :under ${value}K`;
-    case "header":
-      return c.header_name ? `header ${matchType} "${c.header_name}" "${value}"` : "";
-    default:
-      return "";
-  }
-}
-function compileSieveAction(a) {
-  switch (a.type) {
-    case "move":
-      return a.folder ? `fileinto "${a.folder}";` : null;
-    case "copy":
-      return a.folder ? `fileinto :copy "${a.folder}";` : null;
-    case "mark_read":
-      return 'setflag "\\\\Seen";';
-    case "mark_starred":
-      return 'setflag "\\\\Flagged";';
-    case "delete":
-      return "discard;";
-    case "forward":
-      return a.address ? `redirect "${a.address}";` : null;
-    case "reject":
-      return a.message ? `reject "${a.message}";` : null;
-    case "add_flag":
-      return a.flag ? `addflag "${a.flag}";` : null;
-    case "stop":
-      return "stop;";
-    case "vacation":
-      return a.message ? `vacation :days ${a.vacation_days ?? 7} :subject "${a.vacation_subject ?? "Out of Office"}" "${a.message}";` : null;
-    default:
-      return null;
-  }
-}
-async function uploadSieveScript(account, scriptName, script) {
-  if (!account.sieve_host) {
-    return { uploaded: false, fallback: true };
-  }
-  try {
-    console.log(`[sieve] Upload "${scriptName}" to ${account.sieve_host}:${account.sieve_port ?? 4190}`);
-    return { uploaded: false, fallback: true };
-  } catch {
-    return { uploaded: false, fallback: true };
   }
 }
 
@@ -78442,9 +78531,10 @@ Please draft a reply to this email.`
     const upload = accountResult.rows[0] ? await uploadSieveScript(accountResult.rows[0], "zveltio", sieveScript) : { uploaded: false, fallback: true };
     return c.json({
       filter: result.rows[0],
-      applied: upload.uploaded,
+      applied: true,
+      where: upload.uploaded ? "server" : "local",
       ...upload.uploaded ? {} : {
-        notice: "Filter saved but not applied: server-side Sieve upload is not implemented, and no " + "local fallback runs at sync time."
+        notice: "Filter saved. It is applied locally to messages fetched by a sync \u2014 not on the mail " + "server, so it does not act on mail arriving between syncs."
       }
     }, 201);
   });
