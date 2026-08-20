@@ -19441,6 +19441,9 @@ function parseParameter(param) {
   }
   return parseValueExpression(param);
 }
+// ../zveltio-extensions/finance/banking/engine/routes.ts
+import { createHash } from "crypto";
+
 // packages/sdk/src/extension/permission-gate.ts
 async function refuse(ctx, c, resource, action) {
   let denial = null;
@@ -19509,36 +19512,93 @@ function permissionGate(ctx, resource, opts = {}) {
     await next();
   };
 }
-// ../zveltio-extensions/finance/banking/engine/routes.ts
+// packages/sdk/src/extension/numeric.ts
+class NumericConversionError extends Error {
+  value;
+  constructor(value, label) {
+    super(`${label ? `${label}: ` : ""}expected a finite number, got ${typeof value === "string" ? JSON.stringify(value) : String(value)}`);
+    this.value = value;
+    this.name = "NumericConversionError";
+  }
+}
+function toNumber(value, fallback = 0, label) {
+  if (value === null || value === undefined)
+    return fallback;
+  if (typeof value === "bigint") {
+    if (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER) {
+      throw new NumericConversionError(value, label);
+    }
+    return Number(value);
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value))
+      throw new NumericConversionError(value, label);
+    return value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "")
+      throw new NumericConversionError(value, label);
+    const n = Number(trimmed);
+    if (!Number.isFinite(n))
+      throw new NumericConversionError(value, label);
+    return n;
+  }
+  throw new NumericConversionError(value, label);
+}
+// ../zveltio-extensions/finance/banking/engine/mt940.ts
+var MT940_LINE = /^:61:(\d{6})(\d{4})?(RC|RD|C|D)([A-Z])?(\d+,\d*)([NSF]\w{0,3})(.*)?$/;
 function parseMT940(text) {
   const lines = text.replace(/\r\n/g, `
 `).split(`
 `);
   const transactions = [];
+  const unparsed = [];
   let i = 0;
   while (i < lines.length) {
-    const line = lines[i];
-    if (line.startsWith(":61:")) {
-      const match2 = line.match(/:61:(\d{6})(\d{4})?(C|D)(\d+,\d+)N(\w+)(.*)?/);
-      if (match2) {
-        const yy = match2[1].slice(0, 2), mm = match2[1].slice(2, 4), dd = match2[1].slice(4, 6);
-        const year = parseInt(yy) < 50 ? `20${yy}` : `19${yy}`;
-        const date5 = `${year}-${mm}-${dd}`;
-        const type = match2[3] === "C" ? "credit" : "debit";
-        const amount = parseFloat(match2[4].replace(",", "."));
-        const reference = match2[5] ?? "";
-        let description = "";
-        if (lines[i + 1]?.startsWith(":86:")) {
-          description = lines[i + 1].slice(4).trim();
-          i++;
-        }
-        transactions.push({ date: date5, type, amount, description, reference });
-      }
+    const line = (lines[i] ?? "").trim();
+    if (!line.startsWith(":61:")) {
+      i++;
+      continue;
     }
-    i++;
+    const match2 = line.match(MT940_LINE);
+    if (!match2) {
+      unparsed.push(line);
+      i++;
+      continue;
+    }
+    const [, ymd, , mark, , rawAmount, , rest] = match2;
+    const yy = ymd.slice(0, 2);
+    const year = Number.parseInt(yy, 10) < 50 ? `20${yy}` : `19${yy}`;
+    const date5 = `${year}-${ymd.slice(2, 4)}-${ymd.slice(4, 6)}`;
+    const reversal = mark === "RC" || mark === "RD";
+    const credit = mark === "C" || mark === "RD";
+    const amount = Number.parseFloat(rawAmount.replace(",", ".").replace(/\.$/, ""));
+    let description = "";
+    let j = i + 1;
+    if ((lines[j] ?? "").startsWith(":86:")) {
+      description = (lines[j] ?? "").slice(4).trim();
+      j++;
+      while (j < lines.length && !(lines[j] ?? "").trimStart().startsWith(":")) {
+        description += ` ${(lines[j] ?? "").trim()}`;
+        j++;
+      }
+      description = description.trim();
+    }
+    transactions.push({
+      date: date5,
+      type: credit ? "credit" : "debit",
+      amount,
+      description,
+      reference: (rest ?? "").trim(),
+      reversal
+    });
+    i = j;
   }
-  return transactions;
+  return { transactions, unparsed };
 }
+
+// ../zveltio-extensions/finance/banking/engine/routes.ts
 async function applyRules(dbh, accountId, tx) {
   const rules = await sql`
     SELECT * FROM zvd_bank_rules
@@ -19578,6 +19638,9 @@ async function applyRules(dbh, accountId, tx) {
       return rule.category;
   }
   return null;
+}
+function transactionFingerprint(accountId, t) {
+  return createHash("sha256").update([accountId, String(t.date), t.type, String(t.amount), t.description ?? "", t.reference ?? ""].join("\x00")).digest("hex");
 }
 function bankingRoutes(ctx) {
   const { db, auth } = ctx;
@@ -19672,17 +19735,25 @@ function bankingRoutes(ctx) {
     return c.json({ data: row.rows[0] }, 201);
   });
   app.post("/accounts/:id/import/mt940", zValidator("json", exports_external.object({
-    content: exports_external.string().min(10)
+    content: exports_external.string().min(10),
+    filename: exports_external.string().max(255).optional()
   })), async (c) => {
     const user = c.get("user");
-    const { content } = c.req.valid("json");
+    const { content, filename } = c.req.valid("json");
     const accountId = c.req.param("id");
-    const transactions = parseMT940(content);
+    const parsed = parseMT940(content);
+    if (parsed.unparsed.length > 0) {
+      return c.json({
+        error: `${parsed.unparsed.length} statement line(s) could not be read. Nothing was imported \u2014 ` + "importing the rest would leave the balance wrong with no record of what was missed.",
+        unparsed: parsed.unparsed.slice(0, 10)
+      }, 400);
+    }
+    const transactions = parsed.transactions;
     if (!transactions.length)
       return c.json({ error: "No transactions found in MT940 content" }, 400);
     const importRow = await sql`
-      INSERT INTO zvd_bank_imports (account_id, source, rows_imported, imported_by)
-      VALUES (${accountId}, 'mt940', ${transactions.length}, ${user.id}) RETURNING id
+      INSERT INTO zvd_bank_imports (account_id, source, filename, rows_imported, imported_by)
+      VALUES (${accountId}, 'mt940', ${filename ?? null}, ${transactions.length}, ${user.id}) RETURNING id
     `.execute(db);
     const importId = importRow.rows[0].id;
     let imported = 0;
@@ -19690,8 +19761,8 @@ function bankingRoutes(ctx) {
     for (const t of transactions) {
       const autoCategory = await applyRules(db, accountId, t);
       const result = await sql`
-        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, category, auto_categorized, created_by)
-        VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description}, ${t.reference}, ${autoCategory}, ${!!autoCategory}, ${user.id})
+        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, category, auto_categorized, created_by, import_hash)
+        VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description}, ${t.reference}, ${autoCategory}, ${!!autoCategory}, ${user.id}, ${transactionFingerprint(accountId, t)})
         ON CONFLICT DO NOTHING RETURNING id
       `.execute(db);
       if (result.rows.length) {
@@ -19704,6 +19775,7 @@ function bankingRoutes(ctx) {
   });
   app.post("/accounts/:id/import", zValidator("json", exports_external.object({
     source: exports_external.string().default("csv"),
+    filename: exports_external.string().max(255).optional(),
     transactions: exports_external.array(exports_external.object({
       date: exports_external.string(),
       type: exports_external.enum(["credit", "debit"]),
@@ -19717,8 +19789,8 @@ function bankingRoutes(ctx) {
     const d = c.req.valid("json");
     const accountId = c.req.param("id");
     const importRow = await sql`
-      INSERT INTO zvd_bank_imports (account_id, source, rows_imported, imported_by)
-      VALUES (${accountId}, ${d.source}, ${d.transactions.length}, ${user.id}) RETURNING id
+      INSERT INTO zvd_bank_imports (account_id, source, filename, rows_imported, imported_by)
+      VALUES (${accountId}, ${d.source}, ${d.filename ?? null}, ${d.transactions.length}, ${user.id}) RETURNING id
     `.execute(db);
     const importId = importRow.rows[0].id;
     let balance_delta = 0;
@@ -19726,9 +19798,10 @@ function bankingRoutes(ctx) {
     for (const t of d.transactions) {
       const autoCategory = await applyRules(db, accountId, t);
       const result = await sql`
-        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, counterparty_name, category, auto_categorized, created_by)
+        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, counterparty_name, category, auto_categorized, created_by, import_hash)
         VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description},
-          ${t.reference ?? null}, ${t.counterparty_name ?? null}, ${autoCategory}, ${!!autoCategory}, ${user.id})
+          ${t.reference ?? null}, ${t.counterparty_name ?? null}, ${autoCategory}, ${!!autoCategory}, ${user.id},
+          ${transactionFingerprint(accountId, t)})
         ON CONFLICT DO NOTHING RETURNING id
       `.execute(db);
       if (result.rows.length) {
@@ -19795,7 +19868,27 @@ function bankingRoutes(ctx) {
       ON CONFLICT (transaction_id) DO UPDATE SET linked_type = EXCLUDED.linked_type, linked_id = EXCLUDED.linked_id, notes = EXCLUDED.notes
       RETURNING *
     `.execute(db);
-    return c.json({ data: rec.rows[0] });
+    let paid = null;
+    if (d.linked_type === "invoice" && d.linked_id) {
+      const recordPayment = ctx.services.get("invoicing.recordPayment");
+      if (recordPayment) {
+        const t = tx.rows[0];
+        try {
+          paid = await recordPayment({
+            invoiceId: d.linked_id,
+            amount: Math.abs(toNumber(t.amount, 0, "transaction.amount")),
+            paymentDate: t.date instanceof Date ? t.date.toISOString().slice(0, 10) : String(t.date),
+            method: "transfer",
+            reference: t.reference ?? null ? String(t.reference) : undefined,
+            notes: d.notes,
+            userId: user.id
+          });
+        } catch (err) {
+          console.warn(`[banking] reconciled transaction ${c.req.param("txId")} but could not record the payment on invoice ${d.linked_id}:`, err instanceof Error ? err.message : err);
+        }
+      }
+    }
+    return c.json({ data: rec.rows[0], invoice: paid });
   });
   app.get("/accounts/:id/suggest-matches", async (c) => {
     const txns = await sql`
@@ -19804,7 +19897,7 @@ function bankingRoutes(ctx) {
       JOIN zvd_invoices i ON ABS(i.total - t.amount) < 0.01 AND i.status IN ('sent','overdue')
       WHERE t.account_id = ${c.req.param("id")} AND t.is_reconciled = false AND t.type = 'credit'
       ORDER BY t.date DESC LIMIT 50
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
     return c.json({ data: txns.rows });
   });
   app.get("/cash-flow", async (c) => {
@@ -19816,11 +19909,19 @@ function bankingRoutes(ctx) {
       WHERE expected_date BETWEEN ${fromDate} AND ${toDate}
       ORDER BY expected_date
     `.execute(db);
-    const invoices = await sql`
-      SELECT due_date as expected_date, 'inflow' as type, total - amount_paid as amount, 'Invoice ' || number as description, 'accounts_receivable' as category
-      FROM zvd_invoices WHERE status IN ('sent','overdue') AND due_date BETWEEN ${fromDate} AND ${toDate}
-    `.execute(db).catch(() => ({ rows: [] }));
-    return c.json({ data: [...forecast.rows, ...invoices.rows].sort((a, b) => a.expected_date.localeCompare(b.expected_date)) });
+    const openReceivables = ctx.services.get("invoicing.openReceivables");
+    let receivables = [];
+    const unavailable = [];
+    if (openReceivables) {
+      receivables = await openReceivables({ from: fromDate, to: toDate });
+    } else {
+      unavailable.push("accounts_receivable");
+    }
+    const toTime = (v) => v instanceof Date ? v.getTime() : new Date(String(v)).getTime();
+    return c.json({
+      data: [...forecast.rows, ...receivables].sort((a, b) => toTime(a.expected_date) - toTime(b.expected_date)),
+      unavailable
+    });
   });
   app.post("/cash-flow", zValidator("json", exports_external.object({
     account_id: exports_external.string().uuid().optional(),
@@ -19883,7 +19984,9 @@ var extension = {
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
       join(import.meta.dir, "migrations/003_user_ref_text.sql"),
-      join(import.meta.dir, "migrations/004_import_provenance.sql")
+      join(import.meta.dir, "migrations/004_import_provenance.sql"),
+      join(import.meta.dir, "migrations/005_import_filename_optional.sql"),
+      join(import.meta.dir, "migrations/006_import_hash_per_tenant.sql")
     ];
   },
   async register(app, ctx) {

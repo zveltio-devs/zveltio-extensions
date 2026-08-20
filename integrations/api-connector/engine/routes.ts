@@ -5,30 +5,31 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
+import { generateIncomingWebhookSecret } from './incoming-webhooks.js';
 
 const ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
 
-// SSRF protection
-function validateUrl(url: string): void {
-  const parsed = new URL(url);
-  const hostname = parsed.hostname.toLowerCase();
-  if (
-    hostname === 'localhost' || hostname.endsWith('.local') ||
-    /^127\./.test(hostname) || /^10\./.test(hostname) ||
-    /^192\.168\./.test(hostname) || /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
-    /^169\.254\./.test(hostname) || hostname === '0.0.0.0' || hostname === '::1'
-  ) {
-    throw new Error('SSRF: Private/loopback addresses are not allowed');
-  }
-}
-
-async function safeFetch(url: string, options: RequestInit): Promise<Response> {
-  validateUrl(url);
-  return fetch(url, options);
-}
+/**
+ * SSRF protection comes from the engine now, through `ctx.internals`.
+ *
+ * What used to be here was a literal-hostname blocklist: it compared the string
+ * in the URL against `localhost`, `127.`, `10.`, `192.168.`, `169.254.` and a
+ * few more. That stops an attacker who types the address and nobody else. It
+ * does not stop a hostname the attacker controls that RESOLVES to
+ * 169.254.169.254, nor `http://2852039166/`, nor a public host that answers 302
+ * pointing at the metadata service — `fetch` follows redirects, and the check
+ * had already been made on the original URL.
+ *
+ * The engine replaced exactly this guard with a DNS-aware one that re-validates
+ * every redirect hop, and exposed it on `ctx.internals` with a comment naming
+ * this extension as the reason. It was never adopted. Threading the engine's
+ * version in as a parameter, rather than importing it, because these helpers
+ * are module-level and the context arrives at `apiConnectorRoutes`.
+ */
+type SafeFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 // Exponential backoff retry
-async function fetchWithRetry(url: string, options: RequestInit, maxRetries: number, timeoutMs: number): Promise<{ res: Response | null; retries: number; error: string | null }> {
+async function fetchWithRetry(safeFetch: SafeFetch, url: string, options: RequestInit, maxRetries: number, timeoutMs: number): Promise<{ res: Response | null; retries: number; error: string | null }> {
   let lastError: string | null = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     if (attempt > 0) {
@@ -50,7 +51,12 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries: num
 }
 
 // Resolve OAuth2 token (with refresh if expired)
-async function resolveOAuth2Token(dbh: any, connectionId: string, authConfig: any): Promise<string> {
+/**
+ * `token_url` is attacker-reachable in the same way `base_url` is: it is stored
+ * on the connection and fetched by the server. Both calls below were on bare
+ * `fetch`, so the guard that did exist never applied to them at all.
+ */
+async function resolveOAuth2Token(safeFetch: SafeFetch, dbh: any, connectionId: string, authConfig: any): Promise<string> {
   const cached = await sql`SELECT * FROM zvd_api_oauth_tokens WHERE connection_id = ${connectionId}`.execute(dbh);
   if (cached.rows.length) {
     const tok = cached.rows[0] as any;
@@ -59,7 +65,7 @@ async function resolveOAuth2Token(dbh: any, connectionId: string, authConfig: an
     // Try refresh
     if (tok.refresh_token && authConfig.token_url) {
       try {
-        const res = await fetch(authConfig.token_url, {
+        const res = await safeFetch(authConfig.token_url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: tok.refresh_token, client_id: authConfig.client_id ?? '', client_secret: authConfig.client_secret ?? '' }),
@@ -79,7 +85,7 @@ async function resolveOAuth2Token(dbh: any, connectionId: string, authConfig: an
   }
   // Client credentials flow
   if (authConfig.token_url && authConfig.client_id) {
-    const res = await fetch(authConfig.token_url, {
+    const res = await safeFetch(authConfig.token_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ grant_type: 'client_credentials', client_id: authConfig.client_id, client_secret: authConfig.client_secret ?? '', scope: authConfig.scope ?? '' }),
@@ -99,8 +105,43 @@ async function resolveOAuth2Token(dbh: any, connectionId: string, authConfig: an
   return authConfig.access_token ?? '';
 }
 
+/** HMAC-SHA256 of `body` under `secret`, hex — the shape senders put in the header. */
+async function hmacHex(secret: string, body: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(body));
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
+ * Constant-time comparison of two hex strings.
+ *
+ * `a === b` returns at the first differing character, which leaks how much of a
+ * forged signature was right — enough, over many attempts, to build one a byte
+ * at a time. The length is compared first because returning early there leaks
+ * only the length, which the algorithm already fixes at 64 characters.
+ */
+function secretsMatch(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
+  // The engine's DNS-aware SSRF guards. `safeFetch` re-validates every redirect
+  // hop; `assertPublicUrl` resolves the hostname before deciding, so a name that
+  // points at 169.254.169.254 is refused whatever it is spelled.
+  const { safeFetch, assertPublicUrl, maybeEncrypt, maybeDecrypt } = ctx.internals;
 
   // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
   // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
@@ -156,7 +197,7 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
-    try { validateUrl(d.base_url); } catch (e: any) {
+    try { await assertPublicUrl(d.base_url); } catch (e: any) {
       return c.json({ error: e.message }, 400);
     }
     const row = await sql`
@@ -306,7 +347,7 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
       headers['Authorization'] = `Basic ${btoa(`${authConfig.username}:${authConfig.password}`)}`;
     } else if (endpoint.auth_type === 'oauth2') {
       try {
-        const token = await resolveOAuth2Token(db, endpoint.connection_id, authConfig);
+        const token = await resolveOAuth2Token(safeFetch, db, endpoint.connection_id, authConfig);
         headers['Authorization'] = `Bearer ${token}`;
       } catch (e: any) {
         return c.json({ error: 'OAuth2 token error: ' + e.message }, 502);
@@ -314,7 +355,7 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
     }
 
     const startedAt = Date.now();
-    const { res, retries, error: fetchError } = await fetchWithRetry(url, {
+    const { res, retries, error: fetchError } = await fetchWithRetry(safeFetch, url, {
       method: endpoint.method,
       headers,
       body: ['GET', 'HEAD'].includes(endpoint.method) ? undefined : JSON.stringify(d.body),
@@ -367,12 +408,43 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
+    // Always sign incoming deliveries — same contract as engine outbound webhooks.
+    const secret = d.secret ?? generateIncomingWebhookSecret();
+
+    // Encrypted at rest, for the same reason the engine encrypts the secret on
+    // its OUTBOUND webhooks: this value is what separates a genuine delivery
+    // from a forged one, so anyone who can read the database can forge
+    // deliveries into this system. In clear, the signature check would verify
+    // only that the sender had read access.
+    //
+    // `maybeEncrypt` throws when FIELD_ENCRYPTION_KEY is unset rather than
+    // downgrading quietly — the engine's posture on every field an operator
+    // marked sensitive. Refusing the create is the honest outcome; the
+    // alternative is a webhook that looks signed and is not.
+    let storedSecret: string;
+    try {
+      storedSecret = (await maybeEncrypt(secret, true)) as string;
+    } catch (e: any) {
+      return c.json(
+        { error: `Cannot store a webhook signing secret: ${e?.message ?? String(e)}` },
+        500,
+      );
+    }
+
     const row = await sql`
       INSERT INTO zvd_incoming_webhooks (name, endpoint_path, description, secret, connection_id, created_by)
-      VALUES (${d.name}, ${d.endpoint_path}, ${d.description ?? null}, ${d.secret ?? null}, ${d.connection_id ?? null}, ${user.id})
+      VALUES (${d.name}, ${d.endpoint_path}, ${d.description ?? null}, ${storedSecret}, ${d.connection_id ?? null}, ${user.id})
       RETURNING *
     `.execute(db);
-    return c.json({ data: row.rows[0] }, 201);
+    const created = row.rows[0] as Record<string, unknown>;
+    return c.json(
+      {
+        data: { ...created, secret: '••••••••' },
+        secret,
+        _secret_shown_once: true,
+      },
+      201,
+    );
   });
 
   app.delete('/webhooks/:id', async (c) => {
@@ -385,43 +457,34 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
     const path = '/' + c.req.param('path');
     const webhook = await sql`SELECT * FROM zvd_incoming_webhooks WHERE endpoint_path = ${path} AND is_active = true`.execute(db);
     if (!webhook.rows.length) return c.json({ error: 'Webhook not found' }, 404);
-    const w = webhook.rows[0] as any;
-    // Verify the HMAC signature when the webhook carries a secret.
-    //
-    // This used to check that the header was PRESENT and stop there, with a
-    // note saying real verification would need the crypto module. So the
-    // endpoint accepted any payload from anyone who knew the path, as long as
-    // they sent `x-hub-signature-256: anything` — and the signature check
-    // being visibly "there" is what stopped anyone looking again. Configuring
-    // a secret bought nothing.
-    let rawBody = '';
-    if (w.secret) {
-      const sig = c.req.header('x-hub-signature-256') ?? c.req.header('x-webhook-signature');
-      if (!sig) return c.json({ error: 'Missing signature' }, 401);
-      // The signature covers the bytes as sent. Parsing to JSON and
-      // re-serialising would change key order and whitespace, so the body is
-      // read once as text and reused below.
-      rawBody = await c.req.text();
-      const { createHmac, timingSafeEqual } = await import('node:crypto');
-      const expected = createHmac('sha256', w.secret).update(rawBody).digest('hex');
-      // GitHub-style `sha256=<hex>`; also accept a bare hex digest, which is
-      // what most other senders emit.
-      const provided = sig.startsWith('sha256=') ? sig.slice(7) : sig;
-      const a = Buffer.from(provided.toLowerCase(), 'hex');
-      const b = Buffer.from(expected, 'hex');
-      if (a.length !== b.length || !timingSafeEqual(a, b)) {
-        return c.json({ error: 'Invalid signature' }, 401);
-      }
+    const w = webhook.rows[0] as { id: string; secret?: string | null };
+    // Unsigned receive was SEC-04b: knowing the path was enough. repairUnsigned…
+    // backfills legacy rows at load; anything still missing a secret is refused.
+    if (!w.secret) {
+      return c.json({ error: 'Webhook has no signing secret configured' }, 401);
     }
-    const payload = w.secret
-      ? ((): unknown => {
-          try {
-            return JSON.parse(rawBody);
-          } catch {
-            return {};
-          }
-        })()
-      : await c.req.json().catch(() => ({}));
+    const sig = c.req.header('x-hub-signature-256') ?? c.req.header('x-webhook-signature');
+    if (!sig) return c.json({ error: 'Missing signature' }, 401);
+    const rawBody = await c.req.text();
+    // WebCrypto rather than `node:crypto`, which would be the only `node:*`
+    // import across all 57 extensions — the engine signs its own webhooks this
+    // way, and keeping extensions off node builtins is what leaves the runtime
+    // question (worker isolation, WASM) open rather than foreclosed.
+    // Decrypted per request. `maybeDecrypt` passes through anything without the
+    // `enc:v1:` prefix, so rows written before this column was encrypted keep
+    // verifying instead of breaking on upgrade.
+    const signingSecret = (await maybeDecrypt(w.secret, true)) as string;
+    const expected = await hmacHex(signingSecret, rawBody);
+    const provided = (sig.startsWith('sha256=') ? sig.slice(7) : sig).toLowerCase();
+    if (!secretsMatch(provided, expected)) {
+      return c.json({ error: 'Invalid signature' }, 401);
+    }
+    let payload: unknown = {};
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      payload = {};
+    }
     const headers: Record<string, string> = {};
     c.req.raw.headers.forEach((v, k) => { headers[k] = v; });
     await sql`

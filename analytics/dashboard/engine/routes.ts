@@ -276,6 +276,7 @@ async function computeWidgetData(
       sql`SELECT 1`
         .execute(db)
         .then(() => ({ ok: true, database: true }))
+        // fabricated-ok: a failed `SELECT 1` IS an unhealthy database. `{ ok: false }` states what happened.
         .catch(() => ({ ok: false, database: false })),
     );
   }

@@ -65,6 +65,37 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     await next();
   });
 
+  /**
+   * Every route under `/accounts/:accountId/*` must belong to the caller.
+   *
+   * A mailbox is personal in a way almost nothing else in this product is. RLS
+   * scopes these tables to the TENANT, which is the right boundary for a
+   * customer record and the wrong one for someone's mail: it makes every
+   * colleague on the instance an authorised reader.
+   *
+   * Seven routes took `:accountId` straight from the URL and never joined to
+   * `zv_mail_accounts … WHERE user_id = $caller`, while their sibling read
+   * routes did — so a colleague could list another person's mail filters, add a
+   * From: alias to their account, or create a filter on their mailbox, which
+   * `POST /filters` then hands to `uploadSieveScript`: attacker-authored rules
+   * aimed at somebody else's inbox.
+   *
+   * A middleware rather than seven more joins. The joins were the pattern and
+   * seven of them were missing; one gate cannot be forgotten by route number
+   * eight.
+   */
+  app.use('/accounts/:accountId/*', async (c, next) => {
+    const user = c.get('user') as any;
+    const accountId = c.req.param('accountId');
+    const owned = await sql`
+      SELECT 1 FROM zv_mail_accounts WHERE id = ${accountId} AND user_id = ${user.id}
+    `.execute(db);
+    // 404, not 403: whether an account exists is itself information about
+    // someone else's mail.
+    if (!owned.rows.length) return c.json({ error: 'Account not found' }, 404);
+    await next();
+  });
+
   // ═══ ACCOUNTS ═══
 
   // GET /ext/communications/mail/accounts
@@ -734,7 +765,16 @@ Please draft a reply to this email.`,
     attachments: z.array(z.any()).default([]),
   })), async (c) => {
     const data = c.req.valid('json');
-    const draftId = await saveDraft(db, data.draft_id ?? null, data.account_id, {
+    const user = c.get('user') as any;
+    // `saveDraft` refuses an account or a draft that is not the caller's, and it
+    // does so by throwing — which reached the client as a 500. The refusal was
+    // right and the answer was wrong: 404, like every sibling route, because
+    // whether someone else's account exists is itself information.
+    const ownsAccount = await sql`
+      SELECT 1 FROM zv_mail_accounts WHERE id = ${data.account_id} AND user_id = ${user.id}
+    `.execute(db);
+    if (!ownsAccount.rows.length) return c.json({ error: 'Account not found' }, 404);
+    const draftId = await saveDraft(db, data.draft_id ?? null, data.account_id, user.id, {
       identityId: data.identity_id,
       to: data.to,
       cc: data.cc,
@@ -766,7 +806,17 @@ Please draft a reply to this email.`,
 
   // DELETE /ext/communications/mail/drafts/:id
   app.delete('/drafts/:id', async (c) => {
-    await sql`DELETE FROM zv_mail_drafts WHERE id = ${c.req.param('id')}`.execute(db);
+    const user = c.get('user') as any;
+    // Scoped through the account, the way `GET /drafts/:id` two screens up
+    // already does. Without it, any authenticated user in the tenant could
+    // delete anyone's draft by its uuid.
+    const gone = await sql`
+      DELETE FROM zv_mail_drafts d
+      USING zv_mail_accounts a
+      WHERE d.account_id = a.id AND d.id = ${c.req.param('id')} AND a.user_id = ${user.id}
+      RETURNING d.id
+    `.execute(db);
+    if (!gone.rows.length) return c.json({ error: 'Draft not found' }, 404);
     return c.json({ success: true });
   });
 

@@ -2,39 +2,10 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
+import { createHash } from 'node:crypto';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { permissionGate } from '@zveltio/sdk/extension';
-
-// Minimal MT940 parser — handles :60F:, :61:, :86: tags
-function parseMT940(text: string): Array<{date: string, type: 'credit'|'debit', amount: number, description: string, reference: string}> {
-  const lines = text.replace(/\r\n/g, '\n').split('\n');
-  const transactions: any[] = [];
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
-    if (line.startsWith(':61:')) {
-      // Format: :61:YYMMDD[MMDD]C/D<Amount>N<TxType><TxRef>
-      const match = line.match(/:61:(\d{6})(\d{4})?(C|D)(\d+,\d+)N(\w+)(.*)?/);
-      if (match) {
-        const yy = match[1].slice(0, 2), mm = match[1].slice(2, 4), dd = match[1].slice(4, 6);
-        const year = parseInt(yy) < 50 ? `20${yy}` : `19${yy}`;
-        const date = `${year}-${mm}-${dd}`;
-        const type = match[3] === 'C' ? 'credit' : 'debit';
-        const amount = parseFloat(match[4].replace(',', '.'));
-        const reference = match[5] ?? '';
-        let description = '';
-        // Next line(s) starting with :86: are the narrative
-        if (lines[i + 1]?.startsWith(':86:')) {
-          description = lines[i + 1].slice(4).trim();
-          i++;
-        }
-        transactions.push({ date, type, amount, description, reference });
-      }
-    }
-    i++;
-  }
-  return transactions;
-}
+import { permissionGate, toNumber } from '@zveltio/sdk/extension';
+import { parseMT940 } from './mt940.js';
 
 // Apply categorization rules to a transaction
 async function applyRules(dbh: any, accountId: string, tx: any): Promise<string | null> {
@@ -59,6 +30,32 @@ async function applyRules(dbh: any, accountId: string, tx: any): Promise<string 
     if (matches) return rule.category;
   }
   return null;
+}
+
+/**
+ * A stable fingerprint for one imported bank transaction.
+ *
+ * `zvd_bank_transactions.import_hash` has carried a UNIQUE constraint since the
+ * table was created, and both import routes end `ON CONFLICT DO NOTHING` — so
+ * the deduplication reads as implemented. It never ran: neither INSERT supplied
+ * the column, and PostgreSQL does not consider two NULLs equal, so every row
+ * conflicted with nothing. Re-importing the same statement inserted every
+ * transaction again AND added the whole file's delta to the account balance a
+ * second time, because `imported` counts rows returned by RETURNING.
+ *
+ * The fields are the ones a bank restates identically across two downloads of
+ * the same statement. Deliberately NOT the import id or the row's own id: those
+ * differ per upload, which is exactly the case this has to catch.
+ */
+function transactionFingerprint(
+  accountId: string,
+  t: { date: string; type: string; amount: number; description?: string | null; reference?: string | null },
+): string {
+  return createHash('sha256')
+    .update(
+      [accountId, String(t.date), t.type, String(t.amount), t.description ?? '', t.reference ?? ''].join('\u0000'),
+    )
+    .digest('hex');
 }
 
 export function bankingRoutes(ctx: ExtensionContext): Hono {
@@ -170,15 +167,35 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
   // ── MT940 Import ──────────────────────────────────────────────
   app.post('/accounts/:id/import/mt940', zValidator('json', z.object({
     content: z.string().min(10),
+    // Optional because this endpoint takes the statement as a string, not an
+    // upload — a UI that read a file has the name, a script pasting content
+    // does not. `filename` is nullable (migration 005) rather than defaulted,
+    // so an import with no file records no name instead of an invented one.
+    filename: z.string().max(255).optional(),
   })), async (c) => {
     const user = c.get('user') as any;
-    const { content } = c.req.valid('json');
+    const { content, filename } = c.req.valid('json');
     const accountId = c.req.param('id');
-    const transactions = parseMT940(content);
+    // A statement line the parser cannot read is refused, not skipped. Importing
+    // the rest would balance the account against a total that was never right,
+    // and the operator would reconcile against it believing it complete.
+    const parsed = parseMT940(content);
+    if (parsed.unparsed.length > 0) {
+      return c.json(
+        {
+          error:
+            `${parsed.unparsed.length} statement line(s) could not be read. Nothing was imported — ` +
+            'importing the rest would leave the balance wrong with no record of what was missed.',
+          unparsed: parsed.unparsed.slice(0, 10),
+        },
+        400,
+      );
+    }
+    const transactions = parsed.transactions;
     if (!transactions.length) return c.json({ error: 'No transactions found in MT940 content' }, 400);
     const importRow = await sql`
-      INSERT INTO zvd_bank_imports (account_id, source, rows_imported, imported_by)
-      VALUES (${accountId}, 'mt940', ${transactions.length}, ${user.id}) RETURNING id
+      INSERT INTO zvd_bank_imports (account_id, source, filename, rows_imported, imported_by)
+      VALUES (${accountId}, 'mt940', ${filename ?? null}, ${transactions.length}, ${user.id}) RETURNING id
     `.execute(db);
     const importId = (importRow.rows[0] as any).id;
     let imported = 0;
@@ -186,8 +203,8 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     for (const t of transactions) {
       const autoCategory = await applyRules(db, accountId, t);
       const result = await sql`
-        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, category, auto_categorized, created_by)
-        VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description}, ${t.reference}, ${autoCategory}, ${!!autoCategory}, ${user.id})
+        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, category, auto_categorized, created_by, import_hash)
+        VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description}, ${t.reference}, ${autoCategory}, ${!!autoCategory}, ${user.id}, ${transactionFingerprint(accountId, t)})
         ON CONFLICT DO NOTHING RETURNING id
       `.execute(db);
       if (result.rows.length) {
@@ -202,6 +219,9 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
   // ── CSV Import ────────────────────────────────────────────────
   app.post('/accounts/:id/import', zValidator('json', z.object({
     source: z.string().default('csv'),
+    // Same reasoning as the MT940 route: this takes parsed transactions, not a
+    // file, so the name is only available when a UI did the parsing.
+    filename: z.string().max(255).optional(),
     transactions: z.array(z.object({
       date: z.string(),
       type: z.enum(['credit','debit']),
@@ -215,8 +235,8 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     const accountId = c.req.param('id');
     const importRow = await sql`
-      INSERT INTO zvd_bank_imports (account_id, source, rows_imported, imported_by)
-      VALUES (${accountId}, ${d.source}, ${d.transactions.length}, ${user.id}) RETURNING id
+      INSERT INTO zvd_bank_imports (account_id, source, filename, rows_imported, imported_by)
+      VALUES (${accountId}, ${d.source}, ${d.filename ?? null}, ${d.transactions.length}, ${user.id}) RETURNING id
     `.execute(db);
     const importId = (importRow.rows[0] as any).id;
     let balance_delta = 0;
@@ -224,9 +244,10 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     for (const t of d.transactions) {
       const autoCategory = await applyRules(db, accountId, t);
       const result = await sql`
-        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, counterparty_name, category, auto_categorized, created_by)
+        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, counterparty_name, category, auto_categorized, created_by, import_hash)
         VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description},
-          ${t.reference ?? null}, ${t.counterparty_name ?? null}, ${autoCategory}, ${!!autoCategory}, ${user.id})
+          ${t.reference ?? null}, ${t.counterparty_name ?? null}, ${autoCategory}, ${!!autoCategory}, ${user.id},
+          ${transactionFingerprint(accountId, t)})
         ON CONFLICT DO NOTHING RETURNING id
       `.execute(db);
       if (result.rows.length) {
@@ -300,18 +321,75 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
       ON CONFLICT (transaction_id) DO UPDATE SET linked_type = EXCLUDED.linked_type, linked_id = EXCLUDED.linked_id, notes = EXCLUDED.notes
       RETURNING *
     `.execute(db);
-    return c.json({ data: rec.rows[0] });
+
+    // Reconciling against an invoice has to PAY the invoice.
+    //
+    // This route used to set `is_reconciled` on the bank side and stop. The
+    // invoice stayed `sent`, aged into `overdue`, kept appearing in the
+    // cash-flow forecast as expected inflow — `GET /cash-flow` selects
+    // `status IN ('sent','overdue')` — and kept appearing in the very
+    // suggest-matches list it had just been matched from, because that list
+    // filters on the same statuses. The user does the workflow the manifest
+    // advertises, and nothing on the other side moves.
+    //
+    // Through the service rather than an UPDATE on `zvd_invoices`: that table
+    // belongs to `finance/invoicing`, and one extension writing another's table
+    // is what produced H-6 in `ecommerce/store` — a NOT NULL violated silently
+    // for the life of the feature. When invoicing is not installed there is
+    // nothing to pay and the reconciliation still stands on its own.
+    let paid: unknown = null;
+    if (d.linked_type === 'invoice' && d.linked_id) {
+      const recordPayment = ctx.services.get<
+        (input: {
+          invoiceId: string;
+          amount: number;
+          paymentDate?: string;
+          method?: string;
+          reference?: string;
+          notes?: string;
+          userId: string;
+        }) => Promise<unknown>
+      >('invoicing.recordPayment');
+      if (recordPayment) {
+        const t = tx.rows[0] as any;
+        try {
+          paid = await recordPayment({
+            invoiceId: d.linked_id,
+            amount: Math.abs(toNumber(t.amount, 0, 'transaction.amount')),
+            paymentDate: t.date instanceof Date ? t.date.toISOString().slice(0, 10) : String(t.date),
+            method: 'transfer',
+            reference: t.reference ?? null ? String(t.reference) : undefined,
+            notes: d.notes,
+            userId: user.id,
+          });
+        } catch (err) {
+          // Not silent. The reconciliation is recorded either way — that is the
+          // bank's own bookkeeping and it is true — but an operator who thinks
+          // an invoice was settled and finds it open deserves to know which half
+          // failed.
+          console.warn(
+            `[banking] reconciled transaction ${c.req.param('txId')} but could not record the payment on invoice ${d.linked_id}:`,
+            err instanceof Error ? err.message : err,
+          );
+        }
+      }
+    }
+
+    return c.json({ data: rec.rows[0], invoice: paid });
   });
 
   // Suggest unreconciled invoice matches
   app.get('/accounts/:id/suggest-matches', async (c) => {
+    // An empty list here reads as "nothing to reconcile", which is the answer an
+    // operator acts on by closing the screen. A failed query must not look like a
+    // clean bank account.
     const txns = await sql`
       SELECT t.*, i.id as invoice_id, i.number as invoice_number, i.total as invoice_total
       FROM zvd_bank_transactions t
       JOIN zvd_invoices i ON ABS(i.total - t.amount) < 0.01 AND i.status IN ('sent','overdue')
       WHERE t.account_id = ${c.req.param('id')} AND t.is_reconciled = false AND t.type = 'credit'
       ORDER BY t.date DESC LIMIT 50
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
     return c.json({ data: txns.rows });
   });
 
@@ -325,12 +403,45 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
       WHERE expected_date BETWEEN ${fromDate} AND ${toDate}
       ORDER BY expected_date
     `.execute(db);
-    // Also include expected payments from open invoices
-    const invoices = await sql`
-      SELECT due_date as expected_date, 'inflow' as type, total - amount_paid as amount, 'Invoice ' || number as description, 'accounts_receivable' as category
-      FROM zvd_invoices WHERE status IN ('sent','overdue') AND due_date BETWEEN ${fromDate} AND ${toDate}
-    `.execute(db).catch(() => ({ rows: [] }));
-    return c.json({ data: [...forecast.rows, ...invoices.rows].sort((a: any, b: any) => a.expected_date.localeCompare(b.expected_date)) });
+    // The accounts-receivable half of the forecast.
+    //
+    // This read `zvd_invoices` directly — a table `finance/invoicing` owns. Two
+    // things were wrong with that, and dropping the `.catch(() => ({ rows: [] }))`
+    // that used to sit here fixed one and exposed the other:
+    //
+    //   * silently: a swallowed failure rendered the forecast successfully with an
+    //     entire category missing, so an operator read a cash position that was
+    //     wrong by every open invoice in the window;
+    //   * loudly: without the swallow, an instance that does not have
+    //     `finance/invoicing` installed has no `zvd_invoices` at all, so the whole
+    //     forecast answered 500. That is what the contract suite caught:
+    //     `finance/banking GET /cash-flow -> 500`.
+    //
+    // Neither is the right answer. The forecast asks invoicing for its own numbers
+    // now, the same way the reconcile path above asks it to record a payment, and an
+    // absent extension is reported rather than guessed at.
+    const openReceivables = ctx.services.get<
+      (window: { from: string; to: string }) => Promise<Array<Record<string, unknown>>>
+    >('invoicing.openReceivables');
+
+    let receivables: Array<Record<string, unknown>> = [];
+    const unavailable: string[] = [];
+    if (openReceivables) {
+      receivables = await openReceivables({ from: fromDate, to: toDate });
+    } else {
+      unavailable.push('accounts_receivable');
+    }
+
+    const toTime = (v: unknown): number =>
+      v instanceof Date ? v.getTime() : new Date(String(v)).getTime();
+    return c.json({
+      data: [...forecast.rows, ...receivables].sort(
+        (a: any, b: any) => toTime(a.expected_date) - toTime(b.expected_date),
+      ),
+      // Empty on a complete forecast. Named when a category could not be
+      // included, so a caller cannot draw a total that silently omits one.
+      unavailable,
+    });
   });
 
   app.post('/cash-flow', zValidator('json', z.object({

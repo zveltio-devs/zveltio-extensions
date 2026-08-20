@@ -2,8 +2,7 @@
  * Engine-level AI provider manager.
  * Supports OpenAI-compatible APIs, Anthropic (Claude), and Ollama (local).
  *
- * Providers are configured in the DB table `zv_ai_providers`
- * (or via OPENAI_API_KEY / ANTHROPIC_API_KEY env vars as fallback).
+ * Providers are configured in the DB table `zv_ai_providers`, and nowhere else.
  */
 
 import { assertNonMetadataUrl } from './endpoint-guard.js';
@@ -28,7 +27,11 @@ import { decryptApiKey } from './ai-crypto.js';
  * Thirty seconds is far above a healthy embedding round-trip and far below
  * "never".
  */
-const EMBED_TIMEOUT_MS = Number(process.env.AI_EMBED_TIMEOUT_MS ?? 30_000);
+// 30 s, fixed. This was `Number(process.env.AI_EMBED_TIMEOUT_MS ?? 30_000)`,
+// which is ambient authority for a tuning knob nobody has ever turned. If an
+// instance genuinely needs a different deadline it belongs on the provider row,
+// next to the base URL and the model, where an administrator can see it.
+const EMBED_TIMEOUT_MS = 30_000;
 
 
 export interface ChatMessage {
@@ -350,8 +353,11 @@ export async function initAIProviders(db: any): Promise<void> {
     .selectFrom('zv_ai_providers' as any)
     .selectAll()
     .where('is_active' as any, '=', true)
-    .execute()
-    .catch(() => []);
+    .execute();
+    // No `.catch(() => [])`. An empty provider list means "AI is not configured",
+    // so a failed read turned every AI feature off and said nothing. `register()`
+    // already wraps this call and logs `initAIProviders failed (non-fatal)` — that
+    // handler was written for exactly this and the swallow made it unreachable.
 
   for (const row of rows as any[]) {
     let provider: AIProvider | null = null;
@@ -435,25 +441,24 @@ export async function initAIProviders(db: any): Promise<void> {
     }
   }
 
-  // Env var fallbacks (if no DB providers configured)
-  if (!aiProviderManager.getDefault()) {
-    if (process.env.OPENAI_API_KEY) {
-      aiProviderManager.register(
-        new OpenAIProvider(process.env.OPENAI_API_KEY, undefined, process.env.OPENAI_MODEL || 'gpt-4o-mini'),
-        true,
-      );
-    } else if (process.env.ANTHROPIC_API_KEY) {
-      aiProviderManager.register(
-        new AnthropicProvider(process.env.ANTHROPIC_API_KEY, process.env.ANTHROPIC_MODEL),
-        true,
-      );
-    } else if (process.env.OLLAMA_URL) {
-      aiProviderManager.register(
-        new OllamaProvider(process.env.OLLAMA_URL, process.env.OLLAMA_MODEL),
-        true,
-      );
-    }
-  }
+  // There was an env-var fallback here — OPENAI_API_KEY / ANTHROPIC_API_KEY /
+  // OLLAMA_URL, used when no provider row existed. It is gone, for two reasons
+  // that point the same way.
+  //
+  // It was a second source of truth for a setting that already has one. A
+  // provider configured this way is invisible to `GET /providers`, cannot be
+  // edited or disabled from the admin UI, and its key is not encrypted — so
+  // "which model is this instance using" had two answers and only one of them
+  // was on screen.
+  //
+  // And reading it at all meant reading `process.env` from inside an extension,
+  // which hands the extension the ENGINE's whole environment: DATABASE_URL,
+  // BETTER_AUTH_SECRET, FIELD_ENCRYPTION_KEY. An extension that wanted to
+  // decrypt without holding the `secrets` capability could simply take the key
+  // and do it itself.
+  //
+  // Configure providers at `PUT /api/ext/ai/providers/:name`, which is what the
+  // admin UI drives.
 }
 
 /** Matches {{variableName}} placeholders in template strings. */

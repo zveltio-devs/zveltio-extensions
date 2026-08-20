@@ -19603,8 +19603,17 @@ function generateRevisalCsv(internals, employees) {
 `);
 }
 async function loadRates(dbh) {
-  const row = await sql`SELECT * FROM zvd_payroll_rates LIMIT 1`.execute(dbh).catch(() => ({ rows: [] }));
-  const r = row.rows[0];
+  let rows;
+  try {
+    const result = await sql`SELECT * FROM zvd_payroll_rates LIMIT 1`.execute(dbh);
+    rows = result.rows;
+  } catch (err) {
+    const code = err.errno ?? err.code ?? "";
+    if (code !== "42P01")
+      throw err;
+    rows = [];
+  }
+  const r = rows[0];
   if (!r)
     return RO_RATES;
   return {

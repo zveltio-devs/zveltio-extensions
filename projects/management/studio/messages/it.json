@@ -16,8 +16,15 @@
   "projects.management.subtitle": "Bacheca Kanban e gestione delle attività",
   "projects.management.title": "Progetti",
   "projects.management.ui.end_date": "Data di fine",
+  "projects.management.ui.high": "Alto",
+  "projects.management.ui.low": "Basso",
+  "projects.management.ui.medium": "Medio",
+  "projects.management.ui.name": "Nome *",
   "projects.management.ui.new_project": "Nuovo progetto",
   "projects.management.ui.new_task": "Nuova attività",
   "projects.management.ui.no_tasks": "Nessuna attività.",
-  "projects.management.ui.start_date": "Data di inizio"
+  "projects.management.ui.priority": "Priorità",
+  "projects.management.ui.start_date": "Data di inizio",
+  "projects.management.ui.title": "Titolo *",
+  "projects.management.ui.urgent": "Urgente"
 }

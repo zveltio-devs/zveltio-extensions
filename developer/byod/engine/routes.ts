@@ -21,6 +21,35 @@ const ImportBodySchema = z.object({
   exclude: z.array(z.string()).default([]),
 });
 
+
+/**
+ * A schema name a caller is allowed to introspect.
+ *
+ * The name was bound as a parameter — no injection — but restricted to nothing,
+ * and `information_schema` and `pg_catalog` are perfectly valid values. The
+ * import filter refuses tables by prefix (`zv_`, `zvd_`, `_zv_`, `pg_`), which
+ * catches `pg_catalog`'s relations by name and does NOT catch
+ * `information_schema`'s: `columns`, `tables`, `routines`, `role_table_grants`
+ * are all clean of every prefix, so importing that schema registered the
+ * database's own metadata as ordinary collections.
+ *
+ * Worse on a deployment using per-tenant schemas, where `{"schema":"tenant_b"}`
+ * reads another company's tables by name.
+ *
+ * PostgreSQL's own reserved namespaces are refused outright. Everything else is
+ * still allowed, because bringing your own database is what this extension is
+ * for — and `pg_temp_*` / `pg_toast_*` are covered by the `pg_` rule.
+ */
+const RESERVED_SCHEMAS = new Set(['information_schema', 'pg_catalog', 'pg_toast']);
+
+function assertImportableSchema(name: string): string | null {
+  const lower = name.toLowerCase();
+  if (RESERVED_SCHEMAS.has(lower) || lower.startsWith('pg_')) {
+    return `Schema "${name}" is PostgreSQL's own; it cannot be imported as collections.`;
+  }
+  return null;
+}
+
 // ── Auth + admin middleware ────────────────────────────────────────────────────
 
 export function introspectRoutes(ctx: ExtensionContext): Hono {
@@ -45,10 +74,12 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
   });
 
   // ── GET /preview ──────────────────────────────────────────────────────────
-  // Dry-run: returns tables found without writing to zv_collections.
+  // Dry-run: returns tables found without writing to zvd_collections.
   // Query params: schema (default: public), exclude (comma-separated substrings)
   router.get('/preview', async (c) => {
     const schema = c.req.query('schema') || 'public';
+    const refusal = assertImportableSchema(schema);
+    if (refusal) return c.json({ error: refusal }, 400);
     const exclude = c.req.query('exclude')?.split(',').filter(Boolean) ?? [];
 
     try {
@@ -66,6 +97,8 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
     const body = c.req.valid('json');
     const schema: string = body.schema;
     const exclude: string[] = body.exclude;
+    const refusal = assertImportableSchema(schema);
+    if (refusal) return c.json({ error: refusal }, 400);
 
     try {
       const tables = await introspectSchema(db, schema, exclude, false);
@@ -278,20 +311,31 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
 
   // ── GET /stats ────────────────────────────────────────────────────────────
 
+  // The first query said `FROM zv_collections`. There is no such table — the
+  // engine's is `zvd_collections` — so it threw on every request ever made, the
+  // swallow turned that into `total: 0`, and `imported_tables` has read zero on
+  // every install since this endpoint was written. Nobody questioned it because
+  // zero is also what a correct answer looks like before you import anything.
+  //
+  // No `.catch(() => ({ rows: [{ total: 0 }] }))` on any of the three. This screen
+  // answers "how much of my own database have I brought in, and when did I last
+  // look". Zero imported tables with a null last-scan is exactly what a fresh
+  // install looks like, so a failed read rendered the same screen as a correct one
+  // — and the operator's next move is to run an import that is already done.
   router.get('/stats', async (c) => {
     const [importedRes, lastScanRes, profilesRes] = await Promise.all([
       sql<any>`
         SELECT COUNT(*)::int AS total
-        FROM zv_collections
+        FROM zvd_collections
         WHERE is_managed = false
-      `.execute(db).catch(() => ({ rows: [{ total: 0 }] })),
+      `.execute(db),
       sql<any>`
         SELECT created_at FROM zvd_byod_scan_history
         ORDER BY created_at DESC LIMIT 1
-      `.execute(db).catch(() => ({ rows: [] })),
+      `.execute(db),
       sql<any>`
         SELECT COUNT(*)::int AS total FROM zvd_byod_scan_profiles
-      `.execute(db).catch(() => ({ rows: [{ total: 0 }] })),
+      `.execute(db),
     ]);
 
     return c.json({

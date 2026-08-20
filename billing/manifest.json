@@ -3,7 +3,7 @@
   "displayName": "Billing & Usage",
   "category": "billing",
   "description": "Usage metering and Stripe billing integration",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-billing",
@@ -27,12 +27,6 @@
         "component": "./studio/src/pages/BillingPage.svelte",
         "label": "Billing",
         "icon": "credit-card"
-      },
-      {
-        "path": "/admin/billing/usage",
-        "component": "./studio/src/pages/UsagePage.svelte",
-        "label": "Usage",
-        "icon": "bar-chart"
       }
     ],
     "navGroup": "finance"
@@ -43,7 +37,7 @@
     "fieldTypes": []
   },
   "integrity": {
-    "engineSha256": "59f2cf26bab0b86eaf2dcf62e1c88b74afca50e11f36566b89c472d5295801df",
-    "sourceSha256": "faabf4fca1f1c7fc65f36632874e5b68cf974f3bccf534c7c27841d262758c65"
+    "engineSha256": "748f130448fa52c512e1e8088b0e2ff109072af0087eb0c2fa627f6b712c92c9",
+    "sourceSha256": "0a2513f90614bed64c891899e78823043ccd7135f87025ef934fb1607db74d90"
   }
 }

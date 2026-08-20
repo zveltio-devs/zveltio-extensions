@@ -14,11 +14,24 @@
  */
 
 import { describe, expect, it } from 'bun:test';
-import { encryptApiKey } from './ai-crypto.js';
+import {
+  decryptWithKeyring,
+  encryptWithKeyring,
+} from '../../../../zveltio/packages/engine/src/lib/security/keyring.js';
+import { encryptApiKey, setInternals } from './ai-crypto.js';
 import { AIProviderManager, aiProviderManager, initAIProviders } from './ai-provider.js';
 
-// ai-crypto requires a 32-byte hex key; any fixed value works for a round trip.
+// The host holds the key now, so the test stands where the host stands: the real
+// keyring, not a re-implementation of the envelope. A hand-rolled fake here
+// would pass while the two copies drifted, which is the failure this file exists
+// to catch one level up.
 process.env.AI_KEY_ENCRYPTION_KEY ??= 'a'.repeat(64);
+setInternals({
+  encryptSecret: (plaintext: string, opts?: { keyring?: 'field' | 'mail' | 'ai' }) =>
+    encryptWithKeyring(plaintext, opts?.keyring ?? 'field'),
+  decryptSecret: (value: string, opts?: { keyring?: 'field' | 'mail' | 'ai' }) =>
+    decryptWithKeyring(value, opts?.keyring ?? 'field'),
+});
 
 /** Minimal stand-in for the Kysely chain `initAIProviders` uses. */
 function fakeDb(rows: Array<Record<string, unknown>>) {
@@ -41,7 +54,7 @@ describe('initAIProviders — stored keys', () => {
   it('decrypts the api_key column instead of using the ciphertext as a bearer token', async () => {
     const plaintext = 'sk-test-not-a-real-key';
     const stored = await encryptApiKey(plaintext);
-    expect(stored).toStartWith('aes256gcm:');
+    expect(stored).toStartWith('aes256gcm-ai:');
 
     await initAIProviders(
       fakeDb([
@@ -61,7 +74,7 @@ describe('initAIProviders — stored keys', () => {
     expect(provider).not.toBeNull();
     expect(bearerOf(provider)).toBe(plaintext);
     // The specific regression: never the stored form.
-    expect(bearerOf(provider)).not.toStartWith('aes256gcm:');
+    expect(bearerOf(provider)).not.toStartWith('aes256gcm-ai:');
   });
 
   it('leaves a legacy plaintext key untouched', async () => {
@@ -89,8 +102,12 @@ describe('initAIProviders — stored keys', () => {
           name: 'anthropic',
           label: 'Anthropic',
           // Well-formed prefix, unusable payload — what a rotated
-          // AI_KEY_ENCRYPTION_KEY or a copied database looks like.
-          api_key: 'aes256gcm:00000000000000000000000000000000:deadbeef',
+          // AI_KEY_ENCRYPTION_KEY or a copied database looks like. The `-ai`
+          // in the prefix matters: with the bare `aes256gcm:` form the host
+          // routes it to the MAIL keyring, and the row would then be refused
+          // because MAIL_ENCRYPTION_KEY is unset rather than because the
+          // payload is bad — the assertion would pass without testing anything.
+          api_key: 'aes256gcm-ai:00000000000000000000000000000000:deadbeef',
           base_url: null,
           default_model: null,
           is_default: false,

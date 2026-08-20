@@ -19725,11 +19725,11 @@ function ecommerceRoutes(ctx) {
         } else {
           await sql`SAVEPOINT canonical_product`.execute(db);
           const create = await sql`
-            INSERT INTO zvd_products (sku, name, description, sale_price, currency, tax_rate, is_active)
-            VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === "active"})
+            INSERT INTO zvd_products (sku, name, description, sale_price, currency, tax_rate, is_active, created_by)
+            VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === "active"}, ${user.id})
             ON CONFLICT (tenant_id, sku) DO UPDATE SET name = EXCLUDED.name
             RETURNING id
-          `.execute(db).catch(() => null);
+          `.execute(db);
           if (create === null) {
             await sql`ROLLBACK TO SAVEPOINT canonical_product`.execute(db);
           } else {
@@ -19916,6 +19916,7 @@ function ecommerceRoutes(ctx) {
     })).min(1)
   })), async (c) => {
     const d = c.req.valid("json");
+    const user = c.get("user");
     let subtotal = 0;
     const lineData = [];
     for (const line of d.lines) {
@@ -19985,11 +19986,13 @@ function ecommerceRoutes(ctx) {
               first_name: first_name || d.customer_email,
               last_name: rest.join(" ") || null,
               email: d.customer_email,
-              created_by: "system"
+              created_by: user?.id
             });
           }
           canonicalContactId = contact?.id ?? null;
-        } catch {}
+        } catch (err) {
+          console.warn(`[ecommerce/store] could not link ${d.customer_email} to a CRM contact; the order is recorded without one:`, err instanceof Error ? err.message : err);
+        }
       }
     }
     const order = await sql`

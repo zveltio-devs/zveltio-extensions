@@ -110,13 +110,27 @@ export interface DraftData {
 
 /**
  * Creates or updates a draft. Returns the draft ID.
+ *
+ * `userId` is not optional and is not decoration. Both the account and the draft
+ * id arrive from the request body, and neither was checked against the caller —
+ * so a colleague could compose a draft on someone else's account, or overwrite
+ * someone else's draft by its uuid. RLS scopes these tables to the tenant, which
+ * makes every colleague on the instance an authorised writer.
+ *
+ * `sendDraft` two functions down has always joined `zv_mail_accounts … AND
+ * a.user_id = $userId`. This is the same join, on the other half of the pair.
  */
 export async function saveDraft(
   db: Database,
   draftId: string | null,
   accountId: string,
+  userId: string,
   data: DraftData,
 ): Promise<string> {
+  const owned = await sql`
+    SELECT 1 FROM zv_mail_accounts WHERE id = ${accountId} AND user_id = ${userId}
+  `.execute(db);
+  if (!owned.rows.length) throw new Error('Account not found');
   const toJson = (v: any) => JSON.stringify(v ?? []);
 
   if (draftId) {
@@ -139,6 +153,7 @@ export async function saveDraft(
         auto_saved_at   = NOW(),
         updated_at      = NOW()
       WHERE id = ${draftId}
+        AND account_id IN (SELECT id FROM zv_mail_accounts WHERE user_id = ${userId})
     `.execute(db);
     return draftId;
   }

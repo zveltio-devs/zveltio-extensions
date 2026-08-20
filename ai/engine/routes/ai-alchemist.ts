@@ -1,3 +1,4 @@
+import { readMultipart, MULTIPART_REQUIRED } from '@zveltio/sdk/extension';
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
@@ -33,7 +34,8 @@ export function aiAlchemistRoutes(ctx: ExtensionContext): Hono {
 
   // POST /ext/ai/alchemist/analyze — Step 1
   app.post('/analyze', async (c) => {
-    const formData = await c.req.formData();
+    const formData = await readMultipart(c);
+    if (!formData) return c.json(MULTIPART_REQUIRED, 400);
     const files = formData.getAll('files') as File[];
 
     if (!files || files.length === 0) {

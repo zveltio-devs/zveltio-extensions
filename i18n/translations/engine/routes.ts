@@ -56,7 +56,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
       FROM zvd_translations t
       JOIN zvd_translation_keys tk ON tk.id = t.key_id
       WHERE t.locale = ${locale}
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
 
     const map = new Map<string, string>();
     for (const row of rows.rows as any[]) {
@@ -64,7 +64,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
     }
 
     if (rows.rows.length === 0) {
-      const allKeys = await sql`SELECT key, default_value FROM zvd_translation_keys`.execute(db).catch(() => ({ rows: [] }));
+      const allKeys = await sql`SELECT key, default_value FROM zvd_translation_keys`.execute(db);
       for (const row of allKeys.rows as any[]) {
         if (row.default_value) map.set(row.key, row.default_value);
       }
@@ -275,7 +275,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
       CROSS JOIN zvd_translation_keys tk
       LEFT JOIN zvd_translations t ON t.key_id = tk.id AND t.locale = l.code
       GROUP BY l.code, l.name ORDER BY l.code
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
 
     return c.json({ coverage: stats.rows });
   });
@@ -291,7 +291,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
       )
       ORDER BY tk.key
       LIMIT 200
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
 
     return c.json({ locale, missing_keys: missing.rows, count: missing.rows.length });
   });

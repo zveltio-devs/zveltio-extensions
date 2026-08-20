@@ -23,15 +23,12 @@ function q(s: string): string {
 }
 
 export function databaseRoutes(ctx: ExtensionContext): Hono {
-  const { db, auth, checkPermission } = ctx;
-  // NOTE: this gate is `checkPermission(uid, 'admin', '*')`, which is TRUE for a
-  // delegated tenant owner inside their own domain — so a route that runs raw SQL
-  // against the instance is reachable by anyone who owns any tenant. That is a real
-  // hole, and it is fixed on the content-pages branch with the engine helper that
-  // distinguishes an instance admin from a tenant admin. It is deliberately NOT
-  // fixed here: that helper does not exist in the engine this extension is
-  // typechecked and installed against yet, so carrying it in this PR would make an
-  // injection fix that ships TODAY wait on an engine release.
+  const { db, auth } = ctx;
+  // Instance admin, not tenant admin. `checkPermission(uid, 'admin', '*')` is
+  // TRUE for a delegated tenant owner inside their own domain, because the
+  // `tenant_owner` policy is ('*','*','*') there — so this route, which runs
+  // raw SQL against the instance, was reachable by anyone who owned any tenant.
+  const { requireInstanceAdmin } = ctx.internals;
 
   // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
   // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
@@ -49,7 +46,7 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const session = await auth.api.getSession({ headers: c.req.raw.headers });
       if (!session) return c.json({ error: 'Unauthorized' }, 401);
       c.set('user', session.user);
-      const hasAdmin = await checkPermission(session.user.id, 'admin', '*');
+      const hasAdmin = await requireInstanceAdmin(session.user.id);
       if (!hasAdmin) return c.json({ error: 'Admin access required' }, 403);
       await next();
     })

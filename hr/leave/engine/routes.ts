@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { permissionGate } from '@zveltio/sdk/extension';
+import { permissionGate, toNumber } from '@zveltio/sdk/extension';
 
 async function countWorkingDays(dbh: any, startDate: string, endDate: string, isHalfDay = false): Promise<number> {
   if (isHalfDay) return 0.5;
@@ -11,15 +11,34 @@ async function countWorkingDays(dbh: any, startDate: string, endDate: string, is
   const holidays = await sql`
     SELECT date FROM zvd_public_holidays WHERE date BETWEEN ${startDate} AND ${endDate}
   `.execute(dbh);
-  const holidaySet = new Set((holidays.rows as any[]).map(h => h.date instanceof Date ? h.date.toISOString().slice(0, 10) : h.date));
+  const holidaySet = new Set(
+    (holidays.rows as any[]).map((h) =>
+      h.date instanceof Date ? h.date.toISOString().slice(0, 10) : h.date,
+    ),
+  );
+
+  // Walked in UTC, deliberately, because a calendar date has no timezone.
+  //
+  // `new Date('2026-08-17')` parses an ISO date-only string as UTC MIDNIGHT, and
+  // `getDay()` then reads the LOCAL weekday. West of UTC that local instant is
+  // the previous day, so the weekday test asked about a different date than the
+  // holiday test on the same line, which used `toISOString()`. Measured:
+  //
+  //   TZ=Europe/Bucharest  Monday 2026-08-17  → 1 working day   (correct)
+  //   TZ=America/New_York  Monday 2026-08-17  → 0 working days  (refused)
+  //   TZ=America/New_York  Saturday 2026-08-22 → 1 working day  (deducted)
+  //
+  // So on a US-hosted instance an employee could not book a Monday and could
+  // book a Saturday, off their balance. `getUTCDay` and `setUTCDate` keep both
+  // tests on the same day, whatever the server's clock is set to.
   let days = 0;
-  const cur = new Date(startDate);
-  const end = new Date(endDate);
+  const cur = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
   while (cur <= end) {
-    const dow = cur.getDay();
+    const dow = cur.getUTCDay();
     const dateStr = cur.toISOString().slice(0, 10);
     if (dow !== 0 && dow !== 6 && !holidaySet.has(dateStr)) days++;
-    cur.setDate(cur.getDate() + 1);
+    cur.setUTCDate(cur.getUTCDate() + 1);
   }
   return days;
 }
@@ -40,6 +59,25 @@ function employment(ctx: ExtensionContext) {
     identify(u: { id: string; email?: string }): Promise<{ id: string; manager_id: string | null } | null>;
     mayActFor(u: { id: string; email?: string }, employeeId: string): Promise<boolean>;
   }>('hr.employment');
+}
+
+/**
+ * The calendar year a leave date falls in.
+ *
+ * `new Date('2026-01-01').getFullYear()` is **2025** west of UTC: the string is
+ * parsed as UTC midnight and the year is then read locally, which is the
+ * previous instant. So a request starting on 1 January looked up the PREVIOUS
+ * year's balance — either absent, making all of early January unbookable, or
+ * present, silently deducting January's leave from a closed year. Approve,
+ * reject and cancel each recomputed it the same way, so the compensating updates
+ * landed on the same wrong row: consistent, and consistently wrong.
+ *
+ * Reading the string is both simpler and exact. A date a person typed has no
+ * timezone, and turning it into an instant only to ask which year it is throws
+ * away the answer that was already there.
+ */
+function yearOf(isoDate: string): number {
+  return Number.parseInt(String(isoDate).slice(0, 4), 10);
 }
 
 export function leaveRoutes(ctx: ExtensionContext): Hono {
@@ -193,8 +231,20 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
     for (const b of balances.rows as any[]) {
       const rule = ruleMap.get(b.leave_type_id);
       if (!rule || rule.max_carry_days === 0) continue;
-      const remaining = b.allocated_days + b.carried_over_days - b.used_days - b.pending_days;
-      if (remaining <= 0) continue;
+      // Every one of these is NUMERIC, and PostgreSQL sends NUMERIC as a string.
+      // `"21.0" + "0.0"` is `"21.00.0"`, and the first `-` after it gives NaN —
+      // measured on a real balance of 21 allocated / 5 used, which should carry
+      // 16 and instead carried NaN. `NaN <= 0` is false, so the guard below did
+      // not skip the row: it wrote NaN into next year's `carried_over_days`,
+      // PostgreSQL accepted it, and from then on that employee's remaining
+      // balance was NaN — which compares as LARGER than any number of days
+      // requested. The approval guard said yes to 200 days.
+      const remaining =
+        toNumber(b.allocated_days, 0, 'allocated_days') +
+        toNumber(b.carried_over_days, 0, 'carried_over_days') -
+        toNumber(b.used_days, 0, 'used_days') -
+        toNumber(b.pending_days, 0, 'pending_days');
+      if (!Number.isFinite(remaining) || remaining <= 0) continue;
       const carryDays = Math.min(remaining, rule.max_carry_days);
       const expiresAt = new Date(`${toYear}-01-01`);
       expiresAt.setMonth(expiresAt.getMonth() + rule.expiry_months);
@@ -292,14 +342,26 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
     const workingDays = await countWorkingDays(db, d.start_date, d.end_date, d.is_half_day);
     if (workingDays === 0) return c.json({ error: 'No working days in selected range' }, 400);
 
-    const year = start.getFullYear();
+    const year = yearOf(d.start_date);
     const balance = await sql`
       SELECT *, (allocated_days + carried_over_days - used_days - pending_days) as remaining
       FROM zvd_leave_balances
       WHERE employee_id = ${d.employee_id} AND leave_type_id = ${d.leave_type_id} AND year = ${year}
     `.execute(db);
     if (!balance.rows.length) return c.json({ error: 'No leave balance for this type/year' }, 400);
-    if ((balance.rows[0] as any).remaining < workingDays) return c.json({ error: 'Insufficient leave balance' }, 400);
+    // `remaining` is computed in SQL over NUMERIC columns, so it arrives as a
+    // string — and if any of those columns holds NaN, so does this. The
+    // comparison `"NaN" < workingDays` is false in JavaScript, which read as
+    // "there is enough balance" and approved the request. Convert first, and
+    // treat a value that will not convert as no balance at all: a row we cannot
+    // evaluate must not be a row that grants leave.
+    let remainingDays: number;
+    try {
+      remainingDays = toNumber((balance.rows[0] as any).remaining, 0, 'remaining');
+    } catch {
+      return c.json({ error: 'Leave balance is corrupt for this type/year' }, 409);
+    }
+    if (remainingDays < workingDays) return c.json({ error: 'Insufficient leave balance' }, 400);
 
     const type = await sql`SELECT requires_approval FROM zvd_leave_types WHERE id = ${d.leave_type_id}`.execute(db);
     const status = (type.rows[0] as any)?.requires_approval ? 'pending' : 'approved';
@@ -349,7 +411,7 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
       );
     }
 
-    const year = new Date(r.start_date).getFullYear();
+    const year = yearOf(r.start_date);
     await sql`UPDATE zvd_leave_requests SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW() WHERE id = ${r.id}`.execute(db);
     await sql`
       UPDATE zvd_leave_balances SET
@@ -382,7 +444,7 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'Only a manager may reject this' }, 403);
     }
 
-    const year = new Date(r.start_date).getFullYear();
+    const year = yearOf(r.start_date);
     await sql`UPDATE zvd_leave_requests SET status = 'rejected', rejection_reason = ${reason}, updated_at = NOW() WHERE id = ${r.id}`.execute(db);
     await sql`
       UPDATE zvd_leave_balances SET pending_days = GREATEST(0, pending_days - ${r.working_days}), updated_at = NOW()
@@ -408,7 +470,7 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'You may only cancel your own leave or that of someone you manage' }, 403);
     }
 
-    const year = new Date(r.start_date).getFullYear();
+    const year = yearOf(r.start_date);
     await sql`UPDATE zvd_leave_requests SET status = 'cancelled', updated_at = NOW() WHERE id = ${r.id}`.execute(db);
     if (r.status === 'approved') {
       await sql`

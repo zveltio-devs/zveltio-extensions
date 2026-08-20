@@ -3,6 +3,7 @@
   "finance.banking.empty.accounts": "Nog geen bankrekeningen.",
   "finance.banking.empty.transactions": "Nog geen transacties.",
   "finance.banking.empty.unreconciled": "Geen niet-afgeletterde transacties.",
+  "finance.banking.form.currency": "Valuta",
   "finance.banking.newAccount": "Nieuw account",
   "finance.banking.section.openInvoices": "Openstaande facturen (verzonden)",
   "finance.banking.section.unreconciled": "Niet-afgeletterde transacties",

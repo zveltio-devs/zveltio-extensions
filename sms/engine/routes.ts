@@ -23,7 +23,7 @@ export function smsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any 
   const app = new Hono<{ Variables: { user: any } }>();
 
   // Initialize manager
-  SmsManager.init(db);
+  SmsManager.init(db, ctx.config.vars);
 
   // Admin middleware for all except webhook
   app.use('/send', async (c, next) => {
@@ -130,9 +130,13 @@ export function smsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any 
   // auth by design; authenticity comes from the X-Twilio-Signature HMAC,
   // mirroring the Stripe webhook's HMAC check in billing).
   app.post('/webhook/twilio', async (c) => {
-    const authToken = process.env.TWILIO_AUTH_TOKEN ?? '';
+    // `ZVELTIO_EXT_SMS_TWILIO_AUTH_TOKEN` — the host's slice of the environment,
+    // not `process.env`, which in-process is the ENGINE's environment entire.
+    const authToken = ctx.config.vars.TWILIO_AUTH_TOKEN ?? '';
     if (!authToken) {
-      return c.json({ error: 'Webhook not configured' }, 500);
+      // 503 for the same reason as the Stripe webhook in `billing`: Twilio still
+      // retries, but an unconfigured instance stops reporting itself as broken.
+      return c.json({ error: 'Webhook not configured' }, 503);
     }
 
     const body = await c.req.formData().catch(() => null);
@@ -141,7 +145,7 @@ export function smsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any 
     // Twilio signs HMAC-SHA1(authToken, url + concat(sorted params as key+value)),
     // base64. The URL must be the PUBLIC one Twilio requested; behind a proxy
     // the Host header differs, so operators can pin it with TWILIO_WEBHOOK_URL.
-    const url = process.env.TWILIO_WEBHOOK_URL ?? c.req.url;
+    const url = ctx.config.vars.TWILIO_WEBHOOK_URL ?? c.req.url;
     const params: [string, string][] = [];
     body.forEach((v, k) => {
       if (typeof v === 'string') params.push([k, v]);

@@ -14,6 +14,9 @@ const extension: ZveltioExtension = {
       join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
       join(import.meta.dir, 'migrations/003_user_ref_text.sql'),
       join(import.meta.dir, 'migrations/004_invoice_due_date.sql'),
+      // Declared after the other 004 — written later, and declared order is what
+      // the engine runs.
+      join(import.meta.dir, 'migrations/004_cancellation_reason_and_invoice_updated_at.sql'),
     ];
   },
 
