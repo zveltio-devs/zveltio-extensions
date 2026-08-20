@@ -16,6 +16,9 @@ import nodemailer from 'nodemailer';
 import { sql } from 'kysely';
 import type { Database } from '@zveltio/engine-db';
 import { decryptPassword } from './crypto.js';
+import {
+  credentialsFor, endpointsFor, isExpired, refreshAccessToken,
+} from './oauth.js';
 
 /**
  * How many messages a FIRST sync pulls. Later syncs are open-ended and catch up
@@ -91,6 +94,71 @@ export interface MailAccountConfig {
   smtp_secure: boolean;
   smtp_user?: string | null;
   smtp_password?: string | null;
+  oauth2_provider?: 'gmail' | 'outlook' | null;
+  oauth2_access_token?: string | null;
+  oauth2_refresh_token?: string | null;
+  oauth2_expires_at?: Date | string | null;
+}
+
+/**
+ * The auth block for one account, refreshing an expired OAuth token first.
+ *
+ * `imap-operations.ts` already read `oauth2_access_token` and authenticated with
+ * XOAUTH2; this file did not, so an OAuth account synced with a password it does
+ * not have. Two code paths, one of which knew about a feature — which is how the
+ * columns could look wired while the thing they exist for never worked.
+ *
+ * Refresh happens HERE rather than on a timer because a timer is another thing
+ * to run and to get wrong; a token is only interesting at the moment it is used,
+ * and this is that moment.
+ */
+async function buildAuth(
+  db: Database,
+  account: MailAccountConfig,
+): Promise<{ user: string; pass?: string; accessToken?: string }> {
+  if (!account.oauth2_provider) {
+    return { user: account.imap_user, pass: await decryptPassword(account.imap_password) };
+  }
+
+  let token = account.oauth2_access_token ?? null;
+
+  if (isExpired(account.oauth2_expires_at) && account.oauth2_refresh_token) {
+    const cfgRow = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
+    const raw = (cfgRow.rows[0] as { value?: unknown } | undefined)?.value;
+    const cfg: Record<string, unknown> =
+      typeof raw === 'string' ? JSON.parse(raw) : ((raw as Record<string, unknown>) ?? {});
+    const creds = credentialsFor(account.oauth2_provider, cfg);
+    if (creds) {
+      const next = await refreshAccessToken({
+        refreshToken: account.oauth2_refresh_token,
+        clientId: creds.clientId,
+        clientSecret: creds.clientSecret,
+        tokenUrl: endpointsFor(account.oauth2_provider, cfg).tokenUrl,
+      });
+      token = next.accessToken;
+      // `refresh_token` is COALESCEd: providers routinely omit it from a refresh
+      // response, and that means "keep the one you have", not "you have none".
+      // Overwriting it with null is how an account silently becomes unrenewable.
+      await sql`
+        UPDATE zv_mail_accounts SET
+          oauth2_access_token = ${next.accessToken},
+          oauth2_refresh_token = COALESCE(${next.refreshToken}, oauth2_refresh_token),
+          oauth2_expires_at = ${next.expiresAt?.toISOString() ?? null},
+          updated_at = NOW()
+        WHERE id = ${account.id}
+      `.execute(db);
+    }
+  }
+
+  if (!token) {
+    // Not a fallback to the password: an OAuth account has no usable password,
+    // and trying one produces an authentication error that reads like a wrong
+    // credential instead of an expired connection.
+    throw new Error(
+      `account is configured for ${account.oauth2_provider} OAuth2 but has no usable access token — reconnect it`,
+    );
+  }
+  return { user: account.imap_user, accessToken: token };
 }
 
 /**
@@ -100,12 +168,11 @@ export async function syncImapAccount(
   db: Database,
   account: MailAccountConfig,
 ): Promise<{ synced: number; errors: string[] }> {
-  const imapPassword = await decryptPassword(account.imap_password);
   const client = new ImapFlow({
     host: account.imap_host,
     port: account.imap_port,
     secure: account.imap_secure,
-    auth: { user: account.imap_user, pass: imapPassword },
+    auth: await buildAuth(db, account),
     logger: false,
   });
 
