@@ -97,6 +97,18 @@ jobs:
         # every gate stayed green.
         run: bun scripts/check-bespoke-contracts.ts
 
+      - name: A route that decides something asks who is asking
+        # The gate existed in scripts/ and nothing ran it, so the class it was
+        # written for could come back unobserved: `permissionGate(ctx, 'leave')`
+        # on `*` says "you may use this module", not "you may approve this", and
+        # four extensions in a row treated those as the same thing — file a leave
+        # request against a colleague's balance and approve it yourself; approve
+        # and pay an entire payroll run. Leave is money, and an approved timesheet
+        # is what /entries/invoice bills from.
+        #
+        # It reports 0 on the baseline today. Wiring it is what keeps that true.
+        run: bun scripts/check-decision-routes.ts
+
       - name: Verify packed bundles were built from the committed source
         # The check below compares the bundle against the MANIFEST. It cannot
         # tell whether either matches the SOURCE, and on 2026-08-02 three

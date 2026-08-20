@@ -376,6 +376,59 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     }
   }
 
+  /**
+   * PUT /Users/:id — full replace (RFC 7644 §3.5.1).
+   *
+   * It was missing, and a missing method here is not a gap in coverage — it is a
+   * 404 to the identity provider. Okta's profile push uses PUT, not PATCH: a
+   * directory attribute changing on the IdP side sent a PUT, got 404, and Okta
+   * marked the app out of sync. Deactivation happened to work because that path
+   * goes through PATCH, so the failure was invisible on the operation anyone
+   * would think to test.
+   *
+   * Replace semantics, deliberately: absent `active` means `true`, because in a
+   * PUT the absence of a field is an assertion about its value. That is the
+   * difference from PATCH below, where absence means "not mentioned".
+   */
+  app.put('/Users/:id', async (c) => {
+    const id = c.req.param('id');
+    const tenantId = tenantOf(c);
+    // Membership, not existence — the same reason PATCH checks it this way: a
+    // token from one tenant must not be able to write another tenant's users.
+    if (!(await isMember(id, tenantId))) return scimError(c, 404, 'User not found');
+
+    // biome-ignore lint/suspicious/noExplicitAny: SCIM payload
+    const body = (await c.req.json().catch(() => null)) as any;
+    if (!body || (body.schemas && !body.schemas.includes(SCIM_USER))) {
+      return scimError(c, 400, 'Expected a SCIM User payload');
+    }
+
+    const email: string | undefined = body?.userName ?? body?.emails?.[0]?.value;
+    if (!email) return scimError(c, 400, 'userName (email) is required');
+    const name: string = body?.name?.formatted ?? body?.displayName ?? email;
+    const active = body?.active !== false;
+
+    await sql`
+      UPDATE "user" SET name = ${name}, email = ${email}, "updatedAt" = NOW() WHERE id = ${id}
+    `.execute(db);
+
+    await sql`
+      INSERT INTO zv_scim_users (tenant_id, user_id, external_id, active)
+      VALUES (${tenantId}::uuid, ${id}, ${body?.externalId ?? null}, ${active})
+      ON CONFLICT (tenant_id, user_id)
+      DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active
+    `.execute(db);
+
+    // `setActive` is what actually revokes sessions on deactivation; calling it
+    // rather than only writing the column keeps PUT and PATCH doing the same
+    // thing for the same input.
+    await setActive(id, tenantId, active);
+
+    const row = await sql`SELECT id, name, email, "createdAt" FROM "user" WHERE id = ${id}`.execute(db);
+    if (!row.rows[0]) return scimError(c, 404, 'User not found');
+    return c.json(toScimUser(row.rows[0], { external_id: body?.externalId ?? null, active }));
+  });
+
   // PATCH /Users/:id — Azure/Okta PatchOp; v1 honors `active` (the operation
   // that matters for offboarding) and name/displayName replaces.
   app.patch('/Users/:id', async (c) => {
