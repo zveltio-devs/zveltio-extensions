@@ -5,7 +5,7 @@ import { sql } from 'kysely';
 import { syncImapAccount, fetchMessageBody, sendMail } from './lib/imap-client.js';
 import {
   createImapFolder, renameImapFolder, deleteImapFolder,
-  moveMessages, downloadMessageAsEml, getImapQuota,
+  moveMessages, downloadMessageAsEml, getImapQuota, flagMessages,
 } from './lib/imap-operations.js';
 import { buildReplyContext, saveDraft, sendDraft, autoCollectContacts } from './lib/compose.js';
 import { compileFiltersToSieve, uploadSieveScript, applyLocalFilters } from './lib/sieve.js';
@@ -362,7 +362,64 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
       query: { kind: 'RawNode', sqlFragments: [updateSql], parameters: params },
     } as any);
 
-    return c.json({ success: true });
+    // Push read/star to the IMAP server as well. `flagMessages` was written for
+    // this and called from nowhere, which is what made the mirror one-way: the
+    // user marked a message read here, opened the same mailbox in another
+    // client, and it was unread again.
+    //
+    // `tags` is deliberately not propagated — it is a Zveltio concept with no
+    // IMAP counterpart, and inventing keywords for it would put data on
+    // someone's mail server that nothing else can read.
+    let propagated: boolean | null = null;
+    let propagationError: string | null = null;
+
+    if (is_read !== undefined || is_starred !== undefined) {
+      const add: string[] = [];
+      const remove: string[] = [];
+      if (is_read !== undefined) (is_read ? add : remove).push('\\Seen');
+      if (is_starred !== undefined) (is_starred ? add : remove).push('\\Flagged');
+
+      // The message, its folder path and its UID, scoped to the caller in the
+      // same query — a second lookup that trusted the id would reopen the hole
+      // the UPDATE above closes.
+      const target = await sql<{
+        uid: number;
+        path: string;
+        email_address: string;
+        imap_host: string;
+        imap_port: number;
+        imap_secure: boolean;
+        imap_user: string;
+        imap_password: string;
+      }>`
+        SELECT m.uid, f.path, a.email_address, a.imap_host, a.imap_port, a.imap_secure,
+               a.imap_user, a.imap_password
+        FROM zv_mail_messages m
+        INNER JOIN zv_mail_folders f ON f.id = m.folder_id
+        INNER JOIN zv_mail_accounts a ON a.id = m.account_id
+        WHERE m.id = ${c.req.param('id')} AND a.user_id = ${user.id}
+      `.execute(db);
+
+      const row = target.rows[0];
+      if (row) {
+        try {
+          await flagMessages(row as any, row.path, [row.uid], { add, remove });
+          propagated = true;
+        } catch (err: any) {
+          // Not swallowed and not fatal. The local row already carries what the
+          // user asked for; what they must not be told is that the server agrees
+          // when it does not.
+          propagated = false;
+          propagationError = err?.message ?? String(err);
+        }
+      }
+    }
+
+    return c.json({
+      success: true,
+      ...(propagated === null ? {} : { propagated }),
+      ...(propagationError ? { notice: `Saved locally. The mail server did not accept the change: ${propagationError}` } : {}),
+    });
   });
 
   // DELETE /ext/communications/mail/messages/:id — Soft delete (move to trash)
