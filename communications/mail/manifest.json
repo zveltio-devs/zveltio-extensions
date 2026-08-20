@@ -3,7 +3,7 @@
   "displayName": "Mail Client",
   "category": "communications",
   "description": "IMAP/SMTP email client with AI features, filter rules and contacts. Reads mail and sends it; filters are applied locally to messages a sync fetches, not on the mail server. read/star/move/delete are local only and do not yet propagate to IMAP. Attachments are listed, not downloaded.",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-mail",
@@ -46,7 +46,7 @@
     "bundlePeers": true
   },
   "integrity": {
-    "engineSha256": "7e88c0f9227bcfd17b7785db286dc612a324a5ebd9409070f8da9dedc4bb0ecc",
-    "sourceSha256": "dbe9fc65272b1515773fac60481a3a689e934b86dd3bcfd3c03fdcd63fafdc46"
+    "engineSha256": "3d85f82729ba3de0b019d41075d8f0ad25be3df3079b3d6c449c355d5ad78eb8",
+    "sourceSha256": "2be6a4290e6d07ff565215cf11de19c114dd080887e38f2fc3a4d2fda08bdbfb"
   }
 }
