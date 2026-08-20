@@ -17,6 +17,13 @@ import { sql } from 'kysely';
 import type { Database } from '@zveltio/engine-db';
 import { decryptPassword } from './crypto.js';
 
+/**
+ * How many messages a FIRST sync pulls. Later syncs are open-ended and catch up
+ * from where the previous one stopped, so this bounds the initial burst without
+ * putting anything out of reach — which is what it used to do.
+ */
+const FIRST_SYNC_LIMIT = 50;
+
 export interface MailAccountConfig {
   id: string;
   email_address: string;
@@ -87,7 +94,12 @@ export async function syncImapAccount(
       try {
         const lock = await client.getMailboxLock(folder.path);
         try {
-          const since = folder.last_uid > 0 ? `${folder.last_uid + 1}:*` : '1:50';
+          // A first sync is capped; every later one asks for everything above
+          // what it already has. Which of the two ran decides how far `last_uid`
+          // may advance below — see the update after the loop.
+          const firstSync = folder.last_uid === 0;
+          const since = firstSync ? `1:${FIRST_SYNC_LIMIT}` : `${folder.last_uid + 1}:*`;
+          let highestSeen = 0;
 
           for await (const msg of client.fetch(since, {
             uid: true,
@@ -96,6 +108,7 @@ export async function syncImapAccount(
             flags: true,
           })) {
             if (msg.uid <= folder.last_uid) continue;
+            if (msg.uid > highestSeen) highestSeen = msg.uid;
 
             const parsed = parseEnvelope(msg);
 
@@ -132,12 +145,28 @@ export async function syncImapAccount(
             results.synced++;
           }
 
-          // Update last_uid and counts from mailbox status
+          // `last_uid` means "everything up to here has been fetched", and it
+          // used to be set to `uidNext - 1` unconditionally — the top of the
+          // mailbox — even on a first sync that had asked for `1:50`. A mailbox
+          // with 500 messages therefore fetched 50, recorded 500, and resumed at
+          // 501 forever: UIDs 51-500 existed on the server and no later sync
+          // would ever ask for them again.
+          //
+          // So it may only advance as far as this pass actually looked:
+          //   first sync   — capped, so no further than the highest UID seen
+          //   later syncs  — asked `last_uid+1:*`, so the top is genuinely reached
+          //
+          // A first sync that fetched nothing leaves `last_uid` alone rather than
+          // jumping: an empty result there means the mailbox is empty OR the
+          // window missed, and the two are not distinguishable from here.
           const status = client.mailbox;
+          const caughtUp = !firstSync && status?.uidNext ? (status.uidNext as number) - 1 : 0;
+          const nextLastUid = Math.max(folder.last_uid, highestSeen, caughtUp);
+
           if (status?.uidNext) {
             await sql`
               UPDATE zv_mail_folders
-              SET last_uid = ${(status.uidNext as number) - 1},
+              SET last_uid = ${nextLastUid},
                   unread_count = ${(status as any).unseen ?? 0},
                   total_count = ${(status as any).exists ?? 0}
               WHERE id = ${folder.id}
