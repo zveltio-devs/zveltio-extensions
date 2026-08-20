@@ -973,13 +973,40 @@ Please draft a reply to this email.`,
       RETURNING *
     `.execute(db);
 
-    // Upload to server async (fallback gracefully)
+    // A filter saved here is STORED and never APPLIED, and the caller is told so.
+    //
+    // `uploadSieveScript` is a `console.log` that always returns
+    // { uploaded: false, fallback: true } — ManageSieve needs a raw socket, and
+    // the function says itself it is waiting on a Bun-compatible client. The
+    // fallback it defers to, `applyLocalFilters`, is fully implemented and
+    // imported at the top of this file — and called from nowhere, so nothing
+    // applies these rules at sync time either.
+    //
+    // It used to be fire-and-forget with `.catch(() => {})` under a bare 201,
+    // which is the shape this codebase spent a campaign removing: the answer
+    // said "created" and nothing told the reader that no mail would ever move.
+    // Storing the rule is still right — wiring the fallback into
+    // `syncImapAccount` later makes every stored rule start working. What
+    // changes here is that `applied` carries the truth in the meantime.
     const accountResult = await sql`SELECT * FROM zv_mail_accounts WHERE id = ${accountId}`.execute(db);
-    if (accountResult.rows[0]) {
-      uploadSieveScript(accountResult.rows[0] as any, 'zveltio', sieveScript).catch(() => { /* ignore */ });
-    }
+    const upload = accountResult.rows[0]
+      ? await uploadSieveScript(accountResult.rows[0] as any, 'zveltio', sieveScript)
+      : { uploaded: false, fallback: true };
 
-    return c.json({ filter: result.rows[0] }, 201);
+    return c.json(
+      {
+        filter: result.rows[0],
+        applied: upload.uploaded,
+        ...(upload.uploaded
+          ? {}
+          : {
+              notice:
+                'Filter saved but not applied: server-side Sieve upload is not implemented, and no ' +
+                'local fallback runs at sync time.',
+            }),
+      },
+      201,
+    );
   });
 
   // PATCH /ext/communications/mail/accounts/:accountId/filters/:id
