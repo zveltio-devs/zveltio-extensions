@@ -11,6 +11,9 @@ import {
 import { buildReplyContext, saveDraft, sendDraft, autoCollectContacts } from './lib/compose.js';
 import { compileFiltersToSieve, uploadSieveScript, applyLocalFilters } from './lib/sieve.js';
 import { encryptPassword, decryptPassword } from './lib/crypto.js';
+import {
+  buildAuthorizeUrl, credentialsFor, endpointsFor, exchangeCode,
+} from './lib/oauth.js';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 /**
@@ -1281,6 +1284,144 @@ Please draft a reply to this email.`,
 
     await sql`UPDATE zv_mail_messages SET read_receipt_sent = true WHERE id = ${m.id}`.execute(db);
     return c.json({ success: true });
+  });
+
+
+  // ═══ OAUTH2 (Gmail / Outlook) ═══
+  //
+  // The flow the audit reported as absent. The columns and the settings knobs
+  // have existed since 001; `imap-operations.ts` already authenticates with
+  // XOAUTH2 when it finds a token. This is what produces one.
+
+  /**
+   * Start the consent flow for an account the caller owns.
+   *
+   * Answers the URL rather than redirecting: the caller is the Studio page, and
+   * a 302 out of a fetch() is not something it can follow usefully.
+   */
+  app.post('/accounts/:accountId/oauth/:provider/authorize', async (c) => {
+    const user = c.get('user') as any;
+    const accountId = c.req.param('accountId');
+    const provider = c.req.param('provider');
+    if (provider !== 'gmail' && provider !== 'outlook') {
+      return c.json({ error: 'Unknown provider' }, 400);
+    }
+
+    const body = (await c.req.json().catch(() => ({}))) as { redirect_uri?: string };
+    const redirectUri = typeof body.redirect_uri === 'string' ? body.redirect_uri : '';
+    if (!redirectUri) return c.json({ error: 'redirect_uri is required' }, 400);
+
+    const cfgRow = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
+    const cfg = readMailConfig(cfgRow.rows[0]);
+    const creds = credentialsFor(provider, cfg);
+    if (!creds) {
+      // The specific failure, not "something went wrong": an admin has to go and
+      // fill these in, and the message is what tells them so.
+      return c.json(
+        { error: `No OAuth2 client is configured for ${provider}. Set it in mail settings.` },
+        400,
+      );
+    }
+
+    const acct = await sql<{ email_address: string }>`
+      SELECT email_address FROM zv_mail_accounts WHERE id = ${accountId} AND user_id = ${user.id}
+    `.execute(db);
+    if (!acct.rows[0]) return c.json({ error: 'Account not found' }, 404);
+
+    // 32 bytes of CSPRNG. The callback will only accept a state it issued, which
+    // is what stops a code from someone else's consent being bound to this
+    // account.
+    const state = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
+    await sql`
+      INSERT INTO zv_mail_oauth_states (state, user_id, account_id, provider, redirect_uri, expires_at)
+      VALUES (${state}, ${user.id}, ${accountId}::uuid, ${provider}, ${redirectUri},
+              NOW() + INTERVAL '10 minutes')
+    `.execute(db);
+
+    return c.json({
+      authorize_url: buildAuthorizeUrl({
+        provider,
+        clientId: creds.clientId,
+        redirectUri,
+        state,
+        endpoints: endpointsFor(provider, cfg),
+        loginHint: acct.rows[0].email_address,
+      }),
+      state,
+    });
+  });
+
+  /**
+   * Finish the flow: swap the code for tokens and store them on the account.
+   *
+   * The state row is consumed whatever happens next — a code that fails to
+   * exchange must not leave a state usable for a second attempt.
+   */
+  app.post('/oauth/callback', zValidator('json', z.object({
+    state: z.string().min(1),
+    code: z.string().min(1),
+  })), async (c) => {
+    const user = c.get('user') as any;
+    const { state, code } = c.req.valid('json');
+
+    const claimed = await sql<{
+      account_id: string;
+      provider: 'gmail' | 'outlook';
+      redirect_uri: string;
+    }>`
+      DELETE FROM zv_mail_oauth_states
+      WHERE state = ${state} AND user_id = ${user.id} AND expires_at > NOW()
+      RETURNING account_id, provider, redirect_uri
+    `.execute(db);
+    // DELETE ... RETURNING is the claim: expired, forged, replayed and
+    // someone-else's all return no row, and all four deserve the same answer.
+    if (!claimed.rows[0]) return c.json({ error: 'Invalid or expired state' }, 400);
+    const { account_id, provider, redirect_uri } = claimed.rows[0];
+
+    const cfgRow = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
+    const cfg = readMailConfig(cfgRow.rows[0]);
+    const creds = credentialsFor(provider, cfg);
+    if (!creds) return c.json({ error: `No OAuth2 client configured for ${provider}` }, 400);
+
+    let tokens: Awaited<ReturnType<typeof exchangeCode>>;
+    try {
+      tokens = await exchangeCode({
+        code,
+        clientId: creds.clientId,
+        clientSecret: creds.clientSecret,
+        redirectUri: redirect_uri,
+        tokenUrl: endpointsFor(provider, cfg).tokenUrl,
+      });
+    } catch (err: any) {
+      return c.json({ error: `Token exchange failed: ${err?.message ?? String(err)}` }, 502);
+    }
+
+    // No refresh token means the connection dies in an hour with nothing to
+    // renew it. Google only issues one on first consent, so this is a real
+    // outcome and the caller is told rather than finding out later.
+    await sql`
+      UPDATE zv_mail_accounts SET
+        oauth2_provider = ${provider},
+        oauth2_access_token = ${tokens.accessToken},
+        oauth2_refresh_token = COALESCE(${tokens.refreshToken}, oauth2_refresh_token),
+        oauth2_expires_at = ${tokens.expiresAt?.toISOString() ?? null},
+        updated_at = NOW()
+      WHERE id = ${account_id} AND user_id = ${user.id}
+    `.execute(db);
+
+    return c.json({
+      success: true,
+      provider,
+      expires_at: tokens.expiresAt?.toISOString() ?? null,
+      renewable: tokens.refreshToken !== null,
+      ...(tokens.refreshToken
+        ? {}
+        : {
+            notice:
+              'Connected, but the provider returned no refresh token — access will expire and the ' +
+              'account will need reconnecting. Revoke the app and consent again to obtain one.',
+          }),
+    });
   });
 
   // ═══ ADMIN: MAIL CONFIG ═══
