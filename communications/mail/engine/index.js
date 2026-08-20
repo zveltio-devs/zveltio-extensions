@@ -77596,6 +77596,36 @@ async function getImapQuota(account) {
     await client.logout().catch(() => {});
   }
 }
+async function moveMessages(account, sourceFolderPath, uids, targetFolderPath) {
+  if (uids.length === 0)
+    return;
+  const client = await getImapClient(account);
+  try {
+    const lock = await client.getMailboxLock(sourceFolderPath);
+    try {
+      await client.messageMove(uids.join(","), targetFolderPath, { uid: true });
+    } finally {
+      lock.release();
+    }
+  } finally {
+    await client.logout().catch(() => {});
+  }
+}
+async function deleteMessagesFromServer(account, folderPath, uids) {
+  if (uids.length === 0)
+    return;
+  const client = await getImapClient(account);
+  try {
+    const lock = await client.getMailboxLock(folderPath);
+    try {
+      await client.messageDelete(uids.join(","), { uid: true });
+    } finally {
+      lock.release();
+    }
+  } finally {
+    await client.logout().catch(() => {});
+  }
+}
 async function flagMessages(account, folderPath, uids, flags) {
   if (uids.length === 0)
     return;
@@ -78099,19 +78129,37 @@ function mailRoutes(ctx) {
   app.delete("/messages/:id", async (c) => {
     const user = c.get("user");
     const msgResult = await sql`
-      SELECT m.account_id FROM zv_mail_messages m
+      SELECT m.account_id, m.uid, f.path AS source_path,
+             a.email_address, a.imap_host, a.imap_port, a.imap_secure,
+             a.imap_user, a.imap_password
+      FROM zv_mail_messages m
+      INNER JOIN zv_mail_folders f ON f.id = m.folder_id
       INNER JOIN zv_mail_accounts a ON a.id = m.account_id
       WHERE m.id = ${c.req.param("id")} AND a.user_id = ${user.id}
     `.execute(db);
     if (!msgResult.rows[0])
       return c.json({ error: "Not found" }, 404);
-    const accountId = msgResult.rows[0].account_id;
+    const msg = msgResult.rows[0];
     const trashResult = await sql`
-      SELECT id FROM zv_mail_folders WHERE account_id = ${accountId} AND type = 'trash' LIMIT 1
+      SELECT id, path FROM zv_mail_folders
+      WHERE account_id = ${msg.account_id} AND type = 'trash' LIMIT 1
     `.execute(db);
-    if (trashResult.rows[0]) {
+    const trash = trashResult.rows[0];
+    try {
+      if (trash) {
+        await moveMessages(msg, msg.source_path, [msg.uid], trash.path);
+      } else {
+        await deleteMessagesFromServer(msg, msg.source_path, [msg.uid]);
+      }
+    } catch (err) {
+      return c.json({
+        error: "The mail server refused the delete, so nothing was changed here either.",
+        detail: err?.message ?? String(err)
+      }, 502);
+    }
+    if (trash) {
       await sql`
-        UPDATE zv_mail_messages SET folder_id = ${trashResult.rows[0].id}
+        UPDATE zv_mail_messages SET folder_id = ${trash.id}
         WHERE id = ${c.req.param("id")}
       `.execute(db);
     } else {

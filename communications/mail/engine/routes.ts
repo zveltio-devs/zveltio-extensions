@@ -6,6 +6,7 @@ import { syncImapAccount, fetchMessageBody, sendMail } from './lib/imap-client.j
 import {
   createImapFolder, renameImapFolder, deleteImapFolder,
   moveMessages, downloadMessageAsEml, getImapQuota, flagMessages,
+  deleteMessagesFromServer,
 } from './lib/imap-operations.js';
 import { buildReplyContext, saveDraft, sendDraft, autoCollectContacts } from './lib/compose.js';
 import { compileFiltersToSieve, uploadSieveScript, applyLocalFilters } from './lib/sieve.js';
@@ -425,22 +426,67 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
   // DELETE /ext/communications/mail/messages/:id — Soft delete (move to trash)
   app.delete('/messages/:id', async (c) => {
     const user = c.get('user') as any;
-    // Find trash folder for this message's account
-    const msgResult = await sql`
-      SELECT m.account_id FROM zv_mail_messages m
+
+    // The message, where it currently lives, and the account to reach the server
+    // with — one query, joined to the caller.
+    const msgResult = await sql<{
+      account_id: string;
+      uid: number;
+      source_path: string;
+      email_address: string;
+      imap_host: string;
+      imap_port: number;
+      imap_secure: boolean;
+      imap_user: string;
+      imap_password: string;
+    }>`
+      SELECT m.account_id, m.uid, f.path AS source_path,
+             a.email_address, a.imap_host, a.imap_port, a.imap_secure,
+             a.imap_user, a.imap_password
+      FROM zv_mail_messages m
+      INNER JOIN zv_mail_folders f ON f.id = m.folder_id
       INNER JOIN zv_mail_accounts a ON a.id = m.account_id
       WHERE m.id = ${c.req.param('id')} AND a.user_id = ${user.id}
     `.execute(db);
     if (!msgResult.rows[0]) return c.json({ error: 'Not found' }, 404);
 
-    const accountId = (msgResult.rows[0] as any).account_id;
-    const trashResult = await sql`
-      SELECT id FROM zv_mail_folders WHERE account_id = ${accountId} AND type = 'trash' LIMIT 1
+    const msg = msgResult.rows[0];
+    const trashResult = await sql<{ id: string; path: string }>`
+      SELECT id, path FROM zv_mail_folders
+      WHERE account_id = ${msg.account_id} AND type = 'trash' LIMIT 1
     `.execute(db);
+    const trash = trashResult.rows[0];
 
-    if (trashResult.rows[0]) {
+    // The server goes FIRST, and the local row only follows if it agreed.
+    //
+    // This route used to move (or drop) the local row and never touch IMAP, so
+    // a deleted message stayed in the real mailbox. The no-trash branch was the
+    // worse half: it DELETEs the row outright, and a sync only ever fetches UIDs
+    // above `last_uid`, so the message was gone from Zveltio and unrecoverable
+    // by it while still sitting on the server.
+    //
+    // Doing IMAP first means a refusal leaves both sides as they were. The other
+    // order would delete locally and leave the server holding mail nothing here
+    // can see again.
+    try {
+      if (trash) {
+        await moveMessages(msg as any, msg.source_path, [msg.uid], trash.path);
+      } else {
+        await deleteMessagesFromServer(msg as any, msg.source_path, [msg.uid]);
+      }
+    } catch (err: any) {
+      return c.json(
+        {
+          error: 'The mail server refused the delete, so nothing was changed here either.',
+          detail: err?.message ?? String(err),
+        },
+        502,
+      );
+    }
+
+    if (trash) {
       await sql`
-        UPDATE zv_mail_messages SET folder_id = ${(trashResult.rows[0] as any).id}
+        UPDATE zv_mail_messages SET folder_id = ${trash.id}
         WHERE id = ${c.req.param('id')}
       `.execute(db);
     } else {
