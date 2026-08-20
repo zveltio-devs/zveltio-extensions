@@ -11,6 +11,8 @@
   "projects.helpdesk.title": "Helpdesk",
   "projects.helpdesk.toast.resolved": "Ticket resolved.",
   "projects.helpdesk.ui.description": "Description *",
+  "projects.helpdesk.ui.high": "High",
+  "projects.helpdesk.ui.low": "Low",
   "projects.helpdesk.ui.medium": "Medium",
   "projects.helpdesk.ui.new_ticket": "New ticket",
   "projects.helpdesk.ui.priority": "Priority",

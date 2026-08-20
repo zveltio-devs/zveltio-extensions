@@ -16,8 +16,15 @@
   "projects.management.subtitle": "Panou Kanban și gestionarea sarcinilor",
   "projects.management.title": "Proiecte",
   "projects.management.ui.end_date": "Data de sfârșit",
+  "projects.management.ui.high": "Ridicat",
+  "projects.management.ui.low": "Scăzut",
+  "projects.management.ui.medium": "Mediu",
+  "projects.management.ui.name": "Nume *",
   "projects.management.ui.new_project": "Proiect nou",
   "projects.management.ui.new_task": "Sarcină nouă",
   "projects.management.ui.no_tasks": "Nicio sarcină.",
-  "projects.management.ui.start_date": "Data de început"
+  "projects.management.ui.priority": "Prioritate",
+  "projects.management.ui.start_date": "Data de început",
+  "projects.management.ui.title": "Titlu *",
+  "projects.management.ui.urgent": "Urgent"
 }

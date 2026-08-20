@@ -3,6 +3,7 @@
   "finance.banking.empty.accounts": "Brak kont bankowych.",
   "finance.banking.empty.transactions": "Brak transakcji.",
   "finance.banking.empty.unreconciled": "Brak nieuzgodnionych transakcji.",
+  "finance.banking.form.currency": "Waluta",
   "finance.banking.newAccount": "Nowe konto",
   "finance.banking.section.openInvoices": "Otwarte faktury (wysłane)",
   "finance.banking.section.unreconciled": "Nieuzgodnione transakcje",

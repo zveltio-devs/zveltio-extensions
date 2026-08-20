@@ -3,7 +3,7 @@
   "displayName": "SMS / Push Notifications",
   "category": "sms",
   "description": "Send SMS via Twilio or Vonage with templates and delivery tracking",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-sms",
@@ -37,7 +37,7 @@
     "fieldTypes": []
   },
   "integrity": {
-    "engineSha256": "7568587560084be4cf1ed12153e91635dc396b8e5943284faebc5e52e59bb390",
-    "sourceSha256": "c74ff80968b91d8f78f2b2f9fa94b8a4b9a9486d058e3a5646da0e75c3812be6"
+    "engineSha256": "f92c09d02f28aec2b2f2689e92bd4fbdb61b95610f315ec16f385965294ebb5f",
+    "sourceSha256": "3dc815035c99ba2a0b3abfe4f9cd12c72114363d9826487e6e992758c5b0be73"
   }
 }

@@ -16,8 +16,15 @@
   "projects.management.subtitle": "Tableau Kanban et gestion des tâches",
   "projects.management.title": "Projets",
   "projects.management.ui.end_date": "Date de fin",
+  "projects.management.ui.high": "Élevé",
+  "projects.management.ui.low": "Faible",
+  "projects.management.ui.medium": "Moyen",
+  "projects.management.ui.name": "Nom *",
   "projects.management.ui.new_project": "Nouveau projet",
   "projects.management.ui.new_task": "Nouvelle tâche",
   "projects.management.ui.no_tasks": "Aucune tâche.",
-  "projects.management.ui.start_date": "Date de début"
+  "projects.management.ui.priority": "Priorité",
+  "projects.management.ui.start_date": "Date de début",
+  "projects.management.ui.title": "Titre *",
+  "projects.management.ui.urgent": "Urgent"
 }

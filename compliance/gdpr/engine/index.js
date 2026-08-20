@@ -19442,6 +19442,16 @@ function parseParameter(param) {
   return parseValueExpression(param);
 }
 // ../zveltio-extensions/compliance/gdpr/engine/routes.ts
+async function rowsOrEmptyIfTableAbsent(run) {
+  try {
+    return await run();
+  } catch (err) {
+    const code = err.errno ?? err.code ?? "";
+    if (code === "42P01")
+      return { rows: [] };
+    throw err;
+  }
+}
 function gdprRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
   async function requireUser(c) {
@@ -19466,8 +19476,8 @@ function gdprRoutes(ctx) {
       sql`SELECT event_type AS action, resource_type AS collection, resource_id AS record_id, created_at FROM zv_audit_log WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 1000`.execute(db),
       sql`SELECT title, message, type, is_read, created_at FROM zv_notifications WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 500`.execute(db),
       sql`SELECT name, key_prefix, scopes, created_at FROM zv_api_keys WHERE created_by = ${userId}`.execute(db),
-      sql`SELECT id::text, collection, record_id, status, requested_at FROM zv_approval_requests WHERE requested_by = ${userId} ORDER BY requested_at DESC`.execute(db).catch(() => ({ rows: [] })),
-      sql`SELECT purpose, granted, source, created_at, withdrawn_at FROM zvd_gdpr_consents WHERE user_id = ${userId} ORDER BY created_at DESC`.execute(db).catch(() => ({ rows: [] }))
+      rowsOrEmptyIfTableAbsent(() => sql`SELECT id::text, collection, record_id, status, requested_at FROM zv_approval_requests WHERE requested_by = ${userId} ORDER BY requested_at DESC`.execute(db)),
+      rowsOrEmptyIfTableAbsent(() => sql`SELECT purpose, granted, source, created_at, withdrawn_at FROM zvd_gdpr_consents WHERE user_id = ${userId} ORDER BY created_at DESC`.execute(db))
     ]);
     const exportData = {
       exported_at: new Date().toISOString(),
@@ -19806,21 +19816,21 @@ function gdprRoutes(ctx) {
     if (!admin)
       return c.json({ error: "Unauthorized" }, 401);
     const [sarStats, consentStats, breachStats, processingCount] = await Promise.all([
-      sql`
-        SELECT status, COUNT(*)::int AS count
-        FROM zvd_gdpr_access_requests GROUP BY status
-      `.execute(db).catch(() => ({ rows: [] })),
-      sql`
-        SELECT COUNT(*) FILTER (WHERE granted = true)::int AS active_consents,
-               COUNT(*) FILTER (WHERE withdrawn_at IS NOT NULL)::int AS withdrawn,
-               COUNT(DISTINCT user_id)::int AS unique_users
-        FROM zvd_gdpr_consents
-      `.execute(db).catch(() => ({ rows: [{ active_consents: 0, withdrawn: 0, unique_users: 0 }] })),
-      sql`
-        SELECT severity, status, COUNT(*)::int AS count
-        FROM zvd_gdpr_breach_incidents GROUP BY severity, status
-      `.execute(db).catch(() => ({ rows: [] })),
-      sql`SELECT COUNT(*)::int AS count FROM zvd_gdpr_processing_records WHERE is_active = true`.execute(db).catch(() => ({ rows: [{ count: 0 }] }))
+      rowsOrEmptyIfTableAbsent(() => sql`
+          SELECT status, COUNT(*)::int AS count
+          FROM zvd_gdpr_access_requests GROUP BY status
+        `.execute(db)),
+      rowsOrEmptyIfTableAbsent(() => sql`
+          SELECT COUNT(*) FILTER (WHERE granted = true)::int AS active_consents,
+                 COUNT(*) FILTER (WHERE withdrawn_at IS NOT NULL)::int AS withdrawn,
+                 COUNT(DISTINCT user_id)::int AS unique_users
+          FROM zvd_gdpr_consents
+        `.execute(db)),
+      rowsOrEmptyIfTableAbsent(() => sql`
+          SELECT severity, status, COUNT(*)::int AS count
+          FROM zvd_gdpr_breach_incidents GROUP BY severity, status
+        `.execute(db)),
+      rowsOrEmptyIfTableAbsent(() => sql`SELECT COUNT(*)::int AS count FROM zvd_gdpr_processing_records WHERE is_active = true`.execute(db))
     ]);
     const sarByStatus = {};
     for (const row of sarStats.rows)

@@ -277,6 +277,7 @@ export async function mountEdgeFunctions(ctx: ExtensionContext): Promise<void> {
         .where('path', '=', fn.path)
         .where('is_active', '=', true)
         .executeTakeFirst()
+        // fabricated-ok: `if (!live) return 404` refuses to run the function. An unreadable row does not get executed.
         .catch(() => null);
 
       // The path is mounted because SOME tenant defined it. That does not mean

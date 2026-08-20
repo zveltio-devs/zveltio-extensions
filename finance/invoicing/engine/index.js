@@ -14,6 +14,108 @@ var __export = (target, all) => {
     });
 };
 
+// packages/sdk/src/extension/permission-gate.ts
+async function refuse(ctx, c, resource, action) {
+  let denial = null;
+  try {
+    denial = await ctx.describeDenial?.(resource, action) ?? null;
+  } catch {}
+  const names = denial?.canGrant.map((g) => g.name) ?? [];
+  const who = names.length === 0 ? "An administrator of this workspace" : names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
+  const what = denial?.confidential ? `${resource} is confidential` : `you do not have access to ${resource}`;
+  const detail = names.length === 0 ? `${what}. ${who} can grant it.` : `${what}. ${who} can give you access.`;
+  return c.json({
+    type: "about:blank",
+    title: "Forbidden",
+    status: 403,
+    code: "permission_required",
+    detail,
+    resource,
+    action,
+    confidential: denial?.confidential ?? false,
+    can_grant: names.map((name) => ({ name }))
+  }, 403);
+}
+function methodToAction(method) {
+  const m = method.toUpperCase();
+  switch (m) {
+    case "GET":
+    case "HEAD":
+    case "OPTIONS":
+      return "read";
+    case "POST":
+      return "create";
+    case "PATCH":
+    case "PUT":
+      return "update";
+    case "DELETE":
+      return "delete";
+    default:
+      return "delete";
+  }
+}
+function rbacMode() {
+  const v = globalThis.process?.env?.EXTENSION_RBAC;
+  return v === "permissive" ? "permissive" : "strict";
+}
+function permissionGate(ctx, resource, opts = {}) {
+  return async (c, next) => {
+    if (c.req.method === "OPTIONS") {
+      await next();
+      return;
+    }
+    const user = c.get("user");
+    if (!user?.id) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+    const methodKey = c.req.method.toUpperCase();
+    const action = opts.actionOverrides?.[methodKey] ?? methodToAction(methodKey);
+    const allowed = await ctx.checkPermission(user.id, resource, action);
+    if (!allowed) {
+      if (rbacMode() === "permissive") {
+        console.warn(`[permissionGate] WOULD DENY user=${user.id} ${c.req.method} ${c.req.path} \u2192 ${resource}:${action} (EXTENSION_RBAC=permissive \u2014 gate bypassed)`);
+        await next();
+        return;
+      }
+      return refuse(ctx, c, resource, action);
+    }
+    await next();
+  };
+}
+// packages/sdk/src/extension/numeric.ts
+class NumericConversionError extends Error {
+  value;
+  constructor(value, label) {
+    super(`${label ? `${label}: ` : ""}expected a finite number, got ${typeof value === "string" ? JSON.stringify(value) : String(value)}`);
+    this.value = value;
+    this.name = "NumericConversionError";
+  }
+}
+function toNumber(value, fallback = 0, label) {
+  if (value === null || value === undefined)
+    return fallback;
+  if (typeof value === "bigint") {
+    if (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER) {
+      throw new NumericConversionError(value, label);
+    }
+    return Number(value);
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value))
+      throw new NumericConversionError(value, label);
+    return value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "")
+      throw new NumericConversionError(value, label);
+    const n = Number(trimmed);
+    if (!Number.isFinite(n))
+      throw new NumericConversionError(value, label);
+    return n;
+  }
+  throw new NumericConversionError(value, label);
+}
 // ../zveltio-extensions/finance/invoicing/engine/index.ts
 import { join } from "path";
 
@@ -19441,74 +19543,6 @@ function date4(params) {
 
 // node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
 config(en_default());
-// packages/sdk/src/extension/permission-gate.ts
-async function refuse(ctx, c, resource, action) {
-  let denial = null;
-  try {
-    denial = await ctx.describeDenial?.(resource, action) ?? null;
-  } catch {}
-  const names = denial?.canGrant.map((g) => g.name) ?? [];
-  const who = names.length === 0 ? "An administrator of this workspace" : names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
-  const what = denial?.confidential ? `${resource} is confidential` : `you do not have access to ${resource}`;
-  const detail = names.length === 0 ? `${what}. ${who} can grant it.` : `${what}. ${who} can give you access.`;
-  return c.json({
-    type: "about:blank",
-    title: "Forbidden",
-    status: 403,
-    code: "permission_required",
-    detail,
-    resource,
-    action,
-    confidential: denial?.confidential ?? false,
-    can_grant: names.map((name) => ({ name }))
-  }, 403);
-}
-function methodToAction(method) {
-  const m = method.toUpperCase();
-  switch (m) {
-    case "GET":
-    case "HEAD":
-    case "OPTIONS":
-      return "read";
-    case "POST":
-      return "create";
-    case "PATCH":
-    case "PUT":
-      return "update";
-    case "DELETE":
-      return "delete";
-    default:
-      return "delete";
-  }
-}
-function rbacMode() {
-  const v = globalThis.process?.env?.EXTENSION_RBAC;
-  return v === "permissive" ? "permissive" : "strict";
-}
-function permissionGate(ctx, resource, opts = {}) {
-  return async (c, next) => {
-    if (c.req.method === "OPTIONS") {
-      await next();
-      return;
-    }
-    const user = c.get("user");
-    if (!user?.id) {
-      return c.json({ error: "Unauthorized" }, 401);
-    }
-    const methodKey = c.req.method.toUpperCase();
-    const action = opts.actionOverrides?.[methodKey] ?? methodToAction(methodKey);
-    const allowed = await ctx.checkPermission(user.id, resource, action);
-    if (!allowed) {
-      if (rbacMode() === "permissive") {
-        console.warn(`[permissionGate] WOULD DENY user=${user.id} ${c.req.method} ${c.req.path} \u2192 ${resource}:${action} (EXTENSION_RBAC=permissive \u2014 gate bypassed)`);
-        await next();
-        return;
-      }
-      return refuse(ctx, c, resource, action);
-    }
-    await next();
-  };
-}
 // ../zveltio-extensions/finance/invoicing/engine/routes.ts
 async function claimNumber(dbh, docType, series) {
   const row = await sql`
@@ -19568,6 +19602,10 @@ async function mayDecideInvoice(ctx, user, action) {
   if (await ctx.checkPermission(user.id, "invoices", action).catch(() => false))
     return true;
   return ctx.checkPermission(user.id, "admin", "*").catch(() => false);
+}
+function isUniqueViolation(err) {
+  const code = err.errno ?? err.code ?? "";
+  return code === "23505";
 }
 function invoicingRoutes(ctx) {
   const { db, auth } = ctx;
@@ -19658,7 +19696,11 @@ function invoicingRoutes(ctx) {
         INSERT INTO zvd_document_series (doc_type, series, next_number, padding, is_default)
         VALUES (${d.doc_type}, ${d.series}, ${d.next_number}, ${d.padding}, ${d.is_default})
         RETURNING *
-      `.execute(db).catch(() => null);
+      `.execute(db).catch((err) => {
+      if (!isUniqueViolation(err))
+        throw err;
+      return null;
+    });
     if (!row?.rows.length) {
       return c.json({ error: `Series "${d.series}" already exists for ${d.doc_type}` }, 400);
     }
@@ -19714,7 +19756,11 @@ function invoicingRoutes(ctx) {
         VALUES (${d.code ?? null}, ${d.name}, ${d.description ?? null}, ${d.kind},
                 ${d.unit}, ${d.unit_price}, ${d.currency}, ${d.tax_rate})
         RETURNING *
-      `.execute(db).catch(() => null);
+      `.execute(db).catch((err) => {
+      if (!isUniqueViolation(err))
+        throw err;
+      return null;
+    });
     if (!row?.rows.length)
       return c.json({ error: `Code "${d.code}" already exists` }, 400);
     return c.json({ data: row.rows[0] }, 201);
@@ -20107,7 +20153,7 @@ function invoicingRoutes(ctx) {
       VALUES (${invoice.id}, ${d.amount}, ${d.payment_date}, ${d.payment_method}, ${d.reference ?? null}, ${d.notes ?? null}, ${user.id})
       RETURNING *
     `.execute(db);
-    const newPaid = +invoice.amount_paid + d.amount;
+    const newPaid = toNumber(invoice.amount_paid, 0, "zvd_invoices.amount_paid") + d.amount;
     const newStatus = newPaid >= invoice.total ? "paid" : "partially_paid";
     await sql`
       UPDATE zvd_invoices SET amount_paid = ${newPaid}, status = ${newStatus},
@@ -20180,16 +20226,24 @@ function invoicingRoutes(ctx) {
     const newInv = await sql`
       INSERT INTO zvd_invoices (number, series, doc_type, delegate_name, delegate_id_card, delegate_vehicle,
         client_id, client_type, client_name, client_email, client_address,
-        client_tax_id, client_reg_no, client_country,
-        seller_name, seller_tax_id, seller_reg_no, seller_address, seller_iban, seller_bank,
+        client_tax_id, client_reg_no, client_city, client_county, client_country,
+        seller_name, seller_tax_id, seller_reg_no, seller_address,
+        seller_city, seller_county, seller_country, seller_iban, seller_bank,
         issue_date, due_date, currency, subtotal, tax_rate, tax_amount, total, discount_amount, discount_percent,
-        notes, footer_notes, recurring_interval, amount_paid, created_by)
-      VALUES (${claimed.number}, ${claimed.series}, ${i.client_id}, ${i.client_type}, ${i.client_name}, ${i.client_email}, ${i.client_address},
-        ${i.client_tax_id}, ${i.client_reg_no}, ${i.client_country},
-        ${i.seller_name}, ${i.seller_tax_id}, ${i.seller_reg_no}, ${i.seller_address}, ${i.seller_iban}, ${i.seller_bank},
+        vat_breakdown, vat_regime, vat_exemption_reason, exchange_rate, exchange_date, tax_amount_ron,
+        notes, footer_notes, po_number, recurring_interval, amount_paid, created_by)
+      VALUES (${claimed.number}, ${claimed.series}, ${i.doc_type},
+        ${null}, ${null}, ${null},
+        ${i.client_id}, ${i.client_type}, ${i.client_name}, ${i.client_email}, ${i.client_address},
+        ${i.client_tax_id}, ${i.client_reg_no}, ${i.client_city}, ${i.client_county}, ${i.client_country},
+        ${i.seller_name}, ${i.seller_tax_id}, ${i.seller_reg_no}, ${i.seller_address},
+        ${i.seller_city}, ${i.seller_county}, ${i.seller_country}, ${i.seller_iban}, ${i.seller_bank},
         ${newIssue.toISOString().slice(0, 10)}, ${newDue.toISOString().slice(0, 10)},
         ${i.currency}, ${i.subtotal}, ${i.tax_rate}, ${i.tax_amount}, ${i.total},
-        ${i.discount_amount}, ${i.discount_percent}, ${i.notes}, ${i.footer_notes}, ${i.recurring_interval}, 0, ${user.id})
+        ${i.discount_amount}, ${i.discount_percent},
+        ${i.vat_breakdown}, ${i.vat_regime}, ${i.vat_exemption_reason},
+        ${i.exchange_rate}, ${i.exchange_date}, ${i.tax_amount_ron},
+        ${i.notes}, ${i.footer_notes}, ${i.po_number}, ${i.recurring_interval}, 0, ${user.id})
       RETURNING *
     `.execute(db);
     const newId = newInv.rows[0].id;
@@ -20414,6 +20468,43 @@ var extension = {
     ctx.services.register("invoicing.findByNumber", async (number4) => {
       const r = await sql`SELECT * FROM zvd_invoices WHERE number = ${number4} LIMIT 1`.execute(ctx.db);
       return r.rows[0] ?? null;
+    });
+    ctx.services.register("invoicing.recordPayment", async (input) => {
+      const inv = await sql`
+          SELECT id, total, amount_paid FROM zvd_invoices
+          WHERE id = ${input.invoiceId} AND status IN ('sent','overdue','partially_paid')
+          LIMIT 1
+        `.execute(ctx.db);
+      if (!inv.rows[0])
+        return null;
+      const invoice = inv.rows[0];
+      await sql`
+          INSERT INTO zvd_invoice_payments (invoice_id, amount, payment_date, payment_method, reference, notes, created_by)
+          VALUES (${input.invoiceId}, ${input.amount}, ${input.paymentDate ?? new Date().toISOString().slice(0, 10)},
+            ${input.method ?? "transfer"}, ${input.reference ?? null}, ${input.notes ?? null}, ${input.userId})
+        `.execute(ctx.db);
+      const newPaid = toNumber(invoice.amount_paid, 0, "zvd_invoices.amount_paid") + toNumber(input.amount, 0, "invoicing.recordPayment#amount");
+      const newStatus = newPaid >= toNumber(invoice.total, 0, "zvd_invoices.total") ? "paid" : "partially_paid";
+      const row = await sql`
+          UPDATE zvd_invoices SET amount_paid = ${newPaid}, status = ${newStatus}, updated_at = NOW()
+          WHERE id = ${input.invoiceId} RETURNING id, number, status, amount_paid, total
+        `.execute(ctx.db);
+      return row.rows[0] ?? null;
+    });
+    ctx.services.register("invoicing.openReceivables", async (window) => {
+      const r = await sql`
+          SELECT
+            due_date                        AS expected_date,
+            'inflow'                        AS type,
+            (total - amount_paid)           AS amount,
+            'Invoice ' || number            AS description,
+            'accounts_receivable'           AS category
+          FROM zvd_invoices
+          WHERE status IN ('sent', 'overdue')
+            AND due_date BETWEEN ${window.from} AND ${window.to}
+          ORDER BY due_date
+        `.execute(ctx.db);
+      return r.rows;
     });
     ctx.services.register("invoicing.listByClient", async (clientId) => {
       const r = await sql`

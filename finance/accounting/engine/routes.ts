@@ -3,15 +3,20 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { permissionGate } from '@zveltio/sdk/extension';
+import { permissionGate, roundMoney, toNumber } from '@zveltio/sdk/extension';
 
 /**
  * Is this user allowed to take an accounting decision that cannot be undone?
  *
- * Three routes here change the books rather than describe them: voiding a
- * posted journal entry, closing a fiscal year, and marking a tax report
- * submitted. All three ran behind one `accounting` permission and no further
+ * Four routes here change the books rather than describe them: posting a draft
+ * journal entry, voiding a posted one, closing a fiscal year, and marking a tax
+ * report submitted. All ran behind one `accounting` permission and no further
  * question — so anybody who could read the ledger could void an entry in it.
+ *
+ * `post` was added last and is the one that was easiest to miss: it turns a
+ * draft into a book entry, after which the entry can no longer be deleted, only
+ * reversed. The three dramatic-sounding actions were gated and the one that
+ * creates the evidence was not.
  *
  * Voiding is the one that matters most and looks the least dramatic. A posted
  * entry is the evidence; reversing it without a trace of WHO decided is how a
@@ -19,13 +24,13 @@ import { permissionGate } from '@zveltio/sdk/extension';
  * tax report marked submitted is a claim to the authorities that it was.
  *
  * A named action rather than a role: `accounting:void`, `accounting:close`,
- * `accounting:submit`, each granted deliberately. `admin` remains sufficient so
+ * `accounting:submit`, `accounting:post`, each granted deliberately. `admin` remains sufficient so
  * an existing install keeps working before anyone edits policies.
  */
 async function mayDecide(
   ctx: ExtensionContext,
   user: any,
-  action: 'void' | 'close' | 'submit',
+  action: 'void' | 'close' | 'post' | 'submit',
 ): Promise<boolean> {
   if (await ctx.checkPermission(user.id, 'accounting', action).catch(() => false)) return true;
   return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
@@ -53,8 +58,16 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
   // ── Chart of Accounts ────────────────────────────────────────
   app.get('/accounts', async (c) => {
     const rows = await sql`
+      -- Third instance of the same defect, in the same file, found by probing
+      -- the siblings after fixing the two the audit named. The chart of accounts
+      -- shows a balance per account, and it counted draft and voided entries
+      -- for exactly the reason the trial balance did: the posted predicate is in
+      -- the ON clause of a LEFT JOIN, so it chooses whether the join matches,
+      -- not whether the row survives.
       SELECT a.*, p.name as parent_name,
-        COALESCE(SUM(l.debit) - SUM(l.credit), 0) as balance
+        COALESCE(
+          SUM(l.debit) FILTER (WHERE e.id IS NOT NULL)
+            - SUM(l.credit) FILTER (WHERE e.id IS NOT NULL), 0) as balance
       FROM zvd_accounts a
       LEFT JOIN zvd_accounts p ON p.id = a.parent_id
       LEFT JOIN zvd_journal_lines l ON l.account_id = a.id
@@ -273,8 +286,15 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
     fiscal_year_id: z.string().uuid().optional(),
     lines: z.array(z.object({
       account_id: z.string().uuid(),
-      debit: z.number().min(0).default(0),
-      credit: z.number().min(0).default(0),
+      // `.multipleOf(0.01)`, because the columns are NUMERIC(15,2).
+      //
+      // Unbounded scale let the balance check pass on numbers that were never
+      // written: two lines of 10.005 sum to 20.01 in JavaScript and pass against
+      // a credit of 20.01, then PostgreSQL rounds each line to 10.01 and stores
+      // 20.02 against 20.01. The ledger is out by a cent and every check that
+      // ran said it balanced.
+      debit: z.number().min(0).multipleOf(0.01).default(0),
+      credit: z.number().min(0).multipleOf(0.01).default(0),
       description: z.string().optional(),
       currency: z.string().default('RON'),
       exchange_rate: z.number().positive().default(1),
@@ -295,6 +315,21 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
       const fy = await sql`SELECT id FROM zvd_fiscal_years WHERE ${d.date} BETWEEN start_date AND end_date AND status = 'open'`.execute(db);
       fyId = (fy.rows[0] as any)?.id ?? null;
     }
+
+    // A closed year is refused by a trigger on the table (migration 006), so no
+    // route can forget it. Asking here as well is not redundant: the trigger
+    // raises a database error, and an accountant deserves a sentence rather than
+    // an SQLSTATE. The trigger is the guarantee; this is the manners.
+    const closed = await sql`
+      SELECT year FROM zvd_fiscal_years
+      WHERE ${d.date} BETWEEN start_date AND end_date AND status = 'closed' LIMIT 1
+    `.execute(db);
+    if (closed.rows.length) {
+      return c.json(
+        { error: `Fiscal year ${(closed.rows[0] as any).year} is closed — reopen it or date the entry outside it` },
+        409,
+      );
+    }
     const entry = await sql`
       INSERT INTO zvd_journal_entries (date, description, reference, fiscal_year_id, created_by)
       VALUES (${d.date}, ${d.description}, ${d.reference ?? null}, ${fyId}, ${user.id})
@@ -312,6 +347,10 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/journal/:id/post', async (c) => {
+    const actor = c.get('user') as any;
+    if (!(await mayDecide(ctx, actor, 'post'))) {
+      return c.json({ error: 'Posting a journal entry requires accounting:post' }, 403);
+    }
     const row = await sql`
       UPDATE zvd_journal_entries SET status = 'posted', updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND status = 'draft' RETURNING *
@@ -378,8 +417,15 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
     end_date: z.string().optional(),
     lines: z.array(z.object({
       account_id: z.string().uuid(),
-      debit: z.number().min(0).default(0),
-      credit: z.number().min(0).default(0),
+      // `.multipleOf(0.01)`, because the columns are NUMERIC(15,2).
+      //
+      // Unbounded scale let the balance check pass on numbers that were never
+      // written: two lines of 10.005 sum to 20.01 in JavaScript and pass against
+      // a credit of 20.01, then PostgreSQL rounds each line to 10.01 and stores
+      // 20.02 against 20.01. The ledger is out by a cent and every check that
+      // ran said it balanced.
+      debit: z.number().min(0).multipleOf(0.01).default(0),
+      credit: z.number().min(0).multipleOf(0.01).default(0),
       description: z.string().optional(),
     })).min(2),
   })), async (c) => {
@@ -431,10 +477,23 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
   app.get('/reports/trial-balance', async (c) => {
     const { fiscal_year_id, as_of } = c.req.query();
     const rows = await sql`
+      -- FILTER (WHERE e.id IS NOT NULL) is what makes the status and date
+      -- predicates below actually filter. They sit in the ON clause of a LEFT
+      -- JOIN, where they decide whether the join MATCHES — not whether the row
+      -- survives. A draft or voided entry simply left e NULL while its journal
+      -- line went on contributing to these sums, so the trial balance included
+      -- money nobody had posted.
+      --
+      -- The join stays LEFT because this report lists every active account,
+      -- including ones with no movement; making it INNER would silently drop
+      -- them. e.id IS NOT NULL means "this line belongs to an entry that met
+      -- the conditions", which is what the ON clause was believed to say.
       SELECT a.id, a.code, a.name, a.type,
-        COALESCE(SUM(l.debit), 0) as total_debit,
-        COALESCE(SUM(l.credit), 0) as total_credit,
-        COALESCE(SUM(l.debit) - SUM(l.credit), 0) as balance
+        COALESCE(SUM(l.debit) FILTER (WHERE e.id IS NOT NULL), 0) as total_debit,
+        COALESCE(SUM(l.credit) FILTER (WHERE e.id IS NOT NULL), 0) as total_credit,
+        COALESCE(
+          SUM(l.debit) FILTER (WHERE e.id IS NOT NULL)
+            - SUM(l.credit) FILTER (WHERE e.id IS NOT NULL), 0) as balance
       FROM zvd_accounts a
       LEFT JOIN zvd_journal_lines l ON l.account_id = a.id
       LEFT JOIN zvd_journal_entries e ON e.id = l.entry_id AND e.status = 'posted'
@@ -452,8 +511,21 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
     const fromDate = from ?? new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10);
     const toDate = to ?? new Date().toISOString().slice(0, 10);
     const rows = await sql`
+      -- Signed by account type. SUM(credit) - SUM(debit) is right for a
+      -- credit-normal revenue account and inverted for a debit-normal expense
+      -- one, so every expense came back NEGATIVE — and net = revenue - expense
+      -- below then ADDED them: 1000 of revenue against 400 of costs was reported
+      -- as 1400 profit rather than 600.
+      --
+      -- Fixed at the sign rather than at the subtraction, because the breakdown
+      -- is read by people too, and an expense line showing -400 invites exactly
+      -- the reading that produced this.
       SELECT a.code, a.name, a.type,
-        COALESCE(SUM(l.credit) - SUM(l.debit), 0) as amount
+        COALESCE(
+          CASE WHEN a.type = 'expense'
+            THEN SUM(l.debit) - SUM(l.credit)
+            ELSE SUM(l.credit) - SUM(l.debit)
+          END, 0) as amount
       FROM zvd_accounts a
       JOIN zvd_journal_lines l ON l.account_id = a.id
         AND (${cost_center_id ? sql`l.cost_center_id = ${cost_center_id}` : sql`TRUE`})
@@ -471,8 +543,13 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
   app.get('/reports/balance-sheet', async (c) => {
     const { as_of } = c.req.query();
     const rows = await sql`
+      -- Same defect as the trial balance: the posted predicate is in the ON
+      -- clause of a LEFT JOIN and therefore never removed a row. A balance sheet
+      -- that counts unposted entries is not a balance sheet.
       SELECT a.type, a.code, a.name,
-        COALESCE(SUM(l.debit) - SUM(l.credit), 0) as balance
+        COALESCE(
+          SUM(l.debit) FILTER (WHERE e.id IS NOT NULL)
+            - SUM(l.credit) FILTER (WHERE e.id IS NOT NULL), 0) as balance
       FROM zvd_accounts a
       LEFT JOIN zvd_journal_lines l ON l.account_id = a.id
       LEFT JOIN zvd_journal_entries e ON e.id = l.entry_id AND e.status = 'posted'
@@ -481,7 +558,56 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
       GROUP BY a.id, a.code, a.name, a.type
       ORDER BY a.type, a.code
     `.execute(db);
-    return c.json({ data: rows.rows });
+
+    // A balance sheet has to balance, and this returned a flat list of accounts
+    // with no totals and nothing asserting that assets equal liabilities plus
+    // equity. Nobody reading it could tell whether the books were consistent —
+    // which is the single question the statement exists to answer.
+    //
+    // The period result is computed here rather than read from retained
+    // earnings, because `/fiscal-years/:id/close` flips a status and performs no
+    // closing entry, so retained earnings is never credited with the year's
+    // profit. Without this line assets differ from liabilities plus equity by
+    // exactly that profit, by construction, forever. Emitting it as a synthetic
+    // equity row is what a closing entry would have done.
+    const result = await sql`
+      SELECT
+        COALESCE(SUM(CASE WHEN a.type = 'revenue' THEN l.credit - l.debit ELSE 0 END), 0) AS revenue,
+        COALESCE(SUM(CASE WHEN a.type = 'expense' THEN l.debit - l.credit ELSE 0 END), 0) AS expenses
+      FROM zvd_journal_lines l
+      JOIN zvd_accounts a ON a.id = l.account_id
+      JOIN zvd_journal_entries e ON e.id = l.entry_id AND e.status = 'posted'
+        AND (${as_of ? sql`e.date <= ${as_of}` : sql`TRUE`})
+      WHERE a.type IN ('revenue','expense')
+    `.execute(db);
+    const r = result.rows[0] as any;
+    const periodResult = roundMoney(toNumber(r?.revenue, 0) - toNumber(r?.expenses, 0));
+
+    // Assets carry a debit balance and the other two a credit balance, so the
+    // sign flips. Summed with toNumber because these are NUMERIC and arrive as
+    // strings — `+` on them concatenates.
+    const rowsByType = (t: string) =>
+      (rows.rows as any[]).filter((x) => x.type === t).reduce((sum, x) => sum + toNumber(x.balance, 0), 0);
+    const assets = roundMoney(rowsByType('asset'));
+    const liabilities = roundMoney(-rowsByType('liability'));
+    const equity = roundMoney(-rowsByType('equity') + periodResult);
+    const difference = roundMoney(assets - (liabilities + equity));
+
+    return c.json({
+      data: rows.rows,
+      totals: {
+        assets,
+        liabilities,
+        equity,
+        period_result: periodResult,
+        liabilities_and_equity: roundMoney(liabilities + equity),
+        // Zero means the books are consistent. It is reported rather than
+        // asserted: a balance sheet that refuses to render tells an accountant
+        // less than one that shows them the gap.
+        difference,
+        balanced: Math.abs(difference) < 0.005,
+      },
+    });
   });
 
   app.get('/reports/budget-vs-actual', async (c) => {
@@ -495,7 +621,15 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
           FROM zvd_journal_lines l
           JOIN zvd_journal_entries e ON e.id = l.entry_id AND e.status = 'posted'
             AND e.fiscal_year_id = b.fiscal_year_id
-            AND (${sql`b.month IS NOT NULL`} AND EXTRACT(MONTH FROM e.date) = b.month OR b.month IS NULL)
+            -- Parenthesised explicitly. The precedence was already correct here
+            -- (AND binds tighter, so this reads "the month matches, or the
+            -- budget row is annual") but the D300 join one screen down had the
+            -- identical shape and was NOT correct, and an auditor flagged both.
+            -- Spelling it out stops the next reader working out which is which.
+            AND (
+              (${sql`b.month IS NOT NULL`} AND EXTRACT(MONTH FROM e.date) = b.month)
+              OR b.month IS NULL
+            )
           WHERE l.account_id = b.account_id
         ), 0) as actual
       FROM zvd_budgets b
@@ -525,9 +659,18 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
       FROM zvd_journal_lines l
       JOIN zvd_journal_entries e ON e.id = l.entry_id AND e.status = 'posted'
         AND e.date BETWEEN ${period_from} AND ${period_to}
-      JOIN zvd_accounts a ON a.id = l.account_id AND a.code LIKE '4427%' OR a.code LIKE '4426%'
+      -- The parentheses are load-bearing. AND binds tighter than OR, so
+      --   a.id = l.account_id AND a.code LIKE '4427%' OR a.code LIKE '4426%'
+      -- parses as
+      --   (a.id = l.account_id AND a.code LIKE '4427%') OR (a.code LIKE '4426%')
+      -- and the join key disappears for every 4426 account, which is then
+      -- cross-joined to every posted line in the period. Because the books
+      -- balance, that sum is always about zero: deductible VAT was reported to
+      -- ANAF as 0.00 whatever was actually paid. Measured on a real 190.00 debit
+      -- to 4426 — 6 lines joined, amount 0.00, against a correct -190.00 over 1.
+      JOIN zvd_accounts a ON a.id = l.account_id AND (a.code LIKE '4427%' OR a.code LIKE '4426%')
       GROUP BY a.id, a.code, a.name, a.type
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Declaration xmlns="mfp:anaf:dgti:d300:declaratie:v2">
   <Declarant/>

@@ -19509,6 +19509,15 @@ function permissionGate(ctx, resource, opts = {}) {
     await next();
   };
 }
+// packages/sdk/src/extension/multipart.ts
+var MULTIPART_REQUIRED = { error: "Expected a multipart/form-data body." };
+async function readMultipart(c) {
+  try {
+    return await c.req.formData();
+  } catch {
+    return null;
+  }
+}
 // ../zveltio-extensions/data/import/engine/routes.ts
 function parseCSVLine(line, delimiter) {
   const result = [];
@@ -19803,7 +19812,9 @@ function importRoutes(ctx) {
     const contentType = c.req.header("Content-Type") ?? "";
     let rows = [];
     if (contentType.includes("multipart/form-data")) {
-      const formData = await c.req.formData();
+      const formData = await readMultipart(c);
+      if (!formData)
+        return c.json(MULTIPART_REQUIRED, 400);
       const file2 = formData.get("file");
       if (!file2)
         return c.json({ error: "No file provided" }, 400);
@@ -19839,7 +19850,9 @@ function importRoutes(ctx) {
     let mapping = {};
     let onDuplicate = "skip";
     if (contentType.includes("multipart/form-data")) {
-      const formData = await c.req.formData();
+      const formData = await readMultipart(c);
+      if (!formData)
+        return c.json(MULTIPART_REQUIRED, 400);
       const file2 = formData.get("file");
       if (!file2)
         return c.json({ error: "No file provided" }, 400);

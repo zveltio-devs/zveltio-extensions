@@ -24,6 +24,37 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+/**
+ * Rows from a query whose table may legitimately not exist, and only that.
+ *
+ * `GET /export-my-data` is the Article 15 right-of-access response. Two of its
+ * six queries used to end `.catch(() => ({ rows: [] }))`, so a database that
+ * could not answer produced an export delivered to the data subject as complete
+ * with those sections empty — and consents is precisely the section a person
+ * exercising that right is most likely to be checking. An incomplete Article 15
+ * response presented as complete is a legal problem, not a display bug.
+ *
+ * "The table does not exist" is a different statement and a true one: the
+ * feature was never installed, so there is no data. That is 42P01 and nothing
+ * else. A permission error, a timeout, a syntax error — those mean the answer is
+ * unknown, and an unknown answer must not be rendered as "none".
+ *
+ * SQLSTATE arrives on `errno` with the Bun driver and `code` with node-postgres;
+ * both are read so this behaves the same under either.
+ */
+async function rowsOrEmptyIfTableAbsent<T>(
+  run: () => Promise<{ rows: T[] }>,
+): Promise<{ rows: T[] }> {
+  try {
+    return await run();
+  } catch (err) {
+    const code = (err as { errno?: string; code?: string }).errno ??
+      (err as { code?: string }).code ?? '';
+    if (code === '42P01') return { rows: [] };
+    throw err;
+  }
+}
+
 export function gdprRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
 
@@ -61,8 +92,8 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
         sql<any>`SELECT event_type AS action, resource_type AS collection, resource_id AS record_id, created_at FROM zv_audit_log WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 1000`.execute(db),
         sql<any>`SELECT title, message, type, is_read, created_at FROM zv_notifications WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 500`.execute(db),
         sql<any>`SELECT name, key_prefix, scopes, created_at FROM zv_api_keys WHERE created_by = ${userId}`.execute(db),
-        sql<any>`SELECT id::text, collection, record_id, status, requested_at FROM zv_approval_requests WHERE requested_by = ${userId} ORDER BY requested_at DESC`.execute(db).catch(() => ({ rows: [] })),
-        sql<any>`SELECT purpose, granted, source, created_at, withdrawn_at FROM zvd_gdpr_consents WHERE user_id = ${userId} ORDER BY created_at DESC`.execute(db).catch(() => ({ rows: [] })),
+        rowsOrEmptyIfTableAbsent<any>(() => sql<any>`SELECT id::text, collection, record_id, status, requested_at FROM zv_approval_requests WHERE requested_by = ${userId} ORDER BY requested_at DESC`.execute(db)),
+        rowsOrEmptyIfTableAbsent<any>(() => sql<any>`SELECT purpose, granted, source, created_at, withdrawn_at FROM zvd_gdpr_consents WHERE user_id = ${userId} ORDER BY created_at DESC`.execute(db)),
       ]);
 
     const exportData = {
@@ -533,21 +564,32 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
     if (!admin) return c.json({ error: 'Unauthorized' }, 401);
 
     const [sarStats, consentStats, breachStats, processingCount] = await Promise.all([
-      sql<any>`
-        SELECT status, COUNT(*)::int AS count
-        FROM zvd_gdpr_access_requests GROUP BY status
-      `.execute(db).catch(() => ({ rows: [] })),
-      sql<any>`
-        SELECT COUNT(*) FILTER (WHERE granted = true)::int AS active_consents,
-               COUNT(*) FILTER (WHERE withdrawn_at IS NOT NULL)::int AS withdrawn,
-               COUNT(DISTINCT user_id)::int AS unique_users
-        FROM zvd_gdpr_consents
-      `.execute(db).catch(() => ({ rows: [{ active_consents: 0, withdrawn: 0, unique_users: 0 }] })),
-      sql<any>`
-        SELECT severity, status, COUNT(*)::int AS count
-        FROM zvd_gdpr_breach_incidents GROUP BY severity, status
-      `.execute(db).catch(() => ({ rows: [] })),
-      sql<any>`SELECT COUNT(*)::int AS count FROM zvd_gdpr_processing_records WHERE is_active = true`.execute(db).catch(() => ({ rows: [{ count: 0 }] })),
+      rowsOrEmptyIfTableAbsent<any>(
+        () => sql<any>`
+          SELECT status, COUNT(*)::int AS count
+          FROM zvd_gdpr_access_requests GROUP BY status
+        `.execute(db),
+      ),
+      rowsOrEmptyIfTableAbsent<any>(
+        () => sql<any>`
+          SELECT COUNT(*) FILTER (WHERE granted = true)::int AS active_consents,
+                 COUNT(*) FILTER (WHERE withdrawn_at IS NOT NULL)::int AS withdrawn,
+                 COUNT(DISTINCT user_id)::int AS unique_users
+          FROM zvd_gdpr_consents
+        `.execute(db),
+      ),
+      rowsOrEmptyIfTableAbsent<any>(
+        () => sql<any>`
+          SELECT severity, status, COUNT(*)::int AS count
+          FROM zvd_gdpr_breach_incidents GROUP BY severity, status
+        `.execute(db),
+      ),
+      rowsOrEmptyIfTableAbsent<any>(
+        () =>
+          sql<any>`SELECT COUNT(*)::int AS count FROM zvd_gdpr_processing_records WHERE is_active = true`.execute(
+            db,
+          ),
+      ),
     ]);
 
     const sarByStatus: Record<string, number> = {};

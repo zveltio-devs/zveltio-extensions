@@ -4,6 +4,23 @@ import { sendViaVonage } from './providers/vonage.js';
 
 let _db: Database | null = null;
 
+/**
+ * Provider credentials, as the deployment configured them.
+ *
+ * These were `process.env.TWILIO_*` / `process.env.VONAGE_*`, read from inside
+ * the extension — which in-process means the ENGINE's whole environment, not
+ * just these keys. They now arrive through `ctx.config.vars`: everything the
+ * deployment set as `ZVELTIO_EXT_SMS_<KEY>`, and nothing else.
+ *
+ *   ZVELTIO_EXT_SMS_TWILIO_ACCOUNT_SID
+ *   ZVELTIO_EXT_SMS_TWILIO_AUTH_TOKEN
+ *   ZVELTIO_EXT_SMS_TWILIO_FROM_NUMBER
+ *   ZVELTIO_EXT_SMS_VONAGE_API_KEY
+ *   ZVELTIO_EXT_SMS_VONAGE_API_SECRET
+ *   ZVELTIO_EXT_SMS_VONAGE_FROM_NUMBER
+ */
+let _vars: Readonly<Record<string, string>> = {};
+
 function interpolate(template: string, variables: Record<string, string>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? '');
 }
@@ -17,8 +34,9 @@ export interface SendOpts {
 }
 
 export const SmsManager = {
-  init(db: Database): void {
+  init(db: Database, vars?: Readonly<Record<string, string>>): void {
     _db = db;
+    if (vars) _vars = vars;
   },
 
   async send(opts: SendOpts): Promise<{ id: string; status: string }> {
@@ -47,8 +65,8 @@ export const SmsManager = {
         provider: opts.provider,
         to_number: opts.to,
         from_number: opts.provider === 'twilio'
-          ? (process.env.TWILIO_FROM_NUMBER ?? null)
-          : (process.env.VONAGE_FROM_NUMBER ?? null),
+          ? (_vars.TWILIO_FROM_NUMBER ?? null)
+          : (_vars.VONAGE_FROM_NUMBER ?? null),
         body,
         status: 'pending',
       })
@@ -63,9 +81,9 @@ export const SmsManager = {
 
       if (opts.provider === 'twilio') {
         const result = await sendViaTwilio({
-          accountSid: process.env.TWILIO_ACCOUNT_SID ?? '',
-          authToken: process.env.TWILIO_AUTH_TOKEN ?? '',
-          from: process.env.TWILIO_FROM_NUMBER ?? '',
+          accountSid: _vars.TWILIO_ACCOUNT_SID ?? '',
+          authToken: _vars.TWILIO_AUTH_TOKEN ?? '',
+          from: _vars.TWILIO_FROM_NUMBER ?? '',
           to: opts.to,
           body,
         });
@@ -73,9 +91,9 @@ export const SmsManager = {
         providerStatus = result.status;
       } else {
         const result = await sendViaVonage({
-          apiKey: process.env.VONAGE_API_KEY ?? '',
-          apiSecret: process.env.VONAGE_API_SECRET ?? '',
-          from: process.env.VONAGE_FROM_NUMBER ?? '',
+          apiKey: _vars.VONAGE_API_KEY ?? '',
+          apiSecret: _vars.VONAGE_API_SECRET ?? '',
+          from: _vars.VONAGE_FROM_NUMBER ?? '',
           to: opts.to,
           text: body,
         });

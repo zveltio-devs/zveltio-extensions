@@ -3,6 +3,7 @@
   "finance.banking.empty.accounts": "No bank accounts yet.",
   "finance.banking.empty.transactions": "No transactions yet.",
   "finance.banking.empty.unreconciled": "No unreconciled transactions.",
+  "finance.banking.form.currency": "Currency",
   "finance.banking.newAccount": "New account",
   "finance.banking.section.openInvoices": "Open invoices (sent)",
   "finance.banking.section.unreconciled": "Unreconciled transactions",

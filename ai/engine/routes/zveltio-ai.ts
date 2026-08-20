@@ -130,8 +130,10 @@ export function zveltioAIRoutes(ctx: ExtensionContext): Hono {
       .where('user_id', '=', user.id)
       .orderBy('updated_at', 'desc')
       .limit(20)
-      .execute()
-      .catch(() => []);
+      .execute();
+      // No `.catch(() => [])`. An empty list is the user being told they have no
+      // conversations, which is a statement about their history rather than about
+      // this read — and it is indistinguishable from a new account.
 
     return c.json({ conversations });
   });
