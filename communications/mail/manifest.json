@@ -2,8 +2,8 @@
   "name": "communications/mail",
   "displayName": "Mail Client",
   "category": "communications",
-  "description": "IMAP/SMTP email client with AI features, filter rules, attachments and contacts. Password or OAuth2 (Gmail/Outlook). Filters are applied locally to messages a sync fetches, not on the mail server. Move-to-another-folder from the UI is local only.",
-  "version": "1.0.13",
+  "description": "IMAP/SMTP email client with AI features, filter rules, attachments and contacts. Password or OAuth2 (Gmail/Outlook). Background sync on a schedule. Filter actions and read/star/delete are pushed to the mail server.",
+  "version": "1.0.14",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-mail",
@@ -46,7 +46,7 @@
     "bundlePeers": true
   },
   "integrity": {
-    "engineSha256": "cf0a3c7c6b5bd8da382544dc60c00ddc1f5bee9fb94abb6b8ca46f11ed0a9134",
-    "sourceSha256": "7925b6eb3d88fa5eb8b970e32ab6ae7f4d161749c6cf707f617725a2f0faa649"
+    "engineSha256": "933a409a70835e1aa9f9c788da16870209ef5e266e13079abd8cfe6e8438f861",
+    "sourceSha256": "3cb1abdf4a9276cbc4eb6aa2d0a99dd60ce0f1353f37d197ee1d4cca66521d3e"
   }
 }

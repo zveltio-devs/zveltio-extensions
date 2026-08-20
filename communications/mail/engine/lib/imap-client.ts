@@ -338,7 +338,7 @@ export async function syncImapAccount(
     // call exists to end.
     if (arrived.length) {
       try {
-        await applyLocalFilters(db, account.id, arrived);
+        await applyLocalFilters(db, account as never, arrived);
       } catch (err: any) {
         results.errors.push(`filters: ${err.message}`);
       }
