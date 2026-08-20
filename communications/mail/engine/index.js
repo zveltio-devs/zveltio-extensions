@@ -78439,10 +78439,14 @@ Please draft a reply to this email.`
       RETURNING *
     `.execute(db);
     const accountResult = await sql`SELECT * FROM zv_mail_accounts WHERE id = ${accountId}`.execute(db);
-    if (accountResult.rows[0]) {
-      uploadSieveScript(accountResult.rows[0], "zveltio", sieveScript).catch(() => {});
-    }
-    return c.json({ filter: result.rows[0] }, 201);
+    const upload = accountResult.rows[0] ? await uploadSieveScript(accountResult.rows[0], "zveltio", sieveScript) : { uploaded: false, fallback: true };
+    return c.json({
+      filter: result.rows[0],
+      applied: upload.uploaded,
+      ...upload.uploaded ? {} : {
+        notice: "Filter saved but not applied: server-side Sieve upload is not implemented, and no " + "local fallback runs at sync time."
+      }
+    }, 201);
   });
   app.patch("/accounts/:accountId/filters/:id", zValidator("json", exports_external.object({
     name: exports_external.string().min(1).optional(),
