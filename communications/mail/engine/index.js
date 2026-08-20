@@ -75088,10 +75088,10 @@ var SelectQueryNode = freeze({
       offset
     });
   },
-  cloneWithFetch(selectNode, fetch) {
+  cloneWithFetch(selectNode, fetch2) {
     return freeze({
       ...selectNode,
-      fetch
+      fetch: fetch2
     });
   },
   cloneWithHaving(selectNode, operation) {
@@ -77320,6 +77320,110 @@ async function decryptPassword(stored) {
   return internals().decryptSecret(stored, { keyring: "mail" });
 }
 
+// ../zveltio-extensions/communications/mail/engine/lib/oauth.ts
+var DEFAULTS = {
+  gmail: {
+    authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+    tokenUrl: "https://oauth2.googleapis.com/token",
+    scope: "https://mail.google.com/"
+  },
+  outlook: {
+    authorizeUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+    tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+    scope: "offline_access https://outlook.office.com/IMAP.AccessAsUser.All https://outlook.office.com/SMTP.Send"
+  }
+};
+function endpointsFor(provider, config2) {
+  const d = DEFAULTS[provider];
+  const s = (k, fallback) => {
+    const v = config2[`oauth2_${provider}_${k}`];
+    return typeof v === "string" && v.trim() ? v.trim() : fallback;
+  };
+  return {
+    authorizeUrl: s("authorize_url", d.authorizeUrl),
+    tokenUrl: s("token_url", d.tokenUrl),
+    scope: s("scope", d.scope)
+  };
+}
+function credentialsFor(provider, config2) {
+  const id = config2[`oauth2_${provider}_client_id`];
+  const secret = config2[`oauth2_${provider}_client_secret`];
+  if (typeof id !== "string" || !id.trim())
+    return null;
+  if (typeof secret !== "string" || !secret.trim())
+    return null;
+  return { clientId: id.trim(), clientSecret: secret.trim() };
+}
+function buildAuthorizeUrl(args) {
+  const u = new URL(args.endpoints.authorizeUrl);
+  u.searchParams.set("client_id", args.clientId);
+  u.searchParams.set("redirect_uri", args.redirectUri);
+  u.searchParams.set("response_type", "code");
+  u.searchParams.set("scope", args.endpoints.scope);
+  u.searchParams.set("state", args.state);
+  u.searchParams.set("access_type", "offline");
+  u.searchParams.set("prompt", "consent");
+  if (args.loginHint)
+    u.searchParams.set("login_hint", args.loginHint);
+  return u.toString();
+}
+function parseTokenResponse(body) {
+  const accessToken = body.access_token;
+  if (typeof accessToken !== "string" || !accessToken) {
+    throw new Error(`token endpoint returned no access_token${typeof body.error === "string" ? ` (${body.error})` : ""}`);
+  }
+  const expiresIn = typeof body.expires_in === "number" ? body.expires_in : null;
+  return {
+    accessToken,
+    refreshToken: typeof body.refresh_token === "string" ? body.refresh_token : null,
+    expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000) : null
+  };
+}
+async function postForm(url2, form) {
+  const res = await fetch(url2, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(form).toString()
+  });
+  const text = await res.text();
+  let body;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    throw new Error(`token endpoint returned non-JSON (${res.status}): ${text.slice(0, 200)}`);
+  }
+  if (!res.ok) {
+    const err = typeof body.error === "string" ? body.error : `HTTP ${res.status}`;
+    throw new Error(`token endpoint refused: ${err}`);
+  }
+  return body;
+}
+async function exchangeCode(args) {
+  return parseTokenResponse(await postForm(args.tokenUrl, {
+    grant_type: "authorization_code",
+    code: args.code,
+    client_id: args.clientId,
+    client_secret: args.clientSecret,
+    redirect_uri: args.redirectUri
+  }));
+}
+async function refreshAccessToken(args) {
+  return parseTokenResponse(await postForm(args.tokenUrl, {
+    grant_type: "refresh_token",
+    refresh_token: args.refreshToken,
+    client_id: args.clientId,
+    client_secret: args.clientSecret
+  }));
+}
+function isExpired(expiresAt) {
+  if (!expiresAt)
+    return false;
+  const t = expiresAt instanceof Date ? expiresAt : new Date(expiresAt);
+  if (Number.isNaN(t.getTime()))
+    return true;
+  return t.getTime() - 60000 <= Date.now();
+}
+
 // ../zveltio-extensions/communications/mail/engine/lib/imap-client.ts
 var FIRST_SYNC_LIMIT = 50;
 function collectAttachments(node2, out = []) {
@@ -77342,13 +77446,45 @@ function collectAttachments(node2, out = []) {
     collectAttachments(child, out);
   return out;
 }
+async function buildAuth(db, account) {
+  if (!account.oauth2_provider) {
+    return { user: account.imap_user, pass: await decryptPassword(account.imap_password) };
+  }
+  let token2 = account.oauth2_access_token ?? null;
+  if (isExpired(account.oauth2_expires_at) && account.oauth2_refresh_token) {
+    const cfgRow = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
+    const raw2 = cfgRow.rows[0]?.value;
+    const cfg = typeof raw2 === "string" ? JSON.parse(raw2) : raw2 ?? {};
+    const creds = credentialsFor(account.oauth2_provider, cfg);
+    if (creds) {
+      const next = await refreshAccessToken({
+        refreshToken: account.oauth2_refresh_token,
+        clientId: creds.clientId,
+        clientSecret: creds.clientSecret,
+        tokenUrl: endpointsFor(account.oauth2_provider, cfg).tokenUrl
+      });
+      token2 = next.accessToken;
+      await sql`
+        UPDATE zv_mail_accounts SET
+          oauth2_access_token = ${next.accessToken},
+          oauth2_refresh_token = COALESCE(${next.refreshToken}, oauth2_refresh_token),
+          oauth2_expires_at = ${next.expiresAt?.toISOString() ?? null},
+          updated_at = NOW()
+        WHERE id = ${account.id}
+      `.execute(db);
+    }
+  }
+  if (!token2) {
+    throw new Error(`account is configured for ${account.oauth2_provider} OAuth2 but has no usable access token \u2014 reconnect it`);
+  }
+  return { user: account.imap_user, accessToken: token2 };
+}
 async function syncImapAccount(db, account) {
-  const imapPassword = await decryptPassword(account.imap_password);
   const client = new import_imapflow.ImapFlow({
     host: account.imap_host,
     port: account.imap_port,
     secure: account.imap_secure,
-    auth: { user: account.imap_user, pass: imapPassword },
+    auth: await buildAuth(db, account),
     logger: false
   });
   const results = { synced: 0, errors: [] };
@@ -78794,6 +78930,96 @@ Your message "${m.subject}" was read on ${new Date().toLocaleString()}.`;
     await sql`UPDATE zv_mail_messages SET read_receipt_sent = true WHERE id = ${m.id}`.execute(db);
     return c.json({ success: true });
   });
+  app.post("/accounts/:accountId/oauth/:provider/authorize", async (c) => {
+    const user = c.get("user");
+    const accountId = c.req.param("accountId");
+    const provider = c.req.param("provider");
+    if (provider !== "gmail" && provider !== "outlook") {
+      return c.json({ error: "Unknown provider" }, 400);
+    }
+    const body = await c.req.json().catch(() => ({}));
+    const redirectUri = typeof body.redirect_uri === "string" ? body.redirect_uri : "";
+    if (!redirectUri)
+      return c.json({ error: "redirect_uri is required" }, 400);
+    const cfgRow = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
+    const cfg = readMailConfig(cfgRow.rows[0]);
+    const creds = credentialsFor(provider, cfg);
+    if (!creds) {
+      return c.json({ error: `No OAuth2 client is configured for ${provider}. Set it in mail settings.` }, 400);
+    }
+    const acct = await sql`
+      SELECT email_address FROM zv_mail_accounts WHERE id = ${accountId} AND user_id = ${user.id}
+    `.execute(db);
+    if (!acct.rows[0])
+      return c.json({ error: "Account not found" }, 404);
+    const state = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url");
+    await sql`
+      INSERT INTO zv_mail_oauth_states (state, user_id, account_id, provider, redirect_uri, expires_at)
+      VALUES (${state}, ${user.id}, ${accountId}::uuid, ${provider}, ${redirectUri},
+              NOW() + INTERVAL '10 minutes')
+    `.execute(db);
+    return c.json({
+      authorize_url: buildAuthorizeUrl({
+        provider,
+        clientId: creds.clientId,
+        redirectUri,
+        state,
+        endpoints: endpointsFor(provider, cfg),
+        loginHint: acct.rows[0].email_address
+      }),
+      state
+    });
+  });
+  app.post("/oauth/callback", zValidator("json", exports_external.object({
+    state: exports_external.string().min(1),
+    code: exports_external.string().min(1)
+  })), async (c) => {
+    const user = c.get("user");
+    const { state, code } = c.req.valid("json");
+    const claimed = await sql`
+      DELETE FROM zv_mail_oauth_states
+      WHERE state = ${state} AND user_id = ${user.id} AND expires_at > NOW()
+      RETURNING account_id, provider, redirect_uri
+    `.execute(db);
+    if (!claimed.rows[0])
+      return c.json({ error: "Invalid or expired state" }, 400);
+    const { account_id, provider, redirect_uri } = claimed.rows[0];
+    const cfgRow = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
+    const cfg = readMailConfig(cfgRow.rows[0]);
+    const creds = credentialsFor(provider, cfg);
+    if (!creds)
+      return c.json({ error: `No OAuth2 client configured for ${provider}` }, 400);
+    let tokens;
+    try {
+      tokens = await exchangeCode({
+        code,
+        clientId: creds.clientId,
+        clientSecret: creds.clientSecret,
+        redirectUri: redirect_uri,
+        tokenUrl: endpointsFor(provider, cfg).tokenUrl
+      });
+    } catch (err) {
+      return c.json({ error: `Token exchange failed: ${err?.message ?? String(err)}` }, 502);
+    }
+    await sql`
+      UPDATE zv_mail_accounts SET
+        oauth2_provider = ${provider},
+        oauth2_access_token = ${tokens.accessToken},
+        oauth2_refresh_token = COALESCE(${tokens.refreshToken}, oauth2_refresh_token),
+        oauth2_expires_at = ${tokens.expiresAt?.toISOString() ?? null},
+        updated_at = NOW()
+      WHERE id = ${account_id} AND user_id = ${user.id}
+    `.execute(db);
+    return c.json({
+      success: true,
+      provider,
+      expires_at: tokens.expiresAt?.toISOString() ?? null,
+      renewable: tokens.refreshToken !== null,
+      ...tokens.refreshToken ? {} : {
+        notice: "Connected, but the provider returned no refresh token \u2014 access will expire and the " + "account will need reconnecting. Revoke the app and consent again to obtain one."
+      }
+    });
+  });
   app.get("/admin/config", async (c) => {
     const user = c.get("user");
     const isAdmin = await checkPermission(user.id, "admin", "*");
@@ -78863,7 +79089,8 @@ var extension = {
     return [
       join(import.meta.dir, "migrations/001_mail.sql"),
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
-      join(import.meta.dir, "migrations/003_attachment_part.sql")
+      join(import.meta.dir, "migrations/003_attachment_part.sql"),
+      join(import.meta.dir, "migrations/004_oauth_state.sql")
     ];
   },
   async register(app, ctx) {
