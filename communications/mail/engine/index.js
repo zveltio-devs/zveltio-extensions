@@ -77596,6 +77596,26 @@ async function getImapQuota(account) {
     await client.logout().catch(() => {});
   }
 }
+async function flagMessages(account, folderPath, uids, flags) {
+  if (uids.length === 0)
+    return;
+  const client = await getImapClient(account);
+  try {
+    const lock = await client.getMailboxLock(folderPath);
+    try {
+      if (flags.add?.length) {
+        await client.messageFlagsAdd(uids.join(","), flags.add, { uid: true });
+      }
+      if (flags.remove?.length) {
+        await client.messageFlagsRemove(uids.join(","), flags.remove, { uid: true });
+      }
+    } finally {
+      lock.release();
+    }
+  } finally {
+    await client.logout().catch(() => {});
+  }
+}
 async function downloadMessageAsEml(account, folderPath, uid) {
   const client = await getImapClient(account);
   try {
@@ -78042,7 +78062,39 @@ function mailRoutes(ctx) {
       parameters: params,
       query: { kind: "RawNode", sqlFragments: [updateSql], parameters: params }
     });
-    return c.json({ success: true });
+    let propagated = null;
+    let propagationError = null;
+    if (is_read !== undefined || is_starred !== undefined) {
+      const add = [];
+      const remove = [];
+      if (is_read !== undefined)
+        (is_read ? add : remove).push("\\Seen");
+      if (is_starred !== undefined)
+        (is_starred ? add : remove).push("\\Flagged");
+      const target = await sql`
+        SELECT m.uid, f.path, a.email_address, a.imap_host, a.imap_port, a.imap_secure,
+               a.imap_user, a.imap_password
+        FROM zv_mail_messages m
+        INNER JOIN zv_mail_folders f ON f.id = m.folder_id
+        INNER JOIN zv_mail_accounts a ON a.id = m.account_id
+        WHERE m.id = ${c.req.param("id")} AND a.user_id = ${user.id}
+      `.execute(db);
+      const row = target.rows[0];
+      if (row) {
+        try {
+          await flagMessages(row, row.path, [row.uid], { add, remove });
+          propagated = true;
+        } catch (err) {
+          propagated = false;
+          propagationError = err?.message ?? String(err);
+        }
+      }
+    }
+    return c.json({
+      success: true,
+      ...propagated === null ? {} : { propagated },
+      ...propagationError ? { notice: `Saved locally. The mail server did not accept the change: ${propagationError}` } : {}
+    });
   });
   app.delete("/messages/:id", async (c) => {
     const user = c.get("user");
