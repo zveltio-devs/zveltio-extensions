@@ -6,7 +6,7 @@ import { syncImapAccount, fetchMessageBody, sendMail } from './lib/imap-client.j
 import {
   createImapFolder, renameImapFolder, deleteImapFolder,
   moveMessages, downloadMessageAsEml, getImapQuota, flagMessages,
-  deleteMessagesFromServer,
+  deleteMessagesFromServer, downloadAttachment,
 } from './lib/imap-operations.js';
 import { buildReplyContext, saveDraft, sendDraft, autoCollectContacts } from './lib/compose.js';
 import { compileFiltersToSieve, uploadSieveScript, applyLocalFilters } from './lib/sieve.js';
@@ -329,6 +329,69 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     `.execute(db);
 
     return c.json({ message: { ...msg, attachments: attachments.rows } });
+  });
+
+  // GET /ext/communications/mail/attachments/:id — the download the audit found missing.
+  //
+  // The metadata row has existed since migration 001 and nothing wrote to it, so
+  // this route had nothing to serve and did not exist. Sync writes the rows now,
+  // including the IMAP part number, which is what makes fetching one possible.
+  //
+  // Bytes come off the server per request rather than out of Postgres: nothing
+  // stores them, deliberately. That means this route is as available as the mail
+  // server is, and a failure says so instead of answering with an empty file —
+  // a zero-byte download that looks like a successful one is the exact shape
+  // this codebase has spent a campaign removing.
+  app.get('/attachments/:id', async (c) => {
+    const user = c.get('user') as any;
+
+    // Scoped through the message to the account to the caller. An attachment id
+    // is a UUID, but so was every id in an IDOR.
+    const row = await sql<{
+      filename: string;
+      mime_type: string;
+      part: string | null;
+      uid: number;
+      path: string;
+      account_id: string;
+    }>`
+      SELECT at.filename, at.mime_type, at.part, m.uid, f.path, m.account_id
+      FROM zv_mail_attachments at
+      INNER JOIN zv_mail_messages m ON m.id = at.message_id
+      INNER JOIN zv_mail_folders f ON f.id = m.folder_id
+      INNER JOIN zv_mail_accounts a ON a.id = m.account_id
+      WHERE at.id = ${c.req.param('id')} AND a.user_id = ${user.id}
+    `.execute(db);
+
+    const att = row.rows[0];
+    if (!att) return c.json({ error: 'Attachment not found' }, 404);
+
+    // Rows written before migration 003 have no part number and cannot be
+    // fetched. Saying which is the case beats a generic failure.
+    if (!att.part) {
+      return c.json(
+        { error: 'This attachment predates part tracking; re-sync the account to make it downloadable.' },
+        409,
+      );
+    }
+
+    const acct = await sql`SELECT * FROM zv_mail_accounts WHERE id = ${att.account_id}`.execute(db);
+    if (!acct.rows[0]) return c.json({ error: 'Attachment not found' }, 404);
+
+    try {
+      const file = await downloadAttachment(acct.rows[0] as any, att.path, att.uid, att.part);
+      return new Response(new Uint8Array(file.content), {
+        headers: {
+          'Content-Type': file.contentType ?? att.mime_type ?? 'application/octet-stream',
+          'Content-Length': String(file.content.length),
+          // The server's filename when it gave one, ours otherwise. Quoted, and
+          // quotes inside it escaped, so a filename cannot break out of the header.
+          'Content-Disposition': `attachment; filename="${(file.filename ?? att.filename).replace(/"/g, '\\"')}"`,
+        },
+      });
+    } catch (err: any) {
+      return c.json({ error: `Could not fetch attachment from the mail server: ${err.message}` }, 502);
+    }
   });
 
   // PATCH /ext/communications/mail/messages/:id — Update flags

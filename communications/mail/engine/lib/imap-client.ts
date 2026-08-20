@@ -24,6 +24,59 @@ import { decryptPassword } from './crypto.js';
  */
 const FIRST_SYNC_LIMIT = 50;
 
+/** One attachment part of a message, as IMAP describes it. */
+export interface AttachmentPart {
+  /** IMAP part number — `client.download(uid, part)` needs exactly this. */
+  part: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  contentId: string | null;
+  isInline: boolean;
+}
+
+/**
+ * Every attachment in a message, however deeply nested.
+ *
+ * `hasAttachments` used to be computed as
+ *   `msg.bodyStructure?.childNodes?.some(n => n.disposition === 'attachment')`
+ * which only ever looked one level down. A forwarded mail is
+ * multipart/mixed > message/rfc822 > multipart/mixed > the attachment, so that
+ * check said "no attachments" for the single most ordinary way of receiving
+ * one. This walks the whole tree.
+ *
+ * `inline` counts as an attachment here — a disposition of `inline` with a
+ * filename is how mail clients embed images, and a reader that hides them
+ * cannot render the message. Whether to SHOW it is the UI's call; the row
+ * carries `is_inline` so it can make that call with the facts.
+ */
+export function collectAttachments(node: unknown, out: AttachmentPart[] = []): AttachmentPart[] {
+  // biome-ignore lint/suspicious/noExplicitAny: raw imapflow bodyStructure node
+  const n = node as any;
+  if (!n || typeof n !== 'object') return out;
+
+  const disposition = typeof n.disposition === 'string' ? n.disposition.toLowerCase() : null;
+  const filename =
+    n.dispositionParameters?.filename ?? n.parameters?.name ?? null;
+
+  // A part is an attachment when it says so, or when it has a filename and is
+  // not the body itself. `n.part` is absent on the root node, which is never an
+  // attachment on its own.
+  if (n.part && (disposition === 'attachment' || (filename && disposition === 'inline'))) {
+    out.push({
+      part: String(n.part),
+      filename: String(filename ?? `part-${n.part}`),
+      mimeType: String(n.type ?? 'application/octet-stream'),
+      sizeBytes: Number.isFinite(n.size) ? Number(n.size) : 0,
+      contentId: n.id ? String(n.id).replace(/^<|>$/g, '') : null,
+      isInline: disposition === 'inline',
+    });
+  }
+
+  for (const child of n.childNodes ?? []) collectAttachments(child, out);
+  return out;
+}
+
 export interface MailAccountConfig {
   id: string;
   email_address: string;
@@ -133,6 +186,29 @@ export async function syncImapAccount(
             `.execute(db);
 
             const newId = inserted.rows[0]?.id;
+
+            // The attachment rows the table was waiting for since 001. Written
+            // only for a message that actually inserted: on a re-sync the parts
+            // are already there, and the unique (message_id, part) index makes
+            // that idempotent rather than accumulating duplicates.
+            //
+            // Metadata only. The bytes stay on the IMAP server and the download
+            // route streams them on demand — a mailbox's worth of attachments
+            // does not belong in this database.
+            if (newId) {
+              for (const att of collectAttachments(msg.bodyStructure)) {
+                await sql`
+                  INSERT INTO zv_mail_attachments (
+                    message_id, filename, mime_type, size_bytes, content_id, is_inline, part
+                  ) VALUES (
+                    ${newId}, ${att.filename}, ${att.mimeType}, ${att.sizeBytes},
+                    ${att.contentId}, ${att.isInline}, ${att.part}
+                  )
+                  ON CONFLICT (message_id, part) DO NOTHING
+                `.execute(db);
+              }
+            }
+
             if (newId) {
               arrived.push({
                 id: newId,
@@ -331,7 +407,9 @@ function parseEnvelope(msg: any): {
     cc: (env.cc || []).map((a: any) => ({ address: a.address, name: a.name })),
     subject: env.subject || null,
     sentAt: env.date ? new Date(env.date) : null,
-    hasAttachments: !!(msg.bodyStructure?.childNodes?.some((n: any) => n.disposition === 'attachment')),
+    // The one-level `childNodes.some(...)` this replaced said "no attachments"
+    // for a forwarded mail, where the attachment sits under a message/rfc822.
+    hasAttachments: collectAttachments(msg.bodyStructure).length > 0,
     threadId: env.inReplyTo || env.messageId || null,
     headers: msg.headers || {},
   };

@@ -186,6 +186,46 @@ export async function flagMessages(
   }
 }
 
+/**
+ * The bytes of ONE attachment, fetched from the server on demand.
+ *
+ * `part` is the IMAP part number persisted at sync time. Re-deriving it here by
+ * walking bodyStructure and matching on filename would be wrong: one message
+ * can carry two parts called `image001.png`, which is what a forwarded thread
+ * looks like, and the reader would get whichever came first.
+ *
+ * imapflow decodes base64/quoted-printable itself, so what comes back is the
+ * file, not the transfer encoding. `meta.contentType` and `meta.filename` come
+ * from the server rather than from our row — the response headers should
+ * describe what is actually being sent.
+ */
+export async function downloadAttachment(
+  account: ImapAccountConfig,
+  folderPath: string,
+  uid: number,
+  part: string,
+): Promise<{ content: Buffer; contentType: string | null; filename: string | null }> {
+  const client = await getImapClient(account);
+  try {
+    const lock = await client.getMailboxLock(folderPath);
+    try {
+      const dl = await client.download(String(uid), part, { uid: true });
+      if (!dl?.content) throw new Error(`Attachment part ${part} not available`);
+      const chunks: Buffer[] = [];
+      for await (const chunk of dl.content) chunks.push(Buffer.from(chunk));
+      return {
+        content: Buffer.concat(chunks),
+        contentType: dl.meta?.contentType ?? null,
+        filename: dl.meta?.filename ?? null,
+      };
+    } finally {
+      lock.release();
+    }
+  } finally {
+    await client.logout().catch(() => { /* ignore */ });
+  }
+}
+
 export async function downloadMessageAsEml(
   account: ImapAccountConfig,
   folderPath: string,
