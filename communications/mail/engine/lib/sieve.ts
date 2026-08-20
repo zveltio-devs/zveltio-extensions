@@ -8,6 +8,29 @@
 
 import { sql } from 'kysely';
 import type { Database } from '@zveltio/engine-db';
+import {
+  deleteMessagesFromServer, flagMessages, moveMessages,
+} from './imap-operations.js';
+
+/**
+ * What `executeLocalActions` needs to reach the mail server.
+ *
+ * Filters used to act on the local row only — the same one-way mirror the
+ * message routes had, and `delete` was the destructive corner: it dropped the
+ * row while the message stayed on the server, and a sync only fetches UIDs above
+ * `last_uid`, so nothing would ever bring it back.
+ */
+export interface FilterAccount {
+  id: string;
+  email_address: string;
+  imap_host: string;
+  imap_port: number;
+  imap_secure: boolean;
+  imap_user: string;
+  imap_password: string;
+  oauth2_provider?: string | null;
+  oauth2_access_token?: string | null;
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -159,7 +182,7 @@ export async function uploadSieveScript(
  */
 export async function applyLocalFilters(
   db: Database,
-  accountId: string,
+  account: FilterAccount,
   messages: Array<{
     id: string;
     from_address: string;
@@ -172,7 +195,7 @@ export async function applyLocalFilters(
 
   const filtersResult = await sql`
     SELECT * FROM zv_mail_filters
-    WHERE account_id = ${accountId} AND is_active = true
+    WHERE account_id = ${account.id} AND is_active = true
     ORDER BY sort_order
   `.execute(db);
 
@@ -186,7 +209,7 @@ export async function applyLocalFilters(
         : (row.actions ?? []);
 
       if (matchesAll(msg, conditions)) {
-        await executeLocalActions(db, accountId, msg.id, actions);
+        await executeLocalActions(db, account, msg.id, actions);
         if (actions.some((a) => a.type === 'stop')) break;
       }
     }
@@ -219,25 +242,40 @@ function matchesAll(
 
 async function executeLocalActions(
   db: Database,
-  accountId: string,
+  account: FilterAccount,
   msgId: string,
   actions: FilterAction[],
 ): Promise<void> {
+  // Where the message currently is, which is what every IMAP call below needs.
+  const loc = await sql<{ uid: number; path: string }>`
+    SELECT m.uid, f.path
+    FROM zv_mail_messages m
+    INNER JOIN zv_mail_folders f ON f.id = m.folder_id
+    WHERE m.id = ${msgId}
+  `.execute(db);
+  const here = loc.rows[0];
+
   for (const action of actions) {
     try {
       switch (action.type) {
         case 'mark_read':
+          if (here) await flagMessages(account as never, here.path, [here.uid], { add: ['\\Seen'] });
           await sql`UPDATE zv_mail_messages SET is_read = true WHERE id = ${msgId}`.execute(db);
           break;
         case 'mark_starred':
+          if (here) await flagMessages(account as never, here.path, [here.uid], { add: ['\\Flagged'] });
           await sql`UPDATE zv_mail_messages SET is_starred = true WHERE id = ${msgId}`.execute(db);
           break;
         case 'move':
           if (action.folder) {
             const folderRes = await sql`
-              SELECT id FROM zv_mail_folders WHERE account_id = ${accountId} AND path = ${action.folder} LIMIT 1
+              SELECT id FROM zv_mail_folders WHERE account_id = ${account.id} AND path = ${action.folder} LIMIT 1
             `.execute(db);
             if (folderRes.rows[0]) {
+              // Server first. A local-only move puts the message in a folder it
+              // is not in, and the next sync will not correct it — it only ever
+              // asks for UIDs above `last_uid`.
+              if (here) await moveMessages(account as never, here.path, [here.uid], action.folder);
               await sql`
                 UPDATE zv_mail_messages SET folder_id = ${(folderRes.rows[0] as any).id} WHERE id = ${msgId}
               `.execute(db);
@@ -245,9 +283,22 @@ async function executeLocalActions(
           }
           break;
         case 'delete':
+          // The destructive corner. This used to DELETE the local row while the
+          // message stayed on the server, and a sync only fetches UIDs above
+          // `last_uid` — so the mail was gone from Zveltio, unrecoverable by it,
+          // and still sitting in the mailbox.
+          if (here) await deleteMessagesFromServer(account as never, here.path, [here.uid]);
           await sql`DELETE FROM zv_mail_messages WHERE id = ${msgId}`.execute(db);
           break;
       }
-    } catch { /* non-critical: continue */ }
+    } catch (err) {
+      // One rule failing must not stop the rest, but it is no longer silent:
+      // "the filter did nothing and said nothing" is the defect this file exists
+      // to end, and a swallow here would reintroduce it one level down.
+      console.warn(
+        `[mail] filter action "${action.type}" failed for message ${msgId}:`,
+        (err as Error).message,
+      );
+    }
   }
 }
