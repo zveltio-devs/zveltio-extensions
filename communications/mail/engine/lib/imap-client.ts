@@ -9,6 +9,7 @@
 import { ImapFlow } from 'imapflow';
 // @ts-ignore — installed at runtime by extension-loader before this module loads
 import { simpleParser } from 'mailparser';
+import { applyLocalFilters } from './sieve.js';
 // @ts-ignore — installed at runtime by extension-loader before this module loads
 import nodemailer from 'nodemailer';
 
@@ -70,6 +71,18 @@ export async function syncImapAccount(
       WHERE account_id = ${account.id} AND type IN ('inbox', 'sent', 'drafts')
     `.execute(db);
 
+    // Rules run on messages that arrived in THIS sync, so they are collected as
+    // they are inserted rather than re-read afterwards: a second SELECT would
+    // also pick up mail the user has already seen and acted on, and re-marking
+    // or re-moving that is not what a filter means.
+    const arrived: Array<{
+      id: string;
+      from_address: string;
+      to_addresses: unknown;
+      subject: string | null;
+      body_text?: string | null;
+    }> = [];
+
     for (const folder of foldersToSync.rows) {
       try {
         const lock = await client.getMailboxLock(folder.path);
@@ -86,7 +99,10 @@ export async function syncImapAccount(
 
             const parsed = parseEnvelope(msg);
 
-            await sql`
+            // `RETURNING id` with ON CONFLICT DO NOTHING returns NO row when the
+            // insert was skipped, which is exactly the discrimination the filter
+            // pass needs: a message already synced is not newly arrived.
+            const inserted = await sql<{ id: string }>`
               INSERT INTO zv_mail_messages (
                 account_id, folder_id, message_id, uid, thread_id,
                 from_address, from_name, to_addresses, cc_addresses,
@@ -100,7 +116,18 @@ export async function syncImapAccount(
                 ${parsed.sentAt?.toISOString() ?? null}, ${JSON.stringify(parsed.headers)}::jsonb
               )
               ON CONFLICT DO NOTHING
+              RETURNING id
             `.execute(db);
+
+            const newId = inserted.rows[0]?.id;
+            if (newId) {
+              arrived.push({
+                id: newId,
+                from_address: parsed.from.address,
+                to_addresses: parsed.to,
+                subject: parsed.subject,
+              });
+            }
 
             results.synced++;
           }
@@ -121,6 +148,27 @@ export async function syncImapAccount(
         }
       } catch (err: any) {
         results.errors.push(`${folder.path}: ${err.message}`);
+      }
+    }
+
+    // The call this whole feature was missing. `applyLocalFilters` was written as
+    // the fallback for when ManageSieve is unavailable — which is always, since
+    // `uploadSieveScript` is a console.log — and it was never called from
+    // anywhere, so a user could write filter rules and no mail ever moved.
+    //
+    // It runs after the folder loop rather than inside it: a `move` action can
+    // send a message to a folder this same sync is about to walk, and applying
+    // rules mid-walk would let one rule's output become another's input.
+    //
+    // A failure here does NOT fail the sync — the mail is already stored and
+    // that is the part the user cannot re-fetch — but it is recorded rather than
+    // swallowed, because "filters silently did nothing" is the exact defect this
+    // call exists to end.
+    if (arrived.length) {
+      try {
+        await applyLocalFilters(db, account.id, arrived);
+      } catch (err: any) {
+        results.errors.push(`filters: ${err.message}`);
       }
     }
 

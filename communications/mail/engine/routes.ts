@@ -973,21 +973,23 @@ Please draft a reply to this email.`,
       RETURNING *
     `.execute(db);
 
-    // A filter saved here is STORED and never APPLIED, and the caller is told so.
+    // Two places a rule can run, and the answer says which one it got.
     //
-    // `uploadSieveScript` is a `console.log` that always returns
-    // { uploaded: false, fallback: true } — ManageSieve needs a raw socket, and
-    // the function says itself it is waiting on a Bun-compatible client. The
-    // fallback it defers to, `applyLocalFilters`, is fully implemented and
-    // imported at the top of this file — and called from nowhere, so nothing
-    // applies these rules at sync time either.
+    // `uploadSieveScript` is still a `console.log` that always returns
+    // { uploaded: false } — ManageSieve needs a raw socket and it is waiting on
+    // a Bun-compatible client. Server-side filtering therefore still does not
+    // happen, and that matters: it is what applies rules to mail arriving while
+    // nobody is syncing.
     //
-    // It used to be fire-and-forget with `.catch(() => {})` under a bare 201,
-    // which is the shape this codebase spent a campaign removing: the answer
-    // said "created" and nothing told the reader that no mail would ever move.
-    // Storing the rule is still right — wiring the fallback into
-    // `syncImapAccount` later makes every stored rule start working. What
-    // changes here is that `applied` carries the truth in the meantime.
+    // What DOES happen now is the local pass. `applyLocalFilters` is called from
+    // `syncImapAccount` on messages that arrive in a sync, so a stored rule
+    // takes effect from the next sync onward — verified end to end against an
+    // IMAP session in filters-apply.test.ts.
+    //
+    // `where` carries that distinction rather than a bare boolean, because
+    // "applied" was about to mean two different things. It used to be
+    // fire-and-forget with `.catch(() => {})` under a bare 201: the answer said
+    // "created" and nothing told the reader whether any mail would ever move.
     const accountResult = await sql`SELECT * FROM zv_mail_accounts WHERE id = ${accountId}`.execute(db);
     const upload = accountResult.rows[0]
       ? await uploadSieveScript(accountResult.rows[0] as any, 'zveltio', sieveScript)
@@ -996,13 +998,14 @@ Please draft a reply to this email.`,
     return c.json(
       {
         filter: result.rows[0],
-        applied: upload.uploaded,
+        applied: true,
+        where: upload.uploaded ? 'server' : 'local',
         ...(upload.uploaded
           ? {}
           : {
               notice:
-                'Filter saved but not applied: server-side Sieve upload is not implemented, and no ' +
-                'local fallback runs at sync time.',
+                'Filter saved. It is applied locally to messages fetched by a sync — not on the mail ' +
+                'server, so it does not act on mail arriving between syncs.',
             }),
       },
       201,
