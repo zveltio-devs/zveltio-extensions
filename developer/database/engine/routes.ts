@@ -539,6 +539,9 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       const table  = c.req.param('table');
       const policy = c.req.param('policy');
       try {
+        // `q(policy)` too. The table beside it was escaped and the policy name was
+        // not — a policy name reaches here straight from the URL path, so the
+        // one that was missed is the one an attacker controls.
         await sql.raw(`DROP POLICY IF EXISTS ${q(policy)} ON ${q(table)}`).execute(db);
         return c.json({ success: true });
       } catch (error) {
