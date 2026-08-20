@@ -19534,11 +19534,17 @@ async function resolveCollection(ctx, userId, collection) {
   if (!/^[a-z][a-z0-9_]*$/.test(shortName))
     return null;
   const tableName = `zvd_${shortName}`;
-  const exists = await sql`
-    SELECT EXISTS (
-      SELECT 1 FROM information_schema.tables WHERE table_name = ${tableName}
-    ) AS exists
-  `.execute(ctx.db).then((r) => r.rows[0]?.exists ?? false).catch(() => false);
+  let exists = false;
+  try {
+    const r = await sql`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables WHERE table_name = ${tableName}
+      ) AS exists
+    `.execute(ctx.db);
+    exists = r.rows[0]?.exists ?? false;
+  } catch (err) {
+    console.warn(`[postgis] could not check whether ${tableName} exists; refusing access:`, err instanceof Error ? err.message : err);
+  }
   if (!exists)
     return null;
   const canRead = await ctx.checkPermission(userId, `data:${shortName}`, "read").catch(() => false);
@@ -19722,7 +19728,7 @@ function postgisRoutes(ctx) {
         ${entity_type ? sql`AND entity_type = ${entity_type}` : sql``}
       ORDER BY occurred_at DESC
       LIMIT ${parseInt(limit, 10)}
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
     return c.json({ events: events.rows });
   });
   app.post("/geofences/:id/check-entities", zValidator("json", exports_external.object({
@@ -19820,7 +19826,7 @@ function postgisRoutes(ctx) {
         ${to ? sql`AND recorded_at <= ${to}::timestamptz` : sql``}
       ORDER BY recorded_at DESC
       LIMIT ${parseInt(limit, 10)}
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
     return c.json({ history: history.rows });
   });
   app.get("/routes", async (c) => {
@@ -19864,7 +19870,7 @@ function postgisRoutes(ctx) {
       return c.json({ error: "Unauthorized" }, 401);
     const rules = await sql`
       SELECT * FROM zv_geofence_rules WHERE geofence_id = ${c.req.param("id")}::uuid ORDER BY created_at
-    `.execute(db).catch(() => ({ rows: [] }));
+    `.execute(db);
     return c.json({ rules: rules.rows });
   });
   app.post("/geofences/:id/rules", zValidator("json", exports_external.object({

@@ -16,8 +16,15 @@
   "projects.management.subtitle": "Kanban board and task management",
   "projects.management.title": "Projects",
   "projects.management.ui.end_date": "End date",
+  "projects.management.ui.high": "High",
+  "projects.management.ui.low": "Low",
+  "projects.management.ui.medium": "Medium",
+  "projects.management.ui.name": "Name *",
   "projects.management.ui.new_project": "New project",
   "projects.management.ui.new_task": "New task",
   "projects.management.ui.no_tasks": "No tasks.",
-  "projects.management.ui.start_date": "Start date"
+  "projects.management.ui.priority": "Priority",
+  "projects.management.ui.start_date": "Start date",
+  "projects.management.ui.title": "Title *",
+  "projects.management.ui.urgent": "Urgent"
 }

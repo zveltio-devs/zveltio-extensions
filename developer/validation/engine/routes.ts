@@ -75,7 +75,23 @@ const BulkImportRuleSchema = z.object({
 
 // ── Test runner ───────────────────────────────────────────────────────────────
 
-function applyRule(ruleType: string, ruleConfig: any, inputValue: string): boolean {
+/**
+ * Result of the engine's expression evaluator, handed in by the caller.
+ *
+ * Passed as a parameter rather than imported: it lives on `ctx.internals`, and
+ * this function is module-level.
+ */
+type ExpressionEvaluator = (
+  expression: string,
+  value: unknown,
+) => { status: 'passed' } | { status: 'failed' } | { status: 'refused'; reason: string };
+
+function applyRule(
+  ruleType: string,
+  ruleConfig: any,
+  inputValue: string,
+  evaluateExpression: ExpressionEvaluator,
+): boolean {
   try {
     switch (ruleType) {
       case 'required':
@@ -98,10 +114,20 @@ function applyRule(ruleType: string, ruleConfig: any, inputValue: string): boole
         return Number(inputValue) >= (ruleConfig.min ?? -Infinity)
           && Number(inputValue) <= (ruleConfig.max ?? Infinity);
       case 'nlp': {
-        // Safe-ish evaluator: only 'value' in scope, wrapped in try/catch
-        // eslint-disable-next-line no-new-func
-        const result = new Function('value', `return ${ruleConfig.expression}`)(inputValue);
-        return Boolean(result);
+        // Was `new Function('value', 'return ' + expression)`, described in a
+        // comment as "safe-ish: only 'value' in scope". It was neither: a
+        // Function body closes over the global scope, so any tenant admin who
+        // could store a validation rule could reach `process`, `Bun`, and the
+        // filesystem from inside the engine process.
+        //
+        // The engine has evaluated this exact rule type safely the whole time
+        // through expr-eval, whose grammar cannot express a call to anything it
+        // was not handed. This goes through that same function now, so the two
+        // cannot drift apart again.
+        const outcome = evaluateExpression(String(ruleConfig.expression ?? ''), inputValue);
+        // A refused expression has not passed. Reporting it as a pass would
+        // tell whoever is writing the rule that it works.
+        return outcome.status === 'passed';
       }
       default:
         return false;
@@ -109,6 +135,30 @@ function applyRule(ruleType: string, ruleConfig: any, inputValue: string): boole
   } catch {
     return false;
   }
+}
+
+/**
+ * Reject an expression rule that must not be stored.
+ *
+ * Returns the message to send back, or null when the rule is fine. Shared
+ * between the create route and the bulk import for the obvious reason: a guard
+ * on one of two write paths is a guard on neither.
+ */
+function expressionRefusal(
+  ruleType: string,
+  ruleConfig: any,
+  // `{ ok: boolean; reason?: string }` rather than the engine's discriminated
+  // union: this repo compiles with `strict: false`, and without strictNullChecks
+  // TypeScript does not narrow a union on its discriminant. The shape is
+  // structurally compatible with what the engine actually returns.
+  check: (expression: string) => { ok: boolean; reason?: string },
+): string | null {
+  if (ruleType !== 'nlp') return null;
+  const expression = String(ruleConfig?.expression ?? '');
+  if (expression === '') return 'An nlp rule needs an `expression`.';
+  const verdict = check(expression);
+  if (verdict.ok) return null;
+  return `The expression ${verdict.reason ?? 'was rejected'}.`;
 }
 
 // ── Route factory ─────────────────────────────────────────────────────────────
@@ -121,7 +171,8 @@ export function validationRoutes(ctx: ExtensionContext): Hono {
   // a handler is therefore already RLS-scoped — there is one spelling, so there
   // is none to forget.
 
-  const { invalidateRulesCache } = ctx.internals;
+  const { invalidateRulesCache, evaluateExpressionRule, checkValidationExpression } =
+    ctx.internals;
 
   const app = new Hono();
 
@@ -258,6 +309,14 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
     if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
 
     const body = c.req.valid('json');
+
+    // Vet the expression before it is stored, not only before it is run. A rule
+    // that cannot be evaluated is not a rule, and a 400 here tells the author
+    // what is wrong while they are looking at it — the alternative is a row that
+    // silently never fires and a support ticket months later.
+    const refusal = expressionRefusal(body.rule_type, body.rule_config, checkValidationExpression);
+    if (refusal) return c.json({ error: refusal }, 400);
+
     const rule = await (db as any)
       .insertInto('zv_validation_rules')
       .values({
@@ -309,7 +368,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
       const config = typeof row.rule_config === 'string'
         ? JSON.parse(row.rule_config)
         : row.rule_config;
-      const actual = applyRule(row.rule_type, config, row.input_value);
+      const actual = applyRule(row.rule_type, config, row.input_value, evaluateExpressionRule);
       const passed = actual === row.expected_result;
       const now = new Date();
 
@@ -368,6 +427,17 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
       }
 
       const rule = parsed.data;
+
+      // The same guard as the create route. Import is the path an attacker
+      // would reach for precisely because it looks like a bulk convenience
+      // rather than a write — it takes a JSON array and inserts every element.
+      const refusal = expressionRefusal(rule.rule_type, rule.rule_config, checkValidationExpression);
+      if (refusal) {
+        failedCount++;
+        errors.push({ index: i, error: refusal });
+        continue;
+      }
+
       try {
         await (db as any)
           .insertInto('zv_validation_rules')
@@ -468,7 +538,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
     const now = new Date();
 
     for (const tc of casesRes.rows) {
-      const actual = applyRule(rule.rule_type, config, tc.input_value);
+      const actual = applyRule(rule.rule_type, config, tc.input_value, evaluateExpressionRule);
       const passed = actual === tc.expected_result;
       results.push({
         id: tc.id,

@@ -3,6 +3,7 @@
   "finance.banking.empty.accounts": "Még nincsenek bankszámlák.",
   "finance.banking.empty.transactions": "Még nincsenek tranzakciók.",
   "finance.banking.empty.unreconciled": "Nincsenek nem egyeztetett tranzakciók.",
+  "finance.banking.form.currency": "Pénznem",
   "finance.banking.newAccount": "Új fiók",
   "finance.banking.section.openInvoices": "Nyitott számlák (elküldve)",
   "finance.banking.section.unreconciled": "Nem egyeztetett tranzakciók",

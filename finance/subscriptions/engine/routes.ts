@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { permissionGate } from '@zveltio/sdk/extension';
+import { permissionGate, roundMoney, toNumber } from '@zveltio/sdk/extension';
 
 // Compute proration when changing plans mid-cycle
 function computeProration(
@@ -36,6 +36,21 @@ const DUNNING_DAYS = [1, 3, 7, 14];
 async function mayDecide(ctx: ExtensionContext, user: any): Promise<boolean> {
   if (await ctx.checkPermission(user.id, 'subscriptions', 'settle').catch(() => false)) return true;
   return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
+}
+
+/**
+ * The end of a billing period starting on `start`, for a plan's interval.
+ *
+ * `zvd_subscription_plans.interval` is CHECK-constrained to these three values,
+ * so an unknown one cannot come from the database. The fallback covers a plan
+ * row written before that constraint existed, and monthly is the column default.
+ */
+function addInterval(start: string, interval: string): string {
+  const d = new Date(start);
+  if (interval === 'yearly') d.setFullYear(d.getFullYear() + 1);
+  else if (interval === 'quarterly') d.setMonth(d.getMonth() + 3);
+  else d.setMonth(d.getMonth() + 1);
+  return d.toISOString().slice(0, 10);
 }
 
 export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
@@ -170,11 +185,20 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
     const trialEnd = p.trial_days > 0
       ? new Date(Date.now() + p.trial_days * 86400000).toISOString().slice(0, 10)
       : null;
+    // `current_period_end` is NOT NULL and was not supplied at all, so creating
+    // a subscriber failed on the constraint — this extension could not take a
+    // customer on any install.
+    //
+    // Derived from the plan's own interval rather than a fixed span: a quarterly
+    // plan whose first period silently lasted a month would bill the customer
+    // wrong, which is worse than the error it replaces.
+    const periodEnd = addInterval(startDate, p.interval);
+
     const row = await sql`
       INSERT INTO zvd_subscribers (plan_id, contact_id, organization_id, name, email,
-        current_period_start, trial_end, status, metadata, created_by)
+        current_period_start, current_period_end, trial_end, status, metadata, created_by)
       VALUES (${d.plan_id}, ${d.contact_id ?? null}, ${d.organization_id ?? null},
-        ${d.client_name}, ${d.client_email}, ${startDate}, ${trialEnd},
+        ${d.client_name}, ${d.client_email}, ${startDate}, ${periodEnd}, ${trialEnd},
         ${trialEnd ? 'trialing' : 'active'}, ${JSON.stringify(d.notes ? { notes: d.notes } : {})}::jsonb, ${user.id})
       RETURNING *
     `.execute(db);
@@ -295,13 +319,22 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
   app.post('/subscribers/:id/invoices', async (c) => {
     const user = c.get('user') as any;
     const sub = await sql`
-      SELECT s.*, p.price, p.currency, p.usage_billing, p.usage_unit_price
+      SELECT s.*, p.price, p.currency, p.usage_billing, p.usage_unit_price, p.interval
       FROM zvd_subscribers s JOIN zvd_subscription_plans p ON p.id = s.plan_id
       WHERE s.id = ${c.req.param('id')} AND s.status = 'active'
     `.execute(db);
     if (!sub.rows.length) return c.json({ error: 'Subscriber not found or not active' }, 400);
     const s = sub.rows[0] as any;
     const periodStart = new Date().toISOString().slice(0, 10);
+    // `plan_id` and `period_end` are both NOT NULL and neither was supplied, so
+    // issuing an invoice failed on the constraint — the second of this
+    // extension's two write paths, and the one that bills.
+    //
+    // `period_end` follows the plan's interval, like the subscriber's own
+    // period. An invoice whose period is a month while the customer is on a
+    // yearly plan states the wrong thing on a financial document, which is
+    // worse than the error it replaces.
+    const periodEnd = addInterval(periodStart, s.interval);
     const dueDate = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
     // Calculate usage charges
     let usageAmount = 0;
@@ -314,10 +347,17 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
       usageAmount = +(usage.rows[0] as any).total;
       await sql`UPDATE zvd_subscription_usage SET is_billed = true WHERE subscriber_id = ${s.id} AND is_billed = false`.execute(db);
     }
-    const totalAmount = s.price + usageAmount;
+    // `s.price` comes from `zvd_subscription_plans.price`, which is NUMERIC —
+    // and PostgreSQL sends NUMERIC as a string. `"49.00" + 10` is the string
+    // "49.0010", which PostgreSQL then accepts into `total_amount NUMERIC(14,2)`
+    // and rounds to 49.00. Measured: a 49.00 plan with 10.00 of metered usage
+    // invoiced the customer 49.00 and lost the usage entirely. Nothing errors,
+    // and the invoice looks like a perfectly ordinary one.
+    const planPrice = toNumber(s.price, 0, 'plan.price');
+    const totalAmount = roundMoney(planPrice + usageAmount);
     const row = await sql`
-      INSERT INTO zvd_subscription_invoices (subscriber_id, amount, usage_amount, total_amount, currency, period_start, due_date, created_by)
-      VALUES (${s.id}, ${s.price}, ${usageAmount}, ${totalAmount}, ${s.currency}, ${periodStart}, ${dueDate}, ${user.id})
+      INSERT INTO zvd_subscription_invoices (subscriber_id, plan_id, amount, usage_amount, total_amount, currency, period_start, period_end, due_date, created_by)
+      VALUES (${s.id}, ${s.plan_id}, ${planPrice}, ${usageAmount}, ${totalAmount}, ${s.currency}, ${periodStart}, ${periodEnd}, ${dueDate}, ${user.id})
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);

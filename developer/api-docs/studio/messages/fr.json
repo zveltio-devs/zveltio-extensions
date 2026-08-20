@@ -20,5 +20,6 @@
   "developer.api-docs.ui.no_custom_doc_pages": "Aucune page de documentation personnalisée.",
   "developer.api-docs.ui.no_tokens_generate_one_for_read_only_doc_access": "Aucun jeton. Générez-en un pour un accès en lecture seule aux documents.",
   "developer.api-docs.ui.public": "Public",
+  "developer.api-docs.ui.slug": "Slug",
   "developer.api-docs.ui.title": "Titre *"
 }

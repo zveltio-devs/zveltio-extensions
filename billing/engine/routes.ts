@@ -95,13 +95,33 @@ export function billingRoutes(
     '/plans',
     zValidator(
       'json',
-      z.object({
-        name: z.string().min(1),
-        stripe_price_id: z.string().optional(),
-        limits: z.record(z.string(), z.number()).default({}),
-        price_cents: z.number().int().default(0),
-        interval: z.enum(['month', 'year']).default('month'),
-      }),
+      // `.strict()`, unlike every other validator in this product.
+      //
+      // Zod drops unknown keys by default. That is fine for a `notes` field and
+      // is not fine here. Measured live:
+      //
+      //   POST /plans {"name":"Starter","code":"starter","price":49,"interval":"month"}
+      //     → 201, price_cents: 0
+      //
+      // The real field is `price_cents`; `price` and `code` are not in the schema
+      // and were dropped without comment. The plan was created, free, and the
+      // only signal was a field in a response body nobody reads once the status
+      // says 201. A silently ignored `price` is a different kind of wrong from a
+      // silently ignored `notes`.
+      //
+      // Applied here rather than to all 332 validators: making the whole product
+      // reject unknown fields changes documented behaviour for every client at
+      // once, and that is an owner's call. This is the one endpoint where it was
+      // proven to produce a wrong row.
+      z
+        .object({
+          name: z.string().min(1),
+          stripe_price_id: z.string().optional(),
+          limits: z.record(z.string(), z.number()).default({}),
+          price_cents: z.number().int().default(0),
+          interval: z.enum(['month', 'year']).default('month'),
+        })
+        .strict(),
     ),
     async (c) => {
       const data = c.req.valid('json');
@@ -145,9 +165,21 @@ export function billingRoutes(
   // POST /webhook/stripe — Stripe webhook (no auth, verified by HMAC)
   app.post('/webhook/stripe', async (c) => {
     const signature = c.req.header('stripe-signature') ?? '';
-    const secret = process.env.STRIPE_WEBHOOK_SECRET ?? '';
+    // `ZVELTIO_EXT_BILLING_STRIPE_WEBHOOK_SECRET`. Read through the host's slice
+    // of the environment rather than `process.env`, which from inside an
+    // in-process extension is the ENGINE's environment entire — DATABASE_URL,
+    // BETTER_AUTH_SECRET, FIELD_ENCRYPTION_KEY and all.
+    const secret = ctx.config.vars.STRIPE_WEBHOOK_SECRET ?? '';
     if (!secret) {
-      return c.json({ error: 'Webhook secret not configured' }, 500);
+      // 503, not 500. The distinction is not cosmetic here: Stripe retries a
+      // webhook on any 5xx, so either code keeps the event queued for redelivery
+      // — which is what we want, because the event is real and will be
+      // deliverable the moment the secret is set. What 500 gets wrong
+      // is everyone else: it tells uptime checks and error trackers the server
+      // is faulting, so an instance that simply has not configured billing pages
+      // an operator for a crash that never happened. 503 says "not available
+      // yet", which is exactly true.
+      return c.json({ error: 'Webhook secret not configured' }, 503);
     }
     const rawBody = await c.req.text();
     const result = await handleWebhook(rawBody, signature, secret);

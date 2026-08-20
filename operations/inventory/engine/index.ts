@@ -70,7 +70,13 @@ const extension: ZveltioExtension = {
 
     ctx.services.register('inventory.stock.level', async (productId: string, warehouseId?: string) => {
       const r = await sql<any>`
-        SELECT COALESCE(SUM(quantity), 0)::int AS qty
+        -- NOT ::int. The quantity column is NUMERIC(10,3) and the product unit
+        -- CHECK permits kg, liter and meter — fractional by nature. Casting to int
+        -- rounded, so 2.5 kg read back as 3 kg to every other extension: the
+        -- service over-reported, an availability check passed, and the shortfall
+        -- surfaced at the shelf. Below 0.5 it rounded the other way and 0.4 kg
+        -- read as out of stock.
+        SELECT COALESCE(SUM(quantity), 0)::text AS qty
         FROM zvd_stock_levels
         WHERE product_id = ${productId}::uuid
           ${warehouseId ? sql`AND warehouse_id = ${warehouseId}::uuid` : sql``}
@@ -160,7 +166,18 @@ const extension: ZveltioExtension = {
       productId: string;
       warehouseId: string;
       qty: number;
-      type: 'in' | 'out' | 'adjust' | 'transfer';
+      /**
+       * `adjustment`, not `adjust`. The column CHECK is
+       * `type IN ('in','out','transfer','adjustment')` and this union declared
+       * `adjust`, so a caller using the documented value got a 23514 — from the
+       * service whose own header comment says it "was published broken". One of
+       * its four declared values still was.
+       *
+       * `adjust` stays accepted and is translated at the insert: it is the value
+       * this service has always advertised, and an extension already written
+       * against it should not break in order to fix a typo.
+       */
+      type: 'in' | 'out' | 'adjust' | 'adjustment' | 'transfer';
       reference?: string;
       reason?: string;
       /**
@@ -177,10 +194,11 @@ const extension: ZveltioExtension = {
       // which nothing ever noticed, because nothing ever called it. This is the
       // service other extensions are meant to move stock through, and it was
       // published broken.
+      const movementType = input.type === 'adjust' ? 'adjustment' : input.type;
       await sql`
         INSERT INTO zvd_stock_movements (product_id, warehouse_id, quantity, type, reference, note, created_by)
         VALUES (${input.productId}::uuid, ${input.warehouseId}::uuid, ${input.qty},
-                ${input.type}, ${input.reference ?? null}, ${input.reason ?? null},
+                ${movementType}, ${input.reference ?? null}, ${input.reason ?? null},
                 ${input.userId ?? 'system'})
       `.execute(ctx.db);
       const delta = input.type === 'out' ? -Math.abs(input.qty) : Math.abs(input.qty);

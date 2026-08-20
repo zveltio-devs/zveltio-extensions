@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { permissionGate } from '@zveltio/sdk/extension';
+import { permissionGate, toNumber } from '@zveltio/sdk/extension';
 
 // These helpers receive an already-scoped db (the caller passes
 // `db`), so they use that parameter directly. They're declared
@@ -149,6 +149,28 @@ async function mayDecideInvoice(
   return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
 }
 
+/**
+ * A unique-constraint violation, and only that.
+ *
+ * Two create routes used `.execute(db).catch(() => null)` to mean "the row
+ * already exists", because that is what the failure usually is. It catches
+ * everything, though: a dropped connection, a NOT NULL violation, a check
+ * constraint, a permission error all came back as
+ * `Series "X" already exists` or `Code "Y" already exists` — sending whoever
+ * hit it to look for a duplicate that is not there, while the real fault goes
+ * unreported.
+ *
+ * 23505 is unique_violation. SQLSTATE arrives on `errno` under the Bun driver
+ * and `code` under node-postgres, so both are read.
+ */
+function isUniqueViolation(err: unknown): boolean {
+  const code =
+    (err as { errno?: string; code?: string }).errno ??
+    (err as { code?: string }).code ??
+    '';
+  return code === '23505';
+}
+
 export function invoicingRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
   const app = new Hono();
@@ -271,7 +293,10 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
         INSERT INTO zvd_document_series (doc_type, series, next_number, padding, is_default)
         VALUES (${d.doc_type}, ${d.series}, ${d.next_number}, ${d.padding}, ${d.is_default})
         RETURNING *
-      `.execute(db).catch(() => null);
+      `.execute(db).catch((err: unknown) => {
+        if (!isUniqueViolation(err)) throw err;
+        return null;
+      });
       if (!row?.rows.length) {
         return c.json({ error: `Series "${d.series}" already exists for ${d.doc_type}` }, 400);
       }
@@ -368,7 +393,10 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
         VALUES (${d.code ?? null}, ${d.name}, ${d.description ?? null}, ${d.kind},
                 ${d.unit}, ${d.unit_price}, ${d.currency}, ${d.tax_rate})
         RETURNING *
-      `.execute(db).catch(() => null);
+      `.execute(db).catch((err: unknown) => {
+        if (!isUniqueViolation(err)) throw err;
+        return null;
+      });
       if (!row?.rows.length) return c.json({ error: `Code "${d.code}" already exists` }, 400);
       return c.json({ data: row.rows[0] }, 201);
     },
@@ -950,7 +978,11 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
       VALUES (${invoice.id}, ${d.amount}, ${d.payment_date}, ${d.payment_method}, ${d.reference ?? null}, ${d.notes ?? null}, ${user.id})
       RETURNING *
     `.execute(db);
-    const newPaid = +invoice.amount_paid + d.amount;
+    // Same conversion as the `invoicing.recordPayment` service, which is this
+    // route's body reachable by name. Two write paths onto one column that read
+    // it differently is how they drift apart. `d.amount` is a validated number
+    // here, so only the column needs converting.
+    const newPaid = toNumber(invoice.amount_paid, 0, 'zvd_invoices.amount_paid') + d.amount;
     const newStatus = newPaid >= invoice.total ? 'paid' : 'partially_paid';
     await sql`
       UPDATE zvd_invoices SET amount_paid = ${newPaid}, status = ${newStatus},
@@ -1025,16 +1057,24 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
     const newInv = await sql`
       INSERT INTO zvd_invoices (number, series, doc_type, delegate_name, delegate_id_card, delegate_vehicle,
         client_id, client_type, client_name, client_email, client_address,
-        client_tax_id, client_reg_no, client_country,
-        seller_name, seller_tax_id, seller_reg_no, seller_address, seller_iban, seller_bank,
+        client_tax_id, client_reg_no, client_city, client_county, client_country,
+        seller_name, seller_tax_id, seller_reg_no, seller_address,
+        seller_city, seller_county, seller_country, seller_iban, seller_bank,
         issue_date, due_date, currency, subtotal, tax_rate, tax_amount, total, discount_amount, discount_percent,
-        notes, footer_notes, recurring_interval, amount_paid, created_by)
-      VALUES (${claimed.number}, ${claimed.series}, ${i.client_id}, ${i.client_type}, ${i.client_name}, ${i.client_email}, ${i.client_address},
-        ${i.client_tax_id}, ${i.client_reg_no}, ${i.client_country},
-        ${i.seller_name}, ${i.seller_tax_id}, ${i.seller_reg_no}, ${i.seller_address}, ${i.seller_iban}, ${i.seller_bank},
+        vat_breakdown, vat_regime, vat_exemption_reason, exchange_rate, exchange_date, tax_amount_ron,
+        notes, footer_notes, po_number, recurring_interval, amount_paid, created_by)
+      VALUES (${claimed.number}, ${claimed.series}, ${i.doc_type},
+        ${null}, ${null}, ${null},
+        ${i.client_id}, ${i.client_type}, ${i.client_name}, ${i.client_email}, ${i.client_address},
+        ${i.client_tax_id}, ${i.client_reg_no}, ${i.client_city}, ${i.client_county}, ${i.client_country},
+        ${i.seller_name}, ${i.seller_tax_id}, ${i.seller_reg_no}, ${i.seller_address},
+        ${i.seller_city}, ${i.seller_county}, ${i.seller_country}, ${i.seller_iban}, ${i.seller_bank},
         ${newIssue.toISOString().slice(0,10)}, ${newDue.toISOString().slice(0,10)},
         ${i.currency}, ${i.subtotal}, ${i.tax_rate}, ${i.tax_amount}, ${i.total},
-        ${i.discount_amount}, ${i.discount_percent}, ${i.notes}, ${i.footer_notes}, ${i.recurring_interval}, 0, ${user.id})
+        ${i.discount_amount}, ${i.discount_percent},
+        ${i.vat_breakdown}, ${i.vat_regime}, ${i.vat_exemption_reason},
+        ${i.exchange_rate}, ${i.exchange_date}, ${i.tax_amount_ron},
+        ${i.notes}, ${i.footer_notes}, ${i.po_number}, ${i.recurring_interval}, 0, ${user.id})
       RETURNING *
     `.execute(db);
     const newId = (newInv.rows[0] as any).id;

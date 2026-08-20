@@ -16419,6 +16419,15 @@ function permissionGate(ctx, resource, opts = {}) {
     await next();
   };
 }
+// packages/sdk/src/extension/multipart.ts
+var MULTIPART_REQUIRED = { error: "Expected a multipart/form-data body." };
+async function readMultipart(c) {
+  try {
+    return await c.req.formData();
+  } catch {
+    return null;
+  }
+}
 // ../zveltio-extensions/content/media/engine/routes.ts
 var _config;
 var _aws = null;
@@ -16566,7 +16575,9 @@ function mediaRoutes(ctx) {
   });
   router.post("/upload", async (c) => {
     const user = c.get("user");
-    const formData = await c.req.formData();
+    const formData = await readMultipart(c);
+    if (!formData)
+      return c.json(MULTIPART_REQUIRED, 400);
     const file2 = formData.get("file");
     const folderId = formData.get("folder_id");
     const title = formData.get("title");

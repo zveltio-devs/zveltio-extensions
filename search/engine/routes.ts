@@ -22,7 +22,7 @@ export function searchRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
 
   const app = new Hono<{ Variables: { user: any } }>();
 
-  SearchManager.init(db);
+  SearchManager.init(db, ctx.config.vars);
 
   // All routes require admin
   app.use('*', async (c, next) => {

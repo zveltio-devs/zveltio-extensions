@@ -1,3 +1,4 @@
+import { readMultipart, MULTIPART_REQUIRED } from '@zveltio/sdk/extension';
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
@@ -45,7 +46,8 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
   app.post('/files/:id/versions', requireAuth, async (c) => {
     const fileId = c.req.param('id');
     const user = c.get('user') as any;
-    const formData = await c.req.formData();
+    const formData = await readMultipart(c);
+    if (!formData) return c.json(MULTIPART_REQUIRED, 400);
     const file = formData.get('file') as File;
 
     if (!file) return c.json({ error: 'No file provided' }, 400);
@@ -360,7 +362,8 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
   // POST /upload — multipart { file, path }
   app.post('/upload', requireAuth, async (c) => {
     const user = c.get('user') as any;
-    const form = await c.req.formData();
+    const form = await readMultipart(c);
+    if (!form) return c.json(MULTIPART_REQUIRED, 400);
     const file = form.get('file') as File | null;
     if (!file) return c.json({ error: 'No file provided' }, 400);
     const path = (form.get('path') as string | null) || '/';

@@ -19492,7 +19492,7 @@ var BulkImportRuleSchema = exports_external.object({
   error_message: exports_external.string().min(1).max(500),
   nl_description: exports_external.string().optional()
 });
-function applyRule(ruleType, ruleConfig, inputValue) {
+function applyRule(ruleType, ruleConfig, inputValue, evaluateExpression) {
   try {
     switch (ruleType) {
       case "required":
@@ -19514,8 +19514,8 @@ function applyRule(ruleType, ruleConfig, inputValue) {
       case "range":
         return Number(inputValue) >= (ruleConfig.min ?? -Infinity) && Number(inputValue) <= (ruleConfig.max ?? Infinity);
       case "nlp": {
-        const result = new Function("value", `return ${ruleConfig.expression}`)(inputValue);
-        return Boolean(result);
+        const outcome = evaluateExpression(String(ruleConfig.expression ?? ""), inputValue);
+        return outcome.status === "passed";
       }
       default:
         return false;
@@ -19524,9 +19524,20 @@ function applyRule(ruleType, ruleConfig, inputValue) {
     return false;
   }
 }
+function expressionRefusal(ruleType, ruleConfig, check2) {
+  if (ruleType !== "nlp")
+    return null;
+  const expression2 = String(ruleConfig?.expression ?? "");
+  if (expression2 === "")
+    return "An nlp rule needs an `expression`.";
+  const verdict = check2(expression2);
+  if (verdict.ok)
+    return null;
+  return `The expression ${verdict.reason ?? "was rejected"}.`;
+}
 function validationRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
-  const { invalidateRulesCache } = ctx.internals;
+  const { invalidateRulesCache, evaluateExpressionRule, checkValidationExpression } = ctx.internals;
   const app = new Hono2;
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -19631,6 +19642,9 @@ Description: ${description}`;
     if (!isAdmin)
       return c.json({ error: "Admin access required" }, 403);
     const body = c.req.valid("json");
+    const refusal = expressionRefusal(body.rule_type, body.rule_config, checkValidationExpression);
+    if (refusal)
+      return c.json({ error: refusal }, 400);
     const rule = await db.insertInto("zv_validation_rules").values({
       collection,
       field_name: body.field_name,
@@ -19659,7 +19673,7 @@ Description: ${description}`;
       if (!row.tc_id)
         continue;
       const config2 = typeof row.rule_config === "string" ? JSON.parse(row.rule_config) : row.rule_config;
-      const actual = applyRule(row.rule_type, config2, row.input_value);
+      const actual = applyRule(row.rule_type, config2, row.input_value, evaluateExpressionRule);
       const passed2 = actual === row.expected_result;
       const now = new Date;
       results.push({
@@ -19708,6 +19722,12 @@ Description: ${description}`;
         continue;
       }
       const rule = parsed.data;
+      const refusal = expressionRefusal(rule.rule_type, rule.rule_config, checkValidationExpression);
+      if (refusal) {
+        failedCount++;
+        errors3.push({ index: i, error: refusal });
+        continue;
+      }
       try {
         await db.insertInto("zv_validation_rules").values({
           collection,
@@ -19774,7 +19794,7 @@ Description: ${description}`;
     const results = [];
     const now = new Date;
     for (const tc of casesRes.rows) {
-      const actual = applyRule(rule.rule_type, config2, tc.input_value);
+      const actual = applyRule(rule.rule_type, config2, tc.input_value, evaluateExpressionRule);
       const passed2 = actual === tc.expected_result;
       results.push({
         id: tc.id,

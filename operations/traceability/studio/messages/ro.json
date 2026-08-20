@@ -1,6 +1,7 @@
 {
   "operations.traceability.action.details": "Detalii",
   "operations.traceability.addConsumedMaterial": "Adaugă material consumat",
+  "operations.traceability.btn.back": "← Înapoi",
   "operations.traceability.col.expiry": "Expirare",
   "operations.traceability.col.location": "Locație",
   "operations.traceability.col.lotNumber": "Număr lot",
@@ -112,6 +113,7 @@
   "operations.traceability.ui.epuizat": "Epuizat",
   "operations.traceability.ui.ex_inv_00123": "ex: INV-00123",
   "operations.traceability.ui.finalizat": "Finalizat",
+  "operations.traceability.ui.furnizor": "Furnizor",
   "operations.traceability.ui.internal_f_r_distribu_ie_extern": "Internal (fără distribuție externă)",
   "operations.traceability.ui.jurnal_consumuri": "Jurnal Consumuri",
   "operations.traceability.ui.jurnal_recep_ii": "Jurnal Recepții",

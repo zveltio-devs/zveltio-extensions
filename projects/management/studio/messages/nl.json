@@ -16,8 +16,15 @@
   "projects.management.subtitle": "Kanban-bord en taakbeheer",
   "projects.management.title": "Projecten",
   "projects.management.ui.end_date": "Einddatum",
+  "projects.management.ui.high": "Hoog",
+  "projects.management.ui.low": "Laag",
+  "projects.management.ui.medium": "Gemiddeld",
+  "projects.management.ui.name": "Naam *",
   "projects.management.ui.new_project": "Nieuw project",
   "projects.management.ui.new_task": "Nieuwe taak",
   "projects.management.ui.no_tasks": "Geen taken.",
-  "projects.management.ui.start_date": "Startdatum"
+  "projects.management.ui.priority": "Prioriteit",
+  "projects.management.ui.start_date": "Startdatum",
+  "projects.management.ui.title": "Titel *",
+  "projects.management.ui.urgent": "Urgent"
 }

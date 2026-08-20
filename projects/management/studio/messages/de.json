@@ -16,8 +16,15 @@
   "projects.management.subtitle": "Kanban-Board und Aufgabenverwaltung",
   "projects.management.title": "Projekte",
   "projects.management.ui.end_date": "Enddatum",
+  "projects.management.ui.high": "Hoch",
+  "projects.management.ui.low": "Niedrig",
+  "projects.management.ui.medium": "Mittel",
+  "projects.management.ui.name": "Name *",
   "projects.management.ui.new_project": "Neues Projekt",
   "projects.management.ui.new_task": "Neue Aufgabe",
   "projects.management.ui.no_tasks": "Keine Aufgaben.",
-  "projects.management.ui.start_date": "Startdatum"
+  "projects.management.ui.priority": "Priorität",
+  "projects.management.ui.start_date": "Startdatum",
+  "projects.management.ui.title": "Titel *",
+  "projects.management.ui.urgent": "Dringend"
 }

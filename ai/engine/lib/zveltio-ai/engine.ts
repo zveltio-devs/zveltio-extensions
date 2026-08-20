@@ -818,8 +818,9 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
       .selectFrom('zvd_collections')
       .select(['name', 'display_name', 'fields'])
       .orderBy('display_name', 'asc')
-      .execute()
-      .catch(() => []);
+      .execute();
+      // No `.catch(() => [])`. An empty list is the assistant being told this
+      // instance has no collections at all, which is what it will then say.
 
     const mapped = collections.map((c: any) => {
       let fieldCount = 0;
@@ -851,8 +852,10 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
       .selectFrom('zvd_collections')
       .selectAll()
       .where('name', '=', collection)
-      .executeTakeFirst()
-      .catch(() => null);
+      .executeTakeFirst();
+      // No `.catch(() => null)`. It fell into the `if (!colDef) throw` below, so a
+      // failed read told the assistant the collection does not exist — and it then
+      // offers to create one that is already there.
 
     if (!colDef) throw new Error(`Collection '${collection}' not found`);
 
@@ -1004,33 +1007,36 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
     }
   }
 
+  /**
+   * What the assistant can actually count.
+   *
+   * This used to report three numbers and two of them were always zero. It read
+   * `user` and `zv_audit_log` directly, and an extension may read neither — the
+   * engine's proxy refuses both — but each query carried
+   * `.catch(() => ({ count: 0 }))`, so the refusal came back as the number 0 and
+   * the assistant told the operator "0 users, 0 recent activity" on an instance
+   * with thousands of each. A tool that answers a question it cannot answer is
+   * worse than one that declines: nobody re-checks a number.
+   *
+   * `zvd_collections` is the extension's to read, so it is still reported.
+   */
   private async toolGetSystemStats() {
-    const [collections, users, recentActivity] = await Promise.all([
-      this.db
-        .selectFrom('zvd_collections')
-        .select(this.db.fn.count('name').as('count'))
-        .executeTakeFirst()
-        .catch(() => ({ count: 0 })),
-      this.db
-        .selectFrom('user')
-        .select(this.db.fn.count('id').as('count'))
-        .executeTakeFirst()
-        .catch(() => ({ count: 0 })),
-      this.db
-        .selectFrom('zv_audit_log')
-        .select(this.db.fn.count('id').as('count'))
-        .executeTakeFirst()
-        .catch(() => ({ count: 0 })),
-    ]);
+    const collections = await this.db
+      .selectFrom('zvd_collections')
+      .select(this.db.fn.count('name').as('count'))
+      .executeTakeFirst();
 
+    const n = Number(collections?.count ?? 0);
     return {
       success: true,
-      stats: {
-        collections: Number(collections?.count ?? 0),
-        users: Number(users?.count ?? 0),
-        recentActivity: Number(recentActivity?.count ?? 0),
+      stats: { collections: n },
+      unavailable: {
+        users: 'the user directory is engine-owned and not readable by an extension',
+        recentActivity: 'the audit log is engine-owned and not readable by an extension',
       },
-      message: `Platform stats: ${collections?.count ?? 0} collections, ${users?.count ?? 0} users`,
+      message:
+        `Platform stats: ${n} collections. User and audit-activity counts are not ` +
+        `available to this assistant — they live in engine-owned tables.`,
     };
   }
 
@@ -1093,6 +1099,9 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
     args: any,
     request: ZveltioAIRequest,
   ): Promise<any> {
+    // Every tier below falls through to the next on failure — that is the design.
+    // What it could not express is ALL of them failing, so the errors are kept.
+    const recallErrors: string[] = [];
     const { query, limit = 5 } = args;
 
     try {
@@ -1123,8 +1132,9 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
             .limit(limit)
             .execute();
         }
-      } catch {
+      } catch (err) {
         // Fallback to text search
+        recallErrors.push(err instanceof Error ? err.message : String(err));
       }
 
       // Fallback: PostgreSQL full-text search
@@ -1143,7 +1153,10 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
           .orderBy('updated_at', 'desc')
           .limit(limit)
           .execute()
-          .catch(() => []);
+          .catch((err: Error) => {
+            recallErrors.push(err.message);
+            return [];
+          });
       }
 
       // Final fallback: return most important recent memories
@@ -1156,7 +1169,22 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
           .orderBy('updated_at', 'desc')
           .limit(limit)
           .execute()
-          .catch(() => []);
+          .catch((err: Error) => {
+            recallErrors.push(err.message);
+            return [];
+          });
+      }
+
+      // All three tiers failed. Returning `success: true` with "No relevant memories
+      // found" told the assistant, confidently, that this user has never said anything
+      // to it. An unreadable memory store and an empty one are different facts.
+      if (rows.length === 0 && recallErrors.length > 0) {
+        console.error('[zveltio-ai] memory recall failed on every tier:', recallErrors);
+        return {
+          success: false,
+          facts: [],
+          message: 'Memory could not be read, so this answer is without it.',
+        };
       }
 
       if (rows.length === 0) {

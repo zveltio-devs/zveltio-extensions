@@ -1,5 +1,6 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
 import { join } from 'path';
+import { repairUnsignedIncomingWebhooksAtLoad } from './incoming-webhooks.js';
 import { apiConnectorRoutes } from './routes.js';
 
 const extension: ZveltioExtension = {
@@ -17,6 +18,7 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
+    await repairUnsignedIncomingWebhooksAtLoad(ctx.db, ctx.internals.maybeEncrypt);
     app.route('/', apiConnectorRoutes(ctx));
   },
 };
