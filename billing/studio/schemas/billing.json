@@ -1,0 +1,109 @@
+{
+  "sduiSchema": 1,
+  "title": "billing.title",
+  "subtitle": "billing.subtitle",
+  "newLabel": "billing.btn.newPlan",
+  "resources": [
+    {
+      "id": "plans",
+      "label": "billing.ui.available_plans",
+      "icon": "CreditCard",
+      "dataSource": "/ext/billing/plans",
+      "dataPath": "plans",
+      "layout": "cards",
+      "card": {
+        "title": "name",
+        "badge": "interval",
+        "subtitle": "price_cents"
+      },
+      "columns": [
+        { "key": "name", "label": "common.col.name" },
+        { "key": "price_cents", "label": "common.col.price" },
+        { "key": "interval", "label": "billing.col.interval" },
+        { "key": "stripe_price_id", "label": "billing.col.stripePrice", "type": "mono" }
+      ],
+      "form": {
+        "endpoint": "/ext/billing/plans",
+        "fields": [
+          {
+            "name": "name",
+            "label": "common.col.name",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "interval",
+            "label": "billing.col.interval",
+            "type": "select",
+            "colSpan": 1,
+            "default": "month",
+            "options": [
+              { "value": "month", "label": "billing.interval.month" },
+              { "value": "year", "label": "billing.interval.year" }
+            ]
+          },
+          {
+            "name": "price_cents",
+            "label": "billing.form.priceCents",
+            "type": "number",
+            "required": true,
+            "colSpan": 1,
+            "default": 0
+          },
+          {
+            "name": "stripe_price_id",
+            "label": "billing.col.stripePrice",
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "limits",
+            "label": "billing.form.limits",
+            "type": "json",
+            "mono": true,
+            "rows": 4,
+            "colSpan": 2,
+            "default": "{}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "subscriptions",
+      "label": "billing.tab.subscription",
+      "icon": "Receipt",
+      "dataSource": "/ext/billing/subscriptions",
+      "dataPath": "subscriptions",
+      "columns": [
+        { "key": "plan_name", "label": "billing.col.plan" },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "active": "badge-success",
+              "past_due": "badge-warning",
+              "canceled": "badge-error"
+            }
+          }
+        },
+        { "key": "price_cents", "label": "common.col.price" },
+        { "key": "current_period_start", "label": "billing.col.periodStart", "type": "date" },
+        { "key": "current_period_end", "label": "billing.col.periodEnd", "type": "date" }
+      ]
+    },
+    {
+      "id": "usage",
+      "label": "billing.tab.usage",
+      "icon": "BarChart2",
+      "dataSource": "/ext/billing/usage",
+      "dataPath": "usage",
+      "columns": [
+        { "key": "event_type", "label": "billing.col.metric", "type": "mono" },
+        { "key": "day", "label": "common.col.date", "type": "date" },
+        { "key": "total", "label": "common.col.total" }
+      ]
+    }
+  ]
+}
