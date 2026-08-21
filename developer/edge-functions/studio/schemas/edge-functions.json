@@ -1,0 +1,113 @@
+{
+  "sduiSchema": 1,
+  "title": "developer.edge-functions.title",
+  "subtitle": "developer.edge-functions.subtitle",
+  "newLabel": "developer.edge-functions.btn.newFunction",
+  "resources": [
+    {
+      "id": "functions",
+      "dataSource": "/ext/developer/edge-functions",
+      "dataPath": "functions",
+      "columns": [
+        { "key": "name", "label": "developer.edge-functions.ui.name_url_safe", "type": "mono" },
+        { "key": "display_name", "label": "developer.edge-functions.ui.display_name" },
+        { "key": "http_method", "label": "developer.edge-functions.ui.http_method", "type": "mono" },
+        { "key": "path", "label": "developer.edge-functions.form.mountedAt", "type": "mono" },
+        {
+          "key": "is_active",
+          "label": "common.col.status",
+          "type": "boolean"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "edit",
+          "kind": "edit",
+          "icon": "Code",
+          "label": "common.edit"
+        },
+        {
+          "id": "invoke",
+          "icon": "Play",
+          "label": "developer.edge-functions.btn.run",
+          "method": "POST",
+          "endpoint": "/ext/developer/edge-functions/{id}/invoke"
+        },
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/developer/edge-functions/{id}",
+          "confirm": "developer.edgeFunctions.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/developer/edge-functions",
+        "fields": [
+          {
+            "name": "name",
+            "label": "developer.edge-functions.ui.name_url_safe",
+            "required": true,
+            "mono": true,
+            "colSpan": 1,
+            "placeholder": "developer.edge-functions.ui.my_function"
+          },
+          {
+            "name": "display_name",
+            "label": "developer.edge-functions.ui.display_name",
+            "required": true,
+            "colSpan": 1,
+            "placeholder": "developer.edge-functions.form.displayNamePlaceholder"
+          },
+          {
+            "name": "http_method",
+            "label": "developer.edge-functions.ui.http_method",
+            "type": "select",
+            "colSpan": 1,
+            "default": "POST",
+            "options": [
+              { "value": "GET", "label": "GET" },
+              { "value": "POST", "label": "POST" },
+              { "value": "PUT", "label": "PUT" },
+              { "value": "PATCH", "label": "PATCH" },
+              { "value": "DELETE", "label": "DELETE" },
+              { "value": "ANY", "label": "ANY" }
+            ]
+          },
+          {
+            "name": "timeout_ms",
+            "label": "developer.edge-functions.form.timeoutMs",
+            "type": "number",
+            "colSpan": 1,
+            "default": 30000
+          },
+          {
+            "name": "description",
+            "label": "common.col.description",
+            "colSpan": 2
+          },
+          {
+            "name": "code",
+            "label": "developer.edge-functions.panel.title",
+            "type": "textarea",
+            "mono": true,
+            "rows": 12,
+            "colSpan": 2,
+            "default": "export default async function handler(ctx) {\n  const body = await ctx.request.json().catch(() => ({}));\n  return Response.json({ message: \"Hello from edge!\", input: body });\n}\n"
+          },
+          {
+            "name": "env_vars",
+            "label": "developer.edge-functions.form.envVars",
+            "type": "json",
+            "mono": true,
+            "rows": 3,
+            "colSpan": 2,
+            "default": "{}"
+          }
+        ]
+      }
+    }
+  ]
+}

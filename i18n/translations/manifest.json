@@ -15,7 +15,8 @@
       {
         "path": "/admin/i18n",
         "label": "Translations",
-        "icon": "Languages"
+        "icon": "Languages",
+        "schema": "schemas/translations.json"
       }
     ],
     "navGroup": "other"
@@ -32,7 +33,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "58088d23df59d809c2c610e0d1513121278a64dd3c096643e70bcb83d852455f",
+    "engineSha256": "57bb84078ec96b0c93dcfde7760cc70a86cf84cae143528a7b0ad78e39576b06",
     "sourceSha256": "067d4b5d9d5d426d974d6aef15bd7a71c8bf838c28d8b125e0183b8471dba8c4"
   },
   "publicRoutes": [
