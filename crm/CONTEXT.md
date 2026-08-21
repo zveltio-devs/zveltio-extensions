@@ -3,7 +3,8 @@
 **Ownership:** this extension owns `zvd_contacts`, `zvd_organizations`,
 `zvd_transactions`, and CRM-only tables. It CREATE-s via migrations and
 registers Studio metadata in `adoptCrmCollections` on `register()`. The engine
-must not CREATE or adopt them. Briefing: `GET /ext/crm/briefing`.
+must not CREATE or adopt them. Briefing API: `GET /ext/crm/briefing` (Studio
+home no longer embeds receivables — use `/admin/crm` or a future dashboard slot).
 
 **Verificat prin apăsare: 2026-08-09.** Organizație creată, contact legat de ea,
 legătura recitită.
