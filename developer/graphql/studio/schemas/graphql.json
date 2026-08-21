@@ -1,0 +1,147 @@
+{
+  "sduiSchema": 1,
+  "title": "developer.graphql.title",
+  "subtitle": "developer.graphql.subtitle",
+  "newLabel": "common.new",
+  "resources": [
+    {
+      "id": "logs",
+      "label": "developer.graphql.tab.logs",
+      "icon": "ScrollText",
+      "dataSource": "/ext/developer/graphql/logs?limit=100",
+      "dataPath": "logs",
+      "columns": [
+        { "key": "created_at", "label": "developer.graphql.col.time", "type": "date" },
+        { "key": "operation_name", "label": "developer.graphql.col.operation", "type": "mono" },
+        { "key": "user_id", "label": "developer.graphql.col.user" },
+        { "key": "duration_ms", "label": "common.col.duration" },
+        { "key": "error_count", "label": "developer.graphql.col.errors" }
+      ]
+    },
+    {
+      "id": "persisted",
+      "label": "developer.graphql.tab.persisted",
+      "icon": "Save",
+      "dataSource": "/ext/developer/graphql/persisted",
+      "dataPath": "queries",
+      "columns": [
+        { "key": "name", "label": "common.col.name", "type": "mono" },
+        { "key": "description", "label": "common.col.description" },
+        { "key": "created_at", "label": "common.col.created", "type": "date" }
+      ],
+      "rowActions": [
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/developer/graphql/persisted/{id}",
+          "confirm": "developer.graphql.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/developer/graphql/persisted",
+        "fields": [
+          {
+            "name": "name",
+            "label": "common.col.name",
+            "required": true,
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "is_public",
+            "label": "developer.graphql.form.public",
+            "type": "boolean",
+            "colSpan": 1,
+            "default": false
+          },
+          {
+            "name": "description",
+            "label": "common.col.description",
+            "colSpan": 2
+          },
+          {
+            "name": "query",
+            "label": "developer.graphql.panel.query",
+            "type": "textarea",
+            "mono": true,
+            "required": true,
+            "rows": 8,
+            "colSpan": 2
+          },
+          {
+            "name": "allowed_roles",
+            "label": "developer.graphql.col.roles",
+            "type": "json",
+            "mono": true,
+            "rows": 2,
+            "colSpan": 2,
+            "default": "[]"
+          }
+        ]
+      }
+    },
+    {
+      "id": "policies",
+      "label": "developer.graphql.tab.policies",
+      "icon": "Shield",
+      "dataSource": "/ext/developer/graphql/field-policies",
+      "dataPath": "policies",
+      "columns": [
+        { "key": "collection", "label": "common.col.collection", "type": "mono" },
+        { "key": "field", "label": "common.col.field", "type": "mono" },
+        { "key": "allowed_roles", "label": "developer.graphql.col.roles" }
+      ],
+      "rowActions": [
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/developer/graphql/field-policies/{id}",
+          "confirm": "developer.graphql.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/developer/graphql/field-policies",
+        "fields": [
+          {
+            "name": "collection",
+            "label": "common.col.collection",
+            "required": true,
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "field",
+            "label": "common.col.field",
+            "required": true,
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "allowed_roles",
+            "label": "developer.graphql.col.roles",
+            "type": "json",
+            "mono": true,
+            "rows": 2,
+            "colSpan": 1,
+            "default": "[]"
+          },
+          {
+            "name": "deny_roles",
+            "label": "developer.graphql.form.denyRoles",
+            "type": "json",
+            "mono": true,
+            "rows": 2,
+            "colSpan": 1,
+            "default": "[]"
+          }
+        ]
+      }
+    }
+  ]
+}

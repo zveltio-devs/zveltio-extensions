@@ -31,3 +31,8 @@ provocat-o. Ori sunt amândouă, ori niciuna.
 
 Autorizarea pe geofences a fost reparată în auditul din 2026-07-20. **Nu o
 raporta ca deschisă.**
+
+
+## SDUI migration (2026-08-21)
+Branch: feat/sdui-postgis-graphql-db
+Geofences CRUD only. Tradeoff: proximity search + clustering tabs deferred.
