@@ -147,7 +147,16 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
 
   app.post('/products', zValidator('json', z.object({
     name: z.string().min(1),
-    sku: z.string().optional(),
+    // REQUIRED, because `zvd_products.sku` is `TEXT NOT NULL`. Declaring it
+    // optional meant a request without one passed validation and then hit a
+    // not-null violation in Postgres: a 500 where the caller had made an
+    // ordinary mistake and deserved a 400 naming the field.
+    //
+    // Requiring it breaks nobody — a create without a SKU has never succeeded on
+    // any install, it 500'd every time, so there is no working caller to
+    // protect. The variant `sku` further down stays optional: that column is
+    // nullable.
+    sku: z.string().min(1, 'sku is required'),
     barcode: z.string().optional(),
     category: z.string().optional(),
     description: z.string().optional(),
