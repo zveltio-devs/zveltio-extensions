@@ -1,6 +1,7 @@
 {
   "sms.btn.saveTemplate": "Salvează șablonul",
   "sms.btn.send": "Trimite SMS",
+  "sms.btn.sendSms": "Send SMS",
   "sms.col.body": "Conținut",
   "sms.col.provider": "Furnizor",
   "sms.col.sentAt": "Trimis la",
