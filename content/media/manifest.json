@@ -17,7 +17,8 @@
       {
         "path": "/admin/media",
         "label": "Media Library",
-        "icon": "Image"
+        "icon": "Image",
+        "schema": "schemas/media.json"
       }
     ],
     "navGroup": "content"
@@ -34,7 +35,7 @@
     "bundlePeers": true
   },
   "integrity": {
-    "engineSha256": "2232ad7673f0c5cdb4debde8a1b7fc4f4c744282aaaccf1e5f51a491540aea92",
+    "engineSha256": "2434ff2b2f8ed8a893bc81d7395fbbe4b7b085e9243e190e947dcdba05f95697",
     "sourceSha256": "a15fbdd02bb06612788a2b0368dcc21ddac579d634f7b0332e836c853abc8ea5"
   },
   "resources": [

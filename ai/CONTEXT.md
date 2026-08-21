@@ -169,3 +169,7 @@ acoperă toate cele șapte locuri, inclusiv `compliance/ro/procurement`).
 - **`POST /query`, `/alchemist/analyze`, `/admin/templates`** — 400/500 cu
   payload-urile mele; schemele reale n-au fost încă citite. Nu le raporta ca
   defecte până nu sunt.
+
+## SDUI migration (2026-08-21)
+Branch: feat/sdui-tier3-reduced
+Templates+query history; chat/query/schema/search deferred.

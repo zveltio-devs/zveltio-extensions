@@ -1,0 +1,147 @@
+{
+  "sduiSchema": 1,
+  "title": "developer.byod.title",
+  "subtitle": "developer.byod.subtitle",
+  "newLabel": "developer.byod.ui.new_connection_profile",
+  "resources": [
+    {
+      "id": "profiles",
+      "label": "developer.byod.tab.profiles",
+      "icon": "Database",
+      "dataSource": "/ext/developer/byod/profiles",
+      "dataPath": "profiles",
+      "columns": [
+        {
+          "key": "name",
+          "label": "developer.byod.form.name"
+        },
+        {
+          "key": "db_schema",
+          "label": "developer.byod.col.schema",
+          "type": "mono"
+        },
+        {
+          "key": "auto_sync",
+          "label": "common.col.active",
+          "type": "boolean"
+        },
+        {
+          "key": "last_sync_at",
+          "label": "developer.byod.col.lastScan",
+          "type": "date"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "edit",
+          "kind": "edit",
+          "label": "common.edit",
+          "icon": "Pencil"
+        },
+        {
+          "id": "run",
+          "icon": "Play",
+          "label": "developer.byod.btn.scan",
+          "method": "POST",
+          "endpoint": "/ext/developer/byod/profiles/{id}/run"
+        },
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/developer/byod/profiles/{id}",
+          "confirm": "developer.byod.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/developer/byod/profiles",
+        "fields": [
+          {
+            "name": "name",
+            "label": "developer.byod.form.name",
+            "required": true,
+            "colSpan": 2
+          },
+          {
+            "name": "description",
+            "label": "common.col.description",
+            "type": "textarea",
+            "colSpan": 2
+          },
+          {
+            "name": "db_schema",
+            "label": "developer.byod.form.schema",
+            "default": "public",
+            "colSpan": 1
+          },
+          {
+            "name": "exclude_patterns",
+            "label": "developer.byod.form.excludePatterns",
+            "type": "json",
+            "mono": true,
+            "default": "[]",
+            "colSpan": 1
+          },
+          {
+            "name": "auto_sync",
+            "label": "common.col.active",
+            "type": "boolean",
+            "default": false,
+            "colSpan": 1
+          },
+          {
+            "name": "sync_interval_hours",
+            "label": "developer.byod.form.syncInterval",
+            "type": "number",
+            "default": 24,
+            "colSpan": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "history",
+      "label": "developer.byod.tab.history",
+      "icon": "History",
+      "dataSource": "/ext/developer/byod/history",
+      "dataPath": "history",
+      "columns": [
+        {
+          "key": "profile_name",
+          "label": "developer.byod.col.profile"
+        },
+        {
+          "key": "schema_name",
+          "label": "developer.byod.col.schema",
+          "type": "mono"
+        },
+        {
+          "key": "tables_found",
+          "label": "developer.byod.col.tablesFound"
+        },
+        {
+          "key": "tables_imported",
+          "label": "developer.byod.col.tables"
+        },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "completed": "badge-success",
+              "failed": "badge-error"
+            }
+          }
+        },
+        {
+          "key": "created_at",
+          "label": "developer.byod.col.started",
+          "type": "date"
+        }
+      ]
+    }
+  ]
+}
