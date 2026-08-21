@@ -36,9 +36,15 @@
       "rowActions": [
         {
           "id": "edit",
-          "kind": "edit",
+          "kind": "navigate",
+          "href": "/forms/{id}",
           "icon": "Pencil",
           "label": "common.edit"
+        },
+        {
+          "id": "responses",
+          "kind": "navigate",
+          "href": "/forms/{id}?panel=responses",
         },
         {
           "id": "delete",
@@ -83,15 +89,6 @@
             "type": "boolean",
             "default": true,
             "colSpan": 1
-          },
-          {
-            "name": "fields",
-            "label": "forms.col.fields",
-            "type": "json",
-            "mono": true,
-            "rows": 2,
-            "colSpan": 2,
-            "default": "[]"
           }
         ]
       }

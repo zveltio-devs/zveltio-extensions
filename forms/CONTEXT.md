@@ -1,5 +1,5 @@
 # Context
 
 ## SDUI migration (2026-08-21)
-Branch: feat/sdui-tier3-reduced
-List CRUD only; builder stays at /admin/forms/[id].
+List: `schemas/forms.json`. Builder + responses: `schemas/form-builder.json`
+at `/admin/forms/:id` (`layout: builder`, secondary panel for submissions).
