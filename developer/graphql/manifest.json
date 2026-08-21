@@ -18,7 +18,8 @@
       {
         "path": "/admin/developer/graphql",
         "label": "GraphQL",
-        "icon": "Network"
+        "icon": "Network",
+        "schema": "schemas/graphql.json"
       }
     ],
     "navGroup": "developer"
@@ -35,7 +36,7 @@
     "bundlePeers": true
   },
   "integrity": {
-    "engineSha256": "930449ec7dbff94cb087577a760f4bd9db105fc893c280e24cbb447165cb9bb3",
+    "engineSha256": "2834fac7307067b58951356636f8c41daa6f8c2c5f5a88a8203fecd87999c496",
     "sourceSha256": "975d0d18742d2dca56f85d8cc57fd71601e9c694dc6206e919e689117b7fa703"
   }
 }

@@ -21,7 +21,8 @@
       {
         "path": "/admin/geospatial/postgis",
         "label": "PostGIS",
-        "icon": "Map"
+        "icon": "Map",
+        "schema": "schemas/postgis.json"
       }
     ],
     "navGroup": "developer"
@@ -52,7 +53,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "32021365b8f01f7405347c03677c60ff1db0eb19aac3a2ecc4e0fd6685459657",
+    "engineSha256": "2adad05d7790e232a7cd6d008fbff1aeed1d8f02c6c3befd0d0a2c3c0e6d95d2",
     "sourceSha256": "9fe96a92376bb71379ee2ab4ffddaceb8ea23de58dfcd7342462f01b862598e4"
   },
   "resources": [
