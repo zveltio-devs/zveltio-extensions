@@ -1,0 +1,62 @@
+{
+  "sduiSchema": 1,
+  "title": "geospatial.postgis.title",
+  "subtitle": "geospatial.postgis.subtitle",
+  "newLabel": "geospatial.postgis.btn.create",
+  "resources": [
+    {
+      "id": "geofences",
+      "label": "geospatial.postgis.tab.geofences",
+      "icon": "MapPin",
+      "dataSource": "/ext/geospatial/postgis/geofences",
+      "dataPath": "geofences",
+      "columns": [
+        { "key": "name", "label": "common.col.name" },
+        { "key": "description", "label": "common.col.description" },
+        {
+          "key": "is_active",
+          "label": "common.col.status",
+          "type": "boolean"
+        },
+        { "key": "created_at", "label": "common.col.created", "type": "date" }
+      ],
+      "rowActions": [
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/geospatial/postgis/geofences/{id}",
+          "confirm": "geospatial.postgis.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/geospatial/postgis/geofences",
+        "fields": [
+          {
+            "name": "name",
+            "label": "common.col.name",
+            "required": true,
+            "colSpan": 2
+          },
+          {
+            "name": "description",
+            "label": "common.col.description",
+            "colSpan": 2
+          },
+          {
+            "name": "coordinates",
+            "label": "geospatial.postgis.ui.coordinates_geojson_polygon_array",
+            "type": "json",
+            "mono": true,
+            "required": true,
+            "rows": 5,
+            "colSpan": 2,
+            "default": "[]"
+          }
+        ]
+      }
+    }
+  ]
+}

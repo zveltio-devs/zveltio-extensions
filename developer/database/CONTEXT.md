@@ -18,3 +18,8 @@ saved queries" te trimite să cauți o funcție stricată, nu o coloană inexist
 Extensia scria cândva în `zv_saved_queries` — tabelul **engine-ului** pentru
 interogări pe colecții, cu alt model mental. Tabelul ei e
 `zv_developer_database_snippets`. O extensie nu alterează tabelele engine-ului.
+
+
+## SDUI migration (2026-08-21)
+Branch: feat/sdui-postgis-graphql-db
+Master-detail tables → columns. Tradeoff: no sample row browser (dynamic columns).
