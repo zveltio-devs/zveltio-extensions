@@ -24,6 +24,7 @@
   "forms.form.name": "Nom",
   "forms.form.slug": "Slug",
   "forms.form.targetCollection": "Collection cible",
+  "forms.hint.dragReorder": "Glisser pour réordonner",
   "forms.section.details": "Détails",
   "forms.section.fields": "Champs",
   "forms.subtitle": "Gérer les formulaires intégrables et leurs soumissions",

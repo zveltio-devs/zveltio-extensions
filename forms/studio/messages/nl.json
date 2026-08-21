@@ -24,6 +24,7 @@
   "forms.form.name": "Naam",
   "forms.form.slug": "Slug",
   "forms.form.targetCollection": "Doelcollectie",
+  "forms.hint.dragReorder": "Sleep om te herordenen",
   "forms.section.details": "Details",
   "forms.section.fields": "Velden",
   "forms.subtitle": "Beheer insluitbare formulieren en hun inzendingen",

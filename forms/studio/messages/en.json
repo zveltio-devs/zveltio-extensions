@@ -24,6 +24,7 @@
   "forms.form.name": "Name",
   "forms.form.slug": "Slug",
   "forms.form.targetCollection": "Target collection",
+  "forms.hint.dragReorder": "Drag to reorder",
   "forms.section.details": "Details",
   "forms.section.fields": "Fields",
   "forms.subtitle": "Manage embeddable forms and their submissions",
