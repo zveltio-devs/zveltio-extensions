@@ -1,0 +1,103 @@
+{
+  "sduiSchema": 1,
+  "title": "forms.title",
+  "resources": [
+    {
+      "id": "formBuilder",
+      "layout": "builder",
+      "builder": {
+        "loadEndpoint": "/ext/forms/{id}",
+        "loadPath": "form",
+        "saveEndpoint": "/ext/forms/{id}",
+        "saveMethod": "PATCH",
+        "backHref": "/forms",
+        "backLabel": "forms.btn.back",
+        "fields": [
+          {
+            "name": "name",
+            "label": "forms.form.name",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "slug",
+            "label": "forms.form.slug",
+            "required": true,
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "description",
+            "label": "forms.form.description",
+            "colSpan": 2
+          },
+          {
+            "name": "target_collection",
+            "label": "forms.form.targetCollection",
+            "colSpan": 1
+          },
+          {
+            "name": "active",
+            "label": "forms.form.active",
+            "type": "boolean",
+            "colSpan": 1
+          }
+        ],
+        "collection": {
+          "key": "fields",
+          "idKey": "id",
+          "addLabel": "forms.btn.addField",
+          "emptyLabel": "forms.empty.fields",
+          "itemFields": [
+            {
+              "name": "label",
+              "label": "forms.field.label",
+              "colSpan": 1
+            },
+            {
+              "name": "type",
+              "label": "forms.field.type",
+              "type": "select",
+              "options": [
+                { "value": "text", "label": "text" },
+                { "value": "textarea", "label": "textarea" },
+                { "value": "email", "label": "email" },
+                { "value": "number", "label": "number" },
+                { "value": "select", "label": "select" },
+                { "value": "multiselect", "label": "multiselect" },
+                { "value": "checkbox", "label": "checkbox" },
+                { "value": "date", "label": "date" },
+                { "value": "file", "label": "file" }
+              ]
+            },
+            {
+              "name": "placeholder",
+              "label": "forms.field.placeholder"
+            },
+            {
+              "name": "required",
+              "label": "forms.field.required",
+              "type": "boolean"
+            }
+          ],
+          "optionsField": {
+            "name": "options",
+            "label": "forms.field.options",
+            "visibleWhen": { "field": "type", "in": ["select", "multiselect"] },
+            "format": "csv"
+          }
+        },
+        "secondary": {
+          "id": "responses",
+          "label": "forms.btn.responses",
+          "dataSource": "/ext/forms/{id}/responses",
+          "dataPath": "submissions",
+          "answerLabelsFrom": "form.fields",
+          "timestampKey": "created_at",
+          "dataKey": "data",
+          "emptyLabel": "forms.empty.responses"
+        }
+      }
+    }
+  ]
+}
