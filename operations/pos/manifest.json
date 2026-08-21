@@ -21,7 +21,8 @@
       {
         "path": "/admin/pos",
         "label": "POS",
-        "icon": "ScanLine"
+        "icon": "ScanLine",
+        "schema": "schemas/pos.json"
       }
     ],
     "navGroup": "operations"
@@ -39,7 +40,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "c330246b192bea4b3d38898edb844de9424581a3466a0a72b988ae69c712910e",
+    "engineSha256": "b6ad35c21e7b71a467735740408009603acd6aaa1b679a8d85f35e34700c9a45",
     "sourceSha256": "14bb578b53d88cdbabae25eb6baca16d7fde888d9aabb4f115b1a9a991ca7fe5"
   },
   "resources": [

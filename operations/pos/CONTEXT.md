@@ -22,3 +22,8 @@ distincte, deci clienții fără adresă nu sunt afectați.
 
 **Nu există ecran de vânzare.** Motorul are rute; interfața de casă lipsește.
 Rămâne pe lista P0.
+
+## SDUI migration (2026-08-21)
+
+SDUI sessions master + orders; close via prompt
+Branch: `feat/sdui-crud-batch`

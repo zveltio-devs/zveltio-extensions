@@ -29,3 +29,8 @@ contractul SDK. Până atunci fiecare citire își loghează cauza cu etichetă.
 `number` pe comenzi, contracte și note de recepție; `cui` pe furnizori; `code` pe
 liniile de buget. Toate erau unice pe instanță — două primării nu puteau avea
 același furnizor.
+
+## SDUI migration (2026-08-21)
+
+SDUI 3-tab schema; order lines via JSON field
+Branch: `feat/sdui-crud-batch`
