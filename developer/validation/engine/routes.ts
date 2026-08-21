@@ -2,6 +2,10 @@
  * Data Validation Rules — Enterprise Edition
  *
  * POST   /api/validation/generate                        — AI → structured rule (admin)
+ * GET    /api/validation/rules                           — list all rules (optional ?collection=)
+ * POST   /api/validation/rules                           — create rule (admin; collection in body)
+ * PATCH  /api/validation/rules/:id                       — toggle is_active (admin)
+ * DELETE /api/validation/rules/:id                       — delete rule (admin)
  * GET    /api/validation/groups                          — list rule groups (optional ?collection=)
  * POST   /api/validation/groups                          — create rule group (admin)
  * DELETE /api/validation/groups/:id                      — delete rule group (admin)
@@ -46,7 +50,12 @@ const RuleCreateSchema = z.object({
 });
 
 const RuleUpdateSchema = z.object({
-  is_active: z.boolean(),
+  // Studio SDUI editable cells send string option values; coerce so toggles work.
+  is_active: z.union([
+    z.boolean(),
+    z.literal('true').transform(() => true),
+    z.literal('false').transform(() => false),
+  ]),
 });
 
 const TestCaseCreateSchema = z.object({
@@ -280,12 +289,95 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
     if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
 
     const id = c.req.param('id');
-    const res = await (db as any)
-      .deleteFrom('zvd_validation_rule_groups')
-      .where('id', '=', id)
+    await sql`DELETE FROM zvd_validation_rule_groups WHERE id = ${id}`.execute(db);
+    return c.json({ success: true });
+  });
+
+  // ── Flat /rules — SDUI-friendly surface ───────────────────────────────────
+  // The collection-scoped routes below stay for API clients. The Studio page
+  // used to call `/rules` and `/ai-generate` which never existed; SDUI talks to
+  // these instead, with `collection` in the body (create) or query (list).
+
+  const FlatRuleCreateSchema = RuleCreateSchema.extend({
+    collection: z.string().min(1).max(100),
+  });
+
+  app.get('/rules', async (c) => {
+    const collection = c.req.query('collection');
+    let q = (db as any).selectFrom('zv_validation_rules').selectAll().orderBy('created_at', 'desc');
+    if (collection) q = q.where('collection', '=', collection);
+    const rules = await q.execute();
+    return c.json({ data: rules });
+  });
+
+  app.post('/rules', zValidator('json', FlatRuleCreateSchema), async (c) => {
+    const user = c.get('user');
+    const isAdmin = await checkPermission(user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
+
+    const body = c.req.valid('json');
+    const refusal = expressionRefusal(body.rule_type, body.rule_config, checkValidationExpression);
+    if (refusal) return c.json({ error: refusal }, 400);
+
+    const rule = await (db as any)
+      .insertInto('zv_validation_rules')
+      .values({
+        collection: body.collection,
+        field_name: body.field_name,
+        rule_type: body.rule_type,
+        nl_description: body.nl_description || null,
+        rule_config: JSON.stringify(body.rule_config),
+        error_message: body.error_message,
+        is_active: true,
+        created_by: user.id,
+      })
+      .returningAll()
       .executeTakeFirst();
 
-    if ((res?.numDeletedRows ?? 0n) === 0n) return c.json({ error: 'Not found' }, 404);
+    invalidateRulesCache(body.collection);
+    return c.json({ rule }, 201);
+  });
+
+  app.patch('/rules/:id', zValidator('json', RuleUpdateSchema), async (c) => {
+    const user = c.get('user');
+    const isAdmin = await checkPermission(user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
+
+    const id = c.req.param('id');
+    const body = c.req.valid('json');
+    const existing = await (db as any)
+      .selectFrom('zv_validation_rules')
+      .select(['id', 'collection'])
+      .where('id', '=', id)
+      .executeTakeFirst();
+    if (!existing) return c.json({ error: 'Not found' }, 404);
+
+    const rule = await (db as any)
+      .updateTable('zv_validation_rules')
+      .set({ is_active: body.is_active, updated_at: new Date() })
+      .where('id', '=', id)
+      .returningAll()
+      .executeTakeFirst();
+
+    invalidateRulesCache(existing.collection);
+    return c.json({ rule });
+  });
+
+  app.delete('/rules/:id', async (c) => {
+    const user = c.get('user');
+    const isAdmin = await checkPermission(user.id, 'admin', '*');
+    if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
+
+    const id = c.req.param('id');
+    const existing = await (db as any)
+      .selectFrom('zv_validation_rules')
+      .select(['id', 'collection'])
+      .where('id', '=', id)
+      .executeTakeFirst();
+    if (!existing) return c.json({ error: 'Not found' }, 404);
+
+    await (db as any).deleteFrom('zv_validation_rules').where('id', '=', id).execute();
+    invalidateRulesCache(existing.collection);
     return c.json({ success: true });
   });
 
