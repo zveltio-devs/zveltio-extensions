@@ -614,9 +614,34 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
     if (!pq) return c.json({ errors: [{ message: 'Persisted query not found' }] }, 404);
 
     // Check access: public or user role in allowed_roles
-    if (!pq.is_public && pq.allowed_roles?.length > 0) {
-      const isAdmin = await checkPermission(session.user.id, 'admin', '*');
-      if (!isAdmin) return c.json({ errors: [{ message: 'Access denied to this persisted query' }] }, 403);
+    // Access: public, or the caller holds one of `allowed_roles`, or admin.
+    //
+    // The comment here said "user role in allowed_roles" and the code never
+    // looked at the contents — only at the LENGTH. Two consequences, both wrong
+    // in the permissive direction:
+    //
+    //   * a non-public query with an EMPTY allowed_roles skipped the check
+    //     entirely, so "private, nobody listed" meant "any signed-in user".
+    //     That is the default a query gets when someone marks it private and
+    //     does not fill the list in.
+    //   * the roles that WERE listed decided nothing. A query restricted to
+    //     `finance` was reachable by any admin and refused to finance itself.
+    //
+    // An empty list on a private query now denies: a restriction naming nobody
+    // restricts to nobody. Admin still passes — the instance-wide override the
+    // rest of this file already grants.
+    if (!pq.is_public) {
+      const allowed: string[] = Array.isArray(pq.allowed_roles) ? pq.allowed_roles : [];
+      // `getUserRoles` is on ctx, NOT ctx.internals — a distinction this repo has
+      // tripped over before, and typecheck is the only thing that catches it.
+      const roles = await ctx.getUserRoles(session.user.id);
+      const hasRole = allowed.some((r) => roles.includes(r));
+      if (!hasRole) {
+        const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+        if (!isAdmin) {
+          return c.json({ errors: [{ message: 'Access denied to this persisted query' }] }, 403);
+        }
+      }
     }
 
     let variables: Record<string, any> = {};
