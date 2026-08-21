@@ -6,6 +6,7 @@
   "operations.traceability.action.details": "Detalii",
   "operations.traceability.action.haccp": "Verificare HACCP",
   "operations.traceability.action.initiateRecall": "Inițiază recall",
+  "operations.traceability.action.openScanner": "Deschide scanerul",
   "operations.traceability.action.parseGs1": "Parsează GS1",
   "operations.traceability.action.release": "Release",
   "operations.traceability.action.resolve": "Resolve",

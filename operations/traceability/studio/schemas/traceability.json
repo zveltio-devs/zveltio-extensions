@@ -3,6 +3,15 @@
   "title": "operations.traceability.title",
   "subtitle": "operations.traceability.subtitle",
   "newLabel": "common.new",
+  "pageActions": [
+    {
+      "id": "openScanner",
+      "kind": "open",
+      "icon": "ScanSearch",
+      "label": "operations.traceability.action.openScanner",
+      "endpoint": "/ext/operations/traceability/app/"
+    }
+  ],
   "resources": [
     {
       "id": "suppliers",
