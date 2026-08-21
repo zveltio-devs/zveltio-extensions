@@ -1,7 +1,7 @@
 {
   "sduiSchema": 1,
-  "title": "approvals.title",
-  "subtitle": "approvals.subtitle",
+  "title": "workflow.approvals.title",
+  "subtitle": "workflow.approvals.subtitle",
   "resources": [
     {
       "id": "requests",
@@ -21,15 +21,15 @@
         {
           "param": "my_pending",
           "options": [
-            { "value": "", "label": "approvals.tabAll" },
-            { "value": "true", "label": "approvals.tabMyPending" }
+            { "value": "", "label": "common.filter.all" },
+            { "value": "true", "label": "workflow.approvals.tab.myPending" }
           ]
         }
       ],
       "columns": [
-        { "key": "workflow_name", "label": "approvals.col.workflow" },
+        { "key": "workflow_name", "label": "workflow.approvals.col.workflow" },
         { "key": "collection", "label": "common.col.collection", "type": "mono" },
-        { "key": "requested_by_name", "label": "approvals.col.requester" },
+        { "key": "requested_by_name", "label": "workflow.approvals.col.requestedBy" },
         {
           "key": "status",
           "label": "common.col.status",
@@ -62,7 +62,7 @@
             "fields": [
               {
                 "name": "comment",
-                "label": "approvals.comment",
+                "label": "workflow.approvals.comment",
                 "type": "textarea",
                 "rows": 3
               }
@@ -84,7 +84,7 @@
             "fields": [
               {
                 "name": "comment",
-                "label": "approvals.comment",
+                "label": "workflow.approvals.comment",
                 "type": "textarea",
                 "rows": 3,
                 "required": true
@@ -95,10 +95,10 @@
         {
           "id": "cancel",
           "icon": "Ban",
-          "label": "approvals.cancelRequest",
+          "label": "workflow.approvals.cancelRequest",
           "method": "POST",
           "endpoint": "/ext/workflow/approvals/{id}/cancel",
-          "confirm": "approvals.cancelConfirm",
+          "confirm": "workflow.approvals.confirmCancel",
           "visibleWhen": { "field": "status", "equals": "pending" }
         }
       ]

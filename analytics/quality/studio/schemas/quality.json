@@ -46,7 +46,7 @@
         {
           "id": "dismiss",
           "icon": "X",
-          "label": "common.dismiss",
+          "label": "analytics.quality.btn.dismiss",
           "method": "POST",
           "endpoint": "/ext/analytics/quality/issues/{id}/dismiss"
         }
@@ -74,11 +74,11 @@
             "colSpan": 2,
             "default": "full",
             "options": [
-              { "value": "full", "label": "Full" },
-              { "value": "duplicates", "label": "Duplicates" },
-              { "value": "anomalies", "label": "Anomalies" },
-              { "value": "missing_data", "label": "Missing data" },
-              { "value": "normalization", "label": "Normalization" }
+              { "value": "full", "label": "analytics.quality.scan.full" },
+              { "value": "duplicates", "label": "analytics.quality.scan.duplicates" },
+              { "value": "anomalies", "label": "analytics.quality.scan.anomalies" },
+              { "value": "missing_data", "label": "analytics.quality.scan.missing_data" },
+              { "value": "normalization", "label": "analytics.quality.scan.normalization" }
             ]
           }
         ]
