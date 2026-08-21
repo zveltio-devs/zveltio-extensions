@@ -1,0 +1,88 @@
+{
+  "sduiSchema": 1,
+  "title": "analytics.quality.title",
+  "subtitle": "analytics.quality.subtitle",
+  "newLabel": "analytics.quality.btn.runScan",
+  "resources": [
+    {
+      "id": "scans",
+      "dataSource": "/ext/analytics/quality/scan/{masterId}/issues",
+      "dataPath": "issues",
+      "master": {
+        "dataSource": "/ext/analytics/quality/scans",
+        "dataPath": "scans",
+        "idKey": "id",
+        "titleKey": "collection",
+        "subtitle": { "keys": ["status", "issues_found"], "sep": " · " },
+        "badgeKey": "status"
+      },
+      "detailActions": [
+        {
+          "id": "dismissAll",
+          "icon": "XCircle",
+          "label": "analytics.quality.btn.dismissAll",
+          "method": "POST",
+          "endpoint": "/ext/analytics/quality/scan/{id}/dismiss-all"
+        }
+      ],
+      "columns": [
+        {
+          "key": "severity",
+          "label": "analytics.quality.col.severity",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "critical": "badge-error",
+              "high": "badge-warning",
+              "info": "badge-info"
+            }
+          }
+        },
+        { "key": "issue_type", "label": "common.col.type" },
+        { "key": "field_name", "label": "common.col.field", "type": "mono" },
+        { "key": "description", "label": "common.col.description" }
+      ],
+      "rowActions": [
+        {
+          "id": "dismiss",
+          "icon": "X",
+          "label": "analytics.quality.btn.dismiss",
+          "method": "POST",
+          "endpoint": "/ext/analytics/quality/issues/{id}/dismiss"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/analytics/quality/scan",
+        "fields": [
+          {
+            "name": "collection",
+            "label": "analytics.quality.ui.collection",
+            "type": "relation",
+            "required": true,
+            "colSpan": 2,
+            "relation": {
+              "dataSource": "/api/collections",
+              "dataPath": "collections",
+              "valueKey": "name",
+              "labelKey": "name"
+            }
+          },
+          {
+            "name": "scan_type",
+            "label": "analytics.quality.ui.scanType",
+            "type": "select",
+            "colSpan": 2,
+            "default": "full",
+            "options": [
+              { "value": "full", "label": "analytics.quality.scan.full" },
+              { "value": "duplicates", "label": "analytics.quality.scan.duplicates" },
+              { "value": "anomalies", "label": "analytics.quality.scan.anomalies" },
+              { "value": "missing_data", "label": "analytics.quality.scan.missing_data" },
+              { "value": "normalization", "label": "analytics.quality.scan.normalization" }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

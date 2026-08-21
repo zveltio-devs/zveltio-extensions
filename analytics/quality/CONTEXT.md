@@ -40,3 +40,8 @@ trebuie să anunțe.
 `ON CONFLICT` pe pragurile SLA e `(tenant_id, collection)`, în forma de
 constructor Kysely (`oc.columns([...])`) — nu în text. Un sweep care caută doar
 `ON CONFLICT (` în SQL o ratează.
+
+## SDUI migration (2026-08-21)
+
+SDUI master-detail scans→issues; New runs POST /scan
+Branch: `feat/sdui-crud-batch`

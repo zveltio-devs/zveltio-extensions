@@ -1,0 +1,107 @@
+{
+  "sduiSchema": 1,
+  "title": "workflow.approvals.title",
+  "subtitle": "workflow.approvals.subtitle",
+  "resources": [
+    {
+      "id": "requests",
+      "dataSource": "/ext/workflow/approvals",
+      "dataPath": "requests",
+      "filters": [
+        {
+          "param": "status",
+          "options": [
+            { "value": "", "label": "common.filter.all" },
+            { "value": "pending", "label": "common.status.pending" },
+            { "value": "approved", "label": "common.status.approved" },
+            { "value": "rejected", "label": "common.status.rejected" },
+            { "value": "cancelled", "label": "common.status.cancelled" }
+          ]
+        },
+        {
+          "param": "my_pending",
+          "options": [
+            { "value": "", "label": "common.filter.all" },
+            { "value": "true", "label": "workflow.approvals.tab.myPending" }
+          ]
+        }
+      ],
+      "columns": [
+        { "key": "workflow_name", "label": "workflow.approvals.col.workflow" },
+        { "key": "collection", "label": "common.col.collection", "type": "mono" },
+        { "key": "requested_by_name", "label": "workflow.approvals.col.requestedBy" },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "pending": "badge-warning",
+              "approved": "badge-success",
+              "rejected": "badge-error",
+              "cancelled": "badge-ghost"
+            }
+          }
+        },
+        { "key": "requested_at", "label": "common.col.date", "type": "date" },
+        { "key": "priority", "label": "common.col.priority" }
+      ],
+      "rowActions": [
+        {
+          "id": "approve",
+          "icon": "CheckCircle",
+          "variant": "text-success",
+          "label": "common.approve",
+          "method": "POST",
+          "endpoint": "/ext/workflow/approvals/{id}/decide",
+          "body": { "decision": "approved" },
+          "visibleWhen": { "field": "status", "equals": "pending" },
+          "prompt": {
+            "title": "common.approve",
+            "submitLabel": "common.approve",
+            "fields": [
+              {
+                "name": "comment",
+                "label": "workflow.approvals.comment",
+                "type": "textarea",
+                "rows": 3
+              }
+            ]
+          }
+        },
+        {
+          "id": "reject",
+          "icon": "XCircle",
+          "variant": "text-error",
+          "label": "common.reject",
+          "method": "POST",
+          "endpoint": "/ext/workflow/approvals/{id}/decide",
+          "body": { "decision": "rejected" },
+          "visibleWhen": { "field": "status", "equals": "pending" },
+          "prompt": {
+            "title": "common.reject",
+            "submitLabel": "common.reject",
+            "fields": [
+              {
+                "name": "comment",
+                "label": "workflow.approvals.comment",
+                "type": "textarea",
+                "rows": 3,
+                "required": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "cancel",
+          "icon": "Ban",
+          "label": "workflow.approvals.cancelRequest",
+          "method": "POST",
+          "endpoint": "/ext/workflow/approvals/{id}/cancel",
+          "confirm": "workflow.approvals.confirmCancel",
+          "visibleWhen": { "field": "status", "equals": "pending" }
+        }
+      ]
+    }
+  ]
+}
