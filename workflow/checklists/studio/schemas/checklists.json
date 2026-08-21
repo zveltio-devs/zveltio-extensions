@@ -1,12 +1,12 @@
 {
   "sduiSchema": 1,
-  "title": "checklists.title",
-  "subtitle": "checklists.subtitle",
-  "newLabel": "checklists.btn.new",
+  "title": "workflow.checklists.title",
+  "subtitle": "workflow.checklists.pageSubtitle",
+  "newLabel": "workflow.checklists.btn.new",
   "resources": [
     {
       "id": "templates",
-      "label": "checklists.tab.templates",
+      "label": "workflow.checklists.tab.templates",
       "icon": "ClipboardList",
       "dataSource": "/ext/workflow/checklists/templates?all=1",
       "dataPath": "templates",
@@ -36,31 +36,31 @@
         ],
         "repeatable": {
           "name": "items",
-          "label": "checklists.items",
-          "addLabel": "checklists.btn.addItem",
+          "label": "workflow.checklists.col.items",
+          "addLabel": "workflow.checklists.btn.add",
           "min": 0,
           "columns": [
             { "name": "label", "label": "common.col.label", "required": true },
             { "name": "required", "label": "common.required", "type": "boolean", "default": false },
-            { "name": "order_idx", "label": "common.col.order", "type": "number", "default": 0 }
+            { "name": "order_idx", "label": "common.col.index", "type": "number", "default": 0 }
           ]
         }
       }
     },
     {
       "id": "summary",
-      "label": "checklists.tab.summary",
+      "label": "workflow.checklists.tab.instances",
       "icon": "BarChart2",
       "dataSource": "/ext/workflow/checklists/summary",
       "dataPath": "checklists",
       "columns": [
         { "key": "name", "label": "common.col.name" },
         { "key": "collection", "label": "common.col.collection", "type": "mono" },
-        { "key": "record_id", "label": "common.col.record", "type": "mono" },
-        { "key": "checked_items", "label": "checklists.col.checked", "type": "mono" },
-        { "key": "total_items", "label": "checklists.col.total", "type": "mono" },
-        { "key": "progress", "label": "checklists.col.progress", "type": "mono" },
-        { "key": "updated_at", "label": "common.col.updated", "type": "date" }
+        { "key": "record_id", "label": "workflow.checklists.col.record", "type": "mono" },
+        { "key": "checked_items", "label": "workflow.checklists.col.checked", "type": "mono" },
+        { "key": "total_items", "label": "common.col.total", "type": "mono" },
+        { "key": "progress", "label": "workflow.checklists.col.progress", "type": "mono" },
+        { "key": "updated_at", "label": "common.col.created", "type": "date" }
       ]
     }
   ]

@@ -1,6 +1,14 @@
 {
+  "analytics.quality.btn.dismiss": "Dismiss",
+  "analytics.quality.btn.dismissAll": "Dismiss all",
+  "analytics.quality.btn.runScan": "Run scan",
   "analytics.quality.col.severity": "Ernst",
   "analytics.quality.empty": "Nog geen gegevens.",
+  "analytics.quality.scan.anomalies": "Anomalies",
+  "analytics.quality.scan.duplicates": "Duplicates",
+  "analytics.quality.scan.full": "Full",
+  "analytics.quality.scan.missing_data": "Missing data",
+  "analytics.quality.scan.normalization": "Normalization",
   "analytics.quality.subtitle": "Collecties scannen op gegevenskwaliteitsproblemen",
   "analytics.quality.tab.history": "Scangeschiedenis",
   "analytics.quality.tab.issues": "Problemen",
@@ -8,5 +16,6 @@
   "analytics.quality.ui.collection": "Collectie",
   "analytics.quality.ui.no_issues_to_show_run_a_scan": "Geen problemen om weer te geven. Voer een scan uit.",
   "analytics.quality.ui.no_scans_yet": "Nog geen scans.",
+  "analytics.quality.ui.scanType": "Scan type",
   "analytics.quality.ui.select_collection": "— Select collection —"
 }
