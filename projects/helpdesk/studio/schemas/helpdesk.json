@@ -16,7 +16,7 @@
         {
           "param": "status",
           "options": [
-            { "value": "", "label": "common.filter.all" },
+            { "value": "all", "label": "common.filter.all" },
             { "value": "open", "label": "projects.helpdesk.status.open" },
             { "value": "in_progress", "label": "projects.helpdesk.status.in_progress" },
             { "value": "pending_customer", "label": "projects.helpdesk.status.pending_customer" },
