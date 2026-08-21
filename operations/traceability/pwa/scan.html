@@ -222,8 +222,9 @@
   }
 
   function goLogin() {
-    const redirect = encodeURIComponent(window.location.pathname + window.location.search);
-    window.location.href = `/admin/login?redirect=${redirect}`;
+    // Stay under Studio base — core safeRedirect does not allow /ext/*.
+    // After login, open the scanner again from Traceability → Open floor scanner.
+    window.location.href = '/admin/login?redirect=' + encodeURIComponent('/admin/traceability');
   }
 
   function setMode(m) {
