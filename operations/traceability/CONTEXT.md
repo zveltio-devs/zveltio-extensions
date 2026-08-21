@@ -62,3 +62,7 @@ După — `status=pending`, iar cele patru rute răspund 200.
 
 ## SDUI migration (2026-08-21)
 Reduced list CRUD via schema. Nested-route validator fixed in @zveltio/sdk.
+
+## SDUI ops (2026-08-21)
+Lots/production/dispatches/recalls + reception-log as tabs. Deferred: lot tree/QR, HACCP consume UI, GS1 scan, multi-report switcher.
+Forms builder + lots/[id] tree remain out of scope for checklist/list primitives.

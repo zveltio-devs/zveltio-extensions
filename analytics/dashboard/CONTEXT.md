@@ -40,3 +40,6 @@ nu se compun cu instrucţiuni paralele pe aceeaşi conexiune). Panoul rulează �
 
 `health` care raportează `ok: false` **e** semnalul onest — nu-l face să tacă.
 Verificările de permisiuni care refuză închis sunt corecte așa.
+
+## SDUI (2026-08-21)
+Role×widget admin via SchemaPage `layout: checklist` (new host primitive).

@@ -317,6 +317,543 @@
           }
         ]
       }
+    },
+    {
+      "id": "lots",
+      "label": "operations.traceability.tab.lots",
+      "icon": "Package",
+      "dataSource": "/ext/operations/traceability/lots",
+      "dataPath": "data",
+      "columns": [
+        {
+          "key": "lot_number",
+          "label": "operations.traceability.col.lot",
+          "type": "mono"
+        },
+        {
+          "key": "item_name",
+          "label": "operations.traceability.form.product"
+        },
+        {
+          "key": "lot_type",
+          "label": "common.col.type",
+          "type": "badge"
+        },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "quarantine": "badge-warning",
+              "available": "badge-success",
+              "exhausted": "badge-ghost",
+              "recalled": "badge-error"
+            }
+          }
+        },
+        {
+          "key": "quantity_remaining",
+          "label": "operations.traceability.col.qty"
+        },
+        {
+          "key": "unit",
+          "label": "operations.traceability.form.unit"
+        },
+        {
+          "key": "supplier_name",
+          "label": "operations.traceability.form.supplier"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "release",
+          "icon": "CheckCircle",
+          "label": "operations.traceability.action.release",
+          "method": "PATCH",
+          "endpoint": "/ext/operations/traceability/lots/{id}/release",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "quarantine"
+          }
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/operations/traceability/lots",
+        "fields": [
+          {
+            "name": "item_id",
+            "label": "operations.traceability.form.product",
+            "type": "relation",
+            "required": true,
+            "colSpan": 1,
+            "relation": {
+              "dataSource": "/ext/operations/traceability/items",
+              "dataPath": "data",
+              "valueKey": "id",
+              "labelKey": "name"
+            }
+          },
+          {
+            "name": "lot_type",
+            "label": "common.col.type",
+            "type": "select",
+            "default": "inbound",
+            "colSpan": 1,
+            "options": [
+              {
+                "value": "inbound"
+              },
+              {
+                "value": "internal"
+              },
+              {
+                "value": "outbound"
+              }
+            ]
+          },
+          {
+            "name": "quantity_initial",
+            "label": "operations.traceability.col.qty",
+            "type": "number",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "unit",
+            "label": "operations.traceability.form.unit",
+            "type": "select",
+            "required": true,
+            "colSpan": 1,
+            "options": [
+              {
+                "value": "kg"
+              },
+              {
+                "value": "g"
+              },
+              {
+                "value": "l"
+              },
+              {
+                "value": "ml"
+              },
+              {
+                "value": "buc"
+              },
+              {
+                "value": "cutie"
+              },
+              {
+                "value": "sac"
+              },
+              {
+                "value": "palet"
+              }
+            ]
+          },
+          {
+            "name": "supplier_id",
+            "label": "operations.traceability.form.supplier",
+            "type": "relation",
+            "colSpan": 1,
+            "relation": {
+              "dataSource": "/ext/operations/traceability/suppliers",
+              "dataPath": "data",
+              "valueKey": "id",
+              "labelKey": "name"
+            }
+          },
+          {
+            "name": "location_id",
+            "label": "operations.traceability.form.location",
+            "type": "relation",
+            "colSpan": 1,
+            "relation": {
+              "dataSource": "/ext/operations/traceability/locations",
+              "dataPath": "data",
+              "valueKey": "id",
+              "labelKey": "warehouse"
+            }
+          },
+          {
+            "name": "best_before_date",
+            "label": "operations.traceability.col.bbd",
+            "type": "date",
+            "colSpan": 1
+          },
+          {
+            "name": "reception_date",
+            "label": "operations.traceability.col.reception",
+            "type": "date",
+            "colSpan": 1
+          },
+          {
+            "name": "invoice_ref",
+            "label": "operations.traceability.col.invoice",
+            "colSpan": 1
+          },
+          {
+            "name": "supplier_lot_ref",
+            "label": "operations.traceability.col.supplierLot",
+            "colSpan": 1
+          },
+          {
+            "name": "notes",
+            "label": "common.col.notes",
+            "type": "textarea",
+            "colSpan": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "production",
+      "label": "operations.traceability.tab.production",
+      "icon": "Factory",
+      "dataSource": "/ext/operations/traceability/production",
+      "dataPath": "data",
+      "columns": [
+        {
+          "key": "order_number",
+          "label": "operations.traceability.col.order",
+          "type": "mono"
+        },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "draft": "badge-ghost",
+              "in_progress": "badge-warning",
+              "completed": "badge-success"
+            }
+          }
+        },
+        {
+          "key": "planned_quantity",
+          "label": "operations.traceability.col.planned"
+        },
+        {
+          "key": "unit",
+          "label": "operations.traceability.form.unit"
+        },
+        {
+          "key": "started_at",
+          "label": "operations.traceability.col.started",
+          "type": "date"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "start",
+          "icon": "Play",
+          "label": "operations.traceability.action.start",
+          "method": "PATCH",
+          "endpoint": "/ext/operations/traceability/production/{id}/start",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "draft"
+          }
+        },
+        {
+          "id": "complete",
+          "icon": "CheckCircle",
+          "label": "operations.traceability.action.complete",
+          "method": "PATCH",
+          "endpoint": "/ext/operations/traceability/production/{id}/complete",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "in_progress"
+          },
+          "prompt": {
+            "title": "operations.traceability.action.complete",
+            "fields": [
+              {
+                "name": "actual_quantity",
+                "label": "operations.traceability.col.actual",
+                "type": "number",
+                "required": true
+              }
+            ]
+          }
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/operations/traceability/production",
+        "fields": [
+          {
+            "name": "output_item_id",
+            "label": "operations.traceability.form.product",
+            "type": "relation",
+            "required": true,
+            "colSpan": 2,
+            "relation": {
+              "dataSource": "/ext/operations/traceability/items",
+              "dataPath": "data",
+              "valueKey": "id",
+              "labelKey": "name"
+            }
+          },
+          {
+            "name": "planned_quantity",
+            "label": "operations.traceability.col.planned",
+            "type": "number",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "unit",
+            "label": "operations.traceability.form.unit",
+            "type": "select",
+            "required": true,
+            "colSpan": 1,
+            "options": [
+              {
+                "value": "kg"
+              },
+              {
+                "value": "g"
+              },
+              {
+                "value": "l"
+              },
+              {
+                "value": "ml"
+              },
+              {
+                "value": "buc"
+              },
+              {
+                "value": "cutie"
+              },
+              {
+                "value": "sac"
+              },
+              {
+                "value": "palet"
+              }
+            ]
+          },
+          {
+            "name": "notes",
+            "label": "common.col.notes",
+            "type": "textarea",
+            "colSpan": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "dispatches",
+      "label": "operations.traceability.tab.dispatches",
+      "icon": "Truck",
+      "dataSource": "/ext/operations/traceability/dispatches",
+      "dataPath": "data",
+      "columns": [
+        {
+          "key": "id",
+          "label": "operations.traceability.col.dispatchId",
+          "type": "mono"
+        },
+        {
+          "key": "lot_number",
+          "label": "operations.traceability.col.lot",
+          "type": "mono"
+        },
+        {
+          "key": "item_name",
+          "label": "operations.traceability.form.product"
+        },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge"
+        },
+        {
+          "key": "created_at",
+          "label": "common.col.created",
+          "type": "date"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "confirm",
+          "icon": "CheckCircle",
+          "label": "operations.traceability.action.confirm",
+          "method": "POST",
+          "endpoint": "/ext/operations/traceability/dispatches/{id}/confirm",
+          "prompt": {
+            "fields": [
+              {
+                "name": "quantity_dispatched",
+                "label": "operations.traceability.col.qty",
+                "type": "number",
+                "required": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "cancel",
+          "icon": "XCircle",
+          "variant": "text-error",
+          "label": "common.cancel",
+          "method": "POST",
+          "endpoint": "/ext/operations/traceability/dispatches/{id}/cancel",
+          "prompt": {
+            "fields": [
+              {
+                "name": "notes",
+                "label": "common.col.notes",
+                "type": "textarea"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "recalls",
+      "label": "operations.traceability.tab.recalls",
+      "icon": "AlertTriangle",
+      "dataSource": "/ext/operations/traceability/recalls",
+      "dataPath": "data",
+      "columns": [
+        {
+          "key": "lot_number",
+          "label": "operations.traceability.col.lot",
+          "type": "mono"
+        },
+        {
+          "key": "item_name",
+          "label": "operations.traceability.form.product"
+        },
+        {
+          "key": "scope",
+          "label": "operations.traceability.col.scope",
+          "type": "badge"
+        },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge"
+        },
+        {
+          "key": "reason",
+          "label": "common.col.reason"
+        },
+        {
+          "key": "initiated_at",
+          "label": "common.col.created",
+          "type": "date"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "resolve",
+          "icon": "CheckCircle",
+          "label": "operations.traceability.action.resolve",
+          "method": "PATCH",
+          "endpoint": "/ext/operations/traceability/recalls/{id}/resolve",
+          "visibleWhen": {
+            "field": "status",
+            "in": [
+              "open",
+              "in_progress",
+              "active"
+            ]
+          },
+          "prompt": {
+            "fields": [
+              {
+                "name": "resolution_notes",
+                "label": "common.col.notes",
+                "type": "textarea",
+                "required": true
+              }
+            ]
+          }
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/operations/traceability/recalls/initiate",
+        "fields": [
+          {
+            "name": "lot_id",
+            "label": "operations.traceability.col.lot",
+            "type": "relation",
+            "required": true,
+            "colSpan": 2,
+            "relation": {
+              "dataSource": "/ext/operations/traceability/lots",
+              "dataPath": "data",
+              "valueKey": "id",
+              "labelKey": "lot_number"
+            }
+          },
+          {
+            "name": "scope",
+            "label": "operations.traceability.col.scope",
+            "type": "select",
+            "required": true,
+            "colSpan": 2,
+            "options": [
+              {
+                "value": "internal",
+                "label": "operations.traceability.scope.internal"
+              },
+              {
+                "value": "market_withdrawal",
+                "label": "operations.traceability.scope.market"
+              },
+              {
+                "value": "consumer_recall",
+                "label": "operations.traceability.scope.consumer"
+              }
+            ]
+          },
+          {
+            "name": "reason",
+            "label": "common.col.reason",
+            "type": "textarea",
+            "required": true,
+            "colSpan": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "receptionLog",
+      "label": "operations.traceability.tab.reports",
+      "icon": "FileText",
+      "dataSource": "/ext/operations/traceability/reports/reception-log",
+      "dataPath": "data",
+      "columns": [
+        {
+          "key": "Num\u0103r lot",
+          "label": "operations.traceability.col.lot",
+          "type": "mono"
+        },
+        {
+          "key": "Produs",
+          "label": "operations.traceability.form.product"
+        },
+        {
+          "key": "Cantitate",
+          "label": "operations.traceability.col.qty"
+        },
+        {
+          "key": "Furnizor",
+          "label": "operations.traceability.form.supplier"
+        },
+        {
+          "key": "Data/Ora",
+          "label": "common.col.created",
+          "type": "date"
+        }
+      ]
     }
   ]
 }

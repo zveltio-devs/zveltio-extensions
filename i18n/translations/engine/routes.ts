@@ -93,7 +93,14 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
 
   app.post(
     '/locales',
-    zValidator('json', z.object({ code: z.string().min(2).max(10), name: z.string().min(1), is_default: z.boolean().default(false) })),
+    zValidator(
+      'json',
+      z.object({
+        code: z.string().min(2).max(10),
+        name: z.string().min(1),
+        is_default: z.boolean().default(false),
+      }),
+    ),
     async (c) => {
       const { code, name, is_default } = c.req.valid('json');
       if (is_default) {

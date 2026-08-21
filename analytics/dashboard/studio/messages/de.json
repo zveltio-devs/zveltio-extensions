@@ -1,8 +1,16 @@
 {
+  "analytics.dashboard.customLayout": "Custom layout set for this role.",
+  "analytics.dashboard.defaultLayout": "Using the system default (not customized).",
   "analytics.dashboard.includedWidgets": "Enthaltene Widgets",
   "analytics.dashboard.noWidgets": "Keine Widgets ausgewählt.",
   "analytics.dashboard.requiresPermission": "Erfordert diese Berechtigung",
   "analytics.dashboard.subtitle": "Lege das Standard-Dashboard je Rolle fest. Nutzer personalisieren es darüber hinaus.",
   "analytics.dashboard.title": "Dashboards",
+  "analytics.dashboard.widget.activity": "Recent activity",
+  "analytics.dashboard.widget.data": "Data & records",
+  "analytics.dashboard.widget.health": "System health",
+  "analytics.dashboard.widget.people": "People",
+  "analytics.dashboard.widget.trust": "Data protection",
+  "analytics.dashboard.widget.welcome": "Welcome",
   "analytics.dashboard.widgetsForRole": "Widgets für diese Rolle"
 }

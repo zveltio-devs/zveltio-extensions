@@ -1,8 +1,16 @@
 {
+  "analytics.dashboard.customLayout": "Custom layout set for this role.",
+  "analytics.dashboard.defaultLayout": "Using the system default (not customized).",
   "analytics.dashboard.includedWidgets": "Widgeturi incluse",
   "analytics.dashboard.noWidgets": "Niciun widget selectat.",
   "analytics.dashboard.requiresPermission": "Necesită această permisiune",
   "analytics.dashboard.subtitle": "Setează dashboard-ul implicit pentru fiecare rol. Utilizatorii îl personalizează peste.",
   "analytics.dashboard.title": "Tablouri de bord",
+  "analytics.dashboard.widget.activity": "Recent activity",
+  "analytics.dashboard.widget.data": "Data & records",
+  "analytics.dashboard.widget.health": "System health",
+  "analytics.dashboard.widget.people": "People",
+  "analytics.dashboard.widget.trust": "Data protection",
+  "analytics.dashboard.widget.welcome": "Welcome",
   "analytics.dashboard.widgetsForRole": "Widgeturi pentru acest rol"
 }

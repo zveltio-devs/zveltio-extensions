@@ -20,7 +20,8 @@
       {
         "path": "/admin/analytics/dashboard",
         "label": "Analytics Dashboard",
-        "icon": "LayoutDashboard"
+        "icon": "LayoutDashboard",
+        "schema": "schemas/dashboard.json"
       }
     ]
   },
@@ -32,7 +33,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "d8a1d7ab09113b00b6c5eb87a1aa421072cf9c5fcc8c85d7c00612b27c121835",
+    "engineSha256": "8ecc990f774311d5648e7c81465ab8cfe6afa138aa33fb716e755b762a10a8c4",
     "sourceSha256": "98df2c2bf7eade5d1c12c5af8fcf20acb653b3bc8066a79754115808e2942a67"
   }
 }
