@@ -1,0 +1,189 @@
+{
+  "sduiSchema": 1,
+  "title": "content.pages.title",
+  "subtitle": "content.pages.subtitle",
+  "newLabel": "content.pages.newSite",
+  "resources": [
+    {
+      "id": "sites",
+      "label": "content.pages.allSites",
+      "icon": "Globe",
+      "dataSource": "/ext/content/pages/sites",
+      "dataPath": "sites",
+      "columns": [
+        {
+          "key": "name",
+          "label": "common.col.name"
+        },
+        {
+          "key": "slug",
+          "label": "common.col.slug",
+          "type": "mono"
+        },
+        {
+          "key": "is_active",
+          "label": "common.col.active",
+          "type": "boolean"
+        },
+        {
+          "key": "is_public",
+          "label": "content.pages.public",
+          "type": "boolean"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/content/pages/sites/{slug}",
+          "confirm": "content.pages.confirmDeleteSite"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/content/pages/sites",
+        "fields": [
+          {
+            "name": "name",
+            "label": "common.col.name",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "slug",
+            "label": "common.col.slug",
+            "required": true,
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "description",
+            "label": "common.col.description",
+            "type": "textarea",
+            "colSpan": 2
+          },
+          {
+            "name": "base_path",
+            "label": "content.pages.field.basePath",
+            "default": "/",
+            "colSpan": 1
+          },
+          {
+            "name": "is_active",
+            "label": "common.col.active",
+            "type": "boolean",
+            "default": false,
+            "colSpan": 1
+          },
+          {
+            "name": "is_public",
+            "label": "content.pages.public",
+            "type": "boolean",
+            "default": false,
+            "colSpan": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "pages",
+      "label": "content.pages.openPages",
+      "icon": "Layout",
+      "dataSource": "/ext/content/pages/pages",
+      "dataPath": "pages",
+      "columns": [
+        {
+          "key": "title",
+          "label": "common.col.title"
+        },
+        {
+          "key": "slug",
+          "label": "common.col.slug",
+          "type": "mono"
+        },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "draft": "badge-warning",
+              "published": "badge-success",
+              "archived": "badge-ghost"
+            }
+          }
+        },
+        {
+          "key": "locale",
+          "label": "common.col.locale"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/content/pages/pages/{id}",
+          "confirm": "content.pages.confirmDeletePage"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/content/pages/pages",
+        "fields": [
+          {
+            "name": "title",
+            "label": "common.col.title",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "slug",
+            "label": "common.col.slug",
+            "required": true,
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "locale",
+            "label": "common.col.locale",
+            "default": "en",
+            "colSpan": 1
+          },
+          {
+            "name": "status",
+            "label": "common.col.status",
+            "type": "select",
+            "default": "draft",
+            "colSpan": 1,
+            "options": [
+              {
+                "value": "draft",
+                "label": "common.status.draft"
+              },
+              {
+                "value": "published",
+                "label": "content.pages.status.published"
+              },
+              {
+                "value": "archived",
+                "label": "content.pages.status.archived"
+              }
+            ]
+          },
+          {
+            "name": "blocks",
+            "label": "content.pages.field.blocks",
+            "type": "json",
+            "mono": true,
+            "default": "[]",
+            "colSpan": 2
+          }
+        ]
+      }
+    }
+  ]
+}

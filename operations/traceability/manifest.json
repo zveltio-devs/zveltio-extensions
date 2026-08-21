@@ -25,7 +25,8 @@
       {
         "path": "/admin/traceability",
         "label": "Traceability",
-        "icon": "scan-search"
+        "icon": "scan-search",
+        "schema": "schemas/traceability.json"
       }
     ],
     "navGroup": "operations"
@@ -43,7 +44,7 @@
     "bundlePeers": true
   },
   "integrity": {
-    "engineSha256": "11389d4d741885b52ba155ac1c417eeee69f7c37fa3e53ceb29f63c055fa9fa6",
+    "engineSha256": "356fcf99ffef8bee761c495fedd843350a01168b8fd9b9ab3cbb192601489a5f",
     "sourceSha256": "48187959c47218cb8b55d93c6e2ca1c194d3f5fa233a7d1f3fe9b8457b515a6c"
   }
 }

@@ -58,3 +58,7 @@ După — `status=pending`, iar cele patru rute răspund 200.
 - Rapoartele au fost apăsate, nu **validate**: `ansvsa-traceability` întoarce
   200 cu `from`/`to`, dar dacă conținutul lui satisface cerința ANSVSA nu poate
   fi stabilit de aici.
+
+
+## SDUI migration (2026-08-21)
+Reduced list CRUD via schema. Nested-route validator fixed in @zveltio/sdk.
