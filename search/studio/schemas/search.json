@@ -1,0 +1,119 @@
+{
+  "sduiSchema": 1,
+  "title": "search.title",
+  "subtitle": "search.subtitle",
+  "newLabel": "search.configureIndex",
+  "resources": [
+    {
+      "id": "indexes",
+      "label": "search.tab.indexes",
+      "icon": "Database",
+      "dataSource": "/ext/search/indexes",
+      "dataPath": "indexes",
+      "columns": [
+        { "key": "collection", "label": "search.ui.collection", "type": "mono" },
+        { "key": "index_name", "label": "search.col.indexName", "type": "mono" },
+        {
+          "key": "provider",
+          "label": "common.col.provider",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "meilisearch": "badge-warning",
+              "typesense": "badge-info"
+            }
+          }
+        },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "active": "badge-success",
+              "inactive": "badge-ghost"
+            }
+          }
+        },
+        { "key": "last_synced_at", "label": "search.col.lastSynced", "type": "date" }
+      ],
+      "rowActions": [
+        {
+          "id": "sync",
+          "icon": "RefreshCw",
+          "label": "search.btn.sync",
+          "method": "POST",
+          "endpoint": "/ext/search/indexes/{collection}/sync",
+          "visibleWhen": { "field": "status", "equals": "active" }
+        },
+        {
+          "id": "remove",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/search/indexes/{collection}",
+          "confirm": "search.confirm.removeIndex",
+          "visibleWhen": { "field": "status", "equals": "active" }
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/search/indexes",
+        "fields": [
+          {
+            "name": "collection",
+            "label": "search.ui.collection",
+            "required": true,
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "index_name",
+            "label": "search.ui.index_name",
+            "required": true,
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "provider",
+            "label": "common.col.provider",
+            "type": "select",
+            "colSpan": 2,
+            "default": "meilisearch",
+            "options": [
+              { "value": "meilisearch", "label": "search.provider.meilisearch" },
+              { "value": "typesense", "label": "search.provider.typesense" }
+            ]
+          },
+          {
+            "name": "searchable_fields",
+            "label": "search.ui.searchable_fields_comma_separated",
+            "type": "json",
+            "mono": true,
+            "rows": 2,
+            "colSpan": 2,
+            "default": "[]"
+          },
+          {
+            "name": "filterable_fields",
+            "label": "search.ui.filterable_fields",
+            "type": "json",
+            "mono": true,
+            "rows": 2,
+            "colSpan": 1,
+            "default": "[]"
+          },
+          {
+            "name": "sortable_fields",
+            "label": "search.ui.sortable_fields",
+            "type": "json",
+            "mono": true,
+            "rows": 2,
+            "colSpan": 1,
+            "default": "[]"
+          }
+        ]
+      }
+    }
+  ]
+}

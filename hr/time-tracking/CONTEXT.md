@@ -67,3 +67,9 @@ static n-o poate urmări. Handlerele o declară acum explicit:
 `// permission: delegated to hr.employment.mayActFor`. E mai slab decât să vezi
 apelul — o afirmație, nu o dovadă — dar e greppabil și obligă delegarea să fie
 scrisă, nu dedusă.
+
+
+## SDUI migration (2026-08-21)
+Branch: feat/sdui-search-time-docs
+Projects + entries tabs. Timer start/stop as row actions (API: task_description).
+Tradeoff: no live running-timer banner.

@@ -1,6 +1,8 @@
 {
   "hr.time-tracking.badge.billable": "Facturabil",
   "hr.time-tracking.badge.internal": "Intern",
+  "hr.time-tracking.btn.startTimer": "Start timer",
+  "hr.time-tracking.btn.stopTimer": "Stop timer",
   "hr.time-tracking.col.billable": "Facturabil",
   "hr.time-tracking.col.client": "Client",
   "hr.time-tracking.col.hours": "Ore",
@@ -18,12 +20,13 @@
   "hr.time-tracking.title": "Pontaj",
   "hr.time-tracking.ui.description": "Descriere",
   "hr.time-tracking.ui.hourly_rate": "Tarif orar",
-  "hr.time-tracking.ui.new_project": "Proiect nou",
   "hr.time-tracking.ui.newProjectBtn": "Proiect nou",
+  "hr.time-tracking.ui.new_project": "Proiect nou",
   "hr.time-tracking.ui.project": "Proiect *",
   "hr.time-tracking.ui.project_name": "Nume proiect *",
   "hr.time-tracking.ui.select_project": "— Select project —",
-  "hr.time-tracking.ui.start_timer": "Pornește cronometrul",
   "hr.time-tracking.ui.startTimerBtn": "Pornește cronometrul",
-  "hr.time-tracking.ui.stopTimer": "Oprește cronometrul"
+  "hr.time-tracking.ui.start_timer": "Pornește cronometrul",
+  "hr.time-tracking.ui.stopTimer": "Oprește cronometrul",
+  "hr.timeTracking.confirmDelete": "Delete this time entry?"
 }

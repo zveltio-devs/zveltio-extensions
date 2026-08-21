@@ -1,0 +1,179 @@
+{
+  "sduiSchema": 1,
+  "title": "hr.time-tracking.title",
+  "subtitle": "hr.time-tracking.subtitle",
+  "newLabel": "hr.time-tracking.ui.newProjectBtn",
+  "resources": [
+    {
+      "id": "projects",
+      "label": "hr.time-tracking.tab.projects",
+      "icon": "FolderOpen",
+      "dataSource": "/ext/hr/time-tracking/projects",
+      "dataPath": "data",
+      "columns": [
+        { "key": "name", "label": "common.col.name" },
+        { "key": "client_name", "label": "hr.time-tracking.col.client" },
+        { "key": "hourly_rate", "label": "hr.time-tracking.col.rate" },
+        { "key": "currency", "label": "common.col.currency" },
+        {
+          "key": "is_billable",
+          "label": "hr.time-tracking.col.billable",
+          "type": "boolean"
+        },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "active": "badge-success",
+              "archived": "badge-ghost"
+            }
+          }
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "startTimer",
+          "icon": "Play",
+          "label": "hr.time-tracking.btn.startTimer",
+          "method": "POST",
+          "endpoint": "/ext/hr/time-tracking/timer/start",
+          "body": { "project_id": "{id}" },
+          "visibleWhen": { "field": "status", "equals": "active" },
+          "prompt": {
+            "title": "hr.time-tracking.btn.startTimer",
+            "submitLabel": "hr.time-tracking.btn.startTimer",
+            "fields": [
+              {
+                "name": "task_description",
+                "label": "hr.time-tracking.ui.description",
+                "type": "textarea",
+                "rows": 2
+              }
+            ]
+          }
+        },
+        {
+          "id": "stopTimer",
+          "icon": "Square",
+          "label": "hr.time-tracking.btn.stopTimer",
+          "method": "POST",
+          "endpoint": "/ext/hr/time-tracking/timer/stop"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/hr/time-tracking/projects",
+        "fields": [
+          {
+            "name": "name",
+            "label": "common.col.name",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "client_name",
+            "label": "hr.time-tracking.col.client",
+            "colSpan": 1
+          },
+          {
+            "name": "hourly_rate",
+            "label": "hr.time-tracking.ui.hourly_rate",
+            "type": "number",
+            "colSpan": 1,
+            "default": 0
+          },
+          {
+            "name": "currency",
+            "label": "hr.time-tracking.form.currency",
+            "colSpan": 1,
+            "default": "RON"
+          },
+          {
+            "name": "is_billable",
+            "label": "hr.time-tracking.form.billableProject",
+            "type": "boolean",
+            "colSpan": 2,
+            "default": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "entries",
+      "label": "hr.time-tracking.tab.entries",
+      "icon": "Clock",
+      "dataSource": "/ext/hr/time-tracking/entries",
+      "dataPath": "data",
+      "columns": [
+        { "key": "project_name", "label": "common.col.project" },
+        { "key": "task_description", "label": "hr.time-tracking.ui.description" },
+        { "key": "date", "label": "common.col.date", "type": "date" },
+        { "key": "duration_minutes", "label": "hr.time-tracking.col.hours" },
+        {
+          "key": "is_billable",
+          "label": "hr.time-tracking.col.billable",
+          "type": "boolean"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/hr/time-tracking/entries/{id}",
+          "confirm": "hr.timeTracking.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/hr/time-tracking/entries",
+        "fields": [
+          {
+            "name": "project_id",
+            "label": "common.col.project",
+            "type": "relation",
+            "required": true,
+            "colSpan": 1,
+            "relation": {
+              "dataSource": "/ext/hr/time-tracking/projects",
+              "dataPath": "data",
+              "valueKey": "id",
+              "labelKey": "name"
+            }
+          },
+          {
+            "name": "date",
+            "label": "common.col.date",
+            "type": "date",
+            "required": true,
+            "colSpan": 1,
+            "default": "today"
+          },
+          {
+            "name": "duration_minutes",
+            "label": "hr.time-tracking.col.hours",
+            "type": "number",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "is_billable",
+            "label": "hr.time-tracking.col.billable",
+            "type": "boolean",
+            "colSpan": 1,
+            "default": true
+          },
+          {
+            "name": "task_description",
+            "label": "hr.time-tracking.ui.description",
+            "type": "textarea",
+            "rows": 2,
+            "colSpan": 2
+          }
+        ]
+      }
+    }
+  ]
+}

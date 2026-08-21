@@ -21,20 +21,20 @@
     "pages": [
       {
         "path": "/admin/search",
-        "component": "./studio/src/pages/SearchPage.svelte",
         "label": "Search",
-        "icon": "search"
+        "icon": "search",
+        "schema": "schemas/search.json"
       }
     ],
     "navGroup": "developer"
   },
   "contributes": {
     "engine": true,
-    "studio": false,
+    "studio": true,
     "fieldTypes": []
   },
   "integrity": {
-    "engineSha256": "5d21d7a5410349d255ec71e35f8f4dc0c657031c95b10f5f94e6d0534dfaf5c0",
+    "engineSha256": "bb1000b737a2ca30dd8bbbac9f45f4fc876c944e55b2c87510076c4f3ec3edb7",
     "sourceSha256": "edfe681e4e28b886cc91037e1679ea6c412ffbf0055d0f75ae56b54cbeefffda"
   }
 }
