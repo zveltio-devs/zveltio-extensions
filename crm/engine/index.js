@@ -20041,7 +20041,8 @@ var extension = {
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
       join(import.meta.dir, "migrations/003_tenant_scoped_unique_keys.sql"),
       join(import.meta.dir, "migrations/004_contact_organization_role.sql"),
-      join(import.meta.dir, "migrations/005_contact_org_relation.sql")
+      join(import.meta.dir, "migrations/005_contact_org_relation.sql"),
+      join(import.meta.dir, "migrations/006_payment_status_compat.sql")
     ];
   },
   async register(app, ctx) {
