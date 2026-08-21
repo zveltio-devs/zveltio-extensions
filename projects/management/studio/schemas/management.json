@@ -1,0 +1,189 @@
+{
+  "sduiSchema": 1,
+  "title": "projects.management.title",
+  "subtitle": "projects.management.subtitle",
+  "newLabel": "projects.management.btn.newProject",
+  "resources": [
+    {
+      "id": "projects",
+      "dataSource": "/ext/projects/management/{masterId}/tasks",
+      "dataPath": "data",
+      "master": {
+        "dataSource": "/ext/projects/management",
+        "dataPath": "data",
+        "idKey": "id",
+        "titleKey": "name",
+        "subtitle": {
+          "keys": ["status", "priority"],
+          "sep": " · "
+        },
+        "badgeKey": "status"
+      },
+      "detailActions": [
+        {
+          "id": "newTask",
+          "icon": "Plus",
+          "label": "projects.management.btn.newTask",
+          "method": "POST",
+          "endpoint": "/ext/projects/management/{id}/tasks",
+          "prompt": {
+            "title": "projects.management.ui.new_task",
+            "submitLabel": "projects.management.btn.newTask",
+            "fields": [
+              {
+                "name": "title",
+                "label": "projects.management.form.title",
+                "required": true
+              },
+              {
+                "name": "status",
+                "label": "projects.management.col.status",
+                "type": "select",
+                "default": "todo",
+                "options": [
+                  { "value": "todo", "label": "projects.management.status.todo" },
+                  { "value": "in_progress", "label": "projects.management.status.in_progress" },
+                  { "value": "in_review", "label": "projects.management.status.in_review" },
+                  { "value": "done", "label": "projects.management.status.done" },
+                  { "value": "blocked", "label": "projects.management.status.blocked" }
+                ]
+              },
+              {
+                "name": "priority",
+                "label": "projects.management.col.priority",
+                "type": "select",
+                "default": "medium",
+                "options": [
+                  { "value": "low", "label": "projects.management.priority.low" },
+                  { "value": "medium", "label": "projects.management.priority.medium" },
+                  { "value": "high", "label": "projects.management.priority.high" },
+                  { "value": "critical", "label": "projects.management.priority.critical" }
+                ]
+              },
+              {
+                "name": "due_date",
+                "label": "projects.management.col.dueDate",
+                "type": "date"
+              },
+              {
+                "name": "description",
+                "label": "common.col.description",
+                "type": "textarea",
+                "rows": 3
+              }
+            ]
+          }
+        }
+      ],
+      "columns": [
+        { "key": "title", "label": "projects.management.form.title" },
+        {
+          "key": "status",
+          "label": "projects.management.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "todo": "badge-ghost",
+              "in_progress": "badge-info",
+              "in_review": "badge-warning",
+              "done": "badge-success",
+              "blocked": "badge-error"
+            }
+          },
+          "editable": {
+            "endpoint": "/ext/projects/management/tasks/{id}",
+            "options": [
+              { "value": "todo", "label": "projects.management.status.todo" },
+              { "value": "in_progress", "label": "projects.management.status.in_progress" },
+              { "value": "in_review", "label": "projects.management.status.in_review" },
+              { "value": "done", "label": "projects.management.status.done" },
+              { "value": "blocked", "label": "projects.management.status.blocked" }
+            ]
+          }
+        },
+        {
+          "key": "priority",
+          "label": "projects.management.col.priority",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "low": "badge-ghost",
+              "medium": "badge-info",
+              "high": "badge-warning",
+              "critical": "badge-error"
+            }
+          }
+        },
+        { "key": "due_date", "label": "projects.management.col.dueDate", "type": "date" }
+      ],
+      "rowActions": [
+        {
+          "id": "deleteTask",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/projects/management/tasks/{id}",
+          "confirm": "projects.management.confirmDeleteTask"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/projects/management",
+        "fields": [
+          {
+            "name": "name",
+            "label": "projects.management.form.name",
+            "required": true,
+            "colSpan": 2
+          },
+          {
+            "name": "description",
+            "label": "common.col.description",
+            "type": "textarea",
+            "rows": 3,
+            "colSpan": 2
+          },
+          {
+            "name": "start_date",
+            "label": "projects.management.ui.start_date",
+            "type": "date",
+            "colSpan": 1
+          },
+          {
+            "name": "end_date",
+            "label": "projects.management.ui.end_date",
+            "type": "date",
+            "colSpan": 1
+          },
+          {
+            "name": "status",
+            "label": "projects.management.col.status",
+            "type": "select",
+            "colSpan": 1,
+            "default": "planning",
+            "options": [
+              { "value": "planning", "label": "projects.management.projectStatus.planning" },
+              { "value": "active", "label": "projects.management.projectStatus.active" },
+              { "value": "on_hold", "label": "projects.management.projectStatus.on_hold" },
+              { "value": "completed", "label": "projects.management.projectStatus.completed" },
+              { "value": "cancelled", "label": "projects.management.projectStatus.cancelled" }
+            ]
+          },
+          {
+            "name": "priority",
+            "label": "projects.management.col.priority",
+            "type": "select",
+            "colSpan": 1,
+            "default": "medium",
+            "options": [
+              { "value": "low", "label": "projects.management.priority.low" },
+              { "value": "medium", "label": "projects.management.priority.medium" },
+              { "value": "high", "label": "projects.management.priority.high" },
+              { "value": "critical", "label": "projects.management.priority.critical" }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
