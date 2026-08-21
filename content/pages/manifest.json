@@ -25,7 +25,8 @@
       {
         "path": "/admin/pages",
         "label": "Pages",
-        "icon": "Layout"
+        "icon": "Layout",
+        "schema": "schemas/pages.json"
       }
     ],
     "navGroup": "content"
@@ -59,7 +60,7 @@
     "/robots.txt"
   ],
   "integrity": {
-    "engineSha256": "b05a4bbecef938063b6a7704db7876e0fd5032ecd322c3e9a05cfb0101b4fec0",
+    "engineSha256": "716fe98fb952fec415e7b77a1a3616f887a5e905db48705b849bb17a19d2630e",
     "sourceSha256": "49e955a015583fddff1bac23b4b70821e6c813942af556960e8413417ac5ffd4"
   }
 }

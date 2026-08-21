@@ -1,0 +1,322 @@
+{
+  "sduiSchema": 1,
+  "title": "operations.traceability.title",
+  "subtitle": "operations.traceability.subtitle",
+  "newLabel": "common.new",
+  "resources": [
+    {
+      "id": "suppliers",
+      "label": "operations.traceability.tab.suppliers",
+      "icon": "Truck",
+      "dataSource": "/ext/operations/traceability/suppliers",
+      "dataPath": "data",
+      "search": {
+        "param": "q",
+        "placeholder": "common.search"
+      },
+      "columns": [
+        {
+          "key": "name",
+          "label": "operations.traceability.form.supplier"
+        },
+        {
+          "key": "cui",
+          "label": "operations.traceability.col.cui",
+          "type": "mono"
+        },
+        {
+          "key": "email",
+          "label": "common.col.email"
+        },
+        {
+          "key": "is_active",
+          "label": "common.col.active",
+          "type": "boolean"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "edit",
+          "kind": "edit",
+          "label": "common.edit"
+        },
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/operations/traceability/suppliers/{id}",
+          "confirm": "ext.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/operations/traceability/suppliers",
+        "fields": [
+          {
+            "name": "name",
+            "label": "operations.traceability.form.supplier",
+            "required": true,
+            "colSpan": 2
+          },
+          {
+            "name": "cui",
+            "label": "operations.traceability.col.cui",
+            "colSpan": 1
+          },
+          {
+            "name": "contact_person",
+            "label": "operations.traceability.col.contact",
+            "colSpan": 1
+          },
+          {
+            "name": "phone",
+            "label": "common.col.phone",
+            "colSpan": 1
+          },
+          {
+            "name": "email",
+            "label": "common.col.email",
+            "type": "email",
+            "colSpan": 1
+          },
+          {
+            "name": "address",
+            "label": "common.col.address",
+            "colSpan": 2
+          },
+          {
+            "name": "is_active",
+            "label": "common.col.active",
+            "type": "boolean",
+            "default": true,
+            "colSpan": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "items",
+      "label": "operations.traceability.tab.items",
+      "icon": "Package",
+      "dataSource": "/ext/operations/traceability/items",
+      "dataPath": "data",
+      "search": {
+        "param": "q",
+        "placeholder": "common.search"
+      },
+      "columns": [
+        {
+          "key": "code",
+          "label": "operations.traceability.col.code",
+          "type": "mono"
+        },
+        {
+          "key": "name",
+          "label": "operations.traceability.form.product"
+        },
+        {
+          "key": "type",
+          "label": "common.col.type",
+          "type": "badge"
+        },
+        {
+          "key": "default_unit",
+          "label": "operations.traceability.form.unit"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "edit",
+          "kind": "edit",
+          "label": "common.edit"
+        },
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/operations/traceability/items/{id}",
+          "confirm": "ext.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/operations/traceability/items",
+        "fields": [
+          {
+            "name": "code",
+            "label": "operations.traceability.col.code",
+            "required": true,
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "name",
+            "label": "operations.traceability.form.product",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "type",
+            "label": "common.col.type",
+            "type": "select",
+            "required": true,
+            "colSpan": 1,
+            "options": [
+              {
+                "value": "raw",
+                "label": "raw"
+              },
+              {
+                "value": "semi",
+                "label": "semi"
+              },
+              {
+                "value": "finished",
+                "label": "finished"
+              }
+            ]
+          },
+          {
+            "name": "default_unit",
+            "label": "operations.traceability.form.unit",
+            "type": "select",
+            "required": true,
+            "colSpan": 1,
+            "options": [
+              {
+                "value": "kg"
+              },
+              {
+                "value": "g"
+              },
+              {
+                "value": "l"
+              },
+              {
+                "value": "ml"
+              },
+              {
+                "value": "buc"
+              },
+              {
+                "value": "cutie"
+              },
+              {
+                "value": "sac"
+              },
+              {
+                "value": "palet"
+              }
+            ]
+          },
+          {
+            "name": "shelf_life_days",
+            "label": "operations.traceability.col.shelfLife",
+            "type": "number",
+            "colSpan": 1
+          },
+          {
+            "name": "gtin",
+            "label": "operations.traceability.col.gtin",
+            "colSpan": 1
+          },
+          {
+            "name": "allergens",
+            "label": "operations.traceability.col.allergens",
+            "type": "json",
+            "default": "[]",
+            "colSpan": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "locations",
+      "label": "operations.traceability.tab.locations",
+      "icon": "MapPin",
+      "dataSource": "/ext/operations/traceability/locations",
+      "dataPath": "data",
+      "columns": [
+        {
+          "key": "warehouse",
+          "label": "operations.traceability.form.location"
+        },
+        {
+          "key": "row",
+          "label": "operations.traceability.col.row"
+        },
+        {
+          "key": "shelf",
+          "label": "operations.traceability.col.shelf"
+        },
+        {
+          "key": "temperature_zone",
+          "label": "operations.traceability.col.zone",
+          "type": "badge"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "edit",
+          "kind": "edit",
+          "label": "common.edit"
+        },
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/operations/traceability/locations/{id}",
+          "confirm": "ext.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/operations/traceability/locations",
+        "fields": [
+          {
+            "name": "warehouse",
+            "label": "operations.traceability.form.location",
+            "required": true,
+            "colSpan": 2
+          },
+          {
+            "name": "row",
+            "label": "operations.traceability.col.row",
+            "colSpan": 1
+          },
+          {
+            "name": "shelf",
+            "label": "operations.traceability.col.shelf",
+            "colSpan": 1
+          },
+          {
+            "name": "temperature_zone",
+            "label": "operations.traceability.col.zone",
+            "type": "select",
+            "colSpan": 2,
+            "options": [
+              {
+                "value": "ambient"
+              },
+              {
+                "value": "chilled"
+              },
+              {
+                "value": "frozen"
+              }
+            ]
+          },
+          {
+            "name": "description",
+            "label": "common.col.description",
+            "type": "textarea",
+            "colSpan": 2
+          }
+        ]
+      }
+    }
+  ]
+}
