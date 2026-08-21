@@ -1,0 +1,206 @@
+{
+  "sduiSchema": 1,
+  "title": "developer.api-docs.title",
+  "subtitle": "developer.api-docs.subtitle",
+  "newLabel": "common.new",
+  "resources": [
+    {
+      "id": "changelogs",
+      "label": "developer.api-docs.tab.changelog",
+      "icon": "BookOpen",
+      "dataSource": "/ext/developer/api-docs/changelogs",
+      "dataPath": "changelogs",
+      "columns": [
+        { "key": "version", "label": "common.col.version", "type": "mono" },
+        { "key": "title", "label": "common.col.title" },
+        {
+          "key": "is_published",
+          "label": "developer.api-docs.col.public",
+          "type": "boolean"
+        },
+        {
+          "key": "published_at",
+          "label": "common.col.date",
+          "type": "date"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "publish",
+          "label": "common.publish",
+          "icon": "Send",
+          "method": "POST",
+          "endpoint": "/ext/developer/api-docs/changelogs/{id}/publish",
+          "visibleWhen": { "field": "is_published", "equals": false }
+        },
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/developer/api-docs/changelogs/{id}",
+          "confirm": "ext.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/developer/api-docs/changelogs",
+        "fields": [
+          {
+            "name": "version",
+            "label": "common.col.version",
+            "required": true,
+            "mono": true,
+            "colSpan": 1,
+            "placeholder": "1.2.0"
+          },
+          {
+            "name": "title",
+            "label": "common.col.title",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "changes",
+            "label": "developer.api-docs.form.changes",
+            "type": "textarea",
+            "required": true,
+            "rows": 8,
+            "colSpan": 2
+          },
+          {
+            "name": "breaking_changes",
+            "label": "developer.api-docs.form.breaking",
+            "type": "textarea",
+            "rows": 4,
+            "colSpan": 2
+          },
+          {
+            "name": "migration_guide",
+            "label": "developer.api-docs.form.migration",
+            "type": "textarea",
+            "rows": 4,
+            "colSpan": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "custom",
+      "label": "developer.api-docs.tab.customPages",
+      "icon": "FileCode",
+      "dataSource": "/ext/developer/api-docs/custom-docs",
+      "dataPath": "docs",
+      "columns": [
+        { "key": "slug", "label": "common.col.slug", "type": "mono" },
+        { "key": "title", "label": "common.col.title" },
+        {
+          "key": "is_published",
+          "label": "developer.api-docs.col.public",
+          "type": "boolean"
+        },
+        {
+          "key": "updated_at",
+          "label": "developer.api-docs.col.updated",
+          "type": "date"
+        }
+      ],
+      "rowActions": [
+        { "id": "edit", "kind": "edit", "label": "common.edit" },
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/developer/api-docs/custom-docs/{id}",
+          "confirm": "ext.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/developer/api-docs/custom-docs",
+        "fields": [
+          {
+            "name": "slug",
+            "label": "developer.api-docs.ui.slug",
+            "required": true,
+            "mono": true,
+            "colSpan": 1,
+            "placeholder": "getting-started"
+          },
+          {
+            "name": "title",
+            "label": "developer.api-docs.ui.title",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "is_published",
+            "label": "developer.api-docs.ui.public",
+            "type": "boolean",
+            "colSpan": 1,
+            "default": true
+          },
+          {
+            "name": "sort_order",
+            "label": "common.col.index",
+            "type": "number",
+            "colSpan": 1,
+            "default": 0
+          },
+          {
+            "name": "body",
+            "label": "developer.api-docs.ui.body_markdown",
+            "type": "textarea",
+            "required": true,
+            "mono": true,
+            "rows": 14,
+            "colSpan": 2,
+            "default": "# New documentation page\n\nWrite content in Markdown."
+          }
+        ]
+      }
+    },
+    {
+      "id": "tokens",
+      "label": "developer.api-docs.tab.tokens",
+      "icon": "Key",
+      "dataSource": "/ext/developer/api-docs/tokens",
+      "dataPath": "tokens",
+      "columns": [
+        { "key": "name", "label": "common.col.name" },
+        { "key": "token_prefix", "label": "developer.api-docs.col.token", "type": "mono" },
+        { "key": "created_at", "label": "common.col.created", "type": "date" },
+        { "key": "last_used_at", "label": "developer.api-docs.col.lastUsed", "type": "date" }
+      ],
+      "rowActions": [
+        {
+          "id": "revoke",
+          "label": "common.revoke",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "method": "DELETE",
+          "endpoint": "/ext/developer/api-docs/tokens/{id}",
+          "confirm": "developer.api-docs.confirmRevoke"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/developer/api-docs/tokens",
+        "reveal": {
+          "key": "plaintext_token",
+          "title": "developer.api-docs.reveal.title",
+          "note": "developer.api-docs.reveal.note"
+        },
+        "fields": [
+          {
+            "name": "name",
+            "label": "common.col.name",
+            "required": true,
+            "colSpan": 2,
+            "placeholder": "developer.api-docs.placeholder.tokenName"
+          }
+        ]
+      }
+    }
+  ]
+}
