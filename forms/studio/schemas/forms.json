@@ -1,0 +1,100 @@
+{
+  "sduiSchema": 1,
+  "title": "forms.title",
+  "subtitle": "forms.subtitle",
+  "newLabel": "forms.btn.new",
+  "resources": [
+    {
+      "id": "forms",
+      "dataSource": "/ext/forms",
+      "dataPath": "forms",
+      "columns": [
+        {
+          "key": "name",
+          "label": "forms.form.name"
+        },
+        {
+          "key": "slug",
+          "label": "forms.form.slug",
+          "type": "mono"
+        },
+        {
+          "key": "active",
+          "label": "forms.form.active",
+          "type": "boolean"
+        },
+        {
+          "key": "submission_count",
+          "label": "forms.col.submissions"
+        },
+        {
+          "key": "target_collection",
+          "label": "forms.form.targetCollection",
+          "type": "mono"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "edit",
+          "kind": "edit",
+          "icon": "Pencil",
+          "label": "common.edit"
+        },
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/forms/{id}",
+          "confirm": "ext.confirm.deleteForm"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/forms",
+        "fields": [
+          {
+            "name": "name",
+            "label": "forms.form.name",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "slug",
+            "label": "forms.form.slug",
+            "required": true,
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "description",
+            "label": "forms.form.description",
+            "type": "textarea",
+            "colSpan": 2
+          },
+          {
+            "name": "target_collection",
+            "label": "forms.form.targetCollection",
+            "colSpan": 1
+          },
+          {
+            "name": "active",
+            "label": "forms.form.active",
+            "type": "boolean",
+            "default": true,
+            "colSpan": 1
+          },
+          {
+            "name": "fields",
+            "label": "forms.col.fields",
+            "type": "json",
+            "mono": true,
+            "rows": 2,
+            "colSpan": 2,
+            "default": "[]"
+          }
+        ]
+      }
+    }
+  ]
+}

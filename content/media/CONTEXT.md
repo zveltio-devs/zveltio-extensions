@@ -93,3 +93,7 @@ de succes pe o ștergere care nu șterge arată identic cu una care șterge.
 - `lib/cloud/trash.ts` și `lib/cloud/document-indexer.ts` rămân în engine și sunt
   împrumutate prin `ctx.internals`. După ce `routes/media.ts` pleacă, nu mai are
   niciun consumator din gazdă — decizie de proprietar.
+
+## SDUI migration (2026-08-21)
+Branch: feat/sdui-tier3-reduced
+Folders/tags/collections; file browser+upload deferred.

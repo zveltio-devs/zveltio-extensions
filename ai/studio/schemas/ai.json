@@ -1,0 +1,146 @@
+{
+  "sduiSchema": 1,
+  "title": "ai.title",
+  "subtitle": "ai.subtitle",
+  "newLabel": "common.new",
+  "resources": [
+    {
+      "id": "templates",
+      "label": "ai.tab.templates",
+      "icon": "FileText",
+      "dataSource": "/ext/ai/templates",
+      "dataPath": "templates",
+      "columns": [
+        {
+          "key": "name",
+          "label": "common.col.name"
+        },
+        {
+          "key": "category",
+          "label": "common.col.category"
+        },
+        {
+          "key": "model",
+          "label": "ai.provider.defaultModel"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/ai/admin/templates/{id}",
+          "confirm": "ext.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/ai/admin/templates",
+        "fields": [
+          {
+            "name": "name",
+            "label": "common.col.name",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "category",
+            "label": "common.col.category",
+            "default": "general",
+            "colSpan": 1
+          },
+          {
+            "name": "description",
+            "label": "common.col.description",
+            "colSpan": 2
+          },
+          {
+            "name": "system_prompt",
+            "label": "ai.templates.systemPrompt",
+            "type": "textarea",
+            "required": true,
+            "rows": 6,
+            "colSpan": 2
+          },
+          {
+            "name": "user_template",
+            "label": "ai.templates.userTemplate",
+            "type": "textarea",
+            "rows": 3,
+            "colSpan": 2
+          },
+          {
+            "name": "variables",
+            "label": "ai.templates.variables",
+            "type": "json",
+            "mono": true,
+            "default": "[]",
+            "colSpan": 2
+          },
+          {
+            "name": "model",
+            "label": "ai.provider.defaultModel",
+            "colSpan": 1
+          },
+          {
+            "name": "temperature",
+            "label": "ai.templates.temperature",
+            "type": "number",
+            "default": 0.7,
+            "colSpan": 1
+          },
+          {
+            "name": "max_tokens",
+            "label": "ai.templates.maxTokens",
+            "type": "number",
+            "default": 2048,
+            "colSpan": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "queryHistory",
+      "label": "ai.query.title",
+      "icon": "History",
+      "dataSource": "/ext/ai/query/history",
+      "dataPath": "queries",
+      "columns": [
+        {
+          "key": "title",
+          "label": "common.col.title"
+        },
+        {
+          "key": "prompt",
+          "label": "ai.query.placeholder"
+        },
+        {
+          "key": "result_count",
+          "label": "ai.query.rowsReturned"
+        },
+        {
+          "key": "is_saved",
+          "label": "ai.query.saved",
+          "type": "boolean"
+        },
+        {
+          "key": "created_at",
+          "label": "common.col.created",
+          "type": "date"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/ai/query/{id}",
+          "confirm": "ext.confirmDelete"
+        }
+      ]
+    }
+  ]
+}

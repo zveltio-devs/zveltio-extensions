@@ -15,6 +15,7 @@
   "developer.byod.form.includePatterns": "Pattern-uri incluse (separate prin virgulă)",
   "developer.byod.form.name": "Nume",
   "developer.byod.form.schema": "Schemă",
+  "developer.byod.form.syncInterval": "Sync interval (hours)",
   "developer.byod.intro": "Conectează o bază PostgreSQL externă, scanează schema și expune tabelele ca colecții virtuale în Zveltio.",
   "developer.byod.never": "niciodată",
   "developer.byod.saving": "Se salvează…",

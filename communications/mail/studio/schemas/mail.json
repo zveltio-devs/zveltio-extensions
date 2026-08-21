@@ -1,0 +1,177 @@
+{
+  "sduiSchema": 1,
+  "title": "communications.mail.title",
+  "subtitle": "communications.mail.subtitle",
+  "newLabel": "common.new",
+  "resources": [
+    {
+      "id": "accounts",
+      "label": "communications.mail.tab.accounts",
+      "icon": "Mail",
+      "dataSource": "/ext/communications/mail/accounts",
+      "dataPath": "accounts",
+      "columns": [
+        {
+          "key": "name",
+          "label": "common.col.name"
+        },
+        {
+          "key": "email_address",
+          "label": "common.col.email"
+        },
+        {
+          "key": "imap_host",
+          "label": "communications.mail.col.host",
+          "type": "mono"
+        },
+        {
+          "key": "is_default",
+          "label": "communications.mail.col.default",
+          "type": "boolean"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "sync",
+          "icon": "RefreshCw",
+          "label": "common.sync",
+          "method": "POST",
+          "endpoint": "/ext/communications/mail/accounts/{id}/sync"
+        },
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/communications/mail/accounts/{id}",
+          "confirm": "ext.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/communications/mail/accounts",
+        "fields": [
+          {
+            "name": "name",
+            "label": "common.col.name",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "email_address",
+            "label": "common.col.email",
+            "type": "email",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "display_name",
+            "label": "communications.mail.form.displayName",
+            "colSpan": 2
+          },
+          {
+            "name": "imap_host",
+            "label": "communications.mail.form.imapHost",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "imap_port",
+            "label": "communications.mail.form.imapPort",
+            "type": "number",
+            "default": 993,
+            "colSpan": 1
+          },
+          {
+            "name": "imap_user",
+            "label": "communications.mail.form.imapUser",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "imap_password",
+            "label": "communications.mail.form.imapPassword",
+            "type": "password",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "smtp_host",
+            "label": "communications.mail.form.smtpHost",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "smtp_port",
+            "label": "communications.mail.form.smtpPort",
+            "type": "number",
+            "default": 587,
+            "colSpan": 1
+          },
+          {
+            "name": "is_default",
+            "label": "communications.mail.col.default",
+            "type": "boolean",
+            "default": false,
+            "colSpan": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "signatures",
+      "label": "communications.mail.tab.signatures",
+      "icon": "PenLine",
+      "dataSource": "/ext/communications/mail/signatures",
+      "dataPath": "signatures",
+      "columns": [
+        {
+          "key": "name",
+          "label": "common.col.name"
+        },
+        {
+          "key": "is_default",
+          "label": "communications.mail.col.default",
+          "type": "boolean"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/communications/mail/signatures/{id}",
+          "confirm": "communications.mail.confirmDeleteSignature"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/communications/mail/signatures",
+        "fields": [
+          {
+            "name": "name",
+            "label": "common.col.name",
+            "required": true,
+            "colSpan": 2
+          },
+          {
+            "name": "body_html",
+            "label": "communications.mail.form.signatureHtml",
+            "type": "textarea",
+            "required": true,
+            "rows": 6,
+            "colSpan": 2
+          },
+          {
+            "name": "is_default",
+            "label": "communications.mail.col.default",
+            "type": "boolean",
+            "default": false,
+            "colSpan": 2
+          }
+        ]
+      }
+    }
+  ]
+}

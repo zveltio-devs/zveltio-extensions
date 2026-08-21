@@ -15,6 +15,7 @@
   "developer.byod.form.includePatterns": "Modèles à inclure (séparés par des virgules)",
   "developer.byod.form.name": "Nom",
   "developer.byod.form.schema": "Schéma",
+  "developer.byod.form.syncInterval": "Sync interval (hours)",
   "developer.byod.intro": "Connectez-vous à une base de données PostgreSQL externe, analysez son schéma et exposez ses tables en tant que collections virtuelles dans Zveltio.",
   "developer.byod.never": "jamais",
   "developer.byod.saving": "Enregistrement…",

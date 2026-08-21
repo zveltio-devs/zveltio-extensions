@@ -30,7 +30,8 @@
       {
         "path": "/admin/ai",
         "label": "AI",
-        "icon": "Bot"
+        "icon": "Bot",
+        "schema": "schemas/ai.json"
       }
     ],
     "navGroup": "developer"
@@ -43,7 +44,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "f5e56bfb6c8f3213e9cecea966eb303e502f123c492ce94f0256584588e893a7",
+    "engineSha256": "e62c8b315556d5dbb93c8d1077de6c0fd78279adf2f57f08469852c804d3d862",
     "sourceSha256": "91a0e59667675de7e085393fe5ca06feb963b6fa7971dd1a9b3abb58b0e4f8a3"
   }
 }
