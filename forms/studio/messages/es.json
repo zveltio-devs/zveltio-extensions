@@ -24,6 +24,7 @@
   "forms.form.name": "Nombre",
   "forms.form.slug": "Slug",
   "forms.form.targetCollection": "Colección destino",
+  "forms.hint.dragReorder": "Arrastrar para reordenar",
   "forms.section.details": "Detalles",
   "forms.section.fields": "Campos",
   "forms.subtitle": "Gestiona formularios integrables y sus envíos",

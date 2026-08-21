@@ -24,6 +24,7 @@
   "forms.form.name": "Nume",
   "forms.form.slug": "Slug",
   "forms.form.targetCollection": "Colecție țintă",
+  "forms.hint.dragReorder": "Trage pentru reordonare",
   "forms.section.details": "Detalii",
   "forms.section.fields": "Câmpuri",
   "forms.subtitle": "Gestionează formularele încorporabile și trimiterile lor",
