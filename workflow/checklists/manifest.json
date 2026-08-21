@@ -15,7 +15,8 @@
       {
         "path": "/admin/checklists",
         "label": "Checklists",
-        "icon": "CheckSquare"
+        "icon": "CheckSquare",
+        "schema": "schemas/checklists.json"
       }
     ],
     "navGroup": "other"
@@ -33,8 +34,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "1956885bfbfa568f967a503ee883ac4a30dfc13984b0de579e2cb1fbb48f7860",
-    "sourceSha256": "ee5b203718ef11f7bb283cfb0cdb5aafcb057646c38c4c3500100846f163e3b1"
+    "engineSha256": "ea70c6164ada7bbf5cca0bc45ad2c7a02a4928ca39a51930eaece955450307e7",
+    "sourceSha256": "7eddef4438b6735fd008af25c7ab11f6a660a7af0873b230b8ff13bed34f32e6"
   },
   "resources": [
     "checklists"

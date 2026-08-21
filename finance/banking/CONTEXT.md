@@ -23,3 +23,8 @@ Citește `REVIEW-CHECKLIST.md` din rădăcina repo-ului. Verificarea de aici a f
 făcută înainte de campania de chei unice și de cea de identificatori de
 utilizator — dacă adaugi coloane `*_by` sau chei unice pe coloane naturale,
 porțile din engine te vor prinde, dar e mai ieftin să știi dinainte.
+
+## SDUI migration (2026-08-21)
+
+SDUI accounts + per-account transactions; no reconciliation UI
+Branch: `feat/sdui-crud-batch`

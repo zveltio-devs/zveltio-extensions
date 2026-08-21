@@ -1,0 +1,144 @@
+{
+  "sduiSchema": 1,
+  "title": "compliance.ro.procurement.title",
+  "subtitle": "compliance.ro.procurement.subtitle",
+  "newLabel": "common.new",
+  "resources": [
+    {
+      "id": "orders",
+      "label": "compliance.ro.procurement.tab.orders",
+      "icon": "Package",
+      "dataSource": "/ext/compliance/ro/procurement/orders",
+      "dataPath": "orders",
+      "columns": [
+        { "key": "number", "label": "common.col.number", "type": "mono" },
+        { "key": "supplier_name", "label": "common.col.supplier" },
+        { "key": "description", "label": "common.col.description" },
+        { "key": "total", "label": "common.col.total", "type": "currency", "currency": { "codeKey": "currency" } },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "draft": "badge-warning",
+              "approved": "badge-info",
+              "received": "badge-success",
+              "cancelled": "badge-error"
+            }
+          }
+        },
+        { "key": "date", "label": "common.col.date", "type": "date" }
+      ],
+      "rowActions": [
+        {
+          "id": "approve",
+          "icon": "CheckCircle",
+          "label": "common.approve",
+          "method": "POST",
+          "endpoint": "/ext/compliance/ro/procurement/orders/{id}/approve",
+          "visibleWhen": { "field": "status", "equals": "draft" }
+        },
+        {
+          "id": "receive",
+          "icon": "Package",
+          "label": "common.receive",
+          "method": "POST",
+          "endpoint": "/ext/compliance/ro/procurement/orders/{id}/receive",
+          "visibleWhen": { "field": "status", "equals": "approved" }
+        },
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "method": "DELETE",
+          "endpoint": "/ext/compliance/ro/procurement/orders/{id}",
+          "confirm": "ext.confirmDelete",
+          "visibleWhen": { "field": "status", "equals": "draft" }
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/compliance/ro/procurement/orders",
+        "fields": [
+          { "name": "number", "label": "common.col.number", "required": true, "mono": true, "colSpan": 1 },
+          { "name": "date", "label": "common.col.date", "type": "date", "required": true, "colSpan": 1, "default": "today" },
+          { "name": "supplier_name", "label": "common.col.supplier", "required": true, "colSpan": 1 },
+          { "name": "supplier_cui", "label": "CUI", "required": true, "mono": true, "colSpan": 1 },
+          { "name": "description", "label": "common.col.description", "type": "textarea", "required": true, "colSpan": 2 },
+          { "name": "currency", "label": "common.col.currency", "colSpan": 1, "default": "RON" },
+          { "name": "subtotal", "label": "common.col.subtotal", "type": "number", "required": true, "colSpan": 1, "default": 0 },
+          { "name": "vat_total", "label": "VAT", "type": "number", "required": true, "colSpan": 1, "default": 0 },
+          { "name": "total", "label": "common.col.total", "type": "number", "required": true, "colSpan": 1, "default": 0 },
+          {
+            "name": "items",
+            "label": "Line items (JSON)",
+            "type": "json",
+            "mono": true,
+            "rows": 6,
+            "colSpan": 2,
+            "default": "[{\"description\":\"\",\"quantity\":1,\"unit\":\"BUC\",\"unit_price\":0,\"total\":0}]"
+          }
+        ]
+      }
+    },
+    {
+      "id": "suppliers",
+      "label": "compliance.ro.procurement.tab.suppliers",
+      "icon": "Users",
+      "dataSource": "/ext/compliance/ro/procurement/suppliers",
+      "dataPath": "suppliers",
+      "columns": [
+        { "key": "name", "label": "common.col.name" },
+        { "key": "cui", "label": "CUI", "type": "mono" },
+        { "key": "county", "label": "common.col.county" },
+        { "key": "category", "label": "common.col.category" },
+        { "key": "contact_email", "label": "common.col.email" }
+      ],
+      "rowActions": [
+        { "id": "edit", "kind": "edit", "label": "common.edit" },
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "method": "DELETE",
+          "endpoint": "/ext/compliance/ro/procurement/suppliers/{id}",
+          "confirm": "ext.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/compliance/ro/procurement/suppliers",
+        "fields": [
+          { "name": "name", "label": "common.col.name", "required": true, "colSpan": 1 },
+          { "name": "cui", "label": "CUI", "required": true, "mono": true, "colSpan": 1 },
+          { "name": "county", "label": "common.col.county", "colSpan": 1 },
+          { "name": "category", "label": "common.col.category", "colSpan": 1 },
+          { "name": "contact_email", "label": "common.col.email", "type": "email", "colSpan": 2 }
+        ]
+      }
+    },
+    {
+      "id": "budget",
+      "label": "compliance.ro.procurement.tab.budget",
+      "icon": "BarChart3",
+      "dataSource": "/ext/compliance/ro/procurement/budget",
+      "dataPath": "budget_lines",
+      "columns": [
+        { "key": "code", "label": "common.col.code", "type": "mono" },
+        { "key": "name", "label": "common.col.name" },
+        { "key": "year", "label": "common.col.year", "type": "mono" },
+        { "key": "allocated", "label": "Allocated", "type": "currency", "currency": { "code": "RON" } },
+        { "key": "spent", "label": "Spent", "type": "currency", "currency": { "code": "RON" } },
+        { "key": "remaining", "label": "Remaining", "type": "currency", "currency": { "code": "RON" } }
+      ],
+      "form": {
+        "endpoint": "/ext/compliance/ro/procurement/budget",
+        "fields": [
+          { "name": "code", "label": "common.col.code", "required": true, "mono": true, "colSpan": 1 },
+          { "name": "name", "label": "common.col.name", "required": true, "colSpan": 1 },
+          { "name": "year", "label": "common.col.year", "type": "number", "required": true, "colSpan": 1, "default": 2026 },
+          { "name": "allocated", "label": "Allocated", "type": "number", "required": true, "colSpan": 1, "default": 0 }
+        ]
+      }
+    }
+  ]
+}

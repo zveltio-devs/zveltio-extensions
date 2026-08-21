@@ -132,15 +132,31 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
   // ─── Templates ────────────────────────────────────────────────
 
   app.get('/templates', async (c) => {
-    const { collection } = c.req.query();
-    let query = db.selectFrom('zv_checklist_templates').selectAll().where('is_active', '=', true);
+    const { collection, all } = c.req.query();
+    // Studio needs inactive templates + embedded items for SDUI edit forms.
+    // Public/collection consumers can omit `all` to keep the old active-only list.
+    let query = db.selectFrom('zv_checklist_templates').selectAll();
+    if (all !== '1') {
+      query = query.where('is_active', '=', true);
+    }
     if (collection) {
       query = query.where((eb: any) =>
         eb.or([eb('collection', '=', collection), eb('collection', 'is', null)])
       );
     }
     const templates = await query.orderBy('name', 'asc').execute();
-    return c.json({ templates });
+    const withItems = await Promise.all(
+      templates.map(async (t: any) => {
+        const items = await db
+          .selectFrom('zv_checklist_template_items')
+          .selectAll()
+          .where('template_id', '=', t.id)
+          .orderBy('order_idx', 'asc')
+          .execute();
+        return { ...t, items };
+      }),
+    );
+    return c.json({ templates: withItems });
   });
 
   app.post(
