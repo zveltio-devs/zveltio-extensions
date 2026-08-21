@@ -792,32 +792,140 @@ Please draft a reply to this email.`,
     const ids = sql.join(message_ids.map((id) => sql`${id}`), sql`, `);
     const userFilter = sql`account_id IN (SELECT id FROM zv_mail_accounts WHERE user_id = ${user.id})`;
 
+    // Where each message currently lives, read BEFORE the update below moves it.
+    //
+    // Every action here used to stop at the Postgres row. `flagMessages` and
+    // `moveMessages` were already wired into the single-message routes, so
+    // starring ONE message reached the server and starring TWO did not — the
+    // same button, a different result depending on how many were selected.
+    // `delete` was the destructive corner: the local row went to the trash
+    // folder while the mail stayed in the mailbox, and a sync only fetches UIDs
+    // above `last_uid`, so it never came back.
+    //
+    // Scoped to the caller in the same query. A second lookup that trusted the
+    // ids would reopen the hole `userFilter` closes.
+    const targets = await sql<{
+      uid: number;
+      path: string;
+      account_id: string;
+      email_address: string;
+      imap_host: string;
+      imap_port: number;
+      imap_secure: boolean;
+      imap_user: string;
+      imap_password: string;
+    }>`
+      SELECT m.uid, f.path, a.id AS account_id, a.email_address, a.imap_host,
+             a.imap_port, a.imap_secure, a.imap_user, a.imap_password
+      FROM zv_mail_messages m
+      INNER JOIN zv_mail_folders f ON f.id = m.folder_id
+      INNER JOIN zv_mail_accounts a ON a.id = m.account_id
+      WHERE m.id IN (${ids}) AND a.user_id = ${user.id}
+    `.execute(db);
+
+    // One IMAP call per (account, source folder) rather than per message: the
+    // selection can span both, and both operations take a UID list.
+    const groups = new Map<string, { account: any; path: string; uids: number[] }>();
+    for (const row of targets.rows) {
+      const key = `${row.account_id} ${row.path}`;
+      const g = groups.get(key) ?? { account: row, path: row.path, uids: [] };
+      g.uids.push(row.uid);
+      groups.set(key, g);
+    }
+
+    /** Server path of a folder the caller owns, or null. */
+    const folderPath = async (where: 'id' | 'type', value: string): Promise<string | null> => {
+      const accountId = targets.rows[0]?.account_id;
+      if (!accountId) return null;
+      const r =
+        where === 'id'
+          ? await sql<{ path: string }>`
+              SELECT f.path FROM zv_mail_folders f
+              INNER JOIN zv_mail_accounts a ON a.id = f.account_id
+              WHERE f.id = ${value} AND a.user_id = ${user.id} LIMIT 1`.execute(db)
+          : await sql<{ path: string }>`
+              SELECT f.path FROM zv_mail_folders f
+              INNER JOIN zv_mail_accounts a ON a.id = f.account_id
+              WHERE f.account_id = ${accountId} AND f.type = ${value} AND a.user_id = ${user.id} LIMIT 1`.execute(db);
+      return r.rows[0]?.path ?? null;
+    };
+
+    let propagated: boolean | null = null;
+    let propagationError: string | null = null;
+
+    /**
+     * Run an IMAP operation over every group.
+     *
+     * A failure is reported, never swallowed and never fatal: the local rows
+     * already carry what the user asked for, and what they must not be told is
+     * that the server agrees when it does not. Same contract as the
+     * single-message routes.
+     */
+    const propagate = async (fn: (g: { account: any; path: string; uids: number[] }) => Promise<void>) => {
+      if (groups.size === 0) return;
+      propagated = true;
+      for (const g of groups.values()) {
+        try {
+          await fn(g);
+        } catch (err: any) {
+          propagated = false;
+          propagationError ??= err?.message ?? String(err);
+        }
+      }
+    };
+
     switch (action) {
       case 'mark_read':
         await sql`UPDATE zv_mail_messages SET is_read = true WHERE id IN (${ids}) AND ${userFilter}`.execute(db);
+        await propagate((g) => flagMessages(g.account, g.path, g.uids, { add: ['\\Seen'] }));
         break;
       case 'mark_unread':
         await sql`UPDATE zv_mail_messages SET is_read = false WHERE id IN (${ids}) AND ${userFilter}`.execute(db);
+        await propagate((g) => flagMessages(g.account, g.path, g.uids, { remove: ['\\Seen'] }));
         break;
       case 'star':
         await sql`UPDATE zv_mail_messages SET is_starred = true WHERE id IN (${ids}) AND ${userFilter}`.execute(db);
+        await propagate((g) => flagMessages(g.account, g.path, g.uids, { add: ['\\Flagged'] }));
         break;
       case 'unstar':
         await sql`UPDATE zv_mail_messages SET is_starred = false WHERE id IN (${ids}) AND ${userFilter}`.execute(db);
+        await propagate((g) => flagMessages(g.account, g.path, g.uids, { remove: ['\\Flagged'] }));
         break;
-      case 'move':
+      case 'move': {
         if (!target_folder_id) return c.json({ error: 'target_folder_id required' }, 400);
+        // Resolved before the update, and refused if it does not resolve: moving
+        // the local rows to a folder the server never hears about is the exact
+        // divergence this route is being fixed for.
+        const destination = await folderPath('id', target_folder_id);
+        if (!destination && groups.size > 0) {
+          return c.json({ error: 'target folder not found for this account' }, 404);
+        }
         await sql`UPDATE zv_mail_messages SET folder_id = ${target_folder_id} WHERE id IN (${ids}) AND ${userFilter}`.execute(db);
+        await propagate((g) =>
+          g.path === destination ? Promise.resolve() : moveMessages(g.account, g.path, g.uids, destination as string),
+        );
         break;
+      }
       case 'delete': {
         const firstMsg = await sql`SELECT account_id FROM zv_mail_messages WHERE id = ${message_ids[0]}`.execute(db);
         if (firstMsg.rows[0]) {
           const trashRes = await sql`SELECT id FROM zv_mail_folders WHERE account_id = ${(firstMsg.rows[0] as any).account_id} AND type = 'trash' LIMIT 1`.execute(db);
           if (trashRes.rows[0]) {
             await sql`UPDATE zv_mail_messages SET folder_id = ${(trashRes.rows[0] as any).id} WHERE id IN (${ids}) AND ${userFilter}`.execute(db);
+            const trashPath = await folderPath('type', 'trash');
+            if (trashPath) {
+              await propagate((g) =>
+                g.path === trashPath ? Promise.resolve() : moveMessages(g.account, g.path, g.uids, trashPath),
+              );
+            }
             break;
           }
         }
+        // No trash folder: the row is really destroyed here, so the copy on the
+        // server must go too. Otherwise the next sync cannot restore it — it
+        // only fetches UIDs above `last_uid` — and the mail is simultaneously
+        // gone from Zveltio and still sitting in the mailbox.
+        await propagate((g) => deleteMessagesFromServer(g.account, g.path, g.uids));
         await sql`DELETE FROM zv_mail_messages WHERE id IN (${ids}) AND ${userFilter}`.execute(db);
         break;
       }
@@ -827,13 +935,30 @@ Please draft a reply to this email.`,
           const spamRes = await sql`SELECT id FROM zv_mail_folders WHERE account_id = ${(firstMsg2.rows[0] as any).account_id} AND type = 'spam' LIMIT 1`.execute(db);
           if (spamRes.rows[0]) {
             await sql`UPDATE zv_mail_messages SET folder_id = ${(spamRes.rows[0] as any).id} WHERE id IN (${ids}) AND ${userFilter}`.execute(db);
+            const spamPath = await folderPath('type', 'spam');
+            if (spamPath) {
+              await propagate((g) =>
+                g.path === spamPath ? Promise.resolve() : moveMessages(g.account, g.path, g.uids, spamPath),
+              );
+            }
           }
         }
         break;
       }
     }
 
-    return c.json({ success: true, affected: message_ids.length });
+    return c.json({
+      success: true,
+      // How many messages this actually reached, not how many were asked for.
+      // `message_ids.length` reported 500 even when `userFilter` excluded every
+      // one of them, so a caller passing somebody else's ids was told the work
+      // was done.
+      affected: targets.rows.length,
+      ...(propagated === null ? {} : { propagated }),
+      ...(propagationError
+        ? { notice: `Saved locally. The mail server did not accept the change: ${propagationError}` }
+        : {}),
+    });
   });
 
   // ═══ DOWNLOAD EML ═══
