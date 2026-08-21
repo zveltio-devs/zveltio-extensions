@@ -26,7 +26,8 @@
         "path": "/admin/sms",
         "component": "./studio/src/pages/SmsPage.svelte",
         "label": "SMS",
-        "icon": "message-square"
+        "icon": "message-square",
+        "schema": "schemas/sms.json"
       }
     ],
     "navGroup": "communications"
@@ -37,7 +38,7 @@
     "fieldTypes": []
   },
   "integrity": {
-    "engineSha256": "f92c09d02f28aec2b2f2689e92bd4fbdb61b95610f315ec16f385965294ebb5f",
+    "engineSha256": "2a001c2f629fb54e4b71fd0c17e0aa9c2bb378ee10dcab5ec06da1d9e0d2a8c8",
     "sourceSha256": "3dc815035c99ba2a0b3abfe4f9cd12c72114363d9826487e6e992758c5b0be73"
   }
 }

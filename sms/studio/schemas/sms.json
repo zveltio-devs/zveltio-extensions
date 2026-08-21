@@ -1,0 +1,127 @@
+{
+  "sduiSchema": 1,
+  "title": "sms.title",
+  "subtitle": "sms.subtitle",
+  "newLabel": "common.new",
+  "resources": [
+    {
+      "id": "send",
+      "label": "sms.ui.send_sms",
+      "icon": "Send",
+      "dataSource": "/ext/sms/messages?limit=20",
+      "dataPath": "messages",
+      "columns": [
+        { "key": "to_number", "label": "common.col.to", "type": "mono" },
+        { "key": "body", "label": "sms.col.body" },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "sent": "badge-success",
+              "delivered": "badge-success",
+              "failed": "badge-error",
+              "pending": "badge-warning"
+            }
+          }
+        },
+        { "key": "sent_at", "label": "sms.col.sentAt", "type": "date" }
+      ],
+      "form": {
+        "endpoint": "/ext/sms/send",
+        "fields": [
+          {
+            "name": "provider",
+            "label": "sms.ui.provider",
+            "type": "select",
+            "colSpan": 1,
+            "default": "twilio",
+            "options": [
+              { "value": "twilio", "label": "sms.ui.twilio" },
+              { "value": "vonage", "label": "sms.ui.vonage" }
+            ]
+          },
+          {
+            "name": "to",
+            "label": "sms.ui.to_number",
+            "type": "tel",
+            "required": true,
+            "colSpan": 1,
+            "placeholder": "sms.ui.1234567890"
+          },
+          {
+            "name": "template_id",
+            "label": "sms.ui.template_optional",
+            "type": "relation",
+            "colSpan": 2,
+            "relation": {
+              "dataSource": "/ext/sms/templates",
+              "dataPath": "templates",
+              "valueKey": "id",
+              "labelKey": "name"
+            }
+          },
+          {
+            "name": "body",
+            "label": "sms.ui.message_body",
+            "type": "textarea",
+            "rows": 3,
+            "colSpan": 2
+          },
+          {
+            "name": "variables",
+            "label": "sms.ui.variables_json",
+            "type": "json",
+            "mono": true,
+            "rows": 3,
+            "colSpan": 2,
+            "default": "{}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "templates",
+      "label": "sms.tab.templates",
+      "icon": "FileText",
+      "dataSource": "/ext/sms/templates",
+      "dataPath": "templates",
+      "columns": [
+        { "key": "name", "label": "common.col.name" },
+        { "key": "body", "label": "sms.col.body" },
+        { "key": "provider", "label": "sms.col.provider" }
+      ],
+      "form": {
+        "endpoint": "/ext/sms/templates",
+        "fields": [
+          {
+            "name": "name",
+            "label": "common.col.name",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "provider",
+            "label": "sms.col.provider",
+            "type": "select",
+            "colSpan": 1,
+            "default": "twilio",
+            "options": [
+              { "value": "twilio", "label": "sms.ui.twilio" },
+              { "value": "vonage", "label": "sms.ui.vonage" }
+            ]
+          },
+          {
+            "name": "body",
+            "label": "sms.placeholder.body",
+            "type": "textarea",
+            "required": true,
+            "rows": 3,
+            "colSpan": 2
+          }
+        ]
+      }
+    }
+  ]
+}

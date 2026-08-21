@@ -1,0 +1,204 @@
+{
+  "sduiSchema": 1,
+  "title": "compliance.ro.efactura.title",
+  "subtitle": "compliance.ro.efactura.subtitle",
+  "newLabel": "compliance.ro.efactura.btn.newInvoice",
+  "resources": [
+    {
+      "id": "invoices",
+      "dataSource": "/ext/compliance/ro/efactura",
+      "dataPath": "invoices",
+      "filters": [
+        {
+          "param": "status",
+          "options": [
+            { "value": "all", "label": "common.filter.all" },
+            { "value": "draft", "label": "compliance.ro.efactura.status.draft" },
+            { "value": "xml_generated", "label": "compliance.ro.efactura.status.xmlGenerated" },
+            { "value": "submitted", "label": "compliance.ro.efactura.status.submitted" },
+            { "value": "accepted", "label": "compliance.ro.efactura.status.accepted" },
+            { "value": "rejected", "label": "compliance.ro.efactura.status.rejected" }
+          ]
+        }
+      ],
+      "columns": [
+        { "key": "invoice_number", "label": "common.col.number", "type": "mono" },
+        { "key": "invoice_date", "label": "common.col.date", "type": "date" },
+        { "key": "buyer_name", "label": "compliance.ro.efactura.col.buyer" },
+        {
+          "key": "total",
+          "label": "common.col.total",
+          "type": "currency",
+          "currency": { "codeKey": "currency" }
+        },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "draft": "badge-warning",
+              "xml_generated": "badge-info",
+              "submitted": "badge-primary",
+              "accepted": "badge-success",
+              "rejected": "badge-error"
+            }
+          }
+        },
+        { "key": "anaf_index", "label": "compliance.ro.efactura.col.anafIndex", "type": "mono" }
+      ],
+      "rowActions": [
+        {
+          "id": "generateXml",
+          "label": "compliance.ro.efactura.btn.generateXml",
+          "icon": "FileText",
+          "method": "POST",
+          "endpoint": "/ext/compliance/ro/efactura/{id}/generate-xml",
+          "visibleWhen": { "field": "status", "equals": "draft" }
+        },
+        {
+          "id": "downloadXml",
+          "kind": "download",
+          "label": "common.download",
+          "icon": "Download",
+          "endpoint": "/ext/compliance/ro/efactura/{id}/xml",
+          "visibleWhen": {
+            "field": "status",
+            "in": ["xml_generated", "submitted", "accepted", "rejected"]
+          }
+        },
+        {
+          "id": "submit",
+          "label": "common.send",
+          "icon": "Send",
+          "method": "POST",
+          "endpoint": "/ext/compliance/ro/efactura/{id}/submit",
+          "confirm": "compliance.ro.efactura.confirmSend",
+          "visibleWhen": { "field": "status", "equals": "xml_generated" }
+        },
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/compliance/ro/efactura/{id}",
+          "confirm": "compliance.ro.efactura.confirmDelete",
+          "visibleWhen": { "field": "status", "equals": "draft" }
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/compliance/ro/efactura",
+        "fields": [
+          {
+            "name": "invoice_number",
+            "label": "common.col.number",
+            "required": true,
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "invoice_date",
+            "label": "common.col.date",
+            "type": "date",
+            "required": true,
+            "colSpan": 1,
+            "default": "today"
+          },
+          {
+            "name": "due_date",
+            "label": "common.col.dueDate",
+            "type": "date",
+            "colSpan": 1
+          },
+          {
+            "name": "currency",
+            "label": "common.col.currency",
+            "colSpan": 1,
+            "default": "RON"
+          },
+          {
+            "name": "seller_name",
+            "label": "compliance.ro.efactura.form.sellerName",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "seller_cui",
+            "label": "compliance.ro.efactura.form.sellerCui",
+            "required": true,
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "seller_address",
+            "label": "compliance.ro.efactura.form.sellerAddress",
+            "colSpan": 2
+          },
+          {
+            "name": "seller_iban",
+            "label": "common.col.iban",
+            "mono": true,
+            "colSpan": 2
+          },
+          {
+            "name": "buyer_name",
+            "label": "compliance.ro.efactura.form.buyerName",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "buyer_cui",
+            "label": "compliance.ro.efactura.form.buyerCui",
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "buyer_address",
+            "label": "compliance.ro.efactura.form.buyerAddress",
+            "colSpan": 2
+          },
+          {
+            "name": "subtotal",
+            "label": "compliance.ro.efactura.form.subtotal",
+            "type": "number",
+            "required": true,
+            "colSpan": 1,
+            "default": 0
+          },
+          {
+            "name": "vat_total",
+            "label": "common.col.vat",
+            "type": "number",
+            "required": true,
+            "colSpan": 1,
+            "default": 0
+          },
+          {
+            "name": "total",
+            "label": "common.col.total",
+            "type": "number",
+            "required": true,
+            "colSpan": 1,
+            "default": 0
+          }
+        ],
+        "repeatable": {
+          "name": "lines",
+          "label": "compliance.ro.efactura.section.lines",
+          "addLabel": "compliance.ro.efactura.btn.addLine",
+          "min": 1,
+          "columns": [
+            { "name": "description", "label": "common.col.description", "required": true },
+            { "name": "quantity", "label": "compliance.ro.efactura.col.qty", "type": "number", "default": 1 },
+            { "name": "unit", "label": "compliance.ro.efactura.col.unit", "default": "BUC" },
+            { "name": "unit_price", "label": "common.col.price", "type": "number", "default": 0 },
+            { "name": "vat_rate", "label": "compliance.ro.efactura.col.vatPercent", "type": "number", "default": 19 },
+            { "name": "vat_amount", "label": "compliance.ro.efactura.col.vat", "type": "number", "default": 0 },
+            { "name": "line_total", "label": "common.col.total", "type": "number", "default": 0 }
+          ]
+        }
+      }
+    }
+  ]
+}
