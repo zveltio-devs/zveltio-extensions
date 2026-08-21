@@ -424,15 +424,26 @@ export function apiDocsRoutes(ctx: ExtensionContext): Hono {
 
   // ── Changelogs ────────────────────────────────────────────────────────────
 
-  // GET /changelogs — public endpoint (published only)
+  // GET /changelogs — published for anonymous; all for signed-in admin (Studio)
   router.get('/changelogs', async (c) => {
-    const rows = await sql<any>`
-      SELECT id, version, title, changes, breaking_changes, migration_guide,
-             published_at, is_published, created_by, created_at
-      FROM zvd_api_changelogs
-      WHERE is_published = true
-      ORDER BY published_at DESC NULLS LAST, created_at DESC
-    `.execute(db);
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    const isAdmin =
+      !!session && (await checkPermission(session.user.id, 'admin', '*'));
+
+    const rows = isAdmin
+      ? await sql<any>`
+          SELECT id, version, title, changes, breaking_changes, migration_guide,
+                 published_at, is_published, created_by, created_at
+          FROM zvd_api_changelogs
+          ORDER BY published_at DESC NULLS LAST, created_at DESC
+        `.execute(db)
+      : await sql<any>`
+          SELECT id, version, title, changes, breaking_changes, migration_guide,
+                 published_at, is_published, created_by, created_at
+          FROM zvd_api_changelogs
+          WHERE is_published = true
+          ORDER BY published_at DESC NULLS LAST, created_at DESC
+        `.execute(db);
     return c.json({ changelogs: rows.rows });
   });
 
@@ -632,14 +643,24 @@ export function apiDocsRoutes(ctx: ExtensionContext): Hono {
 
   // ── Custom Docs ───────────────────────────────────────────────────────────
 
-  // GET /custom-docs — list published sections (public)
+  // GET /custom-docs — published for anonymous; all for signed-in admin (Studio)
   router.get('/custom-docs', async (c) => {
-    const rows = await sql<any>`
-      SELECT id, title, slug, body, sort_order, is_published, created_at, updated_at
-      FROM zvd_api_custom_docs
-      WHERE is_published = true
-      ORDER BY sort_order ASC, created_at ASC
-    `.execute(db);
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    const isAdmin =
+      !!session && (await checkPermission(session.user.id, 'admin', '*'));
+
+    const rows = isAdmin
+      ? await sql<any>`
+          SELECT id, title, slug, body, sort_order, is_published, created_at, updated_at
+          FROM zvd_api_custom_docs
+          ORDER BY sort_order ASC, created_at ASC
+        `.execute(db)
+      : await sql<any>`
+          SELECT id, title, slug, body, sort_order, is_published, created_at, updated_at
+          FROM zvd_api_custom_docs
+          WHERE is_published = true
+          ORDER BY sort_order ASC, created_at ASC
+        `.execute(db);
     return c.json({ docs: rows.rows });
   });
 

@@ -15,7 +15,8 @@
       {
         "path": "/admin/developer/api-docs",
         "label": "API Docs",
-        "icon": "BookOpen"
+        "icon": "BookOpen",
+        "schema": "schemas/api-docs.json"
       }
     ],
     "navGroup": "developer"
@@ -32,8 +33,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "6c08c6fb35bc776a59d72dc365e1d33737089228211007132f56950ee991228c",
-    "sourceSha256": "d9f12bc52e8e393b23d2374c6d3108c05840f966105ea5a0f26b7a75a36a8b70"
+    "engineSha256": "f9a31f3df8c3056dabc7d1969eeebf904b90e1cea07ce9be693cb54378cef8e0",
+    "sourceSha256": "87e5e9e72ba7c2b8eb82b94cc095583557f7e857121dba6ed6e4c81a907a8587"
   },
   "publicRoutes": [
     "/",
