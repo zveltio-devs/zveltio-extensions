@@ -55,7 +55,7 @@ jobs:
         # No --frozen-lockfile here: this is a transient clone, the
         # extensions repo doesn't own zveltio's bun.lock, and the
         # engine repo's own CI already enforces lockfile freshness.
-        run: cd ../zveltio && bun install
+        run: cd ../zveltio && bun install --frozen-lockfile
 
       - name: Dependency lockstep (kysely == engine)
         # Fails with ONE actionable line instead of ~77 cryptic TS2345 errors
@@ -264,7 +264,7 @@ jobs:
       - name: Install extension deps
         run: bun install --frozen-lockfile
       - name: Install engine deps
-        run: cd ../zveltio && bun install
+        run: cd ../zveltio && bun install --frozen-lockfile
 
       - name: Boot engine + create god + probe SDUI contract
         env:
@@ -363,7 +363,7 @@ jobs:
       - name: Install extension deps
         run: bun install --frozen-lockfile
       - name: Install engine deps
-        run: cd ../zveltio && bun install
+        run: cd ../zveltio && bun install --frozen-lockfile
 
       - name: Migrate engine core schema (in-process harness boot)
         env:

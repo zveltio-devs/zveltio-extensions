@@ -1,0 +1,30 @@
+{
+  "sduiSchema": 1,
+  "title": "analytics.dashboard.title",
+  "subtitle": "analytics.dashboard.subtitle",
+  "resources": [
+    {
+      "id": "roleLayouts",
+      "layout": "checklist",
+      "checklist": {
+        "catalogDataSource": "/ext/analytics/dashboard/admin/catalog",
+        "catalogPath": "catalog",
+        "catalogIdKey": "id",
+        "catalogLabelPrefix": "analytics.dashboard.widget",
+        "optionsPath": "roles",
+        "optionsExtra": [
+          "god",
+          "admin",
+          "editor",
+          "viewer"
+        ],
+        "loadEndpoint": "/ext/analytics/dashboard/admin/role/{id}",
+        "valueKey": "widgets",
+        "configuredKey": "configured",
+        "saveEndpoint": "/ext/analytics/dashboard/admin/role/{id}",
+        "saveMethod": "PUT",
+        "saveBodyKey": "widgets"
+      }
+    }
+  ]
+}
