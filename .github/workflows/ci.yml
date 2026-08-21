@@ -38,7 +38,15 @@ jobs:
       # installed. actions/checkout refuses paths outside the
       # workspace, so the sibling clone uses plain `git clone`.
       - name: Clone engine repo as sibling
-        run: git clone --depth=1 https://github.com/zveltio-devs/zveltio.git ../zveltio
+        run: |
+          REF="${{ github.head_ref || github.ref_name }}"
+          if [ -n "$REF" ] && git ls-remote --heads https://github.com/zveltio-devs/zveltio.git "$REF" | grep -q "$REF"; then
+            echo "Cloning zveltio@$REF (paired branch)"
+            git clone --depth=1 --branch "$REF" https://github.com/zveltio-devs/zveltio.git ../zveltio
+          else
+            echo "Cloning zveltio@master (no paired branch $REF)"
+            git clone --depth=1 https://github.com/zveltio-devs/zveltio.git ../zveltio
+          fi
 
       - name: Install extension deps
         run: bun install --frozen-lockfile
@@ -244,7 +252,15 @@ jobs:
         with:
           bun-version: latest
       - name: Clone engine repo as sibling
-        run: git clone --depth=1 https://github.com/zveltio-devs/zveltio.git ../zveltio
+        run: |
+          REF="${{ github.head_ref || github.ref_name }}"
+          if [ -n "$REF" ] && git ls-remote --heads https://github.com/zveltio-devs/zveltio.git "$REF" | grep -q "$REF"; then
+            echo "Cloning zveltio@$REF (paired branch)"
+            git clone --depth=1 --branch "$REF" https://github.com/zveltio-devs/zveltio.git ../zveltio
+          else
+            echo "Cloning zveltio@master (no paired branch $REF)"
+            git clone --depth=1 https://github.com/zveltio-devs/zveltio.git ../zveltio
+          fi
       - name: Install extension deps
         run: bun install --frozen-lockfile
       - name: Install engine deps
@@ -335,7 +351,15 @@ jobs:
             "apt-get update -qq && apt-get install -y -qq postgresql-18-postgis-3 postgresql-18-postgis-3-scripts"
 
       - name: Clone engine repo as sibling
-        run: git clone --depth=1 https://github.com/zveltio-devs/zveltio.git ../zveltio
+        run: |
+          REF="${{ github.head_ref || github.ref_name }}"
+          if [ -n "$REF" ] && git ls-remote --heads https://github.com/zveltio-devs/zveltio.git "$REF" | grep -q "$REF"; then
+            echo "Cloning zveltio@$REF (paired branch)"
+            git clone --depth=1 --branch "$REF" https://github.com/zveltio-devs/zveltio.git ../zveltio
+          else
+            echo "Cloning zveltio@master (no paired branch $REF)"
+            git clone --depth=1 https://github.com/zveltio-devs/zveltio.git ../zveltio
+          fi
       - name: Install extension deps
         run: bun install --frozen-lockfile
       - name: Install engine deps
