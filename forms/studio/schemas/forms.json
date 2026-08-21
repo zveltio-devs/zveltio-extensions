@@ -45,6 +45,8 @@
           "id": "responses",
           "kind": "navigate",
           "href": "/forms/{id}?panel=responses",
+          "icon": "Inbox",
+          "label": "forms.btn.responses"
         },
         {
           "id": "delete",
