@@ -1,0 +1,172 @@
+{
+  "sduiSchema": 1,
+  "title": "content.media.title",
+  "subtitle": "content.media.subtitle",
+  "newLabel": "common.new",
+  "resources": [
+    {
+      "id": "folders",
+      "label": "content.media.ui.folders",
+      "icon": "Folder",
+      "dataSource": "/ext/content/media/folders",
+      "dataPath": "folders",
+      "columns": [
+        {
+          "key": "name",
+          "label": "content.media.ui.folder_name"
+        },
+        {
+          "key": "description",
+          "label": "common.col.description"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/content/media/folders/{id}",
+          "confirm": "content.media.confirm.deleteFolderMsg"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/content/media/folders",
+        "fields": [
+          {
+            "name": "name",
+            "label": "content.media.ui.folder_name",
+            "required": true,
+            "colSpan": 2
+          },
+          {
+            "name": "description",
+            "label": "common.col.description",
+            "colSpan": 2
+          },
+          {
+            "name": "parent_id",
+            "label": "common.col.parent",
+            "type": "relation",
+            "colSpan": 2,
+            "relation": {
+              "dataSource": "/ext/content/media/folders",
+              "dataPath": "folders",
+              "valueKey": "id",
+              "labelKey": "name"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "tags",
+      "label": "content.media.ui.tags",
+      "icon": "Tag",
+      "dataSource": "/ext/content/media/tags",
+      "dataPath": "tags",
+      "columns": [
+        {
+          "key": "name",
+          "label": "content.media.ui.new_tag"
+        },
+        {
+          "key": "color",
+          "label": "content.media.ui.color",
+          "type": "mono"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/content/media/tags/{id}",
+          "confirm": "ext.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/content/media/tags",
+        "fields": [
+          {
+            "name": "name",
+            "label": "content.media.ui.new_tag",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "color",
+            "label": "content.media.ui.color",
+            "colSpan": 1,
+            "default": "#6366f1"
+          }
+        ]
+      }
+    },
+    {
+      "id": "collections",
+      "label": "content.media.tab.collections",
+      "icon": "Images",
+      "dataSource": "/ext/content/media/collections",
+      "dataPath": "collections",
+      "columns": [
+        {
+          "key": "name",
+          "label": "common.col.name"
+        },
+        {
+          "key": "is_public",
+          "label": "content.media.col.public",
+          "type": "boolean"
+        },
+        {
+          "key": "description",
+          "label": "common.col.description"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "edit",
+          "kind": "edit",
+          "label": "common.edit"
+        },
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/content/media/collections/{id}",
+          "confirm": "ext.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/content/media/collections",
+        "fields": [
+          {
+            "name": "name",
+            "label": "common.col.name",
+            "required": true,
+            "colSpan": 2
+          },
+          {
+            "name": "description",
+            "label": "common.col.description",
+            "type": "textarea",
+            "colSpan": 2
+          },
+          {
+            "name": "is_public",
+            "label": "content.media.col.public",
+            "type": "boolean",
+            "default": false,
+            "colSpan": 2
+          }
+        ]
+      }
+    }
+  ]
+}
