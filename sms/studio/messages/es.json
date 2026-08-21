@@ -1,6 +1,7 @@
 {
   "sms.btn.saveTemplate": "Guardar plantilla",
   "sms.btn.send": "Enviar SMS",
+  "sms.btn.sendSms": "Send SMS",
   "sms.col.body": "Cuerpo",
   "sms.col.provider": "Proveedor",
   "sms.col.sentAt": "Enviado el",
