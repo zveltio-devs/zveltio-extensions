@@ -16,7 +16,8 @@
       {
         "path": "/admin/developer/edge-functions",
         "label": "Edge Functions",
-        "icon": "Code"
+        "icon": "Code",
+        "schema": "schemas/edge-functions.json"
       }
     ],
     "navGroup": "developer"
@@ -34,7 +35,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "4a24313a1c1396b16bb53bcc6123e4cfab29453c9492c5e84b765cfe8d5a70c7",
+    "engineSha256": "61b0c73d2300881b9480322786e2ede0736dcd88c1237ebb03a433753c907a8e",
     "sourceSha256": "93696fd5e356bb0c6bceb84ee6f3b6bd50416794f74b2d35c7a002006c86ef82"
   },
   "globalRoutes": [],
