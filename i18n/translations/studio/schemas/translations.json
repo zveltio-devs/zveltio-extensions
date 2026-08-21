@@ -1,0 +1,131 @@
+{
+  "sduiSchema": 1,
+  "title": "i18n.translations.title",
+  "subtitle": "i18n.translations.subtitle",
+  "newLabel": "common.new",
+  "resources": [
+    {
+      "id": "keys",
+      "label": "i18n.translations.tab.keys",
+      "icon": "Key",
+      "dataSource": "/ext/i18n/translations",
+      "dataPath": "keys",
+      "search": {
+        "param": "search",
+        "placeholder": "i18n.translations.ui.search_keys"
+      },
+      "pagination": { "limit": 50 },
+      "totalPath": "pagination.total",
+      "columns": [
+        { "key": "key", "label": "common.col.key", "type": "mono" },
+        { "key": "context", "label": "i18n.translations.col.context" },
+        { "key": "default_value", "label": "i18n.translations.col.translation" },
+        { "key": "description", "label": "common.col.description" }
+      ],
+      "rowActions": [
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/i18n/translations/{id}",
+          "confirm": "i18n.translations.confirmDeleteKey"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/i18n/translations",
+        "fields": [
+          {
+            "name": "key",
+            "label": "common.col.key",
+            "required": true,
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "context",
+            "label": "i18n.translations.col.context",
+            "colSpan": 1
+          },
+          {
+            "name": "default_value",
+            "label": "i18n.translations.col.translation",
+            "type": "textarea",
+            "rows": 2,
+            "colSpan": 2
+          },
+          {
+            "name": "description",
+            "label": "common.col.description",
+            "colSpan": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "locales",
+      "label": "i18n.translations.tab.locales",
+      "icon": "Globe",
+      "dataSource": "/ext/i18n/translations/locales",
+      "dataPath": "locales",
+      "columns": [
+        { "key": "code", "label": "i18n.translations.col.localeCode", "type": "mono" },
+        { "key": "name", "label": "i18n.translations.col.localeName" },
+        {
+          "key": "is_default",
+          "label": "i18n.translations.col.default",
+          "type": "boolean"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/i18n/translations/locales/{code}",
+          "confirm": "i18n.translations.confirmDeleteLocale"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/i18n/translations/locales",
+        "fields": [
+          {
+            "name": "code",
+            "label": "i18n.translations.col.localeCode",
+            "required": true,
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "name",
+            "label": "i18n.translations.col.localeName",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "is_default",
+            "label": "i18n.translations.col.default",
+            "type": "boolean",
+            "colSpan": 2,
+            "default": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "glossary",
+      "label": "i18n.translations.tab.glossary",
+      "icon": "Book",
+      "dataSource": "/ext/i18n/translations/glossary",
+      "dataPath": "glossary",
+      "columns": [
+        { "key": "term", "label": "i18n.translations.col.term" },
+        { "key": "locale", "label": "i18n.translations.col.localeCode", "type": "mono" },
+        { "key": "translation", "label": "i18n.translations.col.translation" }
+      ]
+    }
+  ]
+}
