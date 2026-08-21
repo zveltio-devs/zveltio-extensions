@@ -1,10 +1,13 @@
 {
   "i18n.translations.btn.search": "Buscar",
   "i18n.translations.col.context": "Contexto",
+  "i18n.translations.col.default": "Default",
   "i18n.translations.col.localeCode": "Code (e.g. ro, en, de)",
   "i18n.translations.col.localeName": "Nombre",
   "i18n.translations.col.term": "Término",
   "i18n.translations.col.translation": "Traducción",
+  "i18n.translations.confirmDeleteKey": "Delete this translation key?",
+  "i18n.translations.confirmDeleteLocale": "Delete this locale?",
   "i18n.translations.empty": "Aún no hay datos.",
   "i18n.translations.subtitle": "Internationalization: manage locales, translation keys and per-locale string values",
   "i18n.translations.tab.glossary": "Glosario",
