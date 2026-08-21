@@ -431,7 +431,7 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
     await sql`UPDATE zvd_payroll_entries SET paid_at = NOW(), updated_at = NOW() WHERE period_id = ${c.req.param('id')} AND status = 'approved'`.execute(db);
     const row = await sql`
       UPDATE zvd_payroll_periods SET status = 'closed', paid_at = NOW(), updated_at = NOW()
-      -- Only \`approve\` can produce 'approved'. Requiring it here is what makes
+      -- Only the approve route can produce 'approved'. Requiring it here is what makes
       -- calculate -> pay impossible: the two decisions no longer share one state,
       -- so the second can finally tell whether the first happened.
       WHERE id = ${c.req.param('id')} AND status = 'approved' RETURNING *
