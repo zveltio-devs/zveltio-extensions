@@ -9,3 +9,8 @@ Recall initiate uses form `preview` (simulate KPIs → confirm). Report tabs use
 `panels.kind: image` → `/labels/{id}/qr-dataurl`.
 Lot detail QR tab via `layout.detail` panel `kind: image`.
 
+## Floor scanner PWA
+Served at \`/ext/operations/traceability/app/\` (HTML + vendored html5-qrcode,
+webmanifest). Linked from Studio via \`pageActions\` → Open floor scanner.
+Login returns via \`/admin/login?redirect=/ext/...\` (safeRedirect allows /ext/).
+

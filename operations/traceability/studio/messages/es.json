@@ -6,6 +6,7 @@
   "operations.traceability.action.details": "Detalles",
   "operations.traceability.action.haccp": "Control HACCP",
   "operations.traceability.action.initiateRecall": "Iniciar recall",
+  "operations.traceability.action.openScanner": "Abrir escáner de planta",
   "operations.traceability.action.parseGs1": "Analizar GS1",
   "operations.traceability.action.release": "Release",
   "operations.traceability.action.resolve": "Resolve",
