@@ -21,7 +21,8 @@
       {
         "path": "/admin/analytics/quality",
         "label": "Data Quality",
-        "icon": "ShieldCheck"
+        "icon": "ShieldCheck",
+        "schema": "schemas/quality.json"
       }
     ]
   },
@@ -33,7 +34,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "bd29d634f5a8cec914f7d305c759552b8e0b076ab37dda233ca9822bc529762f",
+    "engineSha256": "2abf79772c0178c7d36c307f44b0d797a0f9a1e9da40fc989dfdbd6414ce06a1",
     "sourceSha256": "b548fe1922656093791b818402ae5029d288a7aa0f8c335471563d6ae24faf2c"
   }
 }

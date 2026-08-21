@@ -1,0 +1,67 @@
+{
+  "sduiSchema": 1,
+  "title": "checklists.title",
+  "subtitle": "checklists.subtitle",
+  "newLabel": "checklists.btn.new",
+  "resources": [
+    {
+      "id": "templates",
+      "label": "checklists.tab.templates",
+      "icon": "ClipboardList",
+      "dataSource": "/ext/workflow/checklists/templates?all=1",
+      "dataPath": "templates",
+      "columns": [
+        { "key": "name", "label": "common.col.name" },
+        { "key": "description", "label": "common.col.description" },
+        { "key": "collection", "label": "common.col.collection", "type": "mono" },
+        { "key": "is_active", "label": "common.col.active", "type": "boolean" }
+      ],
+      "rowActions": [
+        { "id": "edit", "kind": "edit", "label": "common.edit" },
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "method": "DELETE",
+          "endpoint": "/ext/workflow/checklists/templates/{id}",
+          "confirm": "ext.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/workflow/checklists/templates",
+        "fields": [
+          { "name": "name", "label": "common.col.name", "required": true, "colSpan": 2 },
+          { "name": "description", "label": "common.col.description", "type": "textarea", "colSpan": 2 },
+          { "name": "collection", "label": "common.col.collection", "mono": true, "colSpan": 2 }
+        ],
+        "repeatable": {
+          "name": "items",
+          "label": "checklists.items",
+          "addLabel": "checklists.btn.addItem",
+          "min": 0,
+          "columns": [
+            { "name": "label", "label": "common.col.label", "required": true },
+            { "name": "required", "label": "common.required", "type": "boolean", "default": false },
+            { "name": "order_idx", "label": "common.col.order", "type": "number", "default": 0 }
+          ]
+        }
+      }
+    },
+    {
+      "id": "summary",
+      "label": "checklists.tab.summary",
+      "icon": "BarChart2",
+      "dataSource": "/ext/workflow/checklists/summary",
+      "dataPath": "checklists",
+      "columns": [
+        { "key": "name", "label": "common.col.name" },
+        { "key": "collection", "label": "common.col.collection", "type": "mono" },
+        { "key": "record_id", "label": "common.col.record", "type": "mono" },
+        { "key": "checked_items", "label": "checklists.col.checked", "type": "mono" },
+        { "key": "total_items", "label": "checklists.col.total", "type": "mono" },
+        { "key": "progress", "label": "checklists.col.progress", "type": "mono" },
+        { "key": "updated_at", "label": "common.col.updated", "type": "date" }
+      ]
+    }
+  ]
+}

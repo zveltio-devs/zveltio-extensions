@@ -58,3 +58,8 @@ ecran diferența devine vizibilă.
 
 Ecranul de configurare a schemelor cere **master-detail** (schemă → ponderi per
 punct), care încă nu există în randor. Al treilea lucru care îl așteaptă.
+
+## SDUI migration (2026-08-21)
+
+SDUI templates+summary; GET /templates?all=1 embeds items
+Branch: `feat/sdui-crud-batch`
