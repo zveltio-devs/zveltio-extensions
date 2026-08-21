@@ -1,0 +1,88 @@
+{
+  "sduiSchema": 1,
+  "title": "finance.banking.title",
+  "subtitle": "finance.banking.subtitle",
+  "newLabel": "finance.banking.newAccount",
+  "resources": [
+    {
+      "id": "accounts",
+      "label": "finance.banking.tab.accounts",
+      "icon": "Landmark",
+      "dataSource": "/ext/finance/banking/accounts",
+      "dataPath": "data",
+      "columns": [
+        { "key": "name", "label": "common.col.name" },
+        { "key": "bank_name", "label": "common.col.bank" },
+        { "key": "iban", "label": "common.col.iban", "type": "mono" },
+        { "key": "currency", "label": "common.col.currency", "type": "mono" },
+        {
+          "key": "balance",
+          "label": "common.col.balance",
+          "type": "currency",
+          "currency": { "codeKey": "currency" }
+        },
+        { "key": "is_active", "label": "common.col.active", "type": "boolean" }
+      ],
+      "rowActions": [
+        { "id": "edit", "kind": "edit", "label": "common.edit" }
+      ],
+      "form": {
+        "endpoint": "/ext/finance/banking/accounts",
+        "fields": [
+          { "name": "name", "label": "common.col.name", "required": true, "colSpan": 1 },
+          { "name": "bank_name", "label": "common.col.bank", "required": true, "colSpan": 1 },
+          { "name": "iban", "label": "common.col.iban", "mono": true, "colSpan": 1 },
+          { "name": "currency", "label": "common.col.currency", "colSpan": 1, "default": "RON" },
+          {
+            "name": "account_type",
+            "label": "common.col.type",
+            "type": "select",
+            "colSpan": 1,
+            "default": "checking",
+            "options": [
+              { "value": "checking", "label": "finance.banking.type.checking" },
+              { "value": "savings", "label": "finance.banking.type.savings" },
+              { "value": "credit", "label": "finance.banking.type.credit" },
+              { "value": "cash", "label": "finance.banking.type.cash" }
+            ]
+          },
+          {
+            "name": "opening_balance",
+            "label": "finance.banking.ui.opening_balance",
+            "type": "number",
+            "colSpan": 1,
+            "default": 0
+          },
+          { "name": "notes", "label": "common.col.notes", "type": "textarea", "colSpan": 2 }
+        ]
+      }
+    },
+    {
+      "id": "transactions",
+      "label": "finance.banking.tab.transactions",
+      "icon": "ArrowLeftRight",
+      "dataSource": "/ext/finance/banking/accounts/{masterId}/transactions?limit=100",
+      "dataPath": "data",
+      "master": {
+        "dataSource": "/ext/finance/banking/accounts",
+        "dataPath": "data",
+        "idKey": "id",
+        "titleKey": "name",
+        "subtitle": { "keys": ["bank_name", "iban"], "sep": " · " },
+        "badgeKey": "currency"
+      },
+      "columns": [
+        { "key": "booking_date", "label": "common.col.date", "type": "date" },
+        { "key": "description", "label": "common.col.description" },
+        {
+          "key": "amount",
+          "label": "common.col.amount",
+          "type": "currency",
+          "currency": { "code": "RON" }
+        },
+        { "key": "category", "label": "common.col.category" },
+        { "key": "reconciled", "label": "finance.banking.status.reconciled", "type": "boolean" }
+      ]
+    }
+  ]
+}
