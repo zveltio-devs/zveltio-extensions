@@ -1,6 +1,14 @@
 {
+  "analytics.quality.btn.dismiss": "Dismiss",
+  "analytics.quality.btn.dismissAll": "Dismiss all",
+  "analytics.quality.btn.runScan": "Run scan",
   "analytics.quality.col.severity": "Súlyosság",
   "analytics.quality.empty": "Még nincsenek adatok.",
+  "analytics.quality.scan.anomalies": "Anomalies",
+  "analytics.quality.scan.duplicates": "Duplicates",
+  "analytics.quality.scan.full": "Full",
+  "analytics.quality.scan.missing_data": "Missing data",
+  "analytics.quality.scan.normalization": "Normalization",
   "analytics.quality.subtitle": "Gyűjtemények vizsgálata adatminőségi problémákra",
   "analytics.quality.tab.history": "Vizsgálati előzmények",
   "analytics.quality.tab.issues": "Problémák",
@@ -8,5 +16,6 @@
   "analytics.quality.ui.collection": "Gyűjtemény",
   "analytics.quality.ui.no_issues_to_show_run_a_scan": "Nincs megjeleníthető probléma. Futtass egy vizsgálatot.",
   "analytics.quality.ui.no_scans_yet": "Még nincsenek vizsgálatok.",
+  "analytics.quality.ui.scanType": "Scan type",
   "analytics.quality.ui.select_collection": "— Select collection —"
 }

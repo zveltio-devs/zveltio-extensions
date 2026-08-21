@@ -12,8 +12,8 @@
       "dataPath": "data",
       "columns": [
         { "key": "name", "label": "common.col.name" },
-        { "key": "bank_name", "label": "finance.banking.col.bank" },
-        { "key": "iban", "label": "IBAN", "type": "mono" },
+        { "key": "bank_name", "label": "common.col.bank" },
+        { "key": "iban", "label": "common.col.iban", "type": "mono" },
         { "key": "currency", "label": "common.col.currency", "type": "mono" },
         {
           "key": "balance",
@@ -30,8 +30,8 @@
         "endpoint": "/ext/finance/banking/accounts",
         "fields": [
           { "name": "name", "label": "common.col.name", "required": true, "colSpan": 1 },
-          { "name": "bank_name", "label": "finance.banking.col.bank", "required": true, "colSpan": 1 },
-          { "name": "iban", "label": "IBAN", "mono": true, "colSpan": 1 },
+          { "name": "bank_name", "label": "common.col.bank", "required": true, "colSpan": 1 },
+          { "name": "iban", "label": "common.col.iban", "mono": true, "colSpan": 1 },
           { "name": "currency", "label": "common.col.currency", "colSpan": 1, "default": "RON" },
           {
             "name": "account_type",
@@ -40,15 +40,15 @@
             "colSpan": 1,
             "default": "checking",
             "options": [
-              { "value": "checking", "label": "Checking" },
-              { "value": "savings", "label": "Savings" },
-              { "value": "credit", "label": "Credit" },
-              { "value": "cash", "label": "Cash" }
+              { "value": "checking", "label": "finance.banking.type.checking" },
+              { "value": "savings", "label": "finance.banking.type.savings" },
+              { "value": "credit", "label": "finance.banking.type.credit" },
+              { "value": "cash", "label": "finance.banking.type.cash" }
             ]
           },
           {
             "name": "opening_balance",
-            "label": "finance.banking.form.openingBalance",
+            "label": "finance.banking.ui.opening_balance",
             "type": "number",
             "colSpan": 1,
             "default": 0
@@ -81,7 +81,7 @@
           "currency": { "code": "RON" }
         },
         { "key": "category", "label": "common.col.category" },
-        { "key": "reconciled", "label": "finance.banking.col.reconciled", "type": "boolean" }
+        { "key": "reconciled", "label": "finance.banking.status.reconciled", "type": "boolean" }
       ]
     }
   ]
