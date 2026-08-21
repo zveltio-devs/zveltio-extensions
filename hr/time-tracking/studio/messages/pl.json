@@ -1,6 +1,8 @@
 {
   "hr.time-tracking.badge.billable": "Rozliczalny",
   "hr.time-tracking.badge.internal": "Wewnętrzny",
+  "hr.time-tracking.btn.startTimer": "Start timer",
+  "hr.time-tracking.btn.stopTimer": "Stop timer",
   "hr.time-tracking.col.billable": "Rozliczalny",
   "hr.time-tracking.col.client": "Klient",
   "hr.time-tracking.col.hours": "Godziny",
@@ -18,12 +20,13 @@
   "hr.time-tracking.title": "Śledzenie czasu",
   "hr.time-tracking.ui.description": "Opis",
   "hr.time-tracking.ui.hourly_rate": "Stawka godzinowa",
-  "hr.time-tracking.ui.new_project": "Nowy projekt",
   "hr.time-tracking.ui.newProjectBtn": "Nowy projekt",
+  "hr.time-tracking.ui.new_project": "Nowy projekt",
   "hr.time-tracking.ui.project": "Projekt *",
   "hr.time-tracking.ui.project_name": "Nazwa projektu *",
   "hr.time-tracking.ui.select_project": "— Select project —",
-  "hr.time-tracking.ui.start_timer": "Uruchom stoper",
   "hr.time-tracking.ui.startTimerBtn": "Uruchom stoper",
-  "hr.time-tracking.ui.stopTimer": "Zatrzymaj stoper"
+  "hr.time-tracking.ui.start_timer": "Uruchom stoper",
+  "hr.time-tracking.ui.stopTimer": "Zatrzymaj stoper",
+  "hr.timeTracking.confirmDelete": "Delete this time entry?"
 }
