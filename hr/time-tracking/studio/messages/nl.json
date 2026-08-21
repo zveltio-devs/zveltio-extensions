@@ -1,6 +1,8 @@
 {
   "hr.time-tracking.badge.billable": "Factureerbaar",
   "hr.time-tracking.badge.internal": "Intern",
+  "hr.time-tracking.btn.startTimer": "Start timer",
+  "hr.time-tracking.btn.stopTimer": "Stop timer",
   "hr.time-tracking.col.billable": "Factureerbaar",
   "hr.time-tracking.col.client": "Klant",
   "hr.time-tracking.col.hours": "Uren",
@@ -18,12 +20,13 @@
   "hr.time-tracking.title": "Tijdregistratie",
   "hr.time-tracking.ui.description": "Beschrijving",
   "hr.time-tracking.ui.hourly_rate": "Uurtarief",
-  "hr.time-tracking.ui.new_project": "Nieuw project",
   "hr.time-tracking.ui.newProjectBtn": "Nieuw project",
+  "hr.time-tracking.ui.new_project": "Nieuw project",
   "hr.time-tracking.ui.project": "Project *",
   "hr.time-tracking.ui.project_name": "Projectnaam *",
   "hr.time-tracking.ui.select_project": "— Select project —",
-  "hr.time-tracking.ui.start_timer": "Timer starten",
   "hr.time-tracking.ui.startTimerBtn": "Timer starten",
-  "hr.time-tracking.ui.stopTimer": "Timer stoppen"
+  "hr.time-tracking.ui.start_timer": "Timer starten",
+  "hr.time-tracking.ui.stopTimer": "Timer stoppen",
+  "hr.timeTracking.confirmDelete": "Delete this time entry?"
 }

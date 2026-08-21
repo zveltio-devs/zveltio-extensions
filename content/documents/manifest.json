@@ -26,7 +26,8 @@
       {
         "path": "/admin/content/documents",
         "label": "Documents",
-        "icon": "FileText"
+        "icon": "FileText",
+        "schema": "schemas/documents.json"
       }
     ],
     "navGroup": "content"
@@ -43,7 +44,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "f941663960d27c1336f14a49eee91dcb3ba1bb1a228afd9e1c0ccab1265c7c42",
+    "engineSha256": "0abe0d1b1446b0b59399d61e1c784abbebcdc2079a3eb827d26a88bd3f57d300",
     "sourceSha256": "3d71da0f2ee011e35be54ef1bf2dc2e1b58ae85e45d6a183aa1a630f6bb0e5a4"
   }
 }
