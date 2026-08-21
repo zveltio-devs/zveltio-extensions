@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
+import { receivables } from './briefing.js';
+
 type Bindings = { db: any; user: any };
 
 function buildListQuery(table: string, allowed: string[]) {
@@ -71,6 +73,13 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
     if (!session) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', session.user);
     await next();
+  });
+
+  // Dashboard briefing needs only a session — same soft-fail contract as the
+  // old /api/briefing. Requiring crm:read would hide the card for admins who
+  // have not granted themselves the CRM resource yet.
+  app.get('/briefing', async (c) => {
+    return c.json({ receivables: await receivables(db) });
   });
 
   // ── RBAC gate ─────────────────────────────────────────────────────────────
