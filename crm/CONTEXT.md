@@ -1,5 +1,10 @@
 # CRM — context
 
+**Ownership:** this extension owns `zvd_contacts`, `zvd_organizations`,
+`zvd_transactions`, and CRM-only tables. The engine may *adopt* those tables
+for Studio metadata / RLS / grants when they already exist; it must not CREATE
+them. Dashboard briefing is `GET /ext/crm/briefing` (legacy `/api/briefing` → 410).
+
 **Verificat prin apăsare: 2026-08-09.** Organizație creată, contact legat de ea,
 legătura recitită.
 
