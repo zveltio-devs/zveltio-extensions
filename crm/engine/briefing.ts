@@ -1,8 +1,8 @@
 /**
  * Dashboard briefing — who owes money — owned by CRM, not the engine.
  *
- * Uses `status` (CRM schema). Soft-fails to zeroes when the table is missing
- * or reshaped so a bare dashboard never 500s.
+ * Uses COALESCE(payment_status, status) so legacy core rows and CRM-native
+ * rows both count. Soft-fails to zeroes when the table is missing or reshaped.
  */
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
@@ -33,7 +33,7 @@ export async function receivables(db: ExtensionContext['db']): Promise<Receivabl
        WHERE type = 'invoice'
          AND due_date IS NOT NULL
          AND due_date < CURRENT_DATE
-         AND status NOT IN (${sql.join(settled)})
+         AND COALESCE(payment_status, status) NOT IN (${sql.join(settled)})
        GROUP BY currency
        ORDER BY total DESC
     `.execute(db);
@@ -44,7 +44,7 @@ export async function receivables(db: ExtensionContext['db']): Promise<Receivabl
        WHERE type = 'invoice'
          AND due_date IS NOT NULL
          AND due_date < CURRENT_DATE
-         AND status NOT IN (${sql.join(settled)})
+         AND COALESCE(payment_status, status) NOT IN (${sql.join(settled)})
     `.execute(db);
 
     const soon = await sql<{ currency: string; count: number; total: number }>`
@@ -54,7 +54,7 @@ export async function receivables(db: ExtensionContext['db']): Promise<Receivabl
         FROM zvd_transactions
        WHERE type = 'invoice'
          AND due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + 7
-         AND status NOT IN (${sql.join(settled)})
+         AND COALESCE(payment_status, status) NOT IN (${sql.join(settled)})
        GROUP BY currency
        ORDER BY total DESC
     `.execute(db);

@@ -34,8 +34,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "2161f015885e6231df89419457d2f43e8fb3260aa78f5ef5201f3d4448f96a82",
-    "sourceSha256": "ed8467a17762ec1d83d6442ebd172944330cc1ff739aed2eaa8656a06d731f62"
+    "engineSha256": "66a4f42958adab0c8a106257240c4ca042c00fef349ae4f9036ba979dfe0d2f1",
+    "sourceSha256": "9601de0009ca09f6d6e0b08fee1bdd3f4b8bad2a5388ef6a9444f240a28c22de"
   },
   "resources": [
     "crm",
