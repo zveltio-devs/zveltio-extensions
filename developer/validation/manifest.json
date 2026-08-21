@@ -21,7 +21,8 @@
       {
         "path": "/admin/developer/validation",
         "label": "Validation Rules",
-        "icon": "ShieldCheck"
+        "icon": "ShieldCheck",
+        "schema": "schemas/validation.json"
       }
     ],
     "navGroup": "developer"
@@ -38,7 +39,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "314d5057eab7e36b0715281fe1608c5a7b3d2e1760880806640f113472d472e6",
-    "sourceSha256": "3acb9b1cce8e34ab1b11bbb16bfd3ebdbbe990a998b1834c3d9f846b1403bea6"
+    "engineSha256": "89119ad1df0bec974b9a89a09a567da6c6139ae4b22d5100686c8cb31b2e8719",
+    "sourceSha256": "bc789566cf0281cec9030137190fa9c111f340f579c70212e0e05829c7774fea"
   }
 }

@@ -1,0 +1,127 @@
+{
+  "sduiSchema": 1,
+  "title": "developer.validation.title",
+  "subtitle": "developer.validation.subtitle",
+  "newLabel": "developer.validation.newRule",
+  "resources": [
+    {
+      "id": "rules",
+      "dataSource": "/ext/developer/validation/rules",
+      "dataPath": "data",
+      "search": {
+        "fields": ["collection", "field_name", "error_message", "rule_type"],
+        "placeholder": "common.search"
+      },
+      "columns": [
+        {
+          "key": "collection",
+          "label": "common.col.collection",
+          "type": "badge",
+          "badge": { "colors": {} }
+        },
+        {
+          "key": "field_name",
+          "label": "common.col.field",
+          "type": "mono"
+        },
+        {
+          "key": "rule_type",
+          "label": "developer.validation.col.ruleType"
+        },
+        {
+          "key": "error_message",
+          "label": "common.col.description"
+        },
+        {
+          "key": "is_active",
+          "label": "common.col.active",
+          "type": "boolean",
+          "editable": {
+            "endpoint": "/ext/developer/validation/rules/{id}",
+            "field": "is_active",
+            "options": [
+              { "value": "true", "label": "On" },
+              { "value": "false", "label": "Off" }
+            ]
+          }
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/developer/validation/rules/{id}",
+          "confirm": "developer.validation.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/developer/validation/rules",
+        "fields": [
+          {
+            "name": "collection",
+            "label": "common.col.collection",
+            "type": "relation",
+            "required": true,
+            "colSpan": 1,
+            "relation": {
+              "dataSource": "/api/collections",
+              "dataPath": "collections",
+              "valueKey": "name",
+              "labelKey": "name"
+            }
+          },
+          {
+            "name": "field_name",
+            "label": "common.col.field",
+            "required": true,
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "rule_type",
+            "label": "developer.validation.ruleType",
+            "type": "select",
+            "required": true,
+            "colSpan": 1,
+            "default": "required",
+            "options": [
+              { "value": "required", "label": "developer.validation.rule.required" },
+              { "value": "min", "label": "developer.validation.rule.min" },
+              { "value": "max", "label": "developer.validation.rule.max" },
+              { "value": "minLength", "label": "Min length" },
+              { "value": "maxLength", "label": "Max length" },
+              { "value": "pattern", "label": "developer.validation.rule.pattern" },
+              { "value": "range", "label": "Range" },
+              { "value": "email", "label": "Email" },
+              { "value": "url", "label": "URL" },
+              { "value": "nlp", "label": "Expression (nlp)" }
+            ]
+          },
+          {
+            "name": "error_message",
+            "label": "developer.validation.form.description",
+            "required": true,
+            "colSpan": 2
+          },
+          {
+            "name": "rule_config",
+            "label": "developer.validation.configJson",
+            "type": "json",
+            "mono": true,
+            "rows": 5,
+            "colSpan": 2,
+            "default": {}
+          },
+          {
+            "name": "nl_description",
+            "label": "NL description (optional)",
+            "colSpan": 2
+          }
+        ]
+      }
+    }
+  ]
+}
