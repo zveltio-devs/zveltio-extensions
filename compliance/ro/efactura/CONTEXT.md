@@ -53,3 +53,8 @@ iar `ON CONFLICT` a fost mutat odată cu ea.
 `SETUP.md` — ghidul pentru administratorul instanței, scris pentru client, nu
 pentru dezvoltator. Explică de ce testul „Hello" poate trece și e-Factura să nu:
 token bun, aplicație neînrolată.
+
+## SDUI migration — main invoices page (2026-08-21)
+Branch: feat/sdui-sms-efactura
+Main `/admin/compliance/ro/efactura` now schema-hosted (anaf page already was).
+Tradeoff: line totals (vat_amount, line_total, subtotal, vat_total, total) are manual fields — no live recalc like the Svelte form.

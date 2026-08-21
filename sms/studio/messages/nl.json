@@ -1,6 +1,7 @@
 {
   "sms.btn.saveTemplate": "Sjabloon opslaan",
   "sms.btn.send": "Sms verzenden",
+  "sms.btn.sendSms": "Send SMS",
   "sms.col.body": "Inhoud",
   "sms.col.provider": "Provider",
   "sms.col.sentAt": "Verzonden op",

@@ -16,7 +16,8 @@
       {
         "path": "/admin/compliance/ro/efactura",
         "label": "e-Factura RO",
-        "icon": "receipt"
+        "icon": "receipt",
+        "schema": "schemas/efactura.json"
       },
       {
         "path": "/admin/compliance/ro/efactura/anaf",
@@ -40,7 +41,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "5617cb1f030d9a70279b99e4eeed518be3fabba76314f155fb63b8f96c26089f",
+    "engineSha256": "e5b29a5469449b0d7b9c162d5b10c991eeef0b4b349c22d6b5556ab12e1e3a6e",
     "sourceSha256": "528be8cc4b0e6a48f87780a120165b8e02be44f3c9544d5a87500e184bd3d0a4"
   },
   "resources": [
