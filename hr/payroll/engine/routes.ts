@@ -416,7 +416,7 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
     }
     await sql`UPDATE zvd_payroll_entries SET status = 'approved', updated_at = NOW() WHERE period_id = ${c.req.param('id')} AND status = 'draft'`.execute(db);
     const row = await sql`
-      UPDATE zvd_payroll_periods SET status = 'calculated', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
+      UPDATE zvd_payroll_periods SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
       WHERE id = ${c.req.param('id')} AND status = 'calculated' RETURNING *
     `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Period not found or not calculated' }, 400);
@@ -431,7 +431,10 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
     await sql`UPDATE zvd_payroll_entries SET paid_at = NOW(), updated_at = NOW() WHERE period_id = ${c.req.param('id')} AND status = 'approved'`.execute(db);
     const row = await sql`
       UPDATE zvd_payroll_periods SET status = 'closed', paid_at = NOW(), updated_at = NOW()
-      WHERE id = ${c.req.param('id')} AND status = 'calculated' RETURNING *
+      -- Only \`approve\` can produce 'approved'. Requiring it here is what makes
+      -- calculate -> pay impossible: the two decisions no longer share one state,
+      -- so the second can finally tell whether the first happened.
+      WHERE id = ${c.req.param('id')} AND status = 'approved' RETURNING *
     `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Period not found or not ready' }, 400);
     return c.json({ data: row.rows[0] });
