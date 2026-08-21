@@ -24,6 +24,7 @@
   "forms.form.name": "Név",
   "forms.form.slug": "Slug",
   "forms.form.targetCollection": "Cél gyűjtemény",
+  "forms.hint.dragReorder": "Húzd az átrendezéshez",
   "forms.section.details": "Részletek",
   "forms.section.fields": "Mezők",
   "forms.subtitle": "Beágyazható űrlapok és beküldéseik kezelése",

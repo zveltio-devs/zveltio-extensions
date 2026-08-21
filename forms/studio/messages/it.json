@@ -24,6 +24,7 @@
   "forms.form.name": "Nome",
   "forms.form.slug": "Slug",
   "forms.form.targetCollection": "Collezione di destinazione",
+  "forms.hint.dragReorder": "Trascina per riordinare",
   "forms.section.details": "Dettagli",
   "forms.section.fields": "Campi",
   "forms.subtitle": "Gestisci i moduli incorporabili e i relativi invii",
