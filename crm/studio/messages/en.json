@@ -104,5 +104,10 @@
   "crm.ui.search_organizations": "Search organizations...",
   "crm.ui.tax": "Tax",
   "crm.ui.tax_id_cui": "Tax ID (CUI)",
-  "crm.ui.type": "Type *"
+  "crm.ui.type": "Type *",
+  "briefing.allSettled": "Nothing is overdue.",
+  "briefing.dueSoon": "{count} due in the next 7 days",
+  "briefing.oldestDays": "oldest {days} days",
+  "briefing.overdueCount": "{count} overdue invoices",
+  "briefing.owedTitle": "You are owed"
 }
