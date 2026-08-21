@@ -1,0 +1,154 @@
+{
+  "sduiSchema": 1,
+  "title": "projects.helpdesk.title",
+  "subtitle": "projects.helpdesk.subtitle",
+  "newLabel": "projects.helpdesk.btn.new",
+  "resources": [
+    {
+      "id": "tickets",
+      "dataSource": "/ext/projects/helpdesk/tickets",
+      "dataPath": "data",
+      "search": {
+        "fields": ["title", "number", "requester_email"],
+        "placeholder": "common.search"
+      },
+      "filters": [
+        {
+          "param": "status",
+          "options": [
+            { "value": "", "label": "common.filter.all" },
+            { "value": "open", "label": "projects.helpdesk.status.open" },
+            { "value": "in_progress", "label": "projects.helpdesk.status.in_progress" },
+            { "value": "pending_customer", "label": "projects.helpdesk.status.pending_customer" },
+            { "value": "resolved", "label": "projects.helpdesk.status.resolved" },
+            { "value": "closed", "label": "projects.helpdesk.status.closed" }
+          ]
+        }
+      ],
+      "columns": [
+        { "key": "number", "label": "common.col.number", "type": "mono" },
+        { "key": "title", "label": "common.col.title" },
+        { "key": "requester_email", "label": "common.col.email" },
+        { "key": "category_name", "label": "projects.helpdesk.col.category" },
+        {
+          "key": "priority",
+          "label": "projects.helpdesk.ui.priority",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "low": "badge-ghost",
+              "medium": "badge-info",
+              "high": "badge-warning",
+              "critical": "badge-error"
+            }
+          }
+        },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "open": "badge-info",
+              "in_progress": "badge-warning",
+              "pending_customer": "badge-ghost",
+              "resolved": "badge-success",
+              "closed": "badge-ghost"
+            }
+          }
+        },
+        { "key": "created_at", "label": "common.col.created", "type": "date" }
+      ],
+      "rowActions": [
+        {
+          "id": "resolve",
+          "icon": "CheckCircle",
+          "label": "projects.helpdesk.btn.resolve",
+          "variant": "text-success",
+          "method": "PATCH",
+          "endpoint": "/ext/projects/helpdesk/tickets/{id}",
+          "body": { "status": "resolved" },
+          "visibleWhen": {
+            "field": "status",
+            "in": ["open", "in_progress", "pending_customer"]
+          }
+        },
+        {
+          "id": "reply",
+          "icon": "Send",
+          "label": "common.send",
+          "method": "POST",
+          "endpoint": "/ext/projects/helpdesk/tickets/{id}/messages",
+          "visibleWhen": {
+            "field": "status",
+            "in": ["open", "in_progress", "pending_customer"]
+          },
+          "prompt": {
+            "title": "projects.helpdesk.ui.reply",
+            "submitLabel": "common.send",
+            "fields": [
+              {
+                "name": "content",
+                "label": "projects.helpdesk.ui.reply",
+                "type": "textarea",
+                "required": true,
+                "rows": 4
+              }
+            ]
+          }
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/projects/helpdesk/tickets",
+        "fields": [
+          {
+            "name": "title",
+            "label": "projects.helpdesk.ui.subject",
+            "required": true,
+            "colSpan": 2
+          },
+          {
+            "name": "requester_email",
+            "label": "projects.helpdesk.ui.requester_email",
+            "type": "email",
+            "required": true,
+            "colSpan": 2
+          },
+          {
+            "name": "category_id",
+            "label": "projects.helpdesk.col.category",
+            "type": "relation",
+            "colSpan": 1,
+            "relation": {
+              "dataSource": "/ext/projects/helpdesk/categories",
+              "dataPath": "data",
+              "valueKey": "id",
+              "labelKey": "name"
+            }
+          },
+          {
+            "name": "priority",
+            "label": "projects.helpdesk.ui.priority",
+            "type": "select",
+            "colSpan": 1,
+            "default": "medium",
+            "options": [
+              { "value": "low", "label": "projects.helpdesk.ui.low" },
+              { "value": "medium", "label": "projects.helpdesk.ui.medium" },
+              { "value": "high", "label": "projects.helpdesk.ui.high" },
+              { "value": "critical", "label": "projects.helpdesk.priority.critical" }
+            ]
+          },
+          {
+            "name": "description",
+            "label": "projects.helpdesk.ui.description",
+            "type": "textarea",
+            "required": true,
+            "rows": 4,
+            "colSpan": 2
+          }
+        ]
+      }
+    }
+  ]
+}

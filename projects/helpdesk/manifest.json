@@ -15,7 +15,8 @@
       {
         "path": "/admin/projects/helpdesk",
         "label": "Helpdesk",
-        "icon": "LifeBuoy"
+        "icon": "LifeBuoy",
+        "schema": "schemas/helpdesk.json"
       }
     ],
     "navGroup": "projects"
@@ -33,7 +34,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "cc9f876f5257b33deda2e5fe377e47409e8686910743c9e94950f0cd6ee234bb",
+    "engineSha256": "707464001a2a7f4f946d4c2d6d6a00e1a91756d578843e167568da9cf8d06644",
     "sourceSha256": "87612f7268e52f8c8a3a6ffce4865ec74a5725098aef4f701652644d47613f6f"
   },
   "resources": [
