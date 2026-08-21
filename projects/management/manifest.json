@@ -15,7 +15,8 @@
       {
         "path": "/admin/projects/management",
         "label": "Projects",
-        "icon": "Kanban"
+        "icon": "Kanban",
+        "schema": "schemas/management.json"
       }
     ],
     "navGroup": "projects"
@@ -33,7 +34,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "3bc5ef7a562f0864f1d10b6b9a986b55a4f90087b3efa44a97b6f0bbbe4d1935",
+    "engineSha256": "7762cae30b9c25db596e9dbc2c4ee145d2079805dd10497a4ef056741389dd19",
     "sourceSha256": "fb8ad22011a5d5ad6ce8c8a660eabc80e029f54e4f658ad98d60a90d3c1a9718"
   },
   "resources": [

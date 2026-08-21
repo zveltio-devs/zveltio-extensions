@@ -24,20 +24,20 @@
     "pages": [
       {
         "path": "/admin/billing",
-        "component": "./studio/src/pages/BillingPage.svelte",
         "label": "Billing",
-        "icon": "credit-card"
+        "icon": "credit-card",
+        "schema": "schemas/billing.json"
       }
     ],
     "navGroup": "finance"
   },
   "contributes": {
     "engine": true,
-    "studio": false,
+    "studio": true,
     "fieldTypes": []
   },
   "integrity": {
-    "engineSha256": "748f130448fa52c512e1e8088b0e2ff109072af0087eb0c2fa627f6b712c92c9",
+    "engineSha256": "a11f8e48197efcab52ead61ae78e5763f8f8db407dee034e34ab3fe555853c8b",
     "sourceSha256": "0a2513f90614bed64c891899e78823043ccd7135f87025ef934fb1607db74d90"
   }
 }
