@@ -1,152 +1,236 @@
 <!DOCTYPE html>
-<html lang="ro">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
   <title>Zveltio Scan</title>
   <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --line: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, sans-serif; background: #111; color: #fff; min-height: 100vh; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
     #app { display: flex; flex-direction: column; min-height: 100vh; }
-
-    /* Header */
-    #header { background: #1a1a2e; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; }
-    #header h1 { font-size: 17px; font-weight: 700; }
+    #header { background: #111827; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+    #header .brand { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
+    #header .brand img { width: 28px; height: 28px; }
     #mode-toggle { display: flex; gap: 6px; }
-    .mode-btn { padding: 5px 12px; border-radius: 20px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; background: #334155; color: #94a3b8; }
-    .mode-btn.active { background: #3b82f6; color: #fff; }
-    .mode-btn.dispatch-active { background: #f59e0b; color: #1a1a2e; }
-
-    /* Scanner */
+    .mode-btn { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); font-size: 13px; font-weight: 600; cursor: pointer; background: transparent; color: var(--muted); }
+    .mode-btn.active { background: var(--accent); color: #0f172a; border-color: var(--accent); }
+    .mode-btn.dispatch-active { background: var(--warn); color: #1a1a2e; border-color: var(--warn); }
     #scanner-container { flex: 1; }
     #reader { width: 100%; max-width: 400px; margin: 0 auto; }
-    #status { padding: 14px 16px; text-align: center; font-size: 14px; opacity: 0.7; }
-
-    /* Card */
-    .card { background: #1e293b; margin: 10px 12px; border-radius: 12px; padding: 14px; }
+    #status { padding: 14px 16px; text-align: center; font-size: 14px; color: var(--muted); }
+    .card { background: var(--panel); margin: 10px 12px; border-radius: 12px; padding: 14px; border: 1px solid var(--line); }
     .card.hidden { display: none; }
     .product-name { font-size: 19px; font-weight: 700; margin-bottom: 4px; }
-    .lot-number { font-size: 12px; color: #94a3b8; font-family: monospace; margin-bottom: 10px; }
-    .row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #334155; font-size: 13px; }
+    .lot-number { font-size: 12px; color: var(--muted); font-family: ui-monospace, monospace; margin-bottom: 10px; }
+    .row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
     .row:last-of-type { border-bottom: none; }
-    .lbl { color: #94a3b8; }
-    .danger { color: #ef4444; font-weight: 700; }
-    .warn { color: #f59e0b; }
-    .ok { color: #22c55e; }
-
-    /* Forms */
+    .lbl { color: var(--muted); }
+    .danger { color: var(--danger); font-weight: 700; }
+    .warn { color: var(--warn); }
     .field { margin-top: 12px; }
-    .field label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 4px; }
-    .field input, .field select { width: 100%; padding: 11px; border: 2px solid #334155; border-radius: 8px; background: #0f172a; color: #fff; font-size: 16px; }
+    .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .field input, .field select { width: 100%; padding: 11px; border: 1px solid var(--line); border-radius: 8px; background: #0b1220; color: var(--text); font-size: 16px; }
     .field input[type=number] { text-align: center; font-size: 20px; }
-
-    /* Buttons */
     .btn { width: 100%; padding: 13px; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 15px; margin-top: 8px; }
-    .btn-primary { background: #3b82f6; color: #fff; }
-    .btn-success { background: #22c55e; color: #fff; }
-    .btn-warning { background: #f59e0b; color: #1a1a2e; }
-    .btn-ghost { background: transparent; color: #94a3b8; border: 1px solid #334155; font-size: 13px; padding: 9px; margin-top: 6px; }
-    .btn:disabled { background: #374151; cursor: not-allowed; }
-
-    /* Alerts */
+    .btn-primary { background: var(--accent); color: #0f172a; }
+    .btn-success { background: var(--ok); color: #052e16; }
+    .btn-warning { background: var(--warn); color: #1a1a2e; }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); font-size: 13px; padding: 9px; margin-top: 6px; }
     .alert { padding: 12px 14px; border-radius: 8px; margin: 10px 12px; font-size: 13px; }
     .alert-error { background: #450a0a; color: #fca5a5; }
     .alert-success { background: #052e16; color: #86efac; text-align: center; }
-    .alert-success .check { font-size: 40px; margin-bottom: 6px; }
-    .alert-warning { background: #451a03; color: #fcd34d; }
-
-    /* Dispatch pending badge */
-    .dispatch-badge { background: #f59e0b22; border: 1px solid #f59e0b66; border-radius: 8px; padding: 10px 12px; margin-top: 10px; font-size: 13px; }
+    .alert-success .check { font-size: 36px; margin-bottom: 6px; }
+    .dispatch-badge { background: #f59e0b18; border: 1px solid #f59e0b55; border-radius: 8px; padding: 10px 12px; margin-top: 10px; font-size: 13px; }
     .dispatch-badge strong { color: #fcd34d; display: block; margin-bottom: 2px; }
   </style>
 </head>
 <body>
 <div id="app">
   <div id="header">
-    <span>📦 <span id="header-title">Zveltio Scan</span></span>
+    <div class="brand">
+      <img src="icon.svg" alt="" width="28" height="28">
+      <span id="header-title">Zveltio Scan</span>
+    </div>
     <div id="mode-toggle">
-      <button class="mode-btn active" id="btn-consume" onclick="setMode('consume')">Consum</button>
-      <button class="mode-btn" id="btn-dispatch" onclick="setMode('dispatch')">Expediere</button>
+      <button type="button" class="mode-btn active" id="btn-consume" data-i18n="modeConsume"></button>
+      <button type="button" class="mode-btn" id="btn-dispatch" data-i18n="modeDispatch"></button>
     </div>
   </div>
 
   <div id="scanner-container">
     <div id="reader"></div>
-    <div id="status">Inițializare cameră...</div>
+    <div id="status" data-i18n="initCamera"></div>
   </div>
 
   <div id="error-box" class="alert alert-error" style="display:none"></div>
 
   <div id="success-box" class="alert alert-success" style="display:none">
-    <div class="check">✅</div>
+    <div class="check">✓</div>
     <div id="success-text"></div>
-    <button class="btn btn-ghost" onclick="resetScan()" style="margin-top:10px">Scanează din nou</button>
+    <button type="button" class="btn btn-ghost" id="btn-scan-again" data-i18n="scanAgain"></button>
   </div>
 
-  <!-- LOT INFO CARD -->
   <div id="lot-card" class="card hidden">
     <div class="product-name" id="pc-name"></div>
     <div class="lot-number" id="pc-lot"></div>
-    <div class="row"><span class="lbl">Furnizor</span><span id="pc-supplier"></span></div>
-    <div class="row"><span class="lbl">Disponibil</span><span id="pc-qty"></span></div>
-    <div class="row"><span class="lbl">Valabilitate</span><span id="pc-bbd"></span></div>
-    <div class="row"><span class="lbl">Locație</span><span id="pc-loc"></span></div>
+    <div class="row"><span class="lbl" data-i18n="supplier"></span><span id="pc-supplier"></span></div>
+    <div class="row"><span class="lbl" data-i18n="available"></span><span id="pc-qty"></span></div>
+    <div class="row"><span class="lbl" data-i18n="bbd"></span><span id="pc-bbd"></span></div>
+    <div class="row"><span class="lbl" data-i18n="location"></span><span id="pc-loc"></span></div>
 
-    <!-- CONSUME MODE -->
     <div id="consume-section">
       <div class="field">
-        <label>Ordin de producție</label>
-        <select id="order-select"><option value="">Selectați ordinul...</option></select>
+        <label data-i18n="productionOrder"></label>
+        <select id="order-select"></select>
       </div>
       <div class="field">
-        <label>Cantitate de consumat</label>
+        <label data-i18n="qtyConsume"></label>
         <input type="number" id="qty-consume" min="0.001" step="0.001" placeholder="0.000" />
       </div>
-      <button class="btn btn-success" onclick="confirmConsume()">✓ Confirmă consum</button>
+      <button type="button" class="btn btn-success" id="btn-confirm-consume" data-i18n="confirmConsume"></button>
     </div>
 
-    <!-- DISPATCH MODE -->
     <div id="dispatch-section" style="display:none">
       <div id="pending-dispatch-info" class="dispatch-badge" style="display:none">
         <strong id="pd-customer"></strong>
-        <span id="pd-invoice"></span> · Cant. facturată: <span id="pd-qty-inv"></span>
+        <span id="pd-invoice"></span> · <span data-i18n="invoicedQty"></span>: <span id="pd-qty-inv"></span>
       </div>
-
       <div class="field" style="margin-top:12px">
-        <label>Client</label>
-        <input type="text" id="dispatch-customer" placeholder="Denumire client" />
+        <label data-i18n="customer"></label>
+        <input type="text" id="dispatch-customer" />
       </div>
       <div class="field">
-        <label>Nr. factură / aviz (opțional)</label>
-        <input type="text" id="dispatch-invoice" placeholder="ex: INV-00123" />
+        <label data-i18n="invoiceOptional"></label>
+        <input type="text" id="dispatch-invoice" />
       </div>
       <div class="field">
-        <label>Cantitate expediată</label>
+        <label data-i18n="qtyDispatch"></label>
         <input type="number" id="qty-dispatch" min="0.001" step="0.001" placeholder="0.000" />
       </div>
-      <button class="btn btn-warning" onclick="confirmDispatch()">📦 Confirmă expedierea</button>
+      <button type="button" class="btn btn-warning" id="btn-confirm-dispatch" data-i18n="confirmDispatch"></button>
     </div>
 
-    <button class="btn btn-ghost" onclick="resetScan()">← Scanează alt lot</button>
+    <button type="button" class="btn btn-ghost" id="btn-reset" data-i18n="scanOther"></button>
   </div>
 </div>
 
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="html5-qrcode.min.js"></script>
 <script>
   const API = '/ext/operations/traceability';
-  let mode = 'consume'; // 'consume' | 'dispatch'
+  const STRINGS = {
+    en: {
+      brandConsume: 'Scan · Consume',
+      brandDispatch: 'Scan · Dispatch',
+      modeConsume: 'Consume',
+      modeDispatch: 'Dispatch',
+      initCamera: 'Starting camera…',
+      aimQr: 'Point the camera at the lot QR label',
+      checking: 'Checking lot…',
+      lotUnavailable: 'Lot unavailable',
+      networkError: 'Network error: ',
+      supplier: 'Supplier',
+      available: 'Available',
+      bbd: 'Best before',
+      location: 'Location',
+      productionOrder: 'Production order',
+      selectOrder: 'Select order…',
+      qtyConsume: 'Quantity to consume',
+      confirmConsume: 'Confirm consume',
+      customer: 'Customer',
+      invoiceOptional: 'Invoice / delivery note (optional)',
+      qtyDispatch: 'Quantity dispatched',
+      confirmDispatch: 'Confirm dispatch',
+      invoicedQty: 'Invoiced qty',
+      invoice: 'Invoice',
+      noInvoice: 'No invoice',
+      scanOther: 'Scan another lot',
+      scanAgain: 'Scan again',
+      enterQty: 'Enter quantity',
+      selectOrderErr: 'Select a production order',
+      enterCustomer: 'Enter customer name',
+      consumeOk: (qty, unit, name) => `${qty} ${unit} — ${name} consumed`,
+      dispatchOk: (qty, unit, customer) => `${qty} ${unit} dispatched to ${customer}`,
+      error: 'Error',
+    },
+    ro: {
+      brandConsume: 'Scan · Consum',
+      brandDispatch: 'Scan · Expediere',
+      modeConsume: 'Consum',
+      modeDispatch: 'Expediere',
+      initCamera: 'Inițializare cameră…',
+      aimQr: 'Îndreptați camera spre QR-ul de pe etichetă',
+      checking: 'Se verifică lotul…',
+      lotUnavailable: 'Lot indisponibil',
+      networkError: 'Eroare rețea: ',
+      supplier: 'Furnizor',
+      available: 'Disponibil',
+      bbd: 'Valabilitate',
+      location: 'Locație',
+      productionOrder: 'Ordin de producție',
+      selectOrder: 'Selectați ordinul…',
+      qtyConsume: 'Cantitate de consumat',
+      confirmConsume: 'Confirmă consum',
+      customer: 'Client',
+      invoiceOptional: 'Nr. factură / aviz (opțional)',
+      qtyDispatch: 'Cantitate expediată',
+      confirmDispatch: 'Confirmă expedierea',
+      invoicedQty: 'Cant. facturată',
+      invoice: 'Factură',
+      noInvoice: 'Fără factură',
+      scanOther: 'Scanează alt lot',
+      scanAgain: 'Scanează din nou',
+      enterQty: 'Introduceți cantitatea',
+      selectOrderErr: 'Selectați ordinul de producție',
+      enterCustomer: 'Introduceți numele clientului',
+      consumeOk: (qty, unit, name) => `${qty} ${unit} — ${name} consumat cu succes`,
+      dispatchOk: (qty, unit, customer) => `${qty} ${unit} expediat(ă) către ${customer}`,
+      error: 'Eroare',
+    },
+  };
+
+  const lang = (navigator.language || 'en').toLowerCase().startsWith('ro') ? 'ro' : 'en';
+  const t = STRINGS[lang];
+  document.documentElement.lang = lang;
+
+  let mode = 'consume';
   let currentLot = null;
   let pendingDispatch = null;
   let scanner = null;
+
+  function applyI18n() {
+    document.querySelectorAll('[data-i18n]').forEach((el) => {
+      const key = el.getAttribute('data-i18n');
+      if (key && typeof t[key] === 'string') el.textContent = t[key];
+    });
+  }
+
+  function goLogin() {
+    const redirect = encodeURIComponent(window.location.pathname + window.location.search);
+    window.location.href = `/admin/login?redirect=${redirect}`;
+  }
 
   function setMode(m) {
     mode = m;
     document.getElementById('btn-consume').className = 'mode-btn' + (m === 'consume' ? ' active' : '');
     document.getElementById('btn-dispatch').className = 'mode-btn' + (m === 'dispatch' ? ' dispatch-active' : '');
-    document.getElementById('header-title').textContent = m === 'consume' ? 'Scan Consum' : 'Scan Expediere';
+    document.getElementById('header-title').textContent = m === 'consume' ? t.brandConsume : t.brandDispatch;
     resetScan();
   }
 
@@ -156,21 +240,19 @@
 
   async function onScan(lotId) {
     if (currentLot) return;
-    setStatus('Se verifică lotul...');
+    setStatus(t.checking);
     try {
       const res = await fetch(`${API}/scan/lot/${encodeURIComponent(lotId)}`, { credentials: 'include' });
-      if (res.status === 401) { window.location.href = '/login'; return; }
+      if (res.status === 401) { goLogin(); return; }
       const lot = await res.json();
-      if (!res.ok) { showError(lot.error || 'Lot indisponibil'); return; }
-
+      if (!res.ok) { showError(lot.error || t.lotUnavailable); return; }
       currentLot = { id: lotId, ...lot };
       showLotCard(lot);
       if (navigator.vibrate) navigator.vibrate(200);
-
       if (mode === 'consume') await loadOrders();
-      if (mode === 'dispatch') await loadPendingDispatch(lotId, lot);
+      if (mode === 'dispatch') await loadPendingDispatch(lotId);
     } catch (e) {
-      showError('Eroare rețea: ' + e.message);
+      showError(t.networkError + e.message);
     }
   }
 
@@ -179,18 +261,18 @@
     document.getElementById('pc-lot').textContent = 'LOT: ' + (lot.lot_number || '?');
     document.getElementById('pc-supplier').textContent = lot.supplier_name || '—';
     document.getElementById('pc-qty').textContent = `${lot.quantity_remaining} ${lot.unit}`;
-
     const bbd = lot.best_before_date;
     const bbdEl = document.getElementById('pc-bbd');
     if (bbd) {
       const days = Math.ceil((new Date(bbd) - Date.now()) / 86400000);
       bbdEl.textContent = bbd;
       bbdEl.className = days <= 3 ? 'danger' : days <= 7 ? 'warn' : '';
-    } else { bbdEl.textContent = '—'; }
-
+    } else {
+      bbdEl.textContent = '—';
+      bbdEl.className = '';
+    }
     const loc = [lot.warehouse, lot.row, lot.shelf].filter(Boolean).join(' / ');
     document.getElementById('pc-loc').textContent = loc || '—';
-
     document.getElementById('lot-card').classList.remove('hidden');
     document.getElementById('scanner-container').style.display = 'none';
     document.getElementById('consume-section').style.display = mode === 'consume' ? '' : 'none';
@@ -202,10 +284,11 @@
 
   async function loadOrders() {
     const res = await fetch(`${API}/production?status=in_progress&limit=50`, { credentials: 'include' });
+    if (res.status === 401) { goLogin(); return; }
     const data = await res.json();
     const sel = document.getElementById('order-select');
-    sel.innerHTML = '<option value="">Selectați ordinul...</option>';
-    (data.data || []).forEach(o => {
+    sel.innerHTML = `<option value="">${t.selectOrder}</option>`;
+    (data.data || []).forEach((o) => {
       const opt = document.createElement('option');
       opt.value = o.id;
       opt.textContent = `${o.order_number} — ${o.output_item_name || '?'}`;
@@ -213,16 +296,16 @@
     });
   }
 
-  async function loadPendingDispatch(lotId, lot) {
+  async function loadPendingDispatch(lotId) {
     pendingDispatch = null;
     try {
       const res = await fetch(`${API}/dispatches?status=pending&lot_id=${encodeURIComponent(lotId)}`, { credentials: 'include' });
       const data = await res.json();
-      const pd = (data.data || [])[0]; // primul dispatch pending pentru acest lot
+      const pd = (data.data || [])[0];
       if (pd) {
         pendingDispatch = pd;
         document.getElementById('pd-customer').textContent = pd.customer_name || '?';
-        document.getElementById('pd-invoice').textContent = pd.invoice_number ? `Factură ${pd.invoice_number}` : 'Fără factură';
+        document.getElementById('pd-invoice').textContent = pd.invoice_number ? `${t.invoice} ${pd.invoice_number}` : t.noInvoice;
         document.getElementById('pd-qty-inv').textContent = `${pd.quantity_invoiced} ${pd.unit}`;
         document.getElementById('pending-dispatch-info').style.display = '';
         document.getElementById('dispatch-customer').value = pd.customer_name || '';
@@ -231,16 +314,14 @@
       } else {
         document.getElementById('pending-dispatch-info').style.display = 'none';
       }
-    } catch {}
+    } catch { /* ignore */ }
   }
 
   async function confirmConsume() {
     const qty = parseFloat(document.getElementById('qty-consume').value);
     const orderId = document.getElementById('order-select').value;
-    if (!qty || qty <= 0) { showError('Introduceți cantitatea'); return; }
-    if (!orderId) { showError('Selectați ordinul de producție'); return; }
-
-    disableBtn('btn-success-consume');
+    if (!qty || qty <= 0) { showError(t.enterQty); return; }
+    if (!orderId) { showError(t.selectOrderErr); return; }
     try {
       const res = await fetch(`${API}/scan/consume`, {
         method: 'POST',
@@ -248,24 +329,23 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lot_id: currentLot.id, quantity_used: qty, production_order_id: orderId }),
       });
+      if (res.status === 401) { goLogin(); return; }
       const data = await res.json();
-      if (!res.ok) { showError(data.error || 'Eroare'); return; }
+      if (!res.ok) { showError(data.error || t.error); return; }
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-      showSuccess(`${qty} ${currentLot.unit} — ${currentLot.item_name} consumat cu succes!`);
-    } catch (e) { showError('Eroare: ' + e.message); }
+      showSuccess(t.consumeOk(qty, currentLot.unit, currentLot.item_name));
+    } catch (e) { showError(t.error + ': ' + e.message); }
   }
 
   async function confirmDispatch() {
     const qty = parseFloat(document.getElementById('qty-dispatch').value);
     const customer = document.getElementById('dispatch-customer').value.trim();
     const invoice = document.getElementById('dispatch-invoice').value.trim();
-    if (!qty || qty <= 0) { showError('Introduceți cantitatea'); return; }
-    if (!customer) { showError('Introduceți numele clientului'); return; }
-
+    if (!qty || qty <= 0) { showError(t.enterQty); return; }
+    if (!customer) { showError(t.enterCustomer); return; }
     try {
       let res;
       if (pendingDispatch) {
-        // Confirm existing pending dispatch
         res = await fetch(`${API}/dispatches/${pendingDispatch.id}/confirm`, {
           method: 'POST',
           credentials: 'include',
@@ -273,7 +353,6 @@
           body: JSON.stringify({ quantity_dispatched: qty }),
         });
       } else {
-        // Direct dispatch
         res = await fetch(`${API}/dispatches/direct`, {
           method: 'POST',
           credentials: 'include',
@@ -287,11 +366,12 @@
           }),
         });
       }
+      if (res.status === 401) { goLogin(); return; }
       const data = await res.json();
-      if (!res.ok) { showError(data.error || 'Eroare'); return; }
+      if (!res.ok) { showError(data.error || t.error); return; }
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-      showSuccess(`${qty} ${currentLot.unit} expediat(ă) către ${customer}.`);
-    } catch (e) { showError('Eroare: ' + e.message); }
+      showSuccess(t.dispatchOk(qty, currentLot.unit, customer));
+    } catch (e) { showError(t.error + ': ' + e.message); }
   }
 
   function resetScan() {
@@ -311,7 +391,8 @@
 
   function showError(msg) {
     const el = document.getElementById('error-box');
-    el.textContent = msg; el.style.display = msg ? '' : 'none';
+    el.textContent = msg;
+    el.style.display = msg ? '' : 'none';
   }
   function showSuccess(msg) {
     document.getElementById('lot-card').classList.add('hidden');
@@ -320,16 +401,23 @@
   }
   function setStatus(msg) { document.getElementById('status').textContent = msg; }
 
-  window.addEventListener('DOMContentLoaded', async () => {
-    // Verify session before initializing scanner
-    const authCheck = await fetch(`${API}/me`, { credentials: 'include' });
-    if (authCheck.status === 401) { window.location.href = '/login'; return; }
+  document.getElementById('btn-consume').onclick = () => setMode('consume');
+  document.getElementById('btn-dispatch').onclick = () => setMode('dispatch');
+  document.getElementById('btn-confirm-consume').onclick = confirmConsume;
+  document.getElementById('btn-confirm-dispatch').onclick = confirmDispatch;
+  document.getElementById('btn-reset').onclick = resetScan;
+  document.getElementById('btn-scan-again').onclick = resetScan;
 
+  window.addEventListener('DOMContentLoaded', async () => {
+    applyI18n();
+    document.getElementById('header-title').textContent = t.brandConsume;
+    const authCheck = await fetch(`${API}/me`, { credentials: 'include' });
+    if (authCheck.status === 401) { goLogin(); return; }
     scanner = new Html5QrcodeScanner('reader', { fps: 10, qrbox: { width: 260, height: 260 }, aspectRatio: 1 }, false);
-    scanner.render(decodedText => {
+    scanner.render((decodedText) => {
       if (isUUID(decodedText) && !currentLot) onScan(decodedText);
     }, () => {});
-    setStatus('Îndreptați camera spre QR-ul de pe etichetă');
+    setStatus(t.aimQr);
   });
 </script>
 </body>

@@ -6,6 +6,7 @@
   "operations.traceability.action.details": "Szczegóły",
   "operations.traceability.action.haccp": "Kontrola HACCP",
   "operations.traceability.action.initiateRecall": "Rozpocznij wycofanie",
+  "operations.traceability.action.openScanner": "Otwórz skaner hali",
   "operations.traceability.action.parseGs1": "Parsuj GS1",
   "operations.traceability.action.release": "Release",
   "operations.traceability.action.resolve": "Resolve",

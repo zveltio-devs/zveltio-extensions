@@ -1,0 +1,19 @@
+{
+  "name": "Zveltio Scan",
+  "short_name": "Scan",
+  "description": "Floor scanner for lot consume and dispatch",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

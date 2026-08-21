@@ -145082,7 +145082,7 @@ var require_lib2 = __commonJS((exports) => {
 });
 
 // operations/traceability/engine/index.ts
-import { join } from "path";
+import { join as join2 } from "path";
 
 // node_modules/kysely/dist/util/object-utils.js
 function isUndefined(obj) {
@@ -164992,6 +164992,40 @@ function scanRouter(ctx) {
     const parsed = QRService.parseGS1Barcode(raw2);
     return c.json({ data: parsed });
   });
+  return app;
+}
+
+// operations/traceability/engine/routes/scan-app.ts
+import { join } from "path";
+import { existsSync } from "fs";
+function pwaDir() {
+  const candidates = [join(import.meta.dir, "../../pwa"), join(import.meta.dir, "../pwa")];
+  for (const dir of candidates) {
+    if (existsSync(join(dir, "scan.html")))
+      return dir;
+  }
+  return candidates[0];
+}
+function fileResponse(name, contentType) {
+  const path = join(pwaDir(), name);
+  if (!existsSync(path)) {
+    return new Response(`Missing ${name}`, { status: 404 });
+  }
+  return new Response(Bun.file(path), {
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control": name.endsWith(".html") ? "no-cache" : "public, max-age=86400"
+    }
+  });
+}
+function scanAppRouter() {
+  const app = new Hono2;
+  const html = () => fileResponse("scan.html", "text/html; charset=utf-8");
+  app.get("/", html);
+  app.get("", html);
+  app.get("/html5-qrcode.min.js", () => fileResponse("html5-qrcode.min.js", "application/javascript; charset=utf-8"));
+  app.get("/manifest.webmanifest", () => fileResponse("manifest.webmanifest", "application/manifest+json"));
+  app.get("/icon.svg", () => fileResponse("icon.svg", "image/svg+xml"));
   return app;
 }
 
@@ -185498,6 +185532,7 @@ function locationsRouter(ctx) {
 // operations/traceability/engine/routes/index.ts
 function traceRoutes(ctx) {
   const app = new Hono2;
+  app.route("/app", scanAppRouter());
   app.use("*", async (c, next) => {
     const session = await ctx.auth.api.getSession({ headers: c.req.raw.headers });
     if (!session)
@@ -185539,12 +185574,12 @@ var extension = {
   mountStrategy: "subapp",
   getMigrations() {
     return [
-      join(import.meta.dir, "migrations/001_initial.sql"),
-      join(import.meta.dir, "migrations/002_tenant_rls.sql"),
-      join(import.meta.dir, "migrations/003_user_ref_text.sql"),
-      join(import.meta.dir, "migrations/004_tenant_scoped_unique_keys.sql"),
-      join(import.meta.dir, "migrations/005_user_ref_text.sql"),
-      join(import.meta.dir, "migrations/006_user_ref_text.sql")
+      join2(import.meta.dir, "migrations/001_initial.sql"),
+      join2(import.meta.dir, "migrations/002_tenant_rls.sql"),
+      join2(import.meta.dir, "migrations/003_user_ref_text.sql"),
+      join2(import.meta.dir, "migrations/004_tenant_scoped_unique_keys.sql"),
+      join2(import.meta.dir, "migrations/005_user_ref_text.sql"),
+      join2(import.meta.dir, "migrations/006_user_ref_text.sql")
     ];
   },
   async register(app, ctx) {
