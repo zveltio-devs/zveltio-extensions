@@ -11,7 +11,7 @@
       "dataSource": "/ext/content/documents/generated",
       "dataPath": "documents",
       "columns": [
-        { "key": "filename", "label": "content.documents.col.filename" },
+        { "key": "document_number", "label": "common.col.number", "type": "mono" },
         { "key": "template_name", "label": "content.documents.tab.templates" },
         {
           "key": "status",
@@ -30,7 +30,7 @@
           "label": "content.documents.col.signed",
           "type": "boolean"
         },
-        { "key": "created_at", "label": "common.col.created", "type": "date" }
+        { "key": "generated_at", "label": "common.col.created", "type": "date" }
       ],
       "rowActions": [
         {
