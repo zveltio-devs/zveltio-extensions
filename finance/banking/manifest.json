@@ -21,7 +21,8 @@
       {
         "path": "/admin/finance/banking",
         "label": "Banking Sync",
-        "icon": "Landmark"
+        "icon": "Landmark",
+        "schema": "schemas/banking.json"
       }
     ],
     "navGroup": "finance"
@@ -39,7 +40,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "177463f4456f9f3fa0db4116669841e9db957bb554c6a28fd7378288f5b42a50",
+    "engineSha256": "8763802736693522ceaa97eb1a2c90004ed82f545cccfe2e67333045054dbee4",
     "sourceSha256": "997ea657a4afe83fed37cd9939960895cd78345c03a4713faf9c0ce596352113"
   },
   "resources": [

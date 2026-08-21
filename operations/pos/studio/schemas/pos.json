@@ -1,0 +1,79 @@
+{
+  "sduiSchema": 1,
+  "title": "operations.pos.title",
+  "subtitle": "operations.pos.subtitle",
+  "newLabel": "operations.pos.openSession",
+  "resources": [
+    {
+      "id": "sessions",
+      "dataSource": "/ext/operations/pos/sessions/{masterId}/orders?limit=20",
+      "dataPath": "data",
+      "master": {
+        "dataSource": "/ext/operations/pos/sessions?limit=20",
+        "dataPath": "data",
+        "idKey": "id",
+        "titleKey": "status",
+        "subtitle": { "keys": ["opened_at"], "sep": " " },
+        "badgeKey": "status"
+      },
+      "detailActions": [
+        {
+          "id": "close",
+          "icon": "Square",
+          "label": "operations.pos.closeSession",
+          "method": "POST",
+          "endpoint": "/ext/operations/pos/sessions/{id}/close",
+          "visibleWhen": { "field": "status", "equals": "open" },
+          "prompt": {
+            "title": "operations.pos.closeSession",
+            "submitLabel": "operations.pos.closeSession",
+            "fields": [
+              {
+                "name": "closing_float",
+                "label": "operations.pos.ui.closing_float",
+                "type": "number",
+                "required": true,
+                "default": 0
+              }
+            ]
+          }
+        }
+      ],
+      "columns": [
+        { "key": "order_number", "label": "common.col.number", "type": "mono" },
+        { "key": "created_at", "label": "operations.pos.col.time", "type": "date" },
+        {
+          "key": "total",
+          "label": "common.col.total",
+          "type": "currency",
+          "currency": { "code": "RON" }
+        },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": { "colors": {} }
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/operations/pos/sessions/open",
+        "fields": [
+          {
+            "name": "opening_float",
+            "label": "operations.pos.ui.opening_float",
+            "type": "number",
+            "required": true,
+            "colSpan": 2,
+            "default": 0
+          },
+          {
+            "name": "notes",
+            "label": "common.col.notes",
+            "type": "textarea",
+            "colSpan": 2
+          }
+        ]
+      }
+    }
+  ]
+}

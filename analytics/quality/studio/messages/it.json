@@ -1,6 +1,14 @@
 {
+  "analytics.quality.btn.dismiss": "Dismiss",
+  "analytics.quality.btn.dismissAll": "Dismiss all",
+  "analytics.quality.btn.runScan": "Run scan",
   "analytics.quality.col.severity": "Gravità",
   "analytics.quality.empty": "Ancora nessun dato.",
+  "analytics.quality.scan.anomalies": "Anomalies",
+  "analytics.quality.scan.duplicates": "Duplicates",
+  "analytics.quality.scan.full": "Full",
+  "analytics.quality.scan.missing_data": "Missing data",
+  "analytics.quality.scan.normalization": "Normalization",
   "analytics.quality.subtitle": "Analizza le collezioni per problemi di qualità dei dati",
   "analytics.quality.tab.history": "Cronologia scansioni",
   "analytics.quality.tab.issues": "Problemi",
@@ -8,5 +16,6 @@
   "analytics.quality.ui.collection": "Collezione",
   "analytics.quality.ui.no_issues_to_show_run_a_scan": "Nessun problema da mostrare. Esegui una scansione.",
   "analytics.quality.ui.no_scans_yet": "Ancora nessuna scansione.",
+  "analytics.quality.ui.scanType": "Scan type",
   "analytics.quality.ui.select_collection": "— Select collection —"
 }

@@ -24,7 +24,8 @@
       {
         "path": "/admin/workflow/approvals",
         "label": "Approvals",
-        "icon": "CheckSquare"
+        "icon": "CheckSquare",
+        "schema": "schemas/approvals.json"
       }
     ]
   },
@@ -36,7 +37,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "f82aec7c73f2c7458aa05f4a0e0b13a105e2772c2753b4a9ee9c76aa10c082be",
+    "engineSha256": "847ade6615da2e6377cd2d630911d18565062cf208137c70810df5d6e876761d",
     "sourceSha256": "9c29478bc7af07ba258af5e743340957d311e67676d81ec924f8a2580d3dc8b4"
   }
 }

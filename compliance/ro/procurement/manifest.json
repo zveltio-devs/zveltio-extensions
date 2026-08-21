@@ -15,7 +15,8 @@
       {
         "path": "/admin/compliance/ro/procurement",
         "label": "Achizitii Publice RO",
-        "icon": "Package"
+        "icon": "Package",
+        "schema": "schemas/procurement.json"
       }
     ],
     "navGroup": "compliance"
@@ -33,7 +34,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "2c5dbf18367aa54155ec884a206f65e07e163a2ec6258ca341908bbf396e3bdf",
+    "engineSha256": "3ed435dc0e9159a0994e19e8825b51c2b81d4ec321c14643becdac9d0665a743",
     "sourceSha256": "15f4f76512d230de2bb8bdacccc4ff69438183d4347a71ea6d288077fad27e1f"
   },
   "resources": [
