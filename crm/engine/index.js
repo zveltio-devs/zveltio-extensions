@@ -19974,6 +19974,62 @@ function crmRoutes(ctx) {
   return app;
 }
 
+// engine/adopt.ts
+var CRM_COLLECTIONS = [
+  { name: "contacts", displayName: "Contacts", icon: "Users", singularName: "Contact" },
+  {
+    name: "organizations",
+    displayName: "Organizations",
+    icon: "Building2",
+    singularName: "Organization"
+  },
+  {
+    name: "transactions",
+    displayName: "Transactions",
+    icon: "Receipt",
+    singularName: "Transaction"
+  }
+];
+async function adoptCrmCollections(ctx) {
+  const ddl = ctx.DDLManager;
+  for (const def of CRM_COLLECTIONS) {
+    try {
+      if (!await ddl.tableExists(ctx.db, def.name))
+        continue;
+      const existing = await ddl.getCollection(ctx.db, def.name);
+      if (existing)
+        continue;
+      await ddl.registerMetadata(ctx.db, {
+        name: def.name,
+        displayName: def.displayName,
+        icon: def.icon,
+        singularName: def.singularName,
+        fields: [],
+        isManaged: true,
+        isSystem: false,
+        schemaLocked: false
+      });
+      await ddl.syncFieldsFromDB(ctx.db, def.name);
+      console.log(`   \uD83D\uDCC7 CRM adopted collection '${def.name}'`);
+    } catch (err) {
+      console.warn(`   \u26A0  CRM adopt '${def.name}' failed:`, err.message);
+    }
+  }
+  try {
+    await sql`
+      INSERT INTO zvd_relations
+        (name, type, source_collection, source_field, target_collection, target_field,
+         junction_table, on_delete, on_update)
+      VALUES
+        ('contact_organizations', 'm2m', 'contacts', 'id', 'organizations', 'id',
+         'zvd_contact_organizations', 'CASCADE', 'CASCADE')
+      ON CONFLICT (source_collection, source_field) DO NOTHING
+    `.execute(ctx.db);
+  } catch (err) {
+    console.warn("   \u26A0  CRM contact_organizations relation failed:", err.message);
+  }
+}
+
 // engine/index.ts
 var extension = {
   name: "crm",
@@ -19984,12 +20040,14 @@ var extension = {
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
       join(import.meta.dir, "migrations/003_tenant_scoped_unique_keys.sql"),
-      join(import.meta.dir, "migrations/004_contact_organization_role.sql")
+      join(import.meta.dir, "migrations/004_contact_organization_role.sql"),
+      join(import.meta.dir, "migrations/005_contact_org_relation.sql")
     ];
   },
   async register(app, ctx) {
     const routes = crmRoutes(ctx);
     app.route("/", routes);
+    await adoptCrmCollections(ctx);
     ctx.services.register("crm.contacts.lookup", async (idOrEmail) => {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrEmail);
       const r = await sql`
