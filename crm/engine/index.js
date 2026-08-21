@@ -19500,7 +19500,7 @@ async function receivables(db) {
        WHERE type = 'invoice'
          AND due_date IS NOT NULL
          AND due_date < CURRENT_DATE
-         AND status NOT IN (${sql.join(settled)})
+         AND COALESCE(payment_status, status) NOT IN (${sql.join(settled)})
        GROUP BY currency
        ORDER BY total DESC
     `.execute(db);
@@ -19510,7 +19510,7 @@ async function receivables(db) {
        WHERE type = 'invoice'
          AND due_date IS NOT NULL
          AND due_date < CURRENT_DATE
-         AND status NOT IN (${sql.join(settled)})
+         AND COALESCE(payment_status, status) NOT IN (${sql.join(settled)})
     `.execute(db);
     const soon = await sql`
       SELECT currency,
@@ -19519,7 +19519,7 @@ async function receivables(db) {
         FROM zvd_transactions
        WHERE type = 'invoice'
          AND due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + 7
-         AND status NOT IN (${sql.join(settled)})
+         AND COALESCE(payment_status, status) NOT IN (${sql.join(settled)})
        GROUP BY currency
        ORDER BY total DESC
     `.execute(db);
@@ -20041,7 +20041,8 @@ var extension = {
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
       join(import.meta.dir, "migrations/003_tenant_scoped_unique_keys.sql"),
       join(import.meta.dir, "migrations/004_contact_organization_role.sql"),
-      join(import.meta.dir, "migrations/005_contact_org_relation.sql")
+      join(import.meta.dir, "migrations/005_contact_org_relation.sql"),
+      join(import.meta.dir, "migrations/006_payment_status_compat.sql")
     ];
   },
   async register(app, ctx) {
