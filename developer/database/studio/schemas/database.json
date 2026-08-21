@@ -1,0 +1,28 @@
+{
+  "sduiSchema": 1,
+  "title": "developer.database.title",
+  "subtitle": "developer.database.subtitle",
+  "resources": [
+    {
+      "id": "tables",
+      "dataSource": "/ext/developer/database/tables/{masterId}",
+      "dataPath": "columns",
+      "master": {
+        "dataSource": "/ext/developer/database/tables",
+        "dataPath": "tables",
+        "idKey": "name",
+        "titleKey": "name",
+        "subtitle": {
+          "keys": ["schema", "row_estimate"],
+          "sep": " · "
+        }
+      },
+      "columns": [
+        { "key": "name", "label": "developer.database.col.column", "type": "mono" },
+        { "key": "data_type", "label": "common.col.type", "type": "mono" },
+        { "key": "is_nullable", "label": "developer.database.col.nullable" },
+        { "key": "column_default", "label": "developer.database.col.default", "type": "mono" }
+      ]
+    }
+  ]
+}

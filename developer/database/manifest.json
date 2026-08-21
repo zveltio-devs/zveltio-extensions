@@ -15,7 +15,8 @@
       {
         "path": "/admin/developer/database",
         "label": "Database",
-        "icon": "Database"
+        "icon": "Database",
+        "schema": "schemas/database.json"
       }
     ],
     "navGroup": "developer"
@@ -32,7 +33,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "7e9ddad095ee37066077faf62c7144c23c3b8f0dde2b6cf19a834bf1bdb28479",
+    "engineSha256": "7848a6aab259bbd574fa03d6b92421af9abb0bb90a6471a63da080159af48646",
     "sourceSha256": "70d18ef20cdd814ccf1b910474a4cbc4eed813b0dd411f26208ed5e86d32d560"
   }
 }
