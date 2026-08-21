@@ -1,6 +1,7 @@
 {
   "sms.btn.saveTemplate": "Zapisz szablon",
   "sms.btn.send": "Wyślij SMS",
+  "sms.btn.sendSms": "Send SMS",
   "sms.col.body": "Treść",
   "sms.col.provider": "Dostawca",
   "sms.col.sentAt": "Wysłano",

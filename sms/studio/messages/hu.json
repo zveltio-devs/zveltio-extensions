@@ -1,6 +1,7 @@
 {
   "sms.btn.saveTemplate": "Sablon mentése",
   "sms.btn.send": "SMS küldése",
+  "sms.btn.sendSms": "Send SMS",
   "sms.col.body": "Törzs",
   "sms.col.provider": "Szolgáltató",
   "sms.col.sentAt": "Elküldve",
