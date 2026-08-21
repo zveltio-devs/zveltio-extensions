@@ -143,7 +143,7 @@
           },
           {
             "name": "sort_order",
-            "label": "common.col.order",
+            "label": "common.col.index",
             "type": "number",
             "colSpan": 1,
             "default": 0
@@ -181,7 +181,7 @@
           "variant": "text-error",
           "method": "DELETE",
           "endpoint": "/ext/developer/api-docs/tokens/{id}",
-          "confirm": "developer.apiDocs.confirmRevoke"
+          "confirm": "developer.api-docs.confirmRevoke"
         }
       ],
       "form": {
@@ -197,7 +197,7 @@
             "label": "common.col.name",
             "required": true,
             "colSpan": 2,
-            "placeholder": "Doc access"
+            "placeholder": "developer.api-docs.placeholder.tokenName"
           }
         ]
       }
