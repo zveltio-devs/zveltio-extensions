@@ -24,6 +24,7 @@
   "forms.form.name": "Name",
   "forms.form.slug": "Slug",
   "forms.form.targetCollection": "Zielsammlung",
+  "forms.hint.dragReorder": "Ziehen zum Neuordnen",
   "forms.section.details": "Details",
   "forms.section.fields": "Felder",
   "forms.subtitle": "Einbettbare Formulare und deren Einreichungen verwalten",

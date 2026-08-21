@@ -94,6 +94,15 @@
             ]
           },
           {
+            "id": "qr",
+            "label": "operations.traceability.lot.tab.qr",
+            "kind": "image",
+            "dataSource": "/ext/operations/traceability/labels/{id}/qr-dataurl",
+            "dataPath": "data",
+            "caption": "operations.traceability.lot.qrCaption",
+            "maxWidth": "240px"
+          },
+          {
             "id": "tree",
             "label": "operations.traceability.lot.tab.tree",
             "kind": "tree",
