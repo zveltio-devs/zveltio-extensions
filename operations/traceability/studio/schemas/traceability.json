@@ -998,6 +998,47 @@
       ],
       "form": {
         "endpoint": "/ext/operations/traceability/recalls/initiate",
+        "preview": {
+          "endpoint": "/ext/operations/traceability/recalls/simulate/{lot_id}",
+          "statsPath": "data",
+          "submitLabel": "operations.traceability.action.simulate",
+          "confirmLabel": "operations.traceability.action.initiateRecall",
+          "stats": [
+            {
+              "label": "operations.traceability.recall.lotsAffected",
+              "key": "total_lots_affected"
+            },
+            {
+              "label": "operations.traceability.recall.customersAffected",
+              "key": "total_customers_affected"
+            },
+            {
+              "label": "operations.traceability.recall.recommended",
+              "key": "recommended_action"
+            }
+          ],
+          "listPath": "data.affected_lots",
+          "listColumns": [
+            {
+              "key": "lot_number",
+              "label": "operations.traceability.col.lot",
+              "type": "mono"
+            },
+            {
+              "key": "item_name",
+              "label": "operations.traceability.form.product"
+            },
+            {
+              "key": "status",
+              "label": "common.col.status",
+              "type": "badge"
+            },
+            {
+              "key": "quantity_remaining",
+              "label": "operations.traceability.col.qtyRemaining"
+            }
+          ]
+        },
         "fields": [
           {
             "name": "lot_id",
@@ -1068,6 +1109,14 @@
       "icon": "FileText",
       "dataSource": "/ext/operations/traceability/reports/reception-log",
       "dataPath": "data",
+      "filters": [
+        {
+          "type": "dateRange",
+          "fromParam": "from",
+          "toParam": "to",
+          "label": "operations.traceability.report.dateRange"
+        }
+      ],
       "columns": [
         {
           "key": "Număr lot",
@@ -1149,6 +1198,14 @@
       "icon": "FileText",
       "dataSource": "/ext/operations/traceability/reports/consumption-log",
       "dataPath": "data",
+      "filters": [
+        {
+          "type": "dateRange",
+          "fromParam": "from",
+          "toParam": "to",
+          "label": "operations.traceability.report.dateRange"
+        }
+      ],
       "columns": [
         {
           "key": "Ordin",
@@ -1190,6 +1247,14 @@
       "icon": "FileText",
       "dataSource": "/ext/operations/traceability/reports/haccp-log",
       "dataPath": "data",
+      "filters": [
+        {
+          "type": "dateRange",
+          "fromParam": "from",
+          "toParam": "to",
+          "label": "operations.traceability.report.dateRange"
+        }
+      ],
       "columns": [
         {
           "key": "Ordin",
@@ -1231,6 +1296,15 @@
       "icon": "FileText",
       "dataSource": "/ext/operations/traceability/reports/ansvsa-traceability",
       "dataPath": "data",
+      "filters": [
+        {
+          "type": "dateRange",
+          "fromParam": "from",
+          "toParam": "to",
+          "label": "operations.traceability.report.dateRange",
+          "required": true
+        }
+      ],
       "columns": [
         {
           "key": "Lot",
