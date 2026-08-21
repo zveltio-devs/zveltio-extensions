@@ -24,6 +24,7 @@
   "forms.form.name": "Nazwa",
   "forms.form.slug": "Slug",
   "forms.form.targetCollection": "Kolekcja docelowa",
+  "forms.hint.dragReorder": "Przeciągnij, aby zmienić kolejność",
   "forms.section.details": "Szczegóły",
   "forms.section.fields": "Pola",
   "forms.subtitle": "Zarządzaj formularzami osadzalnymi i ich zgłoszeniami",

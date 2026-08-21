@@ -3,6 +3,7 @@ import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { lotsRouter } from './lots.js';
 import { dispatchesRouter } from './dispatches.js';
 import { scanRouter } from './scan.js';
+import { scanAppRouter } from './scan-app.js';
 import { productionRouter } from './production.js';
 import { traceRouter } from './trace.js';
 import { recallsRouter } from './recalls.js';
@@ -14,6 +15,9 @@ import { locationsRouter } from './locations.js';
 
 export function traceRoutes(ctx: ExtensionContext): Hono {
   const app = new Hono();
+
+  // Floor PWA before auth gate — HTML loads, then JS redirects to /admin/login.
+  app.route('/app', scanAppRouter());
 
   /**
    * Authentication for everything, authorization for anything that writes.
