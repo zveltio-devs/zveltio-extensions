@@ -39,15 +39,6 @@
           "id": "edit",
           "kind": "edit",
           "label": "common.edit"
-        },
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/ext/operations/traceability/suppliers/{id}",
-          "confirm": "ext.confirmDelete"
         }
       ],
       "form": {
@@ -130,15 +121,6 @@
           "id": "edit",
           "kind": "edit",
           "label": "common.edit"
-        },
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/ext/operations/traceability/items/{id}",
-          "confirm": "ext.confirmDelete"
         }
       ],
       "form": {
@@ -361,11 +343,36 @@
           "label": "operations.traceability.form.unit"
         },
         {
+          "key": "best_before_date",
+          "label": "operations.traceability.col.bbd",
+          "type": "date",
+          "classWhen": [
+            {
+              "field": "best_before_date",
+              "class": "text-error font-semibold"
+            }
+          ]
+        },
+        {
           "key": "supplier_name",
           "label": "operations.traceability.form.supplier"
         }
       ],
       "rowActions": [
+        {
+          "id": "open",
+          "kind": "navigate",
+          "href": "/traceability/lots/{id}",
+          "icon": "Package",
+          "label": "operations.traceability.action.details"
+        },
+        {
+          "id": "label",
+          "kind": "download",
+          "icon": "Download",
+          "label": "operations.traceability.ui.printeaz_etichet",
+          "endpoint": "/ext/operations/traceability/labels/{id}"
+        },
         {
           "id": "release",
           "icon": "CheckCircle",
@@ -375,12 +382,32 @@
           "visibleWhen": {
             "field": "status",
             "equals": "quarantine"
-          }
+          },
+          "confirm": "operations.traceability.confirmReleaseLot"
         }
       ],
       "form": {
         "endpoint": "/ext/operations/traceability/lots",
         "fields": [
+          {
+            "name": "gs1_scan",
+            "label": "operations.traceability.form.gs1Scan",
+            "colSpan": 2,
+            "placeholder": "operations.traceability.form.gs1Placeholder",
+            "lookup": {
+              "label": "operations.traceability.action.parseGs1",
+              "endpoint": "/ext/operations/traceability/scan/parse-gs1",
+              "body": {
+                "raw": "{gs1_scan}"
+              },
+              "map": {
+                "supplier_lot_ref": "data.supplier_lot_ref",
+                "best_before_date": "data.best_before_date",
+                "gtin_scanned": "data.gtin",
+                "sscc": "data.sscc"
+              }
+            }
+          },
           {
             "name": "item_id",
             "label": "operations.traceability.form.product",
@@ -499,12 +526,60 @@
             "colSpan": 1
           },
           {
+            "name": "production_date",
+            "label": "operations.traceability.col.productionDate",
+            "type": "date",
+            "colSpan": 1
+          },
+          {
+            "name": "sscc",
+            "label": "operations.traceability.col.sscc",
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "gtin_scanned",
+            "label": "operations.traceability.col.gtin",
+            "mono": true,
+            "colSpan": 1
+          },
+          {
             "name": "notes",
             "label": "common.col.notes",
             "type": "textarea",
             "colSpan": 2
           }
         ]
+      },
+      "filters": [
+        {
+          "param": "status",
+          "options": [
+            {
+              "value": "all",
+              "label": "common.filter.all"
+            },
+            {
+              "value": "quarantine",
+              "label": "operations.traceability.status.quarantine"
+            },
+            {
+              "value": "available",
+              "label": "operations.traceability.status.available"
+            },
+            {
+              "value": "exhausted",
+              "label": "operations.traceability.status.exhausted"
+            },
+            {
+              "value": "recalled",
+              "label": "operations.traceability.status.recalled"
+            }
+          ]
+        }
+      ],
+      "pagination": {
+        "limit": 50
       }
     },
     {
@@ -547,6 +622,13 @@
       ],
       "rowActions": [
         {
+          "id": "open",
+          "kind": "navigate",
+          "href": "/traceability/production/{id}",
+          "icon": "Factory",
+          "label": "operations.traceability.action.details"
+        },
+        {
           "id": "start",
           "icon": "Play",
           "label": "operations.traceability.action.start",
@@ -583,6 +665,18 @@
       "form": {
         "endpoint": "/ext/operations/traceability/production",
         "fields": [
+          {
+            "name": "recipe_id",
+            "label": "operations.traceability.form.recipe",
+            "type": "relation",
+            "colSpan": 2,
+            "relation": {
+              "dataSource": "/ext/operations/traceability/production/recipes",
+              "dataPath": "data",
+              "valueKey": "id",
+              "labelKey": "name"
+            }
+          },
           {
             "name": "output_item_id",
             "label": "operations.traceability.form.product",
@@ -643,7 +737,30 @@
             "colSpan": 2
           }
         ]
-      }
+      },
+      "filters": [
+        {
+          "param": "status",
+          "options": [
+            {
+              "value": "all",
+              "label": "common.filter.all"
+            },
+            {
+              "value": "draft",
+              "label": "operations.traceability.status.draft"
+            },
+            {
+              "value": "in_progress",
+              "label": "operations.traceability.status.inProgress"
+            },
+            {
+              "value": "completed",
+              "label": "operations.traceability.status.completed"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "dispatches",
@@ -679,6 +796,35 @@
       ],
       "rowActions": [
         {
+          "id": "assign",
+          "label": "operations.traceability.action.assignLot",
+          "method": "POST",
+          "endpoint": "/ext/operations/traceability/dispatches/{id}/assign-lot",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "pending"
+          },
+          "prompt": {
+            "fields": [
+              {
+                "name": "lot_id",
+                "label": "operations.traceability.col.lot",
+                "type": "relation",
+                "required": true,
+                "relation": {
+                  "dataSource": "/ext/operations/traceability/lots?status=available",
+                  "dataPath": "data",
+                  "valueKey": "id",
+                  "labelKey": [
+                    "lot_number",
+                    "item_name"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
           "id": "confirm",
           "icon": "CheckCircle",
           "label": "operations.traceability.action.confirm",
@@ -693,6 +839,10 @@
                 "required": true
               }
             ]
+          },
+          "visibleWhen": {
+            "field": "status",
+            "equals": "pending"
           }
         },
         {
@@ -710,9 +860,78 @@
                 "type": "textarea"
               }
             ]
+          },
+          "visibleWhen": {
+            "field": "status",
+            "equals": "pending"
           }
         }
-      ]
+      ],
+      "filters": [
+        {
+          "param": "status",
+          "options": [
+            {
+              "value": "all",
+              "label": "common.filter.all"
+            },
+            {
+              "value": "pending",
+              "label": "operations.traceability.status.pending"
+            },
+            {
+              "value": "confirmed",
+              "label": "operations.traceability.status.confirmed"
+            },
+            {
+              "value": "cancelled",
+              "label": "operations.traceability.status.cancelled"
+            }
+          ]
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/operations/traceability/dispatches/direct",
+        "fields": [
+          {
+            "name": "lot_id",
+            "label": "operations.traceability.col.lot",
+            "type": "relation",
+            "required": true,
+            "colSpan": 2,
+            "relation": {
+              "dataSource": "/ext/operations/traceability/lots?status=available",
+              "dataPath": "data",
+              "valueKey": "id",
+              "labelKey": "lot_number"
+            }
+          },
+          {
+            "name": "customer_name",
+            "label": "operations.traceability.form.customer",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "invoice_ref",
+            "label": "operations.traceability.col.invoice",
+            "colSpan": 1
+          },
+          {
+            "name": "quantity_dispatched",
+            "label": "operations.traceability.col.qty",
+            "type": "number",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "notes",
+            "label": "common.col.notes",
+            "type": "textarea",
+            "colSpan": 2
+          }
+        ]
+      }
     },
     {
       "id": "recalls",
@@ -822,17 +1041,36 @@
             "colSpan": 2
           }
         ]
-      }
+      },
+      "filters": [
+        {
+          "param": "status",
+          "options": [
+            {
+              "value": "all",
+              "label": "common.filter.all"
+            },
+            {
+              "value": "active",
+              "label": "operations.traceability.status.active"
+            },
+            {
+              "value": "resolved",
+              "label": "operations.traceability.status.resolved"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "receptionLog",
-      "label": "operations.traceability.tab.reports",
+      "label": "operations.traceability.report.reception",
       "icon": "FileText",
       "dataSource": "/ext/operations/traceability/reports/reception-log",
       "dataPath": "data",
       "columns": [
         {
-          "key": "Num\u0103r lot",
+          "key": "Număr lot",
           "label": "operations.traceability.col.lot",
           "type": "mono"
         },
@@ -852,6 +1090,173 @@
           "key": "Data/Ora",
           "label": "common.col.created",
           "type": "date"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "csv",
+          "kind": "download",
+          "icon": "Download",
+          "label": "common.download",
+          "endpoint": "/ext/operations/traceability/reports/reception-log?format=csv"
+        }
+      ]
+    },
+    {
+      "id": "stockSnapshot",
+      "label": "operations.traceability.report.stock",
+      "icon": "FileText",
+      "dataSource": "/ext/operations/traceability/reports/stock-snapshot",
+      "dataPath": "data",
+      "columns": [
+        {
+          "key": "Produs",
+          "label": "operations.traceability.form.product"
+        },
+        {
+          "key": "Lot",
+          "label": "operations.traceability.col.lot",
+          "type": "mono"
+        },
+        {
+          "key": "Cantitate",
+          "label": "operations.traceability.col.qty"
+        },
+        {
+          "key": "Status",
+          "label": "common.col.status",
+          "type": "badge"
+        },
+        {
+          "key": "Valabil până",
+          "label": "operations.traceability.col.bbd",
+          "type": "date"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "csv",
+          "kind": "download",
+          "icon": "Download",
+          "label": "common.download",
+          "endpoint": "/ext/operations/traceability/reports/stock-snapshot?format=csv"
+        }
+      ]
+    },
+    {
+      "id": "consumptionLog",
+      "label": "operations.traceability.report.consumption",
+      "icon": "FileText",
+      "dataSource": "/ext/operations/traceability/reports/consumption-log",
+      "dataPath": "data",
+      "columns": [
+        {
+          "key": "Ordin",
+          "label": "operations.traceability.col.order",
+          "type": "mono"
+        },
+        {
+          "key": "Lot",
+          "label": "operations.traceability.col.lot",
+          "type": "mono"
+        },
+        {
+          "key": "Produs",
+          "label": "operations.traceability.form.product"
+        },
+        {
+          "key": "Cantitate",
+          "label": "operations.traceability.col.qty"
+        },
+        {
+          "key": "Data/Ora",
+          "label": "common.col.created",
+          "type": "date"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "csv",
+          "kind": "download",
+          "icon": "Download",
+          "label": "common.download",
+          "endpoint": "/ext/operations/traceability/reports/consumption-log?format=csv"
+        }
+      ]
+    },
+    {
+      "id": "haccpLog",
+      "label": "operations.traceability.report.haccp",
+      "icon": "FileText",
+      "dataSource": "/ext/operations/traceability/reports/haccp-log",
+      "dataPath": "data",
+      "columns": [
+        {
+          "key": "Ordin",
+          "label": "operations.traceability.col.order",
+          "type": "mono"
+        },
+        {
+          "key": "CCP",
+          "label": "operations.traceability.col.ccp"
+        },
+        {
+          "key": "Valoare",
+          "label": "operations.traceability.col.value"
+        },
+        {
+          "key": "OK",
+          "label": "operations.traceability.col.ok",
+          "type": "boolean"
+        },
+        {
+          "key": "Data/Ora",
+          "label": "common.col.created",
+          "type": "date"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "csv",
+          "kind": "download",
+          "icon": "Download",
+          "label": "common.download",
+          "endpoint": "/ext/operations/traceability/reports/haccp-log?format=csv"
+        }
+      ]
+    },
+    {
+      "id": "ansvsa",
+      "label": "operations.traceability.report.ansvsa",
+      "icon": "FileText",
+      "dataSource": "/ext/operations/traceability/reports/ansvsa-traceability",
+      "dataPath": "data",
+      "columns": [
+        {
+          "key": "Lot",
+          "label": "operations.traceability.col.lot",
+          "type": "mono"
+        },
+        {
+          "key": "Produs",
+          "label": "operations.traceability.form.product"
+        },
+        {
+          "key": "Furnizor",
+          "label": "operations.traceability.form.supplier"
+        },
+        {
+          "key": "Mișcări",
+          "label": "operations.traceability.col.movements"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "csv",
+          "kind": "download",
+          "icon": "Download",
+          "label": "common.download",
+          "endpoint": "/ext/operations/traceability/reports/ansvsa-traceability?format=csv"
         }
       ]
     }

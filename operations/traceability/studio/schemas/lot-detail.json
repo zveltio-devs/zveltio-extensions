@@ -1,0 +1,145 @@
+{
+  "sduiSchema": 1,
+  "title": "operations.traceability.lots.title",
+  "resources": [
+    {
+      "id": "lotDetail",
+      "layout": "detail",
+      "detail": {
+        "loadEndpoint": "/ext/operations/traceability/lots/{id}",
+        "loadPath": "data",
+        "titleKey": "lot_number",
+        "subtitleKey": "item_name",
+        "badgeKey": "status",
+        "badge": {
+          "colors": {
+            "available": "badge-success",
+            "quarantine": "badge-warning",
+            "exhausted": "badge-neutral",
+            "recalled": "badge-error",
+            "returned": "badge-info"
+          }
+        },
+        "backHref": "/traceability",
+        "backLabel": "operations.traceability.btn.back",
+        "actions": [
+          {
+            "id": "release",
+            "icon": "CheckCircle",
+            "label": "operations.traceability.action.release",
+            "method": "PATCH",
+            "endpoint": "/ext/operations/traceability/lots/{id}/release",
+            "visibleWhen": {
+              "field": "status",
+              "equals": "quarantine"
+            },
+            "confirm": "operations.traceability.confirmReleaseLot"
+          },
+          {
+            "id": "label",
+            "kind": "download",
+            "label": "operations.traceability.ui.printeaz_etichet",
+            "endpoint": "/ext/operations/traceability/labels/{id}"
+          }
+        ],
+        "panels": [
+          {
+            "id": "info",
+            "label": "operations.traceability.lot.tab.info",
+            "kind": "fields",
+            "fields": [
+              {
+                "key": "item_name",
+                "label": "operations.traceability.form.product"
+              },
+              {
+                "key": "quantity_remaining",
+                "label": "operations.traceability.col.qty"
+              },
+              {
+                "key": "unit",
+                "label": "operations.traceability.form.unit"
+              },
+              {
+                "key": "supplier_name",
+                "label": "operations.traceability.form.supplier"
+              },
+              {
+                "key": "warehouse",
+                "label": "operations.traceability.form.location"
+              },
+              {
+                "key": "best_before_date",
+                "label": "operations.traceability.col.bbd",
+                "type": "date"
+              },
+              {
+                "key": "reception_date",
+                "label": "operations.traceability.col.reception",
+                "type": "date"
+              },
+              {
+                "key": "supplier_lot_ref",
+                "label": "operations.traceability.col.supplierLot",
+                "type": "mono"
+              },
+              {
+                "key": "invoice_ref",
+                "label": "operations.traceability.col.invoice"
+              },
+              {
+                "key": "notes",
+                "label": "common.col.notes"
+              }
+            ]
+          },
+          {
+            "id": "tree",
+            "label": "operations.traceability.lot.tab.tree",
+            "kind": "tree",
+            "dataSource": "/ext/operations/traceability/tree/{id}/upstream",
+            "dataPath": "data",
+            "childrenKey": "inputs",
+            "nodeTemplate": "{item_name} — {lot_number} [{status}]"
+          },
+          {
+            "id": "timeline",
+            "label": "operations.traceability.lot.tab.timeline",
+            "kind": "table",
+            "dataSource": "/ext/operations/traceability/tree/{id}/timeline",
+            "dataPath": "data",
+            "columns": [
+              {
+                "key": "performed_at",
+                "label": "common.col.created",
+                "type": "date"
+              },
+              {
+                "key": "type",
+                "label": "common.col.type",
+                "type": "badge"
+              },
+              {
+                "key": "quantity",
+                "label": "operations.traceability.col.qty"
+              },
+              {
+                "key": "unit",
+                "label": "operations.traceability.form.unit"
+              },
+              {
+                "key": "reference_type",
+                "label": "operations.traceability.col.ref"
+              },
+              {
+                "key": "reference_number",
+                "label": "operations.traceability.col.refNo",
+                "type": "mono"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
