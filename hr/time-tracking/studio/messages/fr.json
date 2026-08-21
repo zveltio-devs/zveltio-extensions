@@ -1,6 +1,8 @@
 {
   "hr.time-tracking.badge.billable": "Facturable",
   "hr.time-tracking.badge.internal": "Interne",
+  "hr.time-tracking.btn.startTimer": "Start timer",
+  "hr.time-tracking.btn.stopTimer": "Stop timer",
   "hr.time-tracking.col.billable": "Facturable",
   "hr.time-tracking.col.client": "Client",
   "hr.time-tracking.col.hours": "Heures",
@@ -18,12 +20,13 @@
   "hr.time-tracking.title": "Suivi du temps",
   "hr.time-tracking.ui.description": "Description",
   "hr.time-tracking.ui.hourly_rate": "Taux horaire",
-  "hr.time-tracking.ui.new_project": "Nouveau projet",
   "hr.time-tracking.ui.newProjectBtn": "Nouveau projet",
+  "hr.time-tracking.ui.new_project": "Nouveau projet",
   "hr.time-tracking.ui.project": "Projet *",
   "hr.time-tracking.ui.project_name": "Nom du projet *",
   "hr.time-tracking.ui.select_project": "— Sélectionner un projet —",
-  "hr.time-tracking.ui.start_timer": "Démarrer le minuteur",
   "hr.time-tracking.ui.startTimerBtn": "Démarrer le minuteur",
-  "hr.time-tracking.ui.stopTimer": "Arrêter le minuteur"
+  "hr.time-tracking.ui.start_timer": "Démarrer le minuteur",
+  "hr.time-tracking.ui.stopTimer": "Arrêter le minuteur",
+  "hr.timeTracking.confirmDelete": "Delete this time entry?"
 }

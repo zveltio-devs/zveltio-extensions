@@ -1,0 +1,123 @@
+{
+  "sduiSchema": 1,
+  "title": "content.documents.title",
+  "subtitle": "content.documents.subtitle",
+  "newLabel": "content.documents.btn.generate",
+  "resources": [
+    {
+      "id": "generated",
+      "label": "content.documents.tab.generated",
+      "icon": "FileText",
+      "dataSource": "/ext/content/documents/generated",
+      "dataPath": "documents",
+      "columns": [
+        { "key": "document_number", "label": "common.col.number", "type": "mono" },
+        { "key": "template_name", "label": "content.documents.tab.templates" },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "active": "badge-success",
+              "expired": "badge-warning",
+              "revoked": "badge-error"
+            }
+          }
+        },
+        {
+          "key": "is_signed",
+          "label": "content.documents.col.signed",
+          "type": "boolean"
+        },
+        { "key": "generated_at", "label": "common.col.created", "type": "date" }
+      ],
+      "rowActions": [
+        {
+          "id": "signRequest",
+          "icon": "Send",
+          "label": "content.documents.btn.requestSignature",
+          "method": "POST",
+          "endpoint": "/ext/content/documents/generated/{id}/sign-request",
+          "prompt": {
+            "title": "content.documents.ui.request_signature",
+            "submitLabel": "content.documents.btn.send",
+            "fields": [
+              {
+                "name": "signer_email",
+                "label": "common.col.email",
+                "type": "email",
+                "required": true
+              },
+              {
+                "name": "signer_name",
+                "label": "common.col.name",
+                "required": true
+              },
+              {
+                "name": "message",
+                "label": "content.documents.ui.message_optional",
+                "type": "textarea",
+                "rows": 2
+              }
+            ]
+          }
+        },
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/ext/content/documents/generated/{id}",
+          "confirm": "content.documents.confirmDelete"
+        }
+      ]
+    },
+    {
+      "id": "templates",
+      "label": "content.documents.tab.templates",
+      "icon": "Plus",
+      "dataSource": "/ext/content/documents/templates",
+      "dataPath": "templates",
+      "columns": [
+        { "key": "name", "label": "common.col.name" },
+        { "key": "category", "label": "common.col.category" },
+        { "key": "description", "label": "common.col.description" }
+      ],
+      "rowActions": [
+        {
+          "id": "generate",
+          "icon": "FileText",
+          "label": "content.documents.btn.generate",
+          "method": "POST",
+          "endpoint": "/ext/content/documents/generate/{id}",
+          "prompt": {
+            "title": "content.documents.generateLabel",
+            "submitLabel": "content.documents.btn.generate",
+            "fields": [
+              {
+                "name": "variables_data",
+                "label": "content.documents.col.variable",
+                "type": "json",
+                "mono": true,
+                "rows": 6,
+                "default": "{}"
+              },
+              {
+                "name": "output_format",
+                "label": "content.documents.form.outputFormat",
+                "type": "select",
+                "default": "pdf",
+                "options": [
+                  { "value": "pdf", "label": "content.documents.format.pdf" },
+                  { "value": "html", "label": "content.documents.format.html" }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

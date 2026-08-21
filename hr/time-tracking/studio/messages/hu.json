@@ -1,6 +1,8 @@
 {
   "hr.time-tracking.badge.billable": "Számlázható",
   "hr.time-tracking.badge.internal": "Belső",
+  "hr.time-tracking.btn.startTimer": "Start timer",
+  "hr.time-tracking.btn.stopTimer": "Stop timer",
   "hr.time-tracking.col.billable": "Számlázható",
   "hr.time-tracking.col.client": "Ügyfél",
   "hr.time-tracking.col.hours": "Órák",
@@ -18,12 +20,13 @@
   "hr.time-tracking.title": "Időkövetés",
   "hr.time-tracking.ui.description": "Leírás",
   "hr.time-tracking.ui.hourly_rate": "Óradíj",
-  "hr.time-tracking.ui.new_project": "Új projekt",
   "hr.time-tracking.ui.newProjectBtn": "Új projekt",
+  "hr.time-tracking.ui.new_project": "Új projekt",
   "hr.time-tracking.ui.project": "Projekt *",
   "hr.time-tracking.ui.project_name": "Projekt neve *",
   "hr.time-tracking.ui.select_project": "— Select project —",
-  "hr.time-tracking.ui.start_timer": "Időzítő indítása",
   "hr.time-tracking.ui.startTimerBtn": "Időzítő indítása",
-  "hr.time-tracking.ui.stopTimer": "Időzítő leállítása"
+  "hr.time-tracking.ui.start_timer": "Időzítő indítása",
+  "hr.time-tracking.ui.stopTimer": "Időzítő leállítása",
+  "hr.timeTracking.confirmDelete": "Delete this time entry?"
 }
