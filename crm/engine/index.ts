@@ -4,7 +4,12 @@ import { sql } from 'kysely';
 import { crmRoutes } from './routes.js';
 
 /**
- * CRM extension — canonical owner of `zvd_contacts` and `zvd_organizations`.
+ * CRM extension — canonical owner of `zvd_contacts`, `zvd_organizations`,
+ * and `zvd_transactions` (plus CRM-only pipeline / activities tables).
+ *
+ * The engine may *adopt* these tables for Studio metadata / RLS / grants when
+ * they already exist; it must not CREATE them. Briefing lives at
+ * `GET /ext/crm/briefing` (not `/api/briefing`).
  *
  * Publishes the following services for cross-extension consumption:
  *   crm.contacts.lookup(idOrEmail)         → contact row | null
