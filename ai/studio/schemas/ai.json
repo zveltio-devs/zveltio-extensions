@@ -104,7 +104,7 @@
       "id": "queryHistory",
       "label": "ai.query.title",
       "icon": "History",
-      "dataSource": "/ext/ai/history",
+      "dataSource": "/ext/ai/query/history",
       "dataPath": "queries",
       "columns": [
         {
@@ -137,7 +137,7 @@
           "variant": "text-error",
           "label": "common.delete",
           "method": "DELETE",
-          "endpoint": "/ext/ai/{id}",
+          "endpoint": "/ext/ai/query/{id}",
           "confirm": "ext.confirmDelete"
         }
       ]
