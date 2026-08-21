@@ -2,14 +2,14 @@ import type { ZveltioExtension } from '@zveltio/sdk/extension';
 import { join } from 'path';
 import { sql } from 'kysely';
 import { crmRoutes } from './routes.js';
+import { adoptCrmCollections } from './adopt.js';
 
 /**
  * CRM extension — canonical owner of `zvd_contacts`, `zvd_organizations`,
  * and `zvd_transactions` (plus CRM-only pipeline / activities tables).
  *
- * The engine may *adopt* these tables for Studio metadata / RLS / grants when
- * they already exist; it must not CREATE them. Briefing lives at
- * `GET /ext/crm/briefing` (not `/api/briefing`).
+ * Owns CREATE (migrations), Studio metadata adopt (`adoptCrmCollections`), and
+ * `GET /ext/crm/briefing`. The engine must not CREATE or adopt these tables.
  *
  * Publishes the following services for cross-extension consumption:
  *   crm.contacts.lookup(idOrEmail)         → contact row | null
@@ -40,12 +40,15 @@ const extension: ZveltioExtension = {
       join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
       join(import.meta.dir, 'migrations/003_tenant_scoped_unique_keys.sql'),
       join(import.meta.dir, 'migrations/004_contact_organization_role.sql'),
+      join(import.meta.dir, 'migrations/005_contact_org_relation.sql'),
     ];
   },
 
   async register(app, ctx) {
     const routes = crmRoutes(ctx);
     app.route('/', routes);
+
+    await adoptCrmCollections(ctx);
 
     // ── Service registry — canonical contacts/organizations API ─────────────
     ctx.services.register('crm.contacts.lookup', async (idOrEmail: string) => {
