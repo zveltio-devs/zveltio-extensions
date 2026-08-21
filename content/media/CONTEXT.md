@@ -1,5 +1,14 @@
 # content/media — context
 
+## Engine dual door removed (2026-08-21)
+
+`/api/media` in the engine is a **410 Gone** shim pointing at
+`/ext/content/media`. Studio already used the extension; keeping a live twin
+in core was the audit failure mode (fix the dead copy). Do not remount
+handlers under `/api/media`.
+
+---
+
 Reparat 2026-08-11. Ștergerea e presată live cu control pozitiv; restul rutelor
 (27) n-au fost parcurse, deci **nu e „verificat"**.
 
