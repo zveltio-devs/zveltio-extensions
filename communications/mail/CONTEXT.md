@@ -106,3 +106,7 @@ context de răspuns.
 
 Apăsate și funcționale: toate cele 7 rute de citire, `admin/config` în ambele
 sensuri, semnături, contacte.
+
+## SDUI migration (2026-08-21)
+Branch: feat/sdui-tier3-reduced
+Accounts+signatures; inbox client deferred.

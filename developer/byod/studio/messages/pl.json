@@ -15,6 +15,7 @@
   "developer.byod.form.includePatterns": "Include patterns (comma-separated)",
   "developer.byod.form.name": "Nazwa",
   "developer.byod.form.schema": "Schemat",
+  "developer.byod.form.syncInterval": "Sync interval (hours)",
   "developer.byod.intro": "Connect to an external PostgreSQL database, scan its schema, and surface tables as virtual collections in Zveltio.",
   "developer.byod.never": "nigdy",
   "developer.byod.saving": "Zapisywanie…",

@@ -28,7 +28,8 @@
       {
         "path": "/admin/mail",
         "label": "Mail",
-        "icon": "Mail"
+        "icon": "Mail",
+        "schema": "schemas/mail.json"
       }
     ],
     "navGroup": "communications"

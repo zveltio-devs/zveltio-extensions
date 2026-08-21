@@ -16,7 +16,8 @@
       {
         "path": "/admin/introspect",
         "label": "BYOD Import",
-        "icon": "Database"
+        "icon": "Database",
+        "schema": "schemas/byod.json"
       }
     ],
     "navGroup": "developer"
@@ -33,7 +34,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "32afd6196acd0f05f77ab432fecd1a261b48110899f9883d9c8fe47747f45038",
+    "engineSha256": "cb9440169d1d776a572a0be42c6a43186d013052c0e4a035e73e2d898a142dbf",
     "sourceSha256": "2d99647df61b5e245a95e5f9eb5ca0949bd6ba3533edc04fae2ed1a2b314969b"
   }
 }
