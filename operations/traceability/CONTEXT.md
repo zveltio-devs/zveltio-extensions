@@ -58,3 +58,7 @@ După — `status=pending`, iar cele patru rute răspund 200.
 - Rapoartele au fost apăsate, nu **validate**: `ansvsa-traceability` întoarce
   200 cu `from`/`to`, dar dacă conținutul lui satisface cerința ANSVSA nu poate
   fi stabilit de aici.
+
+## SDUI deferred (2026-08-21)
+Nested Hono routers fail SDUI_ENDPOINT_UNKNOWN validation (route introspection
+loses mount prefixes). Keep bespoke until validator understands nested apps.

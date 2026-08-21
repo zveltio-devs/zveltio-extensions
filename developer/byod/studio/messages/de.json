@@ -15,6 +15,7 @@
   "developer.byod.form.includePatterns": "Einschlussmuster (kommagetrennt)",
   "developer.byod.form.name": "Name",
   "developer.byod.form.schema": "Schema",
+  "developer.byod.form.syncInterval": "Sync interval (hours)",
   "developer.byod.intro": "Verbinden Sie sich mit einer externen PostgreSQL-Datenbank, scannen Sie ihr Schema und stellen Sie Tabellen als virtuelle Sammlungen in Zveltio bereit.",
   "developer.byod.never": "nie",
   "developer.byod.saving": "Wird gespeichert…",

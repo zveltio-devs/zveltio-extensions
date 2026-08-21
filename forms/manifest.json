@@ -25,18 +25,19 @@
       {
         "path": "/admin/forms",
         "label": "Forms",
-        "icon": "file-text"
+        "icon": "file-text",
+        "schema": "schemas/forms.json"
       }
     ],
     "navGroup": "content"
   },
   "contributes": {
     "engine": true,
-    "studio": false,
+    "studio": true,
     "fieldTypes": []
   },
   "integrity": {
-    "engineSha256": "62dbf142f3d75d9ba0ffe5fac51712b49b9ba5b4c247cabb91f1032ae3782ce1",
+    "engineSha256": "04414a07dac5e8703d5c2320f784d8620355d95df81a68f5a355a8ca0ae9286a",
     "sourceSha256": "07278736c462c8dd0a0c0688f5b1412b05b994d04abfd55ba7f89a7bebdbeb9b"
   }
 }
