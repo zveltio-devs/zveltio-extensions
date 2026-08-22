@@ -9,6 +9,13 @@ home no longer embeds receivables — use `/admin/crm` or a future dashboard slo
 **Verificat prin apăsare: 2026-08-09.** Organizație creată, contact legat de ea,
 legătura recitită.
 
+## Studio UI (SDUI)
+
+Admin CRM is a **single declarative page** at `/admin/crm` —
+`studio/schemas/crm.json` (contacts / organizations / deals tabs). There is no
+`studio/pages/` tree; legacy URLs `/admin/crm/contacts` etc. redirect to
+`/admin/crm?tab=…` via the Studio catch-all host.
+
 ## Ce era rupt
 
 **Un contact nu putea aparține unei organizații.** `zvd_contact_organizations` —

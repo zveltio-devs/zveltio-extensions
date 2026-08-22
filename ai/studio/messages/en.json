@@ -102,5 +102,8 @@
   "ai.ui.raw_json": "Raw JSON",
   "ai.ui.schema_generator": "Schema Generator",
   "ai.ui.type_a_message_enter_to_send_shift_enter_for_new": "Type a message… (Enter to send, Shift+Enter for newline)",
-  "ai.ui.type_a_question_in_plain_language_ai_generates_a": "Type a question in plain language — AI generates and runs the SQL read-only query."
+  "ai.ui.type_a_question_in_plain_language_ai_generates_a": "Type a question in plain language — AI generates and runs the SQL read-only query.",
+  "ai.topbar.open": "Open AI",
+  "ai.topbar.placeholder": "Ask AI anything…",
+  "ai.topbar.setup": "Set up AI providers"
 }

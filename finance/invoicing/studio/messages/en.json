@@ -107,5 +107,7 @@
   "invoicing.vat.nonTaxable": "Not taxable",
   "invoicing.vat.onCollection": "VAT on collection",
   "invoicing.vat.reverseCharge": "Reverse charge",
-  "invoicing.vat.standard": "Standard"
+  "invoicing.vat.standard": "Standard",
+  "invoicing.widget.overdueCount": "{count} overdue",
+  "invoicing.widget.title": "Outstanding invoices"
 }
