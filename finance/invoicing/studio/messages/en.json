@@ -109,5 +109,7 @@
   "invoicing.vat.reverseCharge": "Reverse charge",
   "invoicing.vat.standard": "Standard",
   "invoicing.widget.overdueCount": "{count} overdue",
-  "invoicing.widget.title": "Outstanding invoices"
+  "invoicing.widget.title": "Outstanding invoices",
+  "invoicing.suggestions.overdueTitle": "{count} overdue invoice(s)",
+  "invoicing.suggestions.overdueHint": "Review and send reminders from Invoicing."
 }

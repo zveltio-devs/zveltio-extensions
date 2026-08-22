@@ -98,6 +98,8 @@
   "invoicing.status.partial": "Partiel",
   "invoicing.status.sent": "Envoyé",
   "invoicing.subtitle": "Créer et gérer les factures et les paiements",
+  "invoicing.suggestions.overdueHint": "Vérifiez et envoyez des rappels depuis Facturation.",
+  "invoicing.suggestions.overdueTitle": "{count} facture(s) en retard",
   "invoicing.title": "Facturation",
   "invoicing.toast.created": "Facture créée",
   "invoicing.toast.deleted": "Facture supprimée",

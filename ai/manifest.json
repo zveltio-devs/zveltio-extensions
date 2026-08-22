@@ -24,7 +24,7 @@
     "stepTypes": [
       "ai_decision"
     ],
-    "slots": ["topbar.center"]
+    "slots": ["topbar.center", "dashboard.hero"]
   },
   "studio": {
     "pages": [

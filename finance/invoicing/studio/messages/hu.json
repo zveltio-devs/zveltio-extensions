@@ -98,6 +98,8 @@
   "invoicing.status.partial": "Részleges",
   "invoicing.status.sent": "Elküldve",
   "invoicing.subtitle": "Számlák és fizetések létrehozása és kezelése",
+  "invoicing.suggestions.overdueHint": "Ellenőrizd és küldj emlékeztetőt a Számlázásból.",
+  "invoicing.suggestions.overdueTitle": "{count} lejárt számla",
   "invoicing.title": "Számlázás",
   "invoicing.toast.created": "Számla létrehozva",
   "invoicing.toast.deleted": "Számla törölve",

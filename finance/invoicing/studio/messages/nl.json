@@ -98,6 +98,8 @@
   "invoicing.status.partial": "Gedeeltelijk",
   "invoicing.status.sent": "Verzonden",
   "invoicing.subtitle": "Facturen en betalingen aanmaken en beheren",
+  "invoicing.suggestions.overdueHint": "Bekijk en stuur herinneringen vanuit Facturatie.",
+  "invoicing.suggestions.overdueTitle": "{count} achterstallige factuur/facturen",
   "invoicing.title": "Facturatie",
   "invoicing.toast.created": "Factuur aangemaakt",
   "invoicing.toast.deleted": "Factuur verwijderd",
