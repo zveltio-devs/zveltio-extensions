@@ -36,7 +36,8 @@
   "contributes": {
     "engine": true,
     "studio": true,
-    "fieldTypes": []
+    "fieldTypes": [],
+    "slots": ["dashboard.widgets"]
   },
   "engine": {
     "entry": "engine/index.js",

@@ -1,4 +1,5 @@
 {
+  "sduiSchema": 1,
   "title": "invoicing.series.title",
   "subtitle": "invoicing.series.subtitle",
   "newLabel": "invoicing.series.new",

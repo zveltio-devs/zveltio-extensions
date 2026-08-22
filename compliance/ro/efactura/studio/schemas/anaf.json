@@ -1,4 +1,5 @@
 {
+  "sduiSchema": 1,
   "kind": "settings",
   "title": "efactura.settings.title",
   "subtitle": "efactura.settings.subtitle",

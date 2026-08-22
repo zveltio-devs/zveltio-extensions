@@ -23,7 +23,8 @@
     "fieldTypes": [],
     "stepTypes": [
       "ai_decision"
-    ]
+    ],
+    "slots": ["topbar.center"]
   },
   "studio": {
     "pages": [
