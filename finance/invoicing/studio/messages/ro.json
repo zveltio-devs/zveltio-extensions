@@ -98,6 +98,8 @@
   "invoicing.status.partial": "Parțial",
   "invoicing.status.sent": "Trimis",
   "invoicing.subtitle": "Creează și gestionează facturi și plăți",
+  "invoicing.suggestions.overdueHint": "Verifică și trimite reminder-e din Facturare.",
+  "invoicing.suggestions.overdueTitle": "{count} facturi restante",
   "invoicing.title": "Facturare",
   "invoicing.toast.created": "Factură creată",
   "invoicing.toast.deleted": "Factură ștearsă",

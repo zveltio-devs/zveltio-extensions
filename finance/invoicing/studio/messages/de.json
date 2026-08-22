@@ -98,6 +98,8 @@
   "invoicing.status.partial": "Teilweise",
   "invoicing.status.sent": "Gesendet",
   "invoicing.subtitle": "Rechnungen und Zahlungen erstellen und verwalten",
+  "invoicing.suggestions.overdueHint": "Prüfen und Erinnerungen aus der Rechnungsstellung senden.",
+  "invoicing.suggestions.overdueTitle": "{count} überfällige Rechnung(en)",
   "invoicing.title": "Rechnungsstellung",
   "invoicing.toast.created": "Rechnung erstellt",
   "invoicing.toast.deleted": "Rechnung gelöscht",

@@ -40,8 +40,8 @@
             "endpoint": "/ext/developer/validation/rules/{id}",
             "field": "is_active",
             "options": [
-              { "value": "true", "label": "On" },
-              { "value": "false", "label": "Off" }
+              { "value": "true", "label": "developer.validation.on" },
+              { "value": "false", "label": "developer.validation.off" }
             ]
           }
         }
@@ -91,13 +91,13 @@
               { "value": "required", "label": "developer.validation.rule.required" },
               { "value": "min", "label": "developer.validation.rule.min" },
               { "value": "max", "label": "developer.validation.rule.max" },
-              { "value": "minLength", "label": "Min length" },
-              { "value": "maxLength", "label": "Max length" },
+              { "value": "minLength", "label": "developer.validation.rule.minLength" },
+              { "value": "maxLength", "label": "developer.validation.rule.maxLength" },
               { "value": "pattern", "label": "developer.validation.rule.pattern" },
-              { "value": "range", "label": "Range" },
-              { "value": "email", "label": "Email" },
-              { "value": "url", "label": "URL" },
-              { "value": "nlp", "label": "Expression (nlp)" }
+              { "value": "range", "label": "developer.validation.rule.range" },
+              { "value": "email", "label": "developer.validation.rule.email" },
+              { "value": "url", "label": "developer.validation.rule.url" },
+              { "value": "nlp", "label": "developer.validation.rule.nlp" }
             ]
           },
           {
@@ -117,7 +117,7 @@
           },
           {
             "name": "nl_description",
-            "label": "NL description (optional)",
+            "label": "developer.validation.form.nlDescription",
             "colSpan": 2
           }
         ]
