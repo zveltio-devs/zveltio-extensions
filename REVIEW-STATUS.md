@@ -13,6 +13,10 @@ fiindcă lipsește o dependință externă. Nu e „verificat" și nu se promove
 „Generat automat" e o intenție, nu un fapt: nu există generator, iar coloanele
 numerice au driftat față de fișiere. Coloana `stare` e singura de încredere.
 
+Coloana `UI` (`cod` vs `SDUI`) e **istorică** (august 2026). Toate paginile admin
+cu `manifest.studio.pages[].schema` sunt SDUI; ce lipsește din produs e listat în
+[STUDIO-DEFERRED.md](./STUDIO-DEFERRED.md), nu „nemigrat".
+
 ## Ce înseamnă „verificat" după trecerea din 11 august
 
 Fiecare extensie a fost activată pe o **bază virgină** și i s-au apăsat rutele —
@@ -51,8 +55,8 @@ doi creatori, engine-ul rulează primul, extensia scrie în forma ei:
 | `content/document-templates` | 14 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
 | `content/documents` | 12 | 3 | 0 | 0 | 5 | 0 | 1 | cod | da | **verificat 2026-08-11** |
 | `content/drafts` | 18 | 2 | 0 | 0 | 2 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
-| `content/media` | 27 | 2 | 0 | 0 | 1 | 0 | 1 | cod | da | **verificat 2026-08-12 — G presat 27/27** |
-| `content/page-builder` | 25 | 4 | 0 | 0 | 3 | 2 | 1 | cod | da | **verificat 2026-08-11** |
+| `content/media` | 27 | 2 | 0 | 0 | 1 | 0 | 1 | SDUI | da | **verificat 2026-08-12 — G presat 27/27** |
+| `content/pages` | 25 | 4 | 0 | 0 | 3 | 2 | 1 | SDUI | da | **verificat 2026-08-11** *(fost page-builder)* |
 | `content/pdf-viewer` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | nu | **verificat 2026-08-11** |
 | `crm` | 15 | 2 | 5 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
 | `data/export` | 11 | 2 | 0 | 0 | 2 | 0 | 1 | SDUI | da | **verificat 2026-08-12 — G presat 11/11** |
@@ -62,8 +66,7 @@ doi creatori, engine-ul rulează primul, extensia scrie în forma ei:
 | `developer/database` | 0 | 4 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat** |
 | `developer/edge-functions` | 7 | 0 | 0 | 0 | 4 | 0 | 1 | cod | da | **verificat 2026-08-11** |
 | `developer/graphql` | 13 | 2 | 0 | 0 | 2 | 4 | 1 | cod | da | **verificat 2026-08-11** |
-| `developer/validation` | 14 | 2 | 0 | 0 | 3 | 0 | 1 | cod | da | **verificat 2026-08-11** |
-| `developer/views` | 0 | 0 | 0 | 0 | 0 | 0 | 1 | cod | nu | **verificat 2026-08-11** |
+| `developer/validation` | 14 | 2 | 0 | 0 | 3 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
 | `ecommerce/store` | 33 | 2 | 0 | 0 | 1 | 0 | 1 | SDUI | da | **verificat** |
 | `finance/accounting` | 28 | 4 | 0 | 0 | 1 | 0 | 1 | SDUI | da | **verificat** |
 | `finance/banking` | 18 | 4 | 0 | 0 | 2 | 0 | 1 | cod | da | **verificat** |
@@ -92,7 +95,7 @@ doi creatori, engine-ul rulează primul, extensia scrie în forma ei:
 | `workflow/approvals` | 17 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat 2026-08-11** |
 | `workflow/checklists` | 22 | 5 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat** |
 
-**Total: 57 extensii · verificate: 22**
+**Total: 56 extensii · verificate: 22**
 
 Coloane: `catch` = numărul de `.catch(() => …)` (candidați la A2) · `ext` = apeluri către servicii externe · `serv`/`ascult` = servicii publicate și ascultători de evenimente.
 

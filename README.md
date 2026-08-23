@@ -29,7 +29,7 @@ for end-user applications. Import them directly:
 <script>
   import { FileUpload } from 'zveltio-extensions/storage/cloud/client';
   import { MapPicker }  from 'zveltio-extensions/geospatial/postgis/client';
-  import { HeroSection, GridSection } from 'zveltio-extensions/content/page-builder/client';
+  import { HeroSection, GridSection } from 'zveltio-extensions/content/pages/client';
 </script>
 ```
 
@@ -37,7 +37,7 @@ for end-user applications. Import them directly:
 |---|---|
 | `storage/cloud` | `FileUpload` |
 | `geospatial/postgis` | `MapPicker` |
-| `content/page-builder` | `HeroSection`, `GridSection`, `CTASection`, `TextSection` |
+| `content/pages` | `HeroSection`, `GridSection`, `CTASection`, `TextSection`, … |
 
 ## Categories
 
@@ -51,10 +51,10 @@ for end-user applications. Import them directly:
 | `billing` | `billing` |
 | `communications` | `mail` |
 | `compliance` | `gdpr`, `ro/documents`, `ro/efactura`, `ro/etransport`, `ro/procurement`, `ro/saft` |
-| `content` | `document-templates`, `documents`, `drafts`, `media`, `page-builder`, `pdf-viewer` |
+| `content` | `document-templates`, `documents`, `drafts`, `media`, `pages`, `pdf-viewer` |
 | `crm` | CRM module |
 | `data` | `export`, `import` |
-| `developer` | `api-docs`, `byod`, `database`, `edge-functions`, `graphql`, `validation`, `views` |
+| `developer` | `api-docs`, `byod`, `database`, `edge-functions`, `graphql`, `validation` |
 | `ecommerce` | `store` |
 | `finance` | `accounting`, `banking`, `expenses`, `invoicing`, `quotes`, `subscriptions` |
 | `forms` | `forms` |
@@ -69,9 +69,11 @@ for end-user applications. Import them directly:
 | `storage` | `cloud` |
 | `workflow` | `approvals`, `checklists` |
 
-**Catalog size:** 54 official extensions across 23 categories
-(51 with database migrations + tenant RLS, 3 stateless / API-only:
-`content/pdf-viewer`, `developer/edge-functions`, `developer/views`).
+**Catalog size:** 56 official extensions across 23 categories
+(53 with database migrations + tenant RLS, 3 stateless / API-only:
+`content/pdf-viewer`, `developer/edge-functions`, and extensions without DB tables).
+
+Admin Studio pages are **SDUI schemas** unless listed in [STUDIO-DEFERRED.md](./STUDIO-DEFERRED.md).
 
 ## Using in Zveltio
 
