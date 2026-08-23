@@ -9,7 +9,7 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@hono/zod-validator": "0.7.6",
+    "@hono/zod-validator": "0.8.0",
     "aws4fetch": "1.0.20",
     "hono": "4.13.3",
     "kysely": "0.29.3",
