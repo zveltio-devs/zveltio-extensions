@@ -27,6 +27,11 @@
         "label": "Pages",
         "icon": "Layout",
         "schema": "schemas/pages.json"
+      },
+      {
+        "path": "/admin/pages/builder/:id",
+        "label": "Page builder",
+        "icon": "Layout"
       }
     ],
     "navGroup": "content"
