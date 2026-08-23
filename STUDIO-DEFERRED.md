@@ -1,7 +1,8 @@
 # Studio — ce SDUI acoperă vs ce e amânat
 
 **Scop:** un singur loc pentru „admin page = schema JSON” și ce **nu** e încă acolo.
-Nu e backlog de migrare — migrarea structurală e gata (`0` pagini Tier-3 pe disk).
+Nu e backlog de migrare — migrarea structurală e gata. Tier-3 pages apar doar unde
+produsul o cere (ex. `ai/studio/pages/chat`).
 
 **Legendă**
 
@@ -17,7 +18,7 @@ Nu e backlog de migrare — migrarea structurală e gata (`0` pagini Tier-3 pe d
 
 | Extension | Admin azi (SDUI) | Amânat | Note |
 |-----------|------------------|--------|------|
-| `ai` | providers, templates, history tabs | Chat, query, schema gen, search UI | `AiPromptBar` + `dashboard.hero` = slots 2.5 |
+| `ai` | providers, templates, history tabs | **Chat shipped** (`/admin/ai/chat`, Tier-3, non-streaming). Still deferred: query, schema gen, search UI; token streaming needs engine | `AiPromptBar` + `dashboard.hero` → chat |
 | `communications/mail` | accounts, signatures, filters | Inbox client (read/compose/thread) | Settings rămân SDUI |
 | `content/pages` | sites + page metadata list | Block builder canvas | Cod referință: `_deferred/block-builder/` |
 | `content/media` | metadata CRUD | File browser + upload UI | |
@@ -65,6 +66,6 @@ Nu e backlog de migrare — migrarea structurală e gata (`0` pagini Tier-3 pe d
 
 ## Curățenie repo
 
-- Fără `studio/pages/**/+page.svelte` (Tier-3 pages).
+- Tier-3 `studio/pages/**/+page.svelte` doar pentru escape-uri documentate aici.
 - Fără `studio/svelte.config.js` unde nu există `studio/src/` activ.
 - Extensii șterse din catalog (`content/page-builder`, `developer/views`) — nu reintroduceți rânduri în `REVIEW-STATUS.md`.
