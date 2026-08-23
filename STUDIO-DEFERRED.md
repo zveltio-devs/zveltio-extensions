@@ -22,10 +22,10 @@ produsul o cere (ex. `ai/studio/pages/chat`).
 | `communications/mail` | accounts, signatures | **Inbox shipped** (`/admin/mail/inbox`, Tier-3). Settings remain SDUI | Folders, read/compose/reply, sync, flags |
 | `content/pages` | sites + page metadata list | **Block builder shipped** (`/admin/pages/builder/:id`). Still optional: live resolved preview, templates/menus/insights shell | Canvas under `studio/src/components/builder/` |
 | `content/media` | metadata CRUD | File browser + upload UI | |
-| `developer/graphql` | schema/endpoints admin | GraphQL playground (split pane) | |
-| `developer/edge-functions` | list/create/edit/invoke | Split-pane code IDE | |
-| `geospatial/postgis` | geofences CRUD | Proximity search + clustering tabs | `MapPicker`/`LocationField` = field types, nu pagină |
-| `projects/management` | projects CRUD | Kanban board | |
+| `developer/graphql` | schema/endpoints admin | **Playground shipped** (`/admin/developer/graphql/playground`) | POST `/ext/developer/graphql` |
+| `developer/edge-functions` | list/create/edit/invoke | **IDE shipped** (`/admin/developer/edge-functions/ide`) | Textarea editor + invoke |
+| `geospatial/postgis` | geofences CRUD | **Explore shipped** (`/admin/geospatial/postgis/explore`) — near/cluster/bbox | MapView |
+| `projects/management` | projects CRUD | **Kanban shipped** (`/admin/projects/management/kanban`) | Drag → PATCH status |
 | `projects/helpdesk` | tickets list/create/reply | Live conversation panel | |
 | `search` | indexes CRUD | Interactive `/q` playground | |
 | `i18n/translations` | keys + locales CRUD | Translation matrix editor | |
@@ -51,9 +51,8 @@ produsul o cere (ex. `ai/studio/pages/chat`).
 | Extension | Rol | Sync în Studio? |
 |-----------|-----|-----------------|
 | `crm`, `ai`, `finance/invoicing` | Model 2.5 slot widgets (`contribute.ts`) | Da, la build |
-| `content/pages` | `ListView`, `CardView`, `CalendarView` — renderere pentru saved views | Da (`studioComponents`) |
+| `content/pages` | `ListView`/`CardView`/`CalendarView` + **block builder** Tier-3 | Da |
 | `geospatial/postgis`, `storage/cloud`, `content/pdf-viewer` | Field types / picker / preview | Da |
-| `content/pages` block builder | Tier-3 amânat | **Nu** — mutat în `_deferred/` |
 
 ---
 
