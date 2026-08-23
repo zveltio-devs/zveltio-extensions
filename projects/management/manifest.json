@@ -17,6 +17,11 @@
         "label": "Projects",
         "icon": "Kanban",
         "schema": "schemas/management.json"
+      },
+      {
+        "path": "/admin/projects/management/kanban",
+        "label": "Kanban",
+        "icon": "Columns3"
       }
     ],
     "navGroup": "projects"

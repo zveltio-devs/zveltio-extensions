@@ -23,6 +23,11 @@
         "label": "PostGIS",
         "icon": "Map",
         "schema": "schemas/postgis.json"
+      },
+      {
+        "path": "/admin/geospatial/postgis/explore",
+        "label": "Spatial explore",
+        "icon": "MapPin"
       }
     ],
     "navGroup": "developer"

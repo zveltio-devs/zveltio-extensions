@@ -18,6 +18,11 @@
         "label": "Edge Functions",
         "icon": "Code",
         "schema": "schemas/edge-functions.json"
+      },
+      {
+        "path": "/admin/developer/edge-functions/ide",
+        "label": "Functions IDE",
+        "icon": "Terminal"
       }
     ],
     "navGroup": "developer"
