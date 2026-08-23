@@ -23,8 +23,33 @@
 -- schimbă e că absența lui devine legală — ceea ce e adevărat pentru un formular
 -- care nu stă pe nicio pagină.
 
-ALTER TABLE zv_form_submissions ALTER COLUMN page_id    DROP NOT NULL;
-ALTER TABLE zv_form_submissions ALTER COLUMN section_id DROP NOT NULL;
+-- Condiționat pe existența coloanei, fiindcă „doi creatori" a devenit unul.
+--
+-- Engine-ul nu mai creează `zv_form_submissions` — page-builder-ul a plecat în
+-- extensii, iar `001_initial.sql` al lui nu mai are tabelul. Pe orice bază nouă
+-- creatorul e `001_forms.sql` al acestei extensii, care n-a avut niciodată
+-- `page_id` sau `section_id`: nu e nimic de relaxat, fiindcă nimic nu constrânge.
+-- Necondiționat, migrația moare cu `column "page_id" does not exist`.
+--
+-- Nu se șterge totuși: o bază ridicată pe un engine mai vechi ARE coloanele, cu
+-- NOT NULL cu tot, și fără această relaxare rămâne exact cu bug-ul descris mai
+-- sus. Migrația trebuie să fie adevărată pe amândouă.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'zv_form_submissions' AND column_name = 'page_id'
+  ) THEN
+    ALTER TABLE zv_form_submissions ALTER COLUMN page_id DROP NOT NULL;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'zv_form_submissions' AND column_name = 'section_id'
+  ) THEN
+    ALTER TABLE zv_form_submissions ALTER COLUMN section_id DROP NOT NULL;
+  END IF;
+END $$;
 
 -- DOWN
 -- Nu se pune la loc: rândurile scrise între timp de această extensie au
