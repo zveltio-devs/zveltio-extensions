@@ -122,6 +122,13 @@
       ],
       "rowActions": [
         {
+          "id": "edit-blocks",
+          "icon": "Pencil",
+          "label": "content.pages.openBuilder",
+          "kind": "navigate",
+          "href": "/pages/builder/{id}"
+        },
+        {
           "id": "delete",
           "icon": "Trash2",
           "variant": "text-error",
@@ -173,14 +180,6 @@
                 "label": "content.pages.status.archived"
               }
             ]
-          },
-          {
-            "name": "blocks",
-            "label": "content.pages.field.blocks",
-            "type": "json",
-            "mono": true,
-            "default": "[]",
-            "colSpan": 2
           }
         ]
       }

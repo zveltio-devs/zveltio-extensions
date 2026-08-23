@@ -2,12 +2,11 @@
 
 ## Studio admin UI
 
-Page list CRUD is **SDUI** (`studio/schemas/pages.json`). Deferred product work
-(block builder canvas) is documented in repo-root [STUDIO-DEFERRED.md](../../STUDIO-DEFERRED.md);
-reference code lives under `_deferred/block-builder/` (not synced to Studio).
+- **SDUI** list at `/admin/pages` — sites + page metadata.
+- **Tier-3 block builder** at `/admin/pages/builder/:id` (2026-08-23) — canvas,
+  library, properties, undo/redo, save via `PUT /ext/content/pages/pages/:id`.
 
-View renderers (`ListView`, `CardView`, `CalendarView`) ship via `studioComponents`
-for saved views — not a separate admin page.
+View renderers (`ListView`, `CardView`, `CalendarView`) ship via `studioComponents`.
 
 ## SDUI migration (2026-08-21)
 
