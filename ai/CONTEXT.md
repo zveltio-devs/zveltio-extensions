@@ -171,5 +171,6 @@ acoperă toate cele șapte locuri, inclusiv `compliance/ro/procurement`).
   defecte până nu sunt.
 
 ## SDUI migration (2026-08-21)
-Branch: feat/sdui-tier3-reduced
-Templates+query history; chat/query/schema/search deferred.
+Templates+query history via schema. **Chat Tier-3** at `/admin/ai/chat` (2026-08-23)
+uses `/ext/ai/chats` (non-streaming). Still deferred: NL→SQL UI, schema gen UI,
+semantic search UI; token streaming needs engine work (see STUDIO-DEFERRED.md).
