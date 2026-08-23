@@ -108,5 +108,5 @@ Apăsate și funcționale: toate cele 7 rute de citire, `admin/config` în ambel
 sensuri, semnături, contacte.
 
 ## SDUI migration (2026-08-21)
-Branch: feat/sdui-tier3-reduced
-Accounts+signatures; inbox client deferred.
+Accounts+signatures via schema. **Inbox Tier-3** at `/admin/mail/inbox` (2026-08-23)
+covers folders, list/detail, compose/reply, sync, flags, attachment download.
