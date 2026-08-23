@@ -39,6 +39,12 @@ CREATE TABLE IF NOT EXISTS zv_collection_publish_settings (
   require_review BOOLEAN NOT NULL DEFAULT false,
   allow_self_publish BOOLEAN NOT NULL DEFAULT true,
   notify_roles TEXT[] NOT NULL DEFAULT '{}',
+  -- Which roles may approve a review. `routes.ts` reads this to decide whether
+  -- the caller is a reviewer, so the extension has to declare it: the column
+  -- used to arrive from the engine's 001_initial, which no longer creates this
+  -- table at all. Same default the engine's copy had, so an upgraded database
+  -- and a fresh one agree.
+  reviewer_roles TEXT[] NOT NULL DEFAULT '{admin}',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -61,6 +67,7 @@ ALTER TABLE zv_content_drafts ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ;
 ALTER TABLE zv_collection_publish_settings ADD COLUMN IF NOT EXISTS require_review BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE zv_collection_publish_settings ADD COLUMN IF NOT EXISTS allow_self_publish BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE zv_collection_publish_settings ADD COLUMN IF NOT EXISTS notify_roles TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE zv_collection_publish_settings ADD COLUMN IF NOT EXISTS reviewer_roles TEXT[] NOT NULL DEFAULT '{admin}';
 ALTER TABLE zv_publish_schedule ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending';
 ALTER TABLE zv_publish_schedule ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ;
 
