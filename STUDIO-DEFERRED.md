@@ -19,7 +19,7 @@ produsul o cere (ex. `ai/studio/pages/chat`).
 | Extension | Admin azi (SDUI) | Amânat | Note |
 |-----------|------------------|--------|------|
 | `ai` | providers, templates, history tabs | **Chat shipped** (`/admin/ai/chat`, Tier-3, non-streaming). Still deferred: query, schema gen, search UI; token streaming needs engine | `AiPromptBar` + `dashboard.hero` → chat |
-| `communications/mail` | accounts, signatures, filters | Inbox client (read/compose/thread) | Settings rămân SDUI |
+| `communications/mail` | accounts, signatures | **Inbox shipped** (`/admin/mail/inbox`, Tier-3). Settings remain SDUI | Folders, read/compose/reply, sync, flags |
 | `content/pages` | sites + page metadata list | Block builder canvas | Cod referință: `_deferred/block-builder/` |
 | `content/media` | metadata CRUD | File browser + upload UI | |
 | `developer/graphql` | schema/endpoints admin | GraphQL playground (split pane) | |

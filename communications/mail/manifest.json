@@ -30,6 +30,11 @@
         "label": "Mail",
         "icon": "Mail",
         "schema": "schemas/mail.json"
+      },
+      {
+        "path": "/admin/mail/inbox",
+        "label": "Inbox",
+        "icon": "Inbox"
       }
     ],
     "navGroup": "communications"
