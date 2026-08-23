@@ -24,7 +24,6 @@
     "pages": [
       {
         "path": "/admin/sms",
-        "component": "./studio/src/pages/SmsPage.svelte",
         "label": "SMS",
         "icon": "message-square",
         "schema": "schemas/sms.json"
@@ -34,7 +33,7 @@
   },
   "contributes": {
     "engine": true,
-    "studio": false,
+    "studio": true,
     "fieldTypes": []
   },
   "integrity": {
