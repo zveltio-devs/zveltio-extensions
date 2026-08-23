@@ -33,6 +33,11 @@
         "label": "AI",
         "icon": "Bot",
         "schema": "schemas/ai.json"
+      },
+      {
+        "path": "/admin/ai/chat",
+        "label": "AI Chat",
+        "icon": "MessageSquare"
       }
     ],
     "navGroup": "developer"
