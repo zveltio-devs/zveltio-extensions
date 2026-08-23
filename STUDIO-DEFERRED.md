@@ -20,7 +20,7 @@ produsul o cere (ex. `ai/studio/pages/chat`).
 |-----------|------------------|--------|------|
 | `ai` | providers, templates, history tabs | **Chat shipped** (`/admin/ai/chat`, Tier-3, non-streaming). Still deferred: query, schema gen, search UI; token streaming needs engine | `AiPromptBar` + `dashboard.hero` → chat |
 | `communications/mail` | accounts, signatures | **Inbox shipped** (`/admin/mail/inbox`, Tier-3). Settings remain SDUI | Folders, read/compose/reply, sync, flags |
-| `content/pages` | sites + page metadata list | Block builder canvas | Cod referință: `_deferred/block-builder/` |
+| `content/pages` | sites + page metadata list | **Block builder shipped** (`/admin/pages/builder/:id`). Still optional: live resolved preview, templates/menus/insights shell | Canvas under `studio/src/components/builder/` |
 | `content/media` | metadata CRUD | File browser + upload UI | |
 | `developer/graphql` | schema/endpoints admin | GraphQL playground (split pane) | |
 | `developer/edge-functions` | list/create/edit/invoke | Split-pane code IDE | |
