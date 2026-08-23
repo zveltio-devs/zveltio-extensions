@@ -20,6 +20,11 @@
         "label": "GraphQL",
         "icon": "Network",
         "schema": "schemas/graphql.json"
+      },
+      {
+        "path": "/admin/developer/graphql/playground",
+        "label": "GraphQL Playground",
+        "icon": "Play"
       }
     ],
     "navGroup": "developer"
