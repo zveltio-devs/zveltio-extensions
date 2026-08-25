@@ -28,6 +28,10 @@ async function updateAvgCost(dbh: any, productId: string, addedQty: number, adde
   await sql`UPDATE zvd_products SET avg_cost = ${newAvgCost}, total_value = ${totalValue}, updated_at = NOW() WHERE id = ${productId}`.execute(dbh);
 }
 
+/** Thrown so the transaction rolls back — a RETURNED value commits, and by
+ *  this point the stock-level row has already been created. */
+const INSUFFICIENT_STOCK = Symbol('inventory-insufficient-stock');
+
 export function inventoryRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
@@ -421,7 +425,9 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
     // the condition in the UPDATE is what stops two simultaneous sales of the
     // last unit. That protects one statement against a concurrent one; this
     // protects the five of them against each other.
-    const outcome = await db.transaction().execute(async (trx) => {
+    let outcome: Awaited<ReturnType<typeof recordMovement>>;
+    const recordMovement = () =>
+      db.transaction().execute(async (trx) => {
     await sql`INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity) VALUES (${d.product_id}, ${d.warehouse_id}, 0) ON CONFLICT (product_id, warehouse_id) DO NOTHING`.execute(trx);
     if (d.type === 'out' || d.type === 'transfer') {
       // Deliberately NOT a SELECT here any more.
@@ -443,9 +449,11 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
           AND quantity >= ${d.quantity}
         RETURNING quantity
       `.execute(trx);
-      // Reported rather than returned: a `return` here would leave the
-      // transaction to commit the stock row this handler just created.
-      if (applied.rows.length === 0) return { insufficient: true as const };
+      // THROWN, not returned. A callback that returns normally commits, and the
+      // `INSERT … ON CONFLICT DO NOTHING` above has already created this
+      // product/warehouse row — so returning here would leave a stock level
+      // behind for a movement that was refused.
+      if (applied.rows.length === 0) throw INSUFFICIENT_STOCK;
     } else {
       await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${delta}, updated_at = NOW() WHERE product_id = ${d.product_id} AND warehouse_id = ${d.warehouse_id}`.execute(trx);
     }
@@ -461,10 +469,15 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
       VALUES (${d.product_id}, ${d.warehouse_id}, ${d.destination_warehouse_id ?? null}, ${d.type}, ${d.quantity}, ${d.unit_cost ?? null}, ${d.reference ?? null}, ${d.notes ?? null}, ${user.id})
       RETURNING *
     `.execute(trx);
-      return { insufficient: false as const, movement };
-    });
-    if (outcome.insufficient) return c.json({ error: 'Insufficient stock' }, 400);
-    return c.json({ data: outcome.movement.rows[0] }, 201);
+      return movement;
+      });
+    try {
+      outcome = await recordMovement();
+    } catch (err) {
+      if (err === INSUFFICIENT_STOCK) return c.json({ error: 'Insufficient stock' }, 400);
+      throw err;
+    }
+    return c.json({ data: outcome.rows[0] }, 201);
   });
 
   app.get('/movements', async (c) => {

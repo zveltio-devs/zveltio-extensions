@@ -19540,6 +19540,7 @@ async function updateAvgCost(dbh, productId, addedQty, addedCost) {
   const totalValue = +qty * newAvgCost;
   await sql`UPDATE zvd_products SET avg_cost = ${newAvgCost}, total_value = ${totalValue}, updated_at = NOW() WHERE id = ${productId}`.execute(dbh);
 }
+var INSUFFICIENT_STOCK = Symbol("inventory-insufficient-stock");
 function inventoryRoutes(ctx) {
   const { db, auth } = ctx;
   const app = new Hono2;
@@ -19846,7 +19847,8 @@ function inventoryRoutes(ctx) {
     if (d.type === "transfer" && !d.destination_warehouse_id)
       return c.json({ error: "destination_warehouse_id required for transfer" }, 400);
     const delta = d.type === "in" || d.type === "adjustment" ? d.quantity : -d.quantity;
-    const outcome = await db.transaction().execute(async (trx) => {
+    let outcome;
+    const recordMovement = () => db.transaction().execute(async (trx) => {
       await sql`INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity) VALUES (${d.product_id}, ${d.warehouse_id}, 0) ON CONFLICT (product_id, warehouse_id) DO NOTHING`.execute(trx);
       if (d.type === "out" || d.type === "transfer") {
         const applied = await sql`
@@ -19856,7 +19858,7 @@ function inventoryRoutes(ctx) {
         RETURNING quantity
       `.execute(trx);
         if (applied.rows.length === 0)
-          return { insufficient: true };
+          throw INSUFFICIENT_STOCK;
       } else {
         await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${delta}, updated_at = NOW() WHERE product_id = ${d.product_id} AND warehouse_id = ${d.warehouse_id}`.execute(trx);
       }
@@ -19872,11 +19874,16 @@ function inventoryRoutes(ctx) {
       VALUES (${d.product_id}, ${d.warehouse_id}, ${d.destination_warehouse_id ?? null}, ${d.type}, ${d.quantity}, ${d.unit_cost ?? null}, ${d.reference ?? null}, ${d.notes ?? null}, ${user.id})
       RETURNING *
     `.execute(trx);
-      return { insufficient: false, movement };
+      return movement;
     });
-    if (outcome.insufficient)
-      return c.json({ error: "Insufficient stock" }, 400);
-    return c.json({ data: outcome.movement.rows[0] }, 201);
+    try {
+      outcome = await recordMovement();
+    } catch (err) {
+      if (err === INSUFFICIENT_STOCK)
+        return c.json({ error: "Insufficient stock" }, 400);
+      throw err;
+    }
+    return c.json({ data: outcome.rows[0] }, 201);
   });
   app.get("/movements", async (c) => {
     const { limit = "50", page = "1", product_id, warehouse_id } = c.req.query();

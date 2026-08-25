@@ -246,6 +246,10 @@ function noEmploymentService(c: Context) {
   );
 }
 
+/** Thrown to roll a transaction back on a miss — a RETURNED value commits,
+ *  which would leave the entry updates below in place. */
+const PERIOD_NOT_READY = Symbol('payroll-period-not-ready');
+
 export function payrollRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
   const app = new Hono();
@@ -428,15 +432,28 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
     // every payslip in the period marked approved, with no approver recorded
     // anywhere — approval without an approver. A retry does repair it, but the
     // window is one in which a payroll report reads as signed off by nobody.
-    const row = await db.transaction().execute(async (trx) => {
-      await sql`UPDATE zvd_payroll_entries SET status = 'approved', updated_at = NOW() WHERE period_id = ${c.req.param('id')} AND status = 'draft'`.execute(trx);
-      const updated = await sql`
-        UPDATE zvd_payroll_periods SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
-        WHERE id = ${c.req.param('id')} AND status = 'calculated' RETURNING *
-      `.execute(trx);
-      return updated.rows.length ? updated : null;
-    });
-    if (!row) return c.json({ error: 'Period not found or not calculated' }, 400);
+    let row: Awaited<ReturnType<typeof approvePeriod>>;
+    const approvePeriod = () =>
+      db.transaction().execute(async (trx) => {
+        await sql`UPDATE zvd_payroll_entries SET status = 'approved', updated_at = NOW() WHERE period_id = ${c.req.param('id')} AND status = 'draft'`.execute(trx);
+        const updated = await sql`
+          UPDATE zvd_payroll_periods SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
+          WHERE id = ${c.req.param('id')} AND status = 'calculated' RETURNING *
+        `.execute(trx);
+        // Thrown, not returned. The entries above are already marked approved in
+        // this transaction; returning normally would COMMIT them, which is
+        // precisely the "approval with no approver" this handler was fixed for.
+        if (!updated.rows.length) throw PERIOD_NOT_READY;
+        return updated;
+      });
+    try {
+      row = await approvePeriod();
+    } catch (err) {
+      if (err === PERIOD_NOT_READY) {
+        return c.json({ error: 'Period not found or not calculated' }, 400);
+      }
+      throw err;
+    }
     return c.json({ data: row.rows[0] });
   });
 
@@ -450,18 +467,31 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
     // request would leave the payslips marked paid while the period is still
     // open, so the next report says the money went out and the ledger says it
     // did not.
-    const row = await db.transaction().execute(async (trx) => {
-      await sql`UPDATE zvd_payroll_entries SET paid_at = NOW(), updated_at = NOW() WHERE period_id = ${c.req.param('id')} AND status = 'approved'`.execute(trx);
-      const updated = await sql`
-        UPDATE zvd_payroll_periods SET status = 'closed', paid_at = NOW(), updated_at = NOW()
-        -- Only the approve route can produce 'approved'. Requiring it here is what makes
-        -- calculate -> pay impossible: the two decisions no longer share one state,
-        -- so the second can finally tell whether the first happened.
-        WHERE id = ${c.req.param('id')} AND status = 'approved' RETURNING *
-      `.execute(trx);
-      return updated.rows.length ? updated : null;
-    });
-    if (!row) return c.json({ error: 'Period not found or not ready' }, 400);
+    let row: Awaited<ReturnType<typeof payPeriod>>;
+    const payPeriod = () =>
+      db.transaction().execute(async (trx) => {
+        await sql`UPDATE zvd_payroll_entries SET paid_at = NOW(), updated_at = NOW() WHERE period_id = ${c.req.param('id')} AND status = 'approved'`.execute(trx);
+        const updated = await sql`
+          UPDATE zvd_payroll_periods SET status = 'closed', paid_at = NOW(), updated_at = NOW()
+          -- Only the approve route can produce 'approved'. Requiring it here is what makes
+          -- calculate -> pay impossible: the two decisions no longer share one state,
+          -- so the second can finally tell whether the first happened.
+          WHERE id = ${c.req.param('id')} AND status = 'approved' RETURNING *
+        `.execute(trx);
+        // Thrown for the same reason as approve, and it matters more here: the
+        // entries already carry `paid_at`, so committing them on a refused
+        // request says the money went out.
+        if (!updated.rows.length) throw PERIOD_NOT_READY;
+        return updated;
+      });
+    try {
+      row = await payPeriod();
+    } catch (err) {
+      if (err === PERIOD_NOT_READY) {
+        return c.json({ error: 'Period not found or not ready' }, 400);
+      }
+      throw err;
+    }
     return c.json({ data: row.rows[0] });
   });
 
