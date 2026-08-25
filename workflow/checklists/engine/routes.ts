@@ -36,8 +36,12 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
    * quietly rewriting history, so the row keeps the item labels, their weights,
    * whether each was ticked, and the threshold that was in force.
    */
-  async function scoreChecklist(checklistId: string): Promise<void> {
-    const checklist = await db
+  // Takes the handle so the score commits with whatever change caused it.
+  // Typed as `typeof db` rather than `any`: a Kysely transaction satisfies the
+  // same interface, and `any` here silently erased the row types the arithmetic
+  // below depends on.
+  async function scoreChecklist(trx: typeof db, checklistId: string): Promise<void> {
+    const checklist = await trx
       .selectFrom('zv_checklists')
       .select(['id', 'template_id'])
       .where('id', '=', checklistId)
@@ -47,7 +51,7 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
     // list of things to do, not a measurement.
     if (!checklist?.template_id) return;
 
-    const schemes = await db
+    const schemes = await trx
       .selectFrom('zv_checklist_scoring_schemes')
       .selectAll()
       .where('template_id', '=', checklist.template_id)
@@ -55,14 +59,14 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
       .execute();
     if (schemes.length === 0) return;
 
-    const items = await db
+    const items = await trx
       .selectFrom('zv_checklist_items')
       .select(['id', 'label', 'checked', 'template_item_id'])
       .where('checklist_id', '=', checklistId)
       .execute();
 
     for (const scheme of schemes) {
-      const weights = await db
+      const weights = await trx
         .selectFrom('zv_checklist_scheme_weights')
         .select(['template_item_id', 'weight'])
         .where('scheme_id', '=', scheme.id)
@@ -509,74 +513,87 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
       if (assignee_user_id !== undefined) updateSet.assignee_user_id = assignee_user_id;
       if (due_at !== undefined) updateSet.due_at = new Date(due_at);
 
-      const item = await db
-        .updateTable('zv_checklist_items')
-        .set(updateSet)
-        .where('id', '=', c.req.param('itemId'))
-        .returningAll()
-        .executeTakeFirst();
-
-      if (!item) return c.json({ error: 'Item not found' }, 404);
-
-      // Auto-complete checklist if all required items are checked
-      if (checked !== undefined) {
-        const allItems = await db
-          .selectFrom('zv_checklist_items')
-          .selectAll()
-          .where('checklist_id', '=', item.checklist_id)
-          .execute();
-
-        const allRequiredChecked = allItems
-          .filter((i: any) => i.required)
-          .every((i: any) => i.checked);
-
-        const checklist = await db
-          .selectFrom('zv_checklists')
-          .selectAll()
-          .where('id', '=', item.checklist_id)
+      // Ticking an item can complete the checklist and always rescores it. The
+      // comment further down already claimed these commit together "inside the
+      // request's transaction" — they do now because this handler asks for one,
+      // rather than because of where an unrelated boundary happens to sit.
+      //
+      // Split, an item reads as ticked while the checklist it belongs to is
+      // neither complete nor rescored: the list shows every box checked and a
+      // score from before the last few.
+      const item = await db.transaction().execute(async (trx) => {
+        const item = await trx
+          .updateTable('zv_checklist_items')
+          .set(updateSet)
+          .where('id', '=', c.req.param('itemId'))
+          .returningAll()
           .executeTakeFirst();
 
-        if (allRequiredChecked && checklist && !checklist.completed_at) {
-          // Calculate time_to_complete_minutes
-          let timeToComplete: number | null = null;
-          if (checklist.created_at) {
-            timeToComplete = Math.round((now.getTime() - new Date(checklist.created_at).getTime()) / 60000);
+        if (!item) return null;
+
+        // Auto-complete checklist if all required items are checked
+        if (checked !== undefined) {
+          const allItems = await trx
+            .selectFrom('zv_checklist_items')
+            .selectAll()
+            .where('checklist_id', '=', item.checklist_id)
+            .execute();
+
+          const allRequiredChecked = allItems
+            .filter((i: any) => i.required)
+            .every((i: any) => i.checked);
+
+          const checklist = await trx
+            .selectFrom('zv_checklists')
+            .selectAll()
+            .where('id', '=', item.checklist_id)
+            .executeTakeFirst();
+
+          if (allRequiredChecked && checklist && !checklist.completed_at) {
+            // Calculate time_to_complete_minutes
+            let timeToComplete: number | null = null;
+            if (checklist.created_at) {
+              timeToComplete = Math.round((now.getTime() - new Date(checklist.created_at).getTime()) / 60000);
+            }
+
+            await trx
+              .updateTable('zv_checklists')
+              .set({
+                completed_at: now,
+                updated_at: now,
+                completed_by: user.id,
+                time_to_complete_minutes: timeToComplete,
+              })
+              .where('id', '=', item.checklist_id)
+              .where('completed_at', 'is', null)
+              .execute();
+
+          } else if (!allRequiredChecked) {
+            await trx
+              .updateTable('zv_checklists')
+              .set({ completed_at: null, updated_at: now })
+              .where('id', '=', item.checklist_id)
+              .execute();
           }
-
-          await db
-            .updateTable('zv_checklists')
-            .set({
-              completed_at: now,
-              updated_at: now,
-              completed_by: user.id,
-              time_to_complete_minutes: timeToComplete,
-            })
-            .where('id', '=', item.checklist_id)
-            .where('completed_at', 'is', null)
-            .execute();
-
-        } else if (!allRequiredChecked) {
-          await db
-            .updateTable('zv_checklists')
-            .set({ completed_at: null, updated_at: now })
-            .where('id', '=', item.checklist_id)
-            .execute();
         }
-      }
 
-      // Scored on every change, not only on the tick that completes the list.
-      //
-      // Completion fires when the last REQUIRED item is ticked, and optional
-      // items usually come after — an inspector clears the mandatory ones and
-      // then works through the rest. Scoring on that transition froze the number
-      // early: measured on an instance, a list scored 5/10 because the one
-      // required item happened to be ticked first, and ticking two more never
-      // moved it. The score reflects the state of the list, so it is recomputed
-      // whenever the state changes.
-      //
-      // Awaited, inside the request's transaction: the score and the tick that
-      // caused it commit together or not at all.
-      await scoreChecklist(item.checklist_id);
+        // Scored on every change, not only on the tick that completes the list.
+        //
+        // Completion fires when the last REQUIRED item is ticked, and optional
+        // items usually come after — an inspector clears the mandatory ones and
+        // then works through the rest. Scoring on that transition froze the number
+        // early: measured on an instance, a list scored 5/10 because the one
+        // required item happened to be ticked first, and ticking two more never
+        // moved it. The score reflects the state of the list, so it is recomputed
+        // whenever the state changes.
+        //
+        // Awaited, inside the request's transaction: the score and the tick that
+        // caused it commit together or not at all.
+        await scoreChecklist(trx, item.checklist_id);
+
+        return item;
+      });
+      if (!item) return c.json({ error: 'Item not found' }, 404);
 
       return c.json({ item });
     }
@@ -607,60 +624,72 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
         checked_at: checked ? now : null,
       };
 
-      const updatedItems = await Promise.all(
-        item_ids.map(async (itemId) => {
-          const item = await db
-            .updateTable('zv_checklist_items')
-            .set(updateSet)
-            .where('id', '=', itemId)
-            .returningAll()
-            .executeTakeFirst();
-          return item;
-        })
-      );
-
-      const validItems = updatedItems.filter(Boolean);
-
-      // Auto-complete affected checklists
-      const affectedChecklistIds = [...new Set(validItems.map((i: any) => i.checklist_id))];
-      for (const checklistId of affectedChecklistIds) {
-        const allItems = await db
-          .selectFrom('zv_checklist_items')
-          .selectAll()
-          .where('checklist_id', '=', checklistId)
-          .execute();
-
-        const allRequiredChecked = allItems
-          .filter((i: any) => i.required)
-          .every((i: any) => i.checked);
-
-        const checklist = await db
-          .selectFrom('zv_checklists')
-          .selectAll()
-          .where('id', '=', checklistId)
-          .executeTakeFirst();
-
-        if (allRequiredChecked && checklist && !checklist.completed_at) {
-          let timeToComplete: number | null = null;
-          if (checklist.created_at) {
-            timeToComplete = Math.round((now.getTime() - new Date(checklist.created_at).getTime()) / 60000);
-          }
-          await db
-            .updateTable('zv_checklists')
-            .set({ completed_at: now, updated_at: now, completed_by: user.id, time_to_complete_minutes: timeToComplete })
-            .where('id', '=', checklistId)
-            .where('completed_at', 'is', null)
-            .execute();
-
-          await scoreChecklist(checklistId);
-        } else if (!allRequiredChecked) {
-          await db
-            .updateTable('zv_checklists')
-            .set({ completed_at: null, updated_at: now })
-            .where('id', '=', checklistId)
-            .execute();
+      // A bulk tick is one action from the user's point of view — they select
+      // twenty items and check them. Half of them landing, with the checklists
+      // those items belong to left uncompleted and unscored, is a list that
+      // disagrees with itself and no record of which half was meant.
+      const validItems = await db.transaction().execute(async (trx) => {
+        // Sequential, not `Promise.all`. A transaction is one connection, and
+        // Postgres runs one statement at a time on it — the parallel version only
+        // looked concurrent while the driver queued it, and it made the failure
+        // order impossible to reason about.
+        const updatedItems = [];
+        for (const itemId of item_ids) {
+          updatedItems.push(
+            await trx
+              .updateTable('zv_checklist_items')
+              .set(updateSet)
+              .where('id', '=', itemId)
+              .returningAll()
+              .executeTakeFirst(),
+          );
         }
-      }
+
+        const validItems = updatedItems.filter(Boolean);
+
+        // Auto-complete affected checklists
+        const affectedChecklistIds = [...new Set(validItems.map((i: any) => i.checklist_id))];
+        for (const checklistId of affectedChecklistIds) {
+          const allItems = await trx
+            .selectFrom('zv_checklist_items')
+            .selectAll()
+            .where('checklist_id', '=', checklistId)
+            .execute();
+
+          const allRequiredChecked = allItems
+            .filter((i: any) => i.required)
+            .every((i: any) => i.checked);
+
+          const checklist = await trx
+            .selectFrom('zv_checklists')
+            .selectAll()
+            .where('id', '=', checklistId)
+            .executeTakeFirst();
+
+          if (allRequiredChecked && checklist && !checklist.completed_at) {
+            let timeToComplete: number | null = null;
+            if (checklist.created_at) {
+              timeToComplete = Math.round((now.getTime() - new Date(checklist.created_at).getTime()) / 60000);
+            }
+            await trx
+              .updateTable('zv_checklists')
+              .set({ completed_at: now, updated_at: now, completed_by: user.id, time_to_complete_minutes: timeToComplete })
+              .where('id', '=', checklistId)
+              .where('completed_at', 'is', null)
+              .execute();
+
+            await scoreChecklist(trx, checklistId);
+          } else if (!allRequiredChecked) {
+            await trx
+              .updateTable('zv_checklists')
+              .set({ completed_at: null, updated_at: now })
+              .where('id', '=', checklistId)
+              .execute();
+          }
+        }
+
+        return validItems;
+      });
 
       return c.json({ updated: validItems.length, items: validItems });
     }
@@ -806,53 +835,66 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
 
         if (!templateData) continue;
 
-        // Create checklist instance
-        const checklist = await db
-          .insertInto('zv_checklists')
-          .values({
-            template_id: schedule.template_id,
-            collection: schedule.collection,
-            record_id: schedule.record_id,
-            name: `${templateData.name} (${now.toLocaleDateString()})`,
-            created_by: schedule.created_by,
-          })
-          .returningAll()
-          .executeTakeFirst();
+        // One transaction per schedule, not one around the sweep: this runs from
+        // a scheduler over every due recurrence, and a failure on the fifth must
+        // not undo the four checklists already created.
+        //
+        // Within a schedule the three writes are inseparable. A checklist
+        // created without its items is an empty inspection form somebody is
+        // expected to complete; and if `next_run_at` is not advanced, the next
+        // trigger creates the whole thing AGAIN — duplicate checklists for the
+        // same day, with the earlier one already partly filled in.
+        const checklist = await db.transaction().execute(async (trx) => {
+          // Create checklist instance
+          const checklist = await trx
+            .insertInto('zv_checklists')
+            .values({
+              template_id: schedule.template_id,
+              collection: schedule.collection,
+              record_id: schedule.record_id,
+              name: `${templateData.name} (${now.toLocaleDateString()})`,
+              created_by: schedule.created_by,
+            })
+            .returningAll()
+            .executeTakeFirst();
 
-        if (templateItems.length > 0) {
-          await db.insertInto('zv_checklist_items')
-            .values(templateItems.map((item: any, i: number) => ({
-              checklist_id: checklist.id,
-              label: item.label,
-              description: item.description,
-              required: item.required ?? false,
-              order_idx: item.order_idx ?? i,
-            })))
+          if (templateItems.length > 0) {
+            await trx.insertInto('zv_checklist_items')
+              .values(templateItems.map((item: any, i: number) => ({
+                checklist_id: checklist.id,
+                label: item.label,
+                description: item.description,
+                required: item.required ?? false,
+                order_idx: item.order_idx ?? i,
+              })))
+              .execute();
+          }
+
+          // Calculate next_run_at based on frequency
+          const nextRun = new Date(schedule.next_run_at);
+          switch (schedule.frequency) {
+            case 'daily':
+              nextRun.setDate(nextRun.getDate() + 1);
+              break;
+            case 'weekly':
+              nextRun.setDate(nextRun.getDate() + 7);
+              break;
+            case 'monthly':
+              nextRun.setMonth(nextRun.getMonth() + 1);
+              break;
+            case 'quarterly':
+              nextRun.setMonth(nextRun.getMonth() + 3);
+              break;
+          }
+
+          await trx
+            .updateTable('zv_checklist_recurrence')
+            .set({ last_run_at: now, next_run_at: nextRun })
+            .where('id', '=', schedule.id)
             .execute();
-        }
 
-        // Calculate next_run_at based on frequency
-        const nextRun = new Date(schedule.next_run_at);
-        switch (schedule.frequency) {
-          case 'daily':
-            nextRun.setDate(nextRun.getDate() + 1);
-            break;
-          case 'weekly':
-            nextRun.setDate(nextRun.getDate() + 7);
-            break;
-          case 'monthly':
-            nextRun.setMonth(nextRun.getMonth() + 1);
-            break;
-          case 'quarterly':
-            nextRun.setMonth(nextRun.getMonth() + 3);
-            break;
-        }
-
-        await db
-          .updateTable('zv_checklist_recurrence')
-          .set({ last_run_at: now, next_run_at: nextRun })
-          .where('id', '=', schedule.id)
-          .execute();
+          return checklist;
+        });
 
         created.push({ schedule_id: schedule.id, checklist_id: checklist.id });
       } catch (err: any) {
