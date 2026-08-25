@@ -203,27 +203,38 @@ export function migratorRoutes(ctx: ExtensionContext): Hono {
         .filter(({ col }) => targetCols.has(col) && IDENT.test(col));
       const skipped = fields.filter((f) => !mapping.some((m) => m.f === f));
 
+      // The imported rows and the run's `completed` stamp go together. A run
+      // stamped completed over a half-imported table is a migration nobody
+      // re-runs — the operator reads `imported_rows` and moves on, while the
+      // rows that never landed are gone with no second attempt coming.
       let imported = 0;
-      for (const row of rows) {
-        const cols = mapping.filter(({ f }) => row[f] !== undefined && row[f] !== null);
-        if (cols.length === 0) continue;
-        const colSql = sql.join(cols.map(({ col }) => sql.ref(col)), sql`, `);
-        const valSql = sql.join(cols.map(({ f }) => sql`${row[f]}`), sql`, `);
-        await sql`INSERT INTO ${sql.table(target_collection)} (${colSql}) VALUES (${valSql})`.execute(db);
-        imported++;
-      }
+      await db.transaction().execute(async (trx) => {
+        for (const row of rows) {
+          const cols = mapping.filter(({ f }) => row[f] !== undefined && row[f] !== null);
+          if (cols.length === 0) continue;
+          const colSql = sql.join(cols.map(({ col }) => sql.ref(col)), sql`, `);
+          const valSql = sql.join(cols.map(({ f }) => sql`${row[f]}`), sql`, `);
+          await sql`INSERT INTO ${sql.table(target_collection)} (${colSql}) VALUES (${valSql})`.execute(trx);
+          imported++;
+        }
 
-      await sql`
-        UPDATE zv_migrator_runs
-        SET status = 'completed', total_rows = ${rows.length}, imported_rows = ${imported}, completed_at = NOW()
-        WHERE id = ${runId}
-      `.execute(db);
+        await sql`
+          UPDATE zv_migrator_runs
+          SET status = 'completed', total_rows = ${rows.length}, imported_rows = ${imported}, completed_at = NOW()
+          WHERE id = ${runId}
+        `.execute(trx);
+      });
       return c.json({ run_id: runId, status: 'completed', total_rows: rows.length, imported_rows: imported, skipped_fields: skipped });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      // The `.catch(() => undefined)` that used to hang off this statement is
+      // gone. If the run failed on a SQL error the surrounding transaction is
+      // already aborted and the stamp cannot land — but a migration that failed
+      // and says nothing is one the operator believes succeeded, which is the
+      // worst of the three outcomes. Let it surface.
       await sql`
         UPDATE zv_migrator_runs SET status = 'failed', error = ${msg}, completed_at = NOW() WHERE id = ${runId}
-      `.execute(db).catch(() => undefined);
+      `.execute(db);
       return c.json({ run_id: runId, status: 'failed', error: msg }, 502);
     }
   });

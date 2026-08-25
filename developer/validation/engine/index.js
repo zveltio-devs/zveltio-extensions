@@ -1732,7 +1732,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
+// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.8.0+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -19768,16 +19768,18 @@ Description: ${description}`;
         continue;
       }
       try {
-        await db.insertInto("zv_validation_rules").values({
-          collection,
-          field_name: rule.field_name,
-          rule_type: rule.rule_type,
-          nl_description: rule.nl_description || null,
-          rule_config: JSON.stringify(rule.rule_config),
-          error_message: rule.error_message,
-          is_active: true,
-          created_by: user.id
-        }).execute();
+        await db.transaction().execute(async (trx) => {
+          await trx.insertInto("zv_validation_rules").values({
+            collection,
+            field_name: rule.field_name,
+            rule_type: rule.rule_type,
+            nl_description: rule.nl_description || null,
+            rule_config: JSON.stringify(rule.rule_config),
+            error_message: rule.error_message,
+            is_active: true,
+            created_by: user.id
+          }).execute();
+        });
         importedCount++;
       } catch (err) {
         failedCount++;
