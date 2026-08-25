@@ -101,32 +101,50 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
     if (refusal) return c.json({ error: refusal }, 400);
 
     try {
-      const tables = await introspectSchema(db, schema, exclude, false);
-      const imported = tables.filter((t: any) => t.isNew).length;
-      const updated = tables.filter((t: any) => !t.isNew).length;
-      const skipped = 0;
+      // Importing the tables and recording that the scan happened go together.
+      // A history row saying `completed` over a half-imported schema is worse
+      // than no row: the operator stops looking.
+      const { tables, imported, updated } = await db.transaction().execute(async (trx) => {
+        const found = await introspectSchema(trx, schema, exclude, false);
+        const imp = found.filter((t: any) => t.isNew).length;
+        const upd = found.filter((t: any) => !t.isNew).length;
+        const skipped = 0;
 
-      // Record to scan history
-      await sql`
-        INSERT INTO zvd_byod_scan_history
-          (schema_name, tables_found, tables_imported, tables_updated,
-           tables_skipped, status, triggered_by, created_by)
-        VALUES
-          (${schema}, ${tables.length}, ${imported}, ${updated},
-           ${skipped}, 'completed', 'manual', ${user.id})
-      `.execute(db);
+        // Record to scan history
+        await sql`
+          INSERT INTO zvd_byod_scan_history
+            (schema_name, tables_found, tables_imported, tables_updated,
+             tables_skipped, status, triggered_by, created_by)
+          VALUES
+            (${schema}, ${found.length}, ${imp}, ${upd},
+             ${skipped}, 'completed', 'manual', ${user.id})
+        `.execute(trx);
+        return { tables: found, imported: imp, updated: upd };
+      });
 
       return c.json({ imported, updated, tables });
     } catch (err: any) {
       // Record failed scan
-      await sql`
-        INSERT INTO zvd_byod_scan_history
-          (schema_name, tables_found, tables_imported, tables_updated,
-           tables_skipped, status, error, triggered_by, created_by)
-        VALUES
-          (${schema}, 0, 0, 0, 0, 'failed', ${err.message || 'Unknown error'},
-           'manual', ${user.id})
-      `.execute(db).catch(() => {});
+      // Not swallowed. If the scan failed on a SQL error the surrounding
+      // transaction is already aborted and this insert cannot land — but that is
+      // worth SAYING, because a failed scan recorded nowhere is a scan the
+      // operator believes never ran. The silent `.catch(() => {})` here meant
+      // exactly that.
+      try {
+        await sql`
+          INSERT INTO zvd_byod_scan_history
+            (schema_name, tables_found, tables_imported, tables_updated,
+             tables_skipped, status, error, triggered_by, created_by)
+          VALUES
+            (${schema}, 0, 0, 0, 0, 'failed', ${err.message || 'Unknown error'},
+             'manual', ${user.id})
+        `.execute(db);
+      } catch (histErr) {
+        console.error(
+          '[byod] scan failed AND the failure could not be recorded:',
+          (histErr as Error).message,
+        );
+      }
       return c.json({ error: err.message || 'Introspection failed' }, 500);
     }
   });
@@ -243,43 +261,60 @@ export function introspectRoutes(ctx: ExtensionContext): Hono {
     const exclude: string[] = profile.exclude_patterns || [];
 
     try {
-      const tables = await introspectSchema(db, schema, exclude, false);
-      const imported = tables.filter((t: any) => t.isNew).length;
-      const updated = tables.filter((t: any) => !t.isNew).length;
+      // The import, the profile's sync timestamps and the history row are one
+      // scheduled scan. `next_sync_at` written without the history leaves the
+      // profile looking up to date over a scan nobody can inspect; the history
+      // without the timestamps means the same scan runs again on the next tick.
+      const { imported, updated, tables, histRow } = await db.transaction().execute(async (trx) => {
+        const tables = await introspectSchema(trx, schema, exclude, false);
+        const imported = tables.filter((t: any) => t.isNew).length;
+        const updated = tables.filter((t: any) => !t.isNew).length;
 
-      const now = new Date();
-      const nextSync = profile.auto_sync
-        ? new Date(Date.now() + (profile.sync_interval_hours || 24) * 3_600_000)
-        : null;
+        const now = new Date();
+        const nextSync = profile.auto_sync
+          ? new Date(Date.now() + (profile.sync_interval_hours || 24) * 3_600_000)
+          : null;
 
-      // Update profile last/next sync
-      await sql`
-        UPDATE zvd_byod_scan_profiles
-        SET last_sync_at = ${now}, next_sync_at = ${nextSync}, updated_at = ${now}
-        WHERE id = ${id}
-      `.execute(db);
+        // Update profile last/next sync
+        await sql`
+          UPDATE zvd_byod_scan_profiles
+          SET last_sync_at = ${now}, next_sync_at = ${nextSync}, updated_at = ${now}
+          WHERE id = ${id}
+        `.execute(trx);
 
-      // Insert history
-      const histRow = await sql<any>`
-        INSERT INTO zvd_byod_scan_history
-          (profile_id, schema_name, tables_found, tables_imported, tables_updated,
-           tables_skipped, status, triggered_by, created_by)
-        VALUES
-          (${id}, ${schema}, ${tables.length}, ${imported}, ${updated},
-           0, 'completed', 'profile', ${user.id})
-        RETURNING *
-      `.execute(db);
+        // Insert history
+        const histRow = await sql<any>`
+          INSERT INTO zvd_byod_scan_history
+            (profile_id, schema_name, tables_found, tables_imported, tables_updated,
+             tables_skipped, status, triggered_by, created_by)
+          VALUES
+            (${id}, ${schema}, ${tables.length}, ${imported}, ${updated},
+             0, 'completed', 'profile', ${user.id})
+          RETURNING *
+        `.execute(trx);
+
+        return { imported, updated, tables, histRow };
+      });
 
       return c.json({ imported, updated, tables, history: histRow.rows[0] });
     } catch (err: any) {
-      await sql`
-        INSERT INTO zvd_byod_scan_history
-          (profile_id, schema_name, tables_found, tables_imported, tables_updated,
-           tables_skipped, status, error, triggered_by, created_by)
-        VALUES
-          (${id}, ${schema}, 0, 0, 0, 0, 'failed',
-           ${err.message || 'Unknown error'}, 'profile', ${user.id})
-      `.execute(db).catch(() => {});
+      // Not swallowed — see the note on POST /import. A failed scheduled scan
+      // recorded nowhere is a scan the operator believes never ran.
+      try {
+        await sql`
+          INSERT INTO zvd_byod_scan_history
+            (profile_id, schema_name, tables_found, tables_imported, tables_updated,
+             tables_skipped, status, error, triggered_by, created_by)
+          VALUES
+            (${id}, ${schema}, 0, 0, 0, 0, 'failed',
+             ${err.message || 'Unknown error'}, 'profile', ${user.id})
+        `.execute(db);
+      } catch (histErr) {
+        console.error(
+          '[byod] scheduled scan failed AND the failure could not be recorded:',
+          (histErr as Error).message,
+        );
+      }
       return c.json({ error: err.message || 'Scan failed' }, 500);
     }
   });
