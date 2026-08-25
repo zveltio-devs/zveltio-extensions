@@ -141,20 +141,26 @@ export function helpdeskRoutes(ctx: ExtensionContext): Hono {
         slaDueAt = new Date(Date.now() + slaMs).toISOString();
       }
     }
-    const row = await sql`
-      INSERT INTO zvd_tickets (number, title, description, priority, category_id, requester_id, requester_email, requester_name, assignee_id, channel, sla_due_at, tags, created_by)
-      VALUES (${number}, ${d.title}, ${d.description}, ${d.priority}, ${d.category_id ?? null},
-        ${user.id}, ${d.requester_email}, ${d.requester_name ?? user.name ?? ''},
-        ${d.assignee_id ?? null}, ${d.channel}, ${slaDueAt},
-        ${d.tags}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    const ticketId = (row.rows[0] as any).id;
-    // Add initial message
-    await sql`
-      INSERT INTO zvd_ticket_messages (ticket_id, author_id, author_name, author_email, content, is_internal)
-      VALUES (${ticketId}, ${user.id}, ${d.requester_name ?? user.name ?? ''}, ${d.requester_email}, ${d.description}, false)
-    `.execute(db);
+    // The ticket and its opening message are the same report. A ticket whose
+    // thread starts empty reads as one nobody described, and the agent answers
+    // a title with no question under it.
+    const row = await db.transaction().execute(async (trx) => {
+      const created = await sql`
+        INSERT INTO zvd_tickets (number, title, description, priority, category_id, requester_id, requester_email, requester_name, assignee_id, channel, sla_due_at, tags, created_by)
+        VALUES (${number}, ${d.title}, ${d.description}, ${d.priority}, ${d.category_id ?? null},
+          ${user.id}, ${d.requester_email}, ${d.requester_name ?? user.name ?? ''},
+          ${d.assignee_id ?? null}, ${d.channel}, ${slaDueAt},
+          ${d.tags}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      const ticketId = (created.rows[0] as any).id;
+      // Add initial message
+      await sql`
+        INSERT INTO zvd_ticket_messages (ticket_id, author_id, author_name, author_email, content, is_internal)
+        VALUES (${ticketId}, ${user.id}, ${d.requester_name ?? user.name ?? ''}, ${d.requester_email}, ${d.description}, false)
+      `.execute(trx);
+      return created;
+    });
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -194,19 +200,26 @@ export function helpdeskRoutes(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     const ticket = await sql`SELECT status FROM zvd_tickets WHERE id = ${c.req.param('id')}`.execute(db);
     if (!ticket.rows.length) return c.json({ error: 'Not found' }, 404);
-    const row = await sql`
-      INSERT INTO zvd_ticket_messages (ticket_id, author_id, author_name, author_email, content, is_internal)
-      VALUES (${c.req.param('id')}, ${user.id}, ${d.author_name ?? user.name ?? ''}, ${d.author_email ?? user.email ?? ''}, ${d.content}, ${d.is_internal})
-      RETURNING *
-    `.execute(db);
-    // Set first response time if agent replies
-    await sql`
-      UPDATE zvd_tickets SET
-        first_response_at = CASE WHEN first_response_at IS NULL AND ${!d.is_internal} THEN NOW() ELSE first_response_at END,
-        status = CASE WHEN status = 'open' AND ${!d.is_internal} THEN 'in_progress' ELSE status END,
-        updated_at = NOW()
-      WHERE id = ${c.req.param('id')}
-    `.execute(db);
+    // `first_response_at` is the number the SLA is measured on, and it is stamped
+    // by the very reply it measures. A message that lands without its stamp
+    // leaves the ticket looking unanswered forever — every SLA report counts it
+    // as a breach, and the escalation job below picks it up on the next run.
+    const row = await db.transaction().execute(async (trx) => {
+      const inserted = await sql`
+        INSERT INTO zvd_ticket_messages (ticket_id, author_id, author_name, author_email, content, is_internal)
+        VALUES (${c.req.param('id')}, ${user.id}, ${d.author_name ?? user.name ?? ''}, ${d.author_email ?? user.email ?? ''}, ${d.content}, ${d.is_internal})
+        RETURNING *
+      `.execute(trx);
+      // Set first response time if agent replies
+      await sql`
+        UPDATE zvd_tickets SET
+          first_response_at = CASE WHEN first_response_at IS NULL AND ${!d.is_internal} THEN NOW() ELSE first_response_at END,
+          status = CASE WHEN status = 'open' AND ${!d.is_internal} THEN 'in_progress' ELSE status END,
+          updated_at = NOW()
+        WHERE id = ${c.req.param('id')}
+      `.execute(trx);
+      return inserted;
+    });
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -282,18 +295,26 @@ export function helpdeskRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
     if (d.into_ticket_id === c.req.param('id')) return c.json({ error: 'Cannot merge ticket into itself' }, 400);
-    // Move all messages to target ticket
-    await sql`UPDATE zvd_ticket_messages SET ticket_id = ${d.into_ticket_id} WHERE ticket_id = ${c.req.param('id')}`.execute(db);
-    // Mark source ticket as merged
-    await sql`
-      UPDATE zvd_tickets SET is_merged = true, merged_into_id = ${d.into_ticket_id}, status = 'closed', closed_at = NOW(), updated_at = NOW()
-      WHERE id = ${c.req.param('id')}
-    `.execute(db);
-    // Add merge note to target
-    await sql`
-      INSERT INTO zvd_ticket_messages (ticket_id, author_id, author_name, author_email, content, is_internal)
-      VALUES (${d.into_ticket_id}, ${user.id}, 'System', '', ${`Ticket ${c.req.param('id')} was merged into this ticket. ${d.reason ?? ''}`}, true)
-    `.execute(db);
+    // The worst order in this module. The first statement REPARENTS every message
+    // on the source ticket — it does not copy them. Interrupted after it, the
+    // source ticket has lost its entire conversation and is still open, the
+    // messages are sitting on another ticket with no note saying why they are
+    // there, and `merged_into_id` is null so nothing records the link. There is
+    // no query that reconstructs which messages came from where.
+    await db.transaction().execute(async (trx) => {
+      // Move all messages to target ticket
+      await sql`UPDATE zvd_ticket_messages SET ticket_id = ${d.into_ticket_id} WHERE ticket_id = ${c.req.param('id')}`.execute(trx);
+      // Mark source ticket as merged
+      await sql`
+        UPDATE zvd_tickets SET is_merged = true, merged_into_id = ${d.into_ticket_id}, status = 'closed', closed_at = NOW(), updated_at = NOW()
+        WHERE id = ${c.req.param('id')}
+      `.execute(trx);
+      // Add merge note to target
+      await sql`
+        INSERT INTO zvd_ticket_messages (ticket_id, author_id, author_name, author_email, content, is_internal)
+        VALUES (${d.into_ticket_id}, ${user.id}, 'System', '', ${`Ticket ${c.req.param('id')} was merged into this ticket. ${d.reason ?? ''}`}, true)
+      `.execute(trx);
+    });
     return c.json({ success: true });
   });
 
@@ -353,20 +374,32 @@ export function helpdeskRoutes(ctx: ExtensionContext): Hono {
         `.execute(db);
       }
       for (const t of tickets.rows as any[]) {
-        await sql`
-          INSERT INTO zvd_ticket_escalations (ticket_id, rule_id, reason)
-          VALUES (${t.id}, ${rule.id}, ${rule.condition_type + ' after ' + rule.condition_hours + 'h'})
-          ON CONFLICT DO NOTHING
-        `.execute(db);
-        if (rule.action_assign_to) {
-          await sql`UPDATE zvd_tickets SET assignee_id = ${rule.action_assign_to}, updated_at = NOW() WHERE id = ${t.id}`.execute(db);
-        }
-        if (rule.action_priority) {
-          await sql`UPDATE zvd_tickets SET priority = ${rule.action_priority}, updated_at = NOW() WHERE id = ${t.id}`.execute(db);
-        }
-        if (rule.condition_type === 'sla_breach') {
-          await sql`UPDATE zvd_tickets SET sla_breached = true, updated_at = NOW() WHERE id = ${t.id}`.execute(db);
-        }
+        // One transaction per ticket, deliberately, NOT one around the sweep.
+        // This runs from a cron job over every open ticket, so a single
+        // transaction would hold write locks on the whole table for the length
+        // of the run and undo the work already done if the last ticket failed.
+        //
+        // Per ticket is where atomicity actually matters: the escalation record
+        // is guarded by ON CONFLICT DO NOTHING, so once it exists this rule
+        // never fires for this ticket again. Written without the reassignment
+        // and the priority bump, the escalation is recorded as done and the
+        // ticket is left exactly as it was — it can never be escalated again.
+        await db.transaction().execute(async (trx) => {
+          await sql`
+            INSERT INTO zvd_ticket_escalations (ticket_id, rule_id, reason)
+            VALUES (${t.id}, ${rule.id}, ${rule.condition_type + ' after ' + rule.condition_hours + 'h'})
+            ON CONFLICT DO NOTHING
+          `.execute(trx);
+          if (rule.action_assign_to) {
+            await sql`UPDATE zvd_tickets SET assignee_id = ${rule.action_assign_to}, updated_at = NOW() WHERE id = ${t.id}`.execute(trx);
+          }
+          if (rule.action_priority) {
+            await sql`UPDATE zvd_tickets SET priority = ${rule.action_priority}, updated_at = NOW() WHERE id = ${t.id}`.execute(trx);
+          }
+          if (rule.condition_type === 'sla_breach') {
+            await sql`UPDATE zvd_tickets SET sla_breached = true, updated_at = NOW() WHERE id = ${t.id}`.execute(trx);
+          }
+        });
         escalated++;
       }
     }

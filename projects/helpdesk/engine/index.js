@@ -1732,7 +1732,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
+// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.8.0+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -19609,19 +19609,22 @@ function helpdeskRoutes(ctx) {
         slaDueAt = new Date(Date.now() + slaMs).toISOString();
       }
     }
-    const row = await sql`
-      INSERT INTO zvd_tickets (number, title, description, priority, category_id, requester_id, requester_email, requester_name, assignee_id, channel, sla_due_at, tags, created_by)
-      VALUES (${number4}, ${d.title}, ${d.description}, ${d.priority}, ${d.category_id ?? null},
-        ${user.id}, ${d.requester_email}, ${d.requester_name ?? user.name ?? ""},
-        ${d.assignee_id ?? null}, ${d.channel}, ${slaDueAt},
-        ${d.tags}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    const ticketId = row.rows[0].id;
-    await sql`
-      INSERT INTO zvd_ticket_messages (ticket_id, author_id, author_name, author_email, content, is_internal)
-      VALUES (${ticketId}, ${user.id}, ${d.requester_name ?? user.name ?? ""}, ${d.requester_email}, ${d.description}, false)
-    `.execute(db);
+    const row = await db.transaction().execute(async (trx) => {
+      const created = await sql`
+        INSERT INTO zvd_tickets (number, title, description, priority, category_id, requester_id, requester_email, requester_name, assignee_id, channel, sla_due_at, tags, created_by)
+        VALUES (${number4}, ${d.title}, ${d.description}, ${d.priority}, ${d.category_id ?? null},
+          ${user.id}, ${d.requester_email}, ${d.requester_name ?? user.name ?? ""},
+          ${d.assignee_id ?? null}, ${d.channel}, ${slaDueAt},
+          ${d.tags}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      const ticketId = created.rows[0].id;
+      await sql`
+        INSERT INTO zvd_ticket_messages (ticket_id, author_id, author_name, author_email, content, is_internal)
+        VALUES (${ticketId}, ${user.id}, ${d.requester_name ?? user.name ?? ""}, ${d.requester_email}, ${d.description}, false)
+      `.execute(trx);
+      return created;
+    });
     return c.json({ data: row.rows[0] }, 201);
   });
   app.patch("/tickets/:id", zValidator("json", exports_external.object({
@@ -19660,18 +19663,21 @@ function helpdeskRoutes(ctx) {
     const ticket = await sql`SELECT status FROM zvd_tickets WHERE id = ${c.req.param("id")}`.execute(db);
     if (!ticket.rows.length)
       return c.json({ error: "Not found" }, 404);
-    const row = await sql`
-      INSERT INTO zvd_ticket_messages (ticket_id, author_id, author_name, author_email, content, is_internal)
-      VALUES (${c.req.param("id")}, ${user.id}, ${d.author_name ?? user.name ?? ""}, ${d.author_email ?? user.email ?? ""}, ${d.content}, ${d.is_internal})
-      RETURNING *
-    `.execute(db);
-    await sql`
-      UPDATE zvd_tickets SET
-        first_response_at = CASE WHEN first_response_at IS NULL AND ${!d.is_internal} THEN NOW() ELSE first_response_at END,
-        status = CASE WHEN status = 'open' AND ${!d.is_internal} THEN 'in_progress' ELSE status END,
-        updated_at = NOW()
-      WHERE id = ${c.req.param("id")}
-    `.execute(db);
+    const row = await db.transaction().execute(async (trx) => {
+      const inserted = await sql`
+        INSERT INTO zvd_ticket_messages (ticket_id, author_id, author_name, author_email, content, is_internal)
+        VALUES (${c.req.param("id")}, ${user.id}, ${d.author_name ?? user.name ?? ""}, ${d.author_email ?? user.email ?? ""}, ${d.content}, ${d.is_internal})
+        RETURNING *
+      `.execute(trx);
+      await sql`
+        UPDATE zvd_tickets SET
+          first_response_at = CASE WHEN first_response_at IS NULL AND ${!d.is_internal} THEN NOW() ELSE first_response_at END,
+          status = CASE WHEN status = 'open' AND ${!d.is_internal} THEN 'in_progress' ELSE status END,
+          updated_at = NOW()
+        WHERE id = ${c.req.param("id")}
+      `.execute(trx);
+      return inserted;
+    });
     return c.json({ data: row.rows[0] }, 201);
   });
   app.get("/canned-responses", async (c) => {
@@ -19740,15 +19746,17 @@ function helpdeskRoutes(ctx) {
     const d = c.req.valid("json");
     if (d.into_ticket_id === c.req.param("id"))
       return c.json({ error: "Cannot merge ticket into itself" }, 400);
-    await sql`UPDATE zvd_ticket_messages SET ticket_id = ${d.into_ticket_id} WHERE ticket_id = ${c.req.param("id")}`.execute(db);
-    await sql`
-      UPDATE zvd_tickets SET is_merged = true, merged_into_id = ${d.into_ticket_id}, status = 'closed', closed_at = NOW(), updated_at = NOW()
-      WHERE id = ${c.req.param("id")}
-    `.execute(db);
-    await sql`
-      INSERT INTO zvd_ticket_messages (ticket_id, author_id, author_name, author_email, content, is_internal)
-      VALUES (${d.into_ticket_id}, ${user.id}, 'System', '', ${`Ticket ${c.req.param("id")} was merged into this ticket. ${d.reason ?? ""}`}, true)
-    `.execute(db);
+    await db.transaction().execute(async (trx) => {
+      await sql`UPDATE zvd_ticket_messages SET ticket_id = ${d.into_ticket_id} WHERE ticket_id = ${c.req.param("id")}`.execute(trx);
+      await sql`
+        UPDATE zvd_tickets SET is_merged = true, merged_into_id = ${d.into_ticket_id}, status = 'closed', closed_at = NOW(), updated_at = NOW()
+        WHERE id = ${c.req.param("id")}
+      `.execute(trx);
+      await sql`
+        INSERT INTO zvd_ticket_messages (ticket_id, author_id, author_name, author_email, content, is_internal)
+        VALUES (${d.into_ticket_id}, ${user.id}, 'System', '', ${`Ticket ${c.req.param("id")} was merged into this ticket. ${d.reason ?? ""}`}, true)
+      `.execute(trx);
+    });
     return c.json({ success: true });
   });
   app.get("/escalation-rules", async (c) => {
@@ -19803,20 +19811,22 @@ function helpdeskRoutes(ctx) {
         `.execute(db);
       }
       for (const t of tickets.rows) {
-        await sql`
-          INSERT INTO zvd_ticket_escalations (ticket_id, rule_id, reason)
-          VALUES (${t.id}, ${rule.id}, ${rule.condition_type + " after " + rule.condition_hours + "h"})
-          ON CONFLICT DO NOTHING
-        `.execute(db);
-        if (rule.action_assign_to) {
-          await sql`UPDATE zvd_tickets SET assignee_id = ${rule.action_assign_to}, updated_at = NOW() WHERE id = ${t.id}`.execute(db);
-        }
-        if (rule.action_priority) {
-          await sql`UPDATE zvd_tickets SET priority = ${rule.action_priority}, updated_at = NOW() WHERE id = ${t.id}`.execute(db);
-        }
-        if (rule.condition_type === "sla_breach") {
-          await sql`UPDATE zvd_tickets SET sla_breached = true, updated_at = NOW() WHERE id = ${t.id}`.execute(db);
-        }
+        await db.transaction().execute(async (trx) => {
+          await sql`
+            INSERT INTO zvd_ticket_escalations (ticket_id, rule_id, reason)
+            VALUES (${t.id}, ${rule.id}, ${rule.condition_type + " after " + rule.condition_hours + "h"})
+            ON CONFLICT DO NOTHING
+          `.execute(trx);
+          if (rule.action_assign_to) {
+            await sql`UPDATE zvd_tickets SET assignee_id = ${rule.action_assign_to}, updated_at = NOW() WHERE id = ${t.id}`.execute(trx);
+          }
+          if (rule.action_priority) {
+            await sql`UPDATE zvd_tickets SET priority = ${rule.action_priority}, updated_at = NOW() WHERE id = ${t.id}`.execute(trx);
+          }
+          if (rule.condition_type === "sla_breach") {
+            await sql`UPDATE zvd_tickets SET sla_breached = true, updated_at = NOW() WHERE id = ${t.id}`.execute(trx);
+          }
+        });
         escalated++;
       }
     }
