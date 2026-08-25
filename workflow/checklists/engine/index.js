@@ -1732,7 +1732,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
+// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.8.0+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -19588,20 +19588,23 @@ function checklistsRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const { name, description, collection, items } = c.req.valid("json");
-    const template = await db.insertInto("zv_checklist_templates").values({ name, description, collection: collection || null }).returningAll().executeTakeFirst();
-    if (items.length > 0) {
-      await db.insertInto("zv_checklist_template_items").values(items.map((item, i) => ({
-        template_id: template.id,
-        label: item.label,
-        description: item.description,
-        required: item.required,
-        order_idx: item.order_idx ?? i,
-        time_estimate_minutes: item.time_estimate_minutes ?? null,
-        assignee_role: item.assignee_role ?? null,
-        condition_item_label: item.condition_item_label ?? null,
-        condition_checked: item.condition_checked ?? null
-      }))).execute();
-    }
+    const template = await db.transaction().execute(async (trx) => {
+      const created = await trx.insertInto("zv_checklist_templates").values({ name, description, collection: collection || null }).returningAll().executeTakeFirst();
+      if (items.length > 0) {
+        await trx.insertInto("zv_checklist_template_items").values(items.map((item, i) => ({
+          template_id: created.id,
+          label: item.label,
+          description: item.description,
+          required: item.required,
+          order_idx: item.order_idx ?? i,
+          time_estimate_minutes: item.time_estimate_minutes ?? null,
+          assignee_role: item.assignee_role ?? null,
+          condition_item_label: item.condition_item_label ?? null,
+          condition_checked: item.condition_checked ?? null
+        }))).execute();
+      }
+      return created;
+    });
     const templateItems = await db.selectFrom("zv_checklist_template_items").selectAll().where("template_id", "=", template.id).orderBy("order_idx", "asc").execute();
     return c.json({ template: { ...template, items: templateItems } }, 201);
   });
@@ -19648,23 +19651,26 @@ function checklistsRoutes(ctx) {
       updateFields.collection = fields.collection;
     if (fields.is_active !== undefined)
       updateFields.is_active = fields.is_active;
-    const template = await db.updateTable("zv_checklist_templates").set(updateFields).where("id", "=", id).returningAll().executeTakeFirst();
-    if (items !== undefined) {
-      await db.deleteFrom("zv_checklist_template_items").where("template_id", "=", id).execute();
-      if (items.length > 0) {
-        await db.insertInto("zv_checklist_template_items").values(items.map((item, i) => ({
-          template_id: id,
-          label: item.label,
-          description: item.description,
-          required: item.required,
-          order_idx: item.order_idx ?? i,
-          time_estimate_minutes: item.time_estimate_minutes ?? null,
-          assignee_role: item.assignee_role ?? null,
-          condition_item_label: item.condition_item_label ?? null,
-          condition_checked: item.condition_checked ?? null
-        }))).execute();
+    const template = await db.transaction().execute(async (trx) => {
+      const updated = await trx.updateTable("zv_checklist_templates").set(updateFields).where("id", "=", id).returningAll().executeTakeFirst();
+      if (items !== undefined) {
+        await trx.deleteFrom("zv_checklist_template_items").where("template_id", "=", id).execute();
+        if (items.length > 0) {
+          await trx.insertInto("zv_checklist_template_items").values(items.map((item, i) => ({
+            template_id: id,
+            label: item.label,
+            description: item.description,
+            required: item.required,
+            order_idx: item.order_idx ?? i,
+            time_estimate_minutes: item.time_estimate_minutes ?? null,
+            assignee_role: item.assignee_role ?? null,
+            condition_item_label: item.condition_item_label ?? null,
+            condition_checked: item.condition_checked ?? null
+          }))).execute();
+        }
       }
-    }
+      return updated;
+    });
     const templateItems = await db.selectFrom("zv_checklist_template_items").selectAll().where("template_id", "=", id).orderBy("order_idx", "asc").execute();
     return c.json({ template: { ...template, items: templateItems } });
   });
@@ -19702,29 +19708,32 @@ function checklistsRoutes(ctx) {
       return c.json({ error: "Unauthorized" }, 401);
     const { collection, recordId } = c.req.param();
     const { template_id, name, items: customItems } = c.req.valid("json");
-    const checklist = await db.insertInto("zv_checklists").values({
-      template_id: template_id || null,
-      collection,
-      record_id: recordId,
-      name,
-      created_by: user.id
-    }).returningAll().executeTakeFirst();
-    let itemsToInsert = [];
-    if (template_id) {
-      itemsToInsert = await db.selectFrom("zv_checklist_template_items").selectAll().where("template_id", "=", template_id).orderBy("order_idx", "asc").execute();
-    } else if (customItems) {
-      itemsToInsert = customItems;
-    }
-    if (itemsToInsert.length > 0) {
-      await db.insertInto("zv_checklist_items").values(itemsToInsert.map((item, i) => ({
-        checklist_id: checklist.id,
-        label: item.label,
-        description: item.description,
-        required: item.required ?? false,
-        order_idx: item.order_idx ?? i,
-        template_item_id: template_id ? item.id ?? null : null
-      }))).execute();
-    }
+    const checklist = await db.transaction().execute(async (trx) => {
+      const created = await trx.insertInto("zv_checklists").values({
+        template_id: template_id || null,
+        collection,
+        record_id: recordId,
+        name,
+        created_by: user.id
+      }).returningAll().executeTakeFirst();
+      let itemsToInsert = [];
+      if (template_id) {
+        itemsToInsert = await trx.selectFrom("zv_checklist_template_items").selectAll().where("template_id", "=", template_id).orderBy("order_idx", "asc").execute();
+      } else if (customItems) {
+        itemsToInsert = customItems;
+      }
+      if (itemsToInsert.length > 0) {
+        await trx.insertInto("zv_checklist_items").values(itemsToInsert.map((item, i) => ({
+          checklist_id: created.id,
+          label: item.label,
+          description: item.description,
+          required: item.required ?? false,
+          order_idx: item.order_idx ?? i,
+          template_item_id: template_id ? item.id ?? null : null
+        }))).execute();
+      }
+      return created;
+    });
     const items = await db.selectFrom("zv_checklist_items").selectAll().where("checklist_id", "=", checklist.id).orderBy("order_idx", "asc").execute();
     return c.json({ checklist: { ...checklist, items } }, 201);
   });
@@ -20067,10 +20076,12 @@ function checklistsRoutes(ctx) {
         }, 400);
       }
     }
-    await db.deleteFrom("zv_checklist_scheme_weights").where("scheme_id", "=", schemeId).execute();
-    if (weights.length > 0) {
-      await db.insertInto("zv_checklist_scheme_weights").values(weights.map((w) => ({ scheme_id: schemeId, ...w }))).execute();
-    }
+    await db.transaction().execute(async (trx) => {
+      await trx.deleteFrom("zv_checklist_scheme_weights").where("scheme_id", "=", schemeId).execute();
+      if (weights.length > 0) {
+        await trx.insertInto("zv_checklist_scheme_weights").values(weights.map((w) => ({ scheme_id: schemeId, ...w }))).execute();
+      }
+    });
     return c.json({ success: true, count: weights.length });
   });
   app.get("/:id/scores", async (c) => {
