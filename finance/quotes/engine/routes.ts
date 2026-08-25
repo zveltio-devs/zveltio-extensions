@@ -153,29 +153,36 @@ export function quotesRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
-    const number = await nextQuoteNumber(db);
     const subtotalGross = d.lines.reduce((s, l) => s + l.quantity * l.unit_price * (1 - l.discount / 100), 0);
     const discount_amount = subtotalGross * (d.discount_percent / 100);
     const subtotal = subtotalGross - discount_amount;
     const tax_amount = d.lines.reduce((s, l) => s + l.quantity * l.unit_price * (1 - l.discount / 100) * (1 - d.discount_percent / 100) * l.tax_rate / 100, 0);
     const total = subtotal + tax_amount;
-    const q = await sql`
-      INSERT INTO zvd_quotes (number, title, contact_id, organization_id, client_name, client_email,
-        valid_until, currency, subtotal, tax_rate, tax_amount, total, discount_percent, discount_amount,
-        notes, terms, footer_notes, po_number, created_by)
-      VALUES (${number}, ${d.title}, ${d.contact_id ?? null}, ${d.organization_id ?? null},
-        ${d.client_name}, ${d.client_email ?? null}, ${d.valid_until}, ${d.currency},
-        ${subtotal}, ${d.tax_rate}, ${tax_amount}, ${total}, ${d.discount_percent}, ${discount_amount},
-        ${d.notes ?? null}, ${d.terms ?? null}, ${d.footer_notes ?? null}, ${d.po_number ?? null}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    const qId = (q.rows[0] as any).id;
-    for (const line of d.lines) {
-      const lineTotal = line.quantity * line.unit_price * (1 - line.discount / 100) * (1 - d.discount_percent / 100) * (1 + line.tax_rate / 100);
-      await sql`INSERT INTO zvd_quote_lines (quote_id, description, quantity, unit_price, tax_rate, discount, total, sort_order)
-        VALUES (${qId}, ${line.description}, ${line.quantity}, ${line.unit_price}, ${line.tax_rate}, ${line.discount}, ${lineTotal}, ${line.sort_order})
-      `.execute(db);
-    }
+    // The quote header stores totals computed here from the lines, so a header
+    // written without all of them quotes the customer a figure its own lines do
+    // not add up to — and the quote is sendable in that state. `nextQuoteNumber`
+    // goes inside so a rolled-back quote leaves its number free.
+    const q = await db.transaction().execute(async (trx) => {
+      const number = await nextQuoteNumber(trx);
+      const created = await sql`
+        INSERT INTO zvd_quotes (number, title, contact_id, organization_id, client_name, client_email,
+          valid_until, currency, subtotal, tax_rate, tax_amount, total, discount_percent, discount_amount,
+          notes, terms, footer_notes, po_number, created_by)
+        VALUES (${number}, ${d.title}, ${d.contact_id ?? null}, ${d.organization_id ?? null},
+          ${d.client_name}, ${d.client_email ?? null}, ${d.valid_until}, ${d.currency},
+          ${subtotal}, ${d.tax_rate}, ${tax_amount}, ${total}, ${d.discount_percent}, ${discount_amount},
+          ${d.notes ?? null}, ${d.terms ?? null}, ${d.footer_notes ?? null}, ${d.po_number ?? null}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      const qId = (created.rows[0] as any).id;
+      for (const line of d.lines) {
+        const lineTotal = line.quantity * line.unit_price * (1 - line.discount / 100) * (1 - d.discount_percent / 100) * (1 + line.tax_rate / 100);
+        await sql`INSERT INTO zvd_quote_lines (quote_id, description, quantity, unit_price, tax_rate, discount, total, sort_order)
+          VALUES (${qId}, ${line.description}, ${line.quantity}, ${line.unit_price}, ${line.tax_rate}, ${line.discount}, ${lineTotal}, ${line.sort_order})
+        `.execute(trx);
+      }
+      return created;
+    });
     return c.json({ data: q.rows[0] }, 201);
   });
 
@@ -214,9 +221,17 @@ export function quotesRoutes(ctx: ExtensionContext): Hono {
   // ── Lifecycle ─────────────────────────────────────────────────
   app.post('/:id/request-approval', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const user = c.get('user') as any;
-    const row = await sql`UPDATE zvd_quotes SET approval_status = 'pending', updated_at = NOW() WHERE id = ${c.req.param('id')} AND status = 'draft' RETURNING *`.execute(db);
-    if (!row.rows.length) return c.json({ error: 'Quote not found or not draft' }, 400);
-    await sql`INSERT INTO zvd_quote_approvals (quote_id, requested_by) VALUES (${c.req.param('id')}, ${user.id})`.execute(db);
+    // The quote's `approval_status` and the request row are one act. Between
+    // them the quote reads as awaiting a decision that is in nobody's queue.
+    // A retry recovers this one — the guard is on `status`, which does not
+    // change — so the cost is the window, not the record.
+    const row = await db.transaction().execute(async (trx) => {
+      const updated = await sql`UPDATE zvd_quotes SET approval_status = 'pending', updated_at = NOW() WHERE id = ${c.req.param('id')} AND status = 'draft' RETURNING *`.execute(trx);
+      if (!updated.rows.length) return null;
+      await sql`INSERT INTO zvd_quote_approvals (quote_id, requested_by) VALUES (${c.req.param('id')}, ${user.id})`.execute(trx);
+      return updated;
+    });
+    if (!row) return c.json({ error: 'Quote not found or not draft' }, 400);
     return c.json({ data: row.rows[0] });
   });
 
@@ -224,8 +239,15 @@ export function quotesRoutes(ctx: ExtensionContext): Hono {
     const _u = c.get('user') as any;
     if (!(await mayDecide(ctx, _u))) return c.json({ error: 'Not allowed' }, 403);
     const user = c.get('user') as any;
-    await sql`UPDATE zvd_quote_approvals SET status = 'approved', approved_by = ${user.id}, approved_at = NOW() WHERE quote_id = ${c.req.param('id')} AND status = 'pending'`.execute(db);
-    const row = await sql`UPDATE zvd_quotes SET approval_status = 'approved', updated_at = NOW() WHERE id = ${c.req.param('id')} RETURNING *`.execute(db);
+    // The approval record and the quote's status are the same decision. Split,
+    // the record says approved while the quote still says pending — and this is
+    // the gate a discount above the approver's limit passes through, so the
+    // disagreement is about who authorised what. A retry does repair it, since
+    // the second statement is unconditional.
+    const row = await db.transaction().execute(async (trx) => {
+      await sql`UPDATE zvd_quote_approvals SET status = 'approved', approved_by = ${user.id}, approved_at = NOW() WHERE quote_id = ${c.req.param('id')} AND status = 'pending'`.execute(trx);
+      return await sql`UPDATE zvd_quotes SET approval_status = 'approved', updated_at = NOW() WHERE id = ${c.req.param('id')} RETURNING *`.execute(trx);
+    });
     return c.json({ data: row.rows[0] });
   });
 
@@ -282,20 +304,29 @@ export function quotesRoutes(ctx: ExtensionContext): Hono {
     const q = quote.rows[0] as any;
     const invoiceNumber = `INV-Q-${q.number}`;
     const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const inv = await sql`
-      INSERT INTO zvd_invoices (number, client_id, client_name, client_email, due_date, currency, subtotal, tax_rate, tax_amount, total, discount_amount, discount_percent, notes, created_by)
-      VALUES (${invoiceNumber}, ${q.contact_id ?? q.organization_id}, ${q.client_name}, ${q.client_email},
-        ${dueDate}, ${q.currency}, ${q.subtotal}, ${q.tax_rate}, ${q.tax_amount}, ${q.total},
-        ${q.discount_amount}, ${q.discount_percent}, ${q.notes}, ${q.created_by})
-      RETURNING *
-    `.execute(db);
-    const invId = (inv.rows[0] as any).id;
-    const lines = await sql`SELECT * FROM zvd_quote_lines WHERE quote_id = ${q.id}`.execute(db);
-    for (const line of lines.rows as any[]) {
-      await sql`INSERT INTO zvd_invoice_lines (invoice_id, description, quantity, unit_price, tax_rate, total, sort_order)
-        VALUES (${invId}, ${line.description}, ${line.quantity}, ${line.unit_price}, ${line.tax_rate}, ${line.total}, ${line.sort_order})`.execute(db);
-    }
-    await sql`UPDATE zvd_quotes SET converted_to_invoice_id=${invId}, updated_at=NOW() WHERE id=${q.id}`.execute(db);
+    // `converted_to_invoice_id` is what stops a quote being converted twice, and
+    // it is written LAST. Interrupted before it, the customer has an invoice —
+    // possibly with no lines under its total — and the quote still looks
+    // unconverted, so the next attempt bills them a second time. Duplicate
+    // invoices are not something the customer forgives quietly, and voiding one
+    // afterwards is a correction that shows on the VAT return.
+    const inv = await db.transaction().execute(async (trx) => {
+      const created = await sql`
+        INSERT INTO zvd_invoices (number, client_id, client_name, client_email, due_date, currency, subtotal, tax_rate, tax_amount, total, discount_amount, discount_percent, notes, created_by)
+        VALUES (${invoiceNumber}, ${q.contact_id ?? q.organization_id}, ${q.client_name}, ${q.client_email},
+          ${dueDate}, ${q.currency}, ${q.subtotal}, ${q.tax_rate}, ${q.tax_amount}, ${q.total},
+          ${q.discount_amount}, ${q.discount_percent}, ${q.notes}, ${q.created_by})
+        RETURNING *
+      `.execute(trx);
+      const invId = (created.rows[0] as any).id;
+      const lines = await sql`SELECT * FROM zvd_quote_lines WHERE quote_id = ${q.id}`.execute(trx);
+      for (const line of lines.rows as any[]) {
+        await sql`INSERT INTO zvd_invoice_lines (invoice_id, description, quantity, unit_price, tax_rate, total, sort_order)
+          VALUES (${invId}, ${line.description}, ${line.quantity}, ${line.unit_price}, ${line.tax_rate}, ${line.total}, ${line.sort_order})`.execute(trx);
+      }
+      await sql`UPDATE zvd_quotes SET converted_to_invoice_id=${invId}, updated_at=NOW() WHERE id=${q.id}`.execute(trx);
+      return created;
+    });
     return c.json({ data: inv.rows[0] }, 201);
   });
 
