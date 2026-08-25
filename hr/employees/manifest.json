@@ -3,7 +3,7 @@
   "displayName": "HR",
   "category": "hr",
   "description": "Employee records, departments, job positions, contracts and onboarding checklists",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-hr",
@@ -34,8 +34,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "a883c4185f668296783d5a954abd0e844ec1e72ab435b5ca0eb054127bbef085",
-    "sourceSha256": "cfec0acc106ee8ab98a4db32688fd5b859e70f6b3869ba926621fde80b360a15"
+    "engineSha256": "91cc42b8207caad6c6c785ef96deb54071e9d33a9e5152c87ab6e5e800c244cc",
+    "sourceSha256": "aceb0aea670e81083f60c3173592714a81950a9ffa0c1f1dcdde74f82403e608"
   },
   "resources": [
     "employees"

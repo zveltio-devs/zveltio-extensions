@@ -285,8 +285,14 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
+    // The employee row and their opening salary history are one hiring. Split,
+    // the employee exists with a salary on the row and no record of where that
+    // figure came from — and salary history is what answers "what were they paid
+    // when". The employee number is derived from COUNT(*), so it belongs inside
+    // too: rolled back, the number goes back to being free.
+    const emp = await db.transaction().execute(async (trx) => {
     // Auto-generate employee number
-    const counter = await sql`SELECT COUNT(*) as cnt FROM zvd_employees`.execute(db);
+    const counter = await sql`SELECT COUNT(*) as cnt FROM zvd_employees`.execute(trx);
     const empNum = 'EMP-' + String(+(counter.rows[0] as any).cnt + 1).padStart(4, '0');
     const row = await sql`
       INSERT INTO zvd_employees (employee_number, first_name, last_name, email, work_email, phone, birth_date, gender,
@@ -300,14 +306,16 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
         ${d.salary ?? null}, ${d.currency}, ${d.iban ?? null}, ${d.bank_name ?? null},
         ${d.address ?? null}, ${d.notes ?? null}, ${user.id})
       RETURNING *
-    `.execute(db);
+    `.execute(trx);
     const emp = row.rows[0] as any;
     if (d.salary) {
       await sql`
         INSERT INTO zvd_salary_history (employee_id, effective_date, salary, salary_type, currency, reason, changed_by)
         VALUES (${emp.id}, ${d.hire_date}, ${d.salary}, ${d.salary_type}, ${d.currency}, 'Initial salary', ${user.id})
-      `.execute(db);
+      `.execute(trx);
     }
+      return emp;
+    });
     events.emit('employee.created', { id: emp.id, employee: emp });
     return c.json({ data: emp }, 201);
   });
@@ -387,14 +395,19 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     is_primary: z.boolean().default(false),
   })), async (c) => {
     const d = c.req.valid('json');
-    if (d.is_primary) {
-      await sql`UPDATE zvd_employee_emergency_contacts SET is_primary = false WHERE employee_id = ${c.req.param('id')}`.execute(db);
-    }
-    const row = await sql`
-      INSERT INTO zvd_employee_emergency_contacts (employee_id, name, relationship, phone, email, is_primary)
-      VALUES (${c.req.param('id')}, ${d.name}, ${d.relationship}, ${d.phone}, ${d.email ?? null}, ${d.is_primary})
-      RETURNING *
-    `.execute(db);
+    // Demoting the current primary and promoting the new one are one change.
+    // Split, the employee is left with NO primary emergency contact — the single
+    // row whose whole purpose is to be found in a hurry.
+    const row = await db.transaction().execute(async (trx) => {
+      if (d.is_primary) {
+        await sql`UPDATE zvd_employee_emergency_contacts SET is_primary = false WHERE employee_id = ${c.req.param('id')}`.execute(trx);
+      }
+      return await sql`
+        INSERT INTO zvd_employee_emergency_contacts (employee_id, name, relationship, phone, email, is_primary)
+        VALUES (${c.req.param('id')}, ${d.name}, ${d.relationship}, ${d.phone}, ${d.email ?? null}, ${d.is_primary})
+        RETURNING *
+      `.execute(trx);
+    });
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -418,13 +431,19 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
-    const row = await sql`
-      INSERT INTO zvd_salary_history (employee_id, effective_date, salary, salary_type, currency, reason, changed_by)
-      VALUES (${c.req.param('id')}, ${d.effective_date}, ${d.salary}, ${d.salary_type}, ${d.currency}, ${d.reason ?? null}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    // Update current salary on employee record
-    await sql`UPDATE zvd_employees SET salary = ${d.salary}, currency = ${d.currency}, updated_at = NOW() WHERE id = ${c.req.param('id')}`.execute(db);
+    // Payroll reads the flat column on the employee; the audit reads the history.
+    // Either one written alone is a pay figure nobody can justify, or a
+    // justification for a raise that was never paid.
+    const row = await db.transaction().execute(async (trx) => {
+      const inserted = await sql`
+        INSERT INTO zvd_salary_history (employee_id, effective_date, salary, salary_type, currency, reason, changed_by)
+        VALUES (${c.req.param('id')}, ${d.effective_date}, ${d.salary}, ${d.salary_type}, ${d.currency}, ${d.reason ?? null}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      // Update current salary on employee record
+      await sql`UPDATE zvd_employees SET salary = ${d.salary}, currency = ${d.currency}, updated_at = NOW() WHERE id = ${c.req.param('id')}`.execute(trx);
+      return inserted;
+    });
     return c.json({ data: row.rows[0] }, 201);
   });
 
