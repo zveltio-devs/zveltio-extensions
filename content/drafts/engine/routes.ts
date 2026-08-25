@@ -258,9 +258,19 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
 
         const tableName = `zvd_${item.collection}`;
         const draftData = publishableDraftData(item.draft_data);
-        await (db as any).updateTable(tableName).set({ ...draftData, updated_at: new Date() }).where('id', '=', item.record_id).execute();
-        await (db as any).updateTable('zv_content_drafts').set({ status: 'approved', published_at: new Date() }).where('id', '=', item.draft_id).execute();
-        await (db as any).updateTable('zv_publish_schedule').set({ status: 'published', published_at: new Date() }).where('id', '=', item.schedule_id).execute();
+        // One transaction PER ITEM, not around the loop.
+        //
+        // The loop is deliberately per-item: each entry has its own try/catch and
+        // pushes its own error, so one bad draft must not roll back the others.
+        // But the three writes for a single draft are one publication — the
+        // record, the draft's status, and the schedule row. Split, a draft can be
+        // written to the collection while its schedule still reads pending, and
+        // the next run publishes it again over whatever was edited since.
+        await db.transaction().execute(async (trx) => {
+          await (trx as any).updateTable(tableName).set({ ...draftData, updated_at: new Date() }).where('id', '=', item.record_id).execute();
+          await (trx as any).updateTable('zv_content_drafts').set({ status: 'approved', published_at: new Date() }).where('id', '=', item.draft_id).execute();
+          await (trx as any).updateTable('zv_publish_schedule').set({ status: 'published', published_at: new Date() }).where('id', '=', item.schedule_id).execute();
+        });
         published++;
       } catch (err: any) {
         errors.push(`Draft ${item.draft_id}: ${err.message}`);
@@ -295,8 +305,16 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
         const draft = await (db as any).selectFrom('zv_content_drafts').selectAll().where('id', '=', draftId).executeTakeFirst();
         if (!draft || draft.status !== 'approved') { failedCount++; jobErrors.push(`${draftId}: not approved`); continue; }
         const draftData = publishableDraftData(draft.draft_data);
-        await (db as any).updateTable(`zvd_${draft.collection}`).set({ ...draftData, updated_at: new Date() }).where('id', '=', draft.record_id).execute();
-        await (db as any).updateTable('zv_content_drafts').set({ status: 'approved', published_at: new Date() }).where('id', '=', draftId).execute();
+        // Per item, for the same reason as `/schedule/process`: the loop keeps its
+        // per-draft try/catch so one failure does not roll back the batch, while
+        // the two writes for a single draft — the record and the draft's status —
+        // publish together. Split, a draft is written to the collection and still
+        // reads unpublished, so the next bulk run publishes it again over
+        // whatever was edited in between.
+        await db.transaction().execute(async (trx) => {
+          await (trx as any).updateTable(`zvd_${draft.collection}`).set({ ...draftData, updated_at: new Date() }).where('id', '=', draft.record_id).execute();
+          await (trx as any).updateTable('zv_content_drafts').set({ status: 'approved', published_at: new Date() }).where('id', '=', draftId).execute();
+        });
         published++;
       } catch (err: any) {
         failedCount++;
@@ -353,27 +371,36 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
 
     const baseVersion = parseInt(versionResult?.count || '0') + 1;
 
-    const draft = await (db as any)
-      .insertInto('zv_content_drafts')
-      .values({
-        collection: data.collection,
-        record_id: data.record_id,
-        draft_data: JSON.stringify(data.draft_data),
-        base_version: baseVersion,
-        status: 'draft',
-        notes: data.notes || null,
-        scheduled_at: data.scheduled_at ? new Date(data.scheduled_at) : null,
-        created_by: user.id,
-      })
-      .returningAll()
-      .executeTakeFirst();
+    // A draft that asked to be scheduled is not a draft without a schedule.
+    //
+    // The draft row carries `scheduled_at` and so does the schedule table, and
+    // `/schedule/process` reads the schedule table. A draft with the date on it
+    // and no schedule row simply never publishes — it shows a publish time in the
+    // UI that will not arrive, which is worse than showing none.
+    const draft = await db.transaction().execute(async (trx) => {
+      const created = await (trx as any)
+        .insertInto('zv_content_drafts')
+        .values({
+          collection: data.collection,
+          record_id: data.record_id,
+          draft_data: JSON.stringify(data.draft_data),
+          base_version: baseVersion,
+          status: 'draft',
+          notes: data.notes || null,
+          scheduled_at: data.scheduled_at ? new Date(data.scheduled_at) : null,
+          created_by: user.id,
+        })
+        .returningAll()
+        .executeTakeFirst();
 
-    if (data.scheduled_at && draft) {
-      await (db as any)
-        .insertInto('zv_publish_schedule')
-        .values({ draft_id: draft.id, scheduled_at: new Date(data.scheduled_at) })
-        .execute();
-    }
+      if (data.scheduled_at && created) {
+        await (trx as any)
+          .insertInto('zv_publish_schedule')
+          .values({ draft_id: created.id, scheduled_at: new Date(data.scheduled_at) })
+          .execute();
+      }
+      return created;
+    });
 
     return c.json({ draft }, 201);
   });
@@ -509,8 +536,15 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     const tableName = `zvd_${draft.collection}`;
     const draftData = publishableDraftData(draft.draft_data);
 
-    await (db as any).updateTable(tableName).set({ ...draftData, updated_at: new Date() }).where('id', '=', draft.record_id).execute();
-    await (db as any).updateTable('zv_content_drafts').set({ status: 'approved', published_at: new Date() }).where('id', '=', id).execute();
+    // Writing the record and marking the draft published are one act. Apart, the
+    // content is live while the draft still reads unpublished — so it publishes
+    // again on the next run, over whatever was edited since — or the draft is
+    // marked done and the record never changed, which nobody notices until
+    // someone asks why the page still shows the old text.
+    await db.transaction().execute(async (trx) => {
+      await (trx as any).updateTable(tableName).set({ ...draftData, updated_at: new Date() }).where('id', '=', draft.record_id).execute();
+      await (trx as any).updateTable('zv_content_drafts').set({ status: 'approved', published_at: new Date() }).where('id', '=', id).execute();
+    });
 
     // WebSocket broadcast skipped — ctx.internals will expose broadcastEvent in a future release
 
