@@ -487,11 +487,18 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
     }
     const headers: Record<string, string> = {};
     c.req.raw.headers.forEach((v, k) => { headers[k] = v; });
-    await sql`
-      INSERT INTO zvd_webhook_events (webhook_id, payload, headers, source_ip)
-      VALUES (${w.id}, ${JSON.stringify(payload)}, ${JSON.stringify(headers)}, ${c.req.header('x-forwarded-for') ?? null})
-    `.execute(db);
-    await sql`UPDATE zvd_incoming_webhooks SET last_received_at = NOW() WHERE id = ${w.id}`.execute(db);
+    // The event and the receipt stamp on the webhook. `last_received_at` is what
+    // an operator checks to decide whether an integration is alive, so a stamp
+    // written without the event says the webhook is delivering while nothing is
+    // stored, and an event stored without the stamp makes a working integration
+    // look dead. The sender is told 200 either way and will not retry.
+    await db.transaction().execute(async (trx) => {
+      await sql`
+        INSERT INTO zvd_webhook_events (webhook_id, payload, headers, source_ip)
+        VALUES (${w.id}, ${JSON.stringify(payload)}, ${JSON.stringify(headers)}, ${c.req.header('x-forwarded-for') ?? null})
+      `.execute(trx);
+      await sql`UPDATE zvd_incoming_webhooks SET last_received_at = NOW() WHERE id = ${w.id}`.execute(trx);
+    });
     return c.json({ received: true });
   });
 
