@@ -10261,9 +10261,12 @@ async function initCache() {
     lazyConnect: true,
     maxRetriesPerRequest: 3,
     retryStrategy: (times) => {
-      const delay = Math.min(100 * Math.pow(2, times), 1000) + Math.random() * 100;
+      const delay = Math.min(100 * 2 ** times, 1000) + Math.random() * 100;
       return delay;
     }
+  });
+  _cache.on("error", (err) => {
+    console.error("[cache] Valkey error:", err.message);
   });
   await _cache.connect();
   return _cache;
@@ -12036,7 +12039,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
+// ../../zveltio/node_modules/.bun/@hono+zod-validator@0.8.0+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -30158,32 +30161,34 @@ function aiRoutes(ctx) {
     const body = c.req.valid("json");
     const now = new Date;
     const existing = await db.selectFrom("zv_ai_providers").selectAll().where("name", "=", name).executeTakeFirst();
-    if (existing) {
-      const updateData = { ...body, updated_at: now };
-      if (updateData.api_key) {
-        updateData.api_key = await encryptApiKey(updateData.api_key);
+    await db.transaction().execute(async (trx) => {
+      if (existing) {
+        const updateData = { ...body, updated_at: now };
+        if (updateData.api_key) {
+          updateData.api_key = await encryptApiKey(updateData.api_key);
+        }
+        await trx.updateTable("zv_ai_providers").set(updateData).where("name", "=", name).execute();
+      } else {
+        const labels = {
+          openai: "OpenAI",
+          anthropic: "Anthropic (Claude)",
+          gemini: "Google Gemini",
+          ollama: "Ollama (Local)"
+        };
+        await trx.insertInto("zv_ai_providers").values({
+          name,
+          label: body.label || labels[name] || name,
+          api_key: body.api_key ? await encryptApiKey(body.api_key) : undefined,
+          base_url: body.base_url,
+          default_model: body.default_model,
+          is_default: body.is_default ?? false,
+          is_active: body.is_active ?? true
+        }).execute();
       }
-      await db.updateTable("zv_ai_providers").set(updateData).where("name", "=", name).execute();
-    } else {
-      const labels = {
-        openai: "OpenAI",
-        anthropic: "Anthropic (Claude)",
-        gemini: "Google Gemini",
-        ollama: "Ollama (Local)"
-      };
-      await db.insertInto("zv_ai_providers").values({
-        name,
-        label: body.label || labels[name] || name,
-        api_key: body.api_key ? await encryptApiKey(body.api_key) : undefined,
-        base_url: body.base_url,
-        default_model: body.default_model,
-        is_default: body.is_default ?? false,
-        is_active: body.is_active ?? true
-      }).execute();
-    }
-    if (body.is_default) {
-      await db.updateTable("zv_ai_providers").set({ is_default: false }).where("name", "!=", name).execute();
-    }
+      if (body.is_default) {
+        await trx.updateTable("zv_ai_providers").set({ is_default: false }).where("name", "!=", name).execute();
+      }
+    });
     const updated = await db.selectFrom("zv_ai_providers").selectAll().where("name", "=", name).executeTakeFirst();
     if (updated?.is_active && (updated.api_key || name === "ollama")) {
       const decryptedKey = await decryptApiKey(updated.api_key ?? "");
