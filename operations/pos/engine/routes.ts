@@ -217,19 +217,28 @@ export function posRoutes(ctx: ExtensionContext): Hono {
       FROM zvd_pos_orders WHERE session_id = ${c.req.param('id')}
     `.execute(db);
     const t = totals.rows[0] as any;
-    const row = await sql`
-      UPDATE zvd_pos_sessions SET status = 'closed', closed_at = NOW(),
-        closing_float = ${d.closing_float}, expected_float = opening_float + ${t.cash_sales},
-        notes = COALESCE(${d.notes ?? null}, notes)
-      WHERE id = ${c.req.param('id')} AND status = 'open' RETURNING *
-    `.execute(db);
-    if (!row.rows.length) return c.json({ error: 'Session not found or not open' }, 400);
-    // Generate Z-report
-    await sql`
-      INSERT INTO zvd_pos_z_reports (session_id, total_sales, total_refunds, net_sales, cash_sales, card_sales, order_count, tax_amount)
-      VALUES (${c.req.param('id')}, ${t.total_sales}, ${t.refunds}, ${+t.total_sales - +t.refunds}, ${t.cash_sales}, ${t.card_sales}, ${t.order_count}, ${t.tax_amount})
-      ON CONFLICT (session_id) DO UPDATE SET total_sales = EXCLUDED.total_sales, net_sales = EXCLUDED.net_sales
-    `.execute(db);
+    // Closing the till and writing its Z-report are one end-of-day. The guard is
+    // `status = 'open'`, so a session closed without its report can never be
+    // closed again — the till is shut, the cash reconciliation it is supposed to
+    // produce does not exist, and that report is what the day's takings are
+    // signed off against.
+    const row = await db.transaction().execute(async (trx) => {
+      const closed = await sql`
+        UPDATE zvd_pos_sessions SET status = 'closed', closed_at = NOW(),
+          closing_float = ${d.closing_float}, expected_float = opening_float + ${t.cash_sales},
+          notes = COALESCE(${d.notes ?? null}, notes)
+        WHERE id = ${c.req.param('id')} AND status = 'open' RETURNING *
+      `.execute(trx);
+      if (!closed.rows.length) return null;
+      // Generate Z-report
+      await sql`
+        INSERT INTO zvd_pos_z_reports (session_id, total_sales, total_refunds, net_sales, cash_sales, card_sales, order_count, tax_amount)
+        VALUES (${c.req.param('id')}, ${t.total_sales}, ${t.refunds}, ${+t.total_sales - +t.refunds}, ${t.cash_sales}, ${t.card_sales}, ${t.order_count}, ${t.tax_amount})
+        ON CONFLICT (session_id) DO UPDATE SET total_sales = EXCLUDED.total_sales, net_sales = EXCLUDED.net_sales
+      `.execute(trx);
+      return closed;
+    });
+    if (!row) return c.json({ error: 'Session not found or not open' }, 400);
     return c.json({ data: row.rows[0] });
   });
 
@@ -334,34 +343,68 @@ export function posRoutes(ctx: ExtensionContext): Hono {
     // failed on the constraint — the till could not record a single transaction
     // on any install. Claimed with UPDATE … RETURNING so two tills ringing up at
     // the same moment cannot take the same number.
-    const orderNumber = await claimOrderNumber(db);
-
-    // `'paid'`, not `'completed'`. The CHECK admits ('open','paid','voided'),
-    // so the value the handler used could never be written — the second of the
-    // two independent failures on this one statement.
-    const order = await sql`
-      INSERT INTO zvd_pos_orders (session_id, order_number, created_by, payment_method, customer_id, customer_name, canonical_contact_id, subtotal, tax_amount, total, loyalty_discount, loyalty_points_earned, loyalty_points_redeemed, notes, status)
-      VALUES (${d.session_id}, ${orderNumber}, ${user.id}, ${d.payment_method}, ${d.customer_id ?? null}, ${customerName}, ${canonicalContactId}, ${subtotal}, ${tax_amount}, ${total}, ${loyalty_discount}, ${earnedPoints}, ${redeemedPoints}, ${d.notes ?? null}, 'paid')
-      RETURNING *
-    `.execute(db);
-    const orderId = (order.rows[0] as any).id;
-
     // Drive stock movements via the inventory service when active. This keeps the
     // canonical inventory in sync with POS sales without POS owning warehouses.
     const inventoryMove = ctx.services.get<(input: any) => Promise<{ balance: number }>>('inventory.stock.move');
     const lookupProduct = ctx.services.get<(idOrSku: string) => Promise<any | null>>('inventory.products.lookup');
 
-    for (const line of d.lines) {
-      const lineTotal = line.quantity * line.unit_price * (1 - line.discount / 100) * (1 + line.tax_rate / 100);
-      await sql`INSERT INTO zvd_pos_order_lines (order_id, product_id, product_name, quantity, unit_price, tax_rate, discount, total) VALUES (${orderId}, ${line.product_id ?? null}, ${line.product_name}, ${line.quantity}, ${line.unit_price}, ${line.tax_rate}, ${line.discount}, ${lineTotal})`.execute(db);
+    // A sale is one thing: the order, its lines, the number it was given, and
+    // the loyalty balance it moves. Any of those alone is a receipt that does
+    // not add up — a total with no items under it, points added with nothing
+    // saying why, an order number consumed by a sale that never happened.
+    const { order, orderId, stockToMove } = await db.transaction().execute(async (trx) => {
+      const orderNumber = await claimOrderNumber(trx);
 
-      // Decrement stock if inventory is connected and the line has a product id.
-      if (line.product_id && inventoryMove && lookupProduct) {
-        try {
-          // Find the default warehouse for the session, if any. Falls back to first warehouse.
-          const wh = await sql<any>`SELECT warehouse_id FROM zvd_pos_sessions WHERE id = ${d.session_id}`.execute(db);
-          const warehouseId = wh.rows[0]?.warehouse_id;
-          if (warehouseId) {
+      // `'paid'`, not `'completed'`. The CHECK admits ('open','paid','voided'),
+      // so the value the handler used could never be written — the second of the
+      // two independent failures on this one statement.
+      const created = await sql`
+        INSERT INTO zvd_pos_orders (session_id, order_number, created_by, payment_method, customer_id, customer_name, canonical_contact_id, subtotal, tax_amount, total, loyalty_discount, loyalty_points_earned, loyalty_points_redeemed, notes, status)
+        VALUES (${d.session_id}, ${orderNumber}, ${user.id}, ${d.payment_method}, ${d.customer_id ?? null}, ${customerName}, ${canonicalContactId}, ${subtotal}, ${tax_amount}, ${total}, ${loyalty_discount}, ${earnedPoints}, ${redeemedPoints}, ${d.notes ?? null}, 'paid')
+        RETURNING *
+      `.execute(trx);
+      const id = (created.rows[0] as any).id;
+
+      const pending: Array<{ product_id: string; product_name: string; quantity: number }> = [];
+      for (const line of d.lines) {
+        const lineTotal = line.quantity * line.unit_price * (1 - line.discount / 100) * (1 + line.tax_rate / 100);
+        await sql`INSERT INTO zvd_pos_order_lines (order_id, product_id, product_name, quantity, unit_price, tax_rate, discount, total) VALUES (${id}, ${line.product_id ?? null}, ${line.product_name}, ${line.quantity}, ${line.unit_price}, ${line.tax_rate}, ${line.discount}, ${lineTotal})`.execute(trx);
+        if (line.product_id && inventoryMove && lookupProduct) {
+          pending.push({
+            product_id: line.product_id,
+            product_name: line.product_name,
+            quantity: line.quantity,
+          });
+        }
+      }
+
+      if (d.customer_id) {
+        const pointDelta = earnedPoints - redeemedPoints;
+        await sql`UPDATE zvd_pos_customers SET loyalty_points = loyalty_points + ${pointDelta}, total_spent = total_spent + ${total}, visit_count = visit_count + 1, updated_at = NOW() WHERE id = ${d.customer_id}`.execute(trx);
+        await sql`INSERT INTO zvd_pos_loyalty_log (customer_id, order_id, delta, reason) VALUES (${d.customer_id}, ${id}, ${pointDelta}, 'order')`.execute(trx);
+      }
+      return { order: created, orderId: id, stockToMove: pending };
+    });
+
+    // Stock decrements happen AFTER the sale commits, and that is the point.
+    //
+    // `inventoryMove` is an in-process service, so it writes to this same
+    // database. Called inside the sale's transaction with its failure swallowed
+    // — which is how it used to run — a failed stock statement would poison the
+    // transaction, and every order line and loyalty write after it would fail
+    // too. The swallow protected nothing and took the sale down with it.
+    //
+    // Keeping the sale non-fatal on inventory problems is a deliberate decision
+    // and it stands: a till must not refuse a customer because the stock module
+    // is unhappy. What changes is that the failure is now recorded instead of
+    // discarded, and the reference on each movement is the order id, so the
+    // decrements can be replayed from the sale.
+    if (stockToMove.length > 0 && inventoryMove) {
+      const wh = await sql<any>`SELECT warehouse_id FROM zvd_pos_sessions WHERE id = ${d.session_id}`.execute(db);
+      const warehouseId = wh.rows[0]?.warehouse_id;
+      if (warehouseId) {
+        for (const line of stockToMove) {
+          try {
             await inventoryMove({
               productId: line.product_id,
               warehouseId,
@@ -369,17 +412,17 @@ export function posRoutes(ctx: ExtensionContext): Hono {
               type: 'out',
               reference: `pos:order:${orderId}`,
               reason: `POS sale ${line.product_name}`,
-            }).catch(() => {});
+            });
+          } catch (err) {
+            console.error(
+              `[pos] stock not decremented for order ${orderId}, product ${line.product_id} — inventory is now high by ${line.quantity}:`,
+              (err as Error).message,
+            );
           }
-        } catch { /* non-fatal */ }
+        }
       }
     }
 
-    if (d.customer_id) {
-      const pointDelta = earnedPoints - redeemedPoints;
-      await sql`UPDATE zvd_pos_customers SET loyalty_points = loyalty_points + ${pointDelta}, total_spent = total_spent + ${total}, visit_count = visit_count + 1, updated_at = NOW() WHERE id = ${d.customer_id}`.execute(db);
-      await sql`INSERT INTO zvd_pos_loyalty_log (customer_id, order_id, delta, reason) VALUES (${d.customer_id}, ${orderId}, ${pointDelta}, 'order')`.execute(db);
-    }
     return c.json({ data: order.rows[0] }, 201);
   });
 
@@ -391,13 +434,19 @@ export function posRoutes(ctx: ExtensionContext): Hono {
     const order = await sql`SELECT * FROM zvd_pos_orders WHERE id = ${c.req.param('id')} AND status = 'paid'`.execute(db);
     if (!order.rows.length) return c.json({ error: 'Order not found or not completed' }, 400);
     const o = order.rows[0] as any;
-    await sql`UPDATE zvd_pos_orders SET status = 'refunded', updated_at = NOW() WHERE id = ${o.id}`.execute(db);
-    // Reverse loyalty
-    if (o.customer_id && o.loyalty_points_earned > 0) {
-      const delta = -o.loyalty_points_earned + o.loyalty_points_redeemed;
-      await sql`UPDATE zvd_pos_customers SET loyalty_points = loyalty_points + ${delta}, total_spent = total_spent - ${o.total}, updated_at = NOW() WHERE id = ${o.customer_id}`.execute(db);
-      await sql`INSERT INTO zvd_pos_loyalty_log (customer_id, order_id, delta, reason) VALUES (${o.customer_id}, ${o.id}, ${delta}, 'refund')`.execute(db);
-    }
+    // The refund and the loyalty it reverses are one act. The guard is
+    // `status = 'paid'`, so an order marked refunded without its points being
+    // taken back can never be refunded again — the customer keeps points for a
+    // sale that was returned, and no retry will correct it.
+    await db.transaction().execute(async (trx) => {
+      await sql`UPDATE zvd_pos_orders SET status = 'refunded', updated_at = NOW() WHERE id = ${o.id}`.execute(trx);
+      // Reverse loyalty
+      if (o.customer_id && o.loyalty_points_earned > 0) {
+        const delta = -o.loyalty_points_earned + o.loyalty_points_redeemed;
+        await sql`UPDATE zvd_pos_customers SET loyalty_points = loyalty_points + ${delta}, total_spent = total_spent - ${o.total}, updated_at = NOW() WHERE id = ${o.customer_id}`.execute(trx);
+        await sql`INSERT INTO zvd_pos_loyalty_log (customer_id, order_id, delta, reason) VALUES (${o.customer_id}, ${o.id}, ${delta}, 'refund')`.execute(trx);
+      }
+    });
     return c.json({ data: { refunded: true } });
   });
 
