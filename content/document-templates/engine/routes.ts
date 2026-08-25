@@ -277,18 +277,28 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
     const populated = populatePlaceholders(template.html_body, data.variables || {});
     const pdfBuffer = await generatePDFAsync(populated, template.pdf_options ?? {}) as Buffer;
 
-    // Increment usage_count and last_used_at
-    await (db as any)
-      .updateTable('zv_document_templates')
-      .set({
-        usage_count: sql`usage_count + 1`,
-        last_used_at: new Date(),
-      })
-      .where('id', '=', templateId)
-      .execute();
+    // The usage counter and the render record are the same event counted twice:
+    // `usage_count` is the number, `zv_document_renders` is the detail behind it.
+    // Split, the counter says a template was used more often than the render log
+    // can account for — and the log is what says WHO generated a document and
+    // with which variables.
+    //
+    // The bare `catch { /* non-critical audit log */ }` is gone with it. It
+    // contained nothing: a failed insert aborts the transaction, so the swallow
+    // only moved the error to whatever ran next. And a render nobody can trace
+    // is not a non-critical detail on a document-generation endpoint.
+    await db.transaction().execute(async (trx) => {
+      // Increment usage_count and last_used_at
+      await (trx as any)
+        .updateTable('zv_document_templates')
+        .set({
+          usage_count: sql`usage_count + 1`,
+          last_used_at: new Date(),
+        })
+        .where('id', '=', templateId)
+        .execute();
 
-    try {
-      await (db as any)
+      await (trx as any)
         .insertInto('zv_document_renders')
         .values({
           template_id: templateId,
@@ -298,7 +308,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
           rendered_at: new Date(),
         })
         .execute();
-    } catch { /* non-critical audit log */ }
+    });
 
     const filename = `${template.name.replace(/[^a-zA-Z0-9-]/g, '-')}-${Date.now()}.pdf`;
     c.header('Content-Type', 'application/pdf');
@@ -406,48 +416,55 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
       .where('id', '=', templateId)
       .executeTakeFirst();
 
-    if (current) {
-      const maxVersionResult = await (db as any)
-        .selectFrom('zv_document_template_versions')
-        .select((eb: any) => eb.fn.max('version_number').as('max_version'))
-        .where('template_id', '=', templateId)
-        .executeTakeFirst();
+    // Restoring snapshots the current template before overwriting it, so the
+    // restore is itself undoable. Split, the template is replaced with an old
+    // version and the state it replaced was never saved — the version list
+    // silently stops one step short of the truth.
+    const template = await db.transaction().execute(async (trx) => {
+      if (current) {
+        const maxVersionResult = await (trx as any)
+          .selectFrom('zv_document_template_versions')
+          .select((eb: any) => eb.fn.max('version_number').as('max_version'))
+          .where('template_id', '=', templateId)
+          .executeTakeFirst();
 
-      const nextVersion = (Number(maxVersionResult?.max_version || 0)) + 1;
+        const nextVersion = (Number(maxVersionResult?.max_version || 0)) + 1;
 
-      await (db as any)
-        .insertInto('zv_document_template_versions')
-        .values({
-          template_id: templateId,
-          version_number: nextVersion,
-          html_body: current.html_body || '',
-          css_styles: null,
+        await (trx as any)
+          .insertInto('zv_document_template_versions')
+          .values({
+            template_id: templateId,
+            version_number: nextVersion,
+            html_body: current.html_body || '',
+            css_styles: null,
+            variables: JSON.stringify(
+              typeof current.variables === 'string'
+                ? JSON.parse(current.variables)
+                : current.variables || {}
+            ),
+            change_notes: `Auto-snapshot before restore to v${versionNumber}`,
+            created_by: user.id,
+          })
+          .execute();
+      }
+
+      // Restore to the requested version
+      const template = await (trx as any)
+        .updateTable('zv_document_templates')
+        .set({
+          html_body: version.html_body,
           variables: JSON.stringify(
-            typeof current.variables === 'string'
-              ? JSON.parse(current.variables)
-              : current.variables || {}
+            typeof version.variables === 'string'
+              ? JSON.parse(version.variables)
+              : version.variables || {}
           ),
-          change_notes: `Auto-snapshot before restore to v${versionNumber}`,
-          created_by: user.id,
+          updated_at: new Date(),
         })
-        .execute();
-    }
-
-    // Restore to the requested version
-    const template = await (db as any)
-      .updateTable('zv_document_templates')
-      .set({
-        html_body: version.html_body,
-        variables: JSON.stringify(
-          typeof version.variables === 'string'
-            ? JSON.parse(version.variables)
-            : version.variables || {}
-        ),
-        updated_at: new Date(),
-      })
-      .where('id', '=', templateId)
-      .returningAll()
-      .executeTakeFirst();
+        .where('id', '=', templateId)
+        .returningAll()
+        .executeTakeFirst();
+      return template;
+    });
 
     return c.json({ template, restored_from_version: versionNumber });
   });
