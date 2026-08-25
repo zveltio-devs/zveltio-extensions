@@ -1732,7 +1732,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
+// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.8.0+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -19754,37 +19754,40 @@ function postgisRoutes(ctx) {
       return c.json({ error: "Unauthorized" }, 401);
     const body = c.req.valid("json");
     const point = `SRID=4326;POINT(${body.lng} ${body.lat})`;
-    const entry = await sql`
-        INSERT INTO zv_geo_location_history
-          (entity_type, entity_id, location, accuracy_m, altitude_m, speed_kmh, heading_deg, source, metadata, recorded_at)
-        VALUES
-          (${body.entity_type}, ${body.entity_id}, ${point}::geography,
-           ${body.accuracy_m ?? null}, ${body.altitude_m ?? null},
-           ${body.speed_kmh ?? null}, ${body.heading_deg ?? null},
-           ${body.source}, ${JSON.stringify(body.metadata)},
-           ${body.recorded_at ?? new Date().toISOString()})
-        RETURNING id, entity_type, entity_id, recorded_at
-      `.execute(db);
-    const fences = await sql`
-        SELECT g.id AS geofence_id, g.name,
-               ST_Within(${point}::geometry, g.zone::geometry) AS inside
-        FROM zv_geofences g WHERE g.is_active = true
-      `.execute(db);
-    for (const fence of fences.rows) {
-      await sql`
-          INSERT INTO zv_geofence_events (geofence_id, entity_type, entity_id, event_type, location)
-          SELECT ${fence.geofence_id}::uuid, ${body.entity_type}, ${body.entity_id},
-                 CASE WHEN ${fence.inside} THEN 'enter' ELSE 'exit' END,
-                 ${point}::geography
-          WHERE NOT EXISTS (
-            SELECT 1 FROM zv_geofence_events
-            WHERE geofence_id = ${fence.geofence_id}::uuid
-              AND entity_id = ${body.entity_id}
-              AND event_type = CASE WHEN ${fence.inside} THEN 'enter' ELSE 'exit' END
-              AND occurred_at > NOW() - INTERVAL '5 minutes'
-          )
-        `.execute(db);
-    }
+    const entry = await db.transaction().execute(async (trx) => {
+      const entry2 = await sql`
+          INSERT INTO zv_geo_location_history
+            (entity_type, entity_id, location, accuracy_m, altitude_m, speed_kmh, heading_deg, source, metadata, recorded_at)
+          VALUES
+            (${body.entity_type}, ${body.entity_id}, ${point}::geography,
+             ${body.accuracy_m ?? null}, ${body.altitude_m ?? null},
+             ${body.speed_kmh ?? null}, ${body.heading_deg ?? null},
+             ${body.source}, ${JSON.stringify(body.metadata)},
+             ${body.recorded_at ?? new Date().toISOString()})
+          RETURNING id, entity_type, entity_id, recorded_at
+        `.execute(trx);
+      const fences = await sql`
+          SELECT g.id AS geofence_id, g.name,
+                 ST_Within(${point}::geometry, g.zone::geometry) AS inside
+          FROM zv_geofences g WHERE g.is_active = true
+        `.execute(trx);
+      for (const fence of fences.rows) {
+        await sql`
+            INSERT INTO zv_geofence_events (geofence_id, entity_type, entity_id, event_type, location)
+            SELECT ${fence.geofence_id}::uuid, ${body.entity_type}, ${body.entity_id},
+                   CASE WHEN ${fence.inside} THEN 'enter' ELSE 'exit' END,
+                   ${point}::geography
+            WHERE NOT EXISTS (
+              SELECT 1 FROM zv_geofence_events
+              WHERE geofence_id = ${fence.geofence_id}::uuid
+                AND entity_id = ${body.entity_id}
+                AND event_type = CASE WHEN ${fence.inside} THEN 'enter' ELSE 'exit' END
+                AND occurred_at > NOW() - INTERVAL '5 minutes'
+            )
+          `.execute(trx);
+      }
+      return entry2;
+    });
     return c.json({ location: entry.rows[0] }, 201);
   });
   app.get("/location-history/:entityType/:entityId", async (c) => {
