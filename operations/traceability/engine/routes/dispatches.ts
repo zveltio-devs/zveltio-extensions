@@ -103,39 +103,52 @@ export function dispatchesRouter(ctx: ExtensionContext): Hono {
 
     const newQty = parseFloat(lot.quantity_remaining) - d.quantity_dispatched;
 
-    // Decrement lot stock
-    await sql`
-      UPDATE trace_lots
-      SET quantity_remaining = ${newQty},
-          status = ${newQty === 0 ? 'exhausted' : 'available'}
-      WHERE id = ${dispatch.lot_id}
-    `.execute(db);
+    // A dispatch is the stock leaving, the movement that records it leaving, and
+    // the dispatch row saying it was confirmed. This is a traceability register:
+    // the point of it is that every unit can be followed from lot to customer.
+    //
+    // Split, the chain breaks in a way no later query can mend. Stock decremented
+    // with no movement row means quantity left the lot and nothing says where it
+    // went — on a recall, that lot cannot be traced to the customers who received
+    // it. A movement without the decrement double-counts the same units as still
+    // available. And a dispatch left unconfirmed after the stock moved can be
+    // confirmed again, dispatching the quantity twice.
+    const updated = await db.transaction().execute(async (trx) => {
+      // Decrement lot stock
+      await sql`
+        UPDATE trace_lots
+        SET quantity_remaining = ${newQty},
+            status = ${newQty === 0 ? 'exhausted' : 'available'}
+        WHERE id = ${dispatch.lot_id}
+      `.execute(trx);
 
-    // Record dispatch movement
-    await sql`
-      INSERT INTO trace_movements (
-        lot_id, type, quantity, unit,
-        reference_type, reference_id, reference_number,
-        customer_id, notes, performed_by, performed_at
-      ) VALUES (
-        ${dispatch.lot_id}, 'dispatch', ${-d.quantity_dispatched}, ${lot.unit},
-        'invoice', ${dispatch.invoice_id ?? null}, ${dispatch.invoice_number ?? null},
-        ${dispatch.customer_id ?? null}, ${d.notes ?? null}, ${user.id}, now()
-      )
-    `.execute(db);
+      // Record dispatch movement
+      await sql`
+        INSERT INTO trace_movements (
+          lot_id, type, quantity, unit,
+          reference_type, reference_id, reference_number,
+          customer_id, notes, performed_by, performed_at
+        ) VALUES (
+          ${dispatch.lot_id}, 'dispatch', ${-d.quantity_dispatched}, ${lot.unit},
+          'invoice', ${dispatch.invoice_id ?? null}, ${dispatch.invoice_number ?? null},
+          ${dispatch.customer_id ?? null}, ${d.notes ?? null}, ${user.id}, now()
+        )
+      `.execute(trx);
 
-    // Mark dispatch confirmed
-    const updated = await sql`
-      UPDATE trace_dispatches
-      SET status = 'confirmed',
-          quantity_dispatched = ${d.quantity_dispatched},
-          confirmed_at = now(),
-          confirmed_by = ${user.id},
-          notes = COALESCE(${d.notes ?? null}, notes)
-      WHERE id = ${id}
-      RETURNING *
-    `.execute(db);
+      // Mark dispatch confirmed
+      const updated = await sql`
+        UPDATE trace_dispatches
+        SET status = 'confirmed',
+            quantity_dispatched = ${d.quantity_dispatched},
+            confirmed_at = now(),
+            confirmed_by = ${user.id},
+            notes = COALESCE(${d.notes ?? null}, notes)
+        WHERE id = ${id}
+        RETURNING *
+      `.execute(trx);
 
+      return updated;
+    });
     return c.json({ data: updated.rows[0] });
   });
 
@@ -200,37 +213,42 @@ export function dispatchesRouter(ctx: ExtensionContext): Hono {
 
     const newQty = parseFloat(lot.quantity_remaining) - d.quantity_dispatched;
 
-    await sql`
-      UPDATE trace_lots
-      SET quantity_remaining = ${newQty}, status = ${newQty === 0 ? 'exhausted' : 'available'}
-      WHERE id = ${d.lot_id}
-    `.execute(db);
+    // Same three writes as the confirm route, same reason: on a recall, a lot
+    // whose stock moved without a movement row cannot be traced to anybody.
+    const dispatch = await db.transaction().execute(async (trx) => {
+      await sql`
+        UPDATE trace_lots
+        SET quantity_remaining = ${newQty}, status = ${newQty === 0 ? 'exhausted' : 'available'}
+        WHERE id = ${d.lot_id}
+      `.execute(trx);
 
-    await sql`
-      INSERT INTO trace_movements (
-        lot_id, type, quantity, unit,
-        reference_type, reference_number,
-        customer_id, notes, performed_by, performed_at
-      ) VALUES (
-        ${d.lot_id}, 'dispatch', ${-d.quantity_dispatched}, ${lot.unit},
-        'manual', ${d.invoice_number ?? null},
-        ${d.customer_id ?? null}, ${d.notes ?? null}, ${user.id}, now()
-      )
-    `.execute(db);
+      await sql`
+        INSERT INTO trace_movements (
+          lot_id, type, quantity, unit,
+          reference_type, reference_number,
+          customer_id, notes, performed_by, performed_at
+        ) VALUES (
+          ${d.lot_id}, 'dispatch', ${-d.quantity_dispatched}, ${lot.unit},
+          'manual', ${d.invoice_number ?? null},
+          ${d.customer_id ?? null}, ${d.notes ?? null}, ${user.id}, now()
+        )
+      `.execute(trx);
 
-    const dispatch = await sql`
-      INSERT INTO trace_dispatches (
-        invoice_number, customer_id, customer_name,
-        lot_id, quantity_invoiced, quantity_dispatched, unit,
-        status, confirmed_at, confirmed_by, notes
-      ) VALUES (
-        ${d.invoice_number ?? null}, ${d.customer_id ?? null}, ${d.customer_name},
-        ${d.lot_id}, ${d.quantity_dispatched}, ${d.quantity_dispatched}, ${lot.unit},
-        'confirmed', now(), ${user.id}, ${d.notes ?? null}
-      )
-      RETURNING *
-    `.execute(db);
+      const dispatch = await sql`
+        INSERT INTO trace_dispatches (
+          invoice_number, customer_id, customer_name,
+          lot_id, quantity_invoiced, quantity_dispatched, unit,
+          status, confirmed_at, confirmed_by, notes
+        ) VALUES (
+          ${d.invoice_number ?? null}, ${d.customer_id ?? null}, ${d.customer_name},
+          ${d.lot_id}, ${d.quantity_dispatched}, ${d.quantity_dispatched}, ${lot.unit},
+          'confirmed', now(), ${user.id}, ${d.notes ?? null}
+        )
+        RETURNING *
+      `.execute(trx);
 
+      return dispatch;
+    });
     return c.json({ data: dispatch.rows[0] }, 201);
   });
 

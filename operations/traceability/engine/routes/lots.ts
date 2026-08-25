@@ -118,33 +118,40 @@ export function lotsRouter(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     const lotNumber = generateLotNumber(d.lot_type);
 
-    const row = await sql`
-      INSERT INTO trace_lots (
-        item_id, lot_type, lot_number, status,
-        quantity_initial, quantity_remaining, unit,
-        supplier_id, supplier_lot_ref, best_before_date, production_date,
-        reception_date, invoice_ref, location_id, location_notes,
-        sscc, gtin_scanned, received_by, notes
-      ) VALUES (
-        ${d.item_id}, ${d.lot_type}, ${lotNumber}, 'quarantine',
-        ${d.quantity_initial}, ${d.quantity_initial}, ${d.unit},
-        ${d.supplier_id ?? null}, ${d.supplier_lot_ref ?? null},
-        ${d.best_before_date ?? null}, ${d.production_date ?? null},
-        ${d.reception_date ?? new Date().toISOString().slice(0, 10)},
-        ${d.invoice_ref ?? null}, ${d.location_id ?? null}, ${d.location_notes ?? null},
-        ${d.sscc ?? null}, ${d.gtin_scanned ?? null}, ${user.id}, ${d.notes ?? null}
-      )
-      RETURNING *
-    `.execute(db);
+    // A lot and the reception movement that brought it in. The movement is the
+    // first link in the chain this register exists to keep: a lot whose history
+    // begins with nothing cannot be traced back to the supplier or the delivery
+    // it arrived on, and that is the direction a recall travels.
+    const lot = await db.transaction().execute(async (trx) => {
+      const row = await sql`
+        INSERT INTO trace_lots (
+          item_id, lot_type, lot_number, status,
+          quantity_initial, quantity_remaining, unit,
+          supplier_id, supplier_lot_ref, best_before_date, production_date,
+          reception_date, invoice_ref, location_id, location_notes,
+          sscc, gtin_scanned, received_by, notes
+        ) VALUES (
+          ${d.item_id}, ${d.lot_type}, ${lotNumber}, 'quarantine',
+          ${d.quantity_initial}, ${d.quantity_initial}, ${d.unit},
+          ${d.supplier_id ?? null}, ${d.supplier_lot_ref ?? null},
+          ${d.best_before_date ?? null}, ${d.production_date ?? null},
+          ${d.reception_date ?? new Date().toISOString().slice(0, 10)},
+          ${d.invoice_ref ?? null}, ${d.location_id ?? null}, ${d.location_notes ?? null},
+          ${d.sscc ?? null}, ${d.gtin_scanned ?? null}, ${user.id}, ${d.notes ?? null}
+        )
+        RETURNING *
+      `.execute(trx);
 
-    const lot = row.rows[0] as any;
+      const lot = row.rows[0] as any;
 
-    // Record reception movement
-    await sql`
-      INSERT INTO trace_movements (lot_id, type, quantity, unit, reference_type, reference_number, to_location_id, performed_by, performed_at)
-      VALUES (${lot.id}, 'reception', ${d.quantity_initial}, ${d.unit}, 'reception', ${lotNumber}, ${d.location_id ?? null}, ${user.id}, now())
-    `.execute(db);
+      // Record reception movement
+      await sql`
+        INSERT INTO trace_movements (lot_id, type, quantity, unit, reference_type, reference_number, to_location_id, performed_by, performed_at)
+        VALUES (${lot.id}, 'reception', ${d.quantity_initial}, ${d.unit}, 'reception', ${lotNumber}, ${d.location_id ?? null}, ${user.id}, now())
+      `.execute(trx);
 
+      return lot;
+    });
     return c.json({ data: lot }, 201);
   });
 
