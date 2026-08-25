@@ -186,27 +186,35 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
       const { name, description, collection, items } = c.req.valid('json');
-      const template = await db
-        .insertInto('zv_checklist_templates')
-        .values({ name, description, collection: collection || null })
-        .returningAll()
-        .executeTakeFirst();
+      // A template is its items. One created without them is not a smaller
+      // template, it is a broken one: every checklist made from it afterwards
+      // comes out empty, and the failure surfaces days later as "the checklist
+      // has nothing on it" rather than as the insert that actually failed.
+      const template = await db.transaction().execute(async (trx) => {
+        const created = await trx
+          .insertInto('zv_checklist_templates')
+          .values({ name, description, collection: collection || null })
+          .returningAll()
+          .executeTakeFirst();
 
-      if (items.length > 0) {
-        await db.insertInto('zv_checklist_template_items')
-          .values(items.map((item: any, i: number) => ({
-            template_id: template.id,
-            label: item.label,
-            description: item.description,
-            required: item.required,
-            order_idx: item.order_idx ?? i,
-            time_estimate_minutes: item.time_estimate_minutes ?? null,
-            assignee_role: item.assignee_role ?? null,
-            condition_item_label: item.condition_item_label ?? null,
-            condition_checked: item.condition_checked ?? null,
-          })))
-          .execute();
-      }
+        if (items.length > 0) {
+          await trx
+            .insertInto('zv_checklist_template_items')
+            .values(items.map((item: any, i: number) => ({
+              template_id: created.id,
+              label: item.label,
+              description: item.description,
+              required: item.required,
+              order_idx: item.order_idx ?? i,
+              time_estimate_minutes: item.time_estimate_minutes ?? null,
+              assignee_role: item.assignee_role ?? null,
+              condition_item_label: item.condition_item_label ?? null,
+              condition_checked: item.condition_checked ?? null,
+            })))
+            .execute();
+        }
+        return created;
+      });
 
       const templateItems = await db
         .selectFrom('zv_checklist_template_items')
@@ -287,31 +295,46 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
       if ('collection' in fields) updateFields.collection = fields.collection;
       if (fields.is_active !== undefined) updateFields.is_active = fields.is_active;
 
-      const template = await db
-        .updateTable('zv_checklist_templates')
-        .set(updateFields)
-        .where('id', '=', id)
-        .returningAll()
-        .executeTakeFirst();
+      // Replacing the item list is a delete followed by an insert, which is the
+      // one shape where a failure between the two is not a partial write but a
+      // deletion. Editing a template's name with `items` present and having the
+      // insert refused would leave the template with no items at all — and the
+      // checklists created from it afterwards empty.
+      //
+      // Atomic today only because the request-level tenant transaction happens to
+      // span both. That transaction is there for RLS and its boundary is moving.
+      const template = await db.transaction().execute(async (trx) => {
+        const updated = await trx
+          .updateTable('zv_checklist_templates')
+          .set(updateFields)
+          .where('id', '=', id)
+          .returningAll()
+          .executeTakeFirst();
 
-      if (items !== undefined) {
-        await db.deleteFrom('zv_checklist_template_items').where('template_id', '=', id).execute();
-        if (items.length > 0) {
-          await db.insertInto('zv_checklist_template_items')
-            .values(items.map((item, i) => ({
-              template_id: id,
-              label: item.label,
-              description: item.description,
-              required: item.required,
-              order_idx: item.order_idx ?? i,
-              time_estimate_minutes: (item as any).time_estimate_minutes ?? null,
-              assignee_role: (item as any).assignee_role ?? null,
-              condition_item_label: (item as any).condition_item_label ?? null,
-              condition_checked: (item as any).condition_checked ?? null,
-            })))
+        if (items !== undefined) {
+          await trx
+            .deleteFrom('zv_checklist_template_items')
+            .where('template_id', '=', id)
             .execute();
+          if (items.length > 0) {
+            await trx
+              .insertInto('zv_checklist_template_items')
+              .values(items.map((item, i) => ({
+                template_id: id,
+                label: item.label,
+                description: item.description,
+                required: item.required,
+                order_idx: item.order_idx ?? i,
+                time_estimate_minutes: (item as any).time_estimate_minutes ?? null,
+                assignee_role: (item as any).assignee_role ?? null,
+                condition_item_label: (item as any).condition_item_label ?? null,
+                condition_checked: (item as any).condition_checked ?? null,
+              })))
+              .execute();
+          }
         }
-      }
+        return updated;
+      });
 
       const templateItems = await db
         .selectFrom('zv_checklist_template_items')
@@ -393,38 +416,43 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
       const { collection, recordId } = c.req.param();
       const { template_id, name, items: customItems } = c.req.valid('json');
 
-      const checklist = await db
-        .insertInto('zv_checklists')
-        .values({
-          template_id: template_id || null,
-          collection,
-          record_id: recordId,
-          name,
-          created_by: user.id,
-        })
-        .returningAll()
-        .executeTakeFirst();
+      // Same reason as the template: a checklist without its items is not a
+      // shorter checklist, it is an empty one attached to a record, and whoever
+      // opens it has nothing to tick and no sign anything went wrong.
+      const checklist = await db.transaction().execute(async (trx) => {
+        const created = await trx
+          .insertInto('zv_checklists')
+          .values({
+            template_id: template_id || null,
+            collection,
+            record_id: recordId,
+            name,
+            created_by: user.id,
+          })
+          .returningAll()
+          .executeTakeFirst();
 
-      let itemsToInsert: any[] = [];
-      if (template_id) {
-        itemsToInsert = await db
-          .selectFrom('zv_checklist_template_items')
-          .selectAll()
-          .where('template_id', '=', template_id)
-          .orderBy('order_idx', 'asc')
-          .execute();
-      } else if (customItems) {
-        itemsToInsert = customItems;
-      }
+        let itemsToInsert: any[] = [];
+        if (template_id) {
+          itemsToInsert = await trx
+            .selectFrom('zv_checklist_template_items')
+            .selectAll()
+            .where('template_id', '=', template_id)
+            .orderBy('order_idx', 'asc')
+            .execute();
+        } else if (customItems) {
+          itemsToInsert = customItems;
+        }
 
-      if (itemsToInsert.length > 0) {
-        await db.insertInto('zv_checklist_items')
-          .values(itemsToInsert.map((item: any, i: number) => ({
-            checklist_id: checklist.id,
-            label: item.label,
-            description: item.description,
-            required: item.required ?? false,
-            order_idx: item.order_idx ?? i,
+        if (itemsToInsert.length > 0) {
+          await trx
+            .insertInto('zv_checklist_items')
+            .values(itemsToInsert.map((item: any, i: number) => ({
+              checklist_id: created.id,
+              label: item.label,
+              description: item.description,
+              required: item.required ?? false,
+              order_idx: item.order_idx ?? i,
             // Which template item this copy came from — set only when the
             // checklist was built from a template; an ad-hoc one has no origin.
             //
@@ -432,10 +460,12 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
             // this the only link back is the label, and the first typo fixed in
             // a template would detach every weight. Silently, and in the
             // direction that flatters the score.
-            template_item_id: template_id ? (item.id ?? null) : null,
-          })))
-          .execute();
-      }
+              template_item_id: template_id ? (item.id ?? null) : null,
+            })))
+            .execute();
+        }
+        return created;
+      });
 
       const items = await db
         .selectFrom('zv_checklist_items')
@@ -1068,17 +1098,24 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
         }
       }
 
-      await db
-        .deleteFrom('zv_checklist_scheme_weights')
-        .where('scheme_id', '=', schemeId)
-        .execute();
-
-      if (weights.length > 0) {
-        await db
-          .insertInto('zv_checklist_scheme_weights')
-          .values(weights.map((w) => ({ scheme_id: schemeId, ...w })) as never)
+      // Delete-then-insert, so a failure between the two is a deletion rather
+      // than a partial write: the scheme would be left weighting nothing, and
+      // `scoreChecklist` skips a scheme whose weights cover none of the items —
+      // "absence is the truth", as it says there. Every checklist scored after
+      // that would quietly lose this scheme, with no error anywhere.
+      await db.transaction().execute(async (trx) => {
+        await trx
+          .deleteFrom('zv_checklist_scheme_weights')
+          .where('scheme_id', '=', schemeId)
           .execute();
-      }
+
+        if (weights.length > 0) {
+          await trx
+            .insertInto('zv_checklist_scheme_weights')
+            .values(weights.map((w) => ({ scheme_id: schemeId, ...w })) as never)
+            .execute();
+        }
+      });
 
       return c.json({ success: true, count: weights.length });
     },
