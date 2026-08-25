@@ -72943,7 +72943,8 @@ async function syncImapAccount(db, account) {
             if (msg.uid > highestSeen)
               highestSeen = msg.uid;
             const parsed = parseEnvelope(msg);
-            const inserted = await sql`
+            const inserted = await db.transaction().execute(async (trx) => {
+              const created = await sql`
               INSERT INTO zv_mail_messages (
                 account_id, folder_id, message_id, uid, thread_id,
                 from_address, from_name, to_addresses, cc_addresses,
@@ -72958,11 +72959,11 @@ async function syncImapAccount(db, account) {
               )
               ON CONFLICT DO NOTHING
               RETURNING id
-            `.execute(db);
-            const newId = inserted.rows[0]?.id;
-            if (newId) {
-              for (const att of collectAttachments(msg.bodyStructure)) {
-                await sql`
+            `.execute(trx);
+              const newId = created.rows[0]?.id;
+              if (newId) {
+                for (const att of collectAttachments(msg.bodyStructure)) {
+                  await sql`
                   INSERT INTO zv_mail_attachments (
                     message_id, filename, mime_type, size_bytes, content_id, is_inline, part
                   ) VALUES (
@@ -72970,12 +72971,14 @@ async function syncImapAccount(db, account) {
                     ${att.contentId}, ${att.isInline}, ${att.part}
                   )
                   ON CONFLICT (message_id, part) DO NOTHING
-                `.execute(db);
+                `.execute(trx);
+                }
               }
-            }
-            if (newId) {
+              return newId;
+            });
+            if (inserted) {
               arrived.push({
-                id: newId,
+                id: inserted,
                 from_address: parsed.from.address,
                 to_addresses: parsed.to,
                 subject: parsed.subject
@@ -74834,7 +74837,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
+// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.8.0+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -89404,24 +89407,26 @@ function mailRoutes(ctx) {
     } catch (err) {
       return c.json({ error: `IMAP connection failed: ${err.message}` }, 400);
     }
-    if (data.is_default) {
-      await sql`UPDATE zv_mail_accounts SET is_default = false WHERE user_id = ${user.id}`.execute(db);
-    }
     const encryptedImapPass = await encryptPassword(data.imap_password);
     const encryptedSmtpPass = data.smtp_password ? await encryptPassword(data.smtp_password) : null;
-    const inserted = await sql`
-      INSERT INTO zv_mail_accounts (
-        user_id, name, email_address, display_name,
-        imap_host, imap_port, imap_secure, imap_user, imap_password,
-        smtp_host, smtp_port, smtp_secure, smtp_user, smtp_password, is_default
-      ) VALUES (
-        ${user.id}, ${data.name}, ${data.email_address}, ${data.display_name ?? null},
-        ${data.imap_host}, ${data.imap_port}, ${data.imap_secure}, ${data.imap_user}, ${encryptedImapPass},
-        ${data.smtp_host}, ${data.smtp_port}, ${data.smtp_secure},
-        ${data.smtp_user ?? null}, ${encryptedSmtpPass}, ${data.is_default}
-      )
-      RETURNING *
-    `.execute(db);
+    const inserted = await db.transaction().execute(async (trx) => {
+      if (data.is_default) {
+        await sql`UPDATE zv_mail_accounts SET is_default = false WHERE user_id = ${user.id}`.execute(trx);
+      }
+      return await sql`
+        INSERT INTO zv_mail_accounts (
+          user_id, name, email_address, display_name,
+          imap_host, imap_port, imap_secure, imap_user, imap_password,
+          smtp_host, smtp_port, smtp_secure, smtp_user, smtp_password, is_default
+        ) VALUES (
+          ${user.id}, ${data.name}, ${data.email_address}, ${data.display_name ?? null},
+          ${data.imap_host}, ${data.imap_port}, ${data.imap_secure}, ${data.imap_user}, ${encryptedImapPass},
+          ${data.smtp_host}, ${data.smtp_port}, ${data.smtp_secure},
+          ${data.smtp_user ?? null}, ${encryptedSmtpPass}, ${data.is_default}
+        )
+        RETURNING *
+      `.execute(trx);
+    });
     const account = inserted.rows[0];
     syncImapAccount(db, account).catch((err) => console.error(`[mail] Initial sync failed [${account.id}]:`, err));
     return c.json({ account: { ...account, imap_password: "***", smtp_password: "***" } }, 201);
@@ -89434,18 +89439,20 @@ function mailRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const data = c.req.valid("json");
-    if (data.is_default) {
-      await sql`UPDATE zv_mail_accounts SET is_default = false WHERE user_id = ${user.id}`.execute(db);
-    }
-    await sql`
-      UPDATE zv_mail_accounts SET
-        name = COALESCE(${data.name ?? null}, name),
-        display_name = COALESCE(${data.display_name ?? null}, display_name),
-        is_default = COALESCE(${data.is_default ?? null}::boolean, is_default),
-        is_active = COALESCE(${data.is_active ?? null}::boolean, is_active),
-        updated_at = NOW()
-      WHERE id = ${c.req.param("id")} AND user_id = ${user.id}
-    `.execute(db);
+    await db.transaction().execute(async (trx) => {
+      if (data.is_default) {
+        await sql`UPDATE zv_mail_accounts SET is_default = false WHERE user_id = ${user.id}`.execute(trx);
+      }
+      await sql`
+        UPDATE zv_mail_accounts SET
+          name = COALESCE(${data.name ?? null}, name),
+          display_name = COALESCE(${data.display_name ?? null}, display_name),
+          is_default = COALESCE(${data.is_default ?? null}::boolean, is_default),
+          is_active = COALESCE(${data.is_active ?? null}::boolean, is_active),
+          updated_at = NOW()
+        WHERE id = ${c.req.param("id")} AND user_id = ${user.id}
+      `.execute(trx);
+    });
     return c.json({ success: true });
   });
   app.delete("/accounts/:id", async (c) => {
@@ -90158,18 +90165,20 @@ Please draft a reply to this email.`
   })), async (c) => {
     const user = c.get("user");
     const data = c.req.valid("json");
-    if (data.is_default) {
-      await sql`UPDATE zv_mail_signatures SET is_default = false WHERE user_id = ${user.id}`.execute(db);
-    }
-    await sql`
-      UPDATE zv_mail_signatures SET
-        name = COALESCE(${data.name ?? null}, name),
-        body_html = COALESCE(${data.body_html ?? null}, body_html),
-        body_text = COALESCE(${data.body_text ?? null}, body_text),
-        is_default = COALESCE(${data.is_default ?? null}::boolean, is_default),
-        updated_at = NOW()
-      WHERE id = ${c.req.param("id")} AND user_id = ${user.id}
-    `.execute(db);
+    await db.transaction().execute(async (trx) => {
+      if (data.is_default) {
+        await sql`UPDATE zv_mail_signatures SET is_default = false WHERE user_id = ${user.id}`.execute(trx);
+      }
+      await sql`
+        UPDATE zv_mail_signatures SET
+          name = COALESCE(${data.name ?? null}, name),
+          body_html = COALESCE(${data.body_html ?? null}, body_html),
+          body_text = COALESCE(${data.body_text ?? null}, body_text),
+          is_default = COALESCE(${data.is_default ?? null}::boolean, is_default),
+          updated_at = NOW()
+        WHERE id = ${c.req.param("id")} AND user_id = ${user.id}
+      `.execute(trx);
+    });
     return c.json({ success: true });
   });
   app.delete("/signatures/:id", async (c) => {

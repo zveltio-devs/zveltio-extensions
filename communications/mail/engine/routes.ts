@@ -148,27 +148,37 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: `IMAP connection failed: ${err.message}` }, 400);
     }
 
-    // If is_default, clear existing default
-    if (data.is_default) {
-      await sql`UPDATE zv_mail_accounts SET is_default = false WHERE user_id = ${user.id}`.execute(db);
-    }
-
     const encryptedImapPass = await encryptPassword(data.imap_password);
     const encryptedSmtpPass = data.smtp_password ? await encryptPassword(data.smtp_password) : null;
 
-    const inserted = await sql`
-      INSERT INTO zv_mail_accounts (
-        user_id, name, email_address, display_name,
-        imap_host, imap_port, imap_secure, imap_user, imap_password,
-        smtp_host, smtp_port, smtp_secure, smtp_user, smtp_password, is_default
-      ) VALUES (
-        ${user.id}, ${data.name}, ${data.email_address}, ${data.display_name ?? null},
-        ${data.imap_host}, ${data.imap_port}, ${data.imap_secure}, ${data.imap_user}, ${encryptedImapPass},
-        ${data.smtp_host}, ${data.smtp_port}, ${data.smtp_secure},
-        ${data.smtp_user ?? null}, ${encryptedSmtpPass}, ${data.is_default}
-      )
-      RETURNING *
-    `.execute(db);
+    // Demoting the old default and inserting the new one are one change. Split,
+    // the user is left with no default account at all — every route that reaches
+    // for one finds nothing, and the mail client opens on an empty screen with
+    // the accounts still listed.
+    //
+    // The IMAP connection test above stays OUTSIDE: it talks to another host,
+    // and holding a database transaction open across a network round trip is
+    // how a connection pool gets pinned by something that is not the database's
+    // fault.
+    const inserted = await db.transaction().execute(async (trx) => {
+      // If is_default, clear existing default
+      if (data.is_default) {
+        await sql`UPDATE zv_mail_accounts SET is_default = false WHERE user_id = ${user.id}`.execute(trx);
+      }
+      return await sql`
+        INSERT INTO zv_mail_accounts (
+          user_id, name, email_address, display_name,
+          imap_host, imap_port, imap_secure, imap_user, imap_password,
+          smtp_host, smtp_port, smtp_secure, smtp_user, smtp_password, is_default
+        ) VALUES (
+          ${user.id}, ${data.name}, ${data.email_address}, ${data.display_name ?? null},
+          ${data.imap_host}, ${data.imap_port}, ${data.imap_secure}, ${data.imap_user}, ${encryptedImapPass},
+          ${data.smtp_host}, ${data.smtp_port}, ${data.smtp_secure},
+          ${data.smtp_user ?? null}, ${encryptedSmtpPass}, ${data.is_default}
+        )
+        RETURNING *
+      `.execute(trx);
+    });
 
     const account = inserted.rows[0] as any;
 
@@ -190,19 +200,23 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const data = c.req.valid('json');
 
-    if (data.is_default) {
-      await sql`UPDATE zv_mail_accounts SET is_default = false WHERE user_id = ${user.id}`.execute(db);
-    }
+    // Same pair as the create route: the demotion of whatever was default and
+    // the promotion of this account. Between them the user has no default.
+    await db.transaction().execute(async (trx) => {
+      if (data.is_default) {
+        await sql`UPDATE zv_mail_accounts SET is_default = false WHERE user_id = ${user.id}`.execute(trx);
+      }
 
-    await sql`
-      UPDATE zv_mail_accounts SET
-        name = COALESCE(${data.name ?? null}, name),
-        display_name = COALESCE(${data.display_name ?? null}, display_name),
-        is_default = COALESCE(${data.is_default ?? null}::boolean, is_default),
-        is_active = COALESCE(${data.is_active ?? null}::boolean, is_active),
-        updated_at = NOW()
-      WHERE id = ${c.req.param('id')} AND user_id = ${user.id}
-    `.execute(db);
+      await sql`
+        UPDATE zv_mail_accounts SET
+          name = COALESCE(${data.name ?? null}, name),
+          display_name = COALESCE(${data.display_name ?? null}, display_name),
+          is_default = COALESCE(${data.is_default ?? null}::boolean, is_default),
+          is_active = COALESCE(${data.is_active ?? null}::boolean, is_active),
+          updated_at = NOW()
+        WHERE id = ${c.req.param('id')} AND user_id = ${user.id}
+      `.execute(trx);
+    });
     return c.json({ success: true });
   });
 
@@ -1192,19 +1206,23 @@ Please draft a reply to this email.`,
     const user = c.get('user') as any;
     const data = c.req.valid('json');
 
-    if (data.is_default) {
-      await sql`UPDATE zv_mail_signatures SET is_default = false WHERE user_id = ${user.id}`.execute(db);
-    }
+    // One default, demoted and promoted together. Split, every reply is composed
+    // with no signature until somebody notices and sets one again.
+    await db.transaction().execute(async (trx) => {
+      if (data.is_default) {
+        await sql`UPDATE zv_mail_signatures SET is_default = false WHERE user_id = ${user.id}`.execute(trx);
+      }
 
-    await sql`
-      UPDATE zv_mail_signatures SET
-        name = COALESCE(${data.name ?? null}, name),
-        body_html = COALESCE(${data.body_html ?? null}, body_html),
-        body_text = COALESCE(${data.body_text ?? null}, body_text),
-        is_default = COALESCE(${data.is_default ?? null}::boolean, is_default),
-        updated_at = NOW()
-      WHERE id = ${c.req.param('id')} AND user_id = ${user.id}
-    `.execute(db);
+      await sql`
+        UPDATE zv_mail_signatures SET
+          name = COALESCE(${data.name ?? null}, name),
+          body_html = COALESCE(${data.body_html ?? null}, body_html),
+          body_text = COALESCE(${data.body_text ?? null}, body_text),
+          is_default = COALESCE(${data.is_default ?? null}::boolean, is_default),
+          updated_at = NOW()
+        WHERE id = ${c.req.param('id')} AND user_id = ${user.id}
+      `.execute(trx);
+    });
     return c.json({ success: true });
   });
 
