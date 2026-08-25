@@ -275,44 +275,55 @@ export function formsRoutes(
       if (allowedIds.has(k)) cleanData[k] = v;
     }
 
-    // Insert submission
-    const submission = await (db as any)
-      .insertInto('zv_form_submissions')
-      .values({
-        form_id: form.id,
-        // `::text::jsonb`, not a bare string. `data` is a jsonb column, and a
-        // JS string bound to one arrives AS a jsonb value — so the serialized
-        // document landed as a single string SCALAR and `jsonb_typeof(data)`
-        // read back "string".
-        //
-        // Nothing SQL-side could look inside a submission after that: no
-        // `data->>'field'`, no filtering on an answer. Every reader had to parse
-        // it in JavaScript first, and a page rendering it straight would have
-        // walked the string character by character.
-        data: sql`${JSON.stringify(cleanData)}::text::jsonb`,
-        ip_address: ip,
-        user_agent: c.req.header('user-agent') ?? null,
-      })
-      .returningAll()
-      .executeTakeFirst();
+    // The submission row and the record it is mapped into go together.
+    //
+    // The `try/catch` here said "Don't fail the submission" — and it did the
+    // opposite. A failed insert into the target collection aborts the
+    // transaction, so the SUBMISSION ITSELF never commits either, while this
+    // handler answers success. The visitor is told their form was received and
+    // there is no trace of it anywhere.
+    //
+    // Failing loudly is the lesser harm on a public form: the visitor sees an
+    // error and can try again, and a misconfigured target collection becomes an
+    // operator's problem instead of silent data loss.
+    const submission = await db.transaction().execute(async (trx) => {
+      // Insert submission
+      const submission = await (trx as any)
+        .insertInto('zv_form_submissions')
+        .values({
+          form_id: form.id,
+          // `::text::jsonb`, not a bare string. `data` is a jsonb column, and a
+          // JS string bound to one arrives AS a jsonb value — so the serialized
+          // document landed as a single string SCALAR and `jsonb_typeof(data)`
+          // read back "string".
+          //
+          // Nothing SQL-side could look inside a submission after that: no
+          // `data->>'field'`, no filtering on an answer. Every reader had to parse
+          // it in JavaScript first, and a page rendering it straight would have
+          // walked the string character by character.
+          data: sql`${JSON.stringify(cleanData)}::text::jsonb`,
+          ip_address: ip,
+          user_agent: c.req.header('user-agent') ?? null,
+        })
+        .returningAll()
+        .executeTakeFirst();
 
-    // If target_collection is set, insert record via DDLManager (S4-08:
-    // use the typed instance from ctx instead of dynamic-importing engine
-    // internals).
-    if (form.target_collection) {
-      try {
-        const col = await ctx.DDLManager.getCollection(db, form.target_collection);
-        if (col) {
-          await (db as any)
-            .insertInto(form.target_collection)
-            .values(cleanData as any)
-            .execute();
+      // If target_collection is set, insert record via DDLManager (S4-08:
+      // use the typed instance from ctx instead of dynamic-importing engine
+      // internals).
+      if (form.target_collection) {
+        {
+          const col = await ctx.DDLManager.getCollection(trx, form.target_collection);
+          if (col) {
+            await (trx as any)
+              .insertInto(form.target_collection)
+              .values(cleanData as any)
+              .execute();
+          }
         }
-      } catch (err) {
-        console.error('[Forms] Failed to insert into target_collection:', err);
-        // Don't fail the submission
       }
-    }
+      return submission;
+    });
 
     return c.json({ success: true, submission_id: submission.id }, 201);
   });
