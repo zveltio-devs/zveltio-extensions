@@ -3,7 +3,7 @@
   "displayName": "Checklists",
   "category": "workflow",
   "description": "Attach reusable checklists to any collection record",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-checklists",
@@ -34,8 +34,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "f42af9c4fc6980ee47eda807ed99f61f588526ba4249f4b9e20a543993911493",
-    "sourceSha256": "c97b8aa34a022d4a6e22f686422519591069dd7b608a7e55c8a4abe6662de210"
+    "engineSha256": "6fa0c1b2122483f835fad18e88af0babba3e215671c704e30d410b4057c5cb89",
+    "sourceSha256": "5072ba3971501e6a62050110888f0aa1381b460134c81b33fc7165d7598cfef7"
   },
   "resources": [
     "checklists"
