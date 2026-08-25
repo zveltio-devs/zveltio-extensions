@@ -370,19 +370,48 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     return c.json(toScimUser(row.rows[0], { external_id: body?.externalId ?? null, active }), 201);
   });
 
-  async function setActive(userId: string, tenantId: string, active: boolean): Promise<void> {
+  /**
+   * Record the active flag and, on deactivation, enforce it.
+   *
+   * All three statements are one security decision and they now commit or fail
+   * together. Before, the flag was written first and the two enforcement
+   * statements each carried `.catch(() => undefined)`.
+   *
+   * That is a hole, not a nicety. A failed session delete meant the directory
+   * recorded the user as inactive, this function returned normally, and the IdP
+   * was told the deactivation succeeded — while the user's session was still
+   * live and they stayed signed in. Deprovisioning is the one operation an
+   * administrator must be able to believe: somebody is removed at the IdP
+   * precisely because they should no longer have access, and the request that
+   * says "done" is the only signal anybody gets.
+   *
+   * The swallows could not contain anything either. Inside the surrounding
+   * transaction Postgres refuses every statement after a failed one, so
+   * catching the session delete only moved the error to the password reset and
+   * reported it as that.
+   *
+   * Failing loudly is the correct answer here: the IdP retries deprovisioning,
+   * and a half-deactivated account never exists.
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: Kysely transaction handle
+  async function setActive(
+    trx: any,
+    userId: string,
+    tenantId: string,
+    active: boolean,
+  ): Promise<void> {
     await sql`
       INSERT INTO zv_scim_users (tenant_id, user_id, active)
       VALUES (${tenantId}::uuid, ${userId}, ${active})
       ON CONFLICT (tenant_id, user_id) DO UPDATE SET active = EXCLUDED.active, updated_at = NOW()
-    `.execute(db);
+    `.execute(trx);
     if (!active) {
       // Enforce: instant sign-out + password login impossible until reset/SSO.
-      await sql`DELETE FROM "session" WHERE "userId" = ${userId}`.execute(db).catch(() => undefined);
+      await sql`DELETE FROM "session" WHERE "userId" = ${userId}`.execute(trx);
       await sql`
         UPDATE "account" SET password = ${`scim-deactivated-${randomUUID()}`}
         WHERE "userId" = ${userId} AND "providerId" = 'credential'
-      `.execute(db).catch(() => undefined);
+      `.execute(trx);
     }
   }
 
@@ -418,21 +447,27 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     const name: string = body?.name?.formatted ?? body?.displayName ?? email;
     const active = body?.active !== false;
 
-    await sql`
-      UPDATE "user" SET name = ${name}, email = ${email}, "updatedAt" = NOW() WHERE id = ${id}
-    `.execute(db);
+    // A PUT is a full replace, so the profile, the SCIM record and the
+    // enforcement `setActive` performs are one state. A profile updated without
+    // the deactivation taking effect is the dangerous half: the IdP is told the
+    // replace succeeded, `active: false` and all.
+    await db.transaction().execute(async (trx) => {
+      await sql`
+        UPDATE "user" SET name = ${name}, email = ${email}, "updatedAt" = NOW() WHERE id = ${id}
+      `.execute(trx);
 
-    await sql`
-      INSERT INTO zv_scim_users (tenant_id, user_id, external_id, active)
-      VALUES (${tenantId}::uuid, ${id}, ${body?.externalId ?? null}, ${active})
-      ON CONFLICT (tenant_id, user_id)
-      DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active
-    `.execute(db);
+      await sql`
+        INSERT INTO zv_scim_users (tenant_id, user_id, external_id, active)
+        VALUES (${tenantId}::uuid, ${id}, ${body?.externalId ?? null}, ${active})
+        ON CONFLICT (tenant_id, user_id)
+        DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active
+      `.execute(trx);
 
-    // `setActive` is what actually revokes sessions on deactivation; calling it
-    // rather than only writing the column keeps PUT and PATCH doing the same
-    // thing for the same input.
-    await setActive(id, tenantId, active);
+      // `setActive` is what actually revokes sessions on deactivation; calling
+      // it rather than only writing the column keeps PUT and PATCH doing the
+      // same thing for the same input.
+      await setActive(trx, id, tenantId, active);
+    });
 
     const row = await sql`SELECT id, name, email, "createdAt" FROM "user" WHERE id = ${id}`.execute(db);
     if (!row.rows[0]) return scimError(c, 404, 'User not found');
@@ -452,23 +487,29 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     if (!body?.schemas?.includes(SCIM_PATCH) || !Array.isArray(body.Operations)) {
       return scimError(c, 400, 'Expected a SCIM PatchOp payload');
     }
-    for (const op of body.Operations) {
-      const kind = String(op.op ?? '').toLowerCase();
-      if (kind !== 'replace' && kind !== 'add') continue;
-      const path = String(op.path ?? '').toLowerCase();
-      if (path === 'active') {
-        await setActive(id, tenantId, op.value === true || op.value === 'True' || op.value === 'true');
-      } else if (path === 'displayname' || path === 'name.formatted') {
-        await sql`UPDATE "user" SET name = ${String(op.value)}, "updatedAt" = NOW() WHERE id = ${id}`.execute(db);
-      } else if (!path && op.value && typeof op.value === 'object') {
-        if ('active' in op.value) {
-          await setActive(id, tenantId, op.value.active === true || op.value.active === 'True' || op.value.active === 'true');
-        }
-        if (typeof op.value.displayName === 'string') {
-          await sql`UPDATE "user" SET name = ${op.value.displayName}, "updatedAt" = NOW() WHERE id = ${id}`.execute(db);
+    // RFC 7644 §3.5.2: a PatchOp's operations are applied as a set. Half of them
+    // landing is not a partial success, it is a user whose state matches neither
+    // what the IdP sent nor what it had before — and Azure sends deactivation as
+    // one op alongside profile ops in the same request.
+    await db.transaction().execute(async (trx) => {
+      for (const op of body.Operations) {
+        const kind = String(op.op ?? '').toLowerCase();
+        if (kind !== 'replace' && kind !== 'add') continue;
+        const path = String(op.path ?? '').toLowerCase();
+        if (path === 'active') {
+          await setActive(trx, id, tenantId, op.value === true || op.value === 'True' || op.value === 'true');
+        } else if (path === 'displayname' || path === 'name.formatted') {
+          await sql`UPDATE "user" SET name = ${String(op.value)}, "updatedAt" = NOW() WHERE id = ${id}`.execute(trx);
+        } else if (!path && op.value && typeof op.value === 'object') {
+          if ('active' in op.value) {
+            await setActive(trx, id, tenantId, op.value.active === true || op.value.active === 'True' || op.value.active === 'true');
+          }
+          if (typeof op.value.displayName === 'string') {
+            await sql`UPDATE "user" SET name = ${op.value.displayName}, "updatedAt" = NOW() WHERE id = ${id}`.execute(trx);
+          }
         }
       }
-    }
+    });
     const row = await sql<Record<string, unknown>>`
       SELECT id, email, name, "createdAt", "updatedAt" FROM "user" WHERE id = ${id}
     `.execute(db);
@@ -490,23 +531,40 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     const tenantId = tenantOf(c);
     if (!(await isMember(id, tenantId))) return scimError(c, 404, 'User not found');
 
-    await sql`
-      DELETE FROM zv_tenant_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
-    `.execute(db);
-    await sql`
-      DELETE FROM zv_scim_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
-    `.execute(db).catch(() => undefined);
-    // Sessions go regardless: losing access to this tenant has to take effect
-    // now, and a session is instance-wide.
-    await sql`DELETE FROM "session" WHERE "userId" = ${id}`.execute(db).catch(() => undefined);
+    // Offboarding is one act, and the count that decides whether the account
+    // itself goes is a read taken BETWEEN the writes.
+    //
+    // Outside a transaction that read sees a database other requests are
+    // changing: two tenants deprovisioning the same person at once can each
+    // still see the other's membership and each decline to remove the account,
+    // leaving a `"user"` row no tenant claims and nobody will ever look at
+    // again. Splitting the writes is worse — membership gone but sessions
+    // untouched means somebody who has just been offboarded is still signed in,
+    // and the IdP has already been told the removal succeeded.
+    //
+    // The `.catch(() => undefined)` on three of these is gone with them. It
+    // contained nothing (Postgres refuses every statement after a failed one
+    // inside a transaction) and it turned a failed session delete — the whole
+    // point of the operation — into a silent success.
+    await db.transaction().execute(async (trx) => {
+      await sql`
+        DELETE FROM zv_tenant_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
+      `.execute(trx);
+      await sql`
+        DELETE FROM zv_scim_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
+      `.execute(trx);
+      // Sessions go regardless: losing access to this tenant has to take effect
+      // now, and a session is instance-wide.
+      await sql`DELETE FROM "session" WHERE "userId" = ${id}`.execute(trx);
 
-    const remaining = await sql<{ n: number }>`
-      SELECT COUNT(*)::int AS n FROM zv_tenant_users WHERE user_id = ${id}
-    `.execute(db);
-    if ((remaining.rows[0]?.n ?? 0) === 0) {
-      await sql`DELETE FROM "account" WHERE "userId" = ${id}`.execute(db).catch(() => undefined);
-      await sql`DELETE FROM "user" WHERE id = ${id}`.execute(db);
-    }
+      const remaining = await sql<{ n: number }>`
+        SELECT COUNT(*)::int AS n FROM zv_tenant_users WHERE user_id = ${id}
+      `.execute(trx);
+      if ((remaining.rows[0]?.n ?? 0) === 0) {
+        await sql`DELETE FROM "account" WHERE "userId" = ${id}`.execute(trx);
+        await sql`DELETE FROM "user" WHERE id = ${id}`.execute(trx);
+      }
+    });
     return c.body(null, 204);
   });
 

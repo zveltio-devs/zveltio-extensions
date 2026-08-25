@@ -3,7 +3,7 @@
   "displayName": "SCIM Provisioning",
   "category": "auth",
   "description": "SCIM 2.0 user provisioning for Azure AD / Entra, Okta and other identity providers — bearer tokens, Users CRUD, active-flag offboarding",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-scim",
@@ -23,8 +23,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "0658bbad63c9fdfae9206a20717a0f6755336cda56b7338ebd1174f80a44e246",
-    "sourceSha256": "f2c986ae107f17a6990e2c472a086426db07f615cc31a6f232d18739a60993f8"
+    "engineSha256": "5cf594d4a2b6cde886c29258e015c65b846787f135c08aee17eec2ec23b1d173",
+    "sourceSha256": "123ed9c42dc1e3781dad81ffcc302f96ebd491ed9d81ce133eed7738d5d99087"
   },
   "studio": {
     "navGroup": "other",
