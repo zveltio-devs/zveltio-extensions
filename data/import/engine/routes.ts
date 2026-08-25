@@ -162,7 +162,19 @@ async function runImport(
     .where('id', '=', jobId)
     .execute();
 
-  // Store rollback record if we actually inserted rows
+  // Store rollback record if we actually inserted rows.
+  //
+  // The `.catch(() => { /* non-fatal */ })` that used to be here was the
+  // opposite of non-fatal. `withTenantIsolation` wraps this whole function in
+  // ONE transaction, and Postgres aborts a transaction at the first failed
+  // statement — so a failed insert here did not "skip the rollback record", it
+  // discarded THE ENTIRE IMPORT at commit time while this function returned
+  // normally. The job row it just marked `completed` went back with it, leaving
+  // a job stuck at `running` and not one imported row, with nothing logged.
+  //
+  // It is also the wrong thing to make optional. This row is the only record of
+  // which ids the import created; without it the rollback route below has
+  // nothing to undo, so a bad import of ten thousand rows becomes permanent.
   if (!dryRun && insertedIds.length > 0) {
     await (tdb as any)
       .insertInto('zvd_import_rollbacks')
@@ -171,8 +183,7 @@ async function runImport(
         record_ids: insertedIds,
         status: 'available',
       })
-      .execute()
-      .catch(() => { /* non-fatal */ });
+      .execute();
   }
   });
 }
@@ -453,30 +464,48 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
     const tableName = DDLManager.getTableName(job.collection);
     const recordIds: string[] = rollback.record_ids ?? [];
 
-    // Delete inserted records in batches to avoid enormous IN clauses
-    const BATCH = 500;
-    for (let i = 0; i < recordIds.length; i += BATCH) {
-      const batch = recordIds.slice(i, i + BATCH);
-      await (db as any)
-        .deleteFrom(tableName)
-        .where('id', 'in', batch)
-        .execute()
-        .catch(() => { /* non-fatal per batch */ });
-    }
+    // The deletes and the record that says they happened go together, and the
+    // per-batch `.catch(() => { /* non-fatal per batch */ })` that used to be
+    // here made both claims false.
+    //
+    // A failed batch aborts the transaction, so every batch after it failed
+    // too — and the code then marked the rollback `rolled_back` and answered
+    // `deleted_records: recordIds.length`, a number it had not verified and, in
+    // that case, a lie. Worse, consuming the record is what makes the rollback
+    // unrepeatable: the rows that survived can never be removed, because the
+    // only list of their ids is now marked used.
+    //
+    // Batching stays — the point of it is to keep the IN clauses sane, not to
+    // make the deletes independent.
+    const deleted = await db.transaction().execute(async (trx) => {
+      const BATCH = 500;
+      let removed = 0;
+      for (let i = 0; i < recordIds.length; i += BATCH) {
+        const batch = recordIds.slice(i, i + BATCH);
+        const res = await (trx as any)
+          .deleteFrom(tableName)
+          .where('id', 'in', batch)
+          .executeTakeFirst();
+        removed += Number(res?.numDeletedRows ?? 0);
+      }
 
-    await (db as any)
-      .updateTable('zvd_import_rollbacks')
-      .set({
-        status: 'rolled_back',
-        rolled_back_at: new Date(),
-        rolled_back_by: user.id,
-      })
-      .where('id', '=', rollback.id)
-      .execute();
+      await (trx as any)
+        .updateTable('zvd_import_rollbacks')
+        .set({
+          status: 'rolled_back',
+          rolled_back_at: new Date(),
+          rolled_back_by: user.id,
+        })
+        .where('id', '=', rollback.id)
+        .execute();
+      return removed;
+    });
 
     return c.json({
       success: true,
-      deleted_records: recordIds.length,
+      // What was actually deleted, not what was asked for. Rows an operator had
+      // already removed by hand are not counted twice.
+      deleted_records: deleted,
     });
   });
 
