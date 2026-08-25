@@ -19643,22 +19643,18 @@ function buildScimApp(ctx) {
     `.execute(db);
     return c.json(toScimUser(row.rows[0], { external_id: body?.externalId ?? null, active }), 201);
   });
-  async function setActive(userId, tenantId, active) {
+  async function setActive(trx, userId, tenantId, active) {
     await sql`
       INSERT INTO zv_scim_users (tenant_id, user_id, active)
       VALUES (${tenantId}::uuid, ${userId}, ${active})
       ON CONFLICT (tenant_id, user_id) DO UPDATE SET active = EXCLUDED.active, updated_at = NOW()
-    `.execute(db);
+    `.execute(trx);
     if (!active) {
-      await sql`DELETE FROM "session" WHERE "userId" = ${userId}`.execute(db).catch(() => {
-        return;
-      });
+      await sql`DELETE FROM "session" WHERE "userId" = ${userId}`.execute(trx);
       await sql`
         UPDATE "account" SET password = ${`scim-deactivated-${randomUUID()}`}
         WHERE "userId" = ${userId} AND "providerId" = 'credential'
-      `.execute(db).catch(() => {
-        return;
-      });
+      `.execute(trx);
     }
   }
   app.put("/Users/:id", async (c) => {
@@ -19675,16 +19671,18 @@ function buildScimApp(ctx) {
       return scimError(c, 400, "userName (email) is required");
     const name = body?.name?.formatted ?? body?.displayName ?? email3;
     const active = body?.active !== false;
-    await sql`
-      UPDATE "user" SET name = ${name}, email = ${email3}, "updatedAt" = NOW() WHERE id = ${id}
-    `.execute(db);
-    await sql`
-      INSERT INTO zv_scim_users (tenant_id, user_id, external_id, active)
-      VALUES (${tenantId}::uuid, ${id}, ${body?.externalId ?? null}, ${active})
-      ON CONFLICT (tenant_id, user_id)
-      DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active
-    `.execute(db);
-    await setActive(id, tenantId, active);
+    await db.transaction().execute(async (trx) => {
+      await sql`
+        UPDATE "user" SET name = ${name}, email = ${email3}, "updatedAt" = NOW() WHERE id = ${id}
+      `.execute(trx);
+      await sql`
+        INSERT INTO zv_scim_users (tenant_id, user_id, external_id, active)
+        VALUES (${tenantId}::uuid, ${id}, ${body?.externalId ?? null}, ${active})
+        ON CONFLICT (tenant_id, user_id)
+        DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active
+      `.execute(trx);
+      await setActive(trx, id, tenantId, active);
+    });
     const row = await sql`SELECT id, name, email, "createdAt" FROM "user" WHERE id = ${id}`.execute(db);
     if (!row.rows[0])
       return scimError(c, 404, "User not found");
@@ -19699,24 +19697,26 @@ function buildScimApp(ctx) {
     if (!body?.schemas?.includes(SCIM_PATCH) || !Array.isArray(body.Operations)) {
       return scimError(c, 400, "Expected a SCIM PatchOp payload");
     }
-    for (const op of body.Operations) {
-      const kind = String(op.op ?? "").toLowerCase();
-      if (kind !== "replace" && kind !== "add")
-        continue;
-      const path = String(op.path ?? "").toLowerCase();
-      if (path === "active") {
-        await setActive(id, tenantId, op.value === true || op.value === "True" || op.value === "true");
-      } else if (path === "displayname" || path === "name.formatted") {
-        await sql`UPDATE "user" SET name = ${String(op.value)}, "updatedAt" = NOW() WHERE id = ${id}`.execute(db);
-      } else if (!path && op.value && typeof op.value === "object") {
-        if ("active" in op.value) {
-          await setActive(id, tenantId, op.value.active === true || op.value.active === "True" || op.value.active === "true");
-        }
-        if (typeof op.value.displayName === "string") {
-          await sql`UPDATE "user" SET name = ${op.value.displayName}, "updatedAt" = NOW() WHERE id = ${id}`.execute(db);
+    await db.transaction().execute(async (trx) => {
+      for (const op of body.Operations) {
+        const kind = String(op.op ?? "").toLowerCase();
+        if (kind !== "replace" && kind !== "add")
+          continue;
+        const path = String(op.path ?? "").toLowerCase();
+        if (path === "active") {
+          await setActive(trx, id, tenantId, op.value === true || op.value === "True" || op.value === "true");
+        } else if (path === "displayname" || path === "name.formatted") {
+          await sql`UPDATE "user" SET name = ${String(op.value)}, "updatedAt" = NOW() WHERE id = ${id}`.execute(trx);
+        } else if (!path && op.value && typeof op.value === "object") {
+          if ("active" in op.value) {
+            await setActive(trx, id, tenantId, op.value.active === true || op.value.active === "True" || op.value.active === "true");
+          }
+          if (typeof op.value.displayName === "string") {
+            await sql`UPDATE "user" SET name = ${op.value.displayName}, "updatedAt" = NOW() WHERE id = ${id}`.execute(trx);
+          }
         }
       }
-    }
+    });
     const row = await sql`
       SELECT id, email, name, "createdAt", "updatedAt" FROM "user" WHERE id = ${id}
     `.execute(db);
@@ -19727,26 +19727,22 @@ function buildScimApp(ctx) {
     const tenantId = tenantOf(c);
     if (!await isMember(id, tenantId))
       return scimError(c, 404, "User not found");
-    await sql`
-      DELETE FROM zv_tenant_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
-    `.execute(db);
-    await sql`
-      DELETE FROM zv_scim_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
-    `.execute(db).catch(() => {
-      return;
+    await db.transaction().execute(async (trx) => {
+      await sql`
+        DELETE FROM zv_tenant_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
+      `.execute(trx);
+      await sql`
+        DELETE FROM zv_scim_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
+      `.execute(trx);
+      await sql`DELETE FROM "session" WHERE "userId" = ${id}`.execute(trx);
+      const remaining = await sql`
+        SELECT COUNT(*)::int AS n FROM zv_tenant_users WHERE user_id = ${id}
+      `.execute(trx);
+      if ((remaining.rows[0]?.n ?? 0) === 0) {
+        await sql`DELETE FROM "account" WHERE "userId" = ${id}`.execute(trx);
+        await sql`DELETE FROM "user" WHERE id = ${id}`.execute(trx);
+      }
     });
-    await sql`DELETE FROM "session" WHERE "userId" = ${id}`.execute(db).catch(() => {
-      return;
-    });
-    const remaining = await sql`
-      SELECT COUNT(*)::int AS n FROM zv_tenant_users WHERE user_id = ${id}
-    `.execute(db);
-    if ((remaining.rows[0]?.n ?? 0) === 0) {
-      await sql`DELETE FROM "account" WHERE "userId" = ${id}`.execute(db).catch(() => {
-        return;
-      });
-      await sql`DELETE FROM "user" WHERE id = ${id}`.execute(db);
-    }
     return c.body(null, 204);
   });
   app.get("/Groups", (c) => c.json({ schemas: [SCIM_LIST], totalResults: 0, startIndex: 1, itemsPerPage: 0, Resources: [] }));
