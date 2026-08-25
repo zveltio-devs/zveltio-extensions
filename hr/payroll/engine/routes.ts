@@ -311,8 +311,16 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
     // rates, and the row each entry stores records which ones those were.
     const rates = await loadRates(db);
 
+    // A payroll run is all-or-nothing. Half a run leaves some employees with a
+    // payslip entry for the period and some without, while the period itself
+    // still reads `open` — and the difference between "not generated yet" and
+    // "generated, but yours is missing" is invisible until somebody is not paid.
+    //
+    // One transaction around the whole loop, deliberately. This is a batch that
+    // runs once a month; a long write transaction is the cheaper problem.
     let generated = 0;
     const skipped: Array<{ employee: string; reason: string }> = [];
+    await db.transaction().execute(async (trx) => {
     for (const emp of subjects) {
       // Only a monthly salary can be turned into a month's gross without more
       // information. An hourly or daily contract needs the hours actually
@@ -328,7 +336,7 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
         SELECT * FROM zvd_payroll_adjustments WHERE entry_id IN (
           SELECT id FROM zvd_payroll_entries WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id}
         )
-      `.execute(db);
+      `.execute(trx);
       let taxable_bonuses = 0;
       let deductions = 0;
       for (const adj of adjs.rows as any[]) {
@@ -339,24 +347,24 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
       const sick = await sql`
         SELECT COALESCE(SUM(days), 0) as days, COALESCE(SUM(amount), 0) as amount
         FROM zvd_payroll_sick_leave WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id}
-      `.execute(db);
+      `.execute(trx);
       const sickDays = +(sick.rows[0] as any).days;
       const sickAmount = +(sick.rows[0] as any).amount;
       // Meal vouchers
       const vouchers = await sql`
         SELECT COALESCE(SUM(total_value), 0) as total FROM zvd_payroll_meal_vouchers
         WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id}
-      `.execute(db);
+      `.execute(trx);
       const mealVouchersAmount = +(vouchers.rows[0] as any).total;
       // Overtime
       const overtime = await sql`
         SELECT COALESCE(SUM(amount), 0) as amount FROM zvd_payroll_overtime
         WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id} AND is_night_shift = false
-      `.execute(db);
+      `.execute(trx);
       const nightShift = await sql`
         SELECT COALESCE(SUM(amount), 0) as amount FROM zvd_payroll_overtime
         WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id} AND is_night_shift = true
-      `.execute(db);
+      `.execute(trx);
       const overtimeAmt = +(overtime.rows[0] as any).amount;
       const nightShiftAmt = +(nightShift.rows[0] as any).amount;
 
@@ -399,13 +407,14 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
           sick_leave_days = EXCLUDED.sick_leave_days, sick_leave_amount = EXCLUDED.sick_leave_amount,
           meal_vouchers_amount = EXCLUDED.meal_vouchers_amount, overtime_amount = EXCLUDED.overtime_amount,
           night_shift_bonus = EXCLUDED.night_shift_bonus, updated_at = NOW()
-      `.execute(db);
+      `.execute(trx);
       generated++;
     }
-    await sql`UPDATE zvd_payroll_periods SET status = 'calculated', updated_at = NOW() WHERE id = ${p.id}`.execute(db);
+    await sql`UPDATE zvd_payroll_periods SET status = 'calculated', updated_at = NOW() WHERE id = ${p.id}`.execute(trx);
     // `skipped` is reported rather than swallowed: a run that quietly produced
     // fewer payslips than there are employees is the kind of thing nobody
     // notices until somebody is not paid.
+    });
     return c.json({ data: { generated, skipped } });
   });
 
@@ -414,12 +423,20 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
     if (!(await mayDecidePayroll(ctx, user, 'approve'))) {
       return c.json({ error: 'You may not approve a payroll period' }, 403);
     }
-    await sql`UPDATE zvd_payroll_entries SET status = 'approved', updated_at = NOW() WHERE period_id = ${c.req.param('id')} AND status = 'draft'`.execute(db);
-    const row = await sql`
-      UPDATE zvd_payroll_periods SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
-      WHERE id = ${c.req.param('id')} AND status = 'calculated' RETURNING *
-    `.execute(db);
-    if (!row.rows.length) return c.json({ error: 'Period not found or not calculated' }, 400);
+    // The entries are marked approved BEFORE the period check that can refuse.
+    // Outside a transaction that ordering means a refused request still leaves
+    // every payslip in the period marked approved, with no approver recorded
+    // anywhere — approval without an approver. A retry does repair it, but the
+    // window is one in which a payroll report reads as signed off by nobody.
+    const row = await db.transaction().execute(async (trx) => {
+      await sql`UPDATE zvd_payroll_entries SET status = 'approved', updated_at = NOW() WHERE period_id = ${c.req.param('id')} AND status = 'draft'`.execute(trx);
+      const updated = await sql`
+        UPDATE zvd_payroll_periods SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
+        WHERE id = ${c.req.param('id')} AND status = 'calculated' RETURNING *
+      `.execute(trx);
+      return updated.rows.length ? updated : null;
+    });
+    if (!row) return c.json({ error: 'Period not found or not calculated' }, 400);
     return c.json({ data: row.rows[0] });
   });
 
@@ -428,15 +445,23 @@ export function payrollRoutes(ctx: ExtensionContext): Hono {
     if (!(await mayDecidePayroll(ctx, user, 'pay'))) {
       return c.json({ error: 'You may not mark a payroll period paid' }, 403);
     }
-    await sql`UPDATE zvd_payroll_entries SET paid_at = NOW(), updated_at = NOW() WHERE period_id = ${c.req.param('id')} AND status = 'approved'`.execute(db);
-    const row = await sql`
-      UPDATE zvd_payroll_periods SET status = 'closed', paid_at = NOW(), updated_at = NOW()
-      -- Only the approve route can produce 'approved'. Requiring it here is what makes
-      -- calculate -> pay impossible: the two decisions no longer share one state,
-      -- so the second can finally tell whether the first happened.
-      WHERE id = ${c.req.param('id')} AND status = 'approved' RETURNING *
-    `.execute(db);
-    if (!row.rows.length) return c.json({ error: 'Period not found or not ready' }, 400);
+    // Same ordering as approve, and the stakes are higher: `paid_at` on every
+    // entry is stamped before the period check that can refuse. A refused
+    // request would leave the payslips marked paid while the period is still
+    // open, so the next report says the money went out and the ledger says it
+    // did not.
+    const row = await db.transaction().execute(async (trx) => {
+      await sql`UPDATE zvd_payroll_entries SET paid_at = NOW(), updated_at = NOW() WHERE period_id = ${c.req.param('id')} AND status = 'approved'`.execute(trx);
+      const updated = await sql`
+        UPDATE zvd_payroll_periods SET status = 'closed', paid_at = NOW(), updated_at = NOW()
+        -- Only the approve route can produce 'approved'. Requiring it here is what makes
+        -- calculate -> pay impossible: the two decisions no longer share one state,
+        -- so the second can finally tell whether the first happened.
+        WHERE id = ${c.req.param('id')} AND status = 'approved' RETURNING *
+      `.execute(trx);
+      return updated.rows.length ? updated : null;
+    });
+    if (!row) return c.json({ error: 'Period not found or not ready' }, 400);
     return c.json({ data: row.rows[0] });
   });
 
