@@ -19678,30 +19678,32 @@ function approvalsRoutes(ctx) {
     const canDecide = currentStep.approver_user_id === user.id || currentStep.approver_role && userRoles.includes(currentStep.approver_role) || hasDelegation || isAdmin;
     if (!canDecide)
       return c.json({ error: "You are not authorized to decide on this step" }, 403);
-    await db.insertInto("zv_approval_decisions").values({
-      request_id: requestId,
-      step_id: currentStep.id,
-      decision,
-      decided_by: user.id,
-      comment: comment || null
-    }).execute();
-    if (decision === "rejected") {
-      await db.updateTable("zv_approval_requests").set({
-        status: "rejected",
-        completed_at: new Date,
-        current_step_id: null,
-        rejection_reason: comment || null
-      }).where("id", "=", requestId).execute();
-      return c.json({ success: true, status: "rejected" });
-    }
-    const nextStep = await db.selectFrom("zv_approval_steps").selectAll().where("workflow_id", "=", request.workflow_id).where("step_order", ">", currentStep.step_order).orderBy("step_order").limit(1).executeTakeFirst();
-    if (nextStep) {
-      await db.updateTable("zv_approval_requests").set({ current_step_id: nextStep.id }).where("id", "=", requestId).execute();
-      return c.json({ success: true, status: "pending", next_step: nextStep });
-    } else {
-      await db.updateTable("zv_approval_requests").set({ status: "approved", completed_at: new Date, current_step_id: null }).where("id", "=", requestId).execute();
-      return c.json({ success: true, status: "approved" });
-    }
+    const outcome = await db.transaction().execute(async (trx) => {
+      await trx.insertInto("zv_approval_decisions").values({
+        request_id: requestId,
+        step_id: currentStep.id,
+        decision,
+        decided_by: user.id,
+        comment: comment || null
+      }).execute();
+      if (decision === "rejected") {
+        await trx.updateTable("zv_approval_requests").set({
+          status: "rejected",
+          completed_at: new Date,
+          current_step_id: null,
+          rejection_reason: comment || null
+        }).where("id", "=", requestId).execute();
+        return { success: true, status: "rejected" };
+      }
+      const nextStep = await trx.selectFrom("zv_approval_steps").selectAll().where("workflow_id", "=", request.workflow_id).where("step_order", ">", currentStep.step_order).orderBy("step_order").limit(1).executeTakeFirst();
+      if (nextStep) {
+        await trx.updateTable("zv_approval_requests").set({ current_step_id: nextStep.id }).where("id", "=", requestId).execute();
+        return { success: true, status: "pending", next_step: nextStep };
+      }
+      await trx.updateTable("zv_approval_requests").set({ status: "approved", completed_at: new Date, current_step_id: null }).where("id", "=", requestId).execute();
+      return { success: true, status: "approved" };
+    });
+    return c.json(outcome);
   });
   app.post("/:id/cancel", async (c) => {
     const user = c.get("user");
@@ -19736,30 +19738,32 @@ function approvalsRoutes(ctx) {
           continue;
         }
         const currentStep = await db.selectFrom("zv_approval_steps").selectAll().where("id", "=", request.current_step_id).executeTakeFirst();
-        if (currentStep) {
-          await db.insertInto("zv_approval_decisions").values({
-            request_id: requestId,
-            step_id: currentStep.id,
-            decision,
-            decided_by: user.id,
-            comment: comment || null
-          }).execute();
-        }
-        if (decision === "rejected") {
-          await db.updateTable("zv_approval_requests").set({
-            status: "rejected",
-            completed_at: new Date,
-            current_step_id: null,
-            rejection_reason: comment || null
-          }).where("id", "=", requestId).execute();
-        } else {
-          const nextStep = currentStep ? await db.selectFrom("zv_approval_steps").selectAll().where("workflow_id", "=", request.workflow_id).where("step_order", ">", currentStep.step_order).orderBy("step_order").limit(1).executeTakeFirst() : null;
-          if (nextStep) {
-            await db.updateTable("zv_approval_requests").set({ current_step_id: nextStep.id }).where("id", "=", requestId).execute();
-          } else {
-            await db.updateTable("zv_approval_requests").set({ status: "approved", completed_at: new Date, current_step_id: null }).where("id", "=", requestId).execute();
+        await db.transaction().execute(async (trx) => {
+          if (currentStep) {
+            await trx.insertInto("zv_approval_decisions").values({
+              request_id: requestId,
+              step_id: currentStep.id,
+              decision,
+              decided_by: user.id,
+              comment: comment || null
+            }).execute();
           }
-        }
+          if (decision === "rejected") {
+            await trx.updateTable("zv_approval_requests").set({
+              status: "rejected",
+              completed_at: new Date,
+              current_step_id: null,
+              rejection_reason: comment || null
+            }).where("id", "=", requestId).execute();
+          } else {
+            const nextStep = currentStep ? await trx.selectFrom("zv_approval_steps").selectAll().where("workflow_id", "=", request.workflow_id).where("step_order", ">", currentStep.step_order).orderBy("step_order").limit(1).executeTakeFirst() : null;
+            if (nextStep) {
+              await trx.updateTable("zv_approval_requests").set({ current_step_id: nextStep.id }).where("id", "=", requestId).execute();
+            } else {
+              await trx.updateTable("zv_approval_requests").set({ status: "approved", completed_at: new Date, current_step_id: null }).where("id", "=", requestId).execute();
+            }
+          }
+        });
         results.push({ id: requestId, success: true });
       } catch (err) {
         results.push({ id: requestId, success: false, error: err.message });
@@ -19823,10 +19827,13 @@ function approvalsRoutes(ctx) {
       return c.json({ error: "Admin access required" }, 403);
     }
     const { steps, ...workflowData } = c.req.valid("json");
-    const workflow = await db.insertInto("zv_approval_workflows").values({ ...workflowData, created_by: user.id }).returningAll().executeTakeFirst();
-    for (let i = 0;i < steps.length; i++) {
-      await db.insertInto("zv_approval_steps").values({ ...steps[i], workflow_id: workflow.id, step_order: i }).execute();
-    }
+    const workflow = await db.transaction().execute(async (trx) => {
+      const created = await trx.insertInto("zv_approval_workflows").values({ ...workflowData, created_by: user.id }).returningAll().executeTakeFirst();
+      for (let i = 0;i < steps.length; i++) {
+        await trx.insertInto("zv_approval_steps").values({ ...steps[i], workflow_id: created.id, step_order: i }).execute();
+      }
+      return created;
+    });
     const fullWorkflow = await db.selectFrom("zv_approval_steps").selectAll().where("workflow_id", "=", workflow.id).orderBy("step_order").execute();
     return c.json({ workflow: { ...workflow, steps: fullWorkflow } }, 201);
   });
