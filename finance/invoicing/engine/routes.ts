@@ -283,24 +283,37 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
     })),
     async (c) => {
       const d = c.req.valid('json');
-      // Exactly one default per document type, or issuing has to guess.
-      if (d.is_default) {
-        await sql`
-          UPDATE zvd_document_series SET is_default = FALSE WHERE doc_type = ${d.doc_type}
-        `.execute(db);
-      }
-      const row = await sql`
-        INSERT INTO zvd_document_series (doc_type, series, next_number, padding, is_default)
-        VALUES (${d.doc_type}, ${d.series}, ${d.next_number}, ${d.padding}, ${d.is_default})
-        RETURNING *
-      `.execute(db).catch((err: unknown) => {
+      // Both writes or neither.
+      //
+      // Clearing the previous default and inserting the new one are one decision.
+      // Run apart, a failed INSERT leaves the company with NO default series for
+      // that document type, and the next invoice has nothing to number itself
+      // from. That was the shape here until this transaction: the UPDATE had
+      // already committed by the time the INSERT was refused.
+      //
+      // The unique-violation catch had to move OUT of the transaction with it.
+      // Swallowing that error inside would leave an aborted transaction to be
+      // committed, and — worse — would keep the very behaviour this fixes: the
+      // UPDATE landing while the INSERT does not.
+      try {
+        const row = await db.transaction().execute(async (trx) => {
+          // Exactly one default per document type, or issuing has to guess.
+          if (d.is_default) {
+            await sql`
+              UPDATE zvd_document_series SET is_default = FALSE WHERE doc_type = ${d.doc_type}
+            `.execute(trx);
+          }
+          return await sql`
+            INSERT INTO zvd_document_series (doc_type, series, next_number, padding, is_default)
+            VALUES (${d.doc_type}, ${d.series}, ${d.next_number}, ${d.padding}, ${d.is_default})
+            RETURNING *
+          `.execute(trx);
+        });
+        return c.json({ data: row.rows[0] }, 201);
+      } catch (err: unknown) {
         if (!isUniqueViolation(err)) throw err;
-        return null;
-      });
-      if (!row?.rows.length) {
         return c.json({ error: `Series "${d.series}" already exists for ${d.doc_type}` }, 400);
       }
-      return c.json({ data: row.rows[0] }, 201);
     },
   );
 
