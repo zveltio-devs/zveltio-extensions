@@ -164,47 +164,53 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
         .where('name', '=', name)
         .executeTakeFirst();
 
-      if (existing) {
-        const updateData = { ...body, updated_at: now };
-        if (updateData.api_key) {
-          updateData.api_key = await encryptApiKey(updateData.api_key);
+      // Saving the provider and clearing the previous default are one change.
+      // Split, the instance has two providers marked default or none at all —
+      // and "none" means every AI call falls back to whatever the resolver
+      // picks, silently using a different model and a different bill.
+      await db.transaction().execute(async (trx) => {
+        if (existing) {
+          const updateData = { ...body, updated_at: now };
+          if (updateData.api_key) {
+            updateData.api_key = await encryptApiKey(updateData.api_key);
+          }
+          await trx
+            .updateTable('zv_ai_providers')
+            .set(updateData)
+            .where('name', '=', name)
+            .execute();
+        } else {
+          const labels: Record<string, string> = {
+            openai: 'OpenAI',
+            anthropic: 'Anthropic (Claude)',
+            gemini: 'Google Gemini',
+            ollama: 'Ollama (Local)',
+          };
+          await trx
+            .insertInto('zv_ai_providers')
+            .values({
+              name,
+              label: body.label || labels[name] || name,
+              api_key: body.api_key
+                ? await encryptApiKey(body.api_key)
+                : undefined,
+              base_url: body.base_url,
+              default_model: body.default_model,
+              is_default: body.is_default ?? false,
+              is_active: body.is_active ?? true,
+            })
+            .execute();
         }
-        await db
-          .updateTable('zv_ai_providers')
-          .set(updateData)
-          .where('name', '=', name)
-          .execute();
-      } else {
-        const labels: Record<string, string> = {
-          openai: 'OpenAI',
-          anthropic: 'Anthropic (Claude)',
-          gemini: 'Google Gemini',
-          ollama: 'Ollama (Local)',
-        };
-        await db
-          .insertInto('zv_ai_providers')
-          .values({
-            name,
-            label: body.label || labels[name] || name,
-            api_key: body.api_key
-              ? await encryptApiKey(body.api_key)
-              : undefined,
-            base_url: body.base_url,
-            default_model: body.default_model,
-            is_default: body.is_default ?? false,
-            is_active: body.is_active ?? true,
-          })
-          .execute();
-      }
 
-      // If marking as default, clear others
-      if (body.is_default) {
-        await db
-          .updateTable('zv_ai_providers')
-          .set({ is_default: false })
-          .where('name', '!=', name)
-          .execute();
-      }
+        // If marking as default, clear others
+        if (body.is_default) {
+          await trx
+            .updateTable('zv_ai_providers')
+            .set({ is_default: false })
+            .where('name', '!=', name)
+            .execute();
+        }
+      });
 
       // Hot-reload provider in memory
       const updated = await db

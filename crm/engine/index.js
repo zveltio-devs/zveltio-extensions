@@ -5112,7 +5112,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
+// ../../zveltio/node_modules/.bun/@hono+zod-validator@0.8.0+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -19617,17 +19617,19 @@ function crmRoutes(ctx) {
     return c.json({ data: row.rows[0] });
   });
   async function linkContactOrganization(contactId, organizationId, role, isPrimary) {
-    if (isPrimary) {
+    await db.transaction().execute(async (trx) => {
+      if (isPrimary) {
+        await sql`
+          UPDATE zvd_contact_organizations SET is_primary = FALSE WHERE contact_id = ${contactId}
+        `.execute(trx);
+      }
       await sql`
-        UPDATE zvd_contact_organizations SET is_primary = FALSE WHERE contact_id = ${contactId}
-      `.execute(db);
-    }
-    await sql`
-      INSERT INTO zvd_contact_organizations (contact_id, organization_id, role, is_primary)
-      VALUES (${contactId}, ${organizationId}, ${role ?? null}, ${isPrimary})
-      ON CONFLICT (contact_id, organization_id)
-      DO UPDATE SET role = EXCLUDED.role, is_primary = EXCLUDED.is_primary
-    `.execute(db);
+        INSERT INTO zvd_contact_organizations (contact_id, organization_id, role, is_primary)
+        VALUES (${contactId}, ${organizationId}, ${role ?? null}, ${isPrimary})
+        ON CONFLICT (contact_id, organization_id)
+        DO UPDATE SET role = EXCLUDED.role, is_primary = EXCLUDED.is_primary
+      `.execute(trx);
+    });
   }
   app.post("/contacts", zValidator("json", exports_external.object({
     first_name: exports_external.string().min(1),
