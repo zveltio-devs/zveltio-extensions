@@ -1732,7 +1732,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
+// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.8.0+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -19667,57 +19667,58 @@ function payrollRoutes(ctx) {
     const rates = await loadRates(db);
     let generated = 0;
     const skipped = [];
-    for (const emp of subjects) {
-      if (emp.salary_period !== "month") {
-        skipped.push({ employee: emp.employee_name, reason: `salary_period=${emp.salary_period}` });
-        continue;
-      }
-      const gross = +(emp.salary ?? 0);
-      const adjs = await sql`
+    await db.transaction().execute(async (trx) => {
+      for (const emp of subjects) {
+        if (emp.salary_period !== "month") {
+          skipped.push({ employee: emp.employee_name, reason: `salary_period=${emp.salary_period}` });
+          continue;
+        }
+        const gross = +(emp.salary ?? 0);
+        const adjs = await sql`
         SELECT * FROM zvd_payroll_adjustments WHERE entry_id IN (
           SELECT id FROM zvd_payroll_entries WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id}
         )
-      `.execute(db);
-      let taxable_bonuses = 0;
-      let deductions = 0;
-      for (const adj of adjs.rows) {
-        if (["bonus", "overtime"].includes(adj.type))
-          taxable_bonuses += +adj.amount;
-        else if (["deduction", "advance"].includes(adj.type))
-          deductions += +adj.amount;
-      }
-      const sick = await sql`
+      `.execute(trx);
+        let taxable_bonuses = 0;
+        let deductions = 0;
+        for (const adj of adjs.rows) {
+          if (["bonus", "overtime"].includes(adj.type))
+            taxable_bonuses += +adj.amount;
+          else if (["deduction", "advance"].includes(adj.type))
+            deductions += +adj.amount;
+        }
+        const sick = await sql`
         SELECT COALESCE(SUM(days), 0) as days, COALESCE(SUM(amount), 0) as amount
         FROM zvd_payroll_sick_leave WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id}
-      `.execute(db);
-      const sickDays = +sick.rows[0].days;
-      const sickAmount = +sick.rows[0].amount;
-      const vouchers = await sql`
+      `.execute(trx);
+        const sickDays = +sick.rows[0].days;
+        const sickAmount = +sick.rows[0].amount;
+        const vouchers = await sql`
         SELECT COALESCE(SUM(total_value), 0) as total FROM zvd_payroll_meal_vouchers
         WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id}
-      `.execute(db);
-      const mealVouchersAmount = +vouchers.rows[0].total;
-      const overtime = await sql`
+      `.execute(trx);
+        const mealVouchersAmount = +vouchers.rows[0].total;
+        const overtime = await sql`
         SELECT COALESCE(SUM(amount), 0) as amount FROM zvd_payroll_overtime
         WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id} AND is_night_shift = false
-      `.execute(db);
-      const nightShift = await sql`
+      `.execute(trx);
+        const nightShift = await sql`
         SELECT COALESCE(SUM(amount), 0) as amount FROM zvd_payroll_overtime
         WHERE period_id = ${p.id} AND employee_id = ${emp.employee_id} AND is_night_shift = true
-      `.execute(db);
-      const overtimeAmt = +overtime.rows[0].amount;
-      const nightShiftAmt = +nightShift.rows[0].amount;
-      const calc = computeRO({
-        gross,
-        taxable_bonuses,
-        deductions,
-        sick_leave_days: sickDays,
-        sick_leave_amount: sickAmount,
-        meal_vouchers: mealVouchersAmount,
-        overtime_amount: overtimeAmt,
-        night_shift_bonus: nightShiftAmt
-      }, rates);
-      await sql`
+      `.execute(trx);
+        const overtimeAmt = +overtime.rows[0].amount;
+        const nightShiftAmt = +nightShift.rows[0].amount;
+        const calc = computeRO({
+          gross,
+          taxable_bonuses,
+          deductions,
+          sick_leave_days: sickDays,
+          sick_leave_amount: sickAmount,
+          meal_vouchers: mealVouchersAmount,
+          overtime_amount: overtimeAmt,
+          night_shift_bonus: nightShiftAmt
+        }, rates);
+        await sql`
         INSERT INTO zvd_payroll_entries (
           period_id, employee_id, employee_name, gross_salary, meal_vouchers, other_benefits,
           cas_employee_rate, cass_employee_rate, income_tax_rate, cas_employee, cass_employee,
@@ -19750,10 +19751,11 @@ function payrollRoutes(ctx) {
           sick_leave_days = EXCLUDED.sick_leave_days, sick_leave_amount = EXCLUDED.sick_leave_amount,
           meal_vouchers_amount = EXCLUDED.meal_vouchers_amount, overtime_amount = EXCLUDED.overtime_amount,
           night_shift_bonus = EXCLUDED.night_shift_bonus, updated_at = NOW()
-      `.execute(db);
-      generated++;
-    }
-    await sql`UPDATE zvd_payroll_periods SET status = 'calculated', updated_at = NOW() WHERE id = ${p.id}`.execute(db);
+      `.execute(trx);
+        generated++;
+      }
+      await sql`UPDATE zvd_payroll_periods SET status = 'calculated', updated_at = NOW() WHERE id = ${p.id}`.execute(trx);
+    });
     return c.json({ data: { generated, skipped } });
   });
   app.post("/periods/:id/approve", async (c) => {
@@ -19761,12 +19763,15 @@ function payrollRoutes(ctx) {
     if (!await mayDecidePayroll(ctx, user, "approve")) {
       return c.json({ error: "You may not approve a payroll period" }, 403);
     }
-    await sql`UPDATE zvd_payroll_entries SET status = 'approved', updated_at = NOW() WHERE period_id = ${c.req.param("id")} AND status = 'draft'`.execute(db);
-    const row = await sql`
-      UPDATE zvd_payroll_periods SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
-      WHERE id = ${c.req.param("id")} AND status = 'calculated' RETURNING *
-    `.execute(db);
-    if (!row.rows.length)
+    const row = await db.transaction().execute(async (trx) => {
+      await sql`UPDATE zvd_payroll_entries SET status = 'approved', updated_at = NOW() WHERE period_id = ${c.req.param("id")} AND status = 'draft'`.execute(trx);
+      const updated = await sql`
+        UPDATE zvd_payroll_periods SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
+        WHERE id = ${c.req.param("id")} AND status = 'calculated' RETURNING *
+      `.execute(trx);
+      return updated.rows.length ? updated : null;
+    });
+    if (!row)
       return c.json({ error: "Period not found or not calculated" }, 400);
     return c.json({ data: row.rows[0] });
   });
@@ -19775,15 +19780,18 @@ function payrollRoutes(ctx) {
     if (!await mayDecidePayroll(ctx, user, "pay")) {
       return c.json({ error: "You may not mark a payroll period paid" }, 403);
     }
-    await sql`UPDATE zvd_payroll_entries SET paid_at = NOW(), updated_at = NOW() WHERE period_id = ${c.req.param("id")} AND status = 'approved'`.execute(db);
-    const row = await sql`
-      UPDATE zvd_payroll_periods SET status = 'closed', paid_at = NOW(), updated_at = NOW()
-      -- Only the approve route can produce 'approved'. Requiring it here is what makes
-      -- calculate -> pay impossible: the two decisions no longer share one state,
-      -- so the second can finally tell whether the first happened.
-      WHERE id = ${c.req.param("id")} AND status = 'approved' RETURNING *
-    `.execute(db);
-    if (!row.rows.length)
+    const row = await db.transaction().execute(async (trx) => {
+      await sql`UPDATE zvd_payroll_entries SET paid_at = NOW(), updated_at = NOW() WHERE period_id = ${c.req.param("id")} AND status = 'approved'`.execute(trx);
+      const updated = await sql`
+        UPDATE zvd_payroll_periods SET status = 'closed', paid_at = NOW(), updated_at = NOW()
+        -- Only the approve route can produce 'approved'. Requiring it here is what makes
+        -- calculate -> pay impossible: the two decisions no longer share one state,
+        -- so the second can finally tell whether the first happened.
+        WHERE id = ${c.req.param("id")} AND status = 'approved' RETURNING *
+      `.execute(trx);
+      return updated.rows.length ? updated : null;
+    });
+    if (!row)
       return c.json({ error: "Period not found or not ready" }, 400);
     return c.json({ data: row.rows[0] });
   });
