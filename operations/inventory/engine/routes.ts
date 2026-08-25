@@ -179,16 +179,22 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
-    const row = await sql`
-      INSERT INTO zvd_products (name, sku, barcode, category, description, unit, cost_price, sale_price, tax_rate, reorder_point, reorder_qty, avg_cost, created_by)
-      VALUES (${d.name}, ${d.sku ?? null}, ${d.barcode ?? null}, ${d.category ?? null}, ${d.description ?? null},
-        ${d.unit}, ${d.unit_cost}, ${d.unit_price}, ${d.tax_rate}, ${d.reorder_point}, ${d.reorder_quantity}, ${d.unit_cost}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    const productId = (row.rows[0] as any).id;
-    for (const v of d.variants) {
-      await sql`INSERT INTO zvd_product_variants (product_id, name, sku, attributes, unit_price) VALUES (${productId}, ${v.name}, ${v.sku ?? null}, ${JSON.stringify(v.attributes)}, ${v.unit_price ?? null})`.execute(db);
-    }
+    // A product and its variants are one definition. Split, a variant insert that
+    // fails on its unique SKU leaves a product whose variant list is silently
+    // short — and the caller was told it was created, so nobody goes looking.
+    const row = await db.transaction().execute(async (trx) => {
+      const created = await sql`
+        INSERT INTO zvd_products (name, sku, barcode, category, description, unit, cost_price, sale_price, tax_rate, reorder_point, reorder_qty, avg_cost, created_by)
+        VALUES (${d.name}, ${d.sku ?? null}, ${d.barcode ?? null}, ${d.category ?? null}, ${d.description ?? null},
+          ${d.unit}, ${d.unit_cost}, ${d.unit_price}, ${d.tax_rate}, ${d.reorder_point}, ${d.reorder_quantity}, ${d.unit_cost}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      const productId = (created.rows[0] as any).id;
+      for (const v of d.variants) {
+        await sql`INSERT INTO zvd_product_variants (product_id, name, sku, attributes, unit_price) VALUES (${productId}, ${v.name}, ${v.sku ?? null}, ${JSON.stringify(v.attributes)}, ${v.unit_price ?? null})`.execute(trx);
+      }
+      return created;
+    });
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -282,21 +288,31 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
-    const number = await nextPONumber(db);
     const subtotal = d.lines.reduce((s, l) => s + l.quantity_ordered * l.unit_cost, 0);
     const tax_amount = d.lines.reduce((s, l) => s + l.quantity_ordered * l.unit_cost * l.tax_rate / 100, 0);
     const total = subtotal + tax_amount;
-    const po = await sql`
-      INSERT INTO zvd_purchase_orders (number, supplier_id, warehouse_id, expected_date, currency, subtotal, tax_amount, total, notes, created_by)
-      VALUES (${number}, ${d.supplier_id}, ${d.warehouse_id ?? null}, ${d.expected_date ?? null}, ${d.currency}, ${subtotal}, ${tax_amount}, ${total}, ${d.notes ?? null}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    const poId = (po.rows[0] as any).id;
-    let sort = 0;
-    for (const line of d.lines) {
-      const lineTotal = line.quantity_ordered * line.unit_cost * (1 + line.tax_rate / 100);
-      await sql`INSERT INTO zvd_purchase_order_lines (po_id, product_id, quantity_ordered, unit_cost, tax_rate, total, sort_order) VALUES (${poId}, ${line.product_id}, ${line.quantity_ordered}, ${line.unit_cost}, ${line.tax_rate}, ${lineTotal}, ${sort++})`.execute(db);
-    }
+    // The header carries totals computed from the lines, so a header written
+    // without all of them states a total its own lines do not add up to. The
+    // receive handler then works from those lines and can never close the order.
+    //
+    // `nextPONumber` counts existing orders, so it belongs inside too: rolled
+    // back, the number it derived goes back to being free instead of leaving a
+    // gap in the sequence.
+    const po = await db.transaction().execute(async (trx) => {
+      const number = await nextPONumber(trx);
+      const created = await sql`
+        INSERT INTO zvd_purchase_orders (number, supplier_id, warehouse_id, expected_date, currency, subtotal, tax_amount, total, notes, created_by)
+        VALUES (${number}, ${d.supplier_id}, ${d.warehouse_id ?? null}, ${d.expected_date ?? null}, ${d.currency}, ${subtotal}, ${tax_amount}, ${total}, ${d.notes ?? null}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      const poId = (created.rows[0] as any).id;
+      let sort = 0;
+      for (const line of d.lines) {
+        const lineTotal = line.quantity_ordered * line.unit_cost * (1 + line.tax_rate / 100);
+        await sql`INSERT INTO zvd_purchase_order_lines (po_id, product_id, quantity_ordered, unit_cost, tax_rate, total, sort_order) VALUES (${poId}, ${line.product_id}, ${line.quantity_ordered}, ${line.unit_cost}, ${line.tax_rate}, ${lineTotal}, ${sort++})`.execute(trx);
+      }
+      return created;
+    });
     return c.json({ data: po.rows[0] }, 201);
   });
 
@@ -315,11 +331,23 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
     if (!po.rows.length) return c.json({ error: 'PO not found or already received' }, 400);
     const poData = po.rows[0] as any;
     const receivedDate = d.received_date ?? new Date().toISOString().slice(0, 10);
+    // A receipt is one event, not one event per line. Interrupted halfway, some
+    // lines carry their stock and their movement rows and the rest do not, while
+    // the order's status is computed from `quantity_received` totals that are now
+    // partly written — so the PO can be stamped `received` on a receipt that
+    // never finished, and the receive handler refuses any PO already in that
+    // state. The remaining lines become unreceivable.
+    //
+    // Each line also writes a batch, a stock level, a movement and an average
+    // cost. The average is derived from the quantity, so a level that moved
+    // without its cost recalculation silently misprices every unit already in the
+    // warehouse.
+    const newStatus = await db.transaction().execute(async (trx) => {
     for (const recv of d.lines) {
-      const line = await sql`SELECT * FROM zvd_purchase_order_lines WHERE id = ${recv.line_id} AND po_id = ${poData.id}`.execute(db);
+      const line = await sql`SELECT * FROM zvd_purchase_order_lines WHERE id = ${recv.line_id} AND po_id = ${poData.id}`.execute(trx);
       if (!line.rows.length) continue;
       const l = line.rows[0] as any;
-      await sql`UPDATE zvd_purchase_order_lines SET quantity_received = quantity_received + ${recv.quantity_received} WHERE id = ${l.id}`.execute(db);
+      await sql`UPDATE zvd_purchase_order_lines SET quantity_received = quantity_received + ${recv.quantity_received} WHERE id = ${l.id}`.execute(trx);
       // Create batch if batch_number provided
       let batchId = null;
       if (recv.batch_number) {
@@ -327,18 +355,18 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
           INSERT INTO zvd_product_batches (product_id, warehouse_id, batch_number, quantity, expiry_date, unit_cost)
           VALUES (${l.product_id}, ${poData.warehouse_id}, ${recv.batch_number}, ${recv.quantity_received}, ${recv.expiry_date ?? null}, ${l.unit_cost})
           ON CONFLICT (product_id, warehouse_id, batch_number) DO UPDATE SET quantity = zvd_product_batches.quantity + ${recv.quantity_received}
-        `.execute(db);
-        const bRow = await sql`SELECT id FROM zvd_product_batches WHERE product_id = ${l.product_id} AND batch_number = ${recv.batch_number}`.execute(db);
+        `.execute(trx);
+        const bRow = await sql`SELECT id FROM zvd_product_batches WHERE product_id = ${l.product_id} AND batch_number = ${recv.batch_number}`.execute(trx);
         batchId = (bRow.rows[0] as any)?.id;
       }
       // Update stock
-      await sql`INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity) VALUES (${l.product_id}, ${poData.warehouse_id}, 0) ON CONFLICT (product_id, warehouse_id) DO NOTHING`.execute(db);
-      await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${recv.quantity_received}, updated_at = NOW() WHERE product_id = ${l.product_id} AND warehouse_id = ${poData.warehouse_id}`.execute(db);
-      await sql`INSERT INTO zvd_stock_movements (product_id, warehouse_id, type, quantity, unit_cost, reference, batch_id, po_line_id, created_by) VALUES (${l.product_id}, ${poData.warehouse_id}, 'in', ${recv.quantity_received}, ${l.unit_cost}, ${poData.number}, ${batchId}, ${l.id}, ${user.id})`.execute(db);
-      await updateAvgCost(db, l.product_id, recv.quantity_received, l.unit_cost);
+      await sql`INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity) VALUES (${l.product_id}, ${poData.warehouse_id}, 0) ON CONFLICT (product_id, warehouse_id) DO NOTHING`.execute(trx);
+      await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${recv.quantity_received}, updated_at = NOW() WHERE product_id = ${l.product_id} AND warehouse_id = ${poData.warehouse_id}`.execute(trx);
+      await sql`INSERT INTO zvd_stock_movements (product_id, warehouse_id, type, quantity, unit_cost, reference, batch_id, po_line_id, created_by) VALUES (${l.product_id}, ${poData.warehouse_id}, 'in', ${recv.quantity_received}, ${l.unit_cost}, ${poData.number}, ${batchId}, ${l.id}, ${user.id})`.execute(trx);
+      await updateAvgCost(trx, l.product_id, recv.quantity_received, l.unit_cost);
     }
     // Determine new status
-    const allLines = await sql`SELECT quantity_ordered, quantity_received FROM zvd_purchase_order_lines WHERE po_id = ${poData.id}`.execute(db);
+    const allLines = await sql`SELECT quantity_ordered, quantity_received FROM zvd_purchase_order_lines WHERE po_id = ${poData.id}`.execute(trx);
     // Both columns are NUMERIC(10,4) and PostgreSQL sends NUMERIC as a string, so
     // this compared two STRINGS — lexicographically. `"9.0000" >= "10.0000"` is
     // true. Order 10, receive 9, and the order is stamped `received`; the receive
@@ -357,8 +385,10 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
     const anyReceived = (allLines.rows as any[]).some(
       (l) => toNumber(l.quantity_received, 0, 'quantity_received') > 0,
     );
-    const newStatus = allReceived ? 'received' : anyReceived ? 'partial' : 'sent';
-    await sql`UPDATE zvd_purchase_orders SET status = ${newStatus}, received_date = ${receivedDate}, updated_at = NOW() WHERE id = ${poData.id}`.execute(db);
+    const status = allReceived ? 'received' : anyReceived ? 'partial' : 'sent';
+    await sql`UPDATE zvd_purchase_orders SET status = ${status}, received_date = ${receivedDate}, updated_at = NOW() WHERE id = ${poData.id}`.execute(trx);
+      return status;
+    });
     return c.json({ data: { status: newStatus } });
   });
 
@@ -377,8 +407,22 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
     if (d.type === 'transfer' && !d.destination_warehouse_id) return c.json({ error: 'destination_warehouse_id required for transfer' }, 400);
-    await sql`INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity) VALUES (${d.product_id}, ${d.warehouse_id}, 0) ON CONFLICT (product_id, warehouse_id) DO NOTHING`.execute(db);
     const delta = (d.type === 'in' || d.type === 'adjustment') ? d.quantity : -d.quantity;
+    // Every quantity this handler touches is a running total, and a transfer
+    // touches two of them.
+    //
+    // Split, a transfer decrements the source and fails to increment the
+    // destination: the stock does not move, it CEASES TO EXIST, and no count
+    // anywhere shows where it went. The movement row is the audit trail for all
+    // of it, so a level that changed without one is a discrepancy the next
+    // stocktake finds and nobody can explain.
+    //
+    // The row-lock reasoning below is untouched and still does its job — putting
+    // the condition in the UPDATE is what stops two simultaneous sales of the
+    // last unit. That protects one statement against a concurrent one; this
+    // protects the five of them against each other.
+    const outcome = await db.transaction().execute(async (trx) => {
+    await sql`INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity) VALUES (${d.product_id}, ${d.warehouse_id}, 0) ON CONFLICT (product_id, warehouse_id) DO NOTHING`.execute(trx);
     if (d.type === 'out' || d.type === 'transfer') {
       // Deliberately NOT a SELECT here any more.
       //
@@ -398,24 +442,29 @@ export function inventoryRoutes(ctx: ExtensionContext): Hono {
         WHERE product_id = ${d.product_id} AND warehouse_id = ${d.warehouse_id}
           AND quantity >= ${d.quantity}
         RETURNING quantity
-      `.execute(db);
-      if (applied.rows.length === 0) return c.json({ error: 'Insufficient stock' }, 400);
+      `.execute(trx);
+      // Reported rather than returned: a `return` here would leave the
+      // transaction to commit the stock row this handler just created.
+      if (applied.rows.length === 0) return { insufficient: true as const };
     } else {
-      await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${delta}, updated_at = NOW() WHERE product_id = ${d.product_id} AND warehouse_id = ${d.warehouse_id}`.execute(db);
+      await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${delta}, updated_at = NOW() WHERE product_id = ${d.product_id} AND warehouse_id = ${d.warehouse_id}`.execute(trx);
     }
     if (d.type === 'transfer' && d.destination_warehouse_id) {
-      await sql`INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity) VALUES (${d.product_id}, ${d.destination_warehouse_id}, 0) ON CONFLICT (product_id, warehouse_id) DO NOTHING`.execute(db);
-      await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${d.quantity}, updated_at = NOW() WHERE product_id = ${d.product_id} AND warehouse_id = ${d.destination_warehouse_id}`.execute(db);
+      await sql`INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity) VALUES (${d.product_id}, ${d.destination_warehouse_id}, 0) ON CONFLICT (product_id, warehouse_id) DO NOTHING`.execute(trx);
+      await sql`UPDATE zvd_stock_levels SET quantity = quantity + ${d.quantity}, updated_at = NOW() WHERE product_id = ${d.product_id} AND warehouse_id = ${d.destination_warehouse_id}`.execute(trx);
     }
     if (d.type === 'in' && d.unit_cost) {
-      await updateAvgCost(db, d.product_id, d.quantity, d.unit_cost);
+      await updateAvgCost(trx, d.product_id, d.quantity, d.unit_cost);
     }
     const movement = await sql`
       INSERT INTO zvd_stock_movements (product_id, warehouse_id, destination_warehouse_id, type, quantity, unit_cost, reference, note, created_by)
       VALUES (${d.product_id}, ${d.warehouse_id}, ${d.destination_warehouse_id ?? null}, ${d.type}, ${d.quantity}, ${d.unit_cost ?? null}, ${d.reference ?? null}, ${d.notes ?? null}, ${user.id})
       RETURNING *
-    `.execute(db);
-    return c.json({ data: movement.rows[0] }, 201);
+    `.execute(trx);
+      return { insufficient: false as const, movement };
+    });
+    if (outcome.insufficient) return c.json({ error: 'Insufficient stock' }, 400);
+    return c.json({ data: outcome.movement.rows[0] }, 201);
   });
 
   app.get('/movements', async (c) => {
