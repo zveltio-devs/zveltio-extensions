@@ -119,21 +119,28 @@ export function productionRouter(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     const orderNumber = generateOrderNumber();
 
-    // Create the output lot (internal)
-    const lotNumber = generateLotNumber('internal');
-    const lotResult = await sql`
-      INSERT INTO trace_lots (item_id, lot_type, lot_number, status, quantity_initial, quantity_remaining, unit, received_by)
-      VALUES (${d.output_item_id}, 'internal', ${lotNumber}, 'quarantine', ${d.planned_quantity}, ${d.planned_quantity}, ${d.unit}, ${user.id})
-      RETURNING id
-    `.execute(db);
-    const outputLotId = (lotResult.rows[0] as any).id;
+    // The output lot and the order that produces it. A lot written without its
+    // order is stock in quarantine that nothing explains — no recipe, no
+    // operator, no way to know what it is; and an order without its output lot
+    // points at nothing, so completing it later has nowhere to put the yield.
+    const row = await db.transaction().execute(async (trx) => {
+      // Create the output lot (internal)
+      const lotNumber = generateLotNumber('internal');
+      const lotResult = await sql`
+        INSERT INTO trace_lots (item_id, lot_type, lot_number, status, quantity_initial, quantity_remaining, unit, received_by)
+        VALUES (${d.output_item_id}, 'internal', ${lotNumber}, 'quarantine', ${d.planned_quantity}, ${d.planned_quantity}, ${d.unit}, ${user.id})
+        RETURNING id
+      `.execute(trx);
+      const outputLotId = (lotResult.rows[0] as any).id;
 
-    const row = await sql`
-      INSERT INTO trace_production_orders (order_number, recipe_id, output_lot_id, status, planned_quantity, unit, operator_id, notes)
-      VALUES (${orderNumber}, ${d.recipe_id ?? null}, ${outputLotId}, 'draft', ${d.planned_quantity}, ${d.unit}, ${user.id}, ${d.notes ?? null})
-      RETURNING *
-    `.execute(db);
+      const row = await sql`
+        INSERT INTO trace_production_orders (order_number, recipe_id, output_lot_id, status, planned_quantity, unit, operator_id, notes)
+        VALUES (${orderNumber}, ${d.recipe_id ?? null}, ${outputLotId}, 'draft', ${d.planned_quantity}, ${d.unit}, ${user.id}, ${d.notes ?? null})
+        RETURNING *
+      `.execute(trx);
 
+      return row;
+    });
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -174,26 +181,33 @@ export function productionRouter(ctx: ExtensionContext): Hono {
     const order = orderResult.rows[0] as any;
 
     // Update output lot quantity to actual produced
-    await sql`
-      UPDATE trace_lots
-      SET quantity_initial = ${d.actual_quantity}, quantity_remaining = ${d.actual_quantity}, status = 'available'
-      WHERE id = ${order.output_lot_id}
-    `.execute(db);
+    // Releasing the lot, recording the production movement, and closing the
+    // order are one completion. Split, the lot is released for sale with no
+    // movement saying it was ever produced — which is the row a recall walks
+    // backwards — or the order stays in progress over a lot already sold.
+    const row = await db.transaction().execute(async (trx) => {
+      await sql`
+        UPDATE trace_lots
+        SET quantity_initial = ${d.actual_quantity}, quantity_remaining = ${d.actual_quantity}, status = 'available'
+        WHERE id = ${order.output_lot_id}
+      `.execute(trx);
 
-    // Record production movement
-    await sql`
-      INSERT INTO trace_movements (lot_id, type, quantity, unit, reference_type, reference_id, performed_by, performed_at)
-      VALUES (${order.output_lot_id}, 'reception', ${d.actual_quantity}, ${order.unit}, 'production_order', ${id}, ${user.id}, now())
-    `.execute(db);
+      // Record production movement
+      await sql`
+        INSERT INTO trace_movements (lot_id, type, quantity, unit, reference_type, reference_id, performed_by, performed_at)
+        VALUES (${order.output_lot_id}, 'reception', ${d.actual_quantity}, ${order.unit}, 'production_order', ${id}, ${user.id}, now())
+      `.execute(trx);
 
-    const row = await sql`
-      UPDATE trace_production_orders
-      SET status = 'completed', actual_quantity = ${d.actual_quantity},
-          completed_at = now(), haccp_checks = ${JSON.stringify(d.haccp_checks)}::text::jsonb
-      WHERE id = ${id}
-      RETURNING *
-    `.execute(db);
+      const row = await sql`
+        UPDATE trace_production_orders
+        SET status = 'completed', actual_quantity = ${d.actual_quantity},
+            completed_at = now(), haccp_checks = ${JSON.stringify(d.haccp_checks)}::text::jsonb
+        WHERE id = ${id}
+        RETURNING *
+      `.execute(trx);
 
+      return row;
+    });
     return c.json({ data: row.rows[0] });
   });
 
