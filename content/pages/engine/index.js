@@ -13032,7 +13032,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
+// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.8.0+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -31202,6 +31202,7 @@ async function hasRole(getUserRoles, user, allowed) {
   const roles = await Promise.resolve(getUserRoles(user.id)).catch(() => []);
   return roles.some((r) => allowed.includes(r));
 }
+var NOT_FOUND = Symbol("page-not-found");
 function sitesRoutes(ctx) {
   const { db, auth } = ctx;
   const engine = ctx.internals;
@@ -31312,32 +31313,34 @@ function sitesRoutes(ctx) {
       return c.json({ error: "Site not found" }, 404);
     const data = c.req.valid("json");
     const user = c.get("user");
-    if (data.is_homepage) {
-      await db.updateTable("zv_pages").set({ is_homepage: false }).where("site_id", "=", site.id).where("tenant_id", "=", tenantId(c)).where("is_homepage", "=", true).execute();
-    }
-    const page = await db.insertInto("zv_pages").values({
-      site_id: site.id,
-      title: data.title,
-      slug: data.slug,
-      icon: data.icon ?? null,
-      description: data.description ?? null,
-      is_active: data.is_active ?? true,
-      is_homepage: data.is_homepage ?? false,
-      auth_required: data.auth_required ?? !site.is_public,
-      allowed_roles: data.allowed_roles ?? [],
-      parent_id: data.parent_id ?? null,
-      sort_order: data.sort_order ?? 0,
-      status: data.status ?? "draft",
-      kind: data.kind ?? "page",
-      record_collection: data.record_collection ?? null,
-      record_field: data.record_field ?? null,
-      record_filter: jsonb(data.record_filter ?? []),
-      popup_config: jsonb(data.popup_config ?? {}),
-      blocks: jsonb(sanitizeBlocksForWrite(data.blocks ?? [])),
-      created_by: user?.id ?? null,
-      updated_by: user?.id ?? null,
-      tenant_id: tenantId(c)
-    }).returningAll().executeTakeFirstOrThrow();
+    const page = await db.transaction().execute(async (trx) => {
+      if (data.is_homepage) {
+        await trx.updateTable("zv_pages").set({ is_homepage: false }).where("site_id", "=", site.id).where("tenant_id", "=", tenantId(c)).where("is_homepage", "=", true).execute();
+      }
+      return await trx.insertInto("zv_pages").values({
+        site_id: site.id,
+        title: data.title,
+        slug: data.slug,
+        icon: data.icon ?? null,
+        description: data.description ?? null,
+        is_active: data.is_active ?? true,
+        is_homepage: data.is_homepage ?? false,
+        auth_required: data.auth_required ?? !site.is_public,
+        allowed_roles: data.allowed_roles ?? [],
+        parent_id: data.parent_id ?? null,
+        sort_order: data.sort_order ?? 0,
+        status: data.status ?? "draft",
+        kind: data.kind ?? "page",
+        record_collection: data.record_collection ?? null,
+        record_field: data.record_field ?? null,
+        record_filter: jsonb(data.record_filter ?? []),
+        popup_config: jsonb(data.popup_config ?? {}),
+        blocks: jsonb(sanitizeBlocksForWrite(data.blocks ?? [])),
+        created_by: user?.id ?? null,
+        updated_by: user?.id ?? null,
+        tenant_id: tenantId(c)
+      }).returningAll().executeTakeFirstOrThrow();
+    });
     return c.json({ page }, 201);
   });
   app.put("/:slug/pages/:pageSlug", zValidator("json", PageUpdateSchema), async (c) => {
@@ -31349,23 +31352,34 @@ function sitesRoutes(ctx) {
       return c.json({ error: "Site not found" }, 404);
     const data = c.req.valid("json");
     const user = c.get("user");
-    if (data.is_homepage) {
-      await db.updateTable("zv_pages").set({ is_homepage: false }).where("site_id", "=", site.id).where("tenant_id", "=", tenantId(c)).where("is_homepage", "=", true).execute();
+    let page;
+    const runUpdate = () => db.transaction().execute(async (trx) => {
+      if (data.is_homepage) {
+        await trx.updateTable("zv_pages").set({ is_homepage: false }).where("site_id", "=", site.id).where("tenant_id", "=", tenantId(c)).where("is_homepage", "=", true).execute();
+      }
+      const patch = {
+        ...data,
+        updated_at: new Date,
+        updated_by: user?.id ?? null
+      };
+      if (data.blocks !== undefined)
+        patch.blocks = jsonb(sanitizeBlocksForWrite(data.blocks));
+      if (data.popup_config !== undefined)
+        patch.popup_config = jsonb(data.popup_config);
+      if (data.record_filter !== undefined)
+        patch.record_filter = jsonb(data.record_filter);
+      const updated = await trx.updateTable("zv_pages").set(patch).where("site_id", "=", site.id).where("tenant_id", "=", tenantId(c)).where("slug", "=", c.req.param("pageSlug")).returningAll().executeTakeFirst();
+      if (!updated)
+        throw NOT_FOUND;
+      return updated;
+    });
+    try {
+      page = await runUpdate();
+    } catch (err) {
+      if (err === NOT_FOUND)
+        return c.json({ error: "Page not found" }, 404);
+      throw err;
     }
-    const patch = {
-      ...data,
-      updated_at: new Date,
-      updated_by: user?.id ?? null
-    };
-    if (data.blocks !== undefined)
-      patch.blocks = jsonb(sanitizeBlocksForWrite(data.blocks));
-    if (data.popup_config !== undefined)
-      patch.popup_config = jsonb(data.popup_config);
-    if (data.record_filter !== undefined)
-      patch.record_filter = jsonb(data.record_filter);
-    const page = await db.updateTable("zv_pages").set(patch).where("site_id", "=", site.id).where("tenant_id", "=", tenantId(c)).where("slug", "=", c.req.param("pageSlug")).returningAll().executeTakeFirst();
-    if (!page)
-      return c.json({ error: "Page not found" }, 404);
     return c.json({ page });
   });
   app.delete("/:slug/pages/:pageSlug", async (c) => {
@@ -31873,49 +31887,51 @@ function editorRoutes(ctx) {
     const body = c.req.valid("json");
     const now = new Date;
     const current = await db.selectFrom("zv_pages").select(["blocks", "meta"]).where("id", "=", id).executeTakeFirst();
-    if (current) {
-      const parse7 = (v, fallback) => typeof v === "string" ? JSON.parse(v || "null") ?? fallback : v ?? fallback;
-      await db.insertInto("zv_page_revisions").values({
-        page_id: id,
-        blocks: jsonb(parse7(current.blocks, [])),
-        meta: jsonb(parse7(current.meta, {})),
-        created_by: user.id
-      }).execute();
-    }
-    const updates = { updated_at: now, updated_by: user.id };
-    if (body.title !== undefined)
-      updates.title = body.title;
-    if (body.slug !== undefined)
-      updates.slug = body.slug;
-    if (body.description !== undefined)
-      updates.description = body.description;
-    if (body.template !== undefined)
-      updates.template = body.template;
-    if (body.site_id !== undefined)
-      updates.site_id = body.site_id;
-    if (body.blocks !== undefined)
-      updates.blocks = jsonb(sanitizeBlocksForWrite(body.blocks));
-    if (body.meta !== undefined)
-      updates.meta = jsonb(body.meta);
-    if (body.locale !== undefined)
-      updates.locale = body.locale;
-    if (body.meta_title !== undefined)
-      updates.meta_title = body.meta_title;
-    if (body.meta_description !== undefined)
-      updates.meta_description = body.meta_description;
-    if (body.og_image !== undefined)
-      updates.og_image = body.og_image;
-    if (body.is_noindex !== undefined)
-      updates.is_noindex = body.is_noindex;
-    if (body.status !== undefined) {
-      updates.status = body.status;
-      if (body.status === "published")
-        updates.published_at = now;
-    }
-    const page = await db.updateTable("zv_pages").set(updates).where("id", "=", id).returningAll().executeTakeFirst();
-    if (!page)
+    const outcome = await db.transaction().execute(async (trx) => {
+      if (current) {
+        const parse7 = (v, fallback) => typeof v === "string" ? JSON.parse(v || "null") ?? fallback : v ?? fallback;
+        await trx.insertInto("zv_page_revisions").values({
+          page_id: id,
+          blocks: jsonb(parse7(current.blocks, [])),
+          meta: jsonb(parse7(current.meta, {})),
+          created_by: user.id
+        }).execute();
+      }
+      const updates = { updated_at: now, updated_by: user.id };
+      if (body.title !== undefined)
+        updates.title = body.title;
+      if (body.slug !== undefined)
+        updates.slug = body.slug;
+      if (body.description !== undefined)
+        updates.description = body.description;
+      if (body.template !== undefined)
+        updates.template = body.template;
+      if (body.site_id !== undefined)
+        updates.site_id = body.site_id;
+      if (body.blocks !== undefined)
+        updates.blocks = jsonb(sanitizeBlocksForWrite(body.blocks));
+      if (body.meta !== undefined)
+        updates.meta = jsonb(body.meta);
+      if (body.locale !== undefined)
+        updates.locale = body.locale;
+      if (body.meta_title !== undefined)
+        updates.meta_title = body.meta_title;
+      if (body.meta_description !== undefined)
+        updates.meta_description = body.meta_description;
+      if (body.og_image !== undefined)
+        updates.og_image = body.og_image;
+      if (body.is_noindex !== undefined)
+        updates.is_noindex = body.is_noindex;
+      if (body.status !== undefined) {
+        updates.status = body.status;
+        if (body.status === "published")
+          updates.published_at = now;
+      }
+      return await trx.updateTable("zv_pages").set(updates).where("id", "=", id).returningAll().executeTakeFirst();
+    });
+    if (!outcome)
       return c.json({ error: "Page not found" }, 404);
-    return c.json({ page });
+    return c.json({ page: outcome });
   });
   app.delete("/:id", async (c) => {
     const { user, res } = await requireAdmin(c, auth, checkPermission);
@@ -31952,19 +31968,21 @@ function editorRoutes(ctx) {
     if (!current)
       return c.json({ error: "Page not found" }, 404);
     const asValue = (v, fallback) => typeof v === "string" ? JSON.parse(v || "null") ?? fallback : v ?? fallback;
-    await db.insertInto("zv_page_revisions").values({
-      page_id: id,
-      blocks: jsonb(asValue(current.blocks, [])),
-      meta: jsonb(asValue(current.meta, {})),
-      created_by: user.id
-    }).execute();
-    const restoredBlocks = typeof revision.blocks === "string" ? JSON.parse(revision.blocks) : revision.blocks ?? [];
-    const page = await db.updateTable("zv_pages").set({
-      blocks: jsonb(sanitizeBlocksForWrite(restoredBlocks)),
-      meta: jsonb(asValue(revision.meta, {})),
-      updated_at: new Date,
-      updated_by: user.id
-    }).where("id", "=", id).returningAll().executeTakeFirst();
+    const page = await db.transaction().execute(async (trx) => {
+      await trx.insertInto("zv_page_revisions").values({
+        page_id: id,
+        blocks: jsonb(asValue(current.blocks, [])),
+        meta: jsonb(asValue(current.meta, {})),
+        created_by: user.id
+      }).execute();
+      const restoredBlocks = typeof revision.blocks === "string" ? JSON.parse(revision.blocks) : revision.blocks ?? [];
+      return await trx.updateTable("zv_pages").set({
+        blocks: jsonb(sanitizeBlocksForWrite(restoredBlocks)),
+        meta: jsonb(asValue(revision.meta, {})),
+        updated_at: new Date,
+        updated_by: user.id
+      }).where("id", "=", id).returningAll().executeTakeFirst();
+    });
     return c.json({ page });
   });
   app.get("/:id/seo", async (c) => {

@@ -161,6 +161,9 @@ async function hasRole(
   return roles.some((r: string) => allowed.includes(r));
 }
 
+/** Thrown to roll a transaction back on a miss — a returned value commits. */
+const NOT_FOUND = Symbol('page-not-found');
+
 export function sitesRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
   const engine = ctx.internals as Any;
@@ -339,8 +342,13 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
     // One homepage per site. The database enforces it too
     // (uq_zv_pages_site_homepage); clearing the old one first means the editor
     // gets the change it asked for rather than a 409 it has to interpret.
+    // Demoting the old homepage and creating the new one are one change. Split,
+    // the site is left with NO homepage: the unique index means only one can
+    // hold the flag, and the visitor hitting the root gets nothing while every
+    // page still lists fine in the editor.
+    const page = await db.transaction().execute(async (trx) => {
     if (data.is_homepage) {
-      await db
+      await trx
         .updateTable('zv_pages')
         .set({ is_homepage: false })
         .where('site_id', '=', site.id)
@@ -349,7 +357,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
         .execute();
     }
 
-    const page = await db
+    return await trx
       .insertInto('zv_pages')
       .values({
         site_id: site.id,
@@ -376,6 +384,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
       })
       .returningAll()
       .executeTakeFirstOrThrow();
+    });
 
     return c.json({ page }, 201);
   });
@@ -390,8 +399,15 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
     const data = c.req.valid('json');
     const user = c.get('user');
 
+    // Worse than a crash window here: the demotion runs BEFORE the update that
+    // can match nothing. A PUT naming a slug that does not exist, with
+    // `is_homepage: true`, cleared the site's homepage and answered 404 — the
+    // site lost its front page on a request that failed. No crash required.
+    let page: Awaited<ReturnType<typeof runUpdate>>;
+    const runUpdate = () =>
+      db.transaction().execute(async (trx) => {
     if (data.is_homepage) {
-      await db
+      await trx
         .updateTable('zv_pages')
         .set({ is_homepage: false })
         .where('site_id', '=', site.id)
@@ -414,7 +430,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
     // then parses into nothing — a silently unfiltered record page.
     if (data.record_filter !== undefined) patch.record_filter = jsonb(data.record_filter);
 
-    const page = await db
+    const updated = await trx
       .updateTable('zv_pages')
       .set(patch)
       .where('site_id', '=', site.id)
@@ -422,8 +438,19 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
       .where('slug', '=', c.req.param('pageSlug'))
       .returningAll()
       .executeTakeFirst();
+    // Nothing matched. THROWN, not returned: a callback that returns normally
+    // COMMITS, which would leave the demotion above in place — the exact bug
+    // this transaction exists to prevent.
+    if (!updated) throw NOT_FOUND;
+    return updated;
+      });
+    try {
+      page = await runUpdate();
+    } catch (err) {
+      if (err === NOT_FOUND) return c.json({ error: 'Page not found' }, 404);
+      throw err;
+    }
 
-    if (!page) return c.json({ error: 'Page not found' }, 404);
     return c.json({ page });
   });
 

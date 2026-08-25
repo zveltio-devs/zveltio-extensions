@@ -19616,6 +19616,7 @@ function noEmploymentService(c) {
     code: "dependency_unavailable"
   }, 503);
 }
+var PERIOD_NOT_READY = Symbol("payroll-period-not-ready");
 function payrollRoutes(ctx) {
   const { db, auth } = ctx;
   const app = new Hono2;
@@ -19763,16 +19764,25 @@ function payrollRoutes(ctx) {
     if (!await mayDecidePayroll(ctx, user, "approve")) {
       return c.json({ error: "You may not approve a payroll period" }, 403);
     }
-    const row = await db.transaction().execute(async (trx) => {
+    let row;
+    const approvePeriod = () => db.transaction().execute(async (trx) => {
       await sql`UPDATE zvd_payroll_entries SET status = 'approved', updated_at = NOW() WHERE period_id = ${c.req.param("id")} AND status = 'draft'`.execute(trx);
       const updated = await sql`
-        UPDATE zvd_payroll_periods SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
-        WHERE id = ${c.req.param("id")} AND status = 'calculated' RETURNING *
-      `.execute(trx);
-      return updated.rows.length ? updated : null;
+          UPDATE zvd_payroll_periods SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
+          WHERE id = ${c.req.param("id")} AND status = 'calculated' RETURNING *
+        `.execute(trx);
+      if (!updated.rows.length)
+        throw PERIOD_NOT_READY;
+      return updated;
     });
-    if (!row)
-      return c.json({ error: "Period not found or not calculated" }, 400);
+    try {
+      row = await approvePeriod();
+    } catch (err) {
+      if (err === PERIOD_NOT_READY) {
+        return c.json({ error: "Period not found or not calculated" }, 400);
+      }
+      throw err;
+    }
     return c.json({ data: row.rows[0] });
   });
   app.post("/periods/:id/pay", async (c) => {
@@ -19780,19 +19790,28 @@ function payrollRoutes(ctx) {
     if (!await mayDecidePayroll(ctx, user, "pay")) {
       return c.json({ error: "You may not mark a payroll period paid" }, 403);
     }
-    const row = await db.transaction().execute(async (trx) => {
+    let row;
+    const payPeriod = () => db.transaction().execute(async (trx) => {
       await sql`UPDATE zvd_payroll_entries SET paid_at = NOW(), updated_at = NOW() WHERE period_id = ${c.req.param("id")} AND status = 'approved'`.execute(trx);
       const updated = await sql`
-        UPDATE zvd_payroll_periods SET status = 'closed', paid_at = NOW(), updated_at = NOW()
-        -- Only the approve route can produce 'approved'. Requiring it here is what makes
-        -- calculate -> pay impossible: the two decisions no longer share one state,
-        -- so the second can finally tell whether the first happened.
-        WHERE id = ${c.req.param("id")} AND status = 'approved' RETURNING *
-      `.execute(trx);
-      return updated.rows.length ? updated : null;
+          UPDATE zvd_payroll_periods SET status = 'closed', paid_at = NOW(), updated_at = NOW()
+          -- Only the approve route can produce 'approved'. Requiring it here is what makes
+          -- calculate -> pay impossible: the two decisions no longer share one state,
+          -- so the second can finally tell whether the first happened.
+          WHERE id = ${c.req.param("id")} AND status = 'approved' RETURNING *
+        `.execute(trx);
+      if (!updated.rows.length)
+        throw PERIOD_NOT_READY;
+      return updated;
     });
-    if (!row)
-      return c.json({ error: "Period not found or not ready" }, 400);
+    try {
+      row = await payPeriod();
+    } catch (err) {
+      if (err === PERIOD_NOT_READY) {
+        return c.json({ error: "Period not found or not ready" }, 400);
+      }
+      throw err;
+    }
     return c.json({ data: row.rows[0] });
   });
   app.get("/periods/:id/entries", async (c) => {

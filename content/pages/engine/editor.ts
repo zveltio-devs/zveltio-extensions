@@ -509,13 +509,20 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
       .select(['blocks', 'meta'])
       .where('id', '=', id)
       .executeTakeFirst();
+    // The revision snapshot and the edit it is a snapshot OF.
+    //
+    // Written alone, the revision list gains an entry identical to the page as
+    // it still stands — a version history that records edits which did not
+    // happen. The other way round is worse: the page changes and the version
+    // before it is gone, which is the one thing a revision exists to keep.
+    const outcome = await db.transaction().execute(async (trx) => {
     if (current) {
       // Rows written before `jsonb.ts` existed hold their JSON as TEXT, so the
       // driver hands them back as a string. Parse those before writing, or the
       // snapshot is the text of the text.
       const parse = (v: unknown, fallback: unknown) =>
         typeof v === 'string' ? JSON.parse(v || 'null') ?? fallback : (v ?? fallback);
-      await db
+      await trx
         .insertInto('zv_page_revisions')
         .values({
           page_id: id,
@@ -544,14 +551,15 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
       if (body.status === 'published') updates.published_at = now;
     }
 
-    const page = await db
-      .updateTable('zv_pages')
-      .set(updates)
-      .where('id', '=', id)
-      .returningAll()
-      .executeTakeFirst();
-    if (!page) return c.json({ error: 'Page not found' }, 404);
-    return c.json({ page });
+      return await trx
+        .updateTable('zv_pages')
+        .set(updates)
+        .where('id', '=', id)
+        .returningAll()
+        .executeTakeFirst();
+    });
+    if (!outcome) return c.json({ error: 'Page not found' }, 404);
+    return c.json({ page: outcome });
   });
 
   app.delete('/:id', async (c) => {
@@ -626,34 +634,41 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
     const asValue = (v: unknown, fallback: unknown) =>
       typeof v === 'string' ? JSON.parse(v || 'null') ?? fallback : (v ?? fallback);
 
-    await db
-      .insertInto('zv_page_revisions')
-      .values({
-        page_id: id,
-        blocks: jsonb(asValue(current.blocks, [])),
-        meta: jsonb(asValue(current.meta, {})),
-        created_by: user.id,
-      })
-      .execute();
+    // Restoring snapshots the current page before overwriting it, so the restore
+    // itself is undoable. Split, the page is replaced with an old revision and
+    // the state it replaced was never saved — the editor's undo has quietly
+    // stopped one step short, and the work between the revision and now is gone
+    // with nothing to point at.
+    const page = await db.transaction().execute(async (trx) => {
+      await trx
+        .insertInto('zv_page_revisions')
+        .values({
+          page_id: id,
+          blocks: jsonb(asValue(current.blocks, [])),
+          meta: jsonb(asValue(current.meta, {})),
+          created_by: user.id,
+        })
+        .execute();
 
-    const restoredBlocks = typeof revision.blocks === 'string'
-      ? JSON.parse(revision.blocks)
-      : (revision.blocks ?? []);
+      const restoredBlocks = typeof revision.blocks === 'string'
+        ? JSON.parse(revision.blocks)
+        : (revision.blocks ?? []);
 
-    const page = await db
-      .updateTable('zv_pages')
-      .set({
-        // Scrubbed again on the way back in: the revision was stored before
-        // today's sanitiser reached `richtext` and nested blocks, so an old
-        // snapshot can carry markup a current save would never accept.
-        blocks: jsonb(sanitizeBlocksForWrite(restoredBlocks)),
-        meta: jsonb(asValue(revision.meta, {})),
-        updated_at: new Date(),
-        updated_by: user.id,
-      })
-      .where('id', '=', id)
-      .returningAll()
-      .executeTakeFirst();
+      return await trx
+        .updateTable('zv_pages')
+        .set({
+          // Scrubbed again on the way back in: the revision was stored before
+          // today's sanitiser reached `richtext` and nested blocks, so an old
+          // snapshot can carry markup a current save would never accept.
+          blocks: jsonb(sanitizeBlocksForWrite(restoredBlocks)),
+          meta: jsonb(asValue(revision.meta, {})),
+          updated_at: new Date(),
+          updated_by: user.id,
+        })
+        .where('id', '=', id)
+        .returningAll()
+        .executeTakeFirst();
+    });
 
     return c.json({ page });
   });
