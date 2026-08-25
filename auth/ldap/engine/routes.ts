@@ -265,32 +265,44 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'LDAP user does not have an email address configured' }, 400);
     }
 
-    const user = await findOrCreateSsoUser(db, ldapUser.email, ldapUser.displayName);
+    // Signing in is one act: the user record, the revocation of their previous
+    // sessions, the new session, and the audit row.
+    //
+    // The `.catch` that used to sit on the session delete was the dangerous one.
+    // The comment above states a security property — one active SSO session per
+    // user, so a leaked token stops working at the next sign-in — and swallowing
+    // the failure meant the property silently did not hold while the login
+    // succeeded and reported nothing. Inside a transaction it contained nothing
+    // either: Postgres refuses every statement after a failed one, so the
+    // session creation below would have died and been reported as something
+    // else entirely.
+    //
+    // The audit `try/catch` goes for the same reason. An SSO login with no audit
+    // row is a sign-in nobody can see afterwards.
+    const { user, token, setCookie } = await db.transaction().execute(async (trx) => {
+      const u = await findOrCreateSsoUser(trx, ldapUser.email, ldapUser.displayName);
 
-    // Invalidate prior sessions for this user — limits the blast radius of
-    // a credential leak and matches the "one active SSO session per user"
-    // expectation most ops teams have. Without this, every successful
-    // sign-in leaves the previous token live until its TTL expires.
-    await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(db).catch((err: Error) => {
-      console.warn('[ldap] could not invalidate previous sessions:', err.message);
-    });
+      // Invalidate prior sessions for this user — limits the blast radius of
+      // a credential leak and matches the "one active SSO session per user"
+      // expectation most ops teams have. Without this, every successful
+      // sign-in leaves the previous token live until its TTL expires.
+      await sql`DELETE FROM session WHERE "userId" = ${u.id}`.execute(trx);
 
-    const { token, setCookie } = await internals.createBetterAuthSession(db, user.id, {
-      ipAddress: remoteIp === 'unknown' ? undefined : remoteIp,
-      userAgent: userAgent ?? undefined,
-      crossDomain,
-    });
+      const session = await internals.createBetterAuthSession(trx, u.id, {
+        ipAddress: remoteIp === 'unknown' ? undefined : remoteIp,
+        userAgent: userAgent ?? undefined,
+        crossDomain,
+      });
 
-    try {
       await sql`
         INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, ip, created_at)
-        VALUES ('auth.login_success', ${user.id}, 'session',
+        VALUES ('auth.login_success', ${u.id}, 'session',
                 ${JSON.stringify({ provider: 'ldap', username, user_agent: userAgent })}::jsonb,
                 ${remoteIp}, NOW())
-      `.execute(db);
-    } catch (auditErr) {
-      console.warn('[ldap] success audit write failed:', (auditErr as Error).message);
-    }
+      `.execute(trx);
+
+      return { user: u, ...session };
+    });
 
     c.header('Set-Cookie', setCookie);
     return c.json({
