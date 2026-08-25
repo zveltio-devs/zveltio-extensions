@@ -1729,7 +1729,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
+// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.8.0+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -19837,15 +19837,20 @@ function approvalsRoutes(ctx) {
     }
     const { steps, ...workflowData } = c.req.valid("json");
     const id = c.req.param("id");
-    const workflow = await db.updateTable("zv_approval_workflows").set({ ...workflowData, updated_at: new Date }).where("id", "=", id).returningAll().executeTakeFirst();
+    const workflow = await db.transaction().execute(async (trx) => {
+      const updated = await trx.updateTable("zv_approval_workflows").set({ ...workflowData, updated_at: new Date }).where("id", "=", id).returningAll().executeTakeFirst();
+      if (!updated)
+        return null;
+      if (steps) {
+        await trx.deleteFrom("zv_approval_steps").where("workflow_id", "=", id).execute();
+        for (let i = 0;i < steps.length; i++) {
+          await trx.insertInto("zv_approval_steps").values({ ...steps[i], workflow_id: id, step_order: i }).execute();
+        }
+      }
+      return updated;
+    });
     if (!workflow)
       return c.json({ error: "Workflow not found" }, 404);
-    if (steps) {
-      await db.deleteFrom("zv_approval_steps").where("workflow_id", "=", id).execute();
-      for (let i = 0;i < steps.length; i++) {
-        await db.insertInto("zv_approval_steps").values({ ...steps[i], workflow_id: id, step_order: i }).execute();
-      }
-    }
     return c.json({ workflow });
   });
   app.delete("/workflows/:id", async (c) => {
