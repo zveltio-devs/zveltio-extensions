@@ -229,11 +229,18 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
     const daysInPeriod = s.old_interval === 'monthly' ? 30 : s.old_interval === 'quarterly' ? 91 : 365;
     const daysRemaining = Math.max(0, daysInPeriod - (daysSinceStart % daysInPeriod));
     const prorationAmount = computeProration(s.old_price, np.price, np.interval, daysRemaining);
-    await sql`
-      INSERT INTO zvd_plan_changes (subscriber_id, from_plan_id, to_plan_id, effective_date, proration_amount, reason, created_by)
-      VALUES (${s.id}, ${s.plan_id}, ${d.new_plan_id}, ${effectiveDate}, ${prorationAmount}, ${d.reason ?? null}, ${user.id})
-    `.execute(db);
-    const row = await sql`UPDATE zvd_subscribers SET plan_id = ${d.new_plan_id}, updated_at = NOW() WHERE id = ${s.id} RETURNING *`.execute(db);
+    // The plan change record and the plan itself. The record carries
+    // `from_plan_id` — read from the subscriber BEFORE the update — so writing
+    // it without the update leaves a history saying the customer moved off a
+    // plan they are still on, and writing the update without it moves them with
+    // nothing recording the proration they were charged.
+    const row = await db.transaction().execute(async (trx) => {
+      await sql`
+        INSERT INTO zvd_plan_changes (subscriber_id, from_plan_id, to_plan_id, effective_date, proration_amount, reason, created_by)
+        VALUES (${s.id}, ${s.plan_id}, ${d.new_plan_id}, ${effectiveDate}, ${prorationAmount}, ${d.reason ?? null}, ${user.id})
+      `.execute(trx);
+      return await sql`UPDATE zvd_subscribers SET plan_id = ${d.new_plan_id}, updated_at = NOW() WHERE id = ${s.id} RETURNING *`.execute(trx);
+    });
     return c.json({ data: { subscriber: row.rows[0], proration_amount: prorationAmount } });
   });
 
@@ -336,30 +343,40 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
     // worse than the error it replaces.
     const periodEnd = addInterval(periodStart, s.interval);
     const dueDate = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
-    // Calculate usage charges
-    let usageAmount = 0;
-    if (s.usage_billing) {
-      const usage = await sql`
-        SELECT COALESCE(SUM(quantity * unit_price), 0) as total
-        FROM zvd_subscription_usage
-        WHERE subscriber_id = ${s.id} AND is_billed = false
-      `.execute(db);
-      usageAmount = +(usage.rows[0] as any).total;
-      await sql`UPDATE zvd_subscription_usage SET is_billed = true WHERE subscriber_id = ${s.id} AND is_billed = false`.execute(db);
-    }
-    // `s.price` comes from `zvd_subscription_plans.price`, which is NUMERIC —
-    // and PostgreSQL sends NUMERIC as a string. `"49.00" + 10` is the string
-    // "49.0010", which PostgreSQL then accepts into `total_amount NUMERIC(14,2)`
-    // and rounds to 49.00. Measured: a 49.00 plan with 10.00 of metered usage
-    // invoiced the customer 49.00 and lost the usage entirely. Nothing errors,
-    // and the invoice looks like a perfectly ordinary one.
-    const planPrice = toNumber(s.price, 0, 'plan.price');
-    const totalAmount = roundMoney(planPrice + usageAmount);
-    const row = await sql`
-      INSERT INTO zvd_subscription_invoices (subscriber_id, plan_id, amount, usage_amount, total_amount, currency, period_start, period_end, due_date, created_by)
-      VALUES (${s.id}, ${s.plan_id}, ${planPrice}, ${usageAmount}, ${totalAmount}, ${s.currency}, ${periodStart}, ${periodEnd}, ${dueDate}, ${user.id})
-      RETURNING *
-    `.execute(db);
+    // Usage rows are marked billed BEFORE the invoice that bills them exists.
+    // Split, the usage is flagged as charged and the invoice never arrives —
+    // the customer used the service, the meter says they were billed for it,
+    // and no document anywhere asks them to pay. The next run skips those rows
+    // because `is_billed` is already true, so the revenue is not recoverable
+    // without reading the usage table by hand.
+    const row = await db.transaction().execute(async (trx) => {
+      // Calculate usage charges
+      let usageAmount = 0;
+      if (s.usage_billing) {
+        const usage = await sql`
+          SELECT COALESCE(SUM(quantity * unit_price), 0) as total
+          FROM zvd_subscription_usage
+          WHERE subscriber_id = ${s.id} AND is_billed = false
+        `.execute(trx);
+        usageAmount = +(usage.rows[0] as any).total;
+        await sql`UPDATE zvd_subscription_usage SET is_billed = true WHERE subscriber_id = ${s.id} AND is_billed = false`.execute(trx);
+      }
+      // `s.price` comes from `zvd_subscription_plans.price`, which is NUMERIC —
+      // and PostgreSQL sends NUMERIC as a string. `"49.00" + 10` is the string
+      // "49.0010", which PostgreSQL then accepts into `total_amount NUMERIC(14,2)`
+      // and rounds to 49.00. Measured: a 49.00 plan with 10.00 of metered usage
+      // invoiced the customer 49.00 and lost the usage entirely. Nothing errors,
+      // and the invoice looks like a perfectly ordinary one.
+      const planPrice = toNumber(s.price, 0, 'plan.price');
+      const totalAmount = roundMoney(planPrice + usageAmount);
+      const row = await sql`
+        INSERT INTO zvd_subscription_invoices (subscriber_id, plan_id, amount, usage_amount, total_amount, currency, period_start, period_end, due_date, created_by)
+        VALUES (${s.id}, ${s.plan_id}, ${planPrice}, ${usageAmount}, ${totalAmount}, ${s.currency}, ${periodStart}, ${periodEnd}, ${dueDate}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      return row;
+    });
+
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -383,16 +400,24 @@ export function subscriptionsRoutes(ctx: ExtensionContext): Hono {
     const attemptNum = +(attempts.rows[0] as any).cnt + 1;
     const nextDays = DUNNING_DAYS[attemptNum - 1];
     const nextAttempt = nextDays ? new Date(Date.now() + nextDays * 86400000).toISOString() : null;
-    await sql`
-      INSERT INTO zvd_dunning_attempts (subscriber_id, invoice_id, attempt_number, status, next_attempt_at)
-      VALUES (${invoice.subscriber_id}, ${invoice.id}, ${attemptNum}, 'failed', ${nextAttempt})
-    `.execute(db);
-    if (!nextAttempt) {
-      // Max attempts reached — suspend subscription
-      await sql`UPDATE zvd_subscribers SET status = 'past_due', dunning_count = ${attemptNum}, payment_failure_at = NOW(), updated_at = NOW() WHERE id = ${invoice.subscriber_id}`.execute(db);
-    } else {
-      await sql`UPDATE zvd_subscribers SET dunning_count = ${attemptNum}, payment_failure_at = NOW(), updated_at = NOW() WHERE id = ${invoice.subscriber_id}`.execute(db);
-    }
+    // `attemptNum` is derived from the attempts already recorded, and
+    // `dunning_count` on the subscriber is the same number kept a second time.
+    // Split, they disagree: the attempt is logged but the counter is not
+    // advanced, so the next failure computes the SAME attempt number, the
+    // schedule never reaches its last step, and a subscriber who has stopped
+    // paying is chased forever without ever being suspended.
+    await db.transaction().execute(async (trx) => {
+      await sql`
+        INSERT INTO zvd_dunning_attempts (subscriber_id, invoice_id, attempt_number, status, next_attempt_at)
+        VALUES (${invoice.subscriber_id}, ${invoice.id}, ${attemptNum}, 'failed', ${nextAttempt})
+      `.execute(trx);
+      if (!nextAttempt) {
+        // Max attempts reached — suspend subscription
+        await sql`UPDATE zvd_subscribers SET status = 'past_due', dunning_count = ${attemptNum}, payment_failure_at = NOW(), updated_at = NOW() WHERE id = ${invoice.subscriber_id}`.execute(trx);
+      } else {
+        await sql`UPDATE zvd_subscribers SET dunning_count = ${attemptNum}, payment_failure_at = NOW(), updated_at = NOW() WHERE id = ${invoice.subscriber_id}`.execute(trx);
+      }
+    });
     return c.json({ data: { attempt: attemptNum, next_attempt_at: nextAttempt } });
   });
 
