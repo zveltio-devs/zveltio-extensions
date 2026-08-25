@@ -1732,7 +1732,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
+// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.8.0+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -19658,13 +19658,16 @@ function timeTrackingRoutes(ctx) {
       return c.json({ error: "Timer too short (< 1 minute), discarded" }, 400);
     }
     const amount = t.is_billable ? durationMinutes / 60 * +t.hourly_rate : 0;
-    const row = await sql`
-      INSERT INTO zvd_time_entries (employee_id, project_id, task_description, date, start_time, end_time, duration_minutes, is_billable, hourly_rate, amount, notes, created_by)
-      VALUES (${employeeId}, ${t.project_id}, ${t.task_description}, NOW()::DATE, ${t.started_at}, NOW(), ${durationMinutes},
-        ${t.is_billable}, ${t.hourly_rate}, ${amount}, ${t.notes ?? null}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    await sql`DELETE FROM zvd_active_timers WHERE employee_id = ${employeeId}`.execute(db);
+    const row = await db.transaction().execute(async (trx) => {
+      const inserted = await sql`
+        INSERT INTO zvd_time_entries (employee_id, project_id, task_description, date, start_time, end_time, duration_minutes, is_billable, hourly_rate, amount, notes, created_by)
+        VALUES (${employeeId}, ${t.project_id}, ${t.task_description}, NOW()::DATE, ${t.started_at}, NOW(), ${durationMinutes},
+          ${t.is_billable}, ${t.hourly_rate}, ${amount}, ${t.notes ?? null}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      await sql`DELETE FROM zvd_active_timers WHERE employee_id = ${employeeId}`.execute(trx);
+      return inserted;
+    });
     return c.json({ data: row.rows[0] });
   });
   app.get("/entries", async (c) => {

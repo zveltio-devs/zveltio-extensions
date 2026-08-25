@@ -341,18 +341,28 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     // Membership is what actually provisions the user INTO this tenant.
     // Without it the account exists and belongs nowhere, and the very next
     // `GET /Users` would not return the user SCIM just created.
-    await sql`
-      INSERT INTO zv_tenant_users (tenant_id, user_id, role)
-      VALUES (${tenantId}::uuid, ${userId}, 'member')
-      ON CONFLICT (tenant_id, user_id) DO NOTHING
-    `.execute(db);
-
     const active = body?.active !== false;
-    await sql`
-      INSERT INTO zv_scim_users (tenant_id, user_id, external_id, active)
-      VALUES (${tenantId}::uuid, ${userId}, ${body?.externalId ?? null}, ${active})
-      ON CONFLICT (tenant_id, user_id) DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active, updated_at = NOW()
-    `.execute(db);
+    // Membership and the SCIM record are one provisioning act.
+    //
+    // Split, the halves fail in opposite directions and both are silent. Only the
+    // membership: the user is in the tenant but SCIM has no record of them, so the
+    // identity provider believes provisioning failed and retries — or worse,
+    // deprovisioning later finds nothing to deactivate. Only the SCIM record: SCIM
+    // reports the user provisioned while the very next `GET /Users` cannot see
+    // them, because membership is what actually puts them in the tenant.
+    await db.transaction().execute(async (trx) => {
+      await sql`
+        INSERT INTO zv_tenant_users (tenant_id, user_id, role)
+        VALUES (${tenantId}::uuid, ${userId}, 'member')
+        ON CONFLICT (tenant_id, user_id) DO NOTHING
+      `.execute(trx);
+
+      await sql`
+        INSERT INTO zv_scim_users (tenant_id, user_id, external_id, active)
+        VALUES (${tenantId}::uuid, ${userId}, ${body?.externalId ?? null}, ${active})
+        ON CONFLICT (tenant_id, user_id) DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active, updated_at = NOW()
+      `.execute(trx);
+    });
 
     const row = await sql<Record<string, unknown>>`
       SELECT id, email, name, "createdAt", "updatedAt" FROM "user" WHERE id = ${userId}
