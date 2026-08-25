@@ -1732,7 +1732,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
+// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.8.0+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -19476,28 +19476,35 @@ function introspectRoutes(ctx) {
     if (refusal)
       return c.json({ error: refusal }, 400);
     try {
-      const tables = await introspectSchema(db, schema, exclude, false);
-      const imported = tables.filter((t) => t.isNew).length;
-      const updated = tables.filter((t) => !t.isNew).length;
-      const skipped = 0;
-      await sql`
-        INSERT INTO zvd_byod_scan_history
-          (schema_name, tables_found, tables_imported, tables_updated,
-           tables_skipped, status, triggered_by, created_by)
-        VALUES
-          (${schema}, ${tables.length}, ${imported}, ${updated},
-           ${skipped}, 'completed', 'manual', ${user.id})
-      `.execute(db);
+      const { tables, imported, updated } = await db.transaction().execute(async (trx) => {
+        const found = await introspectSchema(trx, schema, exclude, false);
+        const imp = found.filter((t) => t.isNew).length;
+        const upd = found.filter((t) => !t.isNew).length;
+        const skipped = 0;
+        await sql`
+          INSERT INTO zvd_byod_scan_history
+            (schema_name, tables_found, tables_imported, tables_updated,
+             tables_skipped, status, triggered_by, created_by)
+          VALUES
+            (${schema}, ${found.length}, ${imp}, ${upd},
+             ${skipped}, 'completed', 'manual', ${user.id})
+        `.execute(trx);
+        return { tables: found, imported: imp, updated: upd };
+      });
       return c.json({ imported, updated, tables });
     } catch (err) {
-      await sql`
-        INSERT INTO zvd_byod_scan_history
-          (schema_name, tables_found, tables_imported, tables_updated,
-           tables_skipped, status, error, triggered_by, created_by)
-        VALUES
-          (${schema}, 0, 0, 0, 0, 'failed', ${err.message || "Unknown error"},
-           'manual', ${user.id})
-      `.execute(db).catch(() => {});
+      try {
+        await sql`
+          INSERT INTO zvd_byod_scan_history
+            (schema_name, tables_found, tables_imported, tables_updated,
+             tables_skipped, status, error, triggered_by, created_by)
+          VALUES
+            (${schema}, 0, 0, 0, 0, 'failed', ${err.message || "Unknown error"},
+             'manual', ${user.id})
+        `.execute(db);
+      } catch (histErr) {
+        console.error("[byod] scan failed AND the failure could not be recorded:", histErr.message);
+      }
       return c.json({ error: err.message || "Introspection failed" }, 500);
     }
   });
@@ -19575,35 +19582,42 @@ function introspectRoutes(ctx) {
     const schema = profile.db_schema || "public";
     const exclude = profile.exclude_patterns || [];
     try {
-      const tables = await introspectSchema(db, schema, exclude, false);
-      const imported = tables.filter((t) => t.isNew).length;
-      const updated = tables.filter((t) => !t.isNew).length;
-      const now = new Date;
-      const nextSync = profile.auto_sync ? new Date(Date.now() + (profile.sync_interval_hours || 24) * 3600000) : null;
-      await sql`
-        UPDATE zvd_byod_scan_profiles
-        SET last_sync_at = ${now}, next_sync_at = ${nextSync}, updated_at = ${now}
-        WHERE id = ${id}
-      `.execute(db);
-      const histRow = await sql`
-        INSERT INTO zvd_byod_scan_history
-          (profile_id, schema_name, tables_found, tables_imported, tables_updated,
-           tables_skipped, status, triggered_by, created_by)
-        VALUES
-          (${id}, ${schema}, ${tables.length}, ${imported}, ${updated},
-           0, 'completed', 'profile', ${user.id})
-        RETURNING *
-      `.execute(db);
+      const { imported, updated, tables, histRow } = await db.transaction().execute(async (trx) => {
+        const tables2 = await introspectSchema(trx, schema, exclude, false);
+        const imported2 = tables2.filter((t) => t.isNew).length;
+        const updated2 = tables2.filter((t) => !t.isNew).length;
+        const now = new Date;
+        const nextSync = profile.auto_sync ? new Date(Date.now() + (profile.sync_interval_hours || 24) * 3600000) : null;
+        await sql`
+          UPDATE zvd_byod_scan_profiles
+          SET last_sync_at = ${now}, next_sync_at = ${nextSync}, updated_at = ${now}
+          WHERE id = ${id}
+        `.execute(trx);
+        const histRow2 = await sql`
+          INSERT INTO zvd_byod_scan_history
+            (profile_id, schema_name, tables_found, tables_imported, tables_updated,
+             tables_skipped, status, triggered_by, created_by)
+          VALUES
+            (${id}, ${schema}, ${tables2.length}, ${imported2}, ${updated2},
+             0, 'completed', 'profile', ${user.id})
+          RETURNING *
+        `.execute(trx);
+        return { imported: imported2, updated: updated2, tables: tables2, histRow: histRow2 };
+      });
       return c.json({ imported, updated, tables, history: histRow.rows[0] });
     } catch (err) {
-      await sql`
-        INSERT INTO zvd_byod_scan_history
-          (profile_id, schema_name, tables_found, tables_imported, tables_updated,
-           tables_skipped, status, error, triggered_by, created_by)
-        VALUES
-          (${id}, ${schema}, 0, 0, 0, 0, 'failed',
-           ${err.message || "Unknown error"}, 'profile', ${user.id})
-      `.execute(db).catch(() => {});
+      try {
+        await sql`
+          INSERT INTO zvd_byod_scan_history
+            (profile_id, schema_name, tables_found, tables_imported, tables_updated,
+             tables_skipped, status, error, triggered_by, created_by)
+          VALUES
+            (${id}, ${schema}, 0, 0, 0, 0, 'failed',
+             ${err.message || "Unknown error"}, 'profile', ${user.id})
+        `.execute(db);
+      } catch (histErr) {
+        console.error("[byod] scheduled scan failed AND the failure could not be recorded:", histErr.message);
+      }
       return c.json({ error: err.message || "Scan failed" }, 500);
     }
   });
