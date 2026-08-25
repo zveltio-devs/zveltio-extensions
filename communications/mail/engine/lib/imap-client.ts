@@ -235,7 +235,20 @@ export async function syncImapAccount(
             // `RETURNING id` with ON CONFLICT DO NOTHING returns NO row when the
             // insert was skipped, which is exactly the discrimination the filter
             // pass needs: a message already synced is not newly arrived.
-            const inserted = await sql<{ id: string }>`
+            // The message and its attachment rows are one arrival, and the
+            // comment below is what makes them inseparable: attachments are
+            // written ONLY for a message that actually inserted. If the message
+            // commits and the attachments do not, the re-sync sees the message
+            // already there, skips it, and never writes them — the mail shows
+            // no attachments forever, while the paperclip in the headers says
+            // there are some. Nothing later goes looking.
+            //
+            // Per message, deliberately. This function streams a whole mailbox
+            // over IMAP; one transaction around the sync would hold a
+            // connection for the length of a network transfer and throw away
+            // every message already fetched if the last one failed.
+            const inserted = await db.transaction().execute(async (trx) => {
+            const created = await sql<{ id: string }>`
               INSERT INTO zv_mail_messages (
                 account_id, folder_id, message_id, uid, thread_id,
                 from_address, from_name, to_addresses, cc_addresses,
@@ -250,9 +263,9 @@ export async function syncImapAccount(
               )
               ON CONFLICT DO NOTHING
               RETURNING id
-            `.execute(db);
+            `.execute(trx);
 
-            const newId = inserted.rows[0]?.id;
+            const newId = created.rows[0]?.id;
 
             // The attachment rows the table was waiting for since 001. Written
             // only for a message that actually inserted: on a re-sync the parts
@@ -272,13 +285,15 @@ export async function syncImapAccount(
                     ${att.contentId}, ${att.isInline}, ${att.part}
                   )
                   ON CONFLICT (message_id, part) DO NOTHING
-                `.execute(db);
+                `.execute(trx);
               }
             }
+            return newId;
+            });
 
-            if (newId) {
+            if (inserted) {
               arrived.push({
-                id: newId,
+                id: inserted,
                 from_address: parsed.from.address,
                 to_addresses: parsed.to,
                 subject: parsed.subject,
