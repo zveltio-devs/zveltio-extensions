@@ -1732,7 +1732,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
+// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.8.0+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -19701,14 +19701,17 @@ function bankingRoutes(ctx) {
     const d = c.req.valid("json");
     const accountId = c.req.param("id");
     const autoCategory = d.category ?? await applyRules(db, accountId, d);
-    const row = await sql`
-      INSERT INTO zvd_bank_transactions (account_id, date, type, amount, description, reference, counterparty_name, category, auto_categorized, created_by)
-      VALUES (${accountId}, ${d.date}, ${d.type}, ${d.amount}, ${d.description},
-        ${d.reference ?? null}, ${d.counterparty_name ?? null}, ${autoCategory ?? null}, ${!d.category && !!autoCategory}, ${user.id})
-      RETURNING *
-    `.execute(db);
     const delta = d.type === "credit" ? d.amount : -d.amount;
-    await sql`UPDATE zvd_bank_accounts SET balance = balance + ${delta}, updated_at = NOW() WHERE id = ${accountId}`.execute(db);
+    const row = await db.transaction().execute(async (trx) => {
+      const inserted = await sql`
+        INSERT INTO zvd_bank_transactions (account_id, date, type, amount, description, reference, counterparty_name, category, auto_categorized, created_by)
+        VALUES (${accountId}, ${d.date}, ${d.type}, ${d.amount}, ${d.description},
+          ${d.reference ?? null}, ${d.counterparty_name ?? null}, ${autoCategory ?? null}, ${!d.category && !!autoCategory}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      await sql`UPDATE zvd_bank_accounts SET balance = balance + ${delta}, updated_at = NOW() WHERE id = ${accountId}`.execute(trx);
+      return inserted;
+    });
     return c.json({ data: row.rows[0] }, 201);
   });
   app.post("/accounts/:id/import/mt940", zValidator("json", exports_external.object({
@@ -19728,26 +19731,29 @@ function bankingRoutes(ctx) {
     const transactions = parsed.transactions;
     if (!transactions.length)
       return c.json({ error: "No transactions found in MT940 content" }, 400);
-    const importRow = await sql`
-      INSERT INTO zvd_bank_imports (account_id, source, filename, rows_imported, imported_by)
-      VALUES (${accountId}, 'mt940', ${filename ?? null}, ${transactions.length}, ${user.id}) RETURNING id
-    `.execute(db);
-    const importId = importRow.rows[0].id;
-    let imported = 0;
-    let balance_delta = 0;
-    for (const t of transactions) {
-      const autoCategory = await applyRules(db, accountId, t);
-      const result = await sql`
-        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, category, auto_categorized, created_by, import_hash)
-        VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description}, ${t.reference}, ${autoCategory}, ${!!autoCategory}, ${user.id}, ${transactionFingerprint(accountId, t)})
-        ON CONFLICT DO NOTHING RETURNING id
-      `.execute(db);
-      if (result.rows.length) {
-        balance_delta += t.type === "credit" ? t.amount : -t.amount;
-        imported++;
+    const { importId, imported } = await db.transaction().execute(async (trx) => {
+      const importRow = await sql`
+        INSERT INTO zvd_bank_imports (account_id, source, filename, rows_imported, imported_by)
+        VALUES (${accountId}, 'mt940', ${filename ?? null}, ${transactions.length}, ${user.id}) RETURNING id
+      `.execute(trx);
+      const id = importRow.rows[0].id;
+      let count = 0;
+      let balance_delta = 0;
+      for (const t of transactions) {
+        const autoCategory = await applyRules(trx, accountId, t);
+        const result = await sql`
+          INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, category, auto_categorized, created_by, import_hash)
+          VALUES (${accountId}, ${id}, ${t.date}, ${t.type}, ${t.amount}, ${t.description}, ${t.reference}, ${autoCategory}, ${!!autoCategory}, ${user.id}, ${transactionFingerprint(accountId, t)})
+          ON CONFLICT DO NOTHING RETURNING id
+        `.execute(trx);
+        if (result.rows.length) {
+          balance_delta += t.type === "credit" ? t.amount : -t.amount;
+          count++;
+        }
       }
-    }
-    await sql`UPDATE zvd_bank_accounts SET balance = balance + ${balance_delta}, updated_at = NOW() WHERE id = ${accountId}`.execute(db);
+      await sql`UPDATE zvd_bank_accounts SET balance = balance + ${balance_delta}, updated_at = NOW() WHERE id = ${accountId}`.execute(trx);
+      return { importId: id, imported: count };
+    });
     return c.json({ data: { import_id: importId, total: transactions.length, imported, skipped: transactions.length - imported } }, 201);
   });
   app.post("/accounts/:id/import", zValidator("json", exports_external.object({
@@ -19765,28 +19771,31 @@ function bankingRoutes(ctx) {
     const user = c.get("user");
     const d = c.req.valid("json");
     const accountId = c.req.param("id");
-    const importRow = await sql`
-      INSERT INTO zvd_bank_imports (account_id, source, filename, rows_imported, imported_by)
-      VALUES (${accountId}, ${d.source}, ${d.filename ?? null}, ${d.transactions.length}, ${user.id}) RETURNING id
-    `.execute(db);
-    const importId = importRow.rows[0].id;
-    let balance_delta = 0;
-    let imported = 0;
-    for (const t of d.transactions) {
-      const autoCategory = await applyRules(db, accountId, t);
-      const result = await sql`
-        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, counterparty_name, category, auto_categorized, created_by, import_hash)
-        VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description},
-          ${t.reference ?? null}, ${t.counterparty_name ?? null}, ${autoCategory}, ${!!autoCategory}, ${user.id},
-          ${transactionFingerprint(accountId, t)})
-        ON CONFLICT DO NOTHING RETURNING id
-      `.execute(db);
-      if (result.rows.length) {
-        balance_delta += t.type === "credit" ? t.amount : -t.amount;
-        imported++;
+    const { importId, imported } = await db.transaction().execute(async (trx) => {
+      const importRow = await sql`
+        INSERT INTO zvd_bank_imports (account_id, source, filename, rows_imported, imported_by)
+        VALUES (${accountId}, ${d.source}, ${d.filename ?? null}, ${d.transactions.length}, ${user.id}) RETURNING id
+      `.execute(trx);
+      const id = importRow.rows[0].id;
+      let balance_delta = 0;
+      let count = 0;
+      for (const t of d.transactions) {
+        const autoCategory = await applyRules(trx, accountId, t);
+        const result = await sql`
+          INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, counterparty_name, category, auto_categorized, created_by, import_hash)
+          VALUES (${accountId}, ${id}, ${t.date}, ${t.type}, ${t.amount}, ${t.description},
+            ${t.reference ?? null}, ${t.counterparty_name ?? null}, ${autoCategory}, ${!!autoCategory}, ${user.id},
+            ${transactionFingerprint(accountId, t)})
+          ON CONFLICT DO NOTHING RETURNING id
+        `.execute(trx);
+        if (result.rows.length) {
+          balance_delta += t.type === "credit" ? t.amount : -t.amount;
+          count++;
+        }
       }
-    }
-    await sql`UPDATE zvd_bank_accounts SET balance = balance + ${balance_delta}, updated_at = NOW() WHERE id = ${accountId}`.execute(db);
+      await sql`UPDATE zvd_bank_accounts SET balance = balance + ${balance_delta}, updated_at = NOW() WHERE id = ${accountId}`.execute(trx);
+      return { importId: id, imported: count };
+    });
     return c.json({ data: { import_id: importId, imported } }, 201);
   });
   app.get("/accounts/:id/rules", async (c) => {
@@ -19838,13 +19847,15 @@ function bankingRoutes(ctx) {
     const tx = await sql`SELECT * FROM zvd_bank_transactions WHERE id = ${c.req.param("txId")} AND account_id = ${c.req.param("id")}`.execute(db);
     if (!tx.rows.length)
       return c.json({ error: "Not found" }, 404);
-    await sql`UPDATE zvd_bank_transactions SET is_reconciled = true, updated_at = NOW() WHERE id = ${c.req.param("txId")}`.execute(db);
-    const rec = await sql`
-      INSERT INTO zvd_bank_reconciliations (transaction_id, linked_type, linked_id, matched_amount, notes, created_by)
-      VALUES (${c.req.param("txId")}, ${d.linked_type}, ${d.linked_id ?? null}, ${tx.rows[0].amount}, ${d.notes ?? null}, ${user.id})
-      ON CONFLICT (transaction_id) DO UPDATE SET linked_type = EXCLUDED.linked_type, linked_id = EXCLUDED.linked_id, notes = EXCLUDED.notes
-      RETURNING *
-    `.execute(db);
+    const rec = await db.transaction().execute(async (trx) => {
+      await sql`UPDATE zvd_bank_transactions SET is_reconciled = true, updated_at = NOW() WHERE id = ${c.req.param("txId")}`.execute(trx);
+      return await sql`
+        INSERT INTO zvd_bank_reconciliations (transaction_id, linked_type, linked_id, matched_amount, notes, created_by)
+        VALUES (${c.req.param("txId")}, ${d.linked_type}, ${d.linked_id ?? null}, ${tx.rows[0].amount}, ${d.notes ?? null}, ${user.id})
+        ON CONFLICT (transaction_id) DO UPDATE SET linked_type = EXCLUDED.linked_type, linked_id = EXCLUDED.linked_id, notes = EXCLUDED.notes
+        RETURNING *
+      `.execute(trx);
+    });
     let paid = null;
     if (d.linked_type === "invoice" && d.linked_id) {
       const recordPayment = ctx.services.get("invoicing.recordPayment");
