@@ -144,19 +144,25 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
-    const row = await sql`
-      INSERT INTO zvd_leave_types (code, name, days_per_year, is_paid, requires_approval, color, created_by)
-      VALUES (${d.code}, ${d.name}, ${d.days_per_year}, ${d.is_paid}, ${d.requires_approval}, ${d.color}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    const typeId = (row.rows[0] as any).id;
-    if (d.max_carry_days > 0) {
-      await sql`
-        INSERT INTO zvd_leave_carryover_rules (leave_type_id, max_carry_days, expiry_months)
-        VALUES (${typeId}, ${d.max_carry_days}, ${d.carryover_expiry_months})
-        ON CONFLICT (leave_type_id) DO UPDATE SET max_carry_days = EXCLUDED.max_carry_days
-      `.execute(db);
-    }
+    // The type and its carry-over rule are created together or not at all.
+    // A type whose rule failed to land silently carries nothing over at year
+    // end, and the first anyone hears of it is an employee losing days.
+    const row = await db.transaction().execute(async (trx) => {
+      const created = await sql`
+        INSERT INTO zvd_leave_types (code, name, days_per_year, is_paid, requires_approval, color, created_by)
+        VALUES (${d.code}, ${d.name}, ${d.days_per_year}, ${d.is_paid}, ${d.requires_approval}, ${d.color}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      const typeId = (created.rows[0] as any).id;
+      if (d.max_carry_days > 0) {
+        await sql`
+          INSERT INTO zvd_leave_carryover_rules (leave_type_id, max_carry_days, expiry_months)
+          VALUES (${typeId}, ${d.max_carry_days}, ${d.carryover_expiry_months})
+          ON CONFLICT (leave_type_id) DO UPDATE SET max_carry_days = EXCLUDED.max_carry_days
+        `.execute(trx);
+      }
+      return created;
+    });
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -228,6 +234,14 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
     `.execute(db);
 
     let processed = 0;
+    // One transaction for the whole run, not one per employee.
+    //
+    // This carries a year's unused days forward for every active employee and
+    // writes an audit row beside each. Applied halfway — a failure at employee
+    // forty of sixty — some people have their days and a log entry, the rest have
+    // neither, and the response still reports a `processed` count for a year-end
+    // job nobody will run twice. All or nothing is the only correct shape.
+    await db.transaction().execute(async (trx) => {
     for (const b of balances.rows as any[]) {
       const rule = ruleMap.get(b.leave_type_id);
       if (!rule || rule.max_carry_days === 0) continue;
@@ -253,13 +267,14 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
         VALUES (${b.employee_id}, ${b.leave_type_id}, ${toYear}, 0, ${carryDays}, ${expiresAt.toISOString().slice(0, 10)})
         ON CONFLICT (employee_id, leave_type_id, year) DO UPDATE
           SET carried_over_days = EXCLUDED.carried_over_days, carryover_expires_at = EXCLUDED.carryover_expires_at
-      `.execute(db);
+      `.execute(trx);
       await sql`
         INSERT INTO zvd_leave_carryover_log (employee_id, leave_type_id, from_year, to_year, days_carried, expires_at)
         VALUES (${b.employee_id}, ${b.leave_type_id}, ${d.from_year}, ${toYear}, ${carryDays}, ${expiresAt.toISOString().slice(0, 10)})
-      `.execute(db);
+      `.execute(trx);
       processed++;
     }
+    });
     return c.json({ data: { processed } });
   });
 
@@ -366,24 +381,37 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
     const type = await sql`SELECT requires_approval FROM zvd_leave_types WHERE id = ${d.leave_type_id}`.execute(db);
     const status = (type.rows[0] as any)?.requires_approval ? 'pending' : 'approved';
 
-    const row = await sql`
-      INSERT INTO zvd_leave_requests (employee_id, leave_type_id, start_date, end_date, working_days, is_half_day, half_day_period, cover_employee_id, reason, status)
-      VALUES (${d.employee_id}, ${d.leave_type_id}, ${d.start_date}, ${d.end_date}, ${workingDays},
-        ${d.is_half_day}, ${d.half_day_period ?? null}, ${d.cover_employee_id ?? null}, ${d.reason ?? null}, ${status})
-      RETURNING *
-    `.execute(db);
+    // The request and the days it consumes are one fact.
+    //
+    // Written apart, a failed balance update leaves a request that reserves
+    // nothing: the same days pass the balance check again and the employee books
+    // them twice. The reverse — balance moved, request gone — quietly costs
+    // someone leave they never took.
+    //
+    // Neither is visible today, because the request-level tenant transaction
+    // happens to cover both. That transaction exists for RLS and its boundary is
+    // moving; this one is here for what it actually guarantees.
+    const row = await db.transaction().execute(async (trx) => {
+      const inserted = await sql`
+        INSERT INTO zvd_leave_requests (employee_id, leave_type_id, start_date, end_date, working_days, is_half_day, half_day_period, cover_employee_id, reason, status)
+        VALUES (${d.employee_id}, ${d.leave_type_id}, ${d.start_date}, ${d.end_date}, ${workingDays},
+          ${d.is_half_day}, ${d.half_day_period ?? null}, ${d.cover_employee_id ?? null}, ${d.reason ?? null}, ${status})
+        RETURNING *
+      `.execute(trx);
 
-    if (status === 'approved') {
-      await sql`
-        UPDATE zvd_leave_balances SET used_days = used_days + ${workingDays}, updated_at = NOW()
-        WHERE employee_id = ${d.employee_id} AND leave_type_id = ${d.leave_type_id} AND year = ${year}
-      `.execute(db);
-    } else {
-      await sql`
-        UPDATE zvd_leave_balances SET pending_days = pending_days + ${workingDays}, updated_at = NOW()
-        WHERE employee_id = ${d.employee_id} AND leave_type_id = ${d.leave_type_id} AND year = ${year}
-      `.execute(db);
-    }
+      if (status === 'approved') {
+        await sql`
+          UPDATE zvd_leave_balances SET used_days = used_days + ${workingDays}, updated_at = NOW()
+          WHERE employee_id = ${d.employee_id} AND leave_type_id = ${d.leave_type_id} AND year = ${year}
+        `.execute(trx);
+      } else {
+        await sql`
+          UPDATE zvd_leave_balances SET pending_days = pending_days + ${workingDays}, updated_at = NOW()
+          WHERE employee_id = ${d.employee_id} AND leave_type_id = ${d.leave_type_id} AND year = ${year}
+        `.execute(trx);
+      }
+      return inserted;
+    });
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -412,14 +440,20 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
     }
 
     const year = yearOf(r.start_date);
-    await sql`UPDATE zvd_leave_requests SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW() WHERE id = ${r.id}`.execute(db);
-    await sql`
-      UPDATE zvd_leave_balances SET
-        used_days = used_days + ${r.working_days},
-        pending_days = GREATEST(0, pending_days - ${r.working_days}),
-        updated_at = NOW()
-      WHERE employee_id = ${r.employee_id} AND leave_type_id = ${r.leave_type_id} AND year = ${year}
-    `.execute(db);
+    // Status and balance move together, or a manager's decision half-lands: a
+    // request marked done whose days were never returned, or days returned on a
+    // request still waiting. Today the request-level tenant transaction covers
+    // both by accident; that boundary is moving.
+    await db.transaction().execute(async (trx) => {
+      await sql`UPDATE zvd_leave_requests SET status = 'approved', approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW() WHERE id = ${r.id}`.execute(trx);
+      await sql`
+        UPDATE zvd_leave_balances SET
+          used_days = used_days + ${r.working_days},
+          pending_days = GREATEST(0, pending_days - ${r.working_days}),
+          updated_at = NOW()
+        WHERE employee_id = ${r.employee_id} AND leave_type_id = ${r.leave_type_id} AND year = ${year}
+      `.execute(trx);
+    });
     return c.json({ success: true });
   });
 
@@ -445,11 +479,17 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
     }
 
     const year = yearOf(r.start_date);
-    await sql`UPDATE zvd_leave_requests SET status = 'rejected', rejection_reason = ${reason}, updated_at = NOW() WHERE id = ${r.id}`.execute(db);
-    await sql`
-      UPDATE zvd_leave_balances SET pending_days = GREATEST(0, pending_days - ${r.working_days}), updated_at = NOW()
-      WHERE employee_id = ${r.employee_id} AND leave_type_id = ${r.leave_type_id} AND year = ${year}
-    `.execute(db);
+    // Status and balance move together, or a manager's decision half-lands: a
+    // request marked done whose days were never returned, or days returned on a
+    // request still waiting. Today the request-level tenant transaction covers
+    // both by accident; that boundary is moving.
+    await db.transaction().execute(async (trx) => {
+      await sql`UPDATE zvd_leave_requests SET status = 'rejected', rejection_reason = ${reason}, updated_at = NOW() WHERE id = ${r.id}`.execute(trx);
+      await sql`
+        UPDATE zvd_leave_balances SET pending_days = GREATEST(0, pending_days - ${r.working_days}), updated_at = NOW()
+        WHERE employee_id = ${r.employee_id} AND leave_type_id = ${r.leave_type_id} AND year = ${year}
+      `.execute(trx);
+    });
     return c.json({ success: true });
   });
 
@@ -471,18 +511,24 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
     }
 
     const year = yearOf(r.start_date);
-    await sql`UPDATE zvd_leave_requests SET status = 'cancelled', updated_at = NOW() WHERE id = ${r.id}`.execute(db);
-    if (r.status === 'approved') {
-      await sql`
-        UPDATE zvd_leave_balances SET used_days = GREATEST(0, used_days - ${r.working_days}), updated_at = NOW()
-        WHERE employee_id = ${r.employee_id} AND leave_type_id = ${r.leave_type_id} AND year = ${year}
-      `.execute(db);
-    } else {
-      await sql`
-        UPDATE zvd_leave_balances SET pending_days = GREATEST(0, pending_days - ${r.working_days}), updated_at = NOW()
-        WHERE employee_id = ${r.employee_id} AND leave_type_id = ${r.leave_type_id} AND year = ${year}
-      `.execute(db);
-    }
+    // Cancelling and giving the days back are one act. Apart, a cancelled
+    // request can leave its days still consumed — leave the employee paid for
+    // and never took. Today the request-level tenant transaction covers both by
+    // accident; that boundary is moving.
+    await db.transaction().execute(async (trx) => {
+      await sql`UPDATE zvd_leave_requests SET status = 'cancelled', updated_at = NOW() WHERE id = ${r.id}`.execute(trx);
+      if (r.status === 'approved') {
+        await sql`
+          UPDATE zvd_leave_balances SET used_days = GREATEST(0, used_days - ${r.working_days}), updated_at = NOW()
+          WHERE employee_id = ${r.employee_id} AND leave_type_id = ${r.leave_type_id} AND year = ${year}
+        `.execute(trx);
+      } else {
+        await sql`
+          UPDATE zvd_leave_balances SET pending_days = GREATEST(0, pending_days - ${r.working_days}), updated_at = NOW()
+          WHERE employee_id = ${r.employee_id} AND leave_type_id = ${r.leave_type_id} AND year = ${year}
+        `.execute(trx);
+      }
+    });
     return c.json({ success: true });
   });
 
