@@ -758,21 +758,48 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
       );
     }
 
-    await sql`
-      UPDATE zv_efactura_invoices SET
-        status = 'submitted', anaf_index = ${index},
-        anaf_response = ${body.slice(0, 2000)}, updated_at = NOW()
-      WHERE id = ${invoice.id}
-    `.execute(db);
-    await logStatusChange(db, invoice.id, invoice.status, 'submitted', user.id, `ANAF index: ${index}`);
-    await sql`
-      INSERT INTO zv_efactura_daily_stats (date, seller_cui, submitted_count, total_amount, vat_amount)
-      VALUES (CURRENT_DATE, ${invoice.seller_cui}, 1, ${invoice.total}, ${invoice.vat_total})
-      ON CONFLICT (tenant_id, date, seller_cui)
-      DO UPDATE SET submitted_count = zv_efactura_daily_stats.submitted_count + 1,
-                    total_amount = zv_efactura_daily_stats.total_amount + EXCLUDED.total_amount,
-                    vat_amount = zv_efactura_daily_stats.vat_amount + EXCLUDED.vat_amount
-    `.execute(db).catch(() => {});
+    // At this point ANAF HAS the invoice. That fact is irreversible, and the two
+    // statements that record it locally have to land together: the status with
+    // its upload index, and the audit row that says who submitted it and when.
+    //
+    // Losing the status update is the dangerous half. The invoice would read as
+    // never submitted while it sits in the tax authority's system, and the next
+    // submit would file it a SECOND time — a duplicate at ANAF is corrected by
+    // storno, which shows on the VAT return.
+    await db.transaction().execute(async (trx) => {
+      await sql`
+        UPDATE zv_efactura_invoices SET
+          status = 'submitted', anaf_index = ${index},
+          anaf_response = ${body.slice(0, 2000)}, updated_at = NOW()
+        WHERE id = ${invoice.id}
+      `.execute(trx);
+      await logStatusChange(trx, invoice.id, invoice.status, 'submitted', user.id, `ANAF index: ${index}`);
+    });
+
+    // The daily aggregate stays OUTSIDE that transaction, deliberately. It is
+    // derived — recomputable from the invoices themselves — and rolling the
+    // submission record back because a statistics row failed would produce
+    // exactly the double-filing described above.
+    //
+    // The `.catch(() => {})` it used to carry is gone. Inside a transaction a
+    // swallowed statement error contains nothing, because Postgres refuses
+    // everything after it; and outside one, silently dropping this row makes
+    // the VAT totals under-report with no trace. It is logged now.
+    try {
+      await sql`
+        INSERT INTO zv_efactura_daily_stats (date, seller_cui, submitted_count, total_amount, vat_amount)
+        VALUES (CURRENT_DATE, ${invoice.seller_cui}, 1, ${invoice.total}, ${invoice.vat_total})
+        ON CONFLICT (tenant_id, date, seller_cui)
+        DO UPDATE SET submitted_count = zv_efactura_daily_stats.submitted_count + 1,
+                      total_amount = zv_efactura_daily_stats.total_amount + EXCLUDED.total_amount,
+                      vat_amount = zv_efactura_daily_stats.vat_amount + EXCLUDED.vat_amount
+      `.execute(db);
+    } catch (err) {
+      console.error(
+        `[efactura] daily stats not recorded for invoice ${invoice.id} — VAT totals will under-report until recomputed:`,
+        (err as Error).message,
+      );
+    }
 
     return c.json({ data: { submitted: true, anaf_index: index, environment: authz.cfg.environment } });
   });
@@ -881,25 +908,33 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
       const stornoLines = (typeof original.lines === 'string' ? JSON.parse(original.lines) : original.lines)
         .map((l: any) => ({ ...l, quantity: -l.quantity, vat_amount: -l.vat_amount, line_total: -l.line_total }));
 
-      const storno = await db.insertInto('zv_efactura_invoices').values({
-        invoice_number: `STORNO-${original.invoice_number}`,
-        invoice_date: new Date().toISOString().split('T')[0],
-        seller_name: original.seller_name,
-        seller_cui: original.seller_cui,
-        buyer_name: original.buyer_name,
-        buyer_cui: original.buyer_cui,
-        lines: JSON.stringify(stornoLines),
-        subtotal: -original.subtotal,
-        vat_total: -original.vat_total,
-        total: -original.total,
-        currency: original.currency,
-        created_by: user.id,
-      }).returningAll().executeTakeFirst();
+      // The credit note and the row that says WHAT it reverses are one
+      // correction. Written alone, the negative invoice exists with nothing
+      // linking it to the original — it still lands on the VAT return, but
+      // nothing shows which filing it cancels, and the pair no longer nets to
+      // zero for anyone reading the invoices rather than the storno table.
+      const storno = await db.transaction().execute(async (trx) => {
+        const created = await trx.insertInto('zv_efactura_invoices').values({
+          invoice_number: `STORNO-${original.invoice_number}`,
+          invoice_date: new Date().toISOString().split('T')[0],
+          seller_name: original.seller_name,
+          seller_cui: original.seller_cui,
+          buyer_name: original.buyer_name,
+          buyer_cui: original.buyer_cui,
+          lines: JSON.stringify(stornoLines),
+          subtotal: -original.subtotal,
+          vat_total: -original.vat_total,
+          total: -original.total,
+          currency: original.currency,
+          created_by: user.id,
+        }).returningAll().executeTakeFirst();
 
-      await sql`
-        INSERT INTO zv_efactura_storno (original_id, storno_invoice_id, reason, requested_by)
-        VALUES (${original.id}::uuid, ${storno.id}::uuid, ${reason}, ${user.id})
-      `.execute(db);
+        await sql`
+          INSERT INTO zv_efactura_storno (original_id, storno_invoice_id, reason, requested_by)
+          VALUES (${original.id}::uuid, ${created.id}::uuid, ${reason}, ${user.id})
+        `.execute(trx);
+        return created;
+      });
 
       return c.json({ storno_invoice: storno }, 201);
     },

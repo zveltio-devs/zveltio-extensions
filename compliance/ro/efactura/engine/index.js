@@ -5112,7 +5112,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../../../../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
+// ../../../../zveltio/node_modules/.bun/@hono+zod-validator@0.8.0+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -20242,21 +20242,27 @@ function efacturaRoutes(ctx) {
       `.execute(db);
       return c.json({ error: `ANAF rejected the upload (HTTP ${status})`, detail: body.slice(0, 600), submitted: false }, 400);
     }
-    await sql`
-      UPDATE zv_efactura_invoices SET
-        status = 'submitted', anaf_index = ${index},
-        anaf_response = ${body.slice(0, 2000)}, updated_at = NOW()
-      WHERE id = ${invoice.id}
-    `.execute(db);
-    await logStatusChange(db, invoice.id, invoice.status, "submitted", user.id, `ANAF index: ${index}`);
-    await sql`
-      INSERT INTO zv_efactura_daily_stats (date, seller_cui, submitted_count, total_amount, vat_amount)
-      VALUES (CURRENT_DATE, ${invoice.seller_cui}, 1, ${invoice.total}, ${invoice.vat_total})
-      ON CONFLICT (tenant_id, date, seller_cui)
-      DO UPDATE SET submitted_count = zv_efactura_daily_stats.submitted_count + 1,
-                    total_amount = zv_efactura_daily_stats.total_amount + EXCLUDED.total_amount,
-                    vat_amount = zv_efactura_daily_stats.vat_amount + EXCLUDED.vat_amount
-    `.execute(db).catch(() => {});
+    await db.transaction().execute(async (trx) => {
+      await sql`
+        UPDATE zv_efactura_invoices SET
+          status = 'submitted', anaf_index = ${index},
+          anaf_response = ${body.slice(0, 2000)}, updated_at = NOW()
+        WHERE id = ${invoice.id}
+      `.execute(trx);
+      await logStatusChange(trx, invoice.id, invoice.status, "submitted", user.id, `ANAF index: ${index}`);
+    });
+    try {
+      await sql`
+        INSERT INTO zv_efactura_daily_stats (date, seller_cui, submitted_count, total_amount, vat_amount)
+        VALUES (CURRENT_DATE, ${invoice.seller_cui}, 1, ${invoice.total}, ${invoice.vat_total})
+        ON CONFLICT (tenant_id, date, seller_cui)
+        DO UPDATE SET submitted_count = zv_efactura_daily_stats.submitted_count + 1,
+                      total_amount = zv_efactura_daily_stats.total_amount + EXCLUDED.total_amount,
+                      vat_amount = zv_efactura_daily_stats.vat_amount + EXCLUDED.vat_amount
+      `.execute(db);
+    } catch (err) {
+      console.error(`[efactura] daily stats not recorded for invoice ${invoice.id} \u2014 VAT totals will under-report until recomputed:`, err.message);
+    }
     return c.json({ data: { submitted: true, anaf_index: index, environment: authz.cfg.environment } });
   });
   app.get("/:id/anaf-status", async (c) => {
@@ -20353,24 +20359,27 @@ function efacturaRoutes(ctx) {
       return c.json({ error: "Only submitted/accepted invoices can be storned" }, 400);
     const { reason } = c.req.valid("json");
     const stornoLines = (typeof original.lines === "string" ? JSON.parse(original.lines) : original.lines).map((l) => ({ ...l, quantity: -l.quantity, vat_amount: -l.vat_amount, line_total: -l.line_total }));
-    const storno = await db.insertInto("zv_efactura_invoices").values({
-      invoice_number: `STORNO-${original.invoice_number}`,
-      invoice_date: new Date().toISOString().split("T")[0],
-      seller_name: original.seller_name,
-      seller_cui: original.seller_cui,
-      buyer_name: original.buyer_name,
-      buyer_cui: original.buyer_cui,
-      lines: JSON.stringify(stornoLines),
-      subtotal: -original.subtotal,
-      vat_total: -original.vat_total,
-      total: -original.total,
-      currency: original.currency,
-      created_by: user.id
-    }).returningAll().executeTakeFirst();
-    await sql`
-        INSERT INTO zv_efactura_storno (original_id, storno_invoice_id, reason, requested_by)
-        VALUES (${original.id}::uuid, ${storno.id}::uuid, ${reason}, ${user.id})
-      `.execute(db);
+    const storno = await db.transaction().execute(async (trx) => {
+      const created = await trx.insertInto("zv_efactura_invoices").values({
+        invoice_number: `STORNO-${original.invoice_number}`,
+        invoice_date: new Date().toISOString().split("T")[0],
+        seller_name: original.seller_name,
+        seller_cui: original.seller_cui,
+        buyer_name: original.buyer_name,
+        buyer_cui: original.buyer_cui,
+        lines: JSON.stringify(stornoLines),
+        subtotal: -original.subtotal,
+        vat_total: -original.vat_total,
+        total: -original.total,
+        currency: original.currency,
+        created_by: user.id
+      }).returningAll().executeTakeFirst();
+      await sql`
+          INSERT INTO zv_efactura_storno (original_id, storno_invoice_id, reason, requested_by)
+          VALUES (${original.id}::uuid, ${created.id}::uuid, ${reason}, ${user.id})
+        `.execute(trx);
+      return created;
+    });
     return c.json({ storno_invoice: storno }, 201);
   });
   app.post("/batch-submit", zValidator("json", exports_external.object({ ids: exports_external.array(exports_external.string().uuid()).min(1).max(20) })), async (c) => {
