@@ -153,14 +153,25 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     const accountId = c.req.param('id');
     const autoCategory = d.category ?? await applyRules(db, accountId, d);
-    const row = await sql`
-      INSERT INTO zvd_bank_transactions (account_id, date, type, amount, description, reference, counterparty_name, category, auto_categorized, created_by)
-      VALUES (${accountId}, ${d.date}, ${d.type}, ${d.amount}, ${d.description},
-        ${d.reference ?? null}, ${d.counterparty_name ?? null}, ${autoCategory ?? null}, ${!d.category && !!autoCategory}, ${user.id})
-      RETURNING *
-    `.execute(db);
     const delta = d.type === 'credit' ? d.amount : -d.amount;
-    await sql`UPDATE zvd_bank_accounts SET balance = balance + ${delta}, updated_at = NOW() WHERE id = ${accountId}`.execute(db);
+    // A bank transaction and the balance it moves are the same event.
+    //
+    // The balance is a running total kept by `balance = balance + delta`, not
+    // recomputed from the transactions — so a transaction written without its
+    // delta is permanently invisible in the balance, and a delta applied without
+    // its transaction is money no line explains. Neither self-corrects, and
+    // reconciliation against the real statement is where it surfaces, months
+    // later, as a difference nobody can attribute.
+    const row = await db.transaction().execute(async (trx) => {
+      const inserted = await sql`
+        INSERT INTO zvd_bank_transactions (account_id, date, type, amount, description, reference, counterparty_name, category, auto_categorized, created_by)
+        VALUES (${accountId}, ${d.date}, ${d.type}, ${d.amount}, ${d.description},
+          ${d.reference ?? null}, ${d.counterparty_name ?? null}, ${autoCategory ?? null}, ${!d.category && !!autoCategory}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      await sql`UPDATE zvd_bank_accounts SET balance = balance + ${delta}, updated_at = NOW() WHERE id = ${accountId}`.execute(trx);
+      return inserted;
+    });
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -193,26 +204,33 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     }
     const transactions = parsed.transactions;
     if (!transactions.length) return c.json({ error: 'No transactions found in MT940 content' }, 400);
-    const importRow = await sql`
-      INSERT INTO zvd_bank_imports (account_id, source, filename, rows_imported, imported_by)
-      VALUES (${accountId}, 'mt940', ${filename ?? null}, ${transactions.length}, ${user.id}) RETURNING id
-    `.execute(db);
-    const importId = (importRow.rows[0] as any).id;
-    let imported = 0;
-    let balance_delta = 0;
-    for (const t of transactions) {
-      const autoCategory = await applyRules(db, accountId, t);
-      const result = await sql`
-        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, category, auto_categorized, created_by, import_hash)
-        VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description}, ${t.reference}, ${autoCategory}, ${!!autoCategory}, ${user.id}, ${transactionFingerprint(accountId, t)})
-        ON CONFLICT DO NOTHING RETURNING id
-      `.execute(db);
-      if (result.rows.length) {
-        balance_delta += t.type === 'credit' ? t.amount : -t.amount;
-        imported++;
+    // Same shape and the same reasoning as the CSV import below: the import
+    // record, its transactions and the running balance are one event, and a
+    // partial run cannot be repaired by re-running the file because
+    // `import_hash` will skip exactly the rows that landed.
+    const { importId, imported } = await db.transaction().execute(async (trx) => {
+      const importRow = await sql`
+        INSERT INTO zvd_bank_imports (account_id, source, filename, rows_imported, imported_by)
+        VALUES (${accountId}, 'mt940', ${filename ?? null}, ${transactions.length}, ${user.id}) RETURNING id
+      `.execute(trx);
+      const id = (importRow.rows[0] as any).id;
+      let count = 0;
+      let balance_delta = 0;
+      for (const t of transactions) {
+        const autoCategory = await applyRules(trx, accountId, t);
+        const result = await sql`
+          INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, category, auto_categorized, created_by, import_hash)
+          VALUES (${accountId}, ${id}, ${t.date}, ${t.type}, ${t.amount}, ${t.description}, ${t.reference}, ${autoCategory}, ${!!autoCategory}, ${user.id}, ${transactionFingerprint(accountId, t)})
+          ON CONFLICT DO NOTHING RETURNING id
+        `.execute(trx);
+        if (result.rows.length) {
+          balance_delta += t.type === 'credit' ? t.amount : -t.amount;
+          count++;
+        }
       }
-    }
-    await sql`UPDATE zvd_bank_accounts SET balance = balance + ${balance_delta}, updated_at = NOW() WHERE id = ${accountId}`.execute(db);
+      await sql`UPDATE zvd_bank_accounts SET balance = balance + ${balance_delta}, updated_at = NOW() WHERE id = ${accountId}`.execute(trx);
+      return { importId: id, imported: count };
+    });
     return c.json({ data: { import_id: importId, total: transactions.length, imported, skipped: transactions.length - imported } }, 201);
   });
 
@@ -234,28 +252,41 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
     const accountId = c.req.param('id');
-    const importRow = await sql`
-      INSERT INTO zvd_bank_imports (account_id, source, filename, rows_imported, imported_by)
-      VALUES (${accountId}, ${d.source}, ${d.filename ?? null}, ${d.transactions.length}, ${user.id}) RETURNING id
-    `.execute(db);
-    const importId = (importRow.rows[0] as any).id;
-    let balance_delta = 0;
-    let imported = 0;
-    for (const t of d.transactions) {
-      const autoCategory = await applyRules(db, accountId, t);
-      const result = await sql`
-        INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, counterparty_name, category, auto_categorized, created_by, import_hash)
-        VALUES (${accountId}, ${importId}, ${t.date}, ${t.type}, ${t.amount}, ${t.description},
-          ${t.reference ?? null}, ${t.counterparty_name ?? null}, ${autoCategory}, ${!!autoCategory}, ${user.id},
-          ${transactionFingerprint(accountId, t)})
-        ON CONFLICT DO NOTHING RETURNING id
-      `.execute(db);
-      if (result.rows.length) {
-        balance_delta += t.type === 'credit' ? t.amount : -t.amount;
-        imported++;
+    // A statement import is one event: the import record, the transactions it
+    // produced, and the balance they move.
+    //
+    // Half an import is the worst outcome available here. The balance is a
+    // running total, so a partial run leaves it disagreeing with the
+    // transactions by an amount nobody can derive — and `import_hash`
+    // deduplication means re-running the same file skips exactly the rows that
+    // DID land, so the retry cannot repair it either. It surfaces at
+    // reconciliation against the real statement, as a difference with no
+    // explanation.
+    const { importId, imported } = await db.transaction().execute(async (trx) => {
+      const importRow = await sql`
+        INSERT INTO zvd_bank_imports (account_id, source, filename, rows_imported, imported_by)
+        VALUES (${accountId}, ${d.source}, ${d.filename ?? null}, ${d.transactions.length}, ${user.id}) RETURNING id
+      `.execute(trx);
+      const id = (importRow.rows[0] as any).id;
+      let balance_delta = 0;
+      let count = 0;
+      for (const t of d.transactions) {
+        const autoCategory = await applyRules(trx, accountId, t);
+        const result = await sql`
+          INSERT INTO zvd_bank_transactions (account_id, import_id, date, type, amount, description, reference, counterparty_name, category, auto_categorized, created_by, import_hash)
+          VALUES (${accountId}, ${id}, ${t.date}, ${t.type}, ${t.amount}, ${t.description},
+            ${t.reference ?? null}, ${t.counterparty_name ?? null}, ${autoCategory}, ${!!autoCategory}, ${user.id},
+            ${transactionFingerprint(accountId, t)})
+          ON CONFLICT DO NOTHING RETURNING id
+        `.execute(trx);
+        if (result.rows.length) {
+          balance_delta += t.type === 'credit' ? t.amount : -t.amount;
+          count++;
+        }
       }
-    }
-    await sql`UPDATE zvd_bank_accounts SET balance = balance + ${balance_delta}, updated_at = NOW() WHERE id = ${accountId}`.execute(db);
+      await sql`UPDATE zvd_bank_accounts SET balance = balance + ${balance_delta}, updated_at = NOW() WHERE id = ${accountId}`.execute(trx);
+      return { importId: id, imported: count };
+    });
     return c.json({ data: { import_id: importId, imported } }, 201);
   });
 
@@ -314,13 +345,19 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     const tx = await sql`SELECT * FROM zvd_bank_transactions WHERE id = ${c.req.param('txId')} AND account_id = ${c.req.param('id')}`.execute(db);
     if (!tx.rows.length) return c.json({ error: 'Not found' }, 404);
-    await sql`UPDATE zvd_bank_transactions SET is_reconciled = true, updated_at = NOW() WHERE id = ${c.req.param('txId')}`.execute(db);
-    const rec = await sql`
-      INSERT INTO zvd_bank_reconciliations (transaction_id, linked_type, linked_id, matched_amount, notes, created_by)
-      VALUES (${c.req.param('txId')}, ${d.linked_type}, ${d.linked_id ?? null}, ${(tx.rows[0] as any).amount}, ${d.notes ?? null}, ${user.id})
-      ON CONFLICT (transaction_id) DO UPDATE SET linked_type = EXCLUDED.linked_type, linked_id = EXCLUDED.linked_id, notes = EXCLUDED.notes
-      RETURNING *
-    `.execute(db);
+    // The flag and the record of what it matched are one reconciliation. A
+    // transaction flagged reconciled with nothing behind it drops out of the
+    // unreconciled list while pointing at nothing — the one state a
+    // reconciliation report cannot help anyone recover from.
+    const rec = await db.transaction().execute(async (trx) => {
+      await sql`UPDATE zvd_bank_transactions SET is_reconciled = true, updated_at = NOW() WHERE id = ${c.req.param('txId')}`.execute(trx);
+      return await sql`
+        INSERT INTO zvd_bank_reconciliations (transaction_id, linked_type, linked_id, matched_amount, notes, created_by)
+        VALUES (${c.req.param('txId')}, ${d.linked_type}, ${d.linked_id ?? null}, ${(tx.rows[0] as any).amount}, ${d.notes ?? null}, ${user.id})
+        ON CONFLICT (transaction_id) DO UPDATE SET linked_type = EXCLUDED.linked_type, linked_id = EXCLUDED.linked_id, notes = EXCLUDED.notes
+        RETURNING *
+      `.execute(trx);
+    });
 
     // Reconciling against an invoice has to PAY the invoice.
     //

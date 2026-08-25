@@ -330,19 +330,30 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
         409,
       );
     }
-    const entry = await sql`
-      INSERT INTO zvd_journal_entries (date, description, reference, fiscal_year_id, created_by)
-      VALUES (${d.date}, ${d.description}, ${d.reference ?? null}, ${fyId}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    const entryId = (entry.rows[0] as any).id;
-    for (const line of d.lines) {
-      await sql`
-        INSERT INTO zvd_journal_lines (entry_id, account_id, debit, credit, description, currency, exchange_rate, amount_foreign, cost_center_id)
-        VALUES (${entryId}, ${line.account_id}, ${line.debit}, ${line.credit}, ${line.description ?? null},
-          ${line.currency}, ${line.exchange_rate}, ${line.amount_foreign ?? null}, ${line.cost_center_id ?? null})
-      `.execute(db);
-    }
+    // The balance check above is the whole point of this endpoint, and writing
+    // the lines one at a time outside a transaction throws it away.
+    //
+    // Debits equalling credits was verified over `d.lines` in memory; if the
+    // second line fails to insert, what lands is an entry whose debits do NOT
+    // equal its credits — the exact state this handler refuses to accept from a
+    // caller, created by the handler itself. A trial balance is wrong from that
+    // moment and nothing points at when.
+    const entry = await db.transaction().execute(async (trx) => {
+      const created = await sql`
+        INSERT INTO zvd_journal_entries (date, description, reference, fiscal_year_id, created_by)
+        VALUES (${d.date}, ${d.description}, ${d.reference ?? null}, ${fyId}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      const entryId = (created.rows[0] as any).id;
+      for (const line of d.lines) {
+        await sql`
+          INSERT INTO zvd_journal_lines (entry_id, account_id, debit, credit, description, currency, exchange_rate, amount_foreign, cost_center_id)
+          VALUES (${entryId}, ${line.account_id}, ${line.debit}, ${line.credit}, ${line.description ?? null},
+            ${line.currency}, ${line.exchange_rate}, ${line.amount_foreign ?? null}, ${line.cost_center_id ?? null})
+        `.execute(trx);
+      }
+      return created;
+    });
     return c.json({ data: entry.rows[0] }, 201);
   });
 
@@ -369,19 +380,30 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
     const e = entry.rows[0] as any;
     const lines = await sql`SELECT * FROM zvd_journal_lines WHERE entry_id = ${e.id}`.execute(db);
     // Create reversal entry
-    const reversal = await sql`
-      INSERT INTO zvd_journal_entries (date, description, reference, fiscal_year_id, status, created_by)
-      VALUES (${new Date().toISOString().slice(0,10)}, ${'VOID: ' + e.description}, ${'VOID-' + (e.reference ?? e.id)}, ${e.fiscal_year_id}, 'posted', ${user.id})
-      RETURNING *
-    `.execute(db);
-    const revId = (reversal.rows[0] as any).id;
-    for (const line of lines.rows as any[]) {
-      await sql`
-        INSERT INTO zvd_journal_lines (entry_id, account_id, debit, credit, description, currency, exchange_rate)
-        VALUES (${revId}, ${line.account_id}, ${line.credit}, ${line.debit}, ${line.description}, ${line.currency}, ${line.exchange_rate})
-      `.execute(db);
-    }
-    await sql`UPDATE zvd_journal_entries SET status = 'voided', updated_at = NOW() WHERE id = ${e.id}`.execute(db);
+    // A void is a reversing entry plus the original marked voided, and each half
+    // alone is worse than doing nothing.
+    //
+    // Reversal without the mark: the original still reads `posted`, so it can be
+    // voided again — the entry reversed twice, and the ledger now off by its
+    // amount in the other direction. Mark without the reversal, or with only some
+    // of its lines: an entry marked voided whose amounts were never taken back
+    // out, so the books say it is gone while the balances still carry it.
+    const reversal = await db.transaction().execute(async (trx) => {
+      const created = await sql`
+        INSERT INTO zvd_journal_entries (date, description, reference, fiscal_year_id, status, created_by)
+        VALUES (${new Date().toISOString().slice(0,10)}, ${'VOID: ' + e.description}, ${'VOID-' + (e.reference ?? e.id)}, ${e.fiscal_year_id}, 'posted', ${user.id})
+        RETURNING *
+      `.execute(trx);
+      const revId = (created.rows[0] as any).id;
+      for (const line of lines.rows as any[]) {
+        await sql`
+          INSERT INTO zvd_journal_lines (entry_id, account_id, debit, credit, description, currency, exchange_rate)
+          VALUES (${revId}, ${line.account_id}, ${line.credit}, ${line.debit}, ${line.description}, ${line.currency}, ${line.exchange_rate})
+        `.execute(trx);
+      }
+      await sql`UPDATE zvd_journal_entries SET status = 'voided', updated_at = NOW() WHERE id = ${e.id}`.execute(trx);
+      return created;
+    });
     return c.json({ data: reversal.rows[0] });
   });
 
@@ -434,15 +456,22 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
     const totalD = d.lines.reduce((s, l) => s + l.debit, 0);
     const totalC = d.lines.reduce((s, l) => s + l.credit, 0);
     if (Math.abs(totalD - totalC) > 0.001) return c.json({ error: 'Lines are not balanced' }, 400);
-    const rec = await sql`
-      INSERT INTO zvd_recurring_journals (description, reference, frequency, next_run_date, end_date, created_by)
-      VALUES (${d.description}, ${d.reference ?? null}, ${d.frequency}, ${d.next_run_date}, ${d.end_date ?? null}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    const recId = (rec.rows[0] as any).id;
-    for (const line of d.lines) {
-      await sql`INSERT INTO zvd_recurring_journal_lines (recurring_id, account_id, debit, credit, description) VALUES (${recId}, ${line.account_id}, ${line.debit}, ${line.credit}, ${line.description ?? null})`.execute(db);
-    }
+    // The balance was checked over `d.lines` in memory; a template that lands with
+    // only some of them is unbalanced by construction, and every entry it
+    // generates from then on is unbalanced too — the same defect posted monthly,
+    // automatically, until someone traces a trial balance back to it.
+    const rec = await db.transaction().execute(async (trx) => {
+      const created = await sql`
+        INSERT INTO zvd_recurring_journals (description, reference, frequency, next_run_date, end_date, created_by)
+        VALUES (${d.description}, ${d.reference ?? null}, ${d.frequency}, ${d.next_run_date}, ${d.end_date ?? null}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      const recId = (created.rows[0] as any).id;
+      for (const line of d.lines) {
+        await sql`INSERT INTO zvd_recurring_journal_lines (recurring_id, account_id, debit, credit, description) VALUES (${recId}, ${line.account_id}, ${line.debit}, ${line.credit}, ${line.description ?? null})`.execute(trx);
+      }
+      return created;
+    });
     return c.json({ data: rec.rows[0] }, 201);
   });
 
@@ -452,14 +481,6 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
     if (!rec.rows.length) return c.json({ error: 'Recurring template not found or inactive' }, 400);
     const r = rec.rows[0] as any;
     const lines = await sql`SELECT * FROM zvd_recurring_journal_lines WHERE recurring_id = ${r.id}`.execute(db);
-    const entry = await sql`
-      INSERT INTO zvd_journal_entries (date, description, reference, created_by)
-      VALUES (${r.next_run_date}, ${r.description}, ${r.reference}, ${user.id}) RETURNING *
-    `.execute(db);
-    const entryId = (entry.rows[0] as any).id;
-    for (const line of lines.rows as any[]) {
-      await sql`INSERT INTO zvd_journal_lines (entry_id, account_id, debit, credit, description) VALUES (${entryId}, ${line.account_id}, ${line.debit}, ${line.credit}, ${line.description ?? null})`.execute(db);
-    }
     // Advance next_run_date
     const next = new Date(r.next_run_date);
     if (r.frequency === 'daily') next.setDate(next.getDate() + 1);
@@ -469,7 +490,25 @@ export function accountingRoutes(ctx: ExtensionContext): Hono {
     else if (r.frequency === 'yearly') next.setFullYear(next.getFullYear() + 1);
     const nextStr = next.toISOString().slice(0, 10);
     const shouldDeactivate = r.end_date && nextStr > r.end_date;
-    await sql`UPDATE zvd_recurring_journals SET next_run_date = ${nextStr}, last_run_date = ${r.next_run_date}, is_active = ${!shouldDeactivate}, updated_at = NOW() WHERE id = ${r.id}`.execute(db);
+    // Posting the entry and advancing the schedule are one run.
+    //
+    // `next_run_date` is the ONLY record that this period was posted. If the
+    // entry lands and the advance does not, the template still points at the same
+    // date and the next run posts the same entry again — the same amounts, twice,
+    // on a schedule designed to run unattended. If the advance lands and the
+    // entry does not, a period is skipped with nothing to say so.
+    const entry = await db.transaction().execute(async (trx) => {
+      const created = await sql`
+        INSERT INTO zvd_journal_entries (date, description, reference, created_by)
+        VALUES (${r.next_run_date}, ${r.description}, ${r.reference}, ${user.id}) RETURNING *
+      `.execute(trx);
+      const entryId = (created.rows[0] as any).id;
+      for (const line of lines.rows as any[]) {
+        await sql`INSERT INTO zvd_journal_lines (entry_id, account_id, debit, credit, description) VALUES (${entryId}, ${line.account_id}, ${line.debit}, ${line.credit}, ${line.description ?? null})`.execute(trx);
+      }
+      await sql`UPDATE zvd_recurring_journals SET next_run_date = ${nextStr}, last_run_date = ${r.next_run_date}, is_active = ${!shouldDeactivate}, updated_at = NOW() WHERE id = ${r.id}`.execute(trx);
+      return created;
+    });
     return c.json({ data: entry.rows[0] }, 201);
   });
 
