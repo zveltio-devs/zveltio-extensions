@@ -1740,7 +1740,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
+// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.8.0+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -19871,8 +19871,8 @@ async function createFileVersion(db, fileId, newBuffer, newMimeType, newSize, up
     OFFSET ${MAX_VERSIONS}
   `.execute(db);
   for (const old of oldVersions.rows) {
-    await deleteObject(old.storage_path);
     await sql`DELETE FROM zv_media_versions WHERE id = ${old.id}`.execute(db);
+    await deleteObject(old.storage_path);
   }
   return { versionNum: nextVer + 1 };
 }
