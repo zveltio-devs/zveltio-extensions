@@ -715,24 +715,36 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
     const { steps, ...workflowData } = c.req.valid('json');
     const id = c.req.param('id');
 
-    const workflow = await (db as any)
-      .updateTable('zv_approval_workflows')
-      .set({ ...workflowData, updated_at: new Date() })
-      .where('id', '=', id)
-      .returningAll()
-      .executeTakeFirst();
+    // Replacing the steps is a delete followed by N inserts, and a failure part
+    // way through is not a partial edit — it is an approval workflow with fewer
+    // steps than anyone configured, or none at all. Requests routed through it
+    // afterwards skip approvers nobody removed.
+    //
+    // The `if (!workflow)` check runs inside so a missing workflow aborts before
+    // the steps are touched, and the 404 is raised outside where returning is safe.
+    const workflow = await db.transaction().execute(async (trx) => {
+      const updated = await (trx as any)
+        .updateTable('zv_approval_workflows')
+        .set({ ...workflowData, updated_at: new Date() })
+        .where('id', '=', id)
+        .returningAll()
+        .executeTakeFirst();
+
+      if (!updated) return null;
+
+      if (steps) {
+        await (trx as any).deleteFrom('zv_approval_steps').where('workflow_id', '=', id).execute();
+        for (let i = 0; i < steps.length; i++) {
+          await (trx as any)
+            .insertInto('zv_approval_steps')
+            .values({ ...steps[i], workflow_id: id, step_order: i })
+            .execute();
+        }
+      }
+      return updated;
+    });
 
     if (!workflow) return c.json({ error: 'Workflow not found' }, 404);
-
-    if (steps) {
-      await (db as any).deleteFrom('zv_approval_steps').where('workflow_id', '=', id).execute();
-      for (let i = 0; i < steps.length; i++) {
-        await (db as any)
-          .insertInto('zv_approval_steps')
-          .values({ ...steps[i], workflow_id: id, step_order: i })
-          .execute();
-      }
-    }
 
     return c.json({ workflow });
   });

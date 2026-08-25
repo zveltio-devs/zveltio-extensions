@@ -202,13 +202,23 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'Timer too short (< 1 minute), discarded' }, 400);
     }
     const amount = t.is_billable ? (durationMinutes / 60) * +t.hourly_rate : 0;
-    const row = await sql`
-      INSERT INTO zvd_time_entries (employee_id, project_id, task_description, date, start_time, end_time, duration_minutes, is_billable, hourly_rate, amount, notes, created_by)
-      VALUES (${employeeId}, ${t.project_id}, ${t.task_description}, NOW()::DATE, ${t.started_at}, NOW(), ${durationMinutes},
-        ${t.is_billable}, ${t.hourly_rate}, ${amount}, ${t.notes ?? null}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    await sql`DELETE FROM zvd_active_timers WHERE employee_id = ${employeeId}`.execute(db);
+    // Recording the entry and stopping the timer are the same act.
+    //
+    // Apart, a failed DELETE leaves the timer running with the work already
+    // written down: the next stop records the same hours again, from a start time
+    // that has not moved. On billable work that is an invoice for hours nobody
+    // worked. The reverse — timer cleared, entry lost — is someone's afternoon
+    // gone with nothing to show.
+    const row = await db.transaction().execute(async (trx) => {
+      const inserted = await sql`
+        INSERT INTO zvd_time_entries (employee_id, project_id, task_description, date, start_time, end_time, duration_minutes, is_billable, hourly_rate, amount, notes, created_by)
+        VALUES (${employeeId}, ${t.project_id}, ${t.task_description}, NOW()::DATE, ${t.started_at}, NOW(), ${durationMinutes},
+          ${t.is_billable}, ${t.hourly_rate}, ${amount}, ${t.notes ?? null}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      await sql`DELETE FROM zvd_active_timers WHERE employee_id = ${employeeId}`.execute(trx);
+      return inserted;
+    });
     return c.json({ data: row.rows[0] });
   });
 
