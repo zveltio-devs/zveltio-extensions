@@ -400,58 +400,69 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
 
     if (!canDecide) return c.json({ error: 'You are not authorized to decide on this step' }, 403);
 
-    // Record decision
-    await (db as any)
-      .insertInto('zv_approval_decisions')
-      .values({
-        request_id: requestId,
-        step_id: currentStep.id,
-        decision,
-        decided_by: user.id,
-        comment: comment || null,
-      })
-      .execute();
-
-    if (decision === 'rejected') {
-      await (db as any)
-        .updateTable('zv_approval_requests')
-        .set({
-          status: 'rejected',
-          completed_at: new Date(),
-          current_step_id: null,
-          rejection_reason: comment || null,
+    // The decision record and the state it moves the request to are one act.
+    //
+    // Split either way is bad. Decision recorded, request not advanced: the
+    // request sits pending on a step somebody has already decided, and the next
+    // attempt writes a SECOND decision row for the same step — the audit trail
+    // then shows two approvers, or one approver twice, for a single decision.
+    // Request advanced, decision not recorded: an approval with nothing saying
+    // who gave it, which is the only thing an approval workflow exists to
+    // produce.
+    const outcome = await db.transaction().execute(async (trx) => {
+      // Record decision
+      await (trx as any)
+        .insertInto('zv_approval_decisions')
+        .values({
+          request_id: requestId,
+          step_id: currentStep.id,
+          decision,
+          decided_by: user.id,
+          comment: comment || null,
         })
-        .where('id', '=', requestId)
         .execute();
 
-      return c.json({ success: true, status: 'rejected' });
-    }
+      if (decision === 'rejected') {
+        await (trx as any)
+          .updateTable('zv_approval_requests')
+          .set({
+            status: 'rejected',
+            completed_at: new Date(),
+            current_step_id: null,
+            rejection_reason: comment || null,
+          })
+          .where('id', '=', requestId)
+          .execute();
 
-    // Advance to next step (or complete)
-    const nextStep = await (db as any)
-      .selectFrom('zv_approval_steps')
-      .selectAll()
-      .where('workflow_id', '=', request.workflow_id)
-      .where('step_order', '>', currentStep.step_order)
-      .orderBy('step_order')
-      .limit(1)
-      .executeTakeFirst();
+        return { success: true, status: 'rejected' as const };
+      }
 
-    if (nextStep) {
-      await (db as any)
-        .updateTable('zv_approval_requests')
-        .set({ current_step_id: nextStep.id })
-        .where('id', '=', requestId)
-        .execute();
-      return c.json({ success: true, status: 'pending', next_step: nextStep });
-    } else {
-      await (db as any)
+      // Advance to next step (or complete)
+      const nextStep = await (trx as any)
+        .selectFrom('zv_approval_steps')
+        .selectAll()
+        .where('workflow_id', '=', request.workflow_id)
+        .where('step_order', '>', currentStep.step_order)
+        .orderBy('step_order')
+        .limit(1)
+        .executeTakeFirst();
+
+      if (nextStep) {
+        await (trx as any)
+          .updateTable('zv_approval_requests')
+          .set({ current_step_id: nextStep.id })
+          .where('id', '=', requestId)
+          .execute();
+        return { success: true, status: 'pending' as const, next_step: nextStep };
+      }
+      await (trx as any)
         .updateTable('zv_approval_requests')
         .set({ status: 'approved', completed_at: new Date(), current_step_id: null })
         .where('id', '=', requestId)
         .execute();
-      return c.json({ success: true, status: 'approved' });
-    }
+      return { success: true, status: 'approved' as const };
+    });
+    return c.json(outcome);
   });
 
   // POST /:id/cancel — Cancel a pending request
@@ -517,56 +528,66 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
           .where('id', '=', request.current_step_id)
           .executeTakeFirst();
 
-        if (currentStep) {
-          await (db as any)
-            .insertInto('zv_approval_decisions')
-            .values({
-              request_id: requestId,
-              step_id: currentStep.id,
-              decision,
-              decided_by: user.id,
-              comment: comment || null,
-            })
-            .execute();
-        }
+        // One transaction per request, not one around the batch. Each request in
+        // the list is an independent decision: a failure on the fourth must not
+        // undo the three already decided, and the per-request catch below only
+        // means something if the failed request's own writes went back.
+        //
+        // Within one request, the decision row and the state it moves the
+        // request to are inseparable for the same reason as the single-request
+        // route above.
+        await db.transaction().execute(async (trx) => {
+          if (currentStep) {
+            await (trx as any)
+              .insertInto('zv_approval_decisions')
+              .values({
+                request_id: requestId,
+                step_id: currentStep.id,
+                decision,
+                decided_by: user.id,
+                comment: comment || null,
+              })
+              .execute();
+          }
 
-        if (decision === 'rejected') {
-          await (db as any)
-            .updateTable('zv_approval_requests')
-            .set({
-              status: 'rejected',
-              completed_at: new Date(),
-              current_step_id: null,
-              rejection_reason: comment || null,
-            })
-            .where('id', '=', requestId)
-            .execute();
-        } else {
-          const nextStep = currentStep
-            ? await (db as any)
-                .selectFrom('zv_approval_steps')
-                .selectAll()
-                .where('workflow_id', '=', request.workflow_id)
-                .where('step_order', '>', currentStep.step_order)
-                .orderBy('step_order')
-                .limit(1)
-                .executeTakeFirst()
-            : null;
-
-          if (nextStep) {
-            await (db as any)
+          if (decision === 'rejected') {
+            await (trx as any)
               .updateTable('zv_approval_requests')
-              .set({ current_step_id: nextStep.id })
+              .set({
+                status: 'rejected',
+                completed_at: new Date(),
+                current_step_id: null,
+                rejection_reason: comment || null,
+              })
               .where('id', '=', requestId)
               .execute();
           } else {
-            await (db as any)
-              .updateTable('zv_approval_requests')
-              .set({ status: 'approved', completed_at: new Date(), current_step_id: null })
-              .where('id', '=', requestId)
-              .execute();
+            const nextStep = currentStep
+              ? await (trx as any)
+                  .selectFrom('zv_approval_steps')
+                  .selectAll()
+                  .where('workflow_id', '=', request.workflow_id)
+                  .where('step_order', '>', currentStep.step_order)
+                  .orderBy('step_order')
+                  .limit(1)
+                  .executeTakeFirst()
+              : null;
+
+            if (nextStep) {
+              await (trx as any)
+                .updateTable('zv_approval_requests')
+                .set({ current_step_id: nextStep.id })
+                .where('id', '=', requestId)
+                .execute();
+            } else {
+              await (trx as any)
+                .updateTable('zv_approval_requests')
+                .set({ status: 'approved', completed_at: new Date(), current_step_id: null })
+                .where('id', '=', requestId)
+                .execute();
+            }
           }
-        }
+        });
 
         results.push({ id: requestId, success: true });
       } catch (err: any) {
@@ -682,18 +703,25 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
 
     const { steps, ...workflowData } = c.req.valid('json');
 
-    const workflow = await (db as any)
-      .insertInto('zv_approval_workflows')
-      .values({ ...workflowData, created_by: user.id })
-      .returningAll()
-      .executeTakeFirst();
+    // A workflow is its steps. Written without all of them, requests start
+    // routing through an approval chain that is missing links — and the step a
+    // request stops at is whichever one happened to be written, so an
+    // authorisation that should have needed three signatures needs one.
+    const workflow = await db.transaction().execute(async (trx) => {
+      const created = await (trx as any)
+        .insertInto('zv_approval_workflows')
+        .values({ ...workflowData, created_by: user.id })
+        .returningAll()
+        .executeTakeFirst();
 
-    for (let i = 0; i < steps.length; i++) {
-      await (db as any)
-        .insertInto('zv_approval_steps')
-        .values({ ...steps[i], workflow_id: workflow.id, step_order: i })
-        .execute();
-    }
+      for (let i = 0; i < steps.length; i++) {
+        await (trx as any)
+          .insertInto('zv_approval_steps')
+          .values({ ...steps[i], workflow_id: created.id, step_order: i })
+          .execute();
+      }
+      return created;
+    });
 
     const fullWorkflow = await (db as any)
       .selectFrom('zv_approval_steps')
