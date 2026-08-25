@@ -103,10 +103,16 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
     ),
     async (c) => {
       const { code, name, is_default } = c.req.valid('json');
-      if (is_default) {
-        await (db as any).updateTable('zvd_locales').set({ is_default: false }).where('is_default', '=', true).execute();
-      }
-      const locale = await (db as any).insertInto('zvd_locales').values({ code, name, is_default }).returningAll().executeTakeFirst();
+      // Demoting the old default locale and creating the new one are one change.
+      // Split, the instance has no default locale at all — and the default is
+      // what every untranslated string and every locale-less request falls back
+      // to, so the site starts answering in nothing.
+      const locale = await db.transaction().execute(async (trx) => {
+        if (is_default) {
+          await (trx as any).updateTable('zvd_locales').set({ is_default: false }).where('is_default', '=', true).execute();
+        }
+        return await (trx as any).insertInto('zvd_locales').values({ code, name, is_default }).returningAll().executeTakeFirst();
+      });
       return c.json({ locale }, 201);
     },
   );

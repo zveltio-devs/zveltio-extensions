@@ -1732,7 +1732,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
+// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.8.0+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -19553,15 +19553,18 @@ function projectsRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const d = c.req.valid("json");
-    const row = await sql`
-      INSERT INTO zvd_projects (name, description, client_id, status, priority, start_date, end_date, budget, color, owner_id, created_by)
-      VALUES (${d.name}, ${d.description ?? null}, ${d.client_id ?? null}, ${d.status}, ${d.priority},
-        ${d.start_date ?? null}, ${d.end_date ?? null}, ${d.budget ?? null}, ${d.color}, ${user.id}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    const projectId = row.rows[0].id;
-    await sql`INSERT INTO zvd_project_members (project_id, user_id, role) VALUES (${projectId}, ${user.id}, 'owner')`.execute(db);
-    return c.json({ data: row.rows[0] }, 201);
+    const row = await db.transaction().execute(async (trx) => {
+      const row2 = await sql`
+        INSERT INTO zvd_projects (name, description, client_id, status, priority, start_date, end_date, budget, color, owner_id, created_by)
+        VALUES (${d.name}, ${d.description ?? null}, ${d.client_id ?? null}, ${d.status}, ${d.priority},
+          ${d.start_date ?? null}, ${d.end_date ?? null}, ${d.budget ?? null}, ${d.color}, ${user.id}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      const projectId = row2.rows[0].id;
+      await sql`INSERT INTO zvd_project_members (project_id, user_id, role) VALUES (${projectId}, ${user.id}, 'owner')`.execute(trx);
+      return c.json({ data: row2.rows[0] }, 201);
+      return row2;
+    });
   });
   app.patch("/:id", zValidator("json", exports_external.object({
     name: exports_external.string().optional(),

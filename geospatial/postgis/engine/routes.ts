@@ -343,62 +343,69 @@ export function postgisRoutes(ctx: ExtensionContext): Hono {
       const body = c.req.valid('json');
       const point = `SRID=4326;POINT(${body.lng} ${body.lat})`;
 
-      const entry = await sql<any>`
-        INSERT INTO zv_geo_location_history
-          (entity_type, entity_id, location, accuracy_m, altitude_m, speed_kmh, heading_deg, source, metadata, recorded_at)
-        VALUES
-          (${body.entity_type}, ${body.entity_id}, ${point}::geography,
-           ${body.accuracy_m ?? null}, ${body.altitude_m ?? null},
-           ${body.speed_kmh ?? null}, ${body.heading_deg ?? null},
-           ${body.source}, ${JSON.stringify(body.metadata)},
-           ${body.recorded_at ?? new Date().toISOString()})
-        RETURNING id, entity_type, entity_id, recorded_at
-      `.execute(db);
+      // The comment below already claimed the crossing and the position that
+      // caused it land together. That was true only because the tenant
+      // transaction happened to span the request; the handler asks for one now,
+      // so it is true because it is written that way.
+      const entry = await db.transaction().execute(async (trx) => {
+        const entry = await sql<any>`
+          INSERT INTO zv_geo_location_history
+            (entity_type, entity_id, location, accuracy_m, altitude_m, speed_kmh, heading_deg, source, metadata, recorded_at)
+          VALUES
+            (${body.entity_type}, ${body.entity_id}, ${point}::geography,
+             ${body.accuracy_m ?? null}, ${body.altitude_m ?? null},
+             ${body.speed_kmh ?? null}, ${body.heading_deg ?? null},
+             ${body.source}, ${JSON.stringify(body.metadata)},
+             ${body.recorded_at ?? new Date().toISOString()})
+          RETURNING id, entity_type, entity_id, recorded_at
+        `.execute(trx);
 
-      // Geofence crossings, recorded before this request answers.
-      //
-      // This was launched and not awaited — "check geofence rules
-      // asynchronously" — with the query and every insert ending in
-      // `.catch(() => {})`. Three faults in one shape.
-      //
-      // The writes run on the request's tenant transaction, which the engine
-      // closes when the handler returns. Detached work on a closed transaction
-      // fails with "Transaction is already committed", so whether a crossing got
-      // recorded came down to whether the spatial query happened to finish
-      // first. It usually does — which is the worst kind of race, because it
-      // passes every time you watch it.
-      //
-      // The two catches then made losing that race indistinguishable from
-      // winning it. Silence is the wrong answer here: the crossing IS the
-      // product. A vehicle leaving a zone with nothing written is a missed
-      // alert, and nothing gives it away — the position row is stored perfectly.
-      //
-      // Awaited now, so a crossing lands in the same transaction as the position
-      // that caused it: either both are there or neither is. One spatial query
-      // and a handful of narrow inserts, which is well within the cost of being
-      // right.
-      const fences = await sql<any>`
-        SELECT g.id AS geofence_id, g.name,
-               ST_Within(${point}::geometry, g.zone::geometry) AS inside
-        FROM zv_geofences g WHERE g.is_active = true
-      `.execute(db);
+        // Geofence crossings, recorded before this request answers.
+        //
+        // This was launched and not awaited — "check geofence rules
+        // asynchronously" — with the query and every insert ending in
+        // `.catch(() => {})`. Three faults in one shape.
+        //
+        // The writes run on the request's tenant transaction, which the engine
+        // closes when the handler returns. Detached work on a closed transaction
+        // fails with "Transaction is already committed", so whether a crossing got
+        // recorded came down to whether the spatial query happened to finish
+        // first. It usually does — which is the worst kind of race, because it
+        // passes every time you watch it.
+        //
+        // The two catches then made losing that race indistinguishable from
+        // winning it. Silence is the wrong answer here: the crossing IS the
+        // product. A vehicle leaving a zone with nothing written is a missed
+        // alert, and nothing gives it away — the position row is stored perfectly.
+        //
+        // Awaited now, so a crossing lands in the same transaction as the position
+        // that caused it: either both are there or neither is. One spatial query
+        // and a handful of narrow inserts, which is well within the cost of being
+        // right.
+        const fences = await sql<any>`
+          SELECT g.id AS geofence_id, g.name,
+                 ST_Within(${point}::geometry, g.zone::geometry) AS inside
+          FROM zv_geofences g WHERE g.is_active = true
+        `.execute(trx);
 
-      for (const fence of fences.rows) {
-        await sql`
-          INSERT INTO zv_geofence_events (geofence_id, entity_type, entity_id, event_type, location)
-          SELECT ${fence.geofence_id}::uuid, ${body.entity_type}, ${body.entity_id},
-                 CASE WHEN ${fence.inside} THEN 'enter' ELSE 'exit' END,
-                 ${point}::geography
-          WHERE NOT EXISTS (
-            SELECT 1 FROM zv_geofence_events
-            WHERE geofence_id = ${fence.geofence_id}::uuid
-              AND entity_id = ${body.entity_id}
-              AND event_type = CASE WHEN ${fence.inside} THEN 'enter' ELSE 'exit' END
-              AND occurred_at > NOW() - INTERVAL '5 minutes'
-          )
-        `.execute(db);
-      }
+        for (const fence of fences.rows) {
+          await sql`
+            INSERT INTO zv_geofence_events (geofence_id, entity_type, entity_id, event_type, location)
+            SELECT ${fence.geofence_id}::uuid, ${body.entity_type}, ${body.entity_id},
+                   CASE WHEN ${fence.inside} THEN 'enter' ELSE 'exit' END,
+                   ${point}::geography
+            WHERE NOT EXISTS (
+              SELECT 1 FROM zv_geofence_events
+              WHERE geofence_id = ${fence.geofence_id}::uuid
+                AND entity_id = ${body.entity_id}
+                AND event_type = CASE WHEN ${fence.inside} THEN 'enter' ELSE 'exit' END
+                AND occurred_at > NOW() - INTERVAL '5 minutes'
+            )
+          `.execute(trx);
+        }
 
+        return entry;
+      });
       return c.json({ location: entry.rows[0] }, 201);
     },
   );

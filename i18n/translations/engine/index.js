@@ -19481,10 +19481,12 @@ function translationsRoutes(ctx) {
     is_default: exports_external.boolean().default(false)
   })), async (c) => {
     const { code, name, is_default: is_default2 } = c.req.valid("json");
-    if (is_default2) {
-      await db.updateTable("zvd_locales").set({ is_default: false }).where("is_default", "=", true).execute();
-    }
-    const locale = await db.insertInto("zvd_locales").values({ code, name, is_default: is_default2 }).returningAll().executeTakeFirst();
+    const locale = await db.transaction().execute(async (trx) => {
+      if (is_default2) {
+        await trx.updateTable("zvd_locales").set({ is_default: false }).where("is_default", "=", true).execute();
+      }
+      return await trx.insertInto("zvd_locales").values({ code, name, is_default: is_default2 }).returningAll().executeTakeFirst();
+    });
     return c.json({ locale }, 201);
   });
   app.delete("/locales/:code", async (c) => {

@@ -322,21 +322,28 @@ export function expensesRoutes(ctx: ExtensionContext): Hono {
     }
     if (!report.rows.length) return c.json({ error: 'Report not found or not approved' }, 400);
     const r = report.rows[0] as any;
-    const row = await sql`
-      INSERT INTO zvd_expense_reimbursements (report_id, amount, payment_date, payment_method, reference, notes, created_by)
-      VALUES (${r.id}, ${d.amount}, ${d.payment_date}, ${d.payment_method}, ${d.reference ?? null}, ${d.notes ?? null}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    const newReimbursed = +r.reimbursed_amount + d.amount;
-    const fullyReimbursed = newReimbursed >= r.grand_total;
-    await sql`
-      UPDATE zvd_expense_reports SET
-        reimbursed_amount = ${newReimbursed},
-        status = ${fullyReimbursed ? 'reimbursed' : 'approved'},
-        reimbursed_at = ${fullyReimbursed ? sql`NOW()` : sql`reimbursed_at`},
-        updated_at = NOW()
-      WHERE id = ${r.id}
-    `.execute(db);
+    // The payment record and the report's status. The guard is `status =
+    // 'approved'`, so a report marked reimbursed with no payment row can never
+    // be reimbursed again — the employee is out of pocket and the register says
+    // they were paid. The reverse pays them twice on the next attempt.
+    const row = await db.transaction().execute(async (trx) => {
+      const row = await sql`
+        INSERT INTO zvd_expense_reimbursements (report_id, amount, payment_date, payment_method, reference, notes, created_by)
+        VALUES (${r.id}, ${d.amount}, ${d.payment_date}, ${d.payment_method}, ${d.reference ?? null}, ${d.notes ?? null}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      const newReimbursed = +r.reimbursed_amount + d.amount;
+      const fullyReimbursed = newReimbursed >= r.grand_total;
+      await sql`
+        UPDATE zvd_expense_reports SET
+          reimbursed_amount = ${newReimbursed},
+          status = ${fullyReimbursed ? 'reimbursed' : 'approved'},
+          reimbursed_at = ${fullyReimbursed ? sql`NOW()` : sql`reimbursed_at`},
+          updated_at = NOW()
+        WHERE id = ${r.id}
+      `.execute(trx);
+      return row;
+    });
     return c.json({ data: row.rows[0] }, 201);
   });
 

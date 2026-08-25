@@ -3,7 +3,7 @@
   "displayName": "PostGIS",
   "category": "geospatial",
   "description": "Geospatial queries — proximity search, bounding box, polygon containment",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-postgis",
@@ -58,8 +58,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "2adad05d7790e232a7cd6d008fbff1aeed1d8f02c6c3befd0d0a2c3c0e6d95d2",
-    "sourceSha256": "9fe96a92376bb71379ee2ab4ffddaceb8ea23de58dfcd7342462f01b862598e4"
+    "engineSha256": "e5b2fb7ef1c48ccf0622fffafb206350ddc8e272675d9fd35618be7e5f0986e2",
+    "sourceSha256": "da2d307c73c67fe861ba79f9f07563c69b6cf25837bb769cf8f838b2d3ad289e"
   },
   "resources": [
     "postgis"

@@ -81,15 +81,22 @@ export function projectsRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
-    const row = await sql`
-      INSERT INTO zvd_projects (name, description, client_id, status, priority, start_date, end_date, budget, color, owner_id, created_by)
-      VALUES (${d.name}, ${d.description ?? null}, ${d.client_id ?? null}, ${d.status}, ${d.priority},
-        ${d.start_date ?? null}, ${d.end_date ?? null}, ${d.budget ?? null}, ${d.color}, ${user.id}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    const projectId = (row.rows[0] as any).id;
-    await sql`INSERT INTO zvd_project_members (project_id, user_id, role) VALUES (${projectId}, ${user.id}, 'owner')`.execute(db);
-    return c.json({ data: row.rows[0] }, 201);
+    // The project and its owner's membership. Every list, board and permission
+    // check in this module is scoped by membership, so a project written without
+    // it belongs to nobody — the person who just created it cannot open it, and
+    // only a direct query on the table would ever show it exists.
+    const row = await db.transaction().execute(async (trx) => {
+      const row = await sql`
+        INSERT INTO zvd_projects (name, description, client_id, status, priority, start_date, end_date, budget, color, owner_id, created_by)
+        VALUES (${d.name}, ${d.description ?? null}, ${d.client_id ?? null}, ${d.status}, ${d.priority},
+          ${d.start_date ?? null}, ${d.end_date ?? null}, ${d.budget ?? null}, ${d.color}, ${user.id}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      const projectId = (row.rows[0] as any).id;
+      await sql`INSERT INTO zvd_project_members (project_id, user_id, role) VALUES (${projectId}, ${user.id}, 'owner')`.execute(trx);
+      return c.json({ data: row.rows[0] }, 201);
+      return row;
+    });
   });
 
   app.patch('/:id', zValidator('json', z.object({
