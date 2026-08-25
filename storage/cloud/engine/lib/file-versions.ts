@@ -84,9 +84,17 @@ export async function createFileVersion(
     OFFSET ${MAX_VERSIONS}
   `.execute(db);
 
+  // Row first, object second — the reverse of what this used to do.
+  //
+  // Deleting the object first and failing on the row leaves a version row
+  // pointing at bytes that no longer exist: the version still appears in the
+  // history, and restoring it serves nothing. Deleting the row first and
+  // failing on the object leaves an orphaned blob, which costs storage and
+  // nothing else. Neither order is atomic — object storage has no rollback —
+  // so the question is only which failure is cheaper, and it is this one.
   for (const old of oldVersions.rows) {
-    await deleteObject(old.storage_path);
     await sql`DELETE FROM zv_media_versions WHERE id = ${old.id}`.execute(db);
+    await deleteObject(old.storage_path);
   }
 
   return { versionNum: nextVer + 1 };
