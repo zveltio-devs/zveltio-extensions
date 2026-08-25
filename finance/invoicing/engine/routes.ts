@@ -486,40 +486,45 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
     const claimed = await claimNumber(db, 'invoice');
     if (!claimed) return c.json({ error: 'No invoice series configured' }, 400);
 
+    // Header and lines are one document, and a header alone burns a number from
+    // the series without issuing anything anyone can send.
+    const inv = await db.transaction().execute(async (trx) => {
     const inv = await sql`
-      INSERT INTO zvd_invoices (
-        number, series, doc_type, converted_from_id,
-        client_id, client_type, client_name, client_email, client_address,
-        client_tax_id, client_reg_no, client_city, client_county, client_country,
-        seller_name, seller_tax_id, seller_reg_no, seller_address, seller_city, seller_county, seller_country, seller_iban, seller_bank,
-        issue_date, delivery_date, due_date, currency, subtotal, tax_rate, tax_amount, total,
-        discount_amount, discount_percent, vat_breakdown, vat_regime, vat_exemption_reason,
-        exchange_rate, exchange_date, tax_amount_ron, notes, footer_notes, po_number,
-        amount_paid, created_by
-      )
-      SELECT ${claimed.number}, ${claimed.series}, 'invoice', ${p.id},
-        client_id, client_type, client_name, client_email, client_address,
-        client_tax_id, client_reg_no, client_country,
-        seller_name, seller_tax_id, seller_reg_no, seller_address, seller_iban, seller_bank,
-        CURRENT_DATE, delivery_date, due_date, currency, subtotal, tax_rate, tax_amount, total,
-        discount_amount, discount_percent, vat_breakdown, vat_regime, vat_exemption_reason,
-        exchange_rate, exchange_date, tax_amount_ron, notes, footer_notes, po_number,
-        0, ${user.id}
-      FROM zvd_invoices WHERE id = ${p.id}
-      RETURNING *
-    `.execute(db);
-    const newId = (inv.rows[0] as any).id;
-    await sql`
-      INSERT INTO zvd_invoice_lines (invoice_id, description, quantity, unit, unit_price, tax_rate, total, sort_order, metadata)
-      SELECT ${newId}, description, quantity, unit, unit_price, tax_rate, total, sort_order, metadata
-        FROM zvd_invoice_lines WHERE invoice_id = ${p.id}
-    `.execute(db);
+        INSERT INTO zvd_invoices (
+          number, series, doc_type, converted_from_id,
+          client_id, client_type, client_name, client_email, client_address,
+          client_tax_id, client_reg_no, client_city, client_county, client_country,
+          seller_name, seller_tax_id, seller_reg_no, seller_address, seller_city, seller_county, seller_country, seller_iban, seller_bank,
+          issue_date, delivery_date, due_date, currency, subtotal, tax_rate, tax_amount, total,
+          discount_amount, discount_percent, vat_breakdown, vat_regime, vat_exemption_reason,
+          exchange_rate, exchange_date, tax_amount_ron, notes, footer_notes, po_number,
+          amount_paid, created_by
+        )
+        SELECT ${claimed.number}, ${claimed.series}, 'invoice', ${p.id},
+          client_id, client_type, client_name, client_email, client_address,
+          client_tax_id, client_reg_no, client_country,
+          seller_name, seller_tax_id, seller_reg_no, seller_address, seller_iban, seller_bank,
+          CURRENT_DATE, delivery_date, due_date, currency, subtotal, tax_rate, tax_amount, total,
+          discount_amount, discount_percent, vat_breakdown, vat_regime, vat_exemption_reason,
+          exchange_rate, exchange_date, tax_amount_ron, notes, footer_notes, po_number,
+          0, ${user.id}
+        FROM zvd_invoices WHERE id = ${p.id}
+        RETURNING *
+      `.execute(trx);
+      const newId = (inv.rows[0] as any).id;
+      await sql`
+        INSERT INTO zvd_invoice_lines (invoice_id, description, quantity, unit, unit_price, tax_rate, total, sort_order, metadata)
+        SELECT ${newId}, description, quantity, unit, unit_price, tax_rate, total, sort_order, metadata
+          FROM zvd_invoice_lines WHERE invoice_id = ${p.id}
+      `.execute(trx);
 
-    const lines = await sql`SELECT * FROM zvd_invoice_lines WHERE invoice_id = ${newId}`.execute(db);
-    await ctx.events.emitAsync('invoice.created', {
-      id: newId,
-      invoice: inv.rows[0],
-      lines: lines.rows,
+      const lines = await sql`SELECT * FROM zvd_invoice_lines WHERE invoice_id = ${newId}`.execute(trx);
+      await ctx.events.emitAsync('invoice.created', {
+        id: newId,
+        invoice: inv.rows[0],
+        lines: lines.rows,
+      });
+      return inv;
     });
     return c.json({ data: inv.rows[0] }, 201);
   });
@@ -764,84 +769,105 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
       .sort((a, b) => b.rate - a.rate)
       .map((e) => ({ rate: e.rate, base: round2(e.base), vat: round2(e.vat) }));
     const taxAmountRon = d.exchange_rate ? round2(tax_amount * d.exchange_rate) : null;
-    const inv = await sql`
-      INSERT INTO zvd_invoices (number, series, doc_type, delegate_name, delegate_id_card, delegate_vehicle,
-        client_id, client_type, client_name, client_email, client_address,
-        client_tax_id, client_reg_no, client_city, client_county, client_country,
-        seller_name, seller_tax_id, seller_reg_no, seller_address, seller_city, seller_county, seller_country, seller_iban, seller_bank,
-        issue_date, delivery_date, due_date, currency, subtotal, tax_rate, tax_amount, total, discount_amount, discount_percent,
-        vat_breakdown, vat_regime, vat_exemption_reason, exchange_rate, exchange_date, tax_amount_ron,
-        notes, footer_notes, po_number, recurring_interval, amount_paid, created_by)
-      VALUES (${claimed.number}, ${claimed.series}, ${d.doc_type},
-        ${d.delegate_name ?? null}, ${d.delegate_id_card ?? null}, ${d.delegate_vehicle ?? null},
-        ${d.client_id ?? null}, ${d.client_type ?? null}, ${clientName},
-        ${clientEmail ?? null}, ${d.client_address ?? null},
-        ${clientTaxId ?? null}, ${clientRegNo ?? null}, ${d.client_city ?? null}, ${d.client_county ?? null}, ${d.client_country ?? null},
-        ${company?.legal_name ?? company?.name ?? null}, ${company?.tax_id ?? null},
-        ${company?.reg_no ?? null}, ${company?.address ?? null},
-        ${company?.city ?? null}, ${company?.county ?? null}, ${company?.country ?? 'RO'},
-        ${company?.iban ?? null}, ${company?.bank ?? null},
-        ${d.issue_date ?? new Date().toISOString().slice(0,10)}, ${d.delivery_date ?? null}, ${d.due_date},
-        ${d.currency}, ${subtotal}, ${d.tax_rate}, ${tax_amount}, ${total}, ${discount_amount},
-        ${d.discount_percent},
-        ${JSON.stringify(vatBreakdown)}::jsonb, ${d.vat_regime}, ${d.vat_exemption_reason ?? null},
-        ${d.exchange_rate ?? null}, ${d.exchange_date ?? null}, ${taxAmountRon},
-        ${d.notes ?? null}, ${d.footer_notes ?? null}, ${d.po_number ?? null},
-        ${d.recurring_interval ?? null}, 0, ${user.id})
-      RETURNING *
-    `.execute(db);
-    const invId = (inv.rows[0] as any).id;
-    const insertedLines: any[] = [];
-    for (const line of d.lines) {
-      const lineTotal = line.quantity * line.unit_price * (1 - d.discount_percent / 100) * (1 + line.tax_rate / 100);
-      // `::text::jsonb`, not `::jsonb`. A string parameter cast straight to
-      // jsonb is a no-op — the driver sends it AS a jsonb value, so the
-      // document arrives as a jsonb STRING SCALAR instead of being parsed, and
-      // `jsonb_typeof(metadata)` reads back "string".
-      //
-      // The JS readers here never noticed: both of them do
-      // `typeof x === 'string' ? JSON.parse(x) : x`, so they compensate for it.
-      // A SQL reader cannot compensate. `operations/traceability` subscribes to
-      // record.created and looks for lines with `metadata->>'lot_id'` to raise a
-      // pending dispatch — on a string scalar that operator returns NULL, its
-      // query matched zero rows, and the invoice-to-dispatch handover has never
-      // once fired. Every route that acts on a pending dispatch was unreachable
-      // as a result.
-      const lineRow = await sql`
-        INSERT INTO zvd_invoice_lines (invoice_id, description, quantity, unit, unit_price, tax_rate, total, sort_order, metadata)
-        VALUES (${invId}, ${line.description}, ${line.quantity}, ${line.unit ?? null}, ${line.unit_price}, ${line.tax_rate}, ${lineTotal}, ${line.sort_order}, ${JSON.stringify({ ...(line.metadata ?? {}), ...(line.catalogue_item ? { catalogue_item: line.catalogue_item } : {}) })}::text::jsonb)
+    // An invoice and its lines are one document, and the listeners below are part
+    // of it.
+    //
+    // A header with no lines is not a smaller invoice — it is a legal document
+    // with no content, numbered from a series that will not issue that number
+    // again. The event emission is inside the same boundary deliberately: the
+    // comment on `invoice.created` already states the intent — "awaiting also
+    // makes the draft atomic with the invoice: both commit, or neither does" —
+    // and leaving the emit outside would keep that true only by accident, for
+    // exactly as long as the request-level tenant transaction spans both.
+    //
+    // Note for whoever moves that boundary: `ctx.db.transaction()` JOINS the
+    // request's transaction today rather than nesting, so this wrapper is a
+    // statement of intent right now and becomes a real transaction then. The
+    // listeners resolve their own `ctx.db` through AsyncLocalStorage, so they
+    // follow whichever transaction is current — which is why the emit belongs
+    // inside this block and not after it.
+    const inv = await db.transaction().execute(async (trx) => {
+      const inv = await sql`
+        INSERT INTO zvd_invoices (number, series, doc_type, delegate_name, delegate_id_card, delegate_vehicle,
+          client_id, client_type, client_name, client_email, client_address,
+          client_tax_id, client_reg_no, client_city, client_county, client_country,
+          seller_name, seller_tax_id, seller_reg_no, seller_address, seller_city, seller_county, seller_country, seller_iban, seller_bank,
+          issue_date, delivery_date, due_date, currency, subtotal, tax_rate, tax_amount, total, discount_amount, discount_percent,
+          vat_breakdown, vat_regime, vat_exemption_reason, exchange_rate, exchange_date, tax_amount_ron,
+          notes, footer_notes, po_number, recurring_interval, amount_paid, created_by)
+        VALUES (${claimed.number}, ${claimed.series}, ${d.doc_type},
+          ${d.delegate_name ?? null}, ${d.delegate_id_card ?? null}, ${d.delegate_vehicle ?? null},
+          ${d.client_id ?? null}, ${d.client_type ?? null}, ${clientName},
+          ${clientEmail ?? null}, ${d.client_address ?? null},
+          ${clientTaxId ?? null}, ${clientRegNo ?? null}, ${d.client_city ?? null}, ${d.client_county ?? null}, ${d.client_country ?? null},
+          ${company?.legal_name ?? company?.name ?? null}, ${company?.tax_id ?? null},
+          ${company?.reg_no ?? null}, ${company?.address ?? null},
+          ${company?.city ?? null}, ${company?.county ?? null}, ${company?.country ?? 'RO'},
+          ${company?.iban ?? null}, ${company?.bank ?? null},
+          ${d.issue_date ?? new Date().toISOString().slice(0,10)}, ${d.delivery_date ?? null}, ${d.due_date},
+          ${d.currency}, ${subtotal}, ${d.tax_rate}, ${tax_amount}, ${total}, ${discount_amount},
+          ${d.discount_percent},
+          ${JSON.stringify(vatBreakdown)}::jsonb, ${d.vat_regime}, ${d.vat_exemption_reason ?? null},
+          ${d.exchange_rate ?? null}, ${d.exchange_date ?? null}, ${taxAmountRon},
+          ${d.notes ?? null}, ${d.footer_notes ?? null}, ${d.po_number ?? null},
+          ${d.recurring_interval ?? null}, 0, ${user.id})
         RETURNING *
-      `.execute(db);
-      insertedLines.push(lineRow.rows[0]);
-    }
+      `.execute(trx);
+      const invId = (inv.rows[0] as any).id;
+      const insertedLines: any[] = [];
+      for (const line of d.lines) {
+        const lineTotal = line.quantity * line.unit_price * (1 - d.discount_percent / 100) * (1 + line.tax_rate / 100);
+        // `::text::jsonb`, not `::jsonb`. A string parameter cast straight to
+        // jsonb is a no-op — the driver sends it AS a jsonb value, so the
+        // document arrives as a jsonb STRING SCALAR instead of being parsed, and
+        // `jsonb_typeof(metadata)` reads back "string".
+        //
+        // The JS readers here never noticed: both of them do
+        // `typeof x === 'string' ? JSON.parse(x) : x`, so they compensate for it.
+        // A SQL reader cannot compensate. `operations/traceability` subscribes to
+        // record.created and looks for lines with `metadata->>'lot_id'` to raise a
+        // pending dispatch — on a string scalar that operator returns NULL, its
+        // query matched zero rows, and the invoice-to-dispatch handover has never
+        // once fired. Every route that acts on a pending dispatch was unreachable
+        // as a result.
+        const lineRow = await sql`
+          INSERT INTO zvd_invoice_lines (invoice_id, description, quantity, unit, unit_price, tax_rate, total, sort_order, metadata)
+          VALUES (${invId}, ${line.description}, ${line.quantity}, ${line.unit ?? null}, ${line.unit_price}, ${line.tax_rate}, ${lineTotal}, ${line.sort_order}, ${JSON.stringify({ ...(line.metadata ?? {}), ...(line.catalogue_item ? { catalogue_item: line.catalogue_item } : {}) })}::text::jsonb)
+          RETURNING *
+        `.execute(trx);
+        insertedLines.push(lineRow.rows[0]);
+      }
 
-    // Generic record event — for engine-level data hooks (audit, search index, etc.)
-    await ctx.events.emitAsync('record.created', {
-      collection: 'zvd_invoices',
-      record: inv.rows[0],
-      id: invId,
-      userId: user.id,
-    });
+      // Generic record event — for engine-level data hooks (audit, search index, etc.)
+      await ctx.events.emitAsync('record.created', {
+        collection: 'zvd_invoices',
+        record: inv.rows[0],
+        id: invId,
+        userId: user.id,
+      });
 
-    // Domain event — semantically meaningful "an invoice was created". Other
-    // extensions (efactura, accounting, traceability) listen to this rather than
-    // grepping record.created for collection = zvd_invoices.
-    //
-    // AWAITED, because listeners here are async and write to the database.
-    // Plain `emit` is EventEmitter's synchronous fan-out: an async listener
-    // returns a promise at its first await and the emitter drops it, so the
-    // rest of the listener ran after this request had responded and its tenant
-    // transaction had closed. Every one of them died on "Transaction is already
-    // committed", inside its own try/catch, which is why e-Factura had never
-    // drafted a single submission on any install.
-    //
-    // Awaiting also makes the draft atomic with the invoice: both commit, or
-    // neither does. A listener that throws is logged and skipped by the bus, so
-    // one broken extension cannot fail an invoice.
-    await ctx.events.emitAsync('invoice.created', {
-      id: invId,
-      invoice: inv.rows[0],
-      lines: insertedLines,
+      // Domain event — semantically meaningful "an invoice was created". Other
+      // extensions (efactura, accounting, traceability) listen to this rather than
+      // grepping record.created for collection = zvd_invoices.
+      //
+      // AWAITED, because listeners here are async and write to the database.
+      // Plain `emit` is EventEmitter's synchronous fan-out: an async listener
+      // returns a promise at its first await and the emitter drops it, so the
+      // rest of the listener ran after this request had responded and its tenant
+      // transaction had closed. Every one of them died on "Transaction is already
+      // committed", inside its own try/catch, which is why e-Factura had never
+      // drafted a single submission on any install.
+      //
+      // Awaiting also makes the draft atomic with the invoice: both commit, or
+      // neither does. A listener that throws is logged and skipped by the bus, so
+      // one broken extension cannot fail an invoice.
+      await ctx.events.emitAsync('invoice.created', {
+        id: invId,
+        invoice: inv.rows[0],
+        lines: insertedLines,
+      });
+
+      return inv;
     });
 
     return c.json({ data: inv.rows[0] }, 201);
@@ -986,22 +1012,31 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
     if (d.amount > invoice.total - invoice.amount_paid) {
       return c.json({ error: `Payment exceeds outstanding amount (${invoice.total - invoice.amount_paid})` }, 400);
     }
-    const payment = await sql`
-      INSERT INTO zvd_invoice_payments (invoice_id, amount, payment_date, payment_method, reference, notes, created_by)
-      VALUES (${invoice.id}, ${d.amount}, ${d.payment_date}, ${d.payment_method}, ${d.reference ?? null}, ${d.notes ?? null}, ${user.id})
-      RETURNING *
-    `.execute(db);
     // Same conversion as the `invoicing.recordPayment` service, which is this
     // route's body reachable by name. Two write paths onto one column that read
     // it differently is how they drift apart. `d.amount` is a validated number
     // here, so only the column needs converting.
     const newPaid = toNumber(invoice.amount_paid, 0, 'zvd_invoices.amount_paid') + d.amount;
     const newStatus = newPaid >= invoice.total ? 'paid' : 'partially_paid';
-    await sql`
-      UPDATE zvd_invoices SET amount_paid = ${newPaid}, status = ${newStatus},
-        paid_at = ${newStatus === 'paid' ? sql`NOW()` : sql`paid_at`}, updated_at = NOW()
-      WHERE id = ${invoice.id}
-    `.execute(db);
+    // Money received and the invoice that records it are one fact.
+    //
+    // Apart, either the payment row exists while the invoice still reads unpaid —
+    // so it is chased, and paying twice is the customer's problem to prove — or
+    // the invoice is marked settled with no payment behind it, which is a hole in
+    // the books that reconciliation will find months later.
+    const payment = await db.transaction().execute(async (trx) => {
+      const inserted = await sql`
+        INSERT INTO zvd_invoice_payments (invoice_id, amount, payment_date, payment_method, reference, notes, created_by)
+        VALUES (${invoice.id}, ${d.amount}, ${d.payment_date}, ${d.payment_method}, ${d.reference ?? null}, ${d.notes ?? null}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      await sql`
+        UPDATE zvd_invoices SET amount_paid = ${newPaid}, status = ${newStatus},
+          paid_at = ${newStatus === 'paid' ? sql`NOW()` : sql`paid_at`}, updated_at = NOW()
+        WHERE id = ${invoice.id}
+      `.execute(trx);
+      return inserted;
+    });
     return c.json({ data: payment.rows[0] }, 201);
   });
 
@@ -1067,35 +1102,41 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
     // its numbering together rather than jumping to whatever is default today.
     const claimed = await claimNumber(db, 'invoice', i.series ?? undefined);
     if (!claimed) return c.json({ error: 'No invoice series configured' }, 400);
-    const newInv = await sql`
-      INSERT INTO zvd_invoices (number, series, doc_type, delegate_name, delegate_id_card, delegate_vehicle,
-        client_id, client_type, client_name, client_email, client_address,
-        client_tax_id, client_reg_no, client_city, client_county, client_country,
-        seller_name, seller_tax_id, seller_reg_no, seller_address,
-        seller_city, seller_county, seller_country, seller_iban, seller_bank,
-        issue_date, due_date, currency, subtotal, tax_rate, tax_amount, total, discount_amount, discount_percent,
-        vat_breakdown, vat_regime, vat_exemption_reason, exchange_rate, exchange_date, tax_amount_ron,
-        notes, footer_notes, po_number, recurring_interval, amount_paid, created_by)
-      VALUES (${claimed.number}, ${claimed.series}, ${i.doc_type},
-        ${null}, ${null}, ${null},
-        ${i.client_id}, ${i.client_type}, ${i.client_name}, ${i.client_email}, ${i.client_address},
-        ${i.client_tax_id}, ${i.client_reg_no}, ${i.client_city}, ${i.client_county}, ${i.client_country},
-        ${i.seller_name}, ${i.seller_tax_id}, ${i.seller_reg_no}, ${i.seller_address},
-        ${i.seller_city}, ${i.seller_county}, ${i.seller_country}, ${i.seller_iban}, ${i.seller_bank},
-        ${newIssue.toISOString().slice(0,10)}, ${newDue.toISOString().slice(0,10)},
-        ${i.currency}, ${i.subtotal}, ${i.tax_rate}, ${i.tax_amount}, ${i.total},
-        ${i.discount_amount}, ${i.discount_percent},
-        ${i.vat_breakdown}, ${i.vat_regime}, ${i.vat_exemption_reason},
-        ${i.exchange_rate}, ${i.exchange_date}, ${i.tax_amount_ron},
-        ${i.notes}, ${i.footer_notes}, ${i.po_number}, ${i.recurring_interval}, 0, ${user.id})
-      RETURNING *
-    `.execute(db);
-    const newId = (newInv.rows[0] as any).id;
-    for (const line of lines.rows as any[]) {
-      await sql`INSERT INTO zvd_invoice_lines (invoice_id, description, quantity, unit_price, tax_rate, total, sort_order)
-        VALUES (${newId}, ${line.description}, ${line.quantity}, ${line.unit_price}, ${line.tax_rate}, ${line.total}, ${line.sort_order})
-      `.execute(db);
-    }
+    // Header and lines are one document. A recurring invoice generated without
+    // its lines still consumes the next number in the series, and the customer
+    // receives a bill for nothing.
+    const newInv = await db.transaction().execute(async (trx) => {
+      const newInv = await sql`
+        INSERT INTO zvd_invoices (number, series, doc_type, delegate_name, delegate_id_card, delegate_vehicle,
+          client_id, client_type, client_name, client_email, client_address,
+          client_tax_id, client_reg_no, client_city, client_county, client_country,
+          seller_name, seller_tax_id, seller_reg_no, seller_address,
+          seller_city, seller_county, seller_country, seller_iban, seller_bank,
+          issue_date, due_date, currency, subtotal, tax_rate, tax_amount, total, discount_amount, discount_percent,
+          vat_breakdown, vat_regime, vat_exemption_reason, exchange_rate, exchange_date, tax_amount_ron,
+          notes, footer_notes, po_number, recurring_interval, amount_paid, created_by)
+        VALUES (${claimed.number}, ${claimed.series}, ${i.doc_type},
+          ${null}, ${null}, ${null},
+          ${i.client_id}, ${i.client_type}, ${i.client_name}, ${i.client_email}, ${i.client_address},
+          ${i.client_tax_id}, ${i.client_reg_no}, ${i.client_city}, ${i.client_county}, ${i.client_country},
+          ${i.seller_name}, ${i.seller_tax_id}, ${i.seller_reg_no}, ${i.seller_address},
+          ${i.seller_city}, ${i.seller_county}, ${i.seller_country}, ${i.seller_iban}, ${i.seller_bank},
+          ${newIssue.toISOString().slice(0,10)}, ${newDue.toISOString().slice(0,10)},
+          ${i.currency}, ${i.subtotal}, ${i.tax_rate}, ${i.tax_amount}, ${i.total},
+          ${i.discount_amount}, ${i.discount_percent},
+          ${i.vat_breakdown}, ${i.vat_regime}, ${i.vat_exemption_reason},
+          ${i.exchange_rate}, ${i.exchange_date}, ${i.tax_amount_ron},
+          ${i.notes}, ${i.footer_notes}, ${i.po_number}, ${i.recurring_interval}, 0, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      const newId = (newInv.rows[0] as any).id;
+      for (const line of lines.rows as any[]) {
+        await sql`INSERT INTO zvd_invoice_lines (invoice_id, description, quantity, unit_price, tax_rate, total, sort_order)
+          VALUES (${newId}, ${line.description}, ${line.quantity}, ${line.unit_price}, ${line.tax_rate}, ${line.total}, ${line.sort_order})
+        `.execute(trx);
+      }
+      return newInv;
+    });
     return c.json({ data: newInv.rows[0] }, 201);
   });
 
@@ -1131,22 +1172,28 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
     const subtotal = d.lines.reduce((s, l) => s + l.quantity * l.unit_price, 0);
     const tax_amount = d.lines.reduce((s, l) => s + l.quantity * l.unit_price * l.tax_rate / 100, 0);
     const total = subtotal + tax_amount;
-    const cn = await sql`
-      INSERT INTO zvd_credit_notes (number, original_invoice_id, client_name, client_email, reason,
-        issue_date, currency, subtotal, tax_amount, total, created_by)
-      VALUES (${number}, ${d.original_invoice_id ?? null}, ${d.client_name}, ${d.client_email ?? null},
-        ${d.reason}, ${d.issue_date ?? new Date().toISOString().slice(0,10)},
-        ${d.currency}, ${subtotal}, ${tax_amount}, ${total}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    const cnId = (cn.rows[0] as any).id;
-    let sort = 0;
-    for (const line of d.lines) {
-      const lineTotal = line.quantity * line.unit_price * (1 + line.tax_rate / 100);
-      await sql`INSERT INTO zvd_credit_note_lines (credit_note_id, description, quantity, unit_price, tax_rate, total, sort_order)
-        VALUES (${cnId}, ${line.description}, ${line.quantity}, ${line.unit_price}, ${line.tax_rate}, ${lineTotal}, ${sort++})
-      `.execute(db);
-    }
+    // A credit note is its lines. A header alone credits nothing while occupying
+    // a number from a series that will not issue it again — and it reads as a
+    // credit that was granted, against an invoice it never reduced.
+    const cn = await db.transaction().execute(async (trx) => {
+      const created = await sql`
+        INSERT INTO zvd_credit_notes (number, original_invoice_id, client_name, client_email, reason,
+          issue_date, currency, subtotal, tax_amount, total, created_by)
+        VALUES (${number}, ${d.original_invoice_id ?? null}, ${d.client_name}, ${d.client_email ?? null},
+          ${d.reason}, ${d.issue_date ?? new Date().toISOString().slice(0,10)},
+          ${d.currency}, ${subtotal}, ${tax_amount}, ${total}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      const cnId = (created.rows[0] as any).id;
+      let sort = 0;
+      for (const line of d.lines) {
+        const lineTotal = line.quantity * line.unit_price * (1 + line.tax_rate / 100);
+        await sql`INSERT INTO zvd_credit_note_lines (credit_note_id, description, quantity, unit_price, tax_rate, total, sort_order)
+          VALUES (${cnId}, ${line.description}, ${line.quantity}, ${line.unit_price}, ${line.tax_rate}, ${lineTotal}, ${sort++})
+        `.execute(trx);
+      }
+      return created;
+    });
     return c.json({ data: cn.rows[0] }, 201);
   });
 
@@ -1170,8 +1217,14 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
     const applied = Math.min(credit.total, invoice.total - invoice.amount_paid);
     const newPaid = +invoice.amount_paid + applied;
     const newStatus = newPaid >= invoice.total ? 'paid' : 'partially_paid';
-    await sql`UPDATE zvd_invoices SET amount_paid = ${newPaid}, status = ${newStatus}, updated_at = NOW() WHERE id = ${invoice_id}`.execute(db);
-    await sql`UPDATE zvd_credit_notes SET status = 'applied', updated_at = NOW() WHERE id = ${credit.id}`.execute(db);
+    // Crediting the invoice and marking the note applied are one act. Apart, a
+    // note still reading `issued` after its credit landed can be applied again —
+    // the same money credited twice — and the reverse leaves a note marked spent
+    // against an invoice that never received it.
+    await db.transaction().execute(async (trx) => {
+      await sql`UPDATE zvd_invoices SET amount_paid = ${newPaid}, status = ${newStatus}, updated_at = NOW() WHERE id = ${invoice_id}`.execute(trx);
+      await sql`UPDATE zvd_credit_notes SET status = 'applied', updated_at = NOW() WHERE id = ${credit.id}`.execute(trx);
+    });
     return c.json({ data: { applied_amount: applied, invoice_status: newStatus } });
   });
 
