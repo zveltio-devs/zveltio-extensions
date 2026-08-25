@@ -214,6 +214,17 @@ export function contractRoutes(ctx: ExtensionContext): Hono {
     }
 
     const ch = d.changes;
+    // An amendment is four writes describing one decision: the amendment
+    // document, the contract it changes, the salary history it explains, and the
+    // flat columns on the employee that the rest of the module reads.
+    //
+    // The note below says a failed history insert should make the amendment fail
+    // loudly rather than half-apply. Without a transaction it cannot: the
+    // amendment and the new salary are already committed, and only the record of
+    // WHY the salary changed is missing — the one row somebody consults when the
+    // employee disputes their pay. Leaving `syncEmployeeFromContract` outside is
+    // worse still, since payroll reads the flat columns, not the contract.
+    await db.transaction().execute(async (trx) => {
     await sql`
       INSERT INTO zvd_contract_amendments (
         contract_id, amendment_number, effective_date, changes, reason, signed_at, created_by
@@ -222,7 +233,7 @@ export function contractRoutes(ctx: ExtensionContext): Hono {
         ${JSON.stringify(ch)}::text::jsonb, ${d.reason ?? null},
         ${d.signed_at ?? null}, ${user?.id ?? null}
       )
-    `.execute(db);
+    `.execute(trx);
 
     await sql`
       UPDATE zvd_employment_contracts SET
@@ -234,7 +245,7 @@ export function contractRoutes(ctx: ExtensionContext): Hono {
         end_date      = COALESCE(${ch.end_date ?? null}, end_date),
         updated_at    = NOW()
       WHERE id = ${cid}
-    `.execute(db);
+    `.execute(trx);
 
     // The salary history is what somebody looks at to answer "when did this
     // change and why". It had no link to a document before; now it names one.
@@ -257,10 +268,11 @@ export function contractRoutes(ctx: ExtensionContext): Hono {
                 ${d.effective_date},
                 ${`Amendment ${d.amendment_number}${d.reason ? ` — ${d.reason}` : ''}`},
                 ${user?.id ?? null})
-      `.execute(db);
+      `.execute(trx);
     }
 
-    await syncEmployeeFromContract(db, ct.employee_id);
+    await syncEmployeeFromContract(trx, ct.employee_id);
+    });
     const updated = await sql`SELECT * FROM zvd_employment_contracts WHERE id = ${cid}`.execute(db);
     return c.json({ data: updated.rows[0] }, 201);
   });
@@ -290,15 +302,22 @@ export function contractRoutes(ctx: ExtensionContext): Hono {
         return c.json({ error: 'Only an active contract can be suspended' }, 409);
       }
 
-      await sql`
-        INSERT INTO zvd_contract_suspensions (contract_id, start_date, end_date, reason_code, notes, created_by)
-        VALUES (${cid}, ${d.start_date}, ${d.end_date ?? null}, ${d.reason_code ?? null},
-                ${d.notes ?? null}, ${user?.id ?? null})
-      `.execute(db);
+      // The suspension row and the status are the same fact recorded twice, and
+      // each half alone is a contract nobody can move: a suspension with the
+      // status still `active` is invisible to anything reading status, while a
+      // `suspended` status with no open suspension row can never be resumed —
+      // resume closes the open row and refuses when it finds none.
+      await db.transaction().execute(async (trx) => {
+        await sql`
+          INSERT INTO zvd_contract_suspensions (contract_id, start_date, end_date, reason_code, notes, created_by)
+          VALUES (${cid}, ${d.start_date}, ${d.end_date ?? null}, ${d.reason_code ?? null},
+                  ${d.notes ?? null}, ${user?.id ?? null})
+        `.execute(trx);
 
-      await sql`
-        UPDATE zvd_employment_contracts SET status = 'suspended', updated_at = NOW() WHERE id = ${cid}
-      `.execute(db);
+        await sql`
+          UPDATE zvd_employment_contracts SET status = 'suspended', updated_at = NOW() WHERE id = ${cid}
+        `.execute(trx);
+      });
 
       return c.json({ success: true }, 201);
     },
@@ -310,16 +329,24 @@ export function contractRoutes(ctx: ExtensionContext): Hono {
 
     // Close the open suspension. `end_date IS NULL` is what "still suspended"
     // means, so this is the row to close.
-    const closed = await sql`
-      UPDATE zvd_contract_suspensions SET end_date = ${end_date}
-       WHERE contract_id = ${cid} AND end_date IS NULL
-       RETURNING id
-    `.execute(db);
-    if (!closed.rows.length) return c.json({ error: 'This contract is not suspended' }, 409);
+    // Closing the suspension without reactivating the contract is the one
+    // unrecoverable order: the open row is gone, so a second resume finds
+    // nothing to close and answers 409 forever while the contract stays
+    // `suspended`. Both statements commit together or neither does.
+    const resumed = await db.transaction().execute(async (trx) => {
+      const closed = await sql`
+        UPDATE zvd_contract_suspensions SET end_date = ${end_date}
+         WHERE contract_id = ${cid} AND end_date IS NULL
+         RETURNING id
+      `.execute(trx);
+      if (!closed.rows.length) return false;
 
-    await sql`
-      UPDATE zvd_employment_contracts SET status = 'active', updated_at = NOW() WHERE id = ${cid}
-    `.execute(db);
+      await sql`
+        UPDATE zvd_employment_contracts SET status = 'active', updated_at = NOW() WHERE id = ${cid}
+      `.execute(trx);
+      return true;
+    });
+    if (!resumed) return c.json({ error: 'This contract is not suspended' }, 409);
     return c.json({ success: true });
   });
 
@@ -343,6 +370,13 @@ export function contractRoutes(ctx: ExtensionContext): Hono {
       const d = c.req.valid('json');
       const cid = c.req.param('cid');
 
+      // Ending a contract can also end the employment, and the check that decides
+      // which happens is a read taken BETWEEN the two writes. Outside a
+      // transaction that read sees a database other requests are still changing,
+      // and the employee row can be left disagreeing with every contract they
+      // have: still `active` with nothing running, or `terminated` while a
+      // current contract says otherwise — and payroll reads the employee row.
+      const ct = await db.transaction().execute(async (trx) => {
       const row = await sql`
         UPDATE zvd_employment_contracts
            SET status = 'ended', ended_at = ${d.ended_at}, end_date = COALESCE(end_date, ${d.ended_at}),
@@ -350,8 +384,8 @@ export function contractRoutes(ctx: ExtensionContext): Hono {
                updated_at = NOW()
          WHERE id = ${cid} AND status <> 'ended'
          RETURNING *
-      `.execute(db);
-      if (!row.rows.length) return c.json({ error: 'Contract not found or already ended' }, 409);
+      `.execute(trx);
+      if (!row.rows.length) return null;
 
       const ct = row.rows[0] as any;
 
@@ -362,13 +396,16 @@ export function contractRoutes(ctx: ExtensionContext): Hono {
       const stillActive = await sql`
         SELECT 1 FROM zvd_employment_contracts
          WHERE employee_id = ${ct.employee_id} AND status IN ('active', 'suspended') LIMIT 1
-      `.execute(db);
+      `.execute(trx);
       if (!stillActive.rows.length) {
         await sql`
           UPDATE zvd_employees SET status = 'terminated', end_date = ${d.ended_at}, updated_at = NOW()
            WHERE id = ${ct.employee_id}
-        `.execute(db);
+        `.execute(trx);
       }
+      return ct;
+      });
+      if (!ct) return c.json({ error: 'Contract not found or already ended' }, 409);
 
       return c.json({ data: ct });
     },
