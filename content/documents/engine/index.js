@@ -1732,7 +1732,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
+// ../../../zveltio/node_modules/.bun/@hono+zod-validator@0.8.0+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -19484,9 +19484,11 @@ function documentsRoutes(ctx) {
       await db.updateTable("zv_document_sign_requests").set({ status: "expired" }).where("id", "=", signReq.id).execute();
       return c.json({ error: "Sign token has expired" }, 410);
     }
-    await db.updateTable("zv_document_sign_requests").set({ status: "signed", signed_at: new Date, ip_address: ip }).where("id", "=", signReq.id).execute();
-    await db.updateTable("zv_generated_docs").set({ is_signed: true }).where("id", "=", signReq.document_id).execute();
-    await db.insertInto("zv_document_access_log").values({ document_id: signReq.document_id, ip, action: "sign" }).execute();
+    await db.transaction().execute(async (trx) => {
+      await trx.updateTable("zv_document_sign_requests").set({ status: "signed", signed_at: new Date, ip_address: ip }).where("id", "=", signReq.id).execute();
+      await trx.updateTable("zv_generated_docs").set({ is_signed: true }).where("id", "=", signReq.document_id).execute();
+      await trx.insertInto("zv_document_access_log").values({ document_id: signReq.document_id, ip, action: "sign" }).execute();
+    });
     return c.json({ success: true, signed_at: new Date });
   });
   app.get("/share/:token", async (c) => {
@@ -19533,22 +19535,25 @@ function documentsRoutes(ctx) {
     const htmlContent = renderTemplate(htmlBody, allVariables);
     const pdfBuffer = await generatePDF(htmlContent, { title: `${template.name} ${docNumber}` });
     const expiresAt = data.expires_hours ? new Date(Date.now() + data.expires_hours * 3600 * 1000) : null;
-    const doc2 = await db.insertInto("zv_generated_docs").values({
-      template_id: templateId,
-      template_name: template.name,
-      source_collection: data.source_collection || null,
-      source_record_id: data.source_record_id || null,
-      variables_used: JSON.stringify(allVariables),
-      output_format: data.output_format,
-      document_number: docNumber,
-      generated_by: user.id,
-      expires_at: expiresAt,
-      status: "active"
-    }).returningAll().executeTakeFirst();
-    await db.updateTable("zv_document_templates").set({
-      usage_count: sql`usage_count + 1`,
-      last_used_at: new Date
-    }).where("id", "=", templateId).execute();
+    const doc2 = await db.transaction().execute(async (trx) => {
+      const created = await trx.insertInto("zv_generated_docs").values({
+        template_id: templateId,
+        template_name: template.name,
+        source_collection: data.source_collection || null,
+        source_record_id: data.source_record_id || null,
+        variables_used: JSON.stringify(allVariables),
+        output_format: data.output_format,
+        document_number: docNumber,
+        generated_by: user.id,
+        expires_at: expiresAt,
+        status: "active"
+      }).returningAll().executeTakeFirst();
+      await trx.updateTable("zv_document_templates").set({
+        usage_count: sql`usage_count + 1`,
+        last_used_at: new Date
+      }).where("id", "=", templateId).execute();
+      return created;
+    });
     if (data.output_format === "pdf") {
       const filename = `${template.name.replace(/\s/g, "_")}_${docNumber.replace(/\//g, "-")}.pdf`;
       c.header("Content-Type", "application/pdf");
