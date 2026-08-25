@@ -137,24 +137,36 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
       return c.json({ error: 'Sign token has expired' }, 410);
     }
 
-    await (db as any)
-      .updateTable('zv_document_sign_requests')
-      .set({ status: 'signed', signed_at: new Date(), ip_address: ip })
-      .where('id', '=', signReq.id)
-      .execute();
+    // A signature is one event recorded three times: the request that was
+    // fulfilled, the document that is now signed, and the access log entry that
+    // says who signed it and from where.
+    //
+    // The guard is `status !== 'pending'`, so a request marked signed without
+    // the document being flagged can never be signed again — the signer has
+    // used their one-time token, the document still reads unsigned, and there
+    // is no route that lets them try. And a document flagged signed with no log
+    // entry is a signature with no evidence of who gave it, which for a signed
+    // document is the whole point.
+    await db.transaction().execute(async (trx) => {
+      await (trx as any)
+        .updateTable('zv_document_sign_requests')
+        .set({ status: 'signed', signed_at: new Date(), ip_address: ip })
+        .where('id', '=', signReq.id)
+        .execute();
 
-    // Update document is_signed flag
-    await (db as any)
-      .updateTable('zv_generated_docs')
-      .set({ is_signed: true })
-      .where('id', '=', signReq.document_id)
-      .execute();
+      // Update document is_signed flag
+      await (trx as any)
+        .updateTable('zv_generated_docs')
+        .set({ is_signed: true })
+        .where('id', '=', signReq.document_id)
+        .execute();
 
-    // Log access
-    await (db as any)
-      .insertInto('zv_document_access_log')
-      .values({ document_id: signReq.document_id, ip, action: 'sign' })
-      .execute();
+      // Log access
+      await (trx as any)
+        .insertInto('zv_document_access_log')
+        .values({ document_id: signReq.document_id, ip, action: 'sign' })
+        .execute();
+    });
 
     return c.json({ success: true, signed_at: new Date() });
   });
@@ -248,32 +260,42 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
       ? new Date(Date.now() + data.expires_hours * 3600 * 1000)
       : null;
 
-    const doc = await (db as any)
-      .insertInto('zv_generated_docs')
-      .values({
-        template_id: templateId,
-        template_name: template.name,
-        source_collection: data.source_collection || null,
-        source_record_id: data.source_record_id || null,
-        variables_used: JSON.stringify(allVariables),
-        output_format: data.output_format,
-        document_number: docNumber,
-        generated_by: user.id,
-        expires_at: expiresAt,
-        status: 'active',
-      })
-      .returningAll()
-      .executeTakeFirst();
+    // The document row and the template's usage counter commit together.
+    //
+    // The number was already allocated above by `getNextDocNumber`, which
+    // advances a sequence. Without a transaction a failure here consumes the
+    // number and writes no document — a gap in a numbering series that exists
+    // precisely so there are none, and on a legal document a gap is something
+    // somebody has to explain.
+    const doc = await db.transaction().execute(async (trx) => {
+      const created = await (trx as any)
+        .insertInto('zv_generated_docs')
+        .values({
+          template_id: templateId,
+          template_name: template.name,
+          source_collection: data.source_collection || null,
+          source_record_id: data.source_record_id || null,
+          variables_used: JSON.stringify(allVariables),
+          output_format: data.output_format,
+          document_number: docNumber,
+          generated_by: user.id,
+          expires_at: expiresAt,
+          status: 'active',
+        })
+        .returningAll()
+        .executeTakeFirst();
 
-    // Increment template usage
-    await (db as any)
-      .updateTable('zv_document_templates')
-      .set({
-        usage_count: sql`usage_count + 1`,
-        last_used_at: new Date(),
-      })
-      .where('id', '=', templateId)
-      .execute();
+      // Increment template usage
+      await (trx as any)
+        .updateTable('zv_document_templates')
+        .set({
+          usage_count: sql`usage_count + 1`,
+          last_used_at: new Date(),
+        })
+        .where('id', '=', templateId)
+        .execute();
+      return created;
+    });
 
     if (data.output_format === 'pdf') {
       const filename = `${template.name.replace(/\s/g, '_')}_${docNumber.replace(/\//g, '-')}.pdf`;
