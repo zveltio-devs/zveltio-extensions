@@ -46,6 +46,10 @@ async function mayDecide(ctx: ExtensionContext, user: any): Promise<boolean> {
   return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
 }
 
+/** Thrown so the transaction rolls back — a RETURNED value commits, and the
+ *  register number has already been advanced by then. */
+const NO_REGISTER_NUMBER = Symbol('ro-documents-no-number');
+
 export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
 
@@ -177,62 +181,84 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
       // which was the normal path for every company but the first (see
       // migration 004). An issued number is a legal fact; the register either
       // gives out the next one in the series or the document is not created.
-      let number = body.number;
-      if (!number) {
-        const seq = await sql<{
-          prefix: string;
-          year: number;
-          last_seq: number;
-          format: string;
-        }>`
-          INSERT INTO zv_ro_doc_number_sequences (type, prefix, format, year, last_seq)
-          VALUES (
-            ${body.type},
-            ${DEFAULT_PREFIX[body.type]},
-            '{prefix}-{year}-{seq:4d}',
-            EXTRACT(YEAR FROM NOW())::int,
-            1
-          )
-          ON CONFLICT (tenant_id, type) DO UPDATE
-          SET last_seq = CASE
-                WHEN zv_ro_doc_number_sequences.year = EXCLUDED.year
-                THEN zv_ro_doc_number_sequences.last_seq + 1
-                ELSE 1
-              END,
-              year = EXCLUDED.year,
-              updated_at = NOW()
-          RETURNING prefix, year, last_seq, format
-        `.execute(db);
+      // Claiming the register number and writing the document it belongs to.
+      // The number comes from an upsert that advances a per-year sequence, so
+      // claiming it without writing the document leaves a hole in a register
+      // whose whole purpose is to have none.
+      let doc: Awaited<ReturnType<typeof createDocument>>;
+      const createDocument = () =>
+        db.transaction().execute(async (trx) => {
+        let number = body.number;
+        if (!number) {
+          const seq = await sql<{
+            prefix: string;
+            year: number;
+            last_seq: number;
+            format: string;
+          }>`
+            INSERT INTO zv_ro_doc_number_sequences (type, prefix, format, year, last_seq)
+            VALUES (
+              ${body.type},
+              ${DEFAULT_PREFIX[body.type]},
+              '{prefix}-{year}-{seq:4d}',
+              EXTRACT(YEAR FROM NOW())::int,
+              1
+            )
+            ON CONFLICT (tenant_id, type) DO UPDATE
+            SET last_seq = CASE
+                  WHEN zv_ro_doc_number_sequences.year = EXCLUDED.year
+                  THEN zv_ro_doc_number_sequences.last_seq + 1
+                  ELSE 1
+                END,
+                year = EXCLUDED.year,
+                updated_at = NOW()
+            RETURNING prefix, year, last_seq, format
+          `.execute(trx);
 
-        const claimed = seq.rows[0];
-        if (!claimed) {
-          // Unreachable in practice — the statement above always returns a row —
-          // but a register that cannot number a document must say so rather than
-          // store one without a number.
+          const claimed = seq.rows[0];
+          if (!claimed) {
+            // Unreachable in practice — the statement above always returns a row —
+            // but a register that cannot number a document must say so rather than
+            // store one without a number.
+            // Thrown, not returned: the upsert above has already advanced the
+            // sequence, and returning here would commit that — a register number
+            // consumed by a document that was never created, which in a numbered
+            // register is a gap somebody has to account for.
+            throw NO_REGISTER_NUMBER;
+          }
+          number = claimed.format
+            .replace('{prefix}', claimed.prefix)
+            .replace('{year}', String(claimed.year))
+            .replace(/{seq:(\d+)d}/, (_: string, w: string) =>
+              String(claimed.last_seq).padStart(Number.parseInt(w, 10), '0'),
+            );
+        }
+
+        const doc = await trx
+          .insertInto('zv_ro_documents')
+          .values({
+            ...body,
+            number,
+            parties: JSON.stringify(body.parties),
+            metadata: JSON.stringify(body.metadata),
+            created_by: user.id,
+          })
+          .returningAll()
+          .executeTakeFirst();
+
+          return doc;
+        });
+      try {
+        doc = await createDocument();
+      } catch (err) {
+        if (err === NO_REGISTER_NUMBER) {
           return c.json(
             { error: 'Could not claim a register number; the document was not created' },
             500,
           );
         }
-        number = claimed.format
-          .replace('{prefix}', claimed.prefix)
-          .replace('{year}', String(claimed.year))
-          .replace(/{seq:(\d+)d}/, (_: string, w: string) =>
-            String(claimed.last_seq).padStart(Number.parseInt(w, 10), '0'),
-          );
+        throw err;
       }
-
-      const doc = await db
-        .insertInto('zv_ro_documents')
-        .values({
-          ...body,
-          number,
-          parties: JSON.stringify(body.parties),
-          metadata: JSON.stringify(body.metadata),
-          created_by: user.id,
-        })
-        .returningAll()
-        .executeTakeFirst();
 
       return c.json({ document: doc }, 201);
     },
@@ -265,11 +291,9 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
       // the edit still goes through and the previous version is gone for good —
       // silent, permanent loss of exactly the history this register exists to
       // keep. If the snapshot cannot be written, the edit must not happen.
-      await sql`
-        INSERT INTO zv_ro_document_versions (document_id, version, content, changed_by)
-        VALUES (${existing.id}::uuid, ${existing.version_number}, ${existing.content ?? null}, ${user.id})
-      `.execute(db);
-
+      //
+      // The note above is only true inside a transaction: without one, "the edit
+      // must not happen" is a hope, not a guarantee.
       const updates: any = { updated_at: new Date(), version_number: existing.version_number + 1 };
       if (body.title !== undefined) updates.title = body.title;
       if (body.content !== undefined) updates.content = body.content;
@@ -278,7 +302,18 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
       if (body.internal_notes !== undefined) updates.internal_notes = body.internal_notes;
       if (body.category !== undefined) updates.category = body.category;
 
-      const doc = await db.updateTable('zv_ro_documents').set(updates).where('id', '=', c.req.param('id')).returningAll().executeTakeFirst();
+      const doc = await db.transaction().execute(async (trx) => {
+        await sql`
+          INSERT INTO zv_ro_document_versions (document_id, version, content, changed_by)
+          VALUES (${existing.id}::uuid, ${existing.version_number}, ${existing.content ?? null}, ${user.id})
+        `.execute(trx);
+        return await trx
+          .updateTable('zv_ro_documents')
+          .set(updates)
+          .where('id', '=', c.req.param('id'))
+          .returningAll()
+          .executeTakeFirst();
+      });
       return c.json({ document: doc });
     },
   );
@@ -361,17 +396,20 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
     // Same reasoning as the snapshot on edit, and it matters more here: the
     // restore below replaces the current text wholesale, so a swallowed failure
     // would destroy it with nothing kept back.
-    await sql`
-      INSERT INTO zv_ro_document_versions (document_id, version, content, changed_by, change_note)
-      SELECT id, ${existing.version_number}::int, content, ${user.id}, 'Pre-restore snapshot'
-      FROM zv_ro_documents WHERE id = ${c.req.param('id')}::uuid
-    `.execute(db);
+    const doc = await db.transaction().execute(async (trx) => {
+      await sql`
+        INSERT INTO zv_ro_document_versions (document_id, version, content, changed_by, change_note)
+        SELECT id, ${existing.version_number}::int, content, ${user.id}, 'Pre-restore snapshot'
+        FROM zv_ro_documents WHERE id = ${c.req.param('id')}::uuid
+      `.execute(trx);
 
-    const doc = await db.updateTable('zv_ro_documents')
-      .set({ content: version.rows[0].content, status: 'draft', version_number: existing.version_number + 1, updated_at: new Date() })
-      .where('id', '=', c.req.param('id'))
-      .returningAll()
-      .executeTakeFirst();
+      return await trx
+        .updateTable('zv_ro_documents')
+        .set({ content: version.rows[0].content, status: 'draft', version_number: existing.version_number + 1, updated_at: new Date() })
+        .where('id', '=', c.req.param('id'))
+        .returningAll()
+        .executeTakeFirst();
+    });
 
     return c.json({ document: doc });
   });
