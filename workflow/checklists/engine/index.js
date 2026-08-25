@@ -19490,16 +19490,16 @@ function permissionGate(ctx, resource, opts = {}) {
 function checklistsRoutes(ctx) {
   const { db, auth } = ctx;
   const app = new Hono2;
-  async function scoreChecklist(checklistId) {
-    const checklist = await db.selectFrom("zv_checklists").select(["id", "template_id"]).where("id", "=", checklistId).executeTakeFirst();
+  async function scoreChecklist(trx, checklistId) {
+    const checklist = await trx.selectFrom("zv_checklists").select(["id", "template_id"]).where("id", "=", checklistId).executeTakeFirst();
     if (!checklist?.template_id)
       return;
-    const schemes = await db.selectFrom("zv_checklist_scoring_schemes").selectAll().where("template_id", "=", checklist.template_id).where("is_active", "=", true).execute();
+    const schemes = await trx.selectFrom("zv_checklist_scoring_schemes").selectAll().where("template_id", "=", checklist.template_id).where("is_active", "=", true).execute();
     if (schemes.length === 0)
       return;
-    const items = await db.selectFrom("zv_checklist_items").select(["id", "label", "checked", "template_item_id"]).where("checklist_id", "=", checklistId).execute();
+    const items = await trx.selectFrom("zv_checklist_items").select(["id", "label", "checked", "template_item_id"]).where("checklist_id", "=", checklistId).execute();
     for (const scheme of schemes) {
-      const weights = await db.selectFrom("zv_checklist_scheme_weights").select(["template_item_id", "weight"]).where("scheme_id", "=", scheme.id).execute();
+      const weights = await trx.selectFrom("zv_checklist_scheme_weights").select(["template_item_id", "weight"]).where("scheme_id", "=", scheme.id).execute();
       const byItem = new Map(weights.map((w) => [w.template_item_id, Number(w.weight)]));
       let earned = 0;
       let possible = 0;
@@ -19763,29 +19763,34 @@ function checklistsRoutes(ctx) {
       updateSet.assignee_user_id = assignee_user_id;
     if (due_at !== undefined)
       updateSet.due_at = new Date(due_at);
-    const item = await db.updateTable("zv_checklist_items").set(updateSet).where("id", "=", c.req.param("itemId")).returningAll().executeTakeFirst();
+    const item = await db.transaction().execute(async (trx) => {
+      const item2 = await trx.updateTable("zv_checklist_items").set(updateSet).where("id", "=", c.req.param("itemId")).returningAll().executeTakeFirst();
+      if (!item2)
+        return null;
+      if (checked !== undefined) {
+        const allItems = await trx.selectFrom("zv_checklist_items").selectAll().where("checklist_id", "=", item2.checklist_id).execute();
+        const allRequiredChecked = allItems.filter((i) => i.required).every((i) => i.checked);
+        const checklist = await trx.selectFrom("zv_checklists").selectAll().where("id", "=", item2.checklist_id).executeTakeFirst();
+        if (allRequiredChecked && checklist && !checklist.completed_at) {
+          let timeToComplete = null;
+          if (checklist.created_at) {
+            timeToComplete = Math.round((now.getTime() - new Date(checklist.created_at).getTime()) / 60000);
+          }
+          await trx.updateTable("zv_checklists").set({
+            completed_at: now,
+            updated_at: now,
+            completed_by: user.id,
+            time_to_complete_minutes: timeToComplete
+          }).where("id", "=", item2.checklist_id).where("completed_at", "is", null).execute();
+        } else if (!allRequiredChecked) {
+          await trx.updateTable("zv_checklists").set({ completed_at: null, updated_at: now }).where("id", "=", item2.checklist_id).execute();
+        }
+      }
+      await scoreChecklist(trx, item2.checklist_id);
+      return item2;
+    });
     if (!item)
       return c.json({ error: "Item not found" }, 404);
-    if (checked !== undefined) {
-      const allItems = await db.selectFrom("zv_checklist_items").selectAll().where("checklist_id", "=", item.checklist_id).execute();
-      const allRequiredChecked = allItems.filter((i) => i.required).every((i) => i.checked);
-      const checklist = await db.selectFrom("zv_checklists").selectAll().where("id", "=", item.checklist_id).executeTakeFirst();
-      if (allRequiredChecked && checklist && !checklist.completed_at) {
-        let timeToComplete = null;
-        if (checklist.created_at) {
-          timeToComplete = Math.round((now.getTime() - new Date(checklist.created_at).getTime()) / 60000);
-        }
-        await db.updateTable("zv_checklists").set({
-          completed_at: now,
-          updated_at: now,
-          completed_by: user.id,
-          time_to_complete_minutes: timeToComplete
-        }).where("id", "=", item.checklist_id).where("completed_at", "is", null).execute();
-      } else if (!allRequiredChecked) {
-        await db.updateTable("zv_checklists").set({ completed_at: null, updated_at: now }).where("id", "=", item.checklist_id).execute();
-      }
-    }
-    await scoreChecklist(item.checklist_id);
     return c.json({ item });
   });
   app.post("/items/bulk-check", zValidator("json", exports_external.object({
@@ -19802,27 +19807,30 @@ function checklistsRoutes(ctx) {
       checked_by: checked ? user.id : null,
       checked_at: checked ? now : null
     };
-    const updatedItems = await Promise.all(item_ids.map(async (itemId) => {
-      const item = await db.updateTable("zv_checklist_items").set(updateSet).where("id", "=", itemId).returningAll().executeTakeFirst();
-      return item;
-    }));
-    const validItems = updatedItems.filter(Boolean);
-    const affectedChecklistIds = [...new Set(validItems.map((i) => i.checklist_id))];
-    for (const checklistId of affectedChecklistIds) {
-      const allItems = await db.selectFrom("zv_checklist_items").selectAll().where("checklist_id", "=", checklistId).execute();
-      const allRequiredChecked = allItems.filter((i) => i.required).every((i) => i.checked);
-      const checklist = await db.selectFrom("zv_checklists").selectAll().where("id", "=", checklistId).executeTakeFirst();
-      if (allRequiredChecked && checklist && !checklist.completed_at) {
-        let timeToComplete = null;
-        if (checklist.created_at) {
-          timeToComplete = Math.round((now.getTime() - new Date(checklist.created_at).getTime()) / 60000);
-        }
-        await db.updateTable("zv_checklists").set({ completed_at: now, updated_at: now, completed_by: user.id, time_to_complete_minutes: timeToComplete }).where("id", "=", checklistId).where("completed_at", "is", null).execute();
-        await scoreChecklist(checklistId);
-      } else if (!allRequiredChecked) {
-        await db.updateTable("zv_checklists").set({ completed_at: null, updated_at: now }).where("id", "=", checklistId).execute();
+    const validItems = await db.transaction().execute(async (trx) => {
+      const updatedItems = [];
+      for (const itemId of item_ids) {
+        updatedItems.push(await trx.updateTable("zv_checklist_items").set(updateSet).where("id", "=", itemId).returningAll().executeTakeFirst());
       }
-    }
+      const validItems2 = updatedItems.filter(Boolean);
+      const affectedChecklistIds = [...new Set(validItems2.map((i) => i.checklist_id))];
+      for (const checklistId of affectedChecklistIds) {
+        const allItems = await trx.selectFrom("zv_checklist_items").selectAll().where("checklist_id", "=", checklistId).execute();
+        const allRequiredChecked = allItems.filter((i) => i.required).every((i) => i.checked);
+        const checklist = await trx.selectFrom("zv_checklists").selectAll().where("id", "=", checklistId).executeTakeFirst();
+        if (allRequiredChecked && checklist && !checklist.completed_at) {
+          let timeToComplete = null;
+          if (checklist.created_at) {
+            timeToComplete = Math.round((now.getTime() - new Date(checklist.created_at).getTime()) / 60000);
+          }
+          await trx.updateTable("zv_checklists").set({ completed_at: now, updated_at: now, completed_by: user.id, time_to_complete_minutes: timeToComplete }).where("id", "=", checklistId).where("completed_at", "is", null).execute();
+          await scoreChecklist(trx, checklistId);
+        } else if (!allRequiredChecked) {
+          await trx.updateTable("zv_checklists").set({ completed_at: null, updated_at: now }).where("id", "=", checklistId).execute();
+        }
+      }
+      return validItems2;
+    });
     return c.json({ updated: validItems.length, items: validItems });
   });
   app.get("/overdue-items", async (c) => {
@@ -19907,38 +19915,41 @@ function checklistsRoutes(ctx) {
         const templateData = await db.selectFrom("zv_checklist_templates").selectAll().where("id", "=", schedule.template_id).executeTakeFirst();
         if (!templateData)
           continue;
-        const checklist = await db.insertInto("zv_checklists").values({
-          template_id: schedule.template_id,
-          collection: schedule.collection,
-          record_id: schedule.record_id,
-          name: `${templateData.name} (${now.toLocaleDateString()})`,
-          created_by: schedule.created_by
-        }).returningAll().executeTakeFirst();
-        if (templateItems.length > 0) {
-          await db.insertInto("zv_checklist_items").values(templateItems.map((item, i) => ({
-            checklist_id: checklist.id,
-            label: item.label,
-            description: item.description,
-            required: item.required ?? false,
-            order_idx: item.order_idx ?? i
-          }))).execute();
-        }
-        const nextRun = new Date(schedule.next_run_at);
-        switch (schedule.frequency) {
-          case "daily":
-            nextRun.setDate(nextRun.getDate() + 1);
-            break;
-          case "weekly":
-            nextRun.setDate(nextRun.getDate() + 7);
-            break;
-          case "monthly":
-            nextRun.setMonth(nextRun.getMonth() + 1);
-            break;
-          case "quarterly":
-            nextRun.setMonth(nextRun.getMonth() + 3);
-            break;
-        }
-        await db.updateTable("zv_checklist_recurrence").set({ last_run_at: now, next_run_at: nextRun }).where("id", "=", schedule.id).execute();
+        const checklist = await db.transaction().execute(async (trx) => {
+          const checklist2 = await trx.insertInto("zv_checklists").values({
+            template_id: schedule.template_id,
+            collection: schedule.collection,
+            record_id: schedule.record_id,
+            name: `${templateData.name} (${now.toLocaleDateString()})`,
+            created_by: schedule.created_by
+          }).returningAll().executeTakeFirst();
+          if (templateItems.length > 0) {
+            await trx.insertInto("zv_checklist_items").values(templateItems.map((item, i) => ({
+              checklist_id: checklist2.id,
+              label: item.label,
+              description: item.description,
+              required: item.required ?? false,
+              order_idx: item.order_idx ?? i
+            }))).execute();
+          }
+          const nextRun = new Date(schedule.next_run_at);
+          switch (schedule.frequency) {
+            case "daily":
+              nextRun.setDate(nextRun.getDate() + 1);
+              break;
+            case "weekly":
+              nextRun.setDate(nextRun.getDate() + 7);
+              break;
+            case "monthly":
+              nextRun.setMonth(nextRun.getMonth() + 1);
+              break;
+            case "quarterly":
+              nextRun.setMonth(nextRun.getMonth() + 3);
+              break;
+          }
+          await trx.updateTable("zv_checklist_recurrence").set({ last_run_at: now, next_run_at: nextRun }).where("id", "=", schedule.id).execute();
+          return checklist2;
+        });
         created.push({ schedule_id: schedule.id, checklist_id: checklist.id });
       } catch (err) {
         console.error(`Failed to trigger recurrence ${schedule.id}:`, err.message);
