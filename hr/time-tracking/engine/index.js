@@ -19779,27 +19779,30 @@ function timeTrackingRoutes(ctx) {
     const p = project.rows[0];
     const dueDate = new Date(d.invoice_date);
     dueDate.setDate(dueDate.getDate() + d.due_days);
-    const inv = await sql`
-      INSERT INTO zvd_invoices (number, client_name, issue_date, due_date, subtotal, total, currency, notes, status, created_by)
-      VALUES (
-        'INV-' || to_char(NOW(), 'YYYYMMDD') || '-' || LPAD((SELECT COUNT(*) + 1 FROM zvd_invoices)::TEXT, 4, '0'),
-        ${d.client_name ?? p.client_name ?? ""},
-        ${d.invoice_date}, ${dueDate.toISOString().slice(0, 10)},
-        ${total}, ${total}, ${p.currency}, ${d.notes ?? null}, 'draft', ${user.id}
-      ) RETURNING *
-    `.execute(db);
-    const invId = inv.rows[0].id;
-    for (const e of entries.rows) {
-      const hours = e.duration_minutes / 60;
+    const inv = await db.transaction().execute(async (trx) => {
+      const inv2 = await sql`
+        INSERT INTO zvd_invoices (number, client_name, issue_date, due_date, subtotal, total, currency, notes, status, created_by)
+        VALUES (
+          'INV-' || to_char(NOW(), 'YYYYMMDD') || '-' || LPAD((SELECT COUNT(*) + 1 FROM zvd_invoices)::TEXT, 4, '0'),
+          ${d.client_name ?? p.client_name ?? ""},
+          ${d.invoice_date}, ${dueDate.toISOString().slice(0, 10)},
+          ${total}, ${total}, ${p.currency}, ${d.notes ?? null}, 'draft', ${user.id}
+        ) RETURNING *
+      `.execute(trx);
+      const invId = inv2.rows[0].id;
+      for (const e of entries.rows) {
+        const hours = e.duration_minutes / 60;
+        await sql`
+          INSERT INTO zvd_invoice_lines (invoice_id, description, quantity, unit_price, total)
+          VALUES (${invId}, ${e.task_description || "Time entry"}, ${hours}, ${e.hourly_rate}, ${e.amount})
+        `.execute(trx);
+      }
       await sql`
-        INSERT INTO zvd_invoice_lines (invoice_id, description, quantity, unit_price, total)
-        VALUES (${invId}, ${e.task_description || "Time entry"}, ${hours}, ${e.hourly_rate}, ${e.amount})
-      `.execute(db);
-    }
-    await sql`
-      UPDATE zvd_time_entries SET is_billed = true, invoice_id = ${invId}, updated_at = NOW()
-      WHERE id IN (${sql.join(d.entry_ids.map((id) => sql`${id}`), sql`, `)})
-    `.execute(db);
+        UPDATE zvd_time_entries SET is_billed = true, invoice_id = ${invId}, updated_at = NOW()
+        WHERE id IN (${sql.join(d.entry_ids.map((id) => sql`${id}`), sql`, `)})
+      `.execute(trx);
+      return inv2;
+    });
     return c.json({ data: inv.rows[0] }, 201);
   });
   app.get("/timesheets", async (c) => {

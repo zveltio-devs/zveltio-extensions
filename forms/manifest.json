@@ -3,7 +3,7 @@
   "displayName": "Form Builder",
   "category": "forms",
   "description": "Drag-and-drop form builder with public submission endpoints",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-forms",
@@ -43,7 +43,7 @@
     "fieldTypes": []
   },
   "integrity": {
-    "engineSha256": "a70c75046ac4febbbd9682d70ec44ab69d940120f3df10d3a906dad7c0915607",
-    "sourceSha256": "07278736c462c8dd0a0c0688f5b1412b05b994d04abfd55ba7f89a7bebdbeb9b"
+    "engineSha256": "797ceebdfc30d574263971ae6a41ddb3e59fd3d1db9e809bfacef71d537154a6",
+    "sourceSha256": "fe2902b4ab096dacdb0a2dc7840e3f7c489ae136104d75263cf8c3e1de531d8e"
   }
 }

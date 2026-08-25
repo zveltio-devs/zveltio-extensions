@@ -340,29 +340,38 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
     const p = project.rows[0] as any;
     const dueDate = new Date(d.invoice_date);
     dueDate.setDate(dueDate.getDate() + d.due_days);
-    // Create invoice via invoicing module tables
-    const inv = await sql`
-      INSERT INTO zvd_invoices (number, client_name, issue_date, due_date, subtotal, total, currency, notes, status, created_by)
-      VALUES (
-        'INV-' || to_char(NOW(), 'YYYYMMDD') || '-' || LPAD((SELECT COUNT(*) + 1 FROM zvd_invoices)::TEXT, 4, '0'),
-        ${d.client_name ?? p.client_name ?? ''},
-        ${d.invoice_date}, ${dueDate.toISOString().slice(0, 10)},
-        ${total}, ${total}, ${p.currency}, ${d.notes ?? null}, 'draft', ${user.id}
-      ) RETURNING *
-    `.execute(db);
-    const invId = (inv.rows[0] as any).id;
-    for (const e of entries.rows as any[]) {
-      const hours = e.duration_minutes / 60;
+    // The invoice, its lines, and the time entries it bills.
+    //
+    // The guard is `is_billed = false`, so entries marked billed without an
+    // invoice can never be billed again — the hours were worked, the client is
+    // never asked to pay for them, and nothing surfaces the gap. The reverse
+    // sends an invoice whose lines do not add up to its total.
+    const inv = await db.transaction().execute(async (trx) => {
+      // Create invoice via invoicing module tables
+      const inv = await sql`
+        INSERT INTO zvd_invoices (number, client_name, issue_date, due_date, subtotal, total, currency, notes, status, created_by)
+        VALUES (
+          'INV-' || to_char(NOW(), 'YYYYMMDD') || '-' || LPAD((SELECT COUNT(*) + 1 FROM zvd_invoices)::TEXT, 4, '0'),
+          ${d.client_name ?? p.client_name ?? ''},
+          ${d.invoice_date}, ${dueDate.toISOString().slice(0, 10)},
+          ${total}, ${total}, ${p.currency}, ${d.notes ?? null}, 'draft', ${user.id}
+        ) RETURNING *
+      `.execute(trx);
+      const invId = (inv.rows[0] as any).id;
+      for (const e of entries.rows as any[]) {
+        const hours = e.duration_minutes / 60;
+        await sql`
+          INSERT INTO zvd_invoice_lines (invoice_id, description, quantity, unit_price, total)
+          VALUES (${invId}, ${e.task_description || 'Time entry'}, ${hours}, ${e.hourly_rate}, ${e.amount})
+        `.execute(trx);
+      }
+      // Mark entries as billed
       await sql`
-        INSERT INTO zvd_invoice_lines (invoice_id, description, quantity, unit_price, total)
-        VALUES (${invId}, ${e.task_description || 'Time entry'}, ${hours}, ${e.hourly_rate}, ${e.amount})
-      `.execute(db);
-    }
-    // Mark entries as billed
-    await sql`
-      UPDATE zvd_time_entries SET is_billed = true, invoice_id = ${invId}, updated_at = NOW()
-      WHERE id IN (${sql.join(d.entry_ids.map(id => sql`${id}`), sql`, `)})
-    `.execute(db);
+        UPDATE zvd_time_entries SET is_billed = true, invoice_id = ${invId}, updated_at = NOW()
+        WHERE id IN (${sql.join(d.entry_ids.map(id => sql`${id}`), sql`, `)})
+      `.execute(trx);
+      return inv;
+    });
     return c.json({ data: inv.rows[0] }, 201);
   });
 
