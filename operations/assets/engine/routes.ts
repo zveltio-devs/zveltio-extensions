@@ -100,35 +100,45 @@ export function assetsRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
-    const row = await sql`
-      INSERT INTO zvd_assets (name, code, category, description, serial_number, location,
-        purchase_date, purchase_cost, current_value, useful_life_years, residual_value,
-        depreciation_method, warranty_expiry, depreciation_account_id, accumulated_dep_account_id, created_by)
-      VALUES (${d.name}, ${d.asset_code ?? null}, ${d.category ?? null}, ${d.description ?? null},
-        ${d.serial_number ?? null}, ${d.location ?? null}, ${d.purchase_date}, ${d.purchase_cost},
-        ${d.purchase_cost}, ${d.useful_life_years}, ${d.residual_value}, ${d.depreciation_method},
-        ${d.warranty_expiry ?? null}, ${d.depreciation_account_id ?? null}, ${d.accumulated_dep_account_id ?? null}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    const asset = row.rows[0] as any;
-    // Pre-compute depreciation schedule
-    const annualRate = d.depreciation_method === 'straight_line'
-      ? (d.purchase_cost - d.residual_value) / d.useful_life_years : null;
-    const decliningRate = d.depreciation_method === 'declining_balance' ? 2 / d.useful_life_years : null;
-    let bookValue = d.purchase_cost;
-    for (let year = 1; year <= d.useful_life_years; year++) {
-      const periodDate = new Date(d.purchase_date);
-      periodDate.setFullYear(periodDate.getFullYear() + year);
-      let amount: number;
-      if (d.depreciation_method === 'straight_line') {
-        amount = annualRate!;
-      } else {
-        amount = Math.max(bookValue * decliningRate!, 0);
-        if (bookValue - amount < d.residual_value) amount = Math.max(bookValue - d.residual_value, 0);
+    // The asset and its depreciation schedule are created together.
+    //
+    // The schedule is computed here, once, for the asset's whole useful life. An
+    // asset that lands without it never depreciates: it sits on the books at
+    // purchase cost for years, and `POST /:id/post-depreciation` has nothing to
+    // post because there is no period row to find. Nothing reports an error —
+    // the asset looks fine, it is simply never written down.
+    const asset = await db.transaction().execute(async (trx) => {
+      const row = await sql`
+        INSERT INTO zvd_assets (name, code, category, description, serial_number, location,
+          purchase_date, purchase_cost, current_value, useful_life_years, residual_value,
+          depreciation_method, warranty_expiry, depreciation_account_id, accumulated_dep_account_id, created_by)
+        VALUES (${d.name}, ${d.asset_code ?? null}, ${d.category ?? null}, ${d.description ?? null},
+          ${d.serial_number ?? null}, ${d.location ?? null}, ${d.purchase_date}, ${d.purchase_cost},
+          ${d.purchase_cost}, ${d.useful_life_years}, ${d.residual_value}, ${d.depreciation_method},
+          ${d.warranty_expiry ?? null}, ${d.depreciation_account_id ?? null}, ${d.accumulated_dep_account_id ?? null}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      const asset = row.rows[0] as any;
+      // Pre-compute depreciation schedule
+      const annualRate = d.depreciation_method === 'straight_line'
+        ? (d.purchase_cost - d.residual_value) / d.useful_life_years : null;
+      const decliningRate = d.depreciation_method === 'declining_balance' ? 2 / d.useful_life_years : null;
+      let bookValue = d.purchase_cost;
+      for (let year = 1; year <= d.useful_life_years; year++) {
+        const periodDate = new Date(d.purchase_date);
+        periodDate.setFullYear(periodDate.getFullYear() + year);
+        let amount: number;
+        if (d.depreciation_method === 'straight_line') {
+          amount = annualRate!;
+        } else {
+          amount = Math.max(bookValue * decliningRate!, 0);
+          if (bookValue - amount < d.residual_value) amount = Math.max(bookValue - d.residual_value, 0);
+        }
+        bookValue = Math.max(bookValue - amount, d.residual_value);
+        await sql`INSERT INTO zvd_asset_depreciation (asset_id, period, amount, book_value_after) VALUES (${asset.id}, ${periodDate.toISOString().slice(0, 10)}, ${amount}, ${bookValue})`.execute(trx);
       }
-      bookValue = Math.max(bookValue - amount, d.residual_value);
-      await sql`INSERT INTO zvd_asset_depreciation (asset_id, period, amount, book_value_after) VALUES (${asset.id}, ${periodDate.toISOString().slice(0, 10)}, ${amount}, ${bookValue})`.execute(db);
-    }
+      return asset;
+    });
     return c.json({ data: asset }, 201);
   });
 
@@ -171,17 +181,29 @@ export function assetsRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'Asset must have depreciation_account_id and accumulated_dep_account_id set' }, 400);
     }
     // Create journal entry
-    const entry = await sql`
-      INSERT INTO zvd_journal_entries (date, description, reference, created_by)
-      VALUES (${d.journal_date ?? d.period_date}, ${'Depreciation: ' + depRow.asset_name}, ${'DEP-' + depRow.id}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    const entryId = (entry.rows[0] as any).id;
-    await sql`INSERT INTO zvd_journal_lines (entry_id, account_id, debit, credit, description) VALUES (${entryId}, ${depRow.depreciation_account_id}, ${depRow.amount}, 0, ${'Depreciation expense'})`.execute(db);
-    await sql`INSERT INTO zvd_journal_lines (entry_id, account_id, debit, credit, description) VALUES (${entryId}, ${depRow.accumulated_dep_account_id}, 0, ${depRow.amount}, ${'Accumulated depreciation'})`.execute(db);
-    await sql`UPDATE zvd_journal_entries SET status = 'posted' WHERE id = ${entryId}`.execute(db);
-    await sql`UPDATE zvd_asset_depreciation SET is_posted = true, journal_entry_id = ${entryId} WHERE id = ${depRow.id}`.execute(db);
-    await sql`UPDATE zvd_assets SET accumulated_depreciation = accumulated_depreciation + ${depRow.amount}, current_value = ${depRow.book_value_after}, updated_at = NOW() WHERE id = ${c.req.param('id')}`.execute(db);
+    // Double-entry, so the debit and the credit are not two writes — they are one
+    // posting that happens to need two rows. A journal entry left with one line
+    // does not balance, and nothing in the ledger will ever balance again until
+    // someone finds it by hand.
+    //
+    // The three updates after them belong to the same posting: an entry marked
+    // `posted` whose depreciation row still reads unposted gets posted a second
+    // time, and the asset's accumulated depreciation moves without a journal
+    // behind it. Six statements, one fact.
+    const entry = await db.transaction().execute(async (trx) => {
+      const created = await sql`
+        INSERT INTO zvd_journal_entries (date, description, reference, created_by)
+        VALUES (${d.journal_date ?? d.period_date}, ${'Depreciation: ' + depRow.asset_name}, ${'DEP-' + depRow.id}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      const entryId = (created.rows[0] as any).id;
+      await sql`INSERT INTO zvd_journal_lines (entry_id, account_id, debit, credit, description) VALUES (${entryId}, ${depRow.depreciation_account_id}, ${depRow.amount}, 0, ${'Depreciation expense'})`.execute(trx);
+      await sql`INSERT INTO zvd_journal_lines (entry_id, account_id, debit, credit, description) VALUES (${entryId}, ${depRow.accumulated_dep_account_id}, 0, ${depRow.amount}, ${'Accumulated depreciation'})`.execute(trx);
+      await sql`UPDATE zvd_journal_entries SET status = 'posted' WHERE id = ${entryId}`.execute(trx);
+      await sql`UPDATE zvd_asset_depreciation SET is_posted = true, journal_entry_id = ${entryId} WHERE id = ${depRow.id}`.execute(trx);
+      await sql`UPDATE zvd_assets SET accumulated_depreciation = accumulated_depreciation + ${depRow.amount}, current_value = ${depRow.book_value_after}, updated_at = NOW() WHERE id = ${c.req.param('id')}`.execute(trx);
+      return created;
+    });
     return c.json({ data: entry.rows[0] }, 201);
   });
 
@@ -215,12 +237,18 @@ export function assetsRoutes(ctx: ExtensionContext): Hono {
     const asset = await sql`SELECT location FROM zvd_assets WHERE id = ${c.req.param('id')}`.execute(db);
     if (!asset.rows.length) return c.json({ error: 'Not found' }, 404);
     const fromLocation = (asset.rows[0] as any).location;
-    await sql`UPDATE zvd_assets SET location = ${d.to_location}, updated_at = NOW() WHERE id = ${c.req.param('id')}`.execute(db);
-    const row = await sql`
-      INSERT INTO zvd_asset_transfers (asset_id, from_location, to_location, transfer_date, reason, transferred_by)
-      VALUES (${c.req.param('id')}, ${fromLocation ?? null}, ${d.to_location}, ${d.transfer_date}, ${d.reason ?? null}, ${user.id})
-      RETURNING *
-    `.execute(db);
+    // Moving the asset and recording the move are one act. Apart, either the
+    // asset is somewhere with no record of how it got there — an audit trail with
+    // a hole exactly where someone will ask — or a transfer logged against an
+    // asset that never moved.
+    const row = await db.transaction().execute(async (trx) => {
+      await sql`UPDATE zvd_assets SET location = ${d.to_location}, updated_at = NOW() WHERE id = ${c.req.param('id')}`.execute(trx);
+      return await sql`
+        INSERT INTO zvd_asset_transfers (asset_id, from_location, to_location, transfer_date, reason, transferred_by)
+        VALUES (${c.req.param('id')}, ${fromLocation ?? null}, ${d.to_location}, ${d.transfer_date}, ${d.reason ?? null}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+    });
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -257,12 +285,19 @@ export function assetsRoutes(ctx: ExtensionContext): Hono {
     const asset = await sql`SELECT current_value FROM zvd_assets WHERE id = ${c.req.param('id')}`.execute(db);
     if (!asset.rows.length) return c.json({ error: 'Not found' }, 404);
     const prev = (asset.rows[0] as any).current_value;
-    const rev = await sql`
-      INSERT INTO zvd_asset_revaluations (asset_id, revaluation_date, previous_value, new_value, method, notes, created_by)
-      VALUES (${c.req.param('id')}, ${d.revaluation_date}, ${prev}, ${d.new_value}, ${d.method}, ${d.notes ?? null}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    await sql`UPDATE zvd_assets SET current_value = ${d.new_value}, updated_at = NOW() WHERE id = ${c.req.param('id')}`.execute(db);
+    // The revaluation record IS the justification for the new value. An asset
+    // whose value moved with no revaluation behind it is a balance-sheet figure
+    // nobody can explain; a revaluation with no value change is a decision that
+    // never took effect.
+    const rev = await db.transaction().execute(async (trx) => {
+      const inserted = await sql`
+        INSERT INTO zvd_asset_revaluations (asset_id, revaluation_date, previous_value, new_value, method, notes, created_by)
+        VALUES (${c.req.param('id')}, ${d.revaluation_date}, ${prev}, ${d.new_value}, ${d.method}, ${d.notes ?? null}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      await sql`UPDATE zvd_assets SET current_value = ${d.new_value}, updated_at = NOW() WHERE id = ${c.req.param('id')}`.execute(trx);
+      return inserted;
+    });
     return c.json({ data: rev.rows[0] });
   });
 
@@ -277,14 +312,20 @@ export function assetsRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
-    const row = await sql`
-      INSERT INTO zvd_asset_maintenance (asset_id, scheduled_date, type, description, cost, performed_by, created_by)
-      VALUES (${c.req.param('id')}, ${d.date}, ${d.type}, ${d.description}, ${d.cost}, ${d.performed_by ?? null}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    if (d.next_maintenance_date) {
-      await sql`UPDATE zvd_assets SET next_maintenance_date = ${d.next_maintenance_date}, updated_at = NOW() WHERE id = ${c.req.param('id')}`.execute(db);
-    }
+    // Recording the service and scheduling the next one are one decision. Apart,
+    // the asset keeps a due date that already passed, or loses the schedule it
+    // was just given — and nothing about a maintenance record looks wrong.
+    const row = await db.transaction().execute(async (trx) => {
+      const inserted = await sql`
+        INSERT INTO zvd_asset_maintenance (asset_id, scheduled_date, type, description, cost, performed_by, created_by)
+        VALUES (${c.req.param('id')}, ${d.date}, ${d.type}, ${d.description}, ${d.cost}, ${d.performed_by ?? null}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      if (d.next_maintenance_date) {
+        await sql`UPDATE zvd_assets SET next_maintenance_date = ${d.next_maintenance_date}, updated_at = NOW() WHERE id = ${c.req.param('id')}`.execute(trx);
+      }
+      return inserted;
+    });
     return c.json({ data: row.rows[0] }, 201);
   });
 
