@@ -175,17 +175,23 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
     role: string | undefined,
     isPrimary: boolean,
   ): Promise<void> {
-    if (isPrimary) {
+    // Demoting the old primary organisation and writing the new link are one
+    // change. Split, the contact belongs to organisations but to none of them
+    // primarily — and the primary is what every list, invoice and mail-merge
+    // reads when it needs "the company this person is at".
+    await db.transaction().execute(async (trx) => {
+      if (isPrimary) {
+        await sql`
+          UPDATE zvd_contact_organizations SET is_primary = FALSE WHERE contact_id = ${contactId}
+        `.execute(trx);
+      }
       await sql`
-        UPDATE zvd_contact_organizations SET is_primary = FALSE WHERE contact_id = ${contactId}
-      `.execute(db);
-    }
-    await sql`
-      INSERT INTO zvd_contact_organizations (contact_id, organization_id, role, is_primary)
-      VALUES (${contactId}, ${organizationId}, ${role ?? null}, ${isPrimary})
-      ON CONFLICT (contact_id, organization_id)
-      DO UPDATE SET role = EXCLUDED.role, is_primary = EXCLUDED.is_primary
-    `.execute(db);
+        INSERT INTO zvd_contact_organizations (contact_id, organization_id, role, is_primary)
+        VALUES (${contactId}, ${organizationId}, ${role ?? null}, ${isPrimary})
+        ON CONFLICT (contact_id, organization_id)
+        DO UPDATE SET role = EXCLUDED.role, is_primary = EXCLUDED.is_primary
+      `.execute(trx);
+    });
   }
 
   app.post('/contacts',
