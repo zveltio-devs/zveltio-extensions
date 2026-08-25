@@ -102,26 +102,49 @@ export interface StripeEvent {
  * idempotency is not optional — without it a flaky network turns into
  * duplicate state changes.
  */
+/**
+ * True if this event id had not been seen before.
+ *
+ * The `try/catch` that used to wrap this is gone on purpose. The claim now runs
+ * inside the same transaction as the state change, and Postgres refuses every
+ * statement after a failed one until the transaction ends — so swallowing the
+ * error here would not contain it, it would just move the failure to the update
+ * below and report it as something else. The missing-table degradation this
+ * catch existed for is handled by the caller, which can retry outside the
+ * transaction because it has not written anything yet.
+ */
 async function claimStripeEventId(db: Database, eventId: string): Promise<boolean> {
-  try {
-    // INSERT ON CONFLICT DO NOTHING — atomic, no race. The table is
-    // expected to exist (created in the billing migration); if it
-    // doesn't, fall through and accept the event but log.
-    const result = await (db as any)
-      .insertInto('zv_billing_webhook_events')
-      .values({ event_id: eventId, received_at: new Date() })
-      .onConflict((oc: any) => oc.column('event_id').doNothing())
-      .executeTakeFirst();
-    // numAffectedRows on INSERT … ON CONFLICT DO NOTHING: 0 means dupe,
-    // 1 means new. Different dialects expose this differently — accept
-    // both shapes.
-    const inserted = Number((result as any)?.numAffectedRows ?? (result as any)?.numInsertedOrUpdatedRows ?? 0);
-    return inserted > 0;
-  } catch (err) {
-    console.warn('[stripe-client] event-id dedupe table missing or unreachable — processing anyway:', (err as Error).message);
-    return true;
-  }
+  // INSERT ON CONFLICT DO NOTHING — atomic, no race.
+  const result = await (db as any)
+    .insertInto('zv_billing_webhook_events')
+    .values({ event_id: eventId, received_at: new Date() })
+    .onConflict((oc: any) => oc.column('event_id').doNothing())
+    .executeTakeFirst();
+  // numAffectedRows on INSERT … ON CONFLICT DO NOTHING: 0 means dupe,
+  // 1 means new. Different dialects expose this differently — accept
+  // both shapes.
+  const inserted = Number((result as any)?.numAffectedRows ?? (result as any)?.numInsertedOrUpdatedRows ?? 0);
+  return inserted > 0;
 }
+
+/** Postgres 42P01 — undefined_table. Bun's SQL driver reports SQLSTATE on
+ *  `errno` rather than `code`, so both are checked. */
+function isMissingTable(err: unknown): boolean {
+  const e = err as { code?: string; errno?: string; message?: string };
+  // Anchored on purpose. Postgres words a missing COLUMN as
+  // `column "x" of relation "y" does not exist`, which an unanchored
+  // `relation .* does not exist` matches happily — and did, sending a plain
+  // schema mismatch down the degraded path where the event is applied with no
+  // dedupe at all. Only `relation "y" does not exist` is an absent table.
+  return (
+    e?.code === '42P01' ||
+    e?.errno === '42P01' ||
+    /^relation "[^"]+" does not exist/i.test(e?.message ?? '')
+  );
+}
+
+/** A sentinel, not an error condition: the event was already applied. */
+const ALREADY_APPLIED = Symbol('stripe-event-already-applied');
 
 export async function handleWebhook(
   rawBody: string,
@@ -146,15 +169,46 @@ export async function handleWebhook(
 
   if (!_db) return { handled: true, event };
 
-  // Idempotency — refuse duplicate event ids. Stripe retries on 5xx and
-  // legitimately may replay; without dedupe we'd re-apply state
-  // transitions (e.g. mark a sub canceled twice, billing the operator's
-  // ops team twice in audit terms).
-  const isNew = await claimStripeEventId(_db, event.id);
-  if (!isNew) {
-    return { handled: true, event };
+  // Idempotency and the state change it guards are ONE act.
+  //
+  // The claim used to be committed before the switch ran. A state change that
+  // failed after it left the event id recorded as processed, so Stripe's retry
+  // — the thing that is supposed to make this recoverable — was deduped away
+  // and dropped. The subscription then keeps a status the payment processor has
+  // already moved on from: still `active` after a failed payment, still
+  // `past_due` after a successful one. Nothing in the system disagrees with
+  // itself loudly enough to notice, and the operator finds out from the
+  // customer.
+  //
+  // Rolled back together, the claim is released and the retry does its job.
+  try {
+    await (_db as any).transaction().execute(async (trx: Database) => {
+      const isNew = await claimStripeEventId(trx, event.id);
+      if (!isNew) throw ALREADY_APPLIED;
+      await applyStripeEvent(trx, event);
+    });
+  } catch (err) {
+    if (err === ALREADY_APPLIED) return { handled: true, event };
+    if (isMissingTable(err)) {
+      // The dedupe table is created by the billing migration. If it is absent
+      // the event is still worth applying — but say so, because every replay
+      // Stripe sends will now be applied again.
+      console.warn(
+        '[stripe-client] event-id dedupe table missing — applying without dedupe:',
+        (err as Error).message,
+      );
+      await applyStripeEvent(_db, event);
+      return { handled: true, event };
+    }
+    throw err;
   }
 
+  return { handled: true, event };
+}
+
+/** The state change a Stripe event asks for. Takes a handle so it can run
+ *  inside `handleWebhook`'s transaction, or on its own when dedupe is absent. */
+async function applyStripeEvent(dbh: Database, event: StripeEvent): Promise<void> {
   const obj = event.data.object as any;
 
   switch (event.type) {
@@ -169,7 +223,7 @@ export async function handleWebhook(
         ? new Date((obj.current_period_end as number) * 1000)
         : null;
 
-      await (_db as any)
+      await (dbh as any)
         .updateTable('zv_billing_subscriptions')
         .set({
           status: newStatus,
@@ -185,7 +239,7 @@ export async function handleWebhook(
     case 'invoice.payment_succeeded': {
       const stripeSubId = obj.subscription as string;
       if (stripeSubId) {
-        await (_db as any)
+        await (dbh as any)
           .updateTable('zv_billing_subscriptions')
           .set({ status: 'active', updated_at: new Date() })
           .where('stripe_subscription_id', '=', stripeSubId)
@@ -197,7 +251,7 @@ export async function handleWebhook(
     case 'invoice.payment_failed': {
       const stripeSubId = obj.subscription as string;
       if (stripeSubId) {
-        await (_db as any)
+        await (dbh as any)
           .updateTable('zv_billing_subscriptions')
           .set({ status: 'past_due', updated_at: new Date() })
           .where('stripe_subscription_id', '=', stripeSubId)
@@ -206,6 +260,4 @@ export async function handleWebhook(
       break;
     }
   }
-
-  return { handled: true, event };
 }

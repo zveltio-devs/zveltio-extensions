@@ -1732,7 +1732,7 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
+// ../../zveltio/node_modules/.bun/@hono+zod-validator@0.8.0+acc63ba32095a493/node_modules/@hono/zod-validator/dist/index.js
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
@@ -19500,15 +19500,15 @@ async function verifyStripeSignature(rawBody, signature, secret) {
   return { valid: true, timestamp };
 }
 async function claimStripeEventId(db, eventId) {
-  try {
-    const result = await db.insertInto("zv_billing_webhook_events").values({ event_id: eventId, received_at: new Date }).onConflict((oc) => oc.column("event_id").doNothing()).executeTakeFirst();
-    const inserted = Number(result?.numAffectedRows ?? result?.numInsertedOrUpdatedRows ?? 0);
-    return inserted > 0;
-  } catch (err) {
-    console.warn("[stripe-client] event-id dedupe table missing or unreachable \u2014 processing anyway:", err.message);
-    return true;
-  }
+  const result = await db.insertInto("zv_billing_webhook_events").values({ event_id: eventId, received_at: new Date }).onConflict((oc) => oc.column("event_id").doNothing()).executeTakeFirst();
+  const inserted = Number(result?.numAffectedRows ?? result?.numInsertedOrUpdatedRows ?? 0);
+  return inserted > 0;
 }
+function isMissingTable(err) {
+  const e = err;
+  return e?.code === "42P01" || e?.errno === "42P01" || /^relation "[^"]+" does not exist/i.test(e?.message ?? "");
+}
+var ALREADY_APPLIED = Symbol("stripe-event-already-applied");
 async function handleWebhook(rawBody, signature, secret) {
   const sig = await verifyStripeSignature(rawBody, signature, secret);
   if (!sig.valid) {
@@ -19525,10 +19525,26 @@ async function handleWebhook(rawBody, signature, secret) {
   }
   if (!_db2)
     return { handled: true, event };
-  const isNew = await claimStripeEventId(_db2, event.id);
-  if (!isNew) {
-    return { handled: true, event };
+  try {
+    await _db2.transaction().execute(async (trx) => {
+      const isNew = await claimStripeEventId(trx, event.id);
+      if (!isNew)
+        throw ALREADY_APPLIED;
+      await applyStripeEvent(trx, event);
+    });
+  } catch (err) {
+    if (err === ALREADY_APPLIED)
+      return { handled: true, event };
+    if (isMissingTable(err)) {
+      console.warn("[stripe-client] event-id dedupe table missing \u2014 applying without dedupe:", err.message);
+      await applyStripeEvent(_db2, event);
+      return { handled: true, event };
+    }
+    throw err;
   }
+  return { handled: true, event };
+}
+async function applyStripeEvent(dbh, event) {
   const obj = event.data.object;
   switch (event.type) {
     case "customer.subscription.updated":
@@ -19537,7 +19553,7 @@ async function handleWebhook(rawBody, signature, secret) {
       const newStatus = event.type === "customer.subscription.deleted" ? "canceled" : obj.status;
       const periodStart = obj.current_period_start ? new Date(obj.current_period_start * 1000) : null;
       const periodEnd = obj.current_period_end ? new Date(obj.current_period_end * 1000) : null;
-      await _db2.updateTable("zv_billing_subscriptions").set({
+      await dbh.updateTable("zv_billing_subscriptions").set({
         status: newStatus,
         current_period_start: periodStart,
         current_period_end: periodEnd,
@@ -19548,19 +19564,18 @@ async function handleWebhook(rawBody, signature, secret) {
     case "invoice.payment_succeeded": {
       const stripeSubId = obj.subscription;
       if (stripeSubId) {
-        await _db2.updateTable("zv_billing_subscriptions").set({ status: "active", updated_at: new Date }).where("stripe_subscription_id", "=", stripeSubId).execute();
+        await dbh.updateTable("zv_billing_subscriptions").set({ status: "active", updated_at: new Date }).where("stripe_subscription_id", "=", stripeSubId).execute();
       }
       break;
     }
     case "invoice.payment_failed": {
       const stripeSubId = obj.subscription;
       if (stripeSubId) {
-        await _db2.updateTable("zv_billing_subscriptions").set({ status: "past_due", updated_at: new Date }).where("stripe_subscription_id", "=", stripeSubId).execute();
+        await dbh.updateTable("zv_billing_subscriptions").set({ status: "past_due", updated_at: new Date }).where("stripe_subscription_id", "=", stripeSubId).execute();
       }
       break;
     }
   }
-  return { handled: true, event };
 }
 
 // engine/routes.ts
