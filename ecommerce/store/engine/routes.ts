@@ -255,60 +255,84 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     // becomes a storefront overlay (slug, SEO, images) on top of the canonical row.
     let canonicalProductId: string | null = null;
     const findBySku = ctx.services.get<(sku: string) => Promise<any | null>>('inventory.products.findBySku');
-    if (findBySku) {
-      try {
-        const existing = await findBySku(d.sku);
-        if (existing) {
-          canonicalProductId = existing.id;
-        } else {
-          // Create canonical product directly via the extension's writable db
-          // Best-effort, and therefore inside a SAVEPOINT.
-          //
-          // The `.catch(() => null)` below looks like it contains a failure. It
-          // does not: a statement that errors inside a transaction ABORTS that
-          // transaction, so the catch swallowed the cause and the NEXT insert —
-          // the storefront row this endpoint exists to write — died with
-          // "current transaction is aborted". Creating a product answered 500
-          // while the comment promised a storefront-only product was fine.
-          //
-          // And the reason it failed at all: `zvd_products.created_by` is NOT
-          // NULL with no default, and this INSERT never supplied it. So the
-          // canonical product was never created, the storefront product was
-          // never linked to inventory, and the savepoint quietly rolled it back
-          // every single time — the feature this block exists for has never
-          // worked on any install.
-          //
-          // Writing another extension's table directly is what makes that
-          // possible: `inventory` owns this schema, and nothing checks that a
-          // caller from outside still satisfies it. The savepoint makes the
-          // fallback actually fall back; the coupling is worth revisiting.
-          await sql`SAVEPOINT canonical_product`.execute(db);
-          const create = await sql<any>`
-            INSERT INTO zvd_products (sku, name, description, sale_price, currency, tax_rate, is_active, created_by)
-            VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === 'active'}, ${user.id})
-            ON CONFLICT (tenant_id, sku) DO UPDATE SET name = EXCLUDED.name
-            RETURNING id
-          `.execute(db);
-          if (create === null) {
-            await sql`ROLLBACK TO SAVEPOINT canonical_product`.execute(db);
+    // This handler uses a SAVEPOINT, and a savepoint outside a transaction is an
+    // error in Postgres — it worked only because the tenant transaction happened
+    // to span the request. Asking for the transaction here is what keeps the
+    // fallback below legal once that boundary moves.
+    //
+    // The canonical product and the storefront product are also one creation:
+    // linking a shop item to inventory after the fact means finding it by SKU
+    // and hoping nobody edited either side in between.
+    const row = await db.transaction().execute(async (trx) => {
+      if (findBySku) {
+        try {
+          const existing = await findBySku(d.sku);
+          if (existing) {
+            canonicalProductId = existing.id;
           } else {
-            await sql`RELEASE SAVEPOINT canonical_product`.execute(db);
+            // Create canonical product directly via the extension's writable db
+            // Best-effort, and therefore inside a SAVEPOINT.
+            //
+            // The `.catch(() => null)` below looks like it contains a failure. It
+            // does not: a statement that errors inside a transaction ABORTS that
+            // transaction, so the catch swallowed the cause and the NEXT insert —
+            // the storefront row this endpoint exists to write — died with
+            // "current transaction is aborted". Creating a product answered 500
+            // while the comment promised a storefront-only product was fine.
+            //
+            // And the reason it failed at all: `zvd_products.created_by` is NOT
+            // NULL with no default, and this INSERT never supplied it. So the
+            // canonical product was never created, the storefront product was
+            // never linked to inventory, and the savepoint quietly rolled it back
+            // every single time — the feature this block exists for has never
+            // worked on any install.
+            //
+            // Writing another extension's table directly is what makes that
+            // possible: `inventory` owns this schema, and nothing checks that a
+            // caller from outside still satisfies it. The savepoint makes the
+            // fallback actually fall back; the coupling is worth revisiting.
+            // The savepoint is rolled back on a THROW, which is the only way this
+            // insert reports failure. The previous version rolled back on
+            // `create === null` — a value `.execute()` never returns — so the real
+            // error path skipped both the ROLLBACK and the RELEASE and left the
+            // transaction aborted. The storefront insert below then died with
+            // "current transaction is aborted", which is exactly the outcome the
+            // savepoint was added to prevent.
+            await sql`SAVEPOINT canonical_product`.execute(trx);
+            try {
+              const create = await sql<any>`
+                INSERT INTO zvd_products (sku, name, description, sale_price, currency, tax_rate, is_active, created_by)
+                VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === 'active'}, ${user.id})
+                ON CONFLICT (tenant_id, sku) DO UPDATE SET name = EXCLUDED.name
+                RETURNING id
+              `.execute(trx);
+              await sql`RELEASE SAVEPOINT canonical_product`.execute(trx);
+              canonicalProductId = create?.rows[0]?.id ?? null;
+            } catch (err) {
+              await sql`ROLLBACK TO SAVEPOINT canonical_product`.execute(trx);
+              console.warn(
+                '[store] canonical product not created — the storefront product will not be linked to inventory:',
+                (err as Error).message,
+              );
+              canonicalProductId = null;
+            }
           }
-          canonicalProductId = create?.rows[0]?.id ?? null;
-        }
-      } catch { /* inventory may be unavailable; storefront-only product is fine */ }
-    }
+        } catch { /* inventory may be unavailable; storefront-only product is fine */ }
+      }
 
-    const row = await sql`
-      INSERT INTO zvd_ec_products (name, slug, sku, canonical_product_id, description, short_description, category_id, price, compare_price, cost, currency,
-        tax_rate, stock_qty, track_stock, allow_backorder, weight, images, tags, attributes, status, is_featured, digital_file_url, created_by)
-      VALUES (${d.name}, ${d.slug}, ${d.sku}, ${canonicalProductId}, ${d.description ?? null}, ${d.short_description ?? null}, ${d.category_id ?? null},
-        ${d.price}, ${d.compare_price ?? null}, ${d.cost ?? null}, ${d.currency}, ${d.tax_rate},
-        ${d.stock_qty}, ${d.track_stock}, ${d.allow_backorder}, ${d.weight ?? null},
-        ${JSON.stringify(d.images)}::text::jsonb, ${d.tags}, '{}', ${d.status}, ${d.is_featured},
-        ${d.digital_file_url ?? null}, ${user.id})
-      RETURNING *
-    `.execute(db);
+      const row = await sql`
+        INSERT INTO zvd_ec_products (name, slug, sku, canonical_product_id, description, short_description, category_id, price, compare_price, cost, currency,
+          tax_rate, stock_qty, track_stock, allow_backorder, weight, images, tags, attributes, status, is_featured, digital_file_url, created_by)
+        VALUES (${d.name}, ${d.slug}, ${d.sku}, ${canonicalProductId}, ${d.description ?? null}, ${d.short_description ?? null}, ${d.category_id ?? null},
+          ${d.price}, ${d.compare_price ?? null}, ${d.cost ?? null}, ${d.currency}, ${d.tax_rate},
+          ${d.stock_qty}, ${d.track_stock}, ${d.allow_backorder}, ${d.weight ?? null},
+          ${JSON.stringify(d.images)}::text::jsonb, ${d.tags}, '{}', ${d.status}, ${d.is_featured},
+          ${d.digital_file_url ?? null}, ${user.id})
+        RETURNING *
+      `.execute(trx);
+      return row;
+    });
+
     return c.json({ data: row.rows[0] }, 201);
   });
 
@@ -516,100 +540,112 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
       subtotal += lineTotal;
       lineData.push({ product_id: p.id, variant_id: variantId, product_name: p.name, sku, quantity: line.quantity, unit_price: price, tax_rate: +p.tax_rate, total: lineTotal });
     }
-    // Apply coupon
-    let discount = 0;
-    let couponCode = d.coupon_code ?? null;
-    if (d.coupon_code) {
-      const coupon = await sql`
-        SELECT * FROM zvd_ec_coupons WHERE code = ${d.coupon_code} AND is_active = true
-          AND (valid_until IS NULL OR valid_until > NOW())
-          AND (max_uses IS NULL OR used_count < max_uses)
-          AND (min_order_amount IS NULL OR ${subtotal} >= min_order_amount)
-      `.execute(db);
-      if (coupon.rows.length) {
-        const cp = coupon.rows[0] as any;
-        discount = cp.type === 'percent' ? subtotal * +cp.value / 100 : Math.min(+cp.value, subtotal);
-        await sql`UPDATE zvd_ec_coupons SET used_count = used_count + 1 WHERE id = ${cp.id}`.execute(db);
-      }
-    }
-    // Shipping cost
-    let shippingCost = 0;
-    let shippingZoneId = null;
-    if (d.shipping_rate_id) {
-      const rate = await sql`SELECT r.*, z.id as zone_id FROM zvd_ec_shipping_rates r JOIN zvd_ec_shipping_zones z ON z.id = r.zone_id WHERE r.id = ${d.shipping_rate_id} AND r.is_active = true`.execute(db);
-      if (rate.rows.length) {
-        shippingCost = +(rate.rows[0] as any).price;
-        shippingZoneId = (rate.rows[0] as any).zone_id;
-      }
-    }
-    const taxAmount = lineData.reduce((s, l) => s + l.total * l.tax_rate / 100, 0);
-    const total = Math.max(0, subtotal - discount + taxAmount + shippingCost);
-    const cnt = await sql`SELECT COUNT(*) as cnt FROM zvd_ec_orders`.execute(db);
-    const orderNumber = `ORD-${String(+(cnt.rows[0] as any).cnt + 1).padStart(6, '0')}`;
-
-    // If CRM is active, find or create a canonical contact for this order's email.
-    // The shopper becomes a CRM contact; future invoices, support tickets, marketing
-    // see the same identity.
-    let canonicalContactId: string | null = null;
-    if (d.customer_email) {
-      const lookup = ctx.services.get<(email: string) => Promise<any | null>>('crm.contacts.findByEmail');
-      const create = ctx.services.get<(input: any) => Promise<any>>('crm.contacts.create');
-      if (lookup && create) {
-        try {
-          let contact = await lookup(d.customer_email);
-          if (!contact) {
-            const [first_name, ...rest] = (d.customer_name || d.customer_email).split(' ');
-            contact = await create({
-              first_name: first_name || d.customer_email,
-              last_name: rest.join(' ') || null,
-              email: d.customer_email,
-              // See the same site in operations/pos. 'system' is not a user id,
-              // and `zvd_contacts.created_by` references "user"(id) on any install
-              // whose contacts table came through the engine's DDL manager.
-              created_by: user?.id,
-            });
-          }
-          canonicalContactId = contact?.id ?? null;
-        } catch (err) {
-          // Not silent. A database error here aborts the request transaction, so
-          // the next statement answers 25P02 and the order fails entirely — the
-          // opposite of the graceful degradation this catch was written for. The
-          // log is what tells an operator which of the two happened.
-          console.warn(
-            `[ecommerce/store] could not link ${d.customer_email} to a CRM contact; the order is recorded without one:`,
-            err instanceof Error ? err.message : err,
-          );
+    // Everything from the coupon to the order's last line is one purchase, and
+    // the coupon is why the boundary starts HERE rather than at the insert.
+    //
+    // `used_count` is incremented before the order exists. Written alone, a
+    // single-use voucher is spent on an order that was never placed: the
+    // customer paid nothing, received nothing, and the code they were given no
+    // longer works. Stock is the same shape — decremented for an order that
+    // does not exist, the units are simply gone from the shop.
+    const order = await db.transaction().execute(async (trx) => {
+      // Apply coupon
+      let discount = 0;
+      let couponCode = d.coupon_code ?? null;
+      if (d.coupon_code) {
+        const coupon = await sql`
+          SELECT * FROM zvd_ec_coupons WHERE code = ${d.coupon_code} AND is_active = true
+            AND (valid_until IS NULL OR valid_until > NOW())
+            AND (max_uses IS NULL OR used_count < max_uses)
+            AND (min_order_amount IS NULL OR ${subtotal} >= min_order_amount)
+        `.execute(trx);
+        if (coupon.rows.length) {
+          const cp = coupon.rows[0] as any;
+          discount = cp.type === 'percent' ? subtotal * +cp.value / 100 : Math.min(+cp.value, subtotal);
+          await sql`UPDATE zvd_ec_coupons SET used_count = used_count + 1 WHERE id = ${cp.id}`.execute(trx);
         }
       }
-    }
-
-    const order = await sql`
-      INSERT INTO zvd_ec_orders (order_number, customer_email, customer_name, canonical_contact_id, billing_address, shipping_address,
-        payment_method, currency, subtotal, shipping_cost, discount, tax_amount, total,
-        coupon_code, shipping_zone_id, notes, created_by)
-      VALUES (${orderNumber}, ${d.customer_email}, ${d.customer_name}, ${canonicalContactId}, ${JSON.stringify(d.billing_address)},
-        ${JSON.stringify(d.shipping_address)}, ${d.payment_method ?? null}, ${d.currency},
-        ${subtotal}, ${shippingCost}, ${discount}, ${taxAmount}, ${total},
-        ${couponCode}, ${shippingZoneId}, ${d.notes ?? null}, 'guest')
-      RETURNING *
-    `.execute(db);
-    const orderId = (order.rows[0] as any).id;
-    for (const line of lineData) {
-      await sql`
-        INSERT INTO zvd_ec_order_items (order_id, product_id, variant_id, product_name, sku, quantity, unit_price, tax_rate, total)
-        VALUES (${orderId}, ${line.product_id}, ${line.variant_id}, ${line.product_name}, ${line.sku ?? null},
-          ${line.quantity}, ${line.unit_price}, ${line.tax_rate}, ${line.total})
-      `.execute(db);
-      if (line.variant_id) {
-        await sql`UPDATE zvd_ec_product_variants SET stock_qty = stock_qty - ${line.quantity} WHERE id = ${line.variant_id}`.execute(db);
-      } else {
-        await sql`UPDATE zvd_ec_products SET stock_qty = stock_qty - ${line.quantity}, updated_at = NOW() WHERE id = ${line.product_id}`.execute(db);
+      // Shipping cost
+      let shippingCost = 0;
+      let shippingZoneId = null;
+      if (d.shipping_rate_id) {
+        const rate = await sql`SELECT r.*, z.id as zone_id FROM zvd_ec_shipping_rates r JOIN zvd_ec_shipping_zones z ON z.id = r.zone_id WHERE r.id = ${d.shipping_rate_id} AND r.is_active = true`.execute(trx);
+        if (rate.rows.length) {
+          shippingCost = +(rate.rows[0] as any).price;
+          shippingZoneId = (rate.rows[0] as any).zone_id;
+        }
       }
-    }
-    // Mark cart as recovered
-    if (d.session_id) {
-      await sql`UPDATE zvd_ec_abandoned_carts SET recovered_at = NOW() WHERE session_id = ${d.session_id}`.execute(db);
-    }
+      const taxAmount = lineData.reduce((s, l) => s + l.total * l.tax_rate / 100, 0);
+      const total = Math.max(0, subtotal - discount + taxAmount + shippingCost);
+      const cnt = await sql`SELECT COUNT(*) as cnt FROM zvd_ec_orders`.execute(trx);
+      const orderNumber = `ORD-${String(+(cnt.rows[0] as any).cnt + 1).padStart(6, '0')}`;
+
+      // If CRM is active, find or create a canonical contact for this order's email.
+      // The shopper becomes a CRM contact; future invoices, support tickets, marketing
+      // see the same identity.
+      let canonicalContactId: string | null = null;
+      if (d.customer_email) {
+        const lookup = ctx.services.get<(email: string) => Promise<any | null>>('crm.contacts.findByEmail');
+        const create = ctx.services.get<(input: any) => Promise<any>>('crm.contacts.create');
+        if (lookup && create) {
+          try {
+            let contact = await lookup(d.customer_email);
+            if (!contact) {
+              const [first_name, ...rest] = (d.customer_name || d.customer_email).split(' ');
+              contact = await create({
+                first_name: first_name || d.customer_email,
+                last_name: rest.join(' ') || null,
+                email: d.customer_email,
+                // See the same site in operations/pos. 'system' is not a user id,
+                // and `zvd_contacts.created_by` references "user"(id) on any install
+                // whose contacts table came through the engine's DDL manager.
+                created_by: user?.id,
+              });
+            }
+            canonicalContactId = contact?.id ?? null;
+          } catch (err) {
+            // Not silent. A database error here aborts the request transaction, so
+            // the next statement answers 25P02 and the order fails entirely — the
+            // opposite of the graceful degradation this catch was written for. The
+            // log is what tells an operator which of the two happened.
+            console.warn(
+              `[ecommerce/store] could not link ${d.customer_email} to a CRM contact; the order is recorded without one:`,
+              err instanceof Error ? err.message : err,
+            );
+          }
+        }
+      }
+
+      const order = await sql`
+        INSERT INTO zvd_ec_orders (order_number, customer_email, customer_name, canonical_contact_id, billing_address, shipping_address,
+          payment_method, currency, subtotal, shipping_cost, discount, tax_amount, total,
+          coupon_code, shipping_zone_id, notes, created_by)
+        VALUES (${orderNumber}, ${d.customer_email}, ${d.customer_name}, ${canonicalContactId}, ${JSON.stringify(d.billing_address)},
+          ${JSON.stringify(d.shipping_address)}, ${d.payment_method ?? null}, ${d.currency},
+          ${subtotal}, ${shippingCost}, ${discount}, ${taxAmount}, ${total},
+          ${couponCode}, ${shippingZoneId}, ${d.notes ?? null}, 'guest')
+        RETURNING *
+      `.execute(trx);
+      const orderId = (order.rows[0] as any).id;
+      for (const line of lineData) {
+        await sql`
+          INSERT INTO zvd_ec_order_items (order_id, product_id, variant_id, product_name, sku, quantity, unit_price, tax_rate, total)
+          VALUES (${orderId}, ${line.product_id}, ${line.variant_id}, ${line.product_name}, ${line.sku ?? null},
+            ${line.quantity}, ${line.unit_price}, ${line.tax_rate}, ${line.total})
+        `.execute(trx);
+        if (line.variant_id) {
+          await sql`UPDATE zvd_ec_product_variants SET stock_qty = stock_qty - ${line.quantity} WHERE id = ${line.variant_id}`.execute(trx);
+        } else {
+          await sql`UPDATE zvd_ec_products SET stock_qty = stock_qty - ${line.quantity}, updated_at = NOW() WHERE id = ${line.product_id}`.execute(trx);
+        }
+      }
+      // Mark cart as recovered
+      if (d.session_id) {
+        await sql`UPDATE zvd_ec_abandoned_carts SET recovered_at = NOW() WHERE session_id = ${d.session_id}`.execute(trx);
+      }
+      return order;
+    });
+
     return c.json({ data: order.rows[0] }, 201);
   });
 
@@ -713,16 +749,25 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     status: z.enum(['approved','rejected']),
   })), async (c) => {
     const { status } = c.req.valid('json');
-    const row = await sql`UPDATE zvd_ec_product_reviews SET status = ${status} WHERE id = ${c.req.param('id')} RETURNING *`.execute(db);
-    if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
-    // Update product avg_rating
-    const productId = (row.rows[0] as any).product_id;
-    await sql`
-      UPDATE zvd_ec_products SET
-        avg_rating = (SELECT ROUND(AVG(rating), 2) FROM zvd_ec_product_reviews WHERE product_id = ${productId} AND status = 'approved'),
-        review_count = (SELECT COUNT(*) FROM zvd_ec_product_reviews WHERE product_id = ${productId} AND status = 'approved')
-      WHERE id = ${productId}
-    `.execute(db);
+    // The review's status and the product's rating are the same fact: the
+    // averages are computed FROM `status = 'approved'`. Split, the product shows
+    // a star rating and a review count that its own approved reviews do not
+    // produce, and nothing recomputes them until the next moderation — which may
+    // be never for a product with one review.
+    const row = await db.transaction().execute(async (trx) => {
+      const updated = await sql`UPDATE zvd_ec_product_reviews SET status = ${status} WHERE id = ${c.req.param('id')} RETURNING *`.execute(trx);
+      if (!updated.rows.length) return null;
+      // Update product avg_rating
+      const productId = (updated.rows[0] as any).product_id;
+      await sql`
+        UPDATE zvd_ec_products SET
+          avg_rating = (SELECT ROUND(AVG(rating), 2) FROM zvd_ec_product_reviews WHERE product_id = ${productId} AND status = 'approved'),
+          review_count = (SELECT COUNT(*) FROM zvd_ec_product_reviews WHERE product_id = ${productId} AND status = 'approved')
+        WHERE id = ${productId}
+      `.execute(trx);
+      return updated;
+    });
+    if (!row) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
   });
 
