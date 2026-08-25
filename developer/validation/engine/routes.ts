@@ -530,20 +530,29 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
         continue;
       }
 
+      // One transaction per rule, so the per-rule catch below means something.
+      //
+      // Without it, a rule that fails on a constraint aborts the surrounding
+      // transaction, and every rule after it fails too — while this loop
+      // collects them into `errors` as if each had been judged on its own. The
+      // caller gets a list saying nineteen rules were individually invalid when
+      // one was.
       try {
-        await (db as any)
-          .insertInto('zv_validation_rules')
-          .values({
-            collection,
-            field_name: rule.field_name,
-            rule_type: rule.rule_type,
-            nl_description: rule.nl_description || null,
-            rule_config: JSON.stringify(rule.rule_config),
-            error_message: rule.error_message,
-            is_active: true,
-            created_by: user.id,
-          })
-          .execute();
+        await db.transaction().execute(async (trx) => {
+          await (trx as any)
+            .insertInto('zv_validation_rules')
+            .values({
+              collection,
+              field_name: rule.field_name,
+              rule_type: rule.rule_type,
+              nl_description: rule.nl_description || null,
+              rule_config: JSON.stringify(rule.rule_config),
+              error_message: rule.error_message,
+              is_active: true,
+              created_by: user.id,
+            })
+            .execute();
+        });
         importedCount++;
       } catch (err: any) {
         failedCount++;
