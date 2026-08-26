@@ -255,7 +255,25 @@ async function executeLocalActions(
   `.execute(db);
   const here = loc.rows[0];
 
-  for (const action of actions) {
+  for (const [i, action] of actions.entries()) {
+    // A SAVEPOINT per action, so the `catch` below contains something.
+    //
+    // Inside a transaction Postgres refuses every statement after a failed one,
+    // so without this the first rule that errors takes down every rule after it
+    // — while the loop keeps going and logs each of them as its own failure.
+    // The operator reads five broken filters where there was one.
+    //
+    // Attempted, not assumed: `SAVEPOINT` is an error outside a transaction, and
+    // this function is also reachable from paths that autocommit. There the
+    // catch already contains, so no savepoint is needed.
+    const sp = `sieve_action_${i}`;
+    let savepoint = false;
+    try {
+      await sql.raw(`SAVEPOINT ${sp}`).execute(db);
+      savepoint = true;
+    } catch {
+      savepoint = false;
+    }
     try {
       switch (action.type) {
         case 'mark_read':
@@ -291,7 +309,17 @@ async function executeLocalActions(
           await sql`DELETE FROM zv_mail_messages WHERE id = ${msgId}`.execute(db);
           break;
       }
+      if (savepoint) await sql.raw(`RELEASE SAVEPOINT ${sp}`).execute(db);
     } catch (err) {
+      // Undo just this action, leaving the transaction usable for the next one.
+      if (savepoint) {
+        await sql
+          .raw(`ROLLBACK TO SAVEPOINT ${sp}`)
+          .execute(db)
+          // If even this fails the transaction is beyond saving; the warning
+          // below is then the only thing that can still be said.
+          .catch(() => undefined);
+      }
       // One rule failing must not stop the rest, but it is no longer silent:
       // "the filter did nothing and said nothing" is the defect this file exists
       // to end, and a swallow here would reintroduce it one level down.
