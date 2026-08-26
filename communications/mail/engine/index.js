@@ -62819,7 +62819,15 @@ async function executeLocalActions(db, account, msgId, actions2) {
     WHERE m.id = ${msgId}
   `.execute(db);
   const here = loc.rows[0];
-  for (const action of actions2) {
+  for (const [i, action] of actions2.entries()) {
+    const sp = `sieve_action_${i}`;
+    let savepoint = false;
+    try {
+      await sql.raw(`SAVEPOINT ${sp}`).execute(db);
+      savepoint = true;
+    } catch {
+      savepoint = false;
+    }
     try {
       switch (action.type) {
         case "mark_read":
@@ -62852,7 +62860,14 @@ async function executeLocalActions(db, account, msgId, actions2) {
           await sql`DELETE FROM zv_mail_messages WHERE id = ${msgId}`.execute(db);
           break;
       }
+      if (savepoint)
+        await sql.raw(`RELEASE SAVEPOINT ${sp}`).execute(db);
     } catch (err) {
+      if (savepoint) {
+        await sql.raw(`ROLLBACK TO SAVEPOINT ${sp}`).execute(db).catch(() => {
+          return;
+        });
+      }
       console.warn(`[mail] filter action "${action.type}" failed for message ${msgId}:`, err.message);
     }
   }
