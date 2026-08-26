@@ -20218,6 +20218,17 @@ function efacturaRoutes(ctx) {
     const cif = String(authz.cfg.seller_cif || invoice.seller_cui || "").replace(/^RO/i, "");
     if (!cif)
       return c.json({ error: "No filing CIF configured." }, 400);
+    const claimed = await sql`
+      UPDATE zv_efactura_invoices SET status = 'submitting', updated_at = NOW()
+      WHERE id = ${invoice.id} AND status = 'xml_generated'
+      RETURNING id
+    `.execute(db);
+    if (claimed.rows.length === 0) {
+      return c.json({
+        error: "This invoice is not ready to send, or a submission is already in progress. " + "Reload to see its current state.",
+        submitted: false
+      }, 409);
+    }
     const url2 = `${anafApi(authz.cfg.environment)}/upload?standard=UBL&cif=${encodeURIComponent(cif)}`;
     let body;
     let status;
@@ -20232,12 +20243,23 @@ function efacturaRoutes(ctx) {
       body = await res.text();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return c.json({ error: `Could not reach ANAF: ${msg}`, submitted: false }, 502);
+      await sql`
+        UPDATE zv_efactura_invoices
+        SET anaf_response = ${JSON.stringify(`Upload outcome unknown: ${msg}`)}::text::jsonb, updated_at = NOW()
+        WHERE id = ${invoice.id}
+      `.execute(db);
+      return c.json({
+        error: `Could not reach ANAF: ${msg}`,
+        detail: 'The invoice is left as "submitting" because it is not known whether ANAF ' + "received it. Check the ANAF message list before sending again \u2014 resending " + "a filed invoice creates a duplicate that has to be corrected by storno.",
+        submitted: false,
+        state: "unknown"
+      }, 502);
     }
     const index = /index_incarcare\s*=\s*"([^"]+)"/i.exec(body)?.[1];
     if (status < 200 || status >= 300 || !index) {
       await sql`
-        UPDATE zv_efactura_invoices SET anaf_response = ${body.slice(0, 2000)}, updated_at = NOW()
+        UPDATE zv_efactura_invoices
+        SET status = 'xml_generated', anaf_response = ${JSON.stringify(body.slice(0, 2000))}::text::jsonb, updated_at = NOW()
         WHERE id = ${invoice.id}
       `.execute(db);
       return c.json({ error: `ANAF rejected the upload (HTTP ${status})`, detail: body.slice(0, 600), submitted: false }, 400);
@@ -20246,7 +20268,7 @@ function efacturaRoutes(ctx) {
       await sql`
         UPDATE zv_efactura_invoices SET
           status = 'submitted', anaf_index = ${index},
-          anaf_response = ${body.slice(0, 2000)}, updated_at = NOW()
+          anaf_response = ${JSON.stringify(body.slice(0, 2000))}::text::jsonb, updated_at = NOW()
         WHERE id = ${invoice.id}
       `.execute(trx);
       await logStatusChange(trx, invoice.id, invoice.status, "submitted", user.id, `ANAF index: ${index}`);
@@ -20286,7 +20308,7 @@ function efacturaRoutes(ctx) {
       if (stare === "ok" || stare === "nok") {
         await sql`
           UPDATE zv_efactura_invoices SET status = ${stare === "ok" ? "accepted" : "rejected"},
-            anaf_response = ${text.slice(0, 2000)}, updated_at = NOW()
+            anaf_response = ${JSON.stringify(text.slice(0, 2000))}::text::jsonb, updated_at = NOW()
           WHERE id = ${inv.id}
         `.execute(db);
         await logStatusChange(db, inv.id, inv.status, stare === "ok" ? "accepted" : "rejected", user.id);

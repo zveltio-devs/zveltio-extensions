@@ -726,6 +726,41 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     const cif = String(authz.cfg.seller_cif || invoice.seller_cui || '').replace(/^RO/i, '');
     if (!cif) return c.json({ error: 'No filing CIF configured.' }, 400);
 
+    // `anaf_response` is jsonb and ANAF answers in XML, so every write here has
+    // to be JSON-encoded first. `${text}` alone is raw text and Postgres refuses
+    // it: "invalid input syntax for type json". That was true of the success
+    // path too, which means a submission ANAF ACCEPTED still ended in a 500 and
+    // the invoice never reached `submitted` — found by the idempotency test
+    // below, not by anything that exercised the happy path.
+    //
+    // `::text::jsonb`, not `::jsonb`: a single cast on a string parameter is a
+    // no-op, the same trap documented in the mail module.
+    // Claim the invoice BEFORE the upload, and refuse if somebody else already
+    // holds it.
+    //
+    // Without this, the failure below at `Could not reach ANAF` left the invoice
+    // on `xml_generated` — which is exactly the state the Send button is visible
+    // in. A 60-second timeout is not "it did not happen", it is "I do not know",
+    // and ANAF may well have the invoice. The operator, seeing an error, presses
+    // Send again and files it a SECOND time. A duplicate at the tax authority is
+    // undone by storno, which shows on the VAT return and has to be explained.
+    const claimed = await sql<{ id: string }>`
+      UPDATE zv_efactura_invoices SET status = 'submitting', updated_at = NOW()
+      WHERE id = ${invoice.id} AND status = 'xml_generated'
+      RETURNING id
+    `.execute(db);
+    if (claimed.rows.length === 0) {
+      return c.json(
+        {
+          error:
+            'This invoice is not ready to send, or a submission is already in progress. ' +
+            'Reload to see its current state.',
+          submitted: false,
+        },
+        409,
+      );
+    }
+
     const url = `${anafApi(authz.cfg.environment)}/upload?standard=UBL&cif=${encodeURIComponent(cif)}`;
     let body: string;
     let status: number;
@@ -740,7 +775,28 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
       body = await res.text();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return c.json({ error: `Could not reach ANAF: ${msg}`, submitted: false }, 502);
+      // The claim is deliberately NOT released. Whether ANAF received the upload
+      // is unknown, and the only safe move is to look rather than resend: the
+      // invoice stays `submitting` and `GET /anaf/messages` says whether it
+      // arrived. Releasing it here would hand the operator a Send button for an
+      // invoice that may already be filed.
+      await sql`
+        UPDATE zv_efactura_invoices
+        SET anaf_response = ${JSON.stringify(`Upload outcome unknown: ${msg}`)}::text::jsonb, updated_at = NOW()
+        WHERE id = ${invoice.id}
+      `.execute(db);
+      return c.json(
+        {
+          error: `Could not reach ANAF: ${msg}`,
+          detail:
+            'The invoice is left as "submitting" because it is not known whether ANAF ' +
+            'received it. Check the ANAF message list before sending again — resending ' +
+            'a filed invoice creates a duplicate that has to be corrected by storno.',
+          submitted: false,
+          state: 'unknown',
+        },
+        502,
+      );
     }
 
     // The upload index is what every later call needs, and ANAF returns it in
@@ -748,8 +804,11 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     // encouraging it looks — that assumption is exactly what the old stub made.
     const index = /index_incarcare\s*=\s*"([^"]+)"/i.exec(body)?.[1];
     if (status < 200 || status >= 300 || !index) {
+      // ANAF answered and refused. That IS definite — nothing was filed — so the
+      // claim goes back and the operator can correct the XML and resend.
       await sql`
-        UPDATE zv_efactura_invoices SET anaf_response = ${body.slice(0, 2000)}, updated_at = NOW()
+        UPDATE zv_efactura_invoices
+        SET status = 'xml_generated', anaf_response = ${JSON.stringify(body.slice(0, 2000))}::text::jsonb, updated_at = NOW()
         WHERE id = ${invoice.id}
       `.execute(db);
       return c.json(
@@ -770,7 +829,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
       await sql`
         UPDATE zv_efactura_invoices SET
           status = 'submitted', anaf_index = ${index},
-          anaf_response = ${body.slice(0, 2000)}, updated_at = NOW()
+          anaf_response = ${JSON.stringify(body.slice(0, 2000))}::text::jsonb, updated_at = NOW()
         WHERE id = ${invoice.id}
       `.execute(trx);
       await logStatusChange(trx, invoice.id, invoice.status, 'submitted', user.id, `ANAF index: ${index}`);
@@ -830,7 +889,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
       if (stare === 'ok' || stare === 'nok') {
         await sql`
           UPDATE zv_efactura_invoices SET status = ${stare === 'ok' ? 'accepted' : 'rejected'},
-            anaf_response = ${text.slice(0, 2000)}, updated_at = NOW()
+            anaf_response = ${JSON.stringify(text.slice(0, 2000))}::text::jsonb, updated_at = NOW()
           WHERE id = ${inv.id}
         `.execute(db);
         await logStatusChange(db, inv.id, inv.status, stare === 'ok' ? 'accepted' : 'rejected', user.id);
