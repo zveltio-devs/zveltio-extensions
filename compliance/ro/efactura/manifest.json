@@ -3,7 +3,7 @@
   "displayName": "e-Factura RO",
   "category": "compliance/ro",
   "description": "Romanian e-Invoice (e-Factura) integration with ANAF — generate, validate, and submit UBL XML invoices",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ro-efactura",
@@ -41,8 +41,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "bbc366fd172fa31457d21f0bdedf2e53b9a45cabafba6076f210a29c7c475d85",
-    "sourceSha256": "92cb87314c555ce07cac54d936f2143e7ca68ed1ff8723e2dec0e2c107fad5a7"
+    "engineSha256": "b05b574e2a685bee274d622c0c0f4b249d0dca09b112bb3bd9e437f7a90e7123",
+    "sourceSha256": "ba9699723a0e9592d2ad2fed368f2c1be4841bbf397f633bb15884a687d608c3"
   },
   "resources": [
     "efactura"
