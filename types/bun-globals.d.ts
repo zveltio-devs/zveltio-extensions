@@ -24,6 +24,20 @@ declare module 'bun' {
   export function file(...args: any[]): any;
   export function serve(...args: any[]): any;
   export function password(...args: any[]): any;
+  // `SQL` is imported by the ENGINE's `db/pool-autosize.ts`, which this repo
+  // typechecks through the `../zveltio` path alias. Missing from the shim, it
+  // failed the whole extensions typecheck with a single TS2614 — on a file
+  // nobody here edits, for a reason nobody here would look for.
+  //
+  // That is the cost of a hand-written shim: it has to grow when the engine
+  // starts using another Bun API. The alternative is documented above and is
+  // worse (300+ false positives from unrelated package types).
+  // Callable AND newable: the engine does `new SQL(url)` and then calls the
+  // instance as a tagged template — `sql\`SELECT …\``.
+  export const SQL: {
+    new (...args: any[]): any;
+    (...args: any[]): any;
+  };
   const _default: any;
   export default _default;
 }

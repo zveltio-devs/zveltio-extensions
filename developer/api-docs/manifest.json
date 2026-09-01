@@ -3,7 +3,7 @@
   "displayName": "API Documentation",
   "category": "developer",
   "description": "Swagger UI + OpenAPI spec auto-generated from collections",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-api-docs",
@@ -33,7 +33,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "f9a31f3df8c3056dabc7d1969eeebf904b90e1cea07ce9be693cb54378cef8e0",
+    "engineSha256": "1acd5e60fe2e18780d3bf1949cfdceeabde959cf948195e205b8fe30af4816a3",
     "sourceSha256": "87e5e9e72ba7c2b8eb82b94cc095583557f7e857121dba6ed6e4c81a907a8587"
   },
   "publicRoutes": [
