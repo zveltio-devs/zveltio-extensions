@@ -3,7 +3,7 @@
   "displayName": "Cloud Storage",
   "category": "storage",
   "description": "File versioning, trash bin, public share links, and storage quotas",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-cloud",
@@ -51,7 +51,7 @@
     "bundlePeers": true
   },
   "integrity": {
-    "engineSha256": "a7777436917ce22884865f5ff2166faa0c3185061f5e3df9c0c199744e58375c",
+    "engineSha256": "f50b1054c85363195ccbce70fb25f43fe1ee7909f17a2838ee54009ddc9c5f16",
     "sourceSha256": "9222bb781def9b288172ee6cf63aa54a65836514ef8055bc2d527d2976aa799d"
   },
   "globalRoutes": [

@@ -173,13 +173,28 @@ async function getDb(): Promise<any> {
   // Seed the mock session's user as a REAL row: extension tables commonly carry
   // FK constraints to "user"(id), so writes from route tests would otherwise
   // fail on a foreign-key violation that has nothing to do with the extension.
-  await _pool
-    .query(
-      `INSERT INTO "user" (id, name, email, "emailVerified", role, "createdAt", "updatedAt", "twoFactorEnabled")
-       VALUES ('00000000-0000-4000-8000-00000000e001', 'Ext Harness', 'ext-harness-uuid@test.local', true, 'god', NOW(), NOW(), false)
-       ON CONFLICT (id) DO NOTHING`,
-    )
-    .catch(() => undefined);
+  //
+  // ── Stands the incumbent god down first, and does NOT swallow failure ──
+  //
+  // This used to insert `role = 'god'` with `.catch(() => undefined)`. Engine
+  // migration 008 then made "one god per instance" a database trigger, so the
+  // insert started being REFUSED — and the catch ate the refusal. The user was
+  // never created, and the suite failed dozens of lines later with foreign-key
+  // violations on `zv_ai_chats`, `zv_media_files`, `zv_mail_accounts`: three
+  // symptoms, none of them naming the cause.
+  //
+  // A swallowed failure that turns into a distant, differently-shaped error is
+  // the most expensive kind. So: demote the incumbent the way the engine's own
+  // `createGodSession` does, then insert, then let a failure THROW.
+  await _pool.query(
+    `UPDATE "user" SET role = 'member'
+       WHERE role = 'god' AND id <> '00000000-0000-4000-8000-00000000e001'`,
+  );
+  await _pool.query(
+    `INSERT INTO "user" (id, name, email, "emailVerified", role, "createdAt", "updatedAt", "twoFactorEnabled")
+     VALUES ('00000000-0000-4000-8000-00000000e001', 'Ext Harness', 'ext-harness-uuid@test.local', true, 'god', NOW(), NOW(), false)
+     ON CONFLICT (id) DO UPDATE SET role = 'god'`,
+  );
   return _db;
 }
 afterAll(async () => {
