@@ -26,7 +26,7 @@
     "hoodiecrow-imap": "^2.1.0",
     "imapflow": "^1.7.6",
     "ldapts": "^7.4.0",
-    "mailparser": "^3.6.0",
+    "mailparser": "^3.9.17",
     "nanoid": "^5.1.16",
     "node-saml": "^3.1.2",
     "nodemailer": "^6.10.1",
