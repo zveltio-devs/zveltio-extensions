@@ -3,7 +3,7 @@
   "displayName": "Data Import",
   "category": "data",
   "description": "Import collection data from CSV or JSON files with column mapping and background processing",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-import",
@@ -33,7 +33,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "410b18cdaf65951ae7abe84c28eaf8892c88f14c9d174e46862a067ffe83f73c",
+    "engineSha256": "17e62f0e0f096824ed3222140c225c0a394c079490f91e8b1a30b72eb2ef2260",
     "sourceSha256": "b54be39173d0689621fcb93f8bf2e9b54ff5d5b487876e65bf6a90847037a3ec"
   },
   "resources": [
