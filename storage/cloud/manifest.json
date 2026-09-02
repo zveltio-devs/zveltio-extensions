@@ -13,6 +13,9 @@
     "introspection",
     "storage"
   ],
+  "i18nPrefixes": [
+    "storage"
+  ],
   "publicRoutes": [
     "/share/*"
   ],

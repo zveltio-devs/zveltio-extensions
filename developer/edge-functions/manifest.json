@@ -11,6 +11,10 @@
     "database",
     "edge-functions"
   ],
+  "i18nPrefixes": [
+    "developer.edge-functions",
+    "developer.edgeFunctions"
+  ],
   "studio": {
     "pages": [
       {

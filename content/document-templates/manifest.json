@@ -11,6 +11,9 @@
     "database",
     "documents"
   ],
+  "i18nPrefixes": [
+    "content.document-templates"
+  ],
   "studio": {
     "pages": [
       {
