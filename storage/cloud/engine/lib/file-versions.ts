@@ -102,11 +102,28 @@ export async function createFileVersion(
 
 /**
  * Lists versions of a file.
+ *
+ * The INNER JOIN to `zv_media_files` is the isolation, and it is the whole
+ * reason this query is not two lines shorter.
+ *
+ * `zv_media_versions` carries no `tenant_id`, so row level security has no
+ * column to bind and `ctx.db` — request-scoped though it is — filters nothing
+ * here. The parent DOES carry one and IS policed, so joining through it is what
+ * makes the policy apply. Without the join this returned another company's
+ * version list by file id from the URL: version numbers, sizes, uploader names
+ * and `storage_path`, for a file the caller could not read.
+ *
+ * Measured before the fix, as `zveltio_rls` with firm B's tenant set: the
+ * parent returned 0 rows and this returned the row.
+ *
+ * `createFileVersion` above never had the hole — it looks the file up first and
+ * throws `File not found`. Two functions on the same table, one guarded.
  */
 export async function listFileVersions(db: Database, fileId: string) {
   return sql`
     SELECT v.*, u.name AS uploaded_by_name
     FROM zv_media_versions v
+    INNER JOIN zv_media_files f ON f.id = v.file_id
     LEFT JOIN "user" u ON u.id = v.uploaded_by
     WHERE v.file_id = ${fileId}
     ORDER BY v.version_num DESC
@@ -131,8 +148,12 @@ export async function restoreFileVersion(
 
   if (!version) throw new Error('Version not found');
 
-  const sourceBytes = await getObject(version.storage_path);
-
+  // The file check comes BEFORE the bytes are fetched, and the order is the
+  // point. `zv_media_versions` has no `tenant_id`, so the lookup above is not
+  // filtered by anything; `zv_media_files` is policed, so this is where a
+  // foreign file id stops. Fetching the object first meant reaching into
+  // another company's storage before finding out we were not allowed to —
+  // nothing was returned to the caller, but the read happened.
   const file = await (db as any)
     .selectFrom('zv_media_files')
     .selectAll()
@@ -140,6 +161,8 @@ export async function restoreFileVersion(
     .executeTakeFirst();
 
   if (!file) throw new Error('File not found');
+
+  const sourceBytes = await getObject(version.storage_path);
 
   // No bytes when object storage is unconfigured (or the object is gone) —
   // the metadata rollback below still applies.
