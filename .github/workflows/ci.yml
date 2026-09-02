@@ -253,6 +253,22 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
+      # This job boots the engine with NODE_ENV=production on purpose, and since
+      # zveltio#402 a production boot without VALKEY_URL is refused — the
+      # permission and identity caches degrade silently without one, so the
+      # engine stopped pretending that was a smaller install. The probe was left
+      # behind by that change and could not start at all.
+      #
+      # A real Valkey rather than ZVELTIO_ALLOW_NO_CACHE=1: the point of running
+      # this probe in production mode is to exercise the shape an operator gets.
+      valkey:
+        image: valkey/valkey:8
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -276,6 +292,7 @@ jobs:
       - name: Boot engine + create god + probe SDUI contract
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/zveltio_probe
+          VALKEY_URL: redis://localhost:6379
           BETTER_AUTH_SECRET: probe-secret-32-chars-long-zzzzzzzz
           BETTER_AUTH_URL: http://localhost:3000
           ENCRYPTION_KEY: probe-encryption-key-32-bytes-aaaaaaaa
