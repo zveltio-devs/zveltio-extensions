@@ -11,6 +11,9 @@
     "database",
     "introspection"
   ],
+  "i18nPrefixes": [
+    "analytics.quality"
+  ],
   "contributes": {
     "engine": true,
     "studio": true

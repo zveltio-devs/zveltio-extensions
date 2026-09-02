@@ -11,6 +11,10 @@
     "database",
     "secrets"
   ],
+  "i18nPrefixes": [
+    "compliance.ro.efactura",
+    "efactura"
+  ],
   "studio": {
     "pages": [
       {
