@@ -12,6 +12,9 @@
     "database",
     "secrets"
   ],
+  "i18nPrefixes": [
+    "auth.ldap"
+  ],
   "publicRoutes": [
     "/login"
   ],

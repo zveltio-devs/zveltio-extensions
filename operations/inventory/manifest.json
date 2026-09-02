@@ -10,6 +10,10 @@
   "permissions": [
     "database"
   ],
+  "i18nPrefixes": [
+    "inventory",
+    "operations.inventory"
+  ],
   "studio": {
     "pages": [
       {

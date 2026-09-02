@@ -12,6 +12,9 @@
     "secrets",
     "settings"
   ],
+  "i18nPrefixes": [
+    "communications"
+  ],
   "dependencies": [
     {
       "name": "ai",

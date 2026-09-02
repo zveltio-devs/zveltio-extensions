@@ -10,6 +10,9 @@
   "permissions": [
     "database"
   ],
+  "i18nPrefixes": [
+    "developer.validation"
+  ],
   "dependencies": [
     {
       "name": "ai",
