@@ -8,6 +8,9 @@
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-pdf-viewer",
   "permissions": [],
+  "i18nPrefixes": [
+    "content.pdf-viewer"
+  ],
   "contributes": {
     "engine": false,
     "studio": true,

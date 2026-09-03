@@ -17,6 +17,9 @@
     "secrets",
     "settings"
   ],
+  "i18nPrefixes": [
+    "ai"
+  ],
   "contributes": {
     "engine": true,
     "studio": true,

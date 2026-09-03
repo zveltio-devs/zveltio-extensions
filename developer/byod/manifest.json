@@ -11,6 +11,9 @@
     "database",
     "introspection"
   ],
+  "i18nPrefixes": [
+    "developer.byod"
+  ],
   "studio": {
     "pages": [
       {

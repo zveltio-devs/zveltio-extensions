@@ -10,6 +10,9 @@
   "permissions": [
     "database"
   ],
+  "i18nPrefixes": [
+    "hr.employees"
+  ],
   "contributes": {
     "engine": true,
     "studio": true,

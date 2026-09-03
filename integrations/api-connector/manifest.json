@@ -10,6 +10,10 @@
   "permissions": [
     "database"
   ],
+  "i18nPrefixes": [
+    "integrations.api-connector",
+    "integrations.apiConnector"
+  ],
   "publicRoutes": [
     "/webhooks/receive/*"
   ],

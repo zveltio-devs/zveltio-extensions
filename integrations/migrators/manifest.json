@@ -12,6 +12,9 @@
     "network",
     "secrets"
   ],
+  "i18nPrefixes": [
+    "integrations.migrators"
+  ],
   "contributes": {
     "engine": true,
     "studio": true

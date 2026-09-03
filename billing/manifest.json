@@ -10,6 +10,9 @@
   "permissions": [
     "database"
   ],
+  "i18nPrefixes": [
+    "billing"
+  ],
   "publicRoutes": [
     "/webhook/stripe"
   ],
