@@ -10,6 +10,10 @@
   "permissions": [
     "database"
   ],
+  "i18nPrefixes": [
+    "finance.quotes",
+    "quotes"
+  ],
   "publicRoutes": [
     "/public/*"
   ],

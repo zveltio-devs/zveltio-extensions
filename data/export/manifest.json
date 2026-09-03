@@ -10,6 +10,9 @@
   "permissions": [
     "database"
   ],
+  "i18nPrefixes": [
+    "data.export"
+  ],
   "studio": {
     "pages": [
       {
