@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
+import { toJsonb } from '@zveltio/sdk/extension';
 
 async function getUser(c: any, auth: any) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -110,7 +111,7 @@ export function etransportRoutes(ctx: ExtensionContext): Hono {
     const body = c.req.valid('json');
     const decl = await db
       .insertInto('zv_etransport_declarations')
-      .values({ ...body, goods: JSON.stringify(body.goods) })
+      .values({ ...body, goods: toJsonb(body.goods) })
       .returningAll()
       .executeTakeFirst();
 
@@ -228,7 +229,7 @@ export function etransportRoutes(ctx: ExtensionContext): Hono {
         .set({
           uit: d.uit,
           status: 'declared',
-          anaf_response: JSON.stringify({
+          anaf_response: toJsonb({
             source: 'manual',
             recorded_by: user.id,
             recorded_at: new Date().toISOString(),

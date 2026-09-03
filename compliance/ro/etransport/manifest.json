@@ -2,8 +2,8 @@
   "name": "compliance/ro/etransport",
   "displayName": "e-Transport RO",
   "category": "compliance/ro",
-  "description": "Romanian e-Transport monitoring system — declare and track road transport of goods via ANAF",
-  "version": "1.0.1",
+  "description": "Romanian e-Transport monitoring system \u2014 declare and track road transport of goods via ANAF",
+  "version": "1.0.2",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ro-etransport",
@@ -34,8 +34,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "cd418325dfe695b3afffcdb3e5c4e5fc48ca76cae5ceba5ef827a0ead34692e2",
-    "sourceSha256": "e0826f5d184ae6ea9516db7cd34559cf82c5a4966b86c5c5c4b508fdf01014d2"
+    "engineSha256": "33269e0d7f052624307159ae34183291da2a19dee3d8df4fe63a58d90b292f9d",
+    "sourceSha256": "e19bdb1b10c30b49277c2050b7f611648d885e8f7caf1a8e1c571eb4edce601a"
   },
   "resources": [
     "etransport"

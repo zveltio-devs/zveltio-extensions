@@ -14,10 +14,10 @@ var __export = (target, all) => {
     });
 };
 
-// compliance/ro/etransport/engine/index.ts
+// engine/index.ts
 import { join } from "path";
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/compose.js
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
     let index = -1;
@@ -61,33 +61,10 @@ var compose = (middleware, onError, onNotFound) => {
   };
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/http-exception.js
-var HTTPException = class extends Error {
-  res;
-  status;
-  constructor(status = 500, options) {
-    super(options?.message, { cause: options?.cause });
-    this.res = options?.res;
-    this.status = status;
-  }
-  getResponse() {
-    if (this.res) {
-      const newResponse = new Response(this.res.body, {
-        status: this.status,
-        headers: this.res.headers
-      });
-      return newResponse;
-    }
-    return new Response(this.message, {
-      status: this.status
-    });
-  }
-};
-
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/request/constants.js
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/request/constants.js
 var GET_MATCH_RESULT = /* @__PURE__ */ Symbol();
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/buffer.js
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/utils/buffer.js
 var bufferToFormData = (arrayBuffer, contentType) => {
   const response = new Response(arrayBuffer, {
     headers: {
@@ -97,7 +74,9 @@ var bufferToFormData = (arrayBuffer, contentType) => {
   return response.formData();
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/body.js
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/utils/body.js
+var MAX_NESTING_DEPTH = 32;
+var MAX_NESTED_OBJECTS = 1e4;
 var isRawRequest = (request) => ("headers" in request);
 var parseBody = async (request, options = /* @__PURE__ */ Object.create(null)) => {
   const { all = false, dot = false } = options;
@@ -110,6 +89,9 @@ var parseBody = async (request, options = /* @__PURE__ */ Object.create(null)) =
   return {};
 };
 async function parseFormData(request, options) {
+  if (!isRawRequest(request) && request.bodyCache.formData) {
+    return convertFormDataToBodyData(await request.bodyCache.formData, options);
+  }
   const headers = isRawRequest(request) ? request.headers : request.raw.headers;
   const arrayBuffer = await request.arrayBuffer();
   const formDataPromise = bufferToFormData(arrayBuffer, headers.get("Content-Type") || "");
@@ -124,6 +106,7 @@ async function parseFormData(request, options) {
 }
 function convertFormDataToBodyData(formData, options) {
   const form = /* @__PURE__ */ Object.create(null);
+  const nestingState = { count: 0 };
   formData.forEach((value, key) => {
     const shouldParseAllValues = options.all || key.endsWith("[]");
     if (!shouldParseAllValues) {
@@ -136,7 +119,7 @@ function convertFormDataToBodyData(formData, options) {
     Object.entries(form).forEach(([key, value]) => {
       const shouldParseDotValues = key.includes(".");
       if (shouldParseDotValues) {
-        handleParsingNestedValues(form, key, value);
+        handleParsingNestedValues(form, key, value, nestingState);
         delete form[key];
       }
     });
@@ -158,25 +141,34 @@ var handleParsingAllValues = (form, key, value) => {
     }
   }
 };
-var handleParsingNestedValues = (form, key, value) => {
+var handleParsingNestedValues = (form, key, value, state) => {
   if (/(?:^|\.)__proto__\./.test(key)) {
     return;
   }
   let nestedForm = form;
-  const keys = key.split(".");
+  const keys = key.split(".", MAX_NESTING_DEPTH + 2);
+  if (keys.length > MAX_NESTING_DEPTH + 1) {
+    throwNestingLimitExceeded();
+  }
   keys.forEach((key2, index) => {
     if (index === keys.length - 1) {
       nestedForm[key2] = value;
     } else {
       if (!nestedForm[key2] || typeof nestedForm[key2] !== "object" || Array.isArray(nestedForm[key2]) || nestedForm[key2] instanceof File) {
+        if (state.count++ >= MAX_NESTED_OBJECTS) {
+          throwNestingLimitExceeded();
+        }
         nestedForm[key2] = /* @__PURE__ */ Object.create(null);
       }
       nestedForm = nestedForm[key2];
     }
   });
 };
+var throwNestingLimitExceeded = () => {
+  throw new Error("Nesting limit exceeded");
+};
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/url.js
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/utils/url.js
 var splitPath = (path) => {
   const paths = path.split("/");
   if (paths[0] === "") {
@@ -282,13 +274,13 @@ var checkOptionalParameter = (path) => {
     if (segment !== "" && !/\:/.test(segment)) {
       basePath += "/" + segment;
     } else if (/\:/.test(segment)) {
-      if (/\?/.test(segment)) {
+      if (segment.charCodeAt(segment.length - 1) === 63) {
         if (results.length === 0 && basePath === "") {
           results.push("/");
         } else {
           results.push(basePath);
         }
-        const optionalSegment = segment.replace("?", "");
+        const optionalSegment = segment.slice(0, -1);
         basePath += "/" + optionalSegment;
         results.push(basePath);
       } else {
@@ -298,18 +290,20 @@ var checkOptionalParameter = (path) => {
   });
   return results.filter((v, i, a) => a.indexOf(v) === i);
 };
+var tryDecodeURIComponent = (str) => str.indexOf("%") !== -1 ? tryDecode(str, decodeURIComponent_) : str;
 var _decodeURI = (value) => {
-  if (!/[%+]/.test(value)) {
-    return value;
-  }
   if (value.indexOf("+") !== -1) {
     value = value.replace(/\+/g, " ");
   }
-  return value.indexOf("%") !== -1 ? tryDecode(value, decodeURIComponent_) : value;
+  return tryDecodeURIComponent(value);
 };
 var _getQueryParam = (url, key, multiple) => {
+  const hashIndex = url.indexOf("#", 8);
+  if (hashIndex !== -1) {
+    url = url.slice(0, hashIndex);
+  }
   let encoded;
-  if (!multiple && key && !/[%+]/.test(key)) {
+  if (!multiple && key && key.indexOf("%") === -1 && key.indexOf("+") === -1) {
     let keyIndex2 = url.indexOf("?", 8);
     if (keyIndex2 === -1) {
       return;
@@ -333,7 +327,7 @@ var _getQueryParam = (url, key, multiple) => {
       return;
     }
   }
-  const results = {};
+  const results = /* @__PURE__ */ Object.create(null);
   encoded ??= /[%+]/.test(url);
   let keyIndex = url.indexOf("?", 8);
   while (keyIndex !== -1) {
@@ -376,8 +370,7 @@ var getQueryParams = (url, key) => {
 };
 var decodeURIComponent_ = decodeURIComponent;
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/request.js
-var tryDecodeURIComponent = (str) => tryDecode(str, decodeURIComponent_);
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/request.js
 var HonoRequest = class {
   raw;
   #validatedData;
@@ -389,23 +382,22 @@ var HonoRequest = class {
     this.raw = request;
     this.path = path;
     this.#matchResult = matchResult;
-    this.#validatedData = {};
   }
   param(key) {
     return key ? this.#getDecodedParam(key) : this.#getAllDecodedParams();
   }
   #getDecodedParam(key) {
-    const paramKey = this.#matchResult[0][this.routeIndex][1][key];
+    const paramKey = this.#matchResult[0][this.routeIndex]?.[1][key];
     const param = this.#getParamValue(paramKey);
-    return param && /\%/.test(param) ? tryDecodeURIComponent(param) : param;
+    return param && tryDecodeURIComponent(param);
   }
   #getAllDecodedParams() {
     const decoded = {};
-    const keys = Object.keys(this.#matchResult[0][this.routeIndex][1]);
+    const keys = Object.keys(this.#matchResult[0][this.routeIndex]?.[1] ?? {});
     for (const key of keys) {
       const value = this.#getParamValue(this.#matchResult[0][this.routeIndex][1][key]);
       if (value !== undefined) {
-        decoded[key] = /\%/.test(value) ? tryDecodeURIComponent(value) : value;
+        decoded[key] = tryDecodeURIComponent(value);
       }
     }
     return decoded;
@@ -423,7 +415,7 @@ var HonoRequest = class {
     if (name) {
       return this.raw.headers.get(name) ?? undefined;
     }
-    const headerData = {};
+    const headerData = /* @__PURE__ */ Object.create(null);
     this.raw.headers.forEach((value, key) => {
       headerData[key] = value;
     });
@@ -438,8 +430,7 @@ var HonoRequest = class {
     if (cachedBody) {
       return cachedBody;
     }
-    const anyCachedKey = Object.keys(bodyCache)[0];
-    if (anyCachedKey) {
+    for (const anyCachedKey in bodyCache) {
       return bodyCache[anyCachedKey].then((body) => {
         if (anyCachedKey === "json") {
           body = JSON.stringify(body);
@@ -468,10 +459,10 @@ var HonoRequest = class {
     return this.#cachedBody("formData");
   }
   addValidatedData(target, data) {
-    this.#validatedData[target] = data;
+    (this.#validatedData ??= {})[target] = data;
   }
   valid(target) {
-    return this.#validatedData[target];
+    return this.#validatedData?.[target];
   }
   get url() {
     return this.raw.url;
@@ -490,7 +481,7 @@ var HonoRequest = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/html.js
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/utils/html.js
 var HtmlEscapedCallbackPhase = {
   Stringify: 1,
   BeforeStream: 2,
@@ -528,7 +519,7 @@ var resolveCallback = async (str, phase, preserveCallbacks, context, buffer) => 
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/context.js
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/context.js
 var TEXT_PLAIN = "text/plain; charset=UTF-8";
 var setDefaultContentType = (contentType, headers) => {
   return {
@@ -646,11 +637,11 @@ var Context = class {
     return Object.fromEntries(this.#var);
   }
   #newResponse(data, arg, headers) {
-    const responseHeaders = this.#res ? new Headers(this.#res.headers) : this.#preparedHeaders ?? new Headers;
-    if (typeof arg === "object" && "headers" in arg) {
-      const argHeaders = arg.headers instanceof Headers ? arg.headers : new Headers(arg.headers);
-      for (const [key, value] of argHeaders) {
-        if (key.toLowerCase() === "set-cookie") {
+    let responseHeaders = this.#res ? new Headers(this.#res.headers) : this.#preparedHeaders;
+    if (typeof arg === "object" && arg.headers) {
+      responseHeaders ??= new Headers;
+      for (const [key, value] of new Headers(arg.headers)) {
+        if (key === "set-cookie") {
           responseHeaders.append(key, value);
         } else {
           responseHeaders.set(key, value);
@@ -658,19 +649,34 @@ var Context = class {
       }
     }
     if (headers) {
-      for (const [k, v] of Object.entries(headers)) {
-        if (typeof v === "string") {
-          responseHeaders.set(k, v);
-        } else {
-          responseHeaders.delete(k);
-          for (const v2 of v) {
-            responseHeaders.append(k, v2);
+      if (!responseHeaders) {
+        let count = 0;
+        for (const k in headers) {
+          if (++count > 1 || typeof headers[k] !== "string") {
+            responseHeaders = new Headers;
+            break;
+          }
+        }
+      }
+      if (responseHeaders) {
+        for (const k in headers) {
+          const v = headers[k];
+          if (typeof v === "string") {
+            responseHeaders.set(k, v);
+          } else {
+            responseHeaders.delete(k);
+            for (const v2 of v) {
+              responseHeaders.append(k, v2);
+            }
           }
         }
       }
     }
     const status = typeof arg === "number" ? arg : arg?.status ?? this.#status;
-    return createResponseInstance(data, { status, headers: responseHeaders });
+    return createResponseInstance(data, {
+      status,
+      headers: responseHeaders ?? headers
+    });
   }
   newResponse = (...args) => this.#newResponse(...args);
   body = (data, arg, headers) => this.#newResponse(data, arg, headers);
@@ -695,18 +701,18 @@ var Context = class {
   };
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router.js
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/router.js
 var METHOD_NAME_ALL = "ALL";
 var METHOD_NAME_ALL_LOWERCASE = "all";
-var METHODS = ["get", "post", "put", "delete", "options", "patch"];
+var METHODS = ["get", "post", "put", "delete", "options", "patch", "query"];
 var MESSAGE_MATCHER_IS_ALREADY_BUILT = "Can not add a route since the matcher is already built.";
 var UnsupportedPathError = class extends Error {
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/constants.js
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/utils/constants.js
 var COMPOSED_HANDLER = "__COMPOSED_HANDLER";
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/hono-base.js
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/hono-base.js
 var notFoundHandler = (c) => {
   return c.text("404 Not Found", 404);
 };
@@ -725,6 +731,7 @@ var Hono = class _Hono {
   delete;
   options;
   patch;
+  query;
   all;
   on;
   use;
@@ -930,7 +937,10 @@ var Hono = class _Hono {
   };
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/matcher.js
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/router/utils.js
+var createNullObject = () => /* @__PURE__ */ Object.create(null);
+
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/router/reg-exp-router/matcher.js
 var emptyParam = [];
 function match(method, path) {
   const matchers = this.buildAllMatchers();
@@ -951,7 +961,7 @@ function match(method, path) {
   return match2(method, path);
 }
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/node.js
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/router/reg-exp-router/node.js
 var LABEL_REG_EXP_STR = "[^/]+";
 var ONLY_WILDCARD_REG_EXP_STR = ".*";
 var TAIL_WILDCARD_REG_EXP_STR = "(?:|/.*)";
@@ -965,7 +975,7 @@ function compareKey(a, b) {
     return 1;
   }
   if (a === ONLY_WILDCARD_REG_EXP_STR || a === TAIL_WILDCARD_REG_EXP_STR) {
-    return 1;
+    return b === TAIL_WILDCARD_REG_EXP_STR ? -1 : 1;
   } else if (b === ONLY_WILDCARD_REG_EXP_STR || b === TAIL_WILDCARD_REG_EXP_STR) {
     return -1;
   }
@@ -979,70 +989,69 @@ function compareKey(a, b) {
 var Node = class _Node {
   #index;
   #varIndex;
-  #children = /* @__PURE__ */ Object.create(null);
-  insert(tokens, index, paramMap, context, pathErrorCheckOnly) {
-    if (tokens.length === 0) {
-      if (this.#index !== undefined) {
-        throw PATH_ERROR;
-      }
-      if (pathErrorCheckOnly) {
-        return;
-      }
-      this.#index = index;
-      return;
-    }
-    const [token, ...restTokens] = tokens;
-    const pattern = token === "*" ? restTokens.length === 0 ? ["", "", ONLY_WILDCARD_REG_EXP_STR] : ["", "", LABEL_REG_EXP_STR] : token === "/*" ? ["", "", TAIL_WILDCARD_REG_EXP_STR] : token.match(/^\:([^\{\}]+)(?:\{(.+)\})?$/);
-    let node;
-    if (pattern) {
-      const name = pattern[1];
-      let regexpStr = pattern[2] || LABEL_REG_EXP_STR;
-      if (name && pattern[2]) {
-        if (regexpStr === ".*") {
-          throw PATH_ERROR;
+  #children = createNullObject();
+  insert(tokens, index, paramMap, context, isStatic) {
+    let node = this;
+    for (let i = 0, len = tokens.length;i < len; i++) {
+      const token = tokens[i];
+      const pattern = token.length === 1 ? token === "*" ? i === len - 1 ? ["", "", ONLY_WILDCARD_REG_EXP_STR] : ["", "", LABEL_REG_EXP_STR] : null : token === "/*" ? ["", "", TAIL_WILDCARD_REG_EXP_STR] : token.match(/^\:([^\{\}]+)(?:\{(.+)\})?$/);
+      let nextNode;
+      if (pattern) {
+        const name = pattern[1];
+        let regexpStr = pattern[2] || LABEL_REG_EXP_STR;
+        if (name && pattern[2]) {
+          if (regexpStr === ".*") {
+            throw PATH_ERROR;
+          }
+          regexpStr = regexpStr.replace(/^\((?!\?:)(?=[^)]+\)$)/, "(?:");
+          if (/\((?!\?:)/.test(regexpStr)) {
+            throw PATH_ERROR;
+          }
+          if (regexpStr.length === 1 && regExpMetaChars.has(regexpStr)) {
+            throw PATH_ERROR;
+          }
         }
-        regexpStr = regexpStr.replace(/^\((?!\?:)(?=[^)]+\)$)/, "(?:");
-        if (/\((?!\?:)/.test(regexpStr)) {
-          throw PATH_ERROR;
+        nextNode = node.#children[regexpStr];
+        if (!nextNode) {
+          if (regexpStr !== ONLY_WILDCARD_REG_EXP_STR && regexpStr !== TAIL_WILDCARD_REG_EXP_STR) {
+            for (const k in node.#children) {
+              if ((regexpStr.length > 1 || k.length > 1) && k !== ONLY_WILDCARD_REG_EXP_STR && k !== TAIL_WILDCARD_REG_EXP_STR) {
+                throw PATH_ERROR;
+              }
+            }
+          }
+          nextNode = node.#children[regexpStr] = new _Node;
         }
-      }
-      node = this.#children[regexpStr];
-      if (!node) {
-        if (Object.keys(this.#children).some((k) => k !== ONLY_WILDCARD_REG_EXP_STR && k !== TAIL_WILDCARD_REG_EXP_STR)) {
-          throw PATH_ERROR;
-        }
-        if (pathErrorCheckOnly) {
-          return;
-        }
-        node = this.#children[regexpStr] = new _Node;
         if (name !== "") {
-          node.#varIndex = context.varIndex++;
+          nextNode.#varIndex ??= context.varIndex++;
+          paramMap.push([name, nextNode.#varIndex]);
+        }
+      } else {
+        nextNode = node.#children[token];
+        if (!nextNode) {
+          for (const k in node.#children) {
+            if (k.length > 1 && k !== ONLY_WILDCARD_REG_EXP_STR && k !== TAIL_WILDCARD_REG_EXP_STR) {
+              throw PATH_ERROR;
+            }
+          }
+          nextNode = node.#children[token] = new _Node;
         }
       }
-      if (!pathErrorCheckOnly && name !== "") {
-        paramMap.push([name, node.#varIndex]);
-      }
-    } else {
-      node = this.#children[token];
-      if (!node) {
-        if (Object.keys(this.#children).some((k) => k.length > 1 && k !== ONLY_WILDCARD_REG_EXP_STR && k !== TAIL_WILDCARD_REG_EXP_STR)) {
-          throw PATH_ERROR;
-        }
-        if (pathErrorCheckOnly) {
-          return;
-        }
-        node = this.#children[token] = new _Node;
-      }
+      node = nextNode;
     }
-    node.insert(restTokens, index, paramMap, context, pathErrorCheckOnly);
+    if (node.#index !== undefined) {
+      throw PATH_ERROR;
+    }
+    node.#index = isStatic ? -1 : index;
   }
   buildRegExpStr() {
     const childKeys = Object.keys(this.#children).sort(compareKey);
     const strList = childKeys.map((k) => {
       const c = this.#children[k];
-      return (typeof c.#varIndex === "number" ? `(${k})@${c.#varIndex}` : regExpMetaChars.has(k) ? `\\${k}` : k) + c.buildRegExpStr();
-    });
-    if (typeof this.#index === "number") {
+      const childStr = c.buildRegExpStr();
+      return childStr === "" ? "" : (typeof c.#varIndex === "number" ? `(${k})@${c.#varIndex}` : regExpMetaChars.has(k) ? `\\${k}` : k) + childStr;
+    }).filter(Boolean);
+    if (typeof this.#index === "number" && this.#index !== -1) {
       strList.unshift(`#${this.#index}`);
     }
     if (strList.length === 0) {
@@ -1055,16 +1064,23 @@ var Node = class _Node {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/trie.js
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/router/reg-exp-router/trie.js
 var Trie = class {
   #context = { varIndex: 0 };
   #root = new Node;
-  insert(path, index, pathErrorCheckOnly) {
+  #index = 0;
+  paths = createNullObject();
+  insert(path, isStatic) {
+    if (isStatic) {
+      this.#root.insert(path.split(""), 0, [], this.#context, true);
+      return;
+    }
     const paramAssoc = [];
     const groups = [];
+    let markedPath = path;
     for (let i = 0;; ) {
       let replaced = false;
-      path = path.replace(/\{[^}]+\}/g, (m) => {
+      markedPath = markedPath.replace(/\{[^}]+\}/g, (m) => {
         const mark = `@\\${i}`;
         groups[i] = [mark, m];
         i++;
@@ -1075,7 +1091,7 @@ var Trie = class {
         break;
       }
     }
-    const tokens = path.match(/(?::[^\/]+)|(?:\/\*$)|./g) || [];
+    const tokens = markedPath.match(/(?::[^\/]+)|(?:\/\*$)|./g) || [];
     for (let i = groups.length - 1;i >= 0; i--) {
       const [mark] = groups[i];
       for (let j = tokens.length - 1;j >= 0; j--) {
@@ -1085,8 +1101,8 @@ var Trie = class {
         }
       }
     }
-    this.#root.insert(tokens, index, paramAssoc, this.#context, pathErrorCheckOnly);
-    return paramAssoc;
+    this.#root.insert(tokens, this.#index, paramAssoc, this.#context, false);
+    this.paths[path] = [this.#index++, paramAssoc];
   }
   buildRegExp() {
     let regexp = this.#root.buildRegExpStr();
@@ -1111,72 +1127,12 @@ var Trie = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/router.js
-var nullMatcher = [/^$/, [], /* @__PURE__ */ Object.create(null)];
-var wildcardRegExpCache = /* @__PURE__ */ Object.create(null);
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/router/reg-exp-router/router.js
+var wildcardRegExpCache = createNullObject();
 function buildWildcardRegExp(path) {
-  return wildcardRegExpCache[path] ??= new RegExp(path === "*" ? "" : `^${path.replace(/\/\*$|([.\\+*[^\]$()])/g, (_, metaChar) => metaChar ? `\\${metaChar}` : "(?:|/.*)")}$`);
-}
-function clearWildcardRegExpCache() {
-  wildcardRegExpCache = /* @__PURE__ */ Object.create(null);
-}
-function buildMatcherFromPreprocessedRoutes(routes) {
-  const trie = new Trie;
-  const handlerData = [];
-  if (routes.length === 0) {
-    return nullMatcher;
-  }
-  const routesWithStaticPathFlag = routes.map((route) => [!/\*|\/:/.test(route[0]), ...route]).sort(([isStaticA, pathA], [isStaticB, pathB]) => isStaticA ? 1 : isStaticB ? -1 : pathA.length - pathB.length);
-  const staticMap = /* @__PURE__ */ Object.create(null);
-  for (let i = 0, j = -1, len = routesWithStaticPathFlag.length;i < len; i++) {
-    const [pathErrorCheckOnly, path, handlers] = routesWithStaticPathFlag[i];
-    if (pathErrorCheckOnly) {
-      staticMap[path] = [handlers.map(([h]) => [h, /* @__PURE__ */ Object.create(null)]), emptyParam];
-    } else {
-      j++;
-    }
-    let paramAssoc;
-    try {
-      paramAssoc = trie.insert(path, j, pathErrorCheckOnly);
-    } catch (e) {
-      throw e === PATH_ERROR ? new UnsupportedPathError(path) : e;
-    }
-    if (pathErrorCheckOnly) {
-      continue;
-    }
-    handlerData[j] = handlers.map(([h, paramCount]) => {
-      const paramIndexMap = /* @__PURE__ */ Object.create(null);
-      paramCount -= 1;
-      for (;paramCount >= 0; paramCount--) {
-        const [key, value] = paramAssoc[paramCount];
-        paramIndexMap[key] = value;
-      }
-      return [h, paramIndexMap];
-    });
-  }
-  const [regexp, indexReplacementMap, paramReplacementMap] = trie.buildRegExp();
-  for (let i = 0, len = handlerData.length;i < len; i++) {
-    for (let j = 0, len2 = handlerData[i].length;j < len2; j++) {
-      const map = handlerData[i][j]?.[1];
-      if (!map) {
-        continue;
-      }
-      const keys = Object.keys(map);
-      for (let k = 0, len3 = keys.length;k < len3; k++) {
-        map[keys[k]] = paramReplacementMap[map[keys[k]]];
-      }
-    }
-  }
-  const handlerMap = [];
-  for (const i in indexReplacementMap) {
-    handlerMap[i] = handlerData[indexReplacementMap[i]];
-  }
-  return [regexp, handlerMap, staticMap];
+  return wildcardRegExpCache[path] ??= new RegExp(`^${path.replace(/\/:[^/{}]+(?:\{\[\^\/]\+})?(?=[/{]|$)|\/?\*$|([.\\+*[^\]$()?{}|])/g, (match2, metaChar) => metaChar ? `\\${metaChar}` : match2 === "/*" ? TAIL_WILDCARD_REG_EXP_STR : match2 === "*" ? ONLY_WILDCARD_REG_EXP_STR : `/:${LABEL_REG_EXP_STR}`)}$`);
 }
 function findMiddleware(middleware, path) {
-  if (!middleware) {
-    return;
-  }
   for (const k of Object.keys(middleware).sort((a, b) => b.length - a.length)) {
     if (buildWildcardRegExp(k).test(path)) {
       return [...middleware[k]];
@@ -1188,95 +1144,106 @@ var RegExpRouter = class {
   name = "RegExpRouter";
   #middleware;
   #routes;
+  #tries;
   constructor() {
-    this.#middleware = { [METHOD_NAME_ALL]: /* @__PURE__ */ Object.create(null) };
-    this.#routes = { [METHOD_NAME_ALL]: /* @__PURE__ */ Object.create(null) };
+    this.#middleware = { [METHOD_NAME_ALL]: createNullObject() };
+    this.#routes = { [METHOD_NAME_ALL]: createNullObject() };
+    this.#tries = { [METHOD_NAME_ALL]: new Trie };
+  }
+  #insertPath(method, path) {
+    try {
+      this.#tries[method].insert(path, !/\*|\/:/.test(path));
+    } catch (e) {
+      throw e === PATH_ERROR ? new UnsupportedPathError(path) : e;
+    }
   }
   add(method, path, handler) {
     const middleware = this.#middleware;
     const routes = this.#routes;
-    if (!middleware || !routes) {
+    if (!middleware) {
       throw new Error(MESSAGE_MATCHER_IS_ALREADY_BUILT);
     }
     if (!middleware[method]) {
-      [middleware, routes].forEach((handlerMap) => {
-        handlerMap[method] = /* @__PURE__ */ Object.create(null);
-        Object.keys(handlerMap[METHOD_NAME_ALL]).forEach((p) => {
+      this.#tries[method] = new Trie;
+      for (const handlerMap of [middleware, routes]) {
+        handlerMap[method] = createNullObject();
+        for (const p in handlerMap[METHOD_NAME_ALL]) {
           handlerMap[method][p] = [...handlerMap[METHOD_NAME_ALL][p]];
-        });
-      });
+          this.#insertPath(method, p);
+        }
+      }
     }
     if (path === "/*") {
       path = "*";
     }
-    const paramCount = (path.match(/\/:/g) || []).length;
+    const methods = method === METHOD_NAME_ALL ? Object.keys(middleware) : [method];
     if (/\*$/.test(path)) {
       const re = buildWildcardRegExp(path);
-      if (method === METHOD_NAME_ALL) {
-        Object.keys(middleware).forEach((m) => {
-          middleware[m][path] ||= findMiddleware(middleware[m], path) || findMiddleware(middleware[METHOD_NAME_ALL], path) || [];
-        });
-      } else {
-        middleware[method][path] ||= findMiddleware(middleware[method], path) || findMiddleware(middleware[METHOD_NAME_ALL], path) || [];
+      for (const m of methods) {
+        if (!middleware[m][path]) {
+          this.#insertPath(m, path);
+          middleware[m][path] = findMiddleware(middleware[m], path) || findMiddleware(middleware[METHOD_NAME_ALL], path) || [];
+        }
       }
-      Object.keys(middleware).forEach((m) => {
-        if (method === METHOD_NAME_ALL || method === m) {
-          Object.keys(middleware[m]).forEach((p) => {
-            re.test(p) && middleware[m][p].push([handler, paramCount]);
-          });
+      for (const handlerMap of [middleware, routes]) {
+        for (const m of methods) {
+          for (const p in handlerMap[m]) {
+            re.test(p) && handlerMap[m][p].push([handler, path]);
+          }
         }
-      });
-      Object.keys(routes).forEach((m) => {
-        if (method === METHOD_NAME_ALL || method === m) {
-          Object.keys(routes[m]).forEach((p) => re.test(p) && routes[m][p].push([handler, paramCount]));
-        }
-      });
+      }
       return;
     }
     const paths = checkOptionalParameter(path) || [path];
-    for (let i = 0, len = paths.length;i < len; i++) {
-      const path2 = paths[i];
-      Object.keys(routes).forEach((m) => {
-        if (method === METHOD_NAME_ALL || method === m) {
-          routes[m][path2] ||= [
-            ...findMiddleware(middleware[m], path2) || findMiddleware(middleware[METHOD_NAME_ALL], path2) || []
-          ];
-          routes[m][path2].push([handler, paramCount - len + i + 1]);
+    for (const path2 of paths) {
+      for (const m of methods) {
+        if (!routes[m][path2]) {
+          this.#insertPath(m, path2);
+          routes[m][path2] = findMiddleware(middleware[m], path2) || findMiddleware(middleware[METHOD_NAME_ALL], path2) || [];
         }
-      });
+        routes[m][path2].push([handler, path2]);
+      }
     }
   }
   match = match;
   buildAllMatchers() {
-    const matchers = /* @__PURE__ */ Object.create(null);
-    Object.keys(this.#routes).concat(Object.keys(this.#middleware)).forEach((method) => {
-      matchers[method] ||= this.#buildMatcher(method);
-    });
-    this.#middleware = this.#routes = undefined;
-    clearWildcardRegExpCache();
+    const matchers = createNullObject();
+    for (const method of Object.keys(this.#routes)) {
+      matchers[method] = this.#buildMatcher(method);
+    }
+    this.#middleware = this.#routes = this.#tries = undefined;
+    wildcardRegExpCache = createNullObject();
     return matchers;
   }
   #buildMatcher(method) {
-    const routes = [];
-    let hasOwnRoute = method === METHOD_NAME_ALL;
-    [this.#middleware, this.#routes].forEach((r) => {
-      const ownRoute = r[method] ? Object.keys(r[method]).map((path) => [path, r[method][path]]) : [];
-      if (ownRoute.length !== 0) {
-        hasOwnRoute ||= true;
-        routes.push(...ownRoute);
-      } else if (method !== METHOD_NAME_ALL) {
-        routes.push(...Object.keys(r[METHOD_NAME_ALL]).map((path) => [path, r[METHOD_NAME_ALL][path]]));
+    const middleware = this.#middleware[method];
+    const routes = this.#routes[method];
+    const trie = this.#tries[method];
+    const staticMap = createNullObject();
+    const handlerData = [];
+    const [regexp, indexReplacementMap, paramReplacementMap] = trie.buildRegExp();
+    for (const r of [middleware, routes]) {
+      for (const path in r) {
+        const handlers = r[path];
+        const pathData = trie.paths[path];
+        if (!pathData) {
+          staticMap[path] = [handlers.map(([h]) => [h, createNullObject()]), emptyParam];
+          continue;
+        }
+        handlerData[pathData[0]] = handlers.map(([h, handlerPath]) => [
+          h,
+          trie.paths[handlerPath][1].reduceRight((map, [key], i) => {
+            map[key] = paramReplacementMap[pathData[1][i][1]];
+            return map;
+          }, createNullObject())
+        ]);
       }
-    });
-    if (!hasOwnRoute) {
-      return null;
-    } else {
-      return buildMatcherFromPreprocessedRoutes(routes);
     }
+    return [regexp, indexReplacementMap.map((i) => handlerData[i]), staticMap];
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/reg-exp-router/prepared-router.js
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/router/reg-exp-router/prepared-router.js
 var PreparedRegExpRouter = class {
   name = "PreparedRegExpRouter";
   #matchers;
@@ -1348,7 +1315,7 @@ var PreparedRegExpRouter = class {
   match = match;
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/smart-router/router.js
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/router/smart-router/router.js
 var SmartRouter = class {
   name = "SmartRouter";
   #routers = [];
@@ -1403,78 +1370,53 @@ var SmartRouter = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/trie-router/node.js
-var emptyParams = /* @__PURE__ */ Object.create(null);
-var hasChildren = (children) => {
-  for (const _ in children) {
-    return true;
-  }
-  return false;
-};
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/router/trie-router/node.js
+var emptyParams = createNullObject();
+var order = 0;
 var Node2 = class _Node2 {
-  #methods;
-  #children;
-  #patterns;
-  #order = 0;
+  #methods = [];
+  #children = createNullObject();
+  #patterns = [];
+  #pattern;
   #params = emptyParams;
-  constructor(method, handler, children) {
-    this.#children = children || /* @__PURE__ */ Object.create(null);
-    this.#methods = [];
-    if (method && handler) {
-      const m = /* @__PURE__ */ Object.create(null);
-      m[method] = { handler, possibleKeys: [], score: 0 };
-      this.#methods = [m];
-    }
-    this.#patterns = [];
-  }
   insert(method, path, handler) {
-    this.#order = ++this.#order;
     let curNode = this;
     const parts = splitRoutingPath(path);
-    const possibleKeys = [];
-    for (let i = 0, len = parts.length;i < len; i++) {
-      const p = parts[i];
-      const nextP = parts[i + 1];
-      const pattern = getPattern(p, nextP);
-      const key = Array.isArray(pattern) ? pattern[0] : p;
-      if (key in curNode.#children) {
-        curNode = curNode.#children[key];
-        if (pattern) {
-          possibleKeys.push(pattern[1]);
-        }
-        continue;
+    const possibleKeys = /* @__PURE__ */ new Set;
+    let i = 0;
+    for (const p of parts) {
+      const nextP = parts[++i];
+      const pattern = getPattern(p, nextP) || (nextP === undefined && p && p.indexOf("*") === p.length - 1 ? p : null);
+      const isParam = Array.isArray(pattern);
+      const key = isParam ? pattern[0] : pattern || p;
+      const child = curNode.#children[key] ||= new _Node2;
+      if (pattern && !child.#pattern) {
+        child.#pattern = pattern;
+        curNode.#patterns.push(child);
       }
-      curNode.#children[key] = new _Node2;
-      if (pattern) {
-        curNode.#patterns.push(pattern);
-        possibleKeys.push(pattern[1]);
+      curNode = child;
+      if (isParam) {
+        possibleKeys.add(pattern[1]);
       }
-      curNode = curNode.#children[key];
     }
     curNode.#methods.push({
       [method]: {
         handler,
-        possibleKeys: possibleKeys.filter((v, i, a) => a.indexOf(v) === i),
-        score: this.#order
+        possibleKeys: [...possibleKeys],
+        score: ++order
       }
     });
-    return curNode;
   }
   #pushHandlerSets(handlerSets, node, method, nodeParams, params) {
     for (let i = 0, len = node.#methods.length;i < len; i++) {
       const m = node.#methods[i];
       const handlerSet = m[method] || m[METHOD_NAME_ALL];
-      const processedSet = {};
-      if (handlerSet !== undefined) {
-        handlerSet.params = /* @__PURE__ */ Object.create(null);
+      if (handlerSet) {
+        handlerSet.params = createNullObject();
         handlerSets.push(handlerSet);
-        if (nodeParams !== emptyParams || params && params !== emptyParams) {
-          for (let i2 = 0, len2 = handlerSet.possibleKeys.length;i2 < len2; i2++) {
-            const key = handlerSet.possibleKeys[i2];
-            const processed = processedSet[handlerSet.score];
-            handlerSet.params[key] = params?.[key] && !processed ? params[key] : nodeParams[key] ?? params?.[key];
-            processedSet[handlerSet.score] = true;
-          }
+        for (let i2 = 0, len2 = handlerSet.possibleKeys.length;i2 < len2; i2++) {
+          const key = handlerSet.possibleKeys[i2];
+          handlerSet.params[key] = params?.[key] && !i2 ? params[key] : nodeParams[key] ?? params?.[key];
         }
       }
     }
@@ -1506,42 +1448,46 @@ var Node2 = class _Node2 {
             tempNodes.push(nextNode);
           }
         }
-        for (let k = 0, len3 = node.#patterns.length;k < len3; k++) {
-          const pattern = node.#patterns[k];
+        for (const child of node.#patterns) {
+          const pattern = child.#pattern;
           const params = node.#params === emptyParams ? {} : { ...node.#params };
-          if (pattern === "*") {
-            const astNode = node.#children["*"];
-            if (astNode) {
-              this.#pushHandlerSets(handlerSets, astNode, method, node.#params);
-              astNode.#params = params;
-              tempNodes.push(astNode);
+          if (typeof pattern === "string") {
+            if (pattern === "*" || part.startsWith(pattern.slice(0, -1))) {
+              this.#pushHandlerSets(handlerSets, child, method, node.#params);
+              if (pattern === "*") {
+                child.#params = params;
+                tempNodes.push(child);
+              }
             }
             continue;
           }
-          const [key, name, matcher] = pattern;
-          if (!part && !(matcher instanceof RegExp)) {
+          const [, name, matcher] = pattern;
+          if (!part && matcher === true) {
             continue;
           }
-          const child = node.#children[key];
-          if (matcher instanceof RegExp) {
-            if (partOffsets === null) {
-              partOffsets = new Array(len);
+          if (matcher !== true) {
+            if (!partOffsets) {
+              partOffsets = [];
               let offset = path[0] === "/" ? 1 : 0;
               for (let p = 0;p < len; p++) {
                 partOffsets[p] = offset;
                 offset += parts[p].length + 1;
               }
             }
-            const restPathString = path.substring(partOffsets[i]);
+            const restPathString = path.slice(partOffsets[i]);
             const m = matcher.exec(restPathString);
             if (m) {
               params[name] = m[0];
               this.#pushHandlerSets(handlerSets, child, method, node.#params, params);
-              if (hasChildren(child.#children)) {
+              if (m[0].length === restPathString.length && child.#children["*"]) {
+                this.#pushHandlerSets(handlerSets, child.#children["*"], method, node.#params, params);
+              }
+              for (const _ in child.#children) {
                 child.#params = params;
-                const componentCount = m[0].match(/\//)?.length ?? 0;
+                const componentCount = m[0].match(/\//g)?.length ?? 0;
                 const targetCurNodes = curNodesQueue[componentCount] ||= [];
                 targetCurNodes.push(child);
+                break;
               }
               continue;
             }
@@ -1563,7 +1509,7 @@ var Node2 = class _Node2 {
       const shifted = curNodesQueue.shift();
       curNodes = shifted ? tempNodes.concat(shifted) : tempNodes;
     }
-    if (handlerSets.length > 1) {
+    if (handlerSets[1]) {
       handlerSets.sort((a, b) => {
         return a.score - b.score;
       });
@@ -1572,29 +1518,21 @@ var Node2 = class _Node2 {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/router/trie-router/router.js
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/router/trie-router/router.js
 var TrieRouter = class {
   name = "TrieRouter";
-  #node;
-  constructor() {
-    this.#node = new Node2;
-  }
+  #node = new Node2;
   add(method, path, handler) {
-    const results = checkOptionalParameter(path);
-    if (results) {
-      for (let i = 0, len = results.length;i < len; i++) {
-        this.#node.insert(method, results[i], handler);
-      }
-      return;
+    for (const result of checkOptionalParameter(path) || [path]) {
+      this.#node.insert(method, result, handler);
     }
-    this.#node.insert(method, path, handler);
   }
   match(method, path) {
     return this.#node.search(method, path);
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/hono.js
+// ../../../../../zveltio/node_modules/.bun/hono@4.13.5/node_modules/hono/dist/hono.js
 var Hono2 = class extends Hono {
   constructor(options = {}) {
     super(options);
@@ -1604,8 +1542,25 @@ var Hono2 = class extends Hono {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/utils/cookie.js
-var validCookieNameRegEx = /^[\w!#$%&'*.^`|~+-]+$/;
+// ../../../../../zveltio-extensions/node_modules/hono/dist/utils/url.js
+var tryDecode2 = (str, decoder) => {
+  try {
+    return decoder(str);
+  } catch {
+    return str.replace(/(?:%[0-9A-Fa-f]{2})+/g, (match2) => {
+      try {
+        return decoder(match2);
+      } catch {
+        return match2;
+      }
+    });
+  }
+};
+var tryDecodeURIComponent2 = (str) => str.indexOf("%") !== -1 ? tryDecode2(str, decodeURIComponent_2) : str;
+var decodeURIComponent_2 = decodeURIComponent;
+
+// ../../../../../zveltio-extensions/node_modules/hono/dist/utils/cookie.js
+var relaxedCookieNameRegEx = /^[!#-:<>-[\]-~]+$/;
 var validCookieValueRegEx = /^[ !#-:<-[\]-~]*$/;
 var trimCookieWhitespace = (value) => {
   let start = 0;
@@ -1638,7 +1593,7 @@ var parse = (cookie, name) => {
       continue;
     }
     const cookieName = trimCookieWhitespace(pairStr.substring(0, valueStartPos));
-    if (name && name !== cookieName || !validCookieNameRegEx.test(cookieName) || cookieName in parsedCookie) {
+    if (name && name !== cookieName || !relaxedCookieNameRegEx.test(cookieName) || cookieName in parsedCookie) {
       continue;
     }
     let cookieValue = trimCookieWhitespace(pairStr.substring(valueStartPos + 1));
@@ -1646,7 +1601,7 @@ var parse = (cookie, name) => {
       cookieValue = cookieValue.slice(1, -1);
     }
     if (validCookieValueRegEx.test(cookieValue)) {
-      parsedCookie[cookieName] = cookieValue.indexOf("%") !== -1 ? tryDecode(cookieValue, decodeURIComponent_) : cookieValue;
+      parsedCookie[cookieName] = tryDecodeURIComponent2(cookieValue);
       if (name) {
         break;
       }
@@ -1655,7 +1610,7 @@ var parse = (cookie, name) => {
   return parsedCookie;
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/helper/cookie/index.js
+// ../../../../../zveltio-extensions/node_modules/hono/dist/helper/cookie/index.js
 var getCookie = (c, key, prefix) => {
   const cookie = c.req.raw.headers.get("Cookie");
   if (typeof key === "string") {
@@ -1678,7 +1633,40 @@ var getCookie = (c, key, prefix) => {
   return obj;
 };
 
-// ../zveltio/node_modules/.bun/hono@4.12.28/node_modules/hono/dist/validator/validator.js
+// ../../../../../zveltio-extensions/node_modules/hono/dist/http-exception.js
+var HTTPException2 = class extends Error {
+  res;
+  status;
+  constructor(status = 500, options) {
+    super(options?.message, { cause: options?.cause });
+    this.res = options?.res;
+    this.status = status;
+  }
+  getResponse() {
+    if (this.res) {
+      const newResponse = new Response(this.res.body, {
+        status: this.status,
+        headers: this.res.headers
+      });
+      return newResponse;
+    }
+    return new Response(this.message, {
+      status: this.status
+    });
+  }
+};
+
+// ../../../../../zveltio-extensions/node_modules/hono/dist/utils/buffer.js
+var bufferToFormData2 = (arrayBuffer, contentType) => {
+  const response = new Response(arrayBuffer, {
+    headers: {
+      "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase())
+    }
+  });
+  return response.formData();
+};
+
+// ../../../../../zveltio-extensions/node_modules/hono/dist/validator/validator.js
 var jsonRegex = /^application\/([a-z-\.]+\+)?json(;\s*[a-zA-Z0-9\-]+\=([^;]+))*$/i;
 var multipartRegex = /^multipart\/form-data(;\s?boundary=[a-zA-Z0-9'"()+_,\-./:=?]+)?$/i;
 var urlencodedRegex = /^application\/x-www-form-urlencoded(;\s*[a-zA-Z0-9\-]+\=([^;]+))*$/i;
@@ -1695,7 +1683,7 @@ var validator = (target, validationFunc) => {
           value = await c.req.json();
         } catch {
           const message = "Malformed JSON in request body";
-          throw new HTTPException(400, { message });
+          throw new HTTPException2(400, { message });
         }
         break;
       case "form": {
@@ -1708,12 +1696,12 @@ var validator = (target, validationFunc) => {
         } else {
           try {
             const arrayBuffer = await c.req.arrayBuffer();
-            formData = await bufferToFormData(arrayBuffer, contentType);
+            formData = await bufferToFormData2(arrayBuffer, contentType);
             c.req.bodyCache.formData = formData;
           } catch (e) {
             let message = "Malformed FormData request.";
             message += e instanceof Error ? ` ${e.message}` : ` ${String(e)}`;
-            throw new HTTPException(400, { message });
+            throw new HTTPException2(400, { message });
           }
         }
         const form = /* @__PURE__ */ Object.create(null);
@@ -1755,14 +1743,14 @@ var validator = (target, validationFunc) => {
   };
 };
 
-// ../zveltio/node_modules/.bun/@hono+zod-validator@0.7.6+4bef6e9a69915e20/node_modules/@hono/zod-validator/dist/index.js
+// ../../../../../zveltio-extensions/node_modules/@hono/zod-validator/dist/index.mjs
 function zValidatorFunction(target, schema, hook, options) {
   return validator(target, async (value, c) => {
     let validatorValue = value;
     if (target === "header" && "_def" in schema || target === "header" && "_zod" in schema) {
       const schemaKeys = Object.keys("in" in schema ? schema.in.shape : schema.shape);
       const caseInsensitiveKeymap = Object.fromEntries(schemaKeys.map((key) => [key.toLowerCase(), key]));
-      validatorValue = Object.fromEntries(Object.entries(value).map(([key, value$1]) => [caseInsensitiveKeymap[key] || key, value$1]));
+      validatorValue = Object.fromEntries(Object.entries(value).map(([key, value2]) => [caseInsensitiveKeymap[key] || key, value2]));
     }
     const result = options && options.validationFunction ? await options.validationFunction(schema, validatorValue) : await schema.safeParseAsync(validatorValue);
     if (hook) {
@@ -1785,7 +1773,7 @@ function zValidatorFunction(target, schema, hook, options) {
 }
 var zValidator = zValidatorFunction;
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
 var exports_external = {};
 __export(exports_external, {
   xor: () => xor,
@@ -2028,7 +2016,7 @@ __export(exports_external, {
   $brand: () => $brand
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/index.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/index.js
 var exports_core2 = {};
 __export(exports_core2, {
   version: () => version,
@@ -2307,7 +2295,7 @@ __export(exports_core2, {
   $ZodAny: () => $ZodAny
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/core.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/core.js
 var _a;
 var NEVER = /* @__PURE__ */ Object.freeze({
   status: "aborted"
@@ -2385,7 +2373,7 @@ function config(newConfig) {
     Object.assign(globalConfig, newConfig);
   return globalConfig;
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/util.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/util.js
 var exports_util = {};
 __export(exports_util, {
   unwrapMessage: () => unwrapMessage,
@@ -3077,7 +3065,7 @@ class Class {
   constructor(..._args) {}
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/errors.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/errors.js
 var initializer = (inst, def) => {
   inst.name = "$ZodError";
   Object.defineProperty(inst, "_zod", {
@@ -3217,7 +3205,7 @@ function prettifyError(error) {
 `);
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/parse.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/parse.js
 var _parse = (_Err) => (schema, value, _ctx, _params) => {
   const ctx = _ctx ? { ..._ctx, async: false } : { async: false };
   const result = schema._zod.run({ value, issues: [] }, ctx);
@@ -3304,7 +3292,7 @@ var _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
   return _safeParseAsync(_Err)(schema, value, _ctx);
 };
 var safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync($ZodRealError);
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/regexes.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/regexes.js
 var exports_regexes = {};
 __export(exports_regexes, {
   xid: () => xid,
@@ -3463,7 +3451,7 @@ var sha512_hex = /^[0-9a-fA-F]{128}$/;
 var sha512_base64 = /* @__PURE__ */ fixedBase64(86, "==");
 var sha512_base64url = /* @__PURE__ */ fixedBase64url(86);
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/checks.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a2;
   inst._zod ?? (inst._zod = {});
@@ -4010,7 +3998,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/doc.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/doc.js
 class Doc {
   constructor(args = []) {
     this.content = [];
@@ -4048,14 +4036,14 @@ class Doc {
   }
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/versions.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 4,
   patch: 3
 };
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/schemas.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a2;
   inst ?? (inst = {});
@@ -6139,7 +6127,7 @@ function handleRefineResult(result, payload, input, inst) {
     payload.issues.push(issue(_iss));
   }
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/index.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/index.js
 var exports_locales = {};
 __export(exports_locales, {
   zhTW: () => zh_TW_default,
@@ -6196,7 +6184,7 @@ __export(exports_locales, {
   ar: () => ar_default
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ar.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ar.js
 var error = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0641", verb: "\u0623\u0646 \u064A\u062D\u0648\u064A" },
@@ -6302,7 +6290,7 @@ function ar_default() {
     localeError: error()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/az.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/az.js
 var error2 = () => {
   const Sizable = {
     string: { unit: "simvol", verb: "olmal\u0131d\u0131r" },
@@ -6407,7 +6395,7 @@ function az_default() {
     localeError: error2()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/be.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/be.js
 function getBelarusianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -6563,7 +6551,7 @@ function be_default() {
     localeError: error3()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/bg.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/bg.js
 var error4 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0430", verb: "\u0434\u0430 \u0441\u044A\u0434\u044A\u0440\u0436\u0430" },
@@ -6683,7 +6671,7 @@ function bg_default() {
     localeError: error4()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ca.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ca.js
 var error5 = () => {
   const Sizable = {
     string: { unit: "car\xE0cters", verb: "contenir" },
@@ -6790,7 +6778,7 @@ function ca_default() {
     localeError: error5()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/cs.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/cs.js
 var error6 = () => {
   const Sizable = {
     string: { unit: "znak\u016F", verb: "m\xEDt" },
@@ -6901,7 +6889,7 @@ function cs_default() {
     localeError: error6()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/da.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/da.js
 var error7 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "havde" },
@@ -7016,7 +7004,7 @@ function da_default() {
     localeError: error7()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/de.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/de.js
 var error8 = () => {
   const Sizable = {
     string: { unit: "Zeichen", verb: "zu haben" },
@@ -7124,7 +7112,7 @@ function de_default() {
     localeError: error8()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/el.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/el.js
 var error9 = () => {
   const Sizable = {
     string: { unit: "\u03C7\u03B1\u03C1\u03B1\u03BA\u03C4\u03AE\u03C1\u03B5\u03C2", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" },
@@ -7233,7 +7221,7 @@ function el_default() {
     localeError: error9()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/en.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/en.js
 var error10 = () => {
   const Sizable = {
     string: { unit: "characters", verb: "to have" },
@@ -7343,7 +7331,7 @@ function en_default() {
     localeError: error10()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/eo.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/eo.js
 var error11 = () => {
   const Sizable = {
     string: { unit: "karaktrojn", verb: "havi" },
@@ -7452,7 +7440,7 @@ function eo_default() {
     localeError: error11()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/es.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/es.js
 var error12 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "tener" },
@@ -7584,7 +7572,7 @@ function es_default() {
     localeError: error12()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fa.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fa.js
 var error13 = () => {
   const Sizable = {
     string: { unit: "\u06A9\u0627\u0631\u0627\u06A9\u062A\u0631", verb: "\u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F" },
@@ -7698,7 +7686,7 @@ function fa_default() {
     localeError: error13()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fi.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fi.js
 var error14 = () => {
   const Sizable = {
     string: { unit: "merkki\xE4", subject: "merkkijonon" },
@@ -7810,7 +7798,7 @@ function fi_default() {
     localeError: error14()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr.js
 var error15 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -7935,7 +7923,7 @@ function fr_default() {
     localeError: error15()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr-CA.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr-CA.js
 var error16 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -8042,7 +8030,7 @@ function fr_CA_default() {
     localeError: error16()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/he.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/he.js
 var error17 = () => {
   const TypeNames = {
     string: { label: "\u05DE\u05D7\u05E8\u05D5\u05D6\u05EA", gender: "f" },
@@ -8235,7 +8223,7 @@ function he_default() {
     localeError: error17()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hr.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hr.js
 var error18 = () => {
   const Sizable = {
     string: { unit: "znakova", verb: "imati" },
@@ -8357,7 +8345,7 @@ function hr_default() {
     localeError: error18()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hu.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hu.js
 var error19 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "legyen" },
@@ -8465,7 +8453,7 @@ function hu_default() {
     localeError: error19()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hy.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hy.js
 function getArmenianPlural(count, one, many) {
   return Math.abs(count) === 1 ? one : many;
 }
@@ -8612,7 +8600,7 @@ function hy_default() {
     localeError: error20()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/id.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/id.js
 var error21 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "memiliki" },
@@ -8718,7 +8706,7 @@ function id_default() {
     localeError: error21()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/is.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/is.js
 var error22 = () => {
   const Sizable = {
     string: { unit: "stafi", verb: "a\xF0 hafa" },
@@ -8827,7 +8815,7 @@ function is_default() {
     localeError: error22()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/it.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/it.js
 var error23 = () => {
   const Sizable = {
     string: { unit: "caratteri", verb: "avere" },
@@ -8935,7 +8923,7 @@ function it_default() {
     localeError: error23()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ja.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ja.js
 var error24 = () => {
   const Sizable = {
     string: { unit: "\u6587\u5B57", verb: "\u3067\u3042\u308B" },
@@ -9042,7 +9030,7 @@ function ja_default() {
     localeError: error24()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ka.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ka.js
 var error25 = () => {
   const Sizable = {
     string: { unit: "\u10E1\u10D8\u10DB\u10D1\u10DD\u10DA\u10DD", verb: "\u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1" },
@@ -9154,7 +9142,7 @@ function ka_default() {
     localeError: error25()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/km.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/km.js
 var error26 = () => {
   const Sizable = {
     string: { unit: "\u178F\u17BD\u17A2\u1780\u17D2\u179F\u179A", verb: "\u1782\u17BD\u179A\u1798\u17B6\u1793" },
@@ -9265,11 +9253,11 @@ function km_default() {
   };
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/kh.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/kh.js
 function kh_default() {
   return km_default();
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ko.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ko.js
 var error27 = () => {
   const Sizable = {
     string: { unit: "\uBB38\uC790", verb: "to have" },
@@ -9380,7 +9368,7 @@ function ko_default() {
     localeError: error27()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/lt.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/lt.js
 var capitalizeFirstCharacter = (text) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
@@ -9583,7 +9571,7 @@ function lt_default() {
     localeError: error28()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/mk.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/mk.js
 var error29 = () => {
   const Sizable = {
     string: { unit: "\u0437\u043D\u0430\u0446\u0438", verb: "\u0434\u0430 \u0438\u043C\u0430\u0430\u0442" },
@@ -9692,7 +9680,7 @@ function mk_default() {
     localeError: error29()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ms.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ms.js
 var error30 = () => {
   const Sizable = {
     string: { unit: "aksara", verb: "mempunyai" },
@@ -9799,7 +9787,7 @@ function ms_default() {
     localeError: error30()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/nl.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/nl.js
 var error31 = () => {
   const Sizable = {
     string: { unit: "tekens", verb: "heeft" },
@@ -9909,7 +9897,7 @@ function nl_default() {
     localeError: error31()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/no.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/no.js
 var error32 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "\xE5 ha" },
@@ -10017,7 +10005,7 @@ function no_default() {
     localeError: error32()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ota.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ota.js
 var error33 = () => {
   const Sizable = {
     string: { unit: "harf", verb: "olmal\u0131d\u0131r" },
@@ -10126,7 +10114,7 @@ function ota_default() {
     localeError: error33()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ps.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ps.js
 var error34 = () => {
   const Sizable = {
     string: { unit: "\u062A\u0648\u06A9\u064A", verb: "\u0648\u0644\u0631\u064A" },
@@ -10240,7 +10228,7 @@ function ps_default() {
     localeError: error34()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pl.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pl.js
 var error35 = () => {
   const Sizable = {
     string: { unit: "znak\xF3w", verb: "mie\u0107" },
@@ -10349,7 +10337,7 @@ function pl_default() {
     localeError: error35()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pt.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pt.js
 var error36 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "ter" },
@@ -10457,7 +10445,7 @@ function pt_default() {
     localeError: error36()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ro.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ro.js
 var error37 = () => {
   const Sizable = {
     string: { unit: "caractere", verb: "s\u0103 aib\u0103" },
@@ -10576,7 +10564,7 @@ function ro_default() {
     localeError: error37()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ru.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ru.js
 function getRussianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -10732,7 +10720,7 @@ function ru_default() {
     localeError: error38()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sl.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sl.js
 var error39 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "imeti" },
@@ -10841,7 +10829,7 @@ function sl_default() {
     localeError: error39()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sv.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sv.js
 var error40 = () => {
   const Sizable = {
     string: { unit: "tecken", verb: "att ha" },
@@ -10951,7 +10939,7 @@ function sv_default() {
     localeError: error40()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ta.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ta.js
 var error41 = () => {
   const Sizable = {
     string: { unit: "\u0B8E\u0BB4\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1\u0B95\u0BCD\u0B95\u0BB3\u0BCD", verb: "\u0B95\u0BCA\u0BA3\u0BCD\u0B9F\u0BBF\u0BB0\u0BC1\u0B95\u0BCD\u0B95 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD" },
@@ -11061,7 +11049,7 @@ function ta_default() {
     localeError: error41()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/th.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/th.js
 var error42 = () => {
   const Sizable = {
     string: { unit: "\u0E15\u0E31\u0E27\u0E2D\u0E31\u0E01\u0E29\u0E23", verb: "\u0E04\u0E27\u0E23\u0E21\u0E35" },
@@ -11171,7 +11159,7 @@ function th_default() {
     localeError: error42()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/tr.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/tr.js
 var error43 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "olmal\u0131" },
@@ -11276,7 +11264,7 @@ function tr_default() {
     localeError: error43()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uk.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uk.js
 var error44 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0456\u0432", verb: "\u043C\u0430\u0442\u0438\u043C\u0435" },
@@ -11385,11 +11373,11 @@ function uk_default() {
   };
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ua.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ua.js
 function ua_default() {
   return uk_default();
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ur.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ur.js
 var error45 = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0648\u0641", verb: "\u06C1\u0648\u0646\u0627" },
@@ -11499,7 +11487,7 @@ function ur_default() {
     localeError: error45()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uz.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uz.js
 var error46 = () => {
   const Sizable = {
     string: { unit: "belgi", verb: "bo\u2018lishi kerak" },
@@ -11609,7 +11597,7 @@ function uz_default() {
     localeError: error46()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/vi.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/vi.js
 var error47 = () => {
   const Sizable = {
     string: { unit: "k\xFD t\u1EF1", verb: "c\xF3" },
@@ -11717,7 +11705,7 @@ function vi_default() {
     localeError: error47()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-CN.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-CN.js
 var error48 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u7B26", verb: "\u5305\u542B" },
@@ -11826,7 +11814,7 @@ function zh_CN_default() {
     localeError: error48()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-TW.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-TW.js
 var error49 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u5143", verb: "\u64C1\u6709" },
@@ -11933,7 +11921,7 @@ function zh_TW_default() {
     localeError: error49()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/yo.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/yo.js
 var error50 = () => {
   const Sizable = {
     string: { unit: "\xE0mi", verb: "n\xED" },
@@ -12040,7 +12028,7 @@ function yo_default() {
     localeError: error50()
   };
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/registries.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/registries.js
 var _a2;
 var $output = Symbol("ZodOutput");
 var $input = Symbol("ZodInput");
@@ -12090,7 +12078,7 @@ function registry() {
 }
 (_a2 = globalThis).__zod_globalRegistry ?? (_a2.__zod_globalRegistry = registry());
 var globalRegistry = globalThis.__zod_globalRegistry;
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/api.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/api.js
 function _string(Class2, params) {
   return new Class2({
     type: "string",
@@ -13010,7 +12998,7 @@ function _stringFormat(Class2, format, fnOrRegex, _params = {}) {
   const inst = new Class2(def);
   return inst;
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/to-json-schema.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/to-json-schema.js
 function initializeContext(params) {
   let target = params?.target ?? "draft-2020-12";
   if (target === "draft-4")
@@ -13362,7 +13350,7 @@ var createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params) =
   extractDefs(ctx, schema);
   return finalize(ctx, schema);
 };
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-processors.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-processors.js
 var formatMap = {
   guid: "uuid",
   url: "uri",
@@ -13900,7 +13888,7 @@ function toJSONSchema(input, params) {
   extractDefs(ctx, input);
   return finalize(ctx, input);
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-generator.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-generator.js
 class JSONSchemaGenerator {
   get metadataRegistry() {
     return this.ctx.metadataRegistry;
@@ -13959,9 +13947,9 @@ class JSONSchemaGenerator {
     return plainResult;
   }
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema.js
 var exports_json_schema = {};
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
 var exports_schemas2 = {};
 __export(exports_schemas2, {
   xor: () => xor,
@@ -14132,7 +14120,7 @@ __export(exports_schemas2, {
   ZodAny: () => ZodAny
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/checks.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/checks.js
 var exports_checks2 = {};
 __export(exports_checks2, {
   uppercase: () => _uppercase,
@@ -14166,7 +14154,7 @@ __export(exports_checks2, {
   endsWith: () => _endsWith
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/iso.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/iso.js
 var exports_iso = {};
 __export(exports_iso, {
   time: () => time2,
@@ -14207,7 +14195,7 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/errors.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/errors.js
 var initializer2 = (inst, issues) => {
   $ZodError.init(inst, issues);
   inst.name = "ZodError";
@@ -14242,7 +14230,7 @@ var ZodRealError = /* @__PURE__ */ $constructor("ZodError", initializer2, {
   Parent: Error
 });
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/parse.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/parse.js
 var parse4 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse2 = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -14256,7 +14244,7 @@ var safeDecode2 = /* @__PURE__ */ _safeDecode(ZodRealError);
 var safeEncodeAsync2 = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 var safeDecodeAsync2 = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
 var _installedGroups = /* @__PURE__ */ new WeakMap;
 function _installLazyMethods(inst, group, methods) {
   const proto = Object.getPrototypeOf(inst);
@@ -15543,7 +15531,7 @@ function preprocess(fn, schema) {
     out: schema
   });
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/compat.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/compat.js
 var ZodIssueCode = {
   invalid_type: "invalid_type",
   too_big: "too_big",
@@ -15567,7 +15555,7 @@ function getErrorMap() {
 }
 var ZodFirstPartyTypeKind;
 (function(ZodFirstPartyTypeKind2) {})(ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {}));
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/from-json-schema.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/from-json-schema.js
 var z = {
   ...exports_schemas2,
   ...exports_checks2,
@@ -16034,7 +16022,7 @@ function fromJSONSchema(schema, params) {
   };
   return convertSchema(normalized, ctx);
 }
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/coerce.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/coerce.js
 var exports_coerce = {};
 __export(exports_coerce, {
   string: () => string3,
@@ -16059,9 +16047,9 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
-// ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
+// ../../../../../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
 config(en_default());
-// ../zveltio/packages/sdk/src/extension/permission-gate.ts
+// ../../../../zveltio/packages/sdk/src/extension/permission-gate.ts
 async function refuse(ctx, c, resource, action) {
   let denial = null;
   try {
@@ -16129,7 +16117,3393 @@ function permissionGate(ctx, resource, opts = {}) {
     await next();
   };
 }
-// compliance/ro/etransport/engine/routes.ts
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/util/object-utils.js
+function isUndefined(obj) {
+  return typeof obj === "undefined" || obj === undefined;
+}
+function isString(obj) {
+  return typeof obj === "string";
+}
+function isNumber(obj) {
+  return typeof obj === "number";
+}
+function isBoolean(obj) {
+  return typeof obj === "boolean";
+}
+function isNull(obj) {
+  return obj === null;
+}
+function isBigInt(obj) {
+  return typeof obj === "bigint";
+}
+function isFunction(obj) {
+  return typeof obj === "function";
+}
+function isObject2(obj) {
+  return typeof obj === "object" && obj !== null;
+}
+function freeze(obj) {
+  return Object.freeze(obj);
+}
+function asArray(arg) {
+  if (isReadonlyArray(arg)) {
+    return arg;
+  } else {
+    return [arg];
+  }
+}
+function isReadonlyArray(arg) {
+  return Array.isArray(arg);
+}
+function getMessage(error51) {
+  return error51 instanceof Error ? error51.message : String(error51);
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/identifier-node.js
+var IdentifierNode = freeze({
+  is(node) {
+    return node.kind === "IdentifierNode";
+  },
+  create(name) {
+    return freeze({
+      kind: "IdentifierNode",
+      name
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/schemable-identifier-node.js
+var SchemableIdentifierNode = freeze({
+  is(node) {
+    return node.kind === "SchemableIdentifierNode";
+  },
+  create(identifier) {
+    return freeze({
+      kind: "SchemableIdentifierNode",
+      identifier: IdentifierNode.create(identifier)
+    });
+  },
+  createWithSchema(schema, identifier) {
+    return freeze({
+      kind: "SchemableIdentifierNode",
+      schema: IdentifierNode.create(schema),
+      identifier: IdentifierNode.create(identifier)
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/alias-node.js
+var AliasNode = freeze({
+  is(node) {
+    return node.kind === "AliasNode";
+  },
+  create(node, alias) {
+    return freeze({
+      kind: "AliasNode",
+      node,
+      alias
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/table-node.js
+var TableNode = freeze({
+  is(node) {
+    return node.kind === "TableNode";
+  },
+  create(table) {
+    return freeze({
+      kind: "TableNode",
+      table: SchemableIdentifierNode.create(table)
+    });
+  },
+  createWithSchema(schema, table) {
+    return freeze({
+      kind: "TableNode",
+      table: SchemableIdentifierNode.createWithSchema(schema, table)
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/operation-node-source.js
+function isOperationNodeSource(obj) {
+  return isObject2(obj) && isFunction(obj.toOperationNode);
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/expression/expression.js
+function isExpression(obj) {
+  return isObject2(obj) && "expressionType" in obj && isOperationNodeSource(obj);
+}
+function isAliasedExpression(obj) {
+  return isObject2(obj) && "expression" in obj && isString(obj.alias) && isOperationNodeSource(obj);
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/select-modifier-node.js
+var SelectModifierNode = freeze({
+  is(node) {
+    return node.kind === "SelectModifierNode";
+  },
+  create(modifier, of) {
+    return freeze({
+      kind: "SelectModifierNode",
+      modifier,
+      of
+    });
+  },
+  createWithExpression(modifier) {
+    return freeze({
+      kind: "SelectModifierNode",
+      rawModifier: modifier
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/and-node.js
+var AndNode = freeze({
+  is(node) {
+    return node.kind === "AndNode";
+  },
+  create(left, right) {
+    return freeze({
+      kind: "AndNode",
+      left,
+      right
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/or-node.js
+var OrNode = freeze({
+  is(node) {
+    return node.kind === "OrNode";
+  },
+  create(left, right) {
+    return freeze({
+      kind: "OrNode",
+      left,
+      right
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/on-node.js
+var OnNode = freeze({
+  is(node) {
+    return node.kind === "OnNode";
+  },
+  create(filter) {
+    return freeze({
+      kind: "OnNode",
+      on: filter
+    });
+  },
+  cloneWithOperation(onNode, operator, operation) {
+    return freeze({
+      ...onNode,
+      on: operator === "And" ? AndNode.create(onNode.on, operation) : OrNode.create(onNode.on, operation)
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/join-node.js
+var JoinNode = freeze({
+  is(node) {
+    return node.kind === "JoinNode";
+  },
+  create(joinType, table) {
+    return freeze({
+      kind: "JoinNode",
+      joinType,
+      table,
+      on: undefined
+    });
+  },
+  createWithOn(joinType, table, on) {
+    return freeze({
+      kind: "JoinNode",
+      joinType,
+      table,
+      on: OnNode.create(on)
+    });
+  },
+  cloneWithOn(joinNode, operation) {
+    return freeze({
+      ...joinNode,
+      on: joinNode.on ? OnNode.cloneWithOperation(joinNode.on, "And", operation) : OnNode.create(operation)
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/binary-operation-node.js
+var BinaryOperationNode = freeze({
+  is(node) {
+    return node.kind === "BinaryOperationNode";
+  },
+  create(leftOperand, operator, rightOperand) {
+    return freeze({
+      kind: "BinaryOperationNode",
+      leftOperand,
+      operator,
+      rightOperand
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/operator-node.js
+var COMPARISON_OPERATORS_DICTIONARY = freeze({
+  "=": true,
+  "==": true,
+  "!=": true,
+  "<>": true,
+  ">": true,
+  ">=": true,
+  "<": true,
+  "<=": true,
+  in: true,
+  "not in": true,
+  is: true,
+  "is not": true,
+  like: true,
+  "not like": true,
+  match: true,
+  ilike: true,
+  "not ilike": true,
+  "@>": true,
+  "<@": true,
+  "^@": true,
+  "&&": true,
+  "?": true,
+  "?&": true,
+  "?|": true,
+  "!<": true,
+  "!>": true,
+  "<=>": true,
+  "!~": true,
+  "~": true,
+  "~*": true,
+  "!~*": true,
+  "@@": true,
+  "@@@": true,
+  "!!": true,
+  "<->": true,
+  regexp: true,
+  "is distinct from": true,
+  "is not distinct from": true
+});
+var COMPARISON_OPERATORS = Object.keys(COMPARISON_OPERATORS_DICTIONARY);
+var ARITHMETIC_OPERATORS_DICTIONARY = freeze({
+  "+": true,
+  "-": true,
+  "*": true,
+  "/": true,
+  "%": true,
+  "^": true,
+  "&": true,
+  "|": true,
+  "#": true,
+  "<<": true,
+  ">>": true
+});
+var ARITHMETIC_OPERATORS = Object.keys(ARITHMETIC_OPERATORS_DICTIONARY);
+var JSON_OPERATORS_DICTIONARY = freeze({
+  "->": true,
+  "->>": true
+});
+var JSON_OPERATORS = Object.keys(JSON_OPERATORS_DICTIONARY);
+var BINARY_OPERATORS_DICTIONARY = freeze({
+  ...COMPARISON_OPERATORS_DICTIONARY,
+  ...ARITHMETIC_OPERATORS_DICTIONARY,
+  "||": true
+});
+var BINARY_OPERATORS = Object.keys(BINARY_OPERATORS_DICTIONARY);
+var UNARY_FILTER_OPERATORS_DICTIONARY = freeze({
+  exists: true,
+  "not exists": true
+});
+var UNARY_FILTER_OPERATORS = Object.keys(UNARY_FILTER_OPERATORS_DICTIONARY);
+var UNARY_OPERATORS_DICTIONARY = freeze({
+  ...UNARY_FILTER_OPERATORS_DICTIONARY,
+  "-": true,
+  not: true
+});
+var UNARY_OPERATORS = Object.keys(UNARY_OPERATORS_DICTIONARY);
+var OPERATORS = [
+  ...BINARY_OPERATORS,
+  ...JSON_OPERATORS,
+  ...UNARY_OPERATORS,
+  "between",
+  "between symmetric"
+];
+var OperatorNode = freeze({
+  is(node) {
+    return node.kind === "OperatorNode";
+  },
+  create(operator) {
+    return freeze({
+      kind: "OperatorNode",
+      operator
+    });
+  }
+});
+function isBinaryOperator(op) {
+  return isString(op) && BINARY_OPERATORS_DICTIONARY[op];
+}
+function isJSONOperator(op) {
+  return isString(op) && JSON_OPERATORS_DICTIONARY[op];
+}
+function isUnaryOperator(op) {
+  return isString(op) && UNARY_OPERATORS_DICTIONARY[op];
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/column-node.js
+var ColumnNode = freeze({
+  is(node) {
+    return node.kind === "ColumnNode";
+  },
+  create(column) {
+    return freeze({
+      kind: "ColumnNode",
+      column: IdentifierNode.create(column)
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/select-all-node.js
+var SelectAllNode = freeze({
+  is(node) {
+    return node.kind === "SelectAllNode";
+  },
+  create() {
+    return freeze({
+      kind: "SelectAllNode"
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/reference-node.js
+var ReferenceNode = freeze({
+  is(node) {
+    return node.kind === "ReferenceNode";
+  },
+  create(column, table) {
+    return freeze({
+      kind: "ReferenceNode",
+      table,
+      column
+    });
+  },
+  createSelectAll(table) {
+    return freeze({
+      kind: "ReferenceNode",
+      table,
+      column: SelectAllNode.create()
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/dynamic/dynamic-reference-builder.js
+class DynamicReferenceBuilder {
+  #dynamicReference;
+  get dynamicReference() {
+    return this.#dynamicReference;
+  }
+  get refType() {
+    return;
+  }
+  constructor(reference) {
+    this.#dynamicReference = reference;
+  }
+  toOperationNode() {
+    return parseSimpleReferenceExpression(this.#dynamicReference);
+  }
+}
+function isDynamicReferenceBuilder(obj) {
+  return isObject2(obj) && isOperationNodeSource(obj) && isString(obj.dynamicReference);
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/order-by-item-node.js
+var OrderByItemNode = freeze({
+  is(node) {
+    return node.kind === "OrderByItemNode";
+  },
+  create(orderBy, direction) {
+    return freeze({
+      kind: "OrderByItemNode",
+      orderBy,
+      direction
+    });
+  },
+  cloneWith(node, props) {
+    return freeze({
+      ...node,
+      ...props
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/raw-node.js
+var RawNode = freeze({
+  is(node) {
+    return node.kind === "RawNode";
+  },
+  create(sqlFragments, parameters) {
+    return freeze({
+      kind: "RawNode",
+      sqlFragments: freeze(sqlFragments),
+      parameters: freeze(parameters)
+    });
+  },
+  createWithSql(sql) {
+    return RawNode.create([sql], []);
+  },
+  createWithChild(child) {
+    return RawNode.create(["", ""], [child]);
+  },
+  createWithChildren(children) {
+    return RawNode.create(new Array(children.length + 1).fill(""), children);
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/collate-node.js
+var CollateNode = freeze({
+  is(node) {
+    return node.kind === "CollateNode";
+  },
+  create(collation) {
+    return freeze({
+      kind: "CollateNode",
+      collation: IdentifierNode.create(collation)
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/query-builder/order-by-item-builder.js
+class OrderByItemBuilder {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  desc() {
+    return new OrderByItemBuilder({
+      node: OrderByItemNode.cloneWith(this.#props.node, {
+        direction: RawNode.createWithSql("desc")
+      })
+    });
+  }
+  asc() {
+    return new OrderByItemBuilder({
+      node: OrderByItemNode.cloneWith(this.#props.node, {
+        direction: RawNode.createWithSql("asc")
+      })
+    });
+  }
+  nullsLast() {
+    return new OrderByItemBuilder({
+      node: OrderByItemNode.cloneWith(this.#props.node, { nulls: "last" })
+    });
+  }
+  nullsFirst() {
+    return new OrderByItemBuilder({
+      node: OrderByItemNode.cloneWith(this.#props.node, { nulls: "first" })
+    });
+  }
+  collate(collation) {
+    return new OrderByItemBuilder({
+      node: OrderByItemNode.cloneWith(this.#props.node, {
+        collation: CollateNode.create(collation)
+      })
+    });
+  }
+  toOperationNode() {
+    return this.#props.node;
+  }
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/util/log-once.js
+var LOGGED_MESSAGES = new Set;
+function logOnce(message) {
+  if (LOGGED_MESSAGES.has(message)) {
+    return;
+  }
+  LOGGED_MESSAGES.add(message);
+  console.log(message);
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/parser/order-by-parser.js
+function isOrderByDirection(thing) {
+  return thing === "asc" || thing === "desc";
+}
+function parseOrderBy(args) {
+  if (args.length === 2) {
+    return [parseOrderByItem(args[0], args[1])];
+  }
+  if (args.length === 1) {
+    const [orderBy] = args;
+    if (Array.isArray(orderBy)) {
+      logOnce("orderBy(array) is deprecated, use multiple orderBy calls instead.");
+      return orderBy.map((item) => parseOrderByItem(item));
+    }
+    return [parseOrderByItem(orderBy)];
+  }
+  throw new Error(`Invalid number of arguments at order by! expected 1-2, received ${args.length}`);
+}
+function parseOrderByItem(expr, modifiers) {
+  const parsedRef = parseOrderByExpression(expr);
+  if (OrderByItemNode.is(parsedRef)) {
+    if (modifiers) {
+      throw new Error("Cannot specify direction twice!");
+    }
+    return parsedRef;
+  }
+  return parseOrderByWithModifiers(parsedRef, modifiers);
+}
+function parseOrderByExpression(expr) {
+  if (isExpressionOrFactory(expr)) {
+    return parseExpression(expr);
+  }
+  if (isDynamicReferenceBuilder(expr)) {
+    return expr.toOperationNode();
+  }
+  const [ref, direction] = expr.split(" ");
+  if (direction) {
+    logOnce("`orderBy('column asc')` is deprecated. Use `orderBy('column', 'asc')` instead.");
+    return parseOrderByWithModifiers(parseStringReference(ref), direction);
+  }
+  return parseStringReference(expr);
+}
+function parseOrderByWithModifiers(expr, modifiers) {
+  if (typeof modifiers === "string") {
+    if (!isOrderByDirection(modifiers)) {
+      throw new Error(`Invalid order by direction: ${modifiers}`);
+    }
+    return OrderByItemNode.create(expr, RawNode.createWithSql(modifiers));
+  }
+  if (isExpression(modifiers)) {
+    logOnce("`orderBy(..., expr)` is deprecated. Use `orderBy(..., 'asc')` or `orderBy(..., (ob) => ...)` instead.");
+    return OrderByItemNode.create(expr, modifiers.toOperationNode());
+  }
+  const node = OrderByItemNode.create(expr);
+  if (!modifiers) {
+    return node;
+  }
+  return modifiers(new OrderByItemBuilder({ node })).toOperationNode();
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/json-reference-node.js
+var JSONReferenceNode = freeze({
+  is(node) {
+    return node.kind === "JSONReferenceNode";
+  },
+  create(reference, traversal) {
+    return freeze({
+      kind: "JSONReferenceNode",
+      reference,
+      traversal
+    });
+  },
+  cloneWithTraversal(node, traversal) {
+    return freeze({
+      ...node,
+      traversal
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/json-operator-chain-node.js
+var JSONOperatorChainNode = freeze({
+  is(node) {
+    return node.kind === "JSONOperatorChainNode";
+  },
+  create(operator) {
+    return freeze({
+      kind: "JSONOperatorChainNode",
+      operator,
+      values: freeze([])
+    });
+  },
+  cloneWithValue(node, value) {
+    return freeze({
+      ...node,
+      values: freeze([...node.values, value])
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/json-path-node.js
+var JSONPathNode = freeze({
+  is(node) {
+    return node.kind === "JSONPathNode";
+  },
+  create(inOperator) {
+    return freeze({
+      kind: "JSONPathNode",
+      inOperator,
+      pathLegs: freeze([])
+    });
+  },
+  cloneWithLeg(jsonPathNode, pathLeg) {
+    return freeze({
+      ...jsonPathNode,
+      pathLegs: freeze([...jsonPathNode.pathLegs, pathLeg])
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/parser/reference-parser.js
+function parseSimpleReferenceExpression(exp) {
+  if (isString(exp)) {
+    return parseStringReference(exp);
+  }
+  return exp.toOperationNode();
+}
+function parseReferenceExpressionOrList(arg) {
+  if (isReadonlyArray(arg)) {
+    return arg.map((it) => parseReferenceExpression(it));
+  } else {
+    return [parseReferenceExpression(arg)];
+  }
+}
+function parseReferenceExpression(exp) {
+  if (isExpressionOrFactory(exp)) {
+    return parseExpression(exp);
+  }
+  return parseSimpleReferenceExpression(exp);
+}
+function parseJSONReference(ref, op) {
+  if (isJSONOperator(op)) {
+    return JSONReferenceNode.create(parseStringReference(ref), JSONOperatorChainNode.create(OperatorNode.create(op)));
+  }
+  if (op === "->$" || op === "->>$") {
+    return JSONReferenceNode.create(parseStringReference(ref), JSONPathNode.create(OperatorNode.create(op.slice(0, -1))));
+  }
+  throw new Error(`Invalid JSON operator: ${op}`);
+}
+function parseStringReference(ref) {
+  const COLUMN_SEPARATOR = ".";
+  if (!ref.includes(COLUMN_SEPARATOR)) {
+    return ReferenceNode.create(ColumnNode.create(ref));
+  }
+  const parts = ref.split(COLUMN_SEPARATOR).map(trim);
+  if (parts.length === 3) {
+    return parseStringReferenceWithTableAndSchema(parts);
+  }
+  if (parts.length === 2) {
+    return parseStringReferenceWithTable(parts);
+  }
+  throw new Error(`invalid column reference ${ref}`);
+}
+function parseAliasedStringReference(ref) {
+  const ALIAS_SEPARATOR = " as ";
+  if (ref.includes(ALIAS_SEPARATOR)) {
+    const [columnRef, alias] = ref.split(ALIAS_SEPARATOR).map(trim);
+    return AliasNode.create(parseStringReference(columnRef), IdentifierNode.create(alias));
+  } else {
+    return parseStringReference(ref);
+  }
+}
+function parseStringReferenceWithTableAndSchema(parts) {
+  const [schema, table, column] = parts;
+  return ReferenceNode.create(ColumnNode.create(column), TableNode.createWithSchema(schema, table));
+}
+function parseStringReferenceWithTable(parts) {
+  const [table, column] = parts;
+  return ReferenceNode.create(ColumnNode.create(column), TableNode.create(table));
+}
+function trim(str) {
+  return str.trim();
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/primitive-value-list-node.js
+var PrimitiveValueListNode = freeze({
+  is(node) {
+    return node.kind === "PrimitiveValueListNode";
+  },
+  create(values) {
+    return freeze({
+      kind: "PrimitiveValueListNode",
+      values: freeze([...values])
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/value-list-node.js
+var ValueListNode = freeze({
+  is(node) {
+    return node.kind === "ValueListNode";
+  },
+  create(values) {
+    return freeze({
+      kind: "ValueListNode",
+      values: freeze(values)
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/value-node.js
+var ValueNode = freeze({
+  is(node) {
+    return node.kind === "ValueNode";
+  },
+  create(value) {
+    return freeze({
+      kind: "ValueNode",
+      value
+    });
+  },
+  createImmediate(value) {
+    return freeze({
+      kind: "ValueNode",
+      value,
+      immediate: true
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/parser/value-parser.js
+function parseValueExpressionOrList(arg) {
+  if (isReadonlyArray(arg)) {
+    return parseValueExpressionList(arg);
+  }
+  return parseValueExpression(arg);
+}
+function parseValueExpression(exp) {
+  if (isExpressionOrFactory(exp)) {
+    return parseExpression(exp);
+  }
+  return ValueNode.create(exp);
+}
+function isSafeImmediateValue(value) {
+  return isNumber(value) || isBoolean(value) || isNull(value);
+}
+function parseSafeImmediateValue(value) {
+  if (!isSafeImmediateValue(value)) {
+    throw new Error(`unsafe immediate value ${JSON.stringify(value)}`);
+  }
+  return ValueNode.createImmediate(value);
+}
+function parseValueExpressionList(arg) {
+  if (arg.some(isExpressionOrFactory)) {
+    return ValueListNode.create(arg.map((it) => parseValueExpression(it)));
+  }
+  return PrimitiveValueListNode.create(arg);
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/parens-node.js
+var ParensNode = freeze({
+  is(node) {
+    return node.kind === "ParensNode";
+  },
+  create(node) {
+    return freeze({
+      kind: "ParensNode",
+      node
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/parser/binary-operation-parser.js
+function parseValueBinaryOperationOrExpression(args) {
+  if (args.length === 3) {
+    return parseValueBinaryOperation(args[0], args[1], args[2]);
+  } else if (args.length === 1) {
+    return parseValueExpression(args[0]);
+  }
+  throw new Error(`invalid arguments: ${JSON.stringify(args)}`);
+}
+function parseValueBinaryOperation(left, operator, right) {
+  if (isIsOperator(operator) && needsIsOperator(right)) {
+    return BinaryOperationNode.create(parseReferenceExpression(left), parseBinaryOperator(operator), ValueNode.createImmediate(right));
+  }
+  return BinaryOperationNode.create(parseReferenceExpression(left), parseBinaryOperator(operator), parseValueExpressionOrList(right));
+}
+function parseReferentialBinaryOperation(left, operator, right) {
+  return BinaryOperationNode.create(parseReferenceExpression(left), parseBinaryOperator(operator), parseReferenceExpression(right));
+}
+function parseFilterObject(obj, combinator) {
+  return parseFilterList(Object.entries(obj).filter(([, v]) => !isUndefined(v)).map(([k, v]) => parseValueBinaryOperation(k, needsIsOperator(v) ? "is" : "=", v)), combinator);
+}
+function parseFilterList(list, combinator, withParens = true) {
+  const combine = combinator === "and" ? AndNode.create : OrNode.create;
+  if (list.length === 0) {
+    return BinaryOperationNode.create(ValueNode.createImmediate(1), OperatorNode.create("="), ValueNode.createImmediate(combinator === "and" ? 1 : 0));
+  }
+  let node = toOperationNode(list[0]);
+  for (let i = 1;i < list.length; ++i) {
+    node = combine(node, toOperationNode(list[i]));
+  }
+  if (list.length > 1 && withParens) {
+    return ParensNode.create(node);
+  }
+  return node;
+}
+function isIsOperator(operator) {
+  return operator === "is" || operator === "is not";
+}
+function needsIsOperator(value) {
+  return isNull(value) || isBoolean(value);
+}
+function parseBinaryOperator(operator) {
+  if (isBinaryOperator(operator)) {
+    return OperatorNode.create(operator);
+  }
+  if (isOperationNodeSource(operator)) {
+    return operator.toOperationNode();
+  }
+  throw new Error(`invalid operator ${JSON.stringify(operator)}`);
+}
+function toOperationNode(nodeOrSource) {
+  return isOperationNodeSource(nodeOrSource) ? nodeOrSource.toOperationNode() : nodeOrSource;
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/order-by-node.js
+var OrderByNode = freeze({
+  is(node) {
+    return node.kind === "OrderByNode";
+  },
+  create(items) {
+    return freeze({
+      kind: "OrderByNode",
+      items: freeze([...items])
+    });
+  },
+  cloneWithItems(orderBy, items) {
+    return freeze({
+      ...orderBy,
+      items: freeze([...orderBy.items, ...items])
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/partition-by-node.js
+var PartitionByNode = freeze({
+  is(node) {
+    return node.kind === "PartitionByNode";
+  },
+  create(items) {
+    return freeze({
+      kind: "PartitionByNode",
+      items: freeze(items)
+    });
+  },
+  cloneWithItems(partitionBy, items) {
+    return freeze({
+      ...partitionBy,
+      items: freeze([...partitionBy.items, ...items])
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/over-node.js
+var OverNode = freeze({
+  is(node) {
+    return node.kind === "OverNode";
+  },
+  create() {
+    return freeze({
+      kind: "OverNode"
+    });
+  },
+  cloneWithOrderByItems(overNode, items) {
+    return freeze({
+      ...overNode,
+      orderBy: overNode.orderBy ? OrderByNode.cloneWithItems(overNode.orderBy, items) : OrderByNode.create(items)
+    });
+  },
+  cloneWithPartitionByItems(overNode, items) {
+    return freeze({
+      ...overNode,
+      partitionBy: overNode.partitionBy ? PartitionByNode.cloneWithItems(overNode.partitionBy, items) : PartitionByNode.create(items)
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/from-node.js
+var FromNode = freeze({
+  is(node) {
+    return node.kind === "FromNode";
+  },
+  create(froms) {
+    return freeze({
+      kind: "FromNode",
+      froms: freeze(froms)
+    });
+  },
+  cloneWithFroms(from, froms) {
+    return freeze({
+      ...from,
+      froms: freeze([...from.froms, ...froms])
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/group-by-node.js
+var GroupByNode = freeze({
+  is(node) {
+    return node.kind === "GroupByNode";
+  },
+  create(items) {
+    return freeze({
+      kind: "GroupByNode",
+      items: freeze(items)
+    });
+  },
+  cloneWithItems(groupBy, items) {
+    return freeze({
+      ...groupBy,
+      items: freeze([...groupBy.items, ...items])
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/having-node.js
+var HavingNode = freeze({
+  is(node) {
+    return node.kind === "HavingNode";
+  },
+  create(filter) {
+    return freeze({
+      kind: "HavingNode",
+      having: filter
+    });
+  },
+  cloneWithOperation(havingNode, operator, operation) {
+    return freeze({
+      ...havingNode,
+      having: operator === "And" ? AndNode.create(havingNode.having, operation) : OrNode.create(havingNode.having, operation)
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/insert-query-node.js
+var InsertQueryNode = freeze({
+  is(node) {
+    return node.kind === "InsertQueryNode";
+  },
+  create(into, withNode, replace) {
+    return freeze({
+      kind: "InsertQueryNode",
+      into,
+      ...withNode && { with: withNode },
+      replace
+    });
+  },
+  createWithoutInto() {
+    return freeze({
+      kind: "InsertQueryNode"
+    });
+  },
+  cloneWith(insertQuery, props) {
+    return freeze({
+      ...insertQuery,
+      ...props
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/list-node.js
+var ListNode = freeze({
+  is(node) {
+    return node.kind === "ListNode";
+  },
+  create(items) {
+    return freeze({
+      kind: "ListNode",
+      items: freeze(items)
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/update-query-node.js
+var UpdateQueryNode = freeze({
+  is(node) {
+    return node.kind === "UpdateQueryNode";
+  },
+  create(tables, withNode) {
+    return freeze({
+      kind: "UpdateQueryNode",
+      table: tables.length === 1 ? tables[0] : ListNode.create(tables),
+      ...withNode && { with: withNode }
+    });
+  },
+  createWithoutTable() {
+    return freeze({
+      kind: "UpdateQueryNode"
+    });
+  },
+  cloneWithFromItems(updateQuery, fromItems) {
+    return freeze({
+      ...updateQuery,
+      from: updateQuery.from ? FromNode.cloneWithFroms(updateQuery.from, fromItems) : FromNode.create(fromItems)
+    });
+  },
+  cloneWithUpdates(updateQuery, updates) {
+    return freeze({
+      ...updateQuery,
+      updates: updateQuery.updates ? freeze([...updateQuery.updates, ...updates]) : updates
+    });
+  },
+  cloneWithLimit(updateQuery, limit) {
+    return freeze({
+      ...updateQuery,
+      limit
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/using-node.js
+var UsingNode = freeze({
+  is(node) {
+    return node.kind === "UsingNode";
+  },
+  create(tables) {
+    return freeze({
+      kind: "UsingNode",
+      tables: freeze(tables)
+    });
+  },
+  cloneWithTables(using, tables) {
+    return freeze({
+      ...using,
+      tables: freeze([...using.tables, ...tables])
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/delete-query-node.js
+var DeleteQueryNode = freeze({
+  is(node) {
+    return node.kind === "DeleteQueryNode";
+  },
+  create(fromItems, withNode) {
+    return freeze({
+      kind: "DeleteQueryNode",
+      from: FromNode.create(fromItems),
+      ...withNode && { with: withNode }
+    });
+  },
+  cloneWithOrderByItems: (node, items) => QueryNode.cloneWithOrderByItems(node, items),
+  cloneWithoutOrderBy: (node) => QueryNode.cloneWithoutOrderBy(node),
+  cloneWithLimit(deleteNode, limit) {
+    return freeze({
+      ...deleteNode,
+      limit
+    });
+  },
+  cloneWithoutLimit(deleteNode) {
+    return freeze({
+      ...deleteNode,
+      limit: undefined
+    });
+  },
+  cloneWithUsing(deleteNode, tables) {
+    return freeze({
+      ...deleteNode,
+      using: deleteNode.using !== undefined ? UsingNode.cloneWithTables(deleteNode.using, tables) : UsingNode.create(tables)
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/where-node.js
+var WhereNode = freeze({
+  is(node) {
+    return node.kind === "WhereNode";
+  },
+  create(filter) {
+    return freeze({
+      kind: "WhereNode",
+      where: filter
+    });
+  },
+  cloneWithOperation(whereNode, operator, operation) {
+    return freeze({
+      ...whereNode,
+      where: operator === "And" ? AndNode.create(whereNode.where, operation) : OrNode.create(whereNode.where, operation)
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/returning-node.js
+var ReturningNode = freeze({
+  is(node) {
+    return node.kind === "ReturningNode";
+  },
+  create(selections) {
+    return freeze({
+      kind: "ReturningNode",
+      selections: freeze(selections)
+    });
+  },
+  cloneWithSelections(returning, selections) {
+    return freeze({
+      ...returning,
+      selections: returning.selections ? freeze([...returning.selections, ...selections]) : freeze(selections)
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/explain-node.js
+var ExplainNode = freeze({
+  is(node) {
+    return node.kind === "ExplainNode";
+  },
+  create(format, options) {
+    return freeze({
+      kind: "ExplainNode",
+      format,
+      options
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/when-node.js
+var WhenNode = freeze({
+  is(node) {
+    return node.kind === "WhenNode";
+  },
+  create(condition) {
+    return freeze({
+      kind: "WhenNode",
+      condition
+    });
+  },
+  cloneWithResult(whenNode, result) {
+    return freeze({
+      ...whenNode,
+      result
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/merge-query-node.js
+var MergeQueryNode = freeze({
+  is(node) {
+    return node.kind === "MergeQueryNode";
+  },
+  create(into, withNode) {
+    return freeze({
+      kind: "MergeQueryNode",
+      into,
+      ...withNode && { with: withNode }
+    });
+  },
+  cloneWithUsing(mergeNode, using) {
+    return freeze({
+      ...mergeNode,
+      using
+    });
+  },
+  cloneWithWhen(mergeNode, when) {
+    return freeze({
+      ...mergeNode,
+      whens: mergeNode.whens ? freeze([...mergeNode.whens, when]) : freeze([when])
+    });
+  },
+  cloneWithThen(mergeNode, then) {
+    return freeze({
+      ...mergeNode,
+      whens: mergeNode.whens ? freeze([
+        ...mergeNode.whens.slice(0, -1),
+        WhenNode.cloneWithResult(mergeNode.whens[mergeNode.whens.length - 1], then)
+      ]) : undefined
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/output-node.js
+var OutputNode = freeze({
+  is(node) {
+    return node.kind === "OutputNode";
+  },
+  create(selections) {
+    return freeze({
+      kind: "OutputNode",
+      selections: freeze(selections)
+    });
+  },
+  cloneWithSelections(output, selections) {
+    return freeze({
+      ...output,
+      selections: output.selections ? freeze([...output.selections, ...selections]) : freeze(selections)
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/query-node.js
+var QueryNode = freeze({
+  is(node) {
+    return SelectQueryNode.is(node) || InsertQueryNode.is(node) || UpdateQueryNode.is(node) || DeleteQueryNode.is(node) || MergeQueryNode.is(node);
+  },
+  cloneWithEndModifier(node, modifier) {
+    return freeze({
+      ...node,
+      endModifiers: node.endModifiers ? freeze([...node.endModifiers, modifier]) : freeze([modifier])
+    });
+  },
+  cloneWithWhere(node, operation) {
+    return freeze({
+      ...node,
+      where: node.where ? WhereNode.cloneWithOperation(node.where, "And", operation) : WhereNode.create(operation)
+    });
+  },
+  cloneWithJoin(node, join) {
+    return freeze({
+      ...node,
+      joins: node.joins ? freeze([...node.joins, join]) : freeze([join])
+    });
+  },
+  cloneWithReturning(node, selections) {
+    return freeze({
+      ...node,
+      returning: node.returning ? ReturningNode.cloneWithSelections(node.returning, selections) : ReturningNode.create(selections)
+    });
+  },
+  cloneWithoutReturning(node) {
+    return freeze({
+      ...node,
+      returning: undefined
+    });
+  },
+  cloneWithoutWhere(node) {
+    return freeze({
+      ...node,
+      where: undefined
+    });
+  },
+  cloneWithExplain(node, format, options) {
+    return freeze({
+      ...node,
+      explain: ExplainNode.create(format, options?.toOperationNode())
+    });
+  },
+  cloneWithTop(node, top) {
+    return freeze({
+      ...node,
+      top
+    });
+  },
+  cloneWithOutput(node, selections) {
+    return freeze({
+      ...node,
+      output: node.output ? OutputNode.cloneWithSelections(node.output, selections) : OutputNode.create(selections)
+    });
+  },
+  cloneWithOrderByItems(node, items) {
+    return freeze({
+      ...node,
+      orderBy: node.orderBy ? OrderByNode.cloneWithItems(node.orderBy, items) : OrderByNode.create(items)
+    });
+  },
+  cloneWithoutOrderBy(node) {
+    return freeze({
+      ...node,
+      orderBy: undefined
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/select-query-node.js
+var SelectQueryNode = freeze({
+  is(node) {
+    return node.kind === "SelectQueryNode";
+  },
+  create(withNode) {
+    return freeze({
+      kind: "SelectQueryNode",
+      ...withNode && { with: withNode }
+    });
+  },
+  createFrom(fromItems, withNode) {
+    return freeze({
+      kind: "SelectQueryNode",
+      from: FromNode.create(fromItems),
+      ...withNode && { with: withNode }
+    });
+  },
+  cloneWithSelections(select, selections) {
+    return freeze({
+      ...select,
+      selections: select.selections ? freeze([...select.selections, ...selections]) : freeze(selections)
+    });
+  },
+  cloneWithDistinctOn(select, expressions) {
+    return freeze({
+      ...select,
+      distinctOn: select.distinctOn ? freeze([...select.distinctOn, ...expressions]) : freeze(expressions)
+    });
+  },
+  cloneWithFrontModifier(select, modifier) {
+    return freeze({
+      ...select,
+      frontModifiers: select.frontModifiers ? freeze([...select.frontModifiers, modifier]) : freeze([modifier])
+    });
+  },
+  cloneWithOrderByItems: (node, items) => QueryNode.cloneWithOrderByItems(node, items),
+  cloneWithGroupByItems(selectNode, items) {
+    return freeze({
+      ...selectNode,
+      groupBy: selectNode.groupBy ? GroupByNode.cloneWithItems(selectNode.groupBy, items) : GroupByNode.create(items)
+    });
+  },
+  cloneWithLimit(selectNode, limit) {
+    return freeze({
+      ...selectNode,
+      limit
+    });
+  },
+  cloneWithOffset(selectNode, offset) {
+    return freeze({
+      ...selectNode,
+      offset
+    });
+  },
+  cloneWithFetch(selectNode, fetch) {
+    return freeze({
+      ...selectNode,
+      fetch
+    });
+  },
+  cloneWithHaving(selectNode, operation) {
+    return freeze({
+      ...selectNode,
+      having: selectNode.having ? HavingNode.cloneWithOperation(selectNode.having, "And", operation) : HavingNode.create(operation)
+    });
+  },
+  cloneWithSetOperations(selectNode, setOperations) {
+    return freeze({
+      ...selectNode,
+      setOperations: selectNode.setOperations ? freeze([...selectNode.setOperations, ...setOperations]) : freeze([...setOperations])
+    });
+  },
+  cloneWithoutSelections(select) {
+    return freeze({
+      ...select,
+      selections: []
+    });
+  },
+  cloneWithoutLimit(select) {
+    return freeze({
+      ...select,
+      limit: undefined
+    });
+  },
+  cloneWithoutOffset(select) {
+    return freeze({
+      ...select,
+      offset: undefined
+    });
+  },
+  cloneWithoutOrderBy: (node) => QueryNode.cloneWithoutOrderBy(node),
+  cloneWithoutGroupBy(select) {
+    return freeze({
+      ...select,
+      groupBy: undefined
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/query-builder/join-builder.js
+class JoinBuilder {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  on(...args) {
+    return new JoinBuilder({
+      ...this.#props,
+      joinNode: JoinNode.cloneWithOn(this.#props.joinNode, parseValueBinaryOperationOrExpression(args))
+    });
+  }
+  onRef(lhs, op, rhs) {
+    return new JoinBuilder({
+      ...this.#props,
+      joinNode: JoinNode.cloneWithOn(this.#props.joinNode, parseReferentialBinaryOperation(lhs, op, rhs))
+    });
+  }
+  onTrue() {
+    return new JoinBuilder({
+      ...this.#props,
+      joinNode: JoinNode.cloneWithOn(this.#props.joinNode, RawNode.createWithSql("true"))
+    });
+  }
+  $call(func) {
+    return func(this);
+  }
+  toOperationNode() {
+    return this.#props.joinNode;
+  }
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/partition-by-item-node.js
+var PartitionByItemNode = freeze({
+  is(node) {
+    return node.kind === "PartitionByItemNode";
+  },
+  create(partitionBy) {
+    return freeze({
+      kind: "PartitionByItemNode",
+      partitionBy
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/parser/partition-by-parser.js
+function parsePartitionBy(partitionBy) {
+  return parseReferenceExpressionOrList(partitionBy).map(PartitionByItemNode.create);
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/query-builder/over-builder.js
+class OverBuilder {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  orderBy(...args) {
+    return new OverBuilder({
+      overNode: OverNode.cloneWithOrderByItems(this.#props.overNode, parseOrderBy(args))
+    });
+  }
+  clearOrderBy() {
+    return new OverBuilder({
+      overNode: QueryNode.cloneWithoutOrderBy(this.#props.overNode)
+    });
+  }
+  partitionBy(partitionBy) {
+    return new OverBuilder({
+      overNode: OverNode.cloneWithPartitionByItems(this.#props.overNode, parsePartitionBy(partitionBy))
+    });
+  }
+  $call(func) {
+    return func(this);
+  }
+  toOperationNode() {
+    return this.#props.overNode;
+  }
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/selection-node.js
+var SelectionNode = freeze({
+  is(node) {
+    return node.kind === "SelectionNode";
+  },
+  create(selection) {
+    return freeze({
+      kind: "SelectionNode",
+      selection
+    });
+  },
+  createSelectAll() {
+    return freeze({
+      kind: "SelectionNode",
+      selection: SelectAllNode.create()
+    });
+  },
+  createSelectAllFromTable(table) {
+    return freeze({
+      kind: "SelectionNode",
+      selection: ReferenceNode.createSelectAll(table)
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/parser/select-parser.js
+function parseSelectArg(selection) {
+  if (isFunction(selection)) {
+    return parseSelectArg(selection(expressionBuilder()));
+  } else if (isReadonlyArray(selection)) {
+    return selection.map((it) => parseSelectExpression(it));
+  } else {
+    return [parseSelectExpression(selection)];
+  }
+}
+function parseSelectExpression(selection) {
+  if (isString(selection)) {
+    return SelectionNode.create(parseAliasedStringReference(selection));
+  } else if (isDynamicReferenceBuilder(selection)) {
+    return SelectionNode.create(selection.toOperationNode());
+  } else {
+    return SelectionNode.create(parseAliasedExpression(selection));
+  }
+}
+function parseSelectAll(table) {
+  if (!table) {
+    return [SelectionNode.createSelectAll()];
+  } else if (Array.isArray(table)) {
+    return table.map(parseSelectAllArg);
+  } else {
+    return [parseSelectAllArg(table)];
+  }
+}
+function parseSelectAllArg(table) {
+  if (isString(table)) {
+    return SelectionNode.createSelectAllFromTable(parseTable(table));
+  }
+  throw new Error(`invalid value selectAll expression: ${JSON.stringify(table)}`);
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/query-builder/no-result-error.js
+class NoResultError extends Error {
+  node;
+  constructor(node) {
+    super("no result");
+    this.node = node;
+  }
+}
+function isNoResultErrorConstructor(fn) {
+  return Object.prototype.hasOwnProperty.call(fn, "prototype");
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/top-node.js
+var TopNode = freeze({
+  is(node) {
+    return node.kind === "TopNode";
+  },
+  create(expression, modifiers) {
+    return freeze({
+      kind: "TopNode",
+      expression,
+      modifiers
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/parser/top-parser.js
+function parseTop(expression, modifiers) {
+  if (!isNumber(expression) && !isBigInt(expression)) {
+    throw new Error(`Invalid top expression: ${expression}`);
+  }
+  if (!isUndefined(modifiers) && !isTopModifiers(modifiers)) {
+    throw new Error(`Invalid top modifiers: ${modifiers}`);
+  }
+  return TopNode.create(expression, modifiers);
+}
+function isTopModifiers(modifiers) {
+  return modifiers === "percent" || modifiers === "with ties" || modifiers === "percent with ties";
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/limit-node.js
+var LimitNode = freeze({
+  is(node) {
+    return node.kind === "LimitNode";
+  },
+  create(limit) {
+    return freeze({
+      kind: "LimitNode",
+      limit
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/util/random-string.js
+var CHARS = [
+  "A",
+  "B",
+  "C",
+  "D",
+  "E",
+  "F",
+  "G",
+  "H",
+  "I",
+  "J",
+  "K",
+  "L",
+  "M",
+  "N",
+  "O",
+  "P",
+  "Q",
+  "R",
+  "S",
+  "T",
+  "U",
+  "V",
+  "W",
+  "X",
+  "Y",
+  "Z",
+  "a",
+  "b",
+  "c",
+  "d",
+  "e",
+  "f",
+  "g",
+  "h",
+  "i",
+  "j",
+  "k",
+  "l",
+  "m",
+  "n",
+  "o",
+  "p",
+  "q",
+  "r",
+  "s",
+  "t",
+  "u",
+  "v",
+  "w",
+  "x",
+  "y",
+  "z",
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9"
+];
+function randomString2(length) {
+  let chars = "";
+  for (let i = 0;i < length; ++i) {
+    chars += randomChar();
+  }
+  return chars;
+}
+function randomChar() {
+  return CHARS[~~(Math.random() * CHARS.length)];
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/util/query-id.js
+function createQueryId() {
+  return new LazyQueryId;
+}
+
+class LazyQueryId {
+  #queryId;
+  get queryId() {
+    if (this.#queryId === undefined) {
+      this.#queryId = randomString2(8);
+    }
+    return this.#queryId;
+  }
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/util/deferred.js
+class Deferred {
+  #promise;
+  #resolve;
+  #reject;
+  constructor() {
+    this.#promise = new Promise((resolve, reject) => {
+      this.#reject = reject;
+      this.#resolve = resolve;
+    });
+  }
+  get promise() {
+    return this.#promise;
+  }
+  resolve = (value) => {
+    this.#resolve?.(value);
+    this.#resolve = this.#reject = undefined;
+  };
+  reject = (reason) => {
+    this.#reject?.(reason);
+    this.#reject = this.#resolve = undefined;
+  };
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/util/provide-controlled-connection.js
+async function provideControlledConnection(connectionProvider, options) {
+  const connectionDefer = new Deferred;
+  const connectionReleaseDefer = new Deferred;
+  connectionProvider.provideConnection(async (connection) => {
+    connectionDefer.resolve(connection);
+    return await connectionReleaseDefer.promise;
+  }, options).catch((ex) => connectionDefer.reject(ex));
+  return freeze({
+    connection: await connectionDefer.promise,
+    release: connectionReleaseDefer.resolve
+  });
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/util/abort.js
+function getInflightQueryAbortHandler(abortStrategy = "ignore query", connection, beforeThrow) {
+  if (abortStrategy === "ignore query") {
+    return;
+  }
+  if (abortStrategy === "cancel query") {
+    const handler = connection.cancelQuery;
+    if (!handler) {
+      beforeThrow();
+      throwUnsupportedInflightQueryAbortStrategyError(abortStrategy, connection.killSession ? "kill session" : undefined);
+    }
+    return handler.bind(connection);
+  }
+  if (abortStrategy === "kill session") {
+    const handler = connection.killSession;
+    if (!handler) {
+      beforeThrow();
+      throwUnsupportedInflightQueryAbortStrategyError(abortStrategy, connection.cancelQuery ? "cancel query" : undefined);
+    }
+    return handler.bind(connection);
+  }
+  beforeThrow();
+  throw new Error(`Unexpected \`inflightQueryAbortStrategy\`: "${abortStrategy}"`);
+}
+function throwUnsupportedInflightQueryAbortStrategyError(abortStrategy, alt) {
+  throw new Error(`This dialect doesn't support \`inflightQueryAbortStrategy\` "${abortStrategy}". Use "${"ignore query"}"${alt ? ` or "${alt}"` : ""} instead.`);
+}
+function assertNotAborted(signal, timing, beforeThrow) {
+  if (signal?.aborted) {
+    beforeThrow?.();
+    throwReasonWithTiming(signal.reason, timing);
+  }
+}
+function throwReasonWithTiming(reason, timing) {
+  decorateWithTiming(reason, timing);
+  throw reason;
+}
+var ABORTED = {};
+function printBackgroundFail(name) {
+  return (reason) => console.error(`\`${name}\` failed in the background after abortion: ${getMessage(reason)}`);
+}
+function decorateWithTiming(reason, timing) {
+  if (reason !== null && typeof reason === "object" && !Object.isFrozen(reason)) {
+    Object.defineProperty(reason, "__kysely_timing__", {
+      configurable: true,
+      enumerable: false,
+      value: timing,
+      writable: false
+    });
+  }
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/query-executor/query-executor-base.js
+var NO_PLUGINS = freeze([]);
+
+class QueryExecutorBase {
+  #plugins;
+  constructor(plugins = NO_PLUGINS) {
+    this.#plugins = plugins;
+  }
+  get plugins() {
+    return this.#plugins;
+  }
+  transformQuery(node, queryId) {
+    for (const plugin of this.#plugins) {
+      const transformedNode = plugin.transformQuery({ node, queryId });
+      if (transformedNode.kind === node.kind) {
+        node = transformedNode;
+      } else {
+        throw new Error([
+          `KyselyPlugin.transformQuery must return a node`,
+          `of the same kind that was given to it.`,
+          `The plugin was given a ${node.kind}`,
+          `but it returned a ${transformedNode.kind}`
+        ].join(" "));
+      }
+    }
+    return node;
+  }
+  async executeQuery(compiledQuery, options) {
+    const { inflightQueryAbortStrategy = "ignore query", signal } = options || {};
+    if (!signal) {
+      const result = await this.provideConnection(async (connection2) => {
+        return await connection2.executeQuery(compiledQuery);
+      }, options);
+      return await this.#transformResult(result, compiledQuery.queryId);
+    }
+    assertNotAborted(signal, "before query execution");
+    options = freeze({ signal });
+    const { connection, release } = await provideControlledConnection(this, options);
+    const controlConnectionProvider = this.provideConnection.bind(this);
+    const { promise: abortPromise, resolve } = new Deferred;
+    const abortListener = () => resolve(ABORTED);
+    signal.addEventListener("abort", abortListener, { once: true });
+    try {
+      assertNotAborted(signal, "before query execution", release);
+      const inflightQueryAbortHandler = getInflightQueryAbortHandler(inflightQueryAbortStrategy, connection, release);
+      if (inflightQueryAbortHandler && connection.collectSessionInfo) {
+        assertNotAborted(signal, "before query execution", release);
+        const collectPromise = connection.collectSessionInfo();
+        const result2 = await Promise.race([abortPromise, collectPromise]).catch((error51) => {
+          release();
+          throw error51;
+        });
+        if (result2 === ABORTED) {
+          collectPromise.catch(printBackgroundFail("collectSessionInfo")).finally(release);
+          throwReasonWithTiming(signal.reason, "before query execution");
+        }
+      }
+      const queryPromise = connection.executeQuery(compiledQuery, options);
+      const result = await Promise.race([abortPromise, queryPromise]).catch((error51) => {
+        release();
+        throw error51;
+      });
+      if (result === ABORTED) {
+        Promise.allSettled([
+          queryPromise.catch(printBackgroundFail("query")),
+          inflightQueryAbortHandler?.(controlConnectionProvider).catch(printBackgroundFail("inflightQueryAbortHandler"))
+        ]).finally(release);
+        throwReasonWithTiming(signal.reason, "during query execution");
+      } else {
+        release();
+      }
+      const transformPromise = this.#transformResult(result, compiledQuery.queryId, options);
+      const transformedResult = await Promise.race([
+        abortPromise,
+        transformPromise
+      ]);
+      if (transformedResult === ABORTED) {
+        transformPromise.catch(printBackgroundFail("plugins.transformResult"));
+        throwReasonWithTiming(signal.reason, "during result transformation");
+      }
+      return transformedResult;
+    } finally {
+      resolve(ABORTED);
+      signal.removeEventListener("abort", abortListener);
+    }
+  }
+  async* stream(compiledQuery, chunkSize, options) {
+    const { signal } = options || {};
+    if (!signal) {
+      const { connection: connection2, release: release2 } = await provideControlledConnection(this);
+      try {
+        for await (const result of connection2.streamQuery(compiledQuery, chunkSize)) {
+          yield await this.#transformResult(result, compiledQuery.queryId, options);
+        }
+      } finally {
+        release2();
+      }
+      return;
+    }
+    options = freeze({ signal });
+    assertNotAborted(signal, "before connection acquisition");
+    const { connection, release } = await provideControlledConnection(this, options);
+    const { promise: abortPromise, resolve } = new Deferred;
+    const abortListener = () => resolve(ABORTED);
+    signal.addEventListener("abort", abortListener, { once: true });
+    let asyncIterator;
+    let releasePrerequisite;
+    assertNotAborted(signal, "before query streaming", release);
+    const { queryId } = compiledQuery;
+    try {
+      asyncIterator = connection.streamQuery(compiledQuery, chunkSize, options);
+      while (true) {
+        assertNotAborted(signal, "during query streaming");
+        const nextPromise = asyncIterator.next();
+        const result = await Promise.race([abortPromise, nextPromise]);
+        if (result === ABORTED) {
+          releasePrerequisite = nextPromise.catch(printBackgroundFail("iterator.next"));
+          throwReasonWithTiming(signal.reason, "during query streaming");
+        }
+        if (result.done) {
+          break;
+        }
+        const transformPromise = this.#transformResult(result.value, queryId, options);
+        const transformedResult = await Promise.race([
+          abortPromise,
+          transformPromise
+        ]);
+        if (transformedResult === ABORTED) {
+          releasePrerequisite = transformPromise.catch(printBackgroundFail("plugins.transformResult"));
+          throwReasonWithTiming(signal.reason, "during result transformation");
+        }
+        yield transformedResult;
+      }
+    } finally {
+      resolve(ABORTED);
+      signal.removeEventListener("abort", abortListener);
+      const cleanup = (asyncIterator?.return?.() || Promise.resolve()).finally(() => releasePrerequisite).finally(release);
+      if (!releasePrerequisite) {
+        await cleanup;
+      }
+    }
+  }
+  async#transformResult(result, queryId, options) {
+    const { signal } = options || {};
+    for (const plugin of this.#plugins) {
+      result = await plugin.transformResult(freeze({ queryId, result, signal }));
+    }
+    return result;
+  }
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/query-executor/noop-query-executor.js
+class NoopQueryExecutor extends QueryExecutorBase {
+  get adapter() {
+    throw new Error("this query cannot be compiled to SQL");
+  }
+  compileQuery() {
+    throw new Error("this query cannot be compiled to SQL");
+  }
+  provideConnection() {
+    throw new Error("this query cannot be executed");
+  }
+  withConnectionProvider() {
+    throw new Error("this query cannot have a connection provider");
+  }
+  withPlugin(plugin) {
+    return new NoopQueryExecutor([...this.plugins, plugin]);
+  }
+  withPlugins(plugins) {
+    return new NoopQueryExecutor([...this.plugins, ...plugins]);
+  }
+  withPluginAtFront(plugin) {
+    return new NoopQueryExecutor([plugin, ...this.plugins]);
+  }
+  withoutPlugins() {
+    return new NoopQueryExecutor([]);
+  }
+}
+var NOOP_QUERY_EXECUTOR = new NoopQueryExecutor;
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/parser/parse-utils.js
+function createJoinBuilder(joinType, table) {
+  return new JoinBuilder({
+    joinNode: JoinNode.create(joinType, parseTableExpression(table))
+  });
+}
+function createOverBuilder() {
+  return new OverBuilder({
+    overNode: OverNode.create()
+  });
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/parser/join-parser.js
+function parseJoin(joinType, args) {
+  if (args.length === 3) {
+    return parseSingleOnJoin(joinType, args[0], args[1], args[2]);
+  } else if (args.length === 2) {
+    return parseCallbackJoin(joinType, args[0], args[1]);
+  } else if (args.length === 1) {
+    return parseOnlessJoin(joinType, args[0]);
+  } else {
+    throw new Error("not implemented");
+  }
+}
+function parseCallbackJoin(joinType, from, callback) {
+  return callback(createJoinBuilder(joinType, from)).toOperationNode();
+}
+function parseSingleOnJoin(joinType, from, lhsColumn, rhsColumn) {
+  return JoinNode.createWithOn(joinType, parseTableExpression(from), parseReferentialBinaryOperation(lhsColumn, "=", rhsColumn));
+}
+function parseOnlessJoin(joinType, from) {
+  return JoinNode.create(joinType, parseTableExpression(from));
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/offset-node.js
+var OffsetNode = freeze({
+  is(node) {
+    return node.kind === "OffsetNode";
+  },
+  create(offset) {
+    return freeze({
+      kind: "OffsetNode",
+      offset
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/group-by-item-node.js
+var GroupByItemNode = freeze({
+  is(node) {
+    return node.kind === "GroupByItemNode";
+  },
+  create(groupBy) {
+    return freeze({
+      kind: "GroupByItemNode",
+      groupBy
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/parser/group-by-parser.js
+function parseGroupBy(groupBy) {
+  groupBy = isFunction(groupBy) ? groupBy(expressionBuilder()) : groupBy;
+  return parseReferenceExpressionOrList(groupBy).map(GroupByItemNode.create);
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/set-operation-node.js
+var SetOperationNode = freeze({
+  is(node) {
+    return node.kind === "SetOperationNode";
+  },
+  create(operator, expression, all) {
+    return freeze({
+      kind: "SetOperationNode",
+      operator,
+      expression,
+      all
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/parser/set-operation-parser.js
+function parseSetOperations(operator, expression, all) {
+  if (isFunction(expression)) {
+    expression = expression(createExpressionBuilder());
+  }
+  if (!isReadonlyArray(expression)) {
+    expression = [expression];
+  }
+  return expression.map((expr) => SetOperationNode.create(operator, parseExpression(expr), all));
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/expression/expression-wrapper.js
+class ExpressionWrapper {
+  #node;
+  constructor(node) {
+    this.#node = node;
+  }
+  get expressionType() {
+    return;
+  }
+  as(alias) {
+    return new AliasedExpressionWrapper(this, alias);
+  }
+  or(...args) {
+    return new OrWrapper(OrNode.create(this.#node, parseValueBinaryOperationOrExpression(args)));
+  }
+  and(...args) {
+    return new AndWrapper(AndNode.create(this.#node, parseValueBinaryOperationOrExpression(args)));
+  }
+  $castTo() {
+    return new ExpressionWrapper(this.#node);
+  }
+  $notNull() {
+    return new ExpressionWrapper(this.#node);
+  }
+  toOperationNode() {
+    return this.#node;
+  }
+}
+
+class AliasedExpressionWrapper {
+  #expr;
+  #alias;
+  constructor(expr, alias) {
+    this.#expr = expr;
+    this.#alias = alias;
+  }
+  get expression() {
+    return this.#expr;
+  }
+  get alias() {
+    return this.#alias;
+  }
+  toOperationNode() {
+    return AliasNode.create(this.#expr.toOperationNode(), isOperationNodeSource(this.#alias) ? this.#alias.toOperationNode() : IdentifierNode.create(this.#alias));
+  }
+}
+
+class OrWrapper {
+  #node;
+  constructor(node) {
+    this.#node = node;
+  }
+  get expressionType() {
+    return;
+  }
+  as(alias) {
+    return new AliasedExpressionWrapper(this, alias);
+  }
+  or(...args) {
+    return new OrWrapper(OrNode.create(this.#node, parseValueBinaryOperationOrExpression(args)));
+  }
+  $castTo() {
+    return new OrWrapper(this.#node);
+  }
+  toOperationNode() {
+    return ParensNode.create(this.#node);
+  }
+}
+
+class AndWrapper {
+  #node;
+  constructor(node) {
+    this.#node = node;
+  }
+  get expressionType() {
+    return;
+  }
+  as(alias) {
+    return new AliasedExpressionWrapper(this, alias);
+  }
+  and(...args) {
+    return new AndWrapper(AndNode.create(this.#node, parseValueBinaryOperationOrExpression(args)));
+  }
+  $castTo() {
+    return new AndWrapper(this.#node);
+  }
+  toOperationNode() {
+    return ParensNode.create(this.#node);
+  }
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/fetch-node.js
+var FetchNode = freeze({
+  is(node) {
+    return node.kind === "FetchNode";
+  },
+  create(rowCount, modifier) {
+    return {
+      kind: "FetchNode",
+      rowCount: ValueNode.create(rowCount),
+      modifier
+    };
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/parser/fetch-parser.js
+function parseFetch(rowCount, modifier) {
+  if (!isNumber(rowCount) && !isBigInt(rowCount)) {
+    throw new Error(`Invalid fetch row count: ${rowCount}`);
+  }
+  if (!isFetchModifier(modifier)) {
+    throw new Error(`Invalid fetch modifier: ${modifier}`);
+  }
+  return FetchNode.create(rowCount, modifier);
+}
+function isFetchModifier(value) {
+  return value === "only" || value === "with ties";
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/query-builder/select-query-builder.js
+var _a3;
+
+class SelectQueryBuilderImpl {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  get expressionType() {
+    return;
+  }
+  get isSelectQueryBuilder() {
+    return true;
+  }
+  where(...args) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithWhere(this.#props.queryNode, parseValueBinaryOperationOrExpression(args))
+    });
+  }
+  whereRef(lhs, op, rhs) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithWhere(this.#props.queryNode, parseReferentialBinaryOperation(lhs, op, rhs))
+    });
+  }
+  having(...args) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithHaving(this.#props.queryNode, parseValueBinaryOperationOrExpression(args))
+    });
+  }
+  havingRef(lhs, op, rhs) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithHaving(this.#props.queryNode, parseReferentialBinaryOperation(lhs, op, rhs))
+    });
+  }
+  select(selection) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithSelections(this.#props.queryNode, parseSelectArg(selection))
+    });
+  }
+  distinctOn(selection) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithDistinctOn(this.#props.queryNode, parseReferenceExpressionOrList(selection))
+    });
+  }
+  modifyFront(modifier) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithFrontModifier(this.#props.queryNode, SelectModifierNode.createWithExpression(modifier.toOperationNode()))
+    });
+  }
+  modifyEnd(modifier) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.createWithExpression(modifier.toOperationNode()))
+    });
+  }
+  distinct() {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithFrontModifier(this.#props.queryNode, SelectModifierNode.create("Distinct"))
+    });
+  }
+  forUpdate(of) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("ForUpdate", of ? asArray(of).map(parseTable) : undefined))
+    });
+  }
+  forShare(of) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("ForShare", of ? asArray(of).map(parseTable) : undefined))
+    });
+  }
+  forKeyShare(of) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("ForKeyShare", of ? asArray(of).map(parseTable) : undefined))
+    });
+  }
+  forNoKeyUpdate(of) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("ForNoKeyUpdate", of ? asArray(of).map(parseTable) : undefined))
+    });
+  }
+  skipLocked() {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("SkipLocked"))
+    });
+  }
+  noWait() {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("NoWait"))
+    });
+  }
+  selectAll(table) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithSelections(this.#props.queryNode, parseSelectAll(table))
+    });
+  }
+  innerJoin(...args) {
+    return this.#join("InnerJoin", args);
+  }
+  leftJoin(...args) {
+    return this.#join("LeftJoin", args);
+  }
+  rightJoin(...args) {
+    return this.#join("RightJoin", args);
+  }
+  fullJoin(...args) {
+    return this.#join("FullJoin", args);
+  }
+  crossJoin(...args) {
+    return this.#join("CrossJoin", args);
+  }
+  innerJoinLateral(...args) {
+    return this.#join("LateralInnerJoin", args);
+  }
+  leftJoinLateral(...args) {
+    return this.#join("LateralLeftJoin", args);
+  }
+  crossJoinLateral(...args) {
+    return this.#join("LateralCrossJoin", args);
+  }
+  crossApply(...args) {
+    return this.#join("CrossApply", args);
+  }
+  outerApply(...args) {
+    return this.#join("OuterApply", args);
+  }
+  #join(joinType, args) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithJoin(this.#props.queryNode, parseJoin(joinType, args))
+    });
+  }
+  orderBy(...args) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithOrderByItems(this.#props.queryNode, parseOrderBy(args))
+    });
+  }
+  groupBy(groupBy) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithGroupByItems(this.#props.queryNode, parseGroupBy(groupBy))
+    });
+  }
+  limit(limit) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithLimit(this.#props.queryNode, LimitNode.create(parseValueExpression(limit)))
+    });
+  }
+  offset(offset) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithOffset(this.#props.queryNode, OffsetNode.create(parseValueExpression(offset)))
+    });
+  }
+  fetch(rowCount, modifier = "only") {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithFetch(this.#props.queryNode, parseFetch(rowCount, modifier))
+    });
+  }
+  top(expression, modifiers) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithTop(this.#props.queryNode, parseTop(expression, modifiers))
+    });
+  }
+  union(expression) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("union", expression, false))
+    });
+  }
+  unionAll(expression) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("union", expression, true))
+    });
+  }
+  intersect(expression) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("intersect", expression, false))
+    });
+  }
+  intersectAll(expression) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("intersect", expression, true))
+    });
+  }
+  except(expression) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("except", expression, false))
+    });
+  }
+  exceptAll(expression) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("except", expression, true))
+    });
+  }
+  as(alias) {
+    return new AliasedSelectQueryBuilderImpl(this, alias);
+  }
+  clearSelect() {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithoutSelections(this.#props.queryNode)
+    });
+  }
+  clearWhere() {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithoutWhere(this.#props.queryNode)
+    });
+  }
+  clearLimit() {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithoutLimit(this.#props.queryNode)
+    });
+  }
+  clearOffset() {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithoutOffset(this.#props.queryNode)
+    });
+  }
+  clearOrderBy() {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithoutOrderBy(this.#props.queryNode)
+    });
+  }
+  clearGroupBy() {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithoutGroupBy(this.#props.queryNode)
+    });
+  }
+  $call(func) {
+    return func(this);
+  }
+  $if(condition, func) {
+    if (condition) {
+      return func(this);
+    }
+    return new _a3({
+      ...this.#props
+    });
+  }
+  $castTo() {
+    return new _a3(this.#props);
+  }
+  $narrowType() {
+    return new _a3(this.#props);
+  }
+  $assertType() {
+    return new _a3(this.#props);
+  }
+  $asTuple() {
+    return new ExpressionWrapper(this.toOperationNode());
+  }
+  $asScalar() {
+    return new ExpressionWrapper(this.toOperationNode());
+  }
+  withPlugin(plugin) {
+    return new _a3({
+      ...this.#props,
+      executor: this.#props.executor.withPlugin(plugin)
+    });
+  }
+  toOperationNode() {
+    return this.#props.executor.transformQuery(this.#props.queryNode, this.#props.queryId);
+  }
+  compile() {
+    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
+  }
+  async execute(options) {
+    const compiledQuery = this.compile();
+    const result = await this.#props.executor.executeQuery(compiledQuery, options);
+    return result.rows;
+  }
+  async executeTakeFirst(options) {
+    const [result] = await this.execute(options);
+    return result;
+  }
+  async executeTakeFirstOrThrow(errorConstructorOrOptions) {
+    if (typeof errorConstructorOrOptions === "function") {
+      errorConstructorOrOptions = {
+        errorConstructor: errorConstructorOrOptions
+      };
+    }
+    const result = await this.executeTakeFirst(errorConstructorOrOptions);
+    if (result === undefined) {
+      const errorConstructor = errorConstructorOrOptions?.errorConstructor ?? NoResultError;
+      const error51 = isNoResultErrorConstructor(errorConstructor) ? new errorConstructor(this.toOperationNode()) : errorConstructor(this.toOperationNode());
+      throw error51;
+    }
+    return result;
+  }
+  async* stream(chunkSizeOrOptions) {
+    if (typeof chunkSizeOrOptions !== "object") {
+      chunkSizeOrOptions = {
+        chunkSize: chunkSizeOrOptions
+      };
+    }
+    const compiledQuery = this.compile();
+    const stream = this.#props.executor.stream(compiledQuery, chunkSizeOrOptions.chunkSize ?? 100, chunkSizeOrOptions);
+    for await (const item of stream) {
+      yield* item.rows;
+    }
+  }
+  async explain(format, options) {
+    const builder = new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithExplain(this.#props.queryNode, format, options)
+    });
+    return await builder.execute();
+  }
+}
+_a3 = SelectQueryBuilderImpl;
+function createSelectQueryBuilder(props) {
+  return new SelectQueryBuilderImpl(props);
+}
+
+class AliasedSelectQueryBuilderImpl {
+  #queryBuilder;
+  #alias;
+  constructor(queryBuilder, alias) {
+    this.#queryBuilder = queryBuilder;
+    this.#alias = alias;
+  }
+  get expression() {
+    return this.#queryBuilder;
+  }
+  get alias() {
+    return this.#alias;
+  }
+  get isAliasedSelectQueryBuilder() {
+    return true;
+  }
+  toOperationNode() {
+    return AliasNode.create(this.#queryBuilder.toOperationNode(), IdentifierNode.create(this.#alias));
+  }
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/aggregate-function-node.js
+var AggregateFunctionNode = freeze({
+  is(node) {
+    return node.kind === "AggregateFunctionNode";
+  },
+  create(aggregateFunction, aggregated = []) {
+    return freeze({
+      kind: "AggregateFunctionNode",
+      func: aggregateFunction,
+      aggregated
+    });
+  },
+  cloneWithDistinct(aggregateFunctionNode) {
+    return freeze({
+      ...aggregateFunctionNode,
+      distinct: true
+    });
+  },
+  cloneWithOrderBy(aggregateFunctionNode, orderItems, withinGroup = false) {
+    const prop = withinGroup ? "withinGroup" : "orderBy";
+    return freeze({
+      ...aggregateFunctionNode,
+      [prop]: aggregateFunctionNode[prop] ? OrderByNode.cloneWithItems(aggregateFunctionNode[prop], orderItems) : OrderByNode.create(orderItems)
+    });
+  },
+  cloneWithFilter(aggregateFunctionNode, filter) {
+    return freeze({
+      ...aggregateFunctionNode,
+      filter: aggregateFunctionNode.filter ? WhereNode.cloneWithOperation(aggregateFunctionNode.filter, "And", filter) : WhereNode.create(filter)
+    });
+  },
+  cloneWithOrFilter(aggregateFunctionNode, filter) {
+    return freeze({
+      ...aggregateFunctionNode,
+      filter: aggregateFunctionNode.filter ? WhereNode.cloneWithOperation(aggregateFunctionNode.filter, "Or", filter) : WhereNode.create(filter)
+    });
+  },
+  cloneWithOver(aggregateFunctionNode, over) {
+    return freeze({
+      ...aggregateFunctionNode,
+      over
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/function-node.js
+var FunctionNode = freeze({
+  is(node) {
+    return node.kind === "FunctionNode";
+  },
+  create(func, args) {
+    return freeze({
+      kind: "FunctionNode",
+      func,
+      arguments: args
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/query-builder/aggregate-function-builder.js
+class AggregateFunctionBuilder {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  get expressionType() {
+    return;
+  }
+  as(alias) {
+    return new AliasedAggregateFunctionBuilder(this, alias);
+  }
+  distinct() {
+    return new AggregateFunctionBuilder({
+      ...this.#props,
+      aggregateFunctionNode: AggregateFunctionNode.cloneWithDistinct(this.#props.aggregateFunctionNode)
+    });
+  }
+  orderBy(...args) {
+    return new AggregateFunctionBuilder({
+      ...this.#props,
+      aggregateFunctionNode: QueryNode.cloneWithOrderByItems(this.#props.aggregateFunctionNode, parseOrderBy(args))
+    });
+  }
+  clearOrderBy() {
+    return new AggregateFunctionBuilder({
+      ...this.#props,
+      aggregateFunctionNode: QueryNode.cloneWithoutOrderBy(this.#props.aggregateFunctionNode)
+    });
+  }
+  withinGroupOrderBy(...args) {
+    return new AggregateFunctionBuilder({
+      ...this.#props,
+      aggregateFunctionNode: AggregateFunctionNode.cloneWithOrderBy(this.#props.aggregateFunctionNode, parseOrderBy(args), true)
+    });
+  }
+  filterWhere(...args) {
+    return new AggregateFunctionBuilder({
+      ...this.#props,
+      aggregateFunctionNode: AggregateFunctionNode.cloneWithFilter(this.#props.aggregateFunctionNode, parseValueBinaryOperationOrExpression(args))
+    });
+  }
+  filterWhereRef(lhs, op, rhs) {
+    return new AggregateFunctionBuilder({
+      ...this.#props,
+      aggregateFunctionNode: AggregateFunctionNode.cloneWithFilter(this.#props.aggregateFunctionNode, parseReferentialBinaryOperation(lhs, op, rhs))
+    });
+  }
+  over(over) {
+    const builder = createOverBuilder();
+    return new AggregateFunctionBuilder({
+      ...this.#props,
+      aggregateFunctionNode: AggregateFunctionNode.cloneWithOver(this.#props.aggregateFunctionNode, (over ? over(builder) : builder).toOperationNode())
+    });
+  }
+  $call(func) {
+    return func(this);
+  }
+  $castTo() {
+    return new AggregateFunctionBuilder(this.#props);
+  }
+  $notNull() {
+    return new AggregateFunctionBuilder(this.#props);
+  }
+  toOperationNode() {
+    return this.#props.aggregateFunctionNode;
+  }
+}
+
+class AliasedAggregateFunctionBuilder {
+  #aggregateFunctionBuilder;
+  #alias;
+  constructor(aggregateFunctionBuilder, alias) {
+    this.#aggregateFunctionBuilder = aggregateFunctionBuilder;
+    this.#alias = alias;
+  }
+  get expression() {
+    return this.#aggregateFunctionBuilder;
+  }
+  get alias() {
+    return this.#alias;
+  }
+  toOperationNode() {
+    return AliasNode.create(this.#aggregateFunctionBuilder.toOperationNode(), IdentifierNode.create(this.#alias));
+  }
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/query-builder/function-module.js
+function createFunctionModule() {
+  const fn = (name, args) => {
+    return new ExpressionWrapper(FunctionNode.create(name, parseReferenceExpressionOrList(args ?? [])));
+  };
+  const agg = (name, args) => {
+    return new AggregateFunctionBuilder({
+      aggregateFunctionNode: AggregateFunctionNode.create(name, args ? parseReferenceExpressionOrList(args) : undefined)
+    });
+  };
+  return Object.assign(fn, {
+    agg,
+    avg(column) {
+      return agg("avg", [column]);
+    },
+    coalesce(...values) {
+      return fn("coalesce", values);
+    },
+    count(column) {
+      return agg("count", [column]);
+    },
+    countAll(table) {
+      return new AggregateFunctionBuilder({
+        aggregateFunctionNode: AggregateFunctionNode.create("count", parseSelectAll(table))
+      });
+    },
+    max(column) {
+      return agg("max", [column]);
+    },
+    min(column) {
+      return agg("min", [column]);
+    },
+    sum(column) {
+      return agg("sum", [column]);
+    },
+    any(column) {
+      return fn("any", [column]);
+    },
+    jsonAgg(table) {
+      return new AggregateFunctionBuilder({
+        aggregateFunctionNode: AggregateFunctionNode.create("json_agg", [
+          isString(table) ? parseTable(table) : table.toOperationNode()
+        ])
+      });
+    },
+    toJson(table) {
+      return new ExpressionWrapper(FunctionNode.create("to_json", [
+        isString(table) ? parseTable(table) : table.toOperationNode()
+      ]));
+    }
+  });
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/unary-operation-node.js
+var UnaryOperationNode = freeze({
+  is(node) {
+    return node.kind === "UnaryOperationNode";
+  },
+  create(operator, operand) {
+    return freeze({
+      kind: "UnaryOperationNode",
+      operator,
+      operand
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/parser/unary-operation-parser.js
+function parseUnaryOperation(operator, operand) {
+  if (isUnaryOperator(operator)) {
+    return UnaryOperationNode.create(OperatorNode.create(operator), parseReferenceExpression(operand));
+  }
+  throw new Error(`invalid unary operator ${JSON.stringify(operator)}`);
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/case-node.js
+var CaseNode = freeze({
+  is(node) {
+    return node.kind === "CaseNode";
+  },
+  create(value) {
+    return freeze({
+      kind: "CaseNode",
+      value
+    });
+  },
+  cloneWithWhen(caseNode, when) {
+    return freeze({
+      ...caseNode,
+      when: freeze(caseNode.when ? [...caseNode.when, when] : [when])
+    });
+  },
+  cloneWithThen(caseNode, then) {
+    return freeze({
+      ...caseNode,
+      when: caseNode.when ? freeze([
+        ...caseNode.when.slice(0, -1),
+        WhenNode.cloneWithResult(caseNode.when[caseNode.when.length - 1], then)
+      ]) : undefined
+    });
+  },
+  cloneWith(caseNode, props) {
+    return freeze({
+      ...caseNode,
+      ...props
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/query-builder/case-builder.js
+class CaseBuilder {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  when(...args) {
+    return new CaseThenBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWithWhen(this.#props.node, WhenNode.create(parseValueBinaryOperationOrExpression(args)))
+    });
+  }
+  whenRef(lhs, op, rhs) {
+    return new CaseThenBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWithWhen(this.#props.node, WhenNode.create(parseReferentialBinaryOperation(lhs, op, rhs)))
+    });
+  }
+}
+
+class CaseThenBuilder {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  then(valueExpression) {
+    return new CaseWhenBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWithThen(this.#props.node, isSafeImmediateValue(valueExpression) ? parseSafeImmediateValue(valueExpression) : parseValueExpression(valueExpression))
+    });
+  }
+  thenRef(expression) {
+    return new CaseWhenBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWithThen(this.#props.node, parseReferenceExpression(expression))
+    });
+  }
+}
+
+class CaseWhenBuilder {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  when(...args) {
+    return new CaseThenBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWithWhen(this.#props.node, WhenNode.create(parseValueBinaryOperationOrExpression(args)))
+    });
+  }
+  whenRef(lhs, op, rhs) {
+    return new CaseThenBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWithWhen(this.#props.node, WhenNode.create(parseReferentialBinaryOperation(lhs, op, rhs)))
+    });
+  }
+  else(valueExpression) {
+    return new CaseEndBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWith(this.#props.node, {
+        else: isSafeImmediateValue(valueExpression) ? parseSafeImmediateValue(valueExpression) : parseValueExpression(valueExpression)
+      })
+    });
+  }
+  elseRef(expression) {
+    return new CaseEndBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWith(this.#props.node, {
+        else: parseReferenceExpression(expression)
+      })
+    });
+  }
+  end() {
+    return new ExpressionWrapper(CaseNode.cloneWith(this.#props.node, { isStatement: false }));
+  }
+  endCase() {
+    return new ExpressionWrapper(CaseNode.cloneWith(this.#props.node, { isStatement: true }));
+  }
+}
+
+class CaseEndBuilder {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  end() {
+    return new ExpressionWrapper(CaseNode.cloneWith(this.#props.node, { isStatement: false }));
+  }
+  endCase() {
+    return new ExpressionWrapper(CaseNode.cloneWith(this.#props.node, { isStatement: true }));
+  }
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/json-path-leg-node.js
+var JSONPathLegNode = freeze({
+  is(node) {
+    return node.kind === "JSONPathLegNode";
+  },
+  create(type, value) {
+    return freeze({
+      kind: "JSONPathLegNode",
+      type,
+      value
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/query-builder/json-path-builder.js
+var HASH_NEGATIVE_INDEX_REGEX = /^#-\d+$/;
+
+class JSONPathBuilder {
+  #node;
+  constructor(node) {
+    this.#node = node;
+  }
+  at(index) {
+    if (typeof index !== "number" && typeof index !== "string" || typeof index === "number" && !Number.isInteger(index) || typeof index === "string" && index !== "last" && !HASH_NEGATIVE_INDEX_REGEX.test(index)) {
+      throw new Error(`Unexpected index value in .at(...): ${index}`);
+    }
+    return this.#createBuilderWithPathLeg("ArrayLocation", index);
+  }
+  key(key) {
+    return this.#createBuilderWithPathLeg("Member", key);
+  }
+  #createBuilderWithPathLeg(legType, value) {
+    if (JSONReferenceNode.is(this.#node)) {
+      return new TraversedJSONPathBuilder(JSONReferenceNode.cloneWithTraversal(this.#node, JSONPathNode.is(this.#node.traversal) ? JSONPathNode.cloneWithLeg(this.#node.traversal, JSONPathLegNode.create(legType, value)) : JSONOperatorChainNode.cloneWithValue(this.#node.traversal, ValueNode.createImmediate(value))));
+    }
+    return new TraversedJSONPathBuilder(JSONPathNode.cloneWithLeg(this.#node, JSONPathLegNode.create(legType, value)));
+  }
+}
+
+class TraversedJSONPathBuilder extends JSONPathBuilder {
+  #node;
+  constructor(node) {
+    super(node);
+    this.#node = node;
+  }
+  get expressionType() {
+    return;
+  }
+  as(alias) {
+    return new AliasedJSONPathBuilder(this, alias);
+  }
+  $castTo() {
+    return new TraversedJSONPathBuilder(this.#node);
+  }
+  $notNull() {
+    return new TraversedJSONPathBuilder(this.#node);
+  }
+  toOperationNode() {
+    return this.#node;
+  }
+}
+
+class AliasedJSONPathBuilder {
+  #jsonPath;
+  #alias;
+  constructor(jsonPath, alias) {
+    this.#jsonPath = jsonPath;
+    this.#alias = alias;
+  }
+  get expression() {
+    return this.#jsonPath;
+  }
+  get alias() {
+    return this.#alias;
+  }
+  toOperationNode() {
+    return AliasNode.create(this.#jsonPath.toOperationNode(), isOperationNodeSource(this.#alias) ? this.#alias.toOperationNode() : IdentifierNode.create(this.#alias));
+  }
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/tuple-node.js
+var TupleNode = freeze({
+  is(node) {
+    return node.kind === "TupleNode";
+  },
+  create(values) {
+    return freeze({
+      kind: "TupleNode",
+      values: freeze(values)
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/data-type-node.js
+var SIMPLE_COLUMN_DATA_TYPES = freeze({
+  bigint: true,
+  bigserial: true,
+  binary: true,
+  blob: true,
+  boolean: true,
+  bytea: true,
+  char: true,
+  date: true,
+  datemultirange: true,
+  daterange: true,
+  datetime: true,
+  datetime2: true,
+  decimal: true,
+  "double precision": true,
+  float4: true,
+  float8: true,
+  int2: true,
+  int4: true,
+  int4multirange: true,
+  int4range: true,
+  int8: true,
+  int8multirange: true,
+  int8range: true,
+  integer: true,
+  json: true,
+  jsonb: true,
+  numeric: true,
+  nummultirange: true,
+  numrange: true,
+  real: true,
+  serial: true,
+  smallint: true,
+  text: true,
+  time: true,
+  timestamp: true,
+  timestamptz: true,
+  timetz: true,
+  tsmultirange: true,
+  tsrange: true,
+  tstzmultirange: true,
+  tstzrange: true,
+  uuid: true,
+  varbinary: true,
+  varchar: true
+});
+var COLUMN_DATA_TYPE_REGEX = freeze([
+  /^varchar\(\d+\)$/,
+  /^char\(\d+\)$/,
+  /^decimal\(\d+, \d+\)$/,
+  /^numeric\(\d+, \d+\)$/,
+  /^binary\(\d+\)$/,
+  /^datetime\(\d+\)$/,
+  /^time\(\d+\)$/,
+  /^timetz\(\d+\)$/,
+  /^timestamp\(\d+\)$/,
+  /^timestamptz\(\d+\)$/,
+  /^datetime2\(\d+\)$/,
+  /^varbinary\(\d+\)$/
+]);
+var DataTypeNode = freeze({
+  is(node) {
+    return node.kind === "DataTypeNode";
+  },
+  create(dataType) {
+    return freeze({
+      kind: "DataTypeNode",
+      dataType
+    });
+  }
+});
+function isColumnDataType(dataType) {
+  return SIMPLE_COLUMN_DATA_TYPES[dataType] || COLUMN_DATA_TYPE_REGEX.some((r) => r.test(dataType));
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/parser/data-type-parser.js
+function parseDataTypeExpression(dataType) {
+  if (isOperationNodeSource(dataType)) {
+    return dataType.toOperationNode();
+  }
+  if (isColumnDataType(dataType)) {
+    return DataTypeNode.create(dataType);
+  }
+  throw new Error(`invalid column data type ${JSON.stringify(dataType)}`);
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/operation-node/cast-node.js
+var CastNode = freeze({
+  is(node) {
+    return node.kind === "CastNode";
+  },
+  create(expression, dataType) {
+    return freeze({
+      kind: "CastNode",
+      expression,
+      dataType
+    });
+  }
+});
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/expression/expression-builder.js
+function createExpressionBuilder(executor = NOOP_QUERY_EXECUTOR) {
+  function binary(lhs, op, rhs) {
+    return new ExpressionWrapper(parseValueBinaryOperation(lhs, op, rhs));
+  }
+  function unary(op, expr) {
+    return new ExpressionWrapper(parseUnaryOperation(op, expr));
+  }
+  const eb = Object.assign(binary, {
+    fn: undefined,
+    eb: undefined,
+    selectFrom(table) {
+      return createSelectQueryBuilder({
+        queryId: createQueryId(),
+        executor,
+        queryNode: SelectQueryNode.createFrom(parseTableExpressionOrList(table))
+      });
+    },
+    case(reference) {
+      return new CaseBuilder({
+        node: CaseNode.create(isUndefined(reference) ? undefined : parseReferenceExpression(reference))
+      });
+    },
+    ref(reference, op) {
+      if (isUndefined(op)) {
+        return new ExpressionWrapper(parseStringReference(reference));
+      }
+      return new JSONPathBuilder(parseJSONReference(reference, op));
+    },
+    jsonPath() {
+      return new JSONPathBuilder(JSONPathNode.create());
+    },
+    table(table) {
+      return new ExpressionWrapper(parseTable(table));
+    },
+    val(value) {
+      return new ExpressionWrapper(parseValueExpression(value));
+    },
+    refTuple(...values) {
+      return new ExpressionWrapper(TupleNode.create(values.map(parseReferenceExpression)));
+    },
+    tuple(...values) {
+      return new ExpressionWrapper(TupleNode.create(values.map(parseValueExpression)));
+    },
+    lit(value) {
+      return new ExpressionWrapper(parseSafeImmediateValue(value));
+    },
+    unary,
+    not(expr) {
+      return unary("not", expr);
+    },
+    exists(expr) {
+      return unary("exists", expr);
+    },
+    neg(expr) {
+      return unary("-", expr);
+    },
+    between(expr, start, end) {
+      return new ExpressionWrapper(BinaryOperationNode.create(parseReferenceExpression(expr), OperatorNode.create("between"), AndNode.create(parseValueExpression(start), parseValueExpression(end))));
+    },
+    betweenSymmetric(expr, start, end) {
+      return new ExpressionWrapper(BinaryOperationNode.create(parseReferenceExpression(expr), OperatorNode.create("between symmetric"), AndNode.create(parseValueExpression(start), parseValueExpression(end))));
+    },
+    and(exprs) {
+      if (isReadonlyArray(exprs)) {
+        return new ExpressionWrapper(parseFilterList(exprs, "and"));
+      }
+      return new ExpressionWrapper(parseFilterObject(exprs, "and"));
+    },
+    or(exprs) {
+      if (isReadonlyArray(exprs)) {
+        return new ExpressionWrapper(parseFilterList(exprs, "or"));
+      }
+      return new ExpressionWrapper(parseFilterObject(exprs, "or"));
+    },
+    parens(...args) {
+      const node = parseValueBinaryOperationOrExpression(args);
+      if (ParensNode.is(node)) {
+        return new ExpressionWrapper(node);
+      } else {
+        return new ExpressionWrapper(ParensNode.create(node));
+      }
+    },
+    cast(expr, dataType) {
+      return new ExpressionWrapper(CastNode.create(parseReferenceExpression(expr), parseDataTypeExpression(dataType)));
+    }
+  });
+  eb.fn = createFunctionModule();
+  eb.eb = eb;
+  return eb;
+}
+function expressionBuilder(_) {
+  return createExpressionBuilder();
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/parser/expression-parser.js
+function parseExpression(exp) {
+  if (isOperationNodeSource(exp)) {
+    return exp.toOperationNode();
+  } else if (isFunction(exp)) {
+    return exp(expressionBuilder()).toOperationNode();
+  }
+  throw new Error(`invalid expression: ${JSON.stringify(exp)}`);
+}
+function parseAliasedExpression(exp) {
+  if (isOperationNodeSource(exp)) {
+    return exp.toOperationNode();
+  } else if (isFunction(exp)) {
+    return exp(expressionBuilder()).toOperationNode();
+  }
+  throw new Error(`invalid aliased expression: ${JSON.stringify(exp)}`);
+}
+function isExpressionOrFactory(obj) {
+  return isExpression(obj) || isAliasedExpression(obj) || isFunction(obj);
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/dynamic/dynamic-table-builder.js
+class DynamicTableBuilder {
+  #table;
+  get table() {
+    return this.#table;
+  }
+  constructor(table) {
+    this.#table = table;
+  }
+  as(alias) {
+    return new AliasedDynamicTableBuilder(this.#table, alias);
+  }
+}
+
+class AliasedDynamicTableBuilder {
+  #table;
+  #alias;
+  get table() {
+    return this.#table;
+  }
+  get alias() {
+    return this.#alias;
+  }
+  constructor(table, alias) {
+    this.#table = table;
+    this.#alias = alias;
+  }
+  toOperationNode() {
+    return AliasNode.create(parseTable(this.#table), IdentifierNode.create(this.#alias));
+  }
+}
+function isAliasedDynamicTableBuilder(obj) {
+  return isObject2(obj) && isOperationNodeSource(obj) && isString(obj.table) && isString(obj.alias);
+}
+
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/parser/table-parser.js
+function parseTableExpressionOrList(table) {
+  if (isReadonlyArray(table)) {
+    return table.map((it) => parseTableExpression(it));
+  } else {
+    return [parseTableExpression(table)];
+  }
+}
+function parseTableExpression(table) {
+  if (isString(table)) {
+    return parseAliasedTable(table);
+  } else if (isAliasedDynamicTableBuilder(table)) {
+    return table.toOperationNode();
+  } else {
+    return parseAliasedExpression(table);
+  }
+}
+function parseAliasedTable(from) {
+  const ALIAS_SEPARATOR = " as ";
+  if (from.includes(ALIAS_SEPARATOR)) {
+    const [table, alias] = from.split(ALIAS_SEPARATOR).map(trim2);
+    return AliasNode.create(parseTable(table), IdentifierNode.create(alias));
+  } else {
+    return parseTable(from);
+  }
+}
+function parseTable(from) {
+  const SCHEMA_SEPARATOR = ".";
+  if (from.includes(SCHEMA_SEPARATOR)) {
+    const [schema, table] = from.split(SCHEMA_SEPARATOR).map(trim2);
+    return TableNode.createWithSchema(schema, table);
+  } else {
+    return TableNode.create(from);
+  }
+}
+function trim2(str) {
+  return str.trim();
+}
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/raw-builder/raw-builder.js
+class RawBuilderImpl {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  get expressionType() {
+    return;
+  }
+  get isRawBuilder() {
+    return true;
+  }
+  as(alias) {
+    return new AliasedRawBuilderImpl(this, alias);
+  }
+  $castTo() {
+    return new RawBuilderImpl({ ...this.#props });
+  }
+  $notNull() {
+    return new RawBuilderImpl(this.#props);
+  }
+  withPlugin(plugin) {
+    return new RawBuilderImpl({
+      ...this.#props,
+      plugins: this.#props.plugins !== undefined ? freeze([...this.#props.plugins, plugin]) : freeze([plugin])
+    });
+  }
+  toOperationNode() {
+    return this.#toOperationNode(this.#getExecutor());
+  }
+  compile(executorProvider) {
+    return this.#compile(this.#getExecutor(executorProvider));
+  }
+  async execute(executorProvider, options) {
+    const executor = this.#getExecutor(executorProvider);
+    return executor.executeQuery(this.#compile(executor), options);
+  }
+  #getExecutor(executorProvider) {
+    const executor = executorProvider !== undefined ? executorProvider.getExecutor() : NOOP_QUERY_EXECUTOR;
+    return this.#props.plugins !== undefined ? executor.withPlugins(this.#props.plugins) : executor;
+  }
+  #toOperationNode(executor) {
+    return executor.transformQuery(this.#props.rawNode, this.#props.queryId);
+  }
+  #compile(executor) {
+    return executor.compileQuery(this.#toOperationNode(executor), this.#props.queryId);
+  }
+}
+function createRawBuilder(props) {
+  return new RawBuilderImpl(props);
+}
+
+class AliasedRawBuilderImpl {
+  #rawBuilder;
+  #alias;
+  constructor(rawBuilder, alias) {
+    this.#rawBuilder = rawBuilder;
+    this.#alias = alias;
+  }
+  get expression() {
+    return this.#rawBuilder;
+  }
+  get alias() {
+    return this.#alias;
+  }
+  get rawBuilder() {
+    return this.#rawBuilder;
+  }
+  toOperationNode() {
+    return AliasNode.create(this.#rawBuilder.toOperationNode(), isOperationNodeSource(this.#alias) ? this.#alias.toOperationNode() : IdentifierNode.create(this.#alias));
+  }
+}
+// ../../../../../zveltio-extensions/node_modules/kysely/dist/raw-builder/sql.js
+var sql = Object.assign((sqlFragments, ...parameters) => {
+  return createRawBuilder({
+    queryId: createQueryId(),
+    rawNode: RawNode.create(sqlFragments, parameters?.map(parseParameter) ?? [])
+  });
+}, {
+  ref(columnReference) {
+    return createRawBuilder({
+      queryId: createQueryId(),
+      rawNode: RawNode.createWithChild(parseStringReference(columnReference))
+    });
+  },
+  val(value) {
+    return createRawBuilder({
+      queryId: createQueryId(),
+      rawNode: RawNode.createWithChild(parseValueExpression(value))
+    });
+  },
+  table(tableReference) {
+    return createRawBuilder({
+      queryId: createQueryId(),
+      rawNode: RawNode.createWithChild(parseTable(tableReference))
+    });
+  },
+  id(...ids) {
+    const fragments = new Array(ids.length + 1).fill(".");
+    fragments[0] = "";
+    fragments[fragments.length - 1] = "";
+    return createRawBuilder({
+      queryId: createQueryId(),
+      rawNode: RawNode.create(fragments, ids.map(IdentifierNode.create))
+    });
+  },
+  lit(value) {
+    return createRawBuilder({
+      queryId: createQueryId(),
+      rawNode: RawNode.createWithChild(ValueNode.createImmediate(value))
+    });
+  },
+  raw(sql2) {
+    return createRawBuilder({
+      queryId: createQueryId(),
+      rawNode: RawNode.createWithSql(sql2)
+    });
+  },
+  join(array2, separator = sql`, `) {
+    const nodes = new Array(Math.max(2 * array2.length - 1, 0));
+    const sep = separator.toOperationNode();
+    for (let i = 0;i < array2.length; ++i) {
+      nodes[2 * i] = parseParameter(array2[i]);
+      if (i !== array2.length - 1) {
+        nodes[2 * i + 1] = sep;
+      }
+    }
+    return createRawBuilder({
+      queryId: createQueryId(),
+      rawNode: RawNode.createWithChildren(nodes)
+    });
+  }
+});
+function parseParameter(param) {
+  if (isOperationNodeSource(param)) {
+    return param.toOperationNode();
+  }
+  return parseValueExpression(param);
+}
+// ../../../../zveltio/packages/sdk/src/extension/jsonb.ts
+function toJsonb(value) {
+  return sql`${JSON.stringify(value ?? null)}::text::jsonb`;
+}
+// engine/routes.ts
 async function getUser(c, auth) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   return session?.user ?? null;
@@ -16214,7 +19588,7 @@ function etransportRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const body = c.req.valid("json");
-    const decl = await db.insertInto("zv_etransport_declarations").values({ ...body, goods: JSON.stringify(body.goods) }).returningAll().executeTakeFirst();
+    const decl = await db.insertInto("zv_etransport_declarations").values({ ...body, goods: toJsonb(body.goods) }).returningAll().executeTakeFirst();
     return c.json({ declaration: decl }, 201);
   });
   app.patch("/:id", zValidator("param", exports_external.object({ id: exports_external.string().uuid() })), zValidator("json", declarationSchema.partial()), async (c) => {
@@ -16265,7 +19639,7 @@ function etransportRoutes(ctx) {
     const row = await db.updateTable("zv_etransport_declarations").set({
       uit: d.uit,
       status: "declared",
-      anaf_response: JSON.stringify({
+      anaf_response: toJsonb({
         source: "manual",
         recorded_by: user.id,
         recorded_at: new Date().toISOString(),
@@ -16297,7 +19671,7 @@ function etransportRoutes(ctx) {
   return app;
 }
 
-// compliance/ro/etransport/engine/index.ts
+// engine/index.ts
 var extension = {
   name: "compliance/ro/etransport",
   category: "compliance",
