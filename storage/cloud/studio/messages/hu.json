@@ -17,6 +17,7 @@
   "storage.cloud.confirmDeleteQuota": "Delete this quota?",
   "storage.cloud.confirmRevokeShare": "Revoke this share link?",
   "storage.cloud.copyClose": "Másolás és bezárás",
+  "storage.cloud.dropzone": "Húzza ide a fájlokat a feltöltéshez",
   "storage.cloud.empty": "Még nincsenek adatok.",
   "storage.cloud.empty.folder": "Üres mappa. Húzd ide a fájlokat, vagy kattints a Feltöltésre.",
   "storage.cloud.generateLink": "Hivatkozás létrehozása",

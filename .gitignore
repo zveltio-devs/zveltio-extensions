@@ -1,4 +1,8 @@
 node_modules/
+# …and the same name as a symlink. `node_modules/` matches a DIRECTORY only,
+# so a worktree that links its dependencies instead of installing them offers
+# `node_modules` to `git add -A` as an ordinary file.
+node_modules
 dist/
 build/
 .env
