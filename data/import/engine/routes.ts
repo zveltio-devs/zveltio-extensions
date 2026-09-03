@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate, readMultipart, MULTIPART_REQUIRED } from '@zveltio/sdk/extension';
+import { toJsonb } from '@zveltio/sdk/extension';
 // ─── CSV parsing ──────────────────────────────────────────────────────────────
 
 function parseCSVLine(line: string, delimiter: string): string[] {
@@ -156,7 +157,7 @@ async function runImport(
       status: finalStatus,
       imported_rows: success,
       failed_rows: errors.length,
-      errors: JSON.stringify(errors.slice(0, 100)),
+      errors: toJsonb(errors.slice(0, 100)),
       completed_at: new Date(),
     })
     .where('id', '=', jobId)
@@ -295,7 +296,7 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
           has_header: body.has_header,
           encoding: body.encoding,
           on_duplicate: body.on_duplicate,
-          mappings: JSON.stringify(body.mappings),
+          mappings: toJsonb(body.mappings),
           description: body.description ?? null,
           created_by: user.id,
         })
@@ -683,7 +684,7 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
               .updateTable('zv_import_logs')
               .set({
                 status: 'failed',
-                errors: JSON.stringify([{ row: 0, error: String(err?.message ?? err) }]),
+                errors: toJsonb([{ row: 0, error: String(err?.message ?? err) }]),
                 completed_at: new Date(),
               })
               .where('id', '=', job.id)

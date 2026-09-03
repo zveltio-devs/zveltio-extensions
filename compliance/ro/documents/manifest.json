@@ -2,8 +2,8 @@
   "name": "compliance/ro/documents",
   "displayName": "RO Documents",
   "category": "compliance/ro",
-  "description": "Romanian compliance document management — contracts, PVs, NIRs, dispozitii de plata",
-  "version": "1.0.3",
+  "description": "Romanian compliance document management \u2014 contracts, PVs, NIRs, dispozitii de plata",
+  "version": "1.0.4",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ro-documents",
@@ -34,8 +34,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "e002fb00e5cd19a73d196760b51ce57281082bcfd5e14c96b490186373db9f9b",
-    "sourceSha256": "113971089fe86c6bd48e93c60663f127ea594217635c48460c9b72b4b2c4837e"
+    "engineSha256": "38abd3905aac0605ea19e9c402312137f796c142fefdb5316beec1feb8d04000",
+    "sourceSha256": "a2dce01791351798b854c53053155e710aacf10b7e1214d461e327c39b63fb2f"
   },
   "resources": [
     "ro-documents"

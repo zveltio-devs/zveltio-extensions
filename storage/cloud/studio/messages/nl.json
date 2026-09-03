@@ -17,6 +17,7 @@
   "storage.cloud.confirmDeleteQuota": "Delete this quota?",
   "storage.cloud.confirmRevokeShare": "Revoke this share link?",
   "storage.cloud.copyClose": "Kopiëren en sluiten",
+  "storage.cloud.dropzone": "Sleep bestanden hierheen om te uploaden",
   "storage.cloud.empty": "Nog geen gegevens.",
   "storage.cloud.empty.folder": "Lege map. Sleep bestanden hierheen of klik op Uploaden.",
   "storage.cloud.generateLink": "Link genereren",
