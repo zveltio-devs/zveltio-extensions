@@ -17,6 +17,7 @@
   "storage.cloud.confirmDeleteQuota": "Delete this quota?",
   "storage.cloud.confirmRevokeShare": "Revoke this share link?",
   "storage.cloud.copyClose": "Copier et fermer",
+  "storage.cloud.dropzone": "Déposez les fichiers ici pour les téléverser",
   "storage.cloud.empty": "Aucune donnée pour l'instant.",
   "storage.cloud.empty.folder": "Dossier vide. Faites glisser des fichiers ici ou cliquez sur Téléverser.",
   "storage.cloud.generateLink": "Générer un lien",

@@ -15,6 +15,7 @@ import { zValidator } from '@hono/zod-validator';
 import { sql } from 'kysely';
 import { createSamlInstance, validateSamlResponse } from './saml-provider.js';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { toJsonb } from '@zveltio/sdk/extension';
 // Config schema stored in `zvd_saml_config`, one row per tenant (migration 004).
 const SamlConfigSchema = z.object({
   enabled: z.boolean().default(false),
@@ -104,10 +105,10 @@ async function upsertSamlConfig(
   // this code naming one.
   await db
     .insertInto('zvd_saml_config')
-    .values({ config: JSON.stringify(toStore), updated_at: new Date() })
+    .values({ config: toJsonb(toStore), updated_at: new Date() })
     .onConflict((oc: any) =>
       oc.column('tenant_id').doUpdateSet({
-        config: JSON.stringify(toStore),
+        config: toJsonb(toStore),
         updated_at: new Date(),
       }),
     )

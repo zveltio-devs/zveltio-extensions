@@ -17,6 +17,7 @@
   "storage.cloud.confirmDeleteQuota": "Delete this quota?",
   "storage.cloud.confirmRevokeShare": "Revoke this share link?",
   "storage.cloud.copyClose": "Copiază și închide",
+  "storage.cloud.dropzone": "Trage fișierele aici pentru încărcare",
   "storage.cloud.empty": "Niciun date încă.",
   "storage.cloud.empty.folder": "Folder gol. Trage fișiere aici sau apasă Încarcă.",
   "storage.cloud.generateLink": "Generează link",
