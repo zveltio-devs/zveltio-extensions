@@ -7,6 +7,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { toJsonb } from '@zveltio/sdk/extension';
 const VALID_SCAN_TYPES = ['duplicates', 'anomalies', 'missing_data', 'normalization', 'full'];
 
 const ScanSchema = z.object({
@@ -180,7 +181,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     const data = c.req.valid('json');
     const rule = await (db as any)
       .insertInto('zvd_quality_rules')
-      .values({ ...data, rule_config: JSON.stringify(data.rule_config), created_by: user.id })
+      .values({ ...data, rule_config: toJsonb(data.rule_config), created_by: user.id })
       .returningAll()
       .executeTakeFirst();
     return c.json({ rule }, 201);

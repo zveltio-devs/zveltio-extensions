@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
+import { toJsonb } from '@zveltio/sdk/extension';
 
 async function getUser(c: any, auth: any) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -246,7 +247,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
       const body = c.req.valid('json');
       const order = await db
         .insertInto('zv_ro_purchase_orders')
-        .values({ ...body, items: JSON.stringify(body.items), created_by: user.id })
+        .values({ ...body, items: toJsonb(body.items), created_by: user.id })
         .returningAll()
         .executeTakeFirst();
 
@@ -359,7 +360,7 @@ export function roProcurementRoutes(ctx: ExtensionContext): Hono {
 
       const body = c.req.valid('json');
       const nir = await db.insertInto('zv_ro_reception_notes')
-        .values({ ...body, items: JSON.stringify(body.items), created_by: user.id })
+        .values({ ...body, items: toJsonb(body.items), created_by: user.id })
         .returningAll()
         .executeTakeFirst();
 

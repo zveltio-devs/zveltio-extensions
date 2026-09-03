@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { toJsonb } from '@zveltio/sdk/extension';
 const CreateWorkflowSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
@@ -154,7 +155,7 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
         record_id,
         current_step_id: firstStep?.id || null,
         requested_by: user.id,
-        metadata: JSON.stringify(metadata || {}),
+        metadata: toJsonb(metadata || {}),
         priority,
         sla_due_at: slaDueAt,
       })

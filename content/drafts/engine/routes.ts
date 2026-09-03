@@ -7,6 +7,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { toJsonb } from '@zveltio/sdk/extension';
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
 const CreateDraftSchema = z.object({
@@ -325,7 +326,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     await (db as any).updateTable('zv_draft_publish_jobs').set({
       status: failedCount === draft_ids.length ? 'failed' : 'completed',
       published_count: published, failed_count: failedCount,
-      errors: JSON.stringify(jobErrors), completed_at: new Date(),
+      errors: toJsonb(jobErrors), completed_at: new Date(),
     }).where('id', '=', job.id).execute();
 
     return c.json({ job_id: job.id, published, failed: failedCount, errors: jobErrors });
@@ -383,7 +384,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
         .values({
           collection: data.collection,
           record_id: data.record_id,
-          draft_data: JSON.stringify(data.draft_data),
+          draft_data: toJsonb(data.draft_data),
           base_version: baseVersion,
           status: 'draft',
           notes: data.notes || null,

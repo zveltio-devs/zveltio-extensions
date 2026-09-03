@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { aiProviderManager, type ChatMessage } from '../lib/ai-provider.js';
+import { toJsonb } from '@zveltio/sdk/extension';
 
 function escapeHtml(str: string): string {
   return str
@@ -75,7 +76,7 @@ export function aiChatsRoutes(ctx: ExtensionContext): Hono {
           provider: provider || 'default',
           model: model || null,
           context: context || null,
-          messages: JSON.stringify([]),
+          messages: toJsonb([]),
         })
         .returningAll()
         .executeTakeFirst();
@@ -143,7 +144,7 @@ export function aiChatsRoutes(ctx: ExtensionContext): Hono {
 
       await db
         .updateTable('zv_ai_chats')
-        .set({ messages: JSON.stringify(updatedMessages), title, updated_at: new Date() })
+        .set({ messages: toJsonb(updatedMessages), title, updated_at: new Date() })
         .where('id', '=', chat.id)
         .execute();
 
@@ -235,7 +236,7 @@ export function aiChatsRoutes(ctx: ExtensionContext): Hono {
       const data = c.req.valid('json');
       const template = await db
         .insertInto('zv_prompt_templates')
-        .values({ ...data, variables: JSON.stringify(data.variables), created_by: user.id })
+        .values({ ...data, variables: toJsonb(data.variables), created_by: user.id })
         .returningAll()
         .executeTakeFirst();
       return c.json({ template }, 201);

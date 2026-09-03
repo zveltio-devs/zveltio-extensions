@@ -5,6 +5,7 @@ import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { UsageTracker } from './lib/usage-tracker.js';
 import { handleWebhook, initStripeClient } from './lib/stripe-client.js';
+import { toJsonb } from '@zveltio/sdk/extension';
 
 export function billingRoutes(
   ctx: ExtensionContext,
@@ -130,7 +131,7 @@ export function billingRoutes(
         .values({
           name: data.name,
           stripe_price_id: data.stripe_price_id ?? null,
-          limits: JSON.stringify(data.limits),
+          limits: toJsonb(data.limits),
           price_cents: data.price_cents,
           interval: data.interval,
         })

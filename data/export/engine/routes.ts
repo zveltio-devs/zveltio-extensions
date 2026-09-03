@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
+import { toJsonb } from '@zveltio/sdk/extension';
 // ─── Serialization helpers ────────────────────────────────────────────────────
 
 // CSV rendering is the host's (`ctx.internals.recordsToCsv`). Quoting alone is
@@ -287,7 +288,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
         .values({
           collection: body.collection,
           format: body.format,
-          filters: JSON.stringify(body.filters),
+          filters: toJsonb(body.filters),
           fields: body.fields,
           status: 'pending',
           created_by: user.id,
@@ -389,7 +390,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
           collection: body.collection,
           format: body.format,
           fields: body.fields,
-          filters: JSON.stringify(body.filters),
+          filters: toJsonb(body.filters),
           sort_field: body.sort_field ?? null,
           sort_order: body.sort_order,
           description: body.description ?? null,
@@ -607,7 +608,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
           format,
           record_count: serialized.length,
           fields_exported: exportedFieldNames,
-          filters_used: JSON.stringify(appliedFilters),
+          filters_used: toJsonb(appliedFilters),
           exported_by: user.id,
           ip: c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? null,
         })
