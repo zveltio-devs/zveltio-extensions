@@ -11,6 +11,9 @@
     "database",
     "field-types"
   ],
+  "i18nPrefixes": [
+    "geospatial"
+  ],
   "requires": {
     "postgres_extensions": [
       "postgis"

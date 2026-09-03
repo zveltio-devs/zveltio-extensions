@@ -11,6 +11,9 @@
     "database",
     "secrets"
   ],
+  "i18nPrefixes": [
+    "auth.scim"
+  ],
   "contributes": {
     "engine": true,
     "studio": true

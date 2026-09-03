@@ -12,6 +12,9 @@
     "files",
     "storage"
   ],
+  "i18nPrefixes": [
+    "content.media"
+  ],
   "studio": {
     "pages": [
       {
