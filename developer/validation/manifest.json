@@ -3,7 +3,7 @@
   "displayName": "Data Validation",
   "category": "developer",
   "description": "Field-level validation rules with AI-assisted natural language rule generation",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-validation",
@@ -39,7 +39,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "cd60301e779ce8b92b895cc2556a184f1f7327ef70beca0177c74f18ea524e34",
-    "sourceSha256": "c294b36d88fd9b08699f3627ef3d973d63052d02281902a0d1c9e1b7b2f68a39"
+    "engineSha256": "78f3061318dc12f639eaeec1028bd22f8fd22ed82739b10269bd8a58715e216c",
+    "sourceSha256": "bbf113a17ead219d35aecb7ebb0a68137a99eabdc458c380eebea8cbf8c31392"
   }
 }

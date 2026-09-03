@@ -5,6 +5,7 @@ import { sql } from 'kysely';
 import { generateUBLXML } from './ubl-generator.js';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
+import { toJsonb } from '@zveltio/sdk/extension';
 
 const lineSchema = z.object({
   description: z.string().min(1),
@@ -590,7 +591,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
       .insertInto('zv_efactura_invoices')
       .values({
         ...body,
-        lines: JSON.stringify(body.lines),
+        lines: toJsonb(body.lines),
         created_by: user.id,
       })
       .returningAll()
@@ -980,7 +981,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
           seller_cui: original.seller_cui,
           buyer_name: original.buyer_name,
           buyer_cui: original.buyer_cui,
-          lines: JSON.stringify(stornoLines),
+          lines: toJsonb(stornoLines),
           subtotal: -original.subtotal,
           vat_total: -original.vat_total,
           total: -original.total,

@@ -1,4 +1,5 @@
 import type { Database } from '@zveltio/engine-db';
+import { toJsonb } from '@zveltio/sdk/extension';
 
 let _db: Database | null = null;
 
@@ -26,7 +27,7 @@ export const UsageTracker = {
         tenant_id: opts?.tenant_id ?? null,
         collection: opts?.collection ?? null,
         quantity: opts?.quantity ?? 1,
-        metadata: JSON.stringify(opts?.metadata ?? {}),
+        metadata: toJsonb(opts?.metadata ?? {}),
       })
       .execute()
       .catch((err: unknown) => {
