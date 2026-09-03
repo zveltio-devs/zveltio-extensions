@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
+import { toJsonb } from '@zveltio/sdk/extension';
 
 async function getUser(c: any, auth: any) {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -239,8 +240,8 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
           .values({
             ...body,
             number,
-            parties: JSON.stringify(body.parties),
-            metadata: JSON.stringify(body.metadata),
+            parties: toJsonb(body.parties),
+            metadata: toJsonb(body.metadata),
             created_by: user.id,
           })
           .returningAll()

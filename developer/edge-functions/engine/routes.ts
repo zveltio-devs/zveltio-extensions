@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { toJsonb } from '@zveltio/sdk/extension';
 /**
  * Returns the authenticated user if they have admin permission, or null.
  * Edge function CRUD (create/read/update/delete code) requires admin rights —
@@ -102,7 +103,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
           http_method: body.http_method,
           path,
           timeout_ms: body.timeout_ms,
-          env_vars: JSON.stringify(body.env_vars),
+          env_vars: toJsonb(body.env_vars),
           created_by: user.id,
         })
         .returningAll()

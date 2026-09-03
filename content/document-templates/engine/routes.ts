@@ -22,6 +22,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { toJsonb } from '@zveltio/sdk/extension';
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
 const DocumentTemplateSchema = z.object({
@@ -162,7 +163,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
         template_id: data.template_id,
         job_name: data.job_name,
         data_source: data.data_source,
-        filter_config: JSON.stringify(data.filter_config),
+        filter_config: toJsonb(data.filter_config),
         output_format: data.output_format,
         status: 'pending',
         created_by: user.id,
@@ -302,7 +303,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
         .insertInto('zv_document_renders')
         .values({
           template_id: templateId,
-          variables: JSON.stringify(data.variables || {}),
+          variables: toJsonb(data.variables || {}),
           output_format: 'pdf',
           rendered_by: user?.id || null,
           rendered_at: new Date(),
@@ -378,7 +379,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
         version_number: nextVersion,
         html_body: template.html_body || '',
         css_styles: null,
-        variables: JSON.stringify(
+        variables: toJsonb(
           typeof template.variables === 'string'
             ? JSON.parse(template.variables)
             : template.variables || {}
@@ -437,7 +438,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
             version_number: nextVersion,
             html_body: current.html_body || '',
             css_styles: null,
-            variables: JSON.stringify(
+            variables: toJsonb(
               typeof current.variables === 'string'
                 ? JSON.parse(current.variables)
                 : current.variables || {}
@@ -453,7 +454,7 @@ export function documentTemplatesRoutes(ctx: ExtensionContext): Hono {
         .updateTable('zv_document_templates')
         .set({
           html_body: version.html_body,
-          variables: JSON.stringify(
+          variables: toJsonb(
             typeof version.variables === 'string'
               ? JSON.parse(version.variables)
               : version.variables || {}

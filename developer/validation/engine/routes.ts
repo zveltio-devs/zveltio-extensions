@@ -26,6 +26,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { toJsonb } from '@zveltio/sdk/extension';
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 
 const RULE_TYPES = [
@@ -326,7 +327,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
         field_name: body.field_name,
         rule_type: body.rule_type,
         nl_description: body.nl_description || null,
-        rule_config: JSON.stringify(body.rule_config),
+        rule_config: toJsonb(body.rule_config),
         error_message: body.error_message,
         is_active: true,
         created_by: user.id,
@@ -416,7 +417,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
         field_name: body.field_name,
         rule_type: body.rule_type,
         nl_description: body.nl_description || null,
-        rule_config: JSON.stringify(body.rule_config),
+        rule_config: toJsonb(body.rule_config),
         error_message: body.error_message,
         is_active: true,
         created_by: user.id,
@@ -546,7 +547,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
               field_name: rule.field_name,
               rule_type: rule.rule_type,
               nl_description: rule.nl_description || null,
-              rule_config: JSON.stringify(rule.rule_config),
+              rule_config: toJsonb(rule.rule_config),
               error_message: rule.error_message,
               is_active: true,
               created_by: user.id,

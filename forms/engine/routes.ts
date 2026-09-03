@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { toJsonb } from '@zveltio/sdk/extension';
 
 // Simple in-memory rate limiter: 10 submissions per minute per IP
 const submitRateLimiter = new Map<string, { count: number; resetAt: number }>();
@@ -130,7 +131,7 @@ export function formsRoutes(
         name: data.name,
         slug: data.slug,
         description: data.description ?? null,
-        fields: JSON.stringify(data.fields),
+        fields: toJsonb(data.fields),
         target_collection: data.target_collection ?? null,
         active: data.active,
       })

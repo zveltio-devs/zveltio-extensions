@@ -20,6 +20,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { toJsonb } from '@zveltio/sdk/extension';
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
 const GenerateDocSchema = z.object({
@@ -275,7 +276,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
           template_name: template.name,
           source_collection: data.source_collection || null,
           source_record_id: data.source_record_id || null,
-          variables_used: JSON.stringify(allVariables),
+          variables_used: toJsonb(allVariables),
           output_format: data.output_format,
           document_number: docNumber,
           generated_by: user.id,

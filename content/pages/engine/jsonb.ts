@@ -25,16 +25,17 @@
  * being stored this way, inherited from `content/page-builder`.
  */
 
-import { sql } from 'kysely';
-
 /**
  * A value ready to be assigned to a `jsonb` column.
  *
  * Use everywhere a JSONB column is written. Readers still tolerate both shapes,
  * because rows written before this exists are still text — see migration 004,
  * which normalises them.
+ *
+ * The body moved to `@zveltio/sdk/extension` once seventeen more extensions
+ * turned out to be writing the same shape with no helper at all, and the engine
+ * turned out to have its own third copy. One rule written out three times is
+ * this repository's dominant bug shape; the name stays here so this extension's
+ * call sites do not all have to change to prove it.
  */
-// biome-ignore lint/suspicious/noExplicitAny: any JSON-serialisable value
-export function jsonb(value: any) {
-  return sql`${JSON.stringify(value ?? null)}::text::jsonb`;
-}
+export { toJsonb as jsonb } from '@zveltio/sdk/extension';
