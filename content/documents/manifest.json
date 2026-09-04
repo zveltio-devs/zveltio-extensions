@@ -4,18 +4,18 @@
   "category": "content",
   "description": "Generate PDF documents from templates with data binding",
   "version": "1.0.4",
-  "dependencies": [
-    {
-      "name": "content/document-templates",
-      "minVersion": "1.0.0"
-    }
-  ],
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-documents",
   "permissions": [
     "database",
     "documents"
+  ],
+  "dependencies": [
+    {
+      "name": "content/document-templates",
+      "minVersion": "1.0.0"
+    }
   ],
   "i18nPrefixes": [
     "content.documents"

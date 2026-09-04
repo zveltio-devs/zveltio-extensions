@@ -2,7 +2,7 @@
   "name": "compliance/ro/procurement",
   "displayName": "Achizitii Publice RO",
   "category": "compliance/ro",
-  "description": "Romanian public procurement management \u2014 purchase orders, supplier registry, budget tracking",
+  "description": "Romanian public procurement management — purchase orders, supplier registry, budget tracking",
   "version": "1.0.3",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
