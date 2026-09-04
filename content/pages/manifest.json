@@ -2,7 +2,7 @@
   "name": "content/pages",
   "displayName": "Pages",
   "category": "content",
-  "description": "Pages built from blocks \u2014 content or live collection data \u2014 grouped into sites. A site is a public website with SEO and a sitemap, or an authenticated portal with its own branding, base path and access roles.",
+  "description": "Pages built from blocks — content or live collection data — grouped into sites. A site is a public website with SEO and a sitemap, or an authenticated portal with its own branding, base path and access roles.",
   "version": "1.0.6",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
