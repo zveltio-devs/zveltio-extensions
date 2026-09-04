@@ -2,7 +2,7 @@
   "name": "compliance/ro/documents",
   "displayName": "RO Documents",
   "category": "compliance/ro",
-  "description": "Romanian compliance document management \u2014 contracts, PVs, NIRs, dispozitii de plata",
+  "description": "Romanian compliance document management — contracts, PVs, NIRs, dispozitii de plata",
   "version": "1.0.4",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
