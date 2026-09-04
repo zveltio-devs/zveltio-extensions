@@ -2,7 +2,7 @@
   "name": "compliance/ro/etransport",
   "displayName": "e-Transport RO",
   "category": "compliance/ro",
-  "description": "Romanian e-Transport monitoring system \u2014 declare and track road transport of goods via ANAF",
+  "description": "Romanian e-Transport monitoring system — declare and track road transport of goods via ANAF",
   "version": "1.0.2",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
