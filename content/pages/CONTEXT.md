@@ -184,6 +184,46 @@ what is left over is now escaped rather than deleted, which also keeps `a < b`
 readable. `sanitize.test.ts` asserts both halves and fails against the old
 expression.
 
+### `?? DEFAULT_TENANT_ID` — three copies, all removed
+
+Swept for after the engine session found the same shape in `runQualityScan`,
+where an engine-side default sent every quality scan to the root tenant.
+
+This extension had three identical `tenantId(c)` helpers — `cms-routes.ts`,
+`sites.ts`, `editor.ts` — each ending `?? DEFAULT_TENANT_ID`.
+
+It looked harmless because the engine almost never hands over a null tenant:
+`resolveTenantFromRequest` deliberately falls through to `getDefaultTenant()` for
+an unknown subdomain, an IP address and `localhost`, so the GUC is always set and
+RLS stays uniform. **One path does not fall through.** The explicit header is
+returned directly — `if (headerSlug) return getTenantBySlug(headerSlug)`
+(`tenant-manager.ts:750`) — and that query filters
+`.where('status', '=', 'active')`.
+
+So an `x-tenant-slug` naming a tenant that does not exist, **or one that has been
+SUSPENDED**, resolves to null. The suspended case is the one that matters: a
+company suspended for non-payment or during a security incident keeps sending the
+same header, and the fallback answered it with the root tenant's content.
+
+Now one helper in `tenant.ts`, with two entry points because the two surfaces want
+different refusals:
+
+- `tenantId(c)` **throws** — for the admin surfaces, where the caller is an
+  operator with a session and silence is worse than an error they can read.
+- `tenantIdOrNull(c)` returns null — for the public router, where a visitor
+  should be told there is nothing here rather than handed a 500.
+
+The public side needed no new branch: `publicSite()` is the gate every `/cms/*`
+route already passes through, and every one of them already answers empty or 404
+when it returns nothing. The remaining call sites in that file run *after* a site
+was found, so they now take `site.tenant_id` rather than re-deriving it — the
+tenant is a fact by then, not a lookup.
+
+**Caught by the contract harness**, which mounts without `tenantMiddleware`: the
+first version threw on `/cms` and turned a public route into a 500. That is the
+harness being more realistic than it looks, not a false alarm — a public route
+must not crash on a malformed request.
+
 ### Still to cover in this extension
 
 `editor.ts` and `sites.ts` beyond their guards — the write paths, revisions,
