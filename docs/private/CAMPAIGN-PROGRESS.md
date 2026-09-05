@@ -1,0 +1,105 @@
+# Extensions review campaign — what is done
+
+The record the handoff document asks for, kept **in this repository** because it is
+the one an extensions agent opens first. `EXTENSIONS-REVIEW-HANDOFF.md` lives in
+the engine repository and is maintained by the session working there.
+
+Read this before starting a section. It exists so that nobody — human or agent —
+has to re-derive from the code what has already been covered.
+
+**Status vocabulary.** Deliberately narrower than it looks:
+
+| | |
+|---|---|
+| `scanned` | covered by a mechanical sweep. Says nothing about the extension's routes, guards or writes. |
+| `repaired` | a specific defect was found, fixed, and the fix verified against a real database. Everything NOT part of that defect is untouched. |
+| `reviewed` | the §6 bar in the handoff: every file read end to end, every guard **exercised**, every write checked on a two-tenant database, migrations applied to a virgin AND an upgraded database. |
+
+Nothing is `reviewed` yet. Saying so plainly is the point of this file — 52 of the
+56 rows in `REVIEW-STATUS.md` read "verified", and that word means the August
+button-pressing pass (section G), not this campaign.
+
+---
+
+## Section 1 — Raw SQL inventory · `logged` · 2026-09-05
+
+Full report: [RAW-SQL-INVENTORY.md](./RAW-SQL-INVENTORY.md).
+
+**Coverage: all 56 extensions `scanned`.** 1222 `sql` tagged templates plus 35
+`sql.raw(...)` calls, run through the engine's own policy function against a
+session-private database. The inventory is complete and every case carries a
+proposed answer; the choice between rewrite, grant and catalogue-capability is the
+owner's and is still open.
+
+**Do not redo this sweep.** If you need to extend it, extend the script rather
+than re-deriving the numbers — and note that the earlier figures it corrects
+(18 extensions, 12 named) do not reproduce.
+
+### Repaired and shipped
+
+| extension | version | what was wrong |
+|---|---|---|
+| `auth/saml` | 1.1.0 | SSO could not complete a login in **either** flow. `validateInResponseTo: 'ifPresent'` is a node-saml 4.x idiom against a `^3.1.0` pin where the option is a boolean; and the InResponseTo cache is per-instance while the instance is rebuilt per request. Migration 005 adds assertion replay detection to replace the binding that was turned off. A follow-up fixed the first version of that claim, which could lock a user out of their own account. |
+| `auth/ldap` | 1.1.3 | `selectFrom('user')` refused by the table proxy — directory login could not provision a first-time user. |
+| `content/pages` | 1.0.7 | The same defect, third instance, and the only silent one: the refusal sat inside a `catch` written for a different reason, so role hydration had **never** run on any installation. |
+| `developer/database` | 1.1.0 | Authorised but unbounded. `DROP ROLE` protected `pg_*` and missed `zveltio_rls`/`zveltio_worker`; RLS could be disabled on any `zvd_*` table; `tenant_isolation_*` policies could be dropped; and a PERMISSIVE policy reached the same outcome sideways. |
+| `communications/mail` | 1.1.0 | Configuration read from `zv_settings` in 6 places, and keyed `ON CONFLICT (key)` — one mail configuration for the whole instance, so a second tenant could not have its own IMAP server. Migration 005 moves it to a tenant-keyed table. |
+
+These five are `repaired`, **not** `reviewed`. Each was entered through one
+defect. The rest of each extension is as unexamined as any other.
+
+### Added along the way
+
+- `scripts/check-no-nul-bytes.ts` — a single NUL byte in
+  `communications/mail/engine/routes.ts` made `grep` skip the whole 1658-line file
+  silently. This campaign is grep-shaped, so a class sweep reported that file
+  clean without opening it. **Any count in these documents taken by grep before
+  2026-09-05 is a floor, not a total** — including the "27 `::jsonb` sites across
+  12 extensions" in that extension's own `CONTEXT.md`.
+- Tests: `auth/saml/engine/saml-provider.test.ts`,
+  `developer/database/engine/platform-guards.test.ts`, and a corrected seed in
+  `communications/mail/engine/oauth-flow.test.ts`.
+
+### Blocked on the engine — do not attempt from this repository
+
+The rewrite half of the inventory needs host helpers that do not exist. Trying it
+here trades a documented hole for an undocumented behaviour change:
+
+| case | needs |
+|---|---|
+| `ai`, `storage/cloud` → `user` | `resolveUserNames(ids)`, batched |
+| `content/pages`, `geospatial/postgis`, `integrations/migrators` → catalogue | `describeCollection(name)`, answering from the **catalogue**, not `zvd_collections` — `geospatial/postgis:39` is a guard that must refuse on an unreadable answer |
+| `analytics/dashboard` → `zv_settings` | the engine's own branding keys; a namespaced accessor is the wrong shape |
+| `auth/saml`, `auth/ldap` | `provisionUser`, `revokeUserSessions` — the highest-leverage pair, since they remove the need for a permanent table grant |
+
+**A deadline, not a preference:** when the engine closes the inline raw-SQL path,
+`auth/saml`, `auth/ldap` and `content/pages` must be granted `user` (and
+saml/ldap, `session`) **in the same change**, or SSO and role hydration break
+again, on the write. This is written at all three call sites in the source so it
+does not depend on anyone reading this file.
+
+---
+
+## Sections not started
+
+Nothing below has been touched by this campaign. The order follows the handoff:
+largest first, because size is where the unexamined surface is.
+
+| # | extension | lines | state |
+|---|---|---:|---|
+| 1 | `content/pages` | 7078 | `repaired` (one defect), not reviewed |
+| 2 | `ai` | 5838 | `scanned` only |
+| 3 | `communications/mail` | 3959 | `repaired` (one defect), not reviewed |
+| 4 | `operations/traceability` | 2205 | `scanned` only |
+| 5 | `storage/cloud` | 2083 | `scanned` only |
+| 6 | `finance/invoicing` | 1665 | `scanned` only |
+| 7 | `compliance/ro/efactura` | 1538 | `scanned` only |
+| 8 | `hr/employees` | 1317 | `scanned` only |
+| 9 | `geospatial/postgis` | 1225 | `scanned` only |
+| 10 | `workflow/checklists` | 1211 | `scanned` only |
+
+The remaining 46 are in the handoff's table, all `scanned` only.
+
+**Before starting one**, read that extension's `CONTEXT.md` — it records what was
+already found broken and why nobody saw it, which is the part that does not
+survive between sessions.
