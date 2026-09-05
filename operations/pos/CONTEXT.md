@@ -1,27 +1,27 @@
-# Casă de marcat — context
+# Point of sale — context
 
-**Verificat prin apăsare: 2026-08-09.**
+**Verified by pressing: 2026-08-09.**
 
-## Ce era rupt
+## What was broken
 
-**Crearea unui client de la casă n-a funcționat niciodată.** Ruta face upsert cu
-`ON CONFLICT (email)` pe un tabel **fără cheie unică pe email**, deci Postgres
-răspundea „there is no unique or exclusion constraint matching the ON CONFLICT
-specification" la fiecare apel. Nu o cursă, nu un caz marginal: instrucțiunea nu
-putea executa deloc.
+**Creating a customer at the till never worked.** The route upserts with
+`ON CONFLICT (email)` against a table **with no unique key on email**, so Postgres
+answered "there is no unique or exclusion constraint matching the ON CONFLICT
+specification" on every call. Not a race, not an edge case: the statement could
+not execute at all.
 
-Găsit confruntând fiecare clauză `ON CONFLICT` cu constrângerile care există
-efectiv — asta avea zero. Migrația 006 adaugă cheia pe care instrucțiunea o
-presupunea dintotdeauna, pe `(tenant_id, email)`, fiindcă două firme pot avea
-client la aceeași adresă.
+Found by confronting every `ON CONFLICT` clause with the constraints that
+actually exist — this one had none. Migration 006 adds the key the statement had
+always assumed, on `(tenant_id, email)`, because two tenants can have a customer
+at the same address.
 
-`email` e opțional la casă, iar o constrângere unică tratează NULL-urile ca
-distincte, deci clienții fără adresă nu sunt afectați.
+`email` is optional at the till, and a unique constraint treats NULLs as distinct,
+so customers without an address are unaffected.
 
-## Rămâne deschis
+## Still open
 
-**Nu există ecran de vânzare.** Motorul are rute; interfața de casă lipsește.
-Rămâne pe lista P0.
+**There is no sale screen.** The engine has routes; the till interface is
+missing. It stays on the P0 list.
 
 ## SDUI migration (2026-08-21)
 

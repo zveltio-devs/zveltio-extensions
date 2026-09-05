@@ -1,37 +1,38 @@
-# Registrul de documente — context
+# Document register — context
 
-**Verificat prin apăsare: 2026-08-10.** Document creat cu număr din serie,
-modificat de două ori, istoric citit, versiune restaurată.
+**Verified by pressing: 2026-08-10.** Document created with a number from the
+series, edited twice, history read, a version restored.
 
-## Ce era rupt
+## What was broken
 
-**Fiecare firmă în afară de prima primea numere inventate.**
-`zv_ro_doc_number_sequences` avea `PRIMARY KEY (type)` de pe vremea când exista
-un singur rând per tip. Migrația 002 a adăugat `tenant_id` și RLS **și n-a atins
-constrângerea**. A doua firmă nu-și putea insera rândul, `UPDATE` întorcea zero,
-iar ruta cădea pe `CONTRACT-1754800000000` — un marcaj de timp în loc de număr de
-registru. Calea normală, nu un caz marginal.
+**Every tenant except the first received invented numbers.**
+`zv_ro_doc_number_sequences` had `PRIMARY KEY (type)` from when there was one row
+per type. Migration 002 added `tenant_id` and RLS **and did not touch the
+constraint**. The second tenant could not insert its row, `UPDATE` returned zero,
+and the route fell through to `CONTRACT-1754800000000` — a timestamp instead of a
+register number. The normal path, not an edge case.
 
-**Două scrieri înghițite ștergeau istoricul.** Instantaneul dinaintea unei
-modificări și cel dinaintea unei restaurări ajungeau amândouă în `.catch(() => {})`.
-Dacă eșuau, operația mergea mai departe și versiunea anterioară dispărea — exact
-ce registrul există să păstreze.
+**Two swallowed writes were erasing the history.** The snapshot before an edit and
+the one before a restore both landed in `.catch(() => {})`. If they failed, the
+operation carried on and the previous version disappeared — precisely what the
+register exists to preserve.
 
-## Capcane
+## Traps
 
-**Ruta de modificare e PATCH, nu PUT.** M-a costat o depanare falsă.
+**The edit route is PATCH, not PUT.** That cost one false debugging session.
 
-**Migrația 004 a fost scrisă greșit prima dată:** `SET NOT NULL` înaintea
-completării. Trecea la mine fiindcă rândurile mele fuseseră scrise după ce exista
-coloana; pe o bază nouă, 001 seed-uiește și 002 adaugă coloana după, deci sunt
-NULL-uri. **Orice migrație care pune NOT NULL trebuie să completeze întâi.**
+**Migration 004 was written wrongly the first time:** `SET NOT NULL` before
+backfilling. It passed locally because those rows had been written after the
+column existed; on a fresh database, 001 seeds and 002 adds the column afterwards,
+so there are NULLs. **Any migration setting NOT NULL must backfill first.**
 
-**`003_user_ref_text.sql` a reparat O SINGURĂ coloană** din clasă și le-a lăsat
-pe surori — de asta `zv_ro_documents.created_by` era încă `uuid` și crearea unui
-document cădea pe o bază nouă. Lecția: repară clasa, nu instanța.
+**`003_user_ref_text.sql` repaired ONE column** of the class and left its
+siblings — which is why `zv_ro_documents.created_by` was still `uuid` and creating
+a document failed on a fresh database. The lesson: repair the class, not the
+instance.
 
-## Numerotarea, acum
+## Numbering, as it stands
 
-O singură instrucțiune atomică: revendică următorul număr, creează secvența la
-prima emitere a firmei, repornește seria în ianuarie. **Fără număr de rezervă** —
-dacă registrul nu poate da următorul număr, documentul nu se creează.
+A single atomic statement: claim the next number, create the sequence on the
+tenant's first issue, restart the series in January. **No fallback number** — if
+the register cannot give the next number, the document is not created.

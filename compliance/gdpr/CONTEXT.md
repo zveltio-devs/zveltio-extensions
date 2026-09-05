@@ -1,29 +1,28 @@
 # GDPR — context
 
-**Verificat prin apăsare: 2026-08-09.** Ștergere completă rulată cap-coadă.
+**Verified by pressing: 2026-08-09.** A complete erasure run end to end.
 
-## Ce era rupt
+## What was broken
 
-**Ștergerea eșua pe orice instalare.** Ruta șterge rândurile unei persoane din
-zeci de tabele și le împacheta într-o tranzacție — dar `ctx.db` rezolvă
-tranzacția cererii, iar Kysely refuză `transaction()` pe o tranzacție. Mesajul
-raportat era „referential integrity", care numea cauza greșită și trimitea pe
-oricine depana în direcția opusă.
+**Erasure failed on every installation.** The route deletes a person's rows from
+dozens of tables and wrapped them in a transaction — but `ctx.db` resolves the
+request's transaction, and Kysely refuses `transaction()` on a transaction. The
+reported message was "referential integrity", which named the wrong cause and
+sent anyone debugging in the opposite direction.
 
-Reparat în engine (`createRestrictedDb` face joncțiune în loc de imbricare), nu
-aici.
+Repaired in the engine (`createRestrictedDb` joins instead of nesting), not here.
 
-**Nouă coloane inexistente** — cod și schemă scrise separat.
+**Nine non-existent columns** — code and schema written separately.
 
-## Cum e acum
+## How it is now
 
-Fiecare ștergere opțională are propriul SAVEPOINT, iar ce n-a putut fi șters se
-raportează în `skipped[]`. **Un `try/catch` în JavaScript nu izolează nimic în
-Postgres** — o instrucțiune eșuată abandonează toată tranzacția, deci fără
-savepoint prima tabelă lipsă omora restul ștergerii.
+Every optional delete has its own SAVEPOINT, and whatever could not be deleted is
+reported in `skipped[]`. **A `try/catch` in JavaScript isolates nothing in
+Postgres** — a failed statement aborts the whole transaction, so without a
+savepoint the first missing table killed the rest of the erasure.
 
-## Ce am raportat greșit o dată
+## Something reported wrongly once
 
-Am afirmat că ștergerea „raportează succes fals". Nu e adevărat — `DELETE`-ul
-final nu e prins, deci dă 500. Problema reală era mesajul care numea cauza
-greșită.
+It was claimed that erasure "reports false success". That is not true — the final
+`DELETE` is not caught, so it answers 500. The real problem was the message
+naming the wrong cause.

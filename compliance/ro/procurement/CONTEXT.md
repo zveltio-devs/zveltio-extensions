@@ -1,34 +1,36 @@
-# Achiziții publice — context
+# Public procurement — context
 
-**Verificat prin apăsare: 2026-08-10, pe bază virgină.** Furnizor creat, comandă
-creată și aprobată, raport de cheltuieli cu sume reale pe toate cele trei grupări.
+**Verified by pressing: 2026-08-10, on a virgin database.** Supplier created,
+order created and approved, spending report with real amounts across all three
+groupings.
 
-## Ce era rupt
+## What was broken
 
-**Crearea unei comenzi returna 400 pe orice instalare nouă.** `created_by` și
-`approved_by` erau `uuid`, iar `"user".id` e nanoid de 32 de caractere — 22P02.
-Vizibil **doar pe bază virgină**: pe una folosită coloanele fuseseră modificate
-manual cândva.
+**Creating an order returned 400 on every fresh installation.** `created_by` and
+`approved_by` were `uuid`, while `"user".id` is a 32-character nanoid — 22P02.
+Visible **only on a virgin database**: on a used one the columns had been altered
+by hand at some point.
 
-Ruta nu numea cauza. Eroarea ajungea la client ca „A request parameter has an
-invalid format", ceea ce trimite pe cine depanează direct în validatorul Zod,
-unde nu e nimic.
+The route did not name the cause. The error reached the client as "A request
+parameter has an invalid format", which sends whoever is debugging straight into
+the Zod validator, where there is nothing.
 
-## Capcană care se repetă aici
+## A trap that recurs here
 
-**Raportul de cheltuieli compune trei interogări cu `Promise.all` pe aceeași
-tranzacție.** O singură interogare stricată otrăvește tranzacția, iar celelalte
-două întorc gol — trei zerouri false într-un raport de cheltuieli publice.
+**The spending report composes three queries with `Promise.all` on the same
+transaction.** One broken query poisons the transaction, and the other two return
+empty — three false zeroes in a public-spending report.
 
-Nu se poate repara bine din extensie: `SAVEPOINT` cere să știi dacă ești într-o
-tranzacție, iar extensia n-are cum să afle. Cere `ctx.isolated(label, fn)` în
-contractul SDK. Până atunci fiecare citire își loghează cauza cu etichetă.
+It cannot be repaired properly from inside the extension: `SAVEPOINT` requires
+knowing whether you are in a transaction, and an extension has no way to find out.
+It needs `ctx.isolated(label, fn)` in the SDK contract. Until then each read logs
+its cause with a label.
 
-## Chei lărgite
+## Widened keys
 
-`number` pe comenzi, contracte și note de recepție; `cui` pe furnizori; `code` pe
-liniile de buget. Toate erau unice pe instanță — două primării nu puteau avea
-același furnizor.
+`number` on orders, contracts and reception notes; `cui` on suppliers; `code` on
+budget lines. All were unique per instance — two municipalities could not share a
+supplier.
 
 ## SDUI migration (2026-08-21)
 
