@@ -59261,32 +59261,36 @@ function samlRoutes(ctx) {
     if (!assertionId) {
       return c.json({ error: "SAML assertion carries no ID; refusing to accept it" }, 401);
     }
-    const claimed = await sql`
-      INSERT INTO zvd_saml_consumed_assertions (assertion_id, expires_at)
-      VALUES (${assertionId}, NOW() + INTERVAL '24 hours')
-      ON CONFLICT (tenant_id, assertion_id) DO NOTHING
-      RETURNING assertion_id
-    `.execute(db);
-    if (claimed.rows.length === 0) {
-      console.warn(`[saml] refused a replayed assertion: ${assertionId}`);
-      return c.json({ error: "This SAML assertion has already been used" }, 401);
-    }
-    await sql`DELETE FROM zvd_saml_consumed_assertions WHERE expires_at < NOW()`.execute(db);
     const email3 = profile[config2.mapEmail] ?? profile.email ?? profile.nameID;
     const name2 = profile[config2.mapName] ?? profile.displayName ?? email3;
     if (!email3)
       return c.json({ error: "IdP did not return an email address" }, 400);
-    const user = await findOrCreateSsoUser(db, email3, name2);
-    await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(db).catch((err) => {
-      console.warn("[saml] could not invalidate previous sessions:", err.message);
-    });
     const remoteIp = c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? undefined;
     const userAgent = c.req.header("user-agent") ?? undefined;
-    const { setCookie } = await internals.createBetterAuthSession(db, user.id, {
-      ipAddress: remoteIp,
-      userAgent,
-      crossDomain
+    const outcome = await db.transaction().execute(async (trx) => {
+      const claimed = await sql`
+        INSERT INTO zvd_saml_consumed_assertions (assertion_id, expires_at)
+        VALUES (${assertionId}, NOW() + INTERVAL '24 hours')
+        ON CONFLICT (tenant_id, assertion_id) DO NOTHING
+        RETURNING assertion_id
+      `.execute(trx);
+      if (claimed.rows.length === 0)
+        return { replayed: true };
+      await sql`DELETE FROM zvd_saml_consumed_assertions WHERE expires_at < NOW()`.execute(trx);
+      const user = await findOrCreateSsoUser(trx, email3, name2);
+      await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(trx);
+      const { setCookie: setCookie2 } = await internals.createBetterAuthSession(trx, user.id, {
+        ipAddress: remoteIp,
+        userAgent,
+        crossDomain
+      });
+      return { replayed: false, setCookie: setCookie2 };
     });
+    if (outcome.replayed) {
+      console.warn(`[saml] refused a replayed assertion: ${assertionId}`);
+      return c.json({ error: "This SAML assertion has already been used" }, 401);
+    }
+    const { setCookie } = outcome;
     const rawRedirect = body.RelayState ?? "/admin";
     const redirectTo = typeof rawRedirect === "string" && rawRedirect.startsWith("/") && !rawRedirect.startsWith("//") ? rawRedirect : "/admin";
     const response = c.redirect(redirectTo, 302);

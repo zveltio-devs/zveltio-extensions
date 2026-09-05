@@ -186,6 +186,41 @@ is not the durable answer: when the engine closes the inline raw path,
 `auth/saml` and `auth/ldap` must be granted `user` and `session` in the SAME
 change, or SSO breaks again — on the write this time.
 
+### The first version of the replay claim could lock a user out
+
+Caught by the engine's `check:atomic-writes`, which reads this repository from a
+hardcoded path and so was watching the change before it was pushed.
+
+The claim was placed directly after signature validation, which is the right
+place for *ordering* and the wrong place for *commitment*. `/ext/*` runs inside
+the per-request tenant transaction, so a THROW after the claim rolls it back —
+but `return c.json(…, 400)` is not a throw. Measured:
+
+```
+after a handler that RETURNED 400 : 1   (the id is burned)
+after a handler that THREW        : 0   (the id is released)
+```
+
+The `!email` check sat between the claim and the login, and it returns 400. So an
+IdP with a misconfigured attribute mapping consumed the assertion, the operator
+fixed the mapping, and the user retrying the SAME assertion was told it had
+already been used. A replay guard turned into a lockout with no cure but waiting
+for a new assertion.
+
+Two changes, not one. The claim moved below every check that can still answer
+with a `return`. And the four writes that must happen together — claim,
+provision, drop previous sessions, create the new one — are now in an **explicit**
+`db.transaction()`, because the gate's real point was that they were atomic only
+by accident: *"they look atomic today only because the tenant transaction happens
+to span the request, and that boundary is moving."* `ctx.db.transaction()` joins
+the request transaction rather than nesting, so this is correct on both sides of
+that move.
+
+The `.catch()` on the session delete went with it. It read as "best effort, carry
+on" and was not: a failed statement aborts the transaction in Postgres whatever
+JavaScript does, so the next statement would have failed anyway with an unrelated
+message. Letting it fail the login is the honest version.
+
 ### Verified, and the verification discriminates
 
 With the fix, both flows are accepted; with the old option value restored, both

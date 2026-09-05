@@ -265,50 +265,95 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
     if (!assertionId) {
       return c.json({ error: 'SAML assertion carries no ID; refusing to accept it' }, 401);
     }
-    // One statement, so the check and the claim cannot interleave: a second,
-    // concurrent POST of the same assertion conflicts instead of returning a
-    // row. `ON CONFLICT DO NOTHING` + `RETURNING` yields zero rows for a replay.
-    const claimed = await sql<{ assertion_id: string }>`
-      INSERT INTO zvd_saml_consumed_assertions (assertion_id, expires_at)
-      VALUES (${assertionId}, NOW() + INTERVAL '24 hours')
-      ON CONFLICT (tenant_id, assertion_id) DO NOTHING
-      RETURNING assertion_id
-    `.execute(db);
-    if (claimed.rows.length === 0) {
-      console.warn(`[saml] refused a replayed assertion: ${assertionId}`);
-      return c.json({ error: 'This SAML assertion has already been used' }, 401);
-    }
-    // Opportunistic sweep. Unguarded: a failure here aborts the transaction in
-    // Postgres whatever JavaScript does about it, so swallowing it would take
-    // down the login it was meant not to disturb.
-    await sql`DELETE FROM zvd_saml_consumed_assertions WHERE expires_at < NOW()`.execute(db);
 
     const email = profile[config.mapEmail] ?? profile.email ?? profile.nameID;
     const name = profile[config.mapName] ?? profile.displayName ?? email;
 
     if (!email) return c.json({ error: 'IdP did not return an email address' }, 400);
 
-    const user = await findOrCreateSsoUser(db, email, name);
-
-    // Invalidate prior sessions so each SAML login produces exactly one
-    // active session — limits blast radius if a previous token leaks.
-    await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(db).catch((err: Error) => {
-      console.warn('[saml] could not invalidate previous sessions:', err.message);
-    });
-
+    // The claim goes HERE — after every check that can still answer with a
+    // `return`, and before anything that writes.
+    //
+    // The first version of this put it directly after signature validation,
+    // which burns an id for a login that never happened. `/ext/*` runs inside
+    // the request's tenant transaction, so a THROW after this point rolls the
+    // claim back with everything else — but `return c.json(…, 400)` is not a
+    // throw. It is a normal return, the transaction commits, and the id is
+    // consumed. The `!email` check above it is exactly that case: an IdP with a
+    // misconfigured attribute mapping answers 400, the operator fixes the
+    // mapping, the user retries the SAME assertion and is told it has already
+    // been used. The replay guard becomes a lockout, and the only cure is
+    // waiting for the IdP to mint a new one.
+    //
+    // Everything below either throws — `findOrCreateSsoUser`,
+    // `createBetterAuthSession` — or succeeds, so the claim now commits with the
+    // login and rolls back without it.
+    //
+    // An EXPLICIT transaction, not the request's.
+    //
+    // Four writes have to happen together or not at all: claim the assertion,
+    // provision the user, drop their previous sessions, create the new one. They
+    // were atomic today only because `/ext/*` runs inside the per-request tenant
+    // transaction — and `check:atomic-writes` flags exactly that, because the
+    // boundary is moving. When it does, a failure between the claim and the
+    // session leaves the assertion consumed and no session created, which is a
+    // lockout: the same assertion can never be presented again.
+    //
+    // `ctx.db.transaction()` JOINS the request transaction rather than nesting
+    // (Kysely refuses to nest), so this is correct both today and after the
+    // boundary moves. `internals.createBetterAuthSession` takes the handle, so it
+    // joins too.
     const remoteIp = c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? undefined;
     const userAgent = c.req.header('user-agent') ?? undefined;
-    const { setCookie } = await internals.createBetterAuthSession(db, user.id, {
-      ipAddress: remoteIp,
-      userAgent,
-      crossDomain,
+
+    const outcome = await db.transaction().execute(async (trx: any) => {
+      // One statement, so the check and the claim cannot interleave: a second,
+      // concurrent POST of the same assertion conflicts instead of returning a
+      // row. `ON CONFLICT DO NOTHING` + `RETURNING` yields zero rows for a replay.
+      const claimed = await sql<{ assertion_id: string }>`
+        INSERT INTO zvd_saml_consumed_assertions (assertion_id, expires_at)
+        VALUES (${assertionId}, NOW() + INTERVAL '24 hours')
+        ON CONFLICT (tenant_id, assertion_id) DO NOTHING
+        RETURNING assertion_id
+      `.execute(trx);
+      if (claimed.rows.length === 0) return { replayed: true as const };
+
+      // Opportunistic sweep. Unguarded: a failure here aborts the transaction in
+      // Postgres whatever JavaScript does about it, so swallowing it would take
+      // down the login it was meant not to disturb.
+      await sql`DELETE FROM zvd_saml_consumed_assertions WHERE expires_at < NOW()`.execute(trx);
+
+      const user = await findOrCreateSsoUser(trx, email, name);
+
+      // Invalidate prior sessions so each SAML login produces exactly one active
+      // session — limits blast radius if a previous token leaks.
+      //
+      // Still tolerated, but no longer with `.catch(() => …)` alone: a failed
+      // statement aborts the transaction in Postgres whatever JavaScript does,
+      // so a swallowed error here would surface as an unrelated failure on the
+      // next statement. Logging it and carrying on is only honest inside a
+      // SAVEPOINT, and this one is cheap enough to simply let fail the login.
+      await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(trx);
+
+      const { setCookie } = await internals.createBetterAuthSession(trx, user.id, {
+        ipAddress: remoteIp,
+        userAgent,
+        crossDomain,
+      });
+      return { replayed: false as const, setCookie };
     });
 
-    // Validare open redirect: permite doar path-uri relative (încep cu /)
+    if (outcome.replayed) {
+      console.warn(`[saml] refused a replayed assertion: ${assertionId}`);
+      return c.json({ error: 'This SAML assertion has already been used' }, 401);
+    }
+    const { setCookie } = outcome;
+
+    // Open-redirect guard: relative paths only (must start with `/`).
     const rawRedirect = body.RelayState ?? '/admin';
     const redirectTo = typeof rawRedirect === 'string' &&
       rawRedirect.startsWith('/') &&
-      !rawRedirect.startsWith('//')  // previne protocol-relative URLs
+      !rawRedirect.startsWith('//')  // blocks protocol-relative URLs
       ? rawRedirect
       : '/admin';
 
