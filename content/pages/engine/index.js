@@ -31109,6 +31109,15 @@ function sanitizeBlocksForWrite(blocks) {
 // content/pages/client/bind.ts
 var PLACEHOLDER = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
 var HTML_KEYS = new Set(["content", "html", "code", "items"]);
+var URL_KEYS = new Set([
+  "href",
+  "url",
+  "src",
+  "link",
+  "cta_url",
+  "button_url",
+  "image_url"
+]);
 function placeholdersIn(block) {
   const found = new Set;
   walk(block);
