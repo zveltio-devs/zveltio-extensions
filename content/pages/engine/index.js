@@ -31646,6 +31646,19 @@ function editorRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
   const engine = ctx.internals;
   const app = new Hono2;
+  const isPublicTrack = (path) => path === "/metrics/track" || /^\/[^/]+\/ab-variants\/[^/]+\/track$/.test(path);
+  app.use("*", async (c, next) => {
+    const sub = c.req.path.replace(/^.*?\/pages(?=\/|$)/, "") || "/";
+    if (isPublicTrack(sub))
+      return next();
+    const user = await getUser(c, auth);
+    if (!user)
+      return c.json({ error: "Unauthorized" }, 401);
+    if (!await checkPermission(user.id, "admin", "*")) {
+      return c.json({ error: "Admin access required" }, 403);
+    }
+    await next();
+  });
   app.get("/block-types", async (c) => {
     const types = await db.selectFrom("zv_page_block_types").selectAll().where("is_active", "=", true).orderBy("display_name", "asc").execute();
     return c.json({ block_types: types });
@@ -32144,6 +32157,9 @@ function publicPagesRoutes(ctx) {
     return c.json({ pages });
   });
   router.get("/nav", async (c) => {
+    const site = await publicSite(c);
+    if (!site)
+      return c.json({ menus: { main: [], footer: [] } });
     const rows = await db.selectFrom("zv_page_menus").select(["menu_key", "items"]).where("tenant_id", "=", tenantId3(c)).where("menu_key", "in", ["main", "footer"]).execute();
     const menus = { main: [], footer: [] };
     for (const row of rows) {

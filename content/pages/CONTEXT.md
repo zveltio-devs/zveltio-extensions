@@ -53,3 +53,70 @@ content/pages role hydration now: {"role":"member"}
 The lesson is the one already recorded in `compliance/ro/documents/CONTEXT.md`:
 repair the class, not the instance. Two extensions were named in the report; the
 grep found the third.
+
+---
+
+## Section 2 — file-by-file review, in progress (2026-09-05)
+
+Two authorisation defects, both found by mapping guards mechanically rather than
+by reading for them.
+
+### `GET /cms/nav` served the navigation with no public site
+
+Every route in `cms-routes.ts` calls `publicSite(c)` first — a site that is both
+`is_public` and `is_active` — and declines when there is none. `/cms/nav` queried
+`zv_page_menus` by tenant and menu key alone. `/cms/*` is in the manifest's
+`publicRoutes`, so there is no session in front of it.
+
+Measured against a real database, on a tenant owning only an internal portal:
+
+```
+public sites for the tenant: 0
+every other /cms/* route:    404 / empty
+/cms/nav returned:           [{"label":"Board minutes (confidential)",
+                               "url":"/portal/board-minutes"}, …]
+```
+
+Menu items carry labels and paths, so that is the internal site's structure handed
+to anyone who asks. Now gated like its siblings.
+
+**Not fixed, because it is a schema question:** `zv_page_menus` has no `site_id`.
+One `main` and one `footer` per TENANT, shared by every site that tenant owns — so
+an operator running a public site beside a portal shares one menu between them by
+design, and an internal entry still reaches the public payload. Splitting menus
+per site is a migration and a product decision.
+
+### The editor's READS were open to any session
+
+`editor.ts` guarded all 13 writes with `requireAdmin` and all 13 reads with
+`requireAuth`, which is `getUser` and nothing else. That is not the rule the
+rendered page obeys: `sites.ts:574` refuses a caller who does not hold the site's
+`access_roles`.
+
+So a member refused the rendered page could read the same page from
+`GET /pages/:id`, `blocks` and all. `GET /pages/` was worse — `selectAll()` with
+no status filter, returning every page in the tenant with its body, drafts and
+unpublished work included.
+
+Demonstrated in `editor-read-authz.test.ts` as a pair, because a refusal on the
+render path alone proves nothing: same user, same mount, render refuses and both
+editor reads serve.
+
+Closed with a router-level guard rather than 13 separate calls — the defect is "a
+route that forgot", so a route added tomorrow is covered for free. Admin, not the
+render path's role check, because that is the rule this module already states for
+itself: *"Authoring is therefore an admin-only capability."* A non-admin cannot
+author, so there is nothing here for them to read.
+
+Checked before changing it, since the risk was breaking the admin UI: the only
+consumer of these reads is the Studio page, whose schema calls `/pages` and
+`/pages/{id}`. The public renderer uses `/cms/*`. The two telemetry endpoints the
+rendered page posts to — `/metrics/track` and `/:id/ab-variants/:id/track`, both in
+`publicRoutes` — are excluded, and a test asserts they stayed open, because a guard
+that closed them would look identical to a working fix from the other assertions.
+
+### Still to cover in this extension
+
+`hydrate.ts` (the anonymous data-resolution path, the highest-risk file left),
+`sanitize.ts`, `public-seo.ts`, `jsonb.ts`, the 7 migrations against a virgin AND
+an upgraded database, and the ~2000 lines of client Svelte.

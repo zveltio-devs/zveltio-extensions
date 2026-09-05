@@ -127,8 +127,33 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
     return c.json({ pages });
   });
 
-  /** GET /cms/nav — the public site's navigation menus. */
+  /**
+   * GET /cms/nav — the public site's navigation menus.
+   *
+   * The `publicSite` check is the point of this handler, not decoration. Every
+   * other route in this file establishes that a public, active site exists
+   * before serving anything; this one queried the menus directly, so on an
+   * instance running ONLY an internal portal — no public site at all — an
+   * anonymous request still received the tenant's navigation. Measured:
+   *
+   *   public sites for the tenant: 0
+   *   every other /cms/* route:    404 / empty
+   *   this query returned:         [{"label":"Board minutes (confidential)", …}]
+   *
+   * Menu items carry labels and paths, so that is a listing of the internal
+   * site's structure handed to anyone who asks.
+   *
+   * Note what this does NOT fix. `zv_page_menus` has no `site_id` — one `main`
+   * and one `footer` per TENANT, shared by every site that tenant owns. So an
+   * operator running a public site and a portal side by side is sharing one
+   * menu between them by design, and an internal entry in it still reaches the
+   * public payload. Splitting menus per site is a schema change and a product
+   * decision; it is recorded in CONTEXT.md rather than taken here.
+   */
   router.get('/nav', async (c) => {
+    const site = await publicSite(c);
+    if (!site) return c.json({ menus: { main: [], footer: [] } });
+
     const rows = await db
       .selectFrom('zv_page_menus')
       .select(['menu_key', 'items'])
