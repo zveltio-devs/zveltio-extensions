@@ -1,54 +1,54 @@
-# Secțiunea 1 — Inventarul de SQL brut
+# Section 1 — Raw SQL inventory
 
-**Verdict: `logged`.** Inventarul e complet și fiecare rând are un răspuns propus.
-Nimic nu e reparat: alegerea între (1) rescriere, (2) acordare explicită și
-(3) citire de catalog e a proprietarului.
+**Verdict: `logged`.** The inventory is complete and every row carries a proposed
+answer. Nothing is repaired: choosing between (1) rewrite, (2) explicit grant and
+(3) catalogue read is the owner's call.
 
-Măsurat pe `/home/liviu/zveltio-extensions` la `master`, cu funcția de politică
-importată direct din engine
-(`packages/engine/src/lib/extensions/worker-sql-policy.ts`), pe o bază de test
-proprie sesiunii (`zv_extsql_s1`). Scriptul de scanare și probele sunt în
-scratchpad-ul sesiunii; comenzile sunt reproductibile în §5.
+Measured against `/home/liviu/zveltio-extensions` at `master`, with the engine's
+own policy function imported directly
+(`packages/engine/src/lib/extensions/worker-sql-policy.ts`), on a database
+private to this session (`zv_extsql_s1`). The scan script and probes live in the
+session scratchpad; §5 reproduces them.
 
-Repo-ul de engine nu a fost atins — nici măcar un `git` de citire care schimbă
-arborele. Constatările care sunt de fapt în engine sunt marcate ca atare și
-predate sesiunii care lucrează acolo.
+The engine repository was not touched — not even a read-only `git` that changes
+the tree. Findings that are in fact engine-side are marked as such and handed to
+the session working there.
 
-Cele cinci constatări de engine au fost **reproduse independent** de sesiunea de
-engine. Una dintre prescripțiile mele era greșită (garda pe `executeQuery`); e
-corectată în §0.2, cu măsurătoarea care o stabilește.
+All five engine-side findings were **independently reproduced** by the engine
+session. One of my prescriptions was wrong (a guard on `executeQuery`); §0.2
+corrects it, with the measurement that settles it.
 
 ---
 
-## 0. Trei constatări care schimbă întrebarea
+## 0. Three findings that change the question
 
-Le pun primele pentru că afectează *ce* trebuie decis, nu doar *cum*.
+First, because they affect *what* has to be decided, not just how.
 
-### 0.1 Poarta reparată păzește o cale pe care nu circulă nimeni
+### 0.1 The repaired gate guards a path nobody travels
 
-`assertWorkerSqlAllowed` e apelată dintr-un singur loc:
-`worker-extension-host.ts:807`, pe puntea worker→host. Puntea aia se folosește
-doar de extensiile cu `engine.isolation: "worker"`.
+`assertWorkerSqlAllowed` has exactly one caller:
+`worker-extension-host.ts:807`, on the worker→host bridge. That bridge is used
+only by extensions declaring `engine.isolation: "worker"`.
 
-Măsurat pe toate cele 56 de manifeste:
+Measured across all 56 manifests:
 
 ```
-$ bun -e '…citește engine.isolation din fiecare manifest.json…'
+$ bun -e '…read engine.isolation from every manifest.json…'
 { "(default inline)": 56 }
 ```
 
-**Zero extensii rulează în worker.** Toate merg pe calea *inline*. Poarta nu se
-declanșează astăzi pentru niciuna dintre ele.
+**No extension runs in a worker.** All of them take the *inline* path. The gate
+does not fire for any of them today.
 
-### 0.2 Gaura reală e pe calea inline, și e deschisă acum
+### 0.2 The real hole is the inline path, and it is open now
 
-`createRestrictedDb` interceptează doar `QUERY_METHODS`
+`createRestrictedDb` intercepts only `QUERY_METHODS`
 (`selectFrom`, `insertInto`, `updateTable`, `deleteFrom`, `replaceInto`,
-`mergeInto`, `withSchema` — `extension-context.ts:37`). Un `sql` brut nu trece
-prin niciunul.
+`mergeInto`, `withSchema` — `extension-context.ts:37`). A raw `sql` template goes
+through none of them.
 
-**Unde trece, exact.** Am instrumentat handle-ul cu un proxy care înregistrează
-fiecare proprietate atinsă — o dată pentru `sql` brut, o dată pentru query builder:
+**Where it does go.** I instrumented the handle with a proxy recording every
+property access — once for raw `sql`, once for the query builder:
 
 ```
 properties a raw sql template touched on the handle: ["getExecutor"]
@@ -57,19 +57,19 @@ properties a raw sql template touched on the handle: ["getExecutor"]
 properties the query builder touched:               ["selectFrom"]
 ```
 
-`RawBuilder.execute()` cere handle-ului executorul (`getExecutor`) și cheamă
-`executeQuery` pe **acela**, nu pe handle. O gardă pusă pe `executeQuery` al
-handle-ului stă *lângă* cale, nu pe ea; trebuie învelit executorul întors de
-`getExecutor`.
+`RawBuilder.execute()` asks the handle for its executor (`getExecutor`) and calls
+`executeQuery` on **that object**, not on the handle. A guard placed on the
+handle's own `executeQuery` sits *beside* the path, not on it; what has to be
+wrapped is the executor `getExecutor` returns.
 
-*(Prima versiune a raportului descria mecanismul greșit — „ajunge la
-`executeQuery` … prin ramura generică `value.bind(target)`" — ceea ce duce la o
-reparație care nu prinde nimic. Sesiunea de engine a ajuns independent la aceeași
-concluzie, după ce a încercat varianta greșită; măsurătoarea de mai sus e a mea.)
+*(The first version of this report described the mechanism wrongly — "reaches
+`executeQuery` … via the generic `value.bind(target)` branch" — which points at a
+fix that catches nothing. The engine session reached the same conclusion
+independently, after trying the wrong variant; the measurement above is mine.)*
 
-Măsurat pe o bază proprie (`zv_extsql_s1`, schema engine aplicată), cu extensia
-`forms` — fără nicio acordare, `allowedTables` gol. Aceeași extensie, același
-tabel, două căi:
+Measured on a private database (`zv_extsql_s1`, engine schema applied) with the
+`forms` extension — no grants at all, `allowedTables` empty. Same extension, same
+table, two paths:
 
 ```
 --- path A: query builder (proxied) ---
@@ -80,18 +80,18 @@ B: READ — [{"token":"SECRET-BEARER-TOKEN"}]
 C: WROTE — user.name is now [{"name":"PWNED"}]
 ```
 
-Verificarea discriminează: calea A refuză, calea B citește tokenul de sesiune,
-calea C scrie în `user`. Deci inventarul de mai jos nu pregătește terenul pentru
-o poartă teoretică — pregătește terenul pentru singura poartă care contează.
+The check discriminates: path A refuses, path B reads the session bearer token,
+path C writes to `user`. So the inventory below is not preparing the ground for a
+theoretical gate — it is preparing the ground for the only gate that matters.
 
-### 0.3 Poarta refuză tabelele pe care proprietarul le-a acordat deja
+### 0.3 The gate refuses tables the owner has already granted
 
-`assertWorkerSqlAllowed` nu consultă nici `EXTENSION_TABLE_GRANTS`, nici tabelele
-create de migrațiile extensiei. Regula ei e strict „`zvd_*` sau `zv_<ext>_*`".
-Comentariul din `register.ts` spune de ce asta nu ține: *„109 din ~300 de tabele
-de extensie sunt numite după funcționalitate, nu după folder"*.
+`assertWorkerSqlAllowed` consults neither `EXTENSION_TABLE_GRANTS` nor the tables
+an extension's own migrations create. Its rule is strictly "`zvd_*` or
+`zv_<ext>_*`". The comment in `register.ts` says why that does not hold: *"109 of
+~300 extension tables are named for the feature rather than the folder"*.
 
-Probat direct:
+Probed directly:
 
 ```
 REFUSED  operations/traceability  own table, own migration           SELECT * FROM trace_lots WHERE id = $1
@@ -102,133 +102,135 @@ REFUSED  developer/validation     GRANTED in EXTENSION_TABLE_GRANTS  SELECT * FR
 REFUSED  storage/cloud            GRANTED in EXTENSION_TABLE_GRANTS  SELECT * FROM zv_media_files
 ```
 
-**Remediul (2) din predare — „intră în `EXTENSION_TABLE_GRANTS`" — nu
-funcționează contra acestei porți așa cum e scrisă.** E o reparație de engine, nu
-de extensii; o las aici, n-o ating.
+**The handoff's remedy (2) — "add an entry to `EXTENSION_TABLE_GRANTS`" — does
+not work against this gate as written.** That is an engine repair, not an
+extensions one; recorded here, not touched.
 
-Consecința pe cifre: poarta refuză **26** de extensii, nu 18. Dintre ele **19**
-sunt refuzate *exclusiv* pentru tabele pe care le creează migrațiile lor proprii.
+Effect on the numbers: the gate refuses **26** extensions, not 18. Of those,
+**13** are refused *exclusively* on tables their own migrations create or that a
+grant already names — they have no out-of-namespace access at all. A further
+**19** have at least one own-migration table refused (the two sets overlap: 7
+extensions appear in both).
 
 ---
 
-## 1. Cifrele
+## 1. The numbers
 
 | | |
 |---|---:|
-| `sql` tagged templates în surse (fără teste, fără `dist`) | **1222** |
-| apeluri `sql.raw(...)` — pe care un scanner de template-uri NU le vede | **35** |
-| extensii refuzate de poartă așa cum e scrisă | **26** |
-| … dintre ele, refuzate doar pe tabele proprii / acordate | **13** |
-| **extensii cu atingeri reale în afara spațiului propriu** | **13** |
+| `sql` tagged templates in sources (no tests, no `dist`) | **1222** |
+| `sql.raw(...)` calls — which a template scanner does NOT see | **35** |
+| extensions refused by the gate as written | **26** |
+| … of those, refused only on own / granted tables | **13** |
+| **extensions with real touches outside their own space** | **13** |
 
-Predarea spune „18" și enumeră 12 în tabel. Niciunul din cele două numere nu se
-reproduce; măsurătoarea mea dă 13 extensii cu atingeri reale, iar lista diferă în
-ambele direcții (vezi §3).
+The handoff says "18" and lists 12 in its table. Neither number reproduces; my
+measurement gives 13 extensions with real touches, and the list differs in both
+directions (see §3).
 
-O capcană de scanare, semnalată fiindcă e exact clasa despre care avertizează
-`register.ts` („citea PROZĂ"): un rând de JSDoc care se termină cu
-`` `migrations/001_initial.sql` `` pune un backtick imediat după `sql`, iar
-regex-ul de tag îl prinde. Fără eliminarea comentariilor, `content/pages` era
-raportată ca atingând un tabel numit `this`. Scriptul elimină acum comentariile
-înainte de extragere.
+One scanning trap, recorded because it is exactly the class `register.ts` warns
+about ("it was reading PROSE"): a JSDoc line ending in
+`` `migrations/001_initial.sql` `` puts a backtick immediately after `sql`, which
+the tag regex matches. Without stripping comments first, `content/pages` was
+reported as touching a table called `this`. The script now strips comments before
+extraction.
 
 ---
 
-## 2. Inventarul, cu răspunsul propus
+## 2. The inventory, with a proposed answer
 
-Legendă: **(1)** se rescrie · **(2)** are nevoie real, cere acordare ·
-**(3)** citire de catalog.
+Key: **(1)** rewrite · **(2)** genuinely needs it, requires a grant ·
+**(3)** catalogue read.
 
-### (1) Se rescriu — 7 extensii, 3 helper-e mici acoperă tot
+### (1) Rewrite — 7 extensions, 3 small helpers cover all of them
 
-| extensie | tabel | unde | de ce se rescrie |
+| extension | table | where | why it can be rewritten |
 |---|---|---|---|
-| `ai` | `user` | `engine/routes/ai-analytics.ts:186` | `LEFT JOIN "user" usr ON usr.id::text = u.user_id::text` — doar pentru `COALESCE(usr.name, u.user_id)`. Un nume de afișat. |
-| `storage/cloud` | `user` | `engine/lib/trash.ts:72`, `engine/lib/file-versions.ts:123` | idem — `LEFT JOIN "user" u` pentru `u.name AS deleted_by_name` / `uploaded_by_name`. |
-| `analytics/dashboard` | `zv_settings` | `engine/routes.ts:247` | `SELECT value FROM zv_settings WHERE key IN ('company_name',…)` — un titlu pe dashboard. |
-| `communications/mail` | `zv_settings` | `routes.ts:1457,1524,1578,1606,1628` · `lib/imap-client.ts:126` · `index.ts:56` | de 7 ori exact `SELECT value FROM zv_settings WHERE key = 'mail'` — propria configurație, ținută în tabelul motorului. |
-| `content/pages` | `information_schema.columns` | `engine/public-seo.ts:86` | „are colecția asta coloana `slug`?" |
-| `geospatial/postgis` | `information_schema.tables` | `engine/routes.ts:37` | „există tabelul `zvd_<colecție>`?" |
-| `integrations/migrators` | `information_schema.columns` | `engine/routes.ts:184` | „ce coloane are `zvd_<țintă>`?" |
+| `ai` | `user` | `engine/routes/ai-analytics.ts:186` | `LEFT JOIN "user" usr ON usr.id::text = u.user_id::text` — purely for `COALESCE(usr.name, u.user_id)`. A display name. |
+| `storage/cloud` | `user` | `engine/lib/trash.ts:72`, `engine/lib/file-versions.ts:123` | same — `LEFT JOIN "user" u` for `u.name AS deleted_by_name` / `uploaded_by_name`. |
+| `analytics/dashboard` | `zv_settings` | `engine/routes.ts:247` | `SELECT value FROM zv_settings WHERE key IN ('company_name',…)` — a dashboard heading. |
+| `communications/mail` | `zv_settings` | `routes.ts:1457,1524,1578,1606,1628` · `lib/imap-client.ts:126` · `index.ts:56` | seven times exactly `SELECT value FROM zv_settings WHERE key = 'mail'` — its own configuration, kept in the engine's table. |
+| `content/pages` | `information_schema.columns` | `engine/public-seo.ts:86` | "does this collection have a `slug` column?" |
+| `geospatial/postgis` | `information_schema.tables` | `engine/routes.ts:37` | "does table `zvd_<collection>` exist?" |
+| `integrations/migrators` | `information_schema.columns` | `engine/routes.ts:184` | "what columns does `zvd_<target>` have?" |
 
-Trei helper-e le închid pe toate șapte — cu o rezervă: `analytics/dashboard`
-apare aici doar pentru `zv_settings`. Restul atingerilor ei (`user`,
-`zv_tenant_users`, `zv_audit_log`, `pg_class`, `zv_backups`) sunt statistici de
-platformă și **nu** se închid prin rescriere; vezi nota de la finalul lui (2).
+Three helpers close all seven — with one reservation: `analytics/dashboard`
+appears here only for `zv_settings`. Its remaining touches (`user`,
+`zv_tenant_users`, `zv_audit_log`, `pg_class`, `zv_backups`) are platform
+statistics and **cannot** be closed by rewriting; see the note at the end of (2).
 
-Trei helper-e:
+The three helpers:
 
-- **`resolveUserNames(ids) → Map<id, name>`** — închide `ai` și `storage/cloud`.
-  Ambele vor un nume de afișat, nu acces la tabela de identități.
-- **Un accesor de setări cu namespace** (`ctx.settings.get('mail')`) — închide
-  `communications/mail` (7 situri) și `analytics/dashboard`.
-  **Precedentul există deja în repo:** `auth/saml` și-a mutat configurația din
-  `zv_settings` în `zvd_saml_config` exact din motivul ăsta — vezi comentariul de
-  la `auth/saml/engine/routes.ts:49`: *„`zvd_saml_config`, nu `zv_settings`.
-  Vezi migrația 004: `zv_settings` e tabel de sistem și `ctx.db` îl refuză, deci
-  fiecare citire de aici arunca."* Deci una din cele trei căi e deja bătută:
-  fiecare extensie își ține configurația la ea.
-- **`describeCollection(name) → { exists, columns }`**, limitat la `zvd_*` —
-  închide `content/pages`, `geospatial/postgis` și `integrations/migrators`.
-  Toate trei pun aceeași întrebare îngustă despre forma propriilor date permise,
-  și o pun catalogului doar fiindcă nu există API.
+- **`resolveUserNames(ids) → Map<id, name>`** — closes `ai` and `storage/cloud`.
+  Both want a name to display, not access to the identity table.
+- **A namespaced settings accessor** (`ctx.settings.get('mail')`) — closes
+  `communications/mail` (7 sites) and `analytics/dashboard`.
+  **The precedent already exists in this repo:** `auth/saml` moved its
+  configuration out of `zv_settings` into `zvd_saml_config` for exactly this
+  reason — see the comment at `auth/saml/engine/routes.ts:49`: *"`zvd_saml_config`,
+  not `zv_settings`. See migration 004: `zv_settings` is an engine system table
+  and `ctx.db` refuses it, so every read here threw."* One of the three routes is
+  therefore already walked: each extension keeps its own configuration.
+- **`describeCollection(name) → { exists, columns }`**, limited to `zvd_*` —
+  closes `content/pages`, `geospatial/postgis` and `integrations/migrators`. All
+  three ask the same narrow question about the shape of their own permitted data,
+  and ask the catalogue only because there is no API.
 
-### (2) Au nevoie real — 4 extensii
+### (2) Genuinely need it — 4 extensions
 
-| extensie | tabele | de ce nu se poate rescrie |
+| extension | tables | why it cannot be rewritten |
 |---|---|---|
-| `compliance/gdpr` | `user`, `session`, `account`, `twoFactor`, `zv_api_keys`, `zv_notifications`, `zv_audit_log` | E *implementarea* dreptului la ștergere (`engine/routes.ts:158–201`). A șterge persoana vizată **înseamnă** a șterge rândurile ei de identitate. Nicio rescriere nu evită asta. Export-ul (`:91–95`) e simetric. |
-| `auth/saml` | `user`, `session` | Provizionare SSO + invalidarea sesiunilor anterioare la login. |
-| `auth/ldap` | `user`, `session`, `zv_audit_log` | Idem, plus audit de login reușit/eșuat. |
-| `auth/scim` | `user`, `session`, `account`, `zv_tenants`, `zv_tenant_users` | SCIM **este** protocolul de provizionare de utilizatori. 12 situri pe `user`, 7 pe `zv_tenant_users`. |
+| `compliance/gdpr` | `user`, `session`, `account`, `twoFactor`, `zv_api_keys`, `zv_notifications`, `zv_audit_log` | This *is* the right-to-erasure implementation (`engine/routes.ts:158–201`). Erasing the data subject **means** erasing their identity rows. No rewrite avoids it. The export path (`:91–95`) is symmetric. |
+| `auth/saml` | `user`, `session` | SSO provisioning + invalidating prior sessions at login. |
+| `auth/ldap` | `user`, `session`, `zv_audit_log` | Same, plus success/failure login audit. |
+| `auth/scim` | `user`, `session`, `account`, `zv_tenants`, `zv_tenant_users` | SCIM **is** the user-provisioning protocol. 12 sites on `user`, 7 on `zv_tenant_users`. |
 
-Nuanță pentru cele trei de auth: nu au nevoie de *tabele*, au nevoie de **trei
-operații**. Engine-ul expune deja `internals.createBetterAuthSession` — și
-`auth/saml:234` și `auth/ldap:291` o folosesc. Lipsesc:
+A nuance for the three auth extensions: they do not need *tables*, they need
+**three operations**. The engine already exposes
+`internals.createBetterAuthSession` — `auth/saml:234` and `auth/ldap:291` both use
+it. What is missing:
 
 - `provisionUser({ email, name }) → user` (saml, ldap, scim)
 - `revokeUserSessions(userId)` (saml, ldap, scim, gdpr)
 - `writeAuditLog(entry)` (ldap, gdpr)
 
-Cu ele, `auth/saml` scade la **zero** atingeri directe, `auth/ldap` la zero,
-`auth/scim` rămâne cu `zv_tenants`/`zv_tenant_users` (provizionare de firme —
-acolo acordarea explicită e răspunsul corect), iar `gdpr` rămâne cu ștergerea,
-care e ireductibilă. Recomandarea mea: **helper-e pentru auth, acordare doar
-pentru `gdpr` și pentru partea de tenancy a lui `scim`.**
+With those, `auth/saml` drops to **zero** direct touches, `auth/ldap` to zero,
+`auth/scim` retains `zv_tenants`/`zv_tenant_users` (tenant provisioning — an
+explicit grant is the right answer there), and `gdpr` retains the erasure, which
+is irreducible. My recommendation: **helpers for auth, a grant only for `gdpr`
+and for the tenancy half of `scim`.**
 
-Două cazuri separate, care nu sunt în tabelul din predare:
+Three further cases, none of them in the handoff's table:
 
-- `compliance/gdpr` → **`zv_approval_requests`** (`engine/routes.ts:95`) —
-  tabel al *altei extensii* (`workflow/approvals`), citit direct, învelit în
-  `rowsOrEmptyIfTableAbsent`. Acces între extensii; ar trebui să treacă printr-un
-  serviciu, nu printr-o citire de tabel.
-- `storage/cloud` → **`zv_media_versions`** (5 situri) și
-  **`zv_media_favorites`** (`routes.ts:259`). `zv_media_versions` e tabel
-  declarat de engine și **nu e** în cele patru acordări pe care `storage/cloud`
-  le are deja. Omisiune în lista de acordări, de aceeași formă cu cele patru
-  reparate anterior.
-- `analytics/dashboard` → **`user`** (`routes.ts:296,303`),
-  **`zv_tenant_users`** (`:297,306`), **`zv_audit_log`** (`:335,339`),
-  **`pg_class`** (`:320`) și **`zv_backups`** (`:373`, prin `sql.raw`). Toate
-  sunt numărători pentru un dashboard: câți utilizatori, câți admini, câte
-  intrări de audit azi, ce mărime au colecțiile, când s-a făcut ultimul backup.
-  Niciuna nu e dată de extensie, și niciuna nu se poate rescrie ca să nu atingă
-  tabelul. Răspunsul curat aici nu e nici (1) nici o acordare de tabele, ci **un
-  serviciu de statistici expus de engine** — extensia are nevoie de *cifre*, nu
-  de acces la `user`.
+- `compliance/gdpr` → **`zv_approval_requests`** (`engine/routes.ts:95`) — a table
+  belonging to *another extension* (`workflow/approvals`), read directly, wrapped
+  in `rowsOrEmptyIfTableAbsent`. Cross-extension access; it should go through a
+  service, not a table read.
+- `storage/cloud` → **`zv_media_versions`** (5 sites) and **`zv_media_favorites`**
+  (`routes.ts:259`). `zv_media_versions` is an engine-declared table and is **not**
+  among the four grants `storage/cloud` already holds. An omission in the grant
+  list, the same shape as the four repaired earlier.
+- `analytics/dashboard` → **`user`** (`routes.ts:296,303`), **`zv_tenant_users`**
+  (`:297,306`), **`zv_audit_log`** (`:335,339`), **`pg_class`** (`:320`) and
+  **`zv_backups`** (`:373`, via `sql.raw`). All of them are counts for a
+  dashboard: how many users, how many admins, how many audit entries today, how
+  large the collections are, when the last backup ran. None is extension data, and
+  none can be rewritten to avoid the table. The clean answer here is neither (1)
+  nor a table grant but **a statistics service exposed by the engine** — the
+  extension needs *numbers*, not access to `user`.
 
-### (3) Citire de catalog — 1 extensie, și nu e o citire
+### (3) Catalogue read — 1 extension, and it is not a read
 
-| extensie | ce face |
+| extension | what it does |
 |---|---|
-| `developer/database` | 16 relații de catalog citite (`information_schema.tables/columns/triggers`, `pg_class`, `pg_namespace`, `pg_proc`, `pg_type`, `pg_enum`, `pg_policy`, `pg_trigger`, `pg_roles`, `pg_auth_members`, `pg_extension`, `pg_available_extensions`, `pg_attribute`, `pg_language`) |
+| `developer/database` | 16 catalogue relations read (`information_schema.tables/columns/triggers`, `pg_class`, `pg_namespace`, `pg_proc`, `pg_type`, `pg_enum`, `pg_policy`, `pg_trigger`, `pg_roles`, `pg_auth_members`, `pg_extension`, `pg_available_extensions`, `pg_attribute`, `pg_language`) |
 
-**Predarea o clasează la „răsfoire de schemă". Nu e.** Cele 17 apeluri
-`sql.raw(...)` din același fișier — pe care un scanner de tagged templates nu le
-vede — scriu:
+**The handoff files this under "schema browsing". It is not.** The 17
+`sql.raw(...)` calls in the same file — which a tagged-template scanner does not
+see — write:
 
 ```
-routes.ts:168  await sql.raw(definition)                          CREATE FUNCTION (definition = input de utilizator)
+routes.ts:168  await sql.raw(definition)                          CREATE FUNCTION (definition = user input)
 routes.ts:228  await sql.raw(definition)                          CREATE TRIGGER
 routes.ts:299  CREATE TYPE … AS ENUM                              routes.ts:323  DROP TYPE … CASCADE
 routes.ts:367  CREATE EXTENSION                                   routes.ts:379  DROP EXTENSION … CASCADE
@@ -238,42 +240,42 @@ routes.ts:508  ALTER TABLE … FORCE/NO FORCE ROW LEVEL SECURITY
 routes.ts:531  CREATE POLICY (sql_str)                            routes.ts:545  DROP POLICY
 ```
 
-Extensia asta poate **dezactiva RLS pe orice tabel** și **crea roluri de bază de
-date**. Nu e o categorie de citire; e o consolă DBA. Răspunsul propus: **nu (3),
-ci o capabilitate proprie, cu consimțământ explicit și tier de încredere
-`first-party`** — și, separat de campania asta, o revizuire a rutelor ei de
-scriere. Ambele decizii sunt ale proprietarului.
+This extension can **disable RLS on any table** and **create database roles**. It
+is not a reading category; it is a DBA console. Proposed answer: **not (3), but a
+capability of its own, with explicit consent and a `first-party` trust tier** —
+and, separately from this campaign, a review of its write routes. Both are the
+owner's decisions.
 
-Restul citirilor de catalog (`content/pages`, `geospatial/postgis`,
-`integrations/migrators`, plus `pg_class` la `analytics/dashboard:320` pentru o
-estimare `reltuples`) sunt înguste și intră la (1) prin `describeCollection`.
+The remaining catalogue reads (`content/pages`, `geospatial/postgis`,
+`integrations/migrators`, plus `pg_class` at `analytics/dashboard:320` for a
+`reltuples` estimate) are narrow and belong to (1) via `describeCollection`.
 
-**Precizare despre `sql.raw`.** Ocolește *scanarea statică* — inventarul ăsta nu
-poate vedea `FROM ${sql.raw(table)}` de la `analytics/dashboard:373`. Nu ocolește
-o gardă de **runtime** pe `getExecutor`: acolo textul e deja compilat, cu numele
-de tabel rezolvat. Limita e a inventarului, nu a reparației.
+**A precision about `sql.raw`.** It defeats *static* scanning — this inventory
+cannot see `FROM ${sql.raw(table)}` at `analytics/dashboard:373`. It does not
+defeat a **runtime** guard on `getExecutor`: there the text is already compiled,
+with the table name resolved. The limitation is the inventory's, not the fix's.
 
 ---
 
-## 3. Diferențe față de tabelul din predare
+## 3. Differences from the handoff's table
 
-Le enumăr fiindcă tabelul din §3 al predării o să fie citit ca inventar.
+Listed because §3 of the handoff will be read as the inventory.
 
-**Lipsesc din predare:**
+**Missing from the handoff:**
 
-| extensie | tabel | unde |
+| extension | table | where |
 |---|---|---|
-| `ecommerce/store` | — refuz de *formă*, nu de tabel | `engine/routes.ts:301` (`SAVEPOINT`), `:312` (`ROLLBACK TO SAVEPOINT`) |
+| `ecommerce/store` | — a *form* refusal, not a table one | `engine/routes.ts:301` (`SAVEPOINT`), `:312` (`ROLLBACK TO SAVEPOINT`) |
 | `compliance/gdpr` | `zv_approval_requests` | `engine/routes.ts:95` |
 | `storage/cloud` | `zv_media_versions`, `zv_media_favorites` | `lib/file-versions.ts:29,80,96,123`, `lib/trash.ts:103`, `routes.ts:259` |
-| `analytics/dashboard` | `zv_backups` | `engine/routes.ts:373`, prin `sql.raw(table)` |
+| `analytics/dashboard` | `zv_backups` | `engine/routes.ts:373`, via `sql.raw(table)` |
 
-**Prezent în predare, nereprodus:** `analytics/dashboard` e listată cu
-`zv_audit_log`, `zv_settings`, `zv_tenant_users`, `user`, `pg_class` — toate
-confirmate. Dar predarea nu menționează că 19 extensii pică pe tabele proprii,
-ceea ce e majoritatea impactului.
+**Present in the handoff, confirmed:** `analytics/dashboard` is listed with
+`zv_audit_log`, `zv_settings`, `zv_tenant_users`, `user`, `pg_class` — all
+reproduced. What the handoff does not mention is that 19 extensions are refused on
+tables of their own, which is the bulk of the impact.
 
-**Asimetria de la `SAVEPOINT`** (probată, nu citită):
+**The `SAVEPOINT` asymmetry** (probed, not read):
 
 ```
 REFUSED  SAVEPOINT canonical_product
@@ -281,55 +283,55 @@ ALLOWED  RELEASE SAVEPOINT canonical_product
 REFUSED  ROLLBACK TO SAVEPOINT canonical_product
 ```
 
-`RELEASE` nu e în `CODE_BEARING_FORMS`, `SAVEPOINT` și `ROLLBACK` sunt. Perechea
-e incoerentă. Justificarea din comentariu — *„o instrucțiune care face COMMIT
-scapă din wrapper"* — e adevărată pentru `COMMIT`/`ROLLBACK` simplu, dar un
-savepoint **dintr-o tranzacție existentă nu o poate încheia**. Regula e prea
-largă, iar victimele sunt tratare de erori ordinară: `ecommerce/store:301`,
-`compliance/gdpr:189` (prin `sql.raw`), `ai/routes/ai.ts:58`,
-`communications/mail/lib/sieve.ts:272`. Reparație de engine.
+`RELEASE` is not in `CODE_BEARING_FORMS`; `SAVEPOINT` and `ROLLBACK` are. The
+trio is incoherent. The justification in the comment — *"a statement that COMMITs
+escapes that wrapper"* — is true for bare `COMMIT`/`ROLLBACK`, but a savepoint
+**inside an existing transaction cannot end it**. The rule is over-broad, and its
+victims are ordinary error handling: `ecommerce/store:301`, `compliance/gdpr:189`
+(via `sql.raw`), `ai/routes/ai.ts:58`, `communications/mail/lib/sieve.ts:272`. An
+engine repair.
 
 ---
 
-## 4. Două defecte vii în `auth/saml`, verificate
+## 4. Two live defects in `auth/saml`, verified
 
-Niciunul nu e despre `sql` brut, dar amândouă ies din aceeași măsurătoare.
-**Ordinea în care se manifestă e inversă față de ce am scris în prima versiune a
-raportului** — o corectez mai jos, cu măsurătoarea.
+Neither is about raw SQL, but both fall out of the same measurement. **The order
+in which they surface is the reverse of what the first version of this report
+said** — corrected below, with the measurement.
 
-### 4.1 SSO nu poate trece de validare, în NICIUNUL din cele două fluxuri
+### 4.1 SSO cannot pass validation, in EITHER flow
 
-`createSamlInstance` (`engine/saml-provider.ts:38`) trimite
-`validateInResponseTo: 'ifPresent'`. Ăsta e un idiom **node-saml 4.x**. Extensia
-pinuiește `^3.1.0`, iar în 3.1.2 opțiunea e un **boolean**:
+`createSamlInstance` (`engine/saml-provider.ts:37`) passes
+`validateInResponseTo: 'ifPresent'`. That is a **node-saml 4.x** idiom. The
+extension pins `^3.1.0`, and in 3.1.2 the option is a **boolean**:
 
 ```
 node_modules/node-saml/src/saml.js:39
   validateInResponseTo: options.validateInResponseTo || false
 ```
 
-Măsurat pe instanța pe care o construiește chiar extensia:
+Measured on the instance the extension itself builds:
 
 ```
 options.validateInResponseTo = "ifPresent" -> truthy? true
 ```
 
-Orice valoare truthy înseamnă „cere ÎNTOTDEAUNA InResponseTo" (`saml.js:706-718`).
-Am mintit un `SAMLResponse` real, semnat RSA-SHA256 cu un certificat self-signed,
-cu `AudienceRestriction`, `Conditions` și `SubjectConfirmationData` corecte, și
-l-am dat funcției reale a extensiei:
+Any truthy value means "ALWAYS require InResponseTo" (`saml.js:706-718`). I minted
+a real `SAMLResponse` — RSA-SHA256 signed with a self-signed certificate, with
+correct `AudienceRestriction`, `Conditions` and `SubjectConfirmationData` — and
+handed it to the extension's real function:
 
 ```
 node-saml REJECTED: InResponseTo is missing from response
 ```
 
-Deci **fluxul IdP-inițiat** pică întotdeauna. Ruta prinde asta la
-`engine/routes.ts:215-217` și răspunde **401** `SAML validation failed: …`.
+So the **IdP-initiated flow** always fails. The route catches this at
+`engine/routes.ts:215-217` and answers **401** `SAML validation failed: …`.
 
-**Fluxul SP-inițiat** pică și el, din alt motiv. `cacheProvider` e un
-`InMemoryCacheProvider` nou pentru **fiecare instanță** (`saml.js:41`), iar
-extensia construiește o instanță nouă la fiecare cerere — `:174` pentru `/login`,
-`:213` pentru `/callback`. Măsurat:
+The **SP-initiated flow** fails too, for a different reason. `cacheProvider`
+defaults to a fresh `InMemoryCacheProvider` per **instance** (`saml.js:41`), and
+the extension builds a new instance on every request — `:174` for `/login`,
+`:213` for `/callback`. Measured:
 
 ```
 same cacheProvider object? false
@@ -337,22 +339,26 @@ keys cached on the /login instance : 1
 keys cached on the /callback instance: 0
 ```
 
-Id-ul cererii salvat la `/login` nu există în cache-ul instanței care validează la
-`/callback` ⇒ `InResponseTo is not valid` ⇒ tot 401.
+The request id saved at `/login` does not exist in the cache of the instance
+validating at `/callback` ⇒ `InResponseTo is not valid` ⇒ 401 again.
 
-Aceeași clasă cu bug-ul pe care comentariul din `saml-provider.ts:62-69` îl
-documentează deja (`validatePostResponseAsync` → `validatePostResponse`, 3.x vs
-4.x). Al doilea din aceeași familie, nereparat.
+Same class as the bug the comment at `saml-provider.ts:62-69` already documents
+(`validatePostResponseAsync` → `validatePostResponse`, 3.x vs 4.x). The second of
+the family, unfixed.
 
-### 4.2 Provizionarea utilizatorului e refuzată de proxy — dar e MASCATĂ
+**When fixing this, pin the node-saml MAJOR in the same change.** The version
+boundary is the actual defect; `'ifPresent'` is only where it shows. A `^3`
+resolution will otherwise reintroduce the mismatch with a different symptom.
 
-`auth/saml` și `auth/ldap` creează utilizatorul SSO prin **query builder**:
+### 4.2 User provisioning is refused by the proxy — but is MASKED
 
-- `auth/saml/engine/routes.ts:124` și `:137` — `dbh.selectFrom('user')`
-- `auth/ldap/engine/routes.ts:138` și `:154` — `dbh.selectFrom('user')`
+`auth/saml` and `auth/ldap` create the SSO user through the **query builder**:
 
-`dbh` e `db`, destructurat din `ctx` la `auth/saml:141` — deci proxy-ul restrâns.
-Măsurat, cu `allowedTables` construit din migrațiile reale ale fiecărei extensii:
+- `auth/saml/engine/routes.ts:124` and `:137` — `dbh.selectFrom('user')`
+- `auth/ldap/engine/routes.ts:138` and `:154` — `dbh.selectFrom('user')`
+
+`dbh` is `db`, destructured from `ctx` at `auth/saml:141` — the restricted proxy.
+Measured, with `allowedTables` built from each extension's real migrations:
 
 ```
 auth/saml    allowed:{zvd_saml_login_log,zvd_saml_idp_metadata,zvd_saml_attribute_mappings,zvd_saml_config}
@@ -361,9 +367,10 @@ auth/ldap    allowed:{zvd_ldap_login_log,zvd_ldap_group_mappings,zvd_ldap_ip_all
    query-builder: user=REFUSED  session=REFUSED  account=REFUSED  zv_tenant_users=REFUSED  zv_audit_log=REFUSED
 ```
 
-`findOrCreateSsoUser` e apelată la `auth/saml:224` fără try/catch. Am verificat și
-ce face stratul de montare cu eroarea — montat exact ca la `register.ts:575`
-(`subApp.onError(problemOnError)`), cu un `ExtensionSecurityError` real:
+`findOrCreateSsoUser` is called at `auth/saml:224` with no try/catch. I also
+checked what the mount layer does with the error — mounted exactly as
+`register.ts:575` does (`subApp.onError(problemOnError)`), with a real
+`ExtensionSecurityError`:
 
 ```
 status: 500
@@ -373,61 +380,73 @@ body: {"type":"about:blank","title":"Internal Server Error","status":500,
 control (no throw) status: 200
 ```
 
-Deci nimic de deasupra nu îl convertește în altceva, iar cauza reală („attempted
-to access table user") e **ștearsă din răspuns** — rămâne doar în logul serverului.
+So nothing above converts it, and the real cause ("attempted to access table
+user") is **stripped from the response** — it survives only in the server log.
 
-**Corectura:** în prima versiune am scris că SSO dă 500 pe callback. Nu dă: dă
-**401**, fiindcă §4.1 se manifestă înainte. Defectul din §4.2 e real și dovedit,
-dar **inaccesibil** până se repară §4.1 — un 500 care apare abia după ce repari
-altceva. Ironia formei rămâne: `INSERT`-ul cu SQL brut de la `:132` ar trece;
-`selectFrom` de deasupra lui nu.
+**The correction:** the first version said SSO answers 500 on the callback. It
+does not: it answers **401**, because §4.1 surfaces first. The §4.2 defect is real
+and proven, but **unreachable** until §4.1 is fixed — a 500 that appears only once
+something else is repaired. The irony of the shape stands: the raw-SQL `INSERT` at
+`:132` would pass; the `selectFrom` above it does not.
 
-**Ce NU am verificat:** n-am testat contra unui IdP comercial real (Okta, Entra,
-Keycloak) — doar contra unui `SAMLResponse` pe care l-am semnat eu. Un IdP real
-trimite `InResponseTo` în fluxul SP-inițiat, ceea ce schimbă mesajul de eroare
-(`not valid` în loc de `missing`) dar nu și rezultatul, fiindcă demonstrația de
-cache per-instanță de mai sus nu depinde de cine a emis răspunsul.
+**What I did NOT verify:** I did not test against a real commercial IdP (Okta,
+Entra, Keycloak) — only against a `SAMLResponse` I signed myself. A real IdP does
+send `InResponseTo` in the SP-initiated flow, which changes the error message
+(`not valid` instead of `missing`) but not the outcome, because the per-instance
+cache demonstration above does not depend on who issued the response.
 
-## 5. Cum se reproduce
+I also could not drive the real `samlRoutes` end to end: mounting it fails at
+import because `@zveltio/sdk/*` resolves through tsconfig paths into the engine
+checkout, landing on a hono type entry that does not resolve from there. Fixing
+that would mean running an install in the engine checkout, which the cross-repo
+boundary exists to prevent. A real limit on the evidence, recorded rather than
+worked around.
+
+---
+
+## 5. How to reproduce
 
 ```bash
-# 1. Bază proprie + schema engine
+# 1. Private database + engine schema
 createdb zv_extsql_s1
 for f in $(ls /home/liviu/zveltio/packages/engine/src/db/migrations/sql/*.sql | sort -V); do
   psql "postgresql://postgres:postgres@localhost:5432/zv_extsql_s1" -q -f "$f"
 done
 
-# 2. Scanarea (script în scratchpad-ul sesiunii)
+# 2. The scan (script in the session scratchpad)
 cd /home/liviu/zveltio-extensions && bun scan2.ts
 
-# 3. SAML: certificat de IdP de test + un SAMLResponse semnat real
+# 3. SAML: a test IdP certificate + a really signed SAMLResponse
 openssl req -x509 -newkey rsa:2048 -keyout idp.key -out idp.crt -days 2 -nodes -subj "/CN=test-idp"
-#    apoi mint-saml.ts semnează assertion-ul cu xml-crypto și îl dă
-#    funcției REALE a extensiei (createSamlInstance / validateSamlResponse)
+#    then mint-saml.ts signs the assertion with xml-crypto and hands it to the
+#    extension's REAL functions (createSamlInstance / validateSamlResponse)
 ```
 
-Notă: `001_initial.sql` aplicat cu `psql -f` se oprește la final pe
-`relation "_sensitive" does not exist` — cele 70 de tabele relevante sunt create
-înainte de asta, deci măsurătorile de mai sus stau. Nu am investigat; nu e pe
-drumul secțiunii.
+Note: `001_initial.sql` applied with `psql -f` stops at the end on
+`relation "_sensitive" does not exist` — the 70 relevant tables are created before
+that point, so the measurements above hold. Not investigated; not on this
+section's path.
 
 ---
 
-## 6. Ce rămâne de decis (proprietar)
+## 6. What remains to decide (owner)
 
-1. Se aplică politica pe calea **inline**, învelind executorul întors de
-   `getExecutor` (NU `executeQuery` — vezi §0.2)? Fără asta, gaura rămâne
-   deschisă pentru toate cele 56.
-2. Politica trebuie să consulte `EXTENSION_TABLE_GRANTS` **și** tabelele create
-   de migrațiile extensiei. Altfel 19 extensii pică pe propriile date.
-3. Cele trei helper-e (`resolveUserNames`, accesor de setări, `describeCollection`)
-   — se fac? Ele mută 7 din 13 extensii la (1).
-4. `developer/database` — capabilitate proprie, sau se restrânge?
-5. `SAVEPOINT` — se scoate din `CODE_BEARING_FORMS` (păstrând `COMMIT`/`ROLLBACK` simplu)?
-6. `auth/saml` §4.1 (`validateInResponseTo` + cache per-instanță) — PR separat,
-   în repo-ul de extensii. Blochează SSO complet, în ambele fluxuri.
-7. `auth/saml` / `auth/ldap` §4.2 (`selectFrom('user')`) — același PR sau unul
-   următor; nu se poate testa până nu trece 6.
-8. `analytics/dashboard` — serviciu de statistici în engine, sau acordare?
+1. Apply the policy on the **inline** path, wrapping the executor returned by
+   `getExecutor` (NOT `executeQuery` — see §0.2)? Without it the hole stays open
+   for all 56.
+2. The policy must consult `EXTENSION_TABLE_GRANTS` **and** the tables the
+   extension's migrations create. Otherwise 19 extensions fail on data of their
+   own — 13 of them with no other reason to be refused at all.
+3. The three helpers (`resolveUserNames`, a settings accessor,
+   `describeCollection`) — are they built? They move 7 of 13 extensions to (1).
+4. `developer/database` — its own capability, or a narrower surface?
+5. `SAVEPOINT` — remove it from `CODE_BEARING_FORMS`, keeping bare
+   `COMMIT`/`ROLLBACK`?
+6. `auth/saml` §4.1 (`validateInResponseTo` + per-instance cache) — separate PR in
+   the extensions repo, pinning the node-saml major in the same change. It blocks
+   SSO entirely, in both flows.
+7. `auth/saml` / `auth/ldap` §4.2 (`selectFrom('user')`) — the same PR or the next;
+   it cannot be tested until 6 lands.
+8. `analytics/dashboard` — a statistics service in the engine, or a grant?
 
-Punctele 1, 2 și 5 sunt reparații de **engine**. Le-am scris aici, nu le-am atins.
+Items 1, 2 and 5 are **engine** repairs. Recorded here, not touched.
