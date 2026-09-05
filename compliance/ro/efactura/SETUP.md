@@ -1,159 +1,165 @@
-# Conectarea la ANAF pentru e-Factura
+# Connecting to ANAF for e-Factura
 
-Acest ghid e pentru administratorul instanței Zveltio. Durează în jur de o oră,
-iar cea mai mare parte din ea e aşteptare după ANAF.
+This guide is for the Zveltio instance administrator. It takes about an hour, and
+most of that is waiting on ANAF.
 
-**Nu ai nevoie de nimic din asta ca să emiţi facturi.** Factura, PDF-ul oficial
-şi verificarea că documentul e valid funcţionează fără nicio conectare. ANAF îţi
-trebuie doar ca să **depui** electronic.
-
----
-
-## Ce îţi trebuie înainte să începi
-
-**Un certificat digital calificat**, de la un furnizor autorizat (certSIGN,
-DigiSign, Trans Sped, Alfasign şi altele). E acelaşi certificat cu care se
-semnează declaraţiile.
-
-**Dreptul în SPV pentru firmă** — reprezentant legal, reprezentant desemnat sau
-împuternicit. Dacă depui deja declaraţii pentru firmă, îl ai.
-
-Dacă nu eşti încă în SPV: <https://www.anaf.ro/InregPersFizicePublic/#tabs-2>
+**You need none of this in order to issue invoices.** The invoice, the official
+PDF and the check that the document is valid all work without any connection. You
+only need ANAF in order to **submit** electronically.
 
 ---
 
-## Pasul 1 — Alege adresa de callback
+## What you need before you start
 
-E prima decizie şi cea mai uşor de greşit, fiindcă **se fixează la înregistrare**
-şi nu se schimbă comod după.
+**A qualified digital certificate**, from an authorised provider (certSIGN,
+DigiSign, Trans Sped, Alfasign and others). It is the same certificate used to
+sign tax declarations.
 
-Adresa e:
+**SPV rights for the company** — legal representative, designated representative
+or authorised agent. If you already file declarations for the company, you have
+them.
+
+If you are not yet in SPV:
+<https://www.anaf.ro/InregPersFizicePublic/#tabs-2>
+
+---
+
+## Step 1 — Choose the callback address
+
+This is the first decision and the easiest to get wrong, because it is **fixed at
+registration** and is not comfortably changed afterwards.
+
+The address is:
 
 ```
-https://DOMENIUL-TAU/admin/anaf/callback
+https://YOUR-DOMAIN/admin/anaf/callback
 ```
 
-înlocuind `DOMENIUL-TAU` cu adresa pe care îţi accesezi Zveltio. Trebuie să fie
-adresa **publică, exactă**, aceeaşi pe care o tastezi în browser. Dacă intri pe
-`https://erp.firma.ro`, aceea e; nu `http://`, nu IP-ul serverului, nu
+replacing `YOUR-DOMAIN` with the address you reach Zveltio at. It must be the
+**public, exact** address, the same one you type into the browser. If you go to
+`https://erp.company.ro`, that is the one; not `http://`, not the server's IP, not
 `localhost`.
 
-Notează-o. O foloseşti de două ori: o dată la ANAF, o dată în Zveltio, şi
-**trebuie să fie identice caracter cu caracter**.
+Write it down. You use it twice — once at ANAF, once in Zveltio — and **they must
+be identical character for character**.
 
 ---
 
-## Pasul 2 — Înregistrează aplicaţia la ANAF
+## Step 2 — Register the application with ANAF
 
-Mergi la <https://www.anaf.ro/anaf/internet/ANAF/servicii_online/inreg_api> şi
-autentifică-te cu certificatul.
+Go to <https://www.anaf.ro/anaf/internet/ANAF/servicii_online/inreg_api> and
+authenticate with the certificate.
 
-Completează formularul de înregistrare a aplicaţiei. La callback pui exact
-adresa de la Pasul 1.
+Fill in the application registration form. For the callback, enter exactly the
+address from Step 1.
 
-Primeşti două valori: **client ID** şi **client secret**.
+You receive two values: **client ID** and **client secret**.
 
-Secretul se afişează de regulă o singură dată. Salvează-l pe loc, undeva sigur.
+The secret is usually shown only once. Save it immediately, somewhere safe.
 
 ---
 
-## Pasul 3 — Completează în Zveltio
+## Step 3 — Fill it in inside Zveltio
 
-Deschide **Conexiune ANAF** din meniu.
+Open **ANAF Connection** from the menu.
 
-| Câmp | Ce pui |
+| Field | What to enter |
 |---|---|
-| Destinaţie | **Test** la început. Documentele trimise acolo nu au efect fiscal. |
-| CIF depunător | CIF-ul firmei pentru care depui, fără „RO". |
-| URL de callback | Exact adresa de la Pasul 1. |
-| Client ID | Ce ai primit de la ANAF. |
-| Client secret | Ce ai primit de la ANAF. |
+| Environment | **Test** to begin with. Documents sent there have no fiscal effect. |
+| Filer tax id | The tax id of the company you file for, without "RO". |
+| Callback URL | Exactly the address from Step 1. |
+| Client ID | What you received from ANAF. |
+| Client secret | What you received from ANAF. |
 
-Apeşi **Salvează**.
+Press **Save**.
 
-Secretul nu se mai afişează niciodată după salvare — nici ţie. E criptat în baza
-de date. Când revii pe ecran vezi doar că e setat. Dacă îl laşi gol la o
-re-salvare, rămâne cel dinainte; îl scrii din nou doar dacă vrei să-l schimbi.
-
----
-
-## Pasul 4 — Conectează-te
-
-Apeşi **Conectează la ANAF**. Eşti trimis la portalul lor, unde semnezi cu
-certificatul — **care trebuie să fie conectat fizic la calculatorul de pe care
-apeşi**, nu la server. Semnătura o face browserul tău, nu Zveltio.
-
-După semnare eşti adus înapoi şi conexiunea e activă.
+The secret is never displayed again after saving — not even to you. It is
+encrypted in the database. When you come back to the screen you only see that it
+is set. If you leave it empty on a re-save, the previous one is kept; you type it
+again only if you want to change it.
 
 ---
 
-## Pasul 5 — Verifică
+## Step 4 — Connect
 
-Apeşi **Testează conexiunea**. Zveltio cheamă serviciul „Hello" al ANAF.
+Press **Connect to ANAF**. You are sent to their portal, where you sign with the
+certificate — **which has to be physically attached to the computer you are
+pressing from**, not to the server. Your browser makes the signature, not Zveltio.
 
-Merită făcut, şi iată de ce: ANAF îţi dă un token dacă **tu** ai drepturi, dar
-accesul la e-Factura depinde şi de dacă **aplicaţia** a fost înrolată pentru acel
-serviciu. Cele două eşuează la fel de urât şi din motive complet diferite.
-
-- **Testul merge, e-Factura nu** → token bun, aplicaţia nu are acces la serviciu.
-  Se rezolvă la ANAF, nu în Zveltio.
-- **Nici testul nu merge** → problema e la token: client ID, secret sau callback.
+After signing you are brought back and the connection is active.
 
 ---
 
-## De acum încolo
+## Step 5 — Check
 
-Fiecare factură emisă primeşte automat o ciornă de e-Factura. O deschizi,
-generezi XML-ul, îl verifici — verificarea e făcută chiar de ANAF şi nu costă
-nimic — şi apoi o depui.
+Press **Test connection**. Zveltio calls ANAF's "Hello" service.
 
-După depunere primeşti un **index de încărcare**. Prelucrarea durează de la
-secunde la minute. Interoghezi starea:
+It is worth doing, and here is why: ANAF gives you a token if **you** have the
+rights, but access to e-Factura also depends on whether the **application** was
+enrolled for that service. The two fail just as badly and for completely different
+reasons.
 
-- **ok** — factura a fost validată şi a ajuns la cumpărător. Poţi descărca
-  recipisa semnată de Ministerul Finanţelor.
-- **nok** — au fost găsite erori şi **factura NU a ajuns la cumpărător**.
-  Descarci răspunsul ca să vezi ce anume.
-- **în prelucrare** — mai aşteaptă.
-
-Diferenţa dintre `ok` şi `nok` e cea care contează. O factură `nok` nu a fost
-depusă, oricât de mult ar arăta ca şi cum ar fi fost.
+- **The test works, e-Factura does not** → good token, the application has no
+  access to the service. Resolved at ANAF, not in Zveltio.
+- **The test does not work either** → the problem is with the token: client ID,
+  secret or callback.
 
 ---
 
-## Când treci pe producţie
+## From here on
 
-Schimbi **Destinaţie** din Test în Producţie şi salvezi. Credenţialele rămân.
+Every issued invoice automatically gets an e-Factura draft. You open it, generate
+the XML, check it — the check is done by ANAF itself and costs nothing — and then
+you submit it.
 
-Din acel moment fiecare depunere are efect fiscal.
+After submission you receive an **upload index**. Processing takes from seconds to
+minutes. You query the state:
 
----
+- **ok** — the invoice was validated and reached the buyer. You can download the
+  receipt signed by the Ministry of Finance.
+- **nok** — errors were found and **the invoice did NOT reach the buyer**. You
+  download the response to see what they were.
+- **in processing** — wait a little longer.
 
-## Dacă ceva nu merge
-
-**„Set the ANAF client_id first"** — n-ai salvat încă credenţialele.
-
-**„Set the callback URL"** — n-ai completat adresa de callback.
-
-**ANAF refuză cererea de token** — aproape întotdeauna callback-ul diferă de cel
-înregistrat. Compară-le caracter cu caracter, inclusiv `https://` şi eventualul
-`/` de la final.
-
-**„The ANAF token has expired"** — apeşi **Reînnoieşte token**. Dacă nu merge, te
-reconectezi de la Pasul 4.
-
-**Validarea XML spune `nok`** — problema e în datele facturii, nu în conexiune.
-Mesajele ANAF numesc câmpul lipsă. Cele mai frecvente: lipseşte judeţul sau
-localitatea la una dintre părţi, sau CUI-ul cumpărătorului. Pentru Bucureşti,
-localitatea trebuie să fie sectorul.
+The difference between `ok` and `nok` is the one that matters. A `nok` invoice was
+not submitted, however much it may look as though it was.
 
 ---
 
-## Ce nu face Zveltio
+## When you move to production
 
-Nu îţi ţine certificatul. Rămâne la tine; serverul nu-l vede niciodată.
+Change **Environment** from Test to Production and save. The credentials stay.
 
-Nu depune în locul tău automat. Fiecare depunere e o acţiune pe care o faci tu.
+From that moment every submission has fiscal effect.
 
-Nu poate repara o înregistrare greşită la ANAF. Dacă aplicaţia nu e înrolată
-pentru e-Factura, se rezolvă la ei.
+---
+
+## If something does not work
+
+**"Set the ANAF client_id first"** — you have not saved the credentials yet.
+
+**"Set the callback URL"** — you have not filled in the callback address.
+
+**ANAF refuses the token request** — almost always the callback differs from the
+registered one. Compare them character for character, including `https://` and any
+trailing `/`.
+
+**"The ANAF token has expired"** — press **Renew token**. If that does not work,
+reconnect from Step 4.
+
+**XML validation says `nok`** — the problem is in the invoice data, not the
+connection. ANAF's messages name the missing field. The most frequent: the county
+or the locality is missing for one of the parties, or the buyer's tax id. For
+Bucharest, the locality has to be the sector.
+
+---
+
+## What Zveltio does not do
+
+It does not hold your certificate. It stays with you; the server never sees it.
+
+It does not submit on your behalf automatically. Every submission is an action you
+take.
+
+It cannot repair a wrong registration at ANAF. If the application is not enrolled
+for e-Factura, that is resolved with them.

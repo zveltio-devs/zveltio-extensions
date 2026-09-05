@@ -1,6 +1,6 @@
 # ai — context
 
-Reviewed 2026-08-10/11. **Status: not `verificat`.** The three checks in section G
+Reviewed 2026-08-10/11. **Status: not `verified`.** The three checks in section G
 of `REVIEW-CHECKLIST.md` all need a working embedding provider (OpenAI key or a
 local Ollama), which nobody has had here yet. What follows was verified against a
 real Postgres 18 + pgvector, the extension's own migrations, and the packed
@@ -133,42 +133,46 @@ query they had just run answered `No access to table "zvd_…"`.
   actually write means waiting on the DDL queue — a separate feature.
 - Section G, unpressed, for want of an embedder.
 
-## Secțiunea G — presată parțial 2026-08-12
+## Section G — partially pressed 2026-08-12
 
-Presată cu un **furnizor OpenAI fals, local** (stub determinist, fără model),
-înregistrat în `zv_ai_providers` cu `base_url: http://127.0.0.1:11500/v1`.
-Garda de endpoint permite explicit localhost — Ollama e privat prin proiectare.
+Pressed with a **fake, local OpenAI provider** (a deterministic stub, no model),
+registered in `zv_ai_providers` with `base_url: http://127.0.0.1:11500/v1`. The
+endpoint guard explicitly allows localhost — Ollama is private by design.
 
-**Ce dovedește un stub:** că extensia formulează cererea corect, stochează ce
-primește și tratează forma răspunsului. **Ce nu dovedește:** absolut nimic despre
-calitatea răspunsurilor. Secțiunea G e despre primul lucru.
+**What a stub proves:** that the extension forms the request correctly, stores
+what it receives and handles the shape of the response. **What it does not
+prove:** anything at all about the quality of the answers. Section G is about the
+first thing.
 
-**21 de rute trec.** Nu marchez extensia „verificat" — vezi mai jos ce lipsește.
+**21 routes pass.** The extension is not marked "verified" — see below for what is
+missing.
 
-### Ce a scos: un bug de ENGINE, nu de extensie
+### What it turned up: an ENGINE bug, not an extension one
 
-`GET /ext/ai/usage` dădea **500 pe orice instalare**. Proxy-ul `ctx.db` leagă
-orice proprietate-funcție ca să păstreze `this`; `Function.prototype.bind`
-întoarce o funcție nouă **fără proprietățile originalului**. `db.fn` din Kysely e
-apelabil ȘI poartă `count`/`sum`/`avg`/`max` ca proprietăți proprii — deci
-`ctx.db.fn.count` sosea `undefined`.
+`GET /ext/ai/usage` returned **500 on every installation**. The `ctx.db` proxy
+binds any function-valued property in order to preserve `this`;
+`Function.prototype.bind` returns a new function **without the original's own
+properties**. Kysely's `db.fn` is callable AND carries `count`/`sum`/`avg`/`max`
+as own properties — so `ctx.db.fn.count` arrived `undefined`.
 
-`eb.fn` dintr-un `select(eb => …)` mergea mereu: acel builder vine de la Kysely
-și nu trece prin proxy. Aceeași scriere, rezultat opus.
+`eb.fn` from inside a `select(eb => …)` always worked: that builder comes from
+Kysely and does not pass through the proxy. The same spelling, the opposite
+result.
 
-**Cauza fusese întâlnită și nerecunoscută**: comentariul din
-`routes/zveltio-ai.ts` consemnează `db.fn.max is not a function`, rescrierea
-acelei singure interogări, și atât. Reparat acum în engine (o singură schimbare
-acoperă toate cele șapte locuri, inclusiv `compliance/ro/procurement`).
+**The cause had been met and not recognised**: the comment in
+`routes/zveltio-ai.ts` records `db.fn.max is not a function`, the rewrite of that
+one query, and nothing more. Now repaired in the engine (a single change covers
+all seven sites, including `compliance/ro/procurement`).
 
-### Ce rămâne nepresat
+### What remains unpressed
 
-- **Generarea de schemă** (`POST /preview-schema`, `POST /generate-schema`) —
-  răspund 422 „LLM did not return valid JSON", ceea ce e **corect**: stub-ul meu
-  întoarce text. Presarea onestă cere un stub care întoarce scheme JSON valide.
-- **`POST /query`, `/alchemist/analyze`, `/admin/templates`** — 400/500 cu
-  payload-urile mele; schemele reale n-au fost încă citite. Nu le raporta ca
-  defecte până nu sunt.
+- **Schema generation** (`POST /preview-schema`, `POST /generate-schema`) — they
+  answer 422 "LLM did not return valid JSON", which is **correct**: the stub
+  returns text. Pressing this honestly needs a stub that returns valid JSON
+  schemas.
+- **`POST /query`, `/alchemist/analyze`, `/admin/templates`** — 400/500 with the
+  payloads used here; the real schemas have not been read yet. Do not report them
+  as defects until they have been.
 
 ## SDUI migration (2026-08-21)
 Templates+query history via schema. **Chat Tier-3** at `/admin/ai/chat` (2026-08-23)
