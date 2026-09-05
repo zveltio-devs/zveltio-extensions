@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { sanitizeBlocks, sanitizeBlocksForWrite } from './sanitize.js';
+import { escapeXml } from './public-seo.js';
 import { jsonb } from './jsonb.js';
 import { ICON_NAMES } from '../client/icons.js';
 import { MOTION_TYPES } from '../client/motion.js';
@@ -293,10 +294,10 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
       .map(
         (p: Any) => `
   <url>
-    <loc>${baseUrl}/${p.slug}</loc>
-    <lastmod>${new Date(p.updated_at).toISOString().split('T')[0]}</lastmod>
-    <changefreq>${p.change_freq || 'weekly'}</changefreq>
-    <priority>${p.priority ?? 0.5}</priority>
+    <loc>${escapeXml(`${baseUrl}/${p.slug}`)}</loc>
+    <lastmod>${escapeXml(new Date(p.updated_at).toISOString().split('T')[0])}</lastmod>
+    <changefreq>${escapeXml(p.change_freq || 'weekly')}</changefreq>
+    <priority>${escapeXml(p.priority ?? 0.5)}</priority>
   </url>`,
       )
       .join('');
@@ -778,7 +779,17 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
       issues.push(`Title length ${titleLen} chars (ideal: 30-60)`);
     } else issues.push('Missing page title');
 
-    const metaDesc = page.meta_description || (page.meta as Any)?.description || '';
+    // The string-scalar tolerance every other reader of a jsonb column here has.
+    // Migration 004's comment asserts "every reader in this extension does
+    // `typeof x === 'string' ? JSON.parse(x) : x`" — this one did not, so the
+    // sentence was false. Not reachable today, because 004 normalised the stored
+    // rows and `check-jsonb-cast` ratchets the writes; reachable the moment a row
+    // arrives from an import, a restored backup, or an install that has not run
+    // 004 yet, and the symptom would be this analyser reporting "Missing meta
+    // description" for pages that have one.
+    const pageMeta =
+      typeof page.meta === 'string' ? (JSON.parse(page.meta || '{}') as Any) : ((page.meta ?? {}) as Any);
+    const metaDesc = page.meta_description || pageMeta?.description || '';
     const descLen = metaDesc.length;
     if (descLen >= 120 && descLen <= 160) metaScore = 100;
     else if (descLen > 0) {
