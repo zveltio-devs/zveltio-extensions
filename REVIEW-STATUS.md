@@ -1,114 +1,119 @@
-# Starea verificării extensiilor
+# Extension verification status
 
-Generat automat. `verificat` = cineva a parcurs secțiunea G din REVIEW-CHECKLIST.md
-— adică a apăsat butoanele, nu a citit codul.
+Auto-generated. `verified` = someone walked section G of REVIEW-CHECKLIST.md —
+that is, pressed the buttons, not read the code.
 
-`presat — RUPT` = cineva a parcurs G și extensia **nu funcționează**. Detaliile
-sunt în `CONTEXT.md`-ul extensiei; nu o marca „verificat" până nu trec rutele.
+`pressed — BROKEN` = someone walked G and the extension **does not work**. The
+details are in that extension's `CONTEXT.md`; do not mark it "verified" until the
+routes pass.
 
-`reparat — G nepresat` = codul a fost citit integral, ce s-a găsit a fost reparat
-și verificat contra unei baze reale, dar secțiunea G n-a fost parcursă — de obicei
-fiindcă lipsește o dependință externă. Nu e „verificat" și nu se promovează fără G.
+`repaired — G not pressed` = the code was read end to end, what was found was
+repaired and checked against a real database, but section G was not walked —
+usually because an external dependency is missing. That is not "verified" and it
+is not promoted without G.
 
-„Generat automat" e o intenție, nu un fapt: nu există generator, iar coloanele
-numerice au driftat față de fișiere. Coloana `stare` e singura de încredere.
+"Auto-generated" is an intention, not a fact: there is no generator, and the
+numeric columns have drifted from the files. The `state` column is the only one
+to trust.
 
-Coloana `UI` (`cod` vs `SDUI`) e **istorică** (august 2026). Toate paginile admin
-cu `manifest.studio.pages[].schema` sunt SDUI; ce lipsește din produs e listat în
-[STUDIO-DEFERRED.md](./STUDIO-DEFERRED.md), nu „nemigrat".
+The `UI` column (`code` vs `SDUI`) is **historical** (August 2026). Every admin
+page with `manifest.studio.pages[].schema` is SDUI; what is missing from the
+product is listed in [STUDIO-DEFERRED.md](./STUDIO-DEFERRED.md), not "unmigrated".
 
-## Ce înseamnă „verificat" după trecerea din 11 august
+## What "verified" means after the 11 August pass
 
-Fiecare extensie a fost activată pe o **bază virgină** și i s-au apăsat rutele —
-citirile, apoi ciclul de scriere pe care extensia îl are (creare → modificare →
-decizie → ștergere), plus căile publice acolo unde există. Ce nu se putea apăsa
-fără o dependință externă e scris în `CONTEXT.md`-ul extensiei.
+Every extension was enabled on a **virgin database** and had its routes pressed —
+the reads, then whatever write cycle the extension has (create → edit → decide →
+delete), plus the public paths where they exist. Whatever could not be pressed
+without an external dependency is written in that extension's `CONTEXT.md`.
 
-Notabil: **cinci extensii nu funcționau deloc pe o instalare nouă** și niciuna
-n-ar fi ieșit dintr-o citire de cod. Toate cinci sunt aceeași formă — un tabel cu
-doi creatori, engine-ul rulează primul, extensia scrie în forma ei:
+Notable: **five extensions did not work at all on a fresh install**, and not one
+of them would have surfaced from reading the code. All five are the same shape —
+a table with two creators, the engine runs first, the extension writes in its own
+shape:
 
-| extensie | ce era mort |
+| extension | what was dead |
 |---|---|
-| `forms` | orice trimitere publică de formular — `page_id NOT NULL` |
-| `data/import` | orice import — `format` / `failed_rows` / statusul `running` |
-| `content/documents` | orice generare de document — cheie străină către alt tabel |
-| `storage/cloud` | listarea fișierelor — `updated_at` inexistent |
-| `developer/edge-functions` | propria pagină de administrare — tabel refuzat de gardă |
+| `forms` | any public form submission — `page_id NOT NULL` |
+| `data/import` | any import — `format` / `failed_rows` / the `running` status |
+| `content/documents` | any document generation — foreign key to another table |
+| `storage/cloud` | file listing — `updated_at` did not exist |
+| `developer/edge-functions` | its own admin page — table refused by the guard |
 
-| extensie | rute | migr | serv | ascult | catch | ext | pagini | UI | teste | stare |
+| extension | routes | migr | svc | listen | catch | ext | pages | UI | tests | state |
 |---|--:|--:|--:|--:|--:|--:|--:|---|---|---|
-| `ai` | 0 | 6 | 5 | 2 | 0 | 0 | 1 | cod | da | **reparat 2026-08-11 — G nepresat** |
-| `analytics/dashboard` | 6 | 2 | 0 | 0 | 5 | 0 | 1 | cod | da | **verificat** |
-| `analytics/quality` | 21 | 3 | 0 | 1 | 3 | 0 | 1 | cod | da | **verificat** |
-| `auth/ldap` | 4 | 4 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **reparat 2026-08-11 — G nepresat** |
-| `auth/saml` | 5 | 4 | 0 | 0 | 0 | 4 | 1 | SDUI | da | **reparat 2026-08-11 — G nepresat** |
-| `auth/scim` | 10 | 2 | 0 | 0 | 9 | 0 | 1 | SDUI | da | **verificat** |
-| `billing` | 6 | 2 | 0 | 0 | 0 | 0 | 2 | cod | da | **verificat 2026-08-11** |
-| `communications/mail` | 43 | 2 | 0 | 0 | 1 | 0 | 1 | cod | da | **verificat 2026-08-12 — G presat cu IMAP/SMTP real** |
-| `compliance/gdpr` | 16 | 2 | 0 | 0 | 14 | 0 | 1 | SDUI | da | **verificat** |
-| `compliance/ro/documents` | 12 | 4 | 0 | 0 | 2 | 0 | 1 | SDUI | da | **verificat** |
-| `compliance/ro/efactura` | 23 | 6 | 2 | 1 | 6 | 6 | 2 | SDUI | da | **verificat** |
-| `compliance/ro/etransport` | 9 | 2 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
-| `compliance/ro/procurement` | 22 | 3 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat** |
-| `compliance/ro/saft` | 13 | 2 | 0 | 0 | 0 | 1 | 1 | SDUI | da | **verificat** |
-| `content/document-templates` | 14 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
-| `content/documents` | 12 | 3 | 0 | 0 | 5 | 0 | 1 | cod | da | **verificat 2026-08-11** |
-| `content/drafts` | 18 | 2 | 0 | 0 | 2 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
-| `content/media` | 27 | 2 | 0 | 0 | 1 | 0 | 1 | SDUI | da | **verificat 2026-08-12 — G presat 27/27** |
-| `content/pages` | 25 | 4 | 0 | 0 | 3 | 2 | 1 | SDUI | da | **verificat 2026-08-11** *(fost page-builder)* |
-| `content/pdf-viewer` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | nu | **verificat 2026-08-11** |
-| `crm` | 15 | 2 | 5 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
-| `data/export` | 11 | 2 | 0 | 0 | 2 | 0 | 1 | SDUI | da | **verificat 2026-08-12 — G presat 11/11** |
-| `data/import` | 11 | 3 | 0 | 0 | 3 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
-| `developer/api-docs` | 15 | 4 | 0 | 0 | 1 | 4 | 1 | cod | da | **verificat 2026-08-11** |
-| `developer/byod` | 0 | 2 | 0 | 0 | 5 | 0 | 1 | cod | da | **verificat 2026-08-11** |
-| `developer/database` | 0 | 4 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat** |
-| `developer/edge-functions` | 7 | 0 | 0 | 0 | 4 | 0 | 1 | cod | da | **verificat 2026-08-11** |
-| `developer/graphql` | 13 | 2 | 0 | 0 | 2 | 4 | 1 | cod | da | **verificat 2026-08-11** |
-| `developer/validation` | 14 | 2 | 0 | 0 | 3 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
-| `ecommerce/store` | 33 | 2 | 0 | 0 | 1 | 0 | 1 | SDUI | da | **verificat** |
-| `finance/accounting` | 28 | 4 | 0 | 0 | 1 | 0 | 1 | SDUI | da | **verificat** |
-| `finance/banking` | 18 | 4 | 0 | 0 | 2 | 0 | 1 | cod | da | **verificat** |
-| `finance/expenses` | 15 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
-| `finance/invoicing` | 29 | 9 | 3 | 0 | 4 | 0 | 3 | SDUI | da | **verificat** |
-| `finance/quotes` | 16 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
-| `finance/subscriptions` | 18 | 4 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
-| `forms` | 8 | 2 | 0 | 0 | 1 | 0 | 3 | cod | da | **verificat 2026-08-11** |
-| `geospatial/postgis` | 16 | 2 | 0 | 0 | 2 | 0 | 1 | cod | da | **verificat** |
-| `hr/employees` | 32 | 3 | 5 | 0 | 0 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
-| `hr/leave` | 16 | 2 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
-| `hr/payroll` | 15 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
-| `hr/time-tracking` | 18 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat 2026-08-11** |
-| `i18n/translations` | 15 | 2 | 0 | 0 | 4 | 0 | 1 | cod | da | **verificat 2026-08-11** |
-| `integrations/api-connector` | 17 | 2 | 0 | 0 | 1 | 0 | 1 | SDUI | da | **verificat 2026-08-11** |
-| `integrations/migrators` | 7 | 2 | 0 | 0 | 5 | 6 | 1 | SDUI | da | **verificat 2026-08-11** |
-| `operations/assets` | 11 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
-| `operations/inventory` | 20 | 5 | 7 | 0 | 0 | 0 | 1 | SDUI | da | **verificat** |
-| `operations/pos` | 15 | 4 | 0 | 0 | 1 | 0 | 1 | cod | da | **verificat** |
-| `operations/traceability` | 0 | 3 | 0 | 1 | 0 | 0 | 1 | cod | da | **verificat 2026-08-12 — G presat 54/54** |
-| `projects/helpdesk` | 18 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat 2026-08-11** |
-| `projects/management` | 30 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat 2026-08-11** |
-| `search` | 6 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat 2026-08-11** |
-| `sms` | 6 | 2 | 0 | 0 | 1 | 0 | 1 | cod | da | **verificat 2026-08-11** |
-| `storage/cloud` | 28 | 2 | 0 | 0 | 0 | 1 | 1 | cod | da | **verificat 2026-08-11** |
-| `workflow/approvals` | 17 | 2 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat 2026-08-11** |
-| `workflow/checklists` | 22 | 5 | 0 | 0 | 0 | 0 | 1 | cod | da | **verificat** |
+| `ai` | 0 | 6 | 5 | 2 | 0 | 0 | 1 | code | yes | **repaired 2026-08-11 — G not pressed** |
+| `analytics/dashboard` | 6 | 2 | 0 | 0 | 5 | 0 | 1 | code | yes | **verified** |
+| `analytics/quality` | 21 | 3 | 0 | 1 | 3 | 0 | 1 | code | yes | **verified** |
+| `auth/ldap` | 4 | 4 | 0 | 0 | 0 | 0 | 1 | SDUI | yes | **repaired 2026-08-11 — G not pressed** |
+| `auth/saml` | 5 | 4 | 0 | 0 | 0 | 4 | 1 | SDUI | yes | **repaired 2026-08-11 — G not pressed** |
+| `auth/scim` | 10 | 2 | 0 | 0 | 9 | 0 | 1 | SDUI | yes | **verified** |
+| `billing` | 6 | 2 | 0 | 0 | 0 | 0 | 2 | code | yes | **verified 2026-08-11** |
+| `communications/mail` | 43 | 2 | 0 | 0 | 1 | 0 | 1 | code | yes | **verified 2026-08-12 — G pressed with real IMAP/SMTP** |
+| `compliance/gdpr` | 16 | 2 | 0 | 0 | 14 | 0 | 1 | SDUI | yes | **verified** |
+| `compliance/ro/documents` | 12 | 4 | 0 | 0 | 2 | 0 | 1 | SDUI | yes | **verified** |
+| `compliance/ro/efactura` | 23 | 6 | 2 | 1 | 6 | 6 | 2 | SDUI | yes | **verified** |
+| `compliance/ro/etransport` | 9 | 2 | 0 | 0 | 0 | 0 | 1 | SDUI | yes | **verified** |
+| `compliance/ro/procurement` | 22 | 3 | 0 | 0 | 0 | 0 | 1 | code | yes | **verified** |
+| `compliance/ro/saft` | 13 | 2 | 0 | 0 | 0 | 1 | 1 | SDUI | yes | **verified** |
+| `content/document-templates` | 14 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | yes | **verified** |
+| `content/documents` | 12 | 3 | 0 | 0 | 5 | 0 | 1 | code | yes | **verified 2026-08-11** |
+| `content/drafts` | 18 | 2 | 0 | 0 | 2 | 0 | 1 | SDUI | yes | **verified 2026-08-11** |
+| `content/media` | 27 | 2 | 0 | 0 | 1 | 0 | 1 | SDUI | yes | **verified 2026-08-12 — G pressed 27/27** |
+| `content/pages` | 25 | 4 | 0 | 0 | 3 | 2 | 1 | SDUI | yes | **verified 2026-08-11** *(formerly page-builder)* |
+| `content/pdf-viewer` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | no | **verified 2026-08-11** |
+| `crm` | 15 | 2 | 5 | 0 | 0 | 0 | 1 | SDUI | yes | **verified** |
+| `data/export` | 11 | 2 | 0 | 0 | 2 | 0 | 1 | SDUI | yes | **verified 2026-08-12 — G pressed 11/11** |
+| `data/import` | 11 | 3 | 0 | 0 | 3 | 0 | 1 | SDUI | yes | **verified 2026-08-11** |
+| `developer/api-docs` | 15 | 4 | 0 | 0 | 1 | 4 | 1 | code | yes | **verified 2026-08-11** |
+| `developer/byod` | 0 | 2 | 0 | 0 | 5 | 0 | 1 | code | yes | **verified 2026-08-11** |
+| `developer/database` | 0 | 4 | 0 | 0 | 0 | 0 | 1 | code | yes | **verified** |
+| `developer/edge-functions` | 7 | 0 | 0 | 0 | 4 | 0 | 1 | code | yes | **verified 2026-08-11** |
+| `developer/graphql` | 13 | 2 | 0 | 0 | 2 | 4 | 1 | code | yes | **verified 2026-08-11** |
+| `developer/validation` | 14 | 2 | 0 | 0 | 3 | 0 | 1 | SDUI | yes | **verified 2026-08-11** |
+| `ecommerce/store` | 33 | 2 | 0 | 0 | 1 | 0 | 1 | SDUI | yes | **verified** |
+| `finance/accounting` | 28 | 4 | 0 | 0 | 1 | 0 | 1 | SDUI | yes | **verified** |
+| `finance/banking` | 18 | 4 | 0 | 0 | 2 | 0 | 1 | code | yes | **verified** |
+| `finance/expenses` | 15 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | yes | **verified 2026-08-11** |
+| `finance/invoicing` | 29 | 9 | 3 | 0 | 4 | 0 | 3 | SDUI | yes | **verified** |
+| `finance/quotes` | 16 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | yes | **verified 2026-08-11** |
+| `finance/subscriptions` | 18 | 4 | 0 | 0 | 0 | 0 | 1 | SDUI | yes | **verified** |
+| `forms` | 8 | 2 | 0 | 0 | 1 | 0 | 3 | code | yes | **verified 2026-08-11** |
+| `geospatial/postgis` | 16 | 2 | 0 | 0 | 2 | 0 | 1 | code | yes | **verified** |
+| `hr/employees` | 32 | 3 | 5 | 0 | 0 | 0 | 1 | SDUI | yes | **verified 2026-08-11** |
+| `hr/leave` | 16 | 2 | 0 | 0 | 0 | 0 | 1 | SDUI | yes | **verified 2026-08-11** |
+| `hr/payroll` | 15 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | yes | **verified 2026-08-11** |
+| `hr/time-tracking` | 18 | 2 | 0 | 0 | 0 | 0 | 1 | code | yes | **verified 2026-08-11** |
+| `i18n/translations` | 15 | 2 | 0 | 0 | 4 | 0 | 1 | code | yes | **verified 2026-08-11** |
+| `integrations/api-connector` | 17 | 2 | 0 | 0 | 1 | 0 | 1 | SDUI | yes | **verified 2026-08-11** |
+| `integrations/migrators` | 7 | 2 | 0 | 0 | 5 | 6 | 1 | SDUI | yes | **verified 2026-08-11** |
+| `operations/assets` | 11 | 3 | 0 | 0 | 0 | 0 | 1 | SDUI | yes | **verified** |
+| `operations/inventory` | 20 | 5 | 7 | 0 | 0 | 0 | 1 | SDUI | yes | **verified** |
+| `operations/pos` | 15 | 4 | 0 | 0 | 1 | 0 | 1 | code | yes | **verified** |
+| `operations/traceability` | 0 | 3 | 0 | 1 | 0 | 0 | 1 | code | yes | **verified 2026-08-12 — G pressed 54/54** |
+| `projects/helpdesk` | 18 | 2 | 0 | 0 | 0 | 0 | 1 | code | yes | **verified 2026-08-11** |
+| `projects/management` | 30 | 2 | 0 | 0 | 0 | 0 | 1 | code | yes | **verified 2026-08-11** |
+| `search` | 6 | 2 | 0 | 0 | 0 | 0 | 1 | code | yes | **verified 2026-08-11** |
+| `sms` | 6 | 2 | 0 | 0 | 1 | 0 | 1 | code | yes | **verified 2026-08-11** |
+| `storage/cloud` | 28 | 2 | 0 | 0 | 0 | 1 | 1 | code | yes | **verified 2026-08-11** |
+| `workflow/approvals` | 17 | 2 | 0 | 0 | 0 | 0 | 1 | code | yes | **verified 2026-08-11** |
+| `workflow/checklists` | 22 | 5 | 0 | 0 | 0 | 0 | 1 | code | yes | **verified** |
 
-**Total: 56 extensii · verificate: 22**
+**Total: 56 extensions · verified: 22**
 
-Coloane: `catch` = numărul de `.catch(() => …)` (candidați la A2) · `ext` = apeluri către servicii externe · `serv`/`ascult` = servicii publicate și ascultători de evenimente.
+Columns: `catch` = the number of `.catch(() => …)` (A2 candidates) · `ext` = calls to external services · `svc`/`listen` = services published and event listeners registered.
 
 ---
 
-## Găsiri amânate
+## Deferred findings
 
-Lucruri reale, confirmate prin rulare, pe care am ales deliberat să nu le repar
-în aceeași trecere fiindcă schimbă o cale comună şi îşi merită verificarea lor.
+Real things, confirmed by running them, that were deliberately not repaired in
+the same pass because they change a shared path and deserve a verification of
+their own.
 
-### Widget-urile panoului împart o tranzacţie, deci se contaminează
+### Dashboard widgets share one transaction, so they contaminate each other
 
-`analytics/dashboard`. Un singur tabel lipsă a produs asta în log:
+`analytics/dashboard`. A single missing table produced this in the log:
 
 ```
 widget count "zv_audit_log" failed: relation "zv_audit_log" does not exist
@@ -117,76 +122,76 @@ trust "audit_log" failed: current transaction is aborted…
 trust "last_backup" failed: current transaction is aborted…
 ```
 
-`last_backup` citeşte `zv_backups` — un tabel perfect sănătos — şi a raportat
-totuşi `null`, adică „nicio copie de siguranţă". O interogare stricată a produs
-patru valori false, toate plauzibile.
+`last_backup` reads `zv_backups` — a perfectly healthy table — and still reported
+`null`, meaning "no backup at all". One broken query produced four false values,
+every one of them plausible.
 
-Etichetele adăugate acum fac cauza vizibilă într-o linie, dar valorile false tot
-ajung pe ecran. Reparaţia adevărată e un SAVEPOINT per widget — acelaşi tipar ca
-la `emitAsync` în engine — ceea ce cere şi trecerea interogărilor de la paralel
-la secvenţial, fiindcă savepoint-urile nu se compun cu instrucţiuni paralele pe
-aceeaşi conexiune. Panoul rulează în 76 ms, deci costul e neglijabil.
+The labels added since make the cause visible in one line, but the false values
+still reach the screen. The real repair is a SAVEPOINT per widget — the same
+pattern as `emitAsync` in the engine — which also requires moving the queries
+from parallel to sequential, because savepoints do not compose with parallel
+statements on the same connection. The dashboard runs in 76 ms, so the cost is
+negligible.
 
-**A doua instanţă, găsită de atunci:** raportul de cheltuieli din
-`compliance/ro/procurement` compune trei interogări analitice exact la fel. O
-singură interogare stricată acolo dă trei zerouri false într-un raport de
-cheltuieli publice.
+**A second instance, found since:** the spending report in
+`compliance/ro/procurement` composes three analytical queries in exactly the same
+way. One broken query there yields three false zeroes in a public-spending report.
 
-Două instanţe schimbă concluzia. Reparaţia — un SAVEPOINT per interogare — **nu
-se poate scrie corect în fiecare extensie**: `SAVEPOINT` e valid doar într-un
-bloc de tranzacţie, iar o extensie n-are cum să afle dacă rulează în tranzacţia
-unei cereri sau pe pool. Gazda ştie. Deci cere un ajutor oferit prin contractul
-SDK — ceva de forma `ctx.isolated(label, fn)`, care pune savepoint-ul când există
-tranzacţie şi nu face nimic când nu există — nu încă o rescriere per extensie.
+Two instances change the conclusion. The repair — a SAVEPOINT per query —
+**cannot be written correctly inside each extension**: `SAVEPOINT` is only valid
+inside a transaction block, and an extension has no way to learn whether it is
+running in a request's transaction or on the pool. The host knows. So this calls
+for a helper offered through the SDK contract — something shaped like
+`ctx.isolated(label, fn)`, which places the savepoint when there is a transaction
+and does nothing when there is not — rather than one more per-extension rewrite.
 
-Până atunci ambele locuri îşi loghează cauza cu etichetă, deci un zero fals e
-diagnosticabil într-o linie în loc să fie invizibil.
+Until then both places log their cause with a label, so a false zero is
+diagnosable in one line instead of being invisible.
 
-### Scorul de calitate — ELIMINAT (decizie de owner, 2026-08-10)
+### The quality score — REMOVED (owner's decision, 2026-08-10)
 
-Scos complet: tabelul, ruta `/scores/:collection`, câmpurile din `/summary` şi
-`/stats`, jumătatea de scor din verificarea SLA, şi `min_score` din praguri.
+Taken out entirely: the table, the `/scores/:collection` route, the fields in
+`/summary` and `/stats`, the score half of the SLA check, and `min_score` from
+the thresholds.
 
-Motivul: formula `(critice*10 + erori*5 + avertismente*2 + info*0.5) / înregistrări * 100`
-dădea 0 pentru 4 avertismente pe 2 înregistrări şi 92 pentru aceleaşi 4 pe 100.
-Numărul spunea mai mult despre mărimea colecţiei decât despre calitatea datelor,
-iar nimeni nu putea explica ce înseamnă un 78.
+The reason: the formula
+`(critical*10 + errors*5 + warnings*2 + info*0.5) / records * 100` gave 0 for 4
+warnings across 2 records and 92 for the same 4 across 100. The number said more
+about the size of the collection than about the quality of the data, and nobody
+could explain what a 78 meant.
 
-Ştergerea tabelului e sigură fiindcă e **gol pe orice instalare** — scrierea era
-detaşată, dormea două secunde şi ateriza pe o tranzacţie închisă, cu câte un
-`catch` înăuntru şi în afară. Niciun scor n-a existat vreodată.
+Dropping the table is safe because it is **empty on every installation** — the
+write was detached, slept two seconds and landed on a closed transaction, with a
+`catch` both inside and outside. No score ever existed.
 
-SLA-ul nu pierde nimic: verificarea avea deja `if (score && …)`, deci rula
-dintotdeauna doar pe `max_critical_issues` şi `max_error_issues` — praguri pe care
-le poate apăra oricine, spre deosebire de „scor minim 80".
+The SLA loses nothing: the check already read `if (score && …)`, so it had always
+run on `max_critical_issues` and `max_error_issues` alone — thresholds anyone can
+defend, unlike "minimum score 80".
 
-**Ce urmează, la cerere:** punctaj configurat pe liste de verificare — scheme
-multiple per şablon, ponderi per punct **per schemă** (acelaşi punct poate conta
-la „siguranţă" şi deloc la „completitudine"), o singură metodă la început, iar
-rezultatul stocat împreună cu schema care l-a produs, ca un audit vechi să nu se
-schimbe când se schimbă ponderile. Cere master-detail pentru ecranul de
-configurare — al treilea lucru care îl aşteaptă.
+**What comes next, on request:** configured scoring on checklists — multiple
+schemes per template, weights per item **per scheme** (the same item can count
+towards "safety" and not at all towards "completeness"), one method to begin
+with, and the result stored together with the scheme that produced it, so an old
+audit does not change when the weights do. It needs master-detail for the
+configuration screen — the third thing waiting on that.
 
-### `zv_extension_registry (name)` — singura cheie nelărgită
+### `zv_extension_registry (name)` — the one key not widened
 
-A 61-a din campania de chei, lăsată deliberat. Codul de fuziune din marketplace
-suprapune rândurile de tenant peste cele globale, deci e scris pentru rânduri per
-firmă; `UNIQUE (name)` le-a interzis dintotdeauna, de unde 55 de rânduri globale
-şi 0 per firmă.
+The 61st of the key campaign, deliberately left. The marketplace merge code
+overlays tenant rows on top of global ones, so it is written for per-tenant rows;
+`UNIQUE (name)` has always forbidden them, hence 55 global rows and 0 per tenant.
 
-Trei motive pentru care nu s-a lărgit odată cu celelalte:
+Three reasons it was not widened with the others:
 
-1. `tenant_id` **nu are valoare implicită** pe acest tabel, spre deosebire de
-   toate celelalte. Cu `UNIQUE (tenant_id, name)` şi `tenant_id` NULL, cum
-   NULL-urile sunt distincte, fiecare activare ar insera un rând nou în loc să-l
-   actualizeze.
-2. Cinci ţinte `onConflict(oc.column('name'))` ar înceta să se potrivească, iar
-   una dintre ele stă sub `.catch(() => {})` — deci eşecul ar fi tăcut, exact pe
-   operaţia cea mai importantă din produs.
-3. Nu deblochează nimic azi: `requireInstanceAdmin` refuză oricum orice cerere
-   al cărei domeniu nu e tenantul implicit.
+1. `tenant_id` **has no default** on this table, unlike all the others. With
+   `UNIQUE (tenant_id, name)` and a NULL `tenant_id`, since NULLs are distinct,
+   every activation would insert a new row instead of updating it.
+2. Five `onConflict(oc.column('name'))` targets would stop matching, and one of
+   them sits under `.catch(() => {})` — so the failure would be silent, on
+   precisely the most important operation in the product.
+3. It unblocks nothing today: `requireInstanceAdmin` refuses any request whose
+   scope is not the default tenant anyway.
 
-Se face împreună cu decizia despre activarea per firmă, cu valoarea implicită şi
-cu toate cele cinci ţinte, sau deloc. Poarta din CI o are pe listă de excepţii,
-cu acelaşi raţionament scris lângă ea.
-
+It gets done together with the decision about per-tenant activation, with the
+default and with all five targets, or not at all. The CI gate carries it on an
+exception list, with the same reasoning written beside it.
