@@ -80,6 +80,66 @@ does not depend on anyone reading this file.
 
 ---
 
+## Section 2 — `content/pages` · in progress · 2026-09-05
+
+Full detail in [../../content/pages/CONTEXT.md](../../content/pages/CONTEXT.md).
+Two authorisation defects fixed, one untested guard covered, and a
+measurement problem that is not confined to this extension.
+
+### The test suite cannot see the `::jsonb` bug class
+
+The suite reaches Postgres through a **different driver than production**, and
+the difference is exactly this defect. Measured on one database, the same two
+statements:
+
+```
+             ::jsonb      ::text::jsonb
+pg           array  ✓     array  ✓        ← testing/ext-harness.ts (PostgresDialect)
+Bun.SQL      string ✗     array  ✓        ← the engine (BunSqlDialect)
+```
+
+`pg` sends a string parameter as text, so Postgres parses it and the defect
+disappears. Bun.SQL types it as json, so the cast is a no-op and the value lands
+as a scalar.
+
+**This is why the class has only ever been found by hand on a live engine.** It
+has cost, so far: every mail setting on an instance erased by two consecutive
+saves; an invoice line's metadata stored as a scalar, which made
+`metadata->>'lot_id'` return NULL and left four `operations/traceability` routes
+permanently unreachable; and HACCP food-safety records appended as raw text into
+a jsonb array — present, and unreadable to the SQL an inspection would need.
+
+Second instrument-blindness finding of this campaign, after the NUL byte. Both
+have the same shape: the tool used to look could not see the thing being looked
+for. **Any conclusion drawn from the extension suite about jsonb column shape is
+worth nothing** — that includes anything the suite currently reports green.
+
+`scripts/check-jsonb-cast.ts` ratchets the 16 remaining sites so a 17th cannot be
+added. Deliberately NOT a blind fix: many readers do
+`typeof x === 'string' ? JSON.parse(x) : x` and tolerate the scalar, so rewriting
+them changes what those readers receive. Each needs its consumer read first.
+`content/pages` itself is clean — its only apparent site was documentation of the
+wrong form inside `jsonb.ts`, which is what made the first count say 17.
+
+### Write scoping demonstrated on two tenants
+
+The §6 requirement, done as the non-bypassing `zveltio_rls` role with the tenant
+GUC set, not as superuser — which would have bypassed the policies and proved
+nothing:
+
+```
+scoped to tenant A          READ: 1 of 2 pages visible
+UPDATE tenant B's page   -> 0 rows
+DELETE tenant B's page   -> 0 rows
+INSERT into tenant B     -> ERROR: new row violates row-level security policy
+positive control, own tenant: UPDATE 1, INSERT accepted, DELETE 1
+```
+
+The positive control is the half that makes the rest mean anything: without it,
+four zeroes are equally consistent with a role that can do nothing at all.
+
+---
+
 ## Sections not started
 
 Nothing below has been touched by this campaign. The order follows the handoff:
