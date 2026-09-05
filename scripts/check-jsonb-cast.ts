@@ -45,8 +45,43 @@ import { join } from 'node:path';
 const ROOT = join(import.meta.dir, '..');
 const BASELINE = join(ROOT, 'scripts', 'jsonb-cast-baseline.json');
 
-// `${JSON.stringify(...)}` followed by `::jsonb` that is NOT `::text::jsonb`.
-const OFFENDER = /JSON\.stringify\([^)]*\)\s*\}\s*::jsonb/;
+/**
+ * Any interpolated parameter cast with a single `::jsonb`.
+ *
+ * The first version of this looked for `JSON.stringify(...)` followed
+ * immediately by `}` and then `::jsonb`. That is one spelling of four, and it
+ * found 16 sites when the repository had 31. Measured against the spellings
+ * that are actually in this tree:
+ *
+ *   caught  ${JSON.stringify(x)}::jsonb
+ *   caught  ${JSON.stringify(d.metadata ?? {})}::jsonb
+ *   MISSED  ${c ? JSON.stringify(c) : null}::jsonb          — a ternary, so no `}` after `)`
+ *   MISSED  ${JSON.stringify(d.to.map((e) => ({a: e})))}::jsonb — `[^)]*` cannot cross the inner `)`
+ *   MISSED  ${toJson(data.to)}::jsonb                        — a helper, not JSON.stringify
+ *   MISSED  ${json}::jsonb                                   — stringified on the line above
+ *
+ * Every missed form is a real site in this repository, and one of them
+ * (`ai/engine/routes/ai-query.ts`) was found by reading the file rather than by
+ * running this. A ratchet that cannot see two thirds of the class is not a
+ * ratchet — it is a licence to add the spelling it does not know.
+ *
+ * So the shape being matched changed from "how the value was produced" to "what
+ * is being cast": ANY `${…}` interpolation followed by `::jsonb`, unless the
+ * cast is the safe `::text::jsonb`.
+ *
+ * That is deliberately wider than the defect. A `${uuid}::jsonb` is not this
+ * bug, and a site can be a false positive — it goes in the baseline with the
+ * others and the ratchet still does its one job, which is stopping a new one.
+ * The old pattern's narrowness was not precision; it was blindness.
+ *
+ * Server-side casts are excluded, because they are not this bug at all: the
+ * value never passes through the driver as a parameter. `ST_AsGeoJSON(...)::jsonb`
+ * in `geospatial/postgis` is correct SQL and must stay legal.
+ */
+const OFFENDER = /\$\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}\s*::jsonb\b/;
+
+/** `::text::jsonb` is the correct form; do not report it. */
+const SAFE = /::text\s*::jsonb\b/;
 
 const tracked = new TextDecoder()
   .decode(Bun.spawnSync(['git', 'ls-files', '-z', '*.ts'], { cwd: ROOT }).stdout)
@@ -66,7 +101,10 @@ for (const rel of tracked) {
     // Documentation of the wrong form is not the wrong form. jsonb.ts spells it
     // out on purpose, and counting it made the first measurement of this say 17.
     if (trimmed.startsWith('*') || trimmed.startsWith('//')) return;
-    if (OFFENDER.test(line)) found.push(`${rel}:${i + 1}`);
+    // Strip the correct form first, so a line carrying both spellings is still
+    // reported for the wrong one.
+    const stripped = line.replace(new RegExp(SAFE.source, 'g'), '::ok::');
+    if (OFFENDER.test(stripped)) found.push(`${rel}:${i + 1}`);
   });
 }
 
