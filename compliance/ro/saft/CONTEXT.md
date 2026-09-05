@@ -1,29 +1,31 @@
 # SAF-T (D406) — context
 
-**Verificat prin apăsare: 2026-08-10.** Generarea rulează și produce structura;
-depunerea refuză explicit.
+**Verified by pressing: 2026-08-10.** Generation runs and produces the structure;
+submission refuses explicitly.
 
-## Ce era rupt
+## What was broken
 
-**Depunerea era fabricată** — la fel ca e-Factura și e-Transport. `/submit`
-inventa un răspuns și scria „transmis". Acum întoarce **501** cu explicația: D406
-nu se depune prin API, ci se validează cu **DUK Integrator** (unealtă ANAF, Java)
-și se încarcă în **SPV** manual. Nu există cale programatică, deci un buton care
-pretinde altceva e o minciună, nu o funcție lipsă.
+**Submission was fabricated** — just like e-Factura and e-Transport. `/submit`
+invented a response and wrote "submitted". It now returns **501** with the
+explanation: D406 is not submitted through an API, it is validated with **DUK
+Integrator** (an ANAF tool, Java) and uploaded to **SPV** by hand. There is no
+programmatic path, so a button claiming otherwise is a lie, not a missing feature.
 
-## Rămâne deschis
+## Still open
 
-Generatorul e parțial. Lipsesc: tabela de taxe, partenerii, produsele, mijloacele
-fixe, `SourceDocuments`. Ce există produce structura, nu un fișier depunabil.
+The generator is partial. Missing: the tax table, partners, products, fixed
+assets, `SourceDocuments`. What exists produces the structure, not a submittable
+file.
 
-**Nu marca extensia ca gata** până generatorul nu trece prin DUK Integrator — e
-singura validare care contează, și e offline.
+**Do not mark the extension as done** until the generator passes through DUK
+Integrator — that is the only validation that counts, and it is offline.
 
-## Capcane
+## Traps
 
-`zv_saft_accounts.code` era unic pe instanță; lărgit la `(tenant_id, code)`.
-Fiecare firmă are propriul plan de conturi — evident după, invizibil înainte.
+`zv_saft_accounts.code` was unique per instance; widened to `(tenant_id, code)`.
+Every tenant has its own chart of accounts — obvious afterwards, invisible
+before.
 
-## Proprietate
+## Ownership
 
-Tabelele `zv_saft_*` sunt ale extensiei.
+The `zv_saft_*` tables belong to the extension.

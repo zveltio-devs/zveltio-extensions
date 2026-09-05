@@ -1,23 +1,24 @@
-# Editor de bază de date — context
+# Database editor — context
 
-**Verificat prin apăsare: 2026-08-10.** Interogare salvată și recitită.
+**Verified by pressing: 2026-08-10.** A saved query written and read back.
 
-## Ce era rupt
+## What was broken
 
-**Listarea interogărilor salvate returna 500 tuturor, întotdeauna.** Citirea cerea
-`config::text AS query` de la un tabel a cărui coloană e `query`, și aliasa
-`created_at` ca `updated_at` deși există un `updated_at` real. `INSERT`-ul de
-alături scrie `query` corect — cele două instrucțiuni erau în dezacord despre
-același tabel.
+**Listing saved queries returned 500 to everyone, always.** The read asked for
+`config::text AS query` from a table whose column is `query`, and aliased
+`created_at` as `updated_at` even though a real `updated_at` exists. The `INSERT`
+beside it writes `query` correctly — the two statements disagreed about the same
+table.
 
-A durat fiindcă un `catch` gol numea **ruta**, niciodată coloana: „Failed to list
-saved queries" te trimite să cauți o funcție stricată, nu o coloană inexistentă.
+It took a while because an empty `catch` named the **route**, never the column:
+"Failed to list saved queries" sends you looking for a broken function, not a
+non-existent column.
 
-## Capcană de proprietate
+## An ownership trap
 
-Extensia scria cândva în `zv_saved_queries` — tabelul **engine-ului** pentru
-interogări pe colecții, cu alt model mental. Tabelul ei e
-`zv_developer_database_snippets`. O extensie nu alterează tabelele engine-ului.
+The extension once wrote to `zv_saved_queries` — the **engine's** table for
+collection queries, with a different mental model. Its own table is
+`zv_developer_database_snippets`. An extension does not alter the engine's tables.
 
 
 ## SDUI migration (2026-08-21)
