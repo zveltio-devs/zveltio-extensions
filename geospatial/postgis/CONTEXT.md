@@ -1,36 +1,35 @@
 # PostGIS — context
 
-**Verificat prin apăsare: 2026-08-10.** Zonă creată în jurul Bucureștiului,
-vehicul intrat (`enter`) și ieșit (`exit`), ambele consemnate în bază.
+**Verified by pressing: 2026-08-10.** A zone created around Bucharest, a vehicle
+entering (`enter`) and leaving (`exit`), both recorded in the database.
 
-## Cerință de instalare
+## Installation requirement
 
-Cere extensia Postgres: `CREATE EXTENSION postgis;`. Fără ea activarea refuză cu
-un mesaj clar — nu e un bug.
+Requires the Postgres extension: `CREATE EXTENSION postgis;`. Without it,
+activation refuses with a clear message — that is not a bug.
 
-## Ce era rupt
+## What was broken
 
-**Traversările de zonă se salvau doar dacă câștigau o cursă.** Verificarea era
-lansată fără `await` — „check geofence rules asynchronously" — iar scrierile
-rulau pe tranzacția cererii, pe care engine-ul o închide când handler-ul se
-întoarce. Dacă interogarea spațială termina prima, mergea; altfel, nu.
+**Zone crossings were saved only if they won a race.** The check was launched
+without `await` — "check geofence rules asynchronously" — and the writes ran on
+the request's transaction, which the engine closes when the handler returns. If
+the spatial query finished first, it worked; otherwise, it did not.
 
-**De obicei mergea.** Ăsta e cel mai rău fel de cursă: trece de fiecare dată când
-te uiți la ea. A trecut și când m-am uitat eu — `enter` și `exit` au apărut
-amândouă.
+**It usually worked.** That is the worst kind of race: it passes every time you
+look at it. It passed when it was looked at here too — `enter` and `exit` both
+appeared.
 
-Iar cele două `.catch(() => {})` făceau pierderea cursei identică cu câștigarea
-ei. **Traversarea E produsul**: un vehicul care iese dintr-o zonă fără să se
-scrie nimic e o alertă ratată, și nimic n-o dă de gol — rândul de poziție se
-salvează perfect.
+And the two `.catch(() => {})` made losing the race identical to winning it. **The
+crossing IS the product**: a vehicle leaving a zone with nothing written is a
+missed alert, and nothing gives it away — the position row saves perfectly.
 
-Acum e așteptată: traversarea intră în aceeași tranzacție cu poziția care a
-provocat-o. Ori sunt amândouă, ori niciuna.
+It is now awaited: the crossing enters the same transaction as the position that
+caused it. Either both, or neither.
 
-## Notă istorică
+## Historical note
 
-Autorizarea pe geofences a fost reparată în auditul din 2026-07-20. **Nu o
-raporta ca deschisă.**
+Authorisation on geofences was repaired in the 2026-07-20 audit. **Do not report
+it as open.**
 
 
 ## SDUI migration (2026-08-21)

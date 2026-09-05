@@ -1,58 +1,58 @@
 # e-Factura — context
 
-Pentru o instanță care urmează să atingă extensia asta. Ce nu se vede din cod.
+For an instance about to touch this extension. What is not visible from the code.
 
-**Verificat prin apăsare: 2026-08-10.** Factură generată din bază, XML validat de
-serviciul ANAF (`stare: ok`, zero mesaje), setări salvate și recitite. **NU** a
-fost testat un ciclu complet de depunere — cere certificat și aplicație
-înregistrată, care sunt ale clientului.
+**Verified by pressing: 2026-08-10.** An invoice generated from the database, XML
+validated by the ANAF service (`stare: ok`, zero messages), settings saved and
+read back. A complete submission cycle was **NOT** tested — it needs a certificate
+and a registered application, which are the customer's.
 
-## Ce era rupt, și de ce n-a văzut nimeni
+## What was broken, and why nobody saw it
 
-**Depunerea era fabricată.** `/submit` inventa indexul de încărcare ANAF,
-scria „transmis" în bază și răspundea `Submitted to ANAF`. Nimic nu pleca
-nicăieri. A supraviețuit fiindcă XML-ul era doar o precondiție pentru o depunere
-falsă, care nu-l citea niciodată — deci generatorul n-a rulat niciodată pe un
-rând real.
+**Submission was fabricated.** `/submit` invented the ANAF upload index, wrote
+"submitted" into the database and answered `Submitted to ANAF`. Nothing left for
+anywhere. It survived because the XML was only a precondition for a fake
+submission, which never read it — so the generator had never run against a real
+row.
 
-**Generatorul crăpa pe orice factură reală.** `NUMERIC` vine ca șir din driver
-(refuză să piardă precizie), `date` vine ca obiect `Date`. `vat_total.toFixed()`
-și `d.split('T')` mureau amândouă. Conversia se face acum o singură dată, în
-`toInvoiceData`, la granița rând → `InvoiceData`.
+**The generator crashed on any real invoice.** `NUMERIC` arrives as a string from
+the driver (it refuses to lose precision), `date` arrives as a `Date` object.
+`vat_total.toFixed()` and `d.split('T')` both died. The conversion now happens
+once, in `toInvoiceData`, at the row → `InvoiceData` boundary.
 
-**Trei migrații nedeclarate** în `getMigrations()` — pe instalare nouă nu exista
-nimic din conformitate, iar extensia se activa perfect.
+**Three undeclared migrations** in `getMigrations()` — on a fresh install none of
+the compliance work existed, and the extension enabled perfectly.
 
-## Capcane specifice
+## Extension-specific traps
 
-**Ordinea rutelor.** `/:id` înregistrat înaintea lui `/settings` înghite
-„settings" — ruta de setări dădea 404. Fișierul documenta deja capcana pentru
-`/stats` și tot s-a repetat.
+**Route order.** `/:id` registered before `/settings` swallows "settings" — the
+settings route answered 404. The file already documented the trap for `/stats` and
+it happened anyway.
 
-**Secretele nu se întorc niciodată.** `client_secret` se stochează `enc:v1:` și
-la re-salvare cu câmp gol rămâne cel dinainte. E intenționat.
+**Secrets are never returned.** `client_secret` is stored `enc:v1:` and on
+re-saving with an empty field the previous one is kept. That is intentional.
 
-**Validatorul ANAF e gratuit și fără autentificare** —
-`webservicesp.anaf.ro/prod/FCTEL/rest/validare/FACT1`. Folosește-l înainte de
-orice depunere; a respins opt reguli pe un XML care „arăta corect".
+**The ANAF validator is free and unauthenticated** —
+`webservicesp.anaf.ro/prod/FCTEL/rest/validare/FACT1`. Use it before any
+submission; it rejected eight rules on an XML that "looked correct".
 
-## Rămâne deschis
+## Still open
 
-Generatorul UBL e monolitic. Împărțirea în nucleu EN 16931 + profil de țară e
-ce deblochează o extensie germană — vezi principiul: extensiile regionale nu
-trebuie să rupă modelul generic.
+The UBL generator is monolithic. Splitting it into an EN 16931 core plus a country
+profile is what unblocks a German extension — see the principle: regional
+extensions must not break the generic model.
 
-## Proprietate
+## Ownership
 
-Toate tabelele `zv_efactura_*` sunt ale extensiei. `zv_efactura_daily_stats` are
-cheia primară `(tenant_id, date, seller_cui)` — lărgită în campania de chei,
-iar `ON CONFLICT` a fost mutat odată cu ea.
+All `zv_efactura_*` tables belong to the extension. `zv_efactura_daily_stats` has
+primary key `(tenant_id, date, seller_cui)` — widened in the key campaign, and
+`ON CONFLICT` was moved along with it.
 
-## De citit înainte
+## Read first
 
-`SETUP.md` — ghidul pentru administratorul instanței, scris pentru client, nu
-pentru dezvoltator. Explică de ce testul „Hello" poate trece și e-Factura să nu:
-token bun, aplicație neînrolată.
+`SETUP.md` — the guide for the instance administrator, written for the customer,
+not the developer. It explains why the "Hello" test can pass while e-Factura does
+not: good token, unenrolled application.
 
 ## SDUI migration — main invoices page (2026-08-21)
 Branch: feat/sdui-sms-efactura

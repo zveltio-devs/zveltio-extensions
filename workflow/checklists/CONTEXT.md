@@ -1,63 +1,64 @@
-# Liste de verificare — context
+# Checklists — context
 
-**Verificat prin apăsare: 2026-08-10, pe bază virgină.** Șablon creat, atașat pe
-o înregistrare, puncte copiate, bifate, listă finalizată, două scheme de punctaj
-configurate și scoruri calculate.
+**Verified by pressing: 2026-08-10, on a virgin database.** Template created,
+attached to a record, items copied, ticked, list completed, two scoring schemes
+configured and scores computed.
 
-## Ce era rupt
+## What was broken
 
-**Bifarea unui punct n-a funcționat niciodată.** `checked_by` și `completed_by`
-sunt coloane `uuid` care primesc `"user".id` — un nanoid de 32 de caractere. Fiecare
-încercare de bifare returna 400 cu o eroare de conversie pe care ruta n-o numea.
-Pe orice instalare care a existat, pentru **acțiunea centrală a extensiei**.
+**Ticking an item never worked.** `checked_by` and `completed_by` are `uuid`
+columns receiving `"user".id` — a 32-character nanoid. Every attempt to tick
+returned 400 with a conversion error the route did not name. On every installation
+that ever existed, for **the extension's central action**.
 
-Merită reținut cum a scăpat: **două treceri din aceeași zi căutau exact clasa
-asta** și au ratat-o, fiindcă lucrau după o listă de nume de coloane scrisă de
-mână, iar `checked_by` nu era pe ea. Engine-ul are acum o poartă care întreabă
-catalogul — *care coloane `uuid` se numesc `\*_by`?* — în loc de o listă pe care
-cineva trebuie s-o țină completă.
+Worth remembering how it escaped: **two passes on the same day were looking for
+exactly this class** and missed it, because they worked from a hand-written list
+of column names, and `checked_by` was not on it. The engine now has a gate that
+asks the catalogue — *which `uuid` columns are named `\*_by`?* — instead of a list
+someone has to keep complete.
 
-## Punctaj configurabil
+## Configurable scoring
 
-Un șablon poartă oricâte **scheme**. Ponderile stau pe schemă, nu pe punct —
-asta e tot rostul: o inspecție poate fi măsurată simultan pentru siguranță și
-pentru conformitate comercială, iar punctul care contează enorm la una poate fi
-irelevant la cealaltă. Pondere zero, sau lipsa ei, scoate punctul din numitorul
-acelei scheme.
+A template carries any number of **schemes**. Weights live on the scheme, not on
+the item — that is the whole point: an inspection can be measured simultaneously
+for safety and for commercial compliance, and the item that matters enormously to
+one can be irrelevant to the other. A zero weight, or its absence, removes the
+item from that scheme's denominator.
 
-**Ponderile se leagă de punctul din ȘABLON**, ceea ce a impus
-`zv_checklist_items.template_item_id`. Punctele instanței sunt copii, iar
-singura legătură cu originalul era eticheta — punctarea după etichetă s-ar fi
-desprins la prima corectare a unei greșeli de scriere. Tăcut, și în direcția care
-flatează scorul.
+**Weights bind to the item in the TEMPLATE**, which required
+`zv_checklist_items.template_item_id`. An instance's items are copies, and the
+only link to the original was the label — scoring by label would have come apart
+at the first corrected typo. Silently, and in the direction that flatters the
+score.
 
-**Rezultatul păstrează instantaneul** a ce l-a produs: fiecare punct ponderat,
-ponderea lui, dacă a fost bifat, pragul în vigoare. Ponderile se schimbă;
-auditul de anul trecut nu trebuie să se schimbe.
+**The result keeps a snapshot** of what produced it: every weighted item, its
+weight, whether it was ticked, the threshold in force. Weights change; last year's
+audit must not.
 
-**Se recalculează la fiecare modificare**, nu la finalizare. Finalizarea se
-declanșează când ultimul punct *obligatoriu* e bifat, iar opționalele vin de
-obicei după — calculul pe tranziție îngheța scorul la 5/10 în timp ce două bife
-ulterioare nu-l mai mișcau. Măsurat live după reparație: 50 → 70 → 100.
+**It recomputes on every change**, not on completion. Completion fires when the
+last *required* item is ticked, and the optional ones usually come after — so
+computing on the transition froze the score at 5/10 while two later ticks no
+longer moved it. Measured live after the repair: 50 → 70 → 100.
 
-## Limită de model — citește înainte să extinzi punctajul
+## A model limit — read before extending the scoring
 
-**Bifat nu înseamnă conform.** „Temperatura e greșită" și „n-am verificat
-temperatura" arată identic: un punct nebifat. Pentru o inspecție reală trebuie
-trei stări — conform, neconform, neaplicabil. Deocamdată sunt două.
+**Ticked does not mean compliant.** "The temperature is wrong" and "I did not
+check the temperature" look identical: an unticked item. A real inspection needs
+three states — compliant, non-compliant, not applicable. For now there are two.
 
-Nu s-a schimbat fiindcă e o decizie de model, nu un defect. Dar cu scorul pe
-ecran diferența devine vizibilă.
+It was not changed because it is a model decision, not a defect. But with the
+score on screen the difference becomes visible.
 
-## Rămâne deschis
+## Still open
 
-**Pagina de studio e moartă cap-coadă.** Cheamă patru adrese, toate 404:
-`/`, `/{id}`, `/{id}/responses`. Are stare `responses` și o vedere `'responses'`
-— e o copie a paginii de **formulare**, unde forma aia are sens. API-ul real e
-`/templates`, `/record/:colectie/:id`, `/items/:id`, `/overdue-items`, `/summary`.
+**The studio page is dead end to end.** It calls four addresses, all 404: `/`,
+`/{id}`, `/{id}/responses`. It has a `responses` state and a `'responses'` view —
+it is a copy of the **forms** page, where that shape makes sense. The real API is
+`/templates`, `/record/:collection/:id`, `/items/:id`, `/overdue-items`,
+`/summary`.
 
-Ecranul de configurare a schemelor cere **master-detail** (schemă → ponderi per
-punct), care încă nu există în randor. Al treilea lucru care îl așteaptă.
+The scheme configuration screen needs **master-detail** (scheme → weights per
+item), which the renderer does not have yet. The third thing waiting on it.
 
 ## SDUI migration (2026-08-21)
 

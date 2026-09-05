@@ -1,24 +1,24 @@
-# Panoul de bord — context
+# Dashboard — context
 
-**Verificat prin apăsare: 2026-08-10.** Toate widget-urile citite, valorile
-confruntate cu baza.
+**Verified by pressing: 2026-08-10.** Every widget read, the values confronted
+with the database.
 
-## Ce era rupt
+## What was broken
 
-**`audit_log: true` era scris literal în cod** — în widget-ul al cărui propriu
-comentariu spune că e „pentru un consiliu / un auditor". Ar fi răspuns „da" și cu
-tabelul șters. Acum e derivat și poartă marcajul ultimei intrări, deci se vede și
-un scriitor blocat.
+**`audit_log: true` was written literally in the code** — in the widget whose own
+comment says it is "for a board / an auditor". It would have answered "yes" with
+the table dropped. It is now derived and carries the timestamp of the last entry,
+so a stalled writer is visible too.
 
-**`zv_collections` nu există** — tabelul e `zvd_collections`. `.catch(() => 0)`
-transforma interogarea stricată într-un zero credibil. Arăta ca o instalare
-goală, nu ca ceva rupt.
+**`zv_collections` does not exist** — the table is `zvd_collections`.
+`.catch(() => 0)` turned the broken query into a believable zero. It looked like
+an empty installation, not like something broken.
 
-**Resetarea aranjamentului înghițea eșecul ștergerii** și răspundea „gata".
+**Resetting the layout swallowed the delete failure** and answered "done".
 
-## Capcana cea mai instructivă din tot produsul
+## The most instructive trap in the whole product
 
-Un singur tabel lipsă a produs asta:
+A single missing table produced this:
 
 ```
 widget count "zv_audit_log" failed: relation "zv_audit_log" does not exist
@@ -27,19 +27,19 @@ trust "audit_log" failed: current transaction is aborted…
 trust "last_backup" failed: current transaction is aborted…
 ```
 
-`last_backup` citește `zv_backups`, tabel perfect sănătos, și a raportat totuși
-„nicio copie de siguranță". **Widget-urile împart o tranzacție.** O interogare
-stricată produce patru valori false, toate plauzibile.
+`last_backup` reads `zv_backups`, a perfectly healthy table, and still reported
+"no backup at all". **The widgets share one transaction.** One broken query
+produces four false values, all of them plausible.
 
-Etichetele fac acum cauza vizibilă într-o linie. Contaminarea rămâne — cere
-SAVEPOINT per widget, deci și trecerea de la paralel la secvenţial (savepoint-urile
-nu se compun cu instrucţiuni paralele pe aceeaşi conexiune). Panoul rulează în
-76 ms, deci costul e neglijabil.
+The labels now make the cause visible in one line. The contamination remains — it
+needs a SAVEPOINT per widget, and therefore a move from parallel to sequential
+(savepoints do not compose with parallel statements on the same connection). The
+dashboard runs in 76 ms, so the cost is negligible.
 
-## Ce e corect și nu trebuie „reparat"
+## What is correct and must not be "repaired"
 
-`health` care raportează `ok: false` **e** semnalul onest — nu-l face să tacă.
-Verificările de permisiuni care refuză închis sunt corecte așa.
+A `health` reporting `ok: false` **is** the honest signal — do not silence it. The
+permission checks that refuse closed are correct as they are.
 
 ## SDUI (2026-08-21)
 Role×widget admin via SchemaPage `layout: checklist` (new host primitive).
