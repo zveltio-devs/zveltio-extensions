@@ -115,8 +115,55 @@ rendered page posts to — `/metrics/track` and `/:id/ab-variants/:id/track`, bo
 `publicRoutes` — are excluded, and a test asserts they stayed open, because a guard
 that closed them would look identical to a working fix from the other assertions.
 
+### The `zvd_` prefix guard had no test — found by removing it
+
+`hydrate.ts` has two independent guards on the anonymous path. The registry check
+(`zvd_collections` must hold the name) is well covered: removing the
+`publicCollections` gate fails 4 tests. The prefix — `const table = zvd_${name}`,
+which the file's own header calls the difference between this resolver and the one
+that leaked — was covered by **nothing**. Replacing it with `const table = name`,
+the exact shape of the 2026-08-16 vulnerability, left all 47 tests passing.
+
+The registry check carries them, because a name that is not a collection is
+refused before a table name is built. The case the prefix defends is the one the
+registry cannot: a collection that IS registered under a name colliding with a
+real table. Creating a collection called `user` is an ordinary admin action; the
+engine materialises it as `zvd_user`, and without the prefix the resolver would
+read Better-Auth's `user` instead.
+
+Now tested, and the test discriminates — it is the only one that fails when the
+prefix is removed.
+
+### Verified by exercising, not by reading
+
+- **Anonymous gate** — removing it fails 4 tests across the block, paging,
+  container and viewer-request paths.
+- **Sanitizer** — replacing `scrubHtml` with the identity fails 16 of 21.
+- **Migrations on an upgraded database**, which had not been done: an install
+  carrying only migration 001 plus seeded rows, then 002–007 applied on top. All
+  six apply cleanly, the seeded row survives with `jsonb_typeof` = array/object
+  rather than string scalars, and the resulting schema is **identical** to a
+  virgin install — 130 columns, and the RLS posture matches table for table.
+  `zv_page_block_types` carries no RLS on either path, which is migration 007's
+  intent and makes the parenthesis in `tenant-isolation.test.ts` true.
+
+### Checked and found sound
+
+`public-seo.ts` has no tenant predicate on the sitemap query and leans on RLS.
+That is correct here: the engine mounts `registerPublicRoute` behind
+`tenantMiddleware`, so a request carrying a tenant (per-tenant hostname,
+`x-tenant-slug`) has the GUC set. The route's own filters — `auth_required =
+false`, `kind = 'page'`, `is_public`, `is_active`, and the record-page collection
+having to be in `public_collections` — are the gate that matters, and they are
+there.
+
 ### Still to cover in this extension
 
-`hydrate.ts` (the anonymous data-resolution path, the highest-risk file left),
-`sanitize.ts`, `public-seo.ts`, `jsonb.ts`, the 7 migrations against a virgin AND
-an upgraded database, and the ~2000 lines of client Svelte.
+`editor.ts` and `sites.ts` beyond their guards — the write paths, revisions,
+redirects, A/B variants and the SEO analyser; `jsonb.ts`; and the ~2000 lines of
+client Svelte, none of which has been read.
+
+Not yet done for this extension: exercising the write paths against a TWO-TENANT
+database. The reads and the guards have been; the writes have been checked for
+their guard and not for their scoping, which RLS should cover but which §6 asks to
+be demonstrated rather than assumed.
