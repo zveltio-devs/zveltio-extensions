@@ -429,6 +429,53 @@ section's path.
 
 ---
 
+## 5b. What has been repaired since (2026-09-05)
+
+Items 6 and 7 of the list below are done, plus part of item 3. What follows is
+what changed and, more usefully, what could NOT be closed from this repository.
+
+**Closed:** `auth/saml` (both flows, plus replay protection in migration 005),
+`auth/saml` + `auth/ldap` + `content/pages` `selectFrom('user')`,
+`developer/database` bounded away from the tenant-isolation machinery, and
+`communications/mail` moved off `zv_settings` (6 sites, migration 005) — which
+also fixed an unfiled defect: the mail configuration was instance-wide, so a
+second tenant could not have its own IMAP server.
+
+**A third `selectFrom('user')` was found by sweeping for the class rather than
+the two instances named here** — `content/pages/engine/sites.ts`, where the
+refusal sat inside a `try/catch` written for a different reason, so role
+hydration had never run on any installation.
+
+**One correction to §2's (3).** This report said `developer/database` ran "with no
+capability declared for it". That is wrong: every route is behind
+`requireInstanceAdmin`, and the comment above it shows it had already been
+tightened from `checkPermission(uid,'admin','*')`. The gap was that authorised is
+not bounded — the routes restricted who could call them and never which object
+could be named.
+
+**What could NOT be closed here, and why:**
+
+| case | blocked on |
+|---|---|
+| `ai`, `storage/cloud` → `user` | Needs `resolveUserNames`. Both want a display name; without a host helper the only alternatives are keeping the join or changing the response shape. |
+| `analytics/dashboard` → `zv_settings` | The key is the ENGINE's (`company_name`, `app_name`). Moving it into the extension would duplicate an engine setting, not relocate an extension one. |
+| `content/pages`, `geospatial/postgis`, `integrations/migrators` → catalogue | `zvd_collections` is readable and looks like a substitute, but it is not: it answers "is there a collection" where the code asks "does the physical table/column exist". `geospatial/postgis:37` refuses on an unreadable answer *by design*; swapping in the registry makes it permit where it used to refuse. The correct replacement is `describeCollection`, which the host can answer from both the catalogue and the registry. |
+
+So the rewrite half is genuinely engine-blocked apart from the mail move. Doing it
+extension-side anyway would trade a documented hole for an undocumented
+behaviour change.
+
+**A measurement problem found on the way.** `communications/mail/engine/routes.ts`
+carried a single raw NUL byte, which made `grep` treat the whole 1658-line file as
+binary and skip it silently — exit 1, no output, indistinguishable from "no
+matches". Every grep-shaped sweep in this campaign reported that file clean
+without opening it. Fixed, and `scripts/check-no-nul-bytes.ts` now fails the build
+on a recurrence. The `::jsonb` class count of "27 across 12 extensions" recorded
+in that extension's CONTEXT was measured by grep and this file holds five sites,
+so that number is a floor.
+
+---
+
 ## 6. What remains to decide (owner)
 
 1. Apply the policy on the **inline** path, wrapping the executor returned by
