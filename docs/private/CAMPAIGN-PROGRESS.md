@@ -138,6 +138,24 @@ positive control, own tenant: UPDATE 1, INSERT accepted, DELETE 1
 The positive control is the half that makes the rest mean anything: without it,
 four zeroes are equally consistent with a role that can do nothing at all.
 
+### Upgrade paths, closed before the merge
+
+The two migrations this branch adds — `auth/saml` 005 and `communications/mail`
+005 — had only ever been applied to a virgin database. §6 asks for both paths, and
+it matters more than usual here: a merge publishes to the registry, and every
+install that upgrades runs them against data.
+
+Built an install at 004 for both, seeded what one would carry, applied 005: both
+apply, the mail config is adopted as an object with its fields intact, the old
+`zv_settings` row survives (rule D1), and the pre-existing SAML config is
+untouched. Also exercised the damaged case migration 005's comment claims to
+handle — a config stored as a **string scalar** by the old `::jsonb` bug — and
+both values come back.
+
+**Anything this branch adds a migration for should get the same treatment before
+it merges.** A migration verified only on a virgin database has been verified for
+new installs and for nobody who already uses the product.
+
 ---
 
 ## Sections not started
