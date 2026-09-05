@@ -157,6 +157,33 @@ false`, `kind = 'page'`, `is_public`, `is_active`, and the record-page collectio
 having to be in `public_collections` — are the gate that matters, and they are
 there.
 
+### The client sanitizer let unclosed tags through on SSR
+
+`safeHtml` is what stands between CMS content and `{@html}` in the public
+renderer — all four call sites go through it. It had no test.
+
+Its server branch, where there is no DOM for DOMPurify, fell back to
+`replace(/<[^>]*>/g, '')`. That needs a closing `>` to match, so an unclosed tag
+passed through untouched, and an HTML parser closes one for you at the end of a
+document. Measured on the shipped expression:
+
+```
+'<img src=x onerror=alert(1)>'  -> ''                              stripped
+'<img src=x onerror=alert(1)'   -> '<img src=x onerror=alert(1)'   INTACT
+'Hello <svg onload=alert(1)'    -> 'Hello <svg onload=alert(1)'    INTACT
+```
+
+On the public site this is defence in depth — the engine's `sanitize-html` has
+already parsed the same content structurally, on write and again on the public
+read. But `safeHtml` is exported from this bundle for third-party SvelteKit apps,
+and its contract is "returns HTML safe to hand to {@html}". A caller handing it
+unsanitised content — the case it exists for — got a bypass.
+
+Complete tags are still removed, so well-formed input renders exactly as before;
+what is left over is now escaped rather than deleted, which also keeps `a < b`
+readable. `sanitize.test.ts` asserts both halves and fails against the old
+expression.
+
 ### Still to cover in this extension
 
 `editor.ts` and `sites.ts` beyond their guards — the write paths, revisions,
