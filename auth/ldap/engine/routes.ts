@@ -133,17 +133,36 @@ async function upsertLdapConfig(
   }
 }
 
+// Find or create a user by email (for SSO sign-in).
+//
+// Every statement here is raw SQL, and the two reads used to be
+// `dbh.selectFrom('user')`. That is refused: `dbh` is `ctx.db`, and
+// createRestrictedDb permits `zvd_*`, the extension's own namespace, and the
+// tables its migrations create — `user` is none of those. Measured, with this
+// extension's real allowedTables:
+//
+//   selectFrom("user"): REFUSED — ExtensionSecurityError
+//   raw SELECT:         OK
+//
+// The same defect as in `auth/saml`, found the same way. Raw SQL works because
+// the table policy guards the query builder's entry points and a raw statement
+// does not pass through them — a hole in the sandbox, not a feature. The INSERT
+// below has always taken this path, so the reads are made consistent with it
+// rather than left as the one form that throws.
+//
+// This is NOT the durable answer: when the engine closes the raw path,
+// `auth/ldap` and `auth/saml` have to be granted `user` and `session` in the
+// SAME change, or directory login breaks again — on the write this time.
+//
+// Better-Auth's `user` table uses camelCase columns ("emailVerified",
+// "createdAt", "updatedAt"). Raw SQL keeps the casing literal so a snake_case
+// typo doesn't silently fail.
 async function findOrCreateSsoUser(dbh: any, email: string, displayName: string): Promise<any> {
-  const existing = await dbh
-    .selectFrom('user')
-    .selectAll()
-    .where('email', '=', email)
-    .executeTakeFirst();
+  const existing = await sql<any>`
+    SELECT * FROM "user" WHERE email = ${email} LIMIT 1
+  `.execute(dbh).then((r: any) => r.rows[0]);
   if (existing) return existing;
 
-  // Better-Auth's `user` table uses camelCase columns ("emailVerified",
-  // "createdAt", "updatedAt"). Raw SQL keeps the casing literal so a
-  // snake_case typo doesn't silently fail.
   const id = crypto.randomUUID();
   const now = new Date();
   await sql`
@@ -151,7 +170,13 @@ async function findOrCreateSsoUser(dbh: any, email: string, displayName: string)
     VALUES (${id}, ${email}, ${displayName || email.split('@')[0]}, true, ${now}, ${now})
   `.execute(dbh);
 
-  return dbh.selectFrom('user').selectAll().where('id', '=', id).executeTakeFirstOrThrow();
+  const created = await sql<any>`
+    SELECT * FROM "user" WHERE id = ${id} LIMIT 1
+  `.execute(dbh).then((r: any) => r.rows[0]);
+  // `executeTakeFirstOrThrow` used to provide this. A silent undefined here
+  // would reach `createBetterAuthSession` as a session belonging to nobody.
+  if (!created) throw new Error(`[ldap] user ${id} vanished immediately after insert`);
+  return created;
 }
 
 export function ldapRoutes(ctx: ExtensionContext): Hono {
