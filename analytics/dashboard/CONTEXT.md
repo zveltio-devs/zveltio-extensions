@@ -3,6 +3,53 @@
 **Verified by pressing: 2026-08-10.** Every widget read, the values confronted
 with the database.
 
+## 2026-09-05 — every saved layout was silently discarded (v1.0.3)
+
+Found from the `ai` section of the review campaign, by widening
+`scripts/check-jsonb-cast.ts`. Not a review of this extension: one defect, fixed
+and verified. The rest is as unexamined as before.
+
+`writeLayout` wrote the widget list with a single `::jsonb` cast on a stringified
+array. Under Bun.SQL — the driver the ENGINE runs — the parameter is already
+typed as json, so the cast is a no-op and the column stores a JSON **string
+scalar**. `readLayout` twelve lines above does `if (!Array.isArray(raw)) return
+null`, and a string is not an array. Measured on Postgres 18:
+
+```
+${json}::jsonb        jsonb_typeof=string  "[\"tasks\",\"revenue\"]"  Array.isArray false
+${json}::text::jsonb  jsonb_typeof=array   ["tasks","revenue"]       Array.isArray true
+```
+
+So a user rearranged their dashboard, the save answered success, the row was
+written — and the next page load showed the default set. Every time.
+
+**Why nobody saw it.** Two reasons, and both are reusable:
+
+1. `readLayout` returning `null` means "this user has not personalised
+   anything", which is exactly what a fresh account looks like. The failure mode
+   was indistinguishable from the normal one.
+2. The test suite reaches Postgres through `pg`, which sends the parameter as
+   text; Postgres then parses it and the defect **does not exist** under the
+   suite. This class has only ever been found by hand on a live engine, or by a
+   static gate — and the gate could not see this spelling until it was widened,
+   because the value is stringified on the line above rather than inline.
+
+**Fixed:** `::text::jsonb` at both write sites, and migration
+`003_widgets_unwrap_string.sql` to recover the layouts already stored as strings.
+Without the migration the route fix would help only people who happen to
+rearrange their dashboard again — everyone else's existing personalisation stays
+lost, which is the same outcome from the user's side.
+
+The migration is a per-row loop with an exception handler rather than one
+statement, because the one-statement form **failed on the case its own comment
+claimed to handle**: Postgres does not guarantee the `jsonb_typeof(...::jsonb)`
+guard is evaluated only for rows passing the `jsonb_typeof = 'string'` test, so a
+single string that is not valid JSON aborted the whole migration and left the
+damaged rows untouched. Caught by seeding all three states — damaged, healthy,
+and a string that is not JSON — before believing it. Verified: recovers the
+damaged row, leaves the healthy one alone, warns about the third, idempotent on
+re-run, and a no-op on an install that never had the defect.
+
 ## What was broken
 
 **`audit_log: true` was written literally in the code** — in the widget whose own

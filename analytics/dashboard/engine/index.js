@@ -19485,14 +19485,14 @@ async function writeLayout(db, scope, owner, widgets, updatedBy) {
   const json2 = JSON.stringify(widgets);
   const updated = await sql`
     UPDATE zv_dashboard_layouts
-    SET widgets = ${json2}::jsonb, updated_by = ${updatedBy}, updated_at = NOW()
+    SET widgets = ${json2}::text::jsonb, updated_by = ${updatedBy}, updated_at = NOW()
     WHERE scope = ${scope} AND owner = ${owner}
     RETURNING id
   `.execute(db);
   if (updated.rows.length === 0) {
     await sql`
       INSERT INTO zv_dashboard_layouts (scope, owner, widgets, updated_by)
-      VALUES (${scope}, ${owner}, ${json2}::jsonb, ${updatedBy})
+      VALUES (${scope}, ${owner}, ${json2}::text::jsonb, ${updatedBy})
     `.execute(db);
   }
 }
@@ -19711,7 +19711,8 @@ var extension = {
   getMigrations() {
     return [
       join(import.meta.dir, "migrations/001_initial.sql"),
-      join(import.meta.dir, "migrations/002_tenant_rls.sql")
+      join(import.meta.dir, "migrations/002_tenant_rls.sql"),
+      join(import.meta.dir, "migrations/003_widgets_unwrap_string.sql")
     ];
   },
   async register(app, ctx) {
