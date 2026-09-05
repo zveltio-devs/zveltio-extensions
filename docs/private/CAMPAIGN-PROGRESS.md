@@ -15,7 +15,7 @@ has to re-derive from the code what has already been covered.
 | `repaired` | a specific defect was found, fixed, and the fix verified against a real database. Everything NOT part of that defect is untouched. |
 | `reviewed` | the §6 bar in the handoff: every file read end to end, every guard **exercised**, every write checked on a two-tenant database, migrations applied to a virgin AND an upgraded database. |
 
-**One extension is `reviewed`: `content/pages`.** The other 55 are not, and 52 of
+**Two extensions are `reviewed`: `content/pages` and `ai`.** The other 54 are not, and 52 of
 the 56 rows in `REVIEW-STATUS.md` read "verified" — that word means the August
 button-pressing pass (section G), not this campaign. The two bars are not the
 same and the banner on that file says so.
@@ -49,9 +49,10 @@ than re-deriving the numbers — and note that the earlier figures it corrects
 | `auth/ldap` | 1.1.3 | `selectFrom('user')` refused by the table proxy — directory login could not provision a first-time user. |
 | `content/pages` | 1.0.7 | The same defect, third instance, and the only silent one: the refusal sat inside a `catch` written for a different reason, so role hydration had **never** run on any installation. |
 | `developer/database` | 1.1.0 | Authorised but unbounded. `DROP ROLE` protected `pg_*` and missed `zveltio_rls`/`zveltio_worker`; RLS could be disabled on any `zvd_*` table; `tenant_isolation_*` policies could be dropped; and a PERMISSIVE policy reached the same outcome sideways. |
+| `analytics/dashboard` | 1.0.3 | Every saved dashboard layout silently discarded on read. A single `::jsonb` cast stored the widget list as a JSON string scalar; `readLayout` refuses anything that is not an array, so a personalised dashboard came back as the default. Migration 003 recovers the rows already written. |
 | `communications/mail` | 1.1.0 | Configuration read from `zv_settings` in 6 places, and keyed `ON CONFLICT (key)` — one mail configuration for the whole instance, so a second tenant could not have its own IMAP server. Migration 005 moves it to a tenant-keyed table. |
 
-These five are `repaired`, **not** `reviewed`. Each was entered through one
+These six are `repaired`, **not** `reviewed`. Each was entered through one
 defect. The rest of each extension is as unexamined as any other.
 
 ### Added along the way
@@ -120,8 +121,9 @@ have the same shape: the tool used to look could not see the thing being looked
 for. **Any conclusion drawn from the extension suite about jsonb column shape is
 worth nothing** — that includes anything the suite currently reports green.
 
-`scripts/check-jsonb-cast.ts` ratchets the 16 remaining sites so a 17th cannot be
-added. Deliberately NOT a blind fix: many readers do
+`scripts/check-jsonb-cast.ts` ratchets the remaining sites so a new one cannot be
+added. **Its first pattern saw 16 of 31** — see section 3, "A third blind
+instrument". The baseline is 29 now, after three were fixed. Deliberately NOT a blind fix: many readers do
 `typeof x === 'string' ? JSON.parse(x) : x` and tolerate the scalar, so rewriting
 them changes what those readers receive. Each needs its consumer read first.
 `content/pages` itself is clean — its only apparent site was documentation of the
@@ -161,6 +163,170 @@ both values come back.
 **Anything this branch adds a migration for should get the same treatment before
 it merges.** A migration verified only on a virgin database has been verified for
 new installs and for nobody who already uses the product.
+
+---
+
+## Section 3 — `ai` · **reviewed** (engine/) · 2026-09-05
+
+Full detail in [../../ai/CONTEXT.md](../../ai/CONTEXT.md). Nine defects, one
+cross-cutting engine finding, and one live defect in a different extension that
+only appeared once an instrument was widened.
+
+`reviewed` covers `engine/` only. The Studio side is not covered.
+
+### The shape: this extension has two of everything
+
+Not nine unrelated bugs — one habit, six times. **Two raw-SQL surfaces, two DDL
+paths, two embedding call sites, two auth gates, and every repair landed on one
+copy of the pair.** Each time, the hardened copy carries a comment describing in
+full the problem its twin still had:
+
+| the fixed copy | the copy that was not | what the twin still did |
+|---|---|---|
+| `ai-query.ts` `validateGeneratedSQL` | `execute_sql`, `text_to_sql` | ran model SQL with no table allowlist at all |
+| `ai-query.ts` `runReadOnly` (savepoint) | both of the above | leaked `SET TRANSACTION READ ONLY` into the whole request |
+| `ai.ts`, `ai-embed-hook.ts` (`vec.embedding`) | `remember_fact`, `recall_facts` | stored the whole `EmbedResult` into a `vector` column |
+| `ai-schema-gen.ts` (`internals.enqueueDDLJob`) | `create_collection`, `add_field` | wrote `zv_ddl_jobs` through a handle that refuses it |
+| `ai-schema-gen.ts` (gate on its own paths) | `ai-chats.ts` (`use('*')`) | gated five sibling routers by accident |
+
+**The lesson for the remaining 53 extensions:** when you fix something, grep the
+extension for the same call before you close it. Every one of these was a
+one-line search away from the person who wrote the comment about it.
+
+### The worst two
+
+**A comma bypassed the text-to-SQL allowlist.** `tableReferences` took the first
+identifier after each `FROM`/`JOIN`; a comma-separated FROM list is a join. With
+`{ zvd_products }` permitted, `SELECT u.email FROM zvd_products p, "user" u` was
+ALLOWED — `user`, `session` and `account` are Better-Auth's, unprefixed, with no
+RLS, holding password hashes and live bearer tokens. Any authenticated user with
+read on one collection could ask for them in a sentence.
+
+The doc comment's soundness argument was **backwards**, and readably so: "a
+reference it fails to recognise is simply not on the permitted list, so the query
+is refused rather than allowed." True of a reference the function returns; one it
+fails to recognise is never compared against anything. **Unrecognised meant
+unexamined, not refused.** Worth adding to the class list: an allowlist whose
+extractor is incomplete is a denylist wearing the wrong name.
+
+**`recall_facts` had never worked.** Tier 2 called `db.raw(...)`, removed from
+Kysely in 0.23 (this repo is on 0.29.5), thrown synchronously during query
+BUILD — so past the `.catch` on the promise and into the outer catch, making
+tier 3 unreachable. Every call ever made answered "Memory service not available",
+while the system prompt instructs the model to call it at the start of every
+conversation about preferences.
+
+### A third blind instrument — and this one was mine
+
+`scripts/check-jsonb-cast.ts`, written yesterday as the ratchet for the
+`::jsonb` class, matched `JSON.stringify(...)` followed immediately by `}` and
+then `::jsonb`. That is one spelling of four:
+
+```
+caught  ${JSON.stringify(x)}::jsonb
+caught  ${JSON.stringify(d.metadata ?? {})}::jsonb
+MISSED  ${c ? JSON.stringify(c) : null}::jsonb              a ternary — no `}` after `)`
+MISSED  ${JSON.stringify(d.to.map((e) => ({a: e})))}::jsonb `[^)]*` cannot cross the inner `)`
+MISSED  ${toJson(data.to)}::jsonb                           a helper, not JSON.stringify
+MISSED  ${json}::jsonb                                      stringified on the line above
+```
+
+Every missed form is real code in this tree. **The baseline said 16; the true
+count was 31.** The gate now matches on what is being CAST rather than on how the
+value was produced — any `${…}` before a `::jsonb` that is not `::text::jsonb` —
+which is deliberately wider than the defect. A false positive goes in the
+baseline like the rest; the old pattern's narrowness was not precision, it was
+blindness. Server-side casts (`ST_AsGeoJSON(...)::jsonb`) are excluded by
+construction, since no parameter passes through the driver.
+
+Third instrument-blindness finding of this campaign, after the NUL byte and the
+test-suite driver. The first two were somebody else's tools. **Apply the question
+to your own: before trusting a measurement, ask what the instrument cannot see —
+including the one you built this morning to answer exactly that.**
+
+### What the widened gate found immediately
+
+`analytics/dashboard` — **every saved dashboard layout was silently discarded.**
+`writeLayout` cast `JSON.stringify(widgets)` with a single `::jsonb`; `readLayout`
+does `if (!Array.isArray(raw)) return null`. Measured under Bun.SQL, the driver
+the engine runs:
+
+```
+${json}::jsonb        jsonb_typeof=string   "[\"tasks\",\"revenue\"]"   Array.isArray false -> layout DISCARDED
+${json}::text::jsonb  jsonb_typeof=array    ["tasks","revenue"]        Array.isArray true  -> layout restored
+```
+
+A user rearranged their dashboard, the save answered success, the row was
+written, and the next page load showed the default. `readLayout` returning null
+reads as "this user has not personalised anything" — indistinguishable from a
+fresh account, which is why it never looked like a fault. Invisible to the test
+suite, which is on `pg`, where the same statement behaves correctly.
+
+Fixed, with migration `003_widgets_unwrap_string.sql` to recover the rows already
+damaged — without it, the route fix helps only people who rearrange their
+dashboard again.
+
+**And that migration was wrong on its first draft**, in a way worth recording.
+It was one statement:
+
+```sql
+UPDATE zv_dashboard_layouts SET widgets = (widgets #>> '{}')::jsonb
+ WHERE jsonb_typeof(widgets) = 'string'
+   AND jsonb_typeof((widgets #>> '{}')::jsonb) = 'array';
+```
+
+Postgres does not guarantee the second condition is evaluated only for rows that
+passed the first, so a single string that is not valid JSON aborted the whole
+migration — `ERROR: invalid input syntax for type json` — and the damaged rows it
+existed to rescue were left exactly as they were. **Caught only because the probe
+seeded all three states** (damaged, healthy, and a string that is not JSON)
+before believing it. Now a per-row loop with an exception handler; verified
+recovering the damaged row, leaving the healthy one, warning about the third, and
+idempotent on a second run.
+
+### Engine-side: `EXTENSION_TABLE_GRANTS` is inert for 13 of 18 entries
+
+`buildAllowedTables` uses the grant set in exactly one place — to suppress the
+"this is an engine table" warning on a `CREATE TABLE` found in the extension's
+own migrations. It is **never added to the allowlist**. So a granted engine table
+the extension does not itself create never becomes reachable. Measured through
+the real `createRestrictedDb` with the real allowlist, running the query each
+extension actually makes:
+
+```
+developer/edge-functions | zv_edge_functions   | REFUSED   routes.ts:53
+content/media            | zv_media_files      | REFUSED   routes.ts:89
+content/drafts           | zv_revisions        | REFUSED   routes.ts:367
+developer/validation     | zv_validation_rules | REFUSED   routes.ts:308
+storage/cloud            | zv_media_files      | REFUSED   its /files route
+content/media            | zv_storage_quotas   | query ran     <- control, a grant that DOES land
+ai                       | zvd_collections     | query ran     <- control, zvd_ needs no grant
+```
+
+The three comments in `register.ts` claiming a measured cost — "four of
+storage/cloud's thirteen GETs", "two of content/documents' seven", the
+edge-functions listing page — describe breakage that is **still there**. Each was
+written from reading, not from re-running after the entry was added. The rule
+stated at `register.ts:96-101` is exactly backwards: entries where the extension
+does not create the table are called "the only thing standing", and they are
+precisely the inert ones.
+
+Sent to `zveltio-9f` with the one-line fix (`new Set<string>(granted)`). Nothing
+to change on the extensions side.
+
+### Verified
+
+Virgin database, all eight `ai` migrations. Two-tenant write scoping as
+`zveltio_rls` with the GUC set — all 11 owned tables ENABLE+FORCE with a policy,
+cross-tenant read/update/delete/insert all refused, **with the positive control**
+that the role can still act on its own tenant. 652 pass / 2 skip / 0 fail from
+scratch. Eight repo gates green. Both bundles repacked, `check-bundle-sources`
+green, and the packed `ai/engine/index.js` inspected: the new guard present, one
+`SET TRANSACTION READ ONLY` (the shared helper), zero `zv_ddl_jobs`.
+
+The 16 new tests in `ai/engine/lib/sql-guard.test.ts` were checked the way this
+campaign requires: reverting `tableReferences` turns exactly the five bypass
+tests red and leaves the other eleven green.
 
 ---
 
@@ -214,9 +380,13 @@ Both found by accident, both invalidating results taken with them:
   `testing/ext-harness.ts` is on `pg`; the engine runs `Bun.SQL`. The
   `${JSON.stringify(x)}::jsonb` defect exists only under the latter, which is why
   it has only ever been found by hand on a live engine.
-  `scripts/check-jsonb-cast.ts` ratchets the 16 remaining sites.
+  `scripts/check-jsonb-cast.ts` ratchets the remaining sites.
+- **The jsonb ratchet itself, one day old.** It matched one spelling of four and
+  reported 16 sites where there were 31. Section 3 has the detail. It found a
+  live defect the moment it was widened.
 
-Before trusting a measurement, ask what the instrument cannot see.
+Before trusting a measurement, ask what the instrument cannot see — including the
+instrument you built to answer that question.
 
 ---
 
@@ -258,7 +428,7 @@ largest first, because size is where the unexamined surface is.
 | # | extension | lines | state |
 |---|---|---:|---|
 | 1 | `content/pages` | 7078 | **`reviewed`** — engine/ and client/. Studio side not covered. |
-| 2 | `ai` | 5838 | `scanned` only |
+| 2 | `ai` | 5838 | **`reviewed`** — engine/ only. Studio side not covered. |
 | 3 | `communications/mail` | 3959 | `repaired` (one defect), not reviewed |
 | 4 | `operations/traceability` | 2205 | `scanned` only |
 | 5 | `storage/cloud` | 2083 | `scanned` only |
