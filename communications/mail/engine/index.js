@@ -72893,7 +72893,7 @@ async function buildAuth(db, account) {
   }
   let token2 = account.oauth2_access_token ?? null;
   if (isExpired(account.oauth2_expires_at) && account.oauth2_refresh_token) {
-    const cfgRow = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
+    const cfgRow = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
     const raw2 = cfgRow.rows[0]?.value;
     const cfg = typeof raw2 === "string" ? JSON.parse(raw2) : raw2 ?? {};
     const creds = credentialsFor(account.oauth2_provider, cfg);
@@ -90365,7 +90365,7 @@ Your message "${m.subject}" was read on ${new Date().toLocaleString()}.`;
     const redirectUri = typeof body.redirect_uri === "string" ? body.redirect_uri : "";
     if (!redirectUri)
       return c.json({ error: "redirect_uri is required" }, 400);
-    const cfgRow = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
+    const cfgRow = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
     const cfg = readMailConfig(cfgRow.rows[0]);
     const creds = credentialsFor(provider, cfg);
     if (!creds) {
@@ -90408,7 +90408,7 @@ Your message "${m.subject}" was read on ${new Date().toLocaleString()}.`;
     if (!claimed.rows[0])
       return c.json({ error: "Invalid or expired state" }, 400);
     const { account_id, provider, redirect_uri } = claimed.rows[0];
-    const cfgRow = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
+    const cfgRow = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
     const cfg = readMailConfig(cfgRow.rows[0]);
     const creds = credentialsFor(provider, cfg);
     if (!creds)
@@ -90449,7 +90449,7 @@ Your message "${m.subject}" was read on ${new Date().toLocaleString()}.`;
     const isAdmin = await checkPermission(user.id, "admin", "*");
     if (!isAdmin)
       return c.json({ error: "Admin required" }, 403);
-    const config2 = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
+    const config2 = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
     return c.json({ config: readMailConfig(config2.rows[0]) });
   });
   app.put("/admin/config", zValidator("json", exports_external.object({
@@ -90475,13 +90475,13 @@ Your message "${m.subject}" was read on ${new Date().toLocaleString()}.`;
     const isAdmin = await checkPermission(user.id, "admin", "*");
     if (!isAdmin)
       return c.json({ error: "Admin required" }, 403);
-    const current = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
+    const current = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
     const existing = readMailConfig(current.rows[0]);
     const merged = { ...existing, ...c.req.valid("json") };
     await sql`
-      INSERT INTO zv_settings (key, value, description, is_public)
-      VALUES ('mail', ${JSON.stringify(merged)}::text::jsonb, 'Mail client configuration (admin)', false)
-      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+      INSERT INTO zvd_mail_config (config)
+      VALUES (${JSON.stringify(merged)}::text::jsonb)
+      ON CONFLICT (tenant_id) DO UPDATE SET config = EXCLUDED.config, updated_at = NOW()
     `.execute(db);
     return c.json({ success: true });
   });
@@ -90514,7 +90514,8 @@ var extension = {
       join(import.meta.dir, "migrations/001_mail.sql"),
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
       join(import.meta.dir, "migrations/003_attachment_part.sql"),
-      join(import.meta.dir, "migrations/004_oauth_state.sql")
+      join(import.meta.dir, "migrations/004_oauth_state.sql"),
+      join(import.meta.dir, "migrations/005_config_own_table.sql")
     ];
   },
   async register(app, ctx) {
@@ -90531,7 +90532,7 @@ var extension = {
           const { sql: sql3 } = await Promise.resolve().then(() => (init_dist(), exports_dist));
           const { syncImapAccount: syncImapAccount2 } = await Promise.resolve().then(() => (init_imap_client(), exports_imap_client));
           const db = ctx.db;
-          const cfgRow = await sql3`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
+          const cfgRow = await sql3`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
           const raw2 = cfgRow.rows[0]?.value;
           const cfg = typeof raw2 === "string" ? JSON.parse(raw2) : raw2 ?? {};
           const minutes = Number(cfg.sync_interval_minutes);

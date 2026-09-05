@@ -96,8 +96,13 @@ d('mail: OAuth2 connect flow', () => {
     pool = new (pg.Pool ?? pg.default.Pool)({ connectionString: DB_URL, max: 2 });
 
     await pool.query(
-      `INSERT INTO zv_settings (key, value) VALUES ('mail', $1::jsonb)
-       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      // `zvd_mail_config`, not `zv_settings` — migration 005 moved the mail
+      // configuration into this extension's own table. Seeding the old one kept
+      // this test green for the wrong reason: the migration ADOPTS whatever is in
+      // `zv_settings`, so on a database where a previous run had seeded it the
+      // new table was already populated. On a genuinely fresh database it failed.
+      `INSERT INTO zvd_mail_config (config) VALUES ($1::jsonb)
+       ON CONFLICT (tenant_id) DO UPDATE SET config = EXCLUDED.config`,
       [
         JSON.stringify({
           oauth2_gmail_client_id: 'client-abc',

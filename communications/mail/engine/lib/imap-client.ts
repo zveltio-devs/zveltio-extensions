@@ -123,7 +123,7 @@ async function buildAuth(
   let token = account.oauth2_access_token ?? null;
 
   if (isExpired(account.oauth2_expires_at) && account.oauth2_refresh_token) {
-    const cfgRow = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
+    const cfgRow = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
     const raw = (cfgRow.rows[0] as { value?: unknown } | undefined)?.value;
     const cfg: Record<string, unknown> =
       typeof raw === 'string' ? JSON.parse(raw) : ((raw as Record<string, unknown>) ?? {});
