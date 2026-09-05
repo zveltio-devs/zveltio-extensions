@@ -1,6 +1,353 @@
 # ai — context
 
-Reviewed 2026-08-10/11. **Status: not `verified`.** The three checks in section G
+**Status 2026-09-05: `reviewed` for `engine/`.** Every file under `engine/` read
+end to end, every guard exercised, every write demonstrated on a two-tenant
+database, all eight migrations applied to a virgin database. The Studio side
+(`studio/schemas/ai.json`, `studio/src/`) is NOT covered — that belongs to a
+Studio review. See "Section 3 of the review campaign" below for what that pass
+found and fixed; everything under it is the earlier August pass, kept because it
+records traps that are still live.
+
+The August note below said "not `verified`" because section G needed a working
+embedder. That is still true of the *quality* of answers. It is no longer true of
+the code paths, which are what a review can settle.
+
+---
+
+# Section 3 of the review campaign — 2026-09-05
+
+Nine defects. The shape that produced most of them is one shape: **this
+extension has two of everything, and the repairs only ever landed on one copy.**
+Two raw-SQL surfaces, two DDL paths, two embedding call sites, two auth gates.
+Every time, the hardened one is the one someone was looking at when they found
+the bug, and its twin kept the original defect — usually with a comment on the
+fixed copy describing precisely the problem the other one still had.
+
+## 1. The text-to-SQL allowlist could be walked around with a comma
+
+`routes/ai-query.ts` builds an allowlist of the caller's own collections and
+refuses any table outside it. The comment above it says what it is for:
+
+> Better-Auth keeps `user`, `session`, `account`, `verification` and `twoFactor`,
+> none of them with RLS. Any authenticated user with read on ONE collection could
+> ask, in natural language, for session tokens or password hashes.
+
+`tableReferences` collected identifiers with
+`\b(?:from|join)\s+(IDENT)` — the FIRST identifier after each `FROM` or `JOIN`.
+A comma-separated FROM list is a join, and the second item was never seen.
+Measured, permitted set `{ zvd_products }`:
+
+```
+SELECT * FROM zvd_products p CROSS JOIN "user" u       refused
+SELECT * FROM zvd_products WHERE id IN (SELECT id ...) refused
+SELECT u.email FROM zvd_products p, "user" u           ALLOWED   refs=[zvd_products]
+SELECT s.token FROM zvd_products p, session s          ALLOWED   refs=[zvd_products]
+SELECT * FROM zvd_products, account, verification      ALLOWED   refs=[zvd_products]
+```
+
+Any authenticated user with read on one collection, through a sentence.
+
+**Why nobody saw it.** The soundness argument in the doc comment was backwards,
+and it is the kind of backwards that reads as correct:
+
+> a reference it fails to recognise is simply not on the permitted list, so the
+> query is refused rather than allowed.
+
+True of a reference the function RETURNS. One it fails to recognise is not
+returned, so it is never compared against anything — the loop iterates what came
+back. Unrecognised meant unexamined, not refused.
+
+**Fixed** by reading the FROM clause as the list it is: `splitTopLevel` splits on
+top-level commas, `fromClauseBody` stops at the keyword that ends the clause,
+each item contributes its leading identifier. And the recognition argument is now
+true rather than only stated: `unresolvedTablePosition` reports a table position
+the scanner cannot read, and `validateGeneratedSQL` refuses on it. The next form
+nobody thought of costs a refused query instead of a silent hole.
+
+`engine/lib/sql-guard.test.ts` covers it — 16 tests. Verified the way this
+campaign requires: reverting `tableReferences` to its old form turns exactly the
+five bypass tests red and leaves the other eleven green.
+
+## 2. The assistant had the same tool with none of that
+
+`execute_sql` and `text_to_sql` in `lib/zveltio-ai/engine.ts` ran model-written
+SQL behind `startsWith('SELECT')` and `normalized.includes(kw)` over seven
+keywords. No allowlist, no `pg_*` block, no `information_schema` block, no
+multi-statement check. `SELECT token FROM session` passes all of it.
+
+Admin-gated, so this is a bound rather than an open door — but the gate is
+`checkPermission(userId, 'admin', '*')`, which a **tenant** administrator passes,
+and `user`/`session`/`account` are instance-wide with no policy. A tenant admin
+could read every other company's password hashes by asking for them in a chat
+window.
+
+`includes` is not word-bounded either, so a column named `updated_at` tripped the
+UPDATE rule and refused a legitimate query. Wrong in both directions at once.
+
+**Fixed:** both tools now call the same `validateGeneratedSQL`, moved into
+`engine/lib/sql-guard.ts` so there is one implementation to get right. Extracting
+it was also the only way to test it: `ai-query.ts` imports Hono, and importing
+that from a test in this repository fails in module resolution before any
+assertion runs — a decent explanation for why the most security-relevant
+branching in this extension had no unit test at all.
+
+`text_to_sql` had a third defect of its own: the schema it showed the model was
+the first ten collections on the instance, unfiltered by what the caller may
+read. The schema context IS the allowlist now — one derivation feeds both what
+the model is told and what the validator permits, so they cannot drift.
+
+And its system prompt told the model that collection `orders` becomes table
+`zv_orders`. It is `zvd_orders`; `zv_` is the engine's namespace, where api keys
+and sessions live. Every generated query named a table that does not exist, and
+the one shape that would have hit a real table pointed at engine data.
+
+## 3. The read-only window leaked into the whole request — twice
+
+Both tools wrapped their query in:
+
+```ts
+await this.db.transaction().execute(async (trx) => {
+  await sql`SET TRANSACTION READ ONLY`.execute(trx);
+  return sql.raw(query).execute(trx);
+});
+```
+
+`ctx.db.transaction()` JOINS the request's tenant transaction rather than
+nesting — `extension-context.ts` returns `execute: (fn) => fn(target)`, no
+`BEGIN`, same handle. So the flag applied from there to the end of the request.
+Measured on Postgres 18 in exactly that shape:
+
+```
+the tool's own SELECT            -> ran
+saveConversation, same request   -> cannot execute INSERT in a read-only transaction
+anything after that              -> current transaction is aborted (25P02)
+```
+
+An admin who asked the assistant anything that made it reach for SQL got the
+answer, and then the conversation was never saved, `remember_fact` could not
+write, and the request's COMMIT quietly became a ROLLBACK.
+
+**This is the third instance of this exact defect in this extension.** The doc
+comment on `runReadOnly` in `ai-query.ts` describes it in full — it was written
+when the same bug was fixed on the route in an earlier pass — and the two copies
+in `engine.ts` were never touched. Both now use that same helper. The savepoint
+form is measured both ways: a write inside the window is refused, a write after
+it commits and survives the COMMIT.
+
+## 4. `remember_fact` failed on every call, and blamed migrations
+
+`AIProvider.embed()` returns `{ embedding: number[]; model: string }`. Both call
+sites in `engine.ts` stored `JSON.stringify` of the **whole object** into a
+`vector` column:
+
+```
+JSON.stringify(embedResult)   -> invalid input syntax for type vector:
+                                 "{"embedding":[0.01,…],"model":"…"}"
+JSON.stringify(.embedding)    -> accepted
+```
+
+`ai.ts` and `ai-embed-hook.ts` do it correctly (`vec.embedding`); the assistant's
+two call sites do not. Fourth pair.
+
+Then the `.catch` reported it as **"Memory service not available. Run migrations
+first."** — sending the operator to look at migrations that are fine, for an
+error that is a malformed literal. And the failing INSERT aborts the request's
+transaction, so `saveConversation` went down with it.
+
+The failure mode is worth keeping: with **Anthropic** as the default provider
+there is no `embed`, the branch is skipped and the tool works. With **OpenAI or
+Ollama** it fails every time. Whether the assistant could remember anything
+depended on which provider was default.
+
+## 5. `recall_facts` never worked, and tier 3 was unreachable
+
+Three tiers: vector search, full-text, then plain importance ordering. Tier 2 was
+
+```ts
+.where((this.db as any).raw(`... plainto_tsquery('english', ?)`, [query]))
+```
+
+Kysely has had no `db.raw` since 0.23; this repository is on 0.29.5, where
+`Kysely.prototype.raw` is `undefined`. And `.raw(...)` is called while BUILDING
+the query, so the TypeError is thrown synchronously — past the `.catch` on the
+promise, straight into the function's outer catch. Tier 3 was unreachable.
+Measured through the real restricted handle:
+
+```
+tier 2: (this.db as any).raw(...)   -> TypeError: db.raw is not a function
+tier 3: the plain fallback          -> ok, returns the rows
+```
+
+So `recall_facts` answered **"Memory service not available."** on every call ever
+made — with or without an embedding provider, with or without memories stored —
+while the system prompt instructs the model to "use recall_facts at the start of
+conversations about preferences". The `?` placeholder was wrong too; Postgres
+wants `$1`, so it could not have run even with a `raw` to call it on. Tier 1 had
+the same EmbedResult defect as §4.
+
+## 6. `create_collection` and `add_field` were refused by the table guard
+
+Both wrote `ctx.db.insertInto('zv_ddl_jobs')`. That is an engine table and this
+extension has no grant for it. Measured through the real restricted handle built
+from the real allowlist:
+
+```
+insertInto('zv_ddl_jobs')      -> ExtensionSecurityError: Extension "ai"
+                                  attempted to access table "zv_ddl_jobs"
+selectFrom('zvd_collections')  -> ok       (control)
+```
+
+Two of the fourteen tools the system prompt advertises threw on every call.
+
+Broken twice over: the engine moved DDL onto pg-boss, and `zv_ddl_jobs` is now
+"preserved for historical queries" (`ddl-queue.ts:21`) with no consumer at all.
+**Granting the table would have been the wrong repair** — it turns a refusal into
+a row nothing reads, which is a create_collection that reports success and never
+happens. Worse than the exception.
+
+`ai-schema-gen.ts` enqueues the same two job types through
+`internals.enqueueDDLJob`, on the host's own handle, and always did. Fifth pair.
+Both tools now go through it. The payload is passed as an object, not a JSON
+string: `enqueueDDLJob` serialises it itself, and a string produced a
+double-encoded payload.
+
+## 7. `recentActivity` was empty on every installation
+
+`buildContext` read `zv_audit_log` — another engine table with no grant — under a
+bare `catch {}`, which turned the refusal into `[]`. So the model's context
+carried "no recent activity" as a fact, on every install, for a reason no log
+recorded.
+
+`toolGetSystemStats` had already reached the same conclusion about the same two
+tables and says so out loud instead of reporting zero. This follows it. Restoring
+the query needs `zv_audit_log` in `EXTENSION_TABLE_GRANTS`, which is a decision
+about what an assistant may see, not a repair — so it is **not** made here.
+
+## 8. One router's `use('*')` was the gate for five others
+
+`buildAIRoutes` mounts every sub-router at `/`, and Hono's `route()` copies a
+sub-app's middleware into the parent at the mount prefix. `ai-chats.ts` had
+`app.use('*', requireAuth)`, which therefore registered at `/*` for the whole
+extension. Measured with Hono 4.13.5 and the real mount order:
+
+```
+/providers                    200   ai.ts          registered BEFORE, not gated
+/search                       200   ai.ts          registered BEFORE, not gated
+/chats                        401   ai-chats
+/generate-schema/field-types  401   ai-schema-gen  gated by ai-chats
+/query/history                401   ai-query       gated by ai-chats
+/analytics/summary            401   ai-analytics   gated by ai-chats
+```
+
+Whether a router was authenticated depended on its POSITION in `buildAIRoutes`.
+No route relied on it — each of those declares its own auth — so the visible cost
+was a second `auth.api.getSession()` on every request to five sub-routers. The
+invisible cost is that reordering that list would have moved the gate silently.
+
+This is the same mechanism that once made the entire extension admin-only; the
+note in `ai-schema-gen.ts` records it, and that router was narrowed for exactly
+this reason. This one was left on `'*'`. Sixth pair.
+
+Now bound to its own six paths, and verified: all nine `ai-chats` routes still
+gated, the siblings gated by their own middleware.
+
+## 9. Smaller, with the reason each was worth changing
+
+- **`/search`'s ILIKE fallback did `SELECT *`.** The other two branches of the
+  same endpoint return `{ record_id, content, score }`. `checkPermission(user,
+  collection, 'read')` is collection-level; the product also ships column-level
+  permissions, which `/api/data` applies and this did not — so a role forbidden
+  from seeing `salary` got it back by searching for a substring in it. Narrowed
+  to the shared shape, which closes it without needing role plumbing here.
+- **`logUsage`'s bare `SAVEPOINT`.** Legal only inside a transaction block; off a
+  pool handle Postgres answers `SAVEPOINT can only be used in transaction blocks`
+  (measured), the catch logs it and the INSERT never runs. There is nothing to
+  protect there anyway — with no enclosing transaction a failed statement damages
+  only itself. Now checks `isTransaction` first.
+- **`chart_config` was written with a single `::jsonb`.** A no-op under Bun.SQL;
+  the column held a JSON string scalar. Nothing reads it today (`/history`
+  selects nine columns and that is not one), so this stored a malformed value
+  nobody looked at — corrected rather than left, because the first reader would
+  inherit the bug and would look for it in their own code.
+- **Two references to "migration 009".** This extension has eight. The RLS the
+  comments credit to 009 is in `001_initial.sql` (`zvd_ai_embeddings`) and
+  `004_tenant_rls.sql` (everything else). Verified in the files.
+- **A Romanian comment** in `ai-embed-hook.ts`, in a repository whose stated
+  convention is English.
+- **Silent catch on `collectionCount`.** That number goes into the system prompt
+  as "The platform has N collections", so a swallowed failure tells the model
+  there are none and the model tells the user so. Named now.
+
+## Deliberately NOT changed
+
+- **`ai.providers` is still a process-wide singleton keyed only by provider
+  name**, while `zv_ai_providers` is tenant-scoped. Company B's
+  `PUT /providers/openai` still replaces the object company A is using. Unchanged
+  for the reason the August note gives: `getDefault()` is synchronous, has four
+  consumers in other extensions plus the flow executor, and the host exposes no
+  synchronous current-tenant. Needs `ctx.tenantId` first. **This is the largest
+  thing still open in this extension.**
+- **`endpoint-guard.ts` does not resolve DNS.** A hostname that resolves to
+  169.254.169.254 passes. Closing it means an async lookup inside a zod
+  `superRefine`, and the guard deliberately permits private ranges (Ollama), so
+  the check has to be "resolves to a metadata address" rather than "resolves to a
+  private one". Worth doing; not worth doing blind at the end of a review.
+- **The alchemist session cache key is `alchemist:${id}`, not tenant-prefixed.**
+  The id is 16 chars of CSPRNG (~95 bits), and the routes are admin-only, so this
+  is exposure only if an id leaks. But the cache is instance-wide and holds up to
+  5000 characters of every uploaded document. Flagged, not changed: whether the
+  engine's cache namespaces by tenant is an engine question.
+- **`/alchemist/execute` never compares its `session_id` against the cached
+  proposal.** `collections` and `extracted_data` come from the request body, so
+  the "user confirms the schema" step confirms nothing and `session_id` is used
+  only to delete the cache entry. Admin-only, so it grants nothing they lack —
+  but it is not the flow the endpoint documents.
+- **The 13 remaining `::jsonb` sites** in other extensions. See
+  `docs/private/CAMPAIGN-PROGRESS.md`; each needs its consumer read first, and
+  that is those extensions' sections.
+
+## Engine-side, handed to the session working there
+
+- **`EXTENSION_TABLE_GRANTS` is inert for 13 of its 18 entries**, including
+  `ai: ['zv_flows']`. A grant only ever suppresses a warning about a `CREATE
+  TABLE` the extension already wrote; it is never added to the allowlist. Six
+  extensions are 500ing on install because of it. Measured end to end with two
+  positive controls and sent to `zveltio-9f`. `ai`'s own entry is inert and costs
+  nothing — it only ALTERs `zv_flows`, in a migration, on a different handle.
+- **The transaction-join shim's `setIsolationLevel` and `setAccessMode` are
+  silent no-ops** (`extension-context.ts`). An extension calling
+  `.setAccessMode('read only')` gets read-write and no error. Worth a throw.
+
+## What was verified, and how
+
+- **All eight migrations on a virgin database** (`zv_ai_s1`, engine schema via
+  the migrate CLI, then each extension migration with the `-- DOWN` section cut).
+  All eight apply.
+- **Two-tenant write scoping**, as `zveltio_rls` (NOSUPERUSER, NOBYPASSRLS) with
+  the tenant GUC set — not as superuser, which has BYPASSRLS implicitly and would
+  have proved nothing:
+
+  ```
+  all 11 owned tables:  relrowsecurity=true  relforcerowsecurity=true  1 policy
+  scoped to tenant A    READ: 1 of 2 conversations visible
+  UPDATE tenant B    -> 0 rows
+  DELETE tenant B    -> 0 rows
+  INSERT into B      -> new row violates row-level security policy
+  control, own tenant-> UPDATE 1, INSERT accepted, DELETE 1
+  recall_facts sees  -> a-secret only (1 of 2 memories)
+  ```
+
+  The control is the half that makes the rest mean anything.
+- **652 pass / 2 skip / 0 fail** on a database built from scratch, all three
+  environment flags set. Eight repo gates green.
+- **The bundle repacked and checked**: `check-bundle-sources` green, and the
+  packed `engine/index.js` verified to carry the new guard, one `SET TRANSACTION
+  READ ONLY` (the shared helper, not the two leaking copies) and zero references
+  to `zv_ddl_jobs`.
+
+---
+
+Reviewed 2026-08-10/11. **Status then: not `verified`.** The three checks in section G
 of `REVIEW-CHECKLIST.md` all need a working embedding provider (OpenAI key or a
 local Ollama), which nobody has had here yet. What follows was verified against a
 real Postgres 18 + pgvector, the extension's own migrations, and the packed
@@ -67,9 +414,12 @@ query they had just run answered `No access to table "zvd_…"`.
   alone. Do not "clean this up" without that decision.
 - `zvd_ai_search_config` is written by nobody and read by nobody. Confirmed by grep
   across both repos. It duplicates the three columns above and is dead either way.
-- `zv_prompt_templates` has **no `tenant_id`** and is not in migration 004's RLS
-  list, so prompt templates are instance-wide. That may be intended (they are
-  seeded), but it means one company's templates are visible to all of them.
+- ~~`zv_prompt_templates` has **no `tenant_id`**~~ — **fixed since, in migrations
+  007 and 008.** 007 added the column, the GUC default, the backfill and a
+  `(tenant_id, name)` unique key; 008 added the policy 007 had delegated to a
+  reconciler that could not act on a table with no policy of its own. Verified in
+  the catalog on 2026-09-05: `relrowsecurity`, `relforcerowsecurity` and one
+  policy on all eleven tables this extension owns. Do not re-report this.
 - Migration **006** widened the two unique keys 005 missed:
   `zvd_ai_embeddings(tenant_id, collection, record_id, field)` and
   `zv_ai_memory(tenant_id, user_id, context_key)`. Both failure modes were
