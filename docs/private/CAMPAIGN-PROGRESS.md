@@ -164,6 +164,92 @@ new installs and for nobody who already uses the product.
 
 ---
 
+## The method, and the failure mode it keeps finding
+
+Written here rather than left in three CONTEXT files, because it has now happened
+four times in one day across two repositories and it is worth more than any single
+defect either session has fixed.
+
+### Tests that pass for the wrong reason
+
+Not missing tests — **present tests, green, asserting nothing**. Four independent
+instances on 2026-09-05:
+
+| where | what made it green |
+|---|---|
+| `hydrate.test.ts` (47/47) | The `zvd_` prefix guard removed — the exact 2026-08-16 vulnerability, where an anonymous render returned every account on the instance — and every test still passed. The registry check carried them all. |
+| `oauth-flow.test.ts` | Stayed green after the mail config moved tables, because migration 005 ADOPTS from `zv_settings` and a previous run had seeded it. It only failed on a database built from scratch. |
+| engine `runQualityScan`, ~30 tests | Passed *because of* a `= DEFAULT_TENANT_ID` default they never overrode. They were encoding the defect. |
+| engine `check:atomic-writes` baseline | Writes were atomic only because the request transaction happened to span them — true today, and the boundary is moving. |
+
+The shape is the same every time: the test exercises a path that reaches the right
+answer through a mechanism other than the one under test. Green means "something
+worked", not "this worked".
+
+### What to do about it, concretely
+
+**Remove the guard. Demand the test fail. Restore it.** One edit, one run, one
+revert — cheap enough to do for every guard rather than only for the ones you
+doubt. If nothing fails, the guard is untested no matter how many tests surround
+it, and you have just found the gap for free.
+
+Two rules that fall out of doing this:
+
+- **Build the database from scratch** before believing a suite. Adoption logic,
+  seeds and leftover rows from an earlier run all make a fresh defect look fixed.
+- **Assert on the anchor of every edit.** Formatting and near-duplicate code move
+  things between writing an anchor and using it. It has caught four would-be
+  mis-edits in this campaign — including one where the anchor matched TWICE
+  because a sibling route used the identical two lines.
+
+### Two instruments that could not see what they were pointed at
+
+Both found by accident, both invalidating results taken with them:
+
+- **A NUL byte** in `communications/mail/engine/routes.ts` made `grep` skip the
+  whole 1658-line file silently — exit 1, no output, indistinguishable from "no
+  matches". This campaign is grep-shaped. Any count taken by grep before
+  2026-09-05 is a floor. `scripts/check-no-nul-bytes.ts` guards it now.
+- **The test suite uses a different Postgres driver than production.**
+  `testing/ext-harness.ts` is on `pg`; the engine runs `Bun.SQL`. The
+  `${JSON.stringify(x)}::jsonb` defect exists only under the latter, which is why
+  it has only ever been found by hand on a live engine.
+  `scripts/check-jsonb-cast.ts` ratchets the 16 remaining sites.
+
+Before trusting a measurement, ask what the instrument cannot see.
+
+---
+
+## Rebuilding the environment
+
+The recipe, corrected — `psql -f` on the engine's `001_initial.sql` fails partway
+and leaves a half-built schema that looks plausible. Use the CLI:
+
+```bash
+createdb zv_<yours>
+psql "postgresql://postgres:postgres@localhost:5432/zv_<yours>" \
+  -c "CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS vector;"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/zv_<yours>" NODE_ENV=test \
+  bun /home/liviu/zveltio/packages/cli/src/index.ts migrate      # 72 tables
+```
+
+Then the suite, with all three flags — without any one of them it lies:
+
+```bash
+NODE_ENV=test REGISTRY_URL=http://127.0.0.1:9 BETTER_AUTH_SECRET=... \
+TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/zv_<yours>" bun test
+```
+
+`NODE_ENV=test` or you get dozens of false failures; `REGISTRY_URL` pointed at a
+dead port or tests dial the real registry and pay 5000 ms somewhere else each run;
+`TEST_DATABASE_URL` or the contract suite self-skips and reports green.
+
+**Your own database per session.** Two sessions on one database destroy each
+other, and the symptom looks like an authorisation regression rather than a
+collision.
+
+---
+
 ## Sections not started
 
 Nothing below has been touched by this campaign. The order follows the handoff:
