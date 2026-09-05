@@ -15,9 +15,15 @@ has to re-derive from the code what has already been covered.
 | `repaired` | a specific defect was found, fixed, and the fix verified against a real database. Everything NOT part of that defect is untouched. |
 | `reviewed` | the §6 bar in the handoff: every file read end to end, every guard **exercised**, every write checked on a two-tenant database, migrations applied to a virgin AND an upgraded database. |
 
-Nothing is `reviewed` yet. Saying so plainly is the point of this file — 52 of the
-56 rows in `REVIEW-STATUS.md` read "verified", and that word means the August
-button-pressing pass (section G), not this campaign.
+**One extension is `reviewed`: `content/pages`.** The other 55 are not, and 52 of
+the 56 rows in `REVIEW-STATUS.md` read "verified" — that word means the August
+button-pressing pass (section G), not this campaign. The two bars are not the
+same and the banner on that file says so.
+
+`reviewed` here covers `engine/` and `client/`. It does NOT cover the Studio side
+(`studio/schemas/*.json`, the builder under `studio/src/`), which is where an
+author actually works and which belongs to a Studio review. Nobody should read
+the word as covering it.
 
 ---
 
@@ -80,7 +86,7 @@ does not depend on anyone reading this file.
 
 ---
 
-## Section 2 — `content/pages` · in progress · 2026-09-05
+## Section 2 — `content/pages` · **reviewed** · 2026-09-05
 
 Full detail in [../../content/pages/CONTEXT.md](../../content/pages/CONTEXT.md).
 Two authorisation defects fixed, one untested guard covered, and a
@@ -165,7 +171,7 @@ largest first, because size is where the unexamined surface is.
 
 | # | extension | lines | state |
 |---|---|---:|---|
-| 1 | `content/pages` | 7078 | `repaired` (one defect), not reviewed |
+| 1 | `content/pages` | 7078 | **`reviewed`** — engine/ and client/. Studio side not covered. |
 | 2 | `ai` | 5838 | `scanned` only |
 | 3 | `communications/mail` | 3959 | `repaired` (one defect), not reviewed |
 | 4 | `operations/traceability` | 2205 | `scanned` only |
