@@ -31134,8 +31134,24 @@ function placeholdersIn(block) {
 function toJsonb(value) {
   return sql`${JSON.stringify(value ?? null)}::text::jsonb`;
 }
+// content/pages/engine/tenant.ts
+class TenantUnresolved extends Error {
+  constructor() {
+    super("This request could not be attributed to a tenant. An `x-tenant-slug` naming " + "an unknown or suspended tenant resolves to nothing, and serving the default " + "tenant's content instead would cross a boundary the caller did not ask to cross.");
+    this.name = "TenantUnresolved";
+  }
+}
+function tenantIdOrNull(c) {
+  return c.get("tenant")?.id || null;
+}
+function tenantId(c) {
+  const id = c.get("tenant")?.id;
+  if (!id)
+    throw new TenantUnresolved;
+  return id;
+}
+
 // content/pages/engine/sites.ts
-var DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 var SiteCreateSchema = exports_external.object({
   name: exports_external.string().min(1).max(100),
   slug: exports_external.string().min(1).max(50).regex(/^[a-z0-9-]+$/),
@@ -31196,9 +31212,6 @@ var PageCreateSchema = exports_external.object({
 });
 var PageUpdateSchema = PageCreateSchema.partial();
 var ReorderSchema = exports_external.object({ ids: exports_external.array(exports_external.string().uuid()).min(1) });
-function tenantId(c) {
-  return c.get("tenant")?.id ?? DEFAULT_TENANT_ID;
-}
 async function hasRole(getUserRoles, user, allowed) {
   if (allowed.length === 0)
     return true;
@@ -31588,10 +31601,6 @@ var ICON_NAMES = Object.keys(ICONS).sort();
 var MOTION_TYPES = ["none", "fade", "up", "down", "left", "right", "zoom"];
 
 // content/pages/engine/editor.ts
-var DEFAULT_TENANT_ID2 = "00000000-0000-0000-0000-000000000001";
-function tenantId2(c) {
-  return c.get("tenant")?.id ?? DEFAULT_TENANT_ID2;
-}
 function rateLimit(max, windowMs) {
   const hits = new Map;
   return async (c, next) => {
@@ -31879,7 +31888,7 @@ function editorRoutes(ctx) {
     if (!page)
       return c.json({ error: "Page not found" }, 404);
     const raw2 = typeof page.blocks === "string" ? JSON.parse(page.blocks) : page.blocks ?? [];
-    const blocks = await resolveBlocks({ db, engine }, { user, authType: "session", tenantId: tenantId2(c) }, raw2);
+    const blocks = await resolveBlocks({ db, engine }, { user, authType: "session", tenantId: tenantId(c) }, raw2);
     return c.json({ page: { ...page, blocks } });
   });
   app.get("/:id", async (c) => {
@@ -32115,10 +32124,6 @@ function editorRoutes(ctx) {
 }
 
 // content/pages/engine/cms-routes.ts
-var DEFAULT_TENANT_ID3 = "00000000-0000-0000-0000-000000000001";
-function tenantId3(c) {
-  return c.get("tenant")?.id ?? DEFAULT_TENANT_ID3;
-}
 function metaOf(page) {
   const m = typeof page.meta === "string" ? JSON.parse(page.meta || "{}") : page.meta ?? {};
   return {
@@ -32133,10 +32138,13 @@ function publicPagesRoutes(ctx) {
   const engine = ctx.internals;
   const router = new Hono2;
   async function publicSite(c) {
-    return db.selectFrom("zv_page_sites").selectAll().where("tenant_id", "=", tenantId3(c)).where("is_public", "=", true).where("is_active", "=", true).orderBy("created_at asc").executeTakeFirst();
+    const tid = tenantIdOrNull(c);
+    if (!tid)
+      return;
+    return db.selectFrom("zv_page_sites").selectAll().where("tenant_id", "=", tid).where("is_public", "=", true).where("is_active", "=", true).orderBy("created_at asc").executeTakeFirst();
   }
   async function popupsFor(c, site, pageSlug) {
-    const rows = await db.selectFrom("zv_pages").select(["id", "title", "blocks", "popup_config"]).where("site_id", "=", site.id).where("tenant_id", "=", tenantId3(c)).where("kind", "=", "popup").where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).execute();
+    const rows = await db.selectFrom("zv_pages").select(["id", "title", "blocks", "popup_config"]).where("site_id", "=", site.id).where("tenant_id", "=", site.tenant_id).where("kind", "=", "popup").where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).execute();
     const out = [];
     for (const row of rows) {
       const cfg = typeof row.popup_config === "string" ? JSON.parse(row.popup_config || "{}") : row.popup_config ?? {};
@@ -32144,7 +32152,7 @@ function publicPagesRoutes(ctx) {
       if (targets.length > 0 && !targets.includes(pageSlug))
         continue;
       const raw2 = typeof row.blocks === "string" ? JSON.parse(row.blocks) : row.blocks ?? [];
-      const resolved = await resolveBlocks({ db, engine }, { user: null, tenantId: tenantId3(c), publicCollections: site.public_collections ?? [] }, raw2);
+      const resolved = await resolveBlocks({ db, engine }, { user: null, tenantId: site.tenant_id, publicCollections: site.public_collections ?? [] }, raw2);
       out.push({ id: row.id, title: row.title, config: cfg, blocks: sanitizeBlocks(resolved) });
     }
     return out;
@@ -32153,14 +32161,14 @@ function publicPagesRoutes(ctx) {
     const site = await publicSite(c);
     if (!site)
       return c.json({ pages: [] });
-    const pages = await db.selectFrom("zv_pages").select(["id", "title", "slug", "is_homepage"]).where("site_id", "=", site.id).where("tenant_id", "=", tenantId3(c)).where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).where("kind", "=", "page").orderBy("is_homepage desc").orderBy("title asc").execute();
+    const pages = await db.selectFrom("zv_pages").select(["id", "title", "slug", "is_homepage"]).where("site_id", "=", site.id).where("tenant_id", "=", site.tenant_id).where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).where("kind", "=", "page").orderBy("is_homepage desc").orderBy("title asc").execute();
     return c.json({ pages });
   });
   router.get("/nav", async (c) => {
     const site = await publicSite(c);
     if (!site)
       return c.json({ menus: { main: [], footer: [] } });
-    const rows = await db.selectFrom("zv_page_menus").select(["menu_key", "items"]).where("tenant_id", "=", tenantId3(c)).where("menu_key", "in", ["main", "footer"]).execute();
+    const rows = await db.selectFrom("zv_page_menus").select(["menu_key", "items"]).where("tenant_id", "=", site.tenant_id).where("menu_key", "in", ["main", "footer"]).execute();
     const menus = { main: [], footer: [] };
     for (const row of rows) {
       const items = typeof row.items === "string" ? JSON.parse(row.items) : row.items;
@@ -32173,7 +32181,7 @@ function publicPagesRoutes(ctx) {
     const site = await publicSite(c);
     if (!site)
       return c.json({ error: "Page not found" }, 404);
-    const page = await db.selectFrom("zv_pages").select(["blocks"]).where("site_id", "=", site.id).where("tenant_id", "=", tenantId3(c)).where("slug", "=", c.req.param("slug")).where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).executeTakeFirst();
+    const page = await db.selectFrom("zv_pages").select(["blocks"]).where("site_id", "=", site.id).where("tenant_id", "=", site.tenant_id).where("slug", "=", c.req.param("slug")).where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).executeTakeFirst();
     if (!page)
       return c.json({ error: "Page not found" }, 404);
     const raw2 = typeof page.blocks === "string" ? JSON.parse(page.blocks) : page.blocks ?? [];
@@ -32186,7 +32194,7 @@ function publicPagesRoutes(ctx) {
       sortDir: c.req.query("dir") === "asc" ? "asc" : "desc",
       q: c.req.query("q") || undefined
     };
-    const resolved = await resolveBlockAt({ db, engine }, { user: null, tenantId: tenantId3(c), publicCollections: site.public_collections ?? [] }, block, viewer);
+    const resolved = await resolveBlockAt({ db, engine }, { user: null, tenantId: site.tenant_id, publicCollections: site.public_collections ?? [] }, block, viewer);
     const rc = resolved.content ?? {};
     return c.json({
       data: rc._data ?? [],
@@ -32200,13 +32208,13 @@ function publicPagesRoutes(ctx) {
     const site = await publicSite(c);
     if (!site)
       return c.json({ error: "Page not found" }, 404);
-    const page = await db.selectFrom("zv_pages").selectAll().where("site_id", "=", site.id).where("tenant_id", "=", tenantId3(c)).where("slug", "=", slug).where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).where("kind", "=", "page").executeTakeFirst();
+    const page = await db.selectFrom("zv_pages").selectAll().where("site_id", "=", site.id).where("tenant_id", "=", site.tenant_id).where("slug", "=", slug).where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).where("kind", "=", "page").executeTakeFirst();
     if (!page)
       return c.json({ error: "Page not found" }, 404);
     const raw2 = typeof page.blocks === "string" ? JSON.parse(page.blocks) : page.blocks ?? [];
     const audience = {
       user: null,
-      tenantId: tenantId3(c),
+      tenantId: site.tenant_id,
       publicCollections: site.public_collections ?? []
     };
     let record2 = null;
@@ -32246,7 +32254,7 @@ function publicPagesRoutes(ctx) {
     const site = await publicSite(c);
     if (!site)
       return c.json({ error: "Page not found" }, 404);
-    const flagged = await db.selectFrom("zv_pages").select(["slug"]).where("site_id", "=", site.id).where("tenant_id", "=", tenantId3(c)).where("kind", "=", "page").where("is_homepage", "=", true).where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).executeTakeFirst();
+    const flagged = await db.selectFrom("zv_pages").select(["slug"]).where("site_id", "=", site.id).where("tenant_id", "=", site.tenant_id).where("kind", "=", "page").where("is_homepage", "=", true).where("status", "=", "published").where("is_active", "=", true).where("auth_required", "=", false).executeTakeFirst();
     return servePage(c, flagged?.slug ?? "home");
   });
   router.get("/:slug", (c) => servePage(c, c.req.param("slug")));

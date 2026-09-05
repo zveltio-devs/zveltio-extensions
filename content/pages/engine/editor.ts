@@ -18,15 +18,12 @@ import { jsonb } from './jsonb.js';
 import { ICON_NAMES } from '../client/icons.js';
 import { MOTION_TYPES } from '../client/motion.js';
 import { resolveBlocks } from './hydrate.js';
+import { tenantId } from './tenant.js';
 
 // biome-ignore lint/suspicious/noExplicitAny: Hono context in a self-contained extension
 type Any = any;
 
-const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
-function tenantId(c: Any): string {
-  return (c.get('tenant') as { id?: string } | null | undefined)?.id ?? DEFAULT_TENANT_ID;
-}
 
 /**
  * Fixed-window per-IP limiter for the UNauthenticated tracking writes.

@@ -31,11 +31,10 @@ import { findBlockById, resolveBlockAt, resolveBlocks, resolveRecord } from './h
 import { sanitizeBlocks, sanitizeBlocksForWrite } from './sanitize.js';
 import { placeholdersIn } from '../client/bind.js';
 import { jsonb } from './jsonb.js';
+import { tenantId } from './tenant.js';
 
 // biome-ignore lint/suspicious/noExplicitAny: the internals bag is typed engine-side
 type Any = any;
-
-const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
 const SiteCreateSchema = z.object({
   name: z.string().min(1).max(100),
@@ -118,16 +117,6 @@ const PageCreateSchema = z.object({
 const PageUpdateSchema = PageCreateSchema.partial();
 
 const ReorderSchema = z.object({ ids: z.array(z.string().uuid()).min(1) });
-
-/**
- * `ctx.db` is already RLS-scoped to the request tenant, so these predicates are
- * defence in depth rather than the only guard — which is how the engine wrote
- * them, after an audit found these tables listing every tenant's rows when the
- * filter was absent and RLS had not yet been applied to them.
- */
-function tenantId(c: Any): string {
-  return (c.get('tenant') as { id?: string } | null | undefined)?.id ?? DEFAULT_TENANT_ID;
-}
 
 /**
  * May this user enter a site or page restricted to `allowed` roles?
