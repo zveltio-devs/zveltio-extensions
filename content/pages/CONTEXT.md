@@ -317,6 +317,54 @@ storage throws in a private window and in some embedded contexts.
 property; removing that validation fails 5 tests, including one asserting a colour
 field cannot smuggle a declaration.
 
+### The two PUBLIC write routes accepted anything
+
+Found by reading the routes line by line rather than by sweeping for a pattern —
+which is the part of §6 I had been describing as unfinished instead of doing.
+
+Both are in the manifest's `publicRoutes` because the rendered page posts to them,
+so there is no session in front of either. That makes what they accept the only
+boundary they have.
+
+**`POST /:id/ab-variants/:variantId/track` ignored `:id`.** It declared a page in
+its path and filtered on the variant alone. The `DELETE` twenty lines above it has
+carried the `page_id` pair since it was written; this one never did. Measured:
+
+```
+shipped query, wrong :id in the path   ->  conversions 0 -> 1
+with the page_id filter, wrong :id     ->  unchanged
+```
+
+Not cross-tenant — RLS holds on `zv_page_ab_variants`. What it was is an A/B
+result anyone could move, and an A/B result decides which page the business ships.
+
+**`POST /metrics/track` validated `page_id` for SHAPE and never against a page.**
+Any UUID was accepted, so an anonymous caller could inflate the view count of an
+unpublished draft — which then shows traffic it never had — or create metric rows
+for UUIDs naming nothing.
+
+Now `INSERT … SELECT … WHERE EXISTS`, requiring the page to be published, active,
+and on a site that is public and active: the same four conditions `/cms` uses to
+decide a page may be seen anonymously. Tracking a view of a page the caller could
+not have been shown is not a view. One statement rather than a lookup and then an
+insert, so the highest-frequency endpoint here stays a single round trip.
+Measured:
+
+```
+a real published page       ->  row written
+a UUID naming nothing       ->  nothing written
+the same page, unpublished  ->  nothing written
+```
+
+An unmatched page inserts nothing and still answers 200. A tracking beacon has
+nobody to report an error to, and a 404 would only tell a scraper which UUIDs are
+real.
+
+**A method note, since it cost a step.** Removing the `page_id` filter to check the
+test discriminates hit an anchor that matched TWICE — the `DELETE` route uses the
+identical two lines. The assert caught it before anything was written. The same
+habit has now caught four would-be mis-edits in this campaign.
+
 ### Still to cover in this extension
 
 `editor.ts` and `sites.ts` have had their guards, their write sanitisation and

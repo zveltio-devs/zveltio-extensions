@@ -31799,7 +31799,16 @@ function editorRoutes(ctx) {
     const today = new Date().toISOString().split("T")[0];
     await sql`
         INSERT INTO zv_page_metrics (page_id, date, views, avg_time_on_page_seconds)
-        VALUES (${page_id}, ${today}::date, 1, ${time_on_page_seconds})
+        SELECT ${page_id}, ${today}::date, 1, ${time_on_page_seconds}
+        WHERE EXISTS (
+          SELECT 1 FROM zv_pages p
+          JOIN zv_page_sites s ON s.id = p.site_id
+          WHERE p.id = ${page_id}
+            AND p.status = 'published'
+            AND p.is_active = true
+            AND s.is_public = true
+            AND s.is_active = true
+        )
         ON CONFLICT (page_id, date) DO UPDATE SET
           views = zv_page_metrics.views + 1,
           avg_time_on_page_seconds = (zv_page_metrics.avg_time_on_page_seconds * zv_page_metrics.views + ${time_on_page_seconds}) / (zv_page_metrics.views + 1)
@@ -32119,7 +32128,7 @@ function editorRoutes(ctx) {
     return c.json({ success: true });
   });
   app.post("/:id/ab-variants/:variantId/track", rateLimit(60, 60000), async (c) => {
-    await db.updateTable("zv_page_ab_variants").set({ conversions: sql`conversions + 1` }).where("id", "=", c.req.param("variantId")).execute();
+    await db.updateTable("zv_page_ab_variants").set({ conversions: sql`conversions + 1` }).where("id", "=", c.req.param("variantId")).where("page_id", "=", c.req.param("id")).execute();
     return c.json({ success: true });
   });
   app.get("/:id/metrics", async (c) => {
