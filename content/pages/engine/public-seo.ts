@@ -11,6 +11,35 @@ import { parseFilterList } from './hydrate.js';
 // biome-ignore lint/suspicious/noExplicitAny: Hono context via PublicRouteSpec
 type Ctx = any;
 
+/**
+ * Escape a value for XML text content.
+ *
+ * The sitemap interpolated raw strings into `<loc>`, and one of them is not the
+ * author's: a record page's addresses are built from a COLLECTION FIELD —
+ * `${row.slug}/${r.k}` where `r.k` is a row's value, cast to text. That is a form
+ * submission, a CRM contact, an imported row. Measured on the shipped template:
+ *
+ *   salt-&-pepper                              -> malformed XML
+ *   a<b                                        -> malformed XML
+ *   x</loc></url><url><loc>https://evil.test/  -> an extra <url> a crawler follows
+ *
+ * Both outcomes are quiet. Malformed XML costs the whole sitemap — every URL in
+ * it, not just the bad one — and nobody reads sitemap XML to notice. The
+ * injection puts an address the operator never published in front of every
+ * crawler that fetches it.
+ *
+ * Page slugs are regex-constrained on write and were never the risk. Record
+ * values are not constrained at all, and `base` comes from the `host` header.
+ */
+export function escapeXml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 function baseUrl(c: Ctx): string {
   const proto = c.req.header('x-forwarded-proto') || 'https';
   const host = c.req.header('host') || 'example.com';
@@ -131,10 +160,10 @@ export function registerPublicSeoRoutes(ctx: ExtensionContext): void {
               .map(
                 (path) => `
   <url>
-    <loc>${base}/${path}</loc>
-    <lastmod>${lastmod}</lastmod>
-    <changefreq>${p.change_freq || 'weekly'}</changefreq>
-    <priority>${p.priority ?? 0.5}</priority>
+    <loc>${escapeXml(`${base}/${path}`)}</loc>
+    <lastmod>${escapeXml(lastmod)}</lastmod>
+    <changefreq>${escapeXml(p.change_freq || 'weekly')}</changefreq>
+    <priority>${escapeXml(p.priority ?? 0.5)}</priority>
   </url>`,
               )
               .join('');

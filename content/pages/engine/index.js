@@ -31567,6 +31567,105 @@ function sitesRoutes(ctx) {
   return app;
 }
 
+// content/pages/engine/public-seo.ts
+function escapeXml(value) {
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+function baseUrl(c) {
+  const proto = c.req.header("x-forwarded-proto") || "https";
+  const host = c.req.header("host") || "example.com";
+  return `${proto}://${host}`;
+}
+function registerPublicSeoRoutes(ctx) {
+  const { db } = ctx;
+  const engine = ctx.internals;
+  ctx.registerPublicRoute({
+    method: "GET",
+    path: "/sitemap.xml",
+    handler: async (c) => {
+      const result = await sql`
+        SELECT p.slug, p.updated_at, sc.change_freq, sc.priority,
+               p.record_collection, p.record_field, p.record_filter, s.public_collections
+        FROM zv_pages p
+        JOIN zv_page_sites s ON s.id = p.site_id
+        LEFT JOIN zv_page_sitemap_config sc ON sc.page_id = p.id
+        WHERE p.status = 'published'
+          AND COALESCE(p.is_noindex, false) = false
+          -- A sitemap is a list of URLs for anyone to fetch. Pages behind a role
+          -- or on a non-public site do not belong in one: publishing their slugs
+          -- hands an anonymous crawler the shape of a private portal, and the
+          -- pages themselves 401 when it follows them.
+          AND COALESCE(p.auth_required, false) = false
+          -- A popup has a slug but no address. Listing it would send crawlers
+          -- to a page that is only ever drawn over another one.
+          AND COALESCE(p.kind, 'page') = 'page'
+          AND s.is_public = true
+          AND s.is_active = true
+          AND (sc.include_in_sitemap = true OR sc.page_id IS NULL)
+      `.execute(db);
+      const base = baseUrl(c);
+      const RECORD_CAP = 500;
+      async function addressesFor(row) {
+        if (!row.record_collection)
+          return [row.slug === "home" ? "" : row.slug];
+        const published = row.public_collections ?? [];
+        if (!published.includes(row.record_collection))
+          return [];
+        const field = row.record_field || "slug";
+        const cols = await sql`
+          SELECT column_name FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = ${`zvd_${row.record_collection}`}
+        `.execute(db);
+        const names = new Set(cols.rows.map((r) => r.column_name));
+        if (!names.has(field))
+          return [];
+        const filters = parseFilterList2(row.record_filter);
+        const declared = Array.isArray(row.record_filter) ? row.record_filter.length : 0;
+        if (filters.length !== declared)
+          return [];
+        if (filters.some((f) => !names.has(f.field)))
+          return [];
+        let q = db.selectFrom(`zvd_${row.record_collection}`).select(sql`${sql.id(field)}::text`.as("k")).where(field, "is not", null);
+        for (const f of filters) {
+          q = q.where(engine.buildCondition(f.field, { op: f.op, value: f.value }));
+        }
+        const keys = await q.limit(RECORD_CAP).execute();
+        return keys.map((r) => `${row.slug}/${r.k}`);
+      }
+      const urls = (await Promise.all(result.rows.map(async (p) => {
+        const paths = await addressesFor(p);
+        const lastmod = new Date(p.updated_at).toISOString().split("T")[0];
+        return paths.map((path) => `
+  <url>
+    <loc>${escapeXml(`${base}/${path}`)}</loc>
+    <lastmod>${escapeXml(lastmod)}</lastmod>
+    <changefreq>${escapeXml(p.change_freq || "weekly")}</changefreq>
+    <priority>${escapeXml(p.priority ?? 0.5)}</priority>
+  </url>`).join("");
+      }))).join("");
+      c.header("Content-Type", "application/xml");
+      return c.body(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}
+</urlset>`);
+    }
+  });
+  ctx.registerPublicRoute({
+    method: "GET",
+    path: "/robots.txt",
+    handler: (c) => {
+      c.header("Content-Type", "text/plain");
+      return c.body(`User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+Disallow: /ext/
+
+Sitemap: ${baseUrl(c)}/sitemap.xml
+`);
+    }
+  });
+}
+
 // content/pages/client/icons.ts
 var ICONS = {
   star: "M11.5 3.2a.6.6 0 0 1 1 0l2.3 4.7 5.2.7a.6.6 0 0 1 .3 1l-3.7 3.6.9 5.1a.6.6 0 0 1-.9.7L12 17.6l-4.6 2.4a.6.6 0 0 1-.9-.7l.9-5.1-3.7-3.6a.6.6 0 0 1 .3-1l5.2-.7z",
@@ -31760,13 +31859,13 @@ function editorRoutes(ctx) {
     const pages = await db.selectFrom("zv_pages as p").leftJoin("zv_page_sitemap_config as sc", "sc.page_id", "p.id").select(["p.slug", "p.updated_at", "sc.change_freq", "sc.priority"]).where("p.status", "=", "published").where("p.auth_required", "=", false).where((eb) => eb.or([eb("sc.include_in_sitemap", "=", true), eb("sc.page_id", "is", null)])).execute();
     const proto = c.req.header("x-forwarded-proto") || "https";
     const host = c.req.header("host") || "example.com";
-    const baseUrl = `${proto}://${host}`;
+    const baseUrl2 = `${proto}://${host}`;
     const urls = pages.map((p) => `
   <url>
-    <loc>${baseUrl}/${p.slug}</loc>
-    <lastmod>${new Date(p.updated_at).toISOString().split("T")[0]}</lastmod>
-    <changefreq>${p.change_freq || "weekly"}</changefreq>
-    <priority>${p.priority ?? 0.5}</priority>
+    <loc>${escapeXml(`${baseUrl2}/${p.slug}`)}</loc>
+    <lastmod>${escapeXml(new Date(p.updated_at).toISOString().split("T")[0])}</lastmod>
+    <changefreq>${escapeXml(p.change_freq || "weekly")}</changefreq>
+    <priority>${escapeXml(p.priority ?? 0.5)}</priority>
   </url>`).join("");
     c.header("Content-Type", "application/xml");
     return c.body(`<?xml version="1.0" encoding="UTF-8"?>
@@ -32066,7 +32165,8 @@ function editorRoutes(ctx) {
       issues.push(`Title length ${titleLen} chars (ideal: 30-60)`);
     } else
       issues.push("Missing page title");
-    const metaDesc = page.meta_description || page.meta?.description || "";
+    const pageMeta = typeof page.meta === "string" ? JSON.parse(page.meta || "{}") : page.meta ?? {};
+    const metaDesc = page.meta_description || pageMeta?.description || "";
     const descLen = metaDesc.length;
     if (descLen >= 120 && descLen <= 160)
       metaScore = 100;
@@ -32278,102 +32378,6 @@ function publicPagesRoutes(ctx) {
   router.get("/:slug", (c) => servePage(c, c.req.param("slug")));
   router.get("/:slug/:key", (c) => servePage(c, c.req.param("slug"), c.req.param("key")));
   return router;
-}
-
-// content/pages/engine/public-seo.ts
-function baseUrl(c) {
-  const proto = c.req.header("x-forwarded-proto") || "https";
-  const host = c.req.header("host") || "example.com";
-  return `${proto}://${host}`;
-}
-function registerPublicSeoRoutes(ctx) {
-  const { db } = ctx;
-  const engine = ctx.internals;
-  ctx.registerPublicRoute({
-    method: "GET",
-    path: "/sitemap.xml",
-    handler: async (c) => {
-      const result = await sql`
-        SELECT p.slug, p.updated_at, sc.change_freq, sc.priority,
-               p.record_collection, p.record_field, p.record_filter, s.public_collections
-        FROM zv_pages p
-        JOIN zv_page_sites s ON s.id = p.site_id
-        LEFT JOIN zv_page_sitemap_config sc ON sc.page_id = p.id
-        WHERE p.status = 'published'
-          AND COALESCE(p.is_noindex, false) = false
-          -- A sitemap is a list of URLs for anyone to fetch. Pages behind a role
-          -- or on a non-public site do not belong in one: publishing their slugs
-          -- hands an anonymous crawler the shape of a private portal, and the
-          -- pages themselves 401 when it follows them.
-          AND COALESCE(p.auth_required, false) = false
-          -- A popup has a slug but no address. Listing it would send crawlers
-          -- to a page that is only ever drawn over another one.
-          AND COALESCE(p.kind, 'page') = 'page'
-          AND s.is_public = true
-          AND s.is_active = true
-          AND (sc.include_in_sitemap = true OR sc.page_id IS NULL)
-      `.execute(db);
-      const base = baseUrl(c);
-      const RECORD_CAP = 500;
-      async function addressesFor(row) {
-        if (!row.record_collection)
-          return [row.slug === "home" ? "" : row.slug];
-        const published = row.public_collections ?? [];
-        if (!published.includes(row.record_collection))
-          return [];
-        const field = row.record_field || "slug";
-        const cols = await sql`
-          SELECT column_name FROM information_schema.columns
-          WHERE table_schema = 'public' AND table_name = ${`zvd_${row.record_collection}`}
-        `.execute(db);
-        const names = new Set(cols.rows.map((r) => r.column_name));
-        if (!names.has(field))
-          return [];
-        const filters = parseFilterList2(row.record_filter);
-        const declared = Array.isArray(row.record_filter) ? row.record_filter.length : 0;
-        if (filters.length !== declared)
-          return [];
-        if (filters.some((f) => !names.has(f.field)))
-          return [];
-        let q = db.selectFrom(`zvd_${row.record_collection}`).select(sql`${sql.id(field)}::text`.as("k")).where(field, "is not", null);
-        for (const f of filters) {
-          q = q.where(engine.buildCondition(f.field, { op: f.op, value: f.value }));
-        }
-        const keys = await q.limit(RECORD_CAP).execute();
-        return keys.map((r) => `${row.slug}/${r.k}`);
-      }
-      const urls = (await Promise.all(result.rows.map(async (p) => {
-        const paths = await addressesFor(p);
-        const lastmod = new Date(p.updated_at).toISOString().split("T")[0];
-        return paths.map((path) => `
-  <url>
-    <loc>${base}/${path}</loc>
-    <lastmod>${lastmod}</lastmod>
-    <changefreq>${p.change_freq || "weekly"}</changefreq>
-    <priority>${p.priority ?? 0.5}</priority>
-  </url>`).join("");
-      }))).join("");
-      c.header("Content-Type", "application/xml");
-      return c.body(`<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}
-</urlset>`);
-    }
-  });
-  ctx.registerPublicRoute({
-    method: "GET",
-    path: "/robots.txt",
-    handler: (c) => {
-      c.header("Content-Type", "text/plain");
-      return c.body(`User-agent: *
-Allow: /
-Disallow: /admin
-Disallow: /api/
-Disallow: /ext/
-
-Sitemap: ${baseUrl(c)}/sitemap.xml
-`);
-    }
-  });
 }
 
 // content/pages/engine/index.ts

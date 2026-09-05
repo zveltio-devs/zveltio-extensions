@@ -365,13 +365,69 @@ test discriminates hit an anchor that matched TWICE — the `DELETE` route uses 
 identical two lines. The assert caught it before anything was written. The same
 habit has now caught four would-be mis-edits in this campaign.
 
-### Still to cover in this extension
+### The sitemap interpolated record data into XML
 
-`editor.ts` and `sites.ts` have had their guards, their write sanitisation and
-their tenant scoping exercised. What has NOT been read line by line is the
-business logic in between — the SEO analyser, the A/B variant assignment, the
-sitemap generation, and the record-page resolution in `hydrate.ts`'s
-`resolveRecord`.
+The last of the line-by-line reading, and the one worth the most.
 
-Nothing in this extension is `reviewed` in the §6 sense yet. It is `repaired`
-seven times over, which is a different thing.
+A record page has one address per record, and `public-seo.ts` builds them as
+`${row.slug}/${r.k}` — where `r.k` is a COLLECTION FIELD cast to text. A form
+submission, a CRM contact, an imported row. Page slugs are regex-constrained on
+write and were never the risk; record values are not constrained at all. Neither
+sitemap escaped anything.
+
+Measured on the shipped template:
+
+```
+salt-&-pepper                              ->  malformed XML
+a<b                                        ->  malformed XML
+x</loc></url><url><loc>https://evil.test/  ->  an extra <url>
+```
+
+Both outcomes are quiet, and the first is the one more likely to happen by
+accident: malformed XML costs the WHOLE sitemap, every URL in it, and nobody
+reads sitemap XML to notice it went. The injection puts an address the operator
+never published in front of every crawler that fetches the file.
+
+`escapeXml` now wraps every interpolated value in both sitemaps — the public one
+and the admin preview — including `base`, which is built from the `host` header
+and was equally unescaped. One helper, exported and shared, rather than a second
+copy: one rule written twice is this repository's dominant bug shape.
+
+The test asserts the injection produces no second `<url>`, that no raw `<`, `>` or
+bare `&` survives, and — the control — that an ordinary address comes through
+byte for byte, since an escaper that mangled normal slugs would pass every other
+assertion while breaking every real URL.
+
+### A comment that had quietly become false
+
+Migration 004 says "every reader in this extension does
+`typeof x === 'string' ? JSON.parse(x) : x`". The SEO analyser did not: it read
+`(page.meta as Any)?.description` directly.
+
+Not reachable today — 004 normalised the stored rows and `check-jsonb-cast`
+ratchets the writes — but reachable the moment a row arrives from an import, a
+restored backup, or an install that has not run 004. The symptom would be the
+analyser reporting "Missing meta description" for pages that have one. Fixed, so
+the migration's sentence is true again.
+
+### Read and found sound
+
+`resolveRecord` on the public path: the collection is looked up in the registry,
+the key field must be a real column, the tenant is scoped, and a filter that fails
+to parse REFUSES the page rather than being dropped — the reasoning for that
+asymmetry against the block path is written out in the source and is right. RLS
+filters are skipped for an anonymous caller by design, and the column mask
+resolves `resolveUserRole({})` to `'public'`, the most restrictive role. Checked
+in the engine rather than assumed.
+
+### What is left
+
+Every file in `engine/` and `client/` has now been read end to end, every guard
+exercised by removing it and watching a test fail, writes checked on a two-tenant
+database, and the migrations applied to a virgin AND an upgraded install.
+
+That is the §6 bar. What it does NOT mean is that nothing is left: the Studio
+side (`studio/schemas/*.json` and the builder under `studio/src/`) has not been
+looked at, and it is where an author actually works. It belongs to the Studio
+review rather than to this one, but nobody should read "reviewed" here as
+covering it.
