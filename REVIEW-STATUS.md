@@ -1,5 +1,12 @@
 # Extension verification status
 
+> **This file is the August 2026 button-pressing pass, not the current review
+> campaign.** `verified` below means section G was walked. For what the
+> file-by-file campaign has covered — and what it deliberately has not — see
+> [docs/private/CAMPAIGN-PROGRESS.md](./docs/private/CAMPAIGN-PROGRESS.md). The two
+> use the same words for different bars, which is exactly the confusion that file
+> exists to end.
+
 Auto-generated. `verified` = someone walked section G of REVIEW-CHECKLIST.md —
 that is, pressed the buttons, not read the code.
 
