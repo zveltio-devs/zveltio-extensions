@@ -841,7 +841,7 @@ Please draft a reply to this email.`,
     // selection can span both, and both operations take a UID list.
     const groups = new Map<string, { account: any; path: string; uids: number[] }>();
     for (const row of targets.rows) {
-      const key = `${row.account_id} ${row.path}`;
+      const key = `${row.account_id}\0${row.path}`;
       const g = groups.get(key) ?? { account: row, path: row.path, uids: [] };
       g.uids.push(row.uid);
       groups.set(key, g);
@@ -1454,7 +1454,7 @@ Please draft a reply to this email.`,
     const redirectUri = typeof body.redirect_uri === 'string' ? body.redirect_uri : '';
     if (!redirectUri) return c.json({ error: 'redirect_uri is required' }, 400);
 
-    const cfgRow = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
+    const cfgRow = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
     const cfg = readMailConfig(cfgRow.rows[0]);
     const creds = credentialsFor(provider, cfg);
     if (!creds) {
@@ -1521,7 +1521,7 @@ Please draft a reply to this email.`,
     if (!claimed.rows[0]) return c.json({ error: 'Invalid or expired state' }, 400);
     const { account_id, provider, redirect_uri } = claimed.rows[0];
 
-    const cfgRow = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
+    const cfgRow = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
     const cfg = readMailConfig(cfgRow.rows[0]);
     const creds = credentialsFor(provider, cfg);
     if (!creds) return c.json({ error: `No OAuth2 client configured for ${provider}` }, 400);
@@ -1575,7 +1575,7 @@ Please draft a reply to this email.`,
     const isAdmin = await checkPermission(user.id, 'admin', '*');
     if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
 
-    const config = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
+    const config = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
     return c.json({ config: readMailConfig(config.rows[0]) });
   });
 
@@ -1603,7 +1603,7 @@ Please draft a reply to this email.`,
     const isAdmin = await checkPermission(user.id, 'admin', '*');
     if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
 
-    const current = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
+    const current = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
     const existing = readMailConfig(current.rows[0]);
     const merged = { ...existing, ...c.req.valid('json') };
 
@@ -1625,10 +1625,15 @@ Please draft a reply to this email.`,
     // string, so an install that saved once comes back on the next read. An
     // install that saved twice has nothing left to recover and has to be set up
     // again.
+    // `zvd_mail_config`, not `zv_settings` — see migration 005. Two things moved
+    // with it: this stopped depending on raw SQL escaping the table sandbox, and
+    // the configuration became per-tenant. `ON CONFLICT (key)` above was on a
+    // table keyed by `key` alone, so there was ONE mail configuration for the
+    // whole instance and the second company's save overwrote the first's.
     await sql`
-      INSERT INTO zv_settings (key, value, description, is_public)
-      VALUES ('mail', ${JSON.stringify(merged)}::text::jsonb, 'Mail client configuration (admin)', false)
-      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+      INSERT INTO zvd_mail_config (config)
+      VALUES (${JSON.stringify(merged)}::text::jsonb)
+      ON CONFLICT (tenant_id) DO UPDATE SET config = EXCLUDED.config, updated_at = NOW()
     `.execute(db);
 
     return c.json({ success: true });

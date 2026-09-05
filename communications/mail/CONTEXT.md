@@ -113,3 +113,48 @@ signatures, contacts.
 ## SDUI migration (2026-08-21)
 Accounts+signatures via schema. **Inbox Tier-3** at `/admin/mail/inbox` (2026-08-23)
 covers folders, list/detail, compose/reply, sync, flags, attachment download.
+
+---
+
+## Configuration moved off `zv_settings` — 2026-09-05
+
+Migration 005. Two defects, one move, and the second was not the reason for
+making it.
+
+**It was reading an engine system table.** Six `SELECT value FROM zv_settings
+WHERE key = 'mail'` sites, plus the save. `ctx.db` refuses `zv_settings`; the only
+reason these worked is that they are raw `sql` templates, and the table policy
+guards the query builder's entry points rather than the statement. That is the
+sandbox hole the raw-SQL inventory is cataloguing — when the engine closes it,
+reads like these stop.
+
+A grant on `zv_settings` would not have been the fix. A grant is per TABLE, not
+per key, so this extension would have gained the SAML configuration, the LDAP one
+and every other instance setting. `auth/saml` migration 004 made the same move for
+the same reason; this follows it.
+
+**And the configuration was instance-wide.** `zv_settings` is keyed on `key`
+alone and the save said `ON CONFLICT (key)`, so there was ONE mail configuration
+for the whole install: the second company could not have its own IMAP server or
+OAuth application, and saving theirs overwrote the first's. `zvd_mail_config` is
+keyed on `tenant_id`.
+
+The reads are aliased `SELECT config AS value`, so `readMailConfig` and its
+string-form recovery are untouched.
+
+### The test was green for the wrong reason
+
+`oauth-flow.test.ts` seeded `zv_settings` and kept passing after the move, because
+migration 005 **adopts** whatever is in `zv_settings` — so on a database where an
+earlier run had seeded it, the new table was already populated. It only failed on
+a genuinely fresh database. The seed now writes `zvd_mail_config`.
+
+That is the second time in this file's history that a green result meant "the
+previous run left something behind" rather than "this works".
+
+### The bundle caught the other half
+
+With the test fixed, it failed on the fresh database with `relation
+"zvd_mail_config" does not exist` — migration 005 was registered in `index.ts` and
+the packed `engine/index.js` still listed four. The runtime loads the bundle.
+Repacking fixed it; nothing about the source was wrong.

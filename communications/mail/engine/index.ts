@@ -16,6 +16,7 @@ const extension: ZveltioExtension = {
       join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
       join(import.meta.dir, 'migrations/003_attachment_part.sql'),
       join(import.meta.dir, 'migrations/004_oauth_state.sql'),
+      join(import.meta.dir, 'migrations/005_config_own_table.sql'),
     ];
   },
 
@@ -53,7 +54,7 @@ const extension: ZveltioExtension = {
           const { syncImapAccount } = await import('./lib/imap-client.js');
           const db = ctx.db;
 
-          const cfgRow = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
+          const cfgRow = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
           const raw = (cfgRow.rows[0] as { value?: unknown } | undefined)?.value;
           const cfg: Record<string, unknown> =
             typeof raw === 'string' ? JSON.parse(raw) : ((raw as Record<string, unknown>) ?? {});
