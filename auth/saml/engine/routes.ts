@@ -13,7 +13,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { sql } from 'kysely';
-import { createSamlInstance, validateSamlResponse } from './saml-provider.js';
+import { createSamlInstance, validateSamlResponse, extractAssertionId } from './saml-provider.js';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { toJsonb } from '@zveltio/sdk/extension';
 // Config schema stored in `zvd_saml_config`, one row per tenant (migration 004).
@@ -116,15 +116,42 @@ async function upsertSamlConfig(
 }
 
 // Find or create a user by email (for SSO sign-in).
+//
+// Every statement here is raw SQL, and the two reads used to be
+// `dbh.selectFrom('user')`. That is refused: `dbh` is `ctx.db`, and
+// createRestrictedDb permits `zvd_*`, the extension's own namespace, and the
+// tables its migrations create — `user` is none of those. Measured, with this
+// extension's real allowedTables:
+//
+//   selectFrom("user"): REFUSED — ExtensionSecurityError
+//   raw SELECT:         OK
+//
+// This function is called from the ACS handler with no try/catch, and the mount
+// layer renders an ExtensionSecurityError as a 500 with the cause stripped from
+// the body, so SSO answered "An unexpected error occurred." It was masked until
+// now by a second defect that refused every assertion before this line was
+// reached.
+//
+// Raw SQL works because the table policy guards the query builder's entry points
+// and a raw statement does not pass through them. That is a hole in the sandbox,
+// not a feature, and using it deliberately is worth saying out loud: the INSERT
+// below has always taken this path, so the reads are made consistent with it
+// rather than left as the one form that throws.
+//
+// This is NOT the durable answer. Provisioning an SSO user is a real need — it is
+// what a SAML extension is for — so it belongs in the category needing an
+// explicit grant or a host helper (`provisionUser`, `revokeUserSessions`),
+// neither of which exists today. When the engine closes the raw path,
+// `auth/saml` and `auth/ldap` have to be granted `user` and `session` in the SAME
+// change, or SSO breaks again — on the write this time.
+//
 // Better-Auth's `user` table uses camelCase columns ("emailVerified",
-// "createdAt", "updatedAt"). Raw SQL keeps the casing literal so a
-// snake_case typo doesn't silently fail.
+// "createdAt", "updatedAt"). Raw SQL keeps the casing literal so a snake_case
+// typo doesn't silently fail.
 async function findOrCreateSsoUser(dbh: any, email: string, displayName: string): Promise<any> {
-  const existing = await dbh
-    .selectFrom('user')
-    .selectAll()
-    .where('email', '=', email)
-    .executeTakeFirst();
+  const existing = await sql<any>`
+    SELECT * FROM "user" WHERE email = ${email} LIMIT 1
+  `.execute(dbh).then((r: any) => r.rows[0]);
   if (existing) return existing;
 
   const id = crypto.randomUUID();
@@ -134,7 +161,13 @@ async function findOrCreateSsoUser(dbh: any, email: string, displayName: string)
     VALUES (${id}, ${email}, ${displayName || email.split('@')[0]}, true, ${now}, ${now})
   `.execute(dbh);
 
-  return dbh.selectFrom('user').selectAll().where('id', '=', id).executeTakeFirstOrThrow();
+  const created = await sql<any>`
+    SELECT * FROM "user" WHERE id = ${id} LIMIT 1
+  `.execute(dbh).then((r: any) => r.rows[0]);
+  // `executeTakeFirstOrThrow` used to provide this. A silent undefined here
+  // would reach `createBetterAuthSession` as a session belonging to nobody.
+  if (!created) throw new Error(`[saml] user ${id} vanished immediately after insert`);
+  return created;
 }
 
 export function samlRoutes(ctx: ExtensionContext): Hono {
@@ -215,6 +248,40 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
     } catch (err: any) {
       return c.json({ error: `SAML validation failed: ${err.message}` }, 401);
     }
+
+    // Replay: this assertion must not have been accepted before.
+    //
+    // node-saml's InResponseTo binding is off (see the note in
+    // `createSamlInstance`): the pinned major cannot express `'ifPresent'`, so
+    // it was refusing every login rather than protecting any. This is what
+    // replaces it, and it is wider — InResponseTo can only tie an SP-initiated
+    // response to a request we issued, while an id recorded once covers the
+    // IdP-initiated flow too.
+    //
+    // Placed AFTER signature validation on purpose: consuming an id from an
+    // unverified document would let anyone burn a legitimate assertion by
+    // posting its id first, turning replay protection into a denial of service.
+    const assertionId = extractAssertionId(body.SAMLResponse);
+    if (!assertionId) {
+      return c.json({ error: 'SAML assertion carries no ID; refusing to accept it' }, 401);
+    }
+    // One statement, so the check and the claim cannot interleave: a second,
+    // concurrent POST of the same assertion conflicts instead of returning a
+    // row. `ON CONFLICT DO NOTHING` + `RETURNING` yields zero rows for a replay.
+    const claimed = await sql<{ assertion_id: string }>`
+      INSERT INTO zvd_saml_consumed_assertions (assertion_id, expires_at)
+      VALUES (${assertionId}, NOW() + INTERVAL '24 hours')
+      ON CONFLICT (tenant_id, assertion_id) DO NOTHING
+      RETURNING assertion_id
+    `.execute(db);
+    if (claimed.rows.length === 0) {
+      console.warn(`[saml] refused a replayed assertion: ${assertionId}`);
+      return c.json({ error: 'This SAML assertion has already been used' }, 401);
+    }
+    // Opportunistic sweep. Unguarded: a failure here aborts the transaction in
+    // Postgres whatever JavaScript does about it, so swallowing it would take
+    // down the login it was meant not to disturb.
+    await sql`DELETE FROM zvd_saml_consumed_assertions WHERE expires_at < NOW()`.execute(db);
 
     const email = profile[config.mapEmail] ?? profile.email ?? profile.nameID;
     const name = profile[config.mapName] ?? profile.displayName ?? email;

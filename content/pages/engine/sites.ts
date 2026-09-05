@@ -24,6 +24,7 @@
 
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
+import { sql } from 'kysely';
 import { z } from 'zod';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { findBlockById, resolveBlockAt, resolveBlocks, resolveRecord } from './hydrate.js';
@@ -186,11 +187,30 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
       if (session?.user) {
         // Better-Auth does not put `role` on the session, so it comes from the
         // row. Without this every role check compares against undefined.
-        const row = await db
-          .selectFrom('user')
-          .select(['role'])
-          .where('id', '=', session.user.id)
-          .executeTakeFirst();
+        //
+        // This was `db.selectFrom('user')`, which `ctx.db` refuses — `user` is
+        // neither `zvd_*`, nor this extension's namespace, nor a table its
+        // migrations create. Measured against its real allowedTables:
+        //
+        //   selectFrom("user"): REFUSED — ExtensionSecurityError
+        //
+        // And the `catch` below swallowed it, so the hydration this comment
+        // describes had never once happened: `role` was always undefined, on
+        // every installation, exactly the state the comment says it exists to
+        // prevent. A silent failure inside a catch written for a different
+        // reason — "anonymous is a valid state" is true of a missing session and
+        // says nothing about a refused table.
+        //
+        // Not fail-open: `hasRole` falls through to the Casbin lookup when
+        // `user.role` is absent, which is why nothing visibly broke. What was
+        // lost is the `user.role === 'god'` fast path and any caller reading the
+        // role off the context. Raw SQL is the same deliberate bypass documented
+        // in `auth/saml` — it needs the same grant when the engine closes it.
+        const row = await sql<{ role: string | null }>`
+          SELECT role FROM "user" WHERE id = ${session.user.id} LIMIT 1
+        `
+          .execute(db)
+          .then((r) => r.rows[0]);
         c.set('user', { ...session.user, role: row?.role ?? (session.user as Any).role });
       }
     } catch {

@@ -200,3 +200,33 @@ time, where it belongs.
   so the membership gate could not be distinguished. The table is keyed on
   `tenant_id`, but which tenant resolves during an anonymous `/login` was not put
   to the test.
+
+---
+
+## `selectFrom('user')` refused the directory login — repaired 2026-09-05
+
+The same defect as `auth/saml`, found the same way and repaired in the same
+change. `findOrCreateSsoUser` read the user through the query builder; `ctx.db`
+refuses `user`, which is neither `zvd_*`, nor this extension's namespace, nor a
+table its migrations create. Measured with its real allowedTables:
+
+```
+auth/ldap  allowed:{zvd_ldap_login_log,zvd_ldap_group_mappings,zvd_ldap_ip_allowlist,zvd_ldap_config}
+   query-builder: user=REFUSED  session=REFUSED  account=REFUSED  zv_tenant_users=REFUSED  zv_audit_log=REFUSED
+```
+
+So provisioning a directory user who had never signed in before threw, while the
+`INSERT` two lines below it — raw SQL — would have worked. The reads are now raw
+SQL as well, consistent with the write.
+
+Note what this means for the section above: the note there says the writes to
+`zv_audit_log` "have always worked" because raw SQL escapes the proxy. That is
+the same hole, and it is doing the same work here. **This is not the durable
+answer**: when the engine closes the inline raw path, `auth/ldap` and `auth/saml`
+have to be granted `user` and `session` in the SAME change, or directory login
+breaks again — on the write this time.
+
+Unlike `auth/saml`, nothing masked this one: the LDAP bind path has no equivalent
+of the SAML assertion validation in front of it. It simply required a user who
+did not exist yet, which is why the 17/17 pass above did not catch it — that run
+provisioned against a database where the user was already there.
