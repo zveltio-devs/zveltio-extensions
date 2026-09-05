@@ -264,13 +264,66 @@ keys. `HTML_KEYS` was already consulted at every nesting level and the URL list
 was not. Now both are. Writing the invariant found the bug that reading the fix
 had not.
 
+### Gaps closed on the second pass
+
+Everything I had listed as not-yet-done for this extension, and what each turned
+up.
+
+**Migrations on an upgraded database, for the two NEW migrations elsewhere.**
+`auth/saml` 005 and `communications/mail` 005 had only been applied to a virgin
+database, which §6 does not accept and which matters more here because they ship
+with a merge that upgrades live installs. Built an install at 004 for both
+extensions, seeded the data one would carry, then applied 005:
+
+```
+005_assertion_replay:  ok      PK: tenant_id,assertion_id
+005_config_own_table:  ok      adopted: jsonb_typeof=object  sync_interval=7  oauth_id=legacy-id
+old zv_settings row still present: 1        (rule D1 — an extension must not delete engine rows)
+pre-existing zvd_saml_config untouched
+```
+
+And the case migration 005's own comment claims to handle — an install damaged by
+the OLD `::jsonb` bug, config stored as a **string scalar**:
+
+```
+before 005, stored as: string
+after adoption:        jsonb_typeof=object  sync_interval=9  oauth_id=str-id
+```
+
+Both values recovered. The claim in the comment is now measured rather than
+asserted.
+
+Found on the way: **`communications/mail` migration 001 seeds `zv_settings['mail']`
+itself.** So every install has the row and adoption always finds something —
+useful to know, and it means 001 still writes to an engine table. 005 does not
+remove that seed (rule D1), so on a new install the row is written and then
+adopted. Harmless, and worth someone's attention when 001 is next touched.
+
+**Block writes.** Seven call sites go through `sanitizeBlocksForWrite`; two do
+not, and both are correct — `editor.ts:571` and `:689` snapshot `current.blocks`
+into a revision, which is content already scrubbed on its way in, and
+re-sanitising a snapshot would quietly rewrite history. So the rule is not "every
+write sanitises" but "every write either sanitises or is copying stored content",
+and `write-sanitize.test.ts` asserts that distinction rather than the easier,
+wrong version. It fails when a sanitiser is removed from any of the seven, and it
+carries a control proving the snapshot exception is not excusing everything.
+
+**The remaining client files, read and found sound.** `CollectionList.svelte`
+builds its paging URL from a server-supplied `rowsUrl` and clamps the offset with
+`Math.max(0, …)`; nothing user-typed reaches the request. `Popup.svelte` wraps
+every `localStorage`/`sessionStorage` access in try/catch, which is right —
+storage throws in a private window and in some embedded contexts.
+`responsive.ts`'s `styleVars` validates every value before it becomes a CSS custom
+property; removing that validation fails 5 tests, including one asserting a colour
+field cannot smuggle a declaration.
+
 ### Still to cover in this extension
 
-`editor.ts` and `sites.ts` beyond their guards — the write paths, revisions,
-redirects, A/B variants and the SEO analyser; `jsonb.ts`; and the ~2000 lines of
-client Svelte, none of which has been read.
+`editor.ts` and `sites.ts` have had their guards, their write sanitisation and
+their tenant scoping exercised. What has NOT been read line by line is the
+business logic in between — the SEO analyser, the A/B variant assignment, the
+sitemap generation, and the record-page resolution in `hydrate.ts`'s
+`resolveRecord`.
 
-Not yet done for this extension: exercising the write paths against a TWO-TENANT
-database. The reads and the guards have been; the writes have been checked for
-their guard and not for their scoping, which RLS should cover but which §6 asks to
-be demonstrated rather than assumed.
+Nothing in this extension is `reviewed` in the §6 sense yet. It is `repaired`
+seven times over, which is a different thing.
