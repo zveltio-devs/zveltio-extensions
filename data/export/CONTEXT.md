@@ -1,92 +1,94 @@
 # data/export — context
 
-Presat 2026-08-12: **11/11**, cu o regulă RLS și o permisiune de coloană chiar
-configurate. Asertarea a scos ce citirea codului nu scosese.
+Pressed 2026-08-12: **11/11**, with an RLS rule and a column permission actually
+configured. Asserting turned up what reading the code had not.
 
-## Reparația din 11 august acoperise o singură cale din două
+## The 11 August repair covered one path out of two
 
-`runExportJob` primise ambele gărzi. **`GET /:collection` nu.** Ruta sincronă —
-cea pe care o folosește Studio pentru „descarcă acum" — a rămas pe `selectAll()`.
+`runExportJob` had received both guards. **`GET /:collection` had not.** The
+synchronous route — the one Studio uses for "download now" — was left on
+`selectAll()`.
 
-Dovedit alături, nu dedus: pentru **același utilizator, în aceeași sesiune**,
-`/api/data/probe_docs` ascundea `secret_note`, iar
-`/ext/data/export/probe_docs` îl livra. Exportul întorcea pe deasupra
-`search_vector` și `search_text`, coloane pe care colecția nu le declară.
+Proved side by side, not deduced: for the **same user, in the same session**,
+`/api/data/probe_docs` hid `secret_note`, while `/ext/data/export/probe_docs`
+delivered it. On top of that, the export returned `search_vector` and
+`search_text`, columns the collection does not declare.
 
-Controlul negativ: cu regula ștearsă, coloana reapare în **ambele** căi. Fără
-el, „ascuns" s-ar fi putut obține și rupând interogarea.
+The negative control: with the rule deleted, the column reappears in **both**
+paths. Without it, "hidden" could equally have been achieved by breaking the
+query.
 
-Comentariul care spune „a boundary only one route honours is not a boundary"
-era deja în fișier, cu douăzeci de linii mai sus, despre celălalt handler.
+The comment saying "a boundary only one route honours is not a boundary" was
+already in the file, twenty lines above, about the other handler.
 
-**Rândurile n-au putut fi demonstrate ca scurgere.** Poarta rutei cere admin,
-iar RLS scutește adminii — deci nu există utilizator pentru care filtrul să
-muște și care să poată totuși exporta. Filtrul e aplicat oricum: motivul pentru
-care e neobservabil ține de cine poate chema ruta, nu de ce promite ruta, iar
-ziua în care poarta aia se relaxează nu e ziua potrivită să afli că filtrul nu
-fusese legat niciodată.
+**The rows could not be demonstrated as a leak.** The route's gate requires
+admin, and RLS exempts admins — so there is no user for whom the filter bites and
+who can still export. The filter is applied anyway: the reason it is
+unobservable is about who can call the route, not about what the route promises,
+and the day that gate relaxes is not the day to discover the filter had never been
+wired.
 
-## Ce a costat montarea probei, și de ce contează
+## What building the proof cost, and why it matters
 
-Ca să ajung la codul testat a trebuit: un al doilea utilizator, membru al
-firmei prin `POST /api/tenants/:id/members` (scrisul de mână al rândurilor
-Casbin **nu** funcționează — API-ul transformă `member` în `tenant_member` prin
-`casbinRole()`), o politică RLS cu `filter_value_source: "static:alfa"` — un
-`alfa` simplu se rezolvă la `null` și politica e **sărită în tăcere** — și o
-permisiune de coloană pe rolul din `user.role`, nu pe cel din Casbin, fiindcă
-`getColumnAccess` primește `resolveUserRole(user)`.
+Reaching the code under test required: a second user, a member of the tenant via
+`POST /api/tenants/:id/members` (writing the Casbin rows by hand does **not**
+work — the API turns `member` into `tenant_member` through `casbinRole()`), an RLS
+policy with `filter_value_source: "static:alfa"` — a bare `alfa` resolves to
+`null` and the policy is **silently skipped** — and a column permission on the
+role from `user.role`, not the one from Casbin, because `getColumnAccess` receives
+`resolveUserRole(user)`.
 
-Trei convenții diferite pentru „rol", în același scenariu. Nimic din asta nu e
-greșit, dar explică de ce nota veche spunea că asertarea „cere o regulă RLS și o
-coloană ascunsă configurate întâi": e adevărat, și e mai greu decât sună.
+Three different conventions for "role", in the same scenario. None of it is wrong,
+but it explains why the old note said asserting this "requires an RLS rule and a
+hidden column configured first": it is true, and harder than it sounds.
 
-## Gaura: exportul ocolea două reguli pe care restul produsului le respectă
+## The hole: export bypassed two rules the rest of the product honours
 
-`ctx.db` și `withTenantIsolation` dau **granița de tenant**: politicile Postgres
-se aplică, rândurile altei firme sunt inaccesibile. Nu spun nimic despre cele
-două reguli pe care un operator le scrie *înăuntrul* unei firme:
+`ctx.db` and `withTenantIsolation` give the **tenant boundary**: the Postgres
+policies apply, another tenant's rows are unreachable. They say nothing about the
+two rules an operator writes *inside* a tenant:
 
-- regulile RLS de la `/api/rls`, care ascund rânduri de un utilizator;
-- permisiunile pe coloane, care ascund un câmp de un rol.
+- the RLS rules from `/api/rls`, which hide rows from a user;
+- column permissions, which hide a field from a role.
 
-Exportul verifica `read` pe colecție și apoi făcea `selectAll()`. Adică livra
-exact rândurile pe care o politică le ascundea și exact coloanele pe care un rol
-n-avea voie să le vadă — aceleași date ca API-ul de date, o rută mai la stânga.
+Export checked `read` on the collection and then did `selectAll()`. That is, it
+delivered exactly the rows a policy was hiding and exactly the columns a role was
+not allowed to see — the same data as the data API, one route to the left.
 
-## De ce reparația n-a putut fi scrisă până acum
+## Why the repair could not be written until now
 
-Engine-ul a primit ambele gărzi pe 2026-07-31 (`8c1c10a`), pe `/api/export` —
-rută cu **zero consumatori**. Aici nu se putea face: `getColumnAccess` și
-`getRlsFilters` trăiau în `lib/tenancy` și nimic din afara engine-ului nu le
-putea citi.
+The engine received both guards on 2026-07-31 (`8c1c10a`), on `/api/export` — a
+route with **zero consumers**. It could not be done here: `getColumnAccess` and
+`getRlsFilters` lived in `lib/tenancy` and nothing outside the engine could read
+them.
 
-**Nu era omisiune, era indisponibilitate.** Gărzile au fost expuse pe
-`ctx.internals` (negate — ele doar scot rânduri și coloane, nu acordă nimic).
-Ăsta e și motivul pentru care extensia depinde acum de o versiune de engine
-nemergeată: CI-ul extensiilor clonează master-ul engine-ului.
+**It was not an omission, it was unavailability.** The guards were exposed on
+`ctx.internals` (negating ones — they only remove rows and columns, they grant
+nothing). That is also why the extension now depends on an unmerged engine
+version: the extensions CI clones the engine's master.
 
-## O schimbare reală de comportament
+## A real behaviour change
 
-Când nu se cer câmpuri anume, exportul trece de la `selectAll()` la lista
-explicită schema+sistem, la fel ca engine-ul. Consecință: nu mai iese
-`tenant_id` și nicio altă coloană fizică nedeclarată în colecție. E o reparație
-în sine, dar e o schimbare de formă a rezultatului — de menționat la release.
+When no specific fields are requested, the export moves from `selectAll()` to the
+explicit schema+system list, as the engine does. Consequence: `tenant_id` and any
+other physical column not declared in the collection no longer come out. It is a
+repair in itself, but it changes the shape of the result — worth mentioning at
+release.
 
-## Utilizatorul nu ajungea în job
+## The user did not reach the job
 
-`runExportJob` rulează după răspuns, deci n-are cerere din care să afle cine a
-cerut exportul — exact forma urmării cu `tenantId`, rezolvată în același fel.
-Fără el, ambele gărzi sunt fără sens: și RLS, și permisiunile pe coloane sunt
-întrebări despre *cine*.
+`runExportJob` runs after the response, so it has no request from which to learn
+who asked for the export — exactly the shape of the `tenantId` trail, resolved the
+same way. Without it both guards are meaningless: RLS and column permissions are
+both questions about *who*.
 
-## Ce trebuie apăsat ca să devină „verificat"
+## What has to be pressed for this to become "verified"
 
-1. Colecție cu o coloană ascunsă pentru un rol; export ca acel rol; coloana
-   lipsește din CSV/JSON.
-2. Regulă RLS care ascunde rânduri de un utilizator; export ca el; rândurile
-   lipsesc.
-3. Control pozitiv: un god exportă și primește tot.
+1. A collection with a column hidden from a role; export as that role; the column
+   is absent from the CSV/JSON.
+2. An RLS rule hiding rows from a user; export as them; the rows are absent.
+3. Positive control: a god user exports and receives everything.
 
-## Ce e încă deschis
+## What is still open
 
-`routes/export.ts` din engine (1 rută, zero consumatori) — de șters.
+The engine's `routes/export.ts` (1 route, zero consumers) — to be deleted.

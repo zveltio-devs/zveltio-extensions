@@ -1,92 +1,93 @@
 # hr/leave — context
 
-Verificat 2026-08-11, pe bază virgină. Calculul de zile, soldurile, aprobarea,
-respingerea, anularea, reportarea, calendarul și statisticile — toate presate.
+Verified 2026-08-11, on a virgin database. Day calculation, balances, approval,
+rejection, cancellation, carry-over, the calendar and the statistics — all
+pressed.
 
-Logica de fond era **corectă**. Autorizarea nu era deloc.
+The underlying logic was **correct**. The authorisation was not there at all.
 
-## Oricine cu acces la modul putea consuma concediul altcuiva
+## Anyone with access to the module could consume someone else's leave
 
-O singură permisiune, `leave`, acoperea tot: `permissionGate(ctx, 'leave')` pe
-`*` și nimic altceva. `employee_id` venea din corpul cererii și nu era comparat
-niciodată cu apelantul, iar aprobarea nu verifica absolut nimic.
+A single permission, `leave`, covered everything: `permissionGate(ctx, 'leave')`
+on `*` and nothing else. `employee_id` came from the request body and was never
+compared against the caller, and approval checked absolutely nothing.
 
-Presat înainte de reparație, pe instanță vie: un utilizator obișnuit cu acces la
-`leave` a depus două zile pe soldul altui angajat **și le-a aprobat el însuși**.
-Ambele răspunsuri, 200.
+Pressed before the repair, on a live instance: an ordinary user with access to
+`leave` filed two days against another employee's balance **and approved them
+himself**. Both responses, 200.
 
-Concediul e bani. Zilele neconsumate se compensează la încetare, deci a cheltui
-soldul altcuiva e a-i cheltui plata compensatorie. Iar autoaprobarea desființează
-singurul control care există aici: managerul.
+Leave is money. Unused days are compensated on termination, so spending someone
+else's balance is spending their severance. And self-approval abolishes the only
+control that exists here: the manager.
 
-Trei căi de acces acum, iar ordinea e ideea: **e concediul tău**, **conduci
-persoana**, sau **administrezi instanța**.
+Three access paths now, and the order is the idea: **it is your leave**, **you
+manage the person**, or **you administer the instance**.
 
-| acțiune | tu însuți | manager | admin |
+| action | yourself | manager | admin |
 |---|---|---|---|
-| depunere | da | da | da |
-| aprobare | **nu** | da | da |
-| respingere | **nu** | da | da |
-| anulare | da | da | da |
+| filing | yes | yes | yes |
+| approval | **no** | yes | yes |
+| rejection | **no** | yes | yes |
+| cancellation | yes | yes | yes |
 
-Aprobarea și respingerea exclud explicit cazul „propriul concediu" în loc să
-omită verificarea — omisiunea e chiar felul în care s-a pierdut prima dată.
-Anularea îl păstrează, fiindcă acolo îți dai zilele înapoi, ceea ce e legitim.
+Approval and rejection explicitly exclude the "own leave" case rather than
+omitting the check — the omission is precisely how this was lost the first time.
+Cancellation keeps it, because there you are giving your own days back, which is
+legitimate.
 
-Verificat în **șase** direcții, nu doar în cele care confirmă:
+Verified in **six** directions, not just the confirming ones:
 
-1. depunere pentru altcineva → 403
-2. depunere pentru sine → 201
-3. autoaprobare → 403
-4. aprobare de către admin → 200
-5. după ce devine manager, depune pentru subaltern → 201
-6. și îl aprobă ca manager → 200
+1. filing for someone else → 403
+2. filing for yourself → 201
+3. self-approval → 403
+4. approval by the admin → 200
+5. after becoming a manager, filing for a subordinate → 201
+6. and approving it as the manager → 200
 
-Fără 2, 4, 5 și 6, un fix care blochează tot ar fi arătat identic.
+Without 2, 4, 5 and 6, a fix that blocked everything would have looked identical.
 
-## Legătura utilizator ↔ angajat era pe email
+## The user ↔ employee link went by email
 
-`/requests/my` căuta angajatul după `email = user.email`, deși `zvd_employees`
-are coloana `user_id`. Un om al cărui email de serviciu diferă de cel de logare
-vedea o listă goală și părea că n-a luat concediu niciodată. Helper-ul nou
-încearcă `user_id` întâi și păstrează emailul ca rezervă.
+`/requests/my` looked the employee up by `email = user.email`, even though
+`zvd_employees` has a `user_id` column. Someone whose work email differs from
+their login email saw an empty list and appeared never to have taken leave. The
+new helper tries `user_id` first and keeps the email as a fallback.
 
-## Ce e corect și merită știut
+## What is correct and worth knowing
 
-- Zilele lucrătoare exclud weekendurile **și** sărbătorile legale — verificat cu
-  o sărbătoare pusă în mijlocul intervalului: 5 zile devin 4.
-- Suprapunerile sunt refuzate.
-- Depășirea soldului e refuzată.
-- Aprobarea mută `pending → used`; anularea unei cereri aprobate întoarce
-  `used`, nu `pending`. Corect.
+- Working days exclude weekends **and** public holidays — verified with a holiday
+  placed in the middle of the range: 5 days become 4.
+- Overlaps are refused.
+- Exceeding the balance is refused.
+- Approval moves `pending → used`; cancelling an approved request returns `used`,
+  not `pending`. Correct.
 
-## Lipsuri de produs
+## Product gaps
 
-- **Zero sărbători legale la instalare.** Mecanismul funcționează, dar tabelul e
-  gol, deci pe o instanță nouă orice cerere numără greșit până când cineva
-  introduce manual zilele. Ar trebui aduse de o extensie de țară, pe același
-  tipar ca `identity.nationalId` din `hr/employees` — calendarul de sărbători e
-  specific țării, modulul de concedii nu trebuie să fie.
-- Fără notificări: nici la depunere, nici la aprobare, nici la respingere.
-- Fără vizibilitate de echipă („cine e plecat săptămâna asta" există ca
-  `/calendar`, dar nu e legat de ierarhie).
-- Fără perioade blocate (blackout), fără concediu în avans, fără fracțiuni mai
-  mici de jumătate de zi.
+- **Zero public holidays at installation.** The mechanism works, but the table is
+  empty, so on a new instance every request counts wrongly until someone enters
+  the days by hand. They should be supplied by a country extension, on the same
+  pattern as `identity.nationalId` from `hr/employees` — the holiday calendar is
+  country-specific, the leave module must not be.
+- No notifications: not on filing, not on approval, not on rejection.
+- No team visibility ("who is away this week" exists as `/calendar`, but is not
+  tied to the hierarchy).
+- No blackout periods, no leave in advance, no fractions smaller than half a day.
 
-## Identitatea și autorizarea trec prin `hr.employment` (2026-08-12)
+## Identity and authorisation go through `hr.employment` (2026-08-12)
 
-Helperii `callerEmployee`/`mayActOnLeaveOf` existau identic și în
-`hr/time-tracking`, amândoi deschizând `zvd_employees` — tabelul altei extensii.
-Sunt acum o singură implementare, pe serviciul expus de `hr/employees`.
+The `callerEmployee`/`mayActOnLeaveOf` helpers existed identically in
+`hr/time-tracking` too, both opening `zvd_employees` — another extension's table.
+They are now a single implementation, on the service exposed by `hr/employees`.
 
-Tot ce **decide** trece prin el: cine e apelantul, cine pe cine conduce, cine
-poate acționa pentru cine. Fără `hr/employees` activat, rutele răspund **503**, nu
-crapă.
+Everything that **decides** goes through it: who the caller is, who manages whom,
+who can act for whom. Without `hr/employees` enabled, the routes answer **503**
+rather than crashing.
 
-`/requests/my` căuta după email; acum `identify()` încearcă `user_id` întâi — cine
-are alt email de serviciu decât cel de logare vedea o listă goală.
+`/requests/my` looked up by email; `identify()` now tries `user_id` first — anyone
+whose work email differs from their login email saw an empty list.
 
-**Ce rămâne, deliberat:** JOIN-urile care pun numele omului lângă cerere, și un
-`SELECT id` care listează cui i se inițializează soldurile. Sunt citiri de
-afișare; trecerea lor prin serviciu ar însemna N+1 sau o metodă care re-expune
-tabelul. Marcate în sursă.
+**What remains, deliberately:** the JOINs that put the person's name beside the
+request, and a `SELECT id` listing whose balances are being initialised. These are
+display reads; routing them through the service would mean N+1 or a method that
+re-exposes the table. Marked in the source.

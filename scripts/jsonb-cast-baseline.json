@@ -1,0 +1,33 @@
+{
+  "sites": [
+    "auth/ldap/engine/routes.ts:273",
+    "auth/ldap/engine/routes.ts:325",
+    "communications/mail/engine/lib/compose.ts:140",
+    "communications/mail/engine/lib/compose.ts:141",
+    "communications/mail/engine/lib/compose.ts:142",
+    "communications/mail/engine/lib/compose.ts:152",
+    "communications/mail/engine/lib/compose.ts:168",
+    "communications/mail/engine/lib/compose.ts:173",
+    "communications/mail/engine/lib/imap-client.ts:259",
+    "communications/mail/engine/lib/imap-client.ts:262",
+    "communications/mail/engine/routes.ts:1283",
+    "communications/mail/engine/routes.ts:1284",
+    "communications/mail/engine/routes.ts:629",
+    "communications/mail/engine/routes.ts:630",
+    "compliance/gdpr/engine/routes.ts:160",
+    "compliance/ro/efactura/engine/index.ts:115",
+    "content/document-templates/engine/routes.ts:218",
+    "crm/engine/routes.ts:225",
+    "crm/engine/routes.ts:385",
+    "crm/engine/routes.ts:527",
+    "crm/engine/routes.ts:529",
+    "developer/graphql/engine/routes.ts:517",
+    "developer/graphql/engine/routes.ts:579",
+    "developer/validation/engine/routes.ts:570",
+    "finance/invoicing/engine/routes.ts:810",
+    "finance/subscriptions/engine/routes.ts:202",
+    "integrations/api-connector/engine/routes.ts:223",
+    "integrations/api-connector/engine/routes.ts:224",
+    "workflow/checklists/engine/routes.ts:110"
+  ]
+}

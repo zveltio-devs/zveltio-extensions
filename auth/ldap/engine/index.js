@@ -27227,7 +27227,9 @@ async function upsertLdapConfig(db, config2, encryptSecret) {
   }
 }
 async function findOrCreateSsoUser(dbh, email3, displayName) {
-  const existing = await dbh.selectFrom("user").selectAll().where("email", "=", email3).executeTakeFirst();
+  const existing = await sql`
+    SELECT * FROM "user" WHERE email = ${email3} LIMIT 1
+  `.execute(dbh).then((r) => r.rows[0]);
   if (existing)
     return existing;
   const id = crypto.randomUUID();
@@ -27236,7 +27238,12 @@ async function findOrCreateSsoUser(dbh, email3, displayName) {
     INSERT INTO "user" (id, email, name, "emailVerified", "createdAt", "updatedAt")
     VALUES (${id}, ${email3}, ${displayName || email3.split("@")[0]}, true, ${now}, ${now})
   `.execute(dbh);
-  return dbh.selectFrom("user").selectAll().where("id", "=", id).executeTakeFirstOrThrow();
+  const created = await sql`
+    SELECT * FROM "user" WHERE id = ${id} LIMIT 1
+  `.execute(dbh).then((r) => r.rows[0]);
+  if (!created)
+    throw new Error(`[ldap] user ${id} vanished immediately after insert`);
+  return created;
 }
 function ldapRoutes(ctx) {
   const { db, auth, checkPermission, internals } = ctx;

@@ -1,98 +1,101 @@
 # LDAP / Active Directory — context
 
-**Presat 2026-08-10 (era RUPT). Reparat și re-presat 2026-08-11 — 17/17 verificări
-trec pe bază complet nouă**, cu extensia activată din marketplace și cu bundle-ul
-împachetat, nu cu sursa.
+**Pressed 2026-08-10 (it was BROKEN). Repaired and re-pressed 2026-08-11 — 17/17
+checks pass on a completely fresh database**, with the extension enabled from the
+marketplace and with the packed bundle, not the source.
 
-Server folosit: un LDAP minimal scris de mână (bind + search, BER), fiindcă pe
-mașina asta nu există docker/podman. Vezi „Ce NU s-a verificat" la final — **de
-aceea starea în `REVIEW-STATUS.md` e `reparat — G nepresat`, nu `verificat`.**
+Server used: a minimal hand-written LDAP (bind + search, BER), because there is no
+docker/podman on this machine. See "What was NOT checked" at the end — **that is
+why the state in `REVIEW-STATUS.md` is `repaired — G not pressed`, not
+`verified`.**
 
 ---
 
-## Ce era rupt și de ce n-a văzut nimeni
+## What was broken, and why nobody saw it
 
-Trei blocaje independente, fiecare suficient singur ca să omoare toate rutele.
-Extensia nu putea autentifica pe nimeni, pe nicio instalare. Toate trei sunt
-reparate; le las scrise fiindcă tiparul se repetă în alte extensii.
+Three independent blockers, each enough on its own to kill every route. The
+extension could authenticate nobody, on any installation. All three are repaired;
+they are written down because the pattern recurs in other extensions.
 
-### 1. Configul stătea în `zv_settings` — tabel al engine-ului
+### 1. The config lived in `zv_settings` — an engine table
 
-`ctx.db` refuză tabelele de sistem (regula D1):
+`ctx.db` refuses system tables (rule D1):
 
 ```
 Extension "auth/ldap" attempted to access system table "zv_settings" via selectFrom().
 ```
 
-`POST /config` răspundea 500; restul spuneau „not configured".
+`POST /config` answered 500; the rest said "not configured".
 
-**Reparat** prin migrația `004_config_own_table.sql`: configul stă acum în
-`zvd_ldap_config`, tabelul extensiei, cu RLS pe tenant. Migrația preia
-automat o configurație veche din `zv_settings`, dacă există.
+**Repaired** by migration `004_config_own_table.sql`: the config now lives in
+`zvd_ldap_config`, the extension's own table, with per-tenant RLS. The migration
+automatically adopts an old configuration from `zv_settings` if one exists.
 
-**Nu** am cerut un grant pe `zv_settings` în engine, deși ar fi fost o linie:
-grant-ul e per TABEL, nu per cheie, deci extensia de autentificare ar fi căpătat
-acces la configurația de mail, la cea SAML și la orice altă setare de instanță.
+A grant on `zv_settings` was **not** requested in the engine, though it would have
+been one line: a grant is per TABLE, not per key, so the authentication extension
+would have gained access to the mail configuration, the SAML one, and every other
+instance setting.
 
-> **Același tipar, nepresat:** `auth/saml` și `developer/api-docs` fac tot
-> `selectFrom('zv_settings')` cu Kysely. Aproape sigur rupte identic.
-> `analytics/dashboard` și `communications/mail` scapă doar fiindcă folosesc SQL
-> brut (tagged template) — **proxy-ul restrictiv prinde DOAR metodele Kysely**,
-> nu `sql\`\``. Asta e și motivul pentru care scrierile în `zv_audit_log` de aici
-> au funcționat mereu.
+> **The same pattern, unpressed:** `auth/saml` and `developer/api-docs` also do
+> `selectFrom('zv_settings')` with Kysely. Almost certainly broken identically.
+> `analytics/dashboard` and `communications/mail` escape only because they use raw
+> SQL (a tagged template) — **the restricting proxy catches ONLY Kysely methods**,
+> not `sql\`\``. That is also why the writes to `zv_audit_log` from here have
+> always worked.
 
-### 2. `/login` era în spatele porții `/ext/*` — trebuia să fii logat ca să te loghezi
+### 2. `/login` was behind the `/ext/*` gate — you had to be logged in to log in
 
-Manifestul nu declara `publicRoutes`, iar poarta fail-closed
-(`middleware/extension-auth-gate.ts`) cere sesiune pentru orice sub `/ext/<name>/`.
-Singurul om care are nevoie de ruta aia e exact cel care n-are sesiune.
+The manifest declared no `publicRoutes`, and the fail-closed gate
+(`middleware/extension-auth-gate.ts`) requires a session for anything under
+`/ext/<name>/`. The only person who needs that route is precisely the one with no
+session.
 
-**Reparat**: `"publicRoutes": ["/login"]` în manifest. Verificat că **doar**
-`/login` s-a deschis — `GET/POST /config` și `/test` dau tot 401 anonim.
+**Repaired**: `"publicRoutes": ["/login"]` in the manifest. Verified that **only**
+`/login` opened — `GET/POST /config` and `/test` still answer 401 anonymously.
 
-> `auth/saml` are aceeași lipsă.
+> `auth/saml` has the same omission.
 
-### 3. `ldap://` nu se putea conecta NICIODATĂ — clientul forța TLS
+### 3. `ldap://` could NEVER connect — the client forced TLS
 
-`ldapts` decide transportul așa:
+`ldapts` decides the transport like this:
 
 ```js
 this.secure = isSecureProtocol || !!this.clientOptions.tlsOptions;
 ```
 
-iar `ldap-provider.ts` pasa **mereu** `tlsOptions` — și `{}` e truthy. Deci pe un
-URL `ldap://` clientul trimitea un ClientHello TLS către un port care vorbește
-LDAP în clar. Văzut pe fir, primii octeți de la engine:
+and `ldap-provider.ts` **always** passed `tlsOptions` — and `{}` is truthy. So on
+an `ldap://` URL the client sent a TLS ClientHello to a port speaking cleartext
+LDAP. Seen on the wire, the first bytes from the engine:
 
 ```
-16 03 01 00 df 01 00 00 db 03 03 ...     ← TLS handshake, nu LDAPMessage
+16 03 01 00 df 01 00 00 db 03 03 ...     ← TLS handshake, not an LDAPMessage
 ```
 
-...și „Connection timeout" după exact 10s. Placeholder-ul din UI e literalmente
-`ldap://ldap.example.com:389`, adică produsul recomanda singura configurație care
-nu putea merge. **Bugul ăsta nu se vedea din citit codul** — doar punând un
-server pe fir și uitându-mă la octeți.
+...and "Connection timeout" after exactly 10s. The placeholder in the UI is
+literally `ldap://ldap.example.com:389`, meaning the product recommended the one
+configuration that could not work. **This bug was not visible from reading the
+code** — only by putting a server on the wire and looking at the bytes.
 
-**Reparat**: `tlsOptions` se trimite doar pentru `ldaps://`, și doar ca să relaxeze
-verificarea. Ambele transporturi verificate acum.
+**Repaired**: `tlsOptions` is sent only for `ldaps://`, and only to relax
+verification. Both transports are now verified.
 
-**Legat, tot reparat:** manifestul cerea `ldapts: ^4.2.6`; instalat și împachetat
-era **7.4.0**. Acum cere `^7.4.0`.
+**Related, also repaired:** the manifest asked for `ldapts: ^4.2.6`; what was
+installed and packed was **7.4.0**. It now asks for `^7.4.0`.
 
-### 4. Un singur `catch` făcea trei rute să mintă
+### 4. A single `catch` made three routes lie
 
 ```ts
-} catch { return null; }   // în getLdapConfig
+} catch { return null; }   // in getLdapConfig
 ```
 
-Înghițea orice — refuz de tabel, capabilitate neaprobată, eșec de decriptare —
-și totul ieșea ca „nu e configurat", trimițând administratorul să reintroducă o
-configurație care era deja acolo. Exact capcana de la SCIM: același simptom,
-direcția greșită.
+It swallowed everything — a refused table, an unapproved capability, a failed
+decryption — and it all came out as "not configured", sending the administrator to
+re-enter a configuration that was already there. Exactly the SCIM trap: same
+symptom, wrong direction.
 
-**Reparat**: `null` înseamnă acum un singur lucru — nu s-a salvat nimic. Orice
-altceva aruncă `LdapConfigUnreadable` și iese ca 500 cu cauza. Cu
-`granted_capabilities='[]'`, toate rutele spun acum:
+**Repaired**: `null` now means one thing only — nothing was saved. Anything else
+throws `LdapConfigUnreadable` and comes out as a 500 with the cause. With
+`granted_capabilities='[]'`, every route now says:
 
 ```
 Stored LDAP configuration could not be read: Extension "auth/ldap" used
@@ -101,94 +104,129 @@ declares it, but no administrator has approved it… Approve with
 POST /api/marketplace/auth/ldap/approve-capabilities
 ```
 
-### 5. Nu puteai re-salva configul fără să retastezi parola de bind
+### 5. You could not re-save the config without retyping the bind password
 
-`GET /config` scoate `bindPassword` (corect). Deci formularul îl trimitea înapoi
-gol, iar `z.string().min(1)` îl refuza cu un 400 **fără `detail`, fără numele
-câmpului**. Schimbai bifa de TLS, primeai 400 fără explicație.
+`GET /config` strips `bindPassword` (correctly). So the form sent it back empty,
+and `z.string().min(1)` refused it with a 400 **carrying no `detail` and no field
+name**. Change the TLS checkbox, get a 400 with no explanation.
 
-**Reparat**: câmp gol sau absent = „păstrează ce era", convenția pe care o
-folosește `compliance/ro/efactura` pentru parola certificatului. Doar prima
-salvare n-are ce păstra, și aia spune explicit ce lipsește.
+**Repaired**: an empty or absent field means "keep what was there", the convention
+`compliance/ro/efactura` uses for the certificate password. Only the first save
+has nothing to keep, and that one says explicitly what is missing.
 
-### 6. Configul era unul singur pe toată instanța
+### 6. There was one config for the whole instance
 
-`zv_settings` n-are `tenant_id` — cheia primară e `key` singur. A doua firmă de pe
-o instanță partajată nu putea avea propriul director.
+`zv_settings` has no `tenant_id` — the primary key is `key` alone. A second tenant
+on a shared instance could not have its own directory.
 
-Migrația 003 lărgise cheile pe `zvd_ldap_group_mappings` și `zvd_ldap_ip_allowlist`
-— **exact cele două tabele pe care nu le citește nimeni** — și ratase tocmai
-configul, fiindcă a fost căutat doar în tabelele `zvd_ldap_*`.
+Migration 003 had widened the keys on `zvd_ldap_group_mappings` and
+`zvd_ldap_ip_allowlist` — **exactly the two tables nobody reads** — and had missed
+the config itself, because it was only looked for in the `zvd_ldap_*` tables.
 
-**Reparat** ca efect al lui (1): `zvd_ldap_config` are `PRIMARY KEY (tenant_id)`,
-deci o configurație per firmă.
-
----
-
-## ⚠️ DESCHIS — decizie de owner, NEreparat
-
-**Cele trei tabele `zvd_ldap_*` originale sunt moarte: zero citiri, zero scrieri**,
-nicăieri — nici în rute, nici în bundle, nici în engine, nici în studio. Fără
-pagină, fără chei i18n, fără pomenire în docs.
-
-- **`zvd_ldap_ip_allowlist` este un control de securitate care nu există.** Nimic
-  nu-l citește, deci restricția de IP nu se aplică. Nu e o afișare greșită — e o
-  promisiune de securitate fără implementare.
-- `zvd_ldap_group_mappings` — maparea grup LDAP → rol Zveltio, niciodată aplicată.
-  Orice utilizator din director intră cu `role = 'member'`.
-- `zvd_ldap_login_log` e înlocuit de facto: rutele scriu în `zv_audit_log`.
-
-Nuanță care contează la decizie: **nu există niciun UI prin care un administrator
-să creadă că le-a configurat** — ar trebui să facă `INSERT` de mână. Dar oricine
-citește schema sau tipurile Kysely generate poate presupune rezonabil că merg.
-
-**Nu le-am atins**: „implementezi" vs. „ștergi tabelul" e o decizie de securitate,
-nu curățenie.
+**Repaired** as a consequence of (1): `zvd_ldap_config` has
+`PRIMARY KEY (tenant_id)`, so one configuration per tenant.
 
 ---
 
-## Ce merge, verificat pe fir
+## ⚠️ OPEN — owner's decision, NOT repaired
 
-17/17, pe bază nouă, cu bundle-ul împachetat
-(`scratchpad/verify.sh` din sesiunea de reparare):
+**The three original `zvd_ldap_*` tables are dead: zero reads, zero writes**,
+anywhere — not in the routes, not in the bundle, not in the engine, not in the
+studio. No page, no i18n keys, no mention in the docs.
 
-- bind cu contul de serviciu → search → re-bind ca DN-ul utilizatorului
-- **login anonim** peste `ldap://` ȘI `ldaps://`
-- sesiunea emisă chiar autentifică — folosită pe `/api/auth/get-session`
-- parolă greșită → 401; ambele rânduri de audit aterizează în `zv_audit_log`
-- a doua autentificare invalidează prima sesiune
-- parola de bind: `enc:v1:` la repaus, niciodată returnată de `GET /config`
-- utilizatorul nou primește `role = 'member'`, nu ceva privilegiat
+- **`zvd_ldap_ip_allowlist` is a security control that does not exist.** Nothing
+  reads it, so the IP restriction is not enforced. This is not a display bug — it
+  is a security promise with no implementation.
+- `zvd_ldap_group_mappings` — the LDAP group → Zveltio role mapping, never
+  applied. Every user from the directory arrives with `role = 'member'`.
+- `zvd_ldap_login_log` is superseded in practice: the routes write to
+  `zv_audit_log`.
 
-## Ce NU trebuie „reparat"
+A nuance that matters for the decision: **there is no UI through which an
+administrator could believe they had configured them** — they would have to
+`INSERT` by hand. But anyone reading the schema or the generated Kysely types
+could reasonably assume they work.
 
-Verificarea explicită a lui `createBetterAuthSession` la pornire, cu mesajul
-despre nepotrivire de versiune, e **intenționată** — e poarta care lipsea în
-iulie. Nu dă fals pozitiv când capabilitatea lipsește: `gateInternals` întoarce
-un Proxy cu o *funcție care aruncă la apel*, adică truthy, deci extensia se
-încarcă normal și refuzul vine la apel, unde trebuie.
+**They were not touched**: "implement it" vs "drop the table" is a security
+decision, not housekeeping.
 
-## Capcane plătite la reparare
+---
 
-- **`disable` + `enable` NU reîncarcă octeții bundle-ului.** Am pierdut timp
-  crezând că o reparație n-a avut efect; modulul vechi era în cache. **Repornește
-  engine-ul** ca să testezi un bundle nou.
-- **`extension pack` fără `--first-party` îți injectează `isolation: "worker"` în
-  manifest** și îl LASĂ acolo — o rulare ulterioară cu `--first-party` nu-l scoate.
-  Verifică blocul `engine` după fiecare pack.
-- **`::jsonb` pe un parametru șir e no-op.** Driverul leagă șirul ca valoare JSON,
-  deci rândul ajunge să conțină `"{\"url\":…}"` — un șir care conține JSON. Se
-  scrie `::text::jsonb`. Codul vechi avea exact bugul ăsta și de-aia citirea
-  trebuia să facă `JSON.parse` pe ce venea din `jsonb`.
+## What works, verified on the wire
 
-## Ce NU s-a verificat
+17/17, on a fresh database, with the packed bundle
+(`scratchpad/verify.sh` from the repair session):
 
-- **Un director real.** Serverul meu implementează doar `BindRequest`,
-  `SearchRequest`, `UnbindRequest`. Netestate: apartenența la grupuri, referrals,
-  rezultate paginate, atributele specifice AD, `sAMAccountName`, StartTLS.
-- **Certificat valid.** Testul `ldaps://` a mers cu self-signed și
-  `tlsVerify: false`. Ramura `tlsVerify: true` cu lanț de încredere real n-a fost
-  exersată — și tocmai ea e calea din producție.
-- **Multi-tenant la autentificare** — instanța de probă era single-tenant, deci
-  n-am putut distinge poarta de membership. Tabelul e cheiat pe `tenant_id`, dar
-  care tenant se rezolvă la un `/login` anonim n-a fost pus la încercare.
+- bind with the service account → search → re-bind as the user's DN
+- **anonymous login** over `ldap://` AND `ldaps://`
+- the issued session really does authenticate — used against
+  `/api/auth/get-session`
+- wrong password → 401; both audit rows land in `zv_audit_log`
+- a second authentication invalidates the first session
+- the bind password: `enc:v1:` at rest, never returned by `GET /config`
+- a new user gets `role = 'member'`, not something privileged
+
+## What must NOT be "repaired"
+
+The explicit check of `createBetterAuthSession` at startup, with the message about
+a version mismatch, is **intentional** — it is the gate that was missing in July.
+It does not produce a false positive when the capability is absent:
+`gateInternals` returns a Proxy holding *a function that throws when called*,
+which is truthy, so the extension loads normally and the refusal arrives at call
+time, where it belongs.
+
+## Traps paid for during the repair
+
+- **`disable` + `enable` does NOT reload the bundle's bytes.** Time was lost
+  believing a repair had had no effect; the old module was cached. **Restart the
+  engine** to test a new bundle.
+- **`extension pack` without `--first-party` injects `isolation: "worker"` into
+  the manifest** and LEAVES it there — a later run with `--first-party` does not
+  remove it. Check the `engine` block after every pack.
+- **`::jsonb` on a string parameter is a no-op.** The driver binds the string as a
+  JSON value, so the row ends up containing `"{\"url\":…}"` — a string containing
+  JSON. It is written `::text::jsonb`. The old code had exactly this bug, which is
+  why the read had to `JSON.parse` whatever came out of `jsonb`.
+
+## What was NOT checked
+
+- **A real directory.** This server implements only `BindRequest`,
+  `SearchRequest`, `UnbindRequest`. Untested: group membership, referrals,
+  paginated results, AD-specific attributes, `sAMAccountName`, StartTLS.
+- **A valid certificate.** The `ldaps://` test ran with a self-signed one and
+  `tlsVerify: false`. The `tlsVerify: true` branch with a real trust chain was not
+  exercised — and that is precisely the production path.
+- **Multi-tenant at authentication time** — the trial instance was single-tenant,
+  so the membership gate could not be distinguished. The table is keyed on
+  `tenant_id`, but which tenant resolves during an anonymous `/login` was not put
+  to the test.
+
+---
+
+## `selectFrom('user')` refused the directory login — repaired 2026-09-05
+
+The same defect as `auth/saml`, found the same way and repaired in the same
+change. `findOrCreateSsoUser` read the user through the query builder; `ctx.db`
+refuses `user`, which is neither `zvd_*`, nor this extension's namespace, nor a
+table its migrations create. Measured with its real allowedTables:
+
+```
+auth/ldap  allowed:{zvd_ldap_login_log,zvd_ldap_group_mappings,zvd_ldap_ip_allowlist,zvd_ldap_config}
+   query-builder: user=REFUSED  session=REFUSED  account=REFUSED  zv_tenant_users=REFUSED  zv_audit_log=REFUSED
+```
+
+So provisioning a directory user who had never signed in before threw, while the
+`INSERT` two lines below it — raw SQL — would have worked. The reads are now raw
+SQL as well, consistent with the write.
+
+Note what this means for the section above: the note there says the writes to
+`zv_audit_log` "have always worked" because raw SQL escapes the proxy. That is
+the same hole, and it is doing the same work here. **This is not the durable
+answer**: when the engine closes the inline raw path, `auth/ldap` and `auth/saml`
+have to be granted `user` and `session` in the SAME change, or directory login
+breaks again — on the write this time.
+
+Unlike `auth/saml`, nothing masked this one: the LDAP bind path has no equivalent
+of the SAML assertion validation in front of it. It simply required a user who
+did not exist yet, which is why the 17/17 pass above did not catch it — that run
+provisioned against a database where the user was already there.

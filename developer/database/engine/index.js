@@ -19431,6 +19431,24 @@ function parseParameter(param) {
   }
   return parseValueExpression(param);
 }
+// developer/database/engine/platform-guards.ts
+function isPlatformTable(table) {
+  const t = table.toLowerCase();
+  if (t.startsWith("zvd_") || t.startsWith("zv_"))
+    return true;
+  return ["user", "session", "account", "verification", "twofactor", "passkey", "jwks"].includes(t);
+}
+function isProtectedRole(name) {
+  const PROTECTED = ["postgres", "pg_monitor", "pg_read_all_settings"];
+  return PROTECTED.includes(name) || name.startsWith("pg_") || name.toLowerCase().startsWith("zveltio_");
+}
+function isIsolationPolicy(policy) {
+  return /^tenant_isolation_/i.test(policy);
+}
+function rlsRefusal(table, action) {
+  return `Refusing to ${action} "${table}": it is a Zveltio platform table, and row ` + `level security on it is what isolates one tenant from another. This is not a ` + `database-administration setting \u2014 turning it off exposes every tenant's rows ` + `on that table to every other tenant on this instance.`;
+}
+
 // developer/database/engine/routes.ts
 function q(s) {
   return `"${s.replace(/"/g, '""')}"`;
@@ -19778,9 +19796,18 @@ function databaseRoutes(ctx) {
     }
   }).delete("/roles/:name", async (c) => {
     const name = c.req.param("name");
-    const PROTECTED = ["postgres", "pg_monitor", "pg_read_all_settings"];
-    if (PROTECTED.includes(name) || name.startsWith("pg_"))
-      return c.json({ error: "Cannot drop system role" }, 403);
+    if (isProtectedRole(name)) {
+      return c.json({
+        error: name.toLowerCase().startsWith("zveltio_") ? `Cannot drop "${name}": Zveltio's own database roles carry tenant isolation. ` + `Dropping one disables the boundary for every tenant on this instance.` : "Cannot drop system role"
+      }, 403);
+    }
+    const selfOrSuper = await sql`
+        SELECT (r.rolname = current_user OR r.rolsuper) AS blocked
+        FROM pg_roles r WHERE r.rolname = ${name}
+      `.execute(db).then((r) => r.rows[0]?.blocked === true).catch(() => true);
+    if (selfOrSuper) {
+      return c.json({ error: `Cannot drop "${name}": it is the current role or a superuser` }, 403);
+    }
     try {
       await sql.raw(`DROP ROLE IF EXISTS ${q(name)}`).execute(db);
       return c.json({ success: true });
@@ -19825,6 +19852,13 @@ function databaseRoutes(ctx) {
   })), async (c) => {
     const table = c.req.param("table");
     const { enabled, forced } = c.req.valid("json");
+    const platform = isPlatformTable(table);
+    if (platform && !enabled) {
+      return c.json({ error: rlsRefusal(table, "disable row level security on") }, 403);
+    }
+    if (platform && forced === false) {
+      return c.json({ error: rlsRefusal(table, "remove FORCE row level security from") }, 403);
+    }
     try {
       await sql.raw(`ALTER TABLE ${q(table)} ${enabled ? "ENABLE" : "DISABLE"} ROW LEVEL SECURITY`).execute(db);
       if (forced !== undefined) {
@@ -19843,9 +19877,12 @@ function databaseRoutes(ctx) {
     with_check: exports_external.string().optional()
   })), async (c) => {
     const data = c.req.valid("json");
-    let sql_str = `CREATE POLICY "${data.policy_name}" ON "${data.table}"`;
+    if (isPlatformTable(data.table)) {
+      return c.json({ error: rlsRefusal(data.table, "add a policy to") }, 403);
+    }
+    let sql_str = `CREATE POLICY ${q(data.policy_name)} ON ${q(data.table)}`;
     sql_str += ` AS PERMISSIVE FOR ${data.command}`;
-    sql_str += ` TO ${data.roles.join(", ")}`;
+    sql_str += ` TO ${data.roles.map((r) => r.toUpperCase() === "PUBLIC" ? "PUBLIC" : q(r)).join(", ")}`;
     if (data.using)
       sql_str += ` USING (${data.using})`;
     if (data.with_check)
@@ -19859,6 +19896,14 @@ function databaseRoutes(ctx) {
   }).delete("/rls/:table/:policy", async (c) => {
     const table = c.req.param("table");
     const policy = c.req.param("policy");
+    if (isIsolationPolicy(policy)) {
+      return c.json({
+        error: `Cannot drop "${policy}": it is the tenant isolation policy for "${table}". ` + `Removing it exposes every tenant's rows on that table to every other tenant.`
+      }, 403);
+    }
+    if (isPlatformTable(table)) {
+      return c.json({ error: rlsRefusal(table, "drop a policy from") }, 403);
+    }
     try {
       await sql.raw(`DROP POLICY IF EXISTS ${q(policy)} ON ${q(table)}`).execute(db);
       return c.json({ success: true });

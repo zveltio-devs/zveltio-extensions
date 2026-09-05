@@ -14,19 +14,17 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { sanitizeBlocks, sanitizeBlocksForWrite } from './sanitize.js';
+import { escapeXml } from './public-seo.js';
 import { jsonb } from './jsonb.js';
 import { ICON_NAMES } from '../client/icons.js';
 import { MOTION_TYPES } from '../client/motion.js';
 import { resolveBlocks } from './hydrate.js';
+import { tenantId } from './tenant.js';
 
 // biome-ignore lint/suspicious/noExplicitAny: Hono context in a self-contained extension
 type Any = any;
 
-const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
-function tenantId(c: Any): string {
-  return (c.get('tenant') as { id?: string } | null | undefined)?.id ?? DEFAULT_TENANT_ID;
-}
 
 /**
  * Fixed-window per-IP limiter for the UNauthenticated tracking writes.
@@ -105,6 +103,51 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
   // handler is therefore already RLS-scoped — there is one spelling, so there is
   // none to forget.
   const app = new Hono();
+
+  /**
+   * The editor is admin-only — for READS as well as writes.
+   *
+   * Every write here already called `requireAdmin`. Every read called
+   * `requireAuth`, which is `getUser` and nothing more, so any session at all
+   * reached them. That is not the rule the rendered page obeys: `sites.ts:574`
+   * refuses a caller who does not hold the site's `access_roles`.
+   *
+   * So a member refused the rendered page could read that page's full content,
+   * `blocks` included, from `GET /pages/:id` — and `GET /pages/` is `selectAll()`
+   * with no status filter, so one request returned every page in the tenant with
+   * its body, drafts and unpublished work included. Demonstrated in
+   * `editor-read-authz.test.ts`: the render path refuses that user and both
+   * editor reads hand them the same restricted page.
+   *
+   * Admin rather than the render path's role check, because that is the rule this
+   * module already states for itself — "Authoring is therefore an admin-only
+   * capability" — and every write enforces it. A non-admin cannot author, so
+   * there is nothing here for them to read. Checked before changing it: the only
+   * consumer of these reads is the Studio admin page, whose schema calls
+   * `/pages` and `/pages/{id}`; the public renderer uses `/cms/*`, a separate
+   * router with its own rules.
+   *
+   * Middleware rather than thirteen separate calls, for the reason
+   * `tenant-isolation.test.ts` gives about its own shape: the defect is "a route
+   * that forgot", and a route added tomorrow is covered here for free.
+   */
+  const isPublicTrack = (path: string): boolean =>
+    path === '/metrics/track' || /^\/[^/]+\/ab-variants\/[^/]+\/track$/.test(path);
+
+  app.use('*', async (c, next) => {
+    // The two telemetry endpoints the PUBLIC renderer posts to. Both are declared
+    // in the manifest's `publicRoutes`, so gating them here would break the
+    // rendered page rather than protect it.
+    const sub = c.req.path.replace(/^.*?\/pages(?=\/|$)/, '') || '/';
+    if (isPublicTrack(sub)) return next();
+
+    const user = await getUser(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    if (!(await checkPermission(user.id, 'admin', '*'))) {
+      return c.json({ error: 'Admin access required' }, 403);
+    }
+    await next();
+  });
 
   // ─── Block types ──────────────────────────────────────────────────────────
 
@@ -251,10 +294,10 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
       .map(
         (p: Any) => `
   <url>
-    <loc>${baseUrl}/${p.slug}</loc>
-    <lastmod>${new Date(p.updated_at).toISOString().split('T')[0]}</lastmod>
-    <changefreq>${p.change_freq || 'weekly'}</changefreq>
-    <priority>${p.priority ?? 0.5}</priority>
+    <loc>${escapeXml(`${baseUrl}/${p.slug}`)}</loc>
+    <lastmod>${escapeXml(new Date(p.updated_at).toISOString().split('T')[0])}</lastmod>
+    <changefreq>${escapeXml(p.change_freq || 'weekly')}</changefreq>
+    <priority>${escapeXml(p.priority ?? 0.5)}</priority>
   </url>`,
       )
       .join('');
@@ -306,9 +349,36 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const { page_id, time_on_page_seconds } = c.req.valid('json');
       const today = new Date().toISOString().split('T')[0];
+      // `INSERT … SELECT … WHERE EXISTS`, not a plain VALUES.
+      //
+      // This accepted any UUID. `page_id` is validated for SHAPE by the schema
+      // and never checked against a page, so an anonymous caller could inflate
+      // the view count of any page in the tenant — including an unpublished
+      // draft, which then shows traffic it never had — and could create metric
+      // rows for UUIDs that name nothing at all.
+      //
+      // The page must exist, be published, be active, and be on a site that is
+      // public: the same four conditions `/cms` uses to decide a page may be
+      // seen anonymously. Tracking a view of a page the caller could not have
+      // been shown is not a view.
+      //
+      // One statement rather than a lookup and then an insert, so this stays a
+      // single round trip on the highest-frequency endpoint in the extension.
+      // An unmatched page inserts nothing and still answers 200 — a tracking
+      // beacon has nobody to report an error to, and telling a scraper which
+      // UUIDs are real would be the only thing a 404 here accomplished.
       await sql`
         INSERT INTO zv_page_metrics (page_id, date, views, avg_time_on_page_seconds)
-        VALUES (${page_id}, ${today}::date, 1, ${time_on_page_seconds})
+        SELECT ${page_id}, ${today}::date, 1, ${time_on_page_seconds}
+        WHERE EXISTS (
+          SELECT 1 FROM zv_pages p
+          JOIN zv_page_sites s ON s.id = p.site_id
+          WHERE p.id = ${page_id}
+            AND p.status = 'published'
+            AND p.is_active = true
+            AND s.is_public = true
+            AND s.is_active = true
+        )
         ON CONFLICT (page_id, date) DO UPDATE SET
           views = zv_page_metrics.views + 1,
           avg_time_on_page_seconds = (zv_page_metrics.avg_time_on_page_seconds * zv_page_metrics.views + ${time_on_page_seconds}) / (zv_page_metrics.views + 1)
@@ -709,7 +779,17 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
       issues.push(`Title length ${titleLen} chars (ideal: 30-60)`);
     } else issues.push('Missing page title');
 
-    const metaDesc = page.meta_description || (page.meta as Any)?.description || '';
+    // The string-scalar tolerance every other reader of a jsonb column here has.
+    // Migration 004's comment asserts "every reader in this extension does
+    // `typeof x === 'string' ? JSON.parse(x) : x`" — this one did not, so the
+    // sentence was false. Not reachable today, because 004 normalised the stored
+    // rows and `check-jsonb-cast` ratchets the writes; reachable the moment a row
+    // arrives from an import, a restored backup, or an install that has not run
+    // 004 yet, and the symptom would be this analyser reporting "Missing meta
+    // description" for pages that have one.
+    const pageMeta =
+      typeof page.meta === 'string' ? (JSON.parse(page.meta || '{}') as Any) : ((page.meta ?? {}) as Any);
+    const metaDesc = page.meta_description || pageMeta?.description || '';
     const descLen = metaDesc.length;
     if (descLen >= 120 && descLen <= 160) metaScore = 100;
     else if (descLen > 0) {
@@ -793,11 +873,29 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
     return c.json({ success: true });
   });
 
+  /**
+   * Record a conversion. PUBLIC — the rendered page posts this, so there is no
+   * session in front of it.
+   *
+   * `page_id` is part of the filter, and was not. The route declares
+   * `/:id/ab-variants/:variantId/track` and then ignored `:id` entirely,
+   * filtering on the variant alone — so any variant on the instance could be
+   * incremented from any page's URL by anyone. The `DELETE` twenty lines above
+   * has carried the pair since it was written; this one did not. Measured:
+   *
+   *   shipped query, wrong :id in the path  -> conversions 0 -> 1
+   *   with the page_id filter, wrong :id    -> unchanged
+   *
+   * RLS keeps this inside one tenant, so it was never cross-tenant. What it was
+   * is an A/B result anyone could move, and an A/B result is a decision about
+   * which page the business ships.
+   */
   app.post('/:id/ab-variants/:variantId/track', rateLimit(60, 60_000), async (c) => {
     await db
       .updateTable('zv_page_ab_variants')
       .set({ conversions: sql`conversions + 1` })
       .where('id', '=', c.req.param('variantId'))
+      .where('page_id', '=', c.req.param('id'))
       .execute();
     return c.json({ success: true });
   });

@@ -1,17 +1,17 @@
-# Mijloace fixe — context
+# Fixed assets — context
 
-**Verificat prin apăsare: 2026-08-09.**
+**Verified by pressing: 2026-08-09.**
 
-## Ce era rupt
+## What was broken
 
-Coloane scrise care nu existau — aceeași clasă găsită în zece extensii.
+Columns written that did not exist — the same class found in ten extensions.
 
-`zvd_assets.code` era unic pe instanță; două firme nu puteau avea fiecare
-mijlocul fix „MF-001". Lărgit la `(tenant_id, code)`.
+`zvd_assets.code` was unique per instance; two tenants could not each have asset
+"MF-001". Widened to `(tenant_id, code)`.
 
-## Capcană
+## A trap
 
-`zvd_asset_depreciation` are cheia `(asset_id, period)` și e **corectă așa** —
-`asset_id` e un UUID care aparține deja unei firme, deci copilul nu poate
-traversa granița. Nu o „repara" adăugând `tenant_id`; face parte din categoria pe
-care poarta din engine o lasă intenționat să treacă.
+`zvd_asset_depreciation` is keyed on `(asset_id, period)` and is **correct that
+way** — `asset_id` is a UUID that already belongs to a tenant, so the child cannot
+cross the boundary. Do not "repair" it by adding `tenant_id`; it belongs to the
+category the engine's gate deliberately lets through.

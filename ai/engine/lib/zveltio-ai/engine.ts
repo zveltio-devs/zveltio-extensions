@@ -12,6 +12,7 @@
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { aiProviderManager } from '../ai-provider.js';
+import { runReadOnly, validateGeneratedSQL } from '../sql-guard.js';
 import { zveltioAITools } from './tools.js';
 import type {
   ZveltioAIRequest,
@@ -27,11 +28,39 @@ export class ZveltioAIEngine {
   private db: any;
   private checkPermission: ExtensionContext['checkPermission'];
   private sendNotification: (db: any, input: any) => Promise<void>;
+  /**
+   * The host's DDL queue helper.
+   *
+   * `create_collection` and `add_field` wrote `zv_ddl_jobs` with
+   * `ctx.db.insertInto('zv_ddl_jobs')`, and `zv_ddl_jobs` is an ENGINE table:
+   * the extension has no grant for it, so the table guard refused both. Measured
+   * through the real restricted handle built from the real allowlist:
+   *
+   *   insertInto('zv_ddl_jobs')  -> ExtensionSecurityError: Extension "ai"
+   *                                 attempted to access table "zv_ddl_jobs"
+   *   selectFrom('zvd_collections') -> ok    (control)
+   *
+   * So two of the fourteen tools the system prompt advertises threw on every
+   * call, and the assistant reported the exception text to the user.
+   *
+   * Broken twice over, in fact: the engine moved DDL onto pg-boss, and
+   * `zv_ddl_jobs` is now "preserved for historical queries" (ddl-queue.ts:21)
+   * with no consumer at all. Granting the table would have turned a refusal into
+   * a row nothing ever reads — a create_collection that reports success and
+   * never happens, which is worse than the exception.
+   *
+   * The other half of this extension had it right all along:
+   * `ai-schema-gen.ts` enqueues the same two job types through
+   * `internals.enqueueDDLJob`, on the host's own handle. Same operation, two
+   * paths, one of them never worked.
+   */
+  private enqueueDDLJob: (db: any, operation: string, payload: any) => Promise<unknown>;
 
   constructor(ctx: ExtensionContext) {
     this.db = ctx.db;
     this.checkPermission = ctx.checkPermission;
     this.sendNotification = ctx.internals.sendNotification;
+    this.enqueueDDLJob = ctx.internals.enqueueDDLJob;
   }
 
   // ── Public API ─────────────────────────────────────────────────
@@ -379,8 +408,11 @@ export class ZveltioAIEngine {
         .select(this.db.fn.count('name').as('cnt'))
         .executeTakeFirst()) as any;
       collectionCount = parseInt(result?.cnt ?? '0');
-    } catch {
-      /* non-fatal */
+    } catch (err) {
+      // Named. This number goes into the system prompt as "The platform has N
+      // collections", so a swallowed failure tells the model there are none and
+      // the model tells the user so.
+      console.warn('[zveltio-ai] collection count failed, prompt will say "several":', (err as Error).message);
     }
 
     // User memory — top 10 by importance
@@ -411,18 +443,22 @@ export class ZveltioAIEngine {
       /* table may not exist yet */
     }
 
-    let recentActivity: any[] = [];
-    try {
-      recentActivity = await this.db
-        .selectFrom('zv_audit_log')
-        .select(['event_type', 'resource_type', 'created_at'])
-        .where('user_id', '=', request.userId)
-        .orderBy('created_at', 'desc')
-        .limit(10)
-        .execute();
-    } catch {
-      /* audit log may not exist */
-    }
+    // Recent activity is NOT read, and the assistant is told so rather than
+    // shown an empty list.
+    //
+    // This queried `zv_audit_log`, an engine table the extension has no grant
+    // for. The table guard refuses it — measured through the real restricted
+    // handle: `ExtensionSecurityError: Extension "ai" attempted to access table
+    // "zv_audit_log" via selectFrom()` — and the bare `catch {}` turned that
+    // refusal into `[]`. So `recentActivity` was empty on every installation,
+    // for a reason no log recorded, and the field went into the model's context
+    // as fact.
+    //
+    // `toolGetSystemStats` reached the same conclusion about the same two tables
+    // and says it out loud instead of reporting zero. This follows it. Restoring
+    // the query would need `zv_audit_log` in EXTENSION_TABLE_GRANTS, which is a
+    // decision about what an assistant may see, not a repair.
+    const recentActivity: any[] = [];
 
     return {
       userId: request.userId,
@@ -611,7 +647,7 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
       case 'create_visualization':
         return this.toolCreateVisualization(parsed);
       case 'execute_sql':
-        return this.toolExecuteSQL(parsed);
+        return this.toolExecuteSQL(parsed, request);
       case 'list_collections':
         return this.toolListCollections();
       case 'get_collection_schema':
@@ -707,53 +743,56 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
 
   private async toolCreateCollection(args: any) {
     const { name, display_name, fields } = args;
+    if (!ZveltioAIEngine.SAFE_COLLECTION_RE.test(name)) {
+      throw new Error(`Invalid collection name: "${name}"`);
+    }
+    if (!Array.isArray(fields) || fields.length === 0) {
+      throw new Error('create_collection needs at least one field');
+    }
 
-    await this.db
-      .insertInto('zv_ddl_jobs' as any)
-      .values({
-        operation: 'create_collection',
-        payload: JSON.stringify({
-          name,
-          displayName:
-            display_name || name.charAt(0).toUpperCase() + name.slice(1),
-          fields: fields.map((f: any) => ({
-            name: f.name,
-            type: f.type || 'text',
-            required: f.required || false,
-            unique: f.unique || false,
-            defaultValue: f.default_value,
-            options: f.options,
-          })),
-        }),
-        status: 'pending',
-      })
-      .execute();
+    // Through the host helper — see the note on `enqueueDDLJob`. The payload is
+    // an object, not a JSON string: `enqueueDDLJob` serialises it itself, and
+    // handing it a string produced a double-encoded `payload` column.
+    const jobId = await this.enqueueDDLJob(this.db, 'create_collection', {
+      name,
+      displayName: display_name || name.charAt(0).toUpperCase() + name.slice(1),
+      fields: fields.map((f: any) => ({
+        name: f.name,
+        type: f.type || 'text',
+        required: f.required || false,
+        unique: f.unique || false,
+        defaultValue: f.default_value,
+        options: f.options,
+      })),
+    });
 
     return {
       success: true,
       collection: name,
       fields: fields.length,
-      message: `Collection '${display_name || name}' is being created with ${fields.length} fields`,
+      job_id: jobId,
+      // "queued", not "created" — `enqueueDDLJob` puts the work on a queue and
+      // the job can still fail after this answer. `ai-schema-gen.ts` says the
+      // same thing for the same reason.
+      message: `Collection '${display_name || name}' is queued for creation with ${fields.length} fields`,
     };
   }
 
   private async toolAddField(args: any) {
     const { collection, field } = args;
+    if (!ZveltioAIEngine.SAFE_COLLECTION_RE.test(collection)) {
+      throw new Error(`Invalid collection name: "${collection}"`);
+    }
+    if (!field?.name) throw new Error('add_field needs a field with a name');
 
-    await this.db
-      .insertInto('zv_ddl_jobs' as any)
-      .values({
-        operation: 'add_field',
-        payload: JSON.stringify({ collection, field }),
-        status: 'pending',
-      })
-      .execute();
+    const jobId = await this.enqueueDDLJob(this.db, 'add_field', { collection, field });
 
     return {
       success: true,
       collection,
       field: field.name,
-      message: `Field '${field.name}' is being added to '${collection}'`,
+      job_id: jobId,
+      message: `Field '${field.name}' is queued to be added to '${collection}'`,
     };
   }
 
@@ -788,29 +827,92 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
     };
   }
 
-  private async toolExecuteSQL(args: any) {
+  /**
+   * The assistant's raw-SQL tool. Two things were wrong with it, and the fix for
+   * both already existed in this extension.
+   *
+   * 1. NO TABLE ALLOWLIST. The only checks were "starts with SELECT or WITH" and
+   *    a read-only transaction. `SELECT token FROM session`, `SELECT * FROM
+   *    "user"`, `information_schema`, `pg_*`, a second statement after a
+   *    semicolon — all of it passed. The Better-Auth tables have no prefix and
+   *    no RLS, so read-only does not help: reading them IS the damage.
+   *    `/ext/ai/query` refuses every one of those through
+   *    `validateGeneratedSQL`, three files away, since the audit that put it
+   *    there. This tool was not changed with it.
+   *
+   *    It is admin-gated (`ADMIN_ONLY_TOOLS`), which is why this is a bound
+   *    rather than a hole — but `checkPermission(userId, 'admin', '*')` is
+   *    passed by a TENANT administrator, and `user`/`session`/`account` are
+   *    instance-wide with no policy on them. So the gate does not stop a tenant
+   *    admin from reading every other company's password hashes, and the tool
+   *    reaches them through a sentence in a chat window. The allowlist is
+   *    `accessibleCollections` — the caller's own collections — which is the
+   *    same answer the route uses.
+   *
+   * 2. THE READ-ONLY FLAG LEAKED INTO THE WHOLE REQUEST. `ctx.db.transaction()`
+   *    JOINS the request's tenant transaction instead of nesting
+   *    (extension-context.ts: `execute: (fn) => fn(target)` — no BEGIN, same
+   *    handle), so `SET TRANSACTION READ ONLY` applied from here to the end of
+   *    the request. Measured on Postgres 18 in exactly that shape:
+   *
+   *      the tool's own SELECT            -> ran
+   *      saveConversation, same request   -> cannot execute INSERT in a read-only transaction
+   *      anything after that              -> current transaction is aborted, 25P02
+   *
+   *    So an admin who asked the assistant anything that made it reach for SQL
+   *    got the answer, and then the conversation was never saved, `remember_fact`
+   *    could not write, and the request's COMMIT became a ROLLBACK. `runReadOnly`
+   *    scopes the window to a SAVEPOINT; `ROLLBACK TO SAVEPOINT` restores
+   *    `transaction_read_only = off`, which is measured in that function's note.
+   *
+   * The identical pair of defects is in `toolTextToSQL` below. Both now go
+   * through `lib/sql-guard.ts`, so there is one implementation to get right.
+   */
+  private async toolExecuteSQL(args: any, request: ZveltioAIRequest) {
     const { query: sqlQuery } = args;
-
-    const normalized = sqlQuery.trim().toUpperCase();
-    if (!normalized.startsWith('SELECT') && !normalized.startsWith('WITH')) {
-      return { success: false, error: 'AI can only execute SELECT queries.' };
+    if (typeof sqlQuery !== 'string' || sqlQuery.trim() === '') {
+      return { success: false, error: 'No query supplied.' };
     }
 
-    // P0: keyword blocklists are bypassable via subqueries / comments / case tricks.
-    // Enforce safety at the database level by running inside a READ ONLY transaction.
-    const result = await (this.db as any)
-      .transaction()
-      .execute(async (trx: any) => {
-        await sql`SET TRANSACTION READ ONLY`.execute(trx);
-        return sql.raw(sqlQuery).execute(trx);
-      });
-    const rows = (result as any).rows || [];
+    const accessible = await this.accessibleCollections(request.userId);
+    if (accessible.length === 0) {
+      return {
+        success: false,
+        error: 'You have no collections this query could read.',
+        permission_denied: true,
+      };
+    }
+
+    const validation = validateGeneratedSQL(sqlQuery, accessible);
+    if (!validation.safe) {
+      return { success: false, error: `Refused: ${validation.reason}` };
+    }
+
+    const result = await runReadOnly(this.db, sqlQuery);
+    const rows = (result.rows as any[]) || [];
     return {
       success: true,
       rowCount: rows.length,
       data: rows,
       message: `${rows.length} rows returned.`,
     };
+  }
+
+  /**
+   * The collections this user may read, in the shape `validateGeneratedSQL`
+   * expects. Same derivation as `/ext/ai/query`: the bare collection name is the
+   * resource, which is what migration 034 writes into `zvd_permissions`.
+   */
+  private async accessibleCollections(userId: string): Promise<Array<{ name: string }>> {
+    const all = await this.db
+      .selectFrom('zvd_collections')
+      .select(['name'])
+      .execute();
+    const out: Array<{ name: string }> = [];
+    for (const col of all as Array<{ name: string }>) {
+      if (await this.checkPermission(userId, col.name, 'read')) out.push({ name: col.name });
+    }
+    return out;
   }
 
   private async toolListCollections() {
@@ -1046,7 +1148,25 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
   ): Promise<any> {
     const { context_key, content, importance = 5 } = args;
 
-    // Generate embedding if provider supports embed()
+    // Generate embedding if provider supports embed().
+    //
+    // `.embedding`, not the whole result. `AIProvider.embed()` returns
+    // `{ embedding: number[]; model: string }` (ai-provider.ts:80), and this
+    // stored `JSON.stringify` of the WHOLE object into a `vector` column.
+    // Measured against Postgres 18 + pgvector:
+    //
+    //   JSON.stringify(embedResult)   -> invalid input syntax for type vector:
+    //                                    "{"embedding":[0.01,…],"model":"…"}"
+    //   JSON.stringify(.embedding)    -> accepted
+    //
+    // So `remember_fact` failed on EVERY call as soon as an embedding-capable
+    // provider was configured — and the `.catch` below reports a vector-format
+    // error as "Memory service not available. Run migrations first.", which
+    // sends the operator to look at migrations that are fine. With Anthropic as
+    // the default (no `embed`) the branch is skipped and the tool works, so
+    // whether the assistant can remember anything depended on which provider
+    // was default. The failing INSERT also aborts the request's transaction,
+    // taking `saveConversation` down with it.
     let embedding: number[] | null = null;
     try {
       const provider = aiProviderManager.getDefault();
@@ -1055,13 +1175,14 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
         'embed' in provider &&
         typeof (provider as any).embed === 'function'
       ) {
-        embedding = await (provider as any).embed(
-          content,
-          'text-embedding-3-small',
-        );
+        const result = await (provider as any).embed(content, 'text-embedding-3-small');
+        embedding = Array.isArray(result?.embedding) ? result.embedding : null;
       }
-    } catch {
-      // Embedding is optional — fallback to text search
+    } catch (err) {
+      // Named. This is the branch that decides whether a memory carries a
+      // vector, and a silent failure here is indistinguishable from a provider
+      // that cannot embed at all.
+      console.warn('[zveltio-ai] remember_fact: embedding failed, storing text only:', (err as Error).message);
     }
 
     await (this.db as any)
@@ -1084,8 +1205,11 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
       )
       .execute()
       .catch((err: any) => {
-        console.warn('[AI Memory] Table not ready:', err.message);
-        throw new Error('Memory service not available. Run migrations first.');
+        // The reason, not a guess at it. This said "Run migrations first" for
+        // every failure, and the failure it actually had for as long as an
+        // embedding provider was configured was a malformed vector literal.
+        console.warn('[AI Memory] write failed:', err.message);
+        throw new Error(`Could not save to memory: ${err.message}`);
       });
 
     return {
@@ -1115,10 +1239,17 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
           'embed' in provider &&
           typeof (provider as any).embed === 'function'
         ) {
-          const queryEmbedding = await (provider as any).embed(
+          const embedResult = await (provider as any).embed(
             query,
             'text-embedding-3-small',
           );
+          // `.embedding` — same defect as `remember_fact` above: this
+          // stringified the whole `{ embedding, model }` result into a `::vector`
+          // literal, which Postgres rejects, so tier 1 threw on every call.
+          const queryEmbedding = embedResult?.embedding;
+          if (!Array.isArray(queryEmbedding)) {
+            throw new Error('provider returned no embedding vector');
+          }
 
           rows = await (this.db as any)
             .selectFrom('zv_ai_memory')
@@ -1137,18 +1268,29 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
         recallErrors.push(err instanceof Error ? err.message : String(err));
       }
 
-      // Fallback: PostgreSQL full-text search
+      // Fallback: PostgreSQL full-text search.
+      //
+      // This was `(this.db as any).raw(...)`. Kysely has had no `db.raw` since
+      // 0.23; this repository is on 0.29.5, where `Kysely.prototype.raw` is
+      // `undefined`. And `.raw(…)` is called while BUILDING the query, before
+      // any `.execute()`, so the TypeError was thrown synchronously — past the
+      // `.catch` attached to the promise, straight into the outer catch of this
+      // function. Which means tier 3 below, the plain importance-ordered
+      // fallback, was UNREACHABLE, and `recall_facts` answered
+      // "Memory service not available." on every call ever made, with or without
+      // an embedding provider. Measured through the real restricted handle:
+      //
+      //   tier 2: (this.db as any).raw(...)   -> TypeError: db.raw is not a function
+      //   tier 3: the plain fallback          -> ok, returns the rows
+      //
+      // The `?` placeholder was wrong too — Postgres uses `$1` — so this could
+      // not have run even with a `raw` to call it on.
       if (rows.length === 0) {
         rows = await (this.db as any)
           .selectFrom('zv_ai_memory')
           .selectAll()
           .where('user_id', '=', request.userId)
-          .where(
-            (this.db as any).raw(
-              `to_tsvector('english', content) @@ plainto_tsquery('english', ?)`,
-              [query],
-            ),
-          )
+          .where(sql<boolean>`to_tsvector('english', content) @@ plainto_tsquery('english', ${query})`)
           .orderBy('importance', 'desc')
           .orderBy('updated_at', 'desc')
           .limit(limit)
@@ -1212,27 +1354,50 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
     }
   }
 
+  /**
+   * Natural language to SQL, inside the assistant.
+   *
+   * Carried the same two defects as `toolExecuteSQL` — see the long note there
+   * — and a third of its own: the schema it showed the model was not filtered by
+   * what the caller may read. It listed the first ten collections on the
+   * instance, or whatever `collections_hint` named, with no permission check at
+   * all, so the model was handed the column names of tables the user has no
+   * access to and asked to write queries against them. Now the schema context IS
+   * the allowlist: one derivation, used for what the model is told and for what
+   * the validator permits, so the two cannot drift apart.
+   *
+   * The system prompt also told the model that collection `orders` becomes table
+   * `zv_orders`. It is `zvd_orders` — `zv_` is the ENGINE's namespace, the one
+   * holding api keys, sessions and billing. So every generated query named a
+   * table that does not exist, and the one shape that would have found a real
+   * table is the shape pointing at engine data.
+   */
   private async toolTextToSQL(
     args: any,
-    _request: ZveltioAIRequest,
+    request: ZveltioAIRequest,
   ): Promise<any> {
     const { question, collections_hint = [] } = args;
 
-    // Step 1: Collect schema of relevant collections
+    // Step 1: the caller's own collections — the same set the validator will
+    // enforce, narrowed by the hint if one was given.
+    const accessible = await this.accessibleCollections(request.userId);
+    const hint: string[] = Array.isArray(collections_hint) ? collections_hint : [];
+    const inScope = hint.length > 0 ? accessible.filter((c) => hint.includes(c.name)) : accessible;
+    if (inScope.length === 0) {
+      return {
+        error: 'You have no collections this question could be answered from.',
+        permission_denied: true,
+      };
+    }
+
     let schemaContext = '';
     try {
-      const collections =
-        collections_hint.length > 0
-          ? await (this.db as any)
-              .selectFrom('zvd_collections')
-              .selectAll()
-              .where('name', 'in', collections_hint)
-              .execute()
-          : await (this.db as any)
-              .selectFrom('zvd_collections')
-              .selectAll()
-              .limit(10)
-              .execute();
+      const names = inScope.slice(0, 10).map((c) => c.name);
+      const collections = await (this.db as any)
+        .selectFrom('zvd_collections')
+        .selectAll()
+        .where('name', 'in', names)
+        .execute();
 
       schemaContext = collections
         .map((c: any) => {
@@ -1245,8 +1410,11 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
           return `Table zvd_${c.name}: (${fields})`;
         })
         .join('\n');
-    } catch {
-      /* non-fatal */
+    } catch (err) {
+      // Named. An empty schema means the model is asked to write SQL against
+      // nothing, and the refusal it then earns from the validator reads as
+      // "you have no access" rather than "the schema lookup broke".
+      console.warn('[zveltio-ai] text_to_sql schema lookup failed:', (err as Error).message);
     }
 
     // Step 2: Generate SQL via AI
@@ -1265,7 +1433,8 @@ Available tables:
 ${schemaContext}
 
 Rules:
-- Table names are prefixed with zv_ (e.g., collection "orders" → table "zv_orders")
+- Table names are prefixed with zvd_ (e.g., collection "orders" → table "zvd_orders")
+- Use ONLY the tables listed above; anything else will be refused
 - Always use table aliases for clarity
 - Limit results to 100 rows maximum unless aggregating`,
         },
@@ -1274,41 +1443,28 @@ Rules:
       { temperature: 0.1, max_tokens: 500 },
     );
 
-    const generatedSQL = sqlGenResponse.content.trim();
+    const generatedSQL = sqlGenResponse.content
+      .trim()
+      .replace(/^```sql?\n?/i, '')
+      .replace(/\n?```$/i, '')
+      .trim();
 
-    // Step 3: Strict validation
-    const normalized = generatedSQL.toUpperCase();
-    if (!normalized.startsWith('SELECT') && !normalized.startsWith('WITH')) {
-      return {
-        error: 'Generated query is not a SELECT statement',
-        generated: generatedSQL,
-      };
+    // Step 3: the same validation `/ext/ai/query` uses. This was a bespoke
+    // check: `startsWith('SELECT')` plus `normalized.includes(kw)` over seven
+    // keywords. `includes` is not word-bounded, so a column named `updated_at`
+    // tripped the UPDATE rule and a legitimate query was refused; and nothing at
+    // all stopped `SELECT * FROM "user"`, `information_schema`, `pg_shadow`, or
+    // a second statement after a semicolon.
+    const validation = validateGeneratedSQL(generatedSQL, inScope);
+    if (!validation.safe) {
+      return { error: `Refused: ${validation.reason}`, generated: generatedSQL };
     }
 
-    const forbidden = [
-      'DROP',
-      'DELETE',
-      'UPDATE',
-      'INSERT',
-      'ALTER',
-      'TRUNCATE',
-      'GRANT',
-    ];
-    for (const kw of forbidden) {
-      if (normalized.includes(kw)) {
-        return { error: `Generated query contains forbidden keyword: ${kw}` };
-      }
-    }
-
-    // Step 4: Execution in READ ONLY transaction — keyword blocklists are bypassable
+    // Step 4: the read-only window, scoped to a SAVEPOINT so it does not leak
+    // into the rest of the request. See the note on `runReadOnly`.
     try {
-      const result = await (this.db as any)
-        .transaction()
-        .execute(async (trx: any) => {
-          await sql`SET TRANSACTION READ ONLY`.execute(trx);
-          return sql.raw(generatedSQL).execute(trx);
-        });
-      const rows = (result as any).rows ?? [];
+      const result = await runReadOnly(this.db, generatedSQL);
+      const rows = (result.rows as any[]) ?? [];
 
       return {
         success: true,

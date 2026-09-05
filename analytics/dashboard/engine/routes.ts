@@ -113,18 +113,43 @@ async function writeLayout(
   updatedBy: string,
 ): Promise<void> {
   const json = JSON.stringify(widgets);
+  // `::text::jsonb`, not `::jsonb`, and this one was NOT harmless.
+  //
+  // A single cast on a stringified parameter is a no-op under Bun.SQL — the
+  // driver types the parameter as json, so there is nothing left to parse — and
+  // the column stores a JSON string scalar. `readLayout` above does
+  // `if (!Array.isArray(raw)) return null`, and a string is not an array.
+  //
+  // Measured on Postgres 18 through Bun.SQL, which is what the engine runs:
+  //
+  //   ${json}::jsonb        jsonb_typeof=string  "[\"tasks\",\"revenue\"]"  Array.isArray false
+  //   ${json}::text::jsonb  jsonb_typeof=array   ["tasks","revenue"]      Array.isArray true
+  //
+  // So every saved dashboard layout was discarded on the next read: a user
+  // rearranged their dashboard, the save answered success, the row was written,
+  // and the page came back with the default set. `readLayout` returning null
+  // reads as "this user has not personalised anything", which is exactly what a
+  // fresh account looks like — so it never looked like a fault.
+  //
+  // Invisible to the test suite: it reaches Postgres through `pg`, which sends
+  // the parameter as text, and the same statement then behaves correctly.
+  //
+  // Found by widening `scripts/check-jsonb-cast.ts`, whose first pattern only
+  // matched an inline `JSON.stringify(...)` immediately before the `}` and could
+  // not see a value stringified on the line above.
+  //
   // Update-then-insert (no ON CONFLICT): with RLS active the UPDATE only ever
   // touches the current tenant's row, and INSERT stamps tenant_id via DEFAULT.
   const updated = await sql<{ id: string }>`
     UPDATE zv_dashboard_layouts
-    SET widgets = ${json}::jsonb, updated_by = ${updatedBy}, updated_at = NOW()
+    SET widgets = ${json}::text::jsonb, updated_by = ${updatedBy}, updated_at = NOW()
     WHERE scope = ${scope} AND owner = ${owner}
     RETURNING id
   `.execute(db);
   if (updated.rows.length === 0) {
     await sql`
       INSERT INTO zv_dashboard_layouts (scope, owner, widgets, updated_by)
-      VALUES (${scope}, ${owner}, ${json}::jsonb, ${updatedBy})
+      VALUES (${scope}, ${owner}, ${json}::text::jsonb, ${updatedBy})
     `.execute(db);
   }
 }

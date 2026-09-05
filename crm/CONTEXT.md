@@ -6,8 +6,8 @@ registers Studio metadata in `adoptCrmCollections` on `register()`. The engine
 must not CREATE or adopt them. Briefing API: `GET /ext/crm/briefing` (Studio
 home no longer embeds receivables — use `/admin/crm` or a future dashboard slot).
 
-**Verificat prin apăsare: 2026-08-09.** Organizație creată, contact legat de ea,
-legătura recitită.
+**Verified by pressing: 2026-08-09.** An organisation created, a contact linked to
+it, the link read back.
 
 ## Studio UI (SDUI)
 
@@ -16,22 +16,22 @@ Admin CRM is a **single declarative page** at `/admin/crm` —
 `studio/pages/` tree; legacy URLs `/admin/crm/contacts` etc. redirect to
 `/admin/crm?tab=…` via the Studio catch-all host.
 
-## Ce era rupt
+## What was broken
 
-**Un contact nu putea aparține unei organizații.** `zvd_contact_organizations` —
-tabelul de legătură — era interogat în două locuri și **scris în zero**. Fiecare
-contact apărea fără firmă, pe veci. Proiectat pentru, nefolosit niciodată.
+**A contact could not belong to an organisation.** `zvd_contact_organizations` —
+the link table — was queried in two places and **written in zero**. Every contact
+appeared without a company, forever. Designed for, never used.
 
-Se vede doar dacă te uiți în ambele direcții: o coloană sau un tabel care apare
-doar în `SELECT` e semnalul.
+It only shows if you look in both directions: a column or table that appears only
+in a `SELECT` is the signal.
 
-**`notes` la organizații era acceptat și aruncat** — validatorul îl accepta,
-`INSERT`-ul nu-l conținea. Zod taie tăcut cheile necunoscute.
+**`notes` on organisations was accepted and thrown away** — the validator accepted
+it, the `INSERT` did not contain it. Zod strips unknown keys silently.
 
-## Capcane
+## Traps
 
-`zvd_crm_custom_fields` are cheia `(tenant_id, entity_type, name)` — lărgită.
-Două firme pot avea fiecare un câmp „Sursă lead".
+`zvd_crm_custom_fields` is keyed on `(tenant_id, entity_type, name)` — widened.
+Two tenants can each have a "Lead source" field.
 
-Validarea CUI e partajată cu facturarea prin `isValidCui()`. Dacă o schimbi
-într-un loc, verifică celălalt.
+CUI validation is shared with invoicing through `isValidCui()`. If you change it
+in one place, check the other.
