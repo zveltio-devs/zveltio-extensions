@@ -106,6 +106,51 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
   // none to forget.
   const app = new Hono();
 
+  /**
+   * The editor is admin-only — for READS as well as writes.
+   *
+   * Every write here already called `requireAdmin`. Every read called
+   * `requireAuth`, which is `getUser` and nothing more, so any session at all
+   * reached them. That is not the rule the rendered page obeys: `sites.ts:574`
+   * refuses a caller who does not hold the site's `access_roles`.
+   *
+   * So a member refused the rendered page could read that page's full content,
+   * `blocks` included, from `GET /pages/:id` — and `GET /pages/` is `selectAll()`
+   * with no status filter, so one request returned every page in the tenant with
+   * its body, drafts and unpublished work included. Demonstrated in
+   * `editor-read-authz.test.ts`: the render path refuses that user and both
+   * editor reads hand them the same restricted page.
+   *
+   * Admin rather than the render path's role check, because that is the rule this
+   * module already states for itself — "Authoring is therefore an admin-only
+   * capability" — and every write enforces it. A non-admin cannot author, so
+   * there is nothing here for them to read. Checked before changing it: the only
+   * consumer of these reads is the Studio admin page, whose schema calls
+   * `/pages` and `/pages/{id}`; the public renderer uses `/cms/*`, a separate
+   * router with its own rules.
+   *
+   * Middleware rather than thirteen separate calls, for the reason
+   * `tenant-isolation.test.ts` gives about its own shape: the defect is "a route
+   * that forgot", and a route added tomorrow is covered here for free.
+   */
+  const isPublicTrack = (path: string): boolean =>
+    path === '/metrics/track' || /^\/[^/]+\/ab-variants\/[^/]+\/track$/.test(path);
+
+  app.use('*', async (c, next) => {
+    // The two telemetry endpoints the PUBLIC renderer posts to. Both are declared
+    // in the manifest's `publicRoutes`, so gating them here would break the
+    // rendered page rather than protect it.
+    const sub = c.req.path.replace(/^.*?\/pages(?=\/|$)/, '') || '/';
+    if (isPublicTrack(sub)) return next();
+
+    const user = await getUser(c, auth);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    if (!(await checkPermission(user.id, 'admin', '*'))) {
+      return c.json({ error: 'Admin access required' }, 403);
+    }
+    await next();
+  });
+
   // ─── Block types ──────────────────────────────────────────────────────────
 
   app.get('/block-types', async (c) => {
