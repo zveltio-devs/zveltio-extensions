@@ -348,9 +348,36 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const { page_id, time_on_page_seconds } = c.req.valid('json');
       const today = new Date().toISOString().split('T')[0];
+      // `INSERT … SELECT … WHERE EXISTS`, not a plain VALUES.
+      //
+      // This accepted any UUID. `page_id` is validated for SHAPE by the schema
+      // and never checked against a page, so an anonymous caller could inflate
+      // the view count of any page in the tenant — including an unpublished
+      // draft, which then shows traffic it never had — and could create metric
+      // rows for UUIDs that name nothing at all.
+      //
+      // The page must exist, be published, be active, and be on a site that is
+      // public: the same four conditions `/cms` uses to decide a page may be
+      // seen anonymously. Tracking a view of a page the caller could not have
+      // been shown is not a view.
+      //
+      // One statement rather than a lookup and then an insert, so this stays a
+      // single round trip on the highest-frequency endpoint in the extension.
+      // An unmatched page inserts nothing and still answers 200 — a tracking
+      // beacon has nobody to report an error to, and telling a scraper which
+      // UUIDs are real would be the only thing a 404 here accomplished.
       await sql`
         INSERT INTO zv_page_metrics (page_id, date, views, avg_time_on_page_seconds)
-        VALUES (${page_id}, ${today}::date, 1, ${time_on_page_seconds})
+        SELECT ${page_id}, ${today}::date, 1, ${time_on_page_seconds}
+        WHERE EXISTS (
+          SELECT 1 FROM zv_pages p
+          JOIN zv_page_sites s ON s.id = p.site_id
+          WHERE p.id = ${page_id}
+            AND p.status = 'published'
+            AND p.is_active = true
+            AND s.is_public = true
+            AND s.is_active = true
+        )
         ON CONFLICT (page_id, date) DO UPDATE SET
           views = zv_page_metrics.views + 1,
           avg_time_on_page_seconds = (zv_page_metrics.avg_time_on_page_seconds * zv_page_metrics.views + ${time_on_page_seconds}) / (zv_page_metrics.views + 1)
@@ -835,11 +862,29 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
     return c.json({ success: true });
   });
 
+  /**
+   * Record a conversion. PUBLIC — the rendered page posts this, so there is no
+   * session in front of it.
+   *
+   * `page_id` is part of the filter, and was not. The route declares
+   * `/:id/ab-variants/:variantId/track` and then ignored `:id` entirely,
+   * filtering on the variant alone — so any variant on the instance could be
+   * incremented from any page's URL by anyone. The `DELETE` twenty lines above
+   * has carried the pair since it was written; this one did not. Measured:
+   *
+   *   shipped query, wrong :id in the path  -> conversions 0 -> 1
+   *   with the page_id filter, wrong :id    -> unchanged
+   *
+   * RLS keeps this inside one tenant, so it was never cross-tenant. What it was
+   * is an A/B result anyone could move, and an A/B result is a decision about
+   * which page the business ships.
+   */
   app.post('/:id/ab-variants/:variantId/track', rateLimit(60, 60_000), async (c) => {
     await db
       .updateTable('zv_page_ab_variants')
       .set({ conversions: sql`conversions + 1` })
       .where('id', '=', c.req.param('variantId'))
+      .where('page_id', '=', c.req.param('id'))
       .execute();
     return c.json({ success: true });
   });
