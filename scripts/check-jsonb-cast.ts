@@ -36,6 +36,20 @@
  * readers receive. Each site needs its consumer read first. The 16 that exist are
  * therefore a baseline to work down, and this gate exists to stop a 17th.
  *
+ * ## Why the baseline is not keyed on line numbers
+ *
+ * It was, and the first unrelated edit inside a file that holds baselined sites
+ * turned this gate RED without a single new site being added — nine entries in
+ * `communications/mail` moved by a few lines and stopped matching. The natural
+ * response to that is `--update`, and `--update` accepts whatever else the same
+ * commit introduced. So the ratchet lost its grip exactly when someone was
+ * editing the files it guards, which is the only time it matters.
+ *
+ * The key is now the file plus the offending line's own text, compared as a
+ * multiset so two identical lines in one file still count as two. Line shifts,
+ * reindentation and edits elsewhere in the file are invisible to it; changing
+ * the cast, adding a site, or moving one to another file are not.
+ *
  * Usage: bun scripts/check-jsonb-cast.ts [--update]
  */
 
@@ -88,7 +102,11 @@ const tracked = new TextDecoder()
   .split('\0')
   .filter((f) => f && !f.endsWith('.test.ts') && !f.startsWith('scripts/'));
 
+/** `<path>\t<the offending line, whitespace-collapsed>` — see the note above. */
 const found: string[] = [];
+/** Where each site currently sits, for the error message only. */
+const locations = new Map<string, string[]>();
+
 for (const rel of tracked) {
   let text: string;
   try {
@@ -104,8 +122,31 @@ for (const rel of tracked) {
     // Strip the correct form first, so a line carrying both spellings is still
     // reported for the wrong one.
     const stripped = line.replace(new RegExp(SAFE.source, 'g'), '::ok::');
-    if (OFFENDER.test(stripped)) found.push(`${rel}:${i + 1}`);
+    if (!OFFENDER.test(stripped)) return;
+    const key = `${rel}\t${trimmed.replace(/\s+/g, ' ')}`;
+    found.push(key);
+    const at = locations.get(key) ?? [];
+    at.push(`${rel}:${i + 1}`);
+    locations.set(key, at);
   });
+}
+
+/** Multiset difference: `a` minus `b`, keeping duplicates. */
+function minus(a: string[], b: string[]): string[] {
+  const left = [...b];
+  const out: string[] = [];
+  for (const item of a) {
+    const i = left.indexOf(item);
+    if (i === -1) out.push(item);
+    else left.splice(i, 1);
+  }
+  return out;
+}
+
+/** A key back to something a person can open. */
+function where(key: string): string {
+  const at = locations.get(key);
+  return at && at.length > 0 ? at.join(', ') : key.split('\t')[0]!;
 }
 
 if (process.argv.includes('--update')) {
@@ -118,12 +159,12 @@ const baseline: string[] = existsSync(BASELINE)
   ? (JSON.parse(readFileSync(BASELINE, 'utf8')).sites ?? [])
   : [];
 
-const added = found.filter((f) => !baseline.includes(f));
-const fixed = baseline.filter((b) => !found.includes(b));
+const added = minus(found, baseline);
+const fixed = minus(baseline, found);
 
 if (added.length > 0) {
   console.error('\n✗ New `${JSON.stringify(x)}::jsonb` write — use `::text::jsonb`.\n');
-  for (const a of added) console.error(`  ${a}`);
+  for (const a of added) console.error(`  ${where(a)}\n      ${a.split('\t')[1]}`);
   console.error(
     '\n  A single cast on a stringified parameter is a no-op under Bun.SQL, which is\n' +
       '  what the engine runs: the value is stored as a JSON string scalar, so `->>`,\n' +
@@ -137,6 +178,6 @@ if (added.length > 0) {
 
 if (fixed.length > 0) {
   console.log(`✓ ${fixed.length} site(s) fixed since the baseline — re-run with --update:`);
-  for (const f of fixed) console.log(`    ${f}`);
+  for (const f of fixed) console.log(`    ${f.split('\t')[0]}: ${f.split('\t')[1]}`);
 }
 console.log(`✓ no new single-cast jsonb writes (${found.length} on the baseline)`);
