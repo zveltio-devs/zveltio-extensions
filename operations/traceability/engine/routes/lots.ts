@@ -69,10 +69,16 @@ export function lotsRouter(ctx: ExtensionContext): Hono {
       LIMIT ${lim} OFFSET ${offset}
     `.execute(db);
 
+    // The SAME five filters as the list above. This counted only two of them, so
+    // filtering by supplier or by expiry gave a total larger than the rows —
+    // and a UI paginating on that total offers pages that come back empty.
     const total = await sql<{ count: string }>`
       SELECT COUNT(*) as count FROM trace_lots l
       WHERE (${status ? sql`l.status = ${status}` : sql`TRUE`})
         AND (${item_id ? sql`l.item_id = ${item_id}` : sql`TRUE`})
+        AND (${supplier_id ? sql`l.supplier_id = ${supplier_id}` : sql`TRUE`})
+        AND (${expiry_from ? sql`l.best_before_date >= ${expiry_from}` : sql`TRUE`})
+        AND (${expiry_to ? sql`l.best_before_date <= ${expiry_to}` : sql`TRUE`})
     `.execute(db);
 
     return c.json({
@@ -171,17 +177,66 @@ export function lotsRouter(ctx: ExtensionContext): Hono {
     return c.json({ data: row.rows[0] });
   });
 
-  // PATCH /lots/:id/status — generic status change
+  /**
+   * PATCH /lots/:id/status — generic status change.
+   *
+   * With ONE transition refused: `recalled` → `available`.
+   *
+   * Everything else in this extension was hardened so that a recall cannot be
+   * undone by accident — the consumption and dispatch paths no longer write
+   * `status` from a stale read, and `PATCH /:id/release` has always been guarded
+   * on `status = 'quarantine'`. This route undid all of it on purpose: any holder
+   * of `traceability` write could put a recalled lot straight back to
+   * `available`, in one request, leaving nothing in the movement ledger and
+   * nothing but an optional `notes` to say it happened.
+   *
+   * Recalled product going back on the shelf is the single outcome a
+   * traceability register exists to prevent, and it should not be one field on a
+   * generic endpoint.
+   *
+   * `recalled` → `returned` is NOT blocked: sending recalled product back to the
+   * supplier is a real operation and refusing it would leave the stock stranded.
+   * Nor is any other transition — this is deliberately the narrowest rule that
+   * covers the dangerous case, rather than a state machine invented during a
+   * review. The way back to `available` is to resolve the recall
+   * (`RecallService.resolveRecall`), which records who decided and why; that is
+   * the record an inspection asks for and this route was never going to produce.
+   *
+   * The refusal is in the WHERE clause, not in an `if` above it, so a recall
+   * committed between a read and this write cannot slip through — the same
+   * lesson as `claimLotQuantity`.
+   */
   app.patch('/:id/status', zValidator('json', z.object({
     status: z.enum(['quarantine', 'available', 'exhausted', 'recalled', 'returned']),
     notes: z.string().optional(),
   })), async (c) => {
     const d = c.req.valid('json');
     const id = c.req.param('id');
+
     const row = await sql`
-      UPDATE trace_lots SET status = ${d.status}, notes = COALESCE(${d.notes ?? null}, notes) WHERE id = ${id} RETURNING *
+      UPDATE trace_lots
+      SET status = ${d.status}, notes = COALESCE(${d.notes ?? null}, notes)
+      WHERE id = ${id}
+        AND NOT (status = 'recalled' AND ${d.status}::text = 'available')
+      RETURNING *
     `.execute(db);
-    if (!row.rows.length) return c.json({ error: 'Lot negăsit / Lot not found' }, 404);
+
+    if (!row.rows.length) {
+      // Which of the two, because "not found" for a lot the operator is looking
+      // at is the kind of answer that gets a system distrusted.
+      const exists = await sql<{ status: string }>`
+        SELECT status FROM trace_lots WHERE id = ${id}
+      `.execute(db);
+      if (!exists.rows.length) return c.json({ error: 'Lot negăsit / Lot not found' }, 404);
+      return c.json(
+        {
+          error:
+            'Un lot retras nu poate fi trecut direct în „disponibil". Rezolvați retragerea. / ' +
+            'A recalled lot cannot be set back to available. Resolve the recall instead.',
+        },
+        409,
+      );
+    }
     return c.json({ data: row.rows[0] });
   });
 
