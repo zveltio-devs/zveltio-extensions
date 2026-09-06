@@ -31241,6 +31241,12 @@ function sitesRoutes(ctx) {
   const engine = ctx.internals;
   const getUserRoles = ctx.getUserRoles;
   const app = new Hono2;
+  app.onError((err, c) => {
+    if (err instanceof TenantUnresolved) {
+      return c.json({ error: err.message }, 400);
+    }
+    throw err;
+  });
   async function requireAdmin(c) {
     const user = c.get("user");
     if (!user)
@@ -31732,11 +31738,11 @@ async function getUser(c, auth) {
 async function requireAuth(c, auth) {
   return getUser(c, auth);
 }
-async function requireAdmin(c, auth, checkPermission) {
+async function requireAdmin(c, auth, isTenantAdmin) {
   const user = await getUser(c, auth);
   if (!user)
     return { user: null, res: c.json({ error: "Unauthorized" }, 401) };
-  if (!await checkPermission(user.id, "admin", "*")) {
+  if (!await isTenantAdmin(user.id)) {
     return { user: null, res: c.json({ error: "Admin access required" }, 403) };
   }
   return { user, res: null };
@@ -31760,9 +31766,16 @@ var UpdatePageSchema = PageSchema.partial().extend({
   status: exports_external.enum(["draft", "published", "archived"]).optional()
 });
 function editorRoutes(ctx) {
-  const { db, auth, checkPermission } = ctx;
+  const { db, auth } = ctx;
   const engine = ctx.internals;
+  const isTenantAdmin = (userId) => engine.isTenantAdmin(userId);
   const app = new Hono2;
+  app.onError((err, c) => {
+    if (err instanceof TenantUnresolved) {
+      return c.json({ error: err.message }, 400);
+    }
+    throw err;
+  });
   const isPublicTrack = (path) => path === "/metrics/track" || /^\/[^/]+\/ab-variants\/[^/]+\/track$/.test(path);
   app.use("*", async (c, next) => {
     const sub = c.req.path.replace(/^.*?\/pages(?=\/|$)/, "") || "/";
@@ -31771,7 +31784,7 @@ function editorRoutes(ctx) {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    if (!await checkPermission(user.id, "admin", "*")) {
+    if (!await isTenantAdmin(user.id)) {
       return c.json({ error: "Admin access required" }, 403);
     }
     await next();
@@ -31802,14 +31815,14 @@ function editorRoutes(ctx) {
     to_path: exports_external.string().min(1),
     redirect_type: exports_external.literal(301).or(exports_external.literal(302)).default(301)
   })), async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user)
       return res;
     const redirect = await db.insertInto("zv_page_redirects").values({ ...c.req.valid("json"), created_by: user.id }).returningAll().executeTakeFirst();
     return c.json({ redirect }, 201);
   });
   app.delete("/redirects/:id", async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user)
       return res;
     await db.deleteFrom("zv_page_redirects").where("id", "=", c.req.param("id")).execute();
@@ -31835,7 +31848,7 @@ function editorRoutes(ctx) {
     return c.json({ menus });
   });
   app.put("/menus/:key", zValidator("json", MenuItemsSchema), async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user)
       return res;
     const key = c.req.param("key");
@@ -31878,7 +31891,7 @@ function editorRoutes(ctx) {
     change_freq: exports_external.enum(["always", "hourly", "daily", "weekly", "monthly", "yearly", "never"]).default("weekly"),
     priority: exports_external.number().min(0).max(1).default(0.5)
   })), async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user)
       return res;
     const data = c.req.valid("json");
@@ -31933,7 +31946,7 @@ function editorRoutes(ctx) {
     kind: exports_external.enum(["block", "page"]).default("block"),
     blocks: exports_external.array(exports_external.any()).min(1)
   })), async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user)
       return res;
     const data = c.req.valid("json");
@@ -31954,7 +31967,7 @@ function editorRoutes(ctx) {
     }
   });
   app.delete("/templates/:id", async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user)
       return res;
     await db.deleteFrom("zv_page_templates").where("id", "=", c.req.param("id")).execute();
@@ -31981,7 +31994,7 @@ function editorRoutes(ctx) {
     const user = await requireAuth(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    if (!await checkPermission(user.id, "admin", "*")) {
+    if (!await isTenantAdmin(user.id)) {
       return c.json({ error: "Admin access required" }, 403);
     }
     const [byStatus, avgSeo, viewsMonth, redirectCount] = await Promise.all([
@@ -32018,7 +32031,7 @@ function editorRoutes(ctx) {
     return c.json({ page });
   });
   app.post("/", zValidator("json", PageSchema), async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user)
       return res;
     const body = c.req.valid("json");
@@ -32032,7 +32045,7 @@ function editorRoutes(ctx) {
     return c.json({ page }, 201);
   });
   app.on(["PUT", "PATCH"], "/:id", zValidator("json", UpdatePageSchema), async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user)
       return res;
     const id = c.req.param("id");
@@ -32086,7 +32099,7 @@ function editorRoutes(ctx) {
     return c.json({ page: outcome });
   });
   app.delete("/:id", async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user)
       return res;
     await db.deleteFrom("zv_pages").where("id", "=", c.req.param("id")).execute();
@@ -32109,7 +32122,7 @@ function editorRoutes(ctx) {
     return c.json({ revision });
   });
   app.post("/:id/revisions/:revisionId/restore", async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user)
       return res;
     const id = c.req.param("id");
@@ -32145,7 +32158,7 @@ function editorRoutes(ctx) {
     return c.json({ seo: score || null });
   });
   app.post("/:id/seo/analyze", async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user)
       return res;
     const id = c.req.param("id");
@@ -32208,7 +32221,7 @@ function editorRoutes(ctx) {
     blocks: exports_external.array(exports_external.any()).default([]),
     traffic_pct: exports_external.number().int().min(1).max(99).default(50)
   })), async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user)
       return res;
     const data = c.req.valid("json");
@@ -32221,7 +32234,7 @@ function editorRoutes(ctx) {
     return c.json({ variant }, 201);
   });
   app.delete("/:id/ab-variants/:variantId", async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user)
       return res;
     await db.deleteFrom("zv_page_ab_variants").where("id", "=", c.req.param("variantId")).where("page_id", "=", c.req.param("id")).execute();
