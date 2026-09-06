@@ -52,12 +52,10 @@ const extension: ZveltioExtension = {
         async handler(ctx) {
           const { sql } = await import('kysely');
           const { syncImapAccount } = await import('./lib/imap-client.js');
+          const { loadMailConfig } = await import('./lib/config.js');
           const db = ctx.db;
 
-          const cfgRow = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
-          const raw = (cfgRow.rows[0] as { value?: unknown } | undefined)?.value;
-          const cfg: Record<string, unknown> =
-            typeof raw === 'string' ? JSON.parse(raw) : ((raw as Record<string, unknown>) ?? {});
+          const cfg = await loadMailConfig(db);
 
           // Absent or nonsense reads as "off", not as "every minute". A polling
           // loop nobody asked for is worse than none.

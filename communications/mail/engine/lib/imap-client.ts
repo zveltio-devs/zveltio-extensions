@@ -10,6 +10,7 @@ import { ImapFlow } from 'imapflow';
 // @ts-ignore — installed at runtime by extension-loader before this module loads
 import { simpleParser } from 'mailparser';
 import { applyLocalFilters } from './sieve.js';
+import { intSetting, loadMailConfig, parseMailConfig } from './config.js';
 // @ts-ignore — installed at runtime by extension-loader before this module loads
 import nodemailer from 'nodemailer';
 
@@ -21,9 +22,16 @@ import {
 } from './oauth.js';
 
 /**
- * How many messages a FIRST sync pulls. Later syncs are open-ended and catch up
- * from where the previous one stopped, so this bounds the initial burst without
- * putting anything out of reach — which is what it used to do.
+ * How many messages a FIRST sync pulls when the instance has not said.
+ *
+ * Later syncs are open-ended and catch up from where the previous one stopped,
+ * so this bounds the initial burst without putting anything out of reach — which
+ * is what it used to do.
+ *
+ * `max_messages_sync` overrides it. That setting has been in the admin page and
+ * in `zvd_mail_config` since 001, with a range of 50–10000, and nothing read it:
+ * an operator raising it to 10000 for a large migration got 50 anyway. One of
+ * eleven settings found in that state — see lib/config.ts.
  */
 const FIRST_SYNC_LIMIT = 50;
 
@@ -123,10 +131,7 @@ async function buildAuth(
   let token = account.oauth2_access_token ?? null;
 
   if (isExpired(account.oauth2_expires_at) && account.oauth2_refresh_token) {
-    const cfgRow = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
-    const raw = (cfgRow.rows[0] as { value?: unknown } | undefined)?.value;
-    const cfg: Record<string, unknown> =
-      typeof raw === 'string' ? JSON.parse(raw) : ((raw as Record<string, unknown>) ?? {});
+    const cfg = await loadMailConfig(db);
     const creds = credentialsFor(account.oauth2_provider, cfg);
     if (creds) {
       const next = await refreshAccessToken({
@@ -168,6 +173,11 @@ export async function syncImapAccount(
   db: Database,
   account: MailAccountConfig,
 ): Promise<{ synced: number; errors: string[] }> {
+  // Read before the connection, so a config failure is not reported as a mail
+  // server problem. Falls back to the constant, which is what every install has
+  // been getting.
+  const firstSyncLimit = intSetting(await loadMailConfig(db), 'max_messages_sync', FIRST_SYNC_LIMIT);
+
   const client = new ImapFlow({
     host: account.imap_host,
     port: account.imap_port,
@@ -218,7 +228,7 @@ export async function syncImapAccount(
           // what it already has. Which of the two ran decides how far `last_uid`
           // may advance below — see the update after the loop.
           const firstSync = folder.last_uid === 0;
-          const since = firstSync ? `1:${FIRST_SYNC_LIMIT}` : `${folder.last_uid + 1}:*`;
+          const since = firstSync ? `1:${firstSyncLimit}` : `${folder.last_uid + 1}:*`;
           let highestSeen = 0;
 
           for await (const msg of client.fetch(since, {
