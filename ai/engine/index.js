@@ -30152,24 +30152,23 @@ function aiRoutes(ctx) {
     return isAdmin ? user : null;
   }
   async function logUsage(row) {
-    const inTransaction = Boolean(db.isTransaction);
-    if (!inTransaction) {
-      await db.insertInto("zv_ai_usage").values(row).execute().catch((err) => {
-        console.warn(`[ai] usage accounting failed for ${row.operation}/${row.provider}:`, err.message);
-      });
+    const write = () => db.insertInto("zv_ai_usage").values(row).execute();
+    const complain = (err) => console.warn(`[ai] usage accounting failed for ${row.operation}/${row.provider}:`, err.message);
+    if (!db.isTransaction) {
+      await write().catch(complain);
       return;
     }
     let savepointHeld = false;
     try {
       await sql.raw("SAVEPOINT zv_ai_usage").execute(db);
       savepointHeld = true;
-      await db.insertInto("zv_ai_usage").values(row).execute();
+      await write();
       await sql.raw("RELEASE SAVEPOINT zv_ai_usage").execute(db);
     } catch (err) {
       if (savepointHeld) {
         await sql.raw("ROLLBACK TO SAVEPOINT zv_ai_usage").execute(db).catch(() => {});
       }
-      console.warn(`[ai] usage accounting failed for ${row.operation}/${row.provider}:`, err.message);
+      complain(err);
     }
   }
   app.get("/providers", async (c) => {
