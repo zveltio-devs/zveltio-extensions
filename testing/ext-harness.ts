@@ -335,6 +335,21 @@ async function makeCtx(
       // Imported from the engine rather than reimplemented, so there is one list
       // of blocked addresses and the harness cannot drift into agreeing with a
       // guard the engine no longer has.
+      // `isTenantAdmin` is the SAME check as `ctx.checkPermission(uid, 'admin',
+      // '*')` — it is that call with a name (`permissions.ts:905`), and the two
+      // helpers exist so a call site says which of the two meanings it holds.
+      //
+      // So it must answer what `checkPermission` answers here, or moving a route
+      // from the bare form to the named one silently removes it from the
+      // harness's `admin` switch: the stub returns `undefined`, every gated route
+      // answers 403, and the suite stays green because nothing was exercising the
+      // allow path anyway. Measured on `content/pages/engine/editor.ts` — forcing
+      // its gate to deny left all 196 tests passing.
+      //
+      // `requireInstanceAdmin` is deliberately NOT aliased: it means something
+      // genuinely different (whole-instance power), and a test that needs it
+      // should say so rather than inherit a tenant-level answer.
+      isTenantAdmin: async () => opts.admin,
       assertNonMetadataUrl: (url: string, label?: string) =>
         engineAssertNonMetadataUrl(url, label),
       assertPublicUrl: (url: string) => engineAssertPublicUrl(url),
