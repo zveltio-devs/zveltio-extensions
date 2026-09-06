@@ -42,36 +42,44 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
    * Records one call in `zv_ai_usage` without letting that record's failure
    * damage the request.
    *
-   * A plain try/catch is NOT enough: in Postgres a failed statement aborts the
-   * entire transaction, and `ctx.db` is the request's tenant transaction. So a
-   * swallowed INSERT error left every later statement failing with 25P02 and the
-   * final COMMIT silently rolling back — a 200 response over work that was
-   * discarded. The savepoint scopes the damage to this one statement, which is
-   * the same thing the engine's event bus does around extension listeners.
+   * ONE write, on either path — which is what `check:atomic-writes` in the engine
+   * repository asks of a handler, and what this function has always actually
+   * done. The first version of the savepoint fix spelled `insertInto` twice, once
+   * per branch, and the gate counted two write forms in one handler and turned
+   * engine CI red on master for everyone. The branches are mutually exclusive, so
+   * it was the false positive the gate's own note describes — but the duplication
+   * was mine and removing it is the honest answer, not a baseline entry for a
+   * file the engine does not own.
    *
-   * Accounting is worth attempting and never worth failing a completion for, so
-   * a failure is logged with the reason and the request continues.
+   * A plain try/catch is NOT enough when there IS a transaction: in Postgres a
+   * failed statement aborts the whole thing, and `ctx.db` is the request's tenant
+   * transaction. A swallowed INSERT error left every later statement failing with
+   * 25P02 and the final COMMIT silently rolling back — a 200 response over work
+   * that was discarded. The savepoint scopes the damage to this one statement,
+   * which is what the engine's event bus does around extension listeners.
+   *
+   * A SAVEPOINT is only legal inside a transaction block. Off a pool handle
+   * Postgres answers `SAVEPOINT can only be used in transaction blocks`
+   * (measured), so accounting would be silently dead wherever `ctx.db` resolves
+   * to the pool. There is nothing to protect there either: with no enclosing
+   * transaction a failed statement damages only itself, which is the entire
+   * reason the savepoint exists.
+   *
+   * Nothing here is claimed or spent before a check — this runs AFTER the
+   * provider has already answered and the user has already been charged by them.
+   * Accounting is worth attempting and never worth failing a completion for, so a
+   * failure is logged with its reason and the request continues.
    */
   async function logUsage(row: Record<string, unknown>): Promise<void> {
-    // A SAVEPOINT is only legal inside a transaction block. Off a pool handle
-    // Postgres answers `SAVEPOINT can only be used in transaction blocks`
-    // (measured), the `catch` below logs it, and the INSERT never runs — so
-    // accounting would be silently dead on any path where `ctx.db` resolves to
-    // the pool rather than a request transaction. There is nothing to protect
-    // there either: without an enclosing transaction a failed statement damages
-    // only itself, which is the whole reason the savepoint exists.
-    const inTransaction = Boolean((db as unknown as { isTransaction?: boolean }).isTransaction);
-    if (!inTransaction) {
-      await (db as any)
-        .insertInto('zv_ai_usage')
-        .values(row)
-        .execute()
-        .catch((err: Error) => {
-          console.warn(
-            `[ai] usage accounting failed for ${row.operation}/${row.provider}:`,
-            err.message,
-          );
-        });
+    const write = () => (db as any).insertInto('zv_ai_usage').values(row).execute();
+    const complain = (err: Error) =>
+      console.warn(
+        `[ai] usage accounting failed for ${row.operation}/${row.provider}:`,
+        err.message,
+      );
+
+    if (!(db as unknown as { isTransaction?: boolean }).isTransaction) {
+      await write().catch(complain);
       return;
     }
 
@@ -79,7 +87,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
     try {
       await sql.raw('SAVEPOINT zv_ai_usage').execute(db);
       savepointHeld = true;
-      await (db as any).insertInto('zv_ai_usage').values(row).execute();
+      await write();
       await sql.raw('RELEASE SAVEPOINT zv_ai_usage').execute(db);
     } catch (err) {
       if (savepointHeld) {
@@ -90,10 +98,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
             /* transaction is gone entirely; nothing left to salvage */
           });
       }
-      console.warn(
-        `[ai] usage accounting failed for ${row.operation}/${row.provider}:`,
-        (err as Error).message,
-      );
+      complain(err as Error);
     }
   }
 
