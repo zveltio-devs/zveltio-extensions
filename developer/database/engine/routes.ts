@@ -482,7 +482,8 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       `
         .execute(db)
         .then((r) => r.rows[0]?.blocked === true)
-        .catch(() => true); // unreadable catalogue refuses the drop, not permits it
+        // fabricated-ok: `true` is the REFUSING value here, not an invented success — an unreadable catalogue blocks the drop. Verified there is exactly one consumer: the `if (selfOrSuper)` three lines below, which answers 403. `selfOrSuper` is a local const, not returned, not passed on.
+        .catch(() => true);
       if (selfOrSuper) {
         return c.json({ error: `Cannot drop "${name}": it is the current role or a superuser` }, 403);
       }
