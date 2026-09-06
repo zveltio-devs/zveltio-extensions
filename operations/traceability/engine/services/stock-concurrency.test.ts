@@ -271,3 +271,98 @@ describe.skipIf(!DB_URL)('traceability: concurrent consumption of one lot', () =
     expect(outcome).toContain('not found');
   }, 30_000);
 });
+
+/**
+ * The same read-then-write shape, on a production order instead of a lot.
+ *
+ * `PATCH /production/:id/complete` read the order with `AND status =
+ * 'in_progress'`, checked in JavaScript, then updated `WHERE id = $1` with no
+ * status condition. Two concurrent completions both passed and both ran, writing
+ * TWO `reception` movements for one batch. The lot quantity is assigned rather
+ * than added, so the lot looked right while the movement ledger — the thing an
+ * inspection reads — said the batch was produced twice.
+ */
+describe.skipIf(!DB_URL)('traceability: completing a production order twice', () => {
+  let pool: any;
+  let admin: Kysely<any>;
+
+  const connect2 = async () => {
+    const pg: any = await import('pg');
+    return new (pg.Pool ?? pg.default.Pool)({ connectionString: DB_URL, max: 2 });
+  };
+
+  beforeAll(async () => {
+    pool = await connect2();
+    admin = new Kysely<any>({ dialect: new PostgresDialect({ pool }) });
+  });
+
+  afterAll(async () => {
+    await sql`DELETE FROM trace_movements WHERE reference_type = 'production_order'
+              AND reference_id IN (SELECT id FROM trace_production_orders WHERE order_number = 'PO-DOUBLE')`
+      .execute(admin).catch(() => {});
+    await sql`DELETE FROM trace_production_orders WHERE order_number = 'PO-DOUBLE'`.execute(admin).catch(() => {});
+    await sql`DELETE FROM trace_lots WHERE lot_number = 'PO-DOUBLE-OUT'`.execute(admin).catch(() => {});
+    await admin.destroy();
+  });
+
+  it('the second completion is refused, and writes no second movement', async () => {
+    const item = await sql<{ id: string }>`SELECT id FROM trace_items WHERE code = 'CONCUR'`.execute(admin);
+    const itemId = item.rows[0]!.id;
+
+    await sql`DELETE FROM trace_lots WHERE lot_number = 'PO-DOUBLE-OUT'`.execute(admin);
+    const lot = await sql<{ id: string }>`
+      INSERT INTO trace_lots (lot_number, item_id, lot_type, quantity_initial, quantity_remaining, unit, status, tenant_id)
+      VALUES ('PO-DOUBLE-OUT', ${itemId}, 'internal', 0, 0, 'kg', 'quarantine', ${TENANT}::uuid)
+      RETURNING id
+    `.execute(admin);
+
+    await sql`DELETE FROM trace_production_orders WHERE order_number = 'PO-DOUBLE'`.execute(admin);
+    const order = await sql<{ id: string }>`
+      INSERT INTO trace_production_orders (order_number, output_lot_id, status, planned_quantity, unit, tenant_id)
+      VALUES ('PO-DOUBLE', ${lot.rows[0]!.id}, 'in_progress', 100, 'kg', ${TENANT}::uuid)
+      RETURNING id
+    `.execute(admin);
+    const orderId = order.rows[0]!.id;
+
+    /** What the route now does: the close IS the claim, and it comes first. */
+    const complete = async () => {
+      const p = await connect2();
+      const db = new Kysely<any>({ dialect: new PostgresDialect({ pool: p }) });
+      try {
+        return await db.transaction().execute(async (trx) => {
+          await new Promise((r) => setTimeout(r, 60));
+          const claimed = await sql<{ output_lot_id: string; unit: string }>`
+            UPDATE trace_production_orders
+            SET status = 'completed', actual_quantity = 100, completed_at = now()
+            WHERE id = ${orderId} AND status = 'in_progress'
+            RETURNING *
+          `.execute(trx);
+          if (!claimed.rows.length) return 'refused';
+          const o = claimed.rows[0]!;
+          await sql`
+            UPDATE trace_lots SET quantity_initial = 100, quantity_remaining = 100, status = 'available'
+            WHERE id = ${o.output_lot_id} AND status = 'quarantine'
+          `.execute(trx);
+          await sql`
+            INSERT INTO trace_movements (lot_id, type, quantity, unit, reference_type, reference_id, performed_by, performed_at, tenant_id)
+            VALUES (${o.output_lot_id}, 'reception', 100, ${o.unit}, 'production_order', ${orderId}, 'concur', now(), ${TENANT}::uuid)
+          `.execute(trx);
+          return 'completed';
+        });
+      } finally {
+        await db.destroy();
+      }
+    };
+
+    const results = await Promise.all([complete(), complete()]);
+    expect(results.filter((r) => r === 'completed')).toHaveLength(1);
+    expect(results.filter((r) => r === 'refused')).toHaveLength(1);
+
+    // The ledger an inspection reads. Before the fix this was 2.
+    const moves = await sql<{ n: string }>`
+      SELECT COUNT(*)::text AS n FROM trace_movements
+      WHERE reference_type = 'production_order' AND reference_id = ${orderId}
+    `.execute(admin);
+    expect(Number(moves.rows[0]!.n)).toBe(1);
+  }, 30_000);
+});
