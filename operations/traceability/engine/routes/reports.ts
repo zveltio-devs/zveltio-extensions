@@ -16,6 +16,30 @@ function acceptsCsv(c: any): boolean {
   return c.req.header('Accept')?.includes('text/csv') || c.req.query('format') === 'csv';
 }
 
+/**
+ * A `from`/`to` query parameter, as an ISO date, or null.
+ *
+ * These reach two places and were checked in neither. In SQL they are compared
+ * against a `date` column, so anything that is not a date is a cast error the
+ * caller sees as a 500 — an ANSVSA register answering "server error" because
+ * somebody typed a month name. And they are interpolated into
+ * `Content-Disposition: attachment; filename="…-${from}-${to}.csv"`, where a
+ * quote breaks out of the quoted filename.
+ *
+ * A regexp is not enough on its own: `2026-02-31` matches the shape and is not a
+ * day. The round-trip through `Date` is what settles it.
+ */
+function isoDateParam(v: string | undefined): string | null {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  const d = new Date(`${v}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== v ? null : v;
+}
+
+/** A filename fragment that cannot leave the quoted header value. */
+function filenamePart(v: string | null | undefined): string {
+  return v && /^[\w.-]{1,40}$/.test(v) ? v : 'all';
+}
+
 export function reportsRouter(ctx: ExtensionContext): Hono {
   const { db } = ctx;
 
@@ -28,8 +52,18 @@ export function reportsRouter(ctx: ExtensionContext): Hono {
 
   // GET /reports/ansvsa-traceability — registru trasabilitate conform Ord. 111/2008
   app.get('/ansvsa-traceability', async (c) => {
-    const { from, to } = c.req.query();
-    if (!from || !to) return c.json({ error: 'Parametrii from și to sunt obligatorii / from and to parameters required' }, 400);
+    const from = isoDateParam(c.req.query('from'));
+    const to = isoDateParam(c.req.query('to'));
+    if (!from || !to) {
+      return c.json(
+        {
+          error:
+            'Parametrii from și to sunt obligatorii, în format AAAA-LL-ZZ / ' +
+            'from and to are required, as YYYY-MM-DD',
+        },
+        400,
+      );
+    }
 
     const rows = await sql`
       SELECT
@@ -66,7 +100,7 @@ export function reportsRouter(ctx: ExtensionContext): Hono {
       return new Response(toCSV(ctx.internals, rows.rows as any[], cols), {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
-          'Content-Disposition': `attachment; filename="trasabilitate-ansvsa-${from}-${to}.csv"`,
+          'Content-Disposition': `attachment; filename="trasabilitate-ansvsa-${filenamePart(from)}-${filenamePart(to)}.csv"`,
         },
       });
     }
@@ -75,7 +109,12 @@ export function reportsRouter(ctx: ExtensionContext): Hono {
 
   // GET /reports/reception-log — jurnal recepții
   app.get('/reception-log', async (c) => {
-    const { from, to } = c.req.query();
+    // Optional here, but still validated: an unparseable date is a 400 with a
+    // reason, not a 500 from a failed cast deep in the query.
+    const from = isoDateParam(c.req.query('from'));
+    const to = isoDateParam(c.req.query('to'));
+    if (c.req.query('from') && !from) return c.json({ error: 'from: AAAA-LL-ZZ / YYYY-MM-DD' }, 400);
+    if (c.req.query('to') && !to) return c.json({ error: 'to: AAAA-LL-ZZ / YYYY-MM-DD' }, 400);
 
     const rows = await sql`
       SELECT
@@ -105,7 +144,7 @@ export function reportsRouter(ctx: ExtensionContext): Hono {
       return new Response(toCSV(ctx.internals, rows.rows as any[], cols), {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
-          'Content-Disposition': `attachment; filename="receptii-${from ?? 'all'}-${to ?? 'all'}.csv"`,
+          'Content-Disposition': `attachment; filename="receptii-${filenamePart(from)}-${filenamePart(to)}.csv"`,
         },
       });
     }
@@ -114,7 +153,10 @@ export function reportsRouter(ctx: ExtensionContext): Hono {
 
   // GET /reports/consumption-log — jurnal consumuri
   app.get('/consumption-log', async (c) => {
-    const { from, to } = c.req.query();
+    const from = isoDateParam(c.req.query('from'));
+    const to = isoDateParam(c.req.query('to'));
+    if (c.req.query('from') && !from) return c.json({ error: 'from: AAAA-LL-ZZ / YYYY-MM-DD' }, 400);
+    if (c.req.query('to') && !to) return c.json({ error: 'to: AAAA-LL-ZZ / YYYY-MM-DD' }, 400);
 
     const rows = await sql`
       SELECT
@@ -142,7 +184,7 @@ export function reportsRouter(ctx: ExtensionContext): Hono {
       return new Response(toCSV(ctx.internals, rows.rows as any[], cols), {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
-          'Content-Disposition': `attachment; filename="consumuri-${from ?? 'all'}-${to ?? 'all'}.csv"`,
+          'Content-Disposition': `attachment; filename="consumuri-${filenamePart(from)}-${filenamePart(to)}.csv"`,
         },
       });
     }
@@ -188,7 +230,10 @@ export function reportsRouter(ctx: ExtensionContext): Hono {
 
   // GET /reports/haccp-log — registru CCP pentru control ANSVSA
   app.get('/haccp-log', async (c) => {
-    const { from, to } = c.req.query();
+    const from = isoDateParam(c.req.query('from'));
+    const to = isoDateParam(c.req.query('to'));
+    if (c.req.query('from') && !from) return c.json({ error: 'from: AAAA-LL-ZZ / YYYY-MM-DD' }, 400);
+    if (c.req.query('to') && !to) return c.json({ error: 'to: AAAA-LL-ZZ / YYYY-MM-DD' }, 400);
 
     const rows = await sql`
       SELECT

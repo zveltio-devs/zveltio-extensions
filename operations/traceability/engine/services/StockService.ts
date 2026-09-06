@@ -166,17 +166,36 @@ export class StockService {
     productionOrderId: string;
     scannedBy: string;
   }): Promise<void> {
-    const { unit } = await claimLotQuantity(this.db, params.lotId, params.quantityUsed);
+    // The stock coming off the lot, the consumption record, and the movement are
+    // one act. Split, each half is wrong in a way no later query can mend:
+    // stock decremented with no consumption row means the quantity left the lot
+    // and nothing says which batch used it — the link a recall walks FORWARD —
+    // and a consumption row without the decrement double-counts the same
+    // material as still available.
+    //
+    // Stated, not inherited. These three ran inside the request's transaction
+    // and got atomicity nobody asked for, which is exactly what the engine's
+    // `check:atomic-writes` exists to find before that boundary moves. It found
+    // this one — attributing the writes to `claimLotQuantity` because a
+    // top-level function now sits above the class, but pointing at the right
+    // three statements.
+    //
+    // `ctx.db.transaction()` joins the request's transaction rather than
+    // nesting, so this is a no-op today and the correct thing on the day it is
+    // not.
+    await this.db.transaction().execute(async (trx: any) => {
+      const { unit } = await claimLotQuantity(trx, params.lotId, params.quantityUsed);
 
-    await sql`
-      INSERT INTO trace_lot_consumptions (production_order_id, lot_id, quantity_used, unit, scanned_by, scanned_at)
-      VALUES (${params.productionOrderId}, ${params.lotId}, ${params.quantityUsed}, ${unit}, ${params.scannedBy}, now())
-    `.execute(this.db);
+      await sql`
+        INSERT INTO trace_lot_consumptions (production_order_id, lot_id, quantity_used, unit, scanned_by, scanned_at)
+        VALUES (${params.productionOrderId}, ${params.lotId}, ${params.quantityUsed}, ${unit}, ${params.scannedBy}, now())
+      `.execute(trx);
 
-    await sql`
-      INSERT INTO trace_movements (lot_id, type, quantity, unit, reference_type, reference_id, performed_by, performed_at)
-      VALUES (${params.lotId}, 'consumption', ${-params.quantityUsed}, ${unit}, 'production_order', ${params.productionOrderId}, ${params.scannedBy}, now())
-    `.execute(this.db);
+      await sql`
+        INSERT INTO trace_movements (lot_id, type, quantity, unit, reference_type, reference_id, performed_by, performed_at)
+        VALUES (${params.lotId}, 'consumption', ${-params.quantityUsed}, ${unit}, 'production_order', ${params.productionOrderId}, ${params.scannedBy}, now())
+      `.execute(trx);
+    });
   }
 
   async getExpiringLots(daysAhead: number = 7) {

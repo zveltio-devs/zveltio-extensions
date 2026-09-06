@@ -28,10 +28,27 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import { StockService } from './StockService.js';
+// The ENGINE's own proxy, not a stand-in.
+//
+// `consumeFromLot` wraps its three writes in `this.db.transaction()`, and in
+// production `this.db` is `ctx.db` — a proxy whose `transaction()` JOINS the
+// request's transaction rather than nesting, because Bun SQL has no nested
+// transactions. A raw Kysely `Transaction` refuses outright with "calling the
+// transaction method for a Transaction is not supported".
+//
+// Handing the service a raw trx would therefore test something the product never
+// does. This is the same construction `register.ts` performs.
+import { createRestrictedDb } from '../../../../../zveltio/packages/engine/src/lib/extensions/extension-context.js';
 
 const DB_URL = process.env.TEST_DATABASE_URL;
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const PRODUCTION_ORDER = '00000000-0000-4000-8000-000000000001';
+/** The extension's own `trace_*` namespace, which its migrations create. */
+const ALLOWED = new Set([
+  'trace_lots', 'trace_movements', 'trace_lot_consumptions', 'trace_production_orders',
+  'trace_items', 'trace_suppliers', 'trace_locations', 'trace_recalls',
+  'trace_dispatches', 'trace_recipes', 'trace_recipe_items',
+]);
 
 describe.skipIf(!DB_URL)('traceability: concurrent consumption of one lot', () => {
   let pool: any;
@@ -95,7 +112,8 @@ describe.skipIf(!DB_URL)('traceability: concurrent consumption of one lot', () =
     try {
       return await db.transaction().execute(async (trx) => {
         await new Promise((r) => setTimeout(r, pauseMs));
-        await new StockService(trx).consumeFromLot({
+        const ctxDb = createRestrictedDb(trx as never, 'operations/traceability', ALLOWED);
+        await new StockService(ctxDb).consumeFromLot({
           lotId,
           quantityUsed: qty,
           productionOrderId: PRODUCTION_ORDER,

@@ -164539,15 +164539,17 @@ class StockService {
     this.db = db;
   }
   async consumeFromLot(params) {
-    const { unit } = await claimLotQuantity(this.db, params.lotId, params.quantityUsed);
-    await sql`
-      INSERT INTO trace_lot_consumptions (production_order_id, lot_id, quantity_used, unit, scanned_by, scanned_at)
-      VALUES (${params.productionOrderId}, ${params.lotId}, ${params.quantityUsed}, ${unit}, ${params.scannedBy}, now())
-    `.execute(this.db);
-    await sql`
-      INSERT INTO trace_movements (lot_id, type, quantity, unit, reference_type, reference_id, performed_by, performed_at)
-      VALUES (${params.lotId}, 'consumption', ${-params.quantityUsed}, ${unit}, 'production_order', ${params.productionOrderId}, ${params.scannedBy}, now())
-    `.execute(this.db);
+    await this.db.transaction().execute(async (trx) => {
+      const { unit } = await claimLotQuantity(trx, params.lotId, params.quantityUsed);
+      await sql`
+        INSERT INTO trace_lot_consumptions (production_order_id, lot_id, quantity_used, unit, scanned_by, scanned_at)
+        VALUES (${params.productionOrderId}, ${params.lotId}, ${params.quantityUsed}, ${unit}, ${params.scannedBy}, now())
+      `.execute(trx);
+      await sql`
+        INSERT INTO trace_movements (lot_id, type, quantity, unit, reference_type, reference_id, performed_by, performed_at)
+        VALUES (${params.lotId}, 'consumption', ${-params.quantityUsed}, ${unit}, 'production_order', ${params.productionOrderId}, ${params.scannedBy}, now())
+      `.execute(trx);
+    });
   }
   async getExpiringLots(daysAhead = 7) {
     const rows = await sql`
@@ -185274,13 +185276,26 @@ function toCSV(internals, rows, columns) {
 function acceptsCsv(c) {
   return c.req.header("Accept")?.includes("text/csv") || c.req.query("format") === "csv";
 }
+function isoDateParam(v) {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v))
+    return null;
+  const d = new Date(`${v}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== v ? null : v;
+}
+function filenamePart(v) {
+  return v && /^[\w.-]{1,40}$/.test(v) ? v : "all";
+}
 function reportsRouter(ctx) {
   const { db } = ctx;
   const app = new Hono2;
   app.get("/ansvsa-traceability", async (c) => {
-    const { from, to } = c.req.query();
-    if (!from || !to)
-      return c.json({ error: "Parametrii from \u0219i to sunt obligatorii / from and to parameters required" }, 400);
+    const from = isoDateParam(c.req.query("from"));
+    const to = isoDateParam(c.req.query("to"));
+    if (!from || !to) {
+      return c.json({
+        error: "Parametrii from \u0219i to sunt obligatorii, \xEEn format AAAA-LL-ZZ / " + "from and to are required, as YYYY-MM-DD"
+      }, 400);
+    }
     const rows = await sql`
       SELECT
         l.lot_number as "Num\u0103r lot intern",
@@ -185315,14 +185330,19 @@ function reportsRouter(ctx) {
       return new Response(toCSV(ctx.internals, rows.rows, cols), {
         headers: {
           "Content-Type": "text/csv; charset=utf-8",
-          "Content-Disposition": `attachment; filename="trasabilitate-ansvsa-${from}-${to}.csv"`
+          "Content-Disposition": `attachment; filename="trasabilitate-ansvsa-${filenamePart(from)}-${filenamePart(to)}.csv"`
         }
       });
     }
     return c.json({ data: rows.rows, meta: { from, to, count: rows.rows.length } });
   });
   app.get("/reception-log", async (c) => {
-    const { from, to } = c.req.query();
+    const from = isoDateParam(c.req.query("from"));
+    const to = isoDateParam(c.req.query("to"));
+    if (c.req.query("from") && !from)
+      return c.json({ error: "from: AAAA-LL-ZZ / YYYY-MM-DD" }, 400);
+    if (c.req.query("to") && !to)
+      return c.json({ error: "to: AAAA-LL-ZZ / YYYY-MM-DD" }, 400);
     const rows = await sql`
       SELECT
         m.performed_at as "Data/Ora",
@@ -185350,14 +185370,19 @@ function reportsRouter(ctx) {
       return new Response(toCSV(ctx.internals, rows.rows, cols), {
         headers: {
           "Content-Type": "text/csv; charset=utf-8",
-          "Content-Disposition": `attachment; filename="receptii-${from ?? "all"}-${to ?? "all"}.csv"`
+          "Content-Disposition": `attachment; filename="receptii-${filenamePart(from)}-${filenamePart(to)}.csv"`
         }
       });
     }
     return c.json({ data: rows.rows });
   });
   app.get("/consumption-log", async (c) => {
-    const { from, to } = c.req.query();
+    const from = isoDateParam(c.req.query("from"));
+    const to = isoDateParam(c.req.query("to"));
+    if (c.req.query("from") && !from)
+      return c.json({ error: "from: AAAA-LL-ZZ / YYYY-MM-DD" }, 400);
+    if (c.req.query("to") && !to)
+      return c.json({ error: "to: AAAA-LL-ZZ / YYYY-MM-DD" }, 400);
     const rows = await sql`
       SELECT
         c.scanned_at as "Data/Ora",
@@ -185383,7 +185408,7 @@ function reportsRouter(ctx) {
       return new Response(toCSV(ctx.internals, rows.rows, cols), {
         headers: {
           "Content-Type": "text/csv; charset=utf-8",
-          "Content-Disposition": `attachment; filename="consumuri-${from ?? "all"}-${to ?? "all"}.csv"`
+          "Content-Disposition": `attachment; filename="consumuri-${filenamePart(from)}-${filenamePart(to)}.csv"`
         }
       });
     }
@@ -185424,7 +185449,12 @@ function reportsRouter(ctx) {
     return c.json({ data: rows.rows, meta: { generated_at: new Date().toISOString(), count: rows.rows.length } });
   });
   app.get("/haccp-log", async (c) => {
-    const { from, to } = c.req.query();
+    const from = isoDateParam(c.req.query("from"));
+    const to = isoDateParam(c.req.query("to"));
+    if (c.req.query("from") && !from)
+      return c.json({ error: "from: AAAA-LL-ZZ / YYYY-MM-DD" }, 400);
+    if (c.req.query("to") && !to)
+      return c.json({ error: "to: AAAA-LL-ZZ / YYYY-MM-DD" }, 400);
     const rows = await sql`
       SELECT
         po.order_number as "Ordin produc\u021Bie",
