@@ -175,21 +175,44 @@ export function productionRouter(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     const id = c.req.param('id');
 
-    const orderResult = await sql`SELECT * FROM trace_production_orders WHERE id = ${id} AND status = 'in_progress'`.execute(db);
-    if (!orderResult.rows.length) return c.json({ error: 'Ordinul nu este în execuție / Order not in progress' }, 400);
-
-    const order = orderResult.rows[0] as any;
-
-    // Update output lot quantity to actual produced
     // Releasing the lot, recording the production movement, and closing the
     // order are one completion. Split, the lot is released for sale with no
     // movement saying it was ever produced — which is the row a recall walks
     // backwards — or the order stays in progress over a lot already sold.
+    //
+    // THE CLOSE IS ALSO THE CLAIM, and it comes first. This route used to read
+    // the order with `AND status = 'in_progress'`, check the result in
+    // JavaScript, and then update `WHERE id = ${id}` with no status condition —
+    // the same read-then-write that let two operators over-draw a lot, on the
+    // order instead. Two concurrent completions both passed the check and both
+    // ran, writing TWO `reception` movements for one production order. The lot's
+    // quantity is assigned rather than added so it looked right, while the
+    // movement ledger — the thing an inspection reads — said the batch was
+    // produced twice.
+    //
+    // `PATCH /:id/start` two handlers above already does it correctly:
+    // `WHERE id = … AND status = 'draft' RETURNING *`, refuse on zero rows. This
+    // is the same shape.
     const row = await db.transaction().execute(async (trx) => {
+      const claimed = await sql`
+        UPDATE trace_production_orders
+        SET status = 'completed', actual_quantity = ${d.actual_quantity},
+            completed_at = now(), haccp_checks = ${JSON.stringify(d.haccp_checks)}::text::jsonb
+        WHERE id = ${id} AND status = 'in_progress'
+        RETURNING *
+      `.execute(trx);
+
+      if (!claimed.rows.length) return null;
+      const order = claimed.rows[0] as any;
+
+      // The output lot leaves quarantine. Guarded on the status it is expected
+      // to be in, so a recall that landed on this lot while it was in production
+      // is not flipped back to `available` — the same guard the consumption and
+      // dispatch paths now carry.
       await sql`
         UPDATE trace_lots
         SET quantity_initial = ${d.actual_quantity}, quantity_remaining = ${d.actual_quantity}, status = 'available'
-        WHERE id = ${order.output_lot_id}
+        WHERE id = ${order.output_lot_id} AND status = 'quarantine'
       `.execute(trx);
 
       // Record production movement
@@ -198,16 +221,10 @@ export function productionRouter(ctx: ExtensionContext): Hono {
         VALUES (${order.output_lot_id}, 'reception', ${d.actual_quantity}, ${order.unit}, 'production_order', ${id}, ${user.id}, now())
       `.execute(trx);
 
-      const row = await sql`
-        UPDATE trace_production_orders
-        SET status = 'completed', actual_quantity = ${d.actual_quantity},
-            completed_at = now(), haccp_checks = ${JSON.stringify(d.haccp_checks)}::text::jsonb
-        WHERE id = ${id}
-        RETURNING *
-      `.execute(trx);
-
-      return row;
+      return claimed;
     });
+
+    if (!row) return c.json({ error: 'Ordinul nu este în execuție / Order not in progress' }, 400);
     return c.json({ data: row.rows[0] });
   });
 
