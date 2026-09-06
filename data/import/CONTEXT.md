@@ -1,60 +1,60 @@
 # data/import — context
 
-Verificat 2026-08-11, pe bază virgină, cu control pozitiv. Rutele trec, importul
-scrie rânduri, iar coloanele marcate `encrypted` ajung criptate pe disc.
+Verified 2026-08-11, on a virgin database, with a positive control. The routes
+pass, the import writes rows, and columns marked `encrypted` reach disk encrypted.
 
-## De ce n-a văzut nimeni că importul nu funcționa deloc
+## Why nobody saw that import did not work at all
 
-Importul a fost funcție de core înainte să devină extensie, iar engine-ul încă
-are `routes/import.ts` peste **același tabel**, `zv_import_logs`. Cele două
-migrații îl creează amândouă condiționat, cu vocabulare diferite în trei locuri:
+Import was a core feature before it became an extension, and the engine still has
+`routes/import.ts` over the **same table**, `zv_import_logs`. The two migrations
+both create it conditionally, with different vocabularies in three places:
 
-| | engine | extensia |
+| | engine | extension |
 |---|---|---|
-| format fișier | `file_format` | `format` |
-| rânduri eșuate | `error_rows` | `failed_rows` |
-| job în lucru | `processing` | `running` |
+| file format | `file_format` | `format` |
+| failed rows | `error_rows` | `failed_rows` |
+| job in progress | `processing` | `running` |
 
-Migrațiile de core rulează la boot, înaintea oricărei extensii. Deci pe **orice
-instalare nouă** tabelul e al engine-ului, iar prima instrucțiune a extensiei îl
-încalcă: `POST /ext/data/import/:collection` răspundea 500 cu
+Core migrations run at boot, before any extension. So on **any fresh
+installation** the table is the engine's, and the extension's first statement
+violates it: `POST /ext/data/import/:collection` answered 500 with
 `column "format" does not exist`.
 
-Pe o instalare veche nu se vede: acolo coloanele s-au acumulat din ambele părți
-de-a lungul lunilor. Iar auditul se uita la `/api/import`, care merge perfect —
-peste tabelul pe care tot el l-a creat, cu numele pe care tot el le-a ales.
-Ruta aia n-are niciun apelant: Studio și SDK-ul intră pe `/ext/`.
+On an old installation it does not show: there the columns accumulated from both
+sides over months. And the audit was looking at `/api/import`, which works
+perfectly — over the table it created itself, with the names it chose itself. That
+route has no caller: Studio and the SDK come in through `/ext/`.
 
-Migrația 003 ia reuniunea ambelor forme, aditiv, ca să fie corectă pe oricare și
-să supraviețuiască ștergerii copiei din engine.
+Migration 003 takes the union of both shapes, additively, so it is correct on
+either and survives the removal of the engine's copy.
 
-## De ce eșecul era invizibil
+## Why the failure was invisible
 
-După reparația coloanelor, jobul murea la primul `status: 'running'` și rămânea
-`pending`, `errors: []`, fără nicio linie în log. Handler-ul de eroare scria prin
-`ctx.db`, iar jobul e pornit **în interiorul** handler-ului, deci moștenește
-contextul async al cererii: scrierea de recuperare mergea într-o tranzacție deja
-comisă, iar propriul ei `.catch` arunca eroarea. Un import mort se citea ca unul
-lent.
+After the columns were repaired, the job died at the first `status: 'running'` and
+stayed `pending`, `errors: []`, with no line in the log. The error handler wrote
+through `ctx.db`, and the job is started **inside** the handler, so it inherits
+the request's async context: the recovery write went into an already-committed
+transaction, and its own `.catch` threw the error away. A dead import read as a
+slow one.
 
-Acum: `stderr` întâi, apoi scrierea prin `withTenantIsolation` propriu.
+Now: `stderr` first, then the write through its own `withTenantIsolation`.
 
-## Capcana care merită reținută
+## The trap worth remembering
 
-`fieldTypeRegistry.deserialize` e **async** și nu era așteptat, deci în rând
-intra un Promise. Ajungea totuși în tabel, fiindcă Bun.SQL rezolvă un promise
-dat ca parametru de interogare — de asta n-a deranjat pe nimeni ani de zile.
+`fieldTypeRegistry.deserialize` is **async** and was not awaited, so a Promise
+went into the row. It still reached the table, because Bun.SQL resolves a promise
+passed as a query parameter — which is why it bothered nobody for years.
 
-S-a văzut abia când am adăugat criptarea: `maybeEncrypt` a primit un Promise, a
-luat ieșirea `typeof value !== 'string'` și l-a returnat neatins, iar coloana a
-rămas în clar **cu garda pusă**. Verificarea prin citire ar fi zis „e reparat".
-Tipărirea valorii a zis altceva.
+It only showed when encryption was added: `maybeEncrypt` received a Promise, took
+the `typeof value !== 'string'` exit and returned it untouched, and the column
+stayed in cleartext **with the guard in place**. Verifying by reading would have
+said "it is repaired". Printing the value said otherwise.
 
-**Un `await` lipsă nu se manifestă ca eroare aici. Se manifestă ca o gardă care
-nu se aplică.**
+**A missing `await` does not manifest as an error here. It manifests as a guard
+that does not apply.**
 
-## Ce e încă deschis
+## What is still open
 
-`routes/import.ts` din engine (2 rute, zero consumatori) și tipul
-`zv_import_logs` din `schema.ts` trebuie șterse. Când se întâmplă, coloanele
-duplicate din migrația 003 pot dispărea și ele.
+The engine's `routes/import.ts` (2 routes, zero consumers) and the
+`zv_import_logs` type in `schema.ts` need deleting. When that happens, the
+duplicate columns in migration 003 can go too.

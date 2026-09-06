@@ -1,26 +1,26 @@
-# Provizionare automată de utilizatori (SCIM 2.0)
+# Automatic user provisioning (SCIM 2.0)
 
-Pentru administratorul instanței. Conectează Zveltio la Azure AD / Entra, Okta,
-Google Workspace sau orice furnizor care vorbește SCIM 2.0, astfel încât
-angajații să fie creați și dezactivați automat.
+For the instance administrator. Connects Zveltio to Azure AD / Entra, Okta, Google
+Workspace or any provider speaking SCIM 2.0, so that employees are created and
+deactivated automatically.
 
 ---
 
-## Adresa pe care o dai furnizorului
+## The address you give the provider
 
 ```
-https://DOMENIUL-TAU/scim/v2
+https://YOUR-DOMAIN/scim/v2
 ```
 
-**La rădăcină, nu sub `/ext/`.** Extensia se montează deliberat acolo, fiindcă
-furnizorii de identitate se așteaptă la o adresă SCIM standard, iar unii nici nu
-acceptă căi arbitrare.
+**At the root, not under `/ext/`.** The extension mounts there deliberately,
+because identity providers expect a standard SCIM address and some will not accept
+arbitrary paths.
 
-Merită spus explicit pentru că e ușor de greșit: `/ext/auth/scim/...` returnează
-**401** și pare o problemă de token. Nu e — acolo pur și simplu nu există
-serviciul.
+Worth saying explicitly because it is easy to get wrong:
+`/ext/auth/scim/...` returns **401** and looks like a token problem. It is not —
+there is simply no service there.
 
-Adresele complete pe care le va apela furnizorul:
+The full addresses the provider will call:
 
 ```
 GET    /scim/v2/ServiceProviderConfig
@@ -33,78 +33,79 @@ DELETE /scim/v2/Users/{id}
 
 ---
 
-## Pasul 1 — Aprobă capabilitățile
+## Step 1 — Approve the capabilities
 
-**Acesta e pasul care se uită**, și fără el nimic nu funcționează.
+**This is the step people forget**, and without it nothing works.
 
-Extensia cere `database` și `secrets`. Ele se **declară** în manifest, dar nu se
-acordă automat — un administrator trebuie să le aprobe explicit. Așa e proiectat:
-o extensie care cere mai multă putere trebuie să ceară vizibil.
+The extension asks for `database` and `secrets`. They are **declared** in the
+manifest but not granted automatically — an administrator has to approve them
+explicitly. That is by design: an extension asking for more power has to ask
+visibly.
 
-Fără capabilitatea `secrets`, extensia nu poate valida token-ul, iar furnizorul
-primește 401 la orice apel — inclusiv cu un token perfect valid.
+Without the `secrets` capability the extension cannot validate the token, and the
+provider gets a 401 on every call — including with a perfectly valid token.
 
-Aprobarea se face din **Marketplace**, pe cardul extensiei, la instalare sau
-după o actualizare care cere o capabilitate nouă.
-
----
-
-## Pasul 2 — Generează token-ul
-
-**Studio → SCIM Provisioning → token nou.**
-
-Token-ul începe cu `zvscim_` și **se afișează o singură dată**. Salvează-l pe
-loc; în bază se păstrează doar amprenta lui, deci nu poate fi recuperat, doar
-înlocuit.
-
-Fiecare token aparține unui singur tenant. Utilizatorii pe care îi provizionează
-furnizorul intră în tenantul acelui token — nu există ambiguitate și nici mod de
-a greși tenantul din afară.
+Approval happens from the **Marketplace**, on the extension's card, at
+installation or after an update that asks for a new capability.
 
 ---
 
-## Pasul 3 — Configurează furnizorul
+## Step 2 — Generate the token
 
-În Azure AD / Okta, la provizionare:
+**Studio → SCIM Provisioning → new token.**
 
-| Câmp | Valoare |
+The token begins with `zvscim_` and is **shown only once**. Save it immediately;
+only its fingerprint is kept in the database, so it cannot be recovered, only
+replaced.
+
+Each token belongs to a single tenant. The users the provider provisions land in
+that token's tenant — there is no ambiguity and no way to get the tenant wrong
+from outside.
+
+---
+
+## Step 3 — Configure the provider
+
+In Azure AD / Okta, under provisioning:
+
+| Field | Value |
 |---|---|
-| Tenant URL | `https://DOMENIUL-TAU/scim/v2` |
-| Secret Token | token-ul `zvscim_…` de la Pasul 2 |
+| Tenant URL | `https://YOUR-DOMAIN/scim/v2` |
+| Secret Token | the `zvscim_…` token from Step 2 |
 
-Apoi **Test Connection**. Furnizorul cheamă `ServiceProviderConfig`; dacă
-răspunde, restul va merge.
-
----
-
-## Ce se întâmplă la dezactivare
-
-Când furnizorul dezactivează sau șterge un utilizator, Zveltio:
-
-1. îi scoate apartenența la tenant;
-2. **îi șterge toate sesiunile, imediat** — pierderea accesului trebuie să aibă
-   efect acum, iar o sesiune e valabilă pe toată instanța;
-3. dacă utilizatorul nu mai aparține niciunui tenant, îi șterge și contul.
-
-Punctul 2 e cel important. Un angajat care pleacă vineri nu trebuie să mai poată
-intra luni cu un browser rămas deschis.
-
-Verificat: o dezactivare cu două sesiuni active le lasă pe zero.
+Then **Test Connection**. The provider calls `ServiceProviderConfig`; if that
+answers, the rest will work.
 
 ---
 
-## Dacă ceva nu merge
+## What happens on deactivation
 
-**401 la orice apel, cu token valid** — aproape sigur capabilitățile nu sunt
-aprobate. Verifică Pasul 1.
+When the provider deactivates or deletes a user, Zveltio:
 
-**401 și la `ServiceProviderConfig`** — token greșit, sau adresa e sub `/ext/`
-în loc de rădăcină.
+1. removes their tenant membership;
+2. **deletes all their sessions, immediately** — losing access has to take effect
+   now, and a session is valid across the whole instance;
+3. if the user no longer belongs to any tenant, deletes the account too.
 
-**500 „SCIM is not configured on this server"** — lipsește `FIELD_ENCRYPTION_KEY`
-din configurația instanței. Token-urile se stochează ca amprentă și nu se pot
-verifica fără ea.
+Point 2 is the important one. An employee who leaves on Friday must not still get
+in on Monday with a browser left open.
 
-**Utilizatorii se creează dar nu au drepturi** — SCIM îi face membri ai
-tenantului; rolurile se acordă separat, din Permisiuni. Provizionarea spune
-*cine are voie să intre*, nu *ce are voie să facă*.
+Verified: a deactivation with two active sessions leaves zero.
+
+---
+
+## If something does not work
+
+**401 on every call, with a valid token** — almost certainly the capabilities are
+not approved. Check Step 1.
+
+**401 on `ServiceProviderConfig` too** — wrong token, or the address is under
+`/ext/` instead of the root.
+
+**500 "SCIM is not configured on this server"** — `FIELD_ENCRYPTION_KEY` is
+missing from the instance configuration. Tokens are stored as a fingerprint and
+cannot be verified without it.
+
+**Users are created but have no rights** — SCIM makes them members of the tenant;
+roles are granted separately, from Permissions. Provisioning says *who is allowed
+in*, not *what they are allowed to do*.

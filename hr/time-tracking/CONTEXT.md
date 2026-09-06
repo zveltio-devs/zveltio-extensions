@@ -1,72 +1,74 @@
 # hr/time-tracking — context
 
-Verificat 2026-08-11, pe bază virgină: proiecte, intrări, cronometru, pontaje,
-trimitere, aprobare, respingere, statistici.
+Verified 2026-08-11, on a virgin database: projects, entries, timer, timesheets,
+submission, approval, rejection, statistics.
 
-**Atenție la activare:** extensia cere `finance/invoicing` și refuză corect să se
-încarce fără ea. E și o observație de produs — pontajul nu ar trebui să depindă
-obligatoriu de facturare; se pot urmări ore fără să le facturezi.
+**Note on activation:** the extension requires `finance/invoicing` and correctly
+refuses to load without it. That is also a product observation — time tracking
+should not have to depend on invoicing; hours can be tracked without being billed.
 
-## Al treilea modul HR cu aceeași gaură
+## The third HR module with the same hole
 
-`hr/employees`, `hr/leave` și acesta au aceeași formă: o singură poartă de
-permisiune pe `*` și **nicio** verificare de proprietate. Aici:
+`hr/employees`, `hr/leave` and this one share the same shape: a single permission
+gate on `*` and **no** ownership check at all. Here:
 
-- `employee_id` era **opțional** pe `POST /entries` și pe `POST /timer/start`.
-  Lăsat gol făcea ce trebuie; completat, înregistra ore pe numele oricui.
-- `POST /timesheets/:id/approve` nu verifica absolut nimic — oricine cu acces la
-  modul putea aproba orice pontaj, inclusiv al lui.
-- La fel `reject`, care e mai ieftin de abuzat: nu cere nimic în afară de un id
-  și trimite orele înapoi ca disputate.
+- `employee_id` was **optional** on `POST /entries` and on `POST /timer/start`.
+  Left empty it did the right thing; filled in, it recorded hours in anyone's
+  name.
+- `POST /timesheets/:id/approve` checked absolutely nothing — anyone with access
+  to the module could approve any timesheet, including their own.
+- Likewise `reject`, which is cheaper to abuse: it requires nothing but an id and
+  sends the hours back as disputed.
 
-Un pontaj aprobat e ce facturează `POST /entries/invoice`. **Aprobarea propriilor
-ore înseamnă emiterea propriei linii de factură.**
+An approved timesheet is what `POST /entries/invoice` bills. **Approving your own
+hours means issuing your own invoice line.**
 
-Și un defect adiacent: inserarea folosea `d.employee_id ?? null`, deci o intrare
-fără câmp aparținea **nimănui** — invizibilă și pentru omul care a lucrat orele,
-și pentru orice raport per angajat.
+And an adjacent defect: the insert used `d.employee_id ?? null`, so an entry
+without the field belonged to **nobody** — invisible both to the person who worked
+the hours and to any per-employee report.
 
-Acum: orele tale, ale cuiva pe care îl conduci, sau administratorul. Aprobarea și
-respingerea exclud explicit cazul propriu.
+Now: your hours, those of someone you manage, or the administrator. Approval and
+rejection explicitly exclude the self case.
 
-Verificat în cinci direcții:
+Verified in five directions:
 
-1. Mallory logheaza ore pe numele Anei → **403**
-2. adminul poate → **201**
-3. Mallory își aprobă propriul pontaj → **403**
-4. adminul îl aprobă → **200**
-5. intrare fără `employee_id` ajunge pe apelant, nu pe nimeni → zero intrări
-   orfane în baza de date
+1. Mallory logs hours in Ana's name → **403**
+2. the admin can → **201**
+3. Mallory approves her own timesheet → **403**
+4. the admin approves it → **200**
+5. an entry with no `employee_id` lands on the caller, not on nobody → zero
+   orphan entries in the database
 
-## Duplicare de reparat
+## Duplication to be resolved
 
-Helperii `callerEmployee` / `mayActFor` sunt acum în **două** extensii —
-`hr/leave` și aceasta — cu același conținut. A treia copie ar fi semnalul clar
-că trebuie mutați: locul lor e un serviciu expus de `hr/employees`
-(`ctx.services`, cum e deja `identity.nationalId`), ceea ce ar elimina și
-citirea directă a lui `zvd_employees` de aici — tabelul altei extensii.
+The `callerEmployee` / `mayActFor` helpers now exist in **two** extensions —
+`hr/leave` and this one — with the same content. A third copy would be the clear
+signal that they must move: their place is a service exposed by `hr/employees`
+(`ctx.services`, as `identity.nationalId` already is), which would also remove the
+direct read of `zvd_employees` from here — another extension's table.
 
-## Legătura utilizator ↔ angajat
+## The user ↔ employee link
 
-Ca peste tot în familia HR, căutarea se făcea după email deși `zvd_employees` are
-`user_id`. Helper-ul nou încearcă `user_id` întâi. Fără asta, cine are alt email
-de serviciu decât cel de logare nu putea nici măcar să pornească cronometrul.
+As everywhere in the HR family, the lookup went by email even though
+`zvd_employees` has `user_id`. The new helper tries `user_id` first. Without it,
+anyone whose work email differs from their login email could not even start the
+timer.
 
-## Identitatea și autorizarea trec prin `hr.employment` (2026-08-12)
+## Identity and authorisation go through `hr.employment` (2026-08-12)
 
-Duplicarea semnalată aici a fost rezolvată: `callerEmployee`/`mayActFor` erau
-aceleași douăzeci de linii ca în `hr/leave`, amândouă deschizând `zvd_employees`.
-Sunt acum pe serviciul lui `hr/employees`; fără el, rutele răspund 503.
+The duplication flagged here has been resolved: `callerEmployee`/`mayActFor` were
+the same twenty lines as in `hr/leave`, both opening `zvd_employees`. They are now
+on `hr/employees`'s service; without it, the routes answer 503.
 
-Cele două căutări de identitate (cronometru pornit, cronometru oprit) se făceau
-după email — deci cine are alt email de serviciu nu putea porni cronometrul deloc.
+The two identity lookups (timer started, timer stopped) went by email — so anyone
+with a different work email could not start the timer at all.
 
-**Gate-ul de rute de decizie a trebuit învățat:** o gardă ajunsă prin
-`ctx.services` se rezolvă la execuție, peste graniță de extensie, iar un cititor
-static n-o poate urmări. Handlerele o declară acum explicit:
-`// permission: delegated to hr.employment.mayActFor`. E mai slab decât să vezi
-apelul — o afirmație, nu o dovadă — dar e greppabil și obligă delegarea să fie
-scrisă, nu dedusă.
+**The decision-route gate had to be taught:** a guard arriving through
+`ctx.services` resolves at execution time, across an extension boundary, and a
+static reader cannot follow it. The handlers now declare it explicitly:
+`// permission: delegated to hr.employment.mayActFor`. That is weaker than seeing
+the call — an assertion, not a proof — but it is greppable and it forces the
+delegation to be written down rather than inferred.
 
 
 ## SDUI migration (2026-08-21)

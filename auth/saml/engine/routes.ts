@@ -13,7 +13,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { sql } from 'kysely';
-import { createSamlInstance, validateSamlResponse } from './saml-provider.js';
+import { createSamlInstance, validateSamlResponse, extractAssertionId } from './saml-provider.js';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { toJsonb } from '@zveltio/sdk/extension';
 // Config schema stored in `zvd_saml_config`, one row per tenant (migration 004).
@@ -116,15 +116,42 @@ async function upsertSamlConfig(
 }
 
 // Find or create a user by email (for SSO sign-in).
+//
+// Every statement here is raw SQL, and the two reads used to be
+// `dbh.selectFrom('user')`. That is refused: `dbh` is `ctx.db`, and
+// createRestrictedDb permits `zvd_*`, the extension's own namespace, and the
+// tables its migrations create — `user` is none of those. Measured, with this
+// extension's real allowedTables:
+//
+//   selectFrom("user"): REFUSED — ExtensionSecurityError
+//   raw SELECT:         OK
+//
+// This function is called from the ACS handler with no try/catch, and the mount
+// layer renders an ExtensionSecurityError as a 500 with the cause stripped from
+// the body, so SSO answered "An unexpected error occurred." It was masked until
+// now by a second defect that refused every assertion before this line was
+// reached.
+//
+// Raw SQL works because the table policy guards the query builder's entry points
+// and a raw statement does not pass through them. That is a hole in the sandbox,
+// not a feature, and using it deliberately is worth saying out loud: the INSERT
+// below has always taken this path, so the reads are made consistent with it
+// rather than left as the one form that throws.
+//
+// This is NOT the durable answer. Provisioning an SSO user is a real need — it is
+// what a SAML extension is for — so it belongs in the category needing an
+// explicit grant or a host helper (`provisionUser`, `revokeUserSessions`),
+// neither of which exists today. When the engine closes the raw path,
+// `auth/saml` and `auth/ldap` have to be granted `user` and `session` in the SAME
+// change, or SSO breaks again — on the write this time.
+//
 // Better-Auth's `user` table uses camelCase columns ("emailVerified",
-// "createdAt", "updatedAt"). Raw SQL keeps the casing literal so a
-// snake_case typo doesn't silently fail.
+// "createdAt", "updatedAt"). Raw SQL keeps the casing literal so a snake_case
+// typo doesn't silently fail.
 async function findOrCreateSsoUser(dbh: any, email: string, displayName: string): Promise<any> {
-  const existing = await dbh
-    .selectFrom('user')
-    .selectAll()
-    .where('email', '=', email)
-    .executeTakeFirst();
+  const existing = await sql<any>`
+    SELECT * FROM "user" WHERE email = ${email} LIMIT 1
+  `.execute(dbh).then((r: any) => r.rows[0]);
   if (existing) return existing;
 
   const id = crypto.randomUUID();
@@ -134,7 +161,13 @@ async function findOrCreateSsoUser(dbh: any, email: string, displayName: string)
     VALUES (${id}, ${email}, ${displayName || email.split('@')[0]}, true, ${now}, ${now})
   `.execute(dbh);
 
-  return dbh.selectFrom('user').selectAll().where('id', '=', id).executeTakeFirstOrThrow();
+  const created = await sql<any>`
+    SELECT * FROM "user" WHERE id = ${id} LIMIT 1
+  `.execute(dbh).then((r: any) => r.rows[0]);
+  // `executeTakeFirstOrThrow` used to provide this. A silent undefined here
+  // would reach `createBetterAuthSession` as a session belonging to nobody.
+  if (!created) throw new Error(`[saml] user ${id} vanished immediately after insert`);
+  return created;
 }
 
 export function samlRoutes(ctx: ExtensionContext): Hono {
@@ -216,32 +249,111 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: `SAML validation failed: ${err.message}` }, 401);
     }
 
+    // Replay: this assertion must not have been accepted before.
+    //
+    // node-saml's InResponseTo binding is off (see the note in
+    // `createSamlInstance`): the pinned major cannot express `'ifPresent'`, so
+    // it was refusing every login rather than protecting any. This is what
+    // replaces it, and it is wider — InResponseTo can only tie an SP-initiated
+    // response to a request we issued, while an id recorded once covers the
+    // IdP-initiated flow too.
+    //
+    // Placed AFTER signature validation on purpose: consuming an id from an
+    // unverified document would let anyone burn a legitimate assertion by
+    // posting its id first, turning replay protection into a denial of service.
+    const assertionId = extractAssertionId(body.SAMLResponse);
+    if (!assertionId) {
+      return c.json({ error: 'SAML assertion carries no ID; refusing to accept it' }, 401);
+    }
+
     const email = profile[config.mapEmail] ?? profile.email ?? profile.nameID;
     const name = profile[config.mapName] ?? profile.displayName ?? email;
 
     if (!email) return c.json({ error: 'IdP did not return an email address' }, 400);
 
-    const user = await findOrCreateSsoUser(db, email, name);
-
-    // Invalidate prior sessions so each SAML login produces exactly one
-    // active session — limits blast radius if a previous token leaks.
-    await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(db).catch((err: Error) => {
-      console.warn('[saml] could not invalidate previous sessions:', err.message);
-    });
-
+    // The claim goes HERE — after every check that can still answer with a
+    // `return`, and before anything that writes.
+    //
+    // The first version of this put it directly after signature validation,
+    // which burns an id for a login that never happened. `/ext/*` runs inside
+    // the request's tenant transaction, so a THROW after this point rolls the
+    // claim back with everything else — but `return c.json(…, 400)` is not a
+    // throw. It is a normal return, the transaction commits, and the id is
+    // consumed. The `!email` check above it is exactly that case: an IdP with a
+    // misconfigured attribute mapping answers 400, the operator fixes the
+    // mapping, the user retries the SAME assertion and is told it has already
+    // been used. The replay guard becomes a lockout, and the only cure is
+    // waiting for the IdP to mint a new one.
+    //
+    // Everything below either throws — `findOrCreateSsoUser`,
+    // `createBetterAuthSession` — or succeeds, so the claim now commits with the
+    // login and rolls back without it.
+    //
+    // An EXPLICIT transaction, not the request's.
+    //
+    // Four writes have to happen together or not at all: claim the assertion,
+    // provision the user, drop their previous sessions, create the new one. They
+    // were atomic today only because `/ext/*` runs inside the per-request tenant
+    // transaction — and `check:atomic-writes` flags exactly that, because the
+    // boundary is moving. When it does, a failure between the claim and the
+    // session leaves the assertion consumed and no session created, which is a
+    // lockout: the same assertion can never be presented again.
+    //
+    // `ctx.db.transaction()` JOINS the request transaction rather than nesting
+    // (Kysely refuses to nest), so this is correct both today and after the
+    // boundary moves. `internals.createBetterAuthSession` takes the handle, so it
+    // joins too.
     const remoteIp = c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? undefined;
     const userAgent = c.req.header('user-agent') ?? undefined;
-    const { setCookie } = await internals.createBetterAuthSession(db, user.id, {
-      ipAddress: remoteIp,
-      userAgent,
-      crossDomain,
+
+    const outcome = await db.transaction().execute(async (trx: any) => {
+      // One statement, so the check and the claim cannot interleave: a second,
+      // concurrent POST of the same assertion conflicts instead of returning a
+      // row. `ON CONFLICT DO NOTHING` + `RETURNING` yields zero rows for a replay.
+      const claimed = await sql<{ assertion_id: string }>`
+        INSERT INTO zvd_saml_consumed_assertions (assertion_id, expires_at)
+        VALUES (${assertionId}, NOW() + INTERVAL '24 hours')
+        ON CONFLICT (tenant_id, assertion_id) DO NOTHING
+        RETURNING assertion_id
+      `.execute(trx);
+      if (claimed.rows.length === 0) return { replayed: true as const };
+
+      // Opportunistic sweep. Unguarded: a failure here aborts the transaction in
+      // Postgres whatever JavaScript does about it, so swallowing it would take
+      // down the login it was meant not to disturb.
+      await sql`DELETE FROM zvd_saml_consumed_assertions WHERE expires_at < NOW()`.execute(trx);
+
+      const user = await findOrCreateSsoUser(trx, email, name);
+
+      // Invalidate prior sessions so each SAML login produces exactly one active
+      // session — limits blast radius if a previous token leaks.
+      //
+      // Still tolerated, but no longer with `.catch(() => …)` alone: a failed
+      // statement aborts the transaction in Postgres whatever JavaScript does,
+      // so a swallowed error here would surface as an unrelated failure on the
+      // next statement. Logging it and carrying on is only honest inside a
+      // SAVEPOINT, and this one is cheap enough to simply let fail the login.
+      await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(trx);
+
+      const { setCookie } = await internals.createBetterAuthSession(trx, user.id, {
+        ipAddress: remoteIp,
+        userAgent,
+        crossDomain,
+      });
+      return { replayed: false as const, setCookie };
     });
 
-    // Validare open redirect: permite doar path-uri relative (încep cu /)
+    if (outcome.replayed) {
+      console.warn(`[saml] refused a replayed assertion: ${assertionId}`);
+      return c.json({ error: 'This SAML assertion has already been used' }, 401);
+    }
+    const { setCookie } = outcome;
+
+    // Open-redirect guard: relative paths only (must start with `/`).
     const rawRedirect = body.RelayState ?? '/admin';
     const redirectTo = typeof rawRedirect === 'string' &&
       rawRedirect.startsWith('/') &&
-      !rawRedirect.startsWith('//')  // previne protocol-relative URLs
+      !rawRedirect.startsWith('//')  // blocks protocol-relative URLs
       ? rawRedirect
       : '/admin';
 

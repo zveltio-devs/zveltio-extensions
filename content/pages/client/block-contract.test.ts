@@ -16,6 +16,7 @@
 import { describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
 import { ALL_BLOCK_TYPES, BLOCK_TYPES, LEGACY_BLOCK_TYPES } from './block-types.js';
+import { HTML_KEYS, URL_KEYS } from './bind.js';
 
 const HERE = import.meta.dir;
 const read = (p: string) => Bun.file(join(HERE, p)).text();
@@ -133,5 +134,108 @@ describe('motion settings', () => {
     const out = motionAttrs({ motion: { sticky: true, stickyOffset: 9999 } });
     expect(out.class).toContain('zv-sticky');
     expect(out.style).toContain('--zv-sticky-top:400px');
+  });
+});
+
+/**
+ * The other list that has to agree with the renderer — and the one that matters
+ * for safety rather than for drawing.
+ *
+ * `bind.ts` escapes a record's value only when it lands in a property the
+ * renderer hands to `{@html}`. Which properties those are is `HTML_KEYS`, and its
+ * header says it "is kept in step with BlockRenderer" — by hand, across two
+ * files, with nothing checking.
+ *
+ * The failure this guards is not "a block draws wrong". It is: someone adds an
+ * `{@html}` for a new property, forgets this list, and a record value — a
+ * customer's name, an imported row — reaches a visitor's browser unescaped. The
+ * page sanitiser cannot catch it, because the template is scrubbed when it is
+ * STORED and the value is substituted afterwards.
+ *
+ * Read off the renderer's source for the same reason as the tests above: all the
+ * sources are on disk here and none of this needs a Svelte toolchain.
+ */
+describe('the escaping list tracks the renderer', () => {
+  test('every property handed to {@html} is in HTML_KEYS', async () => {
+    const src = await read('./BlockRenderer.svelte');
+
+    // Each `{@html …}` expression, and the `c.<prop>` references inside it.
+    const expressions = [...src.matchAll(/\{@html\s+([^}]*)\}/g)].map((m) => m[1]);
+    expect(expressions.length).toBeGreaterThan(0);
+
+    const referenced = new Set<string>();
+    for (const expr of expressions) {
+      const direct = [...expr.matchAll(/\bc\.([a-zA-Z_][a-zA-Z0-9_]*)/g)].map((m) => m[1]);
+      for (const d of direct) referenced.add(d);
+
+      // `{#each (Array.isArray(c.items) ? …) as col}` … `{@html safeHtml(String(col))}`
+      // names the loop variable, not the property. Attribute it to the nearest
+      // preceding each-block so the columns case is covered rather than skipped.
+      if (direct.length === 0) {
+        const at = src.indexOf(expr);
+        const before = src.slice(0, at);
+        const loops = [...before.matchAll(/#each\s*\(Array\.isArray\(c\.([a-zA-Z_][a-zA-Z0-9_]*)\)/g)];
+        const nearest = loops.at(-1);
+        expect(nearest, `no c.<prop> and no enclosing each for: {@html ${expr}}`).toBeDefined();
+        referenced.add(nearest![1]);
+      }
+    }
+
+    const unescaped = [...referenced].filter((k) => !HTML_KEYS.has(k)).sort();
+    expect(
+      unescaped,
+      `these reach {@html} but bind.ts will not escape a record value substituted into them`,
+    ).toEqual([]);
+  });
+
+  test('every property bound to an href or src is in URL_KEYS', async () => {
+    // The same drift, on the sink that took longer to notice. A record value in
+    // an `href` is not escaped by Svelte and not seen by any sanitiser; if the
+    // renderer grows a URL attribute this list does not name, a `javascript:`
+    // URL from a record reaches a visitor's browser.
+    const src = (await read('./BlockRenderer.svelte')) +
+      (await read('./HeroSection.svelte')) +
+      (await read('./CTASection.svelte'));
+
+    const bound = new Set<string>();
+    for (const m of src.matchAll(/\b(?:href|src)=\{([^}]*)\}/g)) {
+      const expr = m[1];
+      for (const ref of expr.matchAll(/\bc\.([a-zA-Z_][a-zA-Z0-9_]*)/g)) bound.add(ref[1]);
+      // `<img {src}>` where `{@const src = c.url ?? c.src}`, and the plain
+      // `href={cta_url}` destructured in the small section components.
+      if (!expr.includes('c.')) {
+        for (const bare of expr.matchAll(/\b([a-z_][a-z0-9_]*)\b/g)) {
+          const name = bare[1];
+          if (name !== 'undefined' && name !== 'null') bound.add(name);
+        }
+      }
+    }
+    expect(bound.size).toBeGreaterThan(0);
+
+    // `src` resolves through a local const; the properties behind it are what
+    // matter and both are already named.
+    bound.delete('src');
+    bound.add('url');
+    // `img` is a gallery loop variable over `c.images`, and the attribute is
+    // `img.url` — the property is `url`, already named above. The nested case is
+    // covered because guardUrl runs at every level.
+    bound.delete('img');
+
+    const unguarded = [...bound].filter((k) => !URL_KEYS.has(k)).sort();
+    expect(
+      unguarded,
+      'these reach an href/src but bind.ts will not run safeUrl on a record value in them',
+    ).toEqual([]);
+  });
+
+  test('HTML_KEYS lists nothing the renderer does not render as HTML', async () => {
+    // The other direction. An extra key is not a hole, but it escapes values that
+    // then show a visitor `&lt;img&gt;` where the record says `<img>` — the
+    // display bug bind.ts's header says the narrow list exists to avoid.
+    const src = await read('./BlockRenderer.svelte');
+    const text = src + (await read('./TextSection.svelte'));
+    for (const key of HTML_KEYS) {
+      expect(text, `HTML_KEYS has "${key}" but no {@html} mentions it`).toContain(key);
+    }
   });
 });

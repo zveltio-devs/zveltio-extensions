@@ -24,17 +24,17 @@
 
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
+import { sql } from 'kysely';
 import { z } from 'zod';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { findBlockById, resolveBlockAt, resolveBlocks, resolveRecord } from './hydrate.js';
 import { sanitizeBlocks, sanitizeBlocksForWrite } from './sanitize.js';
 import { placeholdersIn } from '../client/bind.js';
 import { jsonb } from './jsonb.js';
+import { tenantId } from './tenant.js';
 
 // biome-ignore lint/suspicious/noExplicitAny: the internals bag is typed engine-side
 type Any = any;
-
-const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
 const SiteCreateSchema = z.object({
   name: z.string().min(1).max(100),
@@ -119,16 +119,6 @@ const PageUpdateSchema = PageCreateSchema.partial();
 const ReorderSchema = z.object({ ids: z.array(z.string().uuid()).min(1) });
 
 /**
- * `ctx.db` is already RLS-scoped to the request tenant, so these predicates are
- * defence in depth rather than the only guard — which is how the engine wrote
- * them, after an audit found these tables listing every tenant's rows when the
- * filter was absent and RLS had not yet been applied to them.
- */
-function tenantId(c: Any): string {
-  return (c.get('tenant') as { id?: string } | null | undefined)?.id ?? DEFAULT_TENANT_ID;
-}
-
-/**
  * May this user enter a site or page restricted to `allowed` roles?
  *
  * Both sources count. Authorisation everywhere else comes from Casbin, where a
@@ -186,11 +176,30 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
       if (session?.user) {
         // Better-Auth does not put `role` on the session, so it comes from the
         // row. Without this every role check compares against undefined.
-        const row = await db
-          .selectFrom('user')
-          .select(['role'])
-          .where('id', '=', session.user.id)
-          .executeTakeFirst();
+        //
+        // This was `db.selectFrom('user')`, which `ctx.db` refuses — `user` is
+        // neither `zvd_*`, nor this extension's namespace, nor a table its
+        // migrations create. Measured against its real allowedTables:
+        //
+        //   selectFrom("user"): REFUSED — ExtensionSecurityError
+        //
+        // And the `catch` below swallowed it, so the hydration this comment
+        // describes had never once happened: `role` was always undefined, on
+        // every installation, exactly the state the comment says it exists to
+        // prevent. A silent failure inside a catch written for a different
+        // reason — "anonymous is a valid state" is true of a missing session and
+        // says nothing about a refused table.
+        //
+        // Not fail-open: `hasRole` falls through to the Casbin lookup when
+        // `user.role` is absent, which is why nothing visibly broke. What was
+        // lost is the `user.role === 'god'` fast path and any caller reading the
+        // role off the context. Raw SQL is the same deliberate bypass documented
+        // in `auth/saml` — it needs the same grant when the engine closes it.
+        const row = await sql<{ role: string | null }>`
+          SELECT role FROM "user" WHERE id = ${session.user.id} LIMIT 1
+        `
+          .execute(db)
+          .then((r) => r.rows[0]);
         c.set('user', { ...session.user, role: row?.role ?? (session.user as Any).role });
       }
     } catch {
