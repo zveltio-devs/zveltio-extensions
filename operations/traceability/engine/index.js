@@ -164634,6 +164634,9 @@ function lotsRouter(ctx) {
       SELECT COUNT(*) as count FROM trace_lots l
       WHERE (${status ? sql`l.status = ${status}` : sql`TRUE`})
         AND (${item_id ? sql`l.item_id = ${item_id}` : sql`TRUE`})
+        AND (${supplier_id ? sql`l.supplier_id = ${supplier_id}` : sql`TRUE`})
+        AND (${expiry_from ? sql`l.best_before_date >= ${expiry_from}` : sql`TRUE`})
+        AND (${expiry_to ? sql`l.best_before_date <= ${expiry_to}` : sql`TRUE`})
     `.execute(db);
     return c.json({
       data: rows.rows,
@@ -164718,10 +164721,22 @@ function lotsRouter(ctx) {
     const d = c.req.valid("json");
     const id = c.req.param("id");
     const row = await sql`
-      UPDATE trace_lots SET status = ${d.status}, notes = COALESCE(${d.notes ?? null}, notes) WHERE id = ${id} RETURNING *
+      UPDATE trace_lots
+      SET status = ${d.status}, notes = COALESCE(${d.notes ?? null}, notes)
+      WHERE id = ${id}
+        AND NOT (status = 'recalled' AND ${d.status}::text = 'available')
+      RETURNING *
     `.execute(db);
-    if (!row.rows.length)
-      return c.json({ error: "Lot neg\u0103sit / Lot not found" }, 404);
+    if (!row.rows.length) {
+      const exists = await sql`
+        SELECT status FROM trace_lots WHERE id = ${id}
+      `.execute(db);
+      if (!exists.rows.length)
+        return c.json({ error: "Lot neg\u0103sit / Lot not found" }, 404);
+      return c.json({
+        error: 'Un lot retras nu poate fi trecut direct \xEEn \u201Edisponibil". Rezolva\u021Bi retragerea. / ' + "A recalled lot cannot be set back to available. Resolve the recall instead."
+      }, 409);
+    }
     return c.json({ data: row.rows[0] });
   });
   return app;
@@ -164904,6 +164919,47 @@ function dispatchesRouter(ctx) {
 
 // operations/traceability/engine/services/QRService.ts
 var import_qrcode = __toESM(require_server(), 1);
+var FNC1 = "\x1D";
+var FIXED_LENGTH_AI = {
+  "00": 18,
+  "01": 14,
+  "02": 14,
+  "03": 14,
+  "04": 16,
+  "11": 6,
+  "12": 6,
+  "13": 6,
+  "15": 6,
+  "16": 6,
+  "17": 6,
+  "18": 6,
+  "19": 6,
+  "20": 2,
+  "41": 13
+};
+function readAi(s, i) {
+  const four = s.slice(i, i + 4);
+  if (/^3[1-6]\d\d$/.test(four))
+    return four;
+  const two = s.slice(i, i + 2);
+  return /^\d{2}$/.test(two) ? two : null;
+}
+function gs1Date(v) {
+  const m = /^(\d{2})(\d{2})(\d{2})$/.exec(v);
+  if (!m)
+    return null;
+  const year = 2000 + Number.parseInt(m[1], 10);
+  const month = Number.parseInt(m[2], 10);
+  let day = Number.parseInt(m[3], 10);
+  if (month < 1 || month > 12)
+    return null;
+  if (day === 0)
+    day = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (day < 1 || day > last)
+    return null;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
 
 class QRService {
   static generatePayload(lotId) {
@@ -164928,22 +164984,66 @@ class QRService {
   }
   static parseGS1Barcode(raw2) {
     const result = {};
-    const clean = raw2.replace(/\x1D/g, "");
-    const gtin = clean.match(/^01(\d{14})/);
-    if (gtin)
-      result.gtin = gtin[1];
-    const lot = clean.match(/10([^\x1D]{1,20})/);
-    if (lot)
-      result.supplier_lot_ref = lot[1];
-    const expiry = clean.match(/17(\d{6})/);
-    if (expiry) {
-      const m = expiry[1].match(/(\d{2})(\d{2})(\d{2})/);
-      if (m)
-        result.best_before_date = `20${m[1]}-${m[2]}-${m[3]}`;
+    if (typeof raw2 !== "string" || raw2.length === 0)
+      return result;
+    const s = raw2.replace(/\u241D/g, FNC1).replace(/<GS>/gi, FNC1);
+    let i = 0;
+    while (i < s.length) {
+      if (s[i] === FNC1) {
+        i += 1;
+        continue;
+      }
+      const ai = readAi(s, i);
+      if (!ai)
+        break;
+      i += ai.length;
+      const fixed = FIXED_LENGTH_AI[ai];
+      let value;
+      if (fixed !== undefined) {
+        value = s.slice(i, i + fixed);
+        i += fixed;
+      } else {
+        const sep = s.indexOf(FNC1, i);
+        value = sep === -1 ? s.slice(i) : s.slice(i, sep);
+        i = sep === -1 ? s.length : sep;
+      }
+      if (value.length === 0)
+        continue;
+      switch (ai) {
+        case "01":
+          if (/^\d{14}$/.test(value))
+            result.gtin = value;
+          break;
+        case "10":
+          result.supplier_lot_ref = value.slice(0, 20);
+          break;
+        case "15":
+          if (result.best_before_date === undefined) {
+            const d = gs1Date(value);
+            if (d)
+              result.best_before_date = d;
+          }
+          break;
+        case "17": {
+          const d = gs1Date(value);
+          if (d)
+            result.best_before_date = d;
+          break;
+        }
+        case "30":
+        case "37": {
+          if (/^\d{1,8}$/.test(value))
+            result.quantity = Number.parseInt(value, 10);
+          break;
+        }
+        default:
+          if (/^3[1-6]\d\d$/.test(ai) && /^\d{6}$/.test(value) && result.quantity === undefined) {
+            const decimals = Number.parseInt(ai[3], 10);
+            result.quantity = Number.parseInt(value, 10) / 10 ** decimals;
+          }
+          break;
+      }
     }
-    const qty = clean.match(/37(\d+)/);
-    if (qty)
-      result.quantity = parseInt(qty[1]);
     return result;
   }
 }
@@ -165176,29 +165276,30 @@ function productionRouter(ctx) {
     const user = c.get("user");
     const d = c.req.valid("json");
     const id = c.req.param("id");
-    const orderResult = await sql`SELECT * FROM trace_production_orders WHERE id = ${id} AND status = 'in_progress'`.execute(db);
-    if (!orderResult.rows.length)
-      return c.json({ error: "Ordinul nu este \xEEn execu\u021Bie / Order not in progress" }, 400);
-    const order2 = orderResult.rows[0];
     const row = await db.transaction().execute(async (trx) => {
+      const claimed = await sql`
+        UPDATE trace_production_orders
+        SET status = 'completed', actual_quantity = ${d.actual_quantity},
+            completed_at = now(), haccp_checks = ${JSON.stringify(d.haccp_checks)}::text::jsonb
+        WHERE id = ${id} AND status = 'in_progress'
+        RETURNING *
+      `.execute(trx);
+      if (!claimed.rows.length)
+        return null;
+      const order2 = claimed.rows[0];
       await sql`
         UPDATE trace_lots
         SET quantity_initial = ${d.actual_quantity}, quantity_remaining = ${d.actual_quantity}, status = 'available'
-        WHERE id = ${order2.output_lot_id}
+        WHERE id = ${order2.output_lot_id} AND status = 'quarantine'
       `.execute(trx);
       await sql`
         INSERT INTO trace_movements (lot_id, type, quantity, unit, reference_type, reference_id, performed_by, performed_at)
         VALUES (${order2.output_lot_id}, 'reception', ${d.actual_quantity}, ${order2.unit}, 'production_order', ${id}, ${user.id}, now())
       `.execute(trx);
-      const row2 = await sql`
-        UPDATE trace_production_orders
-        SET status = 'completed', actual_quantity = ${d.actual_quantity},
-            completed_at = now(), haccp_checks = ${JSON.stringify(d.haccp_checks)}::text::jsonb
-        WHERE id = ${id}
-        RETURNING *
-      `.execute(trx);
-      return row2;
+      return claimed;
     });
+    if (!row)
+      return c.json({ error: "Ordinul nu este \xEEn execu\u021Bie / Order not in progress" }, 400);
     return c.json({ data: row.rows[0] });
   });
   app.post("/:id/consume", zValidator("json", exports_external.object({
