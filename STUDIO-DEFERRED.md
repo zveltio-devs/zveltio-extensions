@@ -1,22 +1,23 @@
-# Studio — ce SDUI acoperă vs ce e amânat
+# Studio — what SDUI covers vs what is deferred
 
-**Scop:** un singur loc pentru „admin page = schema JSON” și ce **nu** e încă acolo.
-Nu e backlog de migrare — migrarea structurală e gata. Tier-3 pages apar doar unde
-produsul o cere (ex. `ai/studio/pages/chat`).
+**Purpose:** a single place for "admin page = JSON schema" and for what is **not**
+there yet. This is not a migration backlog — the structural migration is done.
+Tier-3 pages appear only where the product calls for them (e.g.
+`ai/studio/pages/chat`).
 
-**Legendă**
+**Key**
 
-| Kind | Înseamnă |
+| Kind | Meaning |
 |------|-----------|
-| `tier3` | UI care nu încape în vocabularul SDUI → pagină code sau widget mare (rar) |
-| `polish` | CRUD/settings acoperite; lipsește finețe UX sau câmp SDUI viitor |
-| `code` | Sursă Svelte păstrată dar **neconectată** (vezi `_deferred/`) |
+| `tier3` | UI that does not fit the SDUI vocabulary → a code page or a large widget (rare) |
+| `polish` | CRUD/settings covered; missing UX refinement or a future SDUI field |
+| `code` | Svelte source kept but **not wired up** (see `_deferred/`) |
 
 ---
 
-## Tier-3 / escape (produs mare)
+## Tier-3 / escape (large product surface)
 
-| Extension | Admin azi (SDUI) | Amânat | Note |
+| Extension | Admin today (SDUI) | Deferred | Notes |
 |-----------|------------------|--------|------|
 | `ai` | providers, templates, history tabs | **Chat shipped** (`/admin/ai/chat`, Tier-3, non-streaming). Still deferred: query, schema gen, search UI; token streaming needs engine | `AiPromptBar` + `dashboard.hero` → chat |
 | `communications/mail` | accounts, signatures | **Inbox shipped** (`/admin/mail/inbox`, Tier-3). Settings remain SDUI | Folders, read/compose/reply, sync, flags |
@@ -32,39 +33,40 @@ produsul o cere (ex. `ai/studio/pages/chat`).
 
 ---
 
-## Polish (SDUI suficient; gaps documentate)
+## Polish (SDUI is sufficient; gaps documented)
 
 | Extension | Gap |
 |-----------|-----|
 | `billing` | Usage progress bars / upgrade CTA |
-| `compliance/ro/efactura` | Line totals manual (fără recalc live ca vechiul form) |
-| `content/documents` | Variabile template = JSON bag, nu câmpuri per variabilă |
-| `developer/database` | Sample row browser (coloane dinamice) |
-| `hr/time-tracking` | Banner timer „running” live |
-| `sms` | Stats strip; body/template opționale la schema (API impune una) |
+| `compliance/ro/efactura` | Line totals are manual (no live recalculation as in the old form) |
+| `content/documents` | Template variables are a JSON bag, not per-variable fields |
+| `developer/database` | Sample row browser (dynamic columns) |
+| `hr/time-tracking` | Live "running" timer banner |
+| `sms` | Stats strip; body/template optional in the schema (the API requires one) |
 | `storage/cloud` | Drag-upload + breadcrumb file browser |
 
 ---
 
-## Componente Svelte care **nu** sunt pagini amânate
+## Svelte components that are **not** deferred pages
 
-| Extension | Rol | Sync în Studio? |
+| Extension | Role | Synced into Studio? |
 |-----------|-----|-----------------|
-| `crm`, `ai`, `finance/invoicing` | Model 2.5 slot widgets (`contribute.ts`) | Da, la build |
-| `content/pages` | `ListView`/`CardView`/`CalendarView` + **block builder** Tier-3 | Da |
-| `geospatial/postgis`, `storage/cloud`, `content/pdf-viewer` | Field types / picker / preview | Da |
+| `crm`, `ai`, `finance/invoicing` | Model 2.5 slot widgets (`contribute.ts`) | Yes, at build time |
+| `content/pages` | `ListView`/`CardView`/`CalendarView` + the Tier-3 **block builder** | Yes |
+| `geospatial/postgis`, `storage/cloud`, `content/pdf-viewer` | Field types / picker / preview | Yes |
 
 ---
 
-## Unde **nu** mai duplica
+## Where **not** to duplicate this
 
-- `CONTEXT.md` per extensie: păstrează doar detalii de verificare (G) și bug-uri runtime.
-- Pentru „ce lipsește din UI admin”, actualizează **doar** acest fișier.
+- Per-extension `CONTEXT.md`: keep only verification detail (G) and runtime bugs.
+- For "what is missing from the admin UI", update **only** this file.
 
 ---
 
-## Curățenie repo
+## Repository hygiene
 
-- Tier-3 `studio/pages/**/+page.svelte` doar pentru escape-uri documentate aici.
-- Fără `studio/svelte.config.js` unde nu există `studio/src/` activ.
-- Extensii șterse din catalog (`content/page-builder`, `developer/views`) — nu reintroduceți rânduri în `REVIEW-STATUS.md`.
+- Tier-3 `studio/pages/**/+page.svelte` only for the escapes documented here.
+- No `studio/svelte.config.js` where there is no active `studio/src/`.
+- Extensions removed from the catalogue (`content/page-builder`,
+  `developer/views`) — do not reintroduce rows for them in `REVIEW-STATUS.md`.

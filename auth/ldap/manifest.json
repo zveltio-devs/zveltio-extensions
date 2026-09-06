@@ -3,7 +3,7 @@
   "displayName": "LDAP / Active Directory",
   "category": "auth",
   "description": "Authenticate users via LDAP or Active Directory (ldapts)",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-auth-ldap",
@@ -44,7 +44,7 @@
     "bundlePeers": true
   },
   "integrity": {
-    "engineSha256": "12db08d174b13e13a6017abb151706e91f90a49cb20f9fbdf5cecf000894d43f",
-    "sourceSha256": "b4363a0eaac34594b505c423e5fc7380af9e66fa43118d727e28ce36bdce0124"
+    "engineSha256": "a100e63d19d562b326403489177c7d881a03729881ed8b3ccefaa2156332de6c",
+    "sourceSha256": "c61a94b52ff60ec21f839c8a423eb961448e5f415033e3141a800cf0afd6bf1b"
   }
 }

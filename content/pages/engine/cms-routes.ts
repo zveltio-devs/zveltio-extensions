@@ -12,16 +12,11 @@ import { Hono } from 'hono';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { findBlockById, resolveBlockAt, resolveBlocks, resolveRecord } from './hydrate.js';
 import { sanitizeBlocks } from './sanitize.js';
+import { tenantIdOrNull } from './tenant.js';
 import { placeholdersIn } from '../client/bind.js';
 
 // biome-ignore lint/suspicious/noExplicitAny: page rows and blocks are untyped JSON
 type Any = any;
-
-const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
-
-function tenantId(c: Any): string {
-  return (c.get('tenant') as { id?: string } | null | undefined)?.id ?? DEFAULT_TENANT_ID;
-}
 
 /**
  * SEO for the public payload. The editor writes the DEDICATED columns, while
@@ -52,10 +47,15 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
    * before anything is served anonymously.
    */
   async function publicSite(c: Any) {
+    // An unresolvable tenant means "no site", not "the root tenant's site".
+    // Every route below already answers empty or 404 when this returns nothing,
+    // so the refusal costs no new branch and no new test.
+    const tid = tenantIdOrNull(c);
+    if (!tid) return undefined;
     return db
       .selectFrom('zv_page_sites')
       .selectAll()
-      .where('tenant_id', '=', tenantId(c))
+      .where('tenant_id', '=', tid)
       .where('is_public', '=', true)
       .where('is_active', '=', true)
       .orderBy('created_at asc')
@@ -78,7 +78,7 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
       .selectFrom('zv_pages')
       .select(['id', 'title', 'blocks', 'popup_config'])
       .where('site_id', '=', site.id)
-      .where('tenant_id', '=', tenantId(c))
+      .where('tenant_id', '=', site.tenant_id)
       .where('kind', '=', 'popup')
       .where('status', '=', 'published')
       .where('is_active', '=', true)
@@ -96,7 +96,7 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
       const raw: Any[] = typeof row.blocks === 'string' ? JSON.parse(row.blocks) : (row.blocks ?? []);
       const resolved = await resolveBlocks(
         { db, engine },
-        { user: null, tenantId: tenantId(c), publicCollections: site.public_collections ?? [] },
+        { user: null, tenantId: site.tenant_id, publicCollections: site.public_collections ?? [] },
         raw,
       );
       out.push({ id: row.id, title: row.title, config: cfg, blocks: sanitizeBlocks(resolved) });
@@ -113,7 +113,7 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
       .selectFrom('zv_pages')
       .select(['id', 'title', 'slug', 'is_homepage'])
       .where('site_id', '=', site.id)
-      .where('tenant_id', '=', tenantId(c))
+      .where('tenant_id', '=', site.tenant_id)
       .where('status', '=', 'published')
       .where('is_active', '=', true)
       // A page behind a role is not part of the public site even when it lives
@@ -127,12 +127,37 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
     return c.json({ pages });
   });
 
-  /** GET /cms/nav — the public site's navigation menus. */
+  /**
+   * GET /cms/nav — the public site's navigation menus.
+   *
+   * The `publicSite` check is the point of this handler, not decoration. Every
+   * other route in this file establishes that a public, active site exists
+   * before serving anything; this one queried the menus directly, so on an
+   * instance running ONLY an internal portal — no public site at all — an
+   * anonymous request still received the tenant's navigation. Measured:
+   *
+   *   public sites for the tenant: 0
+   *   every other /cms/* route:    404 / empty
+   *   this query returned:         [{"label":"Board minutes (confidential)", …}]
+   *
+   * Menu items carry labels and paths, so that is a listing of the internal
+   * site's structure handed to anyone who asks.
+   *
+   * Note what this does NOT fix. `zv_page_menus` has no `site_id` — one `main`
+   * and one `footer` per TENANT, shared by every site that tenant owns. So an
+   * operator running a public site and a portal side by side is sharing one
+   * menu between them by design, and an internal entry in it still reaches the
+   * public payload. Splitting menus per site is a schema change and a product
+   * decision; it is recorded in CONTEXT.md rather than taken here.
+   */
   router.get('/nav', async (c) => {
+    const site = await publicSite(c);
+    if (!site) return c.json({ menus: { main: [], footer: [] } });
+
     const rows = await db
       .selectFrom('zv_page_menus')
       .select(['menu_key', 'items'])
-      .where('tenant_id', '=', tenantId(c))
+      .where('tenant_id', '=', site.tenant_id)
       .where('menu_key', 'in', ['main', 'footer'])
       .execute();
 
@@ -162,7 +187,7 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
       .selectFrom('zv_pages')
       .select(['blocks'])
       .where('site_id', '=', site.id)
-      .where('tenant_id', '=', tenantId(c))
+      .where('tenant_id', '=', site.tenant_id)
       .where('slug', '=', c.req.param('slug'))
       .where('status', '=', 'published')
       .where('is_active', '=', true)
@@ -186,7 +211,7 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
     };
     const resolved = await resolveBlockAt(
       { db, engine },
-      { user: null, tenantId: tenantId(c), publicCollections: site.public_collections ?? [] },
+      { user: null, tenantId: site.tenant_id, publicCollections: site.public_collections ?? [] },
       block,
       viewer,
     );
@@ -219,7 +244,7 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
       .selectFrom('zv_pages')
       .selectAll()
       .where('site_id', '=', site.id)
-      .where('tenant_id', '=', tenantId(c))
+      .where('tenant_id', '=', site.tenant_id)
       .where('slug', '=', slug)
       .where('status', '=', 'published')
       .where('is_active', '=', true)
@@ -238,7 +263,7 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
 
     const audience = {
       user: null,
-      tenantId: tenantId(c),
+      tenantId: site.tenant_id,
       publicCollections: site.public_collections ?? [],
     };
     let record: Record<string, Any> | null = null;
@@ -325,7 +350,7 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
       .selectFrom('zv_pages')
       .select(['slug'])
       .where('site_id', '=', site.id)
-      .where('tenant_id', '=', tenantId(c))
+      .where('tenant_id', '=', site.tenant_id)
       .where('kind', '=', 'page')
       .where('is_homepage', '=', true)
       .where('status', '=', 'published')

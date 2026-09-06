@@ -1,136 +1,139 @@
 # hr/employees — context
 
-Verificat 2026-08-11, pe bază virgină. Tot ciclul de viață trece: angajat,
-departament, poziție, contact de urgență, salariu, onboarding, ciclu de
-performanță + evaluare + închidere, încetare, istoric.
+Verified 2026-08-11, on a virgin database. The whole lifecycle passes: employee,
+department, position, emergency contact, salary, onboarding, performance cycle +
+review + closure, termination, history.
 
-Extensia **nu avea defecte de integrare**. Are lipsuri de funcționalitate, ceea
-ce e altceva — vezi secțiunea finală.
+The extension **had no integration defects**. It has feature gaps, which is a
+different thing — see the final section.
 
-## Cine dispărea din organigramă
+## Who disappeared from the org chart
 
-`GET /org-chart` pornea recursiv din `manager_id IS NULL AND status = 'active'`,
-iar recursia ajunge la oameni **doar prin managerul lor**. Deci un angajat activ
-al cărui manager a plecat din firmă nu era nici rădăcină (are `manager_id`), nici
-accesibil (managerul lui nu e în arbore) — și **dispărea complet din
-organigramă**. Tăcut: pagina pur și simplu afișa mai puțini oameni.
+`GET /org-chart` started its recursion from `manager_id IS NULL AND status =
+'active'`, and the recursion reaches people **only through their manager**. So an
+active employee whose manager had left the company was neither a root (they have a
+`manager_id`) nor reachable (their manager is not in the tree) — and **vanished
+entirely from the org chart**. Silently: the page simply showed fewer people.
 
-Nu e caz-limită. Se întâmplă la fiecare plecare a unui șef, tuturor celor care îi
-raportau, până observă cineva și reatribuie.
+This is not an edge case. It happens on every departure of a manager, to everyone
+who reported to them, until somebody notices and reassigns.
 
-Măsurat: 4 angajați activi, 3 pe organigramă.
+Measured: 4 active employees, 3 on the chart.
 
-Rădăcina e acum „fără manager **activ**". Orfanii apar la nivelul de sus, ceea ce
-e și randarea onestă — sunt exact oamenii a căror linie de raportare are nevoie
-de o decizie.
+The root is now "without an **active** manager". Orphans appear at the top level,
+which is also the honest rendering — they are precisely the people whose reporting
+line needs a decision.
 
-Verificat în ambele sensuri, fiindcă reparația putea la fel de bine să
-aplatizeze tot: după fix, 4 din 4 apar, orfanul la depth 0, iar o linie reală de
-raportare între doi oameni activi rămâne la depth 1.
+Verified in both directions, because the repair could equally well have flattened
+everything: after the fix, 4 out of 4 appear, the orphan at depth 0, and a real
+reporting line between two active people stays at depth 1.
 
-Garda anti-ciclu (`NOT (e.id = ANY(org.path))`) ține — am creat intenționat A→B→A
-și interogarea răspunde fără să se blocheze. Dar **API-ul acceptă ciclul**: nimic
-nu refuză „raportezi la propriul tău subaltern". De reparat separat.
+The anti-cycle guard (`NOT (e.id = ANY(org.path))`) holds — A→B→A was created
+deliberately and the query answers without hanging. But **the API accepts the
+cycle**: nothing refuses "you report to your own subordinate". To be repaired
+separately.
 
-## Identificatorul național — verificat de țară, nu de acest modul
+## The national identifier — validated by the country, not by this module
 
-`national_id` era text liber, deci `9999999999999` — luna 99, ziua 99 — intra
-liniștit.
+`national_id` was free text, so `9999999999999` — month 99, day 99 — went straight
+in.
 
-**Prima reparație a fost greșită ca direcție**: am pus validarea de CNP direct
-aici, ceea ce făcea modulul de HR să se potrivească unei singure țări. Un CNP, un
-NI number britanic și un social security number nu au nimic în comun în afară de
-coloană.
+**The first repair was wrong in direction**: CNP validation was put directly here,
+which made the HR module fit a single country. A Romanian CNP, a British NI number
+and a social security number have nothing in common but the column.
 
-Acum `hr/employees` întreabă registrul de servicii — `identity.nationalId` — și
-aplică ce găsește. Implementarea românească stă în `compliance/ro/documents`, care
-oricum lucrează cu identificatori românești. Nimic înregistrat înseamnă nicio
-verificare de format: o instanță din altă țară nu e certată de o regulă scrisă
-pentru altcineva.
+Now `hr/employees` asks the service registry — `identity.nationalId` — and applies
+whatever it finds. The Romanian implementation lives in
+`compliance/ro/documents`, which works with Romanian identifiers anyway. Nothing
+registered means no format check: an instance in another country is not scolded by
+a rule written for somebody else.
 
-Căutarea se face **per cerere**, deci o extensie de țară activată după HR se
-aplică imediat, fără repornire. Verificat exact așa:
+The lookup happens **per request**, so a country extension enabled after HR
+applies immediately, with no restart. Verified exactly that way:
 
-| | fără extensia RO | cu ea |
+| | without the RO extension | with it |
 |---|---|---|
-| `AB123456C` (britanic) | **201** | — |
+| `AB123456C` (British) | **201** | — |
 | `9999999999999` | — | **400** |
-| CNP valid | — | **201** |
+| a valid CNP | — | **201** |
 
-**Capcană de metodă:** primul CNP „valid" cu care am testat era inventat de mine
-și a fost corect refuzat. Dacă rulam doar testul negativ, aș fi raportat succes.
-Controlul pozitiv nu e formalitate.
+**A method trap:** the first "valid" CNP used for testing was invented and was
+correctly refused. Running only the negative test would have produced a report of
+success. The positive control is not a formality.
 
-## Contractul e acum o entitate (2026-08-11)
+## The contract is now an entity (2026-08-11)
 
-Ce lega un om de firmă erau `hire_date`, `end_date`, `employment_type` și
-`salary`, plate pe `zvd_employees`. Cu ele nu se poate reprezenta nimic din ce
-conține un dosar de personal: durată determinată prelungită prin act adițional,
-trecere de la 4 la 8 ore, suspendare pentru creșterea copilului și revenire, al
-doilea contract la aceeași firmă, sau pur și simplu **ce** s-a schimbat la 1
-aprilie și pe ce document semnat.
+What tied a person to the company were `hire_date`, `end_date`, `employment_type`
+and `salary`, flat on `zvd_employees`. With those, nothing in a personnel file can
+be represented: a fixed term extended by an amendment, a move from 4 to 8 hours,
+suspension for parental leave and the return, a second contract at the same
+company, or simply **what** changed on 1 April and on which signed document.
 
-Trei tabele — `zvd_employment_contracts`, `zvd_contract_amendments`,
-`zvd_contract_suspensions` — și rutele care le mișcă.
+Three tables — `zvd_employment_contracts`, `zvd_contract_amendments`,
+`zvd_contract_suspensions` — and the routes that move them.
 
-**Neutru față de țară**, cum cere regula: `contract_type` are cele două forme
-care există peste tot, norma e în ore pe săptămână (nu „normă întreagă"), iar
-temeiul încetării e un **cod liber** al cărui vocabular îl aduce o extensie de
-țară, ca la `identity.nationalId`. Un cod necunoscut e acceptat — o instanță nu
-trebuie să aștepte o extensie ca să poată încheia un contract.
+**Country-neutral**, as the rule requires: `contract_type` has the two forms that
+exist everywhere, working time is in hours per week (not "full time"), and the
+ground for termination is a **free code** whose vocabulary a country extension
+supplies, as with `identity.nationalId`. An unknown code is accepted — an instance
+must not have to wait for an extension in order to end a contract.
 
-**Câmpurile plate rămân, sincronizate din contractul activ.** `hr/payroll`
-citește `zvd_employees.salary` la fiecare generare de stat; ștergerea coloanelor
-acum ar rupe salarizarea în tăcere. Contractul e sursa de adevăr, câmpurile sunt
-proiecția pentru consumatorii de azi. Ștergerea lor e pasul doi.
+**The flat fields remain, synchronised from the active contract.** `hr/payroll`
+reads `zvd_employees.salary` on every payroll generation; dropping the columns now
+would break payroll silently. The contract is the source of truth, the fields are
+the projection for today's consumers. Removing them is step two.
 
-Migrația preia automat un contract pentru fiecare angajat existent cu dată de
-angajare — altfel o instalare veche ar arăta zero contracte pentru oameni care
-lucrează de ani de zile.
+The migration automatically adopts a contract for every existing employee with a
+hire date — otherwise an old installation would show zero contracts for people who
+have worked there for years.
 
-### Două lucruri prinse la presare, nu la citire
+### Two things caught by pressing, not by reading
 
-**Actul adițional cădea în tăcere.** Inserarea în istoricul salarial folosea
-`created_by`, dar coloana e `changed_by` — iar eu o înfășurasem în `.catch()`
-„ca să nu blocheze actul". Postgres nu lasă o cerere să continue după o
-instrucțiune eșuată, deci `.catch()` n-a conținut nimic: a ascuns cauza și a
-doborât următoarele două instrucțiuni cu „current transaction is aborted".
-**Exact capcana reparată dimineață în engine, comisă de cine tocmai o reparase.**
-Acum inserarea e negardată: dacă eșuează, actul eșuează zgomotos.
+**The amendment failed silently.** The insert into the salary history used
+`created_by`, but the column is `changed_by` — and it had been wrapped in a
+`.catch()` "so it does not block the amendment". Postgres does not let a request
+continue after a failed statement, so the `.catch()` contained nothing: it hid the
+cause and took down the next two statements with "current transaction is aborted".
+**Exactly the trap repaired in the engine that morning, committed by the person
+who had just repaired it.** The insert is now unguarded: if it fails, the
+amendment fails loudly.
 
-**Cine termină un contract și începe altul rămânea „plecat".** Încetarea marchează
-omul `terminated`, ceea ce e corect când nu-l înlocuiește nimic. Dar o durată
-determinată care se încheie pe 31 și un contract nou de pe 1 sunt o angajare
-continuă — iar sincronizarea nu atingea `status`. Măsurat: contract nou activ,
-salariu propagat, om `terminated`. Adică lipsă din organigramă și din concedii,
-dar plătit. Se repune doar tranziția asta; `on_leave` e o stare aleasă de cineva.
+**Someone ending one contract and starting another stayed "departed".**
+Termination marks the person `terminated`, which is right when nothing replaces
+the contract. But a fixed term ending on the 31st and a new contract from the 1st
+are continuous employment — and the synchronisation did not touch `status`.
+Measured: new contract active, salary propagated, person `terminated`. That is,
+missing from the org chart and from leave, but paid. Only this transition is
+restored; `on_leave` is a state somebody chooses.
 
-Verificat în 13 direcții pe bază virgină, inclusiv controalele pozitive:
-refuzurile (durată determinată fără termen, al doilea contract activ, a doua
-suspendare, act pe contract încetat) **și** revenirile.
+Verified in 13 directions on a virgin database, including the positive controls:
+the refusals (fixed term with no end date, a second active contract, a second
+suspension, an amendment on a terminated contract) **and** the recoveries.
 
-## Ce lipsește ca să fie o aplicație HR dedicată
+## What is missing for this to be a dedicated HR application
 
-Propunerea completă e în conversație; pe scurt, în ordinea în care blochează:
+The full proposal is in the conversation; briefly, in the order in which they
+block:
 
-1. ~~**Contractul nu există ca entitate.**~~ **REZOLVAT** — vezi secțiunea de
-   mai sus. Rămâne pasul doi: mutarea consumatorilor de pe câmpurile plate pe
-   contract, ca acele coloane să poată dispărea.
-2. **Nu există cod COR pe poziții**, iar exportul ReviSal din `hr/payroll` pune
-   `position_id` (un UUID) în coloana `FunctieId` și `full_time` în
-   `ContractTip`. Fișierul nu e importabil nicăieri. **Amânat deliberat de
-   owner**: ReviSal e specific României (și s-a mutat între timp în REGES-ONLINE),
-   iar HR nu trebuie să fie specific unei țări. Se discută ca integrare separată,
-   pe același tipar ca `identity.nationalId` de mai sus.
-3. **Încetarea nu are temei legal** — `reason` e text liber lipit în `notes`, deși
-   articolul din Codul Muncii determină preavizul, compensațiile și dreptul la
-   șomaj.
-4. **Medicina muncii și SSM/PSI** nu sunt modelate — doar documente generice cu
-   `expires_at`, fără periodicitate și fără „cine e expirat".
-5. **Nu există autoservire** — toate rutele sunt de administrator.
-6. Lipsesc offboarding, generarea CIM din șablon, raportare de fluctuație, și
-   unicitatea CNP-ului pe firmă.
+1. ~~**The contract does not exist as an entity.**~~ **RESOLVED** — see the
+   section above. Step two remains: moving consumers off the flat fields onto the
+   contract, so those columns can go.
+2. **There is no COR code on positions**, and the ReviSal export in `hr/payroll`
+   puts `position_id` (a UUID) in the `FunctieId` column and `full_time` in
+   `ContractTip`. The file is importable nowhere. **Deliberately deferred by the
+   owner**: ReviSal is Romania-specific (and has since moved to REGES-ONLINE), and
+   HR must not be country-specific. It is being discussed as a separate
+   integration, on the same pattern as `identity.nationalId` above.
+3. **Termination has no legal ground** — `reason` is free text appended to
+   `notes`, even though the article of the Labour Code determines the notice
+   period, the compensation and the right to unemployment benefit.
+4. **Occupational medicine and health & safety** are not modelled — only generic
+   documents with `expires_at`, with no periodicity and no "who has expired".
+5. **There is no self-service** — every route is an administrator's.
+6. Missing: offboarding, CIM generation from a template, turnover reporting, and
+   uniqueness of the national id per company.
 
-ReviSal e, pe deasupra, în extensia greșită: nu e o funcție de salarizare, iar
-`hr/payroll` citește direct `zvd_employees`, tabelul altei extensii. Oriunde
-ajunge, forma corectă e cea de mai sus — HR expune datele, țara aduce regula.
+ReviSal is, on top of that, in the wrong extension: it is not a payroll feature,
+and `hr/payroll` reads `zvd_employees` directly, another extension's table.
+Wherever it ends up, the correct shape is the one above — HR exposes the data, the
+country supplies the rule.

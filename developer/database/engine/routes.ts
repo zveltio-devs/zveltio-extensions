@@ -3,6 +3,12 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import {
+  isPlatformTable,
+  isProtectedRole,
+  isIsolationPolicy,
+  rlsRefusal,
+} from './platform-guards.js';
 
 /**
  * Quote a Postgres identifier.
@@ -446,8 +452,40 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
 
     .delete('/roles/:name', async (c) => {
       const name = c.req.param('name');
-      const PROTECTED = ['postgres', 'pg_monitor', 'pg_read_all_settings'];
-      if (PROTECTED.includes(name) || name.startsWith('pg_')) return c.json({ error: 'Cannot drop system role' }, 403);
+      // This list protected `postgres` and the `pg_*` roles and stopped there,
+      // which is a denylist over an open namespace: it named Postgres's roles and
+      // missed Zveltio's own. `zveltio_rls` (engine migration 030) is the role
+      // tenant isolation is enforced as, and `zveltio_worker` (043) is what the
+      // extension SQL bridge drops to. Dropping either takes the tenant boundary
+      // with it, from a route whose whole purpose is administering roles.
+      //
+      // `zveltio_%` is matched by prefix rather than by listing the two, so a
+      // role the engine adds next is protected the day it lands, without anyone
+      // remembering to come back here.
+      if (isProtectedRole(name)) {
+        return c.json(
+          {
+            error: name.toLowerCase().startsWith('zveltio_')
+              ? `Cannot drop "${name}": Zveltio's own database roles carry tenant isolation. ` +
+                `Dropping one disables the boundary for every tenant on this instance.`
+              : 'Cannot drop system role',
+          },
+          403,
+        );
+      }
+      // The role this connection is authenticated as, and any superuser. Dropping
+      // the former fails anyway, but with a Postgres error rather than a reason;
+      // the latter is an escalation route dressed as housekeeping.
+      const selfOrSuper = await sql<{ blocked: boolean }>`
+        SELECT (r.rolname = current_user OR r.rolsuper) AS blocked
+        FROM pg_roles r WHERE r.rolname = ${name}
+      `
+        .execute(db)
+        .then((r) => r.rows[0]?.blocked === true)
+        .catch(() => true); // unreadable catalogue refuses the drop, not permits it
+      if (selfOrSuper) {
+        return c.json({ error: `Cannot drop "${name}": it is the current role or a superuser` }, 403);
+      }
       try {
         await sql.raw(`DROP ROLE IF EXISTS ${q(name)}`).execute(db);
         return c.json({ success: true });
@@ -502,6 +540,21 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
     })), async (c) => {
       const table = c.req.param('table');
       const { enabled, forced } = c.req.valid('json');
+      // Weakening RLS on a platform table is not a database-administration task,
+      // it is switching off multi-tenancy. `zvd_*` holds every tenant's records
+      // and `zv_*` the engine's own; the isolation policies on them are what make
+      // one company's rows invisible to another. This route could turn that off
+      // for any table, in one request, with `{"enabled": false}`.
+      //
+      // Enabling is still allowed — the direction that adds a boundary is not the
+      // dangerous one. Only the two that remove it are refused.
+      const platform = isPlatformTable(table);
+      if (platform && !enabled) {
+        return c.json({ error: rlsRefusal(table, 'disable row level security on') }, 403);
+      }
+      if (platform && forced === false) {
+        return c.json({ error: rlsRefusal(table, 'remove FORCE row level security from') }, 403);
+      }
       try {
         await sql.raw(`ALTER TABLE ${q(table)} ${enabled ? 'ENABLE' : 'DISABLE'} ROW LEVEL SECURITY`).execute(db);
         if (forced !== undefined) {
@@ -522,9 +575,21 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
       with_check:  z.string().optional(),
     })), async (c) => {
       const data = c.req.valid('json');
-      let sql_str = `CREATE POLICY "${data.policy_name}" ON "${data.table}"`;
+      // A permissive policy on a platform table is additive: PERMISSIVE policies
+      // are OR-ed, so adding `USING (true)` beside `tenant_isolation_*` makes
+      // every row visible without touching the existing policy at all. Refusing
+      // the two removals while allowing this would have left the boundary open
+      // through the one door nobody looks at.
+      if (isPlatformTable(data.table)) {
+        return c.json({ error: rlsRefusal(data.table, 'add a policy to') }, 403);
+      }
+      // `q()` on both identifiers. They were interpolated between bare quotes,
+      // which the comment on `q` already calls out for the routes above — a `"`
+      // in either breaks out. `policy_name` is regex-constrained, `table` is not.
+      let sql_str = `CREATE POLICY ${q(data.policy_name)} ON ${q(data.table)}`;
       sql_str += ` AS PERMISSIVE FOR ${data.command}`;
-      sql_str += ` TO ${data.roles.join(', ')}`;
+      // Role names too: they reach `TO` straight from the request body.
+      sql_str += ` TO ${data.roles.map((r) => (r.toUpperCase() === 'PUBLIC' ? 'PUBLIC' : q(r))).join(', ')}`;
       if (data.using)      sql_str += ` USING (${data.using})`;
       if (data.with_check) sql_str += ` WITH CHECK (${data.with_check})`;
       try {
@@ -538,6 +603,23 @@ export function databaseRoutes(ctx: ExtensionContext): Hono {
     .delete('/rls/:table/:policy', async (c) => {
       const table  = c.req.param('table');
       const policy = c.req.param('policy');
+      // Dropping the isolation policy has the same effect as disabling RLS on the
+      // table, one object lower down, so refusing one and allowing the other
+      // would be a boundary with a door beside it. The engine names these
+      // `tenant_isolation_<table>` in every migration that creates one.
+      if (isIsolationPolicy(policy)) {
+        return c.json(
+          {
+            error:
+              `Cannot drop "${policy}": it is the tenant isolation policy for "${table}". ` +
+              `Removing it exposes every tenant's rows on that table to every other tenant.`,
+          },
+          403,
+        );
+      }
+      if (isPlatformTable(table)) {
+        return c.json({ error: rlsRefusal(table, 'drop a policy from') }, 403);
+      }
       try {
         // `q(policy)` too. The table beside it was escaped and the policy name was
         // not — a policy name reaches here straight from the URL path, so the

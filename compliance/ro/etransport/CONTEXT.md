@@ -1,26 +1,26 @@
 # e-Transport — context
 
-**Verificat prin apăsare: 2026-08-10.**
+**Verified by pressing: 2026-08-10.**
 
-## Ce era rupt, și e cel mai grav lucru găsit în campanie
+## What was broken, and it is the worst thing found in the campaign
 
-**Extensia inventa codul UIT.** Ăla pe care șoferul e obligat să-l aibă la el și
-care se verifică în trafic. `/declare` genera un cod, scria „declarat" în bază și
-răspundea cu succes.
+**The extension invented the UIT code.** The one the driver is legally required to
+carry and which is checked at the roadside. `/declare` generated a code, wrote
+"declared" into the database and answered with success.
 
-Un buton lipsă costă o după-amiază. Un buton care raportează un succes pe care
-nu l-a obținut costă o amendă, luni mai târziu, **cu dovada în propria ta bază de
-date că ai fost conform.**
+A missing button costs an afternoon. A button that reports a success it did not
+achieve costs a fine, months later, **with the proof that you were compliant
+sitting in your own database.**
 
-`/declare` întoarce acum **501**. `/record-uit` există pentru cazul real de azi:
-omul declară în SPV manual și consemnează în Zveltio codul primit.
+`/declare` now returns **501**. `/record-uit` exists for the real case today: the
+person declares in SPV by hand and records the code they were given in Zveltio.
 
-## Rămâne deschis
+## Still open
 
-Generatorul XML (schema v2) și OAuth-ul — care se poate refolosi de la e-Factura,
-e același mecanism ANAF. Până atunci, `/declare` rămâne 501.
+The XML generator (schema v2) and OAuth — which can be reused from e-Factura, it
+is the same ANAF mechanism. Until then, `/declare` stays 501.
 
-## Ce NU e rupt
+## What is NOT broken
 
-`tariff_code` există și e obligatoriu. Am raportat o dată greșit că lipsesc
-codurile vamale — cererea mea de test era incompletă.
+`tariff_code` exists and is required. It was once reported wrongly that the
+customs codes were missing — the test request was incomplete.

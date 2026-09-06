@@ -183,6 +183,37 @@ describe('anonymous callers', () => {
     }
   });
 
+  /**
+   * The `zvd_` prefix is the SECOND guard, and it had no test.
+   *
+   * Found by removing it: with `const table = name` — the exact shape of the
+   * 2026-08-16 vulnerability this file's header describes — all 47 tests still
+   * passed. The registry check above carries them, because a name that is not a
+   * collection is refused before the table name is ever built.
+   *
+   * So the case the prefix actually defends is the one the registry cannot: a
+   * collection that IS registered, under a name that collides with a real table.
+   * Creating a collection called `user` is an ordinary admin action, and the
+   * engine would materialise it as `zvd_user`. Without the prefix the resolver
+   * would read Better-Auth's `user` instead — every account on the instance,
+   * which is precisely what leaked before.
+   */
+  test('a collection whose NAME collides with a real table still reads zvd_*', async () => {
+    for (const name of ['user', 'session', 'account']) {
+      const { db, calls } = makeDb({ collections: [name] });
+      const [out] = await resolveBlocks(
+        { db, engine: makeEngine() },
+        { user: null, tenantId: 't1', publicCollections: [name] },
+        [listBlock({ collection: name })],
+      );
+      // It resolves — this is a legitimate collection, registered and published.
+      expect(out.content._error).toBeUndefined();
+      // But the query went to the collection's table, never to the engine's.
+      expect(calls.selectedTables).toContain(`zvd_${name}`);
+      expect(calls.selectedTables).not.toContain(name);
+    }
+  });
+
   test('row policies are not consulted for an anonymous caller', async () => {
     let rlsCalls = 0;
     const { db } = makeDb({ collections: ['contacts'] });
