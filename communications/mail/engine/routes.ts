@@ -15,34 +15,11 @@ import {
   buildAuthorizeUrl, credentialsFor, endpointsFor, exchangeCode,
 } from './lib/oauth.js';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-
-/**
- * The stored mail config, as an object, whatever shape it is on disk.
- *
- * `zv_settings.value` is `jsonb`, and the save path used to write a jsonb STRING
- * SCALAR into it (see the `::text::jsonb` note below). Reading that back gave
- * the caller a string where it expected an object — the admin page got a
- * character blob, and the next save spread the string into one key per
- * character and destroyed the settings.
- *
- * Parsing here rather than only fixing the write, because the write fix does
- * nothing for an install that already saved once. That one recovers on the next
- * read; an install that saved twice has nothing left to parse.
- */
-// biome-ignore lint/suspicious/noExplicitAny: raw row from a jsonb column
-function readMailConfig(row: any): Record<string, unknown> {
-  const value = row?.value;
-  if (value == null) return {};
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
-      return parsed && typeof parsed === 'object' ? parsed : {};
-    } catch {
-      return {};
-    }
-  }
-  return typeof value === 'object' ? value : {};
-}
+// One parse of the config, and one place that knows which settings are honoured.
+// See the header of lib/config.ts for what was measured.
+import {
+  UNIMPLEMENTED_SETTINGS, enabledSetting, intSetting, loadMailConfig, parseMailConfig,
+} from './lib/config.js';
 
 /**
  * Mail Client routes — IMAP sync + SMTP send + AI features.
@@ -50,6 +27,43 @@ function readMailConfig(row: any): Record<string, unknown> {
  */
 export function mailRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
+
+  /**
+   * Refuses a mail host that points at a cloud-metadata address.
+   *
+   * `POST /accounts` takes `imap_host` and `imap_port` from the request body and
+   * connects to them immediately, to check the credentials. That is a server-side
+   * connection to an address the CALLER chose, and the route is open to any
+   * authenticated user — not an admin. `169.254.169.254` hands out the instance's
+   * cloud credentials.
+   *
+   * Deliberately the METADATA guard and not `assertPublicUrl`. This product is
+   * self-hosted first: an internal Dovecot on 10.x, or a mail server on the same
+   * box, is the normal deployment, and rejecting private ranges would refuse the
+   * configuration most installs actually have. The same trade-off is written out
+   * in `ai/engine/lib/endpoint-guard.ts`, for the same reason — with the
+   * difference, stated so nobody has to rediscover it, that the `ai` field is
+   * admin-only and this one is not.
+   *
+   * WHAT THIS DOES NOT CLOSE, on purpose: a user can still aim the connection at
+   * an internal host and read the outcome from the error message, which is a port
+   * probe with an oracle. Closing that means either an operator-controlled host
+   * allow-list or swallowing the error — and the error is what tells a user their
+   * password is wrong, which is the one thing this route's own test asserts.
+   * A setting for it belongs with the eight other unimplemented ones in
+   * lib/config.ts, as a decision rather than an invention.
+   *
+   * Host + port rather than a URL, so the guard sees what will actually be
+   * dialled; an IPv6 literal has to be bracketed or `new URL` reads it as a host
+   * with a port.
+   */
+  function assertMailHost(host: string, port: number, label: string): void {
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      throw new Error(`${label} port must be between 1 and 65535`);
+    }
+    const authority = host.includes(':') && !host.startsWith('[') ? `[${host}]` : host;
+    ctx.internals.assertNonMetadataUrl(`http://${authority}:${port}`, label);
+  }
 
   // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
   // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
@@ -133,6 +147,32 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const data = c.req.valid('json');
+
+    // `max_accounts_per_user` is honoured. It was accepted by the admin page,
+    // stored, and read by nothing — one of eleven settings in that state (see
+    // lib/config.ts). Checked BEFORE the IMAP round trip below, so a user over
+    // the limit is not made to wait on a network connection to be told no.
+    const cfg = await loadMailConfig(db);
+    const maxAccounts = intSetting(cfg, 'max_accounts_per_user', 0);
+    if (maxAccounts > 0) {
+      const owned = await sql<{ n: string }>`
+        SELECT COUNT(*)::text AS n FROM zv_mail_accounts WHERE user_id = ${user.id}
+      `.execute(db);
+      if (Number(owned.rows[0]?.n ?? 0) >= maxAccounts) {
+        return c.json(
+          { error: `You may configure at most ${maxAccounts} mail account(s).` },
+          403,
+        );
+      }
+    }
+
+    // Before dialling anything. See `assertMailHost`.
+    try {
+      assertMailHost(data.imap_host, data.imap_port, 'IMAP host');
+      assertMailHost(data.smtp_host, data.smtp_port, 'SMTP host');
+    } catch (err: any) {
+      return c.json({ error: err.message }, 400);
+    }
 
     // Test IMAP connection
     try {
@@ -1454,8 +1494,7 @@ Please draft a reply to this email.`,
     const redirectUri = typeof body.redirect_uri === 'string' ? body.redirect_uri : '';
     if (!redirectUri) return c.json({ error: 'redirect_uri is required' }, 400);
 
-    const cfgRow = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
-    const cfg = readMailConfig(cfgRow.rows[0]);
+    const cfg = await loadMailConfig(db);
     const creds = credentialsFor(provider, cfg);
     if (!creds) {
       // The specific failure, not "something went wrong": an admin has to go and
@@ -1521,8 +1560,7 @@ Please draft a reply to this email.`,
     if (!claimed.rows[0]) return c.json({ error: 'Invalid or expired state' }, 400);
     const { account_id, provider, redirect_uri } = claimed.rows[0];
 
-    const cfgRow = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
-    const cfg = readMailConfig(cfgRow.rows[0]);
+    const cfg = await loadMailConfig(db);
     const creds = credentialsFor(provider, cfg);
     if (!creds) return c.json({ error: `No OAuth2 client configured for ${provider}` }, 400);
 
@@ -1575,8 +1613,12 @@ Please draft a reply to this email.`,
     const isAdmin = await checkPermission(user.id, 'admin', '*');
     if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
 
-    const config = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
-    return c.json({ config: readMailConfig(config.rows[0]) });
+    const config = await loadMailConfig(db);
+    // The page is told which of the settings it renders are decoration. Eight of
+    // seventeen were accepted and never read by anything; three of the eleven
+    // found that way are honoured now and the rest are listed here rather than
+    // quietly invented. See lib/config.ts.
+    return c.json({ config, unimplemented: UNIMPLEMENTED_SETTINGS });
   });
 
   // PUT /ext/communications/mail/admin/config
@@ -1603,8 +1645,7 @@ Please draft a reply to this email.`,
     const isAdmin = await checkPermission(user.id, 'admin', '*');
     if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
 
-    const current = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
-    const existing = readMailConfig(current.rows[0]);
+    const existing = await loadMailConfig(db);
     const merged = { ...existing, ...c.req.valid('json') };
 
     // `::text::jsonb`, not `::jsonb`.
@@ -1621,7 +1662,7 @@ Please draft a reply to this email.`,
     // gone. Two saves from an admin, no error at any point, `success: true` both
     // times. Measured on a virgin database.
     //
-    // `readMailConfig` above recovers the single-save case by parsing a stored
+    // `parseMailConfig` recovers the single-save case by parsing a stored
     // string, so an install that saved once comes back on the next read. An
     // install that saved twice has nothing left to recover and has to be set up
     // again.
