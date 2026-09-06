@@ -27,6 +27,28 @@ export class RecallService {
     };
   }
 
+  /**
+   * Marks a lot and everything made from it recalled, and records why.
+   *
+   * The two writes are one change, stated as one. Split, the two halves fail in
+   * opposite and equally bad directions:
+   *
+   *   lots marked, no recall row   the product is frozen and nothing says what
+   *                                happened, who decided, or what the scope is.
+   *                                An inspection asks for exactly that record.
+   *   recall row, lots not marked  the register says a recall is active while
+   *                                every affected lot is still `available` — so
+   *                                the scanner keeps handing it out.
+   *
+   * They were two statements relying on the request transaction happening to
+   * span them, which the engine's own `check:atomic-writes` exists to find and
+   * cannot see here, because it reads route handlers and this is a service the
+   * handler calls. Its note says that class is undercounted; this is one of them.
+   *
+   * The trace runs BEFORE the transaction opens. It is a read-only walk that
+   * issues one query per node, and holding a transaction open across it would
+   * pin a connection for the length of a genealogy.
+   */
   async initiateRecall(params: {
     lotId: string;
     reason: string;
@@ -36,27 +58,29 @@ export class RecallService {
     const downstream = await this.traceTree.traceDownstream(params.lotId);
     const affectedIds = [params.lotId, ...downstream.affected_lots.map((l: any) => l.output_lot_id)];
 
-    await sql`
-      UPDATE trace_lots
-      SET status = 'recalled'
-      WHERE id = ANY(${affectedIds}::uuid[])
-    `.execute(this.db);
+    return await this.db.transaction().execute(async (trx: any) => {
+      await sql`
+        UPDATE trace_lots
+        SET status = 'recalled'
+        WHERE id = ANY(${affectedIds}::uuid[])
+      `.execute(trx);
 
-    const recallResult = await sql`
-      INSERT INTO trace_recalls (lot_id, scope, reason, initiated_by, initiated_at, affected_downstream_lots, status)
-      VALUES (
-        ${params.lotId},
-        ${params.scope},
-        ${params.reason},
-        ${params.initiatedBy},
-        now(),
-        ${JSON.stringify(downstream.affected_lots)}::text::jsonb,
-        'active'
-      )
-      RETURNING *
-    `.execute(this.db);
+      const recallResult = await sql`
+        INSERT INTO trace_recalls (lot_id, scope, reason, initiated_by, initiated_at, affected_downstream_lots, status)
+        VALUES (
+          ${params.lotId},
+          ${params.scope},
+          ${params.reason},
+          ${params.initiatedBy},
+          now(),
+          ${JSON.stringify(downstream.affected_lots)}::text::jsonb,
+          'active'
+        )
+        RETURNING *
+      `.execute(trx);
 
-    return recallResult.rows[0];
+      return recallResult.rows[0];
+    });
   }
 
   async resolveRecall(recallId: string, resolvedBy: string, resolutionNotes: string) {
