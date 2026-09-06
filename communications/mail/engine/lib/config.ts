@@ -23,18 +23,17 @@
  * and was not one" — and it turned out to be eleven more of them in the same
  * file.
  *
- * Three are honoured now, because their meaning is not in doubt and honouring
- * them is a few lines each:
+ * Two are honoured now, because their meaning is not in doubt and honouring them
+ * is a few lines each:
  *
  *   auto_collect_contacts   every address a user mails was harvested into the
  *                           contacts table regardless of the setting. A privacy
  *                           control that does nothing is worse than none.
  *   max_accounts_per_user   no limit was enforced anywhere.
- *   max_messages_sync       the first sync was pinned to a hardcoded 50.
  *
- * The remaining eight are NOT invented here, and `UNIMPLEMENTED_SETTINGS` says
- * so out loud through `GET /admin/config`. Each needs a product decision this
- * review is not entitled to make:
+ * The remaining nine are NOT invented here, and `UNIMPLEMENTED_SETTINGS` says so
+ * out loud through `GET /admin/config`. Each needs a product decision this review
+ * is not entitled to make:
  *
  *   allowed_domains         block what — creating an account on that domain, or
  *   blocked_domains         sending to it? Two different products.
@@ -47,6 +46,29 @@
  *                           server has no ManageSieve; what "off" should mean —
  *                           no upload, or no filtering at all — is a decision.
  *   trash_auto_delete_days  needs a retention job nothing schedules.
+ *   max_messages_sync       the seeded default and the code disagree — below.
+ *
+ * ## The one that looked easiest and was not
+ *
+ * `max_messages_sync` has an obvious home: `FIRST_SYNC_LIMIT` in
+ * `lib/imap-client.ts`, which bounds the first sync. Wiring it up was a two-line
+ * change and it was wrong.
+ *
+ *     001_mail.sql seeds  "max_messages_sync": 1000
+ *     FIRST_SYNC_LIMIT is                        50
+ *
+ * The two disagree by a factor of twenty, and the disagreement was invisible for
+ * exactly as long as nothing read the setting. Honouring it is therefore not a
+ * repair: it changes the first sync on EVERY existing install from 50 messages to
+ * 1000, silently, at merge — because a seeded 1000 is indistinguishable from a
+ * deliberate one, so the "defaults to the previous behaviour when unset" rule
+ * above does not save it.
+ *
+ * Caught by CI, not locally. The local `zvd_mail_config` had been overwritten by
+ * another test and no longer carried the seeded key, so the fallback applied and
+ * the change looked inert. On a database built from scratch
+ * `first-sync-reach.test.ts` failed at once — which is the rule this repository
+ * already writes down, and which I did not follow here.
  */
 
 import { sql } from 'kysely';
@@ -60,6 +82,7 @@ export type MailConfig = Record<string, unknown>;
  * presenting seventeen controls of which eight are decoration.
  */
 export const UNIMPLEMENTED_SETTINGS = [
+  'max_messages_sync',
   'allowed_domains',
   'blocked_domains',
   'require_admin_approval',
