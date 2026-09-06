@@ -10,6 +10,7 @@ import { ImapFlow } from 'imapflow';
 // @ts-ignore — installed at runtime by extension-loader before this module loads
 import { simpleParser } from 'mailparser';
 import { applyLocalFilters } from './sieve.js';
+import { loadMailConfig } from './config.js';
 // @ts-ignore — installed at runtime by extension-loader before this module loads
 import nodemailer from 'nodemailer';
 
@@ -21,9 +22,36 @@ import {
 } from './oauth.js';
 
 /**
- * How many messages a FIRST sync pulls. Later syncs are open-ended and catch up
- * from where the previous one stopped, so this bounds the initial burst without
- * putting anything out of reach — which is what it used to do.
+ * How many messages a FIRST sync pulls.
+ *
+ * Later syncs are open-ended and catch up from where the previous one stopped,
+ * so this bounds the initial burst without putting anything out of reach — which
+ * is what it used to do.
+ *
+ * `max_messages_sync` is NOT wired to this, and the attempt to wire it is worth
+ * recording. That setting has been in the admin page and in `zvd_mail_config`
+ * since 001 with nothing reading it, so it looked like one more dead knob with an
+ * obvious home. It is not:
+ *
+ *   001_mail.sql seeds  "max_messages_sync": 1000
+ *   this constant is                          50
+ *
+ * They disagree by a factor of twenty, and the disagreement was invisible for as
+ * long as nothing read the setting. Honouring it would therefore not have been a
+ * repair — it would have changed the first sync on EVERY existing install from 50
+ * messages to 1000, silently, at merge, because the seeded value is not "unset"
+ * and there is no way to tell a seeded 1000 from a deliberate one.
+ *
+ * `first-sync-reach.test.ts` is what says 50 is the intended window; it was
+ * written for the `last_uid` bug and asserts the window explicitly. Deciding
+ * which of the two numbers is right is a product call, so the setting is listed
+ * in `UNIMPLEMENTED_SETTINGS` with that reason instead.
+ *
+ * HOW THIS WAS ALMOST MISSED: the local suite passed. `zvd_mail_config` on that
+ * database had been overwritten by another test and no longer carried the seeded
+ * key, so the fallback applied and the change looked inert. It failed in CI, on
+ * a database built from scratch — which is the rule this campaign already
+ * writes down and which I did not follow here.
  */
 const FIRST_SYNC_LIMIT = 50;
 
@@ -123,10 +151,7 @@ async function buildAuth(
   let token = account.oauth2_access_token ?? null;
 
   if (isExpired(account.oauth2_expires_at) && account.oauth2_refresh_token) {
-    const cfgRow = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
-    const raw = (cfgRow.rows[0] as { value?: unknown } | undefined)?.value;
-    const cfg: Record<string, unknown> =
-      typeof raw === 'string' ? JSON.parse(raw) : ((raw as Record<string, unknown>) ?? {});
+    const cfg = await loadMailConfig(db);
     const creds = credentialsFor(account.oauth2_provider, cfg);
     if (creds) {
       const next = await refreshAccessToken({

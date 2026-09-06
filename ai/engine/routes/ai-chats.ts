@@ -36,12 +36,45 @@ export function aiChatsRoutes(ctx: ExtensionContext): Hono {
     return isAdmin ? user : null;
   }
 
-  app.use('*', async (c, next) => {
+  /**
+   * Bound to this router's own paths, not `'*'`.
+   *
+   * `buildAIRoutes` mounts this router at `/` alongside `ai.ts` and
+   * `ai-schema-gen.ts`, and Hono's `route()` copies a sub-app's middleware into
+   * the parent at the mount prefix. So `use('*')` here was a middleware
+   * registered at `/*` on the whole extension. Measured with Hono 4.13.5, the
+   * real mount order from `routes/index.ts`:
+   *
+   *   /providers                    200   ai.ts        <- registered BEFORE, not gated
+   *   /search                       200   ai.ts        <- registered BEFORE, not gated
+   *   /chats                        401   this router
+   *   /generate-schema/field-types  401   ai-schema-gen  <- gated by THIS middleware
+   *   /query/history                401   ai-query       <- gated by THIS middleware
+   *   /analytics/summary            401   ai-analytics   <- gated by THIS middleware
+   *
+   * Everything registered after it ran this gate first. No route depended on
+   * that — each of those routers declares its own auth — so the visible cost was
+   * a second `auth.api.getSession()` on every request to five sub-routers. The
+   * invisible cost is the arrangement: whether a router is authenticated
+   * depended on its position in `buildAIRoutes`, and reordering that list would
+   * have moved the gate silently.
+   *
+   * This is the same mechanism that once made the entire extension admin-only —
+   * the note in `ai-schema-gen.ts` records it, and that router was narrowed for
+   * exactly this reason. This one was left on `'*'`.
+   */
+  const requireSession = async (c: any, next: any) => {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', user);
     await next();
-  });
+  };
+  app.use('/chats', requireSession);
+  app.use('/chats/*', requireSession);
+  app.use('/templates', requireSession);
+  app.use('/templates/*', requireSession);
+  app.use('/admin/templates', requireSession);
+  app.use('/admin/templates/*', requireSession);
 
   // ── Chat Sessions (zv_ai_chats) ───────────────────────────────
 

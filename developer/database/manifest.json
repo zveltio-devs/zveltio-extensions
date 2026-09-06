@@ -3,7 +3,7 @@
   "displayName": "Database Management",
   "category": "developer",
   "description": "PostgreSQL functions, triggers, enums, roles, RLS",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-database",
@@ -36,7 +36,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "bde72e1e87423e7f15739f4769f619cda2ef5b8e84f6ffe9849eaa2aa01c9ef4",
-    "sourceSha256": "70d18ef20cdd814ccf1b910474a4cbc4eed813b0dd411f26208ed5e86d32d560"
+    "engineSha256": "c4b527b1990a1dbe1f6183502feb3ee55713076f456c1617e066237a3a2e4ed5",
+    "sourceSha256": "726ce4820beef7e131e7b05ded5d6ed9e9e36225e90cd21659e88ab69a6951c4"
   }
 }

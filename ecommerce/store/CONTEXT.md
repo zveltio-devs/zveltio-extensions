@@ -1,22 +1,23 @@
-# Magazin — context
+# Store — context
 
-**Verificat prin apăsare: 2026-08-09.**
+**Verified by pressing: 2026-08-09.**
 
-## Decizie de proprietate care contează
+## An ownership decision that matters
 
-Magazinul scria prețuri în `zvd_products` — **tabelul gestiunii** — cu propriile
-nume de coloane. Intenția era corectă (un magazin vinde ce ține depozitul), dar
-o extensie nu migrează tabelul altei extensii.
+The store wrote prices into `zvd_products` — **inventory's table** — with its own
+column names. The intention was right (a shop sells what the warehouse holds), but
+an extension does not migrate another extension's table.
 
-**Moneda a fost adăugată de gestiune**, fiindcă tabelul e al ei. Dacă ai nevoie
-de o coloană nouă pe `zvd_products`, migrația se scrie în `operations/inventory`.
+**The currency was added by inventory**, because the table is inventory's. If you
+need a new column on `zvd_products`, the migration is written in
+`operations/inventory`.
 
-## Chei lărgite
+## Widened keys
 
-`sku` pe produse și variante, `slug` pe produse și categorii, `email` pe clienți,
-`order_number` pe comenzi, `code` pe cupoane, și
-`(country, region, applies_to)` pe regulile de taxe. Toate erau unice pe
-instanță — două magazine nu puteau avea același SKU sau același client.
+`sku` on products and variants, `slug` on products and categories, `email` on
+customers, `order_number` on orders, `code` on coupons, and
+`(country, region, applies_to)` on tax rules. All of them were unique per instance
+— two shops could not share a SKU or a customer.
 
-`ON CONFLICT (sku)` și cel de pe regulile de taxe au fost mutate odată cu cheile.
-Dacă mai adaugi vreunul, include `tenant_id`.
+`ON CONFLICT (sku)` and the one on the tax rules were moved along with the keys.
+If you add another, include `tenant_id`.

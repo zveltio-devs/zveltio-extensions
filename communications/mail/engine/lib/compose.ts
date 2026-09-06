@@ -5,6 +5,7 @@
 import { sql } from 'kysely';
 import type { Database } from '@zveltio/engine-db';
 import { sendMail } from './imap-client.js';
+import { enabledSetting, loadMailConfig } from './config.js';
 
 // ═══ REPLY / FORWARD CONTEXT ═════════════════════════════════════════════════
 
@@ -39,13 +40,52 @@ export async function buildReplyContext(
   const subject = m.subject?.startsWith(`${prefix}: `) ? m.subject : `${prefix}: ${m.subject || ''}`;
 
   const sentDate = new Date(m.sent_at || m.received_at).toLocaleString();
-  const senderLabel = m.from_name ? `${m.from_name} &lt;${m.from_address}&gt;` : m.from_address;
 
+  /**
+   * The sender's own words, going into a quote block that is HTML.
+   *
+   * `from_name` and `from_address` were interpolated raw. The `&lt;` and `&gt;`
+   * around the address are LITERAL angle brackets in the output, not an escape
+   * of the value between them — so a sender whose display name is
+   * `<img src=x onerror=…>` had it placed, as markup, into the body of a reply
+   * the victim is about to compose and send.
+   *
+   * This particular Studio strips tags out of `bodyHtml` before showing it, so
+   * it is not a live sink there today. It is one for anything that uses the
+   * field as its name promises, and the value is carried into `saveDraft` and
+   * out through `sendDraft` — where the victim would be the one forwarding it,
+   * under their own address.
+   */
+  const esc = (v: unknown): string =>
+    String(v ?? '').replace(/[<>&"']/g, (ch) =>
+      ch === '<' ? '&lt;' : ch === '>' ? '&gt;' : ch === '&' ? '&amp;' : ch === '"' ? '&quot;' : '&#39;',
+    );
+
+  const senderLabel = m.from_name
+    ? `${esc(m.from_name)} &lt;${esc(m.from_address)}&gt;`
+    : esc(m.from_address);
+
+  /*
+   * `m.body_html` is the original message, quoted, and it is NOT sanitized here.
+   * That is deliberate and it is what every mail client does: a reply carries
+   * the original markup, and rewriting it would mangle legitimate mail on its
+   * way back out. The client that RENDERS it is what sanitizes — which is why
+   * the reading pane in this extension now does (studio/src/lib/sanitize.ts).
+   *
+   * What was not acceptable is this extension's own interpolation around it,
+   * which is escaped above. If outgoing quoting is ever tightened, that is a
+   * decision about what a user may send, not something a reply helper settles.
+   *
+   * This note lives in a code comment rather than an HTML one, because an HTML
+   * comment inside this template is not documentation — it is text in the body
+   * of every reply the user sends. The first draft of it was, and the compiler
+   * caught it only because the backticks in it closed the template literal.
+   */
   const quotedHtml = `
     <br><br>
     <div style="border-left:2px solid #ccc;padding-left:12px;margin-left:4px;color:#555;">
       <p><strong>On ${sentDate}, ${senderLabel} wrote:</strong></p>
-      ${m.body_html || `<pre style="white-space:pre-wrap">${m.body_text || ''}</pre>`}
+      ${m.body_html || `<pre style="white-space:pre-wrap">${esc(m.body_text)}</pre>`}
     </div>`;
 
   const quotedText = `\n\n> On ${sentDate}, ${m.from_name || m.from_address} wrote:\n> ${(m.body_text || '').split('\n').map((l: string) => `> ${l}`).join('\n')}`;
@@ -256,7 +296,22 @@ export async function sendDraft(
   await sql`DELETE FROM zv_mail_drafts WHERE id = ${draftId}`.execute(db);
 
   // Auto-collect contacts (fire-and-forget)
-  autoCollectContacts(db, userId, toAddrs).catch(() => { /* non-critical */ });
+  // `auto_collect_contacts` is honoured. Every address a user mailed was
+  // harvested into `zv_mail_contacts` regardless of the setting, which an admin
+  // could turn off and watch do nothing — a privacy control that does not
+  // control anything is worse than no control, because it is believed.
+  //
+  // Defaults to ON when unset, so this repair is not a behaviour change for an
+  // instance that never touched the setting.
+  void (async () => {
+    try {
+      const cfg = await loadMailConfig(db);
+      if (!enabledSetting(cfg, 'auto_collect_contacts')) return;
+      await autoCollectContacts(db, userId, toAddrs);
+    } catch {
+      /* non-critical: a contact not collected must not fail a sent message */
+    }
+  })();
 
   return result;
 }

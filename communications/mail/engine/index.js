@@ -62882,6 +62882,62 @@ var init_sieve = __esm(() => {
   init_imap_operations();
 });
 
+// communications/mail/engine/lib/config.ts
+var exports_config = {};
+__export(exports_config, {
+  parseMailConfig: () => parseMailConfig,
+  loadMailConfig: () => loadMailConfig,
+  intSetting: () => intSetting,
+  enabledSetting: () => enabledSetting,
+  UNIMPLEMENTED_SETTINGS: () => UNIMPLEMENTED_SETTINGS
+});
+function parseMailConfig(raw2) {
+  if (raw2 == null)
+    return {};
+  if (typeof raw2 === "string") {
+    try {
+      return asConfigObject(JSON.parse(raw2));
+    } catch {
+      return {};
+    }
+  }
+  return asConfigObject(raw2);
+}
+function asConfigObject(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value))
+    return {};
+  return value;
+}
+async function loadMailConfig(db) {
+  const row = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
+  return parseMailConfig(row.rows[0]?.value);
+}
+function intSetting(config2, key, fallback) {
+  const raw2 = config2[key];
+  if (typeof raw2 !== "number" && typeof raw2 !== "string")
+    return fallback;
+  const n = Number(raw2);
+  return Number.isFinite(n) && Number.isInteger(n) && n > 0 ? n : fallback;
+}
+function enabledSetting(config2, key) {
+  return config2[key] !== false;
+}
+var UNIMPLEMENTED_SETTINGS;
+var init_config = __esm(() => {
+  init_dist();
+  UNIMPLEMENTED_SETTINGS = [
+    "max_messages_sync",
+    "allowed_domains",
+    "blocked_domains",
+    "require_admin_approval",
+    "max_attachment_size_mb",
+    "imap_idle_enabled",
+    "pgp_enabled",
+    "sieve_enabled",
+    "trash_auto_delete_days"
+  ];
+});
+
 // node_modules/nodemailer/lib/fetch/cookies.js
 var require_cookies = __commonJS((exports, module) => {
   var urllib = __require("url");
@@ -72893,9 +72949,7 @@ async function buildAuth(db, account) {
   }
   let token2 = account.oauth2_access_token ?? null;
   if (isExpired(account.oauth2_expires_at) && account.oauth2_refresh_token) {
-    const cfgRow = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
-    const raw2 = cfgRow.rows[0]?.value;
-    const cfg = typeof raw2 === "string" ? JSON.parse(raw2) : raw2 ?? {};
+    const cfg = await loadMailConfig(db);
     const creds = credentialsFor(account.oauth2_provider, cfg);
     if (creds) {
       const next = await refreshAccessToken({
@@ -73132,6 +73186,7 @@ function parseEnvelope(msg) {
 var import_imapflow2, import_mailparser, import_nodemailer, FIRST_SYNC_LIMIT = 50;
 var init_imap_client = __esm(() => {
   init_sieve();
+  init_config();
   init_dist();
   init_oauth();
   import_imapflow2 = __toESM(require_imap_flow(), 1);
@@ -89182,6 +89237,7 @@ init_imap_operations();
 // communications/mail/engine/lib/compose.ts
 init_dist();
 init_imap_client();
+init_config();
 async function buildReplyContext(db, messageId, type, userId) {
   const result = await sql`
     SELECT m.*, a.email_address AS my_email FROM zv_mail_messages m
@@ -89194,12 +89250,13 @@ async function buildReplyContext(db, messageId, type, userId) {
   const prefix = type === "forward" ? "Fwd" : "Re";
   const subject = m.subject?.startsWith(`${prefix}: `) ? m.subject : `${prefix}: ${m.subject || ""}`;
   const sentDate = new Date(m.sent_at || m.received_at).toLocaleString();
-  const senderLabel = m.from_name ? `${m.from_name} &lt;${m.from_address}&gt;` : m.from_address;
+  const esc2 = (v) => String(v ?? "").replace(/[<>&"']/g, (ch) => ch === "<" ? "&lt;" : ch === ">" ? "&gt;" : ch === "&" ? "&amp;" : ch === '"' ? "&quot;" : "&#39;");
+  const senderLabel = m.from_name ? `${esc2(m.from_name)} &lt;${esc2(m.from_address)}&gt;` : esc2(m.from_address);
   const quotedHtml = `
     <br><br>
     <div style="border-left:2px solid #ccc;padding-left:12px;margin-left:4px;color:#555;">
       <p><strong>On ${sentDate}, ${senderLabel} wrote:</strong></p>
-      ${m.body_html || `<pre style="white-space:pre-wrap">${m.body_text || ""}</pre>`}
+      ${m.body_html || `<pre style="white-space:pre-wrap">${esc2(m.body_text)}</pre>`}
     </div>`;
   const quotedText = `
 
@@ -89340,7 +89397,14 @@ async function sendDraft(db, draftId, userId) {
   };
   const result = await sendMail(accountForSend, toAddrs, d.subject, d.body_html, d.body_text, ccAddrs.length ? ccAddrs : undefined, bccAddrs.length ? bccAddrs : undefined, undefined, d.in_reply_to ?? undefined);
   await sql`DELETE FROM zv_mail_drafts WHERE id = ${draftId}`.execute(db);
-  autoCollectContacts(db, userId, toAddrs).catch(() => {});
+  (async () => {
+    try {
+      const cfg = await loadMailConfig(db);
+      if (!enabledSetting(cfg, "auto_collect_contacts"))
+        return;
+      await autoCollectContacts(db, userId, toAddrs);
+    } catch {}
+  })();
   return result;
 }
 async function autoCollectContacts(db, userId, emails) {
@@ -89361,22 +89425,16 @@ async function autoCollectContacts(db, userId, emails) {
 // communications/mail/engine/routes.ts
 init_sieve();
 init_oauth();
-function readMailConfig(row) {
-  const value = row?.value;
-  if (value == null)
-    return {};
-  if (typeof value === "string") {
-    try {
-      const parsed = JSON.parse(value);
-      return parsed && typeof parsed === "object" ? parsed : {};
-    } catch {
-      return {};
-    }
-  }
-  return typeof value === "object" ? value : {};
-}
+init_config();
 function mailRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
+  function assertMailHost(host, port, label) {
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      throw new Error(`${label} port must be between 1 and 65535`);
+    }
+    const authority = host.includes(":") && !host.startsWith("[") ? `[${host}]` : host;
+    ctx.internals.assertNonMetadataUrl(`http://${authority}:${port}`, label);
+  }
   const aiProviderManager = ctx.services.get("ai.providers");
   const app = new Hono2;
   app.use("*", async (c, next) => {
@@ -89424,6 +89482,22 @@ function mailRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const data = c.req.valid("json");
+    const cfg = await loadMailConfig(db);
+    const maxAccounts = intSetting(cfg, "max_accounts_per_user", 0);
+    if (maxAccounts > 0) {
+      const owned = await sql`
+        SELECT COUNT(*)::text AS n FROM zv_mail_accounts WHERE user_id = ${user.id}
+      `.execute(db);
+      if (Number(owned.rows[0]?.n ?? 0) >= maxAccounts) {
+        return c.json({ error: `You may configure at most ${maxAccounts} mail account(s).` }, 403);
+      }
+    }
+    try {
+      assertMailHost(data.imap_host, data.imap_port, "IMAP host");
+      assertMailHost(data.smtp_host, data.smtp_port, "SMTP host");
+    } catch (err) {
+      return c.json({ error: err.message }, 400);
+    }
     try {
       const { ImapFlow: ImapFlow3 } = await Promise.resolve().then(() => __toESM(require_imap_flow(), 1));
       const testClient = new ImapFlow3({
@@ -90365,8 +90439,7 @@ Your message "${m.subject}" was read on ${new Date().toLocaleString()}.`;
     const redirectUri = typeof body.redirect_uri === "string" ? body.redirect_uri : "";
     if (!redirectUri)
       return c.json({ error: "redirect_uri is required" }, 400);
-    const cfgRow = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
-    const cfg = readMailConfig(cfgRow.rows[0]);
+    const cfg = await loadMailConfig(db);
     const creds = credentialsFor(provider, cfg);
     if (!creds) {
       return c.json({ error: `No OAuth2 client is configured for ${provider}. Set it in mail settings.` }, 400);
@@ -90408,8 +90481,7 @@ Your message "${m.subject}" was read on ${new Date().toLocaleString()}.`;
     if (!claimed.rows[0])
       return c.json({ error: "Invalid or expired state" }, 400);
     const { account_id, provider, redirect_uri } = claimed.rows[0];
-    const cfgRow = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
-    const cfg = readMailConfig(cfgRow.rows[0]);
+    const cfg = await loadMailConfig(db);
     const creds = credentialsFor(provider, cfg);
     if (!creds)
       return c.json({ error: `No OAuth2 client configured for ${provider}` }, 400);
@@ -90449,8 +90521,8 @@ Your message "${m.subject}" was read on ${new Date().toLocaleString()}.`;
     const isAdmin = await checkPermission(user.id, "admin", "*");
     if (!isAdmin)
       return c.json({ error: "Admin required" }, 403);
-    const config2 = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
-    return c.json({ config: readMailConfig(config2.rows[0]) });
+    const config2 = await loadMailConfig(db);
+    return c.json({ config: config2, unimplemented: UNIMPLEMENTED_SETTINGS });
   });
   app.put("/admin/config", zValidator("json", exports_external.object({
     enabled: exports_external.boolean().optional(),
@@ -90475,13 +90547,12 @@ Your message "${m.subject}" was read on ${new Date().toLocaleString()}.`;
     const isAdmin = await checkPermission(user.id, "admin", "*");
     if (!isAdmin)
       return c.json({ error: "Admin required" }, 403);
-    const current = await sql`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
-    const existing = readMailConfig(current.rows[0]);
+    const existing = await loadMailConfig(db);
     const merged = { ...existing, ...c.req.valid("json") };
     await sql`
-      INSERT INTO zv_settings (key, value, description, is_public)
-      VALUES ('mail', ${JSON.stringify(merged)}::text::jsonb, 'Mail client configuration (admin)', false)
-      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+      INSERT INTO zvd_mail_config (config)
+      VALUES (${JSON.stringify(merged)}::text::jsonb)
+      ON CONFLICT (tenant_id) DO UPDATE SET config = EXCLUDED.config, updated_at = NOW()
     `.execute(db);
     return c.json({ success: true });
   });
@@ -90514,7 +90585,8 @@ var extension = {
       join(import.meta.dir, "migrations/001_mail.sql"),
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
       join(import.meta.dir, "migrations/003_attachment_part.sql"),
-      join(import.meta.dir, "migrations/004_oauth_state.sql")
+      join(import.meta.dir, "migrations/004_oauth_state.sql"),
+      join(import.meta.dir, "migrations/005_config_own_table.sql")
     ];
   },
   async register(app, ctx) {
@@ -90530,10 +90602,9 @@ var extension = {
         async handler(ctx) {
           const { sql: sql3 } = await Promise.resolve().then(() => (init_dist(), exports_dist));
           const { syncImapAccount: syncImapAccount2 } = await Promise.resolve().then(() => (init_imap_client(), exports_imap_client));
+          const { loadMailConfig: loadMailConfig2 } = await Promise.resolve().then(() => (init_config(), exports_config));
           const db = ctx.db;
-          const cfgRow = await sql3`SELECT value FROM zv_settings WHERE key = 'mail'`.execute(db);
-          const raw2 = cfgRow.rows[0]?.value;
-          const cfg = typeof raw2 === "string" ? JSON.parse(raw2) : raw2 ?? {};
+          const cfg = await loadMailConfig2(db);
           const minutes = Number(cfg.sync_interval_minutes);
           if (!Number.isFinite(minutes) || minutes <= 0)
             return;

@@ -53,6 +53,28 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
    * a failure is logged with the reason and the request continues.
    */
   async function logUsage(row: Record<string, unknown>): Promise<void> {
+    // A SAVEPOINT is only legal inside a transaction block. Off a pool handle
+    // Postgres answers `SAVEPOINT can only be used in transaction blocks`
+    // (measured), the `catch` below logs it, and the INSERT never runs — so
+    // accounting would be silently dead on any path where `ctx.db` resolves to
+    // the pool rather than a request transaction. There is nothing to protect
+    // there either: without an enclosing transaction a failed statement damages
+    // only itself, which is the whole reason the savepoint exists.
+    const inTransaction = Boolean((db as unknown as { isTransaction?: boolean }).isTransaction);
+    if (!inTransaction) {
+      await (db as any)
+        .insertInto('zv_ai_usage')
+        .values(row)
+        .execute()
+        .catch((err: Error) => {
+          console.warn(
+            `[ai] usage accounting failed for ${row.operation}/${row.provider}:`,
+            err.message,
+          );
+        });
+      return;
+    }
+
     let savepointHeld = false;
     try {
       await sql.raw('SAVEPOINT zv_ai_usage').execute(db);
@@ -389,7 +411,9 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
         const vectorLiteral = JSON.stringify(embeddings[0]);
         // tenant_id intentionally omitted from the INSERT — the column
         // has DEFAULT NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid
-        // (see migration 009), so running this INSERT inside the tenant
+        // (001_initial.sql for this table; 004_tenant_rls.sql for the rest —
+        // this said "migration 009", and this extension has eight), so running
+        // this INSERT inside the tenant
         // transaction tags the row with the active tenant automatically.
         // FORCE RLS on the table then prevents cross-tenant reads.
         //
@@ -464,7 +488,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
       // is available — both paths target the canonical zvd_ai_embeddings
       // table from ai/engine/migrations/002_embeddings.sql.
       // db routes the query through the tenant transaction, so
-      // FORCE RLS on zvd_ai_embeddings (migration 009) restricts the
+      // FORCE RLS on zvd_ai_embeddings (001_initial.sql) restricts the
       // result set to rows tagged with this tenant. Without it a user
       // in tenant A could pull semantic-search hits — including the
       // raw `text_content` column — from tenant B's records.
@@ -555,8 +579,23 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
         // two lines below unreachable, which is the handler that was written for this.
         // An empty result reads as "no matches for your search", so a failed scan
         // answered the user with silence instead of falling to the outer handler.
+        // The same three columns the pgvector and trigram branches return, not
+        // `SELECT *`.
+        //
+        // This branch answers the identical endpoint with a different shape: two
+        // of the three paths return `{ record_id, content, score }` and this one
+        // returned every column of the collection table. `checkPermission(user,
+        // collection, 'read')` above is COLLECTION-level; the product also ships
+        // column-level permissions (`getColumnAccess`), which `/api/data`
+        // applies and this did not. So a role forbidden from seeing `salary` on
+        // a collection it may otherwise read got `salary` back by searching for
+        // any substring in it.
+        //
+        // Narrowing to the shared shape closes that without needing role
+        // plumbing here, and makes the three branches answer the same contract —
+        // which the response already claims they do.
         fallbackResults = await sql<any>`
-          SELECT *, 0.5 AS score
+          SELECT id AS record_id, ${sql.id(field)} AS content, 0.5 AS score
           FROM ${sql.id(tableName)}
           WHERE ${sql.id(field)} ILIKE ${'%' + query + '%'}
           LIMIT ${limit}

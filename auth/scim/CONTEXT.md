@@ -1,32 +1,34 @@
 # SCIM — context
 
-**Verificat prin apăsare: 2026-08-09.**
+**Verified by pressing: 2026-08-09.**
 
-## Ce pare rupt și NU e — citește înainte să „repari"
+## What looks broken and is NOT — read before "repairing"
 
-**Se montează la RĂDĂCINĂ, `/scim/v2`, nu sub `/ext/`.** Deliberat: furnizorii de
-identitate se așteaptă la o adresă SCIM standard și unii nu acceptă căi
-arbitrare.
+**It mounts at the ROOT, `/scim/v2`, not under `/ext/`.** Deliberate: identity
+providers expect a standard SCIM address and some will not accept arbitrary
+paths.
 
-Consecința: `/ext/auth/scim/...` returnează **401** și pare o problemă de token.
-Nu e — acolo pur și simplu nu există serviciul.
+The consequence: `/ext/auth/scim/...` returns **401** and looks like a token
+problem. It is not — there is simply no service there.
 
-Am „reparat" o dată asta adăugând `publicRoutes` în manifest și **am dat înapoi
-singur** — ar fi deschis o a doua cale inutilă către același serviciu.
+This was "repaired" once by adding `publicRoutes` to the manifest and **reverted
+by the same person** — it would have opened a second, pointless path to the same
+service.
 
-**401 la orice apel cu token valid** înseamnă aproape sigur că **capabilitățile
-nu sunt aprobate**. Extensia cere `database` și `secrets`; se **declară** în
-manifest dar nu se acordă automat — un administrator le aprobă explicit din
-Marketplace. Fără `secrets` nu poate valida token-ul.
+**A 401 on any call with a valid token** almost certainly means the
+**capabilities are not approved**. The extension asks for `database` and
+`secrets`; they are **declared** in the manifest but not granted automatically —
+an administrator approves them explicitly from the Marketplace. Without `secrets`
+it cannot validate the token.
 
-## Comportament de reținut
+## Behaviour worth remembering
 
-La dezactivarea unui utilizator de către furnizor: îi scoate apartenența, **îi
-șterge toate sesiunile imediat**, iar dacă nu mai aparține niciunui tenant îi
-șterge contul. Punctul cu sesiunile e cel important — un angajat care pleacă
-vineri nu trebuie să mai poată intra luni cu un browser deschis.
+When the provider deactivates a user: it removes their membership, **deletes all
+their sessions immediately**, and if they no longer belong to any tenant it
+deletes the account. The sessions point is the important one — an employee who
+leaves on Friday must not still get in on Monday with an open browser.
 
-## De citit
+## Further reading
 
-`SETUP.md` — scris pentru administratorul instanței, cu pașii de configurare la
-Azure AD / Okta și diagnosticul celor trei feluri de 401.
+`SETUP.md` — written for the instance administrator, with the configuration steps
+for Azure AD / Okta and the diagnosis of the three kinds of 401.

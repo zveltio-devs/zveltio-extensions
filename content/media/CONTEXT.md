@@ -9,99 +9,101 @@ handlers under `/api/media`.
 
 ---
 
-Reparat 2026-08-11. Ștergerea e presată live cu control pozitiv; restul rutelor
-(27) n-au fost parcurse, deci **nu e „verificat"**.
+Repaired 2026-08-11. Deletion is pressed live with a positive control; the
+remaining routes (27) were not walked, so this is **not "verified"**.
 
-## Gaura: orice utilizator putea arunca la coș orice fișier din firma lui
+## The hole: any user could trash any file in their tenant
 
-Router-ul cerea doar o sesiune, iar `moveToTrash` filtrează după id, `deleted_at`
-și tenant — nicăieri vreo verificare de proprietar. Deci oricine autentificat
-putea distruge fișierul oricui, numindu-i id-ul. Pe **ambele** uși: cea simplă și
-`POST /files/batch-delete`, care ia o listă arbitrară.
+The router required only a session, and `moveToTrash` filters on id, `deleted_at`
+and tenant — nowhere any owner check. So anyone authenticated could destroy
+anyone's file by naming its id. On **both** doors: the simple one and
+`POST /files/batch-delete`, which takes an arbitrary list.
 
-Engine-ul a primit reparația pe 2026-07-31 (`462310a`), pe `routes/media.ts` —
-care are **zero consumatori**. Studio ajunge la media prin `/ext/content/media`.
-Reparația a stat două săptămâni pe copia pe care n-o rulează nimeni.
+The engine received the repair on 2026-07-31 (`462310a`), on `routes/media.ts` —
+which has **zero consumers**. Studio reaches media through `/ext/content/media`.
+The repair sat for two weeks on the copy nobody runs.
 
-Acum: proprietar sau administrator de tenant. Deliberat nu „oricine îl poate
-citi" — a citi un fișier partajat și a-l distruge sunt acte diferite.
+Now: owner or tenant administrator. Deliberately not "anyone who can read it" —
+reading a shared file and destroying it are different acts.
 
-## De ce n-a văzut nimeni
+## Why nobody saw it
 
-Aceeași cauză ca la [data/import](../../data/import/CONTEXT.md): funcția a fost
-mutată din engine în extensie, dar ruta veche a rămas montată. Auditul a citit
-engine-ul, unde codul era încă vizibil și încă avea rute, și a găsit exact
-problema — pe partea moartă. Mutarea a scos funcționalitatea din raza auditului
-fără s-o scoată din produs.
+The same cause as [data/import](../../data/import/CONTEXT.md): the feature moved
+from the engine into the extension, but the old route stayed mounted. The audit
+read the engine, where the code was still visible and still had routes, and found
+exactly the problem — on the dead side. The move took the feature out of the
+audit's range without taking it out of the product.
 
-Verificarea automată nu putea prinde: nu există niciun test care să pună doi
-utilizatori în aceeași firmă și să-i pună să se calce reciproc.
+Automated checking could not catch it: there is no test that puts two users in the
+same tenant and has them step on each other.
 
-## Ce s-a apăsat efectiv
+## What was actually pressed
 
-Bază virgină, doi utilizatori, extensia activată:
+Virgin database, two users, extension enabled:
 
-1. Mallory, cu `*` pe resursa `media`, șterge fișierul lui Owner → **403**,
-   fișier `INTACT`.
-2. Aceeași, pe ușa de batch → `{"deleted":0,"refused":1}`, fișier `INTACT`.
-3. **Control pozitiv:** Owner își șterge propriul fișier → **200**, `deleted_at`
-   setat.
+1. Mallory, with `*` on the `media` resource, deletes Owner's file → **403**, file
+   `INTACT`.
+2. The same, on the batch door → `{"deleted":0,"refused":1}`, file `INTACT`.
+3. **Positive control:** Owner deletes their own file → **200**, `deleted_at` set.
 
-Punctul 1 fără 3 n-ar fi însemnat nimic — un 403 se obține și rupând totul.
-Primul 403 pe care l-am primit venea de fapt de la poarta de permisiuni, fiindcă
-sub deny-by-default un utilizator nou n-are deloc acces la media; a trebuit să-i
-acord `*` **ca să ajung** la codul testat.
+Point 1 without 3 would have meant nothing — a 403 is also what you get by
+breaking everything. The first 403 received actually came from the permission
+gate, because under deny-by-default a new user has no access to media at all; `*`
+had to be granted **in order to reach** the code under test.
 
-## Secțiunea G — presată 2026-08-12: 27/27
+## Section G — pressed 2026-08-12: 27/27
 
-Toate cele 27 de rute apăsate pe bază virgină, cu engine viu. Două lucruri
-reparate, ambele găsite doar prin apăsat — citirea codului nu le-ar fi arătat.
+All 27 routes pressed on a virgin database, with a live engine. Two things
+repaired, both found only by pressing — reading the code would not have shown
+them.
 
-### Colecțiile erau imposibil de folosit din orice client
+### Collections were impossible to use from any client
 
-`randomUUID().replace(/-/g, '')` genera id-uri **fără cratime** pentru fișiere,
-dosare și etichete. Coloana e `uuid`, deci Postgres normaliza la stocare — dar
-răspunsul întorcea obiectul construit local, nu rândul salvat. Clientul primea
-`bec8520945ff46c6ba19506735a65fe9` pentru un rând stocat ca
+`randomUUID().replace(/-/g, '')` generated ids **without hyphens** for files,
+folders and tags. The column is `uuid`, so Postgres normalised on storage — but
+the response returned the locally built object, not the saved row. The client
+received `bec8520945ff46c6ba19506735a65fe9` for a row stored as
 `bec85209-45ff-46c6-ba19-506735a65fe9`.
 
-Trei endpointuri validează `z.string().uuid()`: `POST /collections`
-(`cover_file_id`), `PATCH /collections/:id` (`cover_file_id`) și
-`POST /collections/:id/files`. **Toate trei respingeau cu 400 exact id-ul pe
-care API-ul tocmai îl dăduse.** Același fișier, scris cu cratime: `{"added":1}`.
+Three endpoints validate `z.string().uuid()`: `POST /collections`
+(`cover_file_id`), `PATCH /collections/:id` (`cover_file_id`) and
+`POST /collections/:id/files`. **All three rejected with 400 exactly the id the
+API had just handed out.** The same file, written with hyphens: `{"added":1}`.
 
-Reparat separând cele două lucruri care fuseseră unul: `id`-ul rândului e UUID
-canonic, iar cheia de stocare rămâne fără cratime — numele obiectelor arătau
-mereu așa și fișierele existente sunt denumite astfel. `storage/cloud` făcea
-deja corect (`${id.replace(/-/g,'')}${ext}`); tiparul greșit era doar aici,
-verificat prin căutare în tot repo-ul.
+Repaired by separating the two things that had been one: the row's `id` is a
+canonical UUID, and the storage key stays hyphen-free — object names always looked
+like that and existing files are named that way. `storage/cloud` already did it
+correctly (`${id.replace(/-/g,'')}${ext}`); the wrong pattern was only here,
+verified by searching the whole repository.
 
-**De ce n-a prins nimic:** niciun test nu ia id-ul dintr-un răspuns și îl trimite
-înapoi. Testele își construiesc propriile UUID-uri, care au cratime.
+**Why nothing caught it:** no test takes an id from a response and sends it back.
+Tests build their own UUIDs, which have hyphens.
 
-### Cotele răspundeau 500 la greșeala administratorului
+### Quotas answered 500 to an administrator's mistake
 
-`POST /admin/quotas` cu un `user_id` inexistent sau malformat dădea 500 — o
-încălcare de cheie străină ieșind ca eroare internă. Acum: `.uuid()` în schemă
-prinde forma greșită, iar SQLSTATE `23503` devine 400 cu „Unknown user_id".
-Verificat în toate trei direcțiile, inclusiv că utilizatorul real dă în
-continuare 201.
+`POST /admin/quotas` with a non-existent or malformed `user_id` gave 500 — a
+foreign key violation coming out as an internal error. Now: `.uuid()` in the
+schema catches the wrong shape, and SQLSTATE `23503` becomes a 400 with "Unknown
+user_id". Verified in all three directions, including that a real user still
+returns 201.
 
-### Verificat, nu presupus
+### Verified, not assumed
 
-`DELETE /files/:id` și `POST /files/batch-delete` au fost confirmate separat că
-**șterg efectiv** — primul răspuns pe care-l primisem era 404 pe un fișier deja
-șters de pasul anterior, iar `batch-delete` raportase cândva `deleted:0`. Un cod
-de succes pe o ștergere care nu șterge arată identic cu una care șterge.
+`DELETE /files/:id` and `POST /files/batch-delete` were separately confirmed to
+**actually delete** — the first response received was a 404 on a file already
+deleted by the previous step, and `batch-delete` had at one point reported
+`deleted:0`. A success code on a delete that does not delete looks identical to
+one that does.
 
-## Ce e încă deschis
-- `cc11e15` (engine): „files are the uploader's unless they are library assets" —
-  o schimbare de vizibilitate la listare, tot pe copia moartă, **neportată**.
-- `routes/media.ts` din engine (784 linii, 17 rute, toate acoperite de extensie)
-  și `zv_storage_quotas` / `zv_media_favorites` din `schema.ts` — de șters.
-- `lib/cloud/trash.ts` și `lib/cloud/document-indexer.ts` rămân în engine și sunt
-  împrumutate prin `ctx.internals`. După ce `routes/media.ts` pleacă, nu mai are
-  niciun consumator din gazdă — decizie de proprietar.
+## What is still open
+- `cc11e15` (engine): "files are the uploader's unless they are library assets" —
+  a listing visibility change, again on the dead copy, **not ported**.
+- The engine's `routes/media.ts` (784 lines, 17 routes, all covered by the
+  extension) and `zv_storage_quotas` / `zv_media_favorites` in `schema.ts` — to be
+  deleted.
+- `lib/cloud/trash.ts` and `lib/cloud/document-indexer.ts` stay in the engine and
+  are borrowed through `ctx.internals`. Once `routes/media.ts` goes, they have no
+  host consumer left — an owner's decision.
 
 ## SDUI migration (2026-08-21)
 Branch: feat/sdui-tier3-reduced

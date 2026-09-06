@@ -141,7 +141,7 @@ export async function triggerEmbedding(
     );
   }
 
-  const textToEmbed = rawText.slice(0, 8000); // Truncate — majoritatea modelelor au limita de tokeni
+  const textToEmbed = rawText.slice(0, 8000); // Truncate — most models have a token limit
   const { embedding, model } = await provider.embed(textToEmbed);
   const vectorLiteral = JSON.stringify(embedding);
 

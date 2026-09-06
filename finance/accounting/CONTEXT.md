@@ -1,32 +1,31 @@
-# Contabilitate — context
+# Accounting — context
 
-**Verificat prin apăsare: 2026-08-09.** Balanță de verificare, bilanț și centre
-de cost citite pe date reale.
+**Verified by pressing: 2026-08-09.** Trial balance, balance sheet and cost
+centres read against real data.
 
-## Ce era rupt
+## What was broken
 
-Coloane scrise care nu existau (aceeași clasă ca în alte nouă extensii: cod și
-schemă scrise separat, niciodată confruntate).
+Columns written that did not exist (the same class as in nine other extensions:
+code and schema written separately, never confronted).
 
-Balanța, bilanțul și centrele de cost existau în bază dar **nu erau expuse** —
-datele se adunau și nu le vedea nimeni.
+The trial balance, the balance sheet and the cost centres existed in the database
+but **were not exposed** — the data accumulated and nobody could see it.
 
-## Chei lărgite, și una merită privită
+## Widened keys, and one worth looking at
 
-`zvd_fiscal_years.year` era unic **pe instanță**: o singură firmă de pe un server
-putea avea exercițiul financiar 2026. La fel `zvd_accounts.code` — o singură
-firmă putea avea contul „401" în planul ei de conturi. Ambele lărgite cu
-`tenant_id`.
+`zvd_fiscal_years.year` was unique **per instance**: only one tenant on a server
+could have the 2026 financial year. Likewise `zvd_accounts.code` — only one tenant
+could have account "401" in its chart of accounts. Both widened with `tenant_id`.
 
-`zvd_exchange_rates` a rămas per firmă deliberat, deși un curs BNR e obiectiv
-același pentru toți: ruta e scrisă ca fiecare firmă să-și adauge propriile
-cursuri, deci a doua ar fi lovit conflictul. Este o memorie cache, nu o sursă de
-adevăr.
+`zvd_exchange_rates` was deliberately left per tenant, even though a BNR rate is
+objectively the same for everyone: the route is written for each tenant to add its
+own rates, so the second one would have hit the conflict. It is a cache, not a
+source of truth.
 
-`ON CONFLICT` pe cursuri include acum `tenant_id`.
+`ON CONFLICT` on rates now includes `tenant_id`.
 
-## Ce am raportat greșit o dată
+## Something reported wrongly once
 
-Am afirmat că balanța afișează sume goale. **Fals** — testul meu cerea
-`debit`/`credit`, iar API-ul întoarce `total_debit`/`total_credit`. Eroare de
-test, nu de produs.
+It was claimed that the trial balance shows empty amounts. **False** — the test
+asked for `debit`/`credit`, while the API returns `total_debit`/`total_credit`. A
+test error, not a product one.

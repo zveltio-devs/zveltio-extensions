@@ -5,6 +5,10 @@ import { sql } from 'kysely';
 import type { Database } from '@zveltio/engine-db';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { aiProviderManager } from '../lib/ai-provider.js';
+// The validator and the read-only window live in lib/sql-guard.ts so the
+// assistant's execute_sql / text_to_sql tools use the SAME ones. They had
+// neither. See the header of that file.
+import { runReadOnly, validateGeneratedSQL } from '../lib/sql-guard.js';
 
 const QuerySchema = z.object({
   prompt: z.string().min(3).max(2000),
@@ -234,194 +238,6 @@ Respond in the same language as the user's question.`,
   return app;
 }
 
-/**
- * Runs AI-generated SQL with writes refused at the database, then restores the
- * request's transaction to read-write.
- *
- * `SET TRANSACTION READ ONLY` is the last line of defence behind
- * `validateGeneratedSQL` — a regex allowlist should not be the only thing
- * between a model's output and a DELETE. It has to stay.
- *
- * What it cannot do is live in its own transaction. This was
- * `db.transaction().execute(…)`, and the host's `ctx.db` JOINS the request's
- * tenant transaction rather than nesting (Bun SQL has no nested transactions),
- * so the flag applied to the WHOLE request. Everything after it that writes then
- * failed:
- *
- *   ERROR: cannot execute INSERT in a read-only transaction
- *
- * which is what `logQuery` below does — and its `.catch()` swallowed it. Net
- * effect, verified against Postgres 18: query history recorded only the queries
- * that were REFUSED (that log call happens before this point) and never one that
- * ran, `/history` was permanently empty, and `PATCH /:id/save` could never find a
- * row. The abort also meant the request's COMMIT quietly became a ROLLBACK.
- *
- * A savepoint fixes both halves: `SET TRANSACTION` is undone by
- * `ROLLBACK TO SAVEPOINT`, so the read-only window is exactly this statement and
- * the outer transaction is writable again afterwards. The rollback discards no
- * results — the rows are already in JS, and a read changes no state. Confirmed
- * both ways: an INSERT inside the window is still refused, and an INSERT after it
- * commits.
- */
-async function runReadOnly(db: Database, query: string): Promise<{ rows: unknown[] }> {
-  await sql.raw('SAVEPOINT zv_ai_ro').execute(db);
-  try {
-    await sql`SET TRANSACTION READ ONLY`.execute(db);
-    const result = await sql.raw(query).execute(db);
-    return result as { rows: unknown[] };
-  } finally {
-    // Unconditional: on success it drops the read-only flag, on failure it also
-    // clears the aborted state, and either way the caller gets a usable
-    // transaction back. Awaited inside `finally` — a synchronous `finally`
-    // around an async call is how a previous audit lost a whole tenant context.
-    await sql
-      .raw('ROLLBACK TO SAVEPOINT zv_ai_ro')
-      .execute(db)
-      .catch(() => {
-        /* transaction gone entirely; the caller's error is the useful one */
-      });
-    await sql
-      .raw('RELEASE SAVEPOINT zv_ai_ro')
-      .execute(db)
-      .catch(() => {
-        /* released with the rollback, or the transaction is gone */
-      });
-  }
-}
-
-// ── Security validation ──────────────────────────────────────────────────────
-
-/**
- * Validates AI-generated SQL before execution.
- * Blocks:
- *  - any non-SELECT statement
- *  - DML/DDL keywords (INSERT, UPDATE, DELETE, DROP, …)
- *  - system catalog access (pg_*, information_schema, system tables)
- *  - dangerous functions with side effects (pg_sleep, set_config, current_setting, etc.)
- *  - multiple statements (semicolons not inside string literals)
- *  - access to tables the user cannot read
- */
-function validateGeneratedSQL(
-  query: string,
-  accessibleCollections: any[],
-): { safe: boolean; reason?: string } {
-  const upper = query.toUpperCase().trim();
-
-  if (!upper.startsWith('SELECT')) {
-    return { safe: false, reason: 'Only SELECT queries are allowed' };
-  }
-
-  // Block multiple statements — strip string literals first to avoid false positives
-  const strippedQuery = query.replace(/'[^']*'/g, "''");
-  if (/;/.test(strippedQuery)) {
-    return { safe: false, reason: 'Multiple statements are not allowed' };
-  }
-
-  // N3: block PL/pgSQL anonymous blocks (DO $$ ... $$) which can execute arbitrary code
-  if (/\bDO\s+(\$\$|\$[a-z_]*\$)/i.test(query)) {
-    return { safe: false, reason: 'DO blocks (anonymous PL/pgSQL) are not allowed' };
-  }
-
-  // Block DML / DDL keywords
-  const forbidden = [
-    'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE',
-    'TRUNCATE', 'GRANT', 'REVOKE', 'COPY', 'EXECUTE', 'CALL',
-  ];
-  for (const kw of forbidden) {
-    if (new RegExp(`\\b${kw}\\b`, 'i').test(query)) {
-      return { safe: false, reason: `${kw} statements are not allowed` };
-    }
-  }
-
-  // Block functions with side effects or information leakage
-  const dangerousFunctions = [
-    'pg_sleep', 'set_config', 'current_setting', 'pg_cancel_backend',
-    'pg_terminate_backend', 'lo_export', 'lo_import', 'copy_to',
-    'dblink', 'file_fdw', 'pg_read_file', 'pg_write_file',
-    'pg_stat_file', 'pg_ls_dir',
-  ];
-  for (const fn of dangerousFunctions) {
-    if (new RegExp(`\\b${fn}\\s*\\(`, 'i').test(query)) {
-      return { safe: false, reason: `Function "${fn}" is not allowed` };
-    }
-  }
-
-  // Block system catalog access
-  if (/\bpg_/i.test(query) || /\binformation_schema\b/i.test(query)) {
-    return { safe: false, reason: 'Access to system catalogs is not allowed' };
-  }
-
-  // ── Table references: ALLOWLIST ─────────────────────────────────────────────
-  //
-  // The checks above denylist `zv_*`, `pg_*` and `information_schema`, and had
-  // no rule at all for UNPREFIXED tables — which is where Better-Auth keeps
-  // `user`, `session`, `account`, `verification` and `twoFactor`, none of them
-  // with RLS. Any authenticated user with read on ONE collection could ask, in
-  // natural language, for session tokens or password hashes, and the model was
-  // free to write the query. The system prompt telling it not to is not an
-  // access control.
-  //
-  // The permitted set already existed — `accessibleCollections`, the caller's
-  // own collections — and was applied only to references that happened to start
-  // `zvd_`. It applies to every table reference now: anything not on the list is
-  // refused because it was never permitted, rather than because someone
-  // remembered to forbid it.
-  const permitted = new Set(accessibleCollections.map((c: any) => `zvd_${c.name}`.toLowerCase()));
-  const cteNames = collectCteNames(query);
-
-  for (const ref of tableReferences(query)) {
-    if (cteNames.has(ref.table)) continue;
-    if (ref.schema !== null && ref.schema !== 'public') {
-      return {
-        safe: false,
-        reason: `Access to "${ref.schema}.${ref.table}" is not allowed`,
-      };
-    }
-    if (!permitted.has(ref.table)) {
-      return { safe: false, reason: `No access to table "${ref.table}"` };
-    }
-  }
-
-  return { safe: true };
-}
-
-/**
- * Names bound by `WITH … AS (…)` in this statement — not tables.
- *
- * Unreachable today: the check at the top of `validateGeneratedSQL` refuses any
- * query that does not start with `SELECT`, so a `WITH` never gets this far.
- * Kept because the allowlist below would otherwise refuse a legitimate CTE the
- * moment that restriction is relaxed, and said out loud so nobody reads this as
- * evidence that CTEs work here. They do not.
- */
-function collectCteNames(query: string): Set<string> {
-  const out = new Set<string>();
-  const re = /(?:\bwith\s+(?:recursive\s+)?|,\s*)("?[A-Za-z_][A-Za-z0-9_$]*"?)\s+as\s*\(/gi;
-  for (const m of query.matchAll(re)) out.add(m[1]!.replace(/^"|"$/g, '').toLowerCase());
-  return out;
-}
-
-/**
- * Every identifier in a TABLE position.
- *
- * Keyed off the words that introduce one rather than by parsing SQL. It does
- * not need to be a complete parser to be a sound allowlist: a reference it
- * fails to recognise is simply not on the permitted list, so the query is
- * refused rather than allowed.
- */
-function tableReferences(query: string): Array<{ schema: string | null; table: string }> {
-  const IDENT = '(?:"[^"]+"|[A-Za-z_][A-Za-z0-9_$]*)';
-  const re = new RegExp(`\\b(?:from|join)\\s+(${IDENT})(?:\\s*\\.\\s*(${IDENT}))?`, 'gi');
-  const unq = (x: string) => x.replace(/^"|"$/g, '').toLowerCase();
-  const out: Array<{ schema: string | null; table: string }> = [];
-  for (const m of query.matchAll(re)) {
-    const a = unq(m[1]!);
-    const b = m[2] ? unq(m[2]) : null;
-    out.push(b === null ? { schema: null, table: a } : { schema: a, table: b });
-  }
-  return out;
-}
-
 async function logQuery(
   db: Database,
   userId: string,
@@ -436,10 +252,25 @@ async function logQuery(
   // Named on failure. This was `.catch(() => {})`, which is how the history
   // stayed empty for as long as `SET TRANSACTION READ ONLY` was leaking into the
   // request's transaction: the INSERT failed every time and said nothing.
+  // `::text::jsonb`, not `::jsonb`. A single cast on a stringified parameter is
+  // a no-op under the driver the engine actually runs (Bun.SQL types the
+  // parameter as json, so there is nothing to parse) and the column ends up
+  // holding a JSON string scalar. The test suite cannot see this — it reaches
+  // Postgres through `pg`, which sends the parameter as text and makes the
+  // defect disappear.
+  //
+  // Nothing reads `chart_config` today: `/history` selects nine columns and that
+  // is not one of them, so this stored a malformed value nobody looked at. It is
+  // corrected rather than left, because the first reader would inherit the bug
+  // and would be looking for it in their own code.
+  //
+  // `scripts/check-jsonb-cast.ts` did not flag this line: its pattern requires
+  // `}` immediately after `JSON.stringify(...)`, and this is a ternary. That gap
+  // is fixed in the same change as this.
   await sql`
     INSERT INTO zv_ai_queries (user_id, prompt, generated_sql, result_count, execution_ms, ai_analysis, chart_config, error)
     VALUES (${userId}, ${prompt}, ${generatedSql}, ${resultCount}, ${executionMs}, ${analysis},
-      ${chartConfig ? JSON.stringify(chartConfig) : null}::jsonb, ${error})
+      ${chartConfig ? JSON.stringify(chartConfig) : null}::text::jsonb, ${error})
   `
     .execute(db)
     .catch((err: Error) => {

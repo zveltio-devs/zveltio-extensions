@@ -34,6 +34,7 @@
  */
 
 import { afterAll, describe, expect, it } from 'bun:test';
+import { assertNonMetadataUrl as engineAssertNonMetadataUrl } from '@zveltio/engine/lib/security/index.js';
 import { createHmac } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
 import { basename, dirname, join, relative } from 'path';
@@ -303,6 +304,17 @@ async function makeCtx(
     // NOTE: anyStub()'s `get` trap ignores its target, so Object.assign onto it
     // is invisible. The real members have to be consulted BEFORE falling back.
     internals: gateInternals(extName, realInternals({
+      // The SSRF guard is REAL, for the same reason the crypto ones are: a stub
+      // that returns undefined turns "refuse this address" into "allowed", and a
+      // test written to prove the guard is wired would pass with the guard
+      // deleted. That is the failure mode this campaign keeps finding — a test
+      // green because of a mechanism other than the one under test.
+      //
+      // Imported from the engine rather than reimplemented, so there is one list
+      // of metadata addresses and the harness cannot drift into agreeing with a
+      // guard the engine no longer has.
+      assertNonMetadataUrl: (url: string, label?: string) =>
+        engineAssertNonMetadataUrl(url, label),
       encryptSecret: async (plaintext: string, o?: { keyring?: string }) =>
         harnessEncrypt(plaintext, o?.keyring ?? 'field'),
       decryptSecret: async (value: string, o?: { keyring?: string }) =>

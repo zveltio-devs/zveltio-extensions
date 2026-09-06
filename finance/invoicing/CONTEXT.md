@@ -1,59 +1,59 @@
-# Facturare — context
+# Invoicing — context
 
-**Verificat prin apăsare: 2026-08-09.** Factură emisă cu serie și număr, PDF
-generat, stoc mișcat pe aviz.
+**Verified by pressing: 2026-08-09.** An invoice issued with series and number,
+PDF generated, stock moved on the delivery note.
 
-## Ce era rupt
+## What was broken
 
-**Șase migrații nedeclarate** în `getMigrations()`. Pe o instalare nouă lipsea
-toată munca de conformitate — fără CUI, fără serii — iar extensia se activa
-perfect, fără niciun semn. Invizibil pe orice mașină de dezvoltare, unde
-coloanele fuseseră adăugate manual.
+**Six undeclared migrations** in `getMigrations()`. On a fresh install all the
+compliance work was missing — no tax id, no series — and the extension enabled
+perfectly, with no sign at all. Invisible on any development machine, where the
+columns had been added by hand.
 
-**`zvd_invoices.number` era unic pe instanță.** A doua firmă nu putea emite
-`FACT-2026-0001`, iar RLS îi ascundea rândul care provoca conflictul — primea o
-eroare de bază de date despre ceva ce nu putea vedea. Lărgit la
-`(tenant_id, number)`.
+**`zvd_invoices.number` was unique per instance.** A second tenant could not issue
+`FACT-2026-0001`, and RLS hid the row causing the conflict from it — it got a
+database error about something it could not see. Widened to `(tenant_id, number)`.
 
-## Ce s-a adăugat pentru a fi emisibilă legal în România
+## What was added to make it legally issuable in Romania
 
-CUI obligatoriu și validat, serii configurabile per tip de document, profil de
-firmă (reg. com., IBAN, bancă, adresă), defalcare TVA pe cote, catalog de
-produse citit din gestiune **când extensia e activă** (`ctx.services.get()`
-întoarce `null` altfel — facturarea trebuie să meargă fără gestiune).
+A required and validated tax id, configurable series per document type, a company
+profile (trade register, IBAN, bank, address), VAT breakdown by rate, a product
+catalogue read from inventory **when that extension is enabled**
+(`ctx.services.get()` returns `null` otherwise — invoicing has to work without
+inventory).
 
-## Decizie de arhitectură
+## An architectural decision
 
-**Stocul se scade pe avizul de însoțire, nu pe factură.** Vezi
-`operations/inventory/CONTEXT.md` — regula de business stă în gestiune, nu într-o
-extensie regională.
+**Stock is deducted on the delivery note, not on the invoice.** See
+`operations/inventory/CONTEXT.md` — the business rule lives in inventory, not in a
+regional extension.
 
-## Capcane
+## Traps
 
-Numerotarea e revendicare atomică per firmă. **Nu adăuga un număr de rezervă**
-dacă revendicarea eșuează — registrul ori dă următorul număr, ori documentul nu
-se creează. Vezi ce a pățit registrul de documente cu `Date.now()`.
+Numbering is an atomic per-tenant claim. **Do not add a fallback number** if the
+claim fails — the register either gives the next number, or the document is not
+created. See what happened to the document register with `Date.now()`.
 
-## Metadata liniei era scalar-șir, nu obiect (reparat 2026-08-12)
+## Line metadata was a string scalar, not an object (repaired 2026-08-12)
 
-Găsit presând `operations/traceability`, nu citind invoicing.
+Found by pressing `operations/traceability`, not by reading invoicing.
 
-`${JSON.stringify(...)}::jsonb` pe linia de factură arăta ca și cum parsează
-documentul. Nu o face: driverul trimite deja parametrul CA valoare jsonb, deci
-cast-ul e un no-op și tot șirul serializat aterizează ca **un singur scalar**.
-`jsonb_typeof(metadata)` citea `string`.
+`${JSON.stringify(...)}::jsonb` on the invoice line looked as though it parsed the
+document. It does not: the driver already sends the parameter AS a jsonb value, so
+the cast is a no-op and the whole serialised string lands as **a single scalar**.
+`jsonb_typeof(metadata)` read `string`.
 
-Cei doi cititori JavaScript de aici n-au observat niciodată, fiindcă amândoi fac
-`typeof x === 'string' ? JSON.parse(x) : x`. **Un cititor SQL nu poate.**
-`operations/traceability` caută linii cu `metadata->>'lot_id'` ca să ridice o
-expediere `pending`; pe un scalar-șir operatorul dă NULL, interogarea găsea zero
-rânduri, iar predarea factură→expediere **nu s-a produs niciodată**. Patru rute
-din traceability erau inaccesibile în consecință.
+The two JavaScript readers here never noticed, because both do
+`typeof x === 'string' ? JSON.parse(x) : x`. **An SQL reader cannot.**
+`operations/traceability` looks for lines with `metadata->>'lot_id'` in order to
+raise a `pending` dispatch; on a string scalar the operator yields NULL, the query
+found zero rows, and the invoice → dispatch handover **never happened**. Four
+traceability routes were unreachable as a result.
 
-Reparat cu `::text::jsonb` + migrația 011, care convertește și rândurile deja
-scrise — verificat pe o bază care le conținea: `string` → `object`, iar
-`->>'lot_id'` devine vizibil.
+Repaired with `::text::jsonb` plus migration 011, which also converts rows already
+written — verified against a database that contained them: `string` → `object`,
+and `->>'lot_id'` becomes visible.
 
-**`vat_breakdown` (linia 746) are aceeași formă greșită și rămâne neatinsă** —
-consumatorul ei face `JSON.parse` explicit, deci funcționează. Nu o schimba fără
-să-i citești întâi consumatorul.
+**`vat_breakdown` (line 746) has the same wrong shape and is left untouched** —
+its consumer does an explicit `JSON.parse`, so it works. Do not change it without
+reading its consumer first.
