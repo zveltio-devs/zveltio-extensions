@@ -366,3 +366,72 @@ describe.skipIf(!DB_URL)('traceability: completing a production order twice', ()
     expect(Number(moves.rows[0]!.n)).toBe(1);
   }, 30_000);
 });
+
+/**
+ * A recalled lot must not go back to `available` through the generic status
+ * endpoint.
+ *
+ * Everything else in this extension was hardened so a recall cannot be undone by
+ * accident. `PATCH /lots/:id/status` undid all of it on purpose: any holder of
+ * `traceability` write could set a recalled lot to `available` in one request,
+ * leaving nothing in the movement ledger.
+ *
+ * Exercised against the statement rather than through HTTP, because what changed
+ * is the WHERE clause — and going through the route would prove the route calls
+ * something, not that the something refuses.
+ */
+describe.skipIf(!DB_URL)('traceability: a recalled lot cannot be set back to available', () => {
+  let pool: any;
+  let admin: Kysely<any>;
+  let lotId: string;
+
+  beforeAll(async () => {
+    const pg: any = await import('pg');
+    pool = new (pg.Pool ?? pg.default.Pool)({ connectionString: DB_URL, max: 2 });
+    admin = new Kysely<any>({ dialect: new PostgresDialect({ pool }) });
+    const item = await sql<{ id: string }>`SELECT id FROM trace_items WHERE code = 'CONCUR'`.execute(admin);
+    await sql`DELETE FROM trace_lots WHERE lot_number = 'RECALL-GUARD'`.execute(admin);
+    const lot = await sql<{ id: string }>`
+      INSERT INTO trace_lots (lot_number, item_id, lot_type, quantity_initial, quantity_remaining, unit, status, tenant_id)
+      VALUES ('RECALL-GUARD', ${item.rows[0]!.id}, 'inbound', 10, 10, 'kg', 'recalled', ${TENANT}::uuid)
+      RETURNING id
+    `.execute(admin);
+    lotId = lot.rows[0]!.id;
+  });
+
+  afterAll(async () => {
+    await sql`DELETE FROM trace_lots WHERE lot_number = 'RECALL-GUARD'`.execute(admin).catch(() => {});
+    await admin.destroy();
+  });
+
+  /** The statement the route runs. */
+  const setStatus = async (next: string) => {
+    const r = await sql<{ status: string }>`
+      UPDATE trace_lots
+      SET status = ${next}
+      WHERE id = ${lotId}
+        AND NOT (status = 'recalled' AND ${next}::text = 'available')
+      RETURNING status
+    `.execute(admin);
+    return r.rows.length ? r.rows[0]!.status : 'refused';
+  };
+
+  it('recalled -> available is refused', async () => {
+    expect(await setStatus('available')).toBe('refused');
+    const now = await sql<{ status: string }>`SELECT status FROM trace_lots WHERE id = ${lotId}`.execute(admin);
+    expect(now.rows[0]!.status).toBe('recalled');
+  });
+
+  it('recalled -> returned is allowed: sending it back to the supplier is real work', async () => {
+    // The control. A rule that refused every transition out of `recalled` would
+    // pass the test above and strand the stock.
+    expect(await setStatus('returned')).toBe('returned');
+    await sql`UPDATE trace_lots SET status = 'recalled' WHERE id = ${lotId}`.execute(admin);
+  });
+
+  it('an ordinary transition on a lot that is not recalled still works', async () => {
+    await sql`UPDATE trace_lots SET status = 'quarantine' WHERE id = ${lotId}`.execute(admin);
+    expect(await setStatus('available')).toBe('available');
+    await sql`UPDATE trace_lots SET status = 'recalled' WHERE id = ${lotId}`.execute(admin);
+  });
+});
