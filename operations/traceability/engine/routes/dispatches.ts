@@ -3,6 +3,9 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+// One implementation of "take this much off a lot", shared with the scanner.
+// See the note on claimLotQuantity for what the three separate copies did.
+import { claimLotQuantity, LotUnavailableError } from '../services/StockService.js';
 
 const UNITS = ['kg', 'g', 'l', 'ml', 'buc', 'cutie', 'sac', 'palet'] as const;
 
@@ -85,24 +88,6 @@ export function dispatchesRouter(ctx: ExtensionContext): Hono {
       return c.json({ error: 'Expedierea nu are lot asociat / Dispatch has no lot assigned' }, 400);
     }
 
-    // Check lot availability and stock
-    const lotResult = await sql`
-      SELECT id, quantity_remaining, unit, status FROM trace_lots
-      WHERE id = ${dispatch.lot_id} AND status = 'available'
-    `.execute(db);
-    if (!lotResult.rows.length) {
-      return c.json({ error: 'Lotul nu este disponibil / Lot not available' }, 400);
-    }
-    const lot = lotResult.rows[0] as any;
-
-    if (parseFloat(lot.quantity_remaining) < d.quantity_dispatched) {
-      return c.json({
-        error: `Stoc insuficient. Disponibil: ${lot.quantity_remaining} ${lot.unit} / Insufficient stock. Available: ${lot.quantity_remaining} ${lot.unit}`,
-      }, 400);
-    }
-
-    const newQty = parseFloat(lot.quantity_remaining) - d.quantity_dispatched;
-
     // A dispatch is the stock leaving, the movement that records it leaving, and
     // the dispatch row saying it was confirmed. This is a traceability register:
     // the point of it is that every unit can be followed from lot to customer.
@@ -113,42 +98,52 @@ export function dispatchesRouter(ctx: ExtensionContext): Hono {
     // it. A movement without the decrement double-counts the same units as still
     // available. And a dispatch left unconfirmed after the stock moved can be
     // confirmed again, dispatching the quantity twice.
-    const updated = await db.transaction().execute(async (trx) => {
-      // Decrement lot stock
-      await sql`
-        UPDATE trace_lots
-        SET quantity_remaining = ${newQty},
-            status = ${newQty === 0 ? 'exhausted' : 'available'}
-        WHERE id = ${dispatch.lot_id}
-      `.execute(trx);
+    //
+    // The stock check is `claimLotQuantity` now, not a SELECT and an `if`. The
+    // transaction gave these three writes atomicity and never gave the check
+    // isolation: the UPDATE matched on `id` alone, so a concurrent writer blocked
+    // on the row lock re-evaluated a condition that was still true and wrote a
+    // remainder computed before the other write landed. Two dispatches of 6 from
+    // a lot holding 10 both succeeded, and the lot reported 4. See the note on
+    // `claimLotQuantity`.
+    let updated: { rows: unknown[] };
+    try {
+      updated = await db.transaction().execute(async (trx) => {
+        const lot = await claimLotQuantity(trx, dispatch.lot_id, d.quantity_dispatched);
 
-      // Record dispatch movement
-      await sql`
-        INSERT INTO trace_movements (
-          lot_id, type, quantity, unit,
-          reference_type, reference_id, reference_number,
-          customer_id, notes, performed_by, performed_at
-        ) VALUES (
-          ${dispatch.lot_id}, 'dispatch', ${-d.quantity_dispatched}, ${lot.unit},
-          'invoice', ${dispatch.invoice_id ?? null}, ${dispatch.invoice_number ?? null},
-          ${dispatch.customer_id ?? null}, ${d.notes ?? null}, ${user.id}, now()
-        )
-      `.execute(trx);
+        // Record dispatch movement
+        await sql`
+          INSERT INTO trace_movements (
+            lot_id, type, quantity, unit,
+            reference_type, reference_id, reference_number,
+            customer_id, notes, performed_by, performed_at
+          ) VALUES (
+            ${dispatch.lot_id}, 'dispatch', ${-d.quantity_dispatched}, ${lot.unit},
+            'invoice', ${dispatch.invoice_id ?? null}, ${dispatch.invoice_number ?? null},
+            ${dispatch.customer_id ?? null}, ${d.notes ?? null}, ${user.id}, now()
+          )
+        `.execute(trx);
 
-      // Mark dispatch confirmed
-      const updated = await sql`
-        UPDATE trace_dispatches
-        SET status = 'confirmed',
-            quantity_dispatched = ${d.quantity_dispatched},
-            confirmed_at = now(),
-            confirmed_by = ${user.id},
-            notes = COALESCE(${d.notes ?? null}, notes)
-        WHERE id = ${id}
-        RETURNING *
-      `.execute(trx);
-
-      return updated;
-    });
+        // Mark dispatch confirmed
+        return await sql`
+          UPDATE trace_dispatches
+          SET status = 'confirmed',
+              quantity_dispatched = ${d.quantity_dispatched},
+              confirmed_at = now(),
+              confirmed_by = ${user.id},
+              notes = COALESCE(${d.notes ?? null}, notes)
+          WHERE id = ${id}
+          RETURNING *
+        `.execute(trx);
+      });
+    } catch (err) {
+      // "Not enough stock" and "that lot is recalled" are answers to the
+      // operator, not server faults. Folding the check into `claimLotQuantity`
+      // would otherwise have turned both of the 400s this route used to return
+      // into 500s.
+      if (err instanceof LotUnavailableError) return c.json({ error: err.message }, 400);
+      throw err;
+    }
     return c.json({ data: updated.rows[0] });
   });
 
@@ -198,57 +193,45 @@ export function dispatchesRouter(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
 
-    const lotResult = await sql`
-      SELECT id, quantity_remaining, unit, status FROM trace_lots
-      WHERE id = ${d.lot_id} AND status = 'available'
-    `.execute(db);
-    if (!lotResult.rows.length) return c.json({ error: 'Lot indisponibil / Lot not available' }, 400);
-    const lot = lotResult.rows[0] as any;
-
-    if (parseFloat(lot.quantity_remaining) < d.quantity_dispatched) {
-      return c.json({
-        error: `Stoc insuficient. Disponibil: ${lot.quantity_remaining} ${lot.unit}`,
-      }, 400);
-    }
-
-    const newQty = parseFloat(lot.quantity_remaining) - d.quantity_dispatched;
-
     // Same three writes as the confirm route, same reason: on a recall, a lot
-    // whose stock moved without a movement row cannot be traced to anybody.
-    const dispatch = await db.transaction().execute(async (trx) => {
-      await sql`
-        UPDATE trace_lots
-        SET quantity_remaining = ${newQty}, status = ${newQty === 0 ? 'exhausted' : 'available'}
-        WHERE id = ${d.lot_id}
-      `.execute(trx);
+    // whose stock moved without a movement row cannot be traced to anybody. And
+    // the same stock check — this route carried the third copy of the
+    // read-then-write, so a direct dispatch could over-draw a lot or send a
+    // recalled one to a customer and mark it available again.
+    let dispatch: { rows: unknown[] };
+    try {
+      dispatch = await db.transaction().execute(async (trx) => {
+        const lot = await claimLotQuantity(trx, d.lot_id, d.quantity_dispatched);
 
-      await sql`
-        INSERT INTO trace_movements (
-          lot_id, type, quantity, unit,
-          reference_type, reference_number,
-          customer_id, notes, performed_by, performed_at
-        ) VALUES (
-          ${d.lot_id}, 'dispatch', ${-d.quantity_dispatched}, ${lot.unit},
-          'manual', ${d.invoice_number ?? null},
-          ${d.customer_id ?? null}, ${d.notes ?? null}, ${user.id}, now()
-        )
-      `.execute(trx);
+        await sql`
+          INSERT INTO trace_movements (
+            lot_id, type, quantity, unit,
+            reference_type, reference_number,
+            customer_id, notes, performed_by, performed_at
+          ) VALUES (
+            ${d.lot_id}, 'dispatch', ${-d.quantity_dispatched}, ${lot.unit},
+            'manual', ${d.invoice_number ?? null},
+            ${d.customer_id ?? null}, ${d.notes ?? null}, ${user.id}, now()
+          )
+        `.execute(trx);
 
-      const dispatch = await sql`
-        INSERT INTO trace_dispatches (
-          invoice_number, customer_id, customer_name,
-          lot_id, quantity_invoiced, quantity_dispatched, unit,
-          status, confirmed_at, confirmed_by, notes
-        ) VALUES (
-          ${d.invoice_number ?? null}, ${d.customer_id ?? null}, ${d.customer_name},
-          ${d.lot_id}, ${d.quantity_dispatched}, ${d.quantity_dispatched}, ${lot.unit},
-          'confirmed', now(), ${user.id}, ${d.notes ?? null}
-        )
-        RETURNING *
-      `.execute(trx);
-
-      return dispatch;
-    });
+        return await sql`
+          INSERT INTO trace_dispatches (
+            invoice_number, customer_id, customer_name,
+            lot_id, quantity_invoiced, quantity_dispatched, unit,
+            status, confirmed_at, confirmed_by, notes
+          ) VALUES (
+            ${d.invoice_number ?? null}, ${d.customer_id ?? null}, ${d.customer_name},
+            ${d.lot_id}, ${d.quantity_dispatched}, ${d.quantity_dispatched}, ${lot.unit},
+            'confirmed', now(), ${user.id}, ${d.notes ?? null}
+          )
+          RETURNING *
+        `.execute(trx);
+      });
+    } catch (err) {
+      if (err instanceof LotUnavailableError) return c.json({ error: err.message }, 400);
+      throw err;
+    }
     return c.json({ data: dispatch.rows[0] }, 201);
   });
 

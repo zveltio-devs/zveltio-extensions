@@ -164499,42 +164499,54 @@ function date4(params) {
 // ../zveltio/node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
 config(en_default());
 // operations/traceability/engine/services/StockService.ts
+async function claimLotQuantity(db, lotId, quantity) {
+  const claimed = await sql`
+    UPDATE trace_lots
+       SET quantity_remaining = quantity_remaining - ${quantity},
+           status = CASE
+                      WHEN quantity_remaining - ${quantity} <= 0 THEN 'exhausted'
+                      ELSE status
+                    END
+     WHERE id = ${lotId}
+       AND status = 'available'
+       AND quantity_remaining >= ${quantity}
+     RETURNING unit, quantity_remaining
+  `.execute(db);
+  if (claimed.rows.length)
+    return claimed.rows[0];
+  const lotResult = await sql`
+    SELECT quantity_remaining, unit, status FROM trace_lots WHERE id = ${lotId}
+  `.execute(db);
+  const lot = lotResult.rows[0];
+  if (!lot)
+    throw new LotUnavailableError("Lot neg\u0103sit / Lot not found");
+  if (lot.status !== "available") {
+    throw new LotUnavailableError(`Lot indisponibil (status: ${lot.status}) / Lot unavailable (status: ${lot.status})`);
+  }
+  throw new LotUnavailableError(`Stoc insuficient. Disponibil: ${lot.quantity_remaining} ${lot.unit} / ` + `Insufficient stock. Available: ${lot.quantity_remaining} ${lot.unit}`);
+}
+
+class LotUnavailableError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "LotUnavailableError";
+  }
+}
+
 class StockService {
   db;
   constructor(db) {
     this.db = db;
   }
   async consumeFromLot(params) {
-    const lotResult = await sql`
-      SELECT id, quantity_remaining, unit, status
-      FROM trace_lots
-      WHERE id = ${params.lotId}
-    `.execute(this.db);
-    if (!lotResult.rows.length) {
-      throw new Error("Lot neg\u0103sit / Lot not found");
-    }
-    const lot = lotResult.rows[0];
-    if (lot.status !== "available") {
-      throw new Error(`Lot indisponibil (status: ${lot.status}) / Lot unavailable (status: ${lot.status})`);
-    }
-    const remaining = parseFloat(lot.quantity_remaining);
-    if (remaining < params.quantityUsed) {
-      throw new Error(`Stoc insuficient. Disponibil: ${remaining} ${lot.unit} / Insufficient stock. Available: ${remaining} ${lot.unit}`);
-    }
-    const newQty = remaining - params.quantityUsed;
-    await sql`
-      UPDATE trace_lots
-      SET quantity_remaining = ${newQty},
-          status = ${newQty === 0 ? "exhausted" : "available"}
-      WHERE id = ${params.lotId}
-    `.execute(this.db);
+    const { unit } = await claimLotQuantity(this.db, params.lotId, params.quantityUsed);
     await sql`
       INSERT INTO trace_lot_consumptions (production_order_id, lot_id, quantity_used, unit, scanned_by, scanned_at)
-      VALUES (${params.productionOrderId}, ${params.lotId}, ${params.quantityUsed}, ${lot.unit}, ${params.scannedBy}, now())
+      VALUES (${params.productionOrderId}, ${params.lotId}, ${params.quantityUsed}, ${unit}, ${params.scannedBy}, now())
     `.execute(this.db);
     await sql`
       INSERT INTO trace_movements (lot_id, type, quantity, unit, reference_type, reference_id, performed_by, performed_at)
-      VALUES (${params.lotId}, 'consumption', ${-params.quantityUsed}, ${lot.unit}, 'production_order', ${params.productionOrderId}, ${params.scannedBy}, now())
+      VALUES (${params.lotId}, 'consumption', ${-params.quantityUsed}, ${unit}, 'production_order', ${params.productionOrderId}, ${params.scannedBy}, now())
     `.execute(this.db);
   }
   async getExpiringLots(daysAhead = 7) {
@@ -164779,50 +164791,37 @@ function dispatchesRouter(ctx) {
     if (!dispatch.lot_id) {
       return c.json({ error: "Expedierea nu are lot asociat / Dispatch has no lot assigned" }, 400);
     }
-    const lotResult = await sql`
-      SELECT id, quantity_remaining, unit, status FROM trace_lots
-      WHERE id = ${dispatch.lot_id} AND status = 'available'
-    `.execute(db);
-    if (!lotResult.rows.length) {
-      return c.json({ error: "Lotul nu este disponibil / Lot not available" }, 400);
+    let updated;
+    try {
+      updated = await db.transaction().execute(async (trx) => {
+        const lot = await claimLotQuantity(trx, dispatch.lot_id, d.quantity_dispatched);
+        await sql`
+          INSERT INTO trace_movements (
+            lot_id, type, quantity, unit,
+            reference_type, reference_id, reference_number,
+            customer_id, notes, performed_by, performed_at
+          ) VALUES (
+            ${dispatch.lot_id}, 'dispatch', ${-d.quantity_dispatched}, ${lot.unit},
+            'invoice', ${dispatch.invoice_id ?? null}, ${dispatch.invoice_number ?? null},
+            ${dispatch.customer_id ?? null}, ${d.notes ?? null}, ${user.id}, now()
+          )
+        `.execute(trx);
+        return await sql`
+          UPDATE trace_dispatches
+          SET status = 'confirmed',
+              quantity_dispatched = ${d.quantity_dispatched},
+              confirmed_at = now(),
+              confirmed_by = ${user.id},
+              notes = COALESCE(${d.notes ?? null}, notes)
+          WHERE id = ${id}
+          RETURNING *
+        `.execute(trx);
+      });
+    } catch (err) {
+      if (err instanceof LotUnavailableError)
+        return c.json({ error: err.message }, 400);
+      throw err;
     }
-    const lot = lotResult.rows[0];
-    if (parseFloat(lot.quantity_remaining) < d.quantity_dispatched) {
-      return c.json({
-        error: `Stoc insuficient. Disponibil: ${lot.quantity_remaining} ${lot.unit} / Insufficient stock. Available: ${lot.quantity_remaining} ${lot.unit}`
-      }, 400);
-    }
-    const newQty = parseFloat(lot.quantity_remaining) - d.quantity_dispatched;
-    const updated = await db.transaction().execute(async (trx) => {
-      await sql`
-        UPDATE trace_lots
-        SET quantity_remaining = ${newQty},
-            status = ${newQty === 0 ? "exhausted" : "available"}
-        WHERE id = ${dispatch.lot_id}
-      `.execute(trx);
-      await sql`
-        INSERT INTO trace_movements (
-          lot_id, type, quantity, unit,
-          reference_type, reference_id, reference_number,
-          customer_id, notes, performed_by, performed_at
-        ) VALUES (
-          ${dispatch.lot_id}, 'dispatch', ${-d.quantity_dispatched}, ${lot.unit},
-          'invoice', ${dispatch.invoice_id ?? null}, ${dispatch.invoice_number ?? null},
-          ${dispatch.customer_id ?? null}, ${d.notes ?? null}, ${user.id}, now()
-        )
-      `.execute(trx);
-      const updated2 = await sql`
-        UPDATE trace_dispatches
-        SET status = 'confirmed',
-            quantity_dispatched = ${d.quantity_dispatched},
-            confirmed_at = now(),
-            confirmed_by = ${user.id},
-            notes = COALESCE(${d.notes ?? null}, notes)
-        WHERE id = ${id}
-        RETURNING *
-      `.execute(trx);
-      return updated2;
-    });
     return c.json({ data: updated.rows[0] });
   });
   app.post("/:id/assign-lot", zValidator("json", exports_external.object({
@@ -164865,50 +164864,39 @@ function dispatchesRouter(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const d = c.req.valid("json");
-    const lotResult = await sql`
-      SELECT id, quantity_remaining, unit, status FROM trace_lots
-      WHERE id = ${d.lot_id} AND status = 'available'
-    `.execute(db);
-    if (!lotResult.rows.length)
-      return c.json({ error: "Lot indisponibil / Lot not available" }, 400);
-    const lot = lotResult.rows[0];
-    if (parseFloat(lot.quantity_remaining) < d.quantity_dispatched) {
-      return c.json({
-        error: `Stoc insuficient. Disponibil: ${lot.quantity_remaining} ${lot.unit}`
-      }, 400);
+    let dispatch;
+    try {
+      dispatch = await db.transaction().execute(async (trx) => {
+        const lot = await claimLotQuantity(trx, d.lot_id, d.quantity_dispatched);
+        await sql`
+          INSERT INTO trace_movements (
+            lot_id, type, quantity, unit,
+            reference_type, reference_number,
+            customer_id, notes, performed_by, performed_at
+          ) VALUES (
+            ${d.lot_id}, 'dispatch', ${-d.quantity_dispatched}, ${lot.unit},
+            'manual', ${d.invoice_number ?? null},
+            ${d.customer_id ?? null}, ${d.notes ?? null}, ${user.id}, now()
+          )
+        `.execute(trx);
+        return await sql`
+          INSERT INTO trace_dispatches (
+            invoice_number, customer_id, customer_name,
+            lot_id, quantity_invoiced, quantity_dispatched, unit,
+            status, confirmed_at, confirmed_by, notes
+          ) VALUES (
+            ${d.invoice_number ?? null}, ${d.customer_id ?? null}, ${d.customer_name},
+            ${d.lot_id}, ${d.quantity_dispatched}, ${d.quantity_dispatched}, ${lot.unit},
+            'confirmed', now(), ${user.id}, ${d.notes ?? null}
+          )
+          RETURNING *
+        `.execute(trx);
+      });
+    } catch (err) {
+      if (err instanceof LotUnavailableError)
+        return c.json({ error: err.message }, 400);
+      throw err;
     }
-    const newQty = parseFloat(lot.quantity_remaining) - d.quantity_dispatched;
-    const dispatch = await db.transaction().execute(async (trx) => {
-      await sql`
-        UPDATE trace_lots
-        SET quantity_remaining = ${newQty}, status = ${newQty === 0 ? "exhausted" : "available"}
-        WHERE id = ${d.lot_id}
-      `.execute(trx);
-      await sql`
-        INSERT INTO trace_movements (
-          lot_id, type, quantity, unit,
-          reference_type, reference_number,
-          customer_id, notes, performed_by, performed_at
-        ) VALUES (
-          ${d.lot_id}, 'dispatch', ${-d.quantity_dispatched}, ${lot.unit},
-          'manual', ${d.invoice_number ?? null},
-          ${d.customer_id ?? null}, ${d.notes ?? null}, ${user.id}, now()
-        )
-      `.execute(trx);
-      const dispatch2 = await sql`
-        INSERT INTO trace_dispatches (
-          invoice_number, customer_id, customer_name,
-          lot_id, quantity_invoiced, quantity_dispatched, unit,
-          status, confirmed_at, confirmed_by, notes
-        ) VALUES (
-          ${d.invoice_number ?? null}, ${d.customer_id ?? null}, ${d.customer_name},
-          ${d.lot_id}, ${d.quantity_dispatched}, ${d.quantity_dispatched}, ${lot.unit},
-          'confirmed', now(), ${user.id}, ${d.notes ?? null}
-        )
-        RETURNING *
-      `.execute(trx);
-      return dispatch2;
-    });
     return c.json({ data: dispatch.rows[0] }, 201);
   });
   return app;
@@ -165420,25 +165408,27 @@ class RecallService {
   async initiateRecall(params) {
     const downstream = await this.traceTree.traceDownstream(params.lotId);
     const affectedIds = [params.lotId, ...downstream.affected_lots.map((l) => l.output_lot_id)];
-    await sql`
-      UPDATE trace_lots
-      SET status = 'recalled'
-      WHERE id = ANY(${affectedIds}::uuid[])
-    `.execute(this.db);
-    const recallResult = await sql`
-      INSERT INTO trace_recalls (lot_id, scope, reason, initiated_by, initiated_at, affected_downstream_lots, status)
-      VALUES (
-        ${params.lotId},
-        ${params.scope},
-        ${params.reason},
-        ${params.initiatedBy},
-        now(),
-        ${JSON.stringify(downstream.affected_lots)}::text::jsonb,
-        'active'
-      )
-      RETURNING *
-    `.execute(this.db);
-    return recallResult.rows[0];
+    return await this.db.transaction().execute(async (trx) => {
+      await sql`
+        UPDATE trace_lots
+        SET status = 'recalled'
+        WHERE id = ANY(${affectedIds}::uuid[])
+      `.execute(trx);
+      const recallResult = await sql`
+        INSERT INTO trace_recalls (lot_id, scope, reason, initiated_by, initiated_at, affected_downstream_lots, status)
+        VALUES (
+          ${params.lotId},
+          ${params.scope},
+          ${params.reason},
+          ${params.initiatedBy},
+          now(),
+          ${JSON.stringify(downstream.affected_lots)}::text::jsonb,
+          'active'
+        )
+        RETURNING *
+      `.execute(trx);
+      return recallResult.rows[0];
+    });
   }
   async resolveRecall(recallId, resolvedBy, resolutionNotes) {
     const result = await sql`
