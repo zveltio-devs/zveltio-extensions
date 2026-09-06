@@ -543,6 +543,94 @@ work have already been through.
 
 ---
 
+## Cross-repository: what was settled, and one thing left open
+
+The engine-side session (`zveltio-9f`) worked in parallel through 2026-09-05/06
+and has since ended. What we agreed is recorded here because a chat transcript is
+not a place decisions survive.
+
+### Three defects that existed only behind a harness stub
+
+`testing/ext-harness.ts` turned any `ctx.internals` member it does not implement
+into a callable stub returning `undefined`. The failure direction is set by how
+each member signals, not by the stub:
+
+```
+throws to refuse    assertPublicUrl and family
+                    -> resolves silently -> ALLOWED. A refusal test passes with
+                       the guard deleted from the route.
+returns a boolean   isTenantAdmin, requireInstanceAdmin
+                    -> undefined -> falsy -> refused. Visible — but it hides the
+                       ALLOW path.
+returns error|null  checkQueryDepth, checkQueryWidth
+                    -> a truthy Promise -> every query rejected. Visible.
+```
+
+Found: `integrations/api-connector` guarding a caller-supplied `base_url` the
+connector later fetches, inert with no test at all; the `content/pages` editor
+gate, untested in both directions; and `GET /sites` answering 500 for a suspended
+tenant slug on a path tests could not reach.
+
+**The settled answer is a ratchet, not a blanket throw** — `quality-gates/harness-stubs.json`
+plus `scripts/check-harness-stubs.ts`. The blanket throw was proposed by the
+engine session and withdrawn on the measurement: 24 members are reached, and for
+most `undefined` is a fair answer. A rule that makes someone write a sentence
+about `generatePDF` to test a mail filter trains people to write it without
+meaning it.
+
+**The argument that decided it, in their words:** *"the three-that-fail-open
+number is not a property of the members; it is a property of the current call
+sites, and it moves when someone refactors."* `isTenantAdmin` was
+fail-closed-and-visible until a route moved onto it, and then "visible" meant
+"invisible, because nothing tested the allow path". A hard throw fixes the count
+at one moment; a ratchet notices the movement.
+
+Their two conditions are in it: a **staleness** check, so a line naming a member
+that has since been made real fails; and **categories** rather than free-text
+reasons, because after the fifth entry a reason no longer says which question is
+being answered.
+
+### The bare admin check, and why the two helpers exist
+
+`checkPermission(uid, 'admin', '*')` reads as "instance admin" and behaves as
+"tenant admin": `('p','tenant_admin','*','*','*')` in `001_initial.sql`, so
+`obj='admin'` matches. Around twenty engine route modules were gated that way,
+and it is how a tenant admin reached user-role changes.
+
+`isTenantAdmin` is literally that same call with a name (`permissions.ts:905`);
+`requireInstanceAdmin` is the different thing. **There is no correct bulk
+answer** — each site is one or the other and only whoever wrote it knows which.
+`content/pages/engine/editor.ts` moved all three of its sites to `isTenantAdmin`,
+because pages are `zv_page*` with `tenant_id` and RLS: `requireInstanceAdmin`
+would have locked every tenant admin out of their own site.
+
+### Still open, and nobody owns it
+
+**`quality-gates/admin-gate-baseline.json` in the ENGINE repository still records
+`"content/pages/engine/editor.ts": 2`.** The file is at 0. The engine session
+undertook to lower it once the extensions PR landed — it landed (#88) and the
+session ended before doing so.
+
+The gate passes on a decrease, so nothing is red. What is lost is the ratchet's
+grip on that file: it could regain two bare admin checks without failing. Whoever
+next works in the engine repository should set it to 0.
+
+### Boundary rules that held, and are worth keeping
+
+- **The coupling runs one way.** Engine gates read this repository at a hardcoded
+  path, so anything published here reaches engine CI before anyone here has run
+  it. There is no equivalent in the other direction. Run `check:atomic-writes`,
+  `catch:fabricated` and `admin-gate-check` from the engine repo before merging.
+- **Baselines are edited by the repository that owns them.** They refused to
+  record a baseline for a file they do not own; the same rule sent the
+  `admin-gate` decrease back to them.
+- **A finding is verified before it is accepted, in both directions.** They
+  reproduced the `EXTENSION_TABLE_GRANTS` result by a different method (building
+  the allowlist and asking membership, against driving the real query through
+  `createRestrictedDb`) and got the same 5 and 13. Two instruments, one answer.
+
+---
+
 ## The method, and the failure mode it keeps finding
 
 Written here rather than left in three CONTEXT files, because it has now happened
