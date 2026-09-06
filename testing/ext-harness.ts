@@ -34,6 +34,7 @@
  */
 
 import { afterAll, describe, expect, it } from 'bun:test';
+import harnessStubs from '../quality-gates/harness-stubs.json';
 import {
   assertNonMetadataUrl as engineAssertNonMetadataUrl,
   assertPublicUrl as engineAssertPublicUrl,
@@ -115,6 +116,15 @@ const kyselyP = import(join(REPO, 'node_modules/kysely/dist/index.js'));
  * are. Reimplementing either check here would produce a second copy that drifts,
  * and a contract harness whose idea of the contract is its own is worth nothing.
  */
+/**
+ * Members the harness is allowed to stub, from
+ * `quality-gates/harness-stubs.json`. Anything else throws — see
+ * `realInternals`.
+ */
+const RECORDED_STUBS = new Set(
+  (harnessStubs as { members: Array<{ member: string }> }).members.map((m) => m.member),
+);
+
 const ENGINE_LIB = join(REPO, '..', 'zveltio', 'packages', 'engine', 'src', 'lib', 'extensions');
 const restrictP = import(join(ENGINE_LIB, 'extension-context.js'));
 const capsP = import(join(ENGINE_LIB, 'capabilities.js'));
@@ -241,9 +251,51 @@ async function makeCtx(
    * seen.
    */
   // biome-ignore lint/suspicious/noExplicitAny: mock ctx surface
+  /**
+   * Real members pass through; recorded stubs are stubbed; anything else throws.
+   *
+   * The stub was unconditional, and that is how three defects reached the other
+   * repository's CI before anything here noticed them. A member that refuses by
+   * THROWING — `assertPublicUrl` and its family — resolved silently under a
+   * stub, so a test written to prove the refusal passed with the guard deleted
+   * from the route. `integrations/api-connector` `POST /connections` guards a
+   * caller-supplied `base_url` that the connector later fetches; it was inert
+   * here, and there was no test at all, so nothing showed.
+   *
+   * A blanket throw was the obvious answer and is the wrong one: 24 members are
+   * reached, and for most of them `undefined` is a fair answer — a test about a
+   * mail filter should not have to write a sentence about `generatePDF`. A rule
+   * that demands one trains people to write it without meaning it, which is how
+   * an exception list stops being review and becomes paperwork.
+   *
+   * So the list is a RATCHET. What is recorded stubs as before; anything new
+   * throws with the member named, and whoever added it decides once, in writing,
+   * which category it falls in. The categories are the part that matters after
+   * the fifth entry: `fails-open-if-stubbed` is a different question from
+   * `inert-by-nature`, and a free-text reason does not carry that.
+   *
+   * `scripts/check-harness-stubs.ts` fails a line that has gone STALE — a member
+   * listed here that is now real — so the file can only shrink on its own
+   * evidence rather than accumulating sentences nobody means.
+   */
   function realInternals(real: Record<string, any>): any {
     return new Proxy(real, {
-      get: (t, p) => (p in t ? (t as Record<string | symbol, unknown>)[p] : anyStub()),
+      get: (t, p) => {
+        if (p in t) return (t as Record<string | symbol, unknown>)[p];
+        if (typeof p !== 'string' || p === 'then' || p.startsWith('__')) return anyStub();
+        if (RECORDED_STUBS.has(p)) return anyStub();
+        throw new Error(
+          `[ext-harness] "${extName}" reached ctx.internals.${p}, which the harness does ` +
+            `not implement and which is not recorded in quality-gates/harness-stubs.json.\n\n` +
+            `  An unrecorded member is a question, not an \`undefined\`. Decide which it is ` +
+            `and add a line:\n\n` +
+            `    inert-by-nature          a stub returning undefined is a fair answer\n` +
+            `    fails-closed-if-stubbed  undefined reads as "no"; the route becomes unreachable\n` +
+            `    fails-open-if-stubbed    it refuses by THROWING, so a stub means ALLOWED —\n` +
+            `                             a bug to fix, not a state to record. Give the harness\n` +
+            `                             a real implementation instead.\n`,
+        );
+      },
     });
   }
 
