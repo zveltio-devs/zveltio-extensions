@@ -15,7 +15,7 @@ has to re-derive from the code what has already been covered.
 | `repaired` | a specific defect was found, fixed, and the fix verified against a real database. Everything NOT part of that defect is untouched. |
 | `reviewed` | the §6 bar in the handoff: every file read end to end, every guard **exercised**, every write checked on a two-tenant database, migrations applied to a virgin AND an upgraded database. |
 
-**Three extensions are `reviewed`: `content/pages`, `ai` and `communications/mail`.** The other 53 are not, and 52 of
+**Four extensions are `reviewed`: `content/pages`, `ai`, `communications/mail` and `operations/traceability`.** The other 52 are not, and 52 of
 the 56 rows in `REVIEW-STATUS.md` read "verified" — that word means the August
 button-pressing pass (section G), not this campaign. The two bars are not the
 same and the banner on that file says so.
@@ -457,6 +457,92 @@ rejected in and asserting on every one.
 
 ---
 
+## Section 5 — `operations/traceability` · **reviewed** (engine/) · 2026-09-06
+
+Full detail in [../../operations/traceability/CONTEXT.md](../../operations/traceability/CONTEXT.md).
+Six defects, five of them one shape — and the shape is the one this extension
+exists to prevent.
+
+### Read, check in JavaScript, write an absolute value
+
+Four handlers did it: `consumeFromLot`, both dispatch routes, and
+`PATCH /production/:id/complete`. Two operators scanning the same pallet at once
+is not an edge case here; it is what the floor scanner PWA is for.
+
+```
+lot holds 10 kg, two concurrent takes of 6 kg
+  operator A: ACCEPTED, wrote quantity_remaining = 4
+  operator B: ACCEPTED, wrote quantity_remaining = 4
+  movements : 2, totalling -12 kg from a lot that held 10
+```
+
+**Being inside a transaction did not help.** Both dispatch routes were already
+wrapped; their UPDATE matched on `id` alone, so a writer blocked on the row lock
+re-evaluated a condition that was still true. **Atomicity was never the missing
+part — the check had no isolation.** Worth carrying: `db.transaction()` around a
+read-then-write is not a fix, and looks like one.
+
+### The losing write is the safety one
+
+All four also wrote `status` from a stale read, so a recall committed in between
+was undone — a recalled lot back to `available`, and on the dispatch routes sent
+to a customer first. That is what makes the shape worth naming rather than just
+fixing: **in every instance the discarded write is the one protecting somebody.**
+
+`PATCH /production/:id/start`, two handlers above `complete`, already did it
+correctly. **Fourth time in this campaign a correct pattern sat a few lines from
+its broken twin** — and a variant: not two copies of a function, but the right
+and wrong shapes side by side in one file, which should have been the easiest
+kind to catch.
+
+### A parser that mis-read every label
+
+`parseGS1Barcode` stripped FNC1 — the only delimiter a variable-length GS1
+element has — then searched for each AI with a bare `match`. All six test labels
+mis-parsed, including `01 … | 10 LOT42 | 17 251231`, where `supplier_lot_ref`
+came back as `541234500001310LOT42` because `"10"` was found inside the GTIN.
+
+`supplier_lot_ref` is what ties a recall to the supplier's batch and
+`best_before_date` decides what gets sold. Both wrong, on an ordinary label,
+presented to the operator as a pre-filled form.
+
+**A defect in my replacement, caught by its own tests:** the four-digit GS1
+measure family is 31nn–36nn, not 30nn. Written `3[0-6]`, AI `30` was read as
+`3014` and `30144` gave a quantity of 4. Third time this campaign that listing
+the cases a value must be rejected in found something reading did not.
+
+### Two gates that pointed at the right thing while naming the wrong one
+
+Both engine gates went red on my work this section, and both were worth having:
+
+- **`check:atomic-writes`** named `claimLotQuantity` as a three-write handler.
+  It has one write; the gate's splitter does not treat class methods as
+  boundaries, so a new top-level function above the class swallowed
+  `consumeFromLot`'s two INSERTs. **The three statements it pointed at were
+  exactly the ones needing a transaction.** Wrapped.
+- **`catch:fabricated`** flagged `.catch(() => true)` in `developer/database`,
+  where `true` is the REFUSING value. Annotated `fabricated-ok` after verifying
+  the condition that makes that honest: one consumer, a local const, `true` → 403.
+
+A gate that says "look" rather than "fix" earns the false positives. Both of
+these did.
+
+### What CI caught that four sections of local runs did not
+
+The `communications/mail` correction belongs here too, because it is the same
+lesson. I honoured `max_messages_sync` — an obvious two-line fix for a dead
+setting — and the local suite passed. It failed in CI, because
+`001_mail.sql` **seeds that setting as 1000 while the code's constant is 50**, and
+my database's config row had been overwritten by an earlier test so the seeded key
+was absent.
+
+**A dead setting whose default disagrees with the code is not a dead setting — it
+is two answers nobody had to reconcile, because nothing was asking.** And the
+database this document tells you to build from scratch is the one four sections of
+work have already been through.
+
+---
+
 ## The method, and the failure mode it keeps finding
 
 Written here rather than left in three CONTEXT files, because it has now happened
@@ -567,7 +653,7 @@ largest first, because size is where the unexamined surface is.
 | 1 | `content/pages` | 7078 | **`reviewed`** — engine/ and client/. Studio side not covered. |
 | 2 | `ai` | 5838 | **`reviewed`** — engine/ only. Studio side not covered. |
 | 3 | `communications/mail` | 3959 | **`reviewed`** — engine/ + the inbox component. Schemas and pages not covered. |
-| 4 | `operations/traceability` | 2205 | `scanned` only |
+| 4 | `operations/traceability` | 2205 | **`reviewed`** — engine/ only. Studio side not covered. |
 | 5 | `storage/cloud` | 2083 | `scanned` only |
 | 6 | `finance/invoicing` | 1665 | `scanned` only |
 | 7 | `compliance/ro/efactura` | 1538 | `scanned` only |
