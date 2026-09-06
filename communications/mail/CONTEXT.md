@@ -117,7 +117,7 @@ a literal string search cannot see. Caught before it was written down, by readin
 the file the search said was empty. The test that now guards this matches on the
 key's tail for exactly that reason.
 
-Three are honoured now, because their meaning is not in doubt:
+Two are honoured now, because their meaning is not in doubt:
 
 - **`auto_collect_contacts`** — every address a user mailed was harvested into
   `zv_mail_contacts` regardless of the setting. A privacy control that does
@@ -125,12 +125,28 @@ Three are honoured now, because their meaning is not in doubt:
 - **`max_accounts_per_user`** — no limit was enforced anywhere. Checked before
   the IMAP round trip, so a user over the limit is not made to wait on a network
   connection to be told no.
-- **`max_messages_sync`** — the first sync was pinned to a hardcoded 50. An
-  operator raising it to 10000 for a migration got 50.
 
-Eight are **not** invented here. `UNIMPLEMENTED_SETTINGS` in `lib/config.ts`
-names them and `GET /admin/config` returns the list, so the page can mark them
-rather than presenting seventeen controls of which eight are decoration. Each
+Nine are **not** invented here.
+
+**`max_messages_sync` was going to be the third, and it was wrong.** It has an obvious home —
+`FIRST_SYNC_LIMIT`, which bounds the first sync — and wiring it up was two lines.
+But `001_mail.sql` seeds `"max_messages_sync": 1000` and the constant is `50`.
+The two disagree by a factor of twenty, and the disagreement was invisible for
+exactly as long as nothing read the setting. Honouring it changes the first sync
+on every existing install from 50 messages to 1000, silently, at merge — a seeded
+1000 cannot be told from a deliberate one, so "defaults to the previous behaviour
+when unset" does not save it. Which number is right is a product call, so it
+joined the list instead.
+
+**And the local suite passed it.** `zvd_mail_config` on that database had been
+overwritten by another test and no longer carried the seeded key, so the fallback
+applied and the change looked inert. CI failed it at once, on a database built
+from scratch. That rule is written in this repository's own campaign notes and I
+did not follow it — the correction is in the commit and at both call sites.
+
+`UNIMPLEMENTED_SETTINGS` in `lib/config.ts` names all nine and
+`GET /admin/config` returns the list, so the page can mark them rather than
+presenting seventeen controls of which nine are decoration. Each
 needs a product decision a review is not entitled to make — `allowed_domains`
 alone could mean "cannot create an account on that domain" or "cannot send to
 it", which are two different products.
