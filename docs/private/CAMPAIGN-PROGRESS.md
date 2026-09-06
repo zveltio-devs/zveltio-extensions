@@ -604,16 +604,23 @@ answer** — each site is one or the other and only whoever wrote it knows which
 because pages are `zv_page*` with `tenant_id` and RLS: `requireInstanceAdmin`
 would have locked every tenant admin out of their own site.
 
-### Still open, and nobody owns it
+### Waiting on an open PR, not unowned
 
-**`quality-gates/admin-gate-baseline.json` in the ENGINE repository still records
-`"content/pages/engine/editor.ts": 2`.** The file is at 0. The engine session
-undertook to lower it once the extensions PR landed — it landed (#88) and the
-session ended before doing so.
+**`quality-gates/admin-gate-baseline.json` in the ENGINE repository.** The
+`"content/pages/engine/editor.ts": 2` entry is REMOVED in engine PR #468
+(`1a31d5ec`), which is open and green and waiting on that repository's owner.
+Verified in the diff rather than taken on report.
 
-The gate passes on a decrease, so nothing is red. What is lost is the ratchet's
-grip on that file: it could regain two bare admin checks without failing. Whoever
-next works in the engine repository should set it to 0.
+This section said "nobody owns it" for about an hour, which was wrong and worth
+recording as a habit rather than a slip: **a thing absent from `master` is not
+the same as a thing nobody is doing**, and the first is what you see from the
+other side of a repository boundary. Check open PRs before writing that a
+cross-repository item is unowned.
+
+Entry removed rather than set to 0, which is the better of the two: a file at 0
+contributes nothing to the tally, and a stale entry keeps its grip only in
+appearance — a return to 2 would have read as "none new" and the gate would have
+been right.
 
 ### Boundary rules that held, and are worth keeping
 
@@ -628,6 +635,58 @@ next works in the engine repository should set it to 0.
   reproduced the `EXTENSION_TABLE_GRANTS` result by a different method (building
   the allowlist and asking membership, against driving the real query through
   `createRestrictedDb`) and got the same 5 and 13. Two instruments, one answer.
+
+---
+
+## The class that needed three gates before anyone named it
+
+### Correct in isolation, wrong in composition
+
+Three defects on 2026-09-06, three different mechanisms, one shape: **the file
+under review is correct, and the cost lands somewhere that never mentions it.**
+
+| the file | correct on its own | where the cost landed |
+|---|---|---|
+| `MailInbox.svelte` — a closing script tag inside a `//` comment | it is a comment | the Studio workspace, three files away: `has no default export` |
+| `ext-harness.ts` — unknown `ctx.internals` become stubs | an extension must mount without every internal | `api-connector`'s SSRF guard, inert with no test at all |
+| `sanitize.ts` × 2 — `DOMPurify.addHook` on the shared import | each hook is right for its own caller | the CMS renderer, which allows `style` deliberately and mentions neither |
+
+Nobody reviewing any one of those files could have seen the defect, because
+nothing in the file is wrong. That is what separates this from the twin class
+(class 14): a twin is a second copy you can grep for. Here there is no copy —
+there is a **consumer** you have to think of.
+
+**What to ask, when reviewing a file that is correct:**
+
+- Does this file change something SHARED — a module singleton, a global hook, a
+  registry, a prototype? Then the blast radius is everyone who imports it, not
+  everyone who calls you.
+- Is this file compiled, parsed or executed somewhere ELSE? Then the thing that
+  consumes it is the only thing that can check it, and this repository cannot.
+- Does this file make something UNREACHABLE for a test — a stub, a gate that
+  always denies, a default that hides a branch? Then the code behind it is
+  unreviewed no matter how green the suite is.
+
+Three gates came out of these — `check-svelte-compiles`,
+`check-harness-stubs`, `check-shared-singleton-hooks` — and gates are what you
+trip over afterwards. The question above is the thing a reviewer can be told in
+advance, which is why it is written here rather than only in three script
+headers.
+
+Named by the session reviewing the synced Studio bundle, who pointed out that
+three gates are not a class and that the class is the useful artefact.
+
+### The direction is not a defence
+
+All three failed SAFE. The comment stripped more markup, the stub refused more
+requests, the hook removed more styles. **That is why none of them was noticed** —
+a control that over-refuses produces no complaint and no error, only a feature
+that quietly does less than it should. `content/pages` lost a hero background
+after a visit to the mail pane and came back after a refresh, which is close to
+unreproducible from a bug report.
+
+A safe failure direction is a reason the defect survives, not a reason to rank it
+lower.
 
 ---
 
