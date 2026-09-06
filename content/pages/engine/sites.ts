@@ -31,7 +31,7 @@ import { findBlockById, resolveBlockAt, resolveBlocks, resolveRecord } from './h
 import { sanitizeBlocks, sanitizeBlocksForWrite } from './sanitize.js';
 import { placeholdersIn } from '../client/bind.js';
 import { jsonb } from './jsonb.js';
-import { tenantId } from './tenant.js';
+import { tenantId, TenantUnresolved } from './tenant.js';
 
 // biome-ignore lint/suspicious/noExplicitAny: the internals bag is typed engine-side
 type Any = any;
@@ -160,6 +160,27 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
   // On `ctx`, not on `ctx.internals` — see `hasRole`.
   const getUserRoles = (ctx as Any).getUserRoles as (userId: string) => Promise<string[]>;
   const app = new Hono();
+
+  /**
+   * A request that cannot be attributed to a tenant is a 400, not a 500.
+   *
+   * `tenantId(c)` throws rather than falling back to the root tenant — see the
+   * note on that helper for why. Nothing caught it, so an `x-tenant-slug` naming
+   * an unknown or SUSPENDED tenant produced `Internal Server Error`: a caller
+   * told the system broke when what happened is that their header was refused,
+   * and an operator told nothing at all.
+   *
+   * Found by the contract harness, which mounts without the tenant middleware
+   * and so reaches the throwing path on every route — a probe that only became
+   * possible once the harness stopped stubbing this router's admin gate to a
+   * refusal. It had been unreachable in tests, not absent.
+   */
+  app.onError((err, c) => {
+    if (err instanceof TenantUnresolved) {
+      return c.json({ error: err.message }, 400);
+    }
+    throw err;
+  });
 
   async function requireAdmin(c: Any): Promise<Response | null> {
     const user = c.get('user');

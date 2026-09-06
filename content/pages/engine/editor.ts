@@ -19,7 +19,7 @@ import { jsonb } from './jsonb.js';
 import { ICON_NAMES } from '../client/icons.js';
 import { MOTION_TYPES } from '../client/motion.js';
 import { resolveBlocks } from './hydrate.js';
-import { tenantId } from './tenant.js';
+import { tenantId, TenantUnresolved } from './tenant.js';
 
 // biome-ignore lint/suspicious/noExplicitAny: Hono context in a self-contained extension
 type Any = any;
@@ -65,10 +65,10 @@ async function requireAuth(c: Any, auth: Any) {
  * Without this, ANY authenticated user could publish arbitrary JavaScript to
  * every visitor, including admins: privilege escalation, not self-XSS.
  */
-async function requireAdmin(c: Any, auth: Any, checkPermission: Any) {
+async function requireAdmin(c: Any, auth: Any, isTenantAdmin: Any) {
   const user = await getUser(c, auth);
   if (!user) return { user: null, res: c.json({ error: 'Unauthorized' }, 401) };
-  if (!(await checkPermission(user.id, 'admin', '*'))) {
+  if (!(await isTenantAdmin(user.id))) {
     return { user: null, res: c.json({ error: 'Admin access required' }, 403) };
   }
   return { user, res: null };
@@ -95,14 +95,63 @@ const UpdatePageSchema = PageSchema.partial().extend({
 });
 
 export function editorRoutes(ctx: ExtensionContext): Hono {
-  const { db, auth, checkPermission } = ctx;
+  const { db, auth } = ctx;
   const engine = ctx.internals as Any;
+
+  /**
+   * The gate for this router, named for what it means.
+   *
+   * All three admin checks in this file were `checkPermission(user.id, 'admin',
+   * '*')`. That call reads as "instance administrator" and behaves as "tenant
+   * administrator": the `tenant_admin` Casbin policy is `('p','tenant_admin',
+   * '*','*','*')` in `001_initial.sql`, so `obj='admin'` matches and a delegated
+   * tenant admin passes it. Around twenty engine route modules were gated that
+   * way, and it is how a tenant admin reached user-role changes and from there
+   * the instance — which is why the engine has a gate forbidding the bare form.
+   *
+   * Pages ARE tenant-scoped: `zv_page*` carries `tenant_id` with RLS, and an
+   * administrator of firm B should manage firm B's site. So the tenant-scoped
+   * meaning is the correct one here, and `requireInstanceAdmin` would be a
+   * regression — it would stop every tenant admin editing their own pages.
+   *
+   * `isTenantAdmin` is literally that same `checkPermission` call with a name
+   * (`permissions.ts:905`), so this changes no behaviour at all. What it changes
+   * is that the call site now states which of the two meanings it holds, which
+   * is the whole point of the two helpers existing.
+   *
+   * NOT wrapped in `.catch(() => false)`, unlike `content/media`. A permission
+   * lookup that throws is a fault, and reporting it as "you are not an admin"
+   * turns a broken system into a plausible-looking refusal — the failure shape
+   * this campaign keeps removing. It surfaces as a 500, which is the truth.
+   */
+  const isTenantAdmin = (userId: string): Promise<boolean> => engine.isTenantAdmin(userId);
 
   // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
   // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in a
   // handler is therefore already RLS-scoped — there is one spelling, so there is
   // none to forget.
   const app = new Hono();
+
+  /**
+   * A request that cannot be attributed to a tenant is a 400, not a 500.
+   *
+   * `tenantId(c)` throws rather than falling back to the root tenant — see the
+   * note on that helper for why. Nothing caught it, so an `x-tenant-slug` naming
+   * an unknown or SUSPENDED tenant produced `Internal Server Error`: a caller
+   * told the system broke when what happened is that their header was refused,
+   * and an operator told nothing at all.
+   *
+   * Found by the contract harness, which mounts without the tenant middleware
+   * and so reaches the throwing path on every route — a probe that only became
+   * possible once the harness stopped stubbing this router's admin gate to a
+   * refusal. It had been unreachable in tests, not absent.
+   */
+  app.onError((err, c) => {
+    if (err instanceof TenantUnresolved) {
+      return c.json({ error: err.message }, 400);
+    }
+    throw err;
+  });
 
   /**
    * The editor is admin-only — for READS as well as writes.
@@ -143,7 +192,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
 
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
-    if (!(await checkPermission(user.id, 'admin', '*'))) {
+    if (!(await isTenantAdmin(user.id))) {
       return c.json({ error: 'Admin access required' }, 403);
     }
     await next();
@@ -200,7 +249,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
       redirect_type: z.literal(301).or(z.literal(302)).default(301),
     })),
     async (c) => {
-      const { user, res } = await requireAdmin(c, auth, checkPermission);
+      const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
       if (!user) return res;
       const redirect = await db
         .insertInto('zv_page_redirects')
@@ -212,7 +261,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
   );
 
   app.delete('/redirects/:id', async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user) return res;
     await db.deleteFrom('zv_page_redirects').where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
@@ -248,7 +297,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.put('/menus/:key', zValidator('json', MenuItemsSchema), async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user) return res;
     const key = c.req.param('key');
     if (!['main', 'footer'].includes(key)) {
@@ -317,7 +366,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
       priority: z.number().min(0).max(1).default(0.5),
     })),
     async (c) => {
-      const { user, res } = await requireAdmin(c, auth, checkPermission);
+      const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
       if (!user) return res;
       const data = c.req.valid('json');
       const config = await db
@@ -429,7 +478,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
       blocks: z.array(z.any()).min(1),
     })),
     async (c) => {
-      const { user, res } = await requireAdmin(c, auth, checkPermission);
+      const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
       if (!user) return res;
       const data = c.req.valid('json');
       try {
@@ -459,7 +508,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
   );
 
   app.delete('/templates/:id', async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user) return res;
     await db.deleteFrom('zv_page_templates').where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
@@ -485,7 +534,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
   app.get('/stats', async (c) => {
     const user = await requireAuth(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
-    if (!(await checkPermission(user.id, 'admin', '*'))) {
+    if (!(await isTenantAdmin(user.id))) {
       return c.json({ error: 'Admin access required' }, 403);
     }
 
@@ -547,7 +596,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/', zValidator('json', PageSchema), async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user) return res;
 
     const body = c.req.valid('json');
@@ -567,7 +616,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.on(['PUT', 'PATCH'], '/:id', zValidator('json', UpdatePageSchema), async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user) return res;
 
     const id = c.req.param('id');
@@ -633,7 +682,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.delete('/:id', async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user) return res;
     await db.deleteFrom('zv_pages').where('id', '=', c.req.param('id')).execute();
     return c.json({ success: true });
@@ -681,7 +730,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
    * not cost the version it replaced.
    */
   app.post('/:id/revisions/:revisionId/restore', async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user) return res;
 
     const id = c.req.param('id');
@@ -759,7 +808,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/:id/seo/analyze', async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user) return res;
 
     const id = c.req.param('id');
@@ -845,7 +894,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
       traffic_pct: z.number().int().min(1).max(99).default(50),
     })),
     async (c) => {
-      const { user, res } = await requireAdmin(c, auth, checkPermission);
+      const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
       if (!user) return res;
       const data = c.req.valid('json');
       const variant = await db
@@ -863,7 +912,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
   );
 
   app.delete('/:id/ab-variants/:variantId', async (c) => {
-    const { user, res } = await requireAdmin(c, auth, checkPermission);
+    const { user, res } = await requireAdmin(c, auth, isTenantAdmin);
     if (!user) return res;
     await db
       .deleteFrom('zv_page_ab_variants')
