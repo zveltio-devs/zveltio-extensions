@@ -1,0 +1,130 @@
+{
+  "_": "See scripts/check-harness-stubs.ts. Every `ctx.internals` member the contract harness stubs, with the category that says WHICH question it answers. A member not listed here throws when a test reaches it.",
+  "categories": {
+    "inert-by-nature": "A stub returning `undefined` is a fair answer. The member does work that is not what the test is about, and its absence cannot make a guard pass.",
+    "fails-closed-if-stubbed": "The stub's `undefined` reads as 'no' at the call site, so a route becomes unreachable rather than unguarded. Visible when it happens — a route that always 403s gets noticed — but it hides the allow path, which is how the editor gate went untested in both directions.",
+    "fails-open-if-stubbed": "The member REFUSES BY THROWING, so a stub that resolves silently means allowed. A test written to prove the refusal passes with the guard deleted. Nothing may sit here: this category exists so the word is available when triaging a new member, and an entry in it is a bug to fix, not a state to record."
+  },
+  "members": [
+    {
+      "member": "checkQueryDepth",
+      "category": "fails-closed-if-stubbed",
+      "reason": "returns an error string or null; the stub is a truthy Promise, so every GraphQL query is rejected as too deep. developer/graphql:462,656."
+    },
+    {
+      "member": "checkQueryWidth",
+      "category": "fails-closed-if-stubbed",
+      "reason": "same shape as checkQueryDepth. developer/graphql:467,653."
+    },
+    {
+      "member": "checkValidationExpression",
+      "category": "inert-by-nature",
+      "reason": "validates a rule expression; a test about rule storage does not need it to parse."
+    },
+    {
+      "member": "createBetterAuthSession",
+      "category": "inert-by-nature",
+      "reason": "the harness mints its own session; an extension asking for one gets nothing and the test supplies what it needs."
+    },
+    {
+      "member": "DataLoaderRegistry",
+      "category": "inert-by-nature",
+      "reason": "a batching cache. Absent, each read goes straight to the database, which is what a test wants anyway."
+    },
+    {
+      "member": "dynamicInsert",
+      "category": "inert-by-nature",
+      "reason": "writes through the field pipeline; extensions that use it are tested on what lands in the table, via the real db."
+    },
+    {
+      "member": "enqueueDDLJob",
+      "category": "inert-by-nature",
+      "reason": "puts a job on pg-boss. A test asserting the response cannot also assert the queue, and the queue is the engine's."
+    },
+    {
+      "member": "evaluateExpressionRule",
+      "category": "inert-by-nature",
+      "reason": "row-rule evaluation. Extensions that depend on the answer stub it themselves."
+    },
+    {
+      "member": "extensionRegistry",
+      "category": "inert-by-nature",
+      "reason": "the host's registry object. Reached for registration side effects the harness models separately."
+    },
+    {
+      "member": "extractTextFromFile",
+      "category": "inert-by-nature",
+      "reason": "PDF/Office text extraction. ai/alchemist is tested on what it does with text, not on getting it out of a .docx."
+    },
+    {
+      "member": "generatePDF",
+      "category": "inert-by-nature",
+      "reason": "renders a PDF. The bytes are not what any extension test asserts."
+    },
+    {
+      "member": "generatePDFAsync",
+      "category": "inert-by-nature",
+      "reason": "queues a PDF render and returns a handle. Absent, the caller gets undefined where it expected an id — loud at the call site, and no extension test asserts on a rendered document."
+    },
+    {
+      "member": "introspectSchema",
+      "category": "inert-by-nature",
+      "reason": "reads the live schema for GraphQL. Absent, the schema is empty, which the tests that care construct themselves."
+    },
+    {
+      "member": "invalidateRulesCache",
+      "category": "inert-by-nature",
+      "reason": "a cache eviction. Doing nothing is correct when there is no cache."
+    },
+    {
+      "member": "maybeDecrypt",
+      "category": "inert-by-nature",
+      "reason": "the FIELD keyring, distinct from encryptSecret/decryptSecret which ARE real here. A test about field encryption sets FIELD_ENCRYPTION_KEY and asserts on the column."
+    },
+    {
+      "member": "maybeEncrypt",
+      "category": "inert-by-nature",
+      "reason": "the FIELD keyring, distinct from encryptSecret which IS real here. Absent, a value is stored as given; a test about field encryption sets FIELD_ENCRYPTION_KEY and asserts on the column rather than on this."
+    },
+    {
+      "member": "moveToTrash",
+      "category": "inert-by-nature",
+      "reason": "moves a stored file. content/media is tested on the row, not the bytes."
+    },
+    {
+      "member": "renderTemplate",
+      "category": "inert-by-nature",
+      "reason": "renders a document template. The output is not asserted by any extension test."
+    },
+    {
+      "member": "requireInstanceAdmin",
+      "category": "fails-closed-if-stubbed",
+      "reason": "returns a boolean; `undefined` is falsy, so developer/database answers 403 on every route. DELIBERATELY not aliased to the harness's `admin` switch: instance-wide power is a different thing from tenant-admin, and a test needing it should say so rather than inherit a tenant-level answer."
+    },
+    {
+      "member": "runEdgeFunction",
+      "category": "inert-by-nature",
+      "reason": "executes user code in the sandbox. Not something an extension test should be running."
+    },
+    {
+      "member": "runQualityScan",
+      "category": "inert-by-nature",
+      "reason": "a long scan over the whole schema; analytics/quality asserts on the rows it stores."
+    },
+    {
+      "member": "safeFetch",
+      "category": "fails-closed-if-stubbed",
+      "reason": "an SSRF-guarded fetch. The stub resolves to `undefined` rather than a Response, so a caller reading `.ok` or `.json()` throws — loud, not silent. NOT fails-open: the guard is inside it and a stub performs no request at all."
+    },
+    {
+      "member": "scheduleFileIndexing",
+      "category": "inert-by-nature",
+      "reason": "queues an indexing job. Nothing consumes it in a test."
+    },
+    {
+      "member": "sendNotification",
+      "category": "inert-by-nature",
+      "reason": "writes a notification row through the engine. Extensions assert on their own tables; ai/runBackgroundTask counts the calls it makes, not the rows."
+    }
+  ]
+}
