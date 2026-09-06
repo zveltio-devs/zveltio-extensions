@@ -374,12 +374,27 @@ extension **already had this defect on record** — the note in `index.ts` calls
 written when a scheduler was added to honour it. Nobody checked the sixteen next
 to it.
 
-Three are honoured now (`auto_collect_contacts`, which was a privacy control that
-harvested every address regardless; `max_accounts_per_user`; `max_messages_sync`,
-which was pinned to a hardcoded 50). Eight are named in `UNIMPLEMENTED_SETTINGS`
-and returned by `GET /admin/config` rather than invented, because each needs a
-product decision — `allowed_domains` alone could mean "cannot create an account
-on that domain" or "cannot send to it".
+Two are honoured now: `auto_collect_contacts`, a privacy control that harvested
+every address regardless, and `max_accounts_per_user`, which nothing enforced.
+Nine are named in `UNIMPLEMENTED_SETTINGS` and returned by `GET /admin/config`
+rather than invented, because each needs a product decision — `allowed_domains`
+alone could mean "cannot create an account on that domain" or "cannot send to it".
+
+**The third one I tried to honour was a mistake, and CI caught it.**
+`max_messages_sync` has an obvious home in `FIRST_SYNC_LIMIT`. But `001_mail.sql`
+seeds it as **1000** and the constant is **50** — a factor of twenty, invisible
+for exactly as long as nothing read the setting. Honouring it would have changed
+the first sync on every existing install, silently, at merge; a seeded value
+cannot be told from a deliberate one, so "defaults to the previous behaviour when
+unset" does not protect you.
+
+**And the local suite passed it.** That database's `zvd_mail_config` had been
+overwritten by another test and no longer carried the seeded key, so the fallback
+applied and the change looked inert. This document already says "build the
+database from scratch before believing a suite"; I ran against a database four
+sections of work had been through. **A dead setting whose default disagrees with
+the code is not a dead setting — it is two answers nobody had to reconcile,
+because nothing was asking.**
 
 **A measurement error worth keeping.** The first pass reported *fifteen* dead
 settings, including all four `oauth2_*` keys. They are read — as
