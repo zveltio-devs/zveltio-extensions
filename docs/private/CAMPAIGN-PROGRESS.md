@@ -15,7 +15,7 @@ has to re-derive from the code what has already been covered.
 | `repaired` | a specific defect was found, fixed, and the fix verified against a real database. Everything NOT part of that defect is untouched. |
 | `reviewed` | the §6 bar in the handoff: every file read end to end, every guard **exercised**, every write checked on a two-tenant database, migrations applied to a virgin AND an upgraded database. |
 
-**Two extensions are `reviewed`: `content/pages` and `ai`.** The other 54 are not, and 52 of
+**Three extensions are `reviewed`: `content/pages`, `ai` and `communications/mail`.** The other 53 are not, and 52 of
 the 56 rows in `REVIEW-STATUS.md` read "verified" — that word means the August
 button-pressing pass (section G), not this campaign. The two bars are not the
 same and the banner on that file says so.
@@ -49,10 +49,11 @@ than re-deriving the numbers — and note that the earlier figures it corrects
 | `auth/ldap` | 1.1.3 | `selectFrom('user')` refused by the table proxy — directory login could not provision a first-time user. |
 | `content/pages` | 1.0.7 | The same defect, third instance, and the only silent one: the refusal sat inside a `catch` written for a different reason, so role hydration had **never** run on any installation. |
 | `developer/database` | 1.1.0 | Authorised but unbounded. `DROP ROLE` protected `pg_*` and missed `zveltio_rls`/`zveltio_worker`; RLS could be disabled on any `zvd_*` table; `tenant_isolation_*` policies could be dropped; and a PERMISSIVE policy reached the same outcome sideways. |
+| `communications/mail` | 1.2.0 | The reading pane rendered inbound email with `{@html}` behind a regex that removed only a literal `<script>` — 11 of 12 payloads survived, and the attacker is anyone who can send mail to a user. Plus 11 of 17 admin settings that nothing read, and an unguarded outbound connection to any host the caller named. |
 | `analytics/dashboard` | 1.0.3 | Every saved dashboard layout silently discarded on read. A single `::jsonb` cast stored the widget list as a JSON string scalar; `readLayout` refuses anything that is not an array, so a personalised dashboard came back as the default. Migration 003 recovers the rows already written. |
 | `communications/mail` | 1.1.0 | Configuration read from `zv_settings` in 6 places, and keyed `ON CONFLICT (key)` — one mail configuration for the whole instance, so a second tenant could not have its own IMAP server. Migration 005 moves it to a tenant-keyed table. |
 
-These six are `repaired`, **not** `reviewed`. Each was entered through one
+These are `repaired`, **not** `reviewed` (except `communications/mail`, which section 4 took to the bar). Each was entered through one
 defect. The rest of each extension is as unexamined as any other.
 
 ### Added along the way
@@ -330,6 +331,117 @@ tests red and leaves the other eleven green.
 
 ---
 
+## Section 4 — `communications/mail` · **reviewed** (engine/ + the inbox component) · 2026-09-06
+
+Full detail in [../../communications/mail/CONTEXT.md](../../communications/mail/CONTEXT.md).
+Four defects. Three of them sit in places the previous passes were not looking:
+the Studio component, the settings surface, and the one field that makes the
+server open an outbound connection.
+
+The engine routes themselves were in good shape — 46 routes, every one scoped to
+the caller, the bulk handler properly parameterised, the OAuth state claimed with
+`DELETE … RETURNING`. That is what a previously-audited surface looks like. The
+defects were all outside it.
+
+### The worst sink found in this repository so far
+
+`MailInbox.svelte` rendered `body_html` with `{@html}` behind one regular
+expression that removed a literal `<script>…</script>`. Measured: **11 of 12
+payloads survived** — `<img src=x onerror=…>`, `<svg onload=…>`,
+`<iframe src=javascript:…>`, `<meta http-equiv=refresh>`, an unclosed `<script>`.
+
+What makes it the worst is the threat model, not the bypass. Everywhere else the
+attacker needs an account. **Here the attacker is anyone who can send an email to
+a user of the instance** — no account, no permission, no interaction beyond the
+victim opening their mail.
+
+**Why it survived:** the 2026-08-02 audit round concluded a "mail iframe XSS"
+claim was FALSE. That verdict was right and does not apply — `MailInbox.svelte`
+did not exist then (Tier-3 inbox, 2026-08-23), and this is `{@html}`, not an
+iframe. **A finding marked "not a bug" stays marked, and the component that
+reintroduced it arrived three weeks later.** Worth carrying: a closed finding
+protects the code that was read, not the file name.
+
+It was also the only `{@html}` in the repository with no sanitizer behind it.
+`content/pages` has three sinks and a DOMPurify module; mail had one sink and a
+regex.
+
+### Eleven of seventeen admin settings were write-only
+
+An admin set them, the save answered success, and nothing read the value. This
+extension **already had this defect on record** — the note in `index.ts` calls
+`sync_interval_minutes` "a knob that looked like a schedule and was not one",
+written when a scheduler was added to honour it. Nobody checked the sixteen next
+to it.
+
+Three are honoured now (`auto_collect_contacts`, which was a privacy control that
+harvested every address regardless; `max_accounts_per_user`; `max_messages_sync`,
+which was pinned to a hardcoded 50). Eight are named in `UNIMPLEMENTED_SETTINGS`
+and returned by `GET /admin/config` rather than invented, because each needs a
+product decision — `allowed_domains` alone could mean "cannot create an account
+on that domain" or "cannot send to it".
+
+**A measurement error worth keeping.** The first pass reported *fifteen* dead
+settings, including all four `oauth2_*` keys. They are read — as
+``config[`oauth2_${provider}_client_id`]``, a computed key a literal search
+cannot see. Caught before it was written down, by opening the file the search
+called empty. Same shape as the NUL byte and the driver: **the instrument could
+not see the thing it was pointed at**, and the only defence is to open one file
+the search said was clean.
+
+The guard against a recurrence is `lib/config.test.ts`, which re-derives the
+partition from source on every run: a new unwired setting fails the suite, and so
+does a setting listed as missing that something now reads.
+
+### A test that would have passed with the guard deleted
+
+`POST /accounts` dials a host the caller names, and is open to any authenticated
+user — so nothing stopped `imap_host: "169.254.169.254"`. Guarded now with the
+engine's own `assertNonMetadataUrl` through `ctx.internals`.
+
+The first version of the test passed for the wrong reason. **`ext-harness.ts`
+turns unknown `ctx.internals` members into callable stubs returning `undefined`**,
+so a guard that calls one always succeeds. The harness now imports the engine's
+real function, next to the crypto internals that are real for the same reason —
+which makes that guard testable for every extension, not only this one.
+
+Then it failed a second time with the source correct: `mountForTest` mounts the
+**packed bundle**, and mail had not been repacked. Third time in this extension's
+history; its own CONTEXT.md records the previous two.
+
+### The ratchet was keyed on line numbers
+
+`scripts/check-jsonb-cast.ts` went RED while editing this extension without a
+single new site being added — nine baselined entries had moved by a few lines.
+The natural response is `--update`, and `--update` accepts whatever else the same
+commit introduced. **So the ratchet lost its grip exactly when someone was editing
+the files it guards**, which is the only time it matters.
+
+Re-keyed on file plus the offending line's own text, compared as a multiset.
+Verified both ways: shifting every line by ten is invisible to it; adding a real
+site is not.
+
+Second correction to this gate in two days, after the pattern that saw one
+spelling of four. A ratchet is a measuring instrument and gets the same
+suspicion as any other.
+
+### Two defects in the module written to contain a defect
+
+`lib/config.test.ts` caught both, in code I had just written:
+
+- `parseMailConfig('[1,2,3]')` returned the array — `typeof [] === 'object'`.
+  The caller does `{ ...existing, ...patch }`, and spreading an array gives
+  `{0:1,1:2,2:3}`, which is exactly how this extension lost every mail setting in
+  the first place.
+- `intSetting({k: true})` returned **1**, because `Number(true)` is 1 and 1 is a
+  positive integer — so a `true` where a count belongs became "at most 1 mail
+  account".
+
+Neither was visible by reading. Both came from listing the shapes a value must be
+rejected in and asserting on every one.
+
+---
+
 ## The method, and the failure mode it keeps finding
 
 Written here rather than left in three CONTEXT files, because it has now happened
@@ -383,7 +495,17 @@ Both found by accident, both invalidating results taken with them:
   `scripts/check-jsonb-cast.ts` ratchets the remaining sites.
 - **The jsonb ratchet itself, one day old.** It matched one spelling of four and
   reported 16 sites where there were 31. Section 3 has the detail. It found a
-  live defect the moment it was widened.
+  live defect the moment it was widened — and section 4 found it keyed on line
+  numbers, so an unrelated edit turned it red and invited an `--update` that
+  would have accepted anything alongside.
+- **A literal string search cannot see a computed key.** Section 4's first count
+  of dead mail settings was 15; four of them are read as
+  ``config[`oauth2_${provider}_client_id`]``. Caught by opening one file the
+  search called empty.
+- **The contract harness stubs unknown `ctx.internals`.** A guard that calls one
+  always succeeds there, so a test proving the guard is wired passes with the
+  guard deleted. Fixed for `assertNonMetadataUrl`; the same is true of every
+  other internal that is not on the real list.
 
 Before trusting a measurement, ask what the instrument cannot see — including the
 instrument you built to answer that question.
@@ -429,7 +551,7 @@ largest first, because size is where the unexamined surface is.
 |---|---|---:|---|
 | 1 | `content/pages` | 7078 | **`reviewed`** — engine/ and client/. Studio side not covered. |
 | 2 | `ai` | 5838 | **`reviewed`** — engine/ only. Studio side not covered. |
-| 3 | `communications/mail` | 3959 | `repaired` (one defect), not reviewed |
+| 3 | `communications/mail` | 3959 | **`reviewed`** — engine/ + the inbox component. Schemas and pages not covered. |
 | 4 | `operations/traceability` | 2205 | `scanned` only |
 | 5 | `storage/cloud` | 2083 | `scanned` only |
 | 6 | `finance/invoicing` | 1665 | `scanned` only |
