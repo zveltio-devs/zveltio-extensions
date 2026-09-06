@@ -34,7 +34,11 @@
  */
 
 import { afterAll, describe, expect, it } from 'bun:test';
-import { assertNonMetadataUrl as engineAssertNonMetadataUrl } from '@zveltio/engine/lib/security/index.js';
+import {
+  assertNonMetadataUrl as engineAssertNonMetadataUrl,
+  assertPublicUrl as engineAssertPublicUrl,
+  validatePublicUrl as engineValidatePublicUrl,
+} from '@zveltio/engine/lib/security/index.js';
 import { createHmac } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
 import { basename, dirname, join, relative } from 'path';
@@ -304,17 +308,37 @@ async function makeCtx(
     // NOTE: anyStub()'s `get` trap ignores its target, so Object.assign onto it
     // is invisible. The real members have to be consulted BEFORE falling back.
     internals: gateInternals(extName, realInternals({
-      // The SSRF guard is REAL, for the same reason the crypto ones are: a stub
-      // that returns undefined turns "refuse this address" into "allowed", and a
-      // test written to prove the guard is wired would pass with the guard
-      // deleted. That is the failure mode this campaign keeps finding — a test
-      // green because of a mechanism other than the one under test.
+      // ── URL guards: REAL, all three ────────────────────────────────────
+      //
+      // These are the members whose stub fails OPEN, and the direction is decided
+      // by how a guard signals rather than by the stub:
+      //
+      //   throws to refuse    assertPublicUrl, assertNonMetadataUrl,
+      //                       validatePublicUrl
+      //                       -> the stub resolves silently -> ALLOWED.
+      //                          A test asserting refusal passes with the guard
+      //                          deleted. This is the dangerous shape.
+      //
+      //   returns a boolean   isTenantAdmin, requireInstanceAdmin
+      //                       -> the stub gives undefined -> falsy -> refused.
+      //                          Fail-closed; the route is unreachable in tests,
+      //                          which is visible rather than silent.
+      //
+      //   returns error|null  checkQueryDepth, checkQueryWidth
+      //                       -> the stub returns a truthy Promise -> every query
+      //                          rejected. Also fail-closed, also visible.
+      //
+      // Found by deleting a guard and watching its test stay green. Measured
+      // across the whole suite afterwards: 26 distinct unknown internals are
+      // reached, and these three are the ones that refuse by throwing.
       //
       // Imported from the engine rather than reimplemented, so there is one list
-      // of metadata addresses and the harness cannot drift into agreeing with a
+      // of blocked addresses and the harness cannot drift into agreeing with a
       // guard the engine no longer has.
       assertNonMetadataUrl: (url: string, label?: string) =>
         engineAssertNonMetadataUrl(url, label),
+      assertPublicUrl: (url: string) => engineAssertPublicUrl(url),
+      validatePublicUrl: (url: string) => engineValidatePublicUrl(url),
       encryptSecret: async (plaintext: string, o?: { keyring?: string }) =>
         harnessEncrypt(plaintext, o?.keyring ?? 'field'),
       decryptSecret: async (value: string, o?: { keyring?: string }) =>
