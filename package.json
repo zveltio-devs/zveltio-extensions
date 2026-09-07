@@ -18,7 +18,7 @@
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1120.0",
-    "@aws-sdk/s3-request-presigner": "^3.1057.0",
+    "@aws-sdk/s3-request-presigner": "^3.1126.0",
     "@types/sanitize-html": "^2.16.1",
     "bun-types": "latest",
     "dompurify": "3.4.14",
