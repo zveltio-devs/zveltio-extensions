@@ -15,7 +15,7 @@ has to re-derive from the code what has already been covered.
 | `repaired` | a specific defect was found, fixed, and the fix verified against a real database. Everything NOT part of that defect is untouched. |
 | `reviewed` | the §6 bar in the handoff: every file read end to end, every guard **exercised**, every write checked on a two-tenant database, migrations applied to a virgin AND an upgraded database. |
 
-**Four extensions are `reviewed`: `content/pages`, `ai`, `communications/mail` and `operations/traceability`.** The other 52 are not, and 52 of
+**Five extensions are `reviewed`: `content/pages`, `ai`, `communications/mail`, `operations/traceability` and `storage/cloud`.** The other 51 are not, and 52 of
 the 56 rows in `REVIEW-STATUS.md` read "verified" — that word means the August
 button-pressing pass (section G), not this campaign. The two bars are not the
 same and the banner on that file says so.
@@ -690,6 +690,52 @@ lower.
 
 ---
 
+## Section 6 — `storage/cloud` · **reviewed** (engine/) · 2026-09-07
+
+Full detail in [../../storage/cloud/CONTEXT.md](../../storage/cloud/CONTEXT.md).
+Four defects, and **two false alarms I caught before writing them down** — which
+is the part of this section worth carrying.
+
+### The defects
+
+Any tenant member could trash any file, and `listTrash` filtered on `deleted_by`,
+so the owner could not see it to restore it and the purge removed it at thirty
+days. **Third door onto that operation** — the engine's `/api/media` and
+`content/media` both got the owner check; this extension writes the same tables
+through the same helper and asked nothing.
+
+A public share's `max_downloads` was advisory: read, presign, then an
+unconditional increment. Two concurrent requests on a limit of one were both
+served. **The calling block exists twice**, and the edit's anchor assert found
+both — one would otherwise have kept the race.
+
+`deleteObject` swallowed every failure and returned `void`; the purge deleted the
+row regardless. On an install with no object storage configured, every expired
+file lost its record and kept its bytes.
+
+### The two false alarms, and what caught them
+
+**Ask the schema what it HAS, not whether it has the name you guessed.** I
+queried four column names, `created_by` was not among them, and I concluded the
+media library had no owner and that unscoped delete was therefore correct. It
+has one. `content/media` reads it.
+
+**A database holding only the extension under review is not the product.** I
+measured `relrowsecurity = f` on `zv_media_files` and had a working cross-tenant
+read and write to prove it — as `zveltio_rls`, with the GUC set, with positive
+controls. All correct, and the cause was that I had applied `storage/cloud`'s
+migrations and not `content/media`'s, which is what enables RLS on those tables.
+
+That one was one step from a published false critical. **The tables an extension
+READS may be created and policed by a different extension.** Apply the migrations
+of every extension that owns a table you touch, not just the one you are
+reviewing. Add it to the environment recipe below.
+
+Both were caught the same way: by checking the thing that would have to be true
+for the finding to hold, rather than by reading more carefully.
+
+---
+
 ## The method, and the failure mode it keeps finding
 
 Written here rather than left in three CONTEXT files, because it has now happened
@@ -784,6 +830,12 @@ TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/zv_<yours>" bun
 dead port or tests dial the real registry and pay 5000 ms somewhere else each run;
 `TEST_DATABASE_URL` or the contract suite self-skips and reports green.
 
+**Apply the migrations of every extension that owns a table you touch**, not
+only the one under review. `storage/cloud` reads `zv_media_*`, which
+`content/media` creates AND policies — a database with only `storage/cloud`'s
+migrations shows those tables with no RLS, which reads as a cross-tenant hole and
+is not one. Section 6 nearly published that.
+
 **Your own database per session.** Two sessions on one database destroy each
 other, and the symptom looks like an authorisation regression rather than a
 collision.
@@ -801,7 +853,7 @@ largest first, because size is where the unexamined surface is.
 | 2 | `ai` | 5838 | **`reviewed`** — engine/ only. Studio side not covered. |
 | 3 | `communications/mail` | 3959 | **`reviewed`** — engine/ + the inbox component. Schemas and pages not covered. |
 | 4 | `operations/traceability` | 2205 | **`reviewed`** — engine/ only. Studio side not covered. |
-| 5 | `storage/cloud` | 2083 | `scanned` only |
+| 5 | `storage/cloud` | 2083 | **`reviewed`** — engine/ only. Studio side not covered. |
 | 6 | `finance/invoicing` | 1665 | `scanned` only |
 | 7 | `compliance/ro/efactura` | 1538 | `scanned` only |
 | 8 | `hr/employees` | 1317 | `scanned` only |
