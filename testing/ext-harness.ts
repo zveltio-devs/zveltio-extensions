@@ -342,7 +342,18 @@ async function makeCtx(
     },
     checkPermission: async () => opts.admin,
     getUserRoles: async () => (opts.admin ? ['god'] : []),
-    events: { on() {}, off() {}, emit: asyncNoop },
+    // `emitAsync` as well as `emit`: the host bus moved to the awaited form —
+    // plain `emit` is EventEmitter's synchronous fan-out, which drops an async
+    // listener's promise at its first await — and extensions moved with it.
+    // The mock had only `emit`, so a handler on the current API met
+    // `ctx.events.emitAsync is not a function` and answered 500. It fails
+    // visibly rather than silently, but it made the path untestable: nothing in
+    // this repository could exercise `POST /ext/finance/invoicing/invoices`,
+    // the route that creates an invoice, because emitting is the last thing it
+    // does inside its transaction. The contract suite did not catch it because
+    // it POSTs an empty body, which is refused by validation two hundred lines
+    // earlier.
+    events: { on() {}, off() {}, emit: asyncNoop, emitAsync: asyncNoop },
     services: {
       register: (n: string, s: unknown) => void services.set(n, s),
       get: (n: string) => services.get(n),
@@ -517,7 +528,7 @@ async function applyMigrations(ext: any): Promise<boolean> {
 export async function mountForTest(
   engineDir: string,
   opts: { authed?: boolean; admin?: boolean } = {},
-): Promise<{ app: any; publicRoutes: any[]; migrated: boolean }> {
+): Promise<{ app: any; publicRoutes: any[]; migrated: boolean; ctx: any }> {
   const { authed = true, admin = true } = opts;
   const { Hono } = (await honoP) as any;
   const db = await getDb();
@@ -537,11 +548,16 @@ export async function mountForTest(
   // is what names it and where its manifest lives.
   const extDir = dirname(engineDir);
   const wiring = await productionWiring(extDir, relative(REPO, extDir), mod.default);
-  await mod.default.register(app, await makeCtx(db, { authed, admin }, publicRoutes, wiring));
+  const ctx = await makeCtx(db, { authed, admin }, publicRoutes, wiring);
+  await mod.default.register(app, ctx);
   // Mount collected root-level public routes on the same app so tests can hit
   // them at their absolute paths (mirrors the engine mounting them globally).
   for (const spec of publicRoutes) app.on(spec.method, spec.path, spec.handler);
-  return { app, publicRoutes, migrated };
+  // `ctx` is returned so a test can call what the extension PUBLISHES, not only
+  // what it routes. `ctx.services` is how extensions call each other — the write
+  // path `finance/banking` uses to settle an invoice lives there and had no
+  // route at all, so nothing in this repository could reach it.
+  return { app, publicRoutes, migrated, ctx };
 }
 
 /** Run the uniform extension contract. `engineDir` = `<ext>/engine`. */

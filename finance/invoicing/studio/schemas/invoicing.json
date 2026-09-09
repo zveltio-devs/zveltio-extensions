@@ -203,7 +203,11 @@
           "label": "common.delete",
           "method": "DELETE",
           "endpoint": "/ext/finance/invoicing/invoices/{id}",
-          "confirm": "invoicing.deleteConfirm"
+          "confirm": "invoicing.deleteConfirm",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "draft"
+          }
         }
       ],
       "form": {
