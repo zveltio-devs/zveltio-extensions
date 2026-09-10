@@ -347,7 +347,12 @@ async function resolveWithViewer(
 
     // Column permissions.
     //
-    // `ctx.internals.getColumnAccess` takes (collection, role) — the host
+    // Third argument is the acting user's id, and it is what lets a god see
+    // every column here as it does everywhere else: the host resolves
+    // `data:view_all_columns` for that identity. Omitting it means no
+    // exemption at all, which is the refusing direction but would mask a god.
+    //
+    // `ctx.internals.getColumnAccess` takes (collection, role, userId?) — the host
     // resolves the db handle itself. Portals called it as
     // `getColumnAccess(db, collection, role)`, the engine-side spelling, so the
     // handle arrived as the collection name and the collection name as the
@@ -356,7 +361,9 @@ async function resolveWithViewer(
     // silently not applied on the portal render path either. `_engine` is typed
     // `any`, so nothing said so.
     const role = await deps.engine.resolveUserRole(audience.user ?? {}).catch(() => 'public');
-    const colAccess = await deps.engine.getColumnAccess(meta.name, role).catch(() => null);
+    const colAccess = await deps.engine
+      .getColumnAccess(meta.name, role, audience.user?.id)
+      .catch(() => null);
     if (colAccess) {
       records = records.map((r: Record<string, unknown>) =>
         deps.engine.applyColumnAccess(r, colAccess),
@@ -474,7 +481,9 @@ export async function resolveRecord(
   if (!row) return null;
 
   const role = await deps.engine.resolveUserRole(audience.user ?? {}).catch(() => 'public');
-  const colAccess = await deps.engine.getColumnAccess(meta.name, role).catch(() => null);
+  const colAccess = await deps.engine
+      .getColumnAccess(meta.name, role, audience.user?.id)
+      .catch(() => null);
   return colAccess ? deps.engine.applyColumnAccess(row, colAccess) : row;
 }
 
