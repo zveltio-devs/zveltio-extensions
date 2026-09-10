@@ -259,7 +259,7 @@ describe('authenticated callers', () => {
     expect(out.content._data).toHaveLength(1);
   });
 
-  test('getColumnAccess is called with (collection, role) — not the engine spelling', async () => {
+  test('getColumnAccess is called with (collection, role, userId) — not the engine spelling', async () => {
     const seen: unknown[][] = [];
     const { db } = makeDb({ collections: ['contacts'] });
     await resolveBlocks(
@@ -280,10 +280,18 @@ describe('authenticated callers', () => {
       { user: { id: 'u1', role: 'member' }, tenantId: 't1' },
       [listBlock({ collection: 'contacts' })],
     );
-    // Portals passed (db, collection, role) here, so the mask silently never
-    // applied. Two arguments, first one the collection name.
+    // Portals passed (db, collection, role) here, so the handle arrived as the
+    // collection name, the lookup matched nothing, and the mask silently never
+    // applied. First argument is the collection name, not a database handle.
     expect(seen[0]?.[0]).toBe('contacts');
-    expect(seen[0]).toHaveLength(2);
+    expect(seen[0]?.[1]).toBe('member');
+
+    // Third argument is the acting user's id. The host resolves
+    // `data:view_all_columns` for that identity, which is how a god sees every
+    // column here as it does everywhere else; without it even a god is masked,
+    // because there is no identity to resolve the permission for.
+    expect(seen[0]?.[2]).toBe('u1');
+    expect(seen[0]).toHaveLength(3);
   });
 
   test('hidden columns are stripped from the rows', async () => {
