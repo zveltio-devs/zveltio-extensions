@@ -33,7 +33,11 @@ const REPO = dirname(dirname(dirname(dirname(import.meta.dir)))); // engine/ -> 
 
 const BASE_ACTIONS = new Set(['read', 'create', 'update', 'delete']);
 
-function makeCtx(db: unknown, allow: (resource: string, action: string) => boolean) {
+function makeCtx(
+  db: unknown,
+  allow: (resource: string, action: string) => boolean,
+  tenantAdmin = false,
+) {
   return {
     db,
     auth: {
@@ -46,7 +50,11 @@ function makeCtx(db: unknown, allow: (resource: string, action: string) => boole
     checkPermission: async (_uid: string, resource: string, action: string) => allow(resource, action),
     events: { on() {}, off() {}, emit: async () => {}, emitAsync: async () => {} },
     services: { register() {}, get: () => null, has: () => false },
-    internals: {},
+    // `mayConfigure` falls back to the tenant-scoped helper, so the stub has to
+    // carry it or the deny path throws instead of refusing. Both values are
+    // exercised below: false must 403 and true must 200, which is what keeps
+    // this from passing with the guard removed.
+    internals: { isTenantAdmin: async () => tenantAdmin },
     config: { vars: {}, env: 'test', isProduction: false, encryptionConfigured: false },
     env: {},
     log: console,
@@ -73,9 +81,9 @@ d('efactura — connection settings and storno ask who is asking', () => {
     await db.destroy();
   });
 
-  async function mount(allow: (resource: string, action: string) => boolean) {
+  async function mount(allow: (resource: string, action: string) => boolean, tenantAdmin = false) {
     const app = new Hono();
-    await mod.default.register(app, makeCtx(db, allow));
+    await mod.default.register(app, makeCtx(db, allow, tenantAdmin));
     return app;
   }
 
@@ -140,5 +148,15 @@ d('efactura — connection settings and storno ask who is asking', () => {
       }),
     });
     expect(create.status).toBe(201);
+  });
+
+  it('allows the settings write to a tenant admin holding no efactura:settings', async () => {
+    const app = await mount((r, a) => r === 'efactura' && BASE_ACTIONS.has(a), true);
+    const res = await app.request('/settings', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ environment: 'test', seller_cif: 'GATE-CIF' }),
+    });
+    expect(res.status).toBe(200);
   });
 });
