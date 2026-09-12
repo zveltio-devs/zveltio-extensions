@@ -5,6 +5,23 @@ import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Every dynamic segment in this extension (`:id`, `:contactId`, `:docId`,
+// `:taskId`, `:cycleId`) is a `uuid` primary key. Unvalidated, it reaches
+// Postgres as one and 22P02s — 500, not 404 — on any typo'd or fuzzed path.
+// This has to be chained on each route directly: a leading `app.use('*', ...)`
+// runs before Hono has matched a route, so `c.req.param()` there is always
+// `{}` — measured, not assumed; see `hr/employees/CONTEXT.md`.
+function requireUuid(...names: string[]) {
+  return async (c: any, next: () => Promise<void>) => {
+    for (const n of names) {
+      if (!UUID_RE.test(c.req.param(n) ?? '')) return c.json({ error: 'Not found' }, 404);
+    }
+    await next();
+  };
+}
+
 export function employeesRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, events } = ctx;
 
@@ -52,7 +69,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: row.rows[0] }, 201);
   });
 
-  app.patch('/departments/:id', zValidator('json', z.object({
+  app.patch('/departments/:id', requireUuid('id'), zValidator('json', z.object({
     name: z.string().optional(),
     description: z.string().optional(),
     manager_id: z.string().uuid().optional(),
@@ -93,7 +110,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: row.rows[0] }, 201);
   });
 
-  app.patch('/positions/:id', zValidator('json', z.object({
+  app.patch('/positions/:id', requireUuid('id'), zValidator('json', z.object({
     title: z.string().optional(),
     is_active: z.boolean().optional(),
     description: z.string().optional(),
@@ -211,7 +228,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: rows.rows });
   });
 
-  app.get('/:id', async (c) => {
+  app.get('/:id', requireUuid('id'), async (c) => {
     const row = await sql`
       SELECT e.*, d.name as department_name, p.title as position_title,
         m.first_name || ' ' || m.last_name as manager_name,
@@ -290,37 +307,58 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     // figure came from — and salary history is what answers "what were they paid
     // when". The employee number is derived from COUNT(*), so it belongs inside
     // too: rolled back, the number goes back to being free.
-    const emp = await db.transaction().execute(async (trx) => {
-    // Auto-generate employee number
-    const counter = await sql`SELECT COUNT(*) as cnt FROM zvd_employees`.execute(trx);
-    const empNum = 'EMP-' + String(+(counter.rows[0] as any).cnt + 1).padStart(4, '0');
-    const row = await sql`
-      INSERT INTO zvd_employees (employee_number, first_name, last_name, email, work_email, phone, birth_date, gender,
-        national_id, tax_id, hire_date, department_id, position_id, manager_id, employment_type,
-        probation_end_date, salary, currency, iban, bank_name, address, notes, created_by)
-      VALUES (${empNum}, ${d.first_name}, ${d.last_name}, ${d.email}, ${d.work_email ?? null},
-        ${d.phone ?? null}, ${d.birth_date ?? null}, ${d.gender ?? null},
-        ${d.national_id ?? null}, ${d.tax_id ?? null}, ${d.hire_date},
-        ${d.department_id ?? null}, ${d.position_id ?? null}, ${d.manager_id ?? null},
-        ${d.employment_type}, ${d.probation_end_date ?? null},
-        ${d.salary ?? null}, ${d.currency}, ${d.iban ?? null}, ${d.bank_name ?? null},
-        ${d.address ?? null}, ${d.notes ?? null}, ${user.id})
-      RETURNING *
-    `.execute(trx);
-    const emp = row.rows[0] as any;
-    if (d.salary) {
-      await sql`
-        INSERT INTO zvd_salary_history (employee_id, effective_date, salary, salary_type, currency, reason, changed_by)
-        VALUES (${emp.id}, ${d.hire_date}, ${d.salary}, ${d.salary_type}, ${d.currency}, 'Initial salary', ${user.id})
-      `.execute(trx);
+    //
+    // Two people hired in the same instant read the same COUNT(*) — neither
+    // has committed yet, so neither sees the other — and both build the same
+    // `EMP-00NN`. The unique key on (tenant_id, employee_number) catches it,
+    // but a caught duplicate still aborts ITS OWN transaction: Postgres does
+    // not let a request continue after a failed statement, so the loser's
+    // INSERT raised straight past this handler as a raw 500. Measured with
+    // two concurrent POSTs on a virgin database: one 201, one 500 with
+    // `23505 zvd_employees_employee_number_key`.
+    //
+    // The retry has to wrap the WHOLE transaction, not the INSERT inside it —
+    // a transaction that has already thrown cannot be reused for a second
+    // attempt.
+    let emp: any;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        emp = await db.transaction().execute(async (trx) => {
+          const counter = await sql`SELECT COUNT(*) as cnt FROM zvd_employees`.execute(trx);
+          const empNum = 'EMP-' + String(+(counter.rows[0] as any).cnt + 1).padStart(4, '0');
+          const row = await sql`
+            INSERT INTO zvd_employees (employee_number, first_name, last_name, email, work_email, phone, birth_date, gender,
+              national_id, tax_id, hire_date, department_id, position_id, manager_id, employment_type,
+              probation_end_date, salary, currency, iban, bank_name, address, notes, created_by)
+            VALUES (${empNum}, ${d.first_name}, ${d.last_name}, ${d.email}, ${d.work_email ?? null},
+              ${d.phone ?? null}, ${d.birth_date ?? null}, ${d.gender ?? null},
+              ${d.national_id ?? null}, ${d.tax_id ?? null}, ${d.hire_date},
+              ${d.department_id ?? null}, ${d.position_id ?? null}, ${d.manager_id ?? null},
+              ${d.employment_type}, ${d.probation_end_date ?? null},
+              ${d.salary ?? null}, ${d.currency}, ${d.iban ?? null}, ${d.bank_name ?? null},
+              ${d.address ?? null}, ${d.notes ?? null}, ${user.id})
+            RETURNING *
+          `.execute(trx);
+          const emp = row.rows[0] as any;
+          if (d.salary) {
+            await sql`
+              INSERT INTO zvd_salary_history (employee_id, effective_date, salary, salary_type, currency, reason, changed_by)
+              VALUES (${emp.id}, ${d.hire_date}, ${d.salary}, ${d.salary_type}, ${d.currency}, 'Initial salary', ${user.id})
+            `.execute(trx);
+          }
+          return emp;
+        });
+        break;
+      } catch (e: any) {
+        const isNumberClash = e?.code === '23505' && String(e?.constraint ?? '').includes('employee_number');
+        if (!isNumberClash || attempt >= 4) throw e;
+      }
     }
-      return emp;
-    });
     events.emit('employee.created', { id: emp.id, employee: emp });
     return c.json({ data: emp }, 201);
   });
 
-  app.patch('/:id', zValidator('json', z.object({
+  app.patch('/:id', requireUuid('id'), zValidator('json', z.object({
     first_name: z.string().optional(),
     last_name: z.string().optional(),
     email: z.string().email().optional(),
@@ -366,7 +404,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: emp });
   });
 
-  app.post('/:id/terminate', zValidator('json', z.object({
+  app.post('/:id/terminate', requireUuid('id'), zValidator('json', z.object({
     end_date: z.string(),
     reason: z.string().optional(),
   })), async (c) => {
@@ -382,12 +420,12 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
   });
 
   // ── Emergency contacts ─────────────────────────────────────────
-  app.get('/:id/emergency-contacts', async (c) => {
+  app.get('/:id/emergency-contacts', requireUuid('id'), async (c) => {
     const rows = await sql`SELECT * FROM zvd_employee_emergency_contacts WHERE employee_id = ${c.req.param('id')} ORDER BY is_primary DESC, name`.execute(db);
     return c.json({ data: rows.rows });
   });
 
-  app.post('/:id/emergency-contacts', zValidator('json', z.object({
+  app.post('/:id/emergency-contacts', requireUuid('id'), zValidator('json', z.object({
     name: z.string().min(1),
     relationship: z.string().min(1),
     phone: z.string().min(1),
@@ -411,18 +449,18 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: row.rows[0] }, 201);
   });
 
-  app.delete('/:id/emergency-contacts/:contactId', async (c) => {
+  app.delete('/:id/emergency-contacts/:contactId', requireUuid('id', 'contactId'), async (c) => {
     await sql`DELETE FROM zvd_employee_emergency_contacts WHERE id = ${c.req.param('contactId')} AND employee_id = ${c.req.param('id')}`.execute(db);
     return c.json({ success: true });
   });
 
   // ── Salary history ─────────────────────────────────────────────
-  app.get('/:id/salary-history', async (c) => {
+  app.get('/:id/salary-history', requireUuid('id'), async (c) => {
     const rows = await sql`SELECT * FROM zvd_salary_history WHERE employee_id = ${c.req.param('id')} ORDER BY effective_date DESC`.execute(db);
     return c.json({ data: rows.rows });
   });
 
-  app.post('/:id/salary', zValidator('json', z.object({
+  app.post('/:id/salary', requireUuid('id'), zValidator('json', z.object({
     effective_date: z.string(),
     salary: z.number().positive(),
     salary_type: z.enum(['gross','net']).default('gross'),
@@ -448,12 +486,12 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
   });
 
   // ── Documents ──────────────────────────────────────────────────
-  app.get('/:id/documents', async (c) => {
+  app.get('/:id/documents', requireUuid('id'), async (c) => {
     const rows = await sql`SELECT * FROM zvd_employee_documents WHERE employee_id = ${c.req.param('id')} ORDER BY created_at DESC`.execute(db);
     return c.json({ data: rows.rows });
   });
 
-  app.post('/:id/documents', zValidator('json', z.object({
+  app.post('/:id/documents', requireUuid('id'), zValidator('json', z.object({
     type: z.enum(['contract','id_card','diploma','certificate','other']).default('other'),
     name: z.string().min(1),
     file_url: z.string().min(1),
@@ -469,18 +507,18 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: row.rows[0] }, 201);
   });
 
-  app.delete('/:id/documents/:docId', async (c) => {
+  app.delete('/:id/documents/:docId', requireUuid('id', 'docId'), async (c) => {
     await sql`DELETE FROM zvd_employee_documents WHERE id = ${c.req.param('docId')} AND employee_id = ${c.req.param('id')}`.execute(db);
     return c.json({ success: true });
   });
 
   // ── Benefits ───────────────────────────────────────────────────
-  app.get('/:id/benefits', async (c) => {
+  app.get('/:id/benefits', requireUuid('id'), async (c) => {
     const rows = await sql`SELECT * FROM zvd_employee_benefits WHERE employee_id = ${c.req.param('id')} ORDER BY start_date DESC`.execute(db);
     return c.json({ data: rows.rows });
   });
 
-  app.post('/:id/benefits', zValidator('json', z.object({
+  app.post('/:id/benefits', requireUuid('id'), zValidator('json', z.object({
     type: z.string().min(1),
     description: z.string().optional(),
     value: z.number().optional(),
@@ -497,12 +535,12 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
   });
 
   // ── Onboarding ────────────────────────────────────────────────
-  app.get('/:id/onboarding', async (c) => {
+  app.get('/:id/onboarding', requireUuid('id'), async (c) => {
     const rows = await sql`SELECT * FROM zvd_onboarding_tasks WHERE employee_id = ${c.req.param('id')} ORDER BY created_at`.execute(db);
     return c.json({ data: rows.rows });
   });
 
-  app.post('/:id/onboarding', zValidator('json', z.object({
+  app.post('/:id/onboarding', requireUuid('id'), zValidator('json', z.object({
     title: z.string().min(1),
     description: z.string().optional(),
     assigned_to: z.string().optional(),
@@ -518,7 +556,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: row.rows[0] }, 201);
   });
 
-  app.patch('/onboarding/:taskId', zValidator('json', z.object({
+  app.patch('/onboarding/:taskId', requireUuid('taskId'), zValidator('json', z.object({
     is_completed: z.boolean().optional(),
     notes: z.string().optional(),
   })), async (c) => {
@@ -557,7 +595,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: row.rows[0] }, 201);
   });
 
-  app.post('/performance/cycles/:id/close', async (c) => {
+  app.post('/performance/cycles/:id/close', requireUuid('id'), async (c) => {
     const user = c.get('user') as any;
     // Closing a review cycle freezes everybody's ratings for that period.
     if (!(await ctx.checkPermission(user.id, 'employees', 'close').catch(() => false)) &&
@@ -569,7 +607,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: row.rows[0] });
   });
 
-  app.get('/performance/cycles/:cycleId/reviews', async (c) => {
+  app.get('/performance/cycles/:cycleId/reviews', requireUuid('cycleId'), async (c) => {
     const rows = await sql`
       SELECT r.*, e.first_name || ' ' || e.last_name as employee_name, e.employee_number,
         d.name as department_name
@@ -581,7 +619,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: rows.rows });
   });
 
-  app.post('/performance/cycles/:cycleId/reviews', zValidator('json', z.object({
+  app.post('/performance/cycles/:cycleId/reviews', requireUuid('cycleId'), zValidator('json', z.object({
     employee_id: z.string().uuid(),
     reviewer_id: z.string().uuid().optional(),
   })), async (c) => {
@@ -595,7 +633,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: row.rows[0] }, 201);
   });
 
-  app.patch('/performance/reviews/:id', zValidator('json', z.object({
+  app.patch('/performance/reviews/:id', requireUuid('id'), zValidator('json', z.object({
     overall_rating: z.number().min(1).max(5).optional(),
     goals_rating: z.number().min(1).max(5).optional(),
     competency_rating: z.number().min(1).max(5).optional(),
