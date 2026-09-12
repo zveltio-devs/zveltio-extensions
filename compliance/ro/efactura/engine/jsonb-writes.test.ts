@@ -72,6 +72,10 @@ d('efactura — jsonb columns hold arrays under Bun.SQL (the production driver)'
 
   afterAll(async () => {
     await pool.query(`DELETE FROM zv_efactura_invoices WHERE invoice_number LIKE 'JB-%'`);
+    // Only present when finance/invoicing is installed; ignore its absence.
+    await pool
+      .query(`DELETE FROM zvd_invoices WHERE number LIKE 'JB-SRC-%'`)
+      .catch(() => {});
     if (bunDb) await bunDb.destroy();
     await pool.end();
   });
@@ -125,6 +129,23 @@ d('efactura — jsonb columns hold arrays under Bun.SQL (the production driver)'
   it('the invoice.created auto-draft stores lines as an array', async () => {
     expect(typeof invoiceCreatedListener).toBe('function');
     const sourceId = crypto.randomUUID();
+
+    // `zv_efactura_source_fk` is added by 001 only when `zvd_invoices` exists,
+    // so whether this listener can reference an arbitrary id depends on
+    // whether finance/invoicing is installed beside us. It is not in a
+    // single-extension run and it IS in the contract suite, which installs
+    // every extension — so a source row invented here passed locally and
+    // violated the FK in CI. Create the parent when the table is there.
+    const hasSource = await pool.query(
+      `SELECT 1 FROM information_schema.tables WHERE table_name = 'zvd_invoices'`,
+    );
+    if (hasSource.rowCount) {
+      await pool.query(
+        `INSERT INTO zvd_invoices (id, number, client_name, due_date, created_by)
+         VALUES ($1, $2, 'B', CURRENT_DATE, 'jsonb-user')`,
+        [sourceId, `JB-SRC-${Date.now()}`],
+      );
+    }
     await invoiceCreatedListener({
       id: sourceId,
       invoice: {
