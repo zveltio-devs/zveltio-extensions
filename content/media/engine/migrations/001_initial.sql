@@ -81,25 +81,13 @@ CREATE TABLE IF NOT EXISTS zv_media_cdn_invalidations (
 CREATE INDEX IF NOT EXISTS idx_media_collections_public ON zv_media_collections(is_public) WHERE is_public = true;
 CREATE INDEX IF NOT EXISTS idx_media_col_files_coll ON zv_media_collection_files(collection_id, sort_order);
 
--- /admin/quotas reads zv_storage_quotas, which is otherwise created by the
--- storage/cloud extension. Duplicate the identical CREATE IF NOT EXISTS so
--- media works standalone (order-independent with storage/cloud).
-CREATE TABLE IF NOT EXISTS zv_storage_quotas (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id TEXT UNIQUE,
-  role_name TEXT UNIQUE,
-  quota_bytes BIGINT NOT NULL DEFAULT 5368709120,
-  max_file_size_bytes BIGINT NOT NULL DEFAULT 104857600,
-  allowed_extensions TEXT[] NOT NULL DEFAULT '{}',
-  created_by TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CHECK (user_id IS NOT NULL OR role_name IS NOT NULL)
-);
-
--- The CORE engine also creates zv_storage_quotas (old shape: user_id /
--- quota_bytes / used_bytes only), so the CREATE above is skipped there.
--- Enrich it with the columns these routes use.
+-- zv_storage_quotas has ONE creator: the engine (001_initial.sql, old shape
+-- user_id / quota_bytes / used_bytes / updated_at), whose core upload path
+-- reads it. This migration once redeclared the table with a richer shape
+-- (PK on id, UNIQUE keys, a CHECK); the engine always migrates first, so
+-- that CREATE never applied on any database — measured against live
+-- PostgreSQL 18, both extension orders converge on the engine shape plus
+-- exactly the ALTERs below. Enrich it with the columns these routes use.
 ALTER TABLE zv_storage_quotas ADD COLUMN IF NOT EXISTS id UUID DEFAULT gen_random_uuid();
 ALTER TABLE zv_storage_quotas ADD COLUMN IF NOT EXISTS role_name TEXT;
 ALTER TABLE zv_storage_quotas ADD COLUMN IF NOT EXISTS max_file_size_bytes BIGINT NOT NULL DEFAULT 104857600;
