@@ -175,12 +175,18 @@ async function mayDecide(ctx: ExtensionContext, user: any): Promise<boolean> {
  * other grant could PUT /settings and overwrite the OAuth client id, the
  * filing CIF and the certificate path of the company's connection to the tax
  * authority, while POST /:id/submit — the same weight of decision — refused
- * them. `efactura:settings`, with `admin` still sufficient, exactly the
- * pattern `mayDecide` set for submit.
+ * them. `efactura:settings`, with a tenant admin still sufficient so an
+ * existing install keeps working before anyone edits policies.
+ *
+ * The fallback is `isTenantAdmin`, NOT `checkPermission(uid, 'admin', '*')`.
+ * The bare form reads as an instance gate and behaves as a tenant-scoped one,
+ * which `scripts/admin-gate-check.ts` in the engine refuses for new sites. The
+ * ANAF connection is per company, so the tenant-scoped helper is also the
+ * correct answer here and not merely the one the gate accepts.
  */
 async function mayConfigure(ctx: ExtensionContext, user: any): Promise<boolean> {
   if (await ctx.checkPermission(user.id, 'efactura', 'settings').catch(() => false)) return true;
-  return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
+  return ctx.internals.isTenantAdmin(user.id).catch(() => false);
 }
 
 export function efacturaRoutes(ctx: ExtensionContext): Hono {
