@@ -23,12 +23,18 @@ export interface InvoiceData {
   seller_cui: string;
   seller_reg_com?: string;
   seller_address?: string;
+  seller_city?: string;
+  seller_county?: string;
+  seller_country?: string;
   seller_iban?: string;
   seller_bank?: string;
 
   buyer_name: string;
   buyer_cui?: string;
   buyer_address?: string;
+  buyer_city?: string;
+  buyer_county?: string;
+  buyer_country?: string;
 
   lines: InvoiceLine[];
 
@@ -212,6 +218,12 @@ function postalAddress(street?: string, city?: string, county?: string, country?
 export function generateUBLXML(invoice: InvoiceData): string {
   const lines = invoice.lines;
 
+  // Escaped once, used everywhere: the currency is interpolated into ATTRIBUTE
+  // positions (`currencyID="…"`) all over the document, and it is caller-
+  // controlled — a `"/><…` value was an XML injection into a fiscal document
+  // until the schema constrained it to three letters and this escape was added.
+  const currency = escapeXml(invoice.currency);
+
   // Group VAT by rate
   const vatGroups: Record<number, { taxable: number; vat: number }> = {};
   for (const line of lines) {
@@ -223,8 +235,8 @@ export function generateUBLXML(invoice: InvoiceData): string {
   const taxSubtotals = Object.entries(vatGroups)
     .map(([rate, amounts]) => `
       <cac:TaxSubtotal>
-        <cbc:TaxableAmount currencyID="${invoice.currency}">${amounts.taxable.toFixed(2)}</cbc:TaxableAmount>
-        <cbc:TaxAmount currencyID="${invoice.currency}">${amounts.vat.toFixed(2)}</cbc:TaxAmount>
+        <cbc:TaxableAmount currencyID="${currency}">${amounts.taxable.toFixed(2)}</cbc:TaxableAmount>
+        <cbc:TaxAmount currencyID="${currency}">${amounts.vat.toFixed(2)}</cbc:TaxAmount>
         <cac:TaxCategory>
           <cbc:ID>${Number(rate) === 0 ? 'Z' : 'S'}</cbc:ID>
           <cbc:Percent>${rate}</cbc:Percent>
@@ -239,7 +251,7 @@ export function generateUBLXML(invoice: InvoiceData): string {
     <cac:InvoiceLine>
       <cbc:ID>${i + 1}</cbc:ID>
       <cbc:InvoicedQuantity unitCode="${unitCode(line.unit)}">${line.quantity}</cbc:InvoicedQuantity>
-      <cbc:LineExtensionAmount currencyID="${invoice.currency}">${(line.line_total - line.vat_amount).toFixed(2)}</cbc:LineExtensionAmount>
+      <cbc:LineExtensionAmount currencyID="${currency}">${(line.line_total - line.vat_amount).toFixed(2)}</cbc:LineExtensionAmount>
       <cac:Item>
         <cbc:Description>${escapeXml(line.description)}</cbc:Description>
         <cbc:Name>${escapeXml(line.description)}</cbc:Name>
@@ -250,7 +262,7 @@ export function generateUBLXML(invoice: InvoiceData): string {
         </cac:ClassifiedTaxCategory>
       </cac:Item>
       <cac:Price>
-        <cbc:PriceAmount currencyID="${invoice.currency}">${line.unit_price.toFixed(2)}</cbc:PriceAmount>
+        <cbc:PriceAmount currencyID="${currency}">${line.unit_price.toFixed(2)}</cbc:PriceAmount>
       </cac:Price>
     </cac:InvoiceLine>`).join('\n');
 
@@ -267,14 +279,14 @@ export function generateUBLXML(invoice: InvoiceData): string {
   <cbc:IssueDate>${formatDate(invoice.invoice_date)}</cbc:IssueDate>
   ${invoice.due_date ? `<cbc:DueDate>${formatDate(invoice.due_date)}</cbc:DueDate>` : ''}
   <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>
-  <cbc:DocumentCurrencyCode>${invoice.currency}</cbc:DocumentCurrencyCode>
+  <cbc:DocumentCurrencyCode>${currency}</cbc:DocumentCurrencyCode>
 
   <cac:AccountingSupplierParty>
     <cac:Party>
       <cac:PartyName>
         <cbc:Name>${escapeXml(invoice.seller_name)}</cbc:Name>
       </cac:PartyName>
-      ${postalAddress(invoice.seller_address, (invoice as any).seller_city, (invoice as any).seller_county, (invoice as any).seller_country)}
+      ${postalAddress(invoice.seller_address, invoice.seller_city, invoice.seller_county, invoice.seller_country)}
       <cac:PartyTaxScheme>
         <cbc:CompanyID>${escapeXml(vatId(invoice.seller_cui))}</cbc:CompanyID>
         <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
@@ -292,7 +304,7 @@ export function generateUBLXML(invoice: InvoiceData): string {
       <cac:PartyName>
         <cbc:Name>${escapeXml(invoice.buyer_name)}</cbc:Name>
       </cac:PartyName>
-      ${postalAddress(invoice.buyer_address, (invoice as any).buyer_city, (invoice as any).buyer_county, (invoice as any).buyer_country)}
+      ${postalAddress(invoice.buyer_address, invoice.buyer_city, invoice.buyer_county, invoice.buyer_country)}
       ${invoice.buyer_cui ? `<cac:PartyTaxScheme><cbc:CompanyID>${escapeXml(vatId(invoice.buyer_cui))}</cbc:CompanyID><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:PartyTaxScheme>` : ''}
       <cac:PartyLegalEntity>
         <cbc:RegistrationName>${escapeXml(invoice.buyer_name)}</cbc:RegistrationName>
@@ -302,15 +314,15 @@ export function generateUBLXML(invoice: InvoiceData): string {
   </cac:AccountingCustomerParty>
 
   <cac:TaxTotal>
-    <cbc:TaxAmount currencyID="${invoice.currency}">${invoice.vat_total.toFixed(2)}</cbc:TaxAmount>
+    <cbc:TaxAmount currencyID="${currency}">${invoice.vat_total.toFixed(2)}</cbc:TaxAmount>
     ${taxSubtotals}
   </cac:TaxTotal>
 
   <cac:LegalMonetaryTotal>
-    <cbc:LineExtensionAmount currencyID="${invoice.currency}">${invoice.subtotal.toFixed(2)}</cbc:LineExtensionAmount>
-    <cbc:TaxExclusiveAmount currencyID="${invoice.currency}">${invoice.subtotal.toFixed(2)}</cbc:TaxExclusiveAmount>
-    <cbc:TaxInclusiveAmount currencyID="${invoice.currency}">${invoice.total.toFixed(2)}</cbc:TaxInclusiveAmount>
-    <cbc:PayableAmount currencyID="${invoice.currency}">${invoice.total.toFixed(2)}</cbc:PayableAmount>
+    <cbc:LineExtensionAmount currencyID="${currency}">${invoice.subtotal.toFixed(2)}</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="${currency}">${invoice.subtotal.toFixed(2)}</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="${currency}">${invoice.total.toFixed(2)}</cbc:TaxInclusiveAmount>
+    <cbc:PayableAmount currencyID="${currency}">${invoice.total.toFixed(2)}</cbc:PayableAmount>
   </cac:LegalMonetaryTotal>
 
   ${invoiceLines}
