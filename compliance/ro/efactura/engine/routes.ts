@@ -25,17 +25,32 @@ const invoiceSchema = z.object({
   seller_cui: z.string().min(1),
   seller_reg_com: z.string().optional(),
   seller_address: z.string().optional(),
+  // Required by ANAF's BR-08/BR-10/BR-RO-081/082/091/092/110/111 whenever an
+  // address is present: without a city and, for RO, an ISO 3166-2:RO county
+  // code, the generated XML fails ANAF's own validator. Migrations 003/004
+  // added the columns for exactly this; this schema is what lets a standalone
+  // caller (no finance/invoicing installed) ever populate them.
+  seller_city: z.string().optional(),
+  seller_county: z.string().optional(),
+  seller_country: z.string().optional(),
   seller_iban: z.string().optional(),
   seller_bank: z.string().optional(),
   buyer_name: z.string().min(1),
   buyer_cui: z.string().optional(),
   buyer_cui_type: z.enum(['RO', 'EU', 'OTHER']).default('RO'),
   buyer_address: z.string().optional(),
+  buyer_city: z.string().optional(),
+  buyer_county: z.string().optional(),
+  buyer_country: z.string().optional(),
   lines: z.array(lineSchema),
   subtotal: z.number(),
   vat_total: z.number(),
   total: z.number(),
-  currency: z.string().default('RON'),
+  // ISO 4217, three letters — and nothing else. The value is interpolated
+  // into the UBL XML unescaped in several attribute positions; a free string
+  // here was an XML injection into a fiscal document (measured: a `"/><…`
+  // currency landed verbatim in the generated XML).
+  currency: z.string().regex(/^[A-Za-z]{3}$/, 'ISO 4217 three-letter currency code').default('RON'),
   payment_method: z.string().optional(),
   payment_reference: z.string().optional(),
   reverse_charge: z.boolean().default(false),
@@ -83,6 +98,16 @@ function day(v: unknown): string {
  *
  * Coerced once here, at the boundary where the row becomes InvoiceData, instead
  * of defending inside each field of the template.
+ *
+ * city/county/country were missing from this boundary entirely — not
+ * miscoerced, just never copied — so `POST /:id/generate-xml`, the only route
+ * that reaches this function, always produced a `<cac:PostalAddress>` with no
+ * `CityName` and no `CountrySubentity`, even for a row the auto-draft listener
+ * (index.ts) had populated correctly. Migrations 003/004 exist because ANAF's
+ * BR-08/BR-10/BR-RO-081/082/091/092/110/111 require exactly those elements;
+ * dropping them here defeated that fix for every invoice generated through the
+ * UI. `efactura.generateXml` (index.ts), which passes the row straight through
+ * without this function, was unaffected — which is why nothing looked broken.
  */
 function toInvoiceData(row: any, lines: any[]): Parameters<typeof generateUBLXML>[0] {
   return {
@@ -95,12 +120,18 @@ function toInvoiceData(row: any, lines: any[]): Parameters<typeof generateUBLXML
     seller_cui: String(row.seller_cui ?? ''),
     seller_reg_com: row.seller_reg_com ?? undefined,
     seller_address: row.seller_address ?? undefined,
+    seller_city: row.seller_city ?? undefined,
+    seller_county: row.seller_county ?? undefined,
+    seller_country: row.seller_country ?? undefined,
     seller_iban: row.seller_iban ?? undefined,
     seller_bank: row.seller_bank ?? undefined,
 
     buyer_name: String(row.buyer_name ?? ''),
     buyer_cui: row.buyer_cui ?? undefined,
     buyer_address: row.buyer_address ?? undefined,
+    buyer_city: row.buyer_city ?? undefined,
+    buyer_county: row.buyer_county ?? undefined,
+    buyer_country: row.buyer_country ?? undefined,
 
     lines: (Array.isArray(lines) ? lines : []).map((l: any) => ({
       description: String(l?.description ?? ''),
@@ -132,6 +163,23 @@ function toInvoiceData(row: any, lines: any[]): Parameters<typeof generateUBLXML
  */
 async function mayDecide(ctx: ExtensionContext, user: any): Promise<boolean> {
   if (await ctx.checkPermission(user.id, 'efactura', 'submit').catch(() => false)) return true;
+  return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
+}
+
+/**
+ * May this user configure the ANAF connection itself?
+ *
+ * The settings write sat behind the module gate alone — `efactura:create`,
+ * which the engine seed hands to EVERY tenant_member (001_initial.sql writes
+ * `('p','tenant_member','*','efactura','create')`). Measured: a member with no
+ * other grant could PUT /settings and overwrite the OAuth client id, the
+ * filing CIF and the certificate path of the company's connection to the tax
+ * authority, while POST /:id/submit — the same weight of decision — refused
+ * them. `efactura:settings`, with `admin` still sufficient, exactly the
+ * pattern `mayDecide` set for submit.
+ */
+async function mayConfigure(ctx: ExtensionContext, user: any): Promise<boolean> {
+  if (await ctx.checkPermission(user.id, 'efactura', 'settings').catch(() => false)) return true;
   return ctx.checkPermission(user.id, 'admin', '*').catch(() => false);
 }
 
@@ -247,6 +295,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
   async function saveSettings(c: any) {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    if (!(await mayConfigure(ctx, user))) return c.json({ error: 'Not allowed' }, 403);
     const d = c.req.valid('json') as z.infer<typeof settingsSchema>;
 
     // Refuse rather than persist plaintext. Without a field key there is no way
@@ -386,6 +435,8 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const user = await getUser(c, auth);
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
+      // Writes the stored OAuth tokens — a credential change, not a read.
+      if (!(await mayConfigure(ctx, user))) return c.json({ error: 'Not allowed' }, 403);
       const d = c.req.valid('json');
 
       const row = await sql<any>`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
@@ -450,6 +501,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
   app.post('/oauth/refresh', async (c) => {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    if (!(await mayConfigure(ctx, user))) return c.json({ error: 'Not allowed' }, 403);
     const row = await sql<any>`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
     const cfg = row.rows[0];
     const dec = ctx.internals?.decryptSecret;
@@ -608,7 +660,11 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     const body = c.req.valid('json');
     const updates: any = { updated_at: new Date() };
     for (const [k, v] of Object.entries(body)) {
-      if (v !== undefined) updates[k] = k === 'lines' ? JSON.stringify(v) : v;
+      // `toJsonb`, not `JSON.stringify`: POST / was repaired for exactly this
+      // and this route was its twin. A bare string parameter lands in the
+      // jsonb column as a STRING SCALAR under Bun.SQL (the production driver),
+      // invisible to the pg-based test suite, where the same statement parses.
+      if (v !== undefined) updates[k] = k === 'lines' ? toJsonb(v) : v;
     }
 
     const invoice = await db
@@ -957,23 +1013,54 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const user = await getUser(c, auth);
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
-
-      const original = await db.selectFrom('zv_efactura_invoices').selectAll().where('id', '=', c.req.param('id')).executeTakeFirst();
-      if (!original) return c.json({ error: 'Invoice not found' }, 404);
-      if (!['submitted', 'accepted'].includes(original.status)) return c.json({ error: 'Only submitted/accepted invoices can be storned' }, 400);
+      // A credit note against a FILED invoice is the same weight of fiscal
+      // decision as the filing itself — it moves the VAT return the other
+      // way — so it asks the same question submit does. It used to ask
+      // nothing beyond the module gate: measured, any tenant_member (seeded
+      // `efactura:create`) could storno a submitted invoice.
+      if (!(await mayDecide(ctx, user))) return c.json({ error: 'Not allowed' }, 403);
 
       const { reason } = c.req.valid('json');
 
-      // Create storno invoice (negative values)
-      const stornoLines = (typeof original.lines === 'string' ? JSON.parse(original.lines) : original.lines)
-        .map((l: any) => ({ ...l, quantity: -l.quantity, vat_amount: -l.vat_amount, line_total: -l.line_total }));
+      // The original is locked FOR UPDATE inside the transaction and the
+      // already-storned check happens under that lock. Before this, the
+      // handler read the original outside any transaction and inserted
+      // unconditionally: measured, two calls — sequential or concurrent —
+      // produced TWO credit notes against one filed invoice, a double credit
+      // on the VAT return. The row lock serialises a concurrent pair; the
+      // second waiter then sees the first's zv_efactura_storno row and is
+      // refused.
+      const result = await db.transaction().execute(async (trx) => {
+        const original = await trx
+          .selectFrom('zv_efactura_invoices')
+          .selectAll()
+          .where('id', '=', c.req.param('id'))
+          .forUpdate()
+          .executeTakeFirst();
 
-      // The credit note and the row that says WHAT it reverses are one
-      // correction. Written alone, the negative invoice exists with nothing
-      // linking it to the original — it still lands on the VAT return, but
-      // nothing shows which filing it cancels, and the pair no longer nets to
-      // zero for anyone reading the invoices rather than the storno table.
-      const storno = await db.transaction().execute(async (trx) => {
+        if (!original) return { error: 'Invoice not found', status: 404 } as const;
+        if (!['submitted', 'accepted'].includes(original.status)) {
+          return { error: 'Only submitted/accepted invoices can be storned', status: 400 } as const;
+        }
+        const existing = await sql`
+          SELECT id FROM zv_efactura_storno WHERE original_id = ${original.id}::uuid LIMIT 1
+        `.execute(trx);
+        if (existing.rows.length > 0) {
+          return {
+            error: 'This invoice already has a storno. Correct a wrong storno with a further document, not a second one.',
+            status: 409,
+          } as const;
+        }
+
+        // Create storno invoice (negative values)
+        const stornoLines = (typeof original.lines === 'string' ? JSON.parse(original.lines) : original.lines)
+          .map((l: any) => ({ ...l, quantity: -l.quantity, vat_amount: -l.vat_amount, line_total: -l.line_total }));
+
+        // The credit note and the row that says WHAT it reverses are one
+        // correction. Written alone, the negative invoice exists with nothing
+        // linking it to the original — it still lands on the VAT return, but
+        // nothing shows which filing it cancels, and the pair no longer nets to
+        // zero for anyone reading the invoices rather than the storno table.
         const created = await trx.insertInto('zv_efactura_invoices').values({
           invoice_number: `STORNO-${original.invoice_number}`,
           invoice_date: new Date().toISOString().split('T')[0],
@@ -993,10 +1080,11 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
           INSERT INTO zv_efactura_storno (original_id, storno_invoice_id, reason, requested_by)
           VALUES (${original.id}::uuid, ${created.id}::uuid, ${reason}, ${user.id})
         `.execute(trx);
-        return created;
+        return { created } as const;
       });
 
-      return c.json({ storno_invoice: storno }, 201);
+      if ('error' in result) return c.json({ error: result.error }, result.status as 404 | 400 | 409);
+      return c.json({ storno_invoice: result.created }, 201);
     },
   );
 
