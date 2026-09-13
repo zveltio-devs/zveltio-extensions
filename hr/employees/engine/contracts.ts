@@ -97,12 +97,28 @@ async function syncEmployeeFromContract(db: any, employeeId: string): Promise<vo
   `.execute(db);
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// `:id` and `:cid` are both `uuid` primary keys; unvalidated, either reaches
+// Postgres as one and 22P02s — 500, not 404. Chained on each route directly:
+// a leading `app.use('*', ...)` runs before Hono has matched a route, so
+// `c.req.param()` there is always `{}` — measured, not assumed; see
+// `hr/employees/CONTEXT.md`.
+function requireUuid(...names: string[]) {
+  return async (c: any, next: () => Promise<void>) => {
+    for (const n of names) {
+      if (!UUID_RE.test(c.req.param(n) ?? '')) return c.json({ error: 'Not found' }, 404);
+    }
+    await next();
+  };
+}
+
 export function contractRoutes(ctx: ExtensionContext): Hono {
   const { db } = ctx;
   const app = new Hono();
 
   // ── An employee's contracts ───────────────────────────────────────────────
-  app.get('/employees/:id/contracts', async (c) => {
+  app.get('/employees/:id/contracts', requireUuid('id'), async (c) => {
     const rows = await sql`
       SELECT c.*,
              p.title AS position_title,
@@ -119,7 +135,7 @@ export function contractRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: rows.rows });
   });
 
-  app.post('/employees/:id/contracts', zValidator('json', ContractCreate), async (c) => {
+  app.post('/employees/:id/contracts', requireUuid('id'), zValidator('json', ContractCreate), async (c) => {
     const user = c.get('user' as never) as any;
     const d = c.req.valid('json');
     const employeeId = c.req.param('id');
@@ -170,7 +186,7 @@ export function contractRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: row.rows[0] }, 201);
   });
 
-  app.get('/contracts/:cid', async (c) => {
+  app.get('/contracts/:cid', requireUuid('cid'), async (c) => {
     const id = c.req.param('cid');
     const contract = await sql`SELECT * FROM zvd_employment_contracts WHERE id = ${id}`.execute(db);
     if (!contract.rows.length) return c.json({ error: 'Contract not found' }, 404);
@@ -199,7 +215,7 @@ export function contractRoutes(ctx: ExtensionContext): Hono {
   // agreed and on which document, and it APPLIES the change to the contract.
   // Applying without recording is what the flat fields did — a salary that
   // changed with nothing to point at.
-  app.post('/contracts/:cid/amendments', zValidator('json', AmendmentCreate), async (c) => {
+  app.post('/contracts/:cid/amendments', requireUuid('cid'), zValidator('json', AmendmentCreate), async (c) => {
     const user = c.get('user' as never) as any;
     const d = c.req.valid('json');
     const cid = c.req.param('cid');
@@ -280,6 +296,7 @@ export function contractRoutes(ctx: ExtensionContext): Hono {
   // ── Suspension ────────────────────────────────────────────────────────────
   app.post(
     '/contracts/:cid/suspend',
+    requireUuid('cid'),
     zValidator(
       'json',
       z.object({
@@ -323,7 +340,7 @@ export function contractRoutes(ctx: ExtensionContext): Hono {
     },
   );
 
-  app.post('/contracts/:cid/resume', zValidator('json', z.object({ end_date: z.string() })), async (c) => {
+  app.post('/contracts/:cid/resume', requireUuid('cid'), zValidator('json', z.object({ end_date: z.string() })), async (c) => {
     const { end_date } = c.req.valid('json');
     const cid = c.req.param('cid');
 
@@ -358,6 +375,7 @@ export function contractRoutes(ctx: ExtensionContext): Hono {
   // module records the answer rather than inventing one.
   app.post(
     '/contracts/:cid/end',
+    requireUuid('cid'),
     zValidator(
       'json',
       z.object({
