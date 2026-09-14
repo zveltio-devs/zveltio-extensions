@@ -3,7 +3,7 @@
   "displayName": "GraphQL API",
   "category": "developer",
   "description": "Auto-generated GraphQL API with playground for all collections",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-graphql",
@@ -44,7 +44,7 @@
     "bundlePeers": true
   },
   "integrity": {
-    "engineSha256": "8ef5ec30d8f18177ed1340f71472c1e1f35293518d6196a53a03223dfd2efa67",
-    "sourceSha256": "975d0d18742d2dca56f85d8cc57fd71601e9c694dc6206e919e689117b7fa703"
+    "engineSha256": "1df6db1193ba028fcc698fc84348df1fe4cdc6b0e5209a29fb58d9f823f96776",
+    "sourceSha256": "886ce69437bc2d7613dbf2c1f8698fad8d4223d7827772cac3cb2b6d447199f9"
   }
 }
