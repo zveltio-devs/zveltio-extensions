@@ -69,7 +69,7 @@ Branch: `feat/sdui-crud-batch`
 
 Two defects, both concurrency/dead-check shaped; the tenant isolation across
 all 8 owned tables was already sound (measured fresh, not assumed — see
-below). Full detail and the version bump: `docs/private/CAMPAIGN-PROGRESS.md`
+below). Full detail and the version bump: `zveltio-private/extensions/CAMPAIGN-PROGRESS.md`
 section 11.
 
 **`POST /recurrence/trigger` refused every caller, forever.** Gated on

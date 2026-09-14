@@ -24,7 +24,7 @@ If you add another, include `tenant_id`.
 
 ## Reviewed to the campaign's §6 bar: 2026-09-13
 
-Full write-up: `docs/private/CAMPAIGN-PROGRESS.md`, Section 14. Three defects
+Full write-up: `zveltio-private/extensions/CAMPAIGN-PROGRESS.md`, Section 14. Three defects
 found and fixed, all concurrency/input-boundary shaped — no tenant-isolation
 or auth-bypass finding. `engine/` only; the Studio side is not covered.
 

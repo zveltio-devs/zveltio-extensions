@@ -68,4 +68,4 @@ No defect found. The 2026-08-10 race fix above was re-read fresh, not assumed:
   `parseInt` (no `zValidator`) — a non-numeric value binds `NaN` into
   `LIMIT $1`. Input-boundary robustness, not a tenant/authz issue.
 
-Full report: `docs/private/CAMPAIGN-PROGRESS.md`, Section 10.
+Full report: `zveltio-private/extensions/CAMPAIGN-PROGRESS.md`, Section 10.

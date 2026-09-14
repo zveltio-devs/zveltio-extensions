@@ -247,7 +247,7 @@ approves it explicitly — that is by design.
 `REVIEW-STATUS.md` keeps the record: which extension was verified, against which
 items, what was found.
 
-[docs/private/CAMPAIGN-PROGRESS.md](./docs/private/CAMPAIGN-PROGRESS.md) keeps the
+`zveltio-private/extensions/CAMPAIGN-PROGRESS.md` keeps the
 other record: what the file-by-file review campaign has covered, and — more
 usefully — what it has NOT, so nobody re-derives that from the code. Read it
 before starting a section.
