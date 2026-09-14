@@ -10,7 +10,7 @@ API paths: policies from `policies`, persisted from `queries`.
 
 Three defects fixed, all confined to this extension. No engine change
 needed — see "Raw sql / ownership" below. Full record in
-`docs/private/CAMPAIGN-PROGRESS.md` §13.
+`zveltio-private/extensions/CAMPAIGN-PROGRESS.md` §13.
 
 ### What this session found and fixed
 

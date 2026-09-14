@@ -9,7 +9,7 @@ home no longer embeds receivables — use `/admin/crm` or a future dashboard slo
 **§6-reviewed 2026-09-13** (engine/ only; Studio side not covered). Two
 defects fixed, both input/output-boundary shaped — no tenant-isolation or
 auth-bypass finding. Full record in
-`docs/private/CAMPAIGN-PROGRESS.md` §12.
+`zveltio-private/extensions/CAMPAIGN-PROGRESS.md` §12.
 
 ## What was broken (2026-08-09 pass, still true)
 
