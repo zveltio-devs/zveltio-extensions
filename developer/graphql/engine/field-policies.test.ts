@@ -104,6 +104,12 @@ d('developer/graphql — field policies are enforced', () => {
         getTableName: (name: string) => `zvd_test_${name}`,
       },
       internals: {
+        // The field-policy bypass asks `isTenantAdmin`, which is the same call
+        // as `checkPermission(uid, 'admin', '*')` (`permissions.ts:905`). This
+        // ctx is hand-built rather than mounted through the harness, so it has
+        // to answer the same question the `checkPermission` stub above answers,
+        // or every query throws and all three cases fail for the wrong reason.
+        isTenantAdmin: async (userId: string) => userId === ADMIN_USER.id,
         DataLoaderRegistry: class {
           get() {
             return { load: async () => null };
