@@ -15,7 +15,6 @@
     "communications/mail/engine/routes.ts\t${JSON.stringify(data.to.map((e: string) => ({ address: e })))}::jsonb,",
     "communications/mail/engine/routes.ts\tVALUES (${accountId}, ${data.name}, ${JSON.stringify(data.conditions)}::jsonb,",
     "compliance/gdpr/engine/routes.ts\tVALUES ('gdpr.account_deleted', ${userId}, 'user', ${JSON.stringify({ gdpr: true, requested_at: new Date().toISOString() })}::jsonb, NOW())",
-    "compliance/ro/efactura/engine/index.ts\t${JSON.stringify(linesJson)}::jsonb,",
     "content/document-templates/engine/routes.ts\t${data.html_body}, ${JSON.stringify(data.variables)}::jsonb, ${JSON.stringify(data.pdf_options)}::jsonb,",
     "crm/engine/routes.ts\t${JSON.stringify(d.line_items ?? [])}::jsonb,",
     "crm/engine/routes.ts\t${JSON.stringify(d.metadata ?? {})}::jsonb, ${user.id})",

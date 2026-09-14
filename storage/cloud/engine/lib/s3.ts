@@ -79,10 +79,25 @@ export async function getObject(key: string): Promise<ArrayBuffer | null> {
 }
 
 /** DELETE an object. Never throws — deleting bytes must not fail a DB cleanup. */
-export async function deleteObject(key: string): Promise<void> {
+/**
+ * Removes an object, and SAYS whether it went.
+ *
+ * This returned `void` and swallowed everything: `if (!aws) return` when storage
+ * is unconfigured, and `.catch(() => undefined)` on the request. Its one caller
+ * that matters, `purgeExpiredTrash`, then deleted the database row regardless —
+ * so on an install with no object storage configured, or one where the DELETE is
+ * refused, every expired file lost its record and kept its bytes. Orphaned
+ * objects the operator pays for, with nothing left that knows they exist.
+ *
+ * Callers that genuinely do not care can ignore the result. The purge cannot.
+ */
+export async function deleteObject(key: string): Promise<boolean> {
   const aws = getAws();
-  if (!aws) return;
-  await aws.fetch(s3Url(key), { method: 'DELETE' }).catch(() => undefined);
+  if (!aws) return false;
+  const res = await aws.fetch(s3Url(key), { method: 'DELETE' }).catch(() => null);
+  // S3 answers 204 for a delete, and 404 for a key that is already gone — which
+  // is the outcome the caller wanted, so it counts as done.
+  return res !== null && (res.ok || res.status === 404);
 }
 
 /**

@@ -19,3 +19,8 @@ bun.lock
 !**/studio/dist/
 !**/studio/dist/bundle.js
 !**/studio/dist/*.css
+
+# Private working documents. This repository is public; these are not.
+# CAMPAIGN-PROGRESS.md records, per extension, which defects were found and
+# which were logged and deliberately left open.
+docs/private/

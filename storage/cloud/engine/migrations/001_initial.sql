@@ -68,19 +68,13 @@ CREATE INDEX IF NOT EXISTS idx_cloud_trash_purge ON zv_cloud_trash(purge_after);
 CREATE INDEX IF NOT EXISTS idx_cloud_shares_token ON zv_cloud_shares(token);
 
 -- ── from 002_enterprise.sql ──
--- Storage quotas (per user/role)
-CREATE TABLE IF NOT EXISTS zv_storage_quotas (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id TEXT UNIQUE,
-  role_name TEXT UNIQUE,
-  quota_bytes BIGINT NOT NULL DEFAULT 5368709120,
-  max_file_size_bytes BIGINT NOT NULL DEFAULT 104857600,
-  allowed_extensions TEXT[] NOT NULL DEFAULT '{}',
-  created_by TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CHECK (user_id IS NOT NULL OR role_name IS NOT NULL)
-);
+-- Storage quotas (per user/role). zv_storage_quotas itself has ONE creator:
+-- the engine (001_initial.sql, old shape user_id / quota_bytes / used_bytes),
+-- whose core upload path reads it. This migration once redeclared the table
+-- with a richer shape (PK on id, UNIQUE keys, a CHECK); the engine always
+-- migrates first, so that CREATE never applied on any database — measured
+-- against live PostgreSQL 18, both extension orders converge on the engine
+-- shape plus the ALTERs further below. The enrichment is what runs.
 
 -- File access audit log
 CREATE TABLE IF NOT EXISTS zv_cloud_access_logs (
@@ -113,9 +107,7 @@ CREATE TABLE IF NOT EXISTS zv_cloud_retention_policies (
 );
 
 
--- The CORE engine also creates zv_storage_quotas (old shape: user_id /
--- quota_bytes / used_bytes only), so the CREATE above is skipped there.
--- Enrich it with the columns these routes use.
+-- Enrich the engine's zv_storage_quotas with the columns these routes use.
 ALTER TABLE zv_storage_quotas ADD COLUMN IF NOT EXISTS id UUID DEFAULT gen_random_uuid();
 ALTER TABLE zv_storage_quotas ADD COLUMN IF NOT EXISTS role_name TEXT;
 ALTER TABLE zv_storage_quotas ADD COLUMN IF NOT EXISTS max_file_size_bytes BIGINT NOT NULL DEFAULT 104857600;
