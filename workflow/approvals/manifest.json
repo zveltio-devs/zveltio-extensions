@@ -3,7 +3,7 @@
   "displayName": "Approval Workflows",
   "category": "workflow",
   "description": "Multi-step approval workflows for any collection",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-approvals",
@@ -40,7 +40,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "40f1be556d90a20e78caeb148dd36c21ce24c75c41eca6951d759a9dea387808",
-    "sourceSha256": "4170ffa049e2add0b3b671f908395101d33c73fc2f70d69c2f8a94981a1de6c3"
+    "engineSha256": "7837e344874bc54578358d5748ed4603099510365a8cf9c288e745505f52e198",
+    "sourceSha256": "3494ab5bb8f7c5e0479ab58dabff973f0feeb0af8a13ecd0b7400fe2c9baecc9"
   }
 }

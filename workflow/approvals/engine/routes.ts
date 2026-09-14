@@ -54,6 +54,35 @@ const CreateRequestSchema = z.object({
 
 export function approvalsRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission, getUserRoles } = ctx;
+  // Display names come from the host, not from a join.
+  //
+  // These three lists used to `leftJoin('user as u', ...)` straight onto the
+  // Better-Auth `user` table. That worked only because `createRestrictedDb`
+  // checked the FROM table and never the JOIN — the same gap that handed
+  // `session.token` to a zero-capability extension. Engine #499 closed it and
+  // the join started answering 500. `getUserNames` returns `{ id: name }` and
+  // nothing else, so rendering a name no longer needs a grant on a table that
+  // also holds emails and roles.
+  const { getUserNames } = ctx.internals;
+
+  /** Attach `<field>_name` to each row from a second, host-resolved lookup. */
+  async function withUserNames<T extends Record<string, unknown>>(
+    rows: T[],
+    idField: string,
+    nameField: string,
+  ): Promise<Array<T & Record<string, string | null>>> {
+    // Names are cosmetic: a host that cannot answer (an older engine, or the
+    // test harness stubbing this member) must degrade to the id, never break
+    // the list. So an undefined or throwing answer is treated as "no names".
+    const names =
+      (await Promise.resolve(getUserNames?.(rows.map((r) => r[idField] as string))).catch(
+        () => undefined,
+      )) ?? ({} as Record<string, string>);
+    return rows.map((r) => ({
+      ...r,
+      [nameField]: names[r[idField] as string] ?? null,
+    })) as Array<T & Record<string, string | null>>;
+  }
 
   // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
   // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
@@ -83,13 +112,12 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
     let query = (db as any)
       .selectFrom('zv_approval_requests as r')
       .leftJoin('zv_approval_workflows as w', 'w.id', 'r.workflow_id')
-      .leftJoin('user as u', 'u.id', 'r.requested_by')
       .select([
         'r.id', 'r.workflow_id', 'r.collection', 'r.record_id',
         'r.status', 'r.requested_at', 'r.completed_at', 'r.metadata',
         'r.priority', 'r.sla_due_at', 'r.sla_breached',
         'w.name as workflow_name',
-        'u.name as requested_by_name',
+        'r.requested_by',
       ])
       .orderBy('r.requested_at', 'desc')
       .limit(parsedLimit)
@@ -114,7 +142,8 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
         );
     }
 
-    const requests = await query.execute();
+    const rows = await query.execute();
+    const requests = await withUserNames(rows, 'requested_by', 'requested_by_name');
     return c.json({ requests });
   });
 
@@ -200,22 +229,22 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'Admin access required' }, 403);
     }
 
-    const requests = await (db as any)
+    const overdueRows = await (db as any)
       .selectFrom('zv_approval_requests as r')
       .leftJoin('zv_approval_workflows as w', 'w.id', 'r.workflow_id')
-      .leftJoin('user as u', 'u.id', 'r.requested_by')
       .select([
         'r.id', 'r.workflow_id', 'r.collection', 'r.record_id',
         'r.status', 'r.requested_at', 'r.sla_due_at', 'r.sla_breached',
         'r.priority', 'r.metadata',
         'w.name as workflow_name',
-        'u.name as requested_by_name',
+        'r.requested_by',
       ])
       .where('r.status', '=', 'pending')
       .where('r.sla_due_at', '<', new Date())
       .orderBy('r.sla_due_at', 'asc')
       .execute();
 
+    const requests = await withUserNames(overdueRows, 'requested_by', 'requested_by_name');
     return c.json({ requests, count: requests.length });
   });
 
@@ -331,12 +360,12 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
 
     const decisions = await (db as any)
       .selectFrom('zv_approval_decisions as d')
-      .leftJoin('user as u', 'u.id', 'd.decided_by')
-      .select(['d.id', 'd.step_id', 'd.decision', 'd.comment', 'd.decided_at', 'u.name as decided_by_name'])
+      .select(['d.id', 'd.step_id', 'd.decision', 'd.comment', 'd.decided_at', 'd.decided_by'])
       .where('d.request_id', '=', request.id)
       .execute();
 
-    return c.json({ request: { ...request, steps, decisions } });
+    const namedDecisions = await withUserNames(decisions, 'decided_by', 'decided_by_name');
+    return c.json({ request: { ...request, steps, decisions: namedDecisions } });
   });
 
   // POST /:id/decide — Submit decision
