@@ -59,7 +59,8 @@ Tier-3 pages appear only where the product calls for them (e.g.
 
 ## Where **not** to duplicate this
 
-- Per-extension `CONTEXT.md`: keep only verification detail (G) and runtime bugs.
+- The per-extension context records, which are kept outside this repository:
+  they hold verification detail and runtime bugs, not admin-UI coverage.
 - For "what is missing from the admin UI", update **only** this file.
 
 ---

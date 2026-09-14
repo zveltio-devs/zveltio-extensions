@@ -24,7 +24,7 @@
  * What this does NOT cover, because it is a schema question rather than a missing
  * guard: `zv_page_menus` has no `site_id`, so one `main` and one `footer` serve
  * every site a tenant owns. A tenant running a public site beside a portal shares
- * one menu between them by design. Recorded in CONTEXT.md.
+ * one menu between them by design.
  */
 
 import { beforeAll, describe, expect, test } from 'bun:test';

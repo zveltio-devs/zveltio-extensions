@@ -22,9 +22,8 @@ describe('hr/employees — concurrent hires do not 500 on a number clash', () =>
     ctx.checkPermission = async () => true;
     // The harness pool is lazy (`max: 4`); on a cold pool the first request
     // pays for opening a connection while the others wait, so they never
-    // actually overlap and the race never fires. Warm it first — see
-    // finance/invoicing/CONTEXT.md, where exactly this made a concurrency
-    // test stay green with its fix reverted.
+    // actually overlap and the race never fires. Warm it first: exactly this
+    // once made a concurrency test stay green with its fix reverted.
     await Promise.all([
       app.request('/departments'),
       app.request('/departments'),
