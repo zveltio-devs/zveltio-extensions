@@ -40,6 +40,7 @@ const extension: ZveltioExtension = {
       join(import.meta.dir, 'migrations/009_party_county.sql'),
       join(import.meta.dir, 'migrations/010_tenant_scoped_unique_keys.sql'),
       join(import.meta.dir, 'migrations/011_line_metadata_object.sql'),
+      join(import.meta.dir, 'migrations/012_credit_note_series.sql'),
     ];
   },
 
@@ -96,33 +97,51 @@ const extension: ZveltioExtension = {
           LIMIT 1
         `.execute(ctx.db);
         if (!inv.rows[0]) return null;
-        const invoice = inv.rows[0];
+        // `input` arrives through `ctx.services`, whose `get<T>()` is an
+        // unchecked cast — the `amount: number` declared above is a claim by the
+        // caller, not a guarantee. One caller passing the string it read from
+        // its own NUMERIC column turned `49 + '5'` into `'495'`, and that is
+        // what got written as the amount paid. `toNumber` also refuses NaN,
+        // which PostgreSQL would otherwise accept into the column and then
+        // compare as larger than every number, marking the invoice paid.
+        const amount = toNumber(input.amount, 0, 'invoicing.recordPayment#amount');
+        // Same statement as `POST /invoices/:id/payments`, for the same reason:
+        // the balance is read, added to and re-checked in one place, by
+        // PostgreSQL, on the row being written. This service previously read
+        // `amount_paid`, added in JavaScript and wrote an ABSOLUTE value with no
+        // condition — so two reconciliations landing together each overwrote the
+        // other, and unlike the route it never checked the outstanding amount at
+        // all, so a bank transaction larger than the invoice was recorded in
+        // full and the invoice marked `paid`.
+        const row = await sql<any>`
+          UPDATE zvd_invoices
+             SET amount_paid = amount_paid + ${amount},
+                 status = CASE WHEN amount_paid + ${amount} >= total THEN 'paid' ELSE 'partially_paid' END,
+                 paid_at = CASE WHEN amount_paid + ${amount} >= total THEN NOW() ELSE paid_at END,
+                 updated_at = NOW()
+           WHERE id = ${input.invoiceId}
+             AND status IN ('sent','overdue','partially_paid')
+             AND amount_paid + ${amount} <= total
+          RETURNING id, number, status, amount_paid, total
+        `.execute(ctx.db);
+        // Thrown, not returned as null. `finance/banking` treats null as
+        // "invoicing is not installed" and says nothing; an operator who
+        // reconciled a transaction and did not settle the invoice has to be
+        // told which half failed, and banking's own catch already logs it.
+        if (!row.rows[0]) {
+          throw new Error(
+            `payment of ${amount} exceeds the outstanding amount on invoice ${input.invoiceId}, or the invoice is no longer payable`,
+          );
+        }
+        // The payment row only exists if the invoice took the money. Written
+        // after the UPDATE rather than before it, so a refusal leaves no
+        // orphaned payment behind.
         await sql`
           INSERT INTO zvd_invoice_payments (invoice_id, amount, payment_date, payment_method, reference, notes, created_by)
-          VALUES (${input.invoiceId}, ${input.amount}, ${input.paymentDate ?? new Date().toISOString().slice(0, 10)},
+          VALUES (${input.invoiceId}, ${amount}, ${input.paymentDate ?? new Date().toISOString().slice(0, 10)},
             ${input.method ?? 'transfer'}, ${input.reference ?? null}, ${input.notes ?? null}, ${input.userId})
         `.execute(ctx.db);
-        // `amount_paid` and `total` are NUMERIC, which the driver hands back as
-        // strings; `+` on those concatenates rather than adds.
-        //
-        // Both operands are converted, not just the column. `input` arrives
-        // through `ctx.services`, whose `get<T>()` is an unchecked cast — the
-        // `amount: number` declared above is a claim by the caller, not a
-        // guarantee. One caller passing the string it read from its own NUMERIC
-        // column turns `49 + '5'` into `'495'`, and that is what gets written as
-        // the amount paid. `toNumber` also refuses NaN, which PostgreSQL would
-        // otherwise accept into the column and then compare as larger than every
-        // number, so `newPaid >= total` would mark the invoice paid.
-        const newPaid =
-          toNumber(invoice.amount_paid, 0, 'zvd_invoices.amount_paid') +
-          toNumber(input.amount, 0, 'invoicing.recordPayment#amount');
-        const newStatus =
-          newPaid >= toNumber(invoice.total, 0, 'zvd_invoices.total') ? 'paid' : 'partially_paid';
-        const row = await sql<any>`
-          UPDATE zvd_invoices SET amount_paid = ${newPaid}, status = ${newStatus}, updated_at = NOW()
-          WHERE id = ${input.invoiceId} RETURNING id, number, status, amount_paid, total
-        `.execute(ctx.db);
-        return row.rows[0] ?? null;
+        return row.rows[0];
       },
     );
 
