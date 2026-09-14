@@ -27,4 +27,14 @@ This repository contains first-party signed extensions for **Zveltio** (the core
 
 - **Hono Pin:** Must match core engine's exact Hono version (bundled in extension artifacts).
 - **Frontend Components:** Svelte 5 runes (`$state`, `$derived`, `$effect`) + Tailwind 4 + daisyUI.
-- **Build & Validate:** Run `bun run check` and `bun run validate` before pushing changes.
+- **Before pushing:** `bun run typecheck` and `bun test`. Those are the only two
+  scripts this `package.json` defines — the gates are run directly:
+  ```sh
+  bun run scripts/check-dep-lockstep.ts        # pins match the engine's lockfile
+  bun run scripts/check-bundle-sources.ts      # committed bundles match their source
+  bun run scripts/check-bundle-build-paths.ts  # no packing machine's paths in a bundle
+  bun ../zveltio/scripts/validate-all-extensions.ts
+  ```
+  Note the last one: `bun --cwd ../zveltio run scripts/<file>.ts` does **not**
+  execute the file — bun prints the package's script list instead. Give the path
+  directly, as CI does.
