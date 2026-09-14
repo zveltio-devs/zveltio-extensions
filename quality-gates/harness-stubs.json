@@ -112,11 +112,6 @@
       "reason": "executes user code in the sandbox. Not something an extension test should be running."
     },
     {
-      "member": "runQualityScan",
-      "category": "inert-by-nature",
-      "reason": "a long scan over the whole schema; analytics/quality asserts on the rows it stores."
-    },
-    {
       "member": "safeFetch",
       "category": "fails-closed-if-stubbed",
       "reason": "an SSRF-guarded fetch. The stub resolves to `undefined` rather than a Response, so a caller reading `.ok` or `.json()` throws \u2014 loud, not silent. NOT fails-open: the guard is inside it and a stub performs no request at all."
@@ -130,6 +125,11 @@
       "member": "sendNotification",
       "category": "inert-by-nature",
       "reason": "writes a notification row through the engine. Extensions assert on their own tables; ai/runBackgroundTask counts the calls it makes, not the rows."
+    },
+    {
+      "member": "withTenantIsolation",
+      "category": "inert-by-nature",
+      "reason": "opens a tenant transaction and runs a callback inside it. Stubbed, the callback never runs at all — so the isolated work does not happen, rather than happening unscoped. Nothing is read or written without a tenant, which is why this is inert and not fails-open. Replaces the `runQualityScan` entry: analytics/quality now ships that scanner itself and reaches this instead, destructuring it in register(). The real behaviour is covered in that extension's own tests, where isolation is injected and the assertion is which tenant it was asked for."
     }
   ]
 }
