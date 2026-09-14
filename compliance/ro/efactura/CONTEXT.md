@@ -7,6 +7,37 @@ validated by the ANAF service (`stare: ok`, zero messages), settings saved and
 read back. A complete submission cycle was **NOT** tested — it needs a certificate
 and a registered application, which are the customer's.
 
+**Reviewed at the §6 bar (engine/): 2026-09-12.** Every file under `engine/`
+read end to end. Two-tenant RLS on all five tables (`invoices`, `settings`,
+`status_log`, `storno`, `daily_stats`) measured as `zveltio_rls` with the GUC
+set: cross-tenant read/update/delete refused, a spoofed `tenant_id` on INSERT
+refused by the `WITH CHECK` policy, and the positive control (own tenant
+read/write/insert) succeeds — so the four refusals are RLS working, not the
+role being unable to do anything. Migration 008 re-verified on an upgrade
+path seeded with all three states (damaged string, healthy array, a string
+that is not JSON): recovers the damaged row, leaves the healthy one, warns on
+the third, idempotent on a second run. `generateUBLXML` posted to ANAF's real
+free validator (`webservicesp.anaf.ro`) and got a real `BR-CO-25` rule
+response — the generator's XML is well-formed enough for ANAF's own service to
+parse and evaluate. Packed bundle (`extension pack --first-party`) matches
+current source; `sourceSha256` unchanged from 1.0.8, only build-path noise in
+the bytes (reverted, not committed). Full typecheck (`tsc --noEmit`) clean.
+19/19 of the extension's own tests pass on a from-scratch two-tenant database.
+Studio side (`studio/schemas/*.json`) not covered — this bar is `engine/` only.
+
+**Repaired: a bespoke test left a live ANAF credential behind.**
+`submit-idempotency.test.ts` mutates the tenant's (singleton, one-per-tenant)
+`zv_efactura_settings` row to `access_token = 'tok'` so the handler reaches the
+upload call, and its `afterAll` only ever deleted the `IDEMP-%` invoices — never
+restored or removed the settings row. Measured: after that file ran once, the
+settings row was left with `connected: true` and a fake token; an unrelated
+walk-through against the same `TEST_DATABASE_URL` read it as configured and made
+a REAL POST to `api.anaf.ro`'s production upload endpoint, drawing a genuine
+401. Fixed by capturing the pre-existing row (or noting there was none) and
+restoring/deleting it in `afterAll`. Verified discriminating: before the fix,
+the settings row survived the test run with the fake token; after, the table is
+back to empty. No production code changed, so no version bump / repack.
+
 ## What was broken, and why nobody saw it
 
 **Submission was fabricated.** `/submit` invented the ANAF upload index, wrote

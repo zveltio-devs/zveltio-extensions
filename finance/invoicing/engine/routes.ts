@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { permissionGate, toNumber } from '@zveltio/sdk/extension';
+import { permissionGate } from '@zveltio/sdk/extension';
 
 // These helpers receive an already-scoped db (the caller passes
 // `db`), so they use that parameter directly. They're declared
@@ -119,10 +119,28 @@ function isValidCui(value: string): boolean {
   return (computed === 10 ? 0 : computed) === check;
 }
 
-async function nextCreditNoteNumber(dbh: any): Promise<string> {
-  const row = await sql`SELECT nextval('zvd_credit_note_seq') as n`.execute(dbh);
-  const n = (row.rows[0] as any).n;
-  return `CN-${String(n).padStart(5, '0')}`;
+/**
+ * The next credit-note number, from this tenant's own series.
+ *
+ * It was `nextval('zvd_credit_note_seq')` — ONE Postgres sequence for the whole
+ * instance, which is exactly the defect `claimNumber` above was written to
+ * remove for invoices, left standing on the twin. A sequence has no tenant, so
+ * two companies sharing an install interleave: the first takes CN-00001,
+ * CN-00003, the second CN-00002, and each is left with permanent holes in a
+ * register an inspection reads. A credit note adjusts an issued invoice, so it
+ * is a fiscal document under the same numbering rule, not a reference.
+ *
+ * Migration 012 gives every tenant a `credit_note` series carrying on from the
+ * highest number it has actually used, so an existing install keeps its
+ * numbering. `null` here means the series was deleted afterwards, and the
+ * caller refuses rather than inventing a number — see the trap in CONTEXT.md.
+ *
+ * `zvd_credit_note_seq` is left in place, unused: an install can still be
+ * running a previously packed bundle that reads it.
+ */
+async function nextCreditNoteNumber(dbh: any): Promise<string | null> {
+  const claimed = await claimNumber(dbh, 'credit_note');
+  return claimed?.number ?? null;
 }
 
 /**
@@ -163,6 +181,14 @@ async function mayDecideInvoice(
  * 23505 is unique_violation. SQLSTATE arrives on `errno` under the Bun driver
  * and `code` under node-postgres, so both are read.
  */
+/**
+ * Raised inside the payment transaction when the conditional UPDATE matches no
+ * row, to roll the payment row back with it. A sentinel rather than a plain
+ * `Error`, so the `catch` that turns it into a 409 cannot swallow a database
+ * failure that happens to travel the same path.
+ */
+class PaymentRaceError extends Error {}
+
 function isUniqueViolation(err: unknown): boolean {
   const code =
     (err as { errno?: string; code?: string }).errno ??
@@ -489,7 +515,15 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
     // Header and lines are one document, and a header alone burns a number from
     // the series without issuing anything anyone can send.
     const inv = await db.transaction().execute(async (trx) => {
-    const inv = await sql`
+      // The column lists below are checked against each other by
+      // `zvd_invoices`' own DDL, not by a test: five columns named on the
+      // INSERT side were missing from the SELECT side, so PostgreSQL refused
+      // the whole statement with `INSERT has more target columns than
+      // expressions` and this route answered 500 on every call since
+      // migrations 008 and 009 added `*_city` and `*_county`. Conversion of a
+      // proforma to an invoice has never worked on an install carrying those.
+      // Keep the two lists in the same order, line for line.
+      const inv = await sql`
         INSERT INTO zvd_invoices (
           number, series, doc_type, converted_from_id,
           client_id, client_type, client_name, client_email, client_address,
@@ -502,8 +536,9 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
         )
         SELECT ${claimed.number}, ${claimed.series}, 'invoice', ${p.id},
           client_id, client_type, client_name, client_email, client_address,
-          client_tax_id, client_reg_no, client_country,
-          seller_name, seller_tax_id, seller_reg_no, seller_address, seller_iban, seller_bank,
+          client_tax_id, client_reg_no, client_city, client_county, client_country,
+          seller_name, seller_tax_id, seller_reg_no, seller_address,
+          seller_city, seller_county, seller_country, seller_iban, seller_bank,
           CURRENT_DATE, delivery_date, due_date, currency, subtotal, tax_rate, tax_amount, total,
           discount_amount, discount_percent, vat_breakdown, vat_regime, vat_exemption_reason,
           exchange_rate, exchange_date, tax_amount_ron, notes, footer_notes, po_number,
@@ -532,8 +567,12 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
   // ── Invoices ──────────────────────────────────────────────────
   app.get('/invoices', async (c) => {
     const { limit = '50', page = '1', status, client_id, overdue_only } = c.req.query();
-    const lim = Math.min(+limit, 200);
-    const offset = (Math.max(1, +page) - 1) * lim;
+    // `+limit` on a non-numeric query string is NaN, and `LIMIT NaN` is
+    // `invalid input syntax for type bigint` — a 500 on
+    // `GET /invoices?limit=all`, which is a thing a person types. Both are
+    // clamped to a usable number instead.
+    const lim = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 200);
+    const offset = (Math.max(1, Number.parseInt(page, 10) || 1) - 1) * lim;
     const rows = await sql`
       SELECT i.*,
         COALESCE(json_agg(json_build_object(
@@ -1012,31 +1051,67 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
     if (d.amount > invoice.total - invoice.amount_paid) {
       return c.json({ error: `Payment exceeds outstanding amount (${invoice.total - invoice.amount_paid})` }, 400);
     }
-    // Same conversion as the `invoicing.recordPayment` service, which is this
-    // route's body reachable by name. Two write paths onto one column that read
-    // it differently is how they drift apart. `d.amount` is a validated number
-    // here, so only the column needs converting.
-    const newPaid = toNumber(invoice.amount_paid, 0, 'zvd_invoices.amount_paid') + d.amount;
-    const newStatus = newPaid >= invoice.total ? 'paid' : 'partially_paid';
+    // The check above is the ordinary refusal, answered before any write. It is
+    // NOT what keeps the total correct — it reads a balance that another request
+    // may change one line later. The statement inside the transaction is what
+    // decides; this one only produces the better error message for the common
+    // case. `toNumber` is no longer needed here because the arithmetic happens
+    // in PostgreSQL, on NUMERIC.
+    //
     // Money received and the invoice that records it are one fact.
     //
     // Apart, either the payment row exists while the invoice still reads unpaid —
     // so it is chased, and paying twice is the customer's problem to prove — or
     // the invoice is marked settled with no payment behind it, which is a hole in
     // the books that reconciliation will find months later.
+    //
+    // The UPDATE adds to the column and re-checks the limit in the same
+    // statement, and the row it matches carries the condition. The previous
+    // shape read `amount_paid`, checked the outstanding amount in JavaScript
+    // and wrote an ABSOLUTE value back, so two payments recorded at once each
+    // passed a check against the same stale balance and the second overwrote
+    // the first. Measured on a 119.00 invoice, two payments of 100.00:
+    //
+    //     invoice amount_paid = 100.00, status = partially_paid
+    //     zvd_invoice_payments  2 rows, 200.00
+    //
+    // Both were accepted although either one alone exhausts the invoice, the
+    // ledger and the invoice disagree, and the customer is chased for money
+    // they paid. Being inside a transaction did not help: the UPDATE matched on
+    // `id` alone, so the writer that waited on the row lock re-applied a
+    // decision taken before it.
     const payment = await db.transaction().execute(async (trx) => {
+      const settled = await sql<{ amount_paid: string; status: string }>`
+        UPDATE zvd_invoices
+           SET amount_paid = amount_paid + ${d.amount},
+               status = CASE WHEN amount_paid + ${d.amount} >= total THEN 'paid' ELSE 'partially_paid' END,
+               paid_at = CASE WHEN amount_paid + ${d.amount} >= total THEN NOW() ELSE paid_at END,
+               updated_at = NOW()
+         WHERE id = ${invoice.id}
+           AND status IN ('sent','overdue','partially_paid')
+           AND amount_paid + ${d.amount} <= total
+        RETURNING amount_paid, status
+      `.execute(trx);
+      // Nothing matched: another payment landed between the read above and
+      // this statement, and together they would exceed the invoice. Thrown
+      // rather than returned, so the payment row rolls back with it.
+      if (!settled.rows.length) throw new PaymentRaceError();
       const inserted = await sql`
         INSERT INTO zvd_invoice_payments (invoice_id, amount, payment_date, payment_method, reference, notes, created_by)
         VALUES (${invoice.id}, ${d.amount}, ${d.payment_date}, ${d.payment_method}, ${d.reference ?? null}, ${d.notes ?? null}, ${user.id})
         RETURNING *
       `.execute(trx);
-      await sql`
-        UPDATE zvd_invoices SET amount_paid = ${newPaid}, status = ${newStatus},
-          paid_at = ${newStatus === 'paid' ? sql`NOW()` : sql`paid_at`}, updated_at = NOW()
-        WHERE id = ${invoice.id}
-      `.execute(trx);
       return inserted;
+    }).catch((err: unknown) => {
+      if (err instanceof PaymentRaceError) return null;
+      throw err;
     });
+    if (!payment) {
+      return c.json(
+        { error: 'Payment exceeds the outstanding amount — another payment was recorded first' },
+        409,
+      );
+    }
     return c.json({ data: payment.rows[0] }, 201);
   });
 
@@ -1169,6 +1244,7 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
     const number = await nextCreditNoteNumber(db);
+    if (!number) return c.json({ error: 'No credit_note series configured' }, 400);
     const subtotal = d.lines.reduce((s, l) => s + l.quantity * l.unit_price, 0);
     const tax_amount = d.lines.reduce((s, l) => s + l.quantity * l.unit_price * l.tax_rate / 100, 0);
     const total = subtotal + tax_amount;
@@ -1214,18 +1290,51 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
     if (!inv.rows.length) return c.json({ error: 'Invoice not found' }, 404);
     const credit = cn.rows[0] as any;
     const invoice = inv.rows[0] as any;
-    const applied = Math.min(credit.total, invoice.total - invoice.amount_paid);
-    const newPaid = +invoice.amount_paid + applied;
-    const newStatus = newPaid >= invoice.total ? 'paid' : 'partially_paid';
     // Crediting the invoice and marking the note applied are one act. Apart, a
     // note still reading `issued` after its credit landed can be applied again —
     // the same money credited twice — and the reverse leaves a note marked spent
     // against an invoice that never received it.
-    await db.transaction().execute(async (trx) => {
-      await sql`UPDATE zvd_invoices SET amount_paid = ${newPaid}, status = ${newStatus}, updated_at = NOW() WHERE id = ${invoice_id}`.execute(trx);
-      await sql`UPDATE zvd_credit_notes SET status = 'applied', updated_at = NOW() WHERE id = ${credit.id}`.execute(trx);
+    //
+    // Both statements carry their own condition, and the amount is computed in
+    // PostgreSQL from the row being written. The previous shape read the note
+    // and the invoice, worked out the amount in JavaScript and wrote an
+    // ABSOLUTE `amount_paid` back with no condition at all — the same defect as
+    // `POST /invoices/:id/payments` above, and the note's `issued → applied`
+    // transition was equally unguarded, so two concurrent applies credited the
+    // invoice twice from one note.
+    const result = await db.transaction().execute(async (trx) => {
+      // Claim the note first: the loser of a race changes nothing.
+      const claimedNote = await sql`
+        UPDATE zvd_credit_notes SET status = 'applied', updated_at = NOW()
+         WHERE id = ${credit.id} AND status = 'issued'
+        RETURNING id
+      `.execute(trx);
+      if (!claimedNote.rows.length) return null;
+      // The amount is worked out in the same statement that writes it, from a
+      // LOCKED read of the invoice — `FOR UPDATE` makes the CTE re-read a row a
+      // concurrent transaction has just changed, so the credit is applied
+      // against the balance that is actually outstanding.
+      //
+      // `RETURNING` alone cannot answer this: it sees the row AFTER the update,
+      // where `total - amount_paid` is what is left over, not what was applied.
+      // Hence the CTE, which holds the value taken before.
+      const updated = await sql<{ applied_amount: string; status: string }>`
+        WITH cur AS (
+          SELECT id, GREATEST(LEAST(${credit.total}::numeric, total - amount_paid), 0) AS applied
+            FROM zvd_invoices WHERE id = ${invoice_id} FOR UPDATE
+        )
+        UPDATE zvd_invoices i
+           SET amount_paid = i.amount_paid + cur.applied,
+               status = CASE WHEN i.amount_paid + cur.applied >= i.total THEN 'paid' ELSE 'partially_paid' END,
+               updated_at = NOW()
+          FROM cur
+         WHERE i.id = cur.id
+        RETURNING cur.applied AS applied_amount, i.status
+      `.execute(trx);
+      return updated.rows[0] ?? null;
     });
-    return c.json({ data: { applied_amount: applied, invoice_status: newStatus } });
+    if (!result) return c.json({ error: 'Credit note is no longer issued — it was applied already' }, 409);
+    return c.json({ data: { applied_amount: Number(result.applied_amount), invoice_status: result.status } });
   });
 
   // ── PDF / HTML export ─────────────────────────────────────────
@@ -1350,10 +1459,40 @@ ${inv.footer_notes ? `<p style="font-size:11px;color:#666">${esc(inv.footer_note
     return c.json({ data: { marked: row.rows.length } });
   });
 
+  /**
+   * Delete a DRAFT, and only a draft.
+   *
+   * This route refused a `paid` invoice and permitted every other status, which
+   * made it a way around the two things `POST /invoices/:id/cancel` was built
+   * to protect. It is gated by the extension's base `invoices` permission —
+   * what somebody needs to draft an invoice at all — while cancelling requires
+   * `invoices:cancel`; so the user refused the reversible, audited operation
+   * could still destroy the document outright, and the Studio row action was
+   * offered on every row regardless of status.
+   *
+   * And a `sent` invoice is issued: it carries a number claimed from the series,
+   * which is never handed out again. Deleting the row leaves a hole in exactly
+   * the sequence `claimNumber` exists to keep continuous — Cod fiscal art. 319
+   * alin. (20) lit. a) — and in Romania an issued invoice is withdrawn by a
+   * credit note or a cancellation, never by deletion.
+   *
+   * A draft has no number and no fiscal existence, so deleting one is the
+   * ordinary "I started the wrong invoice" and stays open to anyone who may
+   * write invoices. Anything else is refused here and pointed at the operation
+   * that handles it properly.
+   */
   app.delete('/invoices/:id', async (c) => {
-    const existing = await sql`SELECT status FROM zvd_invoices WHERE id = ${c.req.param('id')}`.execute(db);
+    const existing = await sql`SELECT status, number FROM zvd_invoices WHERE id = ${c.req.param('id')}`.execute(db);
     if (!existing.rows.length) return c.json({ error: 'Not found' }, 404);
-    if ((existing.rows[0] as any).status === 'paid') return c.json({ error: 'Cannot delete a paid invoice' }, 400);
+    const status = (existing.rows[0] as any).status as string;
+    if (status !== 'draft') {
+      return c.json(
+        {
+          error: `Cannot delete a ${status} invoice — it is issued under number ${(existing.rows[0] as any).number}. Cancel it, or issue a credit note.`,
+        },
+        400,
+      );
+    }
     await sql`DELETE FROM zvd_invoices WHERE id = ${c.req.param('id')}`.execute(db);
     return c.json({ success: true });
   });

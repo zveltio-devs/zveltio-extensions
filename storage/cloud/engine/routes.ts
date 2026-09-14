@@ -4,14 +4,17 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import { createFileVersion, listFileVersions, restoreFileVersion } from './lib/file-versions.js';
-import { moveToTrash, restoreFromTrash, listTrash, purgeExpiredTrash } from './lib/trash.js';
-import { createShareLink, validateShareToken, incrementDownloadCount, listUserShares, revokeShare } from './lib/sharing.js';
+import { mayDeleteFile, moveToTrash, restoreFromTrash, listTrash, purgeExpiredTrash } from './lib/trash.js';
+import { createShareLink, validateShareToken, claimDownload, listUserShares, revokeShare } from './lib/sharing.js';
 import { getAws, presignedGetUrl, putObject, getObject, s3Url } from './lib/s3.js';
 import { objectStorage } from './lib/config.js';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 export function cloudRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
+  // Owner-or-tenant-admin, the same rule `content/media` applies to these tables.
+  const isTenantAdmin = (userId: string): Promise<boolean> =>
+    (ctx.internals as any).isTenantAdmin(userId);
 
   // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
   // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
@@ -87,6 +90,9 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
   app.post('/files/:id/trash', requireAuth, async (c) => {
     const user = c.get('user') as any;
     try {
+      if (!(await mayDeleteFile(db, isTenantAdmin, c.req.param('id'), user.id))) {
+        return c.json({ error: 'You may only delete files you own' }, 403);
+      }
       await moveToTrash(db, c.req.param('id'), user.id);
       return c.json({ success: true, message: 'Moved to trash' });
     } catch (err: any) {
@@ -95,7 +101,14 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/files/:id/restore', requireAuth, async (c) => {
+    const user = c.get('user') as any;
     try {
+      // Same rule as deleting. `restoreFromTrash` took no user at all, so any
+      // member could pull any tenant file back out of the trash — including one
+      // an administrator had just put there.
+      if (!(await mayDeleteFile(db, isTenantAdmin, c.req.param('id'), user.id))) {
+        return c.json({ error: 'You may only restore files you own' }, 403);
+      }
       await restoreFromTrash(db, c.req.param('id'));
       return c.json({ success: true, message: 'Restored from trash' });
     } catch (err: any) {
@@ -177,12 +190,23 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
     }
 
     if (result.file && result.share.share_type === 'download') {
+      // The allowance is claimed BEFORE the URL is handed out, and the claim is
+      // what decides. `validateShareToken` above compares `download_count` to
+      // `max_downloads`, but that read and the increment were separate
+      // statements with a presign between them: two concurrent requests on a
+      // share limited to one both got the file. See `claimDownload`.
+      //
+      // This block exists TWICE — here and in the other share handler — and the
+      // edit that fixed it asserted on finding both. One of them would have kept
+      // the race, and the token that reaches a recipient is served by only one.
+      if (!(await claimDownload(db, result.share.id))) {
+        return c.json({ error: 'Download limit reached' }, 403);
+      }
+
       const presigned = await presignedGetUrl(result.file.storage_path);
       if (!presigned) {
         return c.json({ error: 'Object storage is not configured' }, 503);
       }
-
-      await incrementDownloadCount(db, result.share.id);
 
       // Log download access
       await logAccess(
@@ -417,9 +441,14 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
   });
 
   // DELETE /files/:id — soft delete, so trash/restore keep working.
+  // The second door onto the same operation. Both need the same check; the first
+  // version of this repair guarded only the one named "trash".
   app.delete('/files/:id', requireAuth, async (c) => {
     const user = c.get('user') as any;
     try {
+      if (!(await mayDeleteFile(db, isTenantAdmin, c.req.param('id'), user.id))) {
+        return c.json({ error: 'You may only delete files you own' }, 403);
+      }
       await moveToTrash(db, c.req.param('id'), user.id);
       return c.json({ success: true });
     } catch (err: any) {
@@ -825,12 +854,23 @@ export function makePublicShareHandler(ctx: ExtensionContext) {
     }
 
     if (result.file && result.share.share_type === 'download') {
+      // The allowance is claimed BEFORE the URL is handed out, and the claim is
+      // what decides. `validateShareToken` above compares `download_count` to
+      // `max_downloads`, but that read and the increment were separate
+      // statements with a presign between them: two concurrent requests on a
+      // share limited to one both got the file. See `claimDownload`.
+      //
+      // This block exists TWICE — here and in the other share handler — and the
+      // edit that fixed it asserted on finding both. One of them would have kept
+      // the race, and the token that reaches a recipient is served by only one.
+      if (!(await claimDownload(db, result.share.id))) {
+        return c.json({ error: 'Download limit reached' }, 403);
+      }
+
       const presigned = await presignedGetUrl(result.file.storage_path);
       if (!presigned) {
         return c.json({ error: 'Object storage is not configured' }, 503);
       }
-
-      await incrementDownloadCount(db, result.share.id);
 
       // Log download access
       await logAccess(

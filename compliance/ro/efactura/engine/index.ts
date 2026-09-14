@@ -49,6 +49,7 @@ const extension: ZveltioExtension = {
       join(import.meta.dir, 'migrations/005_anaf_settings.sql'),
       join(import.meta.dir, 'migrations/006_callback_url.sql'),
       join(import.meta.dir, 'migrations/007_tenant_scoped_unique_keys.sql'),
+      join(import.meta.dir, 'migrations/008_lines_unwrap_string.sql'),
     ];
   },
 
@@ -89,6 +90,11 @@ const extension: ZveltioExtension = {
         // The seller values are snapshotted onto the invoice at issue time, so
         // a submission keeps the details the document was issued under even
         // after the company changes its address or its bank.
+        // The lines cast below is `::text::jsonb`, not `::jsonb`: under
+        // Bun.SQL (the production driver) a single cast on a string parameter
+        // is a no-op and the lines land as a jsonb STRING SCALAR — measured:
+        // every auto-draft this listener ever wrote stored lines as text
+        // inside jsonb. Migration 008 unwraps the rows already damaged.
         await sql`
           INSERT INTO zv_efactura_invoices (
             source_invoice_id, invoice_number, invoice_date, due_date,
@@ -112,7 +118,7 @@ const extension: ZveltioExtension = {
             ${invoice.client_city ?? null},
             ${invoice.client_county ?? null},
             ${invoice.client_country ?? 'RO'},
-            ${JSON.stringify(linesJson)}::jsonb,
+            ${JSON.stringify(linesJson)}::text::jsonb,
             ${Number(invoice.subtotal ?? 0)},
             ${Number(invoice.tax_amount ?? 0)},
             ${Number(invoice.total ?? 0)},

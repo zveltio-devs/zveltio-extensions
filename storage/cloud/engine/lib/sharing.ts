@@ -150,12 +150,39 @@ export async function validateShareToken(
 }
 
 /**
- * Increments the download count for a share.
+ * Takes one download off a share's allowance, or refuses.
+ *
+ * `validateShareToken` reads `download_count` and compares it to
+ * `max_downloads`; the route then presigned a URL and called a separate
+ * unconditional increment. Nothing held the row between the two, so the limit
+ * was advisory. Measured on Postgres 18, a share with `max_downloads: 1` and two
+ * concurrent requests:
+ *
+ *     A: SERVED FILE
+ *     B: SERVED FILE
+ *     download_count now: 2 (limit 1)
+ *
+ * A download limit is the whole control on a public link — the token is the only
+ * other thing standing between a recipient and unlimited redistribution — so
+ * "usually one" is not what the person who set it asked for.
+ *
+ * The check and the increment are one statement now. The row is locked by the
+ * UPDATE, and under READ COMMITTED a blocked writer re-evaluates the WHERE
+ * against the committed row, so the second request sees the first one's count.
+ *
+ * Returns false when the allowance is spent. A share with no `max_downloads` is
+ * unlimited and always succeeds.
  */
-export async function incrementDownloadCount(db: Database, shareId: string): Promise<void> {
-  await sql`
-    UPDATE zv_media_shares SET download_count = download_count + 1 WHERE id = ${shareId}
+export async function claimDownload(db: Database, shareId: string): Promise<boolean> {
+  const claimed = await sql<{ id: string }>`
+    UPDATE zv_media_shares
+       SET download_count = download_count + 1
+     WHERE id = ${shareId}
+       AND is_active = true
+       AND (max_downloads IS NULL OR download_count < max_downloads)
+    RETURNING id
   `.execute(db);
+  return claimed.rows.length > 0;
 }
 
 /**
