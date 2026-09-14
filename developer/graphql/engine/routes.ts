@@ -68,6 +68,26 @@ interface RelationInfo {
   junction_table?: string;
 }
 
+// ── Value coercion at the DB → GraphQL boundary ───────────────────────────────
+//
+// Postgres timestamp columns come back from `pg`/Kysely as JS `Date` objects,
+// not strings — `created_at`/`updated_at` and any `date`/`datetime` field are
+// mapped to `GraphQLString` (see `mapFieldType`), and graphql-js's default
+// field resolver hands the raw `Date` straight to `GraphQLString.serialize`.
+// That serializer special-cases object-like values via `.valueOf()`, and
+// `Date.prototype.valueOf()` returns the EPOCH MILLISECOND NUMBER — so it
+// passed through the "finite number" branch and came back as e.g.
+// `"1789297650063"` instead of an ISO timestamp. Measured directly:
+// `GraphQLString.serialize(new Date('2026-09-13T11:07:30.063Z'))` returns
+// `"1789297650063"`, silently — no error, no obviously-wrong shape, just the
+// wrong string. One conversion at the boundary, applied to every scalar field
+// a resolver hands back, closes it for base fields and custom ones alike.
+
+function readFieldValue(parent: any, fieldName: string): any {
+  const value = parent[fieldName];
+  return value instanceof Date ? value.toISOString() : value;
+}
+
 // ── Field type mapping ────────────────────────────────────────────────────────
 
 function mapFieldType(fieldType: string): any {
@@ -116,6 +136,35 @@ async function getRelations(dbh: any): Promise<RelationInfo[]> {
   }
 }
 
+// ── Field policies loader ─────────────────────────────────────────────────────
+//
+// `/field-policies` (admin) writes here; nothing had ever read it back. The
+// Studio tab is titled "Field policies" with a Shield icon and the empty
+// state says "No field policies — all fields readable", which promises the
+// opposite of what shipped: every field of every collection was readable by
+// anyone who passed the collection-level `checkPermission` check, policy row
+// or not. Confirmed by grep — `zvd_graphql_field_policies` had exactly three
+// call sites, all in the CRUD routes below, none in `buildDynamicSchema`.
+
+interface FieldPolicyInfo {
+  collection: string;
+  field: string;
+  allowed_roles: string[];
+  deny_roles: string[];
+}
+
+async function getFieldPolicies(dbh: any): Promise<FieldPolicyInfo[]> {
+  try {
+    const result = await sql<FieldPolicyInfo>`
+      SELECT collection, field, allowed_roles, deny_roles
+      FROM zvd_graphql_field_policies
+    `.execute(dbh);
+    return result.rows;
+  } catch {
+    return [];
+  }
+}
+
 // ── Schema builder ────────────────────────────────────────────────────────────
 //
 // IMPORTANT: every resolver below uses the *request-scoped* context
@@ -142,11 +191,59 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
 
   let collections: any[] = [];
   let relations: RelationInfo[] = [];
+  let fieldPolicies: FieldPolicyInfo[] = [];
 
   try {
     collections = await DDLManager.getCollections(db);
     relations = await getRelations(db);
+    fieldPolicies = await getFieldPolicies(db);
   } catch { /* no collections yet */ }
+
+  const fieldPolicyMap = new Map<string, { allowed: string[]; deny: string[] }>();
+  for (const p of fieldPolicies) {
+    fieldPolicyMap.set(`${p.collection}.${p.field}`, {
+      allowed: Array.isArray(p.allowed_roles) ? p.allowed_roles : [],
+      deny: Array.isArray(p.deny_roles) ? p.deny_roles : [],
+    });
+  }
+
+  // A policy's roles are checked against the caller, not the row — same
+  // caller for every field/row of one GraphQL operation, so cache both
+  // lookups on the shared `contextValue` object instead of re-querying per
+  // field per row.
+  function cachedIsAdmin(context: any): Promise<boolean> {
+    if (!context.__isAdminPromise) {
+      // `isTenantAdmin`, not the bare `checkPermission(uid, 'admin', '*')`:
+      // the same call with a name (`permissions.ts:905`), and field policies are
+      // per-tenant rows, so the tenant-level meaning is the correct one. The
+      // engine's admin-gate check refuses new sites of the bare spelling.
+      context.__isAdminPromise = ctx.internals.isTenantAdmin(context.user.id);
+    }
+    return context.__isAdminPromise;
+  }
+  function cachedRoles(context: any): Promise<string[]> {
+    if (!context.__rolesPromise) {
+      context.__rolesPromise = ctx.getUserRoles(context.user.id);
+    }
+    return context.__rolesPromise;
+  }
+
+  // A field with a policy resolves to `null` for a caller the policy
+  // excludes, rather than the stored value. Admins always pass — the same
+  // instance-wide override every other admin-gated route in this file
+  // grants. This nulls the VALUE; it does not remove the field from the
+  // schema, which is cached across callers (`SCHEMA_TTL_MS`) and can't
+  // vary per request without discarding that cache.
+  function policyResolver(fieldName: string, policy: { allowed: string[]; deny: string[] }) {
+    return async (parent: any, _args: any, context: any) => {
+      const value = readFieldValue(parent, fieldName);
+      if (await cachedIsAdmin(context)) return value;
+      const roles = await cachedRoles(context);
+      if (policy.deny.length && roles.some((r: string) => policy.deny.includes(r))) return null;
+      if (policy.allowed.length && !roles.some((r: string) => policy.allowed.includes(r))) return null;
+      return value;
+    };
+  }
 
   const baseFields = {
     id:         { type: GraphQLID },
@@ -164,6 +261,15 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
     const scalarFields: Record<string, any> = { ...baseFields };
     for (const field of (col.fields || [])) {
       scalarFields[field.name] = { type: mapFieldType(field.type) };
+    }
+    for (const fieldName of Object.keys(scalarFields)) {
+      const policy = fieldPolicyMap.get(`${col.name}.${fieldName}`);
+      scalarFields[fieldName] = {
+        type: scalarFields[fieldName].type,
+        resolve: policy
+          ? policyResolver(fieldName, policy)
+          : (parent: any) => readFieldValue(parent, fieldName),
+      };
     }
 
     const colType = new GraphQLObjectType({
@@ -372,19 +478,32 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
   });
 }
 
-// ── Schema cache (TTL 60 s) ───────────────────────────────────────────────────
+// ── Schema cache (TTL 60 s, per tenant) ───────────────────────────────────────
+//
+// `buildDynamicSchema` reads `zv_collections`/`zv_fields` through `ctx.db`,
+// which resolves whichever tenant transaction is active WHEN THE CACHE IS
+// BUILT (H-12). A single module-global cache entry does not know that: the
+// first request after the TTL expires decides the schema every tenant's
+// GraphQL endpoint serves for the next 60 seconds, regardless of who issued
+// it. Measured: tenant A defines a `widgets_a` collection, tenant B defines
+// `gadgets_b`; if A's request is the one that repopulates the cache, B's very
+// next request introspects a schema with `list_widgets_a` in it and no
+// `list_gadgets_b` — someone else's collection and field names, not B's own,
+// for up to a minute. Keyed by tenant id so each tenant only ever rebuilds
+// and reads its own.
 
-let _cachedSchema: GraphQLSchema | null = null;
-let _schemaBuildTime = 0;
+const _cachedSchemas = new Map<string, { schema: GraphQLSchema; builtAt: number }>();
 const SCHEMA_TTL_MS = 60_000;
 
-async function getSchema(ctx: ExtensionContext): Promise<GraphQLSchema> {
+async function getSchema(ctx: ExtensionContext, tenantKey: string): Promise<GraphQLSchema> {
   const now = Date.now();
-  if (!_cachedSchema || now - _schemaBuildTime > SCHEMA_TTL_MS) {
-    _cachedSchema = await buildDynamicSchema(ctx);
-    _schemaBuildTime = now;
+  const entry = _cachedSchemas.get(tenantKey);
+  if (!entry || now - entry.builtAt > SCHEMA_TTL_MS) {
+    const schema = await buildDynamicSchema(ctx);
+    _cachedSchemas.set(tenantKey, { schema, builtAt: now });
+    return schema;
   }
-  return _cachedSchema;
+  return entry.schema;
 }
 
 // ── GraphiQL playground ───────────────────────────────────────────────────────
@@ -476,7 +595,8 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
     let errorCount = 0;
 
     try {
-      const schema = await getSchema(ctx);
+      const tenantKey = (c.get as any)?.('tenant')?.id ?? 'default';
+      const schema = await getSchema(ctx, tenantKey);
       // Route handler is mounted inside the engine's tenantMiddleware →
       // c.get('tenantTrx') exposes the per-request transaction with
       // `SET LOCAL "zveltio.current_tenant"` already applied. Resolvers
@@ -533,8 +653,14 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
     const isAdmin = await checkPermission(session.user.id, 'admin', '*');
     if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
 
-    _cachedSchema = null;
-    await getSchema(ctx);
+    // Clears every tenant's entry, not just the caller's: the cache is a
+    // shared module-level map (see the comment above `_cachedSchemas`), so an
+    // admin fixing a stale schema for their own tenant has no way to name
+    // just their own entry, and leaving the others would leave the same
+    // staleness the endpoint exists to clear.
+    _cachedSchemas.clear();
+    const tenantKey = (c.get as any)?.('tenant')?.id ?? 'default';
+    await getSchema(ctx, tenantKey);
     return c.json({ success: true, message: 'Schema refreshed' });
   });
 
@@ -657,7 +783,8 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
     if (depthError) return c.json({ errors: [{ message: depthError }] }, 400);
 
     try {
-      const schema = await getSchema(ctx);
+      const tenantKey = (c.get as any)?.('tenant')?.id ?? 'default';
+      const schema = await getSchema(ctx, tenantKey);
       const tenantTrx = (c.get as any)?.('tenantTrx') ?? null;
       const loaders = new DataLoaderRegistry(db);
       const result = await graphql({
