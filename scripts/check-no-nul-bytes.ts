@@ -18,8 +18,8 @@
  * defects, the `::jsonb` cast class, the `.catch(() => {})` inventory and the
  * unique-key campaign were all greps across the tree. Any of them would have
  * reported this file clean without looking at it. The `::jsonb` class count of
- * "27 across 12 extensions" recorded in `communications/mail/CONTEXT.md` was
- * measured that way, and this file holds five such sites.
+ * "27 across 12 extensions" was measured that way, and this file holds five
+ * such sites.
  *
  * The fix is always the escape — `\0` compiles to the identical character, and
  * the file stays greppable.
