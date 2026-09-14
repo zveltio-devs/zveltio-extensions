@@ -12,6 +12,11 @@ This repository contains first-party signed extensions for **Zveltio** (the core
 
 ## Workspace Layout & Core Interaction
 
+- **Engineering records are not in this repository.** The per-extension context
+  records and the verification checklist live in the private repository
+  (`zveltio-private/extensions/`). Code comments here still cite them by their
+  old `CONTEXT.md` path — those are citations, not links. Read them from the
+  private repository before touching an extension, and update them there.
 - **Core Engine Location:** `../zveltio` (sibling directory).
 - **Execution Rules:** Never use `cd` to jump between repos. Use `bun --cwd` to execute cross-repo commands.
   - Test against core: `bun --cwd ../zveltio test`
