@@ -818,11 +818,15 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
     // `"user".role` is a Better-Auth column constrained to `god`/`member`
     // (see `user_role_check`) — it is never `'admin'`, so the check this
     // replaced always answered false and this route refused every caller,
-    // including a real `god` session, since the day it was written. The
-    // repository's own idiom for "admin access required" is the bare
-    // `checkPermission(uid, 'admin', '*')` call, used the same way by
-    // analytics/quality, developer/validation, content/documents and others.
-    const isAdmin = await ctx.checkPermission(user.id, 'admin', '*');
+    // including a real `god` session, since the day it was written.
+    //
+    // `isTenantAdmin` rather than the bare `checkPermission(uid, 'admin', '*')`:
+    // they are the same call (`permissions.ts:905` is literally that line), and
+    // the named one says WHICH of the two admin meanings this route holds.
+    // Running a tenant's due recurrences is tenant-scoped, so this is the
+    // tenant-level answer, not instance power. The engine's admin-gate check
+    // refuses new sites of the bare spelling for exactly this reason.
+    const isAdmin = await ctx.internals.isTenantAdmin(user.id);
     if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
 
     const now = new Date();

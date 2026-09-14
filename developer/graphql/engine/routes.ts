@@ -213,7 +213,11 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
   // field per row.
   function cachedIsAdmin(context: any): Promise<boolean> {
     if (!context.__isAdminPromise) {
-      context.__isAdminPromise = ctx.checkPermission(context.user.id, 'admin', '*');
+      // `isTenantAdmin`, not the bare `checkPermission(uid, 'admin', '*')`:
+      // the same call with a name (`permissions.ts:905`), and field policies are
+      // per-tenant rows, so the tenant-level meaning is the correct one. The
+      // engine's admin-gate check refuses new sites of the bare spelling.
+      context.__isAdminPromise = ctx.internals.isTenantAdmin(context.user.id);
     }
     return context.__isAdminPromise;
   }
