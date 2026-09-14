@@ -4668,7 +4668,7 @@ WD9f
 
 // ../zveltio/node_modules/.bun/ioredis@5.11.1/node_modules/ioredis/built/utils/index.js
 var require_utils2 = __commonJS((exports) => {
-  var __dirname = "/home/liviu/zveltio/node_modules/.bun/ioredis@5.11.1/node_modules/ioredis/built/utils";
+  var __dirname = "/zveltio-extension/node_modules/ioredis/built/utils";
   Object.defineProperty(exports, "__esModule", { value: true });
   exports.noop = exports.isArguments = exports.defaults = exports.Debug = exports.getPackageMeta = exports.zipMap = exports.CONNECTION_CLOSED_ERROR_MSG = exports.shuffle = exports.sample = exports.resolveTLSProfile = exports.parseURL = exports.optimizeErrorStack = exports.toArg = exports.convertMapToArray = exports.convertObjectToArray = exports.timeout = exports.packObject = exports.isInt = exports.wrapMultiResult = exports.convertBufferToString = undefined;
   var fs_1 = __require("fs");
@@ -4982,7 +4982,7 @@ var require_argumentParsers = __commonJS((exports) => {
 
 // ../zveltio/node_modules/.bun/ioredis@5.11.1/node_modules/ioredis/built/Command.js
 var require_Command = __commonJS((exports) => {
-  var __dirname = "/home/liviu/zveltio/node_modules/.bun/ioredis@5.11.1/node_modules/ioredis/built";
+  var __dirname = "/zveltio-extension/node_modules/ioredis/built";
   Object.defineProperty(exports, "__esModule", { value: true });
   var commands_1 = require_built();
   var calculateSlot = require_lib();
@@ -12091,13 +12091,11 @@ var validator = (target, validationFunc) => {
 
 // node_modules/@hono/zod-validator/dist/index.mjs
 function zValidatorFunction(target, schema, hook, options) {
+  const caseInsensitiveKeymap = target === "header" && (("_def" in schema) || ("_zod" in schema)) ? Object.fromEntries(Object.keys("in" in schema ? schema.in.shape : schema.shape).map((key) => [key.toLowerCase(), key])) : undefined;
   return validator(target, async (value, c) => {
     let validatorValue = value;
-    if (target === "header" && "_def" in schema || target === "header" && "_zod" in schema) {
-      const schemaKeys = Object.keys("in" in schema ? schema.in.shape : schema.shape);
-      const caseInsensitiveKeymap = Object.fromEntries(schemaKeys.map((key) => [key.toLowerCase(), key]));
+    if (caseInsensitiveKeymap)
       validatorValue = Object.fromEntries(Object.entries(value).map(([key, value2]) => [caseInsensitiveKeymap[key] || key, value2]));
-    }
     const result = options && options.validationFunction ? await options.validationFunction(schema, validatorValue) : await schema.safeParseAsync(validatorValue);
     if (hook) {
       const hookResult = await hook({

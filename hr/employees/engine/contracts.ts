@@ -102,8 +102,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // `:id` and `:cid` are both `uuid` primary keys; unvalidated, either reaches
 // Postgres as one and 22P02s — 500, not 404. Chained on each route directly:
 // a leading `app.use('*', ...)` runs before Hono has matched a route, so
-// `c.req.param()` there is always `{}` — measured, not assumed; see
-// `hr/employees/CONTEXT.md`.
+// `c.req.param()` there is always `{}` — measured, not assumed.
 function requireUuid(...names: string[]) {
   return async (c: any, next: () => Promise<void>) => {
     for (const n of names) {
