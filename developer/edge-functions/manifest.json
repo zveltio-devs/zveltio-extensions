@@ -3,7 +3,7 @@
   "displayName": "Edge Functions",
   "category": "developer",
   "description": "Write and deploy serverless functions that run inside the Zveltio engine",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-edge-functions",
@@ -44,7 +44,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "f51f70e3673512f4feca47d8adada4b84d309b677829ad47b00635849c1a092a",
+    "engineSha256": "62a163879aaef7a8f457ed3b743a17f2850d958d5e372552f4e70bd196d3f43e",
     "sourceSha256": "559eeefdb6b6c4ebee05ce78e676e3df8b2b7bcdceb7da7b11b1b193efcc6ce1"
   },
   "globalRoutes": [],
