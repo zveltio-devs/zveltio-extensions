@@ -3,7 +3,7 @@
   "displayName": "Expenses",
   "category": "finance",
   "description": "Employee expense reports with receipt management, categorization and approval flow",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-expenses",
@@ -38,7 +38,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "290d9c1d04ba59bdd91eca1c19a40c4e66977e62a83f20fdf2194eae60a4a2b9",
+    "engineSha256": "dffff516f3f65c488b1bf24ffd873fff3e5adad6c9e7c941a2f6ac91cec0c096",
     "sourceSha256": "712f064199b81e724c79c406676f9e7784c2d1f198546db8887ac813b95ca2e6"
   },
   "resources": [

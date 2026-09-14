@@ -3,7 +3,7 @@
   "displayName": "Trasabilitate Alimentară",
   "category": "operations",
   "description": "Trasabilitate alimentară conformă Reg. CE 178/2002 (Art. 18) și cerințelor ANSVSA România — recepție loturi, scanare QR, arbore bidirecțional, simulator recall.",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-traceability",
@@ -60,7 +60,7 @@
     "bundlePeers": true
   },
   "integrity": {
-    "engineSha256": "369373bc8196dcb0d1bff409a992d687e4df4d7d829b85f70c9c7a4794473691",
+    "engineSha256": "9eebde6e12562b4cdd5323ffdf56cbd44f31fdb3d5597521b4ba7d258a9bb9ed",
     "sourceSha256": "02c460fa0fedbf0eb7dc3ff226cb106be640b52e246740caacd5b63797016a37"
   }
 }

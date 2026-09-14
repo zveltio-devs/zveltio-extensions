@@ -3,7 +3,7 @@
   "displayName": "Data Export",
   "category": "data",
   "description": "Export collection data as JSON, CSV or NDJSON with filtering support",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-export",
@@ -36,7 +36,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "91b95d4178ac8bc1ceb1d6bbd5d4f8f5165d4981d7019708ea4fb9766d8a8d77",
+    "engineSha256": "0b2b8638812ec48e6784d9f0c80070ee9388b25f7543f8c435cf300fdd9ffc1c",
     "sourceSha256": "682313d28b4c81ce42155978f07aba6aff217aa3b7839a6fa8e277c17eb66d8d"
   },
   "resources": [
