@@ -62,13 +62,6 @@ describe('developer/graphql — the schema cache is keyed per tenant', () => {
         getTableName: (name: string) => `zvd_test_${name}`,
       },
       internals: {
-        DataLoaderRegistry: class {
-          get() {
-            return { load: async () => null };
-          }
-        },
-        checkQueryDepth: () => null,
-        checkQueryWidth: () => null,
       },
     };
 

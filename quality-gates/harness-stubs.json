@@ -7,16 +7,6 @@
   },
   "members": [
     {
-      "member": "checkQueryDepth",
-      "category": "fails-closed-if-stubbed",
-      "reason": "returns an error string or null; the stub is a truthy Promise, so every GraphQL query is rejected as too deep. developer/graphql:462,656."
-    },
-    {
-      "member": "checkQueryWidth",
-      "category": "fails-closed-if-stubbed",
-      "reason": "same shape as checkQueryDepth. developer/graphql:467,653."
-    },
-    {
       "member": "checkValidationExpression",
       "category": "inert-by-nature",
       "reason": "validates a rule expression; a test about rule storage does not need it to parse."
@@ -25,11 +15,6 @@
       "member": "createBetterAuthSession",
       "category": "inert-by-nature",
       "reason": "the harness mints its own session; an extension asking for one gets nothing and the test supplies what it needs."
-    },
-    {
-      "member": "DataLoaderRegistry",
-      "category": "inert-by-nature",
-      "reason": "a batching cache. Absent, each read goes straight to the database, which is what a test wants anyway."
     },
     {
       "member": "dynamicInsert",
