@@ -37,6 +37,11 @@ import {
 } from 'graphql';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import {
+  DataLoaderRegistry,
+  checkQueryDepth,
+  checkQueryWidth,
+} from './lib/graphql-dataloader.js';
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 
 const PersistedQueryCreateSchema = z.object({
@@ -539,7 +544,12 @@ function detectOperationType(query: string): 'query' | 'mutation' | 'subscriptio
 
 export function graphqlRoutes(ctx: ExtensionContext): Hono {
   const { db, DDLManager, auth, checkPermission } = ctx;
-  const { DataLoaderRegistry, checkQueryDepth, checkQueryWidth } = ctx.internals;
+  // `DataLoaderRegistry`, `checkQueryDepth` and `checkQueryWidth` used to come
+  // from `ctx.internals`: the engine carried the batching and the two query
+  // guards while this extension carried the GraphQL API they protect. They now
+  // live in `./lib/`, with the feature. Nothing else in the engine used them —
+  // `routes/index.ts` has said "moved to extensions/developer/graphql" since
+  // the API itself moved.
 
   // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
   // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
