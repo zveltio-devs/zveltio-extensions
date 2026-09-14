@@ -11,6 +11,7 @@
 // TEST_DATABASE_URL, same convention as the generic contract suite).
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
+import { applyOwnMigrations } from './test-utils';
 
 // biome-ignore lint/suspicious/noExplicitAny: test doubles and the packed module
 type Any = any;
@@ -64,6 +65,10 @@ d('developer/graphql — field policies are enforced', () => {
     await pool.query(
       `INSERT INTO zvd_test_employees (title, salary) VALUES ('Staff Engineer', 185000)`,
     );
+    // Same reason as date-coercion.test.ts: this file mounts its own app, so
+    // nothing applies the extension's migrations for it. It passed only
+    // because another file happened to run first.
+    await applyOwnMigrations((q) => pool.query(q));
     await pool.query('DELETE FROM zvd_graphql_field_policies');
     await pool.query(
       `INSERT INTO zvd_graphql_field_policies (collection, field, allowed_roles, deny_roles, created_by)

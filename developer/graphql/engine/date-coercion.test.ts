@@ -11,6 +11,7 @@
 // TEST_DATABASE_URL).
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
+import { applyOwnMigrations } from './test-utils';
 
 // biome-ignore lint/suspicious/noExplicitAny: test doubles and the packed module
 type Any = any;
@@ -43,6 +44,10 @@ d('developer/graphql — timestamps serialize as ISO strings, not epoch millis',
       )
     `);
     await pool.query(`INSERT INTO zvd_test_widgets_dates (title) VALUES ('probe')`);
+    // Nothing else applies this extension's migrations for a file that mounts
+    // its own app, and `bun test` file order is readdir, not alphabetical —
+    // so without this the next statement hits 42P01 depending on luck.
+    await applyOwnMigrations((q) => pool.query(q));
     await pool.query('DELETE FROM zvd_graphql_field_policies');
 
     const { Hono } = (await import(
