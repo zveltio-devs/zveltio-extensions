@@ -42,11 +42,6 @@
       "reason": "PDF/Office text extraction. ai/alchemist is tested on what it does with text, not on getting it out of a .docx."
     },
     {
-      "member": "generatePDF",
-      "category": "inert-by-nature",
-      "reason": "renders a PDF. The bytes are not what any extension test asserts."
-    },
-    {
       "member": "generatePDFAsync",
       "category": "inert-by-nature",
       "reason": "queues a PDF render and returns a handle. Absent, the caller gets undefined where it expected an id \u2014 loud at the call site, and no extension test asserts on a rendered document."
@@ -80,11 +75,6 @@
       "member": "moveToTrash",
       "category": "inert-by-nature",
       "reason": "moves a stored file. content/media is tested on the row, not the bytes."
-    },
-    {
-      "member": "renderTemplate",
-      "category": "inert-by-nature",
-      "reason": "renders a document template. The output is not asserted by any extension test."
     },
     {
       "member": "requireInstanceAdmin",

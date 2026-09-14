@@ -20,6 +20,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { renderTemplate } from './lib/doc-template.js';
 import { toJsonb } from '@zveltio/sdk/extension';
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
@@ -102,7 +103,12 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
   // a handler is therefore already RLS-scoped — there is one spelling, so there
   // is none to forget.
 
-  const { renderTemplate, generatePDF } = ctx.internals;
+  // `renderTemplate` used to come from `ctx.internals`; it now lives in
+  // `./lib/doc-template.js`, with the feature. `generatePDFAsync` is called
+  // directly: the old `generatePDF` was a one-line delegation to it that
+  // existed only so the engine had something to export. The worker pool
+  // behind it stays the host's — spawning Workers is ambient authority.
+  const { generatePDFAsync } = ctx.internals;
 
   const app = new Hono<{ Variables: { user: any } }>();
 
@@ -255,7 +261,7 @@ export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user
 
     const htmlBody = typeof template.html_body === 'string' ? template.html_body : '';
     const htmlContent = renderTemplate(htmlBody, allVariables);
-    const pdfBuffer = await generatePDF(htmlContent, { title: `${template.name} ${docNumber}` }) as Buffer;
+    const pdfBuffer = await generatePDFAsync(htmlContent, { title: `${template.name} ${docNumber}` }) as Buffer;
 
     const expiresAt = data.expires_hours
       ? new Date(Date.now() + data.expires_hours * 3600 * 1000)
