@@ -6,6 +6,17 @@ import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { LabelService } from '../services/LabelService.js';
 import { QRService } from '../services/QRService.js';
 
+/**
+ * The label fonts encode WinAnsi, so a name carrying `ă`, `ș` or `ț` cannot be
+ * printed rather than printed wrongly — see LabelService. That refusal is a
+ * fact about the request's data, not a server fault, so it must reach the
+ * operator as a message they can act on instead of a bare 500.
+ */
+function labelFailure(err: unknown): { error: string; status: 422 } | null {
+  const message = err instanceof Error ? err.message : '';
+  return message.startsWith('Cannot print ') ? { error: message, status: 422 } : null;
+}
+
 // Top-level helper: keeps `db: any` parameter; callers pass db.
 async function fetchLotDetails(dbh: any, lotId: string) {
   const row = await sql`
@@ -37,7 +48,14 @@ export function labelsRouter(ctx: ExtensionContext): Hono {
     const lot = await fetchLotDetails(db, c.req.param('lot_id'));
     if (!lot) return c.json({ error: 'Lot negăsit / Lot not found' }, 404);
 
-    const pdf = await LabelService.generateLabel(lot);
+    let pdf: Buffer;
+    try {
+      pdf = await LabelService.generateLabel(lot);
+    } catch (err) {
+      const refusal = labelFailure(err);
+      if (!refusal) throw err;
+      return c.json({ error: refusal.error }, refusal.status);
+    }
     return new Response(new Uint8Array(pdf), {
       headers: {
         'Content-Type': 'application/pdf',
@@ -55,7 +73,14 @@ export function labelsRouter(ctx: ExtensionContext): Hono {
 
     if (!validLots.length) return c.json({ error: 'Niciun lot valid / No valid lots' }, 404);
 
-    const pdf = await LabelService.generateBatchLabels(validLots);
+    let pdf: Buffer;
+    try {
+      pdf = await LabelService.generateBatchLabels(validLots);
+    } catch (err) {
+      const refusal = labelFailure(err);
+      if (!refusal) throw err;
+      return c.json({ error: refusal.error }, refusal.status);
+    }
     return new Response(new Uint8Array(pdf), {
       headers: {
         'Content-Type': 'application/pdf',
