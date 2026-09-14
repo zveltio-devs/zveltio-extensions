@@ -1,7 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import fontkit from '@pdf-lib/fontkit';
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+import { DEJAVU_MONO_BASE64, DEJAVU_MONO_BOLD_BASE64, decodeFont } from './fonts.generated.js';
 import { QRService } from './QRService.js';
 
 /**
@@ -26,11 +25,19 @@ import { QRService } from './QRService.js';
  * this is a Romanian food-traceability extension, and those characters are in
  * ordinary supplier and product names.
  *
- * DejaVu Sans covers them. It is shipped in `../fonts`, beside the migrations
- * and for the same reason: `import.meta.dir` stays dynamic through bundling, so
- * unlike a dependency's `__dirname` it resolves on the installation. Licence in
- * `../fonts/LICENSE-DejaVu.txt` — a Bitstream Vera derivative that permits
- * redistribution.
+ * DejaVu Sans Mono covers them, and it travels as base64 in
+ * `fonts.generated.ts` rather than as a file. Reading a `.ttf` from disk would
+ * mean importing `node:fs`, which `check-ambient-authority` refuses: its
+ * allow-list is empty, and this would have been the only extension in the
+ * catalogue reaching for the filesystem — to load an asset it ships itself.
+ *
+ * The face is whole rather than subset because pdf-lib subsets at EMBED time:
+ * a label PDF is about 5 KB whichever face goes in, so the cost is bundle size,
+ * not document size. `scripts/build-traceability-fonts.ts` carries the
+ * measurements behind choosing Mono over Sans.
+ *
+ * Licence: `../../fonts/LICENSE-DejaVu.txt` — a Bitstream Vera derivative that
+ * permits redistribution, which is what makes shipping the glyphs legitimate.
  */
 
 export interface LotWithDetails {
@@ -57,30 +64,6 @@ const QR_SIZE = 80;
 const TEXT_X = 96;
 const TEXT_W = 180;
 
-/**
- * Beside the extension, not inside the bundle — see the note above.
- *
- * The depth differs between the two ways this code runs, which is exactly the
- * kind of difference that ships broken: bundled, the entry is `engine/index.js`
- * and the fonts are one level up; from source, this file is `engine/services/`
- * and they are two. Resolved by looking rather than by assuming, and it fails
- * loudly instead of returning a path nothing is at.
- */
-function resolveFontDir(): string {
-  const candidates = [
-    join(import.meta.dir, '..', 'fonts'),
-    join(import.meta.dir, '..', '..', 'fonts'),
-  ];
-  for (const dir of candidates) {
-    if (existsSync(join(dir, 'DejaVuSans.ttf'))) return dir;
-  }
-  throw new Error(
-    `Label fonts not found. Looked in: ${candidates.join(', ')}. ` +
-      `They ship in the extension's fonts/ directory — check the archive was not pruned.`,
-  );
-}
-
-const FONT_DIR = resolveFontDir();
 
 /** pdf-lib has no text wrapping; the pdfkit renderer this replaced relied on its. */
 function wrap(font: PDFFont, text: string, size: number, maxWidth: number): string[] {
@@ -176,10 +159,8 @@ async function render(lots: LotWithDetails[], title: string): Promise<Buffer> {
   // `subset: true` embeds only the glyphs actually used, so a 742 KB face costs
   // a few KB in the document instead of shipping whole into every label.
   const fonts: Fonts = {
-    regular: await doc.embedFont(readFileSync(join(FONT_DIR, 'DejaVuSans.ttf')), { subset: true }),
-    bold: await doc.embedFont(readFileSync(join(FONT_DIR, 'DejaVuSans-Bold.ttf')), {
-      subset: true,
-    }),
+    regular: await doc.embedFont(decodeFont(DEJAVU_MONO_BASE64), { subset: true }),
+    bold: await doc.embedFont(decodeFont(DEJAVU_MONO_BOLD_BASE64), { subset: true }),
   };
 
   for (const lot of lots) {
