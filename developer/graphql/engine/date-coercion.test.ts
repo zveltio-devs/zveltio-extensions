@@ -66,13 +66,6 @@ d('developer/graphql — timestamps serialize as ISO strings, not epoch millis',
         getTableName: (name: string) => `zvd_test_${name}`,
       },
       internals: {
-        DataLoaderRegistry: class {
-          get() {
-            return { load: async () => null };
-          }
-        },
-        checkQueryDepth: () => null,
-        checkQueryWidth: () => null,
       },
     };
 

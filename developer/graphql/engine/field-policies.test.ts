@@ -110,13 +110,6 @@ d('developer/graphql — field policies are enforced', () => {
         // to answer the same question the `checkPermission` stub above answers,
         // or every query throws and all three cases fail for the wrong reason.
         isTenantAdmin: async (userId: string) => userId === ADMIN_USER.id,
-        DataLoaderRegistry: class {
-          get() {
-            return { load: async () => null };
-          }
-        },
-        checkQueryDepth: () => null,
-        checkQueryWidth: () => null,
       },
     };
 
