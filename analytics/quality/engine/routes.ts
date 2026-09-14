@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { toJsonb } from '@zveltio/sdk/extension';
+import { runQualityScan } from './lib/data-quality.js';
 const VALID_SCAN_TYPES = ['duplicates', 'anomalies', 'missing_data', 'normalization', 'full'];
 
 const ScanSchema = z.object({
@@ -39,7 +40,11 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
   // a handler is therefore already RLS-scoped — there is one spelling, so there
   // is none to forget.
 
-  const { runQualityScan } = ctx.internals;
+  // `runQualityScan` used to come from `ctx.internals` — the engine carried the
+  // scanner, this extension carried the routes. It now lives in `./lib/`, where
+  // the feature it belongs to lives. `withTenantIsolation` still comes from the
+  // engine, and should: tenancy is a platform concern, data quality is not.
+  const { withTenantIsolation } = ctx.internals;
 
   // There is deliberately no quality score.
   //
@@ -84,7 +89,23 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     const canRead = await checkPermission(user.id, collection, 'read');
     if (!canRead) return c.json({ error: 'Forbidden' }, 403);
 
-    const scanId = await runQualityScan(db, collection, scan_type, user.id);
+    // The firm is read from the request and REFUSED when absent, rather than
+    // defaulted to the root tenant. `data/import` and `data/export` both spell
+    // this fallback `?? '00000000-…-0001'`, and that shape is what made every
+    // quality scan read ROOT's rows until it was repaired. Absence of a tenant
+    // is a bug, not a tenant.
+    const tenantId = (c.get('tenant') as { id?: string } | null | undefined)?.id;
+    if (!tenantId) {
+      return c.json(
+        { error: 'No tenant on this request; refusing to scan rather than defaulting to root' },
+        400,
+      );
+    }
+
+    const scanId = await runQualityScan(
+      { db, withTenantIsolation, DDLManager: ctx.DDLManager, services: ctx.services },
+      { collection, scanType: scan_type, userId: user.id, tenantId },
+    );
 
     return c.json({ scan_id: scanId, message: 'Scan started' }, 202);
   });
