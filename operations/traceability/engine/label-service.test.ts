@@ -79,6 +79,27 @@ describe('LabelService', () => {
     expect(await PDFDocument.load(pdf).then((d) => d.getPageCount())).toBe(1);
   });
 
+  it('refuses a name the font cannot draw, instead of printing blanks', async () => {
+    // The regression this guards: switching to a Unicode font removed the old
+    // WinAnsi refusal, and pdf-lib does NOT throw on a missing glyph — it
+    // substitutes .notdef and returns a valid one-page PDF. A Chinese supplier
+    // name printed as empty boxes while the caller was told it worked.
+    await expect(
+      LabelService.generateLabel({ ...LOT, item_name: '北京食品有限公司' }),
+    ).rejects.toThrow(/Cannot print the product name.*U\+5317/);
+  });
+
+  it('prints the scripts the font does cover, beyond Romanian', async () => {
+    // The guard is against the font's real coverage, not a guessed subset —
+    // an earlier version refused everything outside WinAnsi's 224 codepoints.
+    const pdf = await LabelService.generateLabel({
+      ...LOT,
+      item_name: 'Mąka pszenna őrölt',
+      supplier_name: 'Мелница ООД',
+    });
+    expect(await PDFDocument.load(pdf).then((d) => d.getPageCount())).toBe(1);
+  });
+
   it('embeds the shipped font rather than a built-in one', async () => {
     // The discriminating check for the diacritics fix: a WinAnsi built-in would
     // still produce a valid one-page PDF, it would simply be unable to encode

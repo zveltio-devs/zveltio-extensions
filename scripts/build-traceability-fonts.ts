@@ -54,6 +54,7 @@
  * Usage: bun scripts/build-traceability-fonts.ts
  */
 
+import fontkit from '@pdf-lib/fontkit';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -70,6 +71,41 @@ const wrap = (b64: string): string =>
 
 const regular = readFileSync(join(SRC, 'DejaVuSansMono.ttf'));
 const bold = readFileSync(join(SRC, 'DejaVuSansMono-Bold.ttf'));
+
+/**
+ * The codepoints the face can actually draw, as compact ranges.
+ *
+ * Needed because a Unicode font does not make the question go away, it only
+ * moves the threshold: DejaVu Sans Mono covers 3,322 codepoints — Romanian,
+ * Polish, Hungarian, Czech, Turkish, Cyrillic, Greek, Arabic — and not CJK.
+ *
+ * Measured, and this is why the ranges ship: asked to draw a Chinese supplier
+ * name, pdf-lib does NOT throw. It substitutes `.notdef` and returns a perfectly
+ * valid one-page PDF, so the label prints blanks where the name should be and
+ * the caller is told it worked. On a document whose purpose is tracing a lot
+ * back to its source, that is the failure mode worth refusing.
+ *
+ * 256 ranges, about 2.2 KB, beside 967 KB of font.
+ */
+function coveredRanges(ttf: Buffer): string {
+  const font = fontkit.create(ttf) as never as { characterSet: number[] };
+  const cps = [...font.characterSet].filter((c) => c >= 32).sort((a, b) => a - b);
+  const out: string[] = [];
+  let start = cps[0] as number;
+  let prev = start;
+  for (const c of cps.slice(1)) {
+    if (c === prev + 1) {
+      prev = c;
+      continue;
+    }
+    out.push(start === prev ? `${start}` : `${start}-${prev}`);
+    start = prev = c;
+  }
+  out.push(start === prev ? `${start}` : `${start}-${prev}`);
+  return out.join(',');
+}
+
+const ranges = coveredRanges(regular);
 
 const header = `/**
  * DejaVu Sans Mono, base64-encoded.
@@ -94,14 +130,22 @@ export function decodeFont(b64: string): Uint8Array {
   return out;
 }
 
-export const DEJAVU_MONO_BASE64 =
+/**
+ * Codepoints this face can draw, as compact ranges: "32-126,160-383,...".
+ *
+ * A Unicode font does not remove the question, it moves the threshold. Asked
+ * for a glyph it lacks, pdf-lib does not throw — it substitutes \`.notdef\` and
+ * returns a valid PDF, so the label prints blanks and the caller is told it
+ * worked. The renderer checks against this before drawing.
+ */
+export const COVERED_RANGES =
 `;
 
 writeFileSync(
   OUT,
-  `${header}${wrap(regular.toString('base64'))};\n\nexport const DEJAVU_MONO_BOLD_BASE64 =\n${wrap(
-    bold.toString('base64'),
-  )};\n`,
+  `${header}  '${ranges}';\n\nexport const DEJAVU_MONO_BASE64 =\n${wrap(
+    regular.toString('base64'),
+  )};\n\nexport const DEJAVU_MONO_BOLD_BASE64 =\n${wrap(bold.toString('base64'))};\n`,
   'utf8',
 );
 

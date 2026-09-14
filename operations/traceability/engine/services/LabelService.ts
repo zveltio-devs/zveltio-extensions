@@ -1,6 +1,11 @@
 import fontkit from '@pdf-lib/fontkit';
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
-import { DEJAVU_MONO_BASE64, DEJAVU_MONO_BOLD_BASE64, decodeFont } from './fonts.generated.js';
+import {
+  COVERED_RANGES,
+  DEJAVU_MONO_BASE64,
+  DEJAVU_MONO_BOLD_BASE64,
+  decodeFont,
+} from './fonts.generated.js';
 import { QRService } from './QRService.js';
 
 /**
@@ -149,7 +154,73 @@ function drawLabel(page: PDFPage, fonts: Fonts, qr: unknown, lot: LotWithDetails
   });
 }
 
+/** `COVERED_RANGES` parsed once: [start, end] pairs, ascending. */
+const COVERED: Array<[number, number]> = COVERED_RANGES.split(',').map((part) => {
+  const [a, b] = part.split('-');
+  const start = Number(a);
+  return [start, b === undefined ? start : Number(b)] as [number, number];
+});
+
+function covers(codePoint: number): boolean {
+  let lo = 0;
+  let hi = COVERED.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const [start, end] = COVERED[mid] as [number, number];
+    if (codePoint < start) hi = mid - 1;
+    else if (codePoint > end) lo = mid + 1;
+    else return true;
+  }
+  return false;
+}
+
+/** Field name for the message, so a refusal says what to change. */
+const LABELLED_FIELDS: Array<[keyof LotWithDetails, string]> = [
+  ['item_name', 'the product name'],
+  ['supplier_name', 'the supplier name'],
+  ['supplier_lot_ref', "the supplier's lot reference"],
+  ['best_before_date', 'the best-before date'],
+  ['unit', 'the unit'],
+  ['warehouse', 'the storage location'],
+  ['row', 'the storage location'],
+  ['shelf', 'the storage location'],
+  ['lot_number', 'the lot number'],
+];
+
+/**
+ * Refuse what the font cannot draw, rather than printing blanks.
+ *
+ * Measured: pdf-lib does NOT throw on a missing glyph. It substitutes
+ * `.notdef` and returns a valid one-page PDF, so a Chinese supplier name
+ * renders as empty boxes and the caller is told the label printed. On a
+ * document whose purpose is tracing a lot back to its source, a silently wrong
+ * name is worse than a refusal an operator can act on.
+ *
+ * The check is against the FONT's real coverage — 3,322 codepoints, including
+ * Romanian, Polish, Hungarian, Czech, Turkish, Cyrillic, Greek and Arabic — not
+ * against a guessed subset. An earlier version of this file refused anything
+ * outside WinAnsi's 224, which was honest and far too narrow.
+ */
+function assertPrintable(lot: LotWithDetails): void {
+  for (const [key, field] of LABELLED_FIELDS) {
+    const value = lot[key];
+    if (typeof value !== 'string' || value.length === 0) continue;
+    for (const ch of value) {
+      const cp = ch.codePointAt(0);
+      if (cp !== undefined && !covers(cp)) {
+        throw new Error(
+          `Cannot print ${field}: the label font has no glyph for "${ch}" ` +
+            `(U+${cp.toString(16).toUpperCase().padStart(4, '0')}). ` +
+            `The font covers Latin, Cyrillic, Greek and Arabic scripts, but not this one.`,
+        );
+      }
+    }
+  }
+}
+
 async function render(lots: LotWithDetails[], title: string): Promise<Buffer> {
+  for (const lot of lots) assertPrintable(lot);
+
   const doc = await PDFDocument.create();
   doc.setTitle(title);
   // Required before a custom font can be embedded. The built-in fonts need no
