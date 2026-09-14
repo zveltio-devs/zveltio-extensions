@@ -1,13 +1,19 @@
 /**
- * LabelService — the batch path must produce ONE document, not several files
- * in one buffer.
+ * LabelService — two claims, both of which failed silently before.
  *
- * It used to `Buffer.concat` separately generated PDFs, with a comment saying a
- * real merge was still to be done. Nothing tested it, and the shape of the
- * defect is invisible from the outside: the response has the right content
- * type, a plausible size, and opens — showing only the first label. Measured
- * before the repair, two lots produced two `%PDF-` headers and two `%%EOF`
- * markers in one buffer.
+ * 1. The batch path must produce ONE document, not several files in one buffer.
+ *    It used to `Buffer.concat` separately generated PDFs, with a comment
+ *    saying a real merge was still to be done. Nothing tested it, and the shape
+ *    of the defect is invisible from outside: the response has the right
+ *    content type, a plausible size, and opens — showing only the first label.
+ *    Measured before the repair, two lots produced two `%PDF-` headers and two
+ *    `%%EOF` markers.
+ *
+ * 2. Romanian names must print. The built-in pdf-lib fonts encode WinAnsi,
+ *    which has no `ă`, `ș` or `ț` — on a traceability label, a silently
+ *    mangled supplier name is worse than no label. The first repair refused
+ *    those names outright, which was honest and close to useless for a
+ *    Romanian food extension; the font is now shipped beside the extension.
  *
  * These run without a database: the service takes plain objects.
  */
@@ -57,27 +63,39 @@ describe('LabelService', () => {
   });
 
   it('carries no absolute path from the machine that built it', async () => {
-    // The other half of the repair: pdfkit read its font metrics from
+    // The other half of the original repair: pdfkit read its font metrics from
     // `__dirname + "/data/*.afm"`, and the bundler froze `__dirname` to the
     // packing machine's home directory, so printing worked only there.
     const pdf = await LabelService.generateLabel(LOT);
     expect(pdf.toString('latin1')).not.toContain('/home/');
   });
 
-  it('refuses a name the label font cannot encode, naming the field and the character', async () => {
-    // WinAnsi has no `ă`. Printing the label with the character silently
-    // dropped would put a wrong product name on a traceability document.
-    await expect(
-      LabelService.generateLabel({ ...LOT, item_name: 'Făină albă' }),
-    ).rejects.toThrow(/Cannot print the product name.*"ă"/);
-  });
-
-  it('prints the fields that have no diacritics', async () => {
+  it('prints a product name carrying Romanian diacritics', async () => {
     const pdf = await LabelService.generateLabel({
       ...LOT,
-      supplier_name: 'Moara Veche SRL',
-      warehouse: 'Depozit 1',
+      item_name: 'Făină albă',
+      supplier_name: 'Moara Țării SRL',
     });
     expect(await PDFDocument.load(pdf).then((d) => d.getPageCount())).toBe(1);
+  });
+
+  it('embeds the shipped font rather than a built-in one', async () => {
+    // The discriminating check for the diacritics fix: a WinAnsi built-in would
+    // still produce a valid one-page PDF, it would simply be unable to encode
+    // the characters. The font descriptor says which was actually used.
+    //
+    // The document has to be flattened first. pdf-lib writes object streams by
+    // default, so grepping the shipped bytes finds no /BaseFont at all — which
+    // looks exactly like "no font embedded" and is not. Re-saving with
+    // useObjectStreams: false is what makes the claim checkable.
+    const pdf = await LabelService.generateLabel({ ...LOT, item_name: 'Făină albă' });
+    const flat = Buffer.from(
+      await PDFDocument.load(pdf).then((d) => d.save({ useObjectStreams: false })),
+    );
+    const text = flat.toString('latin1');
+
+    expect(text).toContain('DejaVu');
+    // A real embedded font file, not just a name referenced from the catalogue.
+    expect(text).toContain('/FontFile2');
   });
 });

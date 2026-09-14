@@ -1,4 +1,7 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import fontkit from '@pdf-lib/fontkit';
+import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import { QRService } from './QRService.js';
 
 /**
@@ -10,13 +13,24 @@ import { QRService } from './QRService.js';
  * `readFileSync(__dirname + "/data/Helvetica.afm")`. An extension ships as a
  * single bundled `engine/index.js` and nothing else — no `node_modules`, and
  * the bundler rewrites `__dirname` to whatever absolute path the machine that
- * packed it happened to use. So the shipped bundle read the font metrics from
- * the packer's home directory, and label printing failed on every installation
- * that was not that machine. It passed locally for exactly the same reason.
+ * packed it used. So the shipped bundle read its font metrics from the packer's
+ * home directory, and label printing failed on every installation that was not
+ * that machine. It passed locally for exactly the same reason.
  *
- * `pdf-lib` carries its standard-font metrics inside the library, so there is
- * no filesystem lookup to get wrong. The engine's own PDF worker already uses
- * it (`packages/engine/src/workers/pdf-worker.ts`).
+ * ── Why the font is shipped rather than built in ──────────────
+ *
+ * pdf-lib's built-in fonts encode WinAnsi, which has no `ă`, `ș` or `ț`. On a
+ * label whose whole purpose is tracing a lot back to its source, a silently
+ * mangled supplier or product name is worse than no label, so the first version
+ * of this file refused to print them. That was honest and close to useless:
+ * this is a Romanian food-traceability extension, and those characters are in
+ * ordinary supplier and product names.
+ *
+ * DejaVu Sans covers them. It is shipped in `../fonts`, beside the migrations
+ * and for the same reason: `import.meta.dir` stays dynamic through bundling, so
+ * unlike a dependency's `__dirname` it resolves on the installation. Licence in
+ * `../fonts/LICENSE-DejaVu.txt` — a Bitstream Vera derivative that permits
+ * redistribution.
  */
 
 export interface LotWithDetails {
@@ -44,34 +58,31 @@ const TEXT_X = 96;
 const TEXT_W = 180;
 
 /**
- * The built-in fonts encode WinAnsi, which has no `ă`, `ș` or `ț`. Rather than
- * emit a label whose supplier or product name is silently wrong — on a document
- * whose whole purpose is tracing a lot back to its source — refuse and say
- * which field and which character. Printing those names needs an embedded
- * Unicode font, which is a deliberate decision about bundle size, not something
- * to fake here.
+ * Beside the extension, not inside the bundle — see the note above.
+ *
+ * The depth differs between the two ways this code runs, which is exactly the
+ * kind of difference that ships broken: bundled, the entry is `engine/index.js`
+ * and the fonts are one level up; from source, this file is `engine/services/`
+ * and they are two. Resolved by looking rather than by assuming, and it fails
+ * loudly instead of returning a path nothing is at.
  */
-function encodable(font: PDFFont, field: string, value: string): string {
-  try {
-    font.encodeText(value);
-    return value;
-  } catch {
-    const bad = [...value].find((ch) => {
-      try {
-        font.encodeText(ch);
-        return false;
-      } catch {
-        return true;
-      }
-    });
-    throw new Error(
-      `Cannot print ${field}: the built-in label font cannot encode "${bad}". ` +
-        `Remove the character or install a label font with Unicode coverage.`,
-    );
+function resolveFontDir(): string {
+  const candidates = [
+    join(import.meta.dir, '..', 'fonts'),
+    join(import.meta.dir, '..', '..', 'fonts'),
+  ];
+  for (const dir of candidates) {
+    if (existsSync(join(dir, 'DejaVuSans.ttf'))) return dir;
   }
+  throw new Error(
+    `Label fonts not found. Looked in: ${candidates.join(', ')}. ` +
+      `They ship in the extension's fonts/ directory — check the archive was not pruned.`,
+  );
 }
 
-/** pdf-lib has no text wrapping; the previous renderer relied on pdfkit's. */
+const FONT_DIR = resolveFontDir();
+
+/** pdf-lib has no text wrapping; the pdfkit renderer this replaced relied on its. */
 function wrap(font: PDFFont, text: string, size: number, maxWidth: number): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length === 0) return [''];
@@ -109,48 +120,42 @@ function drawLabel(page: PDFPage, fonts: Fonts, qr: unknown, lot: LotWithDetails
 
   let cursor = MARGIN;
 
-  const line = (
-    text: string,
-    size: number,
-    font: PDFFont,
-    field: string,
-    color = rgb(0, 0, 0),
-  ): void => {
-    for (const part of wrap(font, encodable(font, field, text), size, TEXT_W)) {
+  const line = (text: string, size: number, font: PDFFont, color = rgb(0, 0, 0)): void => {
+    for (const part of wrap(font, text, size, TEXT_W)) {
       page.drawText(part, { x: TEXT_X, y: PAGE_H - cursor - size, size, font, color });
       cursor += font.heightAtSize(size);
     }
   };
 
-  line(lot.item_name, 9, fonts.bold, 'the product name');
+  line(lot.item_name, 9, fonts.bold);
   cursor += 2;
 
   if (lot.supplier_name) {
-    line(`Furnizor: ${lot.supplier_name}`, 7, fonts.regular, 'the supplier name');
+    line(`Furnizor: ${lot.supplier_name}`, 7, fonts.regular);
     cursor += 1;
   }
 
   if (lot.supplier_lot_ref) {
-    line(`Lot furnizor: ${lot.supplier_lot_ref}`, 7, fonts.regular, "the supplier's lot reference");
+    line(`Lot furnizor: ${lot.supplier_lot_ref}`, 7, fonts.regular);
     cursor += 1;
   }
 
   if (lot.best_before_date) {
-    line(`BBD: ${lot.best_before_date}`, 10, fonts.bold, 'the best-before date', rgb(1, 0, 0));
+    line(`BBD: ${lot.best_before_date}`, 10, fonts.bold, rgb(1, 0, 0));
     cursor += 2;
   }
 
-  line(`Cant: ${lot.quantity_remaining} ${lot.unit}`, 8, fonts.regular, 'the quantity');
+  line(`Cant: ${lot.quantity_remaining} ${lot.unit}`, 8, fonts.regular);
   cursor += 1;
 
   if (lot.warehouse) {
     const loc = [lot.warehouse, lot.row, lot.shelf].filter(Boolean).join(' / ');
-    line(`Loc: ${loc}`, 7, fonts.regular, 'the storage location');
+    line(`Loc: ${loc}`, 7, fonts.regular);
     cursor += 1;
   }
 
   // Lot number along the bottom, centred across the full width.
-  const lotText = encodable(fonts.bold, 'the lot number', `LOT: ${lot.lot_number}`);
+  const lotText = `LOT: ${lot.lot_number}`;
   const lotWidth = fonts.bold.widthOfTextAtSize(lotText, 7);
   page.drawText(lotText, {
     x: (PAGE_W - lotWidth) / 2,
@@ -164,9 +169,17 @@ function drawLabel(page: PDFPage, fonts: Fonts, qr: unknown, lot: LotWithDetails
 async function render(lots: LotWithDetails[], title: string): Promise<Buffer> {
   const doc = await PDFDocument.create();
   doc.setTitle(title);
+  // Required before a custom font can be embedded. The built-in fonts need no
+  // fontkit, and also cannot spell "Făină".
+  doc.registerFontkit(fontkit);
+
+  // `subset: true` embeds only the glyphs actually used, so a 742 KB face costs
+  // a few KB in the document instead of shipping whole into every label.
   const fonts: Fonts = {
-    regular: await doc.embedFont(StandardFonts.Helvetica),
-    bold: await doc.embedFont(StandardFonts.HelveticaBold),
+    regular: await doc.embedFont(readFileSync(join(FONT_DIR, 'DejaVuSans.ttf')), { subset: true }),
+    bold: await doc.embedFont(readFileSync(join(FONT_DIR, 'DejaVuSans-Bold.ttf')), {
+      subset: true,
+    }),
   };
 
   for (const lot of lots) {
@@ -180,8 +193,6 @@ async function render(lots: LotWithDetails[], title: string): Promise<Buffer> {
 
 export class LabelService {
   static async generateLabel(lot: LotWithDetails): Promise<Buffer> {
-    // Document metadata is UTF-16 in a PDF, so the title keeps its diacritics
-    // even though the page text cannot.
     return render([lot], `Etichetă lot ${lot.lot_number}`);
   }
 
