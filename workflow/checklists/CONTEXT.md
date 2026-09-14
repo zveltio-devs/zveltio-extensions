@@ -64,3 +64,91 @@ item), which the renderer does not have yet. The third thing waiting on it.
 
 SDUI templates+summary; GET /templates?all=1 embeds items
 Branch: `feat/sdui-crud-batch`
+
+## §6 review — 2026-09-13, `reviewed` (engine/)
+
+Two defects, both concurrency/dead-check shaped; the tenant isolation across
+all 8 owned tables was already sound (measured fresh, not assumed — see
+below). Full detail and the version bump: `zveltio-private/extensions/CAMPAIGN-PROGRESS.md`
+section 11.
+
+**`POST /recurrence/trigger` refused every caller, forever.** Gated on
+`session.user.role === 'admin'`. `"user".role` is Better-Auth's column,
+constrained by `user_role_check CHECK (role = ANY (ARRAY['god','member']))` —
+`'admin'` is not a legal value there; that's a `zv_tenant_users.role` value,
+a different table. The check could never pass, for anyone, including a real
+`god` session. Recurring checklists could never be triggered by anybody, on
+any installation, since this route was written. Fixed to the repository's
+own idiom for the same gate — `checkPermission(uid, 'admin', '*')`, used the
+same way by `analytics/quality`, `developer/validation`, `content/documents`.
+
+**Two concurrent required-item ticks could leave a checklist "in progress"
+forever, both items checked.** `PATCH /items/:itemId`'s auto-complete reads
+every item on the checklist, decides `allRequiredChecked` in JavaScript, then
+writes `completed_at`. Two operators ticking two different required items at
+the same moment each read the sibling as still unchecked (their own
+transaction predates the other's commit), so both concluded "not complete".
+Measured: two required items ticked concurrently, both land `checked = true`,
+`completed_at` stays NULL. Same shape as the traceability/invoicing/hr class
+this campaign keeps finding — read, decide in JS, write, no lock between the
+two. Fixed by locking `zv_checklists` `FOR UPDATE` before the decision, in
+both `PATCH /items/:itemId` and `POST /items/bulk-check` (same shape, same
+fix). Regression test in `completion-race.test.ts` replicates the race
+through the real packed route.
+
+**A harness limitation this extension's tests have to work around, not a
+product defect.** `scoreChecklist`'s final write commits through the outer
+`db`, not the `trx` it receives — safe in production, where `ctx.db` resolves
+the CURRENT tenant transaction via AsyncLocalStorage and `db.transaction()`
+JOINS it rather than nesting (confirmed by reading `extension-context.ts` and
+its own unit test). But `testing/ext-harness.ts`'s mock `ctx.db` does not do
+that ALS join — its `db.transaction()` opens a genuinely separate connection.
+Combine that with the `FOR UPDATE` lock above and a checklist that HAS a
+scoring scheme, and the test self-deadlocks: one connection holds the lock
+the other's FK check on `zv_checklist_scores.checklist_id` needs, and the
+lock holder is itself awaiting that FK check to finish. Confirmed via
+`pg_stat_activity` (one backend on `Lock/tuple`, the other on
+`Lock/transactionid`) and confirmed absent in production's actual
+one-transaction-per-request shape by replaying both connections' statements
+on a single connection instead — clean, no deadlock, correct final score.
+`completion-race.test.ts` avoids the artifact by using a checklist with no
+scoring scheme, which is enough to exercise the lock without tripping it.
+Not fixed here: it is a property of the shared harness's transaction model,
+not of this extension, and no other extension's test currently combines a
+`FOR UPDATE` lock with an FK write through the outer `db` inside the same
+nested transaction — so nothing else is known to hit it today.
+
+**Migration 002's `RAISE WARNING` text says the opposite of what happens.**
+Applied 002 to an upgrade database with one pre-existing (pre-tenancy) row.
+It warns the row "is visible to ALL tenants" — measured directly instead of
+taken on the warning's word: `zveltio_tenant_scope_ok(NULL::uuid)` returns
+NULL, and `NULL = ANY(array)` is never true in SQL, in any GUC state,
+including GUC unset (which resolves to the default tenant array `[...0001]`
+via `zveltio_visible_tenants()`, not to "show everything"). A legacy row's
+`tenant_id IS NULL` never matches that array. So the true effect is the
+opposite of the message: the row becomes invisible to EVERY tenant, including
+the default one, through the normal `zveltio_rls` path every request uses —
+not a security leak, but silent, total data loss from the product's point of
+view until someone runs the backfill the warning itself suggests. This is the
+engine's `zveltio_tenant_scope_ok` (hardened to fail-closed on unset context
+by a later engine migration, per its own `\df+` description — "See 047") and
+the identical warning text is copy-pasted into every extension's
+`002_tenant_rls.sql` by the same mechanical rollout this file's own header
+names — not a checklists-specific defect. **Section 10's postgis write-up
+made the same claim ("visible to every tenant until backfilled") without
+independently measuring cross-tenant visibility of the NULL row** — worth
+revisiting there; this session's direct measurement contradicts it. Logged,
+not fixed: the fix (if any) is either engine-side wording, or a repo-wide
+extension-side text correction — outside REPAIR NARROWLY's single-extension
+scope, and the migration file has already shipped.
+
+**Tenant isolation confirmed on all 8 owned tables**, not just the 5 `002`
+covers: `zv_checklists`, `zv_checklist_items`, `zv_checklist_templates`,
+`zv_checklist_template_items`, `zv_checklist_recurrence` (all `002`), plus
+`zv_checklist_scoring_schemes`, `zv_checklist_scheme_weights`,
+`zv_checklist_scores` (`006` — already shipped in `d0d2a52`, predating this
+session; re-verified fresh, not assumed). All ENABLE+FORCE. Measured as
+`zveltio_rls` with a real two-tenant GUC: cross-tenant SELECT/UPDATE/DELETE
+all return 0 rows across every table, a spoofed-tenant INSERT is refused by
+`WITH CHECK`, and the positive control (own-tenant read/write) succeeds on
+every table — the half that makes the refusals mean something.

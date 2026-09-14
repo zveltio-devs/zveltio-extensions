@@ -84,6 +84,21 @@ const extension: ZveltioExtension = {
         RETURNING *
       `.execute(ctx.db);
       const contact = r.rows[0];
+      // `organization_id` above is the legacy column on `zvd_contacts` —
+      // nothing reads it (see routes.ts's comment on the same column). The
+      // relation every route actually joins through is
+      // `zvd_contact_organizations`. Without this insert, a contact created
+      // through this service (pos, ecommerce) would accept `organization_id`
+      // and silently show no organization anywhere in the API — the same
+      // "accepted and thrown away" shape this extension's own CONTEXT.md
+      // already names for `notes`.
+      if (input.organization_id) {
+        await sql`
+          INSERT INTO zvd_contact_organizations (contact_id, organization_id, is_primary)
+          VALUES (${contact.id}, ${input.organization_id}, TRUE)
+          ON CONFLICT (contact_id, organization_id) DO UPDATE SET is_primary = TRUE
+        `.execute(ctx.db);
+      }
       ctx.events.emit('contact.created', { id: contact.id, contact });
       return contact;
     });

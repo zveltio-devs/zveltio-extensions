@@ -303,7 +303,7 @@ gated, the siblings gated by their own middleware.
   only to delete the cache entry. Admin-only, so it grants nothing they lack —
   but it is not the flow the endpoint documents.
 - **The 13 remaining `::jsonb` sites** in other extensions. See
-  `docs/private/CAMPAIGN-PROGRESS.md`; each needs its consumer read first, and
+  `zveltio-private/extensions/CAMPAIGN-PROGRESS.md`; each needs its consumer read first, and
   that is those extensions' sections.
 
 ## Engine-side, handed to the session working there
