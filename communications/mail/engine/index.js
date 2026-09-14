@@ -16665,7 +16665,7 @@ var require_indexes = __commonJS((exports, module) => {
 
 // node_modules/thread-stream/index.js
 var require_thread_stream = __commonJS((exports, module) => {
-  var __dirname = "/home/liviu/zveltio-extensions/node_modules/thread-stream";
+  var __dirname = "/zveltio-extension/node_modules/thread-stream";
   var { version: version2 } = require_package();
   var { EventEmitter } = __require("events");
   var { Worker } = __require("worker_threads");
@@ -17181,7 +17181,7 @@ var require_thread_stream = __commonJS((exports, module) => {
 
 // node_modules/pino/lib/transport.js
 var require_transport = __commonJS((exports, module) => {
-  var __dirname = "/home/liviu/zveltio-extensions/node_modules/pino/lib";
+  var __dirname = "/zveltio-extension/node_modules/pino/lib";
   var { createRequire } = __require("module");
   var { existsSync } = __require("fs");
   var getCallers = require_caller();
@@ -36940,22 +36940,21 @@ var require_encoding_detect = __commonJS((exports) => {
   function isSJIS(data) {
     var i = 0;
     var len = data && data.length;
-    var b;
-    while (i < len && data[i] > 128) {
-      if (data[i++] > 255) {
-        return false;
-      }
-    }
+    var b, lead;
     for (;i < len; i++) {
       b = data[i];
+      if (b > 255) {
+        return false;
+      }
       if (b <= 128 || 161 <= b && b <= 223) {
         continue;
       }
-      if (b === 160 || b > 239 || i + 1 >= len) {
+      if (b === 160 || b > 252 || i + 1 >= len) {
         return false;
       }
+      lead = b;
       b = data[++i];
-      if (b < 64 || b === 127 || b > 252) {
+      if (b < 64 || b > 252 || b === 127 || lead === 252 && b > 75) {
         return false;
       }
     }
@@ -36971,7 +36970,7 @@ var require_encoding_detect = __commonJS((exports) => {
       if (b > 255) {
         return false;
       }
-      if (b === 9 || b === 10 || b === 13 || b >= 32 && b <= 126) {
+      if (b <= 127 && b !== 27) {
         continue;
       }
       if (b >= 194 && b <= 223) {
@@ -37184,12 +37183,99 @@ var require_encoding_detect = __commonJS((exports) => {
   exports.isUNICODE = isUNICODE;
 });
 
+// node_modules/encoding-japanese/src/sjis-ext.js
+var require_sjis_ext = __commonJS((exports) => {
+  var CP932_IBM_EXT_SYMBOL_MAP = [
+    61167,
+    61168,
+    61169,
+    61170,
+    61171,
+    61172,
+    61173,
+    61174,
+    61175,
+    61176,
+    34644,
+    34645,
+    34646,
+    34647,
+    34648,
+    34649,
+    34650,
+    34651,
+    34652,
+    34653,
+    33226,
+    61178,
+    61179,
+    61180,
+    34698,
+    34690,
+    34692,
+    33254
+  ];
+  var CP932_IBM_EXT_LEN = 388;
+  var CP932_IBM_EXT_TRAIL_BYTES_LEN = 188;
+  function remapCP932_IBMExt(b1, b2) {
+    var leadOffset = (b1 - 250) * CP932_IBM_EXT_TRAIL_BYTES_LEN;
+    var trailIndex = b2 - (b2 < 127 ? 64 : 65);
+    var ibmExtIndex = leadOffset + trailIndex;
+    if (ibmExtIndex < 0 || ibmExtIndex >= CP932_IBM_EXT_LEN) {
+      return b1 << 8 | b2;
+    }
+    if (ibmExtIndex < CP932_IBM_EXT_SYMBOL_MAP.length) {
+      return CP932_IBM_EXT_SYMBOL_MAP[ibmExtIndex];
+    }
+    var necSelectedIbmOffset = ibmExtIndex - CP932_IBM_EXT_SYMBOL_MAP.length;
+    b1 = 237;
+    if (necSelectedIbmOffset >= CP932_IBM_EXT_TRAIL_BYTES_LEN) {
+      necSelectedIbmOffset -= CP932_IBM_EXT_TRAIL_BYTES_LEN;
+      b1++;
+    }
+    b2 = necSelectedIbmOffset + 64;
+    if (b2 >= 127) {
+      b2++;
+    }
+    return b1 << 8 | b2;
+  }
+  var CP932_NEC_DUPLICATE_MAP = {
+    34704: 33248,
+    34705: 33247,
+    34706: 33255,
+    34709: 33251,
+    34710: 33243,
+    34711: 33242,
+    34714: 33254,
+    34715: 33215,
+    34716: 33214,
+    61177: 33226
+  };
+  function remapCP932DuplicateCode(b1, b2) {
+    if (b2 < 64 || b2 > 252 || b2 === 127) {
+      return b1 << 8 | b2 & 255;
+    }
+    if (b1 >= 250) {
+      return remapCP932_IBMExt(b1, b2);
+    }
+    var code = b1 << 8 | b2;
+    var remapped = CP932_NEC_DUPLICATE_MAP[code];
+    return remapped == null ? code : remapped;
+  }
+  exports.remapCP932DuplicateCode = remapCP932DuplicateCode;
+  function hasCP932DuplicateCode(b1) {
+    return b1 >= 250 || b1 === 135 || b1 === 238;
+  }
+  exports.hasCP932DuplicateCode = hasCP932DuplicateCode;
+});
+
 // node_modules/encoding-japanese/src/encoding-convert.js
 var require_encoding_convert = __commonJS((exports) => {
   var config2 = require_config();
   var util = require_util();
   var EncodingDetect = require_encoding_detect();
   var EncodingTable = require_encoding_table();
+  var sjisExt = require_sjis_ext();
   function JISToSJIS(data) {
     var results = [];
     var index = 0;
@@ -37294,7 +37380,7 @@ var require_encoding_convert = __commonJS((exports) => {
     var index = 0;
     var len = data && data.length;
     var i = 0;
-    var b1, b2;
+    var b1, b2, remapped;
     var esc2 = [
       27,
       40,
@@ -37323,8 +37409,13 @@ var require_encoding_convert = __commonJS((exports) => {
           results[results.length] = esc2[4];
           results[results.length] = esc2[5];
         }
-        b1 <<= 1;
         b2 = data[++i];
+        if (sjisExt.hasCP932DuplicateCode(b1)) {
+          remapped = sjisExt.remapCP932DuplicateCode(b1, b2);
+          b1 = remapped >> 8;
+          b2 = remapped & 255;
+        }
+        b1 <<= 1;
         if (b2 < 159) {
           if (b1 < 319) {
             b1 -= 225;
@@ -37368,7 +37459,7 @@ var require_encoding_convert = __commonJS((exports) => {
     var results = [];
     var len = data && data.length;
     var i = 0;
-    var b1, b2;
+    var b1, b2, remapped;
     for (;i < len; i++) {
       b1 = data[i];
       if (b1 >= 161 && b1 <= 223) {
@@ -37376,6 +37467,11 @@ var require_encoding_convert = __commonJS((exports) => {
         results[results.length] = b1;
       } else if (b1 >= 129) {
         b2 = data[++i];
+        if (sjisExt.hasCP932DuplicateCode(b1)) {
+          remapped = sjisExt.remapCP932DuplicateCode(b1, b2);
+          b1 = remapped >> 8;
+          b2 = remapped & 255;
+        }
         b1 <<= 1;
         if (b2 < 159) {
           if (b1 < 319) {
@@ -37522,7 +37618,7 @@ var require_encoding_convert = __commonJS((exports) => {
     var results = [];
     var i = 0;
     var len = data && data.length;
-    var b, b1, b2, u2, u3, jis, utf8;
+    var b, b1, b2, u2, u3, jis, utf8, remapped;
     for (;i < len; i++) {
       b = data[i];
       if (b >= 161 && b <= 223) {
@@ -37533,8 +37629,13 @@ var require_encoding_convert = __commonJS((exports) => {
         results[results.length] = u2 & 255;
         results[results.length] = u3 & 255;
       } else if (b >= 128) {
-        b1 = b << 1;
         b2 = data[++i];
+        if (sjisExt.hasCP932DuplicateCode(b)) {
+          remapped = sjisExt.remapCP932DuplicateCode(b, b2);
+          b = remapped >> 8;
+          b2 = remapped & 255;
+        }
+        b1 = b << 1;
         if (b2 < 159) {
           if (b1 < 319) {
             b1 -= 225;
@@ -37785,6 +37886,9 @@ var require_encoding_convert = __commonJS((exports) => {
           utf8 = (b << 24) + (data[++i] << 16) + (data[++i] << 8) + (data[++i] & 255);
         }
         jis = EncodingTable.UTF8_TO_JIS_TABLE[utf8];
+        if (jis != null && EncodingTable.UTF8_TO_JISX0212_TABLE[utf8] != null) {
+          jis = null;
+        }
         if (jis == null) {
           jis = EncodingTable.UTF8_TO_JISX0212_TABLE[utf8];
           if (jis == null) {
@@ -37861,6 +37965,9 @@ var require_encoding_convert = __commonJS((exports) => {
           utf8 = (b << 24) + (data[++i] << 16) + (data[++i] << 8) + (data[++i] & 255);
         }
         jis = EncodingTable.UTF8_TO_JIS_TABLE[utf8];
+        if (jis != null && EncodingTable.UTF8_TO_JISX0212_TABLE[utf8] != null) {
+          jis = null;
+        }
         if (jis == null) {
           jis = EncodingTable.UTF8_TO_JISX0212_TABLE[utf8];
           if (jis == null) {
@@ -38587,7 +38694,7 @@ var require_kana_case_table = __commonJS((exports) => {
 var require_package2 = __commonJS((exports, module) => {
   module.exports = {
     name: "encoding-japanese",
-    version: "2.2.0",
+    version: "2.3.0",
     description: "Convert and detect character encoding in JavaScript",
     main: "src/index.js",
     files: [
@@ -38603,7 +38710,7 @@ var require_package2 = __commonJS((exports, module) => {
       watch: "watchify src/index.js -o encoding.js -s Encoding -p [ bannerify --file src/banner.js ] --no-bundle-external --bare --poll=300 -v"
     },
     engines: {
-      node: ">=8.10.0"
+      node: ">=18.0.0"
     },
     repository: {
       type: "git",
@@ -38639,13 +38746,11 @@ var require_package2 = __commonJS((exports, module) => {
     dependencies: {},
     devDependencies: {
       bannerify: "^1.0.1",
-      browserify: "^17.0.0",
+      browserify: "^17.0.1",
       eslint: "^8.57.0",
-      mocha: "^10.4.0",
+      mocha: "^11.8.0",
       "package-json-versionify": "^1.0.4",
-      "power-assert": "^1.6.1",
-      "uglify-js": "^3.17.4",
-      uglifyify: "^5.0.2",
+      "uglify-js": "^3.19.3",
       watchify: "^4.0.0"
     },
     browserify: {
@@ -38861,6 +38966,12 @@ var require_src = __commonJS((exports, module) => {
         } else if (c === 12535) {
           results[results.length] = 12431;
           c = 12443;
+        } else if (c === 12536) {
+          results[results.length] = 12432;
+          c = 12443;
+        } else if (c === 12537) {
+          results[results.length] = 12433;
+          c = 12443;
         } else if (c === 12538) {
           results[results.length] = 12434;
           c = 12443;
@@ -38882,8 +38993,8 @@ var require_src = __commonJS((exports, module) => {
       while (i < len) {
         c = data[i++];
         if (c >= 12353 && c <= 12438) {
-          if ((c === 12431 || c === 12434) && i < len && data[i] === 12443) {
-            c = c === 12431 ? 12535 : 12538;
+          if ((c === 12431 || c === 12432 || c === 12433 || c === 12434) && i < len && data[i] === 12443) {
+            c = c === 12431 ? 12535 : c === 12432 ? 12536 : c === 12433 ? 12537 : 12538;
             i++;
           } else {
             c += 96;
@@ -41716,6 +41827,21 @@ var require_libmime = __commonJS((exports, module) => {
   var mimetypes = require_mimetypes();
   var STAGE_KEY = 4097;
   var STAGE_VALUE = 4098;
+  var setOwnProperty = (obj, key, value) => {
+    if (key === "__proto__") {
+      Object.defineProperty(obj, key, {
+        value,
+        writable: true,
+        enumerable: true,
+        configurable: true
+      });
+    } else {
+      obj[key] = value;
+    }
+  };
+  var hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+  var isWSP = (chr) => chr === " " || chr === "\t" || chr === "\r" || chr === `
+` || chr === "\f" || chr === "\v";
 
   class Libmime {
     constructor(config2) {
@@ -41906,8 +42032,14 @@ var require_libmime = __commonJS((exports, module) => {
     }
     decodeHeaders(headers) {
       let lines = headers.split(/\r?\n|\r/), headersObj = {}, header, i, len;
-      for (i = lines.length - 1;i >= 0; i--) {
-        if (i && lines[i].match(/^\s/)) {
+      let headersPos = 0;
+      while (headersPos < lines.length && lines[headersPos] === "") {
+        headersPos++;
+      }
+      let bodyPos = lines.indexOf("", headersPos);
+      lines = lines.slice(headersPos, bodyPos >= 0 ? bodyPos : lines.length);
+      for (i = lines.length - 1;i > 0; i--) {
+        if (/^[ \t]/.test(lines[i])) {
           lines[i - 1] += `\r
 ` + lines[i];
           lines.splice(i, 1);
@@ -41915,8 +42047,8 @@ var require_libmime = __commonJS((exports, module) => {
       }
       for (i = 0, len = lines.length;i < len; i++) {
         header = this.decodeHeader(lines[i]);
-        if (!headersObj[header.key]) {
-          headersObj[header.key] = [header.value];
+        if (!hasOwn(headersObj, header.key)) {
+          setOwnProperty(headersObj, header.key, [header.value]);
         } else {
           headersObj[header.key].push(header.value);
         }
@@ -41950,104 +42082,117 @@ var require_libmime = __commonJS((exports, module) => {
       };
       let key = false;
       let value = "";
+      let valueEnd = 0;
       let stage = STAGE_VALUE;
       let quote = false;
       let escaped = false;
       let chr;
+      let commit = () => {
+        let collected = value.substring(0, valueEnd);
+        value = "";
+        valueEnd = 0;
+        if (stage === STAGE_KEY) {
+          if (collected) {
+            setOwnProperty(response.params, collected.toLowerCase(), "");
+          }
+        } else if (key === false) {
+          response.value = collected;
+        } else {
+          setOwnProperty(response.params, key, collected);
+        }
+      };
       for (let i = 0, len = str.length;i < len; i++) {
         chr = str.charAt(i);
         switch (stage) {
           case STAGE_KEY:
             if (chr === "=") {
-              key = value.trim().toLowerCase();
-              stage = STAGE_VALUE;
+              key = value.substring(0, valueEnd).toLowerCase();
               value = "";
-              break;
+              valueEnd = 0;
+              stage = STAGE_VALUE;
+            } else if (chr === ";") {
+              commit();
+            } else if (isWSP(chr)) {
+              if (value.length) {
+                value += chr;
+              }
+            } else {
+              value += chr;
+              valueEnd = value.length;
             }
-            value += chr;
             break;
           case STAGE_VALUE:
             if (escaped) {
               value += chr;
+              valueEnd = value.length;
             } else if (chr === "\\") {
               escaped = true;
               continue;
-            } else if (quote && chr === quote) {
-              quote = false;
-            } else if (!quote && chr === '"') {
-              quote = chr;
+            } else if (chr === '"') {
+              quote = !quote;
             } else if (!quote && chr === ";") {
-              if (key === false) {
-                response.value = value.trim();
-              } else {
-                response.params[key] = value.trim();
-              }
+              commit();
               stage = STAGE_KEY;
-              value = "";
+            } else if (!quote && isWSP(chr)) {
+              if (value.length) {
+                value += chr;
+              }
             } else {
               value += chr;
+              valueEnd = value.length;
             }
             escaped = false;
             break;
         }
       }
-      value = value.trim();
-      if (stage === STAGE_VALUE) {
-        if (key === false) {
-          response.value = value;
-        } else {
-          response.params[key] = value;
-        }
-      } else if (value) {
-        response.params[value.toLowerCase()] = "";
-      }
-      Object.keys(response.params).forEach((key2) => {
-        let actualKey;
-        let nr;
-        let value2;
+      commit();
+      let continuations = new Map;
+      for (let key2 of Object.keys(response.params)) {
         let match2 = key2.match(/\*((\d+)\*?)?$/);
         if (!match2) {
-          return;
+          continue;
         }
-        actualKey = key2.substr(0, match2.index).toLowerCase();
-        nr = Number(match2[2]) || 0;
-        if (!response.params[actualKey] || typeof response.params[actualKey] !== "object") {
-          response.params[actualKey] = {
+        let actualKey = key2.substr(0, match2.index).toLowerCase();
+        let nr = Number(match2[2]) || 0;
+        let value2 = response.params[key2];
+        delete response.params[key2];
+        let continuation = continuations.get(actualKey);
+        if (!continuation) {
+          continuation = {
             charset: false,
             values: []
           };
+          continuations.set(actualKey, continuation);
         }
-        value2 = response.params[key2];
         if (nr === 0 && match2[0].charAt(match2[0].length - 1) === "*" && (match2 = value2.match(/^([^']*)'[^']*'(.*)$/))) {
-          response.params[actualKey].charset = match2[1] || "utf-8";
+          continuation.charset = match2[1] || "utf-8";
           value2 = match2[2];
         }
-        response.params[actualKey].values.push({ nr, value: value2 });
-        delete response.params[key2];
-      });
-      Object.keys(response.params).forEach((key2) => {
-        let value2;
-        if (response.params[key2] && Array.isArray(response.params[key2].values)) {
-          value2 = response.params[key2].values.sort((a, b) => a.nr - b.nr).map((val) => val && val.value || "").join("");
-          if (response.params[key2].charset) {
-            response.params[key2] = this.decodeWords("=?" + response.params[key2].charset + "?Q?" + value2.replace(/[=?_\s]/g, (s) => {
-              let c = s.charCodeAt(0).toString(16);
-              if (s === " ") {
-                return "_";
-              } else {
-                return "%" + (c.length < 2 ? "0" : "") + c;
-              }
-            }).replace(/%/g, "=") + "?=");
-          } else {
-            response.params[key2] = this.decodeWords(value2);
-          }
+        continuation.values.push({ nr, value: value2 });
+      }
+      for (let [key2, continuation] of continuations) {
+        let value2 = continuation.values.sort((a, b) => a.nr - b.nr).map((val) => val.value).join("");
+        if (!continuation.charset) {
+          setOwnProperty(response.params, key2, this.decodeWords(value2));
+          continue;
         }
-      });
+        let qpValue = value2.replace(/[=_\s]/g, (s) => {
+          if (s === " ") {
+            return "_";
+          }
+          let c = s.charCodeAt(0).toString(16);
+          return "%" + (c.length < 2 ? "0" : "") + c;
+        }).replace(/%/g, "=");
+        setOwnProperty(response.params, key2, this.decodeWord(continuation.charset, "Q", qpValue));
+      }
       return response;
     }
     buildHeaderParam(key, data, maxLength, fromCharset) {
       let list = [];
-      let encodedStr = typeof data === "string" ? data : this.decode(data, fromCharset);
+      if (typeof data !== "string" && !Buffer2.isBuffer(data)) {
+        data = data === null || data === undefined ? "" : data.toString();
+      }
+      let encodedStr = typeof data === "string" ? data : libcharset.decode(data, fromCharset);
       let encodedStrArr;
       let chr, ord;
       let line;
@@ -42146,7 +42291,7 @@ var require_libmime = __commonJS((exports, module) => {
     }
     detectExtension(mimeType) {
       mimeType = (mimeType || "").toString().toLowerCase().replace(/\s/g, "");
-      if (!(mimeType in mimetypes.list)) {
+      if (!hasOwn(mimetypes.list, mimeType)) {
         return "bin";
       }
       if (typeof mimetypes.list[mimeType] === "string") {
@@ -42162,7 +42307,7 @@ var require_libmime = __commonJS((exports, module) => {
     }
     detectMimeType(extension) {
       extension = (extension || "").toString().toLowerCase().replace(/\s/g, "").replace(/^\./g, "").split(".").pop();
-      if (!(extension in mimetypes.extensions)) {
+      if (!hasOwn(mimetypes.extensions, extension)) {
         return "application/octet-stream";
       }
       if (typeof mimetypes.extensions[extension] === "string") {
@@ -42234,16 +42379,10 @@ var require_libmime = __commonJS((exports, module) => {
     }
     encodeURICharComponent(chr) {
       let res = "";
-      let ord = chr.charCodeAt(0).toString(16).toUpperCase();
-      if (ord.length % 2) {
-        ord = "0" + ord;
-      }
-      if (ord.length > 2) {
-        for (let i = 0, len = ord.length / 2;i < len; i++) {
-          res += "%" + ord.substr(i, 2);
-        }
-      } else {
-        res += "%" + ord;
+      let buf = Buffer2.from(chr, "utf-8");
+      for (let i = 0, len = buf.length;i < len; i++) {
+        let ord = buf[i].toString(16).toUpperCase();
+        res += "%" + (ord.length < 2 ? "0" : "") + ord;
       }
       return res;
     }
@@ -42333,7 +42472,7 @@ var require_headers = __commonJS((exports, module) => {
         value = Buffer.from(value);
       }
       value = value.toString("binary");
-      this.addFormatted(key, this.libmime.foldLines(key + ": " + value.replace(/\r?\n/g, ""), 76, false), index);
+      this.addFormatted(key, this.libmime.foldLines(key + ": " + value.replace(/[\r\n]/g, ""), 76, false), index);
     }
     addFormatted(key, line, index) {
       if (!this.parsed) {
@@ -42347,6 +42486,10 @@ var require_headers = __commonJS((exports, module) => {
       }
       if (typeof line !== "string") {
         line = line.toString("binary");
+      }
+      line = this._normalizeInsertedLine(line);
+      if (!line) {
+        return;
       }
       let header = {
         key: this._normalizeHeader(key),
@@ -42411,26 +42554,36 @@ var require_headers = __commonJS((exports, module) => {
         this._parseHeaders();
       }
       let lines = this._getLines();
-      lineEnd = lineEnd || `\r
+      const ending = lineEnd || `\r
 `;
-      let headers = lines.map((line) => this._buildHeaderLine(line.line.replace(/\r?\n/g, lineEnd))).reduce((joined, line, idx) => {
+      let headers = lines.map((line) => this._normalizeLineBreaks(line.line, ending)).filter((line) => line !== "").map((line) => this._buildHeaderLine(line)).reduce((joined, line, idx) => {
         if (idx) {
-          joined.push(Buffer.from(lineEnd, "binary"));
+          joined.push(Buffer.from(ending, "binary"));
         }
         joined.push(line);
         return joined;
       }, []);
-      headers.push(Buffer.from(lineEnd + lineEnd, "binary"));
+      headers.push(Buffer.from(ending + ending, "binary"));
       if (this.mbox) {
-        headers.unshift(Buffer.from(this.mbox + lineEnd, "binary"));
+        headers.unshift(Buffer.from(this.mbox + ending, "binary"));
       }
       if (this.http) {
-        headers.unshift(Buffer.from(this.http + lineEnd, "binary"));
+        headers.unshift(Buffer.from(this.http + ending, "binary"));
       }
       return Buffer.concat(headers);
     }
     _normalizeHeader(key) {
       return (key || "").toLowerCase().trim();
+    }
+    _normalizeLineBreaks(line, lineEnd) {
+      return line.replace(/^[\r\n]+/, "").replace(/\r\n|\r|\n/g, (match2, offset, source) => match2 !== "\r" && this._isFoldingChar(source.charAt(offset + match2.length)) ? lineEnd : "");
+    }
+    _normalizeInsertedLine(line) {
+      return this._normalizeLineBreaks(line.replace(/^[\r\n \t]+/, ""), `\r
+`);
+    }
+    _isFoldingChar(chr) {
+      return chr === " " || chr === "\t";
     }
     _getLines() {
       if (!this.lines) {
@@ -42447,8 +42600,7 @@ var require_headers = __commonJS((exports, module) => {
       let lines = this.headers.toString("binary").replace(/[\r\n]+$/, "").split(/\r?\n/);
       for (let i = lines.length - 1;i >= 0; i--) {
         let currentLine = lines[i];
-        let chr = currentLine.charAt(0);
-        if (i && (chr === " " || chr === "\t")) {
+        if (i && this._isFoldingChar(currentLine.charAt(0))) {
           lines[i - 1] = lines[i - 1] + `\r
 ` + currentLine;
           lines.splice(i, 1);
@@ -42504,6 +42656,7 @@ var require_mime_node = __commonJS((exports, module) => {
       this.root = !parentNode;
       this.parentNode = parentNode;
       this._parentBoundary = this.parentNode && this.parentNode._boundary;
+      this._parentBoundaryOwner = this.parentNode || false;
       this._headersLines = [];
       this._headerlen = 0;
       this._parsedContentType = false;
@@ -42715,8 +42868,29 @@ var require_message_splitter = __commonJS((exports, module) => {
   var MimeNode = require_mime_node();
   var MAX_HEAD_SIZE = 1 * 1024 * 1024;
   var MAX_CHILD_NODES = 1000;
+  var MAX_PENDING_LINE_SIZE = 64 * 1024;
+  var MAX_PENDING_LINE_CHUNKS = 1024;
+  var BOUNDARY_LINE_SUFFIX = 2 + 2 + 2;
+  var BOUNDARY_LINE_OVERHEAD = BOUNDARY_LINE_SUFFIX + 2;
   var HEAD = 1;
   var BODY = 2;
+  function maxLenError(message) {
+    let err = new Error(message);
+    err.code = "EMAXLEN";
+    return err;
+  }
+  function trimBodyLineEnd(group, chunk, start, end) {
+    if (group.type !== "body" || !group.node || !group.node.parentNode) {
+      return end;
+    }
+    if (end > start && chunk[end - 1] === 10) {
+      end--;
+      if (end > start && chunk[end - 1] === 13) {
+        end--;
+      }
+    }
+    return end;
+  }
 
   class MessageSplitter extends Transform {
     constructor(config2) {
@@ -42728,13 +42902,33 @@ var require_message_splitter = __commonJS((exports, module) => {
       this.config = config2 || {};
       this.maxHeadSize = this.config.maxHeadSize || MAX_HEAD_SIZE;
       this.maxChildNodes = this.config.maxChildNodes || MAX_CHILD_NODES;
-      this.tree = [];
       this.nodeCounter = 0;
       this.node = null;
+      this.inEpilogue = false;
       this.newNode();
-      this.tree.push(this.node);
-      this.line = false;
+      this.lineChunks = [];
+      this.lineLength = 0;
       this.hasFailed = false;
+      this.pendingLineTruncated = false;
+    }
+    appendPendingLine(chunk) {
+      if (!chunk.length) {
+        return;
+      }
+      this.lineChunks.push(chunk);
+      this.lineLength += chunk.length;
+      if (this.lineChunks.length >= MAX_PENDING_LINE_CHUNKS) {
+        this.lineChunks = [Buffer.concat(this.lineChunks, this.lineLength)];
+      }
+    }
+    takePendingLine() {
+      if (!this.lineLength) {
+        return false;
+      }
+      let line = this.lineChunks.length === 1 ? this.lineChunks[0] : Buffer.concat(this.lineChunks, this.lineLength);
+      this.lineChunks = [];
+      this.lineLength = 0;
+      return line;
     }
     _transform(chunk, encoding, callback) {
       let pos = 0;
@@ -42742,7 +42936,7 @@ var require_message_splitter = __commonJS((exports, module) => {
       let group = {
         type: "none"
       };
-      let groupstart = this.line ? -this.line.length : 0;
+      let groupstart = this.lineLength ? -this.lineLength : 0;
       let groupend = 0;
       let checkTrailingLinebreak = (data) => {
         if (data.type === "body" && data.node.parentNode && data.value && data.value.length) {
@@ -42754,9 +42948,8 @@ var require_message_splitter = __commonJS((exports, module) => {
               groupstart--;
               groupend--;
               pos--;
-              if (groupstart < 0 && !this.line) {
-                this.line = Buffer.allocUnsafe(1);
-                this.line[0] = 13;
+              if (groupstart < 0 && !this.lineLength) {
+                this.appendPendingLine(Buffer.from([13]));
               }
               data.value = data.value.slice(0, data.value.length - 2);
             } else {
@@ -42785,15 +42978,8 @@ var require_message_splitter = __commonJS((exports, module) => {
               }
               if (flush) {
                 if (group && group.type !== "none") {
-                  if (group.type === "body" && groupend >= groupstart && group.node && group.node.parentNode) {
-                    if (chunk[groupend - 1] === 10) {
-                      groupend--;
-                      if (groupend >= groupstart && chunk[groupend - 1] === 13) {
-                        groupend--;
-                      }
-                    }
-                  }
-                  if (groupstart !== groupend) {
+                  groupend = trimBodyLineEnd(group, chunk, groupstart, groupend);
+                  if (groupstart < groupend) {
                     group.value = chunk.slice(groupstart, groupend);
                     if (groupend < i && "value" in data) {
                       data.value = chunk.slice(groupend, i);
@@ -42812,14 +42998,7 @@ var require_message_splitter = __commonJS((exports, module) => {
               if (data.type === group.type) {
                 groupend = i;
               } else {
-                if (group.type === "body" && groupend >= groupstart && group.node && group.node.parentNode) {
-                  if (chunk[groupend - 1] === 10) {
-                    groupend--;
-                    if (groupend >= groupstart && chunk[groupend - 1] === 13) {
-                      groupend--;
-                    }
-                  }
-                }
+                groupend = trimBodyLineEnd(group, chunk, groupstart, groupend);
                 if (group.type !== "none" && group.type !== "node") {
                   if (groupstart !== groupend) {
                     group.value = chunk.slice(groupstart, groupend);
@@ -42852,14 +43031,7 @@ var require_message_splitter = __commonJS((exports, module) => {
             });
           }
         }
-        if (pos >= groupstart + 1 && group.type === "body" && group.node && group.node.parentNode) {
-          if (chunk[pos - 1] === 10) {
-            pos--;
-            if (pos >= groupstart && chunk[pos - 1] === 13) {
-              pos--;
-            }
-          }
-        }
+        pos = trimBodyLineEnd(group, chunk, groupstart, pos);
         if (group.type !== "none" && group.type !== "node" && pos > groupstart) {
           group.value = chunk.slice(groupstart, pos);
           if (group.value && group.value.length) {
@@ -42870,11 +43042,12 @@ var require_message_splitter = __commonJS((exports, module) => {
           }
         }
         if (pos < chunk.length) {
-          if (this.line) {
-            this.line = Buffer.concat([this.line, chunk.slice(pos)]);
-          } else {
-            this.line = chunk.slice(pos);
-          }
+          this.appendPendingLine(chunk.slice(Math.max(pos, 0)));
+        }
+        let pendingLineError = this.enforcePendingLineLimit();
+        if (pendingLineError) {
+          this.hasFailed = true;
+          return callback(pendingLineError);
         }
         callback();
       };
@@ -42895,7 +43068,7 @@ var require_message_splitter = __commonJS((exports, module) => {
       });
     }
     compareBoundary(line, startpos, boundary) {
-      if (line.length < boundary.length + 3 + startpos || line.length > boundary.length + 6 + startpos) {
+      if (line.length < boundary.length + 3 + startpos || line.length > boundary.length + BOUNDARY_LINE_SUFFIX + startpos) {
         return false;
       }
       for (let i = 0;i < boundary.length; i++) {
@@ -42929,7 +43102,7 @@ var require_message_splitter = __commonJS((exports, module) => {
       let startpos = 0;
       if (line.length >= 1 && (line[0] === 13 || line[0] === 10)) {
         startpos++;
-        if (line.length >= 2 && (line[0] === 13 || line[1] === 10)) {
+        if (line.length >= 2 && line[0] === 13 && line[1] === 10) {
           startpos++;
         }
       }
@@ -42937,7 +43110,7 @@ var require_message_splitter = __commonJS((exports, module) => {
         return false;
       }
       let boundary;
-      if (this.node._boundary && (boundary = this.compareBoundary(line, startpos, this.node._boundary))) {
+      if (!this.inEpilogue && this.node._boundary && (boundary = this.compareBoundary(line, startpos, this.node._boundary))) {
         return boundary;
       }
       if (this.node._parentBoundary && (boundary = this.compareBoundary(line, startpos, this.node._parentBoundary))) {
@@ -42945,24 +43118,54 @@ var require_message_splitter = __commonJS((exports, module) => {
       }
       return false;
     }
+    checkHeadSize(extra) {
+      if (this.node._headerlen + (extra || 0) > this.maxHeadSize) {
+        return maxLenError("Max header size for a MIME node exceeded");
+      }
+      return null;
+    }
+    enforcePendingLineLimit() {
+      if (!this.lineLength) {
+        return null;
+      }
+      let maxBoundaryLength = Math.max(this.node._boundary ? this.node._boundary.length : 0, this.node._parentBoundary ? this.node._parentBoundary.length : 0);
+      if (this.lineLength <= maxBoundaryLength + BOUNDARY_LINE_OVERHEAD) {
+        return null;
+      }
+      if (this.state === HEAD) {
+        return this.checkHeadSize(this.lineLength);
+      }
+      if (this.lineLength < MAX_PENDING_LINE_SIZE) {
+        return null;
+      }
+      let value = this.takePendingLine();
+      if (value[value.length - 1] === 13) {
+        this.appendPendingLine(Buffer.from([13]));
+        value = value.slice(0, value.length - 1);
+      }
+      this.push({
+        node: this.node,
+        type: this.node.multipart ? "data" : "body",
+        value
+      });
+      this.pendingLineTruncated = true;
+      return null;
+    }
     processLine(line, final, next) {
       let flush = false;
-      if (this.line && line) {
-        line = Buffer.concat([this.line, line]);
-        this.line = false;
-      } else if (this.line && !line) {
-        line = this.line;
-        this.line = false;
+      let truncatedLine = this.pendingLineTruncated;
+      this.pendingLineTruncated = false;
+      let pending = this.takePendingLine();
+      if (pending) {
+        line = line ? Buffer.concat([pending, line]) : pending;
       }
       if (!line) {
         line = Buffer.alloc(0);
       }
       if (this.nodeCounter > this.maxChildNodes) {
-        let err = new Error("Max allowed child nodes exceeded");
-        err.code = "EMAXLEN";
-        return next(err);
+        return next(maxLenError("Max allowed child nodes exceeded"));
       }
-      let boundary = this.checkBoundary(line);
+      let boundary = truncatedLine ? false : this.checkBoundary(line);
       if (boundary) {
         switch (boundary) {
           case 1:
@@ -42972,24 +43175,23 @@ var require_message_splitter = __commonJS((exports, module) => {
           case 2:
             break;
           case 3: {
-            let parentNode = this.node.parentNode;
-            if (parentNode && parentNode.contentType === "message/rfc822") {
-              parentNode = parentNode.parentNode;
-            }
-            this.newNode(parentNode);
+            this.newNode(this.parentMultipartNode());
             flush = true;
             break;
           }
-          case 4:
+          case 4: {
             if (this.node && this.node._headerlen && !this.node.headers) {
               this.node.parseHeaders();
               this.push(this.node);
             }
-            if (this.tree.length) {
-              this.node = this.tree.pop();
+            let parentNode = this.parentMultipartNode();
+            if (parentNode) {
+              this.node = parentNode;
+              this.inEpilogue = true;
             }
             this.state = BODY;
             break;
+          }
         }
         return next(null, {
           node: this.node,
@@ -43000,10 +43202,9 @@ var require_message_splitter = __commonJS((exports, module) => {
       switch (this.state) {
         case HEAD: {
           this.node.addHeaderChunk(line);
-          if (this.node._headerlen > this.maxHeadSize) {
-            let err = new Error("Max header size for a MIME node exceeded");
-            err.code = "EMAXLEN";
-            return next(err);
+          let headSizeError = this.checkHeadSize();
+          if (headSizeError) {
+            return next(headSizeError);
           }
           if (final || line.length === 1 && line[0] === 10 || line.length === 2 && line[0] === 13 && line[1] === 10) {
             let currentNode = this.node;
@@ -43013,15 +43214,13 @@ var require_message_splitter = __commonJS((exports, module) => {
               this.newNode(currentNode);
               if (currentNode.parentNode) {
                 this.node._parentBoundary = currentNode.parentNode._boundary;
+                this.node._parentBoundaryOwner = currentNode.parentNode;
               }
             } else {
               if (currentNode.contentType === "message/rfc822") {
                 currentNode.messageNode = false;
               }
               this.state = BODY;
-              if (currentNode.multipart && currentNode._boundary) {
-                this.tree.push(currentNode);
-              }
             }
             return next(null, currentNode, flush);
           }
@@ -43037,10 +43236,14 @@ var require_message_splitter = __commonJS((exports, module) => {
       }
       next(null, false);
     }
+    parentMultipartNode() {
+      return this.node._parentBoundaryOwner || false;
+    }
     newNode(parent) {
       this.node = new MimeNode(parent || false, this.config);
       this.state = HEAD;
       this.nodeCounter++;
+      this.inEpilogue = false;
     }
   }
   module.exports = MessageSplitter;
@@ -43405,12 +43608,16 @@ var require_mailsplit = __commonJS((exports, module) => {
 // node_modules/imapflow/lib/limited-passthrough.js
 var require_limited_passthrough = __commonJS((exports, module) => {
   var { Transform } = __require("stream");
+  var normalizeByteLimit = (value) => {
+    let bytes = Number(value);
+    return Number.isFinite(bytes) && bytes > 0 ? Math.max(Math.floor(bytes), 1) : Infinity;
+  };
 
   class LimitedPassthrough extends Transform {
     constructor(options) {
       super();
       this.options = options || {};
-      this.maxBytes = this.options.maxBytes || Infinity;
+      this.maxBytes = normalizeByteLimit(this.options.maxBytes);
       this.processed = 0;
       this.limited = false;
     }
@@ -43434,12 +43641,30 @@ var require_limited_passthrough = __commonJS((exports, module) => {
     }
   }
   exports.LimitedPassthrough = LimitedPassthrough;
+  exports.normalizeByteLimit = normalizeByteLimit;
+});
+
+// node_modules/imapflow/lib/handler/limits.js
+var require_limits = __commonJS((exports, module) => {
+  var MAX_LITERAL_SIZE = 1024 * 1024 * 1024;
+  var MAX_LINE_SIZE = MAX_LITERAL_SIZE;
+  var MAX_RESPONSE_SIZE = 2 * MAX_LITERAL_SIZE;
+  var normalizeLimit = (value, defaultValue) => (Number.isInteger(value) || value === Infinity) && value >= 0 ? value : defaultValue;
+  var createLiteralTooLargeError = (literalSize, maxSize, reason) => {
+    const err = new Error(`Literal size ${literalSize} exceeds ${reason || `maximum allowed size of ${maxSize} bytes`}`);
+    err.code = "LiteralTooLarge";
+    err.literalSize = literalSize;
+    err.maxSize = maxSize;
+    return err;
+  };
+  module.exports = { MAX_LITERAL_SIZE, MAX_LINE_SIZE, MAX_RESPONSE_SIZE, normalizeLimit, createLiteralTooLargeError };
 });
 
 // node_modules/imapflow/lib/handler/imap-stream.js
 var require_imap_stream = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
   var logger = require_logger();
+  var { MAX_LITERAL_SIZE, MAX_LINE_SIZE, MAX_RESPONSE_SIZE, normalizeLimit, createLiteralTooLargeError } = require_limits();
   var LINE = 1;
   var LITERAL = 2;
   var LF = 10;
@@ -43448,8 +43673,6 @@ var require_imap_stream = __commonJS((exports, module) => {
   var NUM_9 = 57;
   var CURLY_OPEN = 123;
   var CURLY_CLOSE = 125;
-  var MAX_LITERAL_SIZE = 1024 * 1024 * 1024;
-  var MAX_LINE_SIZE = MAX_LITERAL_SIZE;
 
   class ImapStream extends Transform {
     constructor(options) {
@@ -43464,8 +43687,9 @@ var require_imap_stream = __commonJS((exports, module) => {
         cid: this.cid
       });
       this.readBytesCounter = 0;
-      this.maxLineLength = Number.isInteger(this.options.maxLineLength) && this.options.maxLineLength >= 0 ? this.options.maxLineLength : MAX_LINE_SIZE;
-      this.maxLiteralSize = Number.isInteger(this.options.maxLiteralSize) && this.options.maxLiteralSize >= 0 ? this.options.maxLiteralSize : MAX_LITERAL_SIZE;
+      this.maxLineLength = normalizeLimit(this.options.maxLineLength, MAX_LINE_SIZE);
+      this.maxLiteralSize = normalizeLimit(this.options.maxLiteralSize, MAX_LITERAL_SIZE);
+      this.maxResponseSize = normalizeLimit(this.options.maxResponseSize, MAX_RESPONSE_SIZE);
       this.state = LINE;
       this.literalWaiting = 0;
       this.inputBuffer = [];
@@ -43473,10 +43697,29 @@ var require_imap_stream = __commonJS((exports, module) => {
       this.lineBytes = 0;
       this.literalBuffer = [];
       this.literals = [];
+      this.responseBytes = 0;
       this.compress = false;
       this.secureConnection = this.options.secureConnection;
       this.processingInput = false;
       this.inputQueue = [];
+      this.activeInput = null;
+      this.pendingPush = null;
+    }
+    failStream(err) {
+      if (this.destroyed) {
+        return false;
+      }
+      this.destroy(err);
+      return false;
+    }
+    releaseInput(item) {
+      if (!item || item.released) {
+        return;
+      }
+      item.released = true;
+      if (typeof item.next === "function") {
+        item.next();
+      }
     }
     checkLiteralMarker(line) {
       if (!line || !line.length) {
@@ -43494,22 +43737,23 @@ var require_imap_stream = __commonJS((exports, module) => {
         return false;
       }
       pos--;
-      let numBytes = [];
+      let digitsEnd = pos;
       for (;pos >= 0; pos--) {
         let c = line[pos];
         if (c >= NUM_0 && c <= NUM_9) {
-          numBytes.unshift(c);
           continue;
         }
-        if (c === CURLY_OPEN && numBytes.length) {
-          const literalSize = Number(Buffer.from(numBytes).toString());
+        if (c === CURLY_OPEN && pos < digitsEnd) {
+          let digitsStart = pos + 1;
+          while (digitsStart < digitsEnd && line[digitsStart] === NUM_0) {
+            digitsStart++;
+          }
+          if (digitsEnd + 1 - digitsStart > 19) {
+            return this.failStream(createLiteralTooLargeError(Infinity, this.maxLiteralSize, "the widest permissible literal size (19 digits)"));
+          }
+          const literalSize = Number(line.toString("latin1", digitsStart, digitsEnd + 1));
           if (literalSize > this.maxLiteralSize) {
-            const err = new Error(`Literal size ${literalSize} exceeds maximum allowed size of ${this.maxLiteralSize} bytes`);
-            err.code = "LiteralTooLarge";
-            err.literalSize = literalSize;
-            err.maxSize = this.maxLiteralSize;
-            this.emit("error", err);
-            return false;
+            return this.failStream(createLiteralTooLargeError(literalSize, this.maxLiteralSize));
           }
           this.state = LITERAL;
           this.literalWaiting = literalSize;
@@ -43519,9 +43763,33 @@ var require_imap_stream = __commonJS((exports, module) => {
       }
       return false;
     }
+    checkLineLength(lineLength) {
+      if (lineLength <= this.maxLineLength) {
+        return true;
+      }
+      const err = new Error(`Line length ${lineLength} exceeds maximum allowed size of ${this.maxLineLength} bytes`);
+      err.code = "LineTooLarge";
+      err.lineLength = lineLength;
+      err.maxSize = this.maxLineLength;
+      return this.failStream(err);
+    }
+    checkResponseSize(additionalBytes, peek) {
+      let total = this.responseBytes + additionalBytes;
+      if (total <= this.maxResponseSize) {
+        if (!peek) {
+          this.responseBytes = total;
+        }
+        return true;
+      }
+      const err = new Error(`Response size ${total} exceeds maximum allowed size of ${this.maxResponseSize} bytes`);
+      err.code = "ResponseTooLarge";
+      err.responseSize = total;
+      err.maxSize = this.maxResponseSize;
+      return this.failStream(err);
+    }
     async processInputChunk(chunk, startPos) {
       startPos = startPos || 0;
-      if (startPos >= chunk.length) {
+      if (this.destroyed || startPos >= chunk.length) {
         return;
       }
       switch (this.state) {
@@ -43529,19 +43797,31 @@ var require_imap_stream = __commonJS((exports, module) => {
           let lineStart = startPos;
           for (let i = startPos, len = chunk.length;i < len; i++) {
             if (chunk[i] === LF) {
-              this.lineBuffer.push(chunk.slice(lineStart, i + 1));
+              let segment = chunk.slice(lineStart, i + 1);
+              if (!this.checkLineLength(this.lineBytes + segment.length)) {
+                return;
+              }
+              this.lineBuffer.push(segment);
               lineStart = i + 1;
-              let line = Buffer.concat(this.lineBuffer);
-              this.inputBuffer.push(line);
+              let line = this.lineBuffer.length === 1 ? this.lineBuffer[0] : Buffer.concat(this.lineBuffer);
               this.lineBuffer = [];
               this.lineBytes = 0;
-              if (this.checkLiteralMarker(line)) {
+              let isLiteralMarker = this.checkLiteralMarker(line);
+              if (this.destroyed) {
+                return;
+              }
+              if (!this.checkResponseSize(line.length + (isLiteralMarker ? this.literalWaiting : 0))) {
+                return;
+              }
+              this.inputBuffer.push(line);
+              if (isLiteralMarker) {
                 return await this.processInputChunk(chunk, lineStart);
               }
               let payload = this.inputBuffer.length === 1 ? this.inputBuffer[0] : Buffer.concat(this.inputBuffer);
               let literals = this.literals;
               this.inputBuffer = [];
               this.literals = [];
+              this.responseBytes = 0;
               if (payload.length) {
                 if (payload[payload.length - 1] === LF) {
                   let end = payload.length - 1;
@@ -43553,24 +43833,23 @@ var require_imap_stream = __commonJS((exports, module) => {
                 if (payload.length) {
                   let trailingAfterLine = lineStart < chunk.length || this.inputQueue.length > 0;
                   await new Promise((resolve) => {
+                    this.pendingPush = resolve;
                     this.push({ payload, literals, next: resolve, trailingAfterLine });
                   });
+                  this.pendingPush = null;
+                  if (this.destroyed) {
+                    return;
+                  }
                 }
               }
             }
           }
           if (lineStart < chunk.length) {
             let tail = chunk.slice(lineStart);
-            let lineLength = this.lineBytes + tail.length;
-            if (lineLength > this.maxLineLength) {
-              const err = new Error(`Line length ${lineLength} exceeds maximum allowed size of ${this.maxLineLength} bytes`);
-              err.code = "LineTooLarge";
-              err.lineLength = lineLength;
-              err.maxSize = this.maxLineLength;
-              this.emit("error", err);
+            if (!this.checkLineLength(this.lineBytes + tail.length) || !this.checkResponseSize(this.lineBytes + tail.length, true)) {
               return;
             }
-            this.lineBytes = lineLength;
+            this.lineBytes += tail.length;
             this.lineBuffer.push(tail);
           }
           break;
@@ -43596,9 +43875,11 @@ var require_imap_stream = __commonJS((exports, module) => {
     async processInput() {
       let data;
       let processedCount = 0;
-      while (data = this.inputQueue.shift()) {
+      while (!this.destroyed && (data = this.inputQueue.shift())) {
+        this.activeInput = data;
         await this.processInputChunk(data.chunk);
-        data.next();
+        this.activeInput = null;
+        this.releaseInput(data);
         processedCount++;
         if (processedCount % 10 === 0) {
           await new Promise((resolve) => setImmediate(resolve));
@@ -43623,10 +43904,13 @@ var require_imap_stream = __commonJS((exports, module) => {
           cid: this.cid
         });
       }
+      if (this.destroyed) {
+        return next();
+      }
       this.inputQueue.push({ chunk, next });
       if (!this.processingInput) {
         this.processingInput = true;
-        this.processInput().catch((err) => this.emit("error", err)).finally(() => this.processingInput = false);
+        this.processInput().catch((err) => this.failStream(err)).finally(() => this.processingInput = false);
       }
     }
     _flush(next) {
@@ -43638,11 +43922,16 @@ var require_imap_stream = __commonJS((exports, module) => {
       this.lineBytes = 0;
       this.literalBuffer = [];
       this.literals = [];
+      this.responseBytes = 0;
+      if (typeof this.pendingPush === "function") {
+        const resolve = this.pendingPush;
+        this.pendingPush = null;
+        resolve();
+      }
+      this.releaseInput(this.activeInput);
+      this.activeInput = null;
       while (this.inputQueue.length) {
-        const item = this.inputQueue.shift();
-        if (typeof item.next === "function") {
-          item.next();
-        }
+        this.releaseInput(this.inputQueue.shift());
       }
       callback(err);
     }
@@ -43774,6 +44063,7 @@ var require_imap_formal_syntax = __commonJS((exports, module) => {
 // node_modules/imapflow/lib/handler/token-parser.js
 var require_token_parser = __commonJS((exports, module) => {
   var imapFormalSyntax = require_imap_formal_syntax();
+  var { MAX_LITERAL_SIZE, normalizeLimit, createLiteralTooLargeError } = require_limits();
   var STATE_ATOM = 1;
   var STATE_LITERAL = 2;
   var STATE_NORMAL = 3;
@@ -43789,6 +44079,7 @@ var require_token_parser = __commonJS((exports, module) => {
       this.str = (str || "").toString();
       this.options = options || {};
       this.parent = parent;
+      this.maxLiteralSize = normalizeLimit(this.options.maxLiteralSize, MAX_LITERAL_SIZE);
       this.tree = this.currentNode = this.createNode();
       this.pos = startPos || 0;
       this.currentNode.type = "TREE";
@@ -44159,6 +44450,9 @@ var require_token_parser = __commonJS((exports, module) => {
               }
               this.currentNode.literalLength = Number(this.currentNode.literalLength);
               if (!this.currentNode.literalLength) {
+                if (this.options.literals && this.options.literals.length) {
+                  this.currentNode.value = this.options.literals.shift();
+                }
                 this.currentNode.endPos = this.pos + i;
                 this.currentNode.isClosed = true;
                 this.currentNode = this.currentNode.parentNode;
@@ -44173,6 +44467,14 @@ var require_token_parser = __commonJS((exports, module) => {
                 this.state = STATE_NORMAL;
                 checkSP();
               } else {
+                let available = this.str.length - i - 1;
+                let literalLength = this.currentNode.literalLength;
+                if (literalLength > this.maxLiteralSize || literalLength > available) {
+                  let overMax = literalLength > this.maxLiteralSize;
+                  let error51 = createLiteralTooLargeError(literalLength, overMax ? this.maxLiteralSize : available, overMax ? null : `the ${available} bytes available in the input`);
+                  error51.parserContext = { input: this.str, pos: this.pos + i, chr };
+                  throw error51;
+                }
                 this.currentNode.started = true;
                 this.currentNode.chBuffer = Buffer.alloc(this.currentNode.literalLength);
                 this.currentNode.chPos = 0;
@@ -44307,7 +44609,8 @@ var require_parser_instance = __commonJS((exports, module) => {
             let match2 = this.remainder.match(/^\s+\[/);
             if (match2) {
               let nesting = 1;
-              for (let i = match2[0].length;i <= this.remainder.length; i++) {
+              let end = -1;
+              for (let i = match2[0].length;i < this.remainder.length; i++) {
                 let c = this.remainder[i];
                 if (c === "[") {
                   nesting++;
@@ -44315,10 +44618,16 @@ var require_parser_instance = __commonJS((exports, module) => {
                   nesting--;
                 }
                 if (!nesting) {
-                  this.humanReadable = this.remainder.substring(i + 1).trim();
-                  this.remainder = this.remainder.substring(0, i + 1);
+                  end = i;
                   break;
                 }
+              }
+              if (end < 0) {
+                end = this.remainder.indexOf("]", match2[0].length);
+              }
+              if (end >= 0) {
+                this.humanReadable = this.remainder.substring(end + 1).trim();
+                this.remainder = this.remainder.substring(0, end + 1);
               }
             } else {
               this.humanReadable = this.remainder.trim();
@@ -44457,6 +44766,9 @@ var require_imap_parser = __commonJS((exports, module) => {
       if (err.code === "ParserErrorExchange" && err.parserContext && err.parserContext.value) {
         return err.parserContext.value;
       }
+      if (response.tag) {
+        err.parsedTag = response.tag;
+      }
       throw err;
     }
     return response;
@@ -44466,25 +44778,47 @@ var require_imap_parser = __commonJS((exports, module) => {
 // node_modules/imapflow/lib/handler/imap-compiler.js
 var require_imap_compiler = __commonJS((exports, module) => {
   var imapFormalSyntax = require_imap_formal_syntax();
-  var formatRespEntry = (entry, returnEmpty) => {
-    if (typeof entry === "string") {
-      return Buffer.from(entry);
+  var SEQ_RANGE = /^(\d+|\*)(:(\d+|\*))?$/;
+  var isValidSequenceSet = (value) => value === "$" || value.split(",").every((part) => SEQ_RANGE.test(part));
+  var safeNumber = (value) => {
+    let num = Math.round(Number(value));
+    return Number.isSafeInteger(num) && num >= 0 ? num : 0;
+  };
+  var NOT_QUOTABLE = /[\r\n\0]/;
+  var CRLF = /[\r\n]/;
+  var quoteString = (value) => {
+    if (NOT_QUOTABLE.test(value)) {
+      let error51 = new Error("Unquotable character in IMAP string value");
+      error51.code = "InvalidStringValue";
+      throw error51;
     }
-    if (typeof entry === "number") {
-      return Buffer.from(entry.toString());
-    }
-    if (Buffer.isBuffer(entry)) {
-      return entry;
-    }
-    if (returnEmpty) {
-      return null;
-    }
-    return Buffer.alloc(0);
+    return '"' + value.replace(/["\\]/g, (char2) => "\\" + char2) + '"';
   };
   module.exports = async (response, options) => {
     let { asArray: asArray2, isLogging, literalPlus, literalMinus } = options || {};
     const respParts = [];
-    let resp = [].concat(formatRespEntry(response.tag, true) || []).concat(response.command ? formatRespEntry(" " + response.command) : []);
+    const emitEntry = (entry, opts) => {
+      let { returnEmpty, raw: raw2 } = opts || {};
+      if (!raw2 && !isLogging && (typeof entry === "string" || Buffer.isBuffer(entry)) && CRLF.test(entry.toString("latin1"))) {
+        let error51 = new Error("Line terminator in IMAP token");
+        error51.code = "InvalidTokenValue";
+        throw error51;
+      }
+      if (typeof entry === "string") {
+        return Buffer.from(entry);
+      }
+      if (typeof entry === "number") {
+        return Buffer.from(entry.toString());
+      }
+      if (Buffer.isBuffer(entry)) {
+        return entry;
+      }
+      if (returnEmpty) {
+        return null;
+      }
+      return Buffer.alloc(0);
+    };
+    let resp = [].concat(emitEntry(response.tag, { returnEmpty: true }) || []).concat(response.command ? emitEntry(" " + response.command) : []);
     let val;
     let lastType;
     let walk = async (node, options2) => {
@@ -44496,7 +44830,7 @@ var require_imap_compiler = __commonJS((exports, module) => {
       }
       if (lastType === "LITERAL" || !["(", "<", "["].includes(lastRespByte) && resp.length) {
         if (!options2.subArray) {
-          resp.push(formatRespEntry(" "));
+          resp.push(emitEntry(" "));
         }
       }
       if (node && node.buffer && !Buffer.isBuffer(node)) {
@@ -44504,7 +44838,7 @@ var require_imap_compiler = __commonJS((exports, module) => {
       }
       if (Array.isArray(node)) {
         lastType = "LIST";
-        resp.push(formatRespEntry("("));
+        resp.push(emitEntry("("));
         let subArray = node.length > 1 && Array.isArray(node[0]);
         for (let child of node) {
           if (subArray && !Array.isArray(child)) {
@@ -44512,84 +44846,102 @@ var require_imap_compiler = __commonJS((exports, module) => {
           }
           await walk(child, { subArray });
         }
-        resp.push(formatRespEntry(")"));
+        resp.push(emitEntry(")"));
         return;
       }
       if (!node && typeof node !== "string" && typeof node !== "number" && !Buffer.isBuffer(node)) {
-        resp.push(formatRespEntry("NIL"));
+        resp.push(emitEntry("NIL"));
         return;
       }
       if (typeof node === "string" || Buffer.isBuffer(node)) {
         if (isLogging && node.length > 100) {
-          resp.push(formatRespEntry('"(* ' + node.length + 'B string *)"'));
+          resp.push(emitEntry('"(* ' + node.length + 'B string *)"'));
         } else {
-          resp.push(formatRespEntry(JSON.stringify(node.toString())));
+          resp.push(emitEntry(isLogging ? JSON.stringify(node.toString()) : quoteString(node.toString())));
         }
         return;
       }
       if (typeof node === "number") {
-        resp.push(formatRespEntry(Math.round(node) || 0));
+        resp.push(emitEntry(safeNumber(node)));
         return;
       }
       lastType = node.type;
       if (isLogging && node.sensitive) {
-        resp.push(formatRespEntry('"(* value hidden *)"'));
+        resp.push(emitEntry('"(* value hidden *)"'));
         return;
       }
       switch (node.type.toUpperCase()) {
         case "LITERAL":
           if (isLogging) {
-            resp.push(formatRespEntry('"(* ' + node.value.length + 'B literal *)"'));
+            resp.push(emitEntry('"(* ' + node.value.length + 'B literal *)"'));
           } else {
-            let literalLength = !node.value ? 0 : Math.max(node.value.length, 0);
-            let canAppend = !asArray2 || literalPlus || literalMinus && literalLength <= 4096;
-            let usePlus = canAppend && (literalMinus || literalPlus);
-            resp.push(formatRespEntry(`${node.isLiteral8 ? "~" : ""}{${literalLength}${usePlus ? "+" : ""}}\r
-`));
+            let literalLength = !node.value ? 0 : Buffer.isBuffer(node.value) ? node.value.length : Buffer.byteLength(node.value.toString());
+            let usePlus = literalPlus || literalMinus && literalLength <= 4096;
+            let canAppend = !asArray2 || usePlus;
+            resp.push(emitEntry(`${node.isLiteral8 ? "~" : ""}{${literalLength}${usePlus ? "+" : ""}}\r
+`, { raw: true }));
             if (canAppend) {
               if (node.value && node.value.length) {
-                resp.push(formatRespEntry(node.value));
+                resp.push(emitEntry(node.value, { raw: true }));
               }
             } else {
               respParts.push(resp);
-              resp = [].concat(formatRespEntry(node.value, true) || []);
+              resp = [].concat(emitEntry(node.value, { returnEmpty: true, raw: true }) || []);
             }
           }
           break;
         case "STRING":
           if (isLogging && node.value.length > 100) {
-            resp.push(formatRespEntry('"(* ' + node.value.length + 'B string *)"'));
+            resp.push(emitEntry('"(* ' + node.value.length + 'B string *)"'));
           } else {
-            resp.push(formatRespEntry(JSON.stringify((node.value || "").toString())));
+            val = (node.value || "").toString();
+            resp.push(emitEntry(isLogging ? JSON.stringify(val) : quoteString(val)));
+          }
+          break;
+        case "SEQUENCE":
+          if (!isLogging && (typeof node.value === "string" || typeof node.value === "number" || Buffer.isBuffer(node.value))) {
+            val = node.value.toString();
+            if (val && !isValidSequenceSet(val)) {
+              let error51 = new Error("Invalid sequence set value");
+              error51.code = "InvalidSequenceSet";
+              throw error51;
+            }
+          }
+          if (node.value) {
+            resp.push(emitEntry(node.value, { raw: true }));
           }
           break;
         case "TEXT":
-        case "SEQUENCE":
           if (node.value) {
-            resp.push(formatRespEntry(node.value));
+            if (!isLogging && CRLF.test(node.value.toString())) {
+              let error51 = new Error("Line terminator in IMAP text value");
+              error51.code = "InvalidTextValue";
+              throw error51;
+            }
+            resp.push(emitEntry(node.value));
           }
           break;
         case "NUMBER":
-          resp.push(formatRespEntry(node.value || 0));
+          resp.push(emitEntry(safeNumber(node.value)));
           break;
         case "ATOM":
         case "SECTION":
           val = (node.value || "").toString();
           if (!node.section || val) {
             if (node.value === "" || imapFormalSyntax.verify(val.charAt(0) === "\\" ? val.substr(1) : val, imapFormalSyntax["ATOM-CHAR"]()) >= 0) {
-              val = JSON.stringify(val);
+              val = isLogging ? JSON.stringify(val) : quoteString(val);
             }
-            resp.push(formatRespEntry(val));
+            resp.push(emitEntry(val));
           }
           if (node.section) {
-            resp.push(formatRespEntry("["));
+            resp.push(emitEntry("["));
             for (let child of node.section) {
               await walk(child);
             }
-            resp.push(formatRespEntry("]"));
+            resp.push(emitEntry("]"));
           }
           if (node.partial) {
-            resp.push(formatRespEntry(`<${node.partial.join(".")}>`));
+            resp.push(emitEntry(`<${node.partial.map(safeNumber).join(".")}>`));
           }
           break;
       }
@@ -44624,15 +44976,17 @@ var require_imap_handler = __commonJS((exports, module) => {
 var require_package3 = __commonJS((exports, module) => {
   module.exports = {
     name: "imapflow",
-    version: "1.4.7",
+    version: "1.7.8",
     description: "IMAP Client for Node",
     main: "lib/imap-flow.js",
     types: "lib/imap-flow.d.ts",
     scripts: {
       test: "grunt",
       coverage: "c8 --reporter=text --reporter=html npx nodeunit test/*-test.js",
+      "test:rev2": "bash test/integration/run-rev2-tests.sh",
       update: "rm -rf node_modules package-lock.json && ncu -u && npm install",
       format: 'prettier --write "**/*.{js,json,md,yml,yaml}" --ignore-path .prettierignore',
+      "format:check": 'prettier --check "**/*.{js,json,md,yml,yaml}" --ignore-path .prettierignore',
       lint: "eslint ."
     },
     repository: {
@@ -44652,480 +45006,30 @@ var require_package3 = __commonJS((exports, module) => {
     homepage: "https://imapflow.com/",
     devDependencies: {
       "@eslint/js": "10.0.1",
-      "@types/node": "26.1.0",
-      c8: "11.0.0",
-      eslint: "10.6.0",
+      "@types/node": "26.4.0",
+      c8: "12.0.0",
+      eslint: "10.9.1",
       "eslint-config-nodemailer": "1.2.0",
       "eslint-config-prettier": "10.1.8",
-      grunt: "1.6.2",
+      grunt: "1.6.3",
       "grunt-cli": "1.5.0",
       "grunt-contrib-nodeunit": "5.0.0",
       "grunt-eslint": "26.0.0",
-      prettier: "3.9.4",
+      prettier: "3.9.6",
       proxyquire: "^2.1.3",
-      typescript: "6.0.3"
+      typescript: "7.0.2"
     },
     dependencies: {
-      "@zone-eu/mailsplit": "5.4.14",
-      "encoding-japanese": "2.2.0",
+      "@zone-eu/mailsplit": "5.4.16",
+      "encoding-japanese": "2.3.0",
       "iconv-lite": "0.7.3",
       libbase64: "1.3.0",
-      libmime: "5.4.1",
+      libmime: "5.4.3",
       libqp: "2.1.1",
-      nodemailer: "9.0.3",
       pino: "10.3.1",
       socks: "2.8.9"
     }
   };
-});
-
-// node_modules/imapflow/node_modules/nodemailer/lib/punycode/index.js
-var require_punycode = __commonJS((exports, module) => {
-  var maxInt = 2147483647;
-  var base = 36;
-  var tMin = 1;
-  var tMax = 26;
-  var skew = 38;
-  var damp = 700;
-  var initialBias = 72;
-  var initialN = 128;
-  var delimiter = "-";
-  var regexPunycode = /^xn--/;
-  var regexNonASCII = /[^\0-\x7F]/;
-  var regexSeparators = /[\x2E\u3002\uFF0E\uFF61]/g;
-  var errors3 = {
-    overflow: "Overflow: input needs wider integers to process",
-    "not-basic": "Illegal input >= 0x80 (not a basic code point)",
-    "invalid-input": "Invalid input"
-  };
-  var baseMinusTMin = base - tMin;
-  var floor = Math.floor;
-  var stringFromCharCode = String.fromCharCode;
-  function error51(type) {
-    throw new RangeError(errors3[type]);
-  }
-  function map2(array2, callback) {
-    const result = [];
-    let length = array2.length;
-    while (length--) {
-      result[length] = callback(array2[length]);
-    }
-    return result;
-  }
-  function mapDomain(domain2, callback) {
-    const parts = domain2.split("@");
-    let result = "";
-    if (parts.length > 1) {
-      result = parts[0] + "@";
-      domain2 = parts[1];
-    }
-    domain2 = domain2.replace(regexSeparators, ".");
-    const labels = domain2.split(".");
-    const encoded = map2(labels, callback).join(".");
-    return result + encoded;
-  }
-  function ucs2decode(string4) {
-    const output = [];
-    let counter = 0;
-    const length = string4.length;
-    while (counter < length) {
-      const value = string4.charCodeAt(counter++);
-      if (value >= 55296 && value <= 56319 && counter < length) {
-        const extra = string4.charCodeAt(counter++);
-        if ((extra & 64512) == 56320) {
-          output.push(((value & 1023) << 10) + (extra & 1023) + 65536);
-        } else {
-          output.push(value);
-          counter--;
-        }
-      } else {
-        output.push(value);
-      }
-    }
-    return output;
-  }
-  var ucs2encode = (codePoints) => String.fromCodePoint(...codePoints);
-  var basicToDigit = function(codePoint) {
-    if (codePoint >= 48 && codePoint < 58) {
-      return 26 + (codePoint - 48);
-    }
-    if (codePoint >= 65 && codePoint < 91) {
-      return codePoint - 65;
-    }
-    if (codePoint >= 97 && codePoint < 123) {
-      return codePoint - 97;
-    }
-    return base;
-  };
-  var digitToBasic = function(digit, flag) {
-    return digit + 22 + 75 * (digit < 26) - ((flag != 0) << 5);
-  };
-  var adapt = function(delta, numPoints, firstTime) {
-    let k = 0;
-    delta = firstTime ? floor(delta / damp) : delta >> 1;
-    delta += floor(delta / numPoints);
-    for (;delta > baseMinusTMin * tMax >> 1; k += base) {
-      delta = floor(delta / baseMinusTMin);
-    }
-    return floor(k + (baseMinusTMin + 1) * delta / (delta + skew));
-  };
-  var decode3 = function(input) {
-    const output = [];
-    const inputLength = input.length;
-    let i = 0;
-    let n = initialN;
-    let bias = initialBias;
-    let basic = input.lastIndexOf(delimiter);
-    if (basic < 0) {
-      basic = 0;
-    }
-    for (let j = 0;j < basic; ++j) {
-      if (input.charCodeAt(j) >= 128) {
-        error51("not-basic");
-      }
-      output.push(input.charCodeAt(j));
-    }
-    for (let index = basic > 0 ? basic + 1 : 0;index < inputLength; ) {
-      const oldi = i;
-      for (let w = 1, k = base;; k += base) {
-        if (index >= inputLength) {
-          error51("invalid-input");
-        }
-        const digit = basicToDigit(input.charCodeAt(index++));
-        if (digit >= base) {
-          error51("invalid-input");
-        }
-        if (digit > floor((maxInt - i) / w)) {
-          error51("overflow");
-        }
-        i += digit * w;
-        const t = k <= bias ? tMin : k >= bias + tMax ? tMax : k - bias;
-        if (digit < t) {
-          break;
-        }
-        const baseMinusT = base - t;
-        if (w > floor(maxInt / baseMinusT)) {
-          error51("overflow");
-        }
-        w *= baseMinusT;
-      }
-      const out = output.length + 1;
-      bias = adapt(i - oldi, out, oldi == 0);
-      if (floor(i / out) > maxInt - n) {
-        error51("overflow");
-      }
-      n += floor(i / out);
-      i %= out;
-      output.splice(i++, 0, n);
-    }
-    return String.fromCodePoint(...output);
-  };
-  var encode3 = function(input) {
-    const output = [];
-    input = ucs2decode(input);
-    const inputLength = input.length;
-    let n = initialN;
-    let delta = 0;
-    let bias = initialBias;
-    for (const currentValue of input) {
-      if (currentValue < 128) {
-        output.push(stringFromCharCode(currentValue));
-      }
-    }
-    const basicLength = output.length;
-    let handledCPCount = basicLength;
-    if (basicLength) {
-      output.push(delimiter);
-    }
-    while (handledCPCount < inputLength) {
-      let m = maxInt;
-      for (const currentValue of input) {
-        if (currentValue >= n && currentValue < m) {
-          m = currentValue;
-        }
-      }
-      const handledCPCountPlusOne = handledCPCount + 1;
-      if (m - n > floor((maxInt - delta) / handledCPCountPlusOne)) {
-        error51("overflow");
-      }
-      delta += (m - n) * handledCPCountPlusOne;
-      n = m;
-      for (const currentValue of input) {
-        if (currentValue < n && ++delta > maxInt) {
-          error51("overflow");
-        }
-        if (currentValue === n) {
-          let q = delta;
-          for (let k = base;; k += base) {
-            const t = k <= bias ? tMin : k >= bias + tMax ? tMax : k - bias;
-            if (q < t) {
-              break;
-            }
-            const qMinusT = q - t;
-            const baseMinusT = base - t;
-            output.push(stringFromCharCode(digitToBasic(t + qMinusT % baseMinusT, 0)));
-            q = floor(qMinusT / baseMinusT);
-          }
-          output.push(stringFromCharCode(digitToBasic(q, 0)));
-          bias = adapt(delta, handledCPCountPlusOne, handledCPCount === basicLength);
-          delta = 0;
-          ++handledCPCount;
-        }
-      }
-      ++delta;
-      ++n;
-    }
-    return output.join("");
-  };
-  var toUnicode = function(input) {
-    return mapDomain(input, function(string4) {
-      return regexPunycode.test(string4) ? decode3(string4.slice(4).toLowerCase()) : string4;
-    });
-  };
-  var toASCII = function(input) {
-    return mapDomain(input, function(string4) {
-      return regexNonASCII.test(string4) ? "xn--" + encode3(string4) : string4;
-    });
-  };
-  var punycode = {
-    version: "2.3.1",
-    ucs2: {
-      decode: ucs2decode,
-      encode: ucs2encode
-    },
-    decode: decode3,
-    encode: encode3,
-    toASCII,
-    toUnicode
-  };
-  module.exports = punycode;
-});
-
-// node_modules/imapflow/node_modules/nodemailer/lib/shared/url.js
-var require_url = __commonJS((exports, module) => {
-  var urllib = __require("url");
-  var punycode = require_punycode();
-  var URLImpl = typeof URL !== "undefined" && URL || urllib.URL;
-  var SLASHLESS_AUTHORITY = /^([a-zA-Z][a-zA-Z0-9+.-]*:)(?!\/\/)(.+)$/;
-  function safeDecode3(str) {
-    try {
-      return decodeURIComponent(str);
-    } catch (_err) {
-      return str;
-    }
-  }
-  function normalizeHostname(raw2) {
-    let hostname3 = raw2 || "";
-    if (!hostname3) {
-      return "";
-    }
-    if (hostname3.charAt(0) === "[" && hostname3.charAt(hostname3.length - 1) === "]") {
-      return hostname3.slice(1, -1);
-    }
-    return punycode.toASCII(safeDecode3(hostname3));
-  }
-  exports.parse = (input, parseQueryString) => {
-    input = input || "";
-    if (!URLImpl) {
-      return urllib.parse(input, parseQueryString);
-    }
-    const slashless = SLASHLESS_AUTHORITY.exec(input);
-    const normalized = slashless ? slashless[1] + "//" + slashless[2] : input;
-    let u;
-    try {
-      u = new URLImpl(normalized);
-    } catch (_err) {
-      return urllib.parse(input, parseQueryString);
-    }
-    const hostname3 = normalizeHostname(u.hostname);
-    const port = u.port || null;
-    const pathname = u.pathname || null;
-    const search = u.search || null;
-    let auth = null;
-    if (u.username || u.password) {
-      auth = safeDecode3(u.username) + (u.password ? ":" + safeDecode3(u.password) : "");
-    }
-    let query;
-    if (parseQueryString) {
-      query = Object.create(null);
-      u.searchParams.forEach((value, key) => {
-        if (Object.prototype.hasOwnProperty.call(query, key)) {
-          if (Array.isArray(query[key])) {
-            query[key].push(value);
-          } else {
-            query[key] = [query[key], value];
-          }
-        } else {
-          query[key] = value;
-        }
-      });
-    } else {
-      query = search ? search.slice(1) : null;
-    }
-    return {
-      protocol: u.protocol || null,
-      host: u.host || null,
-      hostname: hostname3,
-      port,
-      pathname,
-      search,
-      path: (pathname || "") + (search || "") || null,
-      href: u.href,
-      auth,
-      query
-    };
-  };
-  exports.resolve = (from, to) => {
-    if (!URLImpl) {
-      return urllib.resolve(from, to);
-    }
-    try {
-      return new URLImpl(to, from).href;
-    } catch (_err) {
-      return urllib.resolve(from, to);
-    }
-  };
-});
-
-// node_modules/imapflow/node_modules/nodemailer/lib/errors.js
-var require_errors = __commonJS((exports, module) => {
-  var ERROR_CODES = {
-    ECONNECTION: "Connection closed unexpectedly",
-    ETIMEDOUT: "Connection or operation timed out",
-    ESOCKET: "Socket-level error",
-    EDNS: "DNS resolution failed",
-    ETLS: "TLS handshake or STARTTLS failed",
-    EREQUIRETLS: "REQUIRETLS not supported by server (RFC 8689)",
-    EPROTOCOL: "Invalid SMTP server response",
-    EENVELOPE: "Invalid mail envelope (sender or recipients)",
-    EMESSAGE: "Message delivery error",
-    ESTREAM: "Stream processing error",
-    EAUTH: "Authentication failed",
-    ENOAUTH: "Authentication credentials not provided",
-    EOAUTH2: "OAuth2 token generation or refresh error",
-    EMAXLIMIT: "Pool resource limit reached (max messages per connection)",
-    ESENDMAIL: "Sendmail command error",
-    ESES: "AWS SES transport error",
-    ECONFIG: "Invalid configuration",
-    EPROXY: "Proxy connection error",
-    EFILEACCESS: "File access rejected (disableFileAccess is set)",
-    EURLACCESS: "URL access rejected (disableUrlAccess is set)",
-    EFETCH: "HTTP fetch error"
-  };
-  module.exports = { ERROR_CODES };
-  for (const code of Object.keys(ERROR_CODES)) {
-    module.exports[code] = code;
-  }
-});
-
-// node_modules/imapflow/node_modules/nodemailer/lib/smtp-connection/http-proxy-client.js
-var require_http_proxy_client = __commonJS((exports, module) => {
-  var net = __require("net");
-  var tls = __require("tls");
-  var urllib = require_url();
-  var errors3 = require_errors();
-  var MAX_RESPONSE_HEADER_BYTES = 64 * 1024;
-  function httpProxyClient(proxyUrl, destinationPort, destinationHost, tlsOptions, callback) {
-    if (typeof tlsOptions === "function") {
-      callback = tlsOptions;
-      tlsOptions = {};
-    }
-    tlsOptions = tlsOptions || {};
-    destinationPort = Number(destinationPort) || 0;
-    if (!destinationPort || /[\r\n]/.test(destinationHost)) {
-      const err = new Error("Invalid proxy destination");
-      err.code = errors3.EPROXY;
-      return setImmediate(() => callback(err));
-    }
-    const proxy = urllib.parse(proxyUrl);
-    const connectOptions = {
-      host: proxy.hostname,
-      port: Number(proxy.port) ? Number(proxy.port) : proxy.protocol === "https:" ? 443 : 80
-    };
-    let connect;
-    if (proxy.protocol === "https:") {
-      connectOptions.rejectUnauthorized = tlsOptions.rejectUnauthorized !== false;
-      connect = tls.connect.bind(tls);
-    } else {
-      connect = net.connect.bind(net);
-    }
-    let socket;
-    let finished = false;
-    const tempSocketErr = (err) => {
-      if (finished) {
-        return;
-      }
-      finished = true;
-      try {
-        socket.destroy();
-      } catch (_E) {}
-      callback(err);
-    };
-    const timeoutErr = () => {
-      const err = new Error("Proxy socket timed out");
-      err.code = "ETIMEDOUT";
-      tempSocketErr(err);
-    };
-    socket = connect(connectOptions, () => {
-      if (finished) {
-        return;
-      }
-      const reqHeaders = {
-        Host: destinationHost + ":" + destinationPort,
-        Connection: "close"
-      };
-      if (proxy.auth) {
-        reqHeaders["Proxy-Authorization"] = "Basic " + Buffer.from(proxy.auth).toString("base64");
-      }
-      socket.write("CONNECT " + destinationHost + ":" + destinationPort + ` HTTP/1.1\r
-` + Object.keys(reqHeaders).map((key) => key + ": " + reqHeaders[key]).join(`\r
-`) + `\r
-\r
-`);
-      let headers = "";
-      const onSocketData = (chunk) => {
-        let match2;
-        let remainder;
-        if (finished) {
-          return;
-        }
-        headers += chunk.toString("binary");
-        if (match2 = headers.match(/\r\n\r\n/)) {
-          socket.removeListener("data", onSocketData);
-          remainder = headers.substr(match2.index + match2[0].length);
-          headers = headers.substr(0, match2.index);
-          if (remainder) {
-            socket.unshift(Buffer.from(remainder, "binary"));
-          }
-          finished = true;
-          match2 = headers.match(/^HTTP\/\d+\.\d+ (\d+)/i);
-          if (!match2 || (match2[1] || "").charAt(0) !== "2") {
-            try {
-              socket.destroy();
-            } catch (_E) {}
-            const err = new Error("Invalid response from proxy" + (match2 && ": " + match2[1] || ""));
-            err.code = errors3.EPROXY;
-            return callback(err);
-          }
-          socket.removeListener("error", tempSocketErr);
-          socket.removeListener("timeout", timeoutErr);
-          socket.setTimeout(0);
-          return callback(null, socket);
-        }
-        if (headers.length > MAX_RESPONSE_HEADER_BYTES) {
-          socket.removeListener("data", onSocketData);
-          const err = new Error("Proxy response headers too large");
-          err.code = errors3.EPROXY;
-          return tempSocketErr(err);
-        }
-      };
-      socket.on("data", onSocketData);
-    });
-    socket.setTimeout(httpProxyClient.timeout || 30 * 1000);
-    socket.on("timeout", timeoutErr);
-    socket.once("error", tempSocketErr);
-  }
-  module.exports = httpProxyClient;
 });
 
 // node_modules/smart-buffer/build/utils.js
@@ -47921,18 +47825,97 @@ var require_build = __commonJS((exports) => {
   __exportStar(require_socksclient(), exports);
 });
 
+// node_modules/imapflow/lib/connection-deadline.js
+var require_connection_deadline = __commonJS((exports, module) => {
+  var CONNECT_TIMEOUT = 90 * 1000;
+
+  class ConnectionDeadline {
+    constructor(timeout) {
+      this.timeout = Number(timeout) || CONNECT_TIMEOUT;
+      this.startedAt = Date.now();
+    }
+    remaining() {
+      return Math.max(0, this.timeout - (Date.now() - this.startedAt));
+    }
+    error() {
+      let err = new Error("Failed to establish connection in required time");
+      err.code = "CONNECT_TIMEOUT";
+      err.details = { connectionTimeout: this.timeout };
+      return err;
+    }
+    normalize(err) {
+      if (!err || err.code === "CONNECT_TIMEOUT") {
+        return err;
+      }
+      if (err.code !== "ETIMEDOUT" && !/timed out/i.test(err.message || "")) {
+        return err;
+      }
+      let normalized = this.error();
+      normalized._err = err;
+      return normalized;
+    }
+    check() {
+      if (!this.remaining()) {
+        throw this.error();
+      }
+    }
+    async race(promise2) {
+      this.check();
+      let timer = null;
+      try {
+        return await Promise.race([
+          promise2,
+          new Promise((resolve, reject) => {
+            timer = setTimeout(() => reject(this.error()), this.remaining());
+          })
+        ]);
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+  }
+  module.exports = { ConnectionDeadline, CONNECT_TIMEOUT };
+});
+
 // node_modules/imapflow/lib/proxy-connection.js
 var require_proxy_connection = __commonJS((exports, module) => {
-  var httpProxyClient = require_http_proxy_client();
   var { SocksClient } = require_build();
-  var util = __require("util");
-  var httpProxyClientAsync = util.promisify(httpProxyClient);
   var dns = __require("dns").promises;
   var net = __require("net");
-  var hidePassword = (proxyUrl) => {
-    if (proxyUrl.password) {
-      proxyUrl.password = "(hidden)";
+  var tls = __require("tls");
+  var { ConnectionDeadline } = require_connection_deadline();
+  var MAX_RESPONSE_HEADER_BYTES = 64 * 1024;
+  var DEFAULT_SOCKS_PORT = 1080;
+  var unbracketAddress = (host) => typeof host === "string" && host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
+  var formatAuthority = (host, port) => {
+    let address = unbracketAddress(host);
+    return net.isIPv6(address) ? `[${address}]:${port}` : `${address}:${port}`;
+  };
+  var redactUrl = (proxyUrl) => {
+    let redacted = new URL(proxyUrl.href);
+    if (redacted.password) {
+      redacted.password = "(hidden)";
     }
+    return redacted.href;
+  };
+  var proxyError = (message, code) => {
+    let err = new Error(message);
+    err.code = code || "ProxyError";
+    return err;
+  };
+  var decodeUserInfo = (value) => {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  };
+  var stripProxyCredentials = (err) => {
+    if (err && typeof err === "object") {
+      delete err.options;
+      delete err.input;
+    }
+    return err;
   };
   var attachEarlyErrorHandler = (logger, socket) => {
     if (!socket || typeof socket.on !== "function") {
@@ -47949,97 +47932,227 @@ var require_proxy_connection = __commonJS((exports, module) => {
       socket._earlyErrorHandler = null;
     }
   };
-  var proxyConnection = async (logger, connectionUrl, host, port) => {
-    let proxyUrl = new URL(connectionUrl);
-    let protocol = proxyUrl.protocol.replace(/:$/, "").toLowerCase();
-    if (!net.isIP(host)) {
-      let resolveResult = await dns.resolve(host);
-      if (resolveResult && resolveResult.length) {
-        host = resolveResult[0];
-      }
+  var httpConnect = async ({ logger, proxyUrl, secureProxy, proxyHost, proxyPort, host, port, deadline }) => {
+    let destinationPort = Number(port) || 0;
+    if (!destinationPort || /[\r\n]/.test(host)) {
+      throw proxyError("Invalid proxy destination", "EPROXY");
     }
-    switch (protocol) {
-      case "http":
-      case "https": {
-        try {
-          let socket = await httpProxyClientAsync(proxyUrl.href, port, host);
-          if (socket) {
-            hidePassword(proxyUrl);
-            logger.info({
-              msg: "Established a socket via HTTP proxy",
-              proxyUrl: proxyUrl.href,
-              port,
-              host
-            });
-            attachEarlyErrorHandler(logger, socket);
+    let authority = formatAuthority(host, destinationPort);
+    let remaining = deadline.remaining();
+    if (!remaining) {
+      throw deadline.error();
+    }
+    let socket = null;
+    return await new Promise((resolve, reject) => {
+      let settled = false;
+      let timer = null;
+      let headers = "";
+      const onSocketData = (chunk) => {
+        let searchFrom = Math.max(0, headers.length - 3);
+        headers += chunk.toString("binary");
+        let terminator = headers.indexOf(`\r
+\r
+`, searchFrom);
+        if (terminator < 0) {
+          if (headers.length > MAX_RESPONSE_HEADER_BYTES) {
+            fail(proxyError("Proxy response headers too large", "EPROXY"));
           }
-          return socket;
-        } catch (err) {
-          hidePassword(proxyUrl);
-          logger.error({
-            msg: "Failed to establish a socket via HTTP proxy",
-            proxyUrl: proxyUrl.href,
-            port,
-            host,
-            err
-          });
-          throw err;
+          return;
+        }
+        socket.removeListener("data", onSocketData);
+        socket.pause();
+        let headerBytes = terminator + 4;
+        let consumedFromChunk = chunk.length - (headers.length - headerBytes);
+        if (consumedFromChunk < chunk.length) {
+          socket.unshift(chunk.subarray(consumedFromChunk));
+        }
+        headers = headers.slice(0, terminator);
+        let status = headers.match(/^HTTP\/\d+\.\d+ (\d+)/i);
+        if (!status || (status[1] || "").charAt(0) !== "2") {
+          return fail(proxyError(`Invalid response from proxy${status ? `: ${status[1]}` : ""}`, "EPROXY"));
+        }
+        succeed();
+      };
+      const cleanup = () => {
+        clearTimeout(timer);
+        timer = null;
+        if (socket) {
+          socket.removeListener("connect", onConnected);
+          socket.removeListener("data", onSocketData);
+          socket.removeListener("error", fail);
+          socket.removeListener("close", onEarlyClose);
+        }
+      };
+      function fail(err) {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        if (socket) {
+          socket.destroy();
+        }
+        reject(err);
+      }
+      function succeed() {
+        settled = true;
+        cleanup();
+        resolve(socket);
+      }
+      function onEarlyClose() {
+        fail(proxyError("Proxy closed the connection before the tunnel was established", "EPROXY"));
+      }
+      timer = setTimeout(() => fail(deadline.error()), remaining);
+      let connectOptions = { host: proxyHost, port: proxyPort };
+      if (secureProxy) {
+        if (!net.isIP(proxyHost)) {
+          connectOptions.servername = proxyHost;
         }
       }
+      function onConnected() {
+        let requestHeaders = {
+          Host: authority,
+          Connection: "close"
+        };
+        if (proxyUrl.username || proxyUrl.password) {
+          let credentials = `${decodeUserInfo(proxyUrl.username)}:${decodeUserInfo(proxyUrl.password)}`;
+          requestHeaders["Proxy-Authorization"] = `Basic ${Buffer.from(credentials).toString("base64")}`;
+        }
+        socket.write(`CONNECT ${authority} HTTP/1.1\r
+` + Object.keys(requestHeaders).map((key) => `${key}: ${requestHeaders[key]}`).join(`\r
+`) + `\r
+\r
+`);
+        socket.on("data", onSocketData);
+      }
+      socket = secureProxy ? tls.connect(connectOptions, onConnected) : net.connect(connectOptions, onConnected);
+      socket.once("error", fail);
+      socket.once("close", onEarlyClose);
+    }).then((established) => {
+      logger.info({
+        msg: `Established a socket via HTTP proxy`,
+        proxyUrl: redactUrl(proxyUrl),
+        port,
+        host
+      });
+      attachEarlyErrorHandler(logger, established);
+      return established;
+    }).catch((err) => {
+      logger.error({
+        msg: "Failed to establish a socket via HTTP proxy",
+        proxyUrl: redactUrl(proxyUrl),
+        port,
+        host,
+        err
+      });
+      throw err;
+    });
+  };
+  var resolveIPv4 = async (hostname3, deadline) => {
+    let addresses = await deadline.race(dns.resolve4(hostname3));
+    if (!addresses || !addresses.length) {
+      throw proxyError(`Could not resolve an IPv4 address for ${hostname3}`, "EPROXY");
+    }
+    return addresses[0];
+  };
+  var socksConnect = async ({ logger, proxyUrl, protocol, proxyHost, proxyPort, host, port, deadline }) => {
+    let proxyType = protocol === "socks4" || protocol === "socks4a" ? 4 : 5;
+    let destinationHost = unbracketAddress(host);
+    try {
+      if (proxyType === 4) {
+        if (net.isIPv6(destinationHost)) {
+          throw proxyError(`SOCKS4 and SOCKS4a cannot address IPv6 destinations (${destinationHost})`, "UnsupportedProxyAddress");
+        }
+        if (protocol === "socks4" && !net.isIP(destinationHost)) {
+          destinationHost = await resolveIPv4(destinationHost, deadline);
+        }
+      }
+      let connectionOpts = {
+        proxy: {
+          host: proxyHost,
+          port: proxyPort,
+          type: proxyType
+        },
+        destination: {
+          host: destinationHost,
+          port
+        },
+        command: "connect",
+        set_tcp_nodelay: true
+      };
+      if (proxyUrl.username || proxyUrl.password) {
+        connectionOpts.proxy.userId = proxyUrl.username;
+        connectionOpts.proxy.password = proxyUrl.password;
+      }
+      let remaining = deadline.remaining();
+      if (!remaining) {
+        throw deadline.error();
+      }
+      connectionOpts.timeout = remaining;
+      const info = await deadline.race(SocksClient.createConnection(connectionOpts));
+      if (!info || !info.socket) {
+        throw proxyError("SOCKS proxy did not return a socket", "EPROXY");
+      }
+      logger.info({
+        msg: "Established a socket via SOCKS proxy",
+        proxyUrl: redactUrl(proxyUrl),
+        port,
+        host
+      });
+      attachEarlyErrorHandler(logger, info.socket);
+      return info.socket;
+    } catch (caught) {
+      let err = deadline.normalize(stripProxyCredentials(caught));
+      stripProxyCredentials(err._err);
+      logger.error({
+        msg: "Failed to establish a socket via SOCKS proxy",
+        proxyUrl: redactUrl(proxyUrl),
+        port,
+        host,
+        err
+      });
+      throw err;
+    }
+  };
+  var proxyConnection = async (logger, connectionUrl, host, port, options) => {
+    options = options || {};
+    let deadline = options.deadline || new ConnectionDeadline(options.connectionTimeout);
+    deadline.check();
+    let proxyUrl;
+    try {
+      proxyUrl = new URL(connectionUrl);
+    } catch (err) {
+      throw proxyError("Invalid proxy URL", err.code || "ERR_INVALID_URL");
+    }
+    let protocol = proxyUrl.protocol.replace(/:$/, "").toLowerCase();
+    let proxyHost = unbracketAddress(proxyUrl.hostname);
+    switch (protocol) {
+      case "http":
+      case "https":
+        return await httpConnect({
+          logger,
+          proxyUrl,
+          secureProxy: protocol === "https",
+          proxyHost,
+          proxyPort: Number(proxyUrl.port) || (protocol === "https" ? 443 : 80),
+          host,
+          port,
+          deadline
+        });
       case "socks":
       case "socks5":
       case "socks4":
-      case "socks4a": {
-        let proxyType = Number(protocol.replace(/\D/g, "")) || 5;
-        let targetHost = proxyUrl.hostname;
-        if (!net.isIP(targetHost)) {
-          let resolveResult = await dns.resolve(targetHost);
-          if (resolveResult && resolveResult.length) {
-            targetHost = resolveResult[0];
-          }
-        }
-        let connectionOpts = {
-          proxy: {
-            host: targetHost,
-            port: Number(proxyUrl.port) || 1080,
-            type: proxyType
-          },
-          destination: {
-            host,
-            port
-          },
-          command: "connect",
-          set_tcp_nodelay: true
-        };
-        if (proxyUrl.username || proxyUrl.password) {
-          connectionOpts.proxy.userId = proxyUrl.username;
-          connectionOpts.proxy.password = proxyUrl.password;
-        }
-        try {
-          const info = await SocksClient.createConnection(connectionOpts);
-          if (info && info.socket) {
-            hidePassword(proxyUrl);
-            logger.info({
-              msg: "Established a socket via SOCKS proxy",
-              proxyUrl: proxyUrl.href,
-              port,
-              host
-            });
-            attachEarlyErrorHandler(logger, info.socket);
-          }
-          return info.socket;
-        } catch (err) {
-          hidePassword(proxyUrl);
-          logger.error({
-            msg: "Failed to establish a socket via SOCKS proxy",
-            proxyUrl: proxyUrl.href,
-            port,
-            host,
-            err
-          });
-          throw err;
-        }
-      }
+      case "socks4a":
+        return await socksConnect({
+          logger,
+          proxyUrl,
+          protocol,
+          proxyHost,
+          proxyPort: Number(proxyUrl.port) || DEFAULT_SOCKS_PORT,
+          host,
+          port,
+          deadline
+        });
     }
   };
   module.exports = { proxyConnection, detachEarlyErrorHandler };
@@ -48325,20 +48438,31 @@ var require_charsets2 = __commonJS((exports, module) => {
 var require_jp_decoder = __commonJS((exports, module) => {
   var { Transform } = __require("stream");
   var encodingJapanese = require_src();
+  var { normalizeByteLimit } = require_limited_passthrough();
 
   class JPDecoder extends Transform {
-    constructor(charset) {
+    constructor(charset, maxBytes) {
       super();
       this.charset = charset;
       this.chunks = [];
       this.chunklen = 0;
+      this.maxBytes = normalizeByteLimit(maxBytes);
+      this.limited = false;
     }
     _transform(chunk, encoding, done) {
       if (typeof chunk === "string") {
         chunk = Buffer.from(chunk, encoding);
       }
-      this.chunks.push(chunk);
-      this.chunklen += chunk.length;
+      if (this.chunklen + chunk.length > this.maxBytes) {
+        chunk = chunk.slice(0, Math.max(0, this.maxBytes - this.chunklen));
+      }
+      if (chunk.length) {
+        this.chunks.push(chunk);
+        this.chunklen += chunk.length;
+      }
+      if (this.chunklen >= this.maxBytes) {
+        this.limited = true;
+      }
       done();
     }
     _flush(done) {
@@ -48376,14 +48500,124 @@ var require_tools2 = __commonJS((exports, module) => {
   var { JPDecoder } = require_jp_decoder();
   var iconv = require_lib();
   var FLAG_COLORS = ["red", "orange", "yellow", "green", "blue", "purple", "grey"];
+  var CONNECTION_GONE_CODES = new Set(["NoConnection", "EConnectionClosed", "StateLogout"]);
+  var EXPANDED_RANGE_LIMIT = 16777216;
+  var MAX_UINT32_DIGITS = 10;
+  var MAX_NUMBER64_DIGITS = 19;
+  var UNSAFE_OBJECT_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+  var IMAP4REV2_FOLDED_CAPABILITIES = new Set([
+    "ENABLE",
+    "ESEARCH",
+    "IDLE",
+    "LIST-EXTENDED",
+    "LIST-STATUS",
+    "LITERAL-",
+    "MOVE",
+    "NAMESPACE",
+    "SASL-IR",
+    "SEARCHRES",
+    "SPECIAL-USE",
+    "STATUS=SIZE",
+    "UIDPLUS",
+    "UNSELECT"
+  ]);
 
   class AuthenticationFailure extends Error {
     authenticationFailed = true;
   }
+  var noop2 = () => {};
+  var CONNECTION_ERROR_SITE_KEYS = ["rejectedFrom", "command", "path"];
   var tools = {
+    noop: noop2,
+    buildConnectionError(cid, code, message, meta3) {
+      const error51 = new Error(message);
+      error51.code = code;
+      error51.cid = cid;
+      if (meta3) {
+        Object.assign(error51, meta3);
+      }
+      return error51;
+    },
+    restampConnectionError(err, meta3) {
+      let error51 = tools.buildConnectionError(err.cid, err.code, err.message, err);
+      for (let key of CONNECTION_ERROR_SITE_KEYS) {
+        delete error51[key];
+      }
+      if (meta3) {
+        Object.assign(error51, meta3);
+      }
+      error51.cause = err;
+      return error51;
+    },
+    guardedPromise(executor) {
+      let promise2 = new Promise(executor);
+      promise2.catch(noop2);
+      return promise2;
+    },
+    guardedReject(error51) {
+      let promise2 = Promise.reject(error51);
+      promise2.catch(noop2);
+      return promise2;
+    },
+    unrefTimer(timer) {
+      if (timer && typeof timer.unref === "function") {
+        timer.unref();
+      }
+      return timer;
+    },
+    logConnectionError(connection, msg, err) {
+      let routine = !!err && CONNECTION_GONE_CODES.has(err.code) && !err.reason;
+      connection.log[routine ? "debug" : "warn"]({ msg, err, cid: connection.id });
+    },
+    isRev2Active(connection) {
+      return connection.enabled.has("IMAP4REV2") || connection.capabilities.has("IMAP4rev2") && !connection.capabilities.has("IMAP4rev1");
+    },
+    hasCapability(connection, capability) {
+      if (connection.capabilities.has(capability)) {
+        return true;
+      }
+      return IMAP4REV2_FOLDED_CAPABILITIES.has(capability) && tools.isRev2Active(connection);
+    },
+    buildStatusQueryAttributes(connection, statusQuery) {
+      let attributes = [];
+      Object.keys(statusQuery || {}).forEach((key) => {
+        if (!statusQuery[key]) {
+          return;
+        }
+        switch (key.toUpperCase()) {
+          case "MESSAGES":
+          case "UIDNEXT":
+          case "UIDVALIDITY":
+          case "UNSEEN":
+            attributes.push({ type: "ATOM", value: key.toUpperCase() });
+            break;
+          case "RECENT":
+            if (!tools.isRev2Active(connection)) {
+              attributes.push({ type: "ATOM", value: key.toUpperCase() });
+            }
+            break;
+          case "HIGHESTMODSEQ":
+            if (connection.capabilities.has("CONDSTORE")) {
+              attributes.push({ type: "ATOM", value: key.toUpperCase() });
+            }
+            break;
+          case "SIZE":
+            if (tools.hasCapability(connection, "STATUS=SIZE")) {
+              attributes.push({ type: "ATOM", value: key.toUpperCase() });
+            }
+            break;
+          case "DELETED":
+            if (tools.isRev2Active(connection) || connection.capabilities.has("QUOTA=RES-MESSAGE")) {
+              attributes.push({ type: "ATOM", value: key.toUpperCase() });
+            }
+            break;
+        }
+      });
+      return attributes;
+    },
     encodePath(connection, path) {
       path = (path || "").toString();
-      if (!connection.enabled.has("UTF8=ACCEPT") && /[&\x00-\x08\x0b-\x0c\x0e-\x1f\u0080-\uffff]/.test(path)) {
+      if (!connection.enabled.has("UTF8=ACCEPT") && !tools.isRev2Active(connection) && /[&\x00-\x08\x0b-\x0c\x0e-\x1f\u0080-\uffff]/.test(path)) {
         try {
           path = iconv.encode(path, "utf-7-imap").toString();
         } catch {}
@@ -48392,7 +48626,7 @@ var require_tools2 = __commonJS((exports, module) => {
     },
     decodePath(connection, path) {
       path = (path || "").toString();
-      if (!connection.enabled.has("UTF8=ACCEPT") && /[&]/.test(path)) {
+      if (!connection.enabled.has("UTF8=ACCEPT") && !tools.isRev2Active(connection) && /[&]/.test(path)) {
         try {
           path = iconv.decode(Buffer.from(path), "utf-7-imap").toString();
         } catch {}
@@ -48421,7 +48655,7 @@ var require_tools2 = __commonJS((exports, module) => {
       let map2 = new Map;
       if (list && Array.isArray(list)) {
         list.forEach((val) => {
-          if (typeof val.value !== "string") {
+          if (!val || typeof val.value !== "string") {
             return;
           }
           let capability = val.value.toUpperCase().trim();
@@ -48429,10 +48663,13 @@ var require_tools2 = __commonJS((exports, module) => {
             map2.set("IMAP4rev1", true);
             return;
           }
+          if (capability === "IMAP4REV2") {
+            map2.set("IMAP4rev2", true);
+            return;
+          }
           if (capability.startsWith("APPENDLIMIT=")) {
             let splitPos = capability.indexOf("=");
-            let appendLimit = Number(capability.substr(splitPos + 1)) || 0;
-            map2.set("APPENDLIMIT", appendLimit);
+            map2.set("APPENDLIMIT", tools.parseUintValue(capability.substr(splitPos + 1)) || 0);
             return;
           }
           map2.set(capability, true);
@@ -48448,7 +48685,11 @@ var require_tools2 = __commonJS((exports, module) => {
       if (!response) {
         return false;
       }
-      return (await compiler(response)).toString();
+      try {
+        return (await compiler(response)).toString();
+      } catch {
+        return (await compiler(response, { isLogging: true })).toString();
+      }
     },
     async enhanceCommandError(err) {
       let errorCode = tools.getStatusCode(err.response);
@@ -48485,7 +48726,7 @@ var require_tools2 = __commonJS((exports, module) => {
           existing.path = folder.path;
           existing.subscribed = !!folder.subscribed;
           existing.listed = !!folder.listed;
-          existing.status = !!folder.status;
+          existing.status = folder.status;
           if (folder.specialUse) {
             existing.specialUse = folder.specialUse;
           }
@@ -48502,7 +48743,7 @@ var require_tools2 = __commonJS((exports, module) => {
             path: folder.path,
             subscribed: !!folder.subscribed,
             listed: !!folder.listed,
-            status: !!folder.status
+            status: folder.status
           };
           if (folder.delimiter) {
             data.delimiter = folder.delimiter;
@@ -48554,7 +48795,7 @@ var require_tools2 = __commonJS((exports, module) => {
     },
     async formatMessageResponse(untagged, mailbox) {
       let map2 = {};
-      map2.seq = Number(untagged.command);
+      map2.seq = tools.parseUintValue(untagged.command, MAX_UINT32_DIGITS) || undefined;
       let key;
       let attributes = untagged.attributes && untagged.attributes[1] || [];
       for (let i = 0, len = attributes.length;i < len; i++) {
@@ -48587,29 +48828,30 @@ var require_tools2 = __commonJS((exports, module) => {
             return attribute2.value;
           }
         };
-        let getArray = (attribute2) => {
-          if (Array.isArray(attribute2)) {
-            return attribute2.map((entry) => entry && typeof entry.value === "string" ? entry.value : false).filter((entry) => entry);
-          }
-          return [];
-        };
+        let getArray = (attribute2) => tools.getStringList(attribute2);
+        let getUint = (attribute2, maxDigits) => tools.parseUintValue(getString(attribute2), maxDigits);
         switch (key) {
           case "body[]":
           case "binary[]":
             map2.source = getBuffer(attribute);
             break;
           case "uid":
-            map2.uid = Number(getString(attribute));
+            map2.uid = getUint(attribute, MAX_UINT32_DIGITS) || undefined;
             if (map2.uid && (!mailbox.uidNext || mailbox.uidNext <= map2.uid)) {
               mailbox.uidNext = map2.uid + 1;
             }
             break;
-          case "modseq":
-            map2.modseq = BigInt(getArray(attribute)[0]);
+          case "modseq": {
+            let modseq = tools.parseBigIntValue(getArray(attribute)[0]);
+            if (modseq === false) {
+              break;
+            }
+            map2.modseq = modseq;
             if (map2.modseq && (!mailbox.highestModseq || mailbox.highestModseq < map2.modseq)) {
               mailbox.highestModseq = map2.modseq;
             }
             break;
+          }
           case "emailid":
             map2.emailId = getArray(attribute)[0];
             break;
@@ -48626,7 +48868,7 @@ var require_tools2 = __commonJS((exports, module) => {
             map2.labels = new Set(getArray(attribute));
             break;
           case "rfc822.size":
-            map2.size = Number(getString(attribute)) || 0;
+            map2.size = getUint(attribute) || 0;
             break;
           case "flags":
             map2.flags = new Set(getArray(attribute));
@@ -48661,6 +48903,12 @@ var require_tools2 = __commonJS((exports, module) => {
                 map2.bodyParts = new Map;
               }
               map2.bodyParts.set(partKey, value);
+              if (match2[1].toLowerCase() === "binary") {
+                if (!map2.binaryParts) {
+                  map2.binaryParts = new Set;
+                }
+                map2.binaryParts.add(partKey);
+              }
               break;
             }
             break;
@@ -48691,6 +48939,9 @@ var require_tools2 = __commonJS((exports, module) => {
       }
       return name;
     },
+    decodeText(value) {
+      return tools.processName(libmime.decodeWords(value));
+    },
     parseEnvelope(entry) {
       let getStrValue = (obj) => {
         if (!obj) {
@@ -48706,15 +48957,17 @@ var require_tools2 = __commonJS((exports, module) => {
       };
       let processAddresses = function(list) {
         return [].concat(list || []).map((addr) => {
-          let address = (getStrValue(addr[2]) || "") + "@" + (getStrValue(addr[3]) || "");
-          if (address === "@") {
-            address = "";
+          if (!addr) {
+            return false;
           }
-          return {
-            name: tools.processName(libmime.decodeWords(getStrValue(addr[0]))),
-            address
-          };
-        }).filter((addr) => addr.name || addr.address);
+          let name = tools.decodeText(getStrValue(addr[0]));
+          let mailbox = getStrValue(addr[2]) || "";
+          let host = getStrValue(addr[3]) || "";
+          if (!host) {
+            return { name: name || mailbox && tools.decodeText(mailbox), address: "" };
+          }
+          return { name, address: `${mailbox}@${host}` };
+        }).filter((addr) => addr && (addr.name || addr.address));
       }, envelope = {};
       if (entry[0] && entry[0].value) {
         let date5 = new Date(getStrValue(entry[0]));
@@ -48758,7 +49011,9 @@ var require_tools2 = __commonJS((exports, module) => {
       let params = {};
       [].concat(arr || []).forEach((val, j) => {
         if (j % 2) {
-          params[key] = libmime.decodeWords((val && val.value || "").toString());
+          if (!tools.isUnsafeKey(key)) {
+            params[key] = libmime.decodeWords((val && val.value || "").toString());
+          }
         } else {
           key = (val && val.value || "").toString().toLowerCase();
         }
@@ -48779,6 +49034,10 @@ var require_tools2 = __commonJS((exports, module) => {
         }
         actualKey = key2.substr(0, match2.index).toLowerCase();
         nr = Number(match2[2]) || 0;
+        if (tools.isUnsafeKey(actualKey)) {
+          delete params[key2];
+          return;
+        }
         if (!params[actualKey] || typeof params[actualKey] !== "object") {
           params[actualKey] = {
             charset: false,
@@ -48960,35 +49219,80 @@ var require_tools2 = __commonJS((exports, module) => {
     canUseFlag(mailbox, flag) {
       return !mailbox || !mailbox.permanentFlags || mailbox.permanentFlags.has("\\*") || mailbox.permanentFlags.has(flag);
     },
+    isValidSequenceValue(value) {
+      return Number.isSafeInteger(value) && value > 0 && value <= 4294967295;
+    },
+    isDecimalString(value, maxDigits) {
+      return typeof value === "string" && value.length > 0 && value.length <= maxDigits && /^[0-9]+$/.test(value);
+    },
+    isUnsafeKey(key) {
+      return UNSAFE_OBJECT_KEYS.has(key);
+    },
+    getStringList(list) {
+      if (!Array.isArray(list)) {
+        return [];
+      }
+      return list.map((entry) => entry && typeof entry.value === "string" ? entry.value : false).filter((entry) => entry);
+    },
+    parseBigIntValue(value, maxDigits) {
+      if (!tools.isDecimalString(value, maxDigits || MAX_NUMBER64_DIGITS)) {
+        return false;
+      }
+      return BigInt(value);
+    },
+    parseUintValue(value, maxDigits) {
+      if (!tools.isDecimalString(value, maxDigits || MAX_NUMBER64_DIGITS)) {
+        return false;
+      }
+      let num = Number(value);
+      return Number.isSafeInteger(num) ? num : false;
+    },
     expandRange(range) {
-      return range.split(",").flatMap((entry) => {
+      let result = [];
+      if (typeof range !== "string") {
+        return result;
+      }
+      for (let entry of range.split(",")) {
+        if (result.length >= EXPANDED_RANGE_LIMIT) {
+          break;
+        }
         entry = entry.trim();
         let colon = entry.indexOf(":");
         if (colon < 0) {
-          return Number(entry) || 0;
+          let value = Number(entry);
+          if (tools.isValidSequenceValue(value)) {
+            result.push(value);
+          }
+          continue;
         }
-        let first = Number(entry.substr(0, colon)) || 0;
-        let second = Number(entry.substr(colon + 1)) || 0;
+        let first = Number(entry.substr(0, colon));
+        let second = Number(entry.substr(colon + 1));
+        if (!tools.isValidSequenceValue(first) || !tools.isValidSequenceValue(second)) {
+          continue;
+        }
         if (first === second) {
-          return first;
+          result.push(first);
+          continue;
         }
-        let list = [];
+        let remaining = EXPANDED_RANGE_LIMIT - result.length;
         if (first < second) {
-          for (let i = first;i <= second; i++) {
-            list.push(i);
+          let last = Math.min(second, first + remaining - 1);
+          for (let i = first;i <= last; i++) {
+            result.push(i);
           }
         } else {
-          for (let i = first;i >= second; i--) {
-            list.push(i);
+          let last = Math.max(second, first - remaining + 1);
+          for (let i = first;i >= last; i--) {
+            result.push(i);
           }
         }
-        return list;
-      });
+      }
+      return result;
     },
-    getDecoder(charset) {
+    getDecoder(charset, maxBytes) {
       charset = (charset || "ascii").toString().trim().toLowerCase();
       if (/^jis|^iso-?2022-?jp|^euc-?jp/.test(charset)) {
-        return new JPDecoder(charset);
+        return new JPDecoder(charset, maxBytes);
       }
       return iconv.decodeStream(charset);
     },
@@ -49019,6 +49323,8 @@ var require_tools2 = __commonJS((exports, module) => {
     }
   };
   module.exports = tools;
+  module.exports.EXPANDED_RANGE_LIMIT = EXPANDED_RANGE_LIMIT;
+  module.exports.MAX_UINT32_DIGITS = MAX_UINT32_DIGITS;
 });
 
 // node_modules/imapflow/lib/commands/id.js
@@ -49088,11 +49394,12 @@ var require_capability = __commonJS((exports, module) => {
 
 // node_modules/imapflow/lib/commands/namespace.js
 var require_namespace = __commonJS((exports, module) => {
+  var { hasCapability, getStringList } = require_tools2();
   module.exports = async (connection) => {
     if (![connection.states.AUTHENTICATED, connection.states.SELECTED].includes(connection.state)) {
       return;
     }
-    if (!connection.capabilities.has("NAMESPACE")) {
+    if (!hasCapability(connection, "NAMESPACE")) {
       let { prefix, delimiter } = await getListPrefix(connection);
       if (delimiter && prefix && prefix.charAt(prefix.length - 1) !== delimiter) {
         prefix += delimiter;
@@ -49148,7 +49455,7 @@ var require_namespace = __commonJS((exports, module) => {
             if (!untagged.attributes || !untagged.attributes.length) {
               return;
             }
-            map2.flags = new Set(untagged.attributes[0].map((entry) => entry.value));
+            map2.flags = new Set(getStringList(untagged.attributes[0]));
             map2.delimiter = untagged.attributes[1] && untagged.attributes[1].value;
             map2.prefix = untagged.attributes[2] && untagged.attributes[2].value || "";
             if (map2.delimiter && map2.prefix.charAt(0) === map2.delimiter) {
@@ -49256,346 +49563,961 @@ var require_starttls = __commonJS((exports, module) => {
   };
 });
 
+// node_modules/imapflow/lib/commands/status-fields.js
+var require_status_fields = __commonJS((exports, module) => {
+  var { parseBigIntValue, parseUintValue, MAX_UINT32_DIGITS } = require_tools2();
+  var uint322 = (value) => parseUintValue(value, MAX_UINT32_DIGITS);
+  var STATUS_FIELDS = {
+    MESSAGES: { key: "messages", parser: uint322 },
+    RECENT: { key: "recent", parser: uint322 },
+    UIDNEXT: { key: "uidNext", parser: uint322 },
+    UIDVALIDITY: { key: "uidValidity", parser: (value) => parseBigIntValue(value) },
+    UNSEEN: { key: "unseen", parser: uint322 },
+    HIGHESTMODSEQ: { key: "highestModseq", parser: (value) => parseBigIntValue(value) },
+    SIZE: { key: "size", parser: (value) => parseUintValue(value) },
+    DELETED: { key: "deleted", parser: uint322 }
+  };
+  var parseStatusList = (list, onField) => {
+    let name;
+    list.forEach((entry, i) => {
+      if (i % 2 === 0) {
+        name = entry && typeof entry.value === "string" ? entry.value : false;
+        return;
+      }
+      if (!name || !entry) {
+        return;
+      }
+      const field = STATUS_FIELDS[name.toUpperCase()];
+      if (!field) {
+        return;
+      }
+      const value = field.parser(entry.value);
+      if (value === false) {
+        return;
+      }
+      onField(field.key, value);
+    });
+  };
+  module.exports = { parseStatusList };
+});
+
 // node_modules/imapflow/lib/special-use.js
 var require_special_use = __commonJS((exports, module) => {
+  var GENERIC_TOKENS = new Set([
+    "e",
+    "mail",
+    "mails",
+    "email",
+    "emails",
+    "message",
+    "messages",
+    "item",
+    "items",
+    "folder",
+    "my",
+    "objekt",
+    "objekte",
+    "objekten",
+    "objekter",
+    "elemente",
+    "elementen",
+    "elementer",
+    "nachrichten",
+    "berichten",
+    "post",
+    "poster",
+    "viestit",
+    "kirjad",
+    "meldinger",
+    "beskeder",
+    "correo",
+    "posta",
+    "courrier",
+    "elementos",
+    "elementi",
+    "\xE9l\xE9ments",
+    "mensajes",
+    "messaggi",
+    "mensagens",
+    "itens",
+    "poczta",
+    "po\u0161ta",
+    "elementy",
+    "wiadomo\u015Bci",
+    "polo\u017Eky",
+    "spr\xE1vy",
+    "\u043F\u0438\u0441\u044C\u043C\u0430",
+    "\u043F\u0438\u0441\u044C\u043C\u043E",
+    "\u044D\u043B\u0435\u043C\u0435\u043D\u0442\u044B",
+    "\u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F",
+    "\u043F\u043E\u0448\u0442\u0430",
+    "\xF6\u011Feler",
+    "mesajlar",
+    "\u03BC\u03B7\u03BD\u03CD\u03BC\u03B1\u03C4\u03B1",
+    "\u03C3\u03C4\u03BF\u03B9\u03C7\u03B5\u03AF\u03B1"
+  ].map((token) => token.toLowerCase().normalize("NFKC")));
+  var TOKEN_SPLIT = /[\s\-_/.,()[\]]+/;
   module.exports = {
     flags: ["\\All", "\\Archive", "\\Drafts", "\\Flagged", "\\Junk", "\\Sent", "\\Trash"],
     names: {
       "\\Sent": [
         "aika",
+        "air a chur",
+        "am post cuirte",
+        "anfonwyd",
+        "bidalia",
         "bidaliak",
         "bidalita",
+        "bidalitakoak",
+        "currieru mandatu",
+        "danfonwyd",
         "dihantar",
         "e rometsweng",
         "e tindami",
-        "elk\xFCld\xF6tt",
-        "elk\xFCld\xF6ttek",
         "elementos enviados",
-        "\xE9l\xE9ments envoy\xE9s",
-        "enviadas",
+        "elk\xFCld\xF6tt",
+        "elk\xFCld\xF6tt elemek",
+        "elk\xFCld\xF6tt \xFCzenetek",
+        "elk\xFCld\xF6ttek",
         "enviadas",
         "enviados",
+        "enviat",
         "enviats",
         "envoy\xE9s",
         "ethunyelweyo",
         "expediate",
         "ezipuru",
+        "ferstjoerd",
+        "gesendet",
         "gesendete",
         "gesendete elemente",
         "gestuur",
+        "g\xF6nderilmi\u015F",
         "g\xF6nderilmi\u015F \xF6\u011Feler",
         "g\xF6nd\u0259ril\u0259nl\u0259r",
+        "hantar",
         "iberilen",
+        "inviata",
+        "inviate",
         "inviati",
+        "i\u0161si\u0173sti",
+        "i\u0161si\u0173sti lai\u0161kai",
         "i\u0161si\u0173stieji",
+        "jo`natilgan xatlar",
+        "jo\u2018natilgan",
+        "kaset",
         "kuthunyelwe",
+        "k\xFCld\xF6ttek",
         "lasa",
         "l\xE4hetetyt",
+        "mesaje trimise",
         "messages envoy\xE9s",
         "naipadala",
         "nalefa",
         "napadala",
+        "nos\u016Bt\u012Bts",
+        "nos\u016Bt\u012Bt\u0101s",
         "nos\u016Bt\u012Bt\u0101s zi\u0146as",
-        "odeslan\xE9",
         "odeslan\xE1 po\u0161ta",
+        "odeslan\xE9",
+        "odoslan\xE1",
+        "odoslan\xE1 po\u0161ta",
+        "odoslan\xE9",
         "padala",
+        "poslana po\u0161ta",
         "poslane",
-        "poslano",
         "poslano",
         "poslan\xE9",
         "poslato",
+        "posta inviata",
+        "p\xF3s\u0142ane",
+        "p\xF3s\u0142any",
         "saadetud",
         "saadetud kirjad",
         "saadetud \xFCksused",
+        "senditujo",
         "sendt",
-        "sendt",
+        "sendt post",
+        "sendte",
+        "sendte beskeder",
         "sent",
         "sent items",
         "sent messages",
+        "seolta",
+        "si\u016Bsti",
+        "skickat",
         "s\xE4nda poster",
         "s\xE4nt",
+        "s\u016Bt\u012Bt",
         "terkirim",
+        "th\u01B0 \u0111\xE3 g\u1EEDi",
         "ti fi ran\u1E63\u1EB9",
+        "titaq",
+        "tramess",
+        "trimis",
+        "trimise",
+        "ttwaznen",
+        "t\xEB d\xEBrguar",
         "t\xEB d\xEBrguara",
+        "unviaos",
+        "unvios fechos",
+        "versch\xE9ckt",
         "verzonden",
+        "verzonden berichten",
         "vilivyotumwa",
         "wys\u0142ane",
+        "\xE9l\xE9ments envoy\xE9s",
         "\u0111\xE3 g\u1EEDi",
+        "\u015Fand\xEE",
+        "\u03B1\u03C0\u03B5\u03C3\u03C4\u03B1\u03BB\u03BC\u03AD\u03BD\u03B1",
         "\u03C3\u03C4\u03B1\u03BB\u03B8\u03AD\u03BD\u03C4\u03B1",
+        "\u0430\u0434\u043F\u0440\u0430\u045E\u043B\u0435\u043D\u0430",
         "\u0436\u0438\u0431\u0435\u0440\u0438\u043B\u0433\u0435\u043D",
+        "\u0436\u0456\u0431\u0435\u0440\u0456\u043B\u0433\u0435\u043D",
+        "\u0436\u0456\u0431\u0435\u0440\u0456\u043B\u0433\u0435\u043D \u0445\u0430\u0442\u0442\u0430\u0440",
         "\u0436\u0456\u0431\u0435\u0440\u0456\u043B\u0433\u0435\u043D\u0434\u0435\u0440",
         "\u0438\u0437\u043F\u0440\u0430\u0442\u0435\u043D\u0438",
+        "\u0438\u0437\u043F\u0440\u0430\u0442\u0435\u043D\u0438 \u043F\u0438\u0441\u043C\u0430",
         "\u0438\u043B\u0433\u044D\u044D\u0441\u044D\u043D",
         "\u0438\u0440\u0441\u043E\u043B \u0448\u0443\u0434",
+        "\u0438\u0441\u043F\u0440\u0430\u0442\u0435\u043D\u0438",
         "\u0438\u0441\u043F\u0440\u0430\u0442\u0435\u043D\u043E",
         "\u043D\u0430\u0434\u0456\u0441\u043B\u0430\u043D\u0456",
         "\u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043D\u044B\u0435",
         "\u043F\u0430\u0441\u043B\u0430\u043D\u044B\u044F",
+        "\u043F\u043E\u0441\u043B\u0430\u0442\u0435",
+        "\u043F\u043E\u0441\u043B\u0430\u0442\u043E",
+        "\u043F\u0440\u0430\u0442\u0435\u043D\u0438",
         "\u044E\u0431\u043E\u0440\u0438\u043B\u0433\u0430\u043D",
+        "\u0578\u0582\u0572\u0561\u0580\u056F\u0578\u0582\u0561\u056E",
         "\u0578\u0582\u0572\u0561\u0580\u056F\u057E\u0561\u056E",
+        "\u05E0\u05E9\u05DC\u05D7",
         "\u05E0\u05E9\u05DC\u05D7\u05D5",
         "\u05E4\u05E8\u05D9\u05D8\u05D9\u05DD \u05E9\u05E0\u05E9\u05DC\u05D7\u05D5",
+        "\u0626\u06D5\u06CB\u06D5\u062A\u0649\u0644\u06AF\u06D5\u0646",
+        "\u0627\u0631\u0633\u0627\u0644 \u0634\u062F\u0647",
+        "\u0627\u0631\u0633\u0627\u0644\u06CC",
+        "\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0645\u0631\u0633\u0644",
+        "\u0627\u0644\u0645\u0631\u0633\u0644",
         "\u0627\u0644\u0645\u0631\u0633\u0644\u0629",
+        "\u0627\u0644\u0645\u064F\u0631\u0633\u064E\u0644",
+        "\u0628\u06BE\u06CC\u062C\u0627 \u06C1\u0648\u0627 \u0645\u06CC\u0644",
         "\u0628\u06BE\u06CC\u062C\u06D2 \u06AF\u0626\u06D2",
         "\u0633\u0648\u0632\u0645\u0698\u06C1",
+        "\u0644\u06D0\u0696\u0644 \u0634\u0648\u064A \u0644\u064A\u06A9\u0648\u0646\u0647",
         "\u0644\u06D0\u06AB\u0644 \u0634\u0648\u06CC",
         "\u0645\u0648\u0627\u0631\u062F \u0627\u0631\u0633\u0627\u0644 \u0634\u062F\u0647",
+        "\u0645\u064F\u0631\u0633\u064E\u0644",
+        "\u0646\u06CE\u0631\u062F\u0631\u0627\u0648",
+        "\u092A\u0920\u0908\u090F\u0915\u093E \u092E\u0947\u0932\u0939\u0930\u0941",
+        "\u092A\u093E\u0920\u0935\u0932\u0947\u0932\u0947",
         "\u092A\u093E\u0920\u0935\u093F\u0932\u0947",
         "\u092A\u093E\u0920\u0935\u093F\u0932\u0947\u0932\u0947",
         "\u092A\u094D\u0930\u0947\u0937\u093F\u0924",
         "\u092D\u0947\u091C\u093E \u0917\u092F\u093E",
+        "\u092D\u0947\u091C\u0947 \u0917\u090F",
+        "\u09AA\u09BE\u09A0\u09BE\u09A8\u09CB \u09B9\u09AF\u09BC\u09C7\u099B\u09C7",
         "\u09AA\u09CD\u09B0\u09C7\u09B0\u09BF\u09A4",
-        "\u09AA\u09CD\u09B0\u09C7\u09B0\u09BF\u09A4",
+        "\u09AA\u09CD\u09B0\u09C7\u09B0\u09BF\u09A4(\u09AA\u09BE\u09A0\u09BE\u09A8\u09CB \u09AE\u09C7\u0987\u09B2)",
         "\u09AA\u09CD\u09F0\u09C7\u09F0\u09BF\u09A4",
         "\u0A2D\u0A47\u0A1C\u0A47",
         "\u0AAE\u0ACB\u0A95\u0AB2\u0AC7\u0AB2\u0ABE",
+        "\u0AAE\u0ACB\u0A95\u0AB2\u0AC7\u0AB2\u0ACD\u0AAF\u0ABE",
         "\u0B2A\u0B20\u0B3E\u0B17\u0B32\u0B3E",
+        "\u0B85\u0BA9\u0BC1\u0BAA\u0BCD\u0BAA\u0BBF\u0BAF \u0B85\u0B9E\u0BCD\u0B9A\u0BB2\u0BCD",
         "\u0B85\u0BA9\u0BC1\u0BAA\u0BCD\u0BAA\u0BBF\u0BAF\u0BB5\u0BC8",
         "\u0C2A\u0C02\u0C2A\u0C3F\u0C02\u0C1A\u0C2C\u0C21\u0C3F\u0C02\u0C26\u0C3F",
         "\u0C95\u0CB3\u0CC1\u0CB9\u0CBF\u0CB8\u0CB2\u0CBE\u0CA6",
+        "\u0D05\u0D2F\u0D1A\u0D4D\u0D1A\u0D35",
         "\u0D05\u0D2F\u0D1A\u0D4D\u0D1A\u0D41",
         "\u0DBA\u0DD0\u0DC0\u0DD4 \u0DB4\u0DAB\u0DD2\u0DC0\u0DD4\u0DA9",
+        "\u0DBA\u0DD0\u0DC0\u0DD6",
+        "\u0E17\u0E35\u0E48\u0E2A\u0E48\u0E07\u0E41\u0E25\u0E49\u0E27",
+        "\u0E2A\u0E48\u0E07",
         "\u0E2A\u0E48\u0E07\u0E41\u0E25\u0E49\u0E27",
         "\u10D2\u10D0\u10D2\u10D6\u10D0\u10D5\u10DC\u10D8\u10DA\u10D8",
+        "\u12DD\u1270\u1208\u12A3\u12B8",
         "\u12E8\u1270\u120B\u12A9",
         "\u1794\u17B6\u1793\u200B\u1795\u17D2\u1789\u17BE",
-        "\u5BC4\u4EF6\u5099\u4EFD",
+        "\u179F\u17C6\u1794\u17BB\u178F\u17D2\u179A\u178A\u17C2\u179B\u1794\u17B6\u1793\u1794\u1789\u17D2\u1787\u17BC\u1793",
         "\u5BC4\u4EF6\u5099\u4EFD",
         "\u5DF2\u53D1\u4FE1\u606F",
-        "\u9001\u4FE1\u6E08\u307F\uFF92\uFF70\uFF99",
+        "\u5DF2\u53D1\u9001",
+        "\u5DF2\u53D1\u9001\u6D88\u606F",
+        "\u5DF2\u53D1\u9001\u90AE\u4EF6",
+        "\u9001\u4FE1\u6E08\u307F",
+        "\u9001\u4FE1\u6E08\u307F\u30A2\u30A4\u30C6\u30E0",
+        "\u9001\u4FE1\u6E08\u307F\u30C8\u30EC\u30A4",
+        "\u9001\u4FE1\u6E08\u307F\u30E1\u30FC\u30EB",
         "\uBC1C\uC2E0 \uBA54\uC2DC\uC9C0",
-        "\uBCF4\uB0B8 \uD3B8\uC9C0\uD568"
+        "\uBCF4\uB0B8 \uD3B8\uC9C0\uD568",
+        "\uBCF4\uB0C4"
       ],
       "\\Trash": [
+        "an sgudal",
         "articole \u0219terse",
+        "atkritne",
         "bin",
+        "borttaget",
         "borttagna objekt",
+        "bosca bruscair",
+        "bruscar",
+        "cestino",
+        "chanaster da palpiri",
+        "chiqitdon",
+        "corbe a papiro",
+        "corbeille",
+        "co\u0219 de gunoi",
+        "curbella",
         "deleted",
         "deleted items",
         "deleted messages",
+        "dz\u0113stie vienumi",
         "elementi eliminati",
         "elementos borrados",
         "elementos eliminados",
-        "gel\xF6schte objekte",
+        "elements suprimits",
+        "eliminata",
+        "gel\xF6scht",
         "gel\xF6schte elemente",
+        "gel\xF6schte objekte",
+        "gunoi",
+        "hedhurina",
         "item dipadam",
         "itens apagados",
+        "itens eliminados",
         "itens exclu\xEDdos",
+        "i\u0161trinti",
+        "i\u1E0Duman",
+        "jiskefet",
+        "j\xEAbirdank",
+        "kanta",
+        "kest",
+        "kosz",
+        "ko\u0161",
+        "kuka",
+        "kustutatud",
         "kustutatud \xFCksused",
+        "k\xF4\u0161",
+        "lixeira",
+        "lixo",
+        "lomt\xE1r",
+        "molwuj",
         "m\u1EE5c \u0111\xE3 x\xF3a",
-        "odstran\u011Bn\xE9 polo\u017Eky",
+        "obrisane stavke",
+        "odpadkov\xFD k\xF4\u0161",
         "odstran\u011Bn\xE1 po\u0161ta",
+        "odstran\u011Bn\xE9 polo\u017Eky",
+        "papeleira",
+        "papelera",
+        "paperera",
+        "papierkorb",
+        "papirkorg",
+        "papirkurv",
+        "papjernik",
+        "papperskorg",
+        "papperskorgen",
+        "pap\u012Brgrozs",
+        "pap\u012Brkurvis",
         "pesan terhapus",
+        "pod-lastez",
         "poistetut",
+        "poubelle",
         "praht",
+        "prullenbak",
         "pr\xFCgikast",
+        "reciclagem",
+        "roskakori",
+        "rubujo",
+        "rusl",
+        "savat",
+        "sbwriel",
+        "sgudal",
         "silinmi\u015F \xF6\u011Feler",
+        "skrell",
+        "sletta",
         "slettede beskeder",
         "slettede elementer",
+        "slettet",
+        "smeti",
+        "sme\u0107e",
+        "snippermandjie",
+        "surat terhapus",
+        "s\u0259b\u0259t",
+        "th\xF9ng r\xE1c",
+        "tong sampah",
         "trash",
-        "t\xF6r\xF6lt elemek",
         "t\xF6r\xF6lt",
+        "t\xF6r\xF6lt elemek",
+        "usuni\u0119te",
         "usuni\u0119te wiadomo\u015Bci",
         "verwijderde items",
         "vymazan\xE9 spr\xE1vy",
+        "zakarrontzia",
+        "\xE7\xF6p",
+        "\xE7\xF6p kutusu",
         "\xE9l\xE9ments supprim\xE9s",
+        "\u0161iuk\u0161liad\u0117\u017E\u0117",
+        "\u0161iuk\u0161lin\u0117",
+        "\u0161iuk\u0161li\u0173 d\u0117\u017E\u0117",
+        "\u0219terse",
+        "\u03B1\u03C0\u03BF\u03C1\u03C1\u03AF\u03BC\u03BC\u03B1\u03C4\u03B1",
+        "\u03B4\u03B9\u03B1\u03B3\u03C1\u03B1\u03BC\u03BC\u03AD\u03BD\u03B1",
+        "\u03BA\u03AC\u03B4\u03BF\u03C2 \u03B1\u03C0\u03BF\u03C1\u03C1\u03B9\u03BC\u03AC\u03C4\u03C9\u03BD",
+        "\u03BA\u03AC\u03B4\u03BF\u03C2 \u03B1\u03C0\u03BF\u03C1\u03C1\u03B9\u03BC\u03BC\u03AC\u03C4\u03C9\u03BD",
         "\u0432\u0438\u0434\u0430\u043B\u0435\u043D\u0456",
+        "\u0432\u044B\u0434\u0430\u043B\u0435\u043D\u044B\u044F",
         "\u0436\u043E\u0439\u044B\u043B\u0493\u0430\u043D\u0434\u0430\u0440",
+        "\u0438\u0437\u0431\u0440\u0438\u0448\u0430\u043D\u0438",
+        "\u0438\u0437\u0442\u0440\u0438\u0442\u0438",
+        "\u043A\u0430\u043D\u0442\u0430",
+        "\u043A\u043E\u0440\u0437\u0438\u043D\u0430",
+        "\u043A\u043E\u0440\u043F\u0430",
+        "\u043A\u043E\u0448\u0438\u043A",
+        "\u043A\u043E\u0448\u0447\u0435",
+        "\u043E\u0431\u0440\u0438\u0441\u0430\u043D\u0435 \u0441\u0442\u0430\u0432\u043A\u0435",
+        "\u0441\u0435\u0431\u0435\u0442",
+        "\u0441\u043C\u0435\u0442\u043D\u0456\u0446\u0430",
+        "\u0441\u043C\u0435\u045B\u0435",
+        "\u0441\u043C\u0456\u0442\u043D\u0438\u043A",
         "\u0443\u0434\u0430\u043B\u0435\u043D\u043D\u044B\u0435",
+        "\u0443\u0434\u0430\u043B\u0451\u043D\u043D\u044B\u0435",
+        "\u0445\u043E\u0433\u0438\u0439\u043D \u0441\u0430\u0432",
+        "\u049B\u043E\u049B\u044B\u0441 \u0448\u0435\u043B\u0435\u0433\u0456",
+        "\u0561\u0572\u0562\u0561\u0580\u056F\u0572",
+        "\u05D0\u05E9\u05E4\u05D4",
         "\u05E4\u05E8\u05D9\u05D8\u05D9\u05DD \u05E9\u05E0\u05DE\u05D7\u05E7\u05D5",
+        "\u0627\u0634\u063A\u0627\u0644 \u062F\u0627\u0646\u06CC",
         "\u0627\u0644\u0639\u0646\u0627\u0635\u0631 \u0627\u0644\u0645\u062D\u0630\u0648\u0641\u0629",
+        "\u0627\u0644\u0645\u0647\u0645\u0644\u0627\u062A",
+        "\u0631\u062F\u06CC \u06A9\u06CC \u0679\u0648\u06A9\u0631\u06CC",
+        "\u0632\u0628\u0627\u0644\u0647\u200C\u062F\u0627\u0646",
+        "\u0632\u0628\u06B5\u062F\u0627\u0646",
         "\u0645\u0648\u0627\u0631\u062F \u062D\u0630\u0641 \u0634\u062F\u0647",
+        "\u0645\u064F\u0647\u0645\u0644\u0627\u062A",
+        "\u06A9\u062B\u0627\u0641\u062A \u062F\u0627\u0646\u06CD",
+        "\u0915\u091A\u0930\u093E",
+        "\u0915\u091A\u0930\u093E \u092A\u0947\u091F\u0940",
+        "\u0930\u0926\u094D\u0926\u0940",
+        "\u0930\u0926\u094D\u0926\u0940 \u091F\u094B\u0915\u0930\u0940",
+        "\u099D\u09C1\u09A1\u09BC\u09BF",
+        "\u09A1\u09BE\u09B8\u09CD\u099F\u09AC\u09BF\u09A8",
+        "\u0A95\u0A9A\u0AB0\u0ACB",
+        "\u0B95\u0BC1\u0BAA\u0BCD\u0BAA\u0BC8",
+        "\u0D1A\u0D35\u0D31\u0D4D\u0D31\u0D41\u0D15\u0D41\u0D1F\u0D4D\u0D1F",
+        "\u0D89\u0DC0\u0DAD\u0DBD\u0DB1 \u0DB6\u0DB3\u0DD4\u0DB1",
+        "\u0E16\u0E31\u0E07\u0E02\u0E22\u0E30",
         "\u0E23\u0E32\u0E22\u0E01\u0E32\u0E23\u0E17\u0E35\u0E48\u0E25\u0E1A",
+        "\u10DC\u10D0\u10D2\u10D0\u10D5\u10D8",
+        "\u10E3\u10E0\u10DC\u10D0",
+        "\u10EC\u10D0\u10E8\u10DA\u10D8\u10DA\u10D8",
+        "\u12A5\u1295\u12F3\u1309\u1213\u134D",
+        "\u1792\u17BB\u1784\u179F\u17C6\u179A\u17B6\u1798",
+        "\u3054\u307F\u7BB1",
+        "\u30B4\u30DF\u7BB1",
+        "\u524A\u9664\u6E08\u307F\u30A2\u30A4\u30C6\u30E0",
+        "\u56DE\u6536\u7AD9",
+        "\u5783\u573E\u6876",
         "\u5DF2\u5220\u9664\u90AE\u4EF6",
         "\u5DF2\u522A\u9664\u9805\u76EE",
-        "\u5DF2\u522A\u9664\u9805\u76EE"
+        "\u5E9F\u4EF6\u7BB1",
+        "\uC9C0\uC6B4 \uD3B8\uC9C0\uD568",
+        "\uD734\uC9C0\uD1B5"
       ],
       "\\Junk": [
+        "aspam",
+        "basura",
+        "brukalas",
         "bulk mail",
+        "cajk",
+        "correo basura",
+        "correo lixo",
         "correo no deseado",
+        "correu brossa",
+        "corr\xE9u puxarra",
         "courrier ind\xE9sirable",
+        "dramha\xEDl",
+        "dramhphost",
+        "gemors",
+        "gemorspos",
+        "gereksiz",
+        "indesiderata",
+        "indesirate",
+        "ind\xE9sirables",
         "istenmeyen",
         "istenmeyen e-posta",
+        "i\u0307stenmeyen",
         "junk",
         "junk e-mail",
         "junk email",
+        "junk mail",
         "junk-e-mail",
+        "k\xE9retlen",
+        "lastez",
         "lev\xE9lszem\xE9t",
+        "lixo electr\xF3nico",
+        "lixo eletr\xF3nico",
+        "lixo eletr\xF4nico",
+        "mel remeh",
+        "mesaje nedorite",
+        "m\xF8sn",
+        "m\u0113stule",
+        "m\u0113stules",
+        "nepo\u017Eeljne",
+        "nesolicitate",
+        "net-winske",
         "nevy\u017Eiadan\xE1 po\u0161ta",
+        "nevy\u017E\xE1dan\xE1",
         "nevy\u017E\xE1dan\xE1 po\u0161ta",
+        "nev\u0113lams",
+        "neza\u017Eeleno",
+        "ne\u017Eelena po\u0161ta",
+        "ne\u017Eelena sporo\u010Dila",
+        "ne\u017Eeljena po\u0161ta",
+        "niechciane",
         "no deseado",
+        "nungiavisch\xE0",
+        "ongewenst",
+        "ongewenste e-mail",
         "posta indesiderata",
+        "posta indesirate",
         "pourriel",
+        "pourriels",
+        "puxarra",
+        "roskaa",
         "roskaposti",
+        "roskapostit",
+        "ruslp\xF3stur",
+        "r\xE4mps",
         "r\xE4mpspost",
+        "sbam",
+        "seq'",
+        "skr\xE4p",
         "skr\xE4ppost",
-        "spam",
+        "sothach",
         "spam",
         "spamowanie",
+        "spamujo",
+        "strobo\xF9",
+        "szem\xE9t",
         "s\xF8ppelpost",
         "th\u01B0 r\xE1c",
+        "truilleis",
+        "t\xEB pavlera",
+        "t\xEB pavler\xEB",
+        "u\xF8nsket",
+        "u\xF8nsket e-mail",
+        "u\xF8nsket e-post",
+        "u\xF8nsket post",
+        "u\xF8nskt",
         "wiadomo\u015Bci-\u015Bmieci",
+        "zabor-posta",
+        "zaborra",
+        "\xF6nemsiz",
+        "\u010Dapor",
+        "\u0161iuk\u0161l\u0117s",
+        "\u0161lam\u0161tas",
+        "\u03B1\u03BD\u03B5\u03C0\u03B9\u03B8\u03CD\u03BC\u03B7\u03C4\u03B1",
+        "\u03B1\u03BD\u03B5\u03C0\u03B9\u03B8\u03CD\u03BC\u03B7\u03C4\u03B7 \u03B1\u03BB\u03BB\u03B7\u03BB\u03BF\u03B3\u03C1\u03B1\u03C6\u03AF\u03B1",
+        "\u043D\u0435\u0431\u0430\u0436\u0430\u043D\u0430 \u043F\u043E\u0448\u0442\u0430",
+        "\u043D\u0435\u0436\u0435\u043B\u0430\u043D\u0430 \u043F\u043E\u0449\u0430",
+        "\u043D\u0435\u0436\u0435\u043B\u0430\u0442\u0435\u043B\u044C\u043D\u0430\u044F \u043F\u043E\u0447\u0442\u0430",
+        "\u043D\u0435\u043F\u0430\u0436\u0430\u0434\u0430\u043D\u0430\u044F \u043F\u043E\u0448\u0442\u0430",
+        "\u043D\u0435\u043F\u043E\u0436\u0435\u0459\u043D\u0430 \u043F\u043E\u0448\u0442\u0430",
+        "\u043D\u0435\u043F\u043E\u0436\u0435\u0459\u043D\u0435",
+        "\u043D\u0435\u043F\u043E\u0436\u0435\u0459\u043D\u043E",
+        "\u043D\u0435\u043F\u043E\u0441\u0430\u043A\u0443\u0432\u0430\u043D\u0430 \u043F\u043E\u0448\u0442\u0430",
         "\u0441\u043F\u0430\u043C",
+        "\u049B\u0430\u043B\u0430\u0443\u0441\u044B\u0437 \u043F\u043E\u0448\u0442\u0430",
+        "\u0561\u0576\u057A\u056B\u057F\u0561\u0576",
+        "\u0569\u0561\u0583\u0578\u0576",
+        "\u057D\u057A\u0561\u0574",
         "\u05D3\u05D5\u05D0\u05E8 \u05D6\u05D1\u05DC",
+        "\u05D6\u05D1\u05DC",
         "\u0627\u0644\u0631\u0633\u0627\u0626\u0644 \u0627\u0644\u0639\u0634\u0648\u0627\u0626\u064A\u0629",
+        "\u0627\u0644\u0631\u0633\u0627\u0626\u0644 \u063A\u064A\u0631 \u0627\u0644\u0645\u0631\u063A\u0648\u0628 \u0641\u064A\u0647\u0627",
+        "\u0628\u0646\u062C\u0644",
+        "\u0628\u06CC\u06A9\u0627\u0631\u0647",
+        "\u0628\u06CE\u06A9\u0647\u200C\u06B5\u06A9",
+        "\u062C\u0646\u06A9",
+        "\u062C\u0646\u06A9 \u0645\u06CC\u0644",
+        "\u0633\u064F\u062E\u0627\u0645",
+        "\u063A\u064A\u0631 \u0627\u0644\u0645\u0631\u063A\u0648\u0628",
         "\u0647\u0631\u0632\u0646\u0627\u0645\u0647",
+        "\u0928\u0915\u094B \u0905\u0938\u0932\u0947\u0932\u0947 \u0915\u091A\u0930\u093E \u0938\u0902\u0926\u0947\u0936",
+        "\u0938\u094D\u092A\u093E\u092E",
+        "\u0938\u094D\u092A\u0948\u092E",
+        "\u0986\u099C\u09C7\u09AC\u09BE\u099C\u09C7 \u09AE\u09C7\u0987\u09B2",
+        "\u0B8E\u0BB0\u0BBF\u0BA4\u0BAE\u0BCD",
+        "\u0D06\u0D35\u0D36\u0D4D\u0D2F\u0D2E\u0D3F\u0D32\u0D4D\u0D32\u0D3E\u0D24\u0D4D\u0D24\u0D35",
+        "\u0DC3\u0DD4\u0DB1\u0DCA\u0DB6\u0DD4\u0DB1\u0DCA",
+        "\u0E01\u0E25\u0E48\u0E2D\u0E07\u0E08\u0E14\u0E2B\u0E21\u0E32\u0E22\u0E02\u0E22\u0E30",
+        "\u0E02\u0E22\u0E30",
         "\u0E2A\u0E41\u0E1B\u0E21",
-        "\u5783\u573E\u90F5\u4EF6",
+        "\u0E2D\u0E35\u0E40\u0E21\u0E25\u0E02\u0E22\u0E30",
+        "\u10E1\u10DE\u10D0\u10DB\u10D8",
+        "\u10EF\u10D0\u10E0\u10D7\u10D8",
+        "\u12A5\u1295\u12F3\u1245\u1295\u1320\u1218\u1295\u1322",
+        "\u179F\u17C6\u1794\u17BB\u178F\u17D2\u179A\u1798\u17B7\u1793\u179B\u17D2\u17A2",
+        "\u17A5\u178F\u200B\u1794\u17B6\u1793\u200B\u1780\u17B6\u179A",
+        "\u5783\u573E",
+        "\u5783\u573E\u4FE1\u4EF6",
         "\u5783\u573E\u90AE\u4EF6",
-        "\u5783\u573E\u96FB\u90F5"
+        "\u5783\u573E\u90F5\u4EF6",
+        "\u5783\u573E\u96FB\u90F5",
+        "\u8FF7\u60D1\u30E1\u30FC\u30EB",
+        "\uC2A4\uD338",
+        "\uC2A4\uD338 \uD3B8\uC9C0\uD568",
+        "\uC815\uD06C",
+        "\uC815\uD06C \uBA54\uC77C"
       ],
       "\\Drafts": [
+        "arewway",
         "ba brouillon",
-        "borrador",
         "borrador",
         "borradores",
         "bozze",
+        "brouilhedo\xF9",
+        "brouillonen",
         "brouillons",
+        "bruttacopie",
         "b\u1EA3n th\u1EA3o",
         "ciorne",
         "concepten",
         "draf",
+        "drafftiau",
         "draft",
         "drafts",
+        "dreachdan",
+        "dr\xE9achta\xED",
         "dr\xF6g",
         "entw\xFCrfe",
         "esborranys",
+        "esbossos",
         "garalamalar",
         "ihe edeturu",
         "iidrafti",
         "izinhlaka",
         "juodra\u0161\u010Diai",
+        "jusamaj",
         "kladd",
+        "kladdar",
         "kladder",
-        "koncepty",
         "koncepty",
         "konsep",
         "konsepte",
+        "konsepten",
         "kopie robocze",
         "layih\u0259l\u0259r",
         "luonnokset",
+        "malnetujo",
         "melnraksti",
         "meralo",
+        "mesaje nefinalizate",
         "mesazhe t\xEB pad\xEBrguara",
         "mga draft",
         "mustandid",
+        "nacerjenja",
         "nacrti",
-        "nacrti",
+        "na\u0107iski",
+        "nedovr\u0161ene",
+        "nedovr\u0161eno",
+        "onvoltooid",
         "osnutki",
         "piszkozatok",
+        "qaralamalar",
+        "qoralama xatlar",
+        "qoralamalar",
         "rascunhos",
         "rasimu",
+        "re\u015Fniv\xEEs",
+        "rozepsan\xE9",
+        "sbozs",
+        "skica",
         "skice",
+        "skitsur",
+        "szkice",
+        "taslak",
         "taslaklar",
+        "th\u01B0 nh\xE1p",
         "tsararrun sa\u0199onni",
         "utkast",
+        "uzmetumi",
         "vakiraoka",
+        "versiones provisori",
         "v\xE1zlatok",
+        "wersje robocze",
         "zirriborroak",
         "\xE0w\u1ECDn \xE0k\u1ECDpam\u1ECD\u0301",
+        "\u03C0\u03C1\u03BF\u03C3\u03C7\u03AD\u03B4\u03B9\u03B1",
         "\u03C0\u03C1\u03CC\u03C7\u03B5\u03B9\u03C1\u03B1",
+        "\u0434\u0440\u0430\u0444\u0442\u043E\u0432\u0438",
+        "\u0436\u043E\u0431\u0430 \u0436\u0430\u0437\u0431\u0430\u043B\u0430\u0440",
         "\u0436\u043E\u0431\u0430\u043B\u0430\u0440",
         "\u043D\u0430\u0446\u0440\u0442\u0438",
+        "\u043D\u0435\u0434\u043E\u0432\u0440\u0448\u0435\u043D\u0435",
+        "\u043D\u0435\u0434\u043E\u0432\u0440\u0448\u0435\u043D\u043E",
+        "\u043D\u0435\u043F\u0440\u0430\u0442\u0435\u043D\u0438",
         "\u043D\u043E\u043E\u0440\u0433\u0443\u0443\u0434",
+        "\u043D\u043E\u043E\u0440\u043E\u0433",
         "\u0441\u0438\u0451\u04B3\u043D\u0430\u0432\u0438\u0441",
+        "\u0441\u043A\u0438\u0446\u0438",
         "\u0445\u043E\u043C\u0430\u043A\u0438 \u0445\u0430\u0442\u043B\u0430\u0440",
         "\u0447\u0430\u0440\u043D\u0430\u0432\u0456\u043A\u0456",
         "\u0447\u0435\u0440\u043D\u0435\u0442\u043A\u0438",
         "\u0447\u0435\u0440\u043D\u043E\u0432\u0438",
         "\u0447\u0435\u0440\u043D\u043E\u0432\u0438\u043A\u0438",
         "\u0447\u0435\u0440\u043D\u043E\u0432\u0438\u043A\u0442\u0435\u0440",
-        "\u057D\u0587\u0561\u0563\u0580\u0565\u0580",
+        "\u0448\u0438\u043C\u0430\u0439 \u049B\u0430\u0493\u0430\u0437",
+        "\u057D\u0565\u0582\u0561\u0563\u0580\u0565\u0580",
         "\u05D8\u05D9\u05D5\u05D8\u05D5\u05EA",
+        "\u0627\u0644\u0645\u0633\u0648\u062F\u0627\u062A",
+        "\u0628\u0627\u0631\u0644\u064A\u06A9",
+        "\u0642\u0648\u0644\u064A\u0627\u0632\u0645\u0649\u0644\u0627\u0631",
         "\u0645\u0633\u0648\u062F\u0627\u062A",
-        "\u0645\u0633\u0648\u062F\u0627\u062A",
+        "\u0645\u0633\u0648\u0651\u062F\u0627\u062A",
         "\u0645\u0648\u0633\u0648\u062F\u06D0",
+        "\u0646\u0627\u0645\u0647 \u0647\u0627\u06CC \u0646\u0627\u062A\u06A9\u0645\u06CC\u0644",
         "\u067E\u06CC\u0634 \u0646\u0648\u06CC\u0633\u0647\u0627",
+        "\u067E\u06CC\u0634\u200C\u0646\u0648\u06CC\u0633\u200C\u0647\u0627",
+        "\u0688\u0631\u0627\u0641\u0679",
         "\u0688\u0631\u0627\u0641\u0679/",
-        "\u0921\u094D\u0930\u093E\u095E\u094D\u091F",
+        "\u0695\u0647\u200C\u0634\u0646\u0648\u0648\u0633\u06D5\u06A9\u0627\u0646",
+        "\u0921\u094D\u0930\u093E\u092B\u093C\u091F",
+        "\u0921\u094D\u0930\u093E\u092B\u093C\u094D\u091F",
+        "\u0921\u094D\u0930\u093E\u092B\u094D\u091F",
+        "\u0921\u094D\u0930\u093E\u092B\u094D\u091F\u0939\u0930\u0942",
         "\u092A\u094D\u0930\u093E\u0930\u0942\u092A",
-        "\u0996\u09B8\u09DC\u09BE",
-        "\u0996\u09B8\u09DC\u09BE",
+        "\u092E\u0938\u0941\u0926\u093E",
+        "\u0996\u09B8\u09A1\u09BC\u09BE",
         "\u09A1\u09CD\u09F0\u09BE\u09AB\u09CD\u099F",
         "\u0A21\u0A4D\u0A30\u0A3E\u0A2B\u0A1F",
+        "\u0AA1\u0ACD\u0AB0\u0ABE\u0AAB\u0ACD\u0A9F",
         "\u0AA1\u0ACD\u0AB0\u0ABE\u0AAB\u0ACD\u0A9F\u0AB8",
         "\u0B21\u0B4D\u0B30\u0B3E\u0B2B\u0B4D\u0B1F",
         "\u0BB5\u0BB0\u0BC8\u0BB5\u0BC1\u0B95\u0BB3\u0BCD",
         "\u0C1A\u0C3F\u0C24\u0C4D\u0C24\u0C41 \u0C2A\u0C4D\u0C30\u0C24\u0C41\u0C32\u0C41",
         "\u0C95\u0CB0\u0CA1\u0CC1\u0C97\u0CB3\u0CC1",
         "\u0D15\u0D30\u0D1F\u0D41\u0D15\u0D33\u0D4D\u200D",
+        "\u0D21\u0D4D\u0D30\u0D3E\u0D2B\u0D4D\u0D31\u0D4D\u0D31\u0D41\u0D15\u0D7E",
+        "\u0D2A\u0D42\u0D30\u0D4D\u200D\u0D24\u0D4D\u0D24\u0D3F\u0D2F\u0D3E\u0D15\u0D3E\u0D24\u0D4D\u0D24\u0D35",
+        "\u0D9A\u0DA7\u0DD4 \u0DC3\u0DA7\u0DC4\u0DB1\u0DCA",
         "\u0D9A\u0DD9\u0DA7\u0DD4\u0DB8\u0DCA \u0DB4\u0DAD\u0DCA",
+        "\u0E01\u0E25\u0E48\u0E2D\u0E07\u0E08\u0E14\u0E2B\u0E21\u0E32\u0E22\u0E23\u0E48\u0E32\u0E07",
         "\u0E09\u0E1A\u0E31\u0E1A\u0E23\u0E48\u0E32\u0E07",
+        "\u0E23\u0E48\u0E32\u0E07",
+        "\u101C\u102D\u1000\u103A\u1021\u1015\u103C\u1031\u102C\u1036",
+        "\u10D3\u10E0\u10DD\u10D4\u10D1\u10D8\u10D7\u10D8",
         "\u10DB\u10DD\u10DC\u10D0\u10EE\u10D0\u10D6\u10D4\u10D1\u10D8",
+        "\u10EC\u10D8\u10DC\u10D0\u10E1\u10EC\u10D0\u10E0\u10D8",
         "\u1228\u1242\u1246\u127D",
+        "\u12C8\u1321\u1295 \u133D\u1211\u134D",
         "\u179F\u17B6\u179A\u1796\u17D2\u179A\u17B6\u1784",
+        "\u179F\u17C1\u1785\u1780\u17D2\u178A\u17B8\u200B\u1796\u17D2\u179A\u17B6\u1784\u200B",
+        "\u179F\u17C6\u1794\u17BB\u178F\u17D2\u179A\u1796\u1784\u17D2\u179A\u17C0\u1784",
         "\u4E0B\u66F8\u304D",
         "\u8349\u7A3F",
-        "\u8349\u7A3F",
-        "\u8349\u7A3F",
-        "\uC784\uC2DC \uBCF4\uAD00\uD568"
+        "\u8349\u7A3F\u5323",
+        "\u8349\u7A3F\u7BB1",
+        "\uC784\uC2DC \uBCF4\uAD00\uD568",
+        "\uCD08\uC548"
       ],
-      "\\Archive": ["archive"]
-    },
-    specialUse(hasSpecialUseExtension, folder) {
-      if (hasSpecialUseExtension) {
-        const flag2 = module.exports.flags.find((flag3) => folder.flags.has(flag3));
-        if (flag2) {
-          return { flag: flag2, source: "extension" };
-        }
-      }
-      let name = folder.name.toLowerCase().replace(/\u200e/g, "").trim();
-      const flag = Object.keys(module.exports.names).find((flag2) => module.exports.names[flag2].includes(name));
-      if (flag) {
-        return { flag, source: "name" };
-      }
-      return { flag: null };
+      "\\Archive": [
+        "an chartlann",
+        "archief",
+        "archieven",
+        "archif",
+        "archifau",
+        "archiv",
+        "archivados",
+        "archivar",
+        "archive",
+        "archives",
+        "archivi",
+        "archivio",
+        "archivo",
+        "archivos",
+        "archivova\u0165",
+        "archivs",
+        "archivu",
+        "archiv\xE1l\xE1s",
+        "archiwum",
+        "archiwy",
+        "archyvas",
+        "archyvuoti",
+        "arch\xEDv",
+        "arch\xEDvum",
+        "arch\xEDvy",
+        "argief",
+        "argiven",
+        "argyf",
+        "arhiiv",
+        "arhiv",
+        "arhiva",
+        "arhive",
+        "arhivi",
+        "arhiv\u0103",
+        "arh\u012Bvi",
+        "arh\u012Bvs",
+        "arkib",
+        "arkisto",
+        "arkiv",
+        "arkiva",
+        "arkiver",
+        "arkivo",
+        "arkivoje",
+        "arquivamento",
+        "arquivo",
+        "arquivo morto",
+        "arquivos",
+        "arsip",
+        "artxibatu",
+        "artxiboa",
+        "artxiboak",
+        "arxiu",
+        "arxiv",
+        "arxivlar",
+        "ar\u015Fiv",
+        "ar\u015Fivler",
+        "a\u1E25raz",
+        "cartlanna",
+        "diell",
+        "diello\xF9",
+        "er\u015F\xEEv",
+        "geymsla",
+        "goym \xED skjalasavni",
+        "i\u0263baren",
+        "l\u01B0u tr\u1EEF",
+        "skjalageymsla",
+        "taq yakb'\xE4l",
+        "tasg-lannan",
+        "\u03B1\u03C1\u03C7\u03B5\u03B9\u03BF\u03B8\u03AD\u03C4\u03B7\u03C3\u03B7",
+        "\u03B1\u03C1\u03C7\u03B5\u03B9\u03BF\u03B8\u03AE\u03BA\u03B7",
+        "\u0430\u0440\u0445\u0438\u0432",
+        "\u0430\u0440\u0445\u0438\u0432\u0430",
+        "\u0430\u0440\u0445\u0438\u0432\u0435",
+        "\u0430\u0440\u0445\u0438\u0432\u0438",
+        "\u0430\u0440\u0445\u0438\u0432\u0438\u0440\u0430\u0439",
+        "\u0430\u0440\u0445\u0438\u0432\u0442\u0435\u0440",
+        "\u0430\u0440\u0445\u0438\u0432\u044B",
+        "\u0430\u0440\u0445\u0456\u0432",
+        "\u0430\u0440\u0445\u0456\u0432\u0438",
+        "\u0430\u0440\u0445\u0456\u0432\u044B",
+        "\u0430\u0440\u0445\u0456\u045E",
+        "\u043C\u04B1\u0440\u0430\u0493\u0430\u0442",
+        "\u0561\u0580\u056D\u056B\u057E",
+        "\u0561\u0580\u056D\u056B\u0582\u0576\u0565\u0580",
+        "\u05D0\u05E8\u05DB\u05D9\u05D5\u05DF",
+        "\u0623\u0631\u0634\u0641\u0629",
+        "\u0623\u0631\u0634\u064A\u0641",
+        "\u0626\u0627\u0631\u062E\u0649\u067E",
+        "\u0626\u06D5\u0631\u0634\u06CC\u0641",
+        "\u0627\u0631\u0634\u06CC\u0648",
+        "\u0627\u0644\u0623\u0631\u0634\u064A\u0641",
+        "\u0628\u0627\u06CC\u06AF\u0627\u0646\u06CC",
+        "\u091C\u0924\u0928 \u0915\u0947\u0932\u0947\u0932\u093E",
+        "\u0938\u0902\u0917\u094D\u0930\u0939",
+        "\u0D36\u0D47\u0D16\u0D30\u0D02",
+        "\u0DC3\u0D82\u0DBB\u0D9A\u0DCA\u200D\u0DC2\u0DAB\u0DBA",
+        "\u0E01\u0E32\u0E23\u0E40\u0E01\u0E47\u0E1A\u0E16\u0E32\u0E27\u0E23",
+        "\u0E17\u0E35\u0E48\u0E40\u0E01\u0E47\u0E1A\u0E16\u0E32\u0E27\u0E23",
+        "\u10D0\u10E0\u10E5\u10D8\u10D5\u10D4\u10D1\u10D8",
+        "\u10D0\u10E0\u10E5\u10D8\u10D5\u10D8",
+        "\u1794\u17D0\u178E\u17D2\u178E\u179F\u17B6\u179A",
+        "\u1794\u17D0\u178E\u17D2\u178E\u179F\u17B6\u179A\u200B",
+        "\u30A2\u30FC\u30AB\u30A4\u30D6",
+        "\u5099\u5B58",
+        "\u5B58\u6863",
+        "\u5B58\u6A94",
+        "\u5C01\u5B58",
+        "\u5F52\u6863",
+        "\uBCF4\uAD00 \uD3B8\uC9C0\uD568",
+        "\uBCF4\uAD00\uD568",
+        "\uC800\uC7A5 \uD3B8\uC9C0\uD568"
+      ]
     }
+  };
+  var NAME_INDEX = new Map;
+  for (let flag of Object.keys(module.exports.names)) {
+    for (let entry of module.exports.names[flag]) {
+      NAME_INDEX.set(entry, flag);
+    }
+  }
+  function normalizeName(name) {
+    return name.toLowerCase().replace(/\u200e/g, "").trim().normalize("NFKC");
+  }
+  module.exports.specialUse = (hasSpecialUseExtension, folder) => {
+    if (hasSpecialUseExtension) {
+      const flag2 = module.exports.flags.find((flag3) => folder.flags.has(flag3));
+      if (flag2) {
+        return { flag: flag2, source: "extension" };
+      }
+    }
+    let name = normalizeName(folder.name);
+    let flag = NAME_INDEX.get(name);
+    if (flag) {
+      return { flag, source: "name" };
+    }
+    let core2 = name.split(TOKEN_SPLIT).filter((token) => token && !GENERIC_TOKENS.has(token));
+    if (core2.length === 1 && core2[0] !== name) {
+      flag = NAME_INDEX.get(core2[0]);
+      if (flag) {
+        return { flag, source: "name-guess" };
+      }
+    }
+    return { flag: null };
   };
 });
 
 // node_modules/imapflow/lib/commands/list.js
 var require_list = __commonJS((exports, module) => {
-  var { decodePath, encodePath, normalizePath } = require_tools2();
+  var {
+    decodePath,
+    encodePath,
+    normalizePath,
+    enhanceCommandError,
+    hasCapability,
+    isRev2Active,
+    buildStatusQueryAttributes,
+    getStringList
+  } = require_tools2();
+  var { parseStatusList } = require_status_fields();
   var { specialUse } = require_special_use();
   module.exports = async (connection, reference, mailbox, options) => {
     options = options || {};
     const FLAG_SORT_ORDER = ["\\Inbox", "\\Flagged", "\\Sent", "\\Drafts", "\\All", "\\Archive", "\\Junk", "\\Trash"];
-    const SOURCE_SORT_ORDER = ["user", "extension", "name"];
-    let listCommand = connection.capabilities.has("XLIST") && !connection.capabilities.has("SPECIAL-USE") ? "XLIST" : "LIST";
-    let response;
+    const SOURCE_SORT_ORDER = ["user", "extension", "name", "name-guess"];
+    const PUBLIC_SOURCE = { "name-guess": "name" };
+    const isNameSource = (source) => source === "name" || source === "name-guess";
+    let listCommand = connection.capabilities.has("XLIST") && !hasCapability(connection, "SPECIAL-USE") ? "XLIST" : "LIST";
     try {
-      let entries = [];
-      let statusMap = new Map;
-      let returnArgs = [];
-      let statusQueryAttributes = [];
-      if (options.statusQuery) {
-        Object.keys(options.statusQuery).forEach((key) => {
-          if (!options.statusQuery[key]) {
-            return;
-          }
-          switch (key.toUpperCase()) {
-            case "MESSAGES":
-            case "RECENT":
-            case "UIDNEXT":
-            case "UIDVALIDITY":
-            case "UNSEEN":
-              statusQueryAttributes.push({ type: "ATOM", value: key.toUpperCase() });
-              break;
-            case "HIGHESTMODSEQ":
-              if (connection.capabilities.has("CONDSTORE")) {
-                statusQueryAttributes.push({ type: "ATOM", value: key.toUpperCase() });
-              }
-              break;
-          }
-        });
-      }
-      if (listCommand === "LIST" && connection.capabilities.has("LIST-STATUS") && statusQueryAttributes.length) {
-        returnArgs.push({ type: "ATOM", value: "STATUS" }, statusQueryAttributes);
-        if (connection.capabilities.has("SPECIAL-USE")) {
-          returnArgs.push({ type: "ATOM", value: "SPECIAL-USE" });
+      let entries;
+      let statusMap;
+      let specialUseMatches;
+      let statusQueryAttributes = buildStatusQueryAttributes(connection, options.statusQuery);
+      let supportsExtendedList = connection.capabilities.has("LIST-EXTENDED") || connection.capabilities.has("IMAP4rev2");
+      let canRequestStatus = listCommand === "LIST" && !connection.skipListStatusArgs && hasCapability(connection, "LIST-STATUS") && !!statusQueryAttributes.length;
+      let canRequestSubscribed = listCommand === "LIST" && !options.listOnly && !connection.skipListSubscribedArg && supportsExtendedList;
+      let auxArgsAvailable = hasCapability(connection, "SPECIAL-USE") || connection.capabilities.has("CHILDREN") || supportsExtendedList;
+      let stageHasAuxArgs = (stage) => (stage.status || stage.subscribed) && stage.aux !== false && !connection.skipListAuxArgs && auxArgsAvailable;
+      let buildListArgs = (stage) => {
+        let args = [];
+        if (stage.status) {
+          args.push({ type: "ATOM", value: "STATUS" }, statusQueryAttributes);
         }
-      }
-      let specialUseMatches = {};
+        if (stageHasAuxArgs(stage)) {
+          if (hasCapability(connection, "SPECIAL-USE")) {
+            args.push({ type: "ATOM", value: "SPECIAL-USE" });
+          }
+          if (connection.capabilities.has("CHILDREN") || supportsExtendedList) {
+            args.push({ type: "ATOM", value: "CHILDREN" });
+          }
+        }
+        if (stage.subscribed) {
+          args.push({ type: "ATOM", value: "SUBSCRIBED" });
+        }
+        return args;
+      };
       let addSpecialUseMatch = (entry, type, source) => {
         if (!specialUseMatches[type]) {
           specialUseMatches[type] = [];
@@ -49606,8 +50528,12 @@ var require_list = __commonJS((exports, module) => {
         if (entry.flags.has("\\NonExistent")) {
           entry.flags.add("\\Noselect");
         }
+        if (entry.flags.has("\\Subscribed")) {
+          entry.flags.delete("\\Subscribed");
+          entry.subscribed = true;
+        }
       };
-      let specialUseHints = {};
+      let specialUseHints = Object.create(null);
       if (options.specialUseHints && typeof options.specialUseHints === "object") {
         for (let type of Object.keys(options.specialUseHints)) {
           if (["sent", "junk", "trash", "drafts", "archive"].includes(type) && options.specialUseHints[type] && typeof options.specialUseHints[type] === "string") {
@@ -49615,12 +50541,12 @@ var require_list = __commonJS((exports, module) => {
           }
         }
       }
-      let runList = async (reference2, mailbox2) => {
+      let runList = async (reference2, mailbox2, returnArgs) => {
         const cmdArgs = [encodePath(connection, reference2), encodePath(connection, mailbox2)];
         if (returnArgs.length) {
           cmdArgs.push({ type: "ATOM", value: "RETURN" }, returnArgs);
         }
-        response = await connection.exec(listCommand, cmdArgs, {
+        let response = await connection.exec(listCommand, cmdArgs, {
           untagged: {
             [listCommand]: async (untagged) => {
               if (!untagged.attributes || !untagged.attributes.length) {
@@ -49629,7 +50555,7 @@ var require_list = __commonJS((exports, module) => {
               let entry = {
                 path: normalizePath(connection, decodePath(connection, untagged.attributes[2] && untagged.attributes[2].value || "")),
                 pathAsListed: untagged.attributes[2] && untagged.attributes[2].value || "",
-                flags: new Set(untagged.attributes[0].map((entry2) => entry2.value)),
+                flags: new Set(getStringList(untagged.attributes[0])),
                 delimiter: untagged.attributes[1] && untagged.attributes[1].value,
                 listed: true
               };
@@ -49643,7 +50569,7 @@ var require_list = __commonJS((exports, module) => {
                   addSpecialUseMatch(entry, "\\Inbox", "extension");
                 }
               }
-              if (entry.path.toUpperCase() === "INBOX") {
+              if (entry.path.toUpperCase() === "INBOX" && !entry.flags.has("\\NonExistent")) {
                 addSpecialUseMatch(entry, "\\Inbox", "name");
               }
               if (entry.delimiter && entry.path.charAt(0) === entry.delimiter) {
@@ -49652,8 +50578,8 @@ var require_list = __commonJS((exports, module) => {
               entry.parentPath = entry.delimiter && entry.path ? entry.path.substr(0, entry.path.lastIndexOf(entry.delimiter)) : "";
               entry.parent = entry.delimiter ? entry.path.split(entry.delimiter) : [entry.path];
               entry.name = entry.parent.pop();
-              let { flag: specialUseFlag, source: flagSource } = specialUse(connection.capabilities.has("XLIST") || connection.capabilities.has("SPECIAL-USE"), entry);
-              if (specialUseFlag) {
+              let { flag: specialUseFlag, source: flagSource } = specialUse(connection.capabilities.has("XLIST") || hasCapability(connection, "SPECIAL-USE"), entry);
+              if (specialUseFlag && (!isNameSource(flagSource) || !entry.flags.has("\\NonExistent"))) {
                 addSpecialUseMatch(entry, specialUseFlag, flagSource);
               }
               entries.push(entry);
@@ -49664,33 +50590,9 @@ var require_list = __commonJS((exports, module) => {
               if (!statusList || !statusPath) {
                 return;
               }
-              const STATUS_FIELD_MAP = {
-                MESSAGES: { key: "messages", parser: Number },
-                RECENT: { key: "recent", parser: Number },
-                UIDNEXT: { key: "uidNext", parser: Number },
-                UIDVALIDITY: { key: "uidValidity", parser: BigInt },
-                UNSEEN: { key: "unseen", parser: Number },
-                HIGHESTMODSEQ: { key: "highestModseq", parser: BigInt }
-              };
-              let key;
               let map2 = { path: statusPath };
-              statusList.forEach((entry, i) => {
-                if (i % 2 === 0) {
-                  key = entry && typeof entry.value === "string" ? entry.value : false;
-                  return;
-                }
-                if (!key || !entry || typeof entry.value !== "string") {
-                  return;
-                }
-                const fieldConfig = STATUS_FIELD_MAP[key.toUpperCase()];
-                if (!fieldConfig) {
-                  return;
-                }
-                const value = !isNaN(entry.value) ? fieldConfig.parser(entry.value) : false;
-                if (value === false) {
-                  return;
-                }
-                map2[fieldConfig.key] = value;
+              parseStatusList(statusList, (key, value) => {
+                map2[key] = value;
               });
               statusMap.set(statusPath, map2);
             }
@@ -49699,18 +50601,94 @@ var require_list = __commonJS((exports, module) => {
         response.next();
       };
       let normalizedReference = normalizePath(connection, reference || "");
-      await runList(normalizedReference, normalizePath(connection, mailbox || "", true));
+      let normalizedMailbox = normalizePath(connection, mailbox || "", true);
+      let stages = [];
+      if (canRequestStatus && canRequestSubscribed) {
+        stages.push({ status: true, subscribed: true });
+      }
+      if (canRequestStatus) {
+        stages.push({ status: true, subscribed: false });
+      } else if (canRequestSubscribed) {
+        stages.push({ status: false, subscribed: true });
+      }
+      stages.push({ status: false, subscribed: false });
+      let isRejectedCommand = (err) => err.responseStatus === "BAD" && err.code !== "ETHROTTLE";
+      let successStage = null;
+      let subscriptionStateKnown = false;
+      let anyEntrySubscribed = () => entries.some((entry) => entry.subscribed);
+      let lastRejectedStage = null;
+      let auxRetryInserted = false;
+      for (let i = 0;i < stages.length; i++) {
+        let stage = stages[i];
+        let stageArgs = buildListArgs(stage);
+        entries = [];
+        statusMap = new Map;
+        specialUseMatches = {};
+        try {
+          await runList(normalizedReference, normalizedMailbox, stageArgs);
+          if (lastRejectedStage) {
+            if (lastRejectedStage.subscribed && !stage.subscribed) {
+              connection.skipListSubscribedArg = true;
+            }
+            if (lastRejectedStage.status && !stage.status) {
+              connection.skipListStatusArgs = true;
+            }
+            if (stageHasAuxArgs(lastRejectedStage) && stage.aux === false && lastRejectedStage.status === stage.status && lastRejectedStage.subscribed === stage.subscribed) {
+              connection.skipListAuxArgs = true;
+            }
+          }
+          successStage = stage;
+          subscriptionStateKnown = !!stage.subscribed;
+          break;
+        } catch (err) {
+          if (i === stages.length - 1 || !isRejectedCommand(err)) {
+            throw err;
+          }
+          lastRejectedStage = stage;
+          if (!auxRetryInserted && stageHasAuxArgs(stage)) {
+            stages.splice(i + 1, 0, { ...stage, aux: false });
+            auxRetryInserted = true;
+          }
+          connection.log.warn({ msg: "LIST RETURN options rejected, retrying with reduced options", err, cid: connection.id });
+        }
+      }
       if (options.listOnly) {
         return entries;
       }
       if (normalizedReference && !specialUseMatches["\\Inbox"]) {
-        await runList("", "INBOX");
+        let returnArgs = buildListArgs(successStage);
+        let entryCountBefore = entries.length;
+        let specialUseCountsBefore = {};
+        for (let type of Object.keys(specialUseMatches)) {
+          specialUseCountsBefore[type] = specialUseMatches[type].length;
+        }
+        try {
+          await runList("", "INBOX", returnArgs);
+        } catch (err) {
+          if (!returnArgs.length || !isRejectedCommand(err)) {
+            throw err;
+          }
+          entries.length = entryCountBefore;
+          for (let type of Object.keys(specialUseMatches)) {
+            if (!(type in specialUseCountsBefore)) {
+              delete specialUseMatches[type];
+            } else {
+              specialUseMatches[type].length = specialUseCountsBefore[type];
+            }
+          }
+          connection.log.warn({ msg: "INBOX LIST with RETURN options failed, retrying plain", err, cid: connection.id });
+          await runList("", "INBOX", []);
+        }
       }
       if (options.statusQuery) {
+        let syntheticRecent = options.statusQuery.recent && isRev2Active(connection);
         for (let entry of entries) {
           if (!entry.flags.has("\\Noselect") && !entry.flags.has("\\NonExistent")) {
             if (statusMap.has(entry.path)) {
               entry.status = statusMap.get(entry.path);
+              if (syntheticRecent) {
+                entry.status.recent = 0;
+              }
             } else if (!statusMap.size) {
               try {
                 entry.status = await connection.run("STATUS", entry.path, options.statusQuery);
@@ -49721,38 +50699,57 @@ var require_list = __commonJS((exports, module) => {
           }
         }
       }
-      response = await connection.exec("LSUB", [encodePath(connection, normalizePath(connection, reference || "")), encodePath(connection, normalizePath(connection, mailbox || "", true))], {
-        untagged: {
-          LSUB: async (untagged) => {
-            if (!untagged.attributes || !untagged.attributes.length) {
-              return;
-            }
-            let entry = {
-              path: normalizePath(connection, decodePath(connection, untagged.attributes[2] && untagged.attributes[2].value || "")),
-              pathAsListed: untagged.attributes[2] && untagged.attributes[2].value || "",
-              flags: new Set(untagged.attributes[0].map((entry2) => entry2.value)),
-              delimiter: untagged.attributes[1] && untagged.attributes[1].value,
-              subscribed: true
-            };
-            if (entry.path.toUpperCase() === "INBOX") {
-              addSpecialUseMatch(entry, "\\Inbox", "name");
-            }
-            if (entry.delimiter && entry.path.charAt(0) === entry.delimiter) {
-              entry.path = entry.path.slice(1);
-            }
-            entry.parentPath = entry.delimiter && entry.path ? entry.path.substr(0, entry.path.lastIndexOf(entry.delimiter)) : "";
-            entry.parent = entry.delimiter ? entry.path.split(entry.delimiter) : [entry.path];
-            entry.name = entry.parent.pop();
-            let existing = entries.find((existing2) => existing2.path === entry.path);
-            if (existing) {
-              existing.subscribed = true;
-              entry.flags.forEach((flag) => existing.flags.add(flag));
-              normalizeFlags(existing);
+      let runLsub = async () => {
+        let response = await connection.exec("LSUB", [encodePath(connection, normalizedReference), encodePath(connection, normalizedMailbox)], {
+          untagged: {
+            LSUB: async (untagged) => {
+              if (!untagged.attributes || !untagged.attributes.length) {
+                return;
+              }
+              let entry = {
+                path: normalizePath(connection, decodePath(connection, untagged.attributes[2] && untagged.attributes[2].value || "")),
+                pathAsListed: untagged.attributes[2] && untagged.attributes[2].value || "",
+                flags: new Set(getStringList(untagged.attributes[0])),
+                delimiter: untagged.attributes[1] && untagged.attributes[1].value,
+                subscribed: true
+              };
+              if (entry.path.toUpperCase() === "INBOX") {
+                addSpecialUseMatch(entry, "\\Inbox", "name");
+              }
+              if (entry.delimiter && entry.path.charAt(0) === entry.delimiter) {
+                entry.path = entry.path.slice(1);
+              }
+              entry.parentPath = entry.delimiter && entry.path ? entry.path.substr(0, entry.path.lastIndexOf(entry.delimiter)) : "";
+              entry.parent = entry.delimiter ? entry.path.split(entry.delimiter) : [entry.path];
+              entry.name = entry.parent.pop();
+              let existing = entries.find((existing2) => existing2.path === entry.path);
+              if (existing) {
+                existing.subscribed = true;
+                entry.flags.forEach((flag) => existing.flags.add(flag));
+                normalizeFlags(existing);
+              }
             }
           }
+        });
+        response.next();
+      };
+      let needsLsub = !isRev2Active(connection) && (!successStage.subscribed || !anyEntrySubscribed());
+      if (needsLsub) {
+        subscriptionStateKnown = false;
+      }
+      if (needsLsub && !connection.skipLsub) {
+        try {
+          await runLsub();
+          subscriptionStateKnown = true;
+        } catch (err) {
+          if (isRejectedCommand(err)) {
+            connection.skipLsub = true;
+          } else if (err.responseStatus !== "NO" || err.code === "ETHROTTLE") {
+            throw err;
+          }
+          connection.log.warn({ msg: "Failed to request subscription info", err, cid: connection.id });
         }
-      });
-      response.next();
+      }
       for (let type of Object.keys(specialUseMatches)) {
         let sortedEntries = specialUseMatches[type].sort((a, b) => {
           let aSource = SOURCE_SORT_ORDER.indexOf(a.source);
@@ -49763,8 +50760,16 @@ var require_list = __commonJS((exports, module) => {
           return aSource - bSource;
         });
         if (!sortedEntries[0].entry.specialUse) {
+          let source = sortedEntries[0].source;
           sortedEntries[0].entry.specialUse = type;
-          sortedEntries[0].entry.specialUseSource = sortedEntries[0].source;
+          sortedEntries[0].entry.specialUseSource = PUBLIC_SOURCE[source] || source;
+        }
+      }
+      if (!subscriptionStateKnown && !anyEntrySubscribed()) {
+        for (let entry of entries) {
+          if (!entry.flags.has("\\NonExistent")) {
+            entry.subscribed = true;
+          }
         }
       }
       let inboxEntry = entries.find((entry) => entry.specialUse === "\\Inbox");
@@ -49793,6 +50798,7 @@ var require_list = __commonJS((exports, module) => {
         return a.path.localeCompare(b.path);
       });
     } catch (err) {
+      await enhanceCommandError(err);
       connection.log.warn({ msg: "Failed to list folders", err, cid: connection.id });
       throw err;
     }
@@ -49801,11 +50807,13 @@ var require_list = __commonJS((exports, module) => {
 
 // node_modules/imapflow/lib/commands/enable.js
 var require_enable = __commonJS((exports, module) => {
+  var { hasCapability } = require_tools2();
   module.exports = async (connection, extensionList) => {
-    if (!connection.capabilities.has("ENABLE") || connection.state !== connection.states.AUTHENTICATED) {
+    if (!hasCapability(connection, "ENABLE") || connection.state !== connection.states.AUTHENTICATED) {
       return;
     }
-    extensionList = extensionList.filter((extension) => connection.capabilities.has(extension.toUpperCase()));
+    let advertised = new Set([...connection.capabilities.keys()].map((capability) => capability.toUpperCase()));
+    extensionList = extensionList.filter((extension) => advertised.has(extension.toUpperCase()));
     if (!extensionList.length) {
       return;
     }
@@ -49826,9 +50834,9 @@ var require_enable = __commonJS((exports, module) => {
           }
         }
       });
-      connection.enabled = enabled;
+      connection.enabled = new Set([...connection.enabled, ...enabled]);
       response.next();
-      return enabled;
+      return connection.enabled;
     } catch (err) {
       connection.log.warn({ err, cid: connection.id });
       return false;
@@ -49838,7 +50846,19 @@ var require_enable = __commonJS((exports, module) => {
 
 // node_modules/imapflow/lib/commands/select.js
 var require_select = __commonJS((exports, module) => {
-  var { encodePath, normalizePath, enhanceCommandError } = require_tools2();
+  var { encodePath, normalizePath, enhanceCommandError, parseBigIntValue, parseUintValue, getStringList, MAX_UINT32_DIGITS } = require_tools2();
+  var VALUED_RESPONSE_CODES = Object.assign(Object.create(null), {
+    highestmodseq: { key: "highestModseq", parse: (value) => parseBigIntValue(value) },
+    uidvalidity: { key: "uidValidity", parse: (value) => parseBigIntValue(value) },
+    uidnext: { key: "uidNext", parse: (value) => parseUintValue(value, MAX_UINT32_DIGITS) },
+    unseen: { key: "unseen", parse: (value) => parseUintValue(value, MAX_UINT32_DIGITS) },
+    appendlimit: { key: "appendlimit", parse: (value) => parseUintValue(value) },
+    mailboxid: {
+      key: "mailboxId",
+      parse: (value) => Array.isArray(value) ? value.length > 0 && value[0] : typeof value === "string" && value
+    },
+    permanentflags: { key: "permanentFlags", parse: (value) => Array.isArray(value) && new Set(value) }
+  });
   module.exports = async (connection, path, options) => {
     if (![connection.states.AUTHENTICATED, connection.states.SELECTED].includes(connection.state)) {
       return;
@@ -49888,64 +50908,35 @@ var require_select = __commonJS((exports, module) => {
               return;
             }
             let section2 = !untagged.attributes[0].value && untagged.attributes[0].section;
-            if (section2 && section2.length > 1 && section2[0].type === "ATOM" && typeof section2[0].value === "string") {
+            if (section2 && section2.length > 1 && section2[0] && section2[0].type === "ATOM" && typeof section2[0].value === "string") {
               let key = section2[0].value.toLowerCase();
               let value;
-              if (typeof section2[1].value === "string") {
+              if (section2[1] && typeof section2[1].value === "string") {
                 value = section2[1].value;
               } else if (Array.isArray(section2[1])) {
-                value = section2[1].map((entry) => typeof entry.value === "string" ? entry.value : false).filter((entry) => entry);
+                value = getStringList(section2[1]);
               }
-              switch (key) {
-                case "highestmodseq":
-                  key = "highestModseq";
-                  if (/^[0-9]+$/.test(value)) {
-                    value = BigInt(value);
-                  }
-                  break;
-                case "mailboxid":
-                  key = "mailboxId";
-                  if (Array.isArray(value) && value.length) {
-                    value = value[0];
-                  }
-                  break;
-                case "permanentflags":
-                  key = "permanentFlags";
-                  value = new Set(value);
-                  break;
-                case "uidnext":
-                  key = "uidNext";
-                  value = Number(value);
-                  break;
-                case "uidvalidity":
-                  key = "uidValidity";
-                  if (/^[0-9]+$/.test(value)) {
-                    value = BigInt(value);
-                  }
-                  break;
+              let field = VALUED_RESPONSE_CODES[key];
+              if (field) {
+                let parsed = field.parse(value);
+                if (parsed !== false) {
+                  map2[field.key] = parsed;
+                }
               }
-              map2[key] = value;
             }
-            if (section2 && section2.length === 1 && section2[0].type === "ATOM" && typeof section2[0].value === "string") {
-              let key = section2[0].value.toLowerCase();
-              switch (key) {
-                case "nomodseq":
-                  key = "noModseq";
-                  map2[key] = true;
-                  break;
-              }
+            if (section2 && section2.length === 1 && section2[0] && section2[0].type === "ATOM" && section2[0].value?.toUpperCase() === "NOMODSEQ") {
+              map2.noModseq = true;
             }
           },
           FLAGS: async (untagged) => {
             if (!untagged.attributes || !untagged.attributes.length || !Array.isArray(untagged.attributes[0])) {
               return;
             }
-            let flags = untagged.attributes[0].map((flag) => typeof flag.value === "string" ? flag.value : false).filter((flag) => flag);
-            map2.flags = new Set(flags);
+            map2.flags = new Set(getStringList(untagged.attributes[0]));
           },
           EXISTS: async (untagged) => {
-            let num = Number(untagged.command);
-            if (isNaN(num)) {
+            let num = parseUintValue(untagged.command, MAX_UINT32_DIGITS);
+            if (num === false) {
               return false;
             }
             map2.exists = num;
@@ -49958,8 +50949,9 @@ var require_select = __commonJS((exports, module) => {
           }
         }
       });
-      let section = !response.response.attributes[0].value && response.response.attributes[0].section;
-      if (section && section.length && section[0].type === "ATOM" && typeof section[0].value === "string") {
+      let okAttributes = response.response && response.response.attributes || [];
+      let section = okAttributes[0] && !okAttributes[0].value && okAttributes[0].section;
+      if (section && section.length && section[0] && section[0].type === "ATOM" && typeof section[0].value === "string") {
         map2.readOnly = section[0].value.toUpperCase() === "READ-ONLY";
       }
       if (map2.qresync && (options.uidValidity !== map2.uidValidity || !map2.highestModseq || map2.noModseq)) {
@@ -49997,14 +50989,15 @@ var require_select = __commonJS((exports, module) => {
 
 // node_modules/imapflow/lib/commands/fetch.js
 var require_fetch = __commonJS((exports, module) => {
-  var { formatMessageResponse } = require_tools2();
+  var { formatMessageResponse, isRev2Active } = require_tools2();
   module.exports = async (connection, range, query, options) => {
     if (connection.state !== connection.states.SELECTED || !range) {
       return;
     }
     options = options || {};
     let mailbox = connection.mailbox;
-    const commandKey = connection.capabilities.has("BINARY") && options.binary && !connection.disableBinary ? "BINARY" : "BODY";
+    const canUseBinary = connection.capabilities.has("BINARY") || isRev2Active(connection);
+    const commandKey = canUseBinary && options.binary && !connection.disableBinary ? "BINARY" : "BODY";
     let retryCount = 0;
     const maxRetries = 4;
     const baseDelay = 1000;
@@ -50018,19 +51011,14 @@ var require_fetch = __commonJS((exports, module) => {
         let attributes = [{ type: "SEQUENCE", value: (range || "*").toString() }];
         let queryStructure = [];
         let setBodyPeek = (attributes2, partial2) => {
+          let section = [].concat(attributes2 || []);
+          let binaryAddressable = !section.length || section.length === 1 && typeof section[0].value === "string" && /^\d+(\.\d+)*$/.test(section[0].value);
           let bodyPeek = {
             type: "ATOM",
-            value: `${commandKey}.PEEK`,
-            section: [],
+            value: `${binaryAddressable ? commandKey : "BODY"}.PEEK`,
+            section,
             partial: partial2
           };
-          if (Array.isArray(attributes2)) {
-            attributes2.forEach((attribute) => {
-              bodyPeek.section.push(attribute);
-            });
-          } else if (attributes2) {
-            bodyPeek.section.push(attributes2);
-          }
           queryStructure.push(bodyPeek);
         };
         ["all", "fast", "full", "uid", "flags", "bodyStructure", "envelope", "internalDate"].forEach((key) => {
@@ -50049,7 +51037,7 @@ var require_fetch = __commonJS((exports, module) => {
               partial2.push(Number(query.source.maxLength));
             }
           }
-          queryStructure.push({ type: "ATOM", value: `${commandKey}.PEEK`, section: [], partial: partial2 });
+          setBodyPeek(null, partial2);
         }
         if (connection.capabilities.has("OBJECTID")) {
           queryStructure.push({ type: "ATOM", value: "EMAILID" });
@@ -50166,7 +51154,10 @@ var require_fetch = __commonJS((exports, module) => {
             retryCount,
             delayMs: delay
           });
-          await new Promise((resolve) => setTimeout(resolve, delay));
+          let aborted2 = await connection.throttleWait(delay);
+          if (aborted2) {
+            throw connection.createNoConnectionError(connection.byeReason, { rejectedFrom: "throttleAbort", command: "FETCH" });
+          }
           retryCount++;
           continue;
         }
@@ -50422,7 +51413,7 @@ var require_store = __commonJS((exports, module) => {
 
 // node_modules/imapflow/lib/search-compiler.js
 var require_search_compiler = __commonJS((exports, module) => {
-  var { formatDate, formatFlag, canUseFlag, isDate: isDate2 } = require_tools2();
+  var { formatDate, formatFlag, canUseFlag, toValidDate, isRev2Active } = require_tools2();
   var setBoolOpt = (attributes, term, value) => {
     if (!value) {
       if (/^un/i.test(term)) {
@@ -50433,20 +51424,24 @@ var require_search_compiler = __commonJS((exports, module) => {
     }
     attributes.push({ type: "ATOM", value: term.toUpperCase() });
   };
-  var setOpt = (attributes, term, value, type) => {
-    type = type || "ATOM";
+  var toSequenceValue = (value) => [].concat(value).join(",");
+  var setOpt = (attributes, term, value) => {
     if (value === false || value === null) {
-      attributes.push({ type, value: "NOT" });
+      attributes.push({ type: "ATOM", value: "NOT" });
     }
-    attributes.push({ type, value: term.toUpperCase() });
+    attributes.push({ type: "ATOM", value: term.toUpperCase() });
     if (Array.isArray(value)) {
-      value.forEach((entry) => attributes.push({ type, value: (entry || "").toString() }));
+      value.forEach((entry) => attributes.push({ type: "ATOM", value: (entry || "").toString() }));
     } else {
-      attributes.push({ type, value: value.toString() });
+      attributes.push({ type: "ATOM", value: value.toString() });
     }
   };
   var processDateField = (attributes, term, value) => {
-    if (["BEFORE", "SENTBEFORE"].includes(term.toUpperCase()) && isDate2(value) && value.toISOString().substring(11) !== "00:00:00.000Z") {
+    value = toValidDate(value);
+    if (!value) {
+      return;
+    }
+    if (["BEFORE", "SENTBEFORE"].includes(term.toUpperCase()) && value.toISOString().substring(11) !== "00:00:00.000Z") {
       value = new Date(value.getTime() + 24 * 3600 * 1000);
     }
     let date5 = formatDate(value);
@@ -50477,11 +51472,8 @@ var require_search_compiler = __commonJS((exports, module) => {
         switch (term.toUpperCase()) {
           case "SEQ":
             {
-              let value = params[term];
-              if (typeof value === "number") {
-                value = value.toString();
-              }
-              if (typeof value === "string" && /^\S+$/.test(value)) {
+              let value = params[term] || params[term] === 0 ? toSequenceValue(params[term]) : "";
+              if (value) {
                 attributes.push({ type: "SEQUENCE", value });
               }
             }
@@ -50499,10 +51491,19 @@ var require_search_compiler = __commonJS((exports, module) => {
             setBoolOpt(attributes, term, !!params[term]);
             break;
           case "ALL":
+            if (params[term]) {
+              setBoolOpt(attributes, term, true);
+            }
+            break;
           case "NEW":
           case "OLD":
           case "RECENT":
             if (params[term]) {
+              if (isRev2Active(connection)) {
+                let error51 = new Error(`The "${term.toLowerCase()}" search key does not exist in IMAP4rev2`);
+                error51.code = "MissingServerExtension";
+                throw error51;
+              }
               setBoolOpt(attributes, term, true);
             }
             break;
@@ -50529,7 +51530,8 @@ var require_search_compiler = __commonJS((exports, module) => {
             break;
           case "UID":
             if (params[term]) {
-              setOpt(attributes, term, params[term], "SEQUENCE");
+              attributes.push({ type: "ATOM", value: "UID" });
+              attributes.push({ type: "SEQUENCE", value: toSequenceValue(params[term]) });
             }
             break;
           case "EMAILID":
@@ -50597,14 +51599,18 @@ var require_search_compiler = __commonJS((exports, module) => {
           case "BEFORE":
           case "SINCE":
             {
-              if (connection.capabilities.has("WITHIN") && isDate2(params[term])) {
+              let value = toValidDate(params[term]);
+              if (!value) {
+                break;
+              }
+              if (connection.capabilities.has("WITHIN")) {
                 const now = Date.now();
-                const withinSeconds = Math.round(Math.max(0, now - params[term].getTime()) / 1000);
+                const withinSeconds = Math.round(Math.max(0, now - value.getTime()) / 1000);
                 const withinKeyword = term.toUpperCase() === "BEFORE" ? "OLDER" : "YOUNGER";
                 setOpt(attributes, withinKeyword, withinSeconds.toString());
                 break;
               }
-              processDateField(attributes, term, params[term]);
+              processDateField(attributes, term, value);
             }
             break;
           case "ON":
@@ -50719,8 +51725,24 @@ var require_search_compiler = __commonJS((exports, module) => {
 
 // node_modules/imapflow/lib/commands/search.js
 var require_search = __commonJS((exports, module) => {
-  var { enhanceCommandError } = require_tools2();
+  var {
+    enhanceCommandError,
+    hasCapability,
+    isValidSequenceValue,
+    parseBigIntValue,
+    parseUintValue,
+    MAX_UINT32_DIGITS,
+    EXPANDED_RANGE_LIMIT
+  } = require_tools2();
   var { searchCompiler } = require_search_compiler();
+  var stripEsearchPrefix = (attrs) => {
+    let start = 0;
+    if (attrs[start] && Array.isArray(attrs[start]))
+      start++;
+    if (attrs[start] && typeof attrs[start].value === "string" && attrs[start].value.toUpperCase() === "UID")
+      start++;
+    return attrs.slice(start);
+  };
   function parseEsearchResponse(attrs) {
     const result = {};
     let i = 0;
@@ -50737,21 +51759,27 @@ var require_search = __commonJS((exports, module) => {
       }
       switch (key) {
         case "COUNT": {
-          const n = Number(attrs[++i]?.value);
-          if (!isNaN(n))
+          const n = parseUintValue(attrs[++i]?.value, MAX_UINT32_DIGITS);
+          if (n !== false)
             result.count = n;
           break;
         }
         case "MIN": {
-          const n = Number(attrs[++i]?.value);
-          if (!isNaN(n))
+          const n = parseUintValue(attrs[++i]?.value, MAX_UINT32_DIGITS);
+          if (n !== false)
             result.min = n;
           break;
         }
         case "MAX": {
-          const n = Number(attrs[++i]?.value);
-          if (!isNaN(n))
+          const n = parseUintValue(attrs[++i]?.value, MAX_UINT32_DIGITS);
+          if (n !== false)
             result.max = n;
+          break;
+        }
+        case "MODSEQ": {
+          const modseq = parseBigIntValue(attrs[++i]?.value);
+          if (modseq !== false)
+            result.modseq = modseq;
           break;
         }
         case "ALL": {
@@ -50763,7 +51791,7 @@ var require_search = __commonJS((exports, module) => {
         }
         case "PARTIAL": {
           const listToken = attrs[++i];
-          const items = Array.isArray(listToken) ? listToken : listToken && Array.isArray(listToken.attributes) ? listToken.attributes : null;
+          const items = Array.isArray(listToken) ? listToken : null;
           if (!items || items.length < 2)
             break;
           result.partial = {
@@ -50793,7 +51821,7 @@ var require_search = __commonJS((exports, module) => {
     } else {
       return false;
     }
-    const useEsearch = options.returnOptions && options.returnOptions.length > 0 && connection.capabilities.has("ESEARCH");
+    const useEsearch = options.returnOptions && options.returnOptions.length > 0 && hasCapability(connection, "ESEARCH");
     if (useEsearch) {
       const returnItems = [];
       for (const opt of options.returnOptions) {
@@ -50814,13 +51842,7 @@ var require_search = __commonJS((exports, module) => {
               ESEARCH: async (untagged) => {
                 if (!untagged || !untagged.attributes)
                   return;
-                let attrs = untagged.attributes;
-                let start = 0;
-                if (attrs[start] && (Array.isArray(attrs[start]) || attrs[start].type === "LIST"))
-                  start++;
-                if (attrs[start] && typeof attrs[start].value === "string" && attrs[start].value.toUpperCase() === "UID")
-                  start++;
-                esearchResult = parseEsearchResponse(attrs.slice(start));
+                esearchResult = parseEsearchResponse(stripEsearchPrefix(untagged.attributes));
               }
             }
           });
@@ -50840,11 +51862,80 @@ var require_search = __commonJS((exports, module) => {
         untagged: {
           SEARCH: async (untagged) => {
             if (untagged && untagged.attributes && untagged.attributes.length) {
-              untagged.attributes.forEach((attribute) => {
-                if (attribute && attribute.value && typeof attribute.value === "string" && !isNaN(attribute.value)) {
-                  results.add(Number(attribute.value));
+              let truncated = false;
+              let discarded = false;
+              for (let attribute of untagged.attributes) {
+                if (results.size >= EXPANDED_RANGE_LIMIT) {
+                  truncated = true;
+                  break;
                 }
-              });
+                let value = attribute && typeof attribute.value === "string" ? Number(attribute.value) : NaN;
+                if (!isValidSequenceValue(value)) {
+                  discarded = true;
+                  continue;
+                }
+                results.add(value);
+              }
+              if (truncated || discarded) {
+                connection.log.warn({
+                  msg: "Invalid entries in the SEARCH result",
+                  truncated,
+                  discarded,
+                  cid: connection.id
+                });
+              }
+            }
+          },
+          ESEARCH: async (untagged) => {
+            if (!untagged || !untagged.attributes) {
+              return;
+            }
+            let parsed = parseEsearchResponse(stripEsearchPrefix(untagged.attributes));
+            if (parsed.all) {
+              let existsCount = () => connection.mailbox && connection.mailbox.exists || 0;
+              let overBudget = () => results.size >= existsCount() || results.size >= EXPANDED_RANGE_LIMIT;
+              let resolveId = (part) => part === "*" ? options.uid ? 0 : existsCount() : Number(part);
+              let truncated = false;
+              let discarded = false;
+              sequenceSetLoop:
+                for (let part of parsed.all.split(",")) {
+                  part = part.trim();
+                  let colon = part.indexOf(":");
+                  if (colon < 0) {
+                    let value = resolveId(part);
+                    if (!isValidSequenceValue(value)) {
+                      discarded = true;
+                      continue;
+                    }
+                    if (overBudget()) {
+                      truncated = true;
+                      break;
+                    }
+                    results.add(value);
+                    continue;
+                  }
+                  let first = resolveId(part.substr(0, colon));
+                  let second = resolveId(part.substr(colon + 1));
+                  if (!isValidSequenceValue(first) || !isValidSequenceValue(second)) {
+                    discarded = true;
+                    continue;
+                  }
+                  for (let id = Math.min(first, second);id <= Math.max(first, second); id++) {
+                    if (overBudget()) {
+                      truncated = true;
+                      break sequenceSetLoop;
+                    }
+                    results.add(id);
+                  }
+                }
+              if (truncated || discarded) {
+                connection.log.warn({
+                  msg: "Invalid entries in the ESEARCH ALL result",
+                  truncated,
+                  discarded,
+                  cid: connection.id
+                });
+              }
             }
           }
         }
@@ -50876,14 +51967,14 @@ var require_noop = __commonJS((exports, module) => {
 
 // node_modules/imapflow/lib/commands/expunge.js
 var require_expunge = __commonJS((exports, module) => {
-  var { enhanceCommandError } = require_tools2();
+  var { enhanceCommandError, hasCapability, parseBigIntValue } = require_tools2();
   module.exports = async (connection, range, options) => {
     if (connection.state !== connection.states.SELECTED || !range) {
       return;
     }
     options = options || {};
     await connection.messageFlagsAdd(range, ["\\Deleted"], options);
-    let byUid = options.uid && connection.capabilities.has("UIDPLUS");
+    let byUid = options.uid && hasCapability(connection, "UIDPLUS");
     let command = byUid ? "UID EXPUNGE" : "EXPUNGE";
     let attributes = byUid ? [{ type: "SEQUENCE", value: range }] : false;
     let response;
@@ -50892,7 +51983,7 @@ var require_expunge = __commonJS((exports, module) => {
       let section = response.response.attributes && response.response.attributes[0] && response.response.attributes[0].section;
       let responseCode = section && section.length && section[0] && typeof section[0].value === "string" ? section[0].value : "";
       if (responseCode.toUpperCase() === "HIGHESTMODSEQ") {
-        let highestModseq = section[1] && typeof section[1].value === "string" && !isNaN(section[1].value) ? BigInt(section[1].value) : false;
+        let highestModseq = parseBigIntValue(section[1] && section[1].value);
         if (highestModseq && (!connection.mailbox.highestModseq || highestModseq > connection.mailbox.highestModseq)) {
           connection.mailbox.highestModseq = highestModseq;
         }
@@ -50909,7 +52000,18 @@ var require_expunge = __commonJS((exports, module) => {
 
 // node_modules/imapflow/lib/commands/append.js
 var require_append = __commonJS((exports, module) => {
-  var { formatFlag, canUseFlag, formatDateTime, normalizePath, encodePath, comparePaths, enhanceCommandError } = require_tools2();
+  var {
+    formatFlag,
+    canUseFlag,
+    formatDateTime,
+    normalizePath,
+    encodePath,
+    comparePaths,
+    enhanceCommandError,
+    parseBigIntValue,
+    parseUintValue,
+    MAX_UINT32_DIGITS
+  } = require_tools2();
   module.exports = async (connection, destination, content, flags, idate) => {
     if (![connection.states.AUTHENTICATED, connection.states.SELECTED].includes(connection.state) || !destination) {
       return;
@@ -50946,7 +52048,11 @@ var require_append = __commonJS((exports, module) => {
       map2.path = connection.mailbox.path;
     }
     const handleExistsUpdate = (untagged) => {
-      map2.seq = Number(untagged.command);
+      let seq = parseUintValue(untagged.command, MAX_UINT32_DIGITS);
+      if (seq === false) {
+        return;
+      }
+      map2.seq = seq;
       if (expectExists) {
         let prevCount = connection.mailbox.exists;
         if (map2.seq !== prevCount) {
@@ -50968,8 +52074,8 @@ var require_append = __commonJS((exports, module) => {
       if (section && section.length) {
         let responseCode = section[0] && typeof section[0].value === "string" ? section[0].value : "";
         if (responseCode.toUpperCase() === "APPENDUID") {
-          let uidValidity = section[1] && typeof section[1].value === "string" && !isNaN(section[1].value) ? BigInt(section[1].value) : false;
-          let uid = section[2] && typeof section[2].value === "string" && !isNaN(section[2].value) ? Number(section[2].value) : false;
+          let uidValidity = parseBigIntValue(section[1] && section[1].value, MAX_UINT32_DIGITS);
+          let uid = parseUintValue(section[2] && section[2].value, MAX_UINT32_DIGITS);
           if (uidValidity !== false) {
             map2.uidValidity = uidValidity;
           }
@@ -51007,7 +52113,23 @@ var require_append = __commonJS((exports, module) => {
 
 // node_modules/imapflow/lib/commands/status.js
 var require_status = __commonJS((exports, module) => {
-  var { encodePath, normalizePath } = require_tools2();
+  var { encodePath, normalizePath, buildStatusQueryAttributes, isRev2Active } = require_tools2();
+  var { parseStatusList } = require_status_fields();
+  var MAILBOX_UPDATERS = {
+    messages: (value, connection, path) => {
+      let prevCount = connection.mailbox.exists;
+      if (prevCount !== value) {
+        connection.mailbox.exists = value;
+        connection.emit("exists", { path, count: value, prevCount });
+      }
+    },
+    uidNext: (value, connection) => {
+      connection.mailbox.uidNext = value;
+    },
+    highestModseq: (value, connection) => {
+      connection.mailbox.highestModseq = value;
+    }
+  };
   module.exports = async (connection, path, query) => {
     if (![connection.states.AUTHENTICATED, connection.states.SELECTED].includes(connection.state) || !path) {
       return false;
@@ -51015,28 +52137,10 @@ var require_status = __commonJS((exports, module) => {
     path = normalizePath(connection, path);
     let encodedPath = encodePath(connection, path);
     let attributes = [{ type: encodedPath.indexOf("&") >= 0 ? "STRING" : "ATOM", value: encodedPath }];
-    let queryAttributes = [];
-    Object.keys(query || {}).forEach((key) => {
-      if (!query[key]) {
-        return;
-      }
-      switch (key.toUpperCase()) {
-        case "MESSAGES":
-        case "RECENT":
-        case "UIDNEXT":
-        case "UIDVALIDITY":
-        case "UNSEEN":
-          queryAttributes.push({ type: "ATOM", value: key.toUpperCase() });
-          break;
-        case "HIGHESTMODSEQ":
-          if (connection.capabilities.has("CONDSTORE")) {
-            queryAttributes.push({ type: "ATOM", value: key.toUpperCase() });
-          }
-          break;
-      }
-    });
+    let queryAttributes = buildStatusQueryAttributes(connection, query);
+    let syntheticRecent = query && query.recent && isRev2Active(connection);
     if (!queryAttributes.length) {
-      return false;
+      return syntheticRecent ? { path, recent: 0 } : false;
     }
     attributes.push(queryAttributes);
     let response;
@@ -51050,62 +52154,19 @@ var require_status = __commonJS((exports, module) => {
             if (!list) {
               return;
             }
-            const STATUS_FIELD_MAP = {
-              MESSAGES: {
-                key: "messages",
-                parser: Number,
-                updateMailbox: (val, conn) => {
-                  let prevCount = conn.mailbox.exists;
-                  if (prevCount !== val) {
-                    conn.mailbox.exists = val;
-                    conn.emit("exists", { path, count: val, prevCount });
-                  }
-                }
-              },
-              RECENT: { key: "recent", parser: Number },
-              UIDNEXT: {
-                key: "uidNext",
-                parser: Number,
-                updateMailbox: (val, conn) => {
-                  conn.mailbox.uidNext = val;
-                }
-              },
-              UIDVALIDITY: { key: "uidValidity", parser: BigInt },
-              UNSEEN: { key: "unseen", parser: Number },
-              HIGHESTMODSEQ: {
-                key: "highestModseq",
-                parser: BigInt,
-                updateMailbox: (val, conn) => {
-                  conn.mailbox.highestModseq = val;
-                }
-              }
-            };
-            let key;
-            list.forEach((entry, i) => {
-              if (i % 2 === 0) {
-                key = entry && typeof entry.value === "string" ? entry.value : false;
-                return;
-              }
-              if (!key || !entry || typeof entry.value !== "string") {
-                return;
-              }
-              const fieldConfig = STATUS_FIELD_MAP[key.toUpperCase()];
-              if (!fieldConfig) {
-                return;
-              }
-              const value = !isNaN(entry.value) ? fieldConfig.parser(entry.value) : false;
-              if (value === false) {
-                return;
-              }
-              map2[fieldConfig.key] = value;
-              if (updateCurrent && fieldConfig.updateMailbox) {
-                fieldConfig.updateMailbox(value, connection);
+            parseStatusList(list, (key, value) => {
+              map2[key] = value;
+              if (updateCurrent && MAILBOX_UPDATERS[key]) {
+                MAILBOX_UPDATERS[key](value, connection, path);
               }
             });
           }
         }
       });
       response.next();
+      if (syntheticRecent) {
+        map2.recent = 0;
+      }
       return map2;
     } catch (err) {
       if (err.responseStatus === "NO") {
@@ -51125,14 +52186,14 @@ var require_status = __commonJS((exports, module) => {
 
 // node_modules/imapflow/lib/commands/copyuid-parser.js
 var require_copyuid_parser = __commonJS((exports, module) => {
-  var { expandRange } = require_tools2();
+  var { expandRange, parseBigIntValue } = require_tools2();
   function parseCopyUid(response, map2) {
     let section = response.attributes && response.attributes[0] && response.attributes[0].section;
     let responseCode = section && section.length && section[0] && typeof section[0].value === "string" ? section[0].value : "";
     if (responseCode !== "COPYUID") {
       return;
     }
-    let uidValidity = section[1] && typeof section[1].value === "string" && !isNaN(section[1].value) ? BigInt(section[1].value) : false;
+    let uidValidity = parseBigIntValue(section[1] && section[1].value);
     if (uidValidity !== false) {
       map2.uidValidity = uidValidity;
     }
@@ -51176,7 +52237,7 @@ var require_copy = __commonJS((exports, module) => {
 
 // node_modules/imapflow/lib/commands/move.js
 var require_move = __commonJS((exports, module) => {
-  var { normalizePath, encodePath, enhanceCommandError } = require_tools2();
+  var { normalizePath, encodePath, enhanceCommandError, hasCapability } = require_tools2();
   var { parseCopyUid } = require_copyuid_parser();
   module.exports = async (connection, range, destination, options) => {
     if (connection.state !== connection.states.SELECTED || !range || !destination) {
@@ -51189,7 +52250,7 @@ var require_move = __commonJS((exports, module) => {
       { type: "ATOM", value: encodePath(connection, destination) }
     ];
     let map2 = { path: connection.mailbox.path, destination };
-    if (!connection.capabilities.has("MOVE")) {
+    if (!hasCapability(connection, "MOVE")) {
       let result = await connection.messageCopy(range, destination, options);
       await connection.messageDelete(range, Object.assign({ silent: true }, options));
       return result;
@@ -51223,18 +52284,26 @@ var require_compress = __commonJS((exports, module) => {
     let response;
     try {
       response = await connection.exec("COMPRESS", [{ type: "ATOM", value: "DEFLATE" }]);
-      response.next();
-      return true;
     } catch (err) {
       connection.log.warn({ err, cid: connection.id });
       return false;
     }
+    if (response.hasTrailingData) {
+      let error51 = new Error("Server sent data between the COMPRESS response and the compression layer switch");
+      error51.code = "COMPRESS_TRAILING_DATA";
+      connection.log.error({ err: error51, cid: connection.id });
+      connection.closeAfter();
+      response.next();
+      throw error51;
+    }
+    response.next();
+    return true;
   };
 });
 
 // node_modules/imapflow/lib/commands/quota.js
 var require_quota = __commonJS((exports, module) => {
-  var { encodePath, normalizePath, enhanceCommandError } = require_tools2();
+  var { encodePath, normalizePath, enhanceCommandError, parseUintValue, isUnsafeKey } = require_tools2();
   module.exports = async (connection, path) => {
     if (![connection.states.AUTHENTICATED, connection.states.SELECTED].includes(connection.state) || !path) {
       return;
@@ -51259,8 +52328,11 @@ var require_quota = __commonJS((exports, module) => {
         if (!key) {
           return;
         }
-        let value = attribute && typeof attribute.value === "string" && !isNaN(attribute.value) ? Number(attribute.value) : false;
+        let value = parseUintValue(attribute && attribute.value);
         if (value === false) {
+          return;
+        }
+        if (isUnsafeKey(key) || key === "path" || key === "quotaroot") {
           return;
         }
         if (!map2[key]) {
@@ -51303,6 +52375,7 @@ var require_quota = __commonJS((exports, module) => {
             }
           }
         });
+        response.next();
       }
       return map2;
     } catch (err) {
@@ -51315,12 +52388,25 @@ var require_quota = __commonJS((exports, module) => {
 
 // node_modules/imapflow/lib/commands/idle.js
 var require_idle = __commonJS((exports, module) => {
+  var { guardedPromise, hasCapability, logConnectionError, restampConnectionError, unrefTimer } = require_tools2();
   var NOOP_INTERVAL = 2 * 60 * 1000;
+  function claimIdling(connection) {
+    let token = {};
+    connection._idleSession = token;
+    connection.idling = true;
+    return () => {
+      if (connection._idleSession === token) {
+        connection._idleSession = null;
+        connection.idling = false;
+      }
+    };
+  }
   async function runIdle(connection) {
     let response;
     let preCheckWaitQueue = [];
+    let ownPreCheck = null;
+    let releaseIdling = claimIdling(connection);
     try {
-      connection.idling = true;
       let doneRequested = false;
       let doneSent = false;
       let canEnd = false;
@@ -51332,12 +52418,15 @@ var require_idle = __commonJS((exports, module) => {
             msg: `DONE`,
             comment: `breaking IDLE`,
             lockId: connection.currentLock?.lockId,
-            path: connection.mailbox && connection.mailbox.path
+            path: connection.mailbox && connection.mailbox.path,
+            cid: connection.id
           });
           connection.write("DONE");
           doneSent = true;
-          connection.idling = false;
-          connection.preCheck = false;
+          releaseIdling();
+          if (connection.preCheck === ownPreCheck) {
+            connection.preCheck = false;
+          }
           while (preCheckWaitQueue.length) {
             let { resolve } = preCheckWaitQueue.shift();
             resolve();
@@ -51345,7 +52434,7 @@ var require_idle = __commonJS((exports, module) => {
         }
       };
       let connectionPreCheck = () => {
-        let handler = new Promise((resolve, reject) => {
+        let handler = guardedPromise((resolve, reject) => {
           preCheckWaitQueue.push({ resolve, reject });
         });
         connection.log.trace({
@@ -51355,137 +52444,184 @@ var require_idle = __commonJS((exports, module) => {
           queued: preCheckWaitQueue.length,
           doneRequested,
           canEnd,
-          doneSent
+          doneSent,
+          cid: connection.id
         });
-        preCheck().catch((err) => connection.log.warn({ err, cid: connection.id }));
+        preCheck().catch((err) => logConnectionError(connection, "Failed to break IDLE", err));
         return handler;
       };
+      ownPreCheck = connectionPreCheck;
       connection.preCheck = connectionPreCheck;
       response = await connection.exec("IDLE", false, {
         onPlusTag: async () => {
-          connection.log.debug({ msg: `Initiated IDLE, waiting for server input`, lockId: connection.currentLock?.lockId, doneRequested });
+          connection.log.debug({
+            msg: `Initiated IDLE, waiting for server input`,
+            lockId: connection.currentLock?.lockId,
+            doneRequested,
+            cid: connection.id
+          });
           canEnd = true;
           if (doneRequested) {
             try {
               await preCheck();
             } catch (err) {
-              connection.log.warn({ err, cid: connection.id });
+              logConnectionError(connection, "Failed to break IDLE", err);
             }
           }
         },
         onSend: () => {}
       });
-      if (typeof connection.preCheck === "function" && connection.preCheck === connectionPreCheck) {
-        connection.log.trace({
-          msg: "Clearing pre-check function",
-          lockId: connection.currentLock?.lockId,
-          path: connection.mailbox && connection.mailbox.path,
-          queued: preCheckWaitQueue.length,
-          doneRequested,
-          canEnd,
-          doneSent
-        });
-        connection.preCheck = false;
-        while (preCheckWaitQueue.length) {
-          let { resolve } = preCheckWaitQueue.shift();
-          resolve();
-        }
-      }
       response.next();
       return;
     } catch (err) {
-      connection.preCheck = false;
-      connection.idling = false;
-      connection.log.warn({ err, cid: connection.id });
-      while (preCheckWaitQueue.length) {
-        let { reject } = preCheckWaitQueue.shift();
-        reject(err);
+      logConnectionError(connection, "IDLE session failed", err);
+      if (preCheckWaitQueue.length) {
+        let waiterError = restampConnectionError(err, { rejectedFrom: "preCheckWaiter" });
+        while (preCheckWaitQueue.length) {
+          let { reject } = preCheckWaitQueue.shift();
+          reject(waiterError);
+        }
       }
       return false;
+    } finally {
+      releaseIdling();
+      if (connection.preCheck === ownPreCheck) {
+        connection.preCheck = false;
+      }
+      while (preCheckWaitQueue.length) {
+        let { resolve } = preCheckWaitQueue.shift();
+        resolve();
+      }
+    }
+  }
+  async function pollOnce(connection, session) {
+    let path = connection.mailbox && connection.mailbox.path;
+    switch (connection.missingIdleCommand) {
+      case "SELECT":
+        connection.log.debug({ msg: `Running SELECT to detect changes in folder`, cid: connection.id });
+        await connection.runInternal("SELECT", path, { readOnly: session.selectCommand.command === "EXAMINE" });
+        break;
+      case "STATUS": {
+        connection.log.debug({ msg: `Running STATUS to detect changes in folder`, cid: connection.id });
+        let status = await connection.runInternal("STATUS", path, {
+          messages: true,
+          uidNext: true,
+          uidValidity: true,
+          unseen: true,
+          highestModseq: true
+        });
+        if (!status) {
+          let err = new Error("STATUS poll failed");
+          err.code = "PollFailed";
+          throw err;
+        }
+        break;
+      }
+      case "NOOP":
+      default: {
+        let response = await connection.exec("NOOP", false, { comment: "IDLE not supported" });
+        response.next();
+        break;
+      }
+    }
+  }
+  async function runPollingFallback(connection, maxIdleTime) {
+    if (!connection.currentSelectCommand) {
+      return;
+    }
+    let session = {
+      cancelled: false,
+      timer: null,
+      preCheck: null,
+      selectCommand: connection.currentSelectCommand
+    };
+    let interval = maxIdleTime ? Math.min(NOOP_INTERVAL, maxIdleTime) : NOOP_INTERVAL;
+    let releaseIdling = claimIdling(connection);
+    try {
+      await new Promise((resolve) => {
+        const cancel = () => {
+          if (session.cancelled) {
+            return;
+          }
+          session.cancelled = true;
+          clearTimeout(session.timer);
+          session.timer = null;
+          resolve();
+        };
+        session.preCheck = async () => {
+          connection.log.debug({ msg: `Breaking NOOP loop`, cid: connection.id });
+          cancel();
+        };
+        connection.preCheck = session.preCheck;
+        const runPoll = () => {
+          if (session.cancelled) {
+            return;
+          }
+          if (!connection.socket || connection.socket.destroyed || connection.state !== connection.states.SELECTED || !connection.mailbox) {
+            return cancel();
+          }
+          pollOnce(connection, session).then(() => {
+            connection._lastPollAt = Date.now();
+            if (session.cancelled) {
+              return;
+            }
+            scheduleNextPoll(interval);
+          }).catch((err) => {
+            logConnectionError(connection, "Failed to poll for mailbox changes", err);
+            cancel();
+          });
+        };
+        function scheduleNextPoll(delay) {
+          session.timer = setTimeout(runPoll, delay);
+          unrefTimer(session.timer);
+        }
+        connection.log.debug({ msg: `Initiated NOOP loop`, cid: connection.id });
+        let sinceLastPoll = Math.max(0, Date.now() - (connection._lastPollAt || 0));
+        if (sinceLastPoll >= interval) {
+          runPoll();
+        } else {
+          scheduleNextPoll(interval - sinceLastPoll);
+        }
+      });
+    } finally {
+      session.cancelled = true;
+      clearTimeout(session.timer);
+      session.timer = null;
+      releaseIdling();
+      if (connection.preCheck === session.preCheck) {
+        connection.preCheck = false;
+      }
     }
   }
   module.exports = async (connection, maxIdleTime) => {
     if (connection.state !== connection.states.SELECTED) {
       return;
     }
-    if (connection.capabilities.has("IDLE")) {
-      let idleTimer2;
+    if (hasCapability(connection, "IDLE")) {
+      let idleTimer;
       let stillIdling = false;
-      let runIdleLoop = async () => {
+      for (;; ) {
         if (maxIdleTime) {
-          idleTimer2 = setTimeout(() => {
+          idleTimer = setTimeout(() => {
             if (connection.idling) {
               if (typeof connection.preCheck === "function") {
                 stillIdling = true;
                 connection.log.trace({ msg: "Max allowed IDLE time reached", cid: connection.id });
-                connection.preCheck().catch((err) => connection.log.warn({ err, cid: connection.id }));
+                connection.preCheck().catch((err) => logConnectionError(connection, "Failed to break IDLE for restart", err));
               }
             }
           }, maxIdleTime);
+          unrefTimer(idleTimer);
         }
         let resp = await runIdle(connection);
-        clearTimeout(idleTimer2);
-        if (stillIdling) {
-          stillIdling = false;
-          return runIdleLoop();
-        }
-        return resp;
-      };
-      return runIdleLoop();
-    }
-    let idleTimer;
-    return new Promise((resolve) => {
-      if (!connection.currentSelectCommand) {
-        return resolve();
-      }
-      connection.preCheck = async () => {
-        connection.preCheck = false;
         clearTimeout(idleTimer);
-        connection.log.debug({ src: "c", msg: `breaking NOOP loop` });
-        connection.idling = false;
-        resolve();
-      };
-      let selectCommand = connection.currentSelectCommand;
-      let idleCheck = async () => {
-        let response;
-        switch (connection.missingIdleCommand) {
-          case "SELECT":
-            connection.log.debug({ src: "c", msg: `Running SELECT to detect changes in folder` });
-            response = await connection.exec(selectCommand.command, selectCommand.arguments);
-            break;
-          case "STATUS":
-            {
-              let statusArgs = [
-                selectCommand.arguments[0],
-                ["MESSAGES", "UIDNEXT", "UIDVALIDITY", "UNSEEN"].map((key) => ({ type: "ATOM", value: key }))
-              ];
-              connection.log.debug({ src: "c", msg: `Running STATUS to detect changes in folder` });
-              response = await connection.exec("STATUS", statusArgs);
-            }
-            break;
-          case "NOOP":
-          default:
-            response = await connection.exec("NOOP", false, { comment: "IDLE not supported" });
-            break;
+        if (!stillIdling) {
+          return resp;
         }
-        response.next();
-      };
-      let noopInterval = maxIdleTime ? Math.min(NOOP_INTERVAL, maxIdleTime) : NOOP_INTERVAL;
-      let runLoop = () => {
-        idleCheck().then(() => {
-          clearTimeout(idleTimer);
-          idleTimer = setTimeout(runLoop, noopInterval);
-        }).catch((err) => {
-          clearTimeout(idleTimer);
-          connection.preCheck = false;
-          connection.log.warn({ err, cid: connection.id });
-          resolve();
-        });
-      };
-      connection.log.debug({ src: "c", msg: `initiated NOOP loop` });
-      connection.idling = true;
-      runLoop();
-    });
+        stillIdling = false;
+      }
+    }
+    return runPollingFallback(connection, maxIdleTime);
   };
 });
 
@@ -51509,7 +52645,14 @@ var require_authenticate = __commonJS((exports, module) => {
     let command;
     let breaker;
     if (connection.capabilities.has("AUTH=OAUTHBEARER")) {
-      oauthbearer = [`n,a=${username},`, `host=${connection.servername}`, `port=993`, `auth=Bearer ${accessToken}`, "", ""].join("\x01");
+      oauthbearer = [
+        `n,a=${username},`,
+        `host=${connection.servername || connection.host}`,
+        `port=${connection.port}`,
+        `auth=Bearer ${accessToken}`,
+        "",
+        ""
+      ].join("\x01");
       command = "OAUTHBEARER";
       breaker = "AQ==";
     } else if (connection.capabilities.has("AUTH=XOAUTH") || connection.capabilities.has("AUTH=XOAUTH2")) {
@@ -51528,10 +52671,15 @@ var require_authenticate = __commonJS((exports, module) => {
             try {
               errorResponse = JSON.parse(Buffer.from(resp.attributes[0].value, "base64").toString());
             } catch (err) {
-              connection.log.debug({ errorResponse: resp.attributes[0].value, err });
+              connection.log.debug({
+                msg: "Failed to parse OAuth error response",
+                errorResponse: resp.attributes[0].value,
+                err,
+                cid: connection.id
+              });
             }
           }
-          connection.log.debug({ src: "c", msg: breaker, comment: `Error response for ${command}` });
+          connection.log.debug({ src: "c", msg: breaker, comment: `Error response for ${command}`, cid: connection.id });
           connection.write(breaker);
         }
       });
@@ -51551,10 +52699,10 @@ var require_authenticate = __commonJS((exports, module) => {
             let question = Buffer.from(resp.attributes[0].value, "base64").toString().toLowerCase().replace(/[:\x00]*$/, "");
             if (question === "username" || question === "user name") {
               let encodedUsername = Buffer.from(username).toString("base64");
-              connection.log.debug({ src: "c", msg: encodedUsername, comment: `Encoded username for AUTH=LOGIN` });
+              connection.log.debug({ src: "c", msg: encodedUsername, comment: `Encoded username for AUTH=LOGIN`, cid: connection.id });
               connection.write(encodedUsername);
             } else if (question === "password") {
-              connection.log.debug({ src: "c", msg: "(* value hidden *)", comment: `Encoded password for AUTH=LOGIN` });
+              connection.log.debug({ src: "c", msg: "(* value hidden *)", comment: `Encoded password for AUTH=LOGIN`, cid: connection.id });
               connection.write(Buffer.from(password).toString("base64"));
             } else {
               throw new Error(`Unknown LOGIN question "${question}"`);
@@ -51577,7 +52725,12 @@ var require_authenticate = __commonJS((exports, module) => {
           let authzidValue = authzid || "";
           let encodedResponse = Buffer.from([authzidValue, username, password].join("\x00")).toString("base64");
           let loggedResponse = Buffer.from([authzidValue, username, "(* value hidden *)"].join("\x00")).toString("base64");
-          connection.log.debug({ src: "c", msg: loggedResponse, comment: `Encoded response for AUTH=PLAIN${authzid ? " with authzid" : ""}` });
+          connection.log.debug({
+            src: "c",
+            msg: loggedResponse,
+            comment: `Encoded response for AUTH=PLAIN${authzid ? " with authzid" : ""}`,
+            cid: connection.id
+          });
           connection.write(encodedResponse);
         }
       });
@@ -51653,7 +52806,7 @@ var require_imap_flow = __commonJS((exports, module) => {
   var libmime = require_libmime();
   var zlib = __require("zlib");
   var { Headers: Headers2 } = require_mailsplit();
-  var { LimitedPassthrough } = require_limited_passthrough();
+  var { LimitedPassthrough, normalizeByteLimit } = require_limited_passthrough();
   var { ImapStream } = require_imap_stream();
   var { parser, compiler } = require_imap_handler();
   var packageInfo = require_package3();
@@ -51662,6 +52815,7 @@ var require_imap_flow = __commonJS((exports, module) => {
   var FlowedDecoder = require_flowed_decoder();
   var { PassThrough } = __require("stream");
   var { proxyConnection, detachEarlyErrorHandler } = require_proxy_connection();
+  var { ConnectionDeadline } = require_connection_deadline();
   var {
     comparePaths,
     updateCapabilities,
@@ -51672,20 +52826,85 @@ var require_imap_flow = __commonJS((exports, module) => {
     normalizePath,
     expandRange,
     AuthenticationFailure,
-    getColorFlags
+    getColorFlags,
+    hasCapability,
+    logConnectionError,
+    unrefTimer,
+    parseUintValue,
+    isUnsafeKey,
+    getStringList,
+    buildConnectionError,
+    guardedPromise,
+    guardedReject,
+    MAX_UINT32_DIGITS
   } = require_tools2();
   var imapCommands = require_imap_commands();
-  var noop2 = () => {};
-  var CONNECT_TIMEOUT = 90 * 1000;
   var GREETING_TIMEOUT = 16 * 1000;
   var UPGRADE_TIMEOUT = 10 * 1000;
   var SOCKET_TIMEOUT = 5 * 60 * 1000;
+  var MAX_THROTTLE_DELAY = 5 * 60 * 1000;
   var HELD_LOCK_WARN_MS = 30 * 60 * 1000;
+  var AUTO_IDLE_DELAY = 15 * 1000;
+  var AUTO_IDLE_SOCKET_MARGIN = 1000;
+  var RAW_SENSITIVE_COMMANDS = new Set(["LOGIN", "AUTHENTICATE"]);
+  var RAW_HIDDEN_PLACEHOLDER = Buffer.from(`(* value hidden *)\r
+`).toString("base64");
+  function hasSensitiveAttribute(attributes) {
+    return [].concat(attributes || []).some((node) => Array.isArray(node) ? hasSensitiveAttribute(node) : !!node && node.sensitive);
+  }
+  var MAX_ERROR_FLATTEN_DEPTH = 4;
+  function isErrorLike(value) {
+    return value instanceof Error || !!value && typeof value === "object" && typeof value.message === "string" && typeof value.stack === "string";
+  }
+  function flattenLoggedError(value, depth = 0, seen = new Set) {
+    if (depth >= MAX_ERROR_FLATTEN_DEPTH) {
+      return isErrorLike(value) ? value.message : value;
+    }
+    if (Array.isArray(value)) {
+      return value.map((entry) => flattenLoggedError(entry, depth + 1, seen));
+    }
+    if (!isErrorLike(value)) {
+      return value;
+    }
+    if (seen.has(value)) {
+      return value.message;
+    }
+    seen.add(value);
+    let flatErr = {
+      message: value.message,
+      stack: value.stack
+    };
+    for (let key of new Set([...Object.keys(value), "cause", "errors"])) {
+      if (key in value) {
+        flatErr[key] = flattenLoggedError(value[key], depth + 1, seen);
+      }
+    }
+    return flatErr;
+  }
+  var MAX_TIMER_DELAY = 2 ** 31 - 1;
   var states = {
     NOT_AUTHENTICATED: 1,
     AUTHENTICATED: 2,
     SELECTED: 3,
     LOGOUT: 4
+  };
+  var normalizeAutoIdleDelay = (value, socketTimeout, log2, cid) => {
+    const maxDelay = Math.max(0, Math.min(socketTimeout, MAX_TIMER_DELAY) - AUTO_IDLE_SOCKET_MARGIN);
+    const configured = value !== undefined && value !== null;
+    let delay = typeof value === "number" || typeof value === "string" && value.trim() ? Number(value) : NaN;
+    let reason = null;
+    if (!Number.isFinite(delay) || delay < 0) {
+      reason = "not a non-negative finite number";
+      delay = AUTO_IDLE_DELAY;
+    }
+    if (delay > maxDelay) {
+      reason = reason || `above socketTimeout (${socketTimeout} ms)`;
+      delay = maxDelay;
+    }
+    if (configured && reason) {
+      log2.warn({ msg: "Adjusted unusable autoIdleDelay option", requested: value, autoIdleDelay: delay, reason, cid });
+    }
+    return Math.floor(delay);
   };
 
   class ImapFlow extends EventEmitter {
@@ -51708,12 +52927,13 @@ var require_imap_flow = __commonJS((exports, module) => {
       this.serverInfo = null;
       this.log = this.getLogger();
       this.secureConnection = !!this.options.secure;
-      this.port = Number(this.options.port) || (this.secureConnection ? 993 : 110);
+      this.port = Number(this.options.port) || (this.secureConnection ? 993 : 143);
       this.host = this.options.host || "localhost";
       this.servername = this.options.servername ? this.options.servername : !net.isIP(this.host) ? this.host : false;
       if (typeof this.options.secure === "undefined" && this.port === 993) {
         this.secureConnection = true;
       }
+      this.socketTimeout = Number(this.options.socketTimeout) || SOCKET_TIMEOUT;
       this.logRaw = this.options.logRaw;
       this.streamer = new ImapStream({
         logger: this.log,
@@ -51721,13 +52941,13 @@ var require_imap_flow = __commonJS((exports, module) => {
         logRaw: this.logRaw,
         secureConnection: this.secureConnection,
         maxLineLength: this.options.maxLineLength,
-        maxLiteralSize: this.options.maxLiteralSize
+        maxLiteralSize: this.options.maxLiteralSize,
+        maxResponseSize: this.options.maxResponseSize
       });
       this.reading = false;
       this.socket = false;
       this.writeSocket = false;
-      this._throttleTimer = null;
-      this._throttleAbort = null;
+      this._throttleWaits = new Set;
       this._upgradeReject = null;
       this.isClosed = false;
       this.states = states;
@@ -51737,8 +52957,11 @@ var require_imap_flow = __commonJS((exports, module) => {
       this.requestTagMap = new Map;
       this.requestQueue = [];
       this.currentRequest = false;
+      this._unknownTagCount = 0;
+      this._nextUnknownTagWarn = 1;
       this.writeBytesCounter = 0;
       this.commandParts = [];
+      this.rawSensitiveCommand = true;
       this.capabilities = new Map;
       this.authCapabilities = new Map;
       this.rawCapabilities = null;
@@ -51760,8 +52983,15 @@ var require_imap_flow = __commonJS((exports, module) => {
       this.locks = [];
       this.idRequested = false;
       this.maxIdleTime = this.options.maxIdleTime || false;
+      this.autoIdleDelay = normalizeAutoIdleDelay(this.options.autoIdleDelay, this.socketTimeout, this.log, this.id);
+      this._lastPollAt = 0;
+      this._openDownloads = 0;
       this.missingIdleCommand = (this.options.missingIdleCommand || "").toString().toUpperCase().trim() || "NOOP";
       this.disableBinary = !!this.options.disableBinary;
+      this.skipListSubscribedArg = false;
+      this.skipListStatusArgs = false;
+      this.skipListAuxArgs = false;
+      this.skipLsub = false;
       this._streamerErrorHandler = (err) => {
         if (["Z_BUF_ERROR", "ECONNRESET", "EPIPE", "ETIMEDOUT", "EHOSTUNREACH"].includes(err.code)) {
           this.closeAfter();
@@ -51779,13 +53009,14 @@ var require_imap_flow = __commonJS((exports, module) => {
       }
       err._connId = err._connId || this.id;
       if (this.upgrading) {
+        let reject = this._upgradeReject;
+        this._upgradeReject = null;
+        if (typeof reject === "function") {
+          reject(err);
+          return;
+        }
         this.upgrading = false;
         this.closeAfter();
-        if (typeof this._upgradeReject === "function") {
-          let reject = this._upgradeReject;
-          this._upgradeReject = null;
-          reject(err);
-        }
         return;
       }
       if (typeof this.initialReject === "function") {
@@ -51811,14 +53042,10 @@ var require_imap_flow = __commonJS((exports, module) => {
     }
     write(chunk) {
       if (!this.socket || this.socket.destroyed) {
-        const error51 = new Error("Socket is already closed");
-        error51.code = "NoConnection";
-        throw error51;
+        throw this.createConnectionError("NoConnection", "Socket is already closed", { rejectedFrom: "writeNoSocket" });
       }
       if (this.state === this.states.LOGOUT) {
-        const error51 = new Error("Can not send data after logged out");
-        error51.code = "StateLogout";
-        throw error51;
+        throw this.createConnectionError("StateLogout", "Can not send data after logged out", { rejectedFrom: "writeAfterLogout" });
       }
       if (this.writeSocket.destroyed) {
         this.log.error({ msg: "Write socket destroyed", cid: this.id });
@@ -51844,7 +53071,8 @@ var require_imap_flow = __commonJS((exports, module) => {
         this.log.trace({
           src: "c",
           msg: "write to socket",
-          data: chunk.toString("base64"),
+          data: this.rawSensitiveCommand ? RAW_HIDDEN_PLACEHOLDER : chunk.toString("base64"),
+          ...this.rawSensitiveCommand ? { hidden: true } : {},
           compress: !!this._deflate,
           secure: !!this.secureConnection,
           cid: this.id
@@ -51872,16 +53100,15 @@ var require_imap_flow = __commonJS((exports, module) => {
           let request = this.requestTagMap.get(data.tag);
           if (request) {
             this.requestTagMap.delete(request.tag);
-            const error51 = new Error("Connection not available");
-            error51.code = "NoConnection";
-            request.reject(error51);
+            request.reject(this.createNoConnectionError(false, { rejectedFrom: "sendAfterLogout", command: request.command }));
           }
         }
         return;
       }
+      this.rawSensitiveCommand = RAW_SENSITIVE_COMMANDS.has(typeof data.command === "string" ? data.command.toUpperCase() : "") || hasSensitiveAttribute(data.attributes);
       let compiled = await compiler(data, {
         asArray: true,
-        literalMinus: this.capabilities.has("LITERAL-") || this.capabilities.has("LITERAL+")
+        literalMinus: hasCapability(this, "LITERAL-") || this.capabilities.has("LITERAL+")
       });
       this.commandParts = compiled;
       let logCompiled = await compiler(data, {
@@ -51890,58 +53117,60 @@ var require_imap_flow = __commonJS((exports, module) => {
       let options = data.options || {};
       this.log.debug({ src: "c", msg: logCompiled.toString(), cid: this.id, comment: options.comment });
       this.write(this.commandParts.shift());
+      if (this.currentRequest && this.currentRequest.tag === data.tag) {
+        this.currentRequest.sent = true;
+      }
       if (typeof options.onSend === "function") {
-        options.onSend();
+        try {
+          options.onSend();
+        } catch (err) {
+          this.log.warn({ err, cid: this.id });
+        }
       }
     }
     async trySend() {
-      if (this.currentRequest || !this.requestQueue.length) {
-        return;
+      while (!this.currentRequest && this.requestQueue.length) {
+        this.currentRequest = this.requestQueue.shift();
+        try {
+          await this.send({
+            tag: this.currentRequest.tag,
+            command: this.currentRequest.command,
+            attributes: this.currentRequest.attributes,
+            options: this.currentRequest.options
+          });
+          return;
+        } catch (err) {
+          this.commandParts = [];
+          this.rejectCurrentRequest(err);
+        }
       }
-      this.currentRequest = this.requestQueue.shift();
-      await this.send({
-        tag: this.currentRequest.tag,
-        command: this.currentRequest.command,
-        attributes: this.currentRequest.attributes,
-        options: this.currentRequest.options
-      });
     }
     exec(command, attributes, options) {
       if (this.state === this.states.LOGOUT || this.isClosed) {
-        const error51 = new Error("Connection not available");
-        error51.code = "NoConnection";
-        let p = Promise.reject(error51);
-        p.catch(noop2);
-        return p;
+        return guardedReject(this.createNoConnectionError(false, { rejectedFrom: "execClosed", command }));
       }
       if (!this.socket || this.socket.destroyed) {
-        let error51 = new Error("Connection closed");
-        error51.code = "EConnectionClosed";
-        let p = Promise.reject(error51);
-        p.catch(noop2);
-        return p;
+        return guardedReject(this.createConnectionError("EConnectionClosed", "Connection closed", { rejectedFrom: "execNoSocket", command }));
       }
       let tag = (++this.tagCounter).toString(16).toUpperCase();
       options = options || {};
-      let promise2 = new Promise((resolve, reject) => {
+      return guardedPromise((resolve, reject) => {
         this.requestTagMap.set(tag, { command, attributes, options, resolve, reject });
         this.requestQueue.push({ tag, command, attributes, options });
-        this.trySend().catch((err) => {
-          this.requestTagMap.delete(tag);
-          reject(err);
-        });
+        this.trySend().catch((err) => logConnectionError(this, "Failed to dispatch command", err));
       });
-      promise2.catch(noop2);
-      return promise2;
     }
-    getUntaggedHandler(command, attributes) {
+    normalizeUntaggedCommand(command, attributes) {
       if (/^[0-9]+$/.test(command)) {
         let type = attributes && attributes.length && typeof attributes[0].value === "string" ? attributes[0].value.toUpperCase() : false;
         if (type) {
           command = type;
         }
       }
-      command = command.toUpperCase().trim();
+      return command.toUpperCase().trim();
+    }
+    getUntaggedHandler(command, attributes) {
+      command = this.normalizeUntaggedCommand(command, attributes);
       if (this.currentRequest && this.currentRequest.options && this.currentRequest.options.untagged && this.currentRequest.options.untagged[command]) {
         return this.currentRequest.options.untagged[command];
       }
@@ -51954,156 +53183,263 @@ var require_imap_flow = __commonJS((exports, module) => {
         return this.sectionHandlers[key];
       }
     }
+    releaseStreamData(data) {
+      if (!data || data.released) {
+        return;
+      }
+      data.released = true;
+      if (typeof data.next === "function") {
+        data.next();
+      }
+    }
+    countUnknownTag(tag) {
+      if (this.isClosed) {
+        return;
+      }
+      this._unknownTagCount++;
+      if (this._unknownTagCount === this._nextUnknownTagWarn) {
+        this._nextUnknownTagWarn *= 2;
+        this.log.warn({
+          msg: "Tagged response for an unknown tag",
+          tag,
+          unknownTagCount: this._unknownTagCount,
+          cid: this.id
+        });
+      }
+    }
+    failProtocol(err) {
+      if (this.streamer && !this.streamer.destroyed) {
+        this.streamer.destroy();
+      }
+      this.emitError(err);
+    }
+    rejectCurrentRequest(err) {
+      if (!this.currentRequest) {
+        return;
+      }
+      let tag = this.currentRequest.tag;
+      this.currentRequest = false;
+      let request = this.requestTagMap.get(tag);
+      if (request) {
+        this.requestTagMap.delete(tag);
+        request.reject(err);
+      }
+    }
+    async throttleWait(delay) {
+      delay = Math.min(Math.max(Number(delay) || 0, 0), MAX_THROTTLE_DELAY);
+      return await new Promise((resolve) => {
+        let entry = { resolve };
+        entry.timer = setTimeout(() => {
+          this._throttleWaits.delete(entry);
+          resolve(false);
+        }, delay);
+        unrefTimer(entry.timer);
+        this._throttleWaits.add(entry);
+      });
+    }
     async reader() {
       let data;
       let processedCount = 0;
       while ((data = this.streamer.read()) !== null) {
-        let parsed;
+        let keepReading;
         try {
-          parsed = await parser(data.payload, { literals: data.literals });
-          if (parsed.tag && !["*", "+"].includes(parsed.tag) && parsed.command) {
-            let payload = { response: parsed.command };
-            if (parsed.attributes && parsed.attributes[0] && parsed.attributes[0].section && parsed.attributes[0].section[0] && parsed.attributes[0].section[0].type === "ATOM") {
-              payload.code = parsed.attributes[0].section[0].value;
-            }
-            this.emit("response", payload);
-          }
+          keepReading = await this.handleResponse(data);
         } catch (err) {
-          this.log.error({ src: "s", msg: data.payload.toString(), err, cid: this.id });
-          data.next();
-          continue;
+          keepReading = false;
+          let error51 = new Error("Failed to process server response");
+          error51.code = "ResponseProcessingFailed";
+          error51._err = err;
+          this.log.error({ msg: "Failed to process server response", err, cid: this.id });
+          this.rejectCurrentRequest(error51);
+          this.failProtocol(error51);
+        } finally {
+          this.releaseStreamData(data);
         }
-        let logCompiled = await compiler(parsed, {
-          isLogging: true
-        });
-        if (/^\d+$/.test(parsed.command) && parsed.attributes && parsed.attributes[0] && parsed.attributes[0].value === "FETCH") {
-          this.log.trace({ src: "s", msg: logCompiled.toString(), cid: this.id, nullBytesRemoved: parsed.nullBytesRemoved });
-        } else {
-          this.log.debug({ src: "s", msg: logCompiled.toString(), cid: this.id, nullBytesRemoved: parsed.nullBytesRemoved });
+        if (!keepReading) {
+          return;
         }
-        if (parsed.tag === "+" && this.currentRequest && this.currentRequest.options && typeof this.currentRequest.options.onPlusTag === "function") {
-          try {
-            await this.currentRequest.options.onPlusTag(parsed);
-          } catch (err) {
-            this.log.warn({ err, cid: this.id });
-          }
-          data.next();
-          continue;
-        }
-        if (parsed.tag === "+" && this.commandParts.length) {
-          let content = this.commandParts.shift();
-          try {
-            this.write(content);
-            this.log.debug({ src: "c", msg: `(* ${content.length}B continuation *)`, cid: this.id });
-          } catch (err) {
-            this.log.warn({ err, cid: this.id });
-          }
-          data.next();
-          continue;
-        }
-        let section = parsed.attributes && parsed.attributes.length && parsed.attributes[0] && !parsed.attributes[0].value && parsed.attributes[0].section;
-        if (section && section.length && section[0].type === "ATOM" && typeof section[0].value === "string") {
-          let sectionHandler = this.getSectionHandler(section[0].value.toUpperCase().trim());
-          if (sectionHandler) {
-            try {
-              await sectionHandler(section.slice(1));
-            } catch (err) {
-              this.log.warn({ err, cid: this.id });
-            }
-          }
-        }
-        if (parsed.tag === "*" && parsed.command) {
-          let untaggedHandler = this.getUntaggedHandler(parsed.command, parsed.attributes);
-          if (untaggedHandler) {
-            try {
-              await untaggedHandler(parsed);
-            } catch (err) {
-              this.log.warn({ err, cid: this.id });
-              data.next();
-              continue;
-            }
-          }
-        }
-        if (this.requestTagMap.has(parsed.tag)) {
-          let request = this.requestTagMap.get(parsed.tag);
-          this.requestTagMap.delete(parsed.tag);
-          if (this.currentRequest && this.currentRequest.tag === parsed.tag) {
-            this.currentRequest = false;
-            try {
-              await this.trySend();
-            } catch (err) {
-              this.log.warn({ err, cid: this.id });
-            }
-          }
-          switch (parsed.command.toUpperCase()) {
-            case "OK":
-            case "BYE":
-              await new Promise((resolve) => request.resolve({ response: parsed, next: resolve, hasTrailingData: !!data.trailingAfterLine }));
-              break;
-            case "NO":
-            case "BAD": {
-              let txt = parsed.attributes && parsed.attributes.filter((val) => val.type === "TEXT").map((val) => val.value.trim()).join(" ");
-              let err = new Error("Command failed");
-              err.response = parsed;
-              err.responseStatus = parsed.command.toUpperCase();
-              try {
-                err.executedCommand = parsed.tag + (await compiler(request, {
-                  isLogging: true
-                })).toString();
-              } catch {}
-              if (txt) {
-                err.responseText = txt;
-                if (err.responseStatus === "NO" && txt.includes("Some of the requested messages no longer exist")) {
-                  this.log.warn({ msg: "Partial FETCH response", cid: this.id, err });
-                  await new Promise((resolve) => request.resolve({ response: parsed, next: resolve }));
-                  break;
-                }
-                let throttleDelay = false;
-                if (/Request is throttled/i.test(txt) && /Backoff Time/i.test(txt)) {
-                  let throttlingMatch = txt.match(/Backoff Time[:=\s]+(\d+)/i);
-                  if (throttlingMatch && throttlingMatch[1] && !isNaN(throttlingMatch[1])) {
-                    throttleDelay = Number(throttlingMatch[1]);
-                  }
-                }
-                if (throttleDelay) {
-                  err.code = "ETHROTTLE";
-                  err.throttleReset = throttleDelay;
-                  let delayResponse = throttleDelay;
-                  if (delayResponse > 5 * 60 * 1000) {
-                    delayResponse = 5 * 60 * 1000;
-                  }
-                  this.log.warn({ msg: "Throttling detected", cid: this.id, throttleDelay, delayResponse, err });
-                  let aborted2 = await new Promise((resolve) => {
-                    this._throttleAbort = resolve;
-                    this._throttleTimer = setTimeout(() => resolve(false), delayResponse);
-                    if (typeof this._throttleTimer.unref === "function") {
-                      this._throttleTimer.unref();
-                    }
-                  });
-                  this._throttleTimer = null;
-                  this._throttleAbort = null;
-                  if (aborted2) {
-                    request.reject(this.createNoConnectionError(this.byeReason));
-                    break;
-                  }
-                }
-              }
-              request.reject(err);
-              break;
-            }
-            default: {
-              let err = new Error("Invalid server response");
-              err.code = "InvalidResponse";
-              err.response = parsed;
-              request.reject(err);
-              break;
-            }
-          }
-        }
-        data.next();
         processedCount++;
         if (processedCount % 10 === 0) {
           await new Promise((resolve) => setImmediate(resolve));
+        }
+      }
+    }
+    rejectUnparsedCompletion(payload, parserError) {
+      if (!this.currentRequest || !this.currentRequest.sent) {
+        return;
+      }
+      let tag = parserError && parserError.parsedTag;
+      if (!tag) {
+        let match2 = payload.toString("latin1", 0, 64).match(/^\0*([^\s\x00-\x1f\x7f]+)/);
+        tag = match2 && match2[1];
+      }
+      if (!tag || tag !== this.currentRequest.tag) {
+        return;
+      }
+      let err = new Error("Failed to parse the server response for this command");
+      err.code = parserError.code || "ParserError";
+      err.parserError = parserError;
+      this.rejectCurrentRequest(err);
+      this.trySend().catch((sendErr) => logConnectionError(this, "Failed to dispatch command", sendErr));
+    }
+    async handleResponse(data) {
+      let parsed;
+      try {
+        parsed = await parser(data.payload, { literals: data.literals });
+      } catch (err) {
+        this.log.error({ src: "s", msg: data.payload.toString("latin1", 0, 1024), payloadBytes: data.payload.length, err, cid: this.id });
+        this.rejectUnparsedCompletion(data.payload, err);
+        return true;
+      }
+      if (parsed.tag && !["*", "+"].includes(parsed.tag) && parsed.command) {
+        let payload = { response: parsed.command };
+        if (parsed.attributes && parsed.attributes[0] && parsed.attributes[0].section && parsed.attributes[0].section[0] && parsed.attributes[0].section[0].type === "ATOM") {
+          payload.code = parsed.attributes[0].section[0].value;
+        }
+        try {
+          this.emit("response", payload);
+        } catch (err) {
+          this.log.warn({ err, cid: this.id });
+        }
+      }
+      let logCompiled = await compiler(parsed, {
+        isLogging: true
+      });
+      if (/^\d+$/.test(parsed.command) && parsed.attributes && parsed.attributes[0] && parsed.attributes[0].value === "FETCH") {
+        this.log.trace({ src: "s", msg: logCompiled.toString(), cid: this.id, nullBytesRemoved: parsed.nullBytesRemoved });
+      } else {
+        this.log.debug({ src: "s", msg: logCompiled.toString(), cid: this.id, nullBytesRemoved: parsed.nullBytesRemoved });
+      }
+      if (parsed.tag === "+" && this.currentRequest && this.currentRequest.options && typeof this.currentRequest.options.onPlusTag === "function") {
+        try {
+          await this.currentRequest.options.onPlusTag(parsed);
+        } catch (err) {
+          this.log.warn({ msg: "Failed to process continuation response", command: this.currentRequest?.command, err, cid: this.id });
+        }
+        return true;
+      }
+      if (parsed.tag === "+" && this.commandParts.length) {
+        let content = this.commandParts.shift();
+        try {
+          this.write(content);
+          this.log.debug({ src: "c", msg: `(* ${content.length}B continuation *)`, cid: this.id });
+        } catch (err) {
+          logConnectionError(this, "Failed to send literal continuation", err);
+        }
+        return true;
+      }
+      let section = parsed.attributes && parsed.attributes.length && parsed.attributes[0] && !parsed.attributes[0].value && parsed.attributes[0].section;
+      if (section && section.length && section[0] && section[0].type === "ATOM" && typeof section[0].value === "string") {
+        let sectionKey = section[0].value.toUpperCase().trim();
+        let sectionHandler = this.getSectionHandler(sectionKey);
+        if (sectionHandler) {
+          try {
+            await sectionHandler(section.slice(1));
+          } catch (err) {
+            this.log.warn({ msg: "Failed to process response section", section: sectionKey, err, cid: this.id });
+          }
+        }
+      }
+      if (parsed.tag === "*" && parsed.command) {
+        let untaggedHandler = this.getUntaggedHandler(parsed.command, parsed.attributes);
+        if (untaggedHandler) {
+          try {
+            await untaggedHandler(parsed);
+          } catch (err) {
+            this.log.warn({
+              msg: "Failed to process untagged response",
+              command: this.normalizeUntaggedCommand(parsed.command, parsed.attributes),
+              err,
+              cid: this.id
+            });
+            return true;
+          }
+        }
+      }
+      if (parsed.tag && !["*", "+"].includes(parsed.tag)) {
+        if (this.currentRequest && this.currentRequest.tag === parsed.tag && this.currentRequest.sent) {
+          let request = this.requestTagMap.get(parsed.tag);
+          this.requestTagMap.delete(parsed.tag);
+          this.currentRequest = false;
+          if (request) {
+            await this.settleRequest(request, parsed, !!data.trailingAfterLine);
+          }
+          try {
+            await this.trySend();
+          } catch (err) {
+            this.log.warn({ err, cid: this.id });
+          }
+        } else if (this.requestTagMap.has(parsed.tag)) {
+          let request = this.requestTagMap.get(parsed.tag);
+          this.requestTagMap.delete(parsed.tag);
+          let err = new Error("Server sent a tagged response for a command that was not in flight");
+          err.code = "UnexpectedTag";
+          err.details = {
+            received: parsed.tag,
+            expected: this.currentRequest ? this.currentRequest.tag : null
+          };
+          this.log.error({ msg: "Protocol desynchronization", err, cid: this.id });
+          request.reject(err);
+          this.failProtocol(err);
+          return false;
+        } else {
+          this.countUnknownTag(parsed.tag);
+        }
+      }
+      return true;
+    }
+    async settleRequest(request, parsed, hasTrailingData) {
+      switch ((parsed.command || "").toUpperCase()) {
+        case "OK":
+        case "BYE":
+          await new Promise((resolve) => request.resolve({ response: parsed, next: resolve, hasTrailingData }));
+          break;
+        case "NO":
+        case "BAD": {
+          let txt = parsed.attributes && parsed.attributes.filter((val) => val.type === "TEXT").map((val) => val.value.trim()).join(" ");
+          let err = new Error("Command failed");
+          err.response = parsed;
+          err.responseStatus = parsed.command.toUpperCase();
+          try {
+            err.executedCommand = parsed.tag + (await compiler(request, {
+              isLogging: true
+            })).toString();
+          } catch {}
+          if (txt) {
+            err.responseText = txt;
+            if (err.responseStatus === "NO" && txt.includes("Some of the requested messages no longer exist")) {
+              this.log.warn({ msg: "Partial FETCH response", cid: this.id, err });
+              await new Promise((resolve) => request.resolve({ response: parsed, next: resolve }));
+              break;
+            }
+            let throttleDelay = false;
+            if (/Request is throttled/i.test(txt) && /Backoff Time/i.test(txt)) {
+              let throttlingMatch = txt.match(/Backoff Time[:=\s]+(\d+)/i);
+              if (throttlingMatch && throttlingMatch[1] && !isNaN(throttlingMatch[1])) {
+                throttleDelay = Number(throttlingMatch[1]);
+              }
+            }
+            if (throttleDelay) {
+              err.code = "ETHROTTLE";
+              err.throttleReset = throttleDelay;
+              let delayResponse = Math.min(throttleDelay, MAX_THROTTLE_DELAY);
+              this.log.warn({ msg: "Throttling detected", cid: this.id, throttleDelay, delayResponse, err });
+              let aborted2 = await this.throttleWait(delayResponse);
+              if (aborted2) {
+                request.reject(this.createNoConnectionError(this.byeReason, { rejectedFrom: "throttleAbort", command: request.command }));
+                break;
+              }
+            }
+          }
+          request.reject(err);
+          break;
+        }
+        default: {
+          let err = new Error("Invalid server response");
+          err.code = "InvalidResponse";
+          err.response = parsed;
+          request.reject(err);
+          break;
         }
       }
     }
@@ -52118,6 +53454,17 @@ var require_imap_flow = __commonJS((exports, module) => {
       };
       this.streamer.on("readable", this.socketReadable);
     }
+    configureSocket(socket) {
+      if (!socket) {
+        return;
+      }
+      if (typeof socket.setKeepAlive === "function") {
+        socket.setKeepAlive(true, 5 * 1000);
+      }
+      if (typeof socket.setTimeout === "function") {
+        socket.setTimeout(this.socketTimeout);
+      }
+    }
     setSocketHandlers() {
       this.clearSocketHandlers();
       this._socketError = this._socketError || ((err) => {
@@ -52129,13 +53476,15 @@ var require_imap_flow = __commonJS((exports, module) => {
       this._socketTimeout = this._socketTimeout || (() => {
         const err = new Error("Socket timeout");
         err.code = "ETIMEOUT";
-        if (this.idling) {
+        const quietExpected = this.idling || this._openDownloads || this.currentLock;
+        const commandStuck = this.currentRequest && !(this.idling && this.currentRequest.command === "IDLE");
+        if (quietExpected && !commandStuck) {
           if (!this.usable || !this.socket || this.socket.destroyed) {
             this.emitError(err);
             return;
           }
-          this.run("NOOP").then(() => this.idle()).catch((err2) => {
-            this.log.warn({ msg: "IDLE recovery failed after timeout", err: err2, cid: this.id });
+          this.run("NOOP").catch((err2) => {
+            this.log.warn({ msg: "Connection recovery failed after timeout", err: err2, cid: this.id });
             if (!this.isClosed) {
               this.close();
             }
@@ -52206,9 +53555,16 @@ var require_imap_flow = __commonJS((exports, module) => {
         await this.compress();
       }
       if (!this.options.disableAutoEnable) {
-        await this.run("ENABLE", ["CONDSTORE", "UTF8=ACCEPT"].concat(this.options.qresync ? "QRESYNC" : []));
+        await this.autoEnable();
       }
       this.usable = true;
+    }
+    async autoEnable() {
+      let enableList = ["CONDSTORE", "UTF8=ACCEPT"].concat(this.options.qresync ? "QRESYNC" : []).concat(this.options.disableIMAP4rev2 ? [] : "IMAP4rev2");
+      let enableResult = await this.run("ENABLE", enableList);
+      if (enableResult === false && enableList.includes("IMAP4rev2")) {
+        await this.run("ENABLE", enableList.filter((extension) => extension !== "IMAP4rev2"));
+      }
     }
     async compress() {
       if (!await this.run("COMPRESS")) {
@@ -52242,13 +53598,10 @@ var require_imap_flow = __commonJS((exports, module) => {
           }
           this.writeSocket.end();
         } catch (err) {
-          this.log.error({ err, info: "Failed to destroy PassThrough socket", cid: this.id });
+          this.log.error({ err, msg: "Failed to destroy PassThrough socket", cid: this.id });
           throw err;
         }
       };
-      Object.defineProperty(this.writeSocket, "destroyed", {
-        get: () => !this.socket || this.socket.destroyed
-      });
       let reading = false;
       let processedChunks = 0;
       let readNext = async () => {
@@ -52335,57 +53688,50 @@ var require_imap_flow = __commonJS((exports, module) => {
         throw failSTARTTLSInjection();
       }
       let upgraded = await new Promise((resolve, reject) => {
-        this._upgradeReject = reject;
         let socketPlain = this.socket;
         let opts = Object.assign({
           socket: this.socket,
+          host: this.host,
           servername: this.servername,
           port: this.port
         }, this.options.tls || {});
         this.clearSocketHandlers();
-        const socketPlainErrorHandler = (err) => {
-          clearTimeout(this.connectTimeout);
-          clearTimeout(this.upgradeTimeout);
-          if (!this.upgrading) {
+        let settled = false;
+        const settle = (err, result) => {
+          if (settled) {
             return;
           }
-          this.closeAfter();
+          settled = true;
+          clearTimeout(this.upgradeTimeout);
+          this.upgradeTimeout = null;
           this.upgrading = false;
-          err.tlsFailed = true;
-          reject(err);
+          this._upgradeReject = null;
+          socketPlain.removeListener("error", settle);
+          if (this.socket && this.socket !== socketPlain) {
+            this.socket.removeListener("error", settle);
+          }
+          if (err) {
+            clearTimeout(this.connectTimeout);
+            err.tlsFailed = true;
+            this.closeAfter();
+            return reject(err);
+          }
+          resolve(result);
         };
-        socketPlain.once("error", socketPlainErrorHandler);
+        this._upgradeReject = settle;
+        socketPlain.once("error", settle);
         this.upgradeTimeout = setTimeout(() => {
-          if (!this.upgrading) {
-            return;
-          }
-          this.closeAfter();
           let err = new Error("Failed to upgrade connection in required time");
-          err.tlsFailed = true;
           err.code = "UPGRADE_TIMEOUT";
-          reject(err);
+          settle(err);
         }, UPGRADE_TIMEOUT);
-        const tlsSocketErrorHandler = (err) => {
-          clearTimeout(this.connectTimeout);
-          clearTimeout(this.upgradeTimeout);
-          if (!this.upgrading) {
-            return;
-          }
-          this.upgrading = false;
-          err.tlsFailed = true;
-          this.clearSocketHandlers();
-          this.closeAfter();
-          reject(err);
-        };
         this.upgrading = true;
         this.socket = tls.connect(opts, () => {
           try {
-            clearTimeout(this.upgradeTimeout);
             if (this.isClosed) {
-              return this.close();
+              return settle(this.createNoConnectionError(false, { rejectedFrom: "tlsUpgrade" }));
             }
             this.secureConnection = true;
-            this.upgrading = false;
             this.streamer.secureConnection = true;
             this.socket.pipe(this.streamer);
             this.tls = typeof this.socket.getCipher === "function" ? this.socket.getCipher() : false;
@@ -52400,21 +53746,21 @@ var require_imap_flow = __commonJS((exports, module) => {
                 version: this.tls.version
               });
             }
-            socketPlain.removeListener("error", socketPlainErrorHandler);
-            this.socket.removeListener("error", tlsSocketErrorHandler);
+            if (typeof socketPlain.setTimeout === "function") {
+              socketPlain.setTimeout(0);
+            }
             this.setSocketHandlers();
-            this._upgradeReject = null;
-            return resolve(true);
+            this.configureSocket(this.socket);
+            settle(null, true);
           } catch (ex) {
             this.emitError(ex);
           }
         });
-        this.socket.once("error", tlsSocketErrorHandler);
+        this.socket.once("error", settle);
         this.writeSocket = this.socket;
       });
-      if (upgraded && this.expectCapabilityUpdate) {
-        this.capabilities.clear();
-        this.authCapabilities.clear();
+      if (upgraded) {
+        this.clearCapabilities();
         await this.run("CAPABILITY");
       }
       return upgraded;
@@ -52506,6 +53852,7 @@ var require_imap_flow = __commonJS((exports, module) => {
         return;
       }
       this.state = this.states.AUTHENTICATED;
+      this.authenticated = true;
       this.beginSession((err) => {
         this.log.error({ err, cid: this.id });
         this.closeAfter();
@@ -52516,6 +53863,11 @@ var require_imap_flow = __commonJS((exports, module) => {
       this.byeReason = reason || "Server closed connection";
       this.untaggedHandlers.BYE = null;
       this.state = this.states.LOGOUT;
+    }
+    clearCapabilities() {
+      this.capabilities.clear();
+      this.authCapabilities.clear();
+      this.rawCapabilities = null;
     }
     updateCapabilitiesFromRaw(rawCapabilities) {
       this.rawCapabilities = rawCapabilities;
@@ -52541,10 +53893,13 @@ var require_imap_flow = __commonJS((exports, module) => {
       if (!this.mailbox) {
         return;
       }
-      if (!untagged || !untagged.command || isNaN(untagged.command)) {
+      if (!untagged) {
         return;
       }
-      let count = Number(untagged.command);
+      let count = parseUintValue(untagged.command, MAX_UINT32_DIGITS);
+      if (count === false) {
+        return;
+      }
       if (count === this.mailbox.exists) {
         return;
       }
@@ -52556,14 +53911,25 @@ var require_imap_flow = __commonJS((exports, module) => {
         prevCount
       });
     }
+    async notifyExpunge(payload) {
+      if (typeof this.options.expungeHandler !== "function") {
+        this.emit("expunge", payload);
+        return;
+      }
+      try {
+        await this.options.expungeHandler(payload);
+      } catch (err) {
+        this.log.error({ msg: "Failed to notify expunge event", payload, err, cid: this.id });
+      }
+    }
     async untaggedExpunge(untagged) {
       if (!this.mailbox) {
         return;
       }
-      if (!untagged || !untagged.command || isNaN(untagged.command)) {
+      if (!untagged) {
         return;
       }
-      let seq = Number(untagged.command);
+      let seq = parseUintValue(untagged.command, MAX_UINT32_DIGITS);
       if (seq && seq <= this.mailbox.exists) {
         this.mailbox.exists--;
         let payload = {
@@ -52571,15 +53937,7 @@ var require_imap_flow = __commonJS((exports, module) => {
           seq,
           vanished: false
         };
-        if (typeof this.options.expungeHandler === "function") {
-          try {
-            await this.options.expungeHandler(payload);
-          } catch (err) {
-            this.log.error({ msg: "Failed to notify expunge event", payload, error: err, cid: this.id });
-          }
-        } else {
-          this.emit("expunge", payload);
-        }
+        await this.notifyExpunge(payload);
       }
     }
     async untaggedVanished(untagged, mailbox) {
@@ -52589,8 +53947,11 @@ var require_imap_flow = __commonJS((exports, module) => {
       }
       let tags = [];
       let uids = false;
+      if (!untagged.attributes || !untagged.attributes.length) {
+        return;
+      }
       if (untagged.attributes.length > 1 && Array.isArray(untagged.attributes[0])) {
-        tags = untagged.attributes[0].map((entry) => typeof entry.value === "string" ? entry.value.toUpperCase() : false).filter((value) => value);
+        tags = getStringList(untagged.attributes[0]).map((value) => value.toUpperCase());
         untagged.attributes.shift();
       }
       if (untagged.attributes[0] && typeof untagged.attributes[0].value === "string") {
@@ -52604,15 +53965,7 @@ var require_imap_flow = __commonJS((exports, module) => {
           vanished: true,
           earlier: tags.includes("EARLIER")
         };
-        if (typeof this.options.expungeHandler === "function") {
-          try {
-            await this.options.expungeHandler(payload);
-          } catch (err) {
-            this.log.error({ msg: "Failed to notify expunge event", payload, error: err, cid: this.id });
-          }
-        } else {
-          this.emit("expunge", payload);
-        }
+        await this.notifyExpunge(payload);
       }
     }
     async untaggedFetch(untagged, mailbox) {
@@ -52681,20 +54034,31 @@ var require_imap_flow = __commonJS((exports, module) => {
       }
       return range;
     }
+    connectionBusy() {
+      return !!(this.currentLock || this.locks.length || this.currentRequest || this.requestQueue.length || this._openDownloads);
+    }
     autoidle() {
       clearTimeout(this.idleStartTimer);
       if (this.options.disableAutoIdle || this.state !== this.states.SELECTED) {
         return;
       }
+      if (this.connectionBusy()) {
+        return;
+      }
       this.idleStartTimer = setTimeout(() => {
-        this.idle().catch((err) => this.log.warn({ err, cid: this.id }));
-      }, 15 * 1000);
+        if (this.state !== this.states.SELECTED || this.connectionBusy()) {
+          return;
+        }
+        this.idle().catch((err) => logConnectionError(this, "Auto-IDLE failed", err));
+      }, this.autoIdleDelay);
+      unrefTimer(this.idleStartTimer);
     }
     async connect() {
       if (this._connectCalled) {
         throw new Error("Can not re-use ImapFlow instance");
       }
       this._connectCalled = true;
+      let deadline = new ConnectionDeadline(this.options.connectionTimeout);
       let connector = this.secureConnection ? tls : net;
       let opts = Object.assign({
         host: this.host,
@@ -52713,35 +54077,33 @@ var require_imap_flow = __commonJS((exports, module) => {
       let socket = false;
       if (this.options.proxy) {
         try {
-          socket = await proxyConnection(this.log, this.options.proxy, this.host, this.port);
+          socket = await proxyConnection(this.log, this.options.proxy, this.host, this.port, { deadline });
           if (!socket) {
             throw new Error("Failed to setup proxy connection");
           }
         } catch (err) {
+          this.log.error({ msg: "Failed to setup proxy connection", err, cid: this.id });
+          if (err.code === "CONNECT_TIMEOUT") {
+            throw err;
+          }
           let error51 = new Error("Failed to setup proxy connection");
           error51.code = err.code || "ProxyError";
           error51._err = err;
-          this.log.error({ error: error51, cid: this.id });
           throw error51;
         }
       }
-      let connectPromise = new Promise((resolve, reject) => {
+      let connectPromise = guardedPromise((resolve, reject) => {
         this.connectTimeout = setTimeout(() => {
-          let err = new Error("Failed to establish connection in required time");
-          err.code = "CONNECT_TIMEOUT";
-          err.details = {
-            connectionTimeout: this.options.connectionTimeout || CONNECT_TIMEOUT
-          };
+          let err = deadline.error();
           this.log.error({ err, cid: this.id });
           this.closeAfter();
           reject(err);
-        }, this.options.connectionTimeout || CONNECT_TIMEOUT);
+        }, deadline.remaining());
         let onConnect = () => {
           try {
             clearTimeout(this.connectTimeout);
             detachEarlyErrorHandler(socket);
-            this.socket.setKeepAlive(true, 5 * 1000);
-            this.socket.setTimeout(this.options.socketTimeout || SOCKET_TIMEOUT);
+            this.configureSocket(this.socket);
             this.greetingTimeout = setTimeout(() => {
               let err = new Error(`Failed to receive greeting from server in required time${!this.secureConnection ? ". Maybe should use TLS?" : ""}`);
               err.code = "GREETING_TIMEOUT";
@@ -52801,7 +54163,6 @@ var require_imap_flow = __commonJS((exports, module) => {
         };
         this.socket.on("error", this._connectErrorHandler);
       });
-      connectPromise.catch(noop2);
       await connectPromise;
     }
     async logout() {
@@ -52810,9 +54171,11 @@ var require_imap_flow = __commonJS((exports, module) => {
     closeAfter() {
       setImmediate(() => this.close());
     }
-    createNoConnectionError(byeReason) {
-      const error51 = new Error("Connection not available");
-      error51.code = "NoConnection";
+    createConnectionError(code, message, meta3) {
+      return buildConnectionError(this.id, code, message, meta3);
+    }
+    createNoConnectionError(byeReason, meta3) {
+      const error51 = this.createConnectionError("NoConnection", "Connection not available", meta3);
       if (byeReason) {
         error51.reason = byeReason;
       }
@@ -52824,14 +54187,19 @@ var require_imap_flow = __commonJS((exports, module) => {
         clearTimeout(this.upgradeTimeout);
         clearTimeout(this.connectTimeout);
         clearTimeout(this.greetingTimeout);
-        clearTimeout(this._throttleTimer);
-        this._throttleTimer = null;
-        if (typeof this._throttleAbort === "function") {
-          this._throttleAbort(true);
-          this._throttleAbort = null;
+        for (let entry of this._throttleWaits) {
+          clearTimeout(entry.timer);
+          entry.resolve(true);
         }
+        this._throttleWaits.clear();
         this.usable = false;
+        this._idleSession = null;
         this.idling = false;
+        if (typeof this._upgradeReject === "function") {
+          let reject = this._upgradeReject;
+          this._upgradeReject = null;
+          reject(this.createNoConnectionError(false, { rejectedFrom: "upgrade" }));
+        }
         if (typeof this.initialReject === "function" && !this.options.verifyOnly) {
           clearTimeout(this.greetingTimeout);
           let reject = this.initialReject;
@@ -52845,7 +54213,17 @@ var require_imap_flow = __commonJS((exports, module) => {
           reject(err);
         }
         if (typeof this.preCheck === "function") {
-          this.preCheck().catch((err) => this.log.warn({ err, cid: this.id }));
+          this.preCheck().catch((err) => logConnectionError(this, "Failed to break IDLE while closing", err));
+        }
+        let closedMailbox = false;
+        if (!this.isClosed) {
+          closedMailbox = this.mailbox;
+          this.mailbox = false;
+          this.currentSelectCommand = false;
+          if (!this.options.verifyOnly) {
+            this.authenticated = false;
+          }
+          this.preCheck = false;
         }
         let pendingRequests = [];
         if (this.currentRequest && this.requestTagMap.has(this.currentRequest.tag)) {
@@ -52867,10 +54245,9 @@ var require_imap_flow = __commonJS((exports, module) => {
             }
           }
         }
-        const createNoConnectionError = (byeReason2) => this.createNoConnectionError(byeReason2);
         let byeReason = this.byeReason;
         for (let request of pendingRequests) {
-          request.reject(createNoConnectionError(byeReason));
+          request.reject(this.createNoConnectionError(byeReason, { rejectedFrom: "pendingRequest", command: request.command }));
         }
         if (this.currentLock && this.currentLock.heldWarnTimer) {
           clearTimeout(this.currentLock.heldWarnTimer);
@@ -52885,7 +54262,7 @@ var require_imap_flow = __commonJS((exports, module) => {
               lock.acquireTimer = null;
             }
             if (typeof lock.reject === "function") {
-              lock.reject(createNoConnectionError(byeReason));
+              lock.reject(this.createNoConnectionError(byeReason, { rejectedFrom: "mailboxLock", path: lock.path }));
             }
           }
         }
@@ -52895,7 +54272,7 @@ var require_imap_flow = __commonJS((exports, module) => {
             this._inflate.destroy();
             this._inflate = null;
           } catch (err) {
-            this.log.error({ err, info: "Failed to destroy inflate stream", cid: this.id });
+            this.log.error({ err, msg: "Failed to destroy inflate stream", cid: this.id });
           }
         }
         if (this._deflate) {
@@ -52904,7 +54281,7 @@ var require_imap_flow = __commonJS((exports, module) => {
             this._deflate.destroy();
             this._deflate = null;
           } catch (err) {
-            this.log.error({ err, info: "Failed to destroy deflate stream", cid: this.id });
+            this.log.error({ err, msg: "Failed to destroy deflate stream", cid: this.id });
           }
         }
         if (this.streamer) {
@@ -52919,7 +54296,7 @@ var require_imap_flow = __commonJS((exports, module) => {
               this.streamer.destroy();
             }
           } catch (err) {
-            this.log.error({ err, info: "Failed to cleanup streamer", cid: this.id });
+            this.log.error({ err, msg: "Failed to cleanup streamer", cid: this.id });
           }
         }
         this.clearSocketHandlers();
@@ -52929,22 +54306,15 @@ var require_imap_flow = __commonJS((exports, module) => {
         if (this.isClosed) {
           return;
         }
-        if (this.socket && !this.socket.destroyed && this.writeSocket !== this.socket) {
-          try {
-            this.socket.destroy();
-          } catch (err) {
-            this.log.error({ err, cid: this.id });
-          }
-        }
         this.isClosed = true;
-        if (this.writeSocket && !this.writeSocket.destroyed) {
+        if (this.writeSocket && this.writeSocket !== this.socket && !this.writeSocket.destroyed) {
           try {
             this.writeSocket.destroy();
           } catch (err) {
             this.log.error({ err, cid: this.id });
           }
         }
-        if (this.socket && !this.socket.destroyed && this.writeSocket !== this.socket) {
+        if (this.socket && !this.socket.destroyed) {
           try {
             this.socket.destroy();
           } catch (err) {
@@ -52961,10 +54331,17 @@ var require_imap_flow = __commonJS((exports, module) => {
         this._socketClose = null;
         this._socketEnd = null;
         this._socketTimeout = null;
-        this.log.trace({ msg: "Connection closed", cid: this.id });
+        this.log.debug({
+          msg: "Connection closed",
+          cid: this.id,
+          ...this._unknownTagCount ? { unknownTagCount: this._unknownTagCount } : {}
+        });
+        if (closedMailbox) {
+          this.emit("mailboxClose", closedMailbox);
+        }
         this.emit("close");
       } catch (ex) {
-        this.log.error(ex);
+        this.log.error({ err: ex, cid: this.id });
       }
     }
     async getQuota(path) {
@@ -53200,9 +54577,7 @@ var require_imap_flow = __commonJS((exports, module) => {
         while (res = await getNext()) {
           lastRes = res;
           if (this.isClosed || !this.socket || this.socket.destroyed) {
-            let error51 = new Error("Connection closed");
-            error51.code = "EConnectionClosed";
-            throw error51;
+            throw this.createConnectionError("EConnectionClosed", "Connection closed", { rejectedFrom: "fetchStream", command: "FETCH" });
           }
           yield res.response;
           res.next();
@@ -53257,7 +54632,7 @@ var require_imap_flow = __commonJS((exports, module) => {
       let hasMore = true;
       let processed = 0;
       let chunkSize = Number(options.chunkSize) || 64 * 1024;
-      let maxBytes = Number(options.maxBytes) || Infinity;
+      let maxBytes = normalizeByteLimit(options.maxBytes);
       let uid = false;
       if (part === "1") {
         let response2 = await this.fetchOne(range, { uid: true, bodyStructure: true }, options);
@@ -53378,7 +54753,8 @@ var require_imap_flow = __commonJS((exports, module) => {
       let stream;
       let output;
       let fetchAborted = false;
-      switch (meta3.encoding) {
+      let clientEncoding = response.binaryParts && response.binaryParts.has(part) ? false : meta3.encoding;
+      switch (clientEncoding) {
         case "base64":
           output = stream = new libbase64.Decoder;
           break;
@@ -53388,36 +54764,34 @@ var require_imap_flow = __commonJS((exports, module) => {
         default:
           output = stream = new PassThrough;
       }
+      let limiters = [];
+      let isLimited = () => limiters.some((entry) => entry.limited);
+      let pipeStage = (stage) => {
+        output.on("error", (err) => {
+          stage.emit("error", err);
+        });
+        output = output.pipe(stage);
+        return stage;
+      };
       let isTextNode = ["text/html", "text/plain", "text/x-amp-html"].includes(meta3.contentType) || part === "1" && !meta3.contentType;
       if ((!meta3.disposition || meta3.disposition === "inline") && isTextNode) {
         if (meta3.flowed) {
-          let flowDecoder = new FlowedDecoder({
-            delSp: meta3.delSp
-          });
-          output.on("error", (err) => {
-            flowDecoder.emit("error", err);
-          });
-          output = output.pipe(flowDecoder);
+          limiters.push(pipeStage(new LimitedPassthrough({ maxBytes })));
+          pipeStage(new FlowedDecoder({ delSp: meta3.delSp }));
         }
         if (meta3.charset && !["ascii", "usascii", "utf8"].includes(meta3.charset.toLowerCase().replace(/[^a-z0-9]+/g, ""))) {
           try {
-            let decoder = getDecoder(meta3.charset);
+            let decoder = getDecoder(meta3.charset, maxBytes);
             decoder.on("error", (err) => {
               this.log.warn({ err, charset: meta3.charset, cid: this.id });
             });
-            output.on("error", (err) => {
-              decoder.emit("error", err);
-            });
-            output = output.pipe(decoder);
+            limiters.push(pipeStage(decoder));
             meta3.charset = "utf-8";
           } catch {}
         }
       }
-      let limiter = new LimitedPassthrough({ maxBytes });
-      output.on("error", (err) => {
-        limiter.emit("error", err);
-      });
-      output = output.pipe(limiter);
+      let limiter = pipeStage(new LimitedPassthrough({ maxBytes }));
+      limiters.push(limiter);
       const cleanup = () => {
         fetchAborted = true;
         if (stream && !stream.destroyed) {
@@ -53427,13 +54801,13 @@ var require_imap_flow = __commonJS((exports, module) => {
       output.once("error", cleanup);
       output.once("close", cleanup);
       let writeChunk = (chunk2) => {
-        if (limiter.limited || fetchAborted || stream.destroyed) {
+        if (isLimited() || fetchAborted || stream.destroyed) {
           return true;
         }
         return stream.write(chunk2);
       };
       let fetchAllParts = async () => {
-        while (hasMore && !limiter.limited && !fetchAborted) {
+        while (hasMore && !isLimited() && !fetchAborted) {
           let { chunk: chunk2 } = await getNextPart();
           if (!chunk2 || fetchAborted) {
             break;
@@ -53441,23 +54815,19 @@ var require_imap_flow = __commonJS((exports, module) => {
           if (writeChunk(chunk2) === false) {
             try {
               await new Promise((resolve, reject) => {
-                let resolved = false;
                 const finish = (err) => {
-                  if (resolved)
-                    return;
-                  resolved = true;
-                  stream.removeAllListeners("drain");
-                  stream.removeAllListeners("error");
-                  stream.removeAllListeners("close");
+                  for (let event of ["drain", "error", "close"]) {
+                    stream.removeListener(event, finish);
+                  }
                   if (err) {
                     reject(err);
                   } else {
                     resolve();
                   }
                 };
-                stream.once("drain", () => finish());
-                stream.once("error", (err) => finish(err));
-                stream.once("close", () => finish());
+                stream.once("drain", finish);
+                stream.once("error", finish);
+                stream.once("close", finish);
               });
             } catch (err) {
               if (!fetchAborted) {
@@ -53468,6 +54838,15 @@ var require_imap_flow = __commonJS((exports, module) => {
               break;
             }
           }
+        }
+      };
+      this._openDownloads++;
+      let downloadDone = false;
+      let finishDownload = () => {
+        if (!downloadDone) {
+          downloadDone = true;
+          this._openDownloads--;
+          this.autoidle();
         }
       };
       let runFetchAllParts = () => {
@@ -53484,10 +54863,11 @@ var require_imap_flow = __commonJS((exports, module) => {
             });
           }
         }).finally(() => {
+          finishDownload();
           if (!fetchAborted && stream && !stream.destroyed) {
             stream.end();
           }
-        });
+        }).catch((err) => this.log.error({ msg: "Failed to fail the download stream", err, cid: this.id }));
       };
       setImmediate(() => {
         let writeResult;
@@ -53495,6 +54875,7 @@ var require_imap_flow = __commonJS((exports, module) => {
           writeResult = writeChunk(chunk);
         } catch (err) {
           stream.emit("error", err);
+          finishDownload();
           if (!fetchAborted && stream && !stream.destroyed) {
             stream.end();
           }
@@ -53504,6 +54885,8 @@ var require_imap_flow = __commonJS((exports, module) => {
           stream.once("drain", () => {
             if (!fetchAborted) {
               runFetchAllParts();
+            } else {
+              finishDownload();
             }
           });
         } else {
@@ -53535,6 +54918,9 @@ var require_imap_flow = __commonJS((exports, module) => {
       let data = {};
       for (let [part, content] of response.bodyParts) {
         let keyParts = part.split(".mime");
+        if (isUnsafeKey(keyParts[0])) {
+          continue;
+        }
         if (keyParts.length === 1) {
           let key = keyParts[0];
           if (!data[key]) {
@@ -53585,8 +54971,10 @@ var require_imap_flow = __commonJS((exports, module) => {
         }
       }
       for (let part of Object.keys(data)) {
-        let meta3 = data[part].meta;
-        switch (meta3.encoding) {
+        let meta3 = data[part].meta || {};
+        data[part].meta = meta3;
+        let clientEncoding = response.binaryParts && response.binaryParts.has(part) ? false : meta3.encoding;
+        switch (clientEncoding) {
           case "base64":
             data[part].content = data[part].content ? libbase64.decode(data[part].content.toString()) : null;
             break;
@@ -53604,20 +54992,30 @@ var require_imap_flow = __commonJS((exports, module) => {
         return false;
       }
       if (!this.socket || this.socket.destroyed) {
-        const error51 = new Error("Connection not available");
-        error51.code = "NoConnection";
-        throw error51;
+        throw this.createNoConnectionError(false, { rejectedFrom: "noSocket", command });
       }
       clearTimeout(this.idleStartTimer);
-      if (typeof this.preCheck === "function") {
-        await this.preCheck();
+      try {
+        if (typeof this.preCheck === "function") {
+          await this.preCheck();
+        }
+        return await this.runInternal(command, ...args);
+      } finally {
+        if (command !== "IDLE") {
+          this.autoidle();
+        }
+      }
+    }
+    async runInternal(command, ...args) {
+      command = command.toUpperCase();
+      if (!this.commands.has(command)) {
+        return false;
+      }
+      if (!this.socket || this.socket.destroyed) {
+        throw this.createNoConnectionError(false, { rejectedFrom: "noSocket", command });
       }
       let handler = this.commands.get(command);
-      let result = await handler(this, ...args);
-      if (command !== "IDLE") {
-        this.autoidle();
-      }
-      return result;
+      return await handler(this, ...args);
     }
     async processLocks() {
       const wasProcessing = this.processingLock;
@@ -53668,6 +55066,7 @@ var require_imap_flow = __commonJS((exports, module) => {
                 cid: this.id
               });
             }, threshold);
+            unrefTimer(lock.heldWarnTimer);
           };
           const release = () => {
             if (this.currentLock === lock) {
@@ -53683,6 +55082,7 @@ var require_imap_flow = __commonJS((exports, module) => {
                 idling: this.idling
               });
               this.currentLock = false;
+              this.autoidle();
               setImmediate(() => {
                 this.processLocks().catch((err) => this.log.error({ err, cid: this.id }));
               });
@@ -53696,11 +55096,15 @@ var require_imap_flow = __commonJS((exports, module) => {
           };
           if (!this.usable || !this.socket || this.socket.destroyed) {
             this.log.trace({ msg: "Failed to acquire mailbox lock", path, lockId, idling: this.idling });
-            let error51 = new Error("Connection not available");
-            error51.code = "NoConnection";
-            reject(error51);
+            reject(this.createNoConnectionError(false, { rejectedFrom: "mailboxLock", path }));
             continue;
           }
+          const grantLock = () => {
+            this.currentLock = lock;
+            armHeldTimer();
+            this.autoidle();
+            resolve({ path, release });
+          };
           if (this.mailbox && this.mailbox.path === path && !!this.mailbox.readOnly === !!options.readOnly) {
             this.log.trace({
               msg: "Mailbox lock acquired [existing]",
@@ -53709,9 +55113,7 @@ var require_imap_flow = __commonJS((exports, module) => {
               idling: this.idling,
               ...options.description && { description: options.description }
             });
-            this.currentLock = lock;
-            armHeldTimer();
-            resolve({ path, release });
+            grantLock();
             break;
           }
           try {
@@ -53723,9 +55125,7 @@ var require_imap_flow = __commonJS((exports, module) => {
               idling: this.idling,
               ...options.description && { description: options.description }
             });
-            this.currentLock = lock;
-            armHeldTimer();
-            resolve({ path, release });
+            grantLock();
             break;
           } catch (err) {
             if (err.responseStatus === "NO") {
@@ -53772,7 +55172,7 @@ var require_imap_flow = __commonJS((exports, module) => {
           ...this.currentLock.options?.description && { description: this.currentLock.options?.description }
         } : null
       });
-      let lockPromise = new Promise((resolve, reject) => {
+      let lockPromise = guardedPromise((resolve, reject) => {
         let lockEntry = { resolve, reject, path, options, lockId };
         this.locks.push(lockEntry);
         if (Number(options.acquireTimeout) > 0) {
@@ -53790,7 +55190,6 @@ var require_imap_flow = __commonJS((exports, module) => {
         }
         this.processLocks().catch((err) => reject(err));
       });
-      lockPromise.catch(noop2);
       return lockPromise;
     }
     getLogger() {
@@ -53805,24 +55204,28 @@ var require_imap_flow = __commonJS((exports, module) => {
           if (this.options.logger !== false) {
             if (typeof mainLogger[level] !== "function") {
               if (level === "fatal" || level === "error") {
-                console.log(JSON.stringify(...args));
+                let entry = args[0];
+                try {
+                  if (entry && typeof entry === "object" && entry.err) {
+                    entry = Object.assign({}, entry, { err: flattenLoggedError(entry.err) });
+                  }
+                  console.error(JSON.stringify(entry));
+                } catch {
+                  console.error(entry);
+                }
               }
             } else {
               mainLogger[level](...args);
             }
           }
           if (this.emitLogs && args && args[0] && typeof args[0] === "object") {
-            let logEntry = Object.assign({ level, t: Date.now(), cid: this.id, lo: ++this.lo }, args[0]);
-            if (logEntry.err && typeof logEntry.err === "object") {
-              let err = logEntry.err;
-              logEntry.err = {
-                stack: err.stack
-              };
-              Object.keys(err).forEach((key) => {
-                logEntry.err[key] = err[key];
-              });
-            }
-            this.emit("log", logEntry);
+            try {
+              let logEntry = Object.assign({ level, t: Date.now(), cid: this.id, lo: ++this.lo }, args[0]);
+              if (logEntry.err) {
+                logEntry.err = flattenLoggedError(logEntry.err);
+              }
+              this.emit("log", logEntry);
+            } catch {}
           }
         };
       }
@@ -53851,60 +55254,233 @@ var require_imap_flow = __commonJS((exports, module) => {
   exports.ImapFlow = ImapFlow;
 });
 
-// node_modules/mailparser/node_modules/nodemailer/lib/addressparser/index.js
-var require_addressparser = __commonJS((exports, module) => {
-  function _handleAddress(tokens, depth) {
-    let isGroup = false;
-    let state = "text";
-    const addresses = [];
-    const data = {
-      address: [],
-      comment: [],
-      group: [],
-      text: [],
-      textWasQuoted: []
-    };
-    let insideQuotes = false;
-    for (let i = 0, len = tokens.length;i < len; i++) {
-      const token = tokens[i];
-      const prevToken = i ? tokens[i - 1] : null;
-      if (token.type === "operator") {
-        switch (token.value) {
-          case "<":
-            state = "address";
-            insideQuotes = false;
-            break;
-          case "(":
-            state = "comment";
-            insideQuotes = false;
-            break;
-          case ":":
-            state = "group";
-            isGroup = true;
-            insideQuotes = false;
-            break;
-          case '"':
-            insideQuotes = !insideQuotes;
-            state = "text";
-            break;
-          default:
-            state = "text";
-            insideQuotes = false;
-            break;
+// node_modules/mailparser/node_modules/nodemailer/dist/esm/addressparser/index.js
+var exports_addressparser = {};
+__export(exports_addressparser, {
+  default: () => addressparser
+});
+function _quoteLocalPart(address) {
+  const lastAt = address.lastIndexOf("@");
+  if (lastAt < 0) {
+    return address;
+  }
+  const user = address.substr(0, lastAt);
+  if (/^[^\s"(),:;<>@[\\\]]+$/.test(user) || /^"(?:[^"\\]|\\[\s\S])*"$/.test(user)) {
+    return address;
+  }
+  return '"' + user.replace(/["\\]/g, "\\$&") + '"@' + address.substr(lastAt + 1);
+}
+function _isSpaceCode(code) {
+  return code === 32 || code >= 9 && code <= 13 || code === 160 || code === 5760 || code >= 8192 && code <= 8202 || code === 8232 || code === 8233 || code === 8239 || code === 8287 || code === 12288 || code === 65279;
+}
+function _isWordCode(code) {
+  return code >= 48 && code <= 57 || code >= 65 && code <= 90 || code >= 97 && code <= 122 || code === 95;
+}
+function _isBoundary(text, at) {
+  return _isWordCode(text.charCodeAt(at - 1)) !== _isWordCode(text.charCodeAt(at));
+}
+function _indexOfAt(text, from, to) {
+  for (let i = from;i < to; i++) {
+    if (text.charCodeAt(i) === 64) {
+      return i;
+    }
+  }
+  return -1;
+}
+function _looseAddressStart(text) {
+  const len = text.length;
+  let pos = 0;
+  while (pos < len) {
+    while (pos < len && _isSpaceCode(text.charCodeAt(pos))) {
+      pos++;
+    }
+    if (pos >= len) {
+      break;
+    }
+    const runStart = pos;
+    let runEnd = pos;
+    while (runEnd < len && !_isSpaceCode(text.charCodeAt(runEnd))) {
+      runEnd++;
+    }
+    let at = _indexOfAt(text, runStart, runEnd);
+    if (at >= 0) {
+      let lastBoundary = -1;
+      for (let k = runEnd;k > runStart; k--) {
+        if (_isBoundary(text, k)) {
+          lastBoundary = k;
+          break;
         }
-      } else if (token.value) {
-        if (state === "address") {
-          token.value = token.value.replace(/^[^<]*<\s*/, "");
-        }
-        if (prevToken && prevToken.noBreak && data[state].length) {
-          data[state][data[state].length - 1] += token.value;
-          if (state === "text" && insideQuotes) {
-            data.textWasQuoted[data.textWasQuoted.length - 1] = true;
+      }
+      let atomStart = runStart;
+      while (lastBoundary >= 0 && at >= 0) {
+        if (at > atomStart && runEnd > at + 1 && lastBoundary > at + 1) {
+          for (let start = atomStart;start < at; start++) {
+            if (_isBoundary(text, start)) {
+              if (start > runStart) {
+                return start;
+              }
+              let padded = runStart;
+              while (padded > 0 && _isSpaceCode(text.charCodeAt(padded - 1))) {
+                padded--;
+              }
+              return padded;
+            }
           }
+        }
+        atomStart = at + 1;
+        at = _indexOfAt(text, atomStart, runEnd);
+      }
+    }
+    pos = runEnd;
+  }
+  return -1;
+}
+function _recoverAddrSpec(data) {
+  if (!HAS_WHITESPACE.test(data.address)) {
+    return;
+  }
+  let address;
+  let rest;
+  const quoted = data.address.match(QUOTED_LOCAL_ADDR);
+  if (quoted) {
+    if (!quoted[2]) {
+      return;
+    }
+    address = quoted[1];
+    rest = [quoted[2]];
+  } else {
+    if (data.address.indexOf('"') >= 0) {
+      return;
+    }
+    const parts = data.address.split(/\s+/);
+    let addrIndex = parts.findIndex((part) => ADDR_SPEC.test(part));
+    if (addrIndex < 0) {
+      addrIndex = parts.findIndex((part) => LOOSE_ADDR_SPEC.test(part));
+    }
+    if (addrIndex < 0) {
+      return;
+    }
+    address = parts.splice(addrIndex, 1)[0];
+    rest = parts;
+  }
+  data.address = address;
+  data.text = [data.text].concat(rest).filter((part) => part).join(" ");
+}
+function _handleAddress(tokens, depth) {
+  let isGroup = false;
+  let state = "text";
+  const addresses = [];
+  const data = {
+    address: [],
+    comment: [],
+    group: [],
+    text: [],
+    textWasQuoted: []
+  };
+  let insideQuotes = false;
+  const lastChars = { address: "", comment: "", group: "", text: "" };
+  for (let i = 0, len = tokens.length;i < len; i++) {
+    const token = tokens[i];
+    const prevToken = i ? tokens[i - 1] : null;
+    if (token.type === "operator") {
+      switch (token.value) {
+        case "<":
+          state = "address";
+          insideQuotes = false;
+          break;
+        case "(":
+          state = "comment";
+          insideQuotes = false;
+          break;
+        case ":":
+          state = "group";
+          isGroup = true;
+          insideQuotes = false;
+          break;
+        case '"':
+          insideQuotes = !insideQuotes;
+          state = "text";
+          break;
+        default:
+          state = "text";
+          insideQuotes = false;
+          break;
+      }
+    } else if (token.value) {
+      const prevPrevToken = i > 1 ? tokens[i - 2] : null;
+      const opensAfterEmptyQuotedString = prevToken?.type === "operator" && prevToken.value === '"' && !!prevToken.noBreak && prevPrevToken?.type === "operator" && prevPrevToken.value === '"';
+      if (state === "address") {
+        token.value = token.value.replace(/^[^<]*<\s*/, "");
+      }
+      const parts = data[state];
+      const joins = prevToken && prevToken.noBreak && parts.length && (prevToken.value !== ")" || lastChars[state] === "@" || token.value.charAt(0) === "@");
+      if (joins) {
+        data[state][data[state].length - 1] += token.value;
+        if (token.value) {
+          lastChars[state] = token.value.charAt(token.value.length - 1);
+        }
+        if (state === "text" && insideQuotes) {
+          data.textWasQuoted[data.textWasQuoted.length - 1] = true;
+        }
+      } else {
+        data[state].push(token.value);
+        lastChars[state] = token.value.charAt(token.value.length - 1);
+        if (state === "text") {
+          data.textWasQuoted.push(insideQuotes || opensAfterEmptyQuotedString);
+        }
+      }
+    }
+  }
+  if (!data.text.length && data.comment.length) {
+    data.text = data.comment;
+    data.comment = [];
+  }
+  if (isGroup) {
+    data.text = data.text.join(" ");
+    let groupMembers = [];
+    if (data.group.length) {
+      const parsedGroup = addressparser(data.group.join(","), { _depth: depth + 1 });
+      parsedGroup.forEach((member) => {
+        if (member.group) {
+          groupMembers = groupMembers.concat(member.group);
         } else {
-          data[state].push(token.value);
-          if (state === "text") {
-            data.textWasQuoted.push(insideQuotes);
+          groupMembers.push(member);
+        }
+      });
+    }
+    addresses.push({
+      name: data.text || "",
+      group: groupMembers
+    });
+  } else {
+    if (!data.address.length && data.text.length) {
+      for (let i = data.text.length - 1;i >= 0; i--) {
+        if (!data.textWasQuoted[i] && ADDR_SPEC.test(data.text[i])) {
+          data.address = data.text.splice(i, 1);
+          data.textWasQuoted.splice(i, 1);
+          break;
+        }
+      }
+      if (!data.address.length) {
+        let extracted = false;
+        for (let i = data.text.length - 1;i >= 0; i--) {
+          if (!data.textWasQuoted[i]) {
+            const part = data.text[i];
+            let remainder = part;
+            const at = _looseAddressStart(part);
+            if (at >= 0) {
+              LOOSE_TEXT_ADDR.lastIndex = at;
+              const match2 = LOOSE_TEXT_ADDR.exec(part);
+              if (match2) {
+                data.address = [match2[0].trim()];
+                extracted = true;
+                remainder = part.slice(0, at) + " " + part.slice(at + match2[0].length);
+              }
+            }
+            data.text[i] = remainder.trim();
+            if (extracted) {
+              break;
+            }
           }
         }
       }
@@ -53913,221 +55489,187 @@ var require_addressparser = __commonJS((exports, module) => {
       data.text = data.comment;
       data.comment = [];
     }
-    if (isGroup) {
-      data.text = data.text.join(" ");
-      let groupMembers = [];
-      if (data.group.length) {
-        const parsedGroup = addressparser(data.group.join(","), { _depth: depth + 1 });
-        parsedGroup.forEach((member) => {
-          if (member.group) {
-            groupMembers = groupMembers.concat(member.group);
-          } else {
-            groupMembers.push(member);
-          }
-        });
-      }
-      addresses.push({
-        name: data.text || "",
-        group: groupMembers
-      });
-    } else {
-      if (!data.address.length && data.text.length) {
-        for (let i = data.text.length - 1;i >= 0; i--) {
-          if (!data.textWasQuoted[i] && /^[^@\s]+@[^@\s]+$/.test(data.text[i])) {
-            data.address = data.text.splice(i, 1);
-            data.textWasQuoted.splice(i, 1);
-            break;
-          }
-        }
-        if (!data.address.length) {
-          let extracted = false;
-          for (let i = data.text.length - 1;i >= 0; i--) {
-            if (!data.textWasQuoted[i]) {
-              data.text[i] = data.text[i].replace(/\s*\b[^@\s]+@[^\s]+\b\s*/, (match2) => {
-                if (!extracted) {
-                  data.address = [match2.trim()];
-                  extracted = true;
-                  return " ";
-                }
-                return match2;
-              }).trim();
-              if (extracted) {
-                break;
-              }
-            }
-          }
-        }
-      }
-      if (!data.text.length && data.comment.length) {
-        data.text = data.comment;
-        data.comment = [];
-      }
-      if (data.address.length > 1) {
-        data.text = data.text.concat(data.address.splice(1));
-      }
-      data.text = data.text.join(" ");
-      data.address = data.address.join(" ");
-      const address = {
-        address: data.address || data.text || "",
-        name: data.text || data.address || ""
-      };
-      if (address.address === address.name) {
-        if (/@/.test(address.address || "")) {
-          address.name = "";
-        } else {
-          address.address = "";
-        }
-      }
-      addresses.push(address);
+    if (data.address.length > 1) {
+      data.text = data.text.concat(data.address.splice(1));
     }
-    return addresses;
-  }
-
-  class Tokenizer {
-    constructor(str) {
-      this.str = (str || "").toString();
-      this.operatorCurrent = "";
-      this.operatorExpecting = "";
-      this.node = null;
-      this.escaped = false;
-      this.inDomainLiteral = false;
-      this.list = [];
-      this.operators = {
-        '"': '"',
-        "(": ")",
-        "<": ">",
-        ",": "",
-        ":": ";",
-        ";": ""
-      };
+    const addressFromQuotedText = !data.address.length && data.textWasQuoted.some((wasQuoted) => wasQuoted);
+    data.text = data.text.join(" ");
+    data.address = data.address.join(" ");
+    if (addressFromQuotedText && data.text) {
+      data.address = _quoteLocalPart(data.text);
+      data.text = "";
     }
-    tokenize() {
-      const list = [];
-      for (let i = 0, len = this.str.length;i < len; i++) {
-        const chr = this.str.charAt(i);
-        const nextChr = i < len - 1 ? this.str.charAt(i + 1) : null;
-        this.checkChar(chr, nextChr);
-      }
-      this.list.forEach((node) => {
-        node.value = (node.value || "").toString().trim();
-        if (node.value) {
-          list.push(node);
-        }
-      });
-      return list;
-    }
-    checkChar(chr, nextChr) {
-      if (!this.escaped && !this.operatorExpecting) {
-        if (!this.inDomainLiteral && chr === "[") {
-          this.inDomainLiteral = true;
-        } else if (this.inDomainLiteral && (chr === "]" || chr === "," || chr === ";")) {
-          this.inDomainLiteral = false;
-        }
-      }
-      if (this.escaped) {} else if (chr === this.operatorExpecting) {
-        this.node = {
-          type: "operator",
-          value: chr
-        };
-        if (nextChr && ![" ", "\t", "\r", `
-`, ",", ";"].includes(nextChr)) {
-          this.node.noBreak = true;
-        }
-        this.list.push(this.node);
-        this.node = null;
-        this.operatorExpecting = "";
-        this.escaped = false;
-        return;
-      } else if (!this.operatorExpecting && !this.inDomainLiteral && chr in this.operators) {
-        this.node = {
-          type: "operator",
-          value: chr
-        };
-        this.list.push(this.node);
-        this.node = null;
-        this.operatorExpecting = this.operators[chr];
-        this.escaped = false;
-        return;
-      } else if (['"', "'"].includes(this.operatorExpecting) && chr === "\\") {
-        this.escaped = true;
-        return;
-      }
-      if (!this.node) {
-        this.node = {
-          type: "text",
-          value: ""
-        };
-        this.list.push(this.node);
-      }
-      if (chr === `
-`) {
-        chr = " ";
-      }
-      if (chr.charCodeAt(0) >= 33 || [" ", "\t"].includes(chr)) {
-        this.node.value += chr;
-      }
-      this.escaped = false;
-    }
-  }
-  var MAX_NESTED_GROUP_DEPTH = 50;
-  function addressparser(str, options) {
-    options = options || {};
-    const depth = options._depth || 0;
-    if (depth > MAX_NESTED_GROUP_DEPTH) {
-      return [];
-    }
-    const tokenizer = new Tokenizer(str);
-    const tokens = tokenizer.tokenize();
-    const addresses = [];
-    let address = [];
-    let parsedAddresses = [];
-    tokens.forEach((token) => {
-      if (token.type === "operator" && (token.value === "," || token.value === ";")) {
-        if (address.length) {
-          addresses.push(address);
-        }
-        address = [];
+    _recoverAddrSpec(data);
+    const address = {
+      address: data.address || data.text || "",
+      name: data.text || data.address || ""
+    };
+    if (address.address === address.name) {
+      if (/@/.test(address.address || "")) {
+        address.name = "";
       } else {
-        address.push(token);
-      }
-    });
-    if (address.length) {
-      addresses.push(address);
-    }
-    addresses.forEach((addr) => {
-      const handled = _handleAddress(addr, depth);
-      if (handled.length) {
-        parsedAddresses = parsedAddresses.concat(handled);
-      }
-    });
-    for (let i = parsedAddresses.length - 2;i >= 0; i--) {
-      const current = parsedAddresses[i];
-      const next = parsedAddresses[i + 1];
-      if (current.address === "" && current.name && !current.group && next.address && next.name) {
-        next.name = current.name + ", " + next.name;
-        parsedAddresses.splice(i, 1);
+        address.address = "";
       }
     }
-    if (options.flatten) {
-      const flatAddresses = [];
-      const walkAddressList = (list) => {
-        list.forEach((entry) => {
-          if (entry.group) {
-            return walkAddressList(entry.group);
-          }
-          flatAddresses.push(entry);
-        });
-      };
-      walkAddressList(parsedAddresses);
-      return flatAddresses;
-    }
-    return parsedAddresses;
+    addresses.push(address);
   }
-  module.exports = addressparser;
+  return addresses;
+}
+
+class Tokenizer {
+  constructor(str) {
+    this.str = (str || "").toString();
+    this.operatorCurrent = "";
+    this.operatorExpecting = "";
+    this.node = null;
+    this.escaped = false;
+    this.inDomainLiteral = false;
+    this.list = [];
+    this.operators = {
+      '"': '"',
+      "(": ")",
+      "<": ">",
+      ",": "",
+      ":": ";",
+      ";": ""
+    };
+  }
+  tokenize() {
+    const list = [];
+    for (let i = 0, len = this.str.length;i < len; i++) {
+      const chr = this.str.charAt(i);
+      const nextChr = i < len - 1 ? this.str.charAt(i + 1) : null;
+      this.checkChar(chr, nextChr);
+    }
+    this.list.forEach((node) => {
+      node.value = (node.value || "").toString().trim();
+      if (node.value) {
+        list.push(node);
+      }
+    });
+    return list;
+  }
+  checkChar(chr, nextChr) {
+    if (!this.escaped && !this.operatorExpecting) {
+      if (!this.inDomainLiteral && chr === "[") {
+        this.inDomainLiteral = true;
+      } else if (this.inDomainLiteral && (chr === "]" || chr === "," || chr === ";")) {
+        this.inDomainLiteral = false;
+      }
+    }
+    if (this.escaped) {} else if (chr === this.operatorExpecting) {
+      this.node = {
+        type: "operator",
+        value: chr
+      };
+      if (nextChr && ![" ", "\t", "\r", `
+`, ",", ";"].includes(nextChr)) {
+        this.node.noBreak = true;
+      }
+      this.list.push(this.node);
+      this.node = null;
+      this.operatorExpecting = "";
+      this.escaped = false;
+      return;
+    } else if (!this.operatorExpecting && !this.inDomainLiteral && chr in this.operators) {
+      this.node = {
+        type: "operator",
+        value: chr
+      };
+      this.list.push(this.node);
+      this.node = null;
+      this.operatorExpecting = this.operators[chr];
+      this.escaped = false;
+      return;
+    } else if (['"', "'"].includes(this.operatorExpecting) && chr === "\\") {
+      this.escaped = true;
+      return;
+    }
+    if (!this.node) {
+      this.node = {
+        type: "text",
+        value: ""
+      };
+      this.list.push(this.node);
+    }
+    if (chr === `
+`) {
+      chr = " ";
+    }
+    if (chr.charCodeAt(0) >= 33 || [" ", "\t"].includes(chr)) {
+      this.node.value += chr;
+    }
+    this.escaped = false;
+  }
+}
+function addressparser(str, options) {
+  options = options || {};
+  const depth = options._depth || 0;
+  if (depth > MAX_NESTED_GROUP_DEPTH) {
+    return [];
+  }
+  const tokenizer = new Tokenizer(str);
+  const tokens = tokenizer.tokenize();
+  const addresses = [];
+  let address = [];
+  let parsedAddresses = [];
+  tokens.forEach((token) => {
+    if (token.type === "operator" && (token.value === "," || token.value === ";")) {
+      if (address.length) {
+        addresses.push(address);
+      }
+      address = [];
+    } else {
+      address.push(token);
+    }
+  });
+  if (address.length) {
+    addresses.push(address);
+  }
+  addresses.forEach((addr) => {
+    const handled = _handleAddress(addr, depth);
+    for (let i = 0;i < handled.length; i++) {
+      parsedAddresses.push(handled[i]);
+    }
+  });
+  const mergedAddresses = [];
+  for (let i = parsedAddresses.length - 1;i >= 0; i--) {
+    const current = parsedAddresses[i];
+    const next = mergedAddresses.length ? mergedAddresses[mergedAddresses.length - 1] : null;
+    if (next && current.address === "" && current.name && !current.group && next.address && next.name) {
+      next.name = current.name + ", " + next.name;
+    } else {
+      mergedAddresses.push(current);
+    }
+  }
+  mergedAddresses.reverse();
+  parsedAddresses = mergedAddresses;
+  if (options.flatten) {
+    const flatAddresses = [];
+    const walkAddressList = (list) => {
+      list.forEach((entry) => {
+        if (entry.group) {
+          return walkAddressList(entry.group);
+        }
+        flatAddresses.push(entry);
+      });
+    };
+    walkAddressList(parsedAddresses);
+    return flatAddresses;
+  }
+  return parsedAddresses;
+}
+var HAS_WHITESPACE, QUOTED_LOCAL_ADDR, ADDR_SPEC, LOOSE_ADDR_SPEC, LOOSE_TEXT_ADDR, MAX_NESTED_GROUP_DEPTH = 50;
+var init_addressparser = __esm(() => {
+  HAS_WHITESPACE = /\s/;
+  QUOTED_LOCAL_ADDR = /^("(?:[^"\\]|\\[\s\S])*"@\S+)(?:\s+([\s\S]+))?$/;
+  ADDR_SPEC = /^[^@\s]+@[^@\s]+$/;
+  LOOSE_ADDR_SPEC = /^[^@\s]+@\S+$/;
+  LOOSE_TEXT_ADDR = /\s*\b[^@\s]+@[^\s]+\b\s*/y;
 });
 
 // node_modules/punycode.js/punycode.js
-var require_punycode2 = __commonJS((exports, module) => {
+var require_punycode = __commonJS((exports, module) => {
   var maxInt = 2147483647;
   var base = 36;
   var tMin = 1;
@@ -55951,7 +57493,7 @@ var init_hp2_builder = __esm(() => {
   };
 });
 
-// node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/decode-codepoint.js
+// node_modules/entities/dist/esm/decode-codepoint.js
 function replaceCodePoint(codePoint) {
   var _a8;
   if (codePoint >= 55296 && codePoint <= 57343 || codePoint > 1114111) {
@@ -56003,7 +57545,7 @@ var init_decode_codepoint = __esm(() => {
   };
 });
 
-// node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/internal/decode-shared.js
+// node_modules/entities/dist/esm/internal/decode-shared.js
 function decodeBase64(input) {
   const binary = typeof atob === "function" ? atob(input) : typeof Buffer.from === "function" ? Buffer.from(input, "base64").toString("binary") : new Buffer(input, "base64").toString("binary");
   const evenLength = binary.length & ~1;
@@ -56016,19 +57558,19 @@ function decodeBase64(input) {
   return out;
 }
 
-// node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/generated/decode-data-html.js
+// node_modules/entities/dist/esm/generated/decode-data-html.js
 var htmlDecodeTree;
 var init_decode_data_html = __esm(() => {
   htmlDecodeTree = /* @__PURE__ */ decodeBase64("QR08ALkAAgH6AYsDNQR2BO0EPgXZBQEGLAbdBxMISQrvCmQLfQurDKQNLw4fD4YPpA+6D/IPAAAAAAAAAAAAAAAAKhBMEY8TmxUWF2EYLBkxGuAa3RsJHDscWR8YIC8jSCSIJcMl6ie3Ku8rEC0CLjoupS7kLgAIRU1hYmNmZ2xtbm9wcnN0dVQAWgBeAGUAaQBzAHcAfgCBAIQAhwCSAJoAoACsALMAbABpAGcAO4DGAMZAUAA7gCYAJkBjAHUAdABlADuAwQDBQHIiZXZlAAJhAAFpeW0AcgByAGMAO4DCAMJAEGRyAADgNdgE3XIAYQB2AGUAO4DAAMBA8CFoYZFj4SFjcgBhZAAAoFMqAAFncIsAjgBvAG4ABGFmAADgNdg43fAlbHlGdW5jdGlvbgCgYSBpAG4AZwA7gMUAxUAAAWNzpACoAHIAAOA12Jzc6SFnbgCgVCJpAGwAZABlADuAwwDDQG0AbAA7gMQAxEAABGFjZWZvcnN1xQDYANoA7QDxAPYA+QD8AAABY3LJAM8AayNzbGFzaAAAoBYidgHTANUAAKDnKmUAZAAAoAYjeQARZIABY3J0AOAA5QDrAGEidXNlAACgNSLuI291bGxpcwCgLCFhAJJjcgAA4DXYBd1wAGYAAOA12Dnd5SF2ZdhiYwDyAOoAbSJwZXEAAKBOIgAHSE9hY2RlZmhpbG9yc3UXARoBHwE6AVIBVQFiAWQBZgGCAakB6QHtAfIBYwB5ACdkUABZADuAqQCpQIABY3B5ACUBKAE1AfUhdGUGYWmg0iJ0KGFsRGlmZmVyZW50aWFsRAAAoEUhbCJleXMAAKAtIQACYWVpb0EBRAFKAU0B8iFvbgxhZABpAGwAO4DHAMdAcgBjAAhhbiJpbnQAAKAwIm8AdAAKYQABZG5ZAV0BaSJsbGEAuGB0I2VyRG90ALdg8gA5AWkAp2NyImNsZQAAAkRNUFRwAXQBeQF9AW8AdAAAoJkiaSJudXMAAKCWIuwhdXMAoJUiaSJtZXMAAKCXIm8AAAFjc4cBlAFrKndpc2VDb250b3VySW50ZWdyYWwAAKAyImUjQ3VybHkAAAFEUZwBpAFvJXVibGVRdW90ZQAAoB0gdSJvdGUAAKAZIAACbG5wdbABtgHNAdgBbwBuAGWgNyIAoHQqgAFnaXQAvAHBAcUB8iJ1ZW50AKBhIm4AdAAAoC8i7yV1ckludGVncmFsAKAuIgABZnLRAdMBAKACIe8iZHVjdACgECJuLnRlckNsb2Nrd2lzZUNvbnRvdXJJbnRlZ3JhbAAAoDMi7yFzcwCgLypjAHIAAOA12J7ccABDoNMiYQBwAACgTSKABURKU1phY2VmaW9zAAsCEgIVAhgCGwIsAjQCOQI9AnMCfwNvoEUh9CJyYWhkAKARKWMAeQACZGMAeQAFZGMAeQAPZIABZ3JzACECJQIoAuchZXIAoCEgcgAAoKEhaAB2AACg5CoAAWF5MAIzAvIhb24OYRRkbAB0oAciYQCUY3IAAOA12AfdAAFhZkECawIAAWNtRQJnAvIjaXRpY2FsAAJBREdUUAJUAl8CYwJjInV0ZQC0YG8AdAFZAloC2WJiJGxlQWN1dGUA3WJyImF2ZQBgYGkibGRlANxi7yFuZACgxCJmJWVyZW50aWFsRAAAoEYhcAR9AgAAAAAAAIECjgIAABoDZgAA4DXYO91EoagAhQKJAm8AdAAAoNwgcSJ1YWwAAKBQIuIhbGUAA0NETFJVVpkCqAK1Au8C/wIRA28AbgB0AG8AdQByAEkAbgB0AGUAZwByAGEA7ADEAW8AdAKvAgAAAACwAqhgbiNBcnJvdwAAoNMhAAFlb7kC0AJmAHQAgAFBUlQAwQLGAs0CciJyb3cAAKDQIekkZ2h0QXJyb3cAoNQhZQDlACsCbgBnAAABTFLWAugC5SFmdAABQVLcAuECciJyb3cAAKD4J+kkZ2h0QXJyb3cAoPon6SRnaHRBcnJvdwCg+SdpImdodAAAAUFU9gL7AnIicm93AACg0iFlAGUAAKCoInAAQQIGAwAAAAALA3Iicm93AACg0SFvJHduQXJyb3cAAKDVIWUlcnRpY2FsQmFyAACgJSJuAAADQUJMUlRhJAM2AzoDWgNxA3oDciJyb3cAAKGTIUJVLAMwA2EAcgAAoBMpcCNBcnJvdwAAoPUhciJldmUAEWPlIWZ00gJDAwAASwMAAFIDaSVnaHRWZWN0b3IAAKBQKWUkZVZlY3RvcgAAoF4p5SJjdG9yQqC9IWEAcgAAoFYpaSJnaHQA1AFiAwAAaQNlJGVWZWN0b3IAAKBfKeUiY3RvckKgwSFhAHIAAKBXKWUAZQBBoKQiciJyb3cAAKCnIXIAcgBvAPcAtAIAAWN0gwOHA3IA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YwAAoN8i4SFycnCgtiEAoD0pgKIqImJjZG9zACsVMBU6FT4VQRVyImNhcAAAoEgqAAFhdTQVNxVwAACgRipwAACgSipvAHQAAKCNInIAAKBFKgDgKiIA/gACYWxydksVURVuFXMVcgByAG2gtyEAoDwpeQCAAWV2dwBYFWUVaRVxAHACXxUAAAAAYxVyAGUA4wAXFXUA4wAZFWUAZQAAoM4iZSJkZ2UAAKDPImUAbgA7gKQApEBlI2Fycm93AAABbHJ7FX8V5SFmdACgtiFpImdodAAAoLchZQDkAG0VAAFjaYsVkRVvAG4AaQBuAPQAkwFuAHQAAKAxImwiY3R5AACgLSOACUFIYWJjZGVmaGlqbG9yc3R1d3oAuBW7Fb8V1RXgFegV+RUKFhUWHxZUFlcWZRbFFtsW7xb7FgUXChdyAPIAtAJhAHIAAKBlKQACZ2xyc8YVyhXOFdAV5yFlcgCgICDlIXRoAKA4IfIA9QxoAHagECAAoKMiawHZFd4VYSJyb3cAAKAPKWEA4wBfAgABYXnkFecV8iFvbg9hNGQAoUYhYW/tFfQVAAFnciEC8RVyAACgyiF0InNlcQAAoHcqgAFnbG0A/xUCFgUWO4CwALBAdABhALRjcCJ0eXYAAKCxKQABaXIOFhIW8yFodACgfykA4DXYId1hAHIAAAFschsWHRYAoMMhAKDCIYACYWVnc3YAKBauAjYWOhY+Fm0AAKHEIm9zLhY0Fm4AZABzoMQi9SFpdACgZiZhIm1tYQDdY2kAbgAAoPIiAKH3AGlvQxZRFmQAZQAAgfcAO29KFksW90BuI3RpbWVzAACgxyJuAPgAUBZjAHkAUmRjAG8CXhYAAAAAYhZyAG4AAKAeI28AcAAAoA0jgAJscHR1dwBuFnEWdRaSFp4W7CFhciRgZgAA4DXYVd0AotkCZW1wc30WhBaJFo0WcQBkoFAibwB0AACgUSJpIm51cwAAoDgi7CF1cwCgFCLxInVhcmUAoKEiYgBsAGUAYgBhAHIAdwBlAGQAZwDlANcAbgCAAWFkaAClFqoWtBZyAHIAbwD3APUMbwB3AG4AYQByAHIAbwB3APMA8xVhI3Jwb29uAAABbHK8FsAWZQBmAPQAHBZpAGcAaAD0AB4WYgHJFs8WawBhAHIAbwD3AJILbwLUFgAAAADYFnIAbgAAoB8jbwBwAACgDCOAAWNvdADhFukW7BYAAXJ55RboFgDgNdi53FVkbAAAoPYp8iFvaxFhAAFkcvMW9xZvAHQAAKDxImkA5qC/JVsSAAFhaP8WAhdyAPIANQNhAPIA1wvhIm5nbGUAoKYpAAFjaQ4XEBd5AF9k5yJyYXJyAKD/JwAJRGFjZGVmZ2xtbm9wcXJzdHV4MRc4F0YXWxcyBF4XaRd5F40XrBe0F78X2RcVGCEYLRg1GEAYAAFEbzUXgRZvAPQA+BUAAWNzPBdCF3UAdABlADuA6QDpQPQhZXIAoG4qAAJhaW95TRdQF1YXWhfyIW9uG2FyAGOgViI7gOoA6kDsIW9uAKBVIk1kbwB0ABdhAAFEcmIXZhdvAHQAAKBSIgDgNdgi3XKhmipuF3QXYQB2AGUAO4DoAOhAZKCWKm8AdAAAoJgqgKGZKmlscwCAF4UXhxfuInRlcnMAoOcjAKATIWSglSpvAHQAAKCXKoABYXBzAJMXlheiF2MAcgATYXQAeQBzogUinxcAAAAAoRdlAHQAAKAFInAAMaADIDMBqRerFwCgBCAAoAUgAAFnc7AXsRdLYXAAAKACIAABZ3C4F7sXbwBuABlhZgAA4DXYVt2AAWFscwDFF8sXzxdyAHOg1SJsAACg4yl1AHMAAKBxKmkAAKG1A2x21RfYF28AbgC1Y/VjAAJjc3V24BfoF/0XEBgAAWlv5BdWF3IAYwAAoFYiaQLuFwAAAADwF+0ADQThIW50AAFnbPUX+Rd0AHIAAKCWKuUhc3MAoJUqgAFhZWkAAxgGGAoYbABzAD1gcwB0AACgXyJ2AESgYSJEAACgeCrwImFyc2wAoOUpAAFEYRkYHRhvAHQAAKBTInIAcgAAoHEpgAFjZGkAJxgqGO0XcgAAoC8hbwD0AIwCAAFhaDEYMhi3YzuA8ADwQAABbXI5GD0YbAA7gOsA60BvAACgrCCAAWNpcABGGEgYSxhsACFgcwD0ACwEAAFlb08YVxhjAHQAYQB0AGkAbwDuABoEbgBlAG4AdABpAGEAbADlADME4Ql1GAAAgRgAAIMYiBgAAAAAoRilGAAAqhgAALsYvhjRGAAA1xgnGWwAbABpAG4AZwBkAG8AdABzAGUA8QBlF3kARGRtImFsZQAAoEAmgAFpbHIAjRiRGJ0Y7CFpZwCgA/tpApcYAAAAAJoYZwAAoAD7aQBnAACgBPsA4DXYI93sIWlnAKAB++whaWcA4GYAagCAAWFsdACvGLIYthh0AACgbSZpAGcAAKAC+24AcwAAoLElbwBmAJJh8AHCGAAAxhhmAADgNdhX3QABYWvJGMwYbADsAGsEdqDUIgCg2SphI3J0aW50AACgDSoAAWFv2hgiGQABY3PeGB8ZsQPnGP0YBRkSGRUZAAAdGbID7xjyGPQY9xj5GAAA+xg7gL0AvUAAoFMhO4C8ALxAAKBVIQCgWSEAoFshswEBGQAAAxkAoFQhAKBWIbQCCxkOGQAAAAAQGTuAvgC+QACgVyEAoFwhNQAAoFghtgEZGQAAGxkAoFohAKBdITgAAKBeIWwAAKBEIHcAbgAAoCIjYwByAADgNdi73IAIRWFiY2RlZmdpamxub3JzdHYARhlKGVoZXhlmGWkZkhmWGZkZnRmgGa0ZxhnLGc8Z4BkjGmygZyIAoIwqgAFjbXAAUBlTGVgZ9SF0ZfVhbQBhAOSgswM6FgCghipyImV2ZQAfYQABaXliGWUZcgBjAB1hM2RvAHQAIWGAoWUibHFzAMYEcBl6GfGhZSLOBAAAdhlsAGEAbgD0AN8EgKF+KmNkbACBGYQZjBljAACgqSpvAHQAb6CAKmyggioAoIQqZeDbIgD+cwAAoJQqcgAA4DXYJN3noGsirATtIWVsAKA3IWMAeQBTZIChdyJFYWoApxmpGasZAKCSKgCgpSoAoKQqAAJFYWVztBm2Gb0ZwhkAoGkicABwoIoq8iFveACgiipxoIgq8aCIKrUZaQBtAACg5yJwAGYAAOA12FjdYQB2AOUAYwIAAWNp0xnWGXIAAKAKIW0AAKFzImVs3BneGQCgjioAoJAqAIM+ADtjZGxxco0E6xn0GfgZ/BkBGgABY2nvGfEZAKCnKnIAAKB6Km8AdAAAoNci0CFhcgCglSl1ImVzdAAAoHwqgAJhZGVscwAKGvQZFhrVBCAa8AEPGgAAFBpwAHIAbwD4AFkZcgAAoHgpcQAAAWxxxAQbGmwAZQBzAPMASRlpAO0A5AQAAWVuJxouGnIjdG5lcXEAAOBpIgD+xQAsGgAFQWFiY2Vma29zeUAaQxpmGmoabRqDGocalhrCGtMacgDyAMwCAAJpbG1yShpOGlAaVBpyAHMA8ABxD2YAvWBpAGwA9AASBQABZHJYGlsaYwB5AEpkAKGUIWN3YBpkGmkAcgAAoEgpAKCtIWEAcgAAoA8h6SFyYyVhgAFhbHIAcxp7Gn8a8iF0c3WgZSZpAHQAAKBlJuwhaXAAoCYg4yFvbgCguSJyAADgNdgl3XMAAAFld4wakRphInJvdwAAoCUpYSJyb3cAAKAmKYACYW1vcHIAnxqjGqcauhq+GnIAcgAAoP8h9CFodACgOyJrAAABbHKsGrMaZSRmdGFycm93AACgqSHpJGdodGFycm93AKCqIWYAAOA12Fnd4iFhcgCgFSCAAWNsdADIGswa0BpyAADgNdi93GEAcwDoAGka8iFvaydhAAFicNca2xr1IWxsAKBDIOghZW4AoBAg4Qr2GgAA/RoAAAgbExsaGwAAIRs7GwAAAAA+G2IbmRuVG6sbAACyG80b0htjAHUAdABlADuA7QDtQAChYyBpeQEbBhtyAGMAO4DuAO5AOGQAAWN4CxsNG3kANWRjAGwAO4ChAKFAAAFmcssCFhsA4DXYJt1yAGEAdgBlADuA7ADsQIChSCFpbm8AJxsyGzYbAAFpbisbLxtuAHQAAKAMKnQAAKAtIuYhaW4AoNwpdABhAACgKSHsIWlnM2GAAWFvcABDG1sbXhuAAWNndABJG0sbWRtyACthgAFlbHAAcQVRG1UbaQBuAOUAyAVhAHIA9AByBWgAMWFmAACgtyJlAGQAtWEAoggiY2ZvdGkbbRt1G3kb4SFyZQCgBSFpAG4AdKAeImkAZQAAoN0pZABvAPQAWxsAoisiY2VscIEbhRuPG5QbYQBsAACguiIAAWdyiRuNG2UAcgDzACMQ4wCCG2EicmhrAACgFyryIW9kAKA8KgACY2dwdJ8boRukG6gbeQBRZG8AbgAvYWYAAOA12FrdYQC5Y3UAZQBzAHQAO4C/AL9AAAFjabUbuRtyAADgNdi+3G4AAKIIIkVkc3bCG8QbyBvQAwCg+SJvAHQAAKD1Inag9CIAoPMiaaBiIOwhZGUpYesB1hsAANkbYwB5AFZkbAA7gO8A70AAA2NmbW9zdeYb7hvyG/Ub+hsFHAABaXnqG+0bcgBjADVhOWRyAADgNdgn3eEhdGg3YnAAZgAA4DXYW93jAf8bAAADHHIAAOA12L/c8iFjeVhk6yFjeVRkAARhY2ZnaGpvcxUcGhwiHCYcKhwtHDAcNRzwIXBhdqC6A/BjAAFleR4cIRzkIWls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ZmdobG1vcHJzdHV3CiwNLBEsHSwnLDEsQCxLLFIsYix6LIQsjyzLLOgs7Sz/LAotcgDyAAkDYQByAACgYykAAWNyFSwbLHUAdABlADuA+gD6QPIACQ1yAOMBIywAACUseQBeZHYAZQBtYQABaXkrLDAscgBjADuA+wD7QENkgAFhYmgANyw6LD0scgDyANEO7CFhY3FhYQDyAOAOAAFpckQsSCzzIWh0AKB+KQDgNdgy3XIAYQB2AGUAO4D5APlAYQFWLF8scgAAAWxyWixcLACgvyEAoL4hbABrAACggCUAAWN0Zix2LG8CbCwAAAAAcyxyAG4AZaAcI3IAAKAcI28AcAAAoA8jcgBpAACg+CUAAWFsfiyBLGMAcgBrYTuAqACoQAABZ3CILIssbwBuAHNhZgAA4DXYZt0AA2FkaGxzdZksniynLLgsuyzFLHIAcgBvAPcACQ1vAHcAbgBhAHIAcgBvAPcA2A5hI3Jwb29uAAABbHKvLLMsZQBmAPQAWyxpAGcAaAD0AF0sdQDzAKYOaQAAocUDaGzBLMIs0mNvAG4AxWPwI2Fycm93cwCgyCGAAWNpdADRLOEs5CxvAtcsAAAAAN4scgBuAGWgHSNyAACgHSNvAHAAAKAOI24AZwBvYXIAaQAAoPklYwByAADgNdjK3IABZGlyAPMs9yz6LG8AdAAAoPAi7CFkZWlhaQBmoLUlAKC0JQABYW0DLQYtcgDyAMosbAA7gPwA/EDhIm5nbGUAoKcpgAdBQkRhY2RlZmxub3Byc3oAJy0qLTAtNC2bLZ0toS2/LcMtxy3TLdgt3C3gLfwtcgDyABADYQByAHag6CoAoOkqYQBzAOgA/gIAAW5yOC08LechcnQAoJwpgANla25wcnN0AJkpSC1NLVQtXi1iLYItYQBwAHAA4QAaHG8AdABoAGkAbgDnAKEXgAFoaXIAoSmzJFotbwBwAPQAdCVooJUh7wD4JgABaXVmLWotZwBtAOEAuygAAWJwbi14LXMjZXRuZXEAceCKIgD+AODLKgD+cyNldG5lcQBx4IsiAP4A4MwqAP4AAWhyhi2KLWUAdADhABIraSNhbmdsZQAAAWxyki2WLeUhZnQAoLIiaSJnaHQAAKCzInkAMmThIXNoAKCiIoABZWxyAKcttC24LWKiKCKuLQAAAACyLWEAcgAAoLsicQAAoFoi7CFpcACg7iIAAWJ0vC1eD2EA8gBfD3IAAOA12DPddAByAOkAlS1zAHUAAAFicM0t0C0A4IIi0iAA4IMi0iBwAGYAAOA12GfdcgBvAPAAWQt0AHIA6QCaLQABY3XkLegtcgAA4DXYy9wAAWJw7C30LW4AAAFFZXUt8S0A4IoiAP5uAAABRWV/LfktAOCLIgD+6SJnemFnAKCaKYADY2Vmb3BycwANLhAuJS4pLiMuLi40LukhcmN1YQABZGkULiEuAAFiZxguHC5hAHIAAKBfKmUAcaAnIgCgWSLlIXJwAKAYIXIAAOA12DTdcABmAADgNdho3WWgQCJhAHQA6ABqD2MAcgAA4DXYzNzjCuQRUC4AAFQuAABYLmIuAAAAAGMubS5wLnQuAAAAAIguki4AAJouJxIqEnQAcgDpAB0ScgAA4DXYNd0AAUFhWy5eLnIA8gDnAnIA8gCTB75jAAFBYWYuaS5yAPIA4AJyAPIAjAdhAPAAeh5pAHMAAKD7IoABZHB0APgReS6DLgABZmx9LoAuAOA12GnddQDzAP8RaQBtAOUABBIAAUFhiy6OLnIA8gDuAnIA8gCaBwABY3GVLgoScgAA4DXYzdwAAXB0nS6hLmwAdQDzACUScgDpACASAARhY2VmaW9zdbEuvC7ELsguzC7PLtQu2S5jAAABdXm2LrsudABlADuA/QD9QE9kAAFpecAuwy5yAGMAd2FLZG4AO4ClAKVAcgAA4DXYNt1jAHkAV2RwAGYAAOA12GrdYwByAADgNdjO3AABY23dLt8ueQBOZGwAO4D/AP9AAAVhY2RlZmhpb3N38y73Lv8uAi8MLxAvEy8YLx0vIi9jInV0ZQB6YQABYXn7Lv4u8iFvbn5hN2RvAHQAfGEAAWV0Bi8KL3QAcgDmAB8QYQC2Y3IAAOA12DfdYwB5ADZk5yJyYXJyAKDdIXAAZgAA4DXYa91jAHIAAOA12M/cAAFqbiYvKC8AoA0gagAAoAwg");
 });
 
-// node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/generated/decode-data-xml.js
+// node_modules/entities/dist/esm/generated/decode-data-xml.js
 var xmlDecodeTree;
 var init_decode_data_xml = __esm(() => {
   xmlDecodeTree = /* @__PURE__ */ decodeBase64("AAJhZ2xxBwARABMAFQBtAg0AAAAAAA8AcAAmYG8AcwAnYHQAPmB0ADxg9SFvdCJg");
 });
 
-// node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/internal/bin-trie-flags.js
+// node_modules/entities/dist/esm/internal/bin-trie-flags.js
 var BinTrieFlags;
 var init_bin_trie_flags = __esm(() => {
   (function(BinTrieFlags2) {
@@ -56039,7 +57581,7 @@ var init_bin_trie_flags = __esm(() => {
   })(BinTrieFlags || (BinTrieFlags = {}));
 });
 
-// node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/decode.js
+// node_modules/entities/dist/esm/decode.js
 function isNumber2(code) {
   return code >= CharCodes.ZERO && code <= CharCodes.NINE;
 }
@@ -56323,7 +57865,7 @@ var init_decode = __esm(() => {
   })(DecodingMode || (DecodingMode = {}));
 });
 
-// node_modules/html-to-text/node_modules/htmlparser2/dist/esm/Tokenizer.js
+// node_modules/htmlparser2/dist/esm/Tokenizer.js
 function isWhitespace(c) {
   return c === CharCodes2.Space || c === CharCodes2.NewLine || c === CharCodes2.Tab || c === CharCodes2.FormFeed || c === CharCodes2.CarriageReturn;
 }
@@ -56334,7 +57876,7 @@ function isASCIIAlpha(c) {
   return c >= CharCodes2.LowerA && c <= CharCodes2.LowerZ || c >= CharCodes2.UpperA && c <= CharCodes2.UpperZ;
 }
 
-class Tokenizer {
+class Tokenizer2 {
   constructor({ xmlMode = false, decodeEntities = true }, cbs) {
     this.cbs = cbs;
     this.state = State.Text;
@@ -56984,7 +58526,7 @@ var init_Tokenizer = __esm(() => {
   };
 });
 
-// node_modules/html-to-text/node_modules/htmlparser2/dist/esm/Parser.js
+// node_modules/htmlparser2/dist/esm/Parser.js
 class Parser {
   constructor(cbs, options = {}) {
     var _a8, _b, _c, _d, _e, _f;
@@ -57006,7 +58548,7 @@ class Parser {
     this.lowerCaseTagNames = (_a8 = options.lowerCaseTags) !== null && _a8 !== undefined ? _a8 : this.htmlMode;
     this.lowerCaseAttributeNames = (_b = options.lowerCaseAttributeNames) !== null && _b !== undefined ? _b : this.htmlMode;
     this.recognizeSelfClosing = (_c = options.recognizeSelfClosing) !== null && _c !== undefined ? _c : !this.htmlMode;
-    this.tokenizer = new ((_d = options.Tokenizer) !== null && _d !== undefined ? _d : Tokenizer)(this.options, this);
+    this.tokenizer = new ((_d = options.Tokenizer) !== null && _d !== undefined ? _d : Tokenizer2)(this.options, this);
     this.foreignContext = [!this.htmlMode];
     (_f = (_e = this.cbs).onparserinit) === null || _f === undefined || _f.call(_e, this);
   }
@@ -57744,7 +59286,7 @@ var init_esm5 = __esm(() => {
   init_feeds();
 });
 
-// node_modules/html-to-text/node_modules/htmlparser2/dist/esm/index.js
+// node_modules/htmlparser2/dist/esm/index.js
 function parseDocument(data, options) {
   const handler = new DomHandler(undefined, options);
   new Parser(handler, options).end(data);
@@ -57758,101 +59300,185 @@ var init_esm6 = __esm(() => {
 });
 
 // node_modules/deepmerge-ts/dist/index.mjs
-function defaultMetaDataUpdater(previousMeta, metaMeta) {
-  return metaMeta;
+function defaultMetaDataUpdater(previousMeta, mergeInfo) {
+  const ancestor = {
+    key: mergeInfo.key,
+    parents: mergeInfo.parents,
+    values: mergeInfo.values,
+    result: mergeInfo.result
+  };
+  const prevHierarchy = previousMeta?.hierarchy;
+  return {
+    ...ancestor,
+    hierarchy: prevHierarchy === undefined ? [ancestor] : [...prevHierarchy, ancestor]
+  };
 }
 function defaultFilterValues(values, meta3) {
-  return values.filter((value) => value !== undefined);
+  return values.includes(undefined) ? values.filter((value) => value !== undefined) : values;
+}
+function shouldFallbackToDefault(utils, fallback, result) {
+  return result === actions.defaultMerge || utils.useImplicitDefaultMerging && result === undefined && utils.mergeFunctions[fallback] !== utils.defaultMergeFunctions[fallback];
+}
+function resolveCustomMergeFunctions(options, defaultMergeFunctions) {
+  return {
+    ...defaultMergeFunctions,
+    ...Object.fromEntries(Object.entries(options).filter(([key]) => Object.hasOwn(defaultMergeFunctions, key)).map(([key, option2]) => option2 === false ? [key, defaultMergeFunctions.mergeOthers] : typeof option2 === "function" ? [key, option2] : [key, defaultMergeFunctions[key]]))
+  };
+}
+function mergeArrays$1(values, utils, meta3) {
+  return values.flat();
+}
+function mergeSets$1(values, utils, meta3) {
+  const result = new Set;
+  for (const set2 of values) {
+    for (const element of set2) {
+      result.add(element);
+    }
+  }
+  return result;
+}
+function mergeOthers$1(values, utils, meta3) {
+  return values.at(-1);
 }
 function getObjectType(object2) {
   if (typeof object2 !== "object" || object2 === null) {
-    return 0;
+    return ObjectType.NOT;
   }
   if (Array.isArray(object2)) {
-    return 2;
+    return ObjectType.ARRAY;
   }
   if (isRecord(object2)) {
-    return 1;
+    return ObjectType.RECORD;
   }
   if (object2 instanceof Set) {
-    return 3;
+    return ObjectType.SET;
   }
   if (object2 instanceof Map) {
-    return 4;
+    return ObjectType.MAP;
   }
-  return 5;
+  return ObjectType.OTHER;
 }
-function getKeys(objects) {
+function getKeysOfObjects(objects) {
   const keys = new Set;
-  for (const object2 of objects) {
-    for (const key of [...Object.keys(object2), ...Object.getOwnPropertySymbols(object2)]) {
-      keys.add(key);
+  for (const currentObject of objects) {
+    const stringKeys = Object.keys(currentObject);
+    for (const stringKey of stringKeys) {
+      keys.add(stringKey);
+    }
+    const symbols = Object.getOwnPropertySymbols(currentObject);
+    if (symbols.length > 0) {
+      for (const symbol2 of symbols) {
+        if (Object.prototype.propertyIsEnumerable.call(currentObject, symbol2)) {
+          keys.add(symbol2);
+        }
+      }
     }
   }
   return keys;
 }
+function getKeysOfObject(object2) {
+  const symbols = Object.getOwnPropertySymbols(object2).filter((symbol2) => Object.prototype.propertyIsEnumerable.call(object2, symbol2));
+  return [...Object.keys(object2), ...symbols];
+}
 function objectHasProperty(object2, property) {
   return typeof object2 === "object" && Object.prototype.propertyIsEnumerable.call(object2, property);
 }
-function getIterableOfIterables(iterables) {
-  let mut_iterablesIndex = 0;
-  let mut_iterator = iterables[0]?.[Symbol.iterator]();
-  return {
-    [Symbol.iterator]() {
-      return {
-        next() {
-          do {
-            if (mut_iterator === undefined) {
-              return { done: true, value: undefined };
-            }
-            const result = mut_iterator.next();
-            if (result.done === true) {
-              mut_iterablesIndex += 1;
-              mut_iterator = iterables[mut_iterablesIndex]?.[Symbol.iterator]();
-              continue;
-            }
-            return {
-              done: false,
-              value: result.value
-            };
-          } while (true);
-        }
-      };
-    }
-  };
-}
 function isRecord(value) {
-  if (!validRecordToStringValues.includes(Object.prototype.toString.call(value))) {
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype === null || prototype === Object.prototype) {
+    return true;
+  }
+  const objectToString = Object.prototype.toString.call(value);
+  if (objectToString !== "[object Object]" && objectToString !== "[object Module]") {
     return false;
   }
   const { constructor } = value;
   if (constructor === undefined) {
     return true;
   }
-  const prototype = constructor.prototype;
-  if (prototype === null || typeof prototype !== "object" || !validRecordToStringValues.includes(Object.prototype.toString.call(prototype))) {
+  const constructorPrototype = constructor.prototype;
+  if (constructorPrototype === null || typeof constructorPrototype !== "object") {
     return false;
   }
-  if (!prototype.hasOwnProperty("isPrototypeOf")) {
+  const constructorToString = Object.prototype.toString.call(constructorPrototype);
+  if (constructorToString !== "[object Object]" && constructorToString !== "[object Module]") {
+    return false;
+  }
+  if (!Object.hasOwn(constructorPrototype, "isPrototypeOf")) {
     return false;
   }
   return true;
 }
+function getCyclicReferenceDepth(object2, hierarchy, index) {
+  if (hierarchy === undefined || hierarchy.length === 0) {
+    return 0;
+  }
+  let mut_depth = 1;
+  for (let mut_index = hierarchy.length - 1;mut_index >= 0; mut_index--) {
+    const { parents } = hierarchy[mut_index];
+    if (parents[index] === object2 || parents.includes(object2)) {
+      return mut_depth;
+    }
+    mut_depth += 1;
+  }
+  return 0;
+}
+function getMetaDataHierarchy(meta3) {
+  return meta3?.hierarchy;
+}
 function mergeRecords$1(values, utils, meta3) {
+  if (values.length === 2) {
+    const result = {};
+    const mergeProperty = (key, propValues) => {
+      const updatedMeta = utils.metaDataUpdater(meta3, {
+        key,
+        parents: values,
+        values: propValues,
+        result
+      });
+      const propertyResult = mergeUnknowns(propValues, utils, updatedMeta);
+      if (propertyResult === actions.skip) {
+        return;
+      }
+      if (key === "__proto__") {
+        Object.defineProperty(result, key, {
+          value: propertyResult,
+          configurable: true,
+          enumerable: true,
+          writable: true
+        });
+      } else {
+        result[key] = propertyResult;
+      }
+    };
+    const firstValue = values[0];
+    const secondValue = values[1];
+    for (const key of getKeysOfObject(firstValue)) {
+      mergeProperty(key, objectHasProperty(secondValue, key) ? [firstValue[key], secondValue[key]] : [firstValue[key]]);
+    }
+    for (const key of getKeysOfObject(secondValue)) {
+      if (!objectHasProperty(firstValue, key)) {
+        mergeProperty(key, [secondValue[key]]);
+      }
+    }
+    return result;
+  }
+  return mergeRecordsGeneral(values, utils, meta3);
+}
+function mergeRecordsGeneral(values, utils, meta3) {
   const result = {};
-  for (const key of getKeys(values)) {
+  for (const key of getKeysOfObjects(values)) {
     const propValues = [];
     for (const value of values) {
       if (objectHasProperty(value, key)) {
         propValues.push(value[key]);
       }
     }
-    if (propValues.length === 0) {
-      continue;
-    }
     const updatedMeta = utils.metaDataUpdater(meta3, {
       key,
-      parents: values
+      parents: values,
+      values: propValues,
+      result
     });
     const propertyResult = mergeUnknowns(propValues, utils, updatedMeta);
     if (propertyResult === actions.skip) {
@@ -57871,36 +59497,104 @@ function mergeRecords$1(values, utils, meta3) {
   }
   return result;
 }
-function mergeArrays$1(values) {
-  return values.flat();
+function mergeMaps$1(values, utils, meta3) {
+  const result = new Map;
+  const valuesByKey = new Map;
+  for (const map3 of values) {
+    for (const [key, value] of map3) {
+      const mut_keyValues = valuesByKey.get(key);
+      if (mut_keyValues === undefined) {
+        valuesByKey.set(key, [value]);
+      } else {
+        mut_keyValues.push(value);
+      }
+    }
+  }
+  for (const [key, keyValues] of valuesByKey) {
+    const updatedMeta = utils.metaDataUpdater(meta3, {
+      key,
+      parents: values,
+      values: keyValues,
+      result
+    });
+    const keyResult = mergeUnknowns(keyValues, utils, updatedMeta);
+    if (keyResult === actions.skip) {
+      continue;
+    }
+    result.set(key, keyResult);
+  }
+  return result;
 }
-function mergeSets$1(values) {
-  return new Set(getIterableOfIterables(values));
+function resolveCyclicReferences(value, utils, meta3) {
+  if (typeof value !== "object" || value === null) {
+    return value;
+  }
+  const hierarchy = getMetaDataHierarchy(meta3);
+  const depth = getCyclicReferenceDepth(value, hierarchy, 0);
+  if (hierarchy !== undefined && depth > 0) {
+    return hierarchy[hierarchy.length - depth]?.result;
+  }
+  const type = getObjectType(value);
+  if (type === ObjectType.RECORD) {
+    const record2 = value;
+    let mut_changed = false;
+    const result = {};
+    for (const key of getKeysOfObject(record2)) {
+      const propVal = record2[key];
+      const updatedMeta = utils.metaDataUpdater(meta3, {
+        key,
+        parents: [record2],
+        values: [propVal],
+        result
+      });
+      const resolvedProp = resolveCyclicReferences(propVal, utils, updatedMeta);
+      if (resolvedProp !== propVal) {
+        mut_changed = true;
+      }
+      if (key === "__proto__") {
+        Object.defineProperty(result, key, {
+          value: resolvedProp,
+          configurable: true,
+          enumerable: true,
+          writable: true
+        });
+      } else {
+        result[key] = resolvedProp;
+      }
+    }
+    return mut_changed ? result : value;
+  }
+  return value;
 }
-function mergeMaps$1(values) {
-  return new Map(getIterableOfIterables(values));
+function mergeCircularReferences$1(values, cyclicDepths, utils, meta3) {
+  const depth = cyclicDepths[0];
+  const hierarchy = getMetaDataHierarchy(meta3);
+  for (let mut_index = 1;mut_index < values.length; mut_index++) {
+    if (cyclicDepths[mut_index] !== depth) {
+      const lastCyclicDepth = cyclicDepths.at(-1);
+      return lastCyclicDepth === 0 ? resolveCyclicReferences(values.at(-1), utils, meta3) : hierarchy?.[hierarchy.length - lastCyclicDepth]?.result;
+    }
+  }
+  return hierarchy?.[hierarchy.length - depth]?.result;
 }
-function mergeOthers$1(values) {
-  return values.at(-1);
-}
-function deepmergeCustom(options, rootMetaData) {
-  const utils = getUtils(options, customizedDeepmerge);
+function deepmergeCustom(options = {}, rootMetaData) {
+  const utils = getUtils$1(options, customizedDeepmerge);
   function customizedDeepmerge(...objects) {
-    return mergeUnknowns(objects, utils, rootMetaData);
+    return mergeUnknowns(objects, utils, rootMetaData ?? undefined);
   }
   return customizedDeepmerge;
 }
-function getUtils(options, customizedDeepmerge) {
+function getUtils$1(options, customizedDeepmerge) {
+  const defaultMergeFns = mergeFunctions;
+  const defaultMetaDataUpd = defaultMetaDataUpdater;
   return {
-    defaultMergeFunctions: mergeFunctions,
-    mergeFunctions: {
-      ...mergeFunctions,
-      ...Object.fromEntries(Object.entries(options).filter(([key, option2]) => Object.hasOwn(mergeFunctions, key)).map(([key, option2]) => option2 === false ? [key, mergeFunctions.mergeOthers] : [key, option2]))
-    },
-    metaDataUpdater: options.metaDataUpdater ?? defaultMetaDataUpdater,
+    defaultMergeFunctions: defaultMergeFns,
+    mergeFunctions: resolveCustomMergeFunctions(options, defaultMergeFns),
+    metaDataUpdater: typeof options.metaDataUpdater === "function" ? options.metaDataUpdater : defaultMetaDataUpd,
     deepmerge: customizedDeepmerge,
     useImplicitDefaultMerging: options.enableImplicitDefaultMerging ?? false,
-    filterValues: options.filterValues === false ? undefined : options.filterValues ?? defaultFilterValues,
+    filterValues: options.filterValues === false ? undefined : typeof options.filterValues === "function" ? options.filterValues : defaultFilterValues,
+    maxDepth: typeof options.maxDepth === "number" && !Number.isNaN(options.maxDepth) && options.maxDepth >= 0 ? options.maxDepth : 1000,
     actions
   };
 }
@@ -57909,29 +59603,56 @@ function mergeUnknowns(values, utils, meta3) {
   if (filteredValues.length === 0) {
     return;
   }
+  const hierarchy = getMetaDataHierarchy(meta3);
+  const currentDepth = hierarchy?.length ?? (typeof meta3 === "number" ? meta3 : meta3?.depth ?? 0);
+  if (utils.maxDepth !== undefined && currentDepth >= utils.maxDepth) {
+    return mergeOthers(filteredValues, utils, meta3);
+  }
   if (filteredValues.length === 1) {
+    if (hierarchy !== undefined) {
+      const depth = getCyclicReferenceDepth(filteredValues[0], hierarchy, 0);
+      if (depth > 0) {
+        return hierarchy[hierarchy.length - depth]?.result ?? hierarchy[hierarchy.length - depth]?.parents[0];
+      }
+    }
     return mergeOthers(filteredValues, utils, meta3);
   }
   const type = getObjectType(filteredValues[0]);
-  if (type !== 0 && type !== 5) {
-    for (let mut_index = 1;mut_index < filteredValues.length; mut_index++) {
-      if (getObjectType(filteredValues[mut_index]) === type) {
-        continue;
+  if (type !== ObjectType.NOT && type !== ObjectType.OTHER) {
+    if (filteredValues.length === 2) {
+      if (getObjectType(filteredValues[1]) !== type) {
+        return mergeOthers(filteredValues, utils, meta3);
       }
-      return mergeOthers(filteredValues, utils, meta3);
+      const d0 = getCyclicReferenceDepth(filteredValues[0], hierarchy, 0);
+      const d1 = getCyclicReferenceDepth(filteredValues[1], hierarchy, 1);
+      if (d0 !== 0 || d1 !== 0) {
+        return mergeCircularReferences(filteredValues, [d0, d1], utils, meta3);
+      }
+    } else {
+      const cyclicDepths = new Array(filteredValues.length);
+      cyclicDepths[0] = getCyclicReferenceDepth(filteredValues[0], hierarchy, 0);
+      for (let mut_index = 1;mut_index < filteredValues.length; mut_index++) {
+        if (getObjectType(filteredValues[mut_index]) !== type) {
+          return mergeOthers(filteredValues, utils, meta3);
+        }
+        cyclicDepths[mut_index] = getCyclicReferenceDepth(filteredValues[mut_index], hierarchy, mut_index);
+      }
+      if (cyclicDepths.some((depth) => depth !== 0)) {
+        return mergeCircularReferences(filteredValues, cyclicDepths, utils, meta3);
+      }
     }
   }
   switch (type) {
-    case 1: {
+    case ObjectType.RECORD: {
       return mergeRecords(filteredValues, utils, meta3);
     }
-    case 2: {
+    case ObjectType.ARRAY: {
       return mergeArrays(filteredValues, utils, meta3);
     }
-    case 3: {
+    case ObjectType.SET: {
       return mergeSets(filteredValues, utils, meta3);
     }
-    case 4: {
+    case ObjectType.MAP: {
       return mergeMaps(filteredValues, utils, meta3);
     }
     default: {
@@ -57941,40 +59662,47 @@ function mergeUnknowns(values, utils, meta3) {
 }
 function mergeRecords(values, utils, meta3) {
   const result = utils.mergeFunctions.mergeRecords(values, utils, meta3);
-  if (result === actions.defaultMerge || utils.useImplicitDefaultMerging && result === undefined && utils.mergeFunctions.mergeRecords !== utils.defaultMergeFunctions.mergeRecords) {
+  if (shouldFallbackToDefault(utils, "mergeRecords", result)) {
     return utils.defaultMergeFunctions.mergeRecords(values, utils, meta3);
   }
   return result;
 }
 function mergeArrays(values, utils, meta3) {
   const result = utils.mergeFunctions.mergeArrays(values, utils, meta3);
-  if (result === actions.defaultMerge || utils.useImplicitDefaultMerging && result === undefined && utils.mergeFunctions.mergeArrays !== utils.defaultMergeFunctions.mergeArrays) {
+  if (shouldFallbackToDefault(utils, "mergeArrays", result)) {
     return utils.defaultMergeFunctions.mergeArrays(values);
   }
   return result;
 }
 function mergeSets(values, utils, meta3) {
   const result = utils.mergeFunctions.mergeSets(values, utils, meta3);
-  if (result === actions.defaultMerge || utils.useImplicitDefaultMerging && result === undefined && utils.mergeFunctions.mergeSets !== utils.defaultMergeFunctions.mergeSets) {
+  if (shouldFallbackToDefault(utils, "mergeSets", result)) {
     return utils.defaultMergeFunctions.mergeSets(values);
   }
   return result;
 }
 function mergeMaps(values, utils, meta3) {
   const result = utils.mergeFunctions.mergeMaps(values, utils, meta3);
-  if (result === actions.defaultMerge || utils.useImplicitDefaultMerging && result === undefined && utils.mergeFunctions.mergeMaps !== utils.defaultMergeFunctions.mergeMaps) {
-    return utils.defaultMergeFunctions.mergeMaps(values);
+  if (shouldFallbackToDefault(utils, "mergeMaps", result)) {
+    return utils.defaultMergeFunctions.mergeMaps(values, utils, meta3);
+  }
+  return result;
+}
+function mergeCircularReferences(values, cyclicDepths, utils, meta3) {
+  const result = utils.mergeFunctions.mergeCircularReferences(values, cyclicDepths, utils, meta3);
+  if (shouldFallbackToDefault(utils, "mergeCircularReferences", result)) {
+    return utils.defaultMergeFunctions.mergeCircularReferences(values, cyclicDepths, utils, meta3);
   }
   return result;
 }
 function mergeOthers(values, utils, meta3) {
   const result = utils.mergeFunctions.mergeOthers(values, utils, meta3);
-  if (result === actions.defaultMerge || utils.useImplicitDefaultMerging && result === undefined && utils.mergeFunctions.mergeOthers !== utils.defaultMergeFunctions.mergeOthers) {
+  if (shouldFallbackToDefault(utils, "mergeOthers", result)) {
     return utils.defaultMergeFunctions.mergeOthers(values);
   }
   return result;
 }
-var actions, actionsInto, ObjectType, validRecordToStringValues, mergeFunctions;
+var actions, actionsInto, ObjectType, mergeFunctions;
 var init_dist2 = __esm(() => {
   actions = {
     defaultMerge: Symbol("deepmerge-ts: default merge"),
@@ -57991,12 +59719,12 @@ var init_dist2 = __esm(() => {
     ObjectType2[ObjectType2["MAP"] = 4] = "MAP";
     ObjectType2[ObjectType2["OTHER"] = 5] = "OTHER";
   })(ObjectType || (ObjectType = {}));
-  validRecordToStringValues = ["[object Object]", "[object Module]"];
   mergeFunctions = {
     mergeRecords: mergeRecords$1,
     mergeArrays: mergeArrays$1,
     mergeSets: mergeSets$1,
     mergeMaps: mergeMaps$1,
+    mergeCircularReferences: mergeCircularReferences$1,
     mergeOthers: mergeOthers$1
   };
 });
@@ -61410,11 +63138,11 @@ var require_tlds = __commonJS((exports, module) => {
 var require_mail_parser = __commonJS((exports, module) => {
   var mailsplit = require_mailsplit();
   var libmime = require_libmime();
-  var addressparser = require_addressparser();
+  var addressparser2 = (init_addressparser(), __toCommonJS(exports_addressparser));
   var Transform = __require("stream").Transform;
   var Splitter = mailsplit.Splitter;
   var ChunkedPassthrough = mailsplit.ChunkedPassthrough;
-  var punycode = require_punycode2();
+  var punycode = require_punycode();
   var FlowedDecoder = require_flowed_decoder();
   var StreamHash = require_stream_hash();
   var iconv = require_lib();
@@ -61423,7 +63151,13 @@ var require_mail_parser = __commonJS((exports, module) => {
   var linkify = require_index_cjs2()();
   var tlds = require_tlds();
   var encodingJapanese = require_src();
+  var MAX_LINKIFY_SEGMENT_LENGTH = 4096;
+  var MAX_LINKIFY_HOST_LABELS = 6;
+  var MAX_LINKIFY_WORK = 768 * 1024 * 1024;
   linkify.tlds(tlds).tlds("onion", true).add("git:", "http:").add("ftp:", null).set({ fuzzyIP: true, fuzzyLink: true, fuzzyEmail: true });
+  function isHostChar(code) {
+    return code >= 97 && code <= 122 || code >= 65 && code <= 90 || code >= 48 && code <= 57 || code === 45 || code >= 128;
+  }
   linkify.add("@", {
     validate(text, pos, self) {
       let tail = text.slice(pos);
@@ -61431,7 +63165,7 @@ var require_mail_parser = __commonJS((exports, module) => {
         self.re.twitter = new RegExp("^([a-zA-Z0-9_]){1,15}(?!_)(?=$|" + self.re.src_ZPCc + ")");
       }
       if (self.re.twitter.test(tail)) {
-        if (pos >= 2 && tail[pos - 2] === "@") {
+        if (pos >= 2 && text[pos - 2] === "@") {
           return false;
         }
         return tail.match(self.re.twitter)[0].length;
@@ -61531,6 +63265,7 @@ var require_mail_parser = __commonJS((exports, module) => {
       this.text = false;
       this.html = false;
       this.textAsHtml = false;
+      this.linkifyWork = 0;
       this.attachmentList = [];
       this.boundaries = [];
       this.textTypes = ["text/plain", "text/html"].concat(!this.options.keepDeliveryStatus ? "message/delivery-status" : []);
@@ -61629,9 +63364,7 @@ var require_mail_parser = __commonJS((exports, module) => {
         return this.cleanup(done);
       }
       this.waitingEnd = () => {
-        this.cleanup(() => {
-          done();
-        });
+        this.cleanup(done);
       };
     }
     cleanup(done) {
@@ -61640,7 +63373,7 @@ var require_mail_parser = __commonJS((exports, module) => {
           let t = this.getTextContent();
           this.push(t);
         } catch (err) {
-          return this.emit("error", err);
+          return done(err);
         }
         done();
       };
@@ -61717,7 +63450,7 @@ var require_mail_parser = __commonJS((exports, module) => {
           case "delivered-to":
           case "return-path":
           case "disposition-notification-to":
-            value = addressparser(value);
+            value = addressparser2(value);
             this.decodeAddresses(value);
             value = {
               value,
@@ -61780,7 +63513,7 @@ var require_mail_parser = __commonJS((exports, module) => {
       return headers;
     }
     parseListHeader(key, value) {
-      let addresses = addressparser(value);
+      let addresses = addressparser2(value);
       let response = {};
       let data = addresses.map((address) => {
         if (/^https?:/i.test(address.name)) {
@@ -61850,7 +63583,7 @@ var require_mail_parser = __commonJS((exports, module) => {
         if (!address.address && /^(=\?([^?]+)\?[Bb]\?[^?]*\?=)(\s*=\?([^?]+)\?[Bb]\?[^?]*\?=)*$/.test(address.name) && !processedAddress.has(address)) {
           let decoded = this.libmime.decodeWords(address.name);
           if (/<[^<>]+@[^<>]+>/.test(decoded)) {
-            let parsed = addressparser(decoded);
+            let parsed = addressparser2(decoded);
             if (parsed.length) {
               parsed.forEach((entry) => {
                 processedAddress.add(entry);
@@ -62344,18 +64077,58 @@ var require_mail_parser = __commonJS((exports, module) => {
       };
       setImmediate(processNext);
     }
+    canScanSegment(segment) {
+      if (segment.length > MAX_LINKIFY_SEGMENT_LENGTH || !/[.:@/]/.test(segment)) {
+        return false;
+      }
+      let labels = 0;
+      for (let i = 0, len = segment.length;i < len; i++) {
+        let code = segment.charCodeAt(i);
+        if (code === 46) {
+          if (++labels > MAX_LINKIFY_HOST_LABELS) {
+            return false;
+          }
+        } else if (!isHostChar(code)) {
+          labels = 0;
+        }
+      }
+      return true;
+    }
+    findLinks(str) {
+      let links = [];
+      if (this.linkifyWork >= MAX_LINKIFY_WORK || !linkify.pretest(str)) {
+        return links;
+      }
+      let segmentRegex = /[\S\uFEFF]+/g;
+      let segmentMatch;
+      while ((segmentMatch = segmentRegex.exec(str)) !== null) {
+        let segment = segmentMatch[0];
+        if (!this.canScanSegment(segment)) {
+          continue;
+        }
+        let matches = linkify.match(segment);
+        for (let i = 0;matches && i < matches.length; i++) {
+          matches[i].index += segmentMatch.index;
+          matches[i].lastIndex += segmentMatch.index;
+          links.push(matches[i]);
+        }
+        this.linkifyWork += segment.length * (segment.length + 1024);
+        if (this.linkifyWork >= MAX_LINKIFY_WORK) {
+          break;
+        }
+      }
+      return links;
+    }
     textToHtml(str) {
       if (this.options.skipTextToHtml) {
         return "";
       }
       str = (str || "").toString();
       let encoded;
-      let linkified = false;
       if (!this.options.skipTextLinks) {
         try {
-          if (linkify.pretest(str)) {
-            linkified = true;
-            let links = linkify.match(str) || [];
+          let links = this.findLinks(str);
+          if (links.length) {
             let result = [];
             let last = 0;
             links.forEach((link) => {
@@ -62378,13 +64151,13 @@ var require_mail_parser = __commonJS((exports, module) => {
           }
         } catch (E) {}
       }
-      if (!linkified) {
+      if (!encoded) {
         encoded = he.encode(str, {
           useNamedReferences: true
         });
       }
       let text = "<p>" + encoded.replace(/\r?\n/g, `
-`).trim().replace(/[ \t]+$/gm, "").trim().replace(/\n\n+/g, "</p><p>").trim().replace(/\n/g, "<br/>") + "</p>";
+`).trim().replace(/(^|[^ \t])[ \t]+(?=[\n\r\u2028\u2029]|$)/g, "$1").trim().replace(/\n\n+/g, "</p><p>").trim().replace(/\n/g, "<br/>") + "</p>";
       return text;
     }
   }
@@ -65938,7 +67711,7 @@ var require_mime_types = __commonJS((exports, module) => {
 });
 
 // node_modules/nodemailer/lib/punycode/index.js
-var require_punycode3 = __commonJS((exports, module) => {
+var require_punycode2 = __commonJS((exports, module) => {
   var maxInt = 2147483647;
   var base = 36;
   var tMin = 1;
@@ -66806,8 +68579,8 @@ var require_mime_funcs = __commonJS((exports, module) => {
 });
 
 // node_modules/nodemailer/lib/addressparser/index.js
-var require_addressparser2 = __commonJS((exports, module) => {
-  function _handleAddress(tokens) {
+var require_addressparser = __commonJS((exports, module) => {
+  function _handleAddress2(tokens) {
     let isGroup = false;
     let state = "text";
     let address;
@@ -66858,7 +68631,7 @@ var require_addressparser2 = __commonJS((exports, module) => {
       data.text = data.text.join(" ");
       addresses.push({
         name: data.text || address && address.name,
-        group: data.group.length ? addressparser(data.group.join(",")) : []
+        group: data.group.length ? addressparser2(data.group.join(",")) : []
       });
     } else {
       if (!data.address.length && data.text.length) {
@@ -66914,7 +68687,7 @@ var require_addressparser2 = __commonJS((exports, module) => {
     return addresses;
   }
 
-  class Tokenizer2 {
+  class Tokenizer3 {
     constructor(str) {
       this.str = (str || "").toString();
       this.operatorCurrent = "";
@@ -66992,9 +68765,9 @@ var require_addressparser2 = __commonJS((exports, module) => {
       this.escaped = false;
     }
   }
-  function addressparser(str, options) {
+  function addressparser2(str, options) {
     options = options || {};
-    let tokenizer = new Tokenizer2(str);
+    let tokenizer = new Tokenizer3(str);
     let tokens = tokenizer.tokenize();
     let addresses = [];
     let address = [];
@@ -67013,7 +68786,7 @@ var require_addressparser2 = __commonJS((exports, module) => {
       addresses.push(address);
     }
     addresses.forEach((address2) => {
-      address2 = _handleAddress(address2);
+      address2 = _handleAddress2(address2);
       if (address2.length) {
         parsedAddresses = parsedAddresses.concat(address2);
       }
@@ -67034,7 +68807,7 @@ var require_addressparser2 = __commonJS((exports, module) => {
     }
     return parsedAddresses;
   }
-  module.exports = addressparser;
+  module.exports = addressparser2;
 });
 
 // node_modules/nodemailer/lib/mime-node/last-newline.js
@@ -67146,13 +68919,13 @@ var require_le_unix = __commonJS((exports, module) => {
 var require_mime_node2 = __commonJS((exports, module) => {
   var crypto2 = __require("crypto");
   var fs = __require("fs");
-  var punycode = require_punycode3();
+  var punycode = require_punycode2();
   var PassThrough = __require("stream").PassThrough;
   var shared = require_shared();
   var mimeFuncs = require_mime_funcs();
   var qp = require_qp();
   var base643 = require_base64();
-  var addressparser = require_addressparser2();
+  var addressparser2 = require_addressparser();
   var nmfetch = require_fetch2();
   var LastNewline = require_last_newline();
   var LeWindows = require_le_windows();
@@ -67780,7 +69553,7 @@ var require_mime_node2 = __commonJS((exports, module) => {
           address.name = address.name || "";
           return [address];
         }
-        return addressparser(address);
+        return addressparser2(address);
       }));
     }
     _normalizeHeaderKey(key) {
@@ -68545,7 +70318,7 @@ var require_relaxed_body = __commonJS((exports, module) => {
 
 // node_modules/nodemailer/lib/dkim/sign.js
 var require_sign = __commonJS((exports, module) => {
-  var punycode = require_punycode3();
+  var punycode = require_punycode2();
   var mimeFuncs = require_mime_funcs();
   var crypto2 = __require("crypto");
   module.exports = (headers, hashAlgo, bodyHash, options) => {
@@ -68818,7 +70591,7 @@ var require_dkim = __commonJS((exports, module) => {
 });
 
 // node_modules/nodemailer/lib/smtp-connection/http-proxy-client.js
-var require_http_proxy_client2 = __commonJS((exports, module) => {
+var require_http_proxy_client = __commonJS((exports, module) => {
   var net = __require("net");
   var tls = __require("tls");
   var urllib = __require("url");
@@ -69176,7 +70949,7 @@ var require_mailer = __commonJS((exports, module) => {
   var mimeTypes = require_mime_types();
   var MailComposer = require_mail_composer();
   var DKIM = require_dkim();
-  var httpProxyClient = require_http_proxy_client2();
+  var httpProxyClient = require_http_proxy_client();
   var util = __require("util");
   var urllib = __require("url");
   var packageData = require_package4();
@@ -74925,13 +76698,11 @@ var validator = (target, validationFunc) => {
 
 // node_modules/@hono/zod-validator/dist/index.mjs
 function zValidatorFunction(target, schema, hook, options) {
+  const caseInsensitiveKeymap = target === "header" && (("_def" in schema) || ("_zod" in schema)) ? Object.fromEntries(Object.keys("in" in schema ? schema.in.shape : schema.shape).map((key) => [key.toLowerCase(), key])) : undefined;
   return validator(target, async (value, c) => {
     let validatorValue = value;
-    if (target === "header" && "_def" in schema || target === "header" && "_zod" in schema) {
-      const schemaKeys = Object.keys("in" in schema ? schema.in.shape : schema.shape);
-      const caseInsensitiveKeymap = Object.fromEntries(schemaKeys.map((key) => [key.toLowerCase(), key]));
+    if (caseInsensitiveKeymap)
       validatorValue = Object.fromEntries(Object.entries(value).map(([key, value2]) => [caseInsensitiveKeymap[key] || key, value2]));
-    }
     const result = options && options.validationFunction ? await options.validationFunction(schema, validatorValue) : await schema.safeParseAsync(validatorValue);
     if (hook) {
       const hookResult = await hook({

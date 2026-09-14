@@ -12,7 +12,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // Postgres as one and 22P02s — 500, not 404 — on any typo'd or fuzzed path.
 // This has to be chained on each route directly: a leading `app.use('*', ...)`
 // runs before Hono has matched a route, so `c.req.param()` there is always
-// `{}` — measured, not assumed; see `hr/employees/CONTEXT.md`.
+// `{}` — measured, not assumed.
 function requireUuid(...names: string[]) {
   return async (c: any, next: () => Promise<void>) => {
     for (const n of names) {

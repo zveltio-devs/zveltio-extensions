@@ -138,6 +138,16 @@ jobs:
         # recorded it.
         run: bun scripts/check-bundle-sources.ts
 
+      - name: No packing machine's filesystem layout in a bundle
+        # check-bundle-sources hashes the SOURCE and check-embedded-deps-fresh
+        # compares bundled dependency VERSIONS. Neither looks at what a bundle
+        # points AT on disk, and three bundles shipped `__dirname` frozen to the
+        # packer's home directory. operations/traceability used it to load PDF
+        # font metrics, so label printing worked only on the machine that packed
+        # it. `extension pack` now rewrites those paths; this notices when that
+        # stops happening.
+        run: bun scripts/check-bundle-build-paths.ts
+
 
       - name: Verify packed bundles match manifest engineSha256
         # Drift between manifest.integrity.engineSha256 and the committed
