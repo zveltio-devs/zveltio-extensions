@@ -8,6 +8,19 @@ import { receivables } from './briefing.js';
 
 type Bindings = { db: any; user: any };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * `:id` is interpolated straight into `WHERE x = $1` against a `uuid` column.
+ * Postgres refuses a non-uuid parameter with 22P02 — a raw 500, not a 404 —
+ * on any typo'd or fuzzed path. A malformed id can never match a row, so the
+ * honest answer is the same one a well-formed-but-absent id gets.
+ */
+function requireUuid(c: any, id: string): Response | null {
+  if (UUID_RE.test(id)) return null;
+  return c.json({ error: 'Not found' }, 404);
+}
+
 function buildListQuery(table: string, allowed: string[]) {
   return (c: any) => {
     const { limit = '50', page = '1', sort, order = 'desc', search } = c.req.query();
@@ -138,12 +151,15 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.get('/contacts/:id', async (c) => {
+    const id = c.req.param('id');
+    const invalid = requireUuid(c, id);
+    if (invalid) return invalid;
     const row = await sql`
       SELECT c.*, COALESCE(json_agg(o.*) FILTER (WHERE o.id IS NOT NULL), '[]') AS organizations
       FROM zvd_contacts c
       LEFT JOIN zvd_contact_organizations co ON co.contact_id = c.id
       LEFT JOIN zvd_organizations o ON o.id = co.organization_id
-      WHERE c.id = ${c.req.param('id')}
+      WHERE c.id = ${id}
       GROUP BY c.id
     `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
@@ -254,6 +270,8 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const d = c.req.valid('json');
       const id = c.req.param('id');
+      const invalid = requireUuid(c, id);
+      if (invalid) return invalid;
       const sets: string[] = [];
       const vals: any[] = [];
       let i = 1;
@@ -290,6 +308,8 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
   app.delete('/contacts/:id', async (c) => {
     const user = c.get('user') as any;
     const id = c.req.param('id');
+    const invalid = requireUuid(c, id);
+    if (invalid) return invalid;
     const existing = await sql<{ created_by: string }>`
       SELECT created_by FROM zvd_contacts WHERE id = ${id}
     `.execute(db);
@@ -334,6 +354,9 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.get('/organizations/:id', async (c) => {
+    const id = c.req.param('id');
+    const invalid = requireUuid(c, id);
+    if (invalid) return invalid;
     const row = await sql`
       SELECT o.*,
         COALESCE(json_agg(json_build_object('id', c.id, 'first_name', c.first_name, 'last_name', c.last_name, 'email', c.email))
@@ -341,7 +364,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       FROM zvd_organizations o
       LEFT JOIN zvd_contact_organizations co ON co.organization_id = o.id
       LEFT JOIN zvd_contacts c ON c.id = co.contact_id
-      WHERE o.id = ${c.req.param('id')}
+      WHERE o.id = ${id}
       GROUP BY o.id
     `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
@@ -409,6 +432,8 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const d = c.req.valid('json');
       const id = c.req.param('id');
+      const invalid = requireUuid(c, id);
+      if (invalid) return invalid;
       const sets: string[] = [];
       const vals: any[] = [];
       let i = 1;
@@ -427,6 +452,8 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
   app.delete('/organizations/:id', async (c) => {
     const user = c.get('user') as any;
     const id = c.req.param('id');
+    const invalid = requireUuid(c, id);
+    if (invalid) return invalid;
     const existing = await sql<{ created_by: string }>`
       SELECT created_by FROM zvd_organizations WHERE id = ${id}
     `.execute(db);
@@ -480,6 +507,9 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.get('/transactions/:id', async (c) => {
+    const id = c.req.param('id');
+    const invalid = requireUuid(c, id);
+    if (invalid) return invalid;
     const row = await sql`
       SELECT t.*,
         json_build_object('id', c.id, 'first_name', c.first_name, 'last_name', c.last_name, 'email', c.email) AS contact,
@@ -487,7 +517,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       FROM zvd_transactions t
       LEFT JOIN zvd_contacts c ON c.id = t.contact_id
       LEFT JOIN zvd_organizations o ON o.id = t.organization_id
-      WHERE t.id = ${c.req.param('id')}
+      WHERE t.id = ${id}
     `.execute(db);
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     return c.json({ data: row.rows[0] });
@@ -550,6 +580,8 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const d = c.req.valid('json');
       const id = c.req.param('id');
+      const invalid = requireUuid(c, id);
+      if (invalid) return invalid;
       const sets: string[] = [];
       const vals: any[] = [];
       let i = 1;
@@ -569,6 +601,8 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
   app.delete('/transactions/:id', async (c) => {
     const user = c.get('user') as any;
     const id = c.req.param('id');
+    const invalid = requireUuid(c, id);
+    if (invalid) return invalid;
     const existing = await sql<{ created_by: string }>`
       SELECT created_by FROM zvd_transactions WHERE id = ${id}
     `.execute(db);

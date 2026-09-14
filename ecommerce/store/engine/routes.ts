@@ -5,6 +5,49 @@ import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * `:id` is interpolated straight into `WHERE x = $1` against a `uuid` column.
+ * Postgres refuses a non-uuid parameter with 22P02 — a raw 500, not a 404 —
+ * on any typo'd or fuzzed path. A malformed id can never match a row, so the
+ * honest answer is the same one a well-formed-but-absent id gets. Same class
+ * already fixed in hr/employees and crm.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: Hono context in self-contained extension
+function requireUuid(c: any, id: string): Response | null {
+  if (UUID_RE.test(id)) return null;
+  return c.json({ error: 'Not found' }, 404);
+}
+
+/** Thrown inside the checkout transaction to abort it and answer 400, not 500. */
+class InsufficientStockError extends Error {}
+
+/**
+ * The whole checkout transaction, retried on a lost race for `order_number`.
+ *
+ * `orderNumber` is `ORD-<COUNT(*)+1>`, read before either concurrent
+ * transaction commits — two checkouts landing at the same instant compute the
+ * same number, and the loser's INSERT dies on `zvd_ec_orders_order_number_key`
+ * (23505). Not the STOCK race (that one is refused honestly by the conditional
+ * decrement below); this is a duplicate document number. Retrying the whole
+ * transaction re-reads the count and gets a fresh one — a partial retry of
+ * just the INSERT would run against a transaction already aborted by the
+ * first failed statement.
+ */
+async function withOrderNumberRetry<T>(fn: () => Promise<T>, maxAttempts = 5): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const pgErr = err as { code?: string; constraint?: string };
+      const isOrderNumberClash =
+        pgErr?.code === '23505' && String(pgErr?.constraint ?? '').includes('order_number');
+      if (!isOrderNumberClash || attempt >= maxAttempts) throw err;
+    }
+  }
+}
+
 // Fixed-window per-IP limiter for the UNauthenticated storefront writes.
 // In-memory on purpose: it only has to blunt scripted spam on a public
 // endpoint, not survive restarts or coordinate replicas. IP comes from the
@@ -111,6 +154,8 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     body: z.string().optional(),
     order_id: z.string().uuid().optional(),
   })), async (c) => {
+    const invalid = requireUuid(c, c.req.param('id'));
+    if (invalid) return invalid;
     const d = c.req.valid('json');
     // Check if verified purchase
     let isVerified = false;
@@ -195,6 +240,8 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     is_active: z.boolean().optional(),
     sort_order: z.number().int().optional(),
   })), async (c) => {
+    const invalid = requireUuid(c, c.req.param('id'));
+    if (invalid) return invalid;
     const d = c.req.valid('json');
     const row = await sql`
       UPDATE zvd_ec_categories SET
@@ -349,6 +396,8 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     category_id: z.string().uuid().optional(),
     tax_rate: z.number().optional(),
   })), async (c) => {
+    const invalid = requireUuid(c, c.req.param('id'));
+    if (invalid) return invalid;
     const d = c.req.valid('json');
     const row = await sql`
       UPDATE zvd_ec_products SET
@@ -371,12 +420,16 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.delete('/admin/products/:id', async (c) => {
+    const invalid = requireUuid(c, c.req.param('id'));
+    if (invalid) return invalid;
     await sql`UPDATE zvd_ec_products SET status = 'archived', updated_at = NOW() WHERE id = ${c.req.param('id')}`.execute(db);
     return c.json({ success: true });
   });
 
   // ── Product Variants ───────────────────────────────────────────
   app.get('/admin/products/:id/variants', async (c) => {
+    const invalid = requireUuid(c, c.req.param('id'));
+    if (invalid) return invalid;
     const rows = await sql`SELECT * FROM zvd_ec_product_variants WHERE product_id = ${c.req.param('id')} ORDER BY sort_order`.execute(db);
     return c.json({ data: rows.rows });
   });
@@ -393,6 +446,8 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     image_url: z.string().optional(),
     sort_order: z.number().int().default(0),
   })), async (c) => {
+    const invalid = requireUuid(c, c.req.param('id'));
+    if (invalid) return invalid;
     const d = c.req.valid('json');
     const row = await sql`
       INSERT INTO zvd_ec_product_variants (product_id, sku, name, attributes, price, compare_price, cost, stock_qty, weight, image_url, sort_order)
@@ -410,6 +465,8 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     stock_qty: z.number().int().optional(),
     is_active: z.boolean().optional(),
   })), async (c) => {
+    const invalid = requireUuid(c, c.req.param('id'));
+    if (invalid) return invalid;
     const d = c.req.valid('json');
     const row = await sql`
       UPDATE zvd_ec_product_variants SET
@@ -424,6 +481,8 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.delete('/admin/variants/:id', async (c) => {
+    const invalid = requireUuid(c, c.req.param('id'));
+    if (invalid) return invalid;
     await sql`UPDATE zvd_ec_product_variants SET is_active = false WHERE id = ${c.req.param('id')}`.execute(db);
     return c.json({ success: true });
   });
@@ -462,6 +521,8 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     estimated_days_min: z.number().int().optional(),
     estimated_days_max: z.number().int().optional(),
   })), async (c) => {
+    const invalid = requireUuid(c, c.req.param('id'));
+    if (invalid) return invalid;
     const d = c.req.valid('json');
     const row = await sql`
       INSERT INTO zvd_ec_shipping_rates (zone_id, name, type, price, free_above_amount, estimated_days_min, estimated_days_max)
@@ -548,7 +609,9 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     // customer paid nothing, received nothing, and the code they were given no
     // longer works. Stock is the same shape — decremented for an order that
     // does not exist, the units are simply gone from the shop.
-    const order = await db.transaction().execute(async (trx) => {
+    let order: any;
+    try {
+      order = await withOrderNumberRetry(() => db.transaction().execute(async (trx) => {
       // Apply coupon
       let discount = 0;
       let couponCode = d.coupon_code ?? null;
@@ -633,10 +696,32 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
           VALUES (${orderId}, ${line.product_id}, ${line.variant_id}, ${line.product_name}, ${line.sku ?? null},
             ${line.quantity}, ${line.unit_price}, ${line.tax_rate}, ${line.total})
         `.execute(trx);
+        // Conditional, self-checking decrement — not a separate lock plus a
+        // second statement. Two concurrent checkouts for the last unit used to
+        // both pass a JS check made from a read taken before either wrote, then
+        // both run this UPDATE unconditionally: `stock_qty` went negative and
+        // both orders were created. The row lock this UPDATE takes IS the
+        // isolation; a 0-row result means the other transaction already spent
+        // the stock (or a concurrent edit turned off backorder/tracking), and
+        // throwing here rolls back the whole order — line items, coupon use,
+        // and any earlier decrements in this same checkout included.
         if (line.variant_id) {
-          await sql`UPDATE zvd_ec_product_variants SET stock_qty = stock_qty - ${line.quantity} WHERE id = ${line.variant_id}`.execute(trx);
+          const dec = await sql`
+            UPDATE zvd_ec_product_variants v SET stock_qty = stock_qty - ${line.quantity}
+            FROM zvd_ec_products p
+            WHERE v.id = ${line.variant_id} AND p.id = v.product_id
+              AND (NOT p.track_stock OR p.allow_backorder OR v.stock_qty >= ${line.quantity})
+            RETURNING v.stock_qty
+          `.execute(trx);
+          if (!dec.rows.length) throw new InsufficientStockError(`Insufficient stock for ${line.product_name}`);
         } else {
-          await sql`UPDATE zvd_ec_products SET stock_qty = stock_qty - ${line.quantity}, updated_at = NOW() WHERE id = ${line.product_id}`.execute(trx);
+          const dec = await sql`
+            UPDATE zvd_ec_products SET stock_qty = stock_qty - ${line.quantity}, updated_at = NOW()
+            WHERE id = ${line.product_id}
+              AND (NOT track_stock OR allow_backorder OR stock_qty >= ${line.quantity})
+            RETURNING stock_qty
+          `.execute(trx);
+          if (!dec.rows.length) throw new InsufficientStockError(`Insufficient stock for ${line.product_name}`);
         }
       }
       // Mark cart as recovered
@@ -644,7 +729,13 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
         await sql`UPDATE zvd_ec_abandoned_carts SET recovered_at = NOW() WHERE session_id = ${d.session_id}`.execute(trx);
       }
       return order;
-    });
+      }));
+    } catch (err) {
+      if (err instanceof InsufficientStockError) {
+        return c.json({ error: err.message }, 400);
+      }
+      throw err;
+    }
 
     return c.json({ data: order.rows[0] }, 201);
   });
@@ -666,6 +757,8 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.get('/admin/orders/:id', async (c) => {
+    const invalid = requireUuid(c, c.req.param('id'));
+    if (invalid) return invalid;
     const row = await sql`SELECT * FROM zvd_ec_orders WHERE id = ${c.req.param('id')}`.execute(db);
     if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
     const items = await sql`SELECT * FROM zvd_ec_order_items WHERE order_id = ${c.req.param('id')}`.execute(db);
@@ -678,6 +771,8 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     tracking_number: z.string().optional(),
     notes: z.string().optional(),
   })), async (c) => {
+    const invalid = requireUuid(c, c.req.param('id'));
+    if (invalid) return invalid;
     const d = c.req.valid('json');
     const row = await sql`
       UPDATE zvd_ec_orders SET
@@ -722,6 +817,8 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     max_uses: z.number().int().optional(),
     valid_until: z.string().optional(),
   })), async (c) => {
+    const invalid = requireUuid(c, c.req.param('id'));
+    if (invalid) return invalid;
     const d = c.req.valid('json');
     const row = await sql`
       UPDATE zvd_ec_coupons SET
@@ -748,6 +845,8 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
   app.patch('/admin/reviews/:id', zValidator('json', z.object({
     status: z.enum(['approved','rejected']),
   })), async (c) => {
+    const invalid = requireUuid(c, c.req.param('id'));
+    if (invalid) return invalid;
     const { status } = c.req.valid('json');
     // The review's status and the product's rating are the same fact: the
     // averages are computed FROM `status = 'approved'`. Split, the product shows

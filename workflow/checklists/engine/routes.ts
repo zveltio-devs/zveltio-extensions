@@ -533,6 +533,22 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
 
         // Auto-complete checklist if all required items are checked
         if (checked !== undefined) {
+          // Locked FOR UPDATE before the completeness decision, so a second
+          // tick on a sibling item of the same checklist waits behind this
+          // one rather than reading a snapshot that predates it. Without the
+          // lock, two concurrent required-item ticks each read the other as
+          // still unchecked, both conclude "not complete", and the checklist
+          // is left in progress forever even though every required item is
+          // checked. Measured: two concurrent PATCHes on a 2-required-item
+          // checklist both committed `checked = true`, and `completed_at`
+          // stayed NULL.
+          const checklist = await trx
+            .selectFrom('zv_checklists')
+            .selectAll()
+            .where('id', '=', item.checklist_id)
+            .forUpdate()
+            .executeTakeFirst();
+
           const allItems = await trx
             .selectFrom('zv_checklist_items')
             .selectAll()
@@ -542,12 +558,6 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
           const allRequiredChecked = allItems
             .filter((i: any) => i.required)
             .every((i: any) => i.checked);
-
-          const checklist = await trx
-            .selectFrom('zv_checklists')
-            .selectAll()
-            .where('id', '=', item.checklist_id)
-            .executeTakeFirst();
 
           if (allRequiredChecked && checklist && !checklist.completed_at) {
             // Calculate time_to_complete_minutes
@@ -650,6 +660,16 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
         // Auto-complete affected checklists
         const affectedChecklistIds = [...new Set(validItems.map((i: any) => i.checklist_id))];
         for (const checklistId of affectedChecklistIds) {
+          // Same lock as PATCH /items/:itemId, and for the same reason: a
+          // concurrent tick on a sibling item of this checklist — from this
+          // bulk call or a lone PATCH — must not read a pre-commit snapshot.
+          const checklist = await trx
+            .selectFrom('zv_checklists')
+            .selectAll()
+            .where('id', '=', checklistId)
+            .forUpdate()
+            .executeTakeFirst();
+
           const allItems = await trx
             .selectFrom('zv_checklist_items')
             .selectAll()
@@ -659,12 +679,6 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
           const allRequiredChecked = allItems
             .filter((i: any) => i.required)
             .every((i: any) => i.checked);
-
-          const checklist = await trx
-            .selectFrom('zv_checklists')
-            .selectAll()
-            .where('id', '=', checklistId)
-            .executeTakeFirst();
 
           if (allRequiredChecked && checklist && !checklist.completed_at) {
             let timeToComplete: number | null = null;
@@ -801,9 +815,14 @@ export function checklistsRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    // Admin check via session roles
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    const isAdmin = session?.user?.role === 'admin';
+    // `"user".role` is a Better-Auth column constrained to `god`/`member`
+    // (see `user_role_check`) — it is never `'admin'`, so the check this
+    // replaced always answered false and this route refused every caller,
+    // including a real `god` session, since the day it was written. The
+    // repository's own idiom for "admin access required" is the bare
+    // `checkPermission(uid, 'admin', '*')` call, used the same way by
+    // analytics/quality, developer/validation, content/documents and others.
+    const isAdmin = await ctx.checkPermission(user.id, 'admin', '*');
     if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
 
     const now = new Date();

@@ -22,9 +22,31 @@ d('efactura — an unknown submission outcome is not repeatable', () => {
   const pool = new Pool({ connectionString: URL_ });
   const db = new Kysely<Record<string, never>>({ dialect: new PostgresDialect({ pool }) });
   const realFetch = globalThis.fetch;
+  // The settings row is a tenant-wide singleton (one per tenant_id). Mutating
+  // it in place and never restoring it left a fake `access_token = 'tok'`
+  // behind after this file finished — measured: a later, unrelated test run
+  // against the same TEST_DATABASE_URL read `connected: true` from that row
+  // and made a REAL call to ANAF's production upload endpoint with the fake
+  // token, drawing a genuine 401 from ANAF. Captured and restored below so
+  // this file's fixture does not outlive the file.
+  let savedSettings: Record<string, unknown> | null = null;
+  let insertedSettingsId: string | null = null;
   afterAll(async () => {
     globalThis.fetch = realFetch;
     await sql`DELETE FROM zv_efactura_invoices WHERE invoice_number LIKE 'IDEMP-%'`.execute(db);
+    if (insertedSettingsId) {
+      await sql`DELETE FROM zv_efactura_settings WHERE id = ${insertedSettingsId}`.execute(db);
+    } else if (savedSettings) {
+      await sql`
+        UPDATE zv_efactura_settings SET
+          environment = ${savedSettings.environment as string},
+          seller_cif = ${savedSettings.seller_cif as string | null},
+          client_id = ${savedSettings.client_id as string | null},
+          access_token = ${savedSettings.access_token as string | null},
+          token_expires_at = ${savedSettings.token_expires_at as Date | null}
+        WHERE id = ${savedSettings.id as string}
+      `.execute(db);
+    }
     await db.destroy();
   });
 
@@ -33,10 +55,11 @@ d('efactura — an unknown submission outcome is not repeatable', () => {
 
     // Settings ANAF calls need, so the handler reaches the upload rather than
     // failing earlier on configuration.
-    const existing = await sql<{ id: string }>`
-      SELECT id FROM zv_efactura_settings LIMIT 1
+    const existing = await sql<Record<string, unknown>>`
+      SELECT * FROM zv_efactura_settings LIMIT 1
     `.execute(db);
     if (existing.rows[0]) {
+      savedSettings = existing.rows[0];
       await sql`
         UPDATE zv_efactura_settings
         SET environment = 'test', seller_cif = '12345678', client_id = 'cid',
@@ -44,10 +67,12 @@ d('efactura — an unknown submission outcome is not repeatable', () => {
         WHERE id = ${existing.rows[0].id}
       `.execute(db);
     } else {
-      await sql`
+      const inserted = await sql<{ id: string }>`
         INSERT INTO zv_efactura_settings (environment, seller_cif, client_id, access_token)
         VALUES ('test', '12345678', 'cid', 'tok')
+        RETURNING id
       `.execute(db);
+      insertedSettingsId = inserted.rows[0].id;
     }
 
     const number = `IDEMP-${Date.now()}`;
