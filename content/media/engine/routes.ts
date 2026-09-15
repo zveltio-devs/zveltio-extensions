@@ -67,7 +67,20 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   // a handler is therefore already RLS-scoped — there is one spelling, so there
   // is none to forget.
 
-  const { moveToTrash, scheduleFileIndexing, isTenantAdmin } = ctx.internals;
+  const { moveToTrash, isTenantAdmin } = ctx.internals;
+
+  // AI indexing is the `ai` extension's, not the host's: it writes
+  // `zvd_ai_embeddings`, a table that extension's migration creates. It used to
+  // arrive as `ctx.internals.scheduleFileIndexing`, which put the code in the
+  // engine. Resolved per call, not once at register time — service registration
+  // order between two extensions is not ours to depend on.
+  const indexFile = (fileId: string, buffer: Buffer, mimeType: string): void => {
+    const schedule = ctx.services.get<
+      (db: unknown, fileId: string, buffer: Buffer, mimeType: string) => Promise<void>
+    >('ai.indexFile');
+    if (!schedule) return;
+    void schedule(db, fileId, buffer, mimeType);
+  };
 
   /**
    * May this user delete this file?
@@ -404,8 +417,10 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
 
     await (db as any).insertInto('zv_media_files').values(fileRecord).execute();
 
-    // AI document indexing — fire-and-forget
-    scheduleFileIndexing(db, fileId, buffer, file.type);
+    // AI document indexing — fire-and-forget, and skipped entirely when the `ai`
+    // extension is not installed. The call was already fire-and-forget, so an
+    // upload has never waited on or reported indexing.
+    indexFile(fileId, buffer, file.type);
 
     return c.json({ file: fileRecord }, 201);
   });
