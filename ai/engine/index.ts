@@ -5,6 +5,7 @@ import { aiProviderManager, initAIProviders } from './lib/ai-provider.js';
 import { setInternals } from './lib/ai-crypto.js';
 import { triggerEmbedding } from './lib/ai-embed-hook.js';
 import { ZveltioAIEngine } from './lib/zveltio-ai/engine.js';
+import { extractTextFromFile, scheduleFileIndexing } from './lib/document-indexer.js';
 
 /**
  * AI extension — providers, chat, embeddings, semantic search, text-to-SQL,
@@ -18,6 +19,11 @@ import { ZveltioAIEngine } from './lib/zveltio-ai/engine.js';
  *                                   — re-index one record's embedding
  *   ai.runBackgroundTask(userId, instruction, opts)
  *                                   — agentic task, consumed by flow-scheduler
+ *   ai.extractText(buffer, mimeType)
+ *                                   — plain text out of an uploaded file
+ *   ai.indexFile(db, fileId, buffer, mimeType)
+ *                                   — extract + embed a file, fire-and-forget,
+ *                                     consumed by content/media
  *
  * Other extensions consume these via `ctx.services.get('ai.providers')` etc.
  * Consumers should declare a manifest dependency: { "name": "ai" }.
@@ -89,6 +95,19 @@ const extension: ZveltioExtension = {
         record: Record<string, any>,
         tenantId: string | null = null,
       ) => triggerEmbedding(ctx.db, collection, recordId, record, tenantId),
+    );
+
+    // File text extraction and indexing. Both were `ctx.internals` members, so
+    // the host carried the code that writes `zvd_ai_embeddings` — this
+    // extension's own table. `extractText` resolves null to '' to keep the
+    // `Promise<string>` shape `ctx.internals.extractTextFromFile` declared.
+    ctx.services.register('ai.extractText', async (buffer: Buffer, mimeType: string) =>
+      (await extractTextFromFile(buffer, mimeType)) ?? '',
+    );
+    ctx.services.register(
+      'ai.indexFile',
+      async (db: any, fileId: string, buffer: Buffer, mimeType: string) =>
+        scheduleFileIndexing(db, fileId, buffer, mimeType),
     );
 
     // Background AI task runner — used by flow-scheduler for `ai_task` flows.
