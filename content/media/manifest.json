@@ -3,7 +3,7 @@
   "displayName": "Media Library",
   "category": "content",
   "description": "Media folders, files, and tags management",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-media",
@@ -38,8 +38,8 @@
     "bundlePeers": true
   },
   "integrity": {
-    "engineSha256": "ba7bd66433263c260aa104f62519a0c00ccebdeddde99ad574bac02dc2a4bae2",
-    "sourceSha256": "a15fbdd02bb06612788a2b0368dcc21ddac579d634f7b0332e836c853abc8ea5"
+    "engineSha256": "5e76b170e668c81158f9f5ef0b2913d8a01427c57b9d67a9e6209e5530ccd799",
+    "sourceSha256": "c94c758b94db539986ca9b957571548e06e99eb95a3361f00691e0d71fdcd552"
   },
   "resources": [
     "media"

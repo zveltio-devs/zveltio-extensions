@@ -7,6 +7,7 @@ import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 import { generateId } from '../lib/utils.js';
 import { aiProviderManager } from '../lib/ai-provider.js';
+import { extractTextFromFile } from '../lib/document-indexer.js';
 
 /**
  * Data Alchemist — transforms unstructured documents into structured databases.
@@ -18,8 +19,7 @@ import { aiProviderManager } from '../lib/ai-provider.js';
  * Mounted at /ext/ai/alchemist
  */
 export function aiAlchemistRoutes(ctx: ExtensionContext): Hono {
-  const { db, auth, checkPermission, DDLManager, fieldTypeRegistry, internals } = ctx;
-  const extractTextFromFile = internals.extractTextFromFile;
+  const { db, auth, checkPermission, DDLManager, fieldTypeRegistry } = ctx;
   const app = new Hono();
 
   // Admin-only middleware
