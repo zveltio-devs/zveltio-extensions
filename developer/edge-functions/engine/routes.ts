@@ -10,6 +10,62 @@ import { toJsonb } from '@zveltio/sdk/extension';
  * arbitrary code in the engine sandbox.
  */
 
+/**
+ * What `ctx.internals.runEdgeFunction` takes and returns.
+ *
+ * Declared here because the internals boundary is untyped, and that is not a
+ * cosmetic gap: both call sites used to pass a `Request` where an EdgeRequest
+ * belongs and read `.status` / `.body` off a result that has neither, and an
+ * `as any` on the return meant nothing said so. Writing the shapes down is what
+ * makes the next mistake of that kind a compile error.
+ *
+ * Mirrors packages/engine/src/lib/edge-function-runner.ts.
+ */
+interface EdgeRequestShape {
+  method: string;
+  headers: Record<string, string>;
+  query: Record<string, string>;
+  body: unknown;
+  path: string;
+}
+
+interface EdgeRunResult {
+  ok: boolean;
+  response?: { status: number; body: unknown; headers?: Record<string, string> };
+  error?: string;
+  logs: string[];
+  duration_ms: number;
+}
+
+type RunEdgeFunction = (
+  code: string,
+  request: EdgeRequestShape,
+  env: Record<string, string>,
+  timeoutMs: number,
+) => Promise<EdgeRunResult>;
+
+/**
+ * Headers a sandboxed function must not be given — the caller's credentials.
+ * Mirrors the engine's own `/api/fn/:name` route.
+ */
+const CREDENTIAL_HEADERS = new Set([
+  'cookie',
+  'authorization',
+  'x-api-key',
+  'x-preview-token',
+  'x-tenant-slug',
+]);
+
+/** A request body the handler can use: parsed JSON, or the raw text if it is not JSON. */
+function parseJsonBody(text: string): unknown {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
 const DEFAULT_CODE = `// Edge function — runs inside the Zveltio engine
 // Available: fetch, Request, Response, URL, console, crypto
 
@@ -32,7 +88,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
   // a handler is therefore already RLS-scoped — there is one spelling, so there
   // is none to forget.
 
-  const { runEdgeFunction: runFunction } = ctx.internals;
+  const runFunction = ctx.internals.runEdgeFunction as unknown as RunEdgeFunction;
 
   async function requireAdmin(c: any) {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -189,24 +245,40 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
     if (!fn) return c.json({ error: 'Function not found' }, 404);
 
     const bodyText = await c.req.text();
-    const testRequest = new Request(`http://localhost${fn.path}`, {
-      method: fn.http_method === 'ANY' ? 'POST' : fn.http_method,
-      headers: { 'Content-Type': 'application/json' },
-      body: bodyText || '{}',
-    });
 
-    const env = typeof fn.env_vars === 'string' ? JSON.parse(fn.env_vars) : fn.env_vars;
-    const result = await runFunction(fn.code, testRequest, env, fn.timeout_ms) as any;
+    // `runEdgeFunction` takes an EdgeRequest — a plain object — not a `Request`.
+    // It used to be handed `new Request(...)`, which the runner passes through
+    // `JSON.stringify` on its way into the sandbox: `JSON.stringify(request)` is
+    // `{}` for a Request, so the handler received an EMPTY object and saw no
+    // method, no body, no headers and no query. Measured, not deduced.
+    const result = await runFunction(
+      fn.code,
+      {
+        method: fn.http_method === 'ANY' ? 'POST' : fn.http_method,
+        headers: { 'content-type': 'application/json' },
+        query: Object.fromEntries(new URL(c.req.url).searchParams),
+        body: parseJsonBody(bodyText),
+        path: fn.path,
+      },
+      typeof fn.env_vars === 'string' ? JSON.parse(fn.env_vars) : (fn.env_vars ?? {}),
+      fn.timeout_ms,
+    );
 
-    // Log invocation
+    // A RunResult is { ok, response, logs, duration_ms } — it has no `status`
+    // and no `body`. Reading those wrote `status: undefined` into a NOT NULL
+    // column, so every insert here failed and the `.catch(() => {})` swallowed
+    // it: this table has never had a row from this route.
+    const status = result.ok ? (result.response?.status ?? 200) : 500;
     await db.insertInto('zv_edge_function_logs').values({
       function_id: fn.id,
-      status: result.status,
+      status,
       duration_ms: result.duration_ms,
       request_body: bodyText,
-      response_body: result.body,
+      response_body: result.ok ? JSON.stringify(result.response?.body) : null,
       error: result.error || null,
-    }).execute().catch(() => {});
+    }).execute().catch((err: Error) => {
+      console.warn('[edge-functions] invocation log failed:', err.message);
+    });
 
     return c.json({ result });
   });
@@ -227,7 +299,7 @@ type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export async function mountEdgeFunctions(ctx: ExtensionContext): Promise<void> {
   const { db, auth } = ctx;
-  const { runEdgeFunction: runFunction } = ctx.internals;
+  const runFunction = ctx.internals.runEdgeFunction as unknown as RunEdgeFunction;
 
   // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
   // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
@@ -297,20 +369,69 @@ export async function mountEdgeFunctions(ctx: ExtensionContext): Promise<void> {
         if (!session?.user) return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      const result = await runFunction(live.code, c.req.raw, liveEnv, live.timeout_ms) as any;
+      // An EdgeRequest, not `c.req.raw`. A `Request` JSON-stringifies to `{}`,
+      // so every function reached through this path ran against an empty
+      // request object — no method, no body, no headers, no query.
+      //
+      // Credential headers are withheld deliberately, matching the engine's own
+      // route: forwarding `cookie` hands the function the caller's session, and
+      // a sandbox that is given the caller's credentials on the way in is not
+      // containing very much. Webhook signature headers survive — they are what
+      // a receiver is for, and they authenticate the sender, not the caller.
+      const headersObj: Record<string, string> = {};
+      c.req.raw.headers.forEach((v: string, k: string) => {
+        if (!CREDENTIAL_HEADERS.has(k.toLowerCase())) headersObj[k] = v;
+      });
 
-      // Log async
+      const contentType = c.req.header('content-type') ?? '';
+      let body: unknown = null;
+      try {
+        if (contentType.includes('application/json')) body = await c.req.json();
+        else if (contentType.includes('text/')) body = await c.req.text();
+      } catch {
+        // A malformed body is the caller's problem, not a reason to 500 before
+        // the function has seen it. The handler gets null.
+      }
+
+      const result = await runFunction(
+        live.code,
+        {
+          method: c.req.method,
+          headers: headersObj,
+          query: Object.fromEntries(new URL(c.req.url).searchParams),
+          body,
+          path: c.req.path,
+        },
+        liveEnv,
+        live.timeout_ms,
+      );
+
+      const status = result.ok ? (result.response?.status ?? 200) : 500;
+
+      // Log async. `status` is NOT NULL, and this used to pass `result.status`,
+      // which a RunResult does not carry — so the insert failed every time and
+      // the empty catch hid it.
       db.insertInto('zv_edge_function_logs').values({
         function_id: live.id,
-        status: result.status,
+        status,
         duration_ms: result.duration_ms,
         error: result.error || null,
-      }).execute().catch(() => {});
+      }).execute().catch((err: Error) => {
+        console.warn('[edge-functions] invocation log failed:', err.message);
+      });
 
-      return new Response(result.body, {
-        status: result.status,
+      if (!result.ok) {
+        return c.json({ error: result.error, logs: result.logs }, 500);
+      }
+
+      const response = new Response(JSON.stringify(result.response?.body ?? null), {
+        status,
         headers: { 'Content-Type': 'application/json' },
       });
+      for (const [k, v] of Object.entries(result.response?.headers ?? {})) {
+        response.headers.set(k, v as string);
+      }
+      return response;
     };
 
     // `/api/fn/*` belongs to the engine, not to this extension.
