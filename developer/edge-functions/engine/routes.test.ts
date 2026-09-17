@@ -22,6 +22,14 @@
  * type declaration and explodes. The packed bundle is also the artifact the
  * engine actually loads — a source-level test would pass while the shipped
  * bundle stayed stale.
+ *
+ * And it runs against the REAL `ctx.internals`, which is the correction this
+ * file needed. Its first version stubbed `internals.runEdgeFunction` with the
+ * shapes the repair assumed, so it proved the repair agreed with itself. The
+ * engine had two functions of that name with incompatible signatures, internals
+ * exported the other one, and the extension shipped throwing
+ * `request.headers.forEach is not a function` on every invocation — green test
+ * included. A stub at the boundary under test is not a test of that boundary.
  */
 
 import { describe, expect, it } from 'bun:test';
@@ -31,6 +39,10 @@ const ENGINE_DIR = import.meta.dir;
 const REPO = join(ENGINE_DIR, '../../..');
 const { Hono } = (await import(join(REPO, 'node_modules/hono/dist/index.js'))) as any;
 const packed = (await import(join(ENGINE_DIR, 'index.js'))) as any;
+// The engine's real internals — the object the engine hands an extension.
+const { buildExtensionInternals } = (await import(
+  '@zveltio/engine/lib/extensions/internals.js'
+)) as any;
 
 const FN = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -44,13 +56,14 @@ const FN = {
 };
 
 /** Just enough Kysely to answer the chains these routes build. */
-function stubDb(inserted: Record<string, unknown>[]) {
+function stubDb(inserted: Record<string, unknown>[], code: string) {
   const chain: Record<string, unknown> = {};
   for (const method of ['selectFrom', 'select', 'selectAll', 'where', 'orderBy', 'limit']) {
     chain[method] = () => chain;
   }
-  chain.executeTakeFirst = async () => FN;
-  chain.execute = async () => [FN];
+  const fn = { ...FN, code };
+  chain.executeTakeFirst = async () => fn;
+  chain.execute = async () => [fn];
   return {
     ...chain,
     insertInto: () => ({
@@ -62,17 +75,22 @@ function stubDb(inserted: Record<string, unknown>[]) {
   };
 }
 
-async function invoke(runResult: unknown) {
+async function invoke(code: string) {
   const calls: unknown[][] = [];
   const inserted: Record<string, unknown>[] = [];
+  const internals = buildExtensionInternals();
   const ctx: any = {
-    db: stubDb(inserted),
+    db: stubDb(inserted, code),
     auth: { api: { getSession: async () => ({ user: { id: 'u1' } }) } },
     checkPermission: async () => true,
+    // Real internals, with one member wrapped only to RECORD the call. The
+    // wrapper forwards to the real implementation, so the shapes asserted below
+    // are the shapes the engine actually accepts and returns.
     internals: {
+      ...internals,
       runEdgeFunction: async (...args: unknown[]) => {
         calls.push(args);
-        return runResult;
+        return (internals.runEdgeFunction as (...a: unknown[]) => unknown)(...args);
       },
     },
     logger: { warn() {}, error() {}, info() {} },
@@ -94,38 +112,55 @@ async function invoke(runResult: unknown) {
   return { res, call: calls[0], inserted };
 }
 
-const OK_RESULT = {
-  ok: true,
-  response: { status: 201, body: { fine: true }, headers: {} },
-  logs: [],
-  duration_ms: 3,
-};
+const HANDLER = `async function handler(request, env) {
+  return { status: 201, body: { method: request.method, a: request.body?.a, tenant: request.query?.tenant, who: env.WHO } };
+}`;
 
-describe('POST /:id/invoke — what reaches the runner', () => {
-  it('passes an EdgeRequest, not a Request', async () => {
-    const { res, call } = await invoke(OK_RESULT);
+describe('POST /:id/invoke — what reaches the runner, and what comes back', () => {
+  it('passes an EdgeRequest the real runner can use', async () => {
+    const { res, call } = await invoke(HANDLER);
     expect(res.status).toBe(200);
 
     const request = call?.[1] as Record<string, unknown>;
-    // The defect in one line: a Request survives JSON as nothing at all.
+    // The defect in one line: a Request survives JSON as nothing at all, and
+    // the real runner throws on it rather than quietly losing the body.
     expect(JSON.stringify(request)).not.toBe('{}');
     expect(request.method).toBe('POST');
     expect(request.body).toEqual({ a: 1 });
     expect(request.path).toBe('/probe');
     expect(request.query).toEqual({ tenant: 'acme', debug: '1' });
-  });
+  }, 20_000);
 
-  it('logs the status the RunResult actually carries', async () => {
-    const { inserted } = await invoke(OK_RESULT);
+  it('the handler actually receives what was sent', async () => {
+    // The end of the contract the stub could not check: the sandbox ran, and
+    // what it saw is what the route put on the wire.
+    const { res } = await invoke(HANDLER);
+    const payload = (await res.json()) as { result: { ok: boolean; response: { body: unknown } } };
+
+    expect(payload.result.ok).toBe(true);
+    expect(payload.result.response.body).toEqual({
+      method: 'POST',
+      a: 1,
+      tenant: 'acme',
+      who: 'test',
+    });
+  }, 20_000);
+
+  it('logs the status the run actually produced', async () => {
+    const { inserted } = await invoke(HANDLER);
+
     expect(inserted).toHaveLength(1);
     // `status` is NOT NULL; undefined here means a failed insert, not a log row.
     expect(inserted[0].status).toBe(201);
-    expect(inserted[0].duration_ms).toBe(3);
-  });
+    expect(inserted[0].duration_ms).toBeGreaterThanOrEqual(0);
+  }, 20_000);
 
-  it('records 500 when the run failed, instead of undefined', async () => {
-    const { inserted } = await invoke({ ok: false, error: 'boom', logs: [], duration_ms: 1 });
+  it('records 500 when the handler throws, instead of undefined', async () => {
+    const { inserted } = await invoke(
+      `async function handler() { throw new Error('boom in handler'); }`,
+    );
+
     expect(inserted[0].status).toBe(500);
-    expect(inserted[0].error).toBe('boom');
-  });
+    expect(String(inserted[0].error)).toContain('boom in handler');
+  }, 20_000);
 });
