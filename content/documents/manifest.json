@@ -3,7 +3,7 @@
   "displayName": "Document Generator",
   "category": "content",
   "description": "Generate PDF documents from templates with data binding",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-documents",
@@ -47,7 +47,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "e534112ecc30728cd951415bf00c3ab4579b7142a16a40d12f2366d006be3dad",
+    "engineSha256": "d5957a2bd9e772cc38a95ec33facb15d80924a05c25e0b68bb97065be797793a",
     "sourceSha256": "ed1804d9ed6dfeec11da7e58275c06c3c246f78e5137ba5315193dd7aff5e2ba"
   }
 }

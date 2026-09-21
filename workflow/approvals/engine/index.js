@@ -14,7 +14,7 @@ var __export = (target, all) => {
     });
 };
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/compose.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
     let index = -1;
@@ -58,10 +58,10 @@ var compose = (middleware, onError, onNotFound) => {
   };
 };
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/request/constants.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/request/constants.js
 var GET_MATCH_RESULT = /* @__PURE__ */ Symbol();
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/utils/buffer.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/utils/buffer.js
 var bufferToFormData = (arrayBuffer, contentType) => {
   const response = new Response(arrayBuffer, {
     headers: {
@@ -71,7 +71,7 @@ var bufferToFormData = (arrayBuffer, contentType) => {
   return response.formData();
 };
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/utils/body.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/utils/body.js
 var MAX_NESTING_DEPTH = 32;
 var MAX_NESTED_OBJECTS = 1e4;
 var isRawRequest = (request) => ("headers" in request);
@@ -165,7 +165,7 @@ var throwNestingLimitExceeded = () => {
   throw new Error("Nesting limit exceeded");
 };
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/utils/url.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/utils/url.js
 var splitPath = (path) => {
   const paths = path.split("/");
   if (paths[0] === "") {
@@ -367,7 +367,7 @@ var getQueryParams = (url, key) => {
 };
 var decodeURIComponent_ = decodeURIComponent;
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/request.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/request.js
 var HonoRequest = class {
   raw;
   #validatedData;
@@ -432,7 +432,10 @@ var HonoRequest = class {
         if (anyCachedKey === "json") {
           body = JSON.stringify(body);
         }
-        return new Response(body)[key]();
+        const contentType = anyCachedKey === "formData" ? undefined : raw.headers.get("content-type");
+        return new Response(body, {
+          headers: contentType ? { "Content-Type": contentType } : undefined
+        })[key]();
       });
     }
     return bodyCache[key] = raw[key]();
@@ -478,7 +481,7 @@ var HonoRequest = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/utils/html.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/utils/html.js
 var HtmlEscapedCallbackPhase = {
   Stringify: 1,
   BeforeStream: 2,
@@ -516,7 +519,7 @@ var resolveCallback = async (str, phase, preserveCallbacks, context, buffer) => 
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/context.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/context.js
 var TEXT_PLAIN = "text/plain; charset=UTF-8";
 var setDefaultContentType = (contentType, headers) => {
   return {
@@ -698,7 +701,7 @@ var Context = class {
   };
 };
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/router.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router.js
 var METHOD_NAME_ALL = "ALL";
 var METHOD_NAME_ALL_LOWERCASE = "all";
 var METHODS = ["get", "post", "put", "delete", "options", "patch", "query"];
@@ -706,10 +709,10 @@ var MESSAGE_MATCHER_IS_ALREADY_BUILT = "Can not add a route since the matcher is
 var UnsupportedPathError = class extends Error {
 };
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/utils/constants.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/utils/constants.js
 var COMPOSED_HANDLER = "__COMPOSED_HANDLER";
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/hono-base.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/hono-base.js
 var notFoundHandler = (c) => {
   return c.text("404 Not Found", 404);
 };
@@ -935,10 +938,10 @@ var Hono = class _Hono {
   };
 };
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/router/utils.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router/utils.js
 var createNullObject = () => /* @__PURE__ */ Object.create(null);
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/router/reg-exp-router/matcher.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router/reg-exp-router/matcher.js
 var emptyParam = [];
 function match(method, path) {
   const matchers = this.buildAllMatchers();
@@ -959,7 +962,7 @@ function match(method, path) {
   return match2(method, path);
 }
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/router/reg-exp-router/node.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router/reg-exp-router/node.js
 var LABEL_REG_EXP_STR = "[^/]+";
 var ONLY_WILDCARD_REG_EXP_STR = ".*";
 var TAIL_WILDCARD_REG_EXP_STR = "(?:|/.*)";
@@ -1062,7 +1065,7 @@ var Node = class _Node {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/router/reg-exp-router/trie.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router/reg-exp-router/trie.js
 var Trie = class {
   #context = { varIndex: 0 };
   #root = new Node;
@@ -1125,7 +1128,7 @@ var Trie = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/router/reg-exp-router/router.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router/reg-exp-router/router.js
 var wildcardRegExpCache = createNullObject();
 function buildWildcardRegExp(path) {
   return wildcardRegExpCache[path] ??= new RegExp(`^${path.replace(/\/:[^/{}]+(?:\{\[\^\/]\+})?(?=[/{]|$)|\/?\*$|([.\\+*[^\]$()?{}|])/g, (match2, metaChar) => metaChar ? `\\${metaChar}` : match2 === "/*" ? TAIL_WILDCARD_REG_EXP_STR : match2 === "*" ? ONLY_WILDCARD_REG_EXP_STR : `/:${LABEL_REG_EXP_STR}`)}$`);
@@ -1241,7 +1244,7 @@ var RegExpRouter = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/router/reg-exp-router/prepared-router.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router/reg-exp-router/prepared-router.js
 var PreparedRegExpRouter = class {
   name = "PreparedRegExpRouter";
   #matchers;
@@ -1313,7 +1316,7 @@ var PreparedRegExpRouter = class {
   match = match;
 };
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/router/smart-router/router.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router/smart-router/router.js
 var SmartRouter = class {
   name = "SmartRouter";
   #routers = [];
@@ -1368,7 +1371,7 @@ var SmartRouter = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/router/trie-router/node.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router/trie-router/node.js
 var emptyParams = createNullObject();
 var order = 0;
 var Node2 = class _Node2 {
@@ -1516,7 +1519,7 @@ var Node2 = class _Node2 {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/router/trie-router/router.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router/trie-router/router.js
 var TrieRouter = class {
   name = "TrieRouter";
   #node = new Node2;
@@ -1530,7 +1533,7 @@ var TrieRouter = class {
   }
 };
 
-// ../zveltio/node_modules/.bun/hono@4.13.7/node_modules/hono/dist/hono.js
+// ../zveltio/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/hono.js
 var Hono2 = class extends Hono {
   constructor(options = {}) {
     super(options);
