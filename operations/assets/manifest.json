@@ -3,7 +3,7 @@
   "displayName": "Fixed Assets",
   "category": "operations",
   "description": "Fixed asset register, straight-line and declining balance depreciation, maintenance schedules",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-assets",
@@ -44,7 +44,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "45ed54a3e4b2a68ad7e05a25ddc35fbf720a0472c45a25f70584de92a86cb4c3",
+    "engineSha256": "3295058c4a5194e0ec998108c612839b488b38f514c41bd1bd2085f71026566b",
     "sourceSha256": "7964785f1d1c3de37c36ca392a30681717498a91fc9376992500948660fb5622"
   },
   "resources": [
