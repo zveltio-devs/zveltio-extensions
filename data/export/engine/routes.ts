@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { ExtensionContext } from '@zveltio/sdk/extension';
+import type { ExtensionContext, ExtensionInternals } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
 import { toJsonb } from '@zveltio/sdk/extension';
 // ─── Serialization helpers ────────────────────────────────────────────────────
@@ -12,8 +12,8 @@ import { toJsonb } from '@zveltio/sdk/extension';
 // so exported data runs as a formula in the reviewer's Excel. The host also
 // takes the union of every row's keys, where this took Object.keys(rows[0])
 // and silently dropped columns whenever rows were ragged.
-// biome-ignore lint/suspicious/noExplicitAny: ctx.internals is engine-typed
-function toCSV(internals: any, rows: any[]): string {
+// biome-ignore lint/suspicious/noExplicitAny: exported rows are collection data
+function toCSV(internals: ExtensionInternals, rows: any[]): string {
   return internals.recordsToCsv(rows);
 }
 

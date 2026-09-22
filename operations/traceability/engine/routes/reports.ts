@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
 import { sql } from 'kysely';
-import type { ExtensionContext } from '@zveltio/sdk/extension';
+import type { ExtensionContext, ExtensionInternals } from '@zveltio/sdk/extension';
 
 // Cells are rendered by the host (`ctx.internals.csvCell`), which quotes AND
 // neutralises leading =,+,-,@ — a spreadsheet evaluates those as formulas, so
 // exported data would execute in the reader's Excel.
-// biome-ignore lint/suspicious/noExplicitAny: ctx.internals is engine-typed
-function toCSV(internals: any, rows: any[], columns: string[]): string {
+// biome-ignore lint/suspicious/noExplicitAny: report rows are collection data
+function toCSV(internals: ExtensionInternals, rows: any[], columns: string[]): string {
   const header = columns.map((c) => internals.csvCell(c)).join(',');
   const lines = rows.map((r) => columns.map((c) => internals.csvCell(r[c] ?? '')).join(','));
   return [header, ...lines].join('\r\n');
