@@ -60,6 +60,34 @@ const FROZEN_DIRNAME = /(?:__dirname|__filename)\s*=\s*"(\/[^"]*)"/g;
 const NODE_MODULES_PATH = /[^\s"'`]*node_modules[\\/][^\s"'`]*/g;
 const MACHINE_SEGMENT = /(?:^|[\\/])(?:home|Users|root)[\\/][^\\/]+[\\/]/;
 
+/**
+ * The relative form, which the two rules above both let through.
+ *
+ * Bun names each inlined module by the path it resolved RELATIVE to the package
+ * being built, and an extension's dependencies live outside it: the committed
+ * bundles carried `../wt-t4/node_modules/…` and `../wt-t4/packages/sdk/src/…`,
+ * naming a git worktree that exists on one laptop. No home directory in it, so
+ * neither pattern above fired.
+ *
+ * It is also why a bundle could not be reproduced: two checkouts of the same
+ * commit, differing only in directory name, packed to different bytes — so
+ * "this bundle does not match its source" was indistinguishable from "someone
+ * packed it from a worktree", and every repack asked the registry to accept
+ * different bytes for a difference that was pure noise.
+ *
+ * `extension pack` rewrites these to `/zveltio-extension/…` as of this change.
+ */
+const RELATIVE_ESCAPE = /\.{1,2}\/[^\s"'`]*(?:node_modules|packages)\/[^\s"'`]*/g;
+
+/**
+ * The bare form of the same thing. Packing from the repo root instead of from
+ * inside the extension makes Bun write `node_modules/hono/dist/…` with no
+ * leading `./`, which is a third spelling of one dependency and a third set of
+ * bytes for one source. Anchored to the start of a comment line, so a bundled
+ * library's own string containing "node_modules/" does not trip it.
+ */
+const BARE_MODULE_COMMENT = /^\/\/\s*(node_modules\/\S*)/gm;
+
 function bundles(): string[] {
   const found: string[] = [];
   const collect = (dir: string): void => {
@@ -95,6 +123,12 @@ for (const file of bundles()) {
   for (const m of text.matchAll(FROZEN_DIRNAME)) {
     const value = m[1] as string;
     if (!value.startsWith(NEUTRAL)) hits.push(value);
+  }
+  for (const m of text.matchAll(RELATIVE_ESCAPE)) {
+    hits.push(m[0] as string);
+  }
+  for (const m of text.matchAll(BARE_MODULE_COMMENT)) {
+    hits.push(m[1] as string);
   }
   for (const m of text.matchAll(NODE_MODULES_PATH)) {
     const value = m[0] as string;
