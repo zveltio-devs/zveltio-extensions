@@ -3,7 +3,7 @@
   "displayName": "CRM",
   "category": "business",
   "description": "Contacts, Organizations, and Transactions — owned by this extension, not the engine core",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-crm",
@@ -41,7 +41,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "31a2e8eac45baf84dedd27f75f12cfb1ab2356d9038acecb51f13ac250922dba",
+    "engineSha256": "af601b1664f612ffe5e87525b73bede07cc450f5a045960b11b548ead7a88575",
     "sourceSha256": "d250d616aaf6b21e5ceb04308ae7070bf38ae1173a4f8ab8a4b3e8a9e7bdd93b"
   },
   "resources": [
