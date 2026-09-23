@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { Context } from 'hono';
-import type { ExtensionContext } from '@zveltio/sdk/extension';
+import type { ExtensionContext, ExtensionInternals } from '@zveltio/sdk/extension';
 import { permissionGate } from '@zveltio/sdk/extension';
 
 /**
@@ -97,8 +97,8 @@ function generateD112Xml(period: any, entries: any[]): string {
 // with commas and no escaping at all: an employee name containing a comma
 // broke the file for the whole payroll upload, and a name starting with `=`
 // executed as a formula when the export was opened.
-// biome-ignore lint/suspicious/noExplicitAny: ctx.internals is engine-typed
-function generateRevisalCsv(internals: any, employees: any[]): string {
+// biome-ignore lint/suspicious/noExplicitAny: employee rows are collection data
+function generateRevisalCsv(internals: ExtensionInternals, employees: any[]): string {
   // Fed from the `hr.employment` service now, which gives a single
   // `employee_name` rather than the two columns this used to read. Split on the
   // LAST space: a person with two given names has them before the surname here,

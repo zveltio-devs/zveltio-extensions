@@ -1,3 +1,4 @@
+import type { ExtensionInternals, FilterOp } from '@zveltio/sdk/extension';
 /**
  * Resolving a data block — the ONE place a `collection_list` becomes rows.
  *
@@ -43,18 +44,26 @@
  * against the table's REAL columns before they reach a query.
  */
 
-// biome-ignore lint/suspicious/noExplicitAny: the internals bag is typed engine-side
+// biome-ignore lint/suspicious/noExplicitAny: collection rows have no static shape
 type Any = any;
 
 export interface HydrateDeps {
   db: Any;
   /** `ctx.internals` — the engine helpers. Never reimplement one of these. */
-  engine: Any;
+  engine: ExtensionInternals;
 }
 
 export interface HydrateAudience {
-  /** The signed-in user, or null/undefined for an anonymous visitor. */
-  user: { id?: string; role?: string } | null | undefined;
+  /**
+   * The signed-in user, or null/undefined for an anonymous visitor.
+   *
+   * `id` is required, not optional: it is the whole identity the row policies
+   * resolve against — `getRlsFilters` reads the user's roles and the
+   * `data:view_all` override from it, and hands an absent id straight to
+   * `checkPermission`. An object without one is not a less-privileged caller,
+   * it is a caller no policy can judge.
+   */
+  user: { id: string; role?: string } | null | undefined;
   authType?: 'session' | 'api_key';
   /** Tenant to scope collection rows to. */
   tenantId: string;
@@ -552,7 +561,7 @@ function parseFields(content: Any): string[] {
 
 interface ParsedFilter {
   field: string;
-  op: string;
+  op: FilterOp;
   value: unknown;
 }
 
@@ -564,14 +573,14 @@ interface ParsedFilter {
  * straight through would land in `buildCondition`'s default branch — so the
  * filter would be dropped and the block would answer with unfiltered rows.
  */
-const OP_ALIASES: Record<string, string> = {
+const OP_ALIASES: Record<string, FilterOp> = {
   is_null: 'null',
   is_not_null: 'not_null',
   ne: 'neq',
   contains: 'ilike',
 };
 
-const KNOWN_OPS = new Set([
+const KNOWN_OPS = new Set<FilterOp>([
   'eq', 'neq', 'lt', 'lte', 'gt', 'gte',
   'like', 'ilike', 'in', 'not_in', 'null', 'not_null',
 ]);
@@ -596,7 +605,7 @@ export function parseFilterList(raw: unknown): ParsedFilter[] {
   for (const f of list as Any[]) {
     if (!f || typeof f !== 'object') continue;
     if (typeof f.field !== 'string' || typeof f.op !== 'string') continue;
-    const op = OP_ALIASES[f.op] ?? f.op;
+    const op = OP_ALIASES[f.op] ?? (f.op as FilterOp);
     if (!KNOWN_OPS.has(op)) continue;
     out.push({ field: f.field, op, value: f.value });
   }

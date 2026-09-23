@@ -19,7 +19,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import { randomBytes, randomUUID } from 'crypto';
-import type { ExtensionContext } from '@zveltio/sdk/extension';
+import type { ExtensionContext, ExtensionInternals } from '@zveltio/sdk/extension';
 
 // biome-ignore lint/suspicious/noExplicitAny: dual-kysely brand guard (see analytics/quality)
 type Db = any;
@@ -43,8 +43,7 @@ const SCIM_PATCH = 'urn:ietf:params:scim:api:messages:2.0:PatchOp';
 // the instance — to compute one token hash. The host computes the same
 // HMAC-SHA256, so bearer tokens already issued keep authenticating, while the
 // extension no longer holds the secret itself.
-// biome-ignore lint/suspicious/noExplicitAny: ctx.internals is engine-typed
-function hashToken(internals: any, raw: string): Promise<string> {
+function hashToken(internals: ExtensionInternals, raw: string): Promise<string> {
   return internals.deriveTokenHash(raw);
 }
 
