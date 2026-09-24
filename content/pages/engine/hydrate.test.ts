@@ -849,3 +849,45 @@ describe('a record page filters which rows have an address', () => {
     expect(calls.conditions).toEqual([]);
   });
 });
+
+describe('a failed policy lookup hides, it does not reveal', () => {
+  // `[]` from getRlsFilters and `null` from getColumnAccess mean "nothing
+  // restricts this caller". Both lookups were caught as exactly that, so a
+  // failed policy query (a timeout, a failover) rendered every row and column
+  // the caller's rules hide.
+  const user = { user: { id: 'u1', role: 'member' }, tenantId: 't1' };
+  const down = async () => {
+    throw new Error('statement timeout');
+  };
+
+  for (const failing of ['getRlsFilters', 'getColumnAccess'] as const) {
+    test(`collection_list: ${failing} failing yields no rows`, async () => {
+      const { db } = makeDb({ collections: ['contacts'] });
+      const [out] = await resolveBlocks(
+        { db, engine: makeEngine({ [failing]: down }) },
+        user,
+        [listBlock({ collection: 'contacts' })],
+      );
+      expect(out.content._error).toBeDefined();
+      expect(out.content._data ?? []).toEqual([]);
+    });
+
+    test(`record page: ${failing} failing refuses the record`, async () => {
+      const { db } = makeDb({
+        collections: ['contacts'],
+        columns: ['id', 'tenant_id', 'slug'],
+        rows: [{ id: '1', slug: 'maria-radu' }],
+      });
+      const { resolveRecord } = await import('./hydrate.js');
+      await expect(
+        resolveRecord(
+          { db, engine: makeEngine({ [failing]: down }) },
+          user,
+          'contacts',
+          'slug',
+          'maria-radu',
+        ),
+      ).rejects.toThrow('statement timeout');
+    });
+  }
+});
