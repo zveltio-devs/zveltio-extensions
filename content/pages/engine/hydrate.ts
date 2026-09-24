@@ -337,10 +337,14 @@ async function resolveWithViewer(
     // Row policies, for a caller we can identify. An anonymous visitor has no
     // identity for a policy to match, which is why the gate above is a site's
     // explicit list rather than a policy evaluation.
+    //
+    // Neither this lookup nor the column one below catches: `[]` / `null` mean
+    // "nothing restricts this caller", so reading a failed lookup that way
+    // rendered every row and column the caller's rules hide. The block errors
+    // instead (the catch at the bottom), and `resolveRecord` fails the request.
     if (audience.user) {
       const rls = await deps.engine
-        .getRlsFilters(meta.name, audience.user, audience.authType ?? 'session')
-        .catch(() => []);
+        .getRlsFilters(meta.name, audience.user, audience.authType ?? 'session');
       q = deps.engine.applyRlsFilters(q, rls);
     }
 
@@ -371,8 +375,7 @@ async function resolveWithViewer(
     // `any`, so nothing said so.
     const role = await deps.engine.resolveUserRole(audience.user ?? {}).catch(() => 'public');
     const colAccess = await deps.engine
-      .getColumnAccess(meta.name, role, audience.user?.id)
-      .catch(() => null);
+      .getColumnAccess(meta.name, role, audience.user?.id);
     if (colAccess) {
       records = records.map((r: Record<string, unknown>) =>
         deps.engine.applyColumnAccess(r, colAccess),
@@ -481,8 +484,7 @@ export async function resolveRecord(
 
   if (audience.user) {
     const rls = await deps.engine
-      .getRlsFilters(meta.name, audience.user, audience.authType ?? 'session')
-      .catch(() => []);
+      .getRlsFilters(meta.name, audience.user, audience.authType ?? 'session');
     q = deps.engine.applyRlsFilters(q, rls);
   }
 
@@ -491,8 +493,7 @@ export async function resolveRecord(
 
   const role = await deps.engine.resolveUserRole(audience.user ?? {}).catch(() => 'public');
   const colAccess = await deps.engine
-      .getColumnAccess(meta.name, role, audience.user?.id)
-      .catch(() => null);
+      .getColumnAccess(meta.name, role, audience.user?.id);
   return colAccess ? deps.engine.applyColumnAccess(row, colAccess) : row;
 }
 
