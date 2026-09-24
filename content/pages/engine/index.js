@@ -35790,14 +35790,14 @@ async function resolveWithViewer(deps, audience, lookup, block, viewer) {
       }
     }
     if (audience.user) {
-      const rls = await deps.engine.getRlsFilters(meta3.name, audience.user, audience.authType ?? "session").catch(() => []);
+      const rls = await deps.engine.getRlsFilters(meta3.name, audience.user, audience.authType ?? "session");
       q = deps.engine.applyRlsFilters(q, rls);
     }
     const window2 = await q.orderBy(sortField, sortDir).limit(limit + 1).offset(Math.max(0, Math.floor(offset))).execute();
     const hasMore = window2.length > limit;
     let records = hasMore ? window2.slice(0, limit) : window2;
     const role = await deps.engine.resolveUserRole(audience.user ?? {}).catch(() => "public");
-    const colAccess = await deps.engine.getColumnAccess(meta3.name, role, audience.user?.id).catch(() => null);
+    const colAccess = await deps.engine.getColumnAccess(meta3.name, role, audience.user?.id);
     if (colAccess) {
       records = records.map((r) => deps.engine.applyColumnAccess(r, colAccess));
     }
@@ -35844,14 +35844,14 @@ async function resolveRecord(deps, audience, collection, keyField, keyValue, rec
     q = q.where(deps.engine.buildCondition(f.field, { op: f.op, value: f.value }));
   }
   if (audience.user) {
-    const rls = await deps.engine.getRlsFilters(meta3.name, audience.user, audience.authType ?? "session").catch(() => []);
+    const rls = await deps.engine.getRlsFilters(meta3.name, audience.user, audience.authType ?? "session");
     q = deps.engine.applyRlsFilters(q, rls);
   }
   const row = await q.limit(1).executeTakeFirst();
   if (!row)
     return null;
   const role = await deps.engine.resolveUserRole(audience.user ?? {}).catch(() => "public");
-  const colAccess = await deps.engine.getColumnAccess(meta3.name, role, audience.user?.id).catch(() => null);
+  const colAccess = await deps.engine.getColumnAccess(meta3.name, role, audience.user?.id);
   return colAccess ? deps.engine.applyColumnAccess(row, colAccess) : row;
 }
 function findBlockById(blocks, id) {
@@ -37386,3 +37386,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
