@@ -342,6 +342,8 @@ async function resolveWithViewer(
     // "nothing restricts this caller", so reading a failed lookup that way
     // rendered every row and column the caller's rules hide. The block errors
     // instead (the catch at the bottom), and `resolveRecord` fails the request.
+    // The role lookup below does not catch either: column rules restrict the
+    // role they name, so a member read as `public` escaped every member rule.
     if (audience.user) {
       const rls = await deps.engine
         .getRlsFilters(meta.name, audience.user, audience.authType ?? 'session');
@@ -373,7 +375,7 @@ async function resolveWithViewer(
     // matched nothing, and the mask came back empty: column permissions were
     // silently not applied on the portal render path either. `_engine` is typed
     // `any`, so nothing said so.
-    const role = await deps.engine.resolveUserRole(audience.user ?? {}).catch(() => 'public');
+    const role = await deps.engine.resolveUserRole(audience.user ?? {});
     const colAccess = await deps.engine
       .getColumnAccess(meta.name, role, audience.user?.id);
     if (colAccess) {
@@ -491,7 +493,7 @@ export async function resolveRecord(
   const row = await q.limit(1).executeTakeFirst();
   if (!row) return null;
 
-  const role = await deps.engine.resolveUserRole(audience.user ?? {}).catch(() => 'public');
+  const role = await deps.engine.resolveUserRole(audience.user ?? {});
   const colAccess = await deps.engine
       .getColumnAccess(meta.name, role, audience.user?.id);
   return colAccess ? deps.engine.applyColumnAccess(row, colAccess) : row;

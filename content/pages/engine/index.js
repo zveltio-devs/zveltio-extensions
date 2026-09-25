@@ -35796,7 +35796,7 @@ async function resolveWithViewer(deps, audience, lookup, block, viewer) {
     const window2 = await q.orderBy(sortField, sortDir).limit(limit + 1).offset(Math.max(0, Math.floor(offset))).execute();
     const hasMore = window2.length > limit;
     let records = hasMore ? window2.slice(0, limit) : window2;
-    const role = await deps.engine.resolveUserRole(audience.user ?? {}).catch(() => "public");
+    const role = await deps.engine.resolveUserRole(audience.user ?? {});
     const colAccess = await deps.engine.getColumnAccess(meta3.name, role, audience.user?.id);
     if (colAccess) {
       records = records.map((r) => deps.engine.applyColumnAccess(r, colAccess));
@@ -35850,7 +35850,7 @@ async function resolveRecord(deps, audience, collection, keyField, keyValue, rec
   const row = await q.limit(1).executeTakeFirst();
   if (!row)
     return null;
-  const role = await deps.engine.resolveUserRole(audience.user ?? {}).catch(() => "public");
+  const role = await deps.engine.resolveUserRole(audience.user ?? {});
   const colAccess = await deps.engine.getColumnAccess(meta3.name, role, audience.user?.id);
   return colAccess ? deps.engine.applyColumnAccess(row, colAccess) : row;
 }
