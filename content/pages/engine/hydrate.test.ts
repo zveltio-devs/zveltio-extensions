@@ -860,7 +860,7 @@ describe('a failed policy lookup hides, it does not reveal', () => {
     throw new Error('statement timeout');
   };
 
-  for (const failing of ['getRlsFilters', 'getColumnAccess'] as const) {
+  for (const failing of ['getRlsFilters', 'getColumnAccess', 'resolveUserRole'] as const) {
     test(`collection_list: ${failing} failing yields no rows`, async () => {
       const { db } = makeDb({ collections: ['contacts'] });
       const [out] = await resolveBlocks(
