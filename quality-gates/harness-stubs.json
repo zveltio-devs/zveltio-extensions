@@ -12,11 +12,6 @@
       "reason": "validates a rule expression; a test about rule storage does not need it to parse."
     },
     {
-      "member": "createBetterAuthSession",
-      "category": "inert-by-nature",
-      "reason": "the harness mints its own session; an extension asking for one gets nothing and the test supplies what it needs."
-    },
-    {
       "member": "dynamicInsert",
       "category": "inert-by-nature",
       "reason": "writes through the field pipeline; extensions that use it are tested on what lands in the table, via the real db."
