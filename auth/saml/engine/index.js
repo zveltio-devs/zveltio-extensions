@@ -126,7 +126,7 @@ var require_ms = __commonJS((exports, module) => {
   }
 });
 
-// /zveltio-extension/node_modules/debug/src/common.js
+// /zveltio-extension/node_modules/node-saml/node_modules/debug/src/common.js
 var require_common = __commonJS((exports, module) => {
   function setup(env) {
     createDebug.debug = createDebug;
@@ -301,7 +301,7 @@ var require_common = __commonJS((exports, module) => {
   module.exports = setup;
 });
 
-// /zveltio-extension/node_modules/debug/src/browser.js
+// /zveltio-extension/node_modules/node-saml/node_modules/debug/src/browser.js
 var require_browser = __commonJS((exports, module) => {
   exports.formatArgs = formatArgs;
   exports.save = save;
@@ -461,7 +461,7 @@ var require_browser = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/debug/src/node.js
+// /zveltio-extension/node_modules/node-saml/node_modules/debug/src/node.js
 var require_node = __commonJS((exports, module) => {
   var tty = __require("tty");
   var util = __require("util");
@@ -632,7 +632,7 @@ var require_node = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/debug/src/index.js
+// /zveltio-extension/node_modules/node-saml/node_modules/debug/src/index.js
 var require_src = __commonJS((exports, module) => {
   if (typeof process === "undefined" || process.type === "renderer" || false || process.__nwjs) {
     module.exports = require_browser();
@@ -716,7 +716,7 @@ var require_defaults = __commonJS((exports) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/Utility.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/Utility.js
 var require_Utility = __commonJS((exports, module) => {
   (function() {
     var assign, getValue, isArray, isEmpty, isFunction2, isObject3, isPlainObject2, slice = [].slice, hasProp = {}.hasOwnProperty;
@@ -787,7 +787,7 @@ var require_Utility = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLDOMImplementation.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDOMImplementation.js
 var require_XMLDOMImplementation = __commonJS((exports, module) => {
   (function() {
     var XMLDOMImplementation;
@@ -813,7 +813,7 @@ var require_XMLDOMImplementation = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLDOMErrorHandler.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDOMErrorHandler.js
 var require_XMLDOMErrorHandler = __commonJS((exports, module) => {
   (function() {
     var XMLDOMErrorHandler;
@@ -827,7 +827,7 @@ var require_XMLDOMErrorHandler = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLDOMStringList.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDOMStringList.js
 var require_XMLDOMStringList = __commonJS((exports, module) => {
   (function() {
     var XMLDOMStringList;
@@ -851,7 +851,7 @@ var require_XMLDOMStringList = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLDOMConfiguration.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDOMConfiguration.js
 var require_XMLDOMConfiguration = __commonJS((exports, module) => {
   (function() {
     var XMLDOMConfiguration, XMLDOMErrorHandler, XMLDOMStringList;
@@ -908,7 +908,7 @@ var require_XMLDOMConfiguration = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/NodeType.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/NodeType.js
 var require_NodeType = __commonJS((exports, module) => {
   (function() {
     module.exports = {
@@ -933,7 +933,7 @@ var require_NodeType = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLAttribute.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLAttribute.js
 var require_XMLAttribute = __commonJS((exports, module) => {
   (function() {
     var NodeType, XMLAttribute, XMLNode;
@@ -1027,7 +1027,7 @@ var require_XMLAttribute = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLNamedNodeMap.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLNamedNodeMap.js
 var require_XMLNamedNodeMap = __commonJS((exports, module) => {
   (function() {
     var XMLNamedNodeMap;
@@ -1075,7 +1075,7 @@ var require_XMLNamedNodeMap = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLElement.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLElement.js
 var require_XMLElement = __commonJS((exports, module) => {
   (function() {
     var NodeType, XMLAttribute, XMLElement, XMLNamedNodeMap, XMLNode, getValue, isFunction2, isObject3, ref, extend2 = function(child, parent) {
@@ -1343,7 +1343,7 @@ var require_XMLElement = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLCharacterData.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLCharacterData.js
 var require_XMLCharacterData = __commonJS((exports, module) => {
   (function() {
     var XMLCharacterData, XMLNode, extend2 = function(child, parent) {
@@ -1419,7 +1419,7 @@ var require_XMLCharacterData = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLCData.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLCData.js
 var require_XMLCData = __commonJS((exports, module) => {
   (function() {
     var NodeType, XMLCData, XMLCharacterData, extend2 = function(child, parent) {
@@ -1459,7 +1459,7 @@ var require_XMLCData = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLComment.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLComment.js
 var require_XMLComment = __commonJS((exports, module) => {
   (function() {
     var NodeType, XMLCharacterData, XMLComment, extend2 = function(child, parent) {
@@ -1499,7 +1499,7 @@ var require_XMLComment = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLDeclaration.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDeclaration.js
 var require_XMLDeclaration = __commonJS((exports, module) => {
   (function() {
     var NodeType, XMLDeclaration, XMLNode, isObject3, extend2 = function(child, parent) {
@@ -1546,7 +1546,7 @@ var require_XMLDeclaration = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLDTDAttList.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDTDAttList.js
 var require_XMLDTDAttList = __commonJS((exports, module) => {
   (function() {
     var NodeType, XMLDTDAttList, XMLNode, extend2 = function(child, parent) {
@@ -1606,7 +1606,7 @@ var require_XMLDTDAttList = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLDTDEntity.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDTDEntity.js
 var require_XMLDTDEntity = __commonJS((exports, module) => {
   (function() {
     var NodeType, XMLDTDEntity, XMLNode, isObject3, extend2 = function(child, parent) {
@@ -1701,7 +1701,7 @@ var require_XMLDTDEntity = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLDTDElement.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDTDElement.js
 var require_XMLDTDElement = __commonJS((exports, module) => {
   (function() {
     var NodeType, XMLDTDElement, XMLNode, extend2 = function(child, parent) {
@@ -1744,7 +1744,7 @@ var require_XMLDTDElement = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLDTDNotation.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDTDNotation.js
 var require_XMLDTDNotation = __commonJS((exports, module) => {
   (function() {
     var NodeType, XMLDTDNotation, XMLNode, extend2 = function(child, parent) {
@@ -1799,7 +1799,7 @@ var require_XMLDTDNotation = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLDocType.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDocType.js
 var require_XMLDocType = __commonJS((exports, module) => {
   (function() {
     var NodeType, XMLDTDAttList, XMLDTDElement, XMLDTDEntity, XMLDTDNotation, XMLDocType, XMLNamedNodeMap, XMLNode, isObject3, extend2 = function(child, parent) {
@@ -1967,7 +1967,7 @@ var require_XMLDocType = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLRaw.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLRaw.js
 var require_XMLRaw = __commonJS((exports, module) => {
   (function() {
     var NodeType, XMLNode, XMLRaw, extend2 = function(child, parent) {
@@ -2006,7 +2006,7 @@ var require_XMLRaw = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLText.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLText.js
 var require_XMLText = __commonJS((exports, module) => {
   (function() {
     var NodeType, XMLCharacterData, XMLText, extend2 = function(child, parent) {
@@ -2075,7 +2075,7 @@ var require_XMLText = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLProcessingInstruction.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLProcessingInstruction.js
 var require_XMLProcessingInstruction = __commonJS((exports, module) => {
   (function() {
     var NodeType, XMLCharacterData, XMLProcessingInstruction, extend2 = function(child, parent) {
@@ -2127,7 +2127,7 @@ var require_XMLProcessingInstruction = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLDummy.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDummy.js
 var require_XMLDummy = __commonJS((exports, module) => {
   (function() {
     var NodeType, XMLDummy, XMLNode, extend2 = function(child, parent) {
@@ -2162,7 +2162,7 @@ var require_XMLDummy = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLNodeList.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLNodeList.js
 var require_XMLNodeList = __commonJS((exports, module) => {
   (function() {
     var XMLNodeList;
@@ -2186,7 +2186,7 @@ var require_XMLNodeList = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/DocumentPosition.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/DocumentPosition.js
 var require_DocumentPosition = __commonJS((exports, module) => {
   (function() {
     module.exports = {
@@ -2200,7 +2200,7 @@ var require_DocumentPosition = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLNode.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLNode.js
 var require_XMLNode = __commonJS((exports, module) => {
   (function() {
     var DocumentPosition, NodeType, XMLCData, XMLComment, XMLDeclaration, XMLDocType, XMLDummy, XMLElement, XMLNamedNodeMap, XMLNode, XMLNodeList, XMLProcessingInstruction, XMLRaw, XMLText, getValue, isEmpty, isFunction2, isObject3, ref1, hasProp = {}.hasOwnProperty;
@@ -2893,7 +2893,7 @@ var require_XMLNode = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLStringifier.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLStringifier.js
 var require_XMLStringifier = __commonJS((exports, module) => {
   (function() {
     var XMLStringifier, bind = function(fn2, me) {
@@ -3107,7 +3107,7 @@ var require_XMLStringifier = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/WriterState.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/WriterState.js
 var require_WriterState = __commonJS((exports, module) => {
   (function() {
     module.exports = {
@@ -3119,7 +3119,7 @@ var require_WriterState = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLWriterBase.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLWriterBase.js
 var require_XMLWriterBase = __commonJS((exports, module) => {
   (function() {
     var NodeType, WriterState, XMLCData, XMLComment, XMLDTDAttList, XMLDTDElement, XMLDTDEntity, XMLDTDNotation, XMLDeclaration, XMLDocType, XMLDummy, XMLElement, XMLProcessingInstruction, XMLRaw, XMLText, XMLWriterBase, assign, hasProp = {}.hasOwnProperty;
@@ -3511,7 +3511,7 @@ var require_XMLWriterBase = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLStringWriter.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLStringWriter.js
 var require_XMLStringWriter = __commonJS((exports, module) => {
   (function() {
     var XMLStringWriter, XMLWriterBase, extend2 = function(child, parent) {
@@ -3552,7 +3552,7 @@ var require_XMLStringWriter = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLDocument.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDocument.js
 var require_XMLDocument = __commonJS((exports, module) => {
   (function() {
     var NodeType, XMLDOMConfiguration, XMLDOMImplementation, XMLDocument, XMLNode, XMLStringWriter, XMLStringifier, isPlainObject2, extend2 = function(child, parent) {
@@ -3758,7 +3758,7 @@ var require_XMLDocument = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLDocumentCB.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLDocumentCB.js
 var require_XMLDocumentCB = __commonJS((exports, module) => {
   (function() {
     var NodeType, WriterState, XMLAttribute, XMLCData, XMLComment, XMLDTDAttList, XMLDTDElement, XMLDTDEntity, XMLDTDNotation, XMLDeclaration, XMLDocType, XMLDocument, XMLDocumentCB, XMLElement, XMLProcessingInstruction, XMLRaw, XMLStringWriter, XMLStringifier, XMLText, getValue, isFunction2, isObject3, isPlainObject2, ref, hasProp = {}.hasOwnProperty;
@@ -4224,7 +4224,7 @@ var require_XMLDocumentCB = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/XMLStreamWriter.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/XMLStreamWriter.js
 var require_XMLStreamWriter = __commonJS((exports, module) => {
   (function() {
     var NodeType, WriterState, XMLStreamWriter, XMLWriterBase, extend2 = function(child, parent) {
@@ -4391,7 +4391,7 @@ var require_XMLStreamWriter = __commonJS((exports, module) => {
   }).call(exports);
 });
 
-// /zveltio-extension/node_modules/xmlbuilder/lib/index.js
+// /zveltio-extension/node_modules/xml2js/node_modules/xmlbuilder/lib/index.js
 var require_lib = __commonJS((exports, module) => {
   (function() {
     var NodeType, WriterState, XMLDOMImplementation, XMLDocument, XMLDocumentCB, XMLStreamWriter, XMLStringWriter, assign, isFunction2, ref;
@@ -64374,18 +64374,26 @@ function samlRoutes(ctx) {
         return { replayed: true };
       await sql`DELETE FROM zvd_saml_consumed_assertions WHERE expires_at < NOW()`.execute(trx);
       const user = await findOrCreateSsoUser(trx, email3, name2);
-      await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(trx);
-      const { setCookie: setCookie2 } = await internals.createBetterAuthSession(trx, user.id, {
-        ipAddress: remoteIp,
-        userAgent,
-        crossDomain
-      });
-      return { replayed: false, setCookie: setCookie2 };
+      try {
+        const { setCookie: setCookie2 } = await internals.createBetterAuthSession(trx, user.id, {
+          ipAddress: remoteIp,
+          userAgent,
+          crossDomain,
+          replaceExisting: true
+        });
+        return { replayed: false, blocked: false, setCookie: setCookie2 };
+      } catch (err) {
+        if (err?.code !== "account_disabled")
+          throw err;
+        return { replayed: false, blocked: true };
+      }
     });
     if (outcome.replayed) {
       console.warn(`[saml] refused a replayed assertion: ${assertionId}`);
       return c.json({ error: "This SAML assertion has already been used" }, 401);
     }
+    if (outcome.blocked)
+      return c.json({ error: "This account is disabled." }, 403);
     const { setCookie } = outcome;
     const rawRedirect = body.RelayState ?? "/admin";
     const redirectTo = typeof rawRedirect === "string" && rawRedirect.startsWith("/") && !rawRedirect.startsWith("//") ? rawRedirect : "/admin";
@@ -64450,3 +64458,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
