@@ -155,9 +155,11 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
     const skipped: string[] = [];
     try {
       await (db as any).transaction().execute(async (trx: any) => {
-        await sql`
+        // Its id names this erasure in the `user.deleted` row written below.
+        const erasure = await sql<{ id: string }>`
           INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, created_at)
           VALUES ('gdpr.account_deleted', ${userId}, 'user', ${JSON.stringify({ gdpr: true, requested_at: new Date().toISOString() })}::jsonb, NOW())
+          RETURNING id::text
         `.execute(trx);
         // Each optional delete inside a SAVEPOINT, because a try/catch is not
         // isolation in Postgres.
@@ -176,10 +178,12 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
         // fail are collected and returned. An erasure that only partly happened
         // must say so — under GDPR the difference between "deleted" and "mostly
         // deleted" is the whole obligation.
+        //
+        // `session`, `account` and `twoFactor` are not here: they are refused to
+        // the request's role (engine migration 044), so they were "skipped" on
+        // every erasure. The host revokes the sessions below, and the other two
+        // go with the user row (ON DELETE CASCADE).
         const optional: Array<[string, () => Promise<unknown>]> = [
-          ['session', () => sql`DELETE FROM session WHERE "userId" = ${userId}`.execute(trx)],
-          ['account', () => sql`DELETE FROM account WHERE "userId" = ${userId}`.execute(trx)],
-          ['twoFactor', () => sql`DELETE FROM "twoFactor" WHERE "userId" = ${userId}`.execute(trx)],
           ['zv_api_keys', () => sql`DELETE FROM zv_api_keys WHERE created_by = ${userId}`.execute(trx)],
           ['zv_notifications', () => sql`DELETE FROM zv_notifications WHERE user_id = ${userId}`.execute(trx)],
           ['zvd_gdpr_consents', () => sql`DELETE FROM zvd_gdpr_consents WHERE user_id = ${userId}`.execute(trx)],
@@ -195,10 +199,17 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
             skipped.push(`${label}: ${err instanceof Error ? err.message : String(err)}`);
           }
         }
-        // Finally the user row itself — anything still FK-referencing
-        // it will fail loudly here, which is what we want (better an
-        // error to the caller than a silently incomplete erasure).
-        await sql`DELETE FROM "user" WHERE id = ${userId}`.execute(trx);
+        // Finally the user row itself, through the host (`auth:users`): the raw
+        // delete that stood here left the session cached in Valkey — the erased
+        // user's cookie kept signing them in — the enforcer's grants live, and
+        // no `user.deleted`. Anything still FK-referencing the row fails loudly
+        // here, which is what we want. The actor is the subject, who no longer
+        // exists, so the audit row names the erasure instead.
+        await ctx.internals.deleteUser(trx, userId, {
+          actor: 'self',
+          reason: 'gdpr.erasure',
+          metadata: { erasure_id: erasure.rows[0]!.id },
+        });
       });
     } catch (err) {
       // Logged, because the caller never sees it. The envelope strips `detail`,
@@ -211,11 +222,15 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
         '| skipped so far:', skipped,
         '| cause:', err instanceof Error ? err.message : String(err),
       );
+      // The instance owner (god) is refused by the host: the account would go
+      // and leave the instance without one. That is a state to change first,
+      // not a failure to retry.
+      const status = (err as { code?: string })?.code === 'user_protected' ? 409 : 500;
       return c.json({
         error: 'Account deletion failed. The erasure did NOT complete — see the server log for the cause.',
         detail: err instanceof Error ? err.message : String(err),
         skipped,
-      }, 500);
+      }, status);
     }
 
     if (skipped.length > 0) {

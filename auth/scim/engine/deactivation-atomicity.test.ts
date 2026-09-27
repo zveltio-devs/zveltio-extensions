@@ -1,8 +1,8 @@
 // Deprovisioning must not report success while the person is still signed in.
 //
-// `setActive` writes three things on deactivation: the SCIM active flag, the
-// deletion of every session, and a password the user cannot know. The last two
-// used to carry `.catch(() => undefined)`, so a failed session delete produced
+// `setActive` writes the SCIM active flag and has the host block the user's
+// sign-in and end their sessions. The enforcement used to carry
+// `.catch(() => undefined)`, so a failed session delete produced
 // a directory that said "inactive", a 200 to the identity provider, and a live
 // session belonging to somebody who had just been offboarded.
 //
@@ -53,8 +53,8 @@ d('auth/scim — deactivation is all-or-nothing', () => {
     expect(create.status).toBe(201);
     const { id } = (await create.json()) as { id: string };
 
-    // Break the last enforcement statement the way a schema drift would.
-    await sql`ALTER TABLE "account" RENAME COLUMN password TO password_hidden`.execute(db);
+    // Break the enforcement statement the way a schema drift would.
+    await sql`ALTER TABLE "user" RENAME COLUMN banned TO banned_hidden`.execute(db);
     let status: number;
     try {
       const res = await app.request(`/scim/v2/Users/${id}`, {
@@ -67,7 +67,7 @@ d('auth/scim — deactivation is all-or-nothing', () => {
       });
       status = res.status;
     } finally {
-      await sql`ALTER TABLE "account" RENAME COLUMN password_hidden TO password`.execute(db);
+      await sql`ALTER TABLE "user" RENAME COLUMN banned_hidden TO banned`.execute(db);
     }
 
     // Whatever the surface answer, it must not be a success.

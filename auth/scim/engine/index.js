@@ -24590,6 +24590,12 @@ function scimAdminRoutes(ctx) {
 function buildScimApp(ctx) {
   const { db, auth } = ctx;
   const app = new Hono2().basePath("/scim/v2");
+  app.onError((err, c) => {
+    if (err.code === "user_protected")
+      return scimError(c, 400, err.message);
+    console.error(err);
+    return c.text("Internal Server Error", 500);
+  });
   const tenantOf = (c) => c.get("scimTenantId");
   async function isMember(userId, tenantId) {
     if (tenantId === DEFAULT_TENANT_ID) {
@@ -24630,6 +24636,7 @@ function buildScimApp(ctx) {
     if (row.rows.length === 0)
       return scimError(c, 401, "Invalid bearer token");
     c.set("scimTenantId", row.rows[0].tenant_id);
+    c.set("scimTokenId", row.rows[0].id);
     await sql`UPDATE zv_scim_tokens SET last_used_at = NOW() WHERE id = ${row.rows[0].id}`.execute(db).catch(() => {
       return;
     });
@@ -24746,6 +24753,7 @@ function buildScimApp(ctx) {
         VALUES (${tenantId}::uuid, ${userId}, ${body?.externalId ?? null}, ${active})
         ON CONFLICT (tenant_id, user_id) DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active, updated_at = NOW()
       `.execute(trx);
+      await ctx.internals.setUserActive(trx, userId, active);
     });
     const row = await sql`
       SELECT id, email, name, "createdAt", "updatedAt" FROM "user" WHERE id = ${userId}
@@ -24758,13 +24766,7 @@ function buildScimApp(ctx) {
       VALUES (${tenantId}::uuid, ${userId}, ${active})
       ON CONFLICT (tenant_id, user_id) DO UPDATE SET active = EXCLUDED.active, updated_at = NOW()
     `.execute(trx);
-    if (!active) {
-      await sql`DELETE FROM "session" WHERE "userId" = ${userId}`.execute(trx);
-      await sql`
-        UPDATE "account" SET password = ${`scim-deactivated-${randomUUID()}`}
-        WHERE "userId" = ${userId} AND "providerId" = 'credential'
-      `.execute(trx);
-    }
+    await ctx.internals.setUserActive(trx, userId, active);
   }
   app.put("/Users/:id", async (c) => {
     const id = c.req.param("id");
@@ -24843,13 +24845,17 @@ function buildScimApp(ctx) {
       await sql`
         DELETE FROM zv_scim_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
       `.execute(trx);
-      await sql`DELETE FROM "session" WHERE "userId" = ${id}`.execute(trx);
       const remaining = await sql`
         SELECT COUNT(*)::int AS n FROM zv_tenant_users WHERE user_id = ${id}
       `.execute(trx);
       if ((remaining.rows[0]?.n ?? 0) === 0) {
-        await sql`DELETE FROM "account" WHERE "userId" = ${id}`.execute(trx);
-        await sql`DELETE FROM "user" WHERE id = ${id}`.execute(trx);
+        await ctx.internals.deleteUser(trx, id, {
+          actor: `scim:${c.get("scimTokenId")}`,
+          reason: "scim.deprovision",
+          metadata: { tenant_id: tenantId }
+        });
+      } else {
+        await ctx.internals.revokeUserSessions(id);
       }
     });
     return c.body(null, 204);
@@ -24885,3 +24891,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1

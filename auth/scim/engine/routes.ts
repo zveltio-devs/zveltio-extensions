@@ -8,10 +8,9 @@
  *     AD / Entra and Okta drive — ServiceProviderConfig, Users CRUD with
  *     `userName eq` filtering and PatchOp `active` handling.
  *
- * Deactivation without engine changes: SCIM active=false records the flag,
- * deletes the user's sessions (instant sign-out) and scrambles the credential
- * password so password login is impossible; re-activation flips the flag —
- * the user returns via SSO or a password reset (documented IdP flows).
+ * Deactivation: SCIM active=false records the flag and has the host revoke the
+ * user's sessions (instant sign-out) and block every sign-in method; active=true
+ * lifts the block and the user's own credentials work again.
  */
 
 import { Hono } from 'hono';
@@ -111,6 +110,16 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
   const app = new Hono().basePath('/scim/v2');
 
+  // The host refuses to deactivate or delete the instance owner (god) — an IdP
+  // sync must not be able to lock the instance out. Said to the IdP as a 400
+  // naming the reason, not a bare 500 it would retry forever. Anything else
+  // keeps Hono's default answer.
+  app.onError((err, c) => {
+    if ((err as { code?: string }).code === 'user_protected') return scimError(c, 400, err.message);
+    console.error(err);
+    return c.text('Internal Server Error', 500);
+  });
+
   /**
    * The tenant that issued the bearer token on this request.
    *
@@ -206,6 +215,8 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     `.execute(db);
     if (row.rows.length === 0) return scimError(c, 401, 'Invalid bearer token');
     (c as Ctx).set('scimTenantId', row.rows[0]!.tenant_id);
+    // Who offboarded somebody: the audit row names the token, not a user.
+    (c as Ctx).set('scimTokenId', row.rows[0]!.id);
     await sql`UPDATE zv_scim_tokens SET last_used_at = NOW() WHERE id = ${row.rows[0]!.id}`
       .execute(db)
       .catch(() => undefined);
@@ -361,6 +372,8 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
         VALUES (${tenantId}::uuid, ${userId}, ${body?.externalId ?? null}, ${active})
         ON CONFLICT (tenant_id, user_id) DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active, updated_at = NOW()
       `.execute(trx);
+      // Provisioned inactive means unable to sign in, as a later `active=false` would.
+      await ctx.internals.setUserActive(trx, userId, active);
     });
 
     const row = await sql<Record<string, unknown>>`
@@ -391,6 +404,17 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
    *
    * Failing loudly is the correct answer here: the IdP retries deprovisioning,
    * and a half-deactivated account never exists.
+   *
+   * The enforcement is the host's (`auth:users`). As SQL here it could not work:
+   * `session` and `account` are refused to the request's role since engine
+   * migration 044, so every deactivation answered 500 — and with Valkey,
+   * better-auth keeps sessions only in the cache, which no SQL reaches. It runs
+   * before the flag commits, so a failure still leaves the user active.
+   *
+   * It blocks sign-in by every method rather than clearing the password, which
+   * left a passkey, a magic link and OAuth working, and which `active=true` could
+   * not undo. Reactivation lifts the block and the credentials work again.
+   * Sign-in is instance-wide, so so is the block — see SETUP.md.
    */
   // biome-ignore lint/suspicious/noExplicitAny: Kysely transaction handle
   async function setActive(
@@ -404,14 +428,8 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
       VALUES (${tenantId}::uuid, ${userId}, ${active})
       ON CONFLICT (tenant_id, user_id) DO UPDATE SET active = EXCLUDED.active, updated_at = NOW()
     `.execute(trx);
-    if (!active) {
-      // Enforce: instant sign-out + password login impossible until reset/SSO.
-      await sql`DELETE FROM "session" WHERE "userId" = ${userId}`.execute(trx);
-      await sql`
-        UPDATE "account" SET password = ${`scim-deactivated-${randomUUID()}`}
-        WHERE "userId" = ${userId} AND "providerId" = 'credential'
-      `.execute(trx);
-    }
+    // Deactivation signs the user out and blocks every sign-in; activation lifts it.
+    await ctx.internals.setUserActive(trx, userId, active);
   }
 
   /**
@@ -545,6 +563,12 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     // contained nothing (Postgres refuses every statement after a failed one
     // inside a transaction) and it turned a failed session delete — the whole
     // point of the operation — into a silent success.
+    //
+    // Sessions and the account itself go through the host (`auth:users`). The
+    // raw `DELETE FROM "session"` that stood here was refused to the request's
+    // role (engine migration 044), so this route answered 500 to every
+    // deprovisioning; and deleting the row by hand wrote no `user.deleted`, left
+    // the enforcer's grants live and, with Valkey, the session cached.
     await db.transaction().execute(async (trx) => {
       await sql`
         DELETE FROM zv_tenant_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
@@ -552,16 +576,21 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
       await sql`
         DELETE FROM zv_scim_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
       `.execute(trx);
-      // Sessions go regardless: losing access to this tenant has to take effect
-      // now, and a session is instance-wide.
-      await sql`DELETE FROM "session" WHERE "userId" = ${id}`.execute(trx);
 
       const remaining = await sql<{ n: number }>`
         SELECT COUNT(*)::int AS n FROM zv_tenant_users WHERE user_id = ${id}
       `.execute(trx);
       if ((remaining.rows[0]?.n ?? 0) === 0) {
-        await sql`DELETE FROM "account" WHERE "userId" = ${id}`.execute(trx);
-        await sql`DELETE FROM "user" WHERE id = ${id}`.execute(trx);
+        // Revokes the sessions too; `account` goes with the row (ON DELETE CASCADE).
+        await ctx.internals.deleteUser(trx, id, {
+          actor: `scim:${(c as Ctx).get('scimTokenId')}`,
+          reason: 'scim.deprovision',
+          metadata: { tenant_id: tenantId },
+        });
+      } else {
+        // Still someone else's member: only the sessions go, and they go now —
+        // a session is instance-wide.
+        await ctx.internals.revokeUserSessions(id);
       }
     });
     return c.body(null, 204);
