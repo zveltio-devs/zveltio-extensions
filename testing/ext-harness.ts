@@ -176,6 +176,31 @@ async function productionWiring(
 const DB_URL = process.env.TEST_DATABASE_URL ?? '';
 const d = DB_URL ? describe : describe.skip;
 
+/**
+ * The engine's own `deleteUser` / `revokeUserSessions` / `setUserActive`
+ * (`lib/users.ts`), wired the way `buildExtensionInternals` wires them: the
+ * caller's handle for the row and the audit, a privileged engine pool for
+ * sessions and the sign-in block, and a live enforcer.
+ * Not a copy — offboarding a user is exactly what a copy would get subtly wrong.
+ */
+let _engineUsersP: Promise<{ users: any; pool: any }> | null = null;
+function engineUsers(): Promise<{ users: any; pool: any }> {
+  _engineUsersP ??= (async () => {
+    const src = join(REPO, '..', 'zveltio', 'packages', 'engine', 'src');
+    const { createDb } = (await import(join(src, 'db', 'index.js'))) as any;
+    const { initPermissions } = (await import(join(src, 'lib', 'tenancy', 'index.js'))) as any;
+    const pool = createDb(DB_URL);
+    await initPermissions(pool);
+    return { users: await import(join(src, 'lib', 'users.js')), pool };
+  })();
+  return _engineUsersP;
+}
+afterAll(async () => {
+  const p = _engineUsersP;
+  _engineUsersP = null;
+  if (p) await (await p).pool.destroy().catch(() => undefined);
+});
+
 // One shared pool + Kysely across all test files (bun test = one process).
 let _db: any | null = null;
 let _pool: any | null = null;
@@ -226,7 +251,7 @@ type Session = { user: { id: string; role: string; email: string; name: string }
 /** Tolerant ctx mock covering every member the 48 extensions actually use. */
 async function makeCtx(
   db: any,
-  opts: { authed: boolean; admin: boolean },
+  opts: { authed: boolean; admin: boolean; user?: { id: string; email: string } },
   publicRoutes?: any[],
   wiring?: { extName?: string; allowedTables?: Set<string>; capabilities?: readonly string[] },
 ): Promise<any> {
@@ -234,9 +259,9 @@ async function makeCtx(
   const session: Session = opts.authed
     ? {
         user: {
-          id: '00000000-0000-4000-8000-00000000e001',
+          id: opts.user?.id ?? '00000000-0000-4000-8000-00000000e001',
           role: opts.admin ? 'god' : 'user',
-          email: 'ext-harness@test.local',
+          email: opts.user?.email ?? 'ext-harness@test.local',
           name: 'Ext Harness',
         },
       }
@@ -327,6 +352,9 @@ async function makeCtx(
     auth: {
       api: {
         getSession: async () => session,
+        // Password re-authentication (GDPR erasure). Checking a password is
+        // better-auth's job, not the extension's; any password is accepted.
+        signInEmail: async (args: { body: { email: string } }) => ({ user: { email: args.body.email } }),
         // In-process signup mirror (real INSERT) so provisioning-style
         // extensions (SCIM) exercise their create path against the real DB.
         signUpEmail: async (args: { body: { email: string; name?: string } }) => {
@@ -440,6 +468,18 @@ async function makeCtx(
         const rows = records.map((r) => keys.map((k) => harnessCsvCell(r[k])).join(','));
         return [header, ...rows].join('\r\n');
       },
+      deleteUser: async (handle: any, userId: string, who: any) => {
+        const { users, pool } = await engineUsers();
+        return users.deleteUser(handle, pool, userId, who);
+      },
+      revokeUserSessions: async (userId: string) => {
+        const { users, pool } = await engineUsers();
+        return users.revokeUserSessions(pool, userId);
+      },
+      setUserActive: async (handle: any, userId: string, active: boolean) => {
+        const { users, pool } = await engineUsers();
+        return users.setUserActive(handle, pool, userId, active);
+      },
     }), capabilities, []),
     registerPublicRoute(spec: any) {
       publicRoutes?.push(spec);
@@ -523,13 +563,14 @@ async function applyMigrations(ext: any): Promise<boolean> {
  *
  * Defaults to an authed ADMIN. Pass `{ admin: false }` / `{ authed: false }` to
  * assert authorization gates (e.g. that a non-admin cannot publish content that
- * lands on the public website).
+ * lands on the public website). `{ user }` signs in as that real user instead
+ * of the shared harness god — a test that erases its session user needs its own.
  */
 export async function mountForTest(
   engineDir: string,
-  opts: { authed?: boolean; admin?: boolean } = {},
+  opts: { authed?: boolean; admin?: boolean; user?: { id: string; email: string } } = {},
 ): Promise<{ app: any; publicRoutes: any[]; migrated: boolean; ctx: any }> {
-  const { authed = true, admin = true } = opts;
+  const { authed = true, admin = true, user } = opts;
   const { Hono } = (await honoP) as any;
   const db = await getDb();
   const mod = await import(join(engineDir, 'index.js'));
@@ -548,7 +589,7 @@ export async function mountForTest(
   // is what names it and where its manifest lives.
   const extDir = dirname(engineDir);
   const wiring = await productionWiring(extDir, relative(REPO, extDir), mod.default);
-  const ctx = await makeCtx(db, { authed, admin }, publicRoutes, wiring);
+  const ctx = await makeCtx(db, { authed, admin, user }, publicRoutes, wiring);
   await mod.default.register(app, ctx);
   // Mount collected root-level public routes on the same app so tests can hit
   // them at their absolute paths (mirrors the engine mounting them globally).

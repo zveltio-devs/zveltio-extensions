@@ -37,13 +37,17 @@ DELETE /scim/v2/Users/{id}
 
 **This is the step people forget**, and without it nothing works.
 
-The extension asks for `database` and `secrets`. They are **declared** in the
+The extension asks for `database`, `secrets` and `auth:users`. They are **declared** in the
 manifest but not granted automatically — an administrator has to approve them
 explicitly. That is by design: an extension asking for more power has to ask
 visibly.
 
 Without the `secrets` capability the extension cannot validate the token, and the
 provider gets a 401 on every call — including with a perfectly valid token.
+
+Without `auth:users` it cannot revoke a session, block a sign-in or delete an
+account, so every provisioning, (de)activation and delete answers 500 until it
+is approved — the IdP retries, so nothing is lost. Version 1.0.10 added it: approve it after updating.
 
 Approval happens from the **Marketplace**, on the extension's card, at
 installation or after an update that asks for a new capability.
@@ -80,15 +84,39 @@ answers, the rest will work.
 
 ## What happens on deactivation
 
-When the provider deactivates or deletes a user, Zveltio:
+**Deactivation** (`active: false`, by PATCH or PUT, or a user provisioned
+inactive):
 
-1. removes their tenant membership;
-2. **deletes all their sessions, immediately** — losing access has to take effect
-   now, and a session is valid across the whole instance;
-3. if the user no longer belongs to any tenant, deletes the account too.
+1. **deletes all their sessions, immediately**;
+2. **blocks every way of signing in** — password, magic link, passkey, OAuth and
+   SSO (LDAP, SAML). Their credentials are left as they are.
 
-Point 2 is the important one. An employee who leaves on Friday must not still get
-in on Monday with a browser left open.
+**Reactivation** (`active: true`) lifts the block, and the user signs in again
+with the password, passkeys and SSO accounts they already had.
+
+**Deletion** (`DELETE /Users/{id}`):
+
+1. removes their membership of this tenant;
+2. **deletes all their sessions, immediately**;
+3. if the user no longer belongs to any tenant, deletes the account too — the
+   same way an administrator's delete does: grants removed, and a `user.deleted`
+   audit entry naming the SCIM token (`scim:<token id>`) and the tenant.
+
+The sessions are the important part. An employee who leaves on Friday must not
+still get in on Monday with a browser left open.
+
+### Instance-wide, by design
+
+A person has one account and one sign-in on the instance, not one per tenant,
+and a session belongs to no tenant. So when one tenant's provider deactivates or
+deletes someone who is also a member of another tenant on the same instance:
+
+- their sessions end **everywhere**, including the other tenant's — they sign in
+  again to keep working there;
+- a **deactivation** blocks their sign-in **everywhere** until a provider
+  reactivates them;
+- a **deletion** removes only this tenant's membership; the account stays while
+  another tenant still has them.
 
 Verified: a deactivation with two active sessions leaves zero.
 

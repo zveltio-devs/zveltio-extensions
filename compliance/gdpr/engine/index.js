@@ -24606,14 +24606,12 @@ function gdprRoutes(ctx) {
     const skipped = [];
     try {
       await db.transaction().execute(async (trx) => {
-        await sql`
+        const erasure = await sql`
           INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, created_at)
           VALUES ('gdpr.account_deleted', ${userId}, 'user', ${JSON.stringify({ gdpr: true, requested_at: new Date().toISOString() })}::jsonb, NOW())
+          RETURNING id::text
         `.execute(trx);
         const optional2 = [
-          ["session", () => sql`DELETE FROM session WHERE "userId" = ${userId}`.execute(trx)],
-          ["account", () => sql`DELETE FROM account WHERE "userId" = ${userId}`.execute(trx)],
-          ["twoFactor", () => sql`DELETE FROM "twoFactor" WHERE "userId" = ${userId}`.execute(trx)],
           ["zv_api_keys", () => sql`DELETE FROM zv_api_keys WHERE created_by = ${userId}`.execute(trx)],
           ["zv_notifications", () => sql`DELETE FROM zv_notifications WHERE user_id = ${userId}`.execute(trx)],
           ["zvd_gdpr_consents", () => sql`DELETE FROM zvd_gdpr_consents WHERE user_id = ${userId}`.execute(trx)]
@@ -24629,15 +24627,20 @@ function gdprRoutes(ctx) {
             skipped.push(`${label}: ${err instanceof Error ? err.message : String(err)}`);
           }
         }
-        await sql`DELETE FROM "user" WHERE id = ${userId}`.execute(trx);
+        await ctx.internals.deleteUser(trx, userId, {
+          actor: "self",
+          reason: "gdpr.erasure",
+          metadata: { erasure_id: erasure.rows[0].id }
+        });
       });
     } catch (err) {
       console.error("[gdpr] erasure failed for", userId, "| skipped so far:", skipped, "| cause:", err instanceof Error ? err.message : String(err));
+      const status = err?.code === "user_protected" ? 409 : 500;
       return c.json({
         error: "Account deletion failed. The erasure did NOT complete \u2014 see the server log for the cause.",
         detail: err instanceof Error ? err.message : String(err),
         skipped
-      }, 500);
+      }, status);
     }
     if (skipped.length > 0) {
       console.error("[gdpr] erasure incomplete for", userId, skipped);
@@ -24950,3 +24953,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
