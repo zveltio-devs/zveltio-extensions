@@ -151,8 +151,9 @@ async function upsertLdapConfig(
 // rather than left as the one form that throws.
 //
 // This is NOT the durable answer: when the engine closes the raw path,
-// `auth/ldap` and `auth/saml` have to be granted `user` and `session` in the
-// SAME change, or directory login breaks again — on the write this time.
+// `auth/ldap` and `auth/saml` have to be granted `user` in the SAME change, or
+// directory login breaks again — on the write this time. Sessions already go
+// through the host (`createBetterAuthSession`).
 //
 // Better-Auth's `user` table uses camelCase columns ("emailVerified",
 // "createdAt", "updatedAt"). Raw SQL keeps the casing literal so a snake_case
@@ -187,12 +188,10 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
   // a handler is therefore already RLS-scoped — there is one spelling, so there
   // is none to forget.
 
-  // ctx.internals.createBetterAuthSession produces a session row + signed
-  // cookie matching Better-Auth's exact shape (camelCase columns + Hono
-  // HMAC signature) so the engine's `auth.api.getSession({ headers })`
-  // recognises our SSO cookie. Inlining an insert here used to fail at
-  // runtime — the `session` table uses camelCase columns and the cookie
-  // value must be signed, neither of which the old code respected.
+  // ctx.internals.createBetterAuthSession is the only way to produce a session
+  // the engine's `auth.api.getSession({ headers })` will accept: better-auth
+  // writes it where it reads sessions (its pool, or its Valkey cache) and names
+  // the cookie.
   if (!internals?.createBetterAuthSession) {
     throw new Error('[ldap] engine internals missing createBetterAuthSession — Zveltio version mismatch');
   }
@@ -304,30 +303,40 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
     //
     // The audit `try/catch` goes for the same reason. An SSO login with no audit
     // row is a sign-in nobody can see afterwards.
-    const { user, token, setCookie } = await db.transaction().execute(async (trx) => {
-      const u = await findOrCreateSsoUser(trx, ldapUser.email, ldapUser.displayName);
+    //
+    // The session is the engine's to write: `session` is out of `ctx.db`'s reach
+    // (the `DELETE FROM session` here made every login a 500), and with Valkey
+    // better-auth reads sessions only from its cache. `replaceExisting` keeps one
+    // live SSO session per user, so a leaked token stops working at the next
+    // sign-in.
+    let signedIn: { user: any; token: string; setCookie: string };
+    try {
+      signedIn = await db.transaction().execute(async (trx) => {
+        const u = await findOrCreateSsoUser(trx, ldapUser.email, ldapUser.displayName);
 
-      // Invalidate prior sessions for this user — limits the blast radius of
-      // a credential leak and matches the "one active SSO session per user"
-      // expectation most ops teams have. Without this, every successful
-      // sign-in leaves the previous token live until its TTL expires.
-      await sql`DELETE FROM session WHERE "userId" = ${u.id}`.execute(trx);
+        const session = await internals.createBetterAuthSession(trx, u.id, {
+          ipAddress: remoteIp === 'unknown' ? undefined : remoteIp,
+          userAgent: userAgent ?? undefined,
+          crossDomain,
+          replaceExisting: true,
+        });
 
-      const session = await internals.createBetterAuthSession(trx, u.id, {
-        ipAddress: remoteIp === 'unknown' ? undefined : remoteIp,
-        userAgent: userAgent ?? undefined,
-        crossDomain,
+        await sql`
+          INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, ip, created_at)
+          VALUES ('auth.login_success', ${u.id}, 'session',
+                  ${JSON.stringify({ provider: 'ldap', username, user_agent: userAgent })}::jsonb,
+                  ${remoteIp}, NOW())
+        `.execute(trx);
+
+        return { user: u, ...session };
       });
-
-      await sql`
-        INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, ip, created_at)
-        VALUES ('auth.login_success', ${u.id}, 'session',
-                ${JSON.stringify({ provider: 'ldap', username, user_agent: userAgent })}::jsonb,
-                ${remoteIp}, NOW())
-      `.execute(trx);
-
-      return { user: u, ...session };
-    });
+    } catch (err: any) {
+      // A deactivated account: the directory said yes, the instance says no.
+      if (err?.code !== 'account_disabled') throw err;
+      await auditFailure(err);
+      return c.json({ error: 'This account is disabled.' }, 403);
+    }
+    const { user, token, setCookie } = signedIn;
 
     c.header('Set-Cookie', setCookie);
     return c.json({

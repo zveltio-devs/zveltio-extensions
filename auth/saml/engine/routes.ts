@@ -140,10 +140,10 @@ async function upsertSamlConfig(
 //
 // This is NOT the durable answer. Provisioning an SSO user is a real need — it is
 // what a SAML extension is for — so it belongs in the category needing an
-// explicit grant or a host helper (`provisionUser`, `revokeUserSessions`),
-// neither of which exists today. When the engine closes the raw path,
-// `auth/saml` and `auth/ldap` have to be granted `user` and `session` in the SAME
-// change, or SSO breaks again — on the write this time.
+// explicit grant or a host helper (`provisionUser`), which does not exist today.
+// When the engine closes the raw path, `auth/saml` and `auth/ldap` have to be
+// granted `user` in the SAME change, or SSO breaks again — on the write this
+// time. Sessions already go through the host (`createBetterAuthSession`).
 //
 // Better-Auth's `user` table uses camelCase columns ("emailVerified",
 // "createdAt", "updatedAt"). Raw SQL keeps the casing literal so a snake_case
@@ -178,10 +178,9 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
   // a handler is therefore already RLS-scoped — there is one spelling, so there
   // is none to forget.
 
-  // See ctx.internals.createBetterAuthSession docs — it's the only way to
-  // produce a session row + signed cookie that the engine's
-  // `auth.api.getSession` will accept (camelCase columns + Hono HMAC
-  // signature). Inlining an insert + plain cookie used to fail at runtime.
+  // ctx.internals.createBetterAuthSession is the only way to produce a session
+  // the engine's `auth.api.getSession` will accept: better-auth writes it where
+  // it reads sessions (its pool, or its Valkey cache) and names the cookie.
   if (!internals?.createBetterAuthSession) {
     throw new Error('[saml] engine internals missing createBetterAuthSession — Zveltio version mismatch');
   }
@@ -301,8 +300,8 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
     //
     // `ctx.db.transaction()` JOINS the request transaction rather than nesting
     // (Kysely refuses to nest), so this is correct both today and after the
-    // boundary moves. `internals.createBetterAuthSession` takes the handle, so it
-    // joins too.
+    // boundary moves. `internals.createBetterAuthSession` takes the handle, so a
+    // user provisioned here gets the session once it commits, and none if not.
     const remoteIp = c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? undefined;
     const userAgent = c.req.header('user-agent') ?? undefined;
 
@@ -325,28 +324,31 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
 
       const user = await findOrCreateSsoUser(trx, email, name);
 
-      // Invalidate prior sessions so each SAML login produces exactly one active
-      // session — limits blast radius if a previous token leaks.
-      //
-      // Still tolerated, but no longer with `.catch(() => …)` alone: a failed
-      // statement aborts the transaction in Postgres whatever JavaScript does,
-      // so a swallowed error here would surface as an unrelated failure on the
-      // next statement. Logging it and carrying on is only honest inside a
-      // SAVEPOINT, and this one is cheap enough to simply let fail the login.
-      await sql`DELETE FROM session WHERE "userId" = ${user.id}`.execute(trx);
-
-      const { setCookie } = await internals.createBetterAuthSession(trx, user.id, {
-        ipAddress: remoteIp,
-        userAgent,
-        crossDomain,
-      });
-      return { replayed: false as const, setCookie };
+      // The session is the engine's to write: `session` is out of `ctx.db`'s
+      // reach (the `DELETE FROM session` here made every login a 500), and with
+      // Valkey better-auth reads sessions only from its cache. `replaceExisting`
+      // keeps one live session per user, limiting the blast radius of a leak.
+      try {
+        const { setCookie } = await internals.createBetterAuthSession(trx, user.id, {
+          ipAddress: remoteIp,
+          userAgent,
+          crossDomain,
+          replaceExisting: true,
+        });
+        return { replayed: false as const, blocked: false as const, setCookie };
+      } catch (err: any) {
+        // Refused before anything was written, so the claim still commits: a
+        // deactivated user's assertion is spent, not kept for later.
+        if (err?.code !== 'account_disabled') throw err;
+        return { replayed: false as const, blocked: true as const };
+      }
     });
 
     if (outcome.replayed) {
       console.warn(`[saml] refused a replayed assertion: ${assertionId}`);
       return c.json({ error: 'This SAML assertion has already been used' }, 401);
     }
+    if (outcome.blocked) return c.json({ error: 'This account is disabled.' }, 403);
     const { setCookie } = outcome;
 
     // Open-redirect guard: relative paths only (must start with `/`).

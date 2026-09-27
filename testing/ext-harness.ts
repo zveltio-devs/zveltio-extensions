@@ -182,18 +182,33 @@ const d = DB_URL ? describe : describe.skip;
  * caller's handle for the row and the audit, a privileged engine pool for
  * sessions and the sign-in block, and a live enforcer.
  * Not a copy — offboarding a user is exactly what a copy would get subtly wrong.
+ *
+ * `createBetterAuthSession` too, over the engine's real better-auth: the session
+ * it writes is the one `engineSession` reads back, so an SSO login is proven by
+ * the engine accepting its cookie rather than by a stub returning nothing.
  */
-let _engineUsersP: Promise<{ users: any; pool: any }> | null = null;
-function engineUsers(): Promise<{ users: any; pool: any }> {
+let _engineUsersP: Promise<{ users: any; pool: any; auth: any }> | null = null;
+function engineUsers(): Promise<{ users: any; pool: any; auth: any }> {
   _engineUsersP ??= (async () => {
     const src = join(REPO, '..', 'zveltio', 'packages', 'engine', 'src');
     const { createDb } = (await import(join(src, 'db', 'index.js'))) as any;
     const { initPermissions } = (await import(join(src, 'lib', 'tenancy', 'index.js'))) as any;
     const pool = createDb(DB_URL);
     await initPermissions(pool);
-    return { users: await import(join(src, 'lib', 'users.js')), pool };
+    // better-auth opens its own pool from DATABASE_URL.
+    process.env.DATABASE_URL ??= DB_URL;
+    const auth = (await import(join(src, 'lib', 'auth.js'))) as any;
+    await auth.initAuth(pool);
+    return { users: await import(join(src, 'lib', 'users.js')), pool, auth };
   })();
   return _engineUsersP;
+}
+
+/** The user id the engine's `getSession` reads from a `Set-Cookie` value, if any. */
+export async function engineSession(setCookie: string): Promise<string | undefined> {
+  const { auth } = await engineUsers();
+  const headers = new Headers({ cookie: setCookie.split(';')[0] ?? '' });
+  return (await auth.getAuth().api.getSession({ headers }))?.user?.id;
 }
 afterAll(async () => {
   const p = _engineUsersP;
@@ -479,6 +494,10 @@ async function makeCtx(
       setUserActive: async (handle: any, userId: string, active: boolean) => {
         const { users, pool } = await engineUsers();
         return users.setUserActive(handle, pool, userId, active);
+      },
+      createBetterAuthSession: async (handle: any, userId: string, o?: any) => {
+        const { users, pool } = await engineUsers();
+        return users.createBetterAuthSession(handle, pool, userId, o);
       },
     }), capabilities, []),
     registerPublicRoute(spec: any) {

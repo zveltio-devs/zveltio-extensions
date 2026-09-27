@@ -32414,22 +32414,31 @@ function ldapRoutes(ctx) {
       await auditFailure({ message: "no email attribute" });
       return c.json({ error: "LDAP user does not have an email address configured" }, 400);
     }
-    const { user, token, setCookie } = await db.transaction().execute(async (trx) => {
-      const u = await findOrCreateSsoUser(trx, ldapUser.email, ldapUser.displayName);
-      await sql`DELETE FROM session WHERE "userId" = ${u.id}`.execute(trx);
-      const session = await internals.createBetterAuthSession(trx, u.id, {
-        ipAddress: remoteIp === "unknown" ? undefined : remoteIp,
-        userAgent: userAgent ?? undefined,
-        crossDomain
+    let signedIn;
+    try {
+      signedIn = await db.transaction().execute(async (trx) => {
+        const u = await findOrCreateSsoUser(trx, ldapUser.email, ldapUser.displayName);
+        const session = await internals.createBetterAuthSession(trx, u.id, {
+          ipAddress: remoteIp === "unknown" ? undefined : remoteIp,
+          userAgent: userAgent ?? undefined,
+          crossDomain,
+          replaceExisting: true
+        });
+        await sql`
+          INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, ip, created_at)
+          VALUES ('auth.login_success', ${u.id}, 'session',
+                  ${JSON.stringify({ provider: "ldap", username, user_agent: userAgent })}::jsonb,
+                  ${remoteIp}, NOW())
+        `.execute(trx);
+        return { user: u, ...session };
       });
-      await sql`
-        INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, ip, created_at)
-        VALUES ('auth.login_success', ${u.id}, 'session',
-                ${JSON.stringify({ provider: "ldap", username, user_agent: userAgent })}::jsonb,
-                ${remoteIp}, NOW())
-      `.execute(trx);
-      return { user: u, ...session };
-    });
+    } catch (err) {
+      if (err?.code !== "account_disabled")
+        throw err;
+      await auditFailure(err);
+      return c.json({ error: "This account is disabled." }, 403);
+    }
+    const { user, token, setCookie } = signedIn;
     c.header("Set-Cookie", setCookie);
     return c.json({
       token,
@@ -32523,3 +32532,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
