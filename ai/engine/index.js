@@ -11892,6 +11892,30 @@ var Hono2 = class extends Hono {
   }
 };
 
+// /zveltio-extension/node_modules/hono/dist/http-exception.js
+var HTTPException2 = class extends Error {
+  res;
+  status;
+  constructor(status = 500, options) {
+    super(options?.message, { cause: options?.cause });
+    this.res = options?.res;
+    this.status = status;
+  }
+  getResponse() {
+    if (this.res)
+      return new Response(this.res.body, {
+        status: this.status,
+        headers: this.res.headers
+      });
+    return new Response(this.message, { status: this.status });
+  }
+};
+
+// /zveltio-extension/node_modules/hono/dist/utils/buffer.js
+var bufferToFormData2 = (arrayBuffer, contentType) => {
+  return new Response(arrayBuffer, { headers: { "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase()) } }).formData();
+};
+
 // /zveltio-extension/node_modules/hono/dist/utils/url.js
 var tryDecode2 = (str, decoder) => {
   try {
@@ -11917,44 +11941,37 @@ var trimCookieWhitespace = (value) => {
   let end = value.length;
   while (start < end) {
     const charCode = value.charCodeAt(start);
-    if (charCode !== 32 && charCode !== 9) {
+    if (charCode !== 32 && charCode !== 9)
       break;
-    }
     start++;
   }
   while (end > start) {
     const charCode = value.charCodeAt(end - 1);
-    if (charCode !== 32 && charCode !== 9) {
+    if (charCode !== 32 && charCode !== 9)
       break;
-    }
     end--;
   }
   return start === 0 && end === value.length ? value : value.slice(start, end);
 };
 var parse = (cookie, name) => {
-  if (name && cookie.indexOf(name) === -1) {
+  if (name && cookie.indexOf(name) === -1)
     return {};
-  }
   const pairs = cookie.split(";");
-  const parsedCookie = /* @__PURE__ */ Object.create(null);
+  const parsedCookie = Object.create(null);
   for (const pairStr of pairs) {
     const valueStartPos = pairStr.indexOf("=");
-    if (valueStartPos === -1) {
+    if (valueStartPos === -1)
       continue;
-    }
     const cookieName = trimCookieWhitespace(pairStr.substring(0, valueStartPos));
-    if (name && name !== cookieName || !relaxedCookieNameRegEx.test(cookieName) || cookieName in parsedCookie) {
+    if (name && name !== cookieName || !relaxedCookieNameRegEx.test(cookieName) || cookieName in parsedCookie)
       continue;
-    }
     let cookieValue = trimCookieWhitespace(pairStr.substring(valueStartPos + 1));
-    if (cookieValue.startsWith('"') && cookieValue.endsWith('"')) {
+    if (cookieValue.startsWith('"') && cookieValue.endsWith('"'))
       cookieValue = cookieValue.slice(1, -1);
-    }
     if (validCookieValueRegEx.test(cookieValue)) {
       parsedCookie[cookieName] = tryDecodeURIComponent2(cookieValue);
-      if (name) {
+      if (name)
         break;
-      }
     }
   }
   return parsedCookie;
@@ -11964,56 +11981,18 @@ var parse = (cookie, name) => {
 var getCookie = (c, key, prefix) => {
   const cookie = c.req.raw.headers.get("Cookie");
   if (typeof key === "string") {
-    if (!cookie) {
+    if (!cookie)
       return;
-    }
     let finalKey = key;
-    if (prefix === "secure") {
+    if (prefix === "secure")
       finalKey = "__Secure-" + key;
-    } else if (prefix === "host") {
+    else if (prefix === "host")
       finalKey = "__Host-" + key;
-    }
-    const obj2 = parse(cookie, finalKey);
-    return obj2[finalKey];
+    return parse(cookie, finalKey)[finalKey];
   }
-  if (!cookie) {
+  if (!cookie)
     return {};
-  }
-  const obj = parse(cookie);
-  return obj;
-};
-
-// /zveltio-extension/node_modules/hono/dist/http-exception.js
-var HTTPException2 = class extends Error {
-  res;
-  status;
-  constructor(status = 500, options) {
-    super(options?.message, { cause: options?.cause });
-    this.res = options?.res;
-    this.status = status;
-  }
-  getResponse() {
-    if (this.res) {
-      const newResponse = new Response(this.res.body, {
-        status: this.status,
-        headers: this.res.headers
-      });
-      return newResponse;
-    }
-    return new Response(this.message, {
-      status: this.status
-    });
-  }
-};
-
-// /zveltio-extension/node_modules/hono/dist/utils/buffer.js
-var bufferToFormData2 = (arrayBuffer, contentType) => {
-  const response = new Response(arrayBuffer, {
-    headers: {
-      "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase())
-    }
-  });
-  return response.formData();
+  return parse(cookie);
 };
 
 // /zveltio-extension/node_modules/hono/dist/validator/validator.js
@@ -12026,24 +12005,21 @@ var validator = (target, validationFunc) => {
     const contentType = c.req.header("Content-Type");
     switch (target) {
       case "json":
-        if (!contentType || !jsonRegex.test(contentType)) {
+        if (!contentType || !jsonRegex.test(contentType))
           break;
-        }
         try {
           value = await c.req.json();
         } catch {
-          const message = "Malformed JSON in request body";
-          throw new HTTPException2(400, { message });
+          throw new HTTPException2(400, { message: "Malformed JSON in request body" });
         }
         break;
       case "form": {
-        if (!contentType || !(multipartRegex.test(contentType) || urlencodedRegex.test(contentType))) {
+        if (!contentType || !(multipartRegex.test(contentType) || urlencodedRegex.test(contentType)))
           break;
-        }
         let formData;
-        if (c.req.bodyCache.formData) {
+        if (c.req.bodyCache.formData)
           formData = await c.req.bodyCache.formData;
-        } else {
+        else
           try {
             const arrayBuffer = await c.req.arrayBuffer();
             formData = await bufferToFormData2(arrayBuffer, contentType);
@@ -12053,18 +12029,16 @@ var validator = (target, validationFunc) => {
             message += e instanceof Error ? ` ${e.message}` : ` ${String(e)}`;
             throw new HTTPException2(400, { message });
           }
-        }
-        const form = /* @__PURE__ */ Object.create(null);
+        const form = Object.create(null);
         formData.forEach((value2, key) => {
-          if (key.endsWith("[]")) {
+          if (key.endsWith("[]"))
             (form[key] ??= []).push(value2);
-          } else if (Array.isArray(form[key])) {
+          else if (Array.isArray(form[key]))
             form[key].push(value2);
-          } else if (Object.hasOwn(form, key)) {
+          else if (Object.hasOwn(form, key))
             form[key] = [form[key], value2];
-          } else {
+          else
             form[key] = value2;
-          }
         });
         value = form;
         break;
@@ -12082,12 +12056,10 @@ var validator = (target, validationFunc) => {
         break;
       case "cookie":
         value = getCookie(c);
-        break;
     }
     const res = await validationFunc(value, c);
-    if (res instanceof Response) {
+    if (res instanceof Response)
       return res;
-    }
     c.req.addValidatedData(target, res);
     return await next();
   };
@@ -37283,17 +37255,25 @@ class ZveltioAIEngine {
   checkPermission;
   sendNotification;
   enqueueDDLJob;
+  withTenantIsolation;
   constructor(ctx) {
     this.db = ctx.db;
     this.checkPermission = ctx.checkPermission;
     this.sendNotification = ctx.internals.sendNotification;
     this.enqueueDDLJob = ctx.internals.enqueueDDLJob;
+    this.withTenantIsolation = ctx.internals.withTenantIsolation;
+  }
+  dbWork(request, fn) {
+    const tenantId = request.context?.tenantId;
+    return typeof tenantId === "string" && tenantId ? this.withTenantIsolation(tenantId, () => fn()) : fn();
   }
   async processRequest(request) {
     const startTime = Date.now();
     try {
-      const context = await this.buildContext(request);
-      const history = request.conversationId ? await this.getConversationHistory(request.conversationId, request.userId) : [];
+      const [context, history] = await this.dbWork(request, async () => [
+        await this.buildContext(request),
+        request.conversationId ? await this.getConversationHistory(request.conversationId, request.userId) : []
+      ]);
       const provider = aiProviderManager.getDefault();
       if (!provider) {
         return {
@@ -37417,7 +37397,7 @@ class ZveltioAIEngine {
       }
       const conversationId = request.conversationId || this.generateConversationId();
       if (request.conversationId !== null) {
-        await this.saveConversation(conversationId, request.userId, request.message, finalResponse);
+        await this.dbWork(request, () => this.saveConversation(conversationId, request.userId, request.message, finalResponse));
       }
       return {
         response: finalResponse,
@@ -37438,6 +37418,7 @@ class ZveltioAIEngine {
   }
   async processBackgroundTask(userId, instruction, options = {}) {
     const startTime = Date.now();
+    const background = { context: { tenantId: options.tenantId } };
     try {
       const result = await this.processRequest({
         userId,
@@ -37446,6 +37427,7 @@ class ZveltioAIEngine {
         conversationId: null,
         context: {
           isBackground: true,
+          tenantId: options.tenantId,
           maxIterations: options.maxIterations ?? 5
         }
       });
@@ -37454,7 +37436,7 @@ class ZveltioAIEngine {
       if (shouldNotify && result.response) {
         const notifTitle = options.notificationTitle ?? "AI Background Report";
         const notifMessage = result.response.length > 500 ? result.response.substring(0, 497) + "..." : result.response;
-        await this.sendNotification(this.db, {
+        await this.dbWork(background, () => this.sendNotification(this.db, {
           user_id: userId,
           title: notifTitle,
           message: notifMessage,
@@ -37465,7 +37447,7 @@ class ZveltioAIEngine {
             latency_ms: Date.now() - startTime,
             iterations: result.metadata?.iterations ?? 0
           }
-        });
+        }));
         notificationsSent = 1;
       }
       return {
@@ -37479,13 +37461,13 @@ class ZveltioAIEngine {
       const errorMessage = error62 instanceof Error ? error62.message : "Unknown error";
       console.error(`[ZveltioAI Background] Task failed for user ${userId}:`, errorMessage);
       if (options.notifyOnResult) {
-        await this.sendNotification(this.db, {
+        await this.dbWork(background, () => this.sendNotification(this.db, {
           user_id: userId,
           title: "AI Background Task Failed",
           message: `Task "${instruction.substring(0, 100)}" failed: ${errorMessage}`,
           type: "error",
           source: "ai-background"
-        }).catch(() => {});
+        })).catch(() => {});
       }
       return {
         executed: false,
@@ -37632,6 +37614,17 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
       }
     }
     switch (name) {
+      case "remember_fact":
+        return this.toolRememberFact(parsed, request);
+      case "recall_facts":
+        return this.toolRecallFacts(parsed, request);
+      case "text_to_sql":
+        return this.toolTextToSQL(parsed, request);
+    }
+    return this.dbWork(request, () => this.dispatchDbTool(name, parsed, request));
+  }
+  async dispatchDbTool(name, parsed, request) {
+    switch (name) {
       case "query_data":
         return this.toolQueryData(parsed, request);
       case "create_collection":
@@ -37658,12 +37651,6 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
         return this.toolCountRecords(parsed);
       case "get_system_stats":
         return this.toolGetSystemStats();
-      case "remember_fact":
-        return this.toolRememberFact(parsed, request);
-      case "recall_facts":
-        return this.toolRecallFacts(parsed, request);
-      case "text_to_sql":
-        return this.toolTextToSQL(parsed, request);
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
@@ -37974,7 +37961,7 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
     } catch (err) {
       console.warn("[zveltio-ai] remember_fact: embedding failed, storing text only:", err.message);
     }
-    await this.db.insertInto("zv_ai_memory").values({
+    await this.dbWork(request, () => this.db.insertInto("zv_ai_memory").values({
       user_id: request.userId,
       context_key,
       content,
@@ -37986,7 +37973,7 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
       importance,
       updated_at: new Date,
       ...embedding ? { embedding: JSON.stringify(embedding) } : {}
-    })).execute().catch((err) => {
+    })).execute()).catch((err) => {
       console.warn("[AI Memory] write failed:", err.message);
       throw new Error(`Could not save to memory: ${err.message}`);
     });
@@ -38009,19 +37996,19 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
           if (!Array.isArray(queryEmbedding)) {
             throw new Error("provider returned no embedding vector");
           }
-          rows = await this.db.selectFrom("zv_ai_memory").selectAll().where("user_id", "=", request.userId).where("embedding", "is not", null).orderBy(sql`embedding <=> ${JSON.stringify(queryEmbedding)}::vector`).limit(limit).execute();
+          rows = await this.dbWork(request, () => this.db.selectFrom("zv_ai_memory").selectAll().where("user_id", "=", request.userId).where("embedding", "is not", null).orderBy(sql`embedding <=> ${JSON.stringify(queryEmbedding)}::vector`).limit(limit).execute());
         }
       } catch (err) {
         recallErrors.push(err instanceof Error ? err.message : String(err));
       }
       if (rows.length === 0) {
-        rows = await this.db.selectFrom("zv_ai_memory").selectAll().where("user_id", "=", request.userId).where(sql`to_tsvector('english', content) @@ plainto_tsquery('english', ${query})`).orderBy("importance", "desc").orderBy("updated_at", "desc").limit(limit).execute().catch((err) => {
+        rows = await this.dbWork(request, () => this.db.selectFrom("zv_ai_memory").selectAll().where("user_id", "=", request.userId).where(sql`to_tsvector('english', content) @@ plainto_tsquery('english', ${query})`).orderBy("importance", "desc").orderBy("updated_at", "desc").limit(limit).execute()).catch((err) => {
           recallErrors.push(err.message);
           return [];
         });
       }
       if (rows.length === 0) {
-        rows = await this.db.selectFrom("zv_ai_memory").selectAll().where("user_id", "=", request.userId).orderBy("importance", "desc").orderBy("updated_at", "desc").limit(limit).execute().catch((err) => {
+        rows = await this.dbWork(request, () => this.db.selectFrom("zv_ai_memory").selectAll().where("user_id", "=", request.userId).orderBy("importance", "desc").orderBy("updated_at", "desc").limit(limit).execute()).catch((err) => {
           recallErrors.push(err.message);
           return [];
         });
@@ -38058,7 +38045,7 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
   }
   async toolTextToSQL(args, request) {
     const { question, collections_hint = [] } = args;
-    const accessible = await this.accessibleCollections(request.userId);
+    const accessible = await this.dbWork(request, () => this.accessibleCollections(request.userId));
     const hint = Array.isArray(collections_hint) ? collections_hint : [];
     const inScope = hint.length > 0 ? accessible.filter((c) => hint.includes(c.name)) : accessible;
     if (inScope.length === 0) {
@@ -38070,7 +38057,7 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
     let schemaContext = "";
     try {
       const names = inScope.slice(0, 10).map((c) => c.name);
-      const collections = await this.db.selectFrom("zvd_collections").selectAll().where("name", "in", names).execute();
+      const collections = await this.dbWork(request, () => this.db.selectFrom("zvd_collections").selectAll().where("name", "in", names).execute());
       schemaContext = collections.map((c) => {
         const parsed = typeof c.fields === "string" ? JSON.parse(c.fields) : c.fields;
         const fields = (Array.isArray(parsed) ? parsed : []).map((f) => `${f.name} ${f.type}`).join(", ");
@@ -38107,7 +38094,7 @@ Rules:
       return { error: `Refused: ${validation.reason}`, generated: generatedSQL };
     }
     try {
-      const result = await runReadOnly(this.db, generatedSQL);
+      const result = await this.dbWork(request, () => runReadOnly(this.db, generatedSQL));
       const rows = result.rows ?? [];
       return {
         success: true,
@@ -38397,3 +38384,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
