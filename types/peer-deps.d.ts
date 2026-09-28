@@ -20,25 +20,6 @@
  */
 
 declare module 'imapflow';
-/**
- * Same namespace-vs-class trap as graphql for `S3Client` — promote it
- * to an `any`-typed class so storage/cloud code can both call `new
- * S3Client(...)` and annotate variables as `S3Client`.
- */
-declare module '@aws-sdk/client-s3' {
-  export class S3Client { constructor(config?: any); [k: string]: any; }
-  export class PutObjectCommand { constructor(input?: any); }
-  export class GetObjectCommand { constructor(input?: any); }
-  export class DeleteObjectCommand { constructor(input?: any); }
-  export class CopyObjectCommand { constructor(input?: any); }
-  export class HeadObjectCommand { constructor(input?: any); }
-  export class ListObjectsV2Command { constructor(input?: any); }
-  const _default: any;
-  export default _default;
-}
-declare module '@aws-sdk/s3-request-presigner' {
-  export const getSignedUrl: (...args: any[]) => Promise<string>;
-}
 declare module 'nanoid';
 declare module 'pdf-parse';
 declare module 'pdfkit';
