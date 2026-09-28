@@ -24699,6 +24699,8 @@ function invoicingRoutes(ctx) {
   const { db, auth } = ctx;
   const app = new Hono2;
   app.use("*", async (c, next) => {
+    if (c.get("user"))
+      return next();
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session)
       return c.json({ error: "Unauthorized" }, 401);
@@ -25127,7 +25129,7 @@ function invoicingRoutes(ctx) {
           ${JSON.stringify(vatBreakdown)}::jsonb, ${d.vat_regime}, ${d.vat_exemption_reason ?? null},
           ${d.exchange_rate ?? null}, ${d.exchange_date ?? null}, ${taxAmountRon},
           ${d.notes ?? null}, ${d.footer_notes ?? null}, ${d.po_number ?? null},
-          ${d.recurring_interval ?? null}, 0, ${user.id})
+          ${d.recurring_interval ?? null}, 0, ${user.authorUserId ?? user.id})
         RETURNING *
       `.execute(trx);
       const invId = inv2.rows[0].id;
@@ -25671,3 +25673,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
