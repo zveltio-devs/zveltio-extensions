@@ -25714,6 +25714,11 @@ async function logAccess(db, fileId, userId, action, userAgent, shareToken, ip) 
 function makePublicShareHandler(ctx) {
   const { db } = ctx;
   return async (c) => {
+    const share = await db.selectFrom("zv_media_shares").selectAll().where("token", "=", c.req.param("token")).executeTakeFirst();
+    const tenant = share?.tenant_id ?? undefined;
+    return tenant ? ctx.internals.withTenantIsolation(tenant, () => serveShare(c)) : serveShare(c);
+  };
+  async function serveShare(c) {
     const password = c.req.query("password");
     const token = c.req.param("token");
     const result = await validateShareToken(db, token, password || undefined);
@@ -25746,7 +25751,7 @@ function makePublicShareHandler(ctx) {
       } : null,
       share_type: result.share.share_type
     });
-  };
+  }
 }
 
 // engine/index.ts
@@ -25778,3 +25783,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
