@@ -207,6 +207,9 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
   // is none to forget.
 
   app.use('*', async (c, next) => {
+    // The engine's /ext gate already published the caller: a session, or an API
+    // key on a manifest `apiKeyRoutes` route — for which getSession is null.
+    if (c.get('user')) return next();
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.json({ error: 'Unauthorized' }, 401);
     c.set('user', session.user);
@@ -849,7 +852,7 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
           ${JSON.stringify(vatBreakdown)}::jsonb, ${d.vat_regime}, ${d.vat_exemption_reason ?? null},
           ${d.exchange_rate ?? null}, ${d.exchange_date ?? null}, ${taxAmountRon},
           ${d.notes ?? null}, ${d.footer_notes ?? null}, ${d.po_number ?? null},
-          ${d.recurring_interval ?? null}, 0, ${user.id})
+          ${d.recurring_interval ?? null}, 0, ${user.authorUserId ?? user.id})
         RETURNING *
       `.execute(trx);
       const invId = (inv.rows[0] as any).id;
