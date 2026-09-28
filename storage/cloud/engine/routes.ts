@@ -844,7 +844,24 @@ async function logAccess(
  */
 export function makePublicShareHandler(ctx: ExtensionContext) {
   const { db } = ctx;
+  // The link names no firm, and the file it shares is under that firm's RLS:
+  // on the pool with no tenant a plain-role engine sees only the default
+  // tenant's files, so every other firm's link answered "File has been deleted".
+  // The share row records its firm (engine migration 023); enter it. An engine
+  // without that column leaves `tenant_id` undefined and the old path runs.
   return async (c: any) => {
+    const share = await (db as any)
+      .selectFrom('zv_media_shares')
+      .selectAll()
+      .where('token', '=', c.req.param('token'))
+      .executeTakeFirst();
+    const tenant: string | undefined = share?.tenant_id ?? undefined;
+    return tenant
+      ? ctx.internals.withTenantIsolation(tenant, () => serveShare(c))
+      : serveShare(c);
+  };
+
+  async function serveShare(c: any) {
     const password = c.req.query('password');
     const token = c.req.param('token');
     const result = await validateShareToken(db, token, password || undefined);
@@ -911,7 +928,7 @@ export function makePublicShareHandler(ctx: ExtensionContext) {
       } : null,
       share_type: result.share.share_type,
     });
-  };
+  }
 }
 
 /**
