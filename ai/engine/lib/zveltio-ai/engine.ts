@@ -55,12 +55,38 @@ export class ZveltioAIEngine {
    * paths, one of them never worked.
    */
   private enqueueDDLJob: (db: any, operation: string, payload: any) => Promise<unknown>;
+  private withTenantIsolation: ExtensionContext['internals']['withTenantIsolation'];
 
   constructor(ctx: ExtensionContext) {
     this.db = ctx.db;
     this.checkPermission = ctx.checkPermission;
     this.sendNotification = ctx.internals.sendNotification;
     this.enqueueDDLJob = ctx.internals.enqueueDDLJob;
+    this.withTenantIsolation = ctx.internals.withTenantIsolation;
+  }
+
+  /**
+   * Database work — never a model call — for a request that names its firm.
+   *
+   * A background task (`ai_task` flow) is handed its firm as `tenantId` and NO
+   * transaction: the scheduler used to run the whole task inside one, and it sat
+   * `idle in transaction` through every wait on the model until
+   * `idle_in_transaction_session_timeout` (60 s) killed the connection and the
+   * task with it. So each stretch of database work opens its own short tenant
+   * transaction, and `ctx.db` inside it resolves that transaction. Outside one,
+   * the host refuses `ctx.db` rather than answer as the default firm.
+   *
+   * A request from a route names no firm here: its request transaction is
+   * already open, and `fn` runs in it as before.
+   */
+  private dbWork<T>(
+    request: Pick<ZveltioAIRequest, 'context'>,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    const tenantId: unknown = request.context?.tenantId;
+    return typeof tenantId === 'string' && tenantId
+      ? this.withTenantIsolation(tenantId, () => fn())
+      : fn();
   }
 
   // ── Public API ─────────────────────────────────────────────────
@@ -69,10 +95,12 @@ export class ZveltioAIEngine {
     const startTime = Date.now();
 
     try {
-      const context = await this.buildContext(request);
-      const history = request.conversationId
-        ? await this.getConversationHistory(request.conversationId, request.userId)
-        : [];
+      const [context, history] = await this.dbWork(request, async () => [
+        await this.buildContext(request),
+        request.conversationId
+          ? await this.getConversationHistory(request.conversationId, request.userId)
+          : [],
+      ] as const);
 
       const provider = aiProviderManager.getDefault();
 
@@ -262,11 +290,13 @@ export class ZveltioAIEngine {
       const conversationId =
         request.conversationId || this.generateConversationId();
       if (request.conversationId !== null) {
-        await this.saveConversation(
-          conversationId,
-          request.userId,
-          request.message,
-          finalResponse,
+        await this.dbWork(request, () =>
+          this.saveConversation(
+            conversationId,
+            request.userId,
+            request.message,
+            finalResponse,
+          ),
         );
       }
 
@@ -302,6 +332,8 @@ export class ZveltioAIEngine {
       notificationTitle?: string;
       maxIterations?: number;
       organizationId?: string;
+      /** The flow's firm. Its database work runs in short transactions as it. */
+      tenantId?: string;
     } = {},
   ): Promise<{
     executed: boolean;
@@ -312,6 +344,8 @@ export class ZveltioAIEngine {
     error?: string;
   }> {
     const startTime = Date.now();
+    // Carries the firm to `dbWork` for the notification writes below.
+    const background = { context: { tenantId: options.tenantId } };
 
     try {
       const result = await this.processRequest({
@@ -321,6 +355,7 @@ export class ZveltioAIEngine {
         conversationId: null as any,
         context: {
           isBackground: true,
+          tenantId: options.tenantId,
           maxIterations: options.maxIterations ?? 5,
         },
       });
@@ -343,18 +378,20 @@ export class ZveltioAIEngine {
             ? result.response.substring(0, 497) + '...'
             : result.response;
 
-        await this.sendNotification(this.db, {
-          user_id: userId,
-          title: notifTitle,
-          message: notifMessage,
-          type: 'info',
-          source: 'ai-background',
-          metadata: {
-            instruction: instruction.substring(0, 200),
-            latency_ms: Date.now() - startTime,
-            iterations: result.metadata?.iterations ?? 0,
-          },
-        });
+        await this.dbWork(background, () =>
+          this.sendNotification(this.db, {
+            user_id: userId,
+            title: notifTitle,
+            message: notifMessage,
+            type: 'info',
+            source: 'ai-background',
+            metadata: {
+              instruction: instruction.substring(0, 200),
+              latency_ms: Date.now() - startTime,
+              iterations: result.metadata?.iterations ?? 0,
+            },
+          }),
+        );
 
         notificationsSent = 1;
       }
@@ -375,13 +412,15 @@ export class ZveltioAIEngine {
       );
 
       if (options.notifyOnResult) {
-        await this.sendNotification(this.db, {
-          user_id: userId,
-          title: 'AI Background Task Failed',
-          message: `Task "${instruction.substring(0, 100)}" failed: ${errorMessage}`,
-          type: 'error',
-          source: 'ai-background',
-        }).catch(() => {});
+        await this.dbWork(background, () =>
+          this.sendNotification(this.db, {
+            user_id: userId,
+            title: 'AI Background Task Failed',
+            message: `Task "${instruction.substring(0, 100)}" failed: ${errorMessage}`,
+            type: 'error',
+            source: 'ai-background',
+          }),
+        ).catch(() => {});
       }
 
       return {
@@ -635,6 +674,24 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
     }
 
     // ── Dispatch ───────────────────────────────────────────────
+    // These three wait on the model mid-tool, so they wrap their own database
+    // work; every other tool is database work only.
+    switch (name) {
+      case 'remember_fact':
+        return this.toolRememberFact(parsed, request);
+      case 'recall_facts':
+        return this.toolRecallFacts(parsed, request);
+      case 'text_to_sql':
+        return this.toolTextToSQL(parsed, request);
+    }
+    return this.dbWork(request, () => this.dispatchDbTool(name, parsed, request));
+  }
+
+  private async dispatchDbTool(
+    name: string,
+    parsed: any,
+    request: ZveltioAIRequest,
+  ): Promise<any> {
     switch (name) {
       case 'query_data':
         return this.toolQueryData(parsed, request);
@@ -662,12 +719,6 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
         return this.toolCountRecords(parsed);
       case 'get_system_stats':
         return this.toolGetSystemStats();
-      case 'remember_fact':
-        return this.toolRememberFact(parsed, request);
-      case 'recall_facts':
-        return this.toolRecallFacts(parsed, request);
-      case 'text_to_sql':
-        return this.toolTextToSQL(parsed, request);
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
@@ -1185,25 +1236,27 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
       console.warn('[zveltio-ai] remember_fact: embedding failed, storing text only:', (err as Error).message);
     }
 
-    await (this.db as any)
-      .insertInto('zv_ai_memory')
-      .values({
-        user_id: request.userId,
-        context_key,
-        content,
-        importance,
-        source: 'user',
-        ...(embedding ? { embedding: JSON.stringify(embedding) } : {}),
-      })
-      .onConflict((oc: any) =>
-        oc.columns(['user_id', 'context_key']).doUpdateSet({
+    await this.dbWork(request, () =>
+      (this.db as any)
+        .insertInto('zv_ai_memory')
+        .values({
+          user_id: request.userId,
+          context_key,
           content,
           importance,
-          updated_at: new Date(),
+          source: 'user',
           ...(embedding ? { embedding: JSON.stringify(embedding) } : {}),
-        }),
-      )
-      .execute()
+        })
+        .onConflict((oc: any) =>
+          oc.columns(['user_id', 'context_key']).doUpdateSet({
+            content,
+            importance,
+            updated_at: new Date(),
+            ...(embedding ? { embedding: JSON.stringify(embedding) } : {}),
+          }),
+        )
+        .execute(),
+    )
       .catch((err: any) => {
         // The reason, not a guess at it. This said "Run migrations first" for
         // every failure, and the failure it actually had for as long as an
@@ -1251,17 +1304,19 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
             throw new Error('provider returned no embedding vector');
           }
 
-          rows = await (this.db as any)
-            .selectFrom('zv_ai_memory')
-            .selectAll()
-            .where('user_id', '=', request.userId)
-            .where('embedding', 'is not', null)
-            // P0: use parameterized sql`` template, not raw string interpolation
-            .orderBy(
-              sql`embedding <=> ${JSON.stringify(queryEmbedding)}::vector`,
-            )
-            .limit(limit)
-            .execute();
+          rows = await this.dbWork<any[]>(request, () =>
+            (this.db as any)
+              .selectFrom('zv_ai_memory')
+              .selectAll()
+              .where('user_id', '=', request.userId)
+              .where('embedding', 'is not', null)
+              // P0: use parameterized sql`` template, not raw string interpolation
+              .orderBy(
+                sql`embedding <=> ${JSON.stringify(queryEmbedding)}::vector`,
+              )
+              .limit(limit)
+              .execute(),
+          );
         }
       } catch (err) {
         // Fallback to text search
@@ -1286,16 +1341,17 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
       // The `?` placeholder was wrong too — Postgres uses `$1` — so this could
       // not have run even with a `raw` to call it on.
       if (rows.length === 0) {
-        rows = await (this.db as any)
-          .selectFrom('zv_ai_memory')
-          .selectAll()
-          .where('user_id', '=', request.userId)
-          .where(sql<boolean>`to_tsvector('english', content) @@ plainto_tsquery('english', ${query})`)
-          .orderBy('importance', 'desc')
-          .orderBy('updated_at', 'desc')
-          .limit(limit)
-          .execute()
-          .catch((err: Error) => {
+        rows = await this.dbWork<any[]>(request, () =>
+          (this.db as any)
+            .selectFrom('zv_ai_memory')
+            .selectAll()
+            .where('user_id', '=', request.userId)
+            .where(sql<boolean>`to_tsvector('english', content) @@ plainto_tsquery('english', ${query})`)
+            .orderBy('importance', 'desc')
+            .orderBy('updated_at', 'desc')
+            .limit(limit)
+            .execute(),
+        ).catch((err: Error) => {
             recallErrors.push(err.message);
             return [];
           });
@@ -1303,15 +1359,16 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
 
       // Final fallback: return most important recent memories
       if (rows.length === 0) {
-        rows = await (this.db as any)
-          .selectFrom('zv_ai_memory')
-          .selectAll()
-          .where('user_id', '=', request.userId)
-          .orderBy('importance', 'desc')
-          .orderBy('updated_at', 'desc')
-          .limit(limit)
-          .execute()
-          .catch((err: Error) => {
+        rows = await this.dbWork<any[]>(request, () =>
+          (this.db as any)
+            .selectFrom('zv_ai_memory')
+            .selectAll()
+            .where('user_id', '=', request.userId)
+            .orderBy('importance', 'desc')
+            .orderBy('updated_at', 'desc')
+            .limit(limit)
+            .execute(),
+        ).catch((err: Error) => {
             recallErrors.push(err.message);
             return [];
           });
@@ -1380,7 +1437,9 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
 
     // Step 1: the caller's own collections — the same set the validator will
     // enforce, narrowed by the hint if one was given.
-    const accessible = await this.accessibleCollections(request.userId);
+    const accessible = await this.dbWork(request, () =>
+      this.accessibleCollections(request.userId),
+    );
     const hint: string[] = Array.isArray(collections_hint) ? collections_hint : [];
     const inScope = hint.length > 0 ? accessible.filter((c) => hint.includes(c.name)) : accessible;
     if (inScope.length === 0) {
@@ -1393,11 +1452,13 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
     let schemaContext = '';
     try {
       const names = inScope.slice(0, 10).map((c) => c.name);
-      const collections = await (this.db as any)
-        .selectFrom('zvd_collections')
-        .selectAll()
-        .where('name', 'in', names)
-        .execute();
+      const collections = await this.dbWork<any[]>(request, () =>
+        (this.db as any)
+          .selectFrom('zvd_collections')
+          .selectAll()
+          .where('name', 'in', names)
+          .execute(),
+      );
 
       schemaContext = collections
         .map((c: any) => {
@@ -1463,7 +1524,7 @@ Rules:
     // Step 4: the read-only window, scoped to a SAVEPOINT so it does not leak
     // into the rest of the request. See the note on `runReadOnly`.
     try {
-      const result = await runReadOnly(this.db, generatedSQL);
+      const result = await this.dbWork(request, () => runReadOnly(this.db, generatedSQL));
       const rows = (result.rows as any[]) ?? [];
 
       return {
