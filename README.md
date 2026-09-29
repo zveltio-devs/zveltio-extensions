@@ -1,5 +1,7 @@
 # zveltio-extensions
 
+[![Built with Claude](https://img.shields.io/badge/Built%20with-Claude-D97757)](https://claude.com/claude-code)
+
 Official Zveltio extensions. Each extension is a self-contained folder with an `engine/` backend and optionally a `studio/` frontend.
 
 ## Structure
