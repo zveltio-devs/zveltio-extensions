@@ -3947,6 +3947,12 @@ var require_stringifier = __commonJS((exports, module) => {
     }
     return name + afterName + params;
   }
+  function isCustomProperty(node3) {
+    if (!node3.prop.startsWith("--"))
+      return false;
+    let before = node3.raws.before;
+    return typeof before === "undefined" || !/\S$/.test(before);
+  }
   function pushBody(str, stack, node3) {
     let nodes = node3.nodes;
     let last = nodes.length - 1;
@@ -3958,10 +3964,15 @@ var require_stringifier = __commonJS((exports, module) => {
     let semicolon = str.raw(node3, "semicolon");
     let isDocument2 = node3.type === "document";
     for (let i = nodes.length - 1;i >= 0; i--) {
+      let child = nodes[i];
+      let childSemicolon = last !== i || semicolon;
+      if (!childSemicolon && i < nodes.length - 1 && (child.type === "atrule" && !child.nodes || child.type === "decl" && isCustomProperty(child))) {
+        childSemicolon = true;
+      }
       stack.push({
         document: isDocument2,
-        node: nodes[i],
-        semicolon: last !== i || semicolon
+        node: child,
+        semicolon: childSemicolon
       });
     }
   }
@@ -4272,6 +4283,9 @@ var require_stringifier = __commonJS((exports, module) => {
       return value;
     }
     root(node3) {
+      if (node3.source && node3.source.input.hasBOM) {
+        this.builder("\uFEFF", node3, "start");
+      }
       this.body(node3);
       if (node3.raws.after) {
         let after = node3.raws.after;
@@ -6062,10 +6076,9 @@ var require_source_map_generator = __commonJS((exports) => {
       next = "";
       if (mapping.generatedLine !== previousGeneratedLine) {
         previousGeneratedColumn = 0;
-        while (mapping.generatedLine !== previousGeneratedLine) {
-          next += ";";
-          previousGeneratedLine++;
-        }
+        var lineDelta = mapping.generatedLine - previousGeneratedLine;
+        next += lineDelta === 1 ? ";" : ";".repeat(lineDelta);
+        previousGeneratedLine = mapping.generatedLine;
       } else {
         if (i > 0) {
           if (!util.compareByGeneratedPositionsInflated(mapping, mappings[i - 1])) {
@@ -6213,9 +6226,17 @@ var require_quick_sort = __commonJS((exports) => {
     let templateFn = new Function(`return ${template}`)();
     return templateFn(comparator);
   }
+  var isEvalAllowed = function() {
+    try {
+      new Function("return 0")();
+      return true;
+    } catch {
+      return false;
+    }
+  }();
   var sortCache = new WeakMap;
   exports.quickSort = function(ary, comparator, start = 0) {
-    let doQuickSort = sortCache.get(comparator);
+    let doQuickSort = isEvalAllowed ? sortCache.get(comparator) : SortTemplate(comparator);
     if (doQuickSort === undefined) {
       doQuickSort = cloneSort(comparator);
       sortCache.set(comparator, doQuickSort);
@@ -6231,6 +6252,7 @@ var require_source_map_consumer = __commonJS((exports) => {
   var ArraySet = require_array_set().ArraySet;
   var base64VLQ = require_base64_vlq();
   var quickSort = require_quick_sort().quickSort;
+  var MAX_SECTION_OFFSET_LINE = 1e7;
   function SourceMapConsumer(aSourceMap, aSourceMapURL) {
     var sourceMap = aSourceMap;
     if (typeof aSourceMap === "string") {
@@ -6699,6 +6721,7 @@ var require_source_map_consumer = __commonJS((exports) => {
       line: -1,
       column: 0
     };
+    var maxOffsetLine = 0;
     this._sections = sections.map(function(s) {
       if (s.url) {
         throw new Error("Support for url field in sections not implemented.");
@@ -6706,18 +6729,36 @@ var require_source_map_consumer = __commonJS((exports) => {
       var offset = util.getArg(s, "offset");
       var offsetLine = util.getArg(offset, "line");
       var offsetColumn = util.getArg(offset, "column");
+      if (!isValidOffset(offsetLine) || !isValidOffset(offsetColumn)) {
+        throw new Error("Section offset line and column must be non-negative integers.");
+      }
+      if (offsetLine > MAX_SECTION_OFFSET_LINE) {
+        throw new Error("Section offset line must not exceed " + MAX_SECTION_OFFSET_LINE + ".");
+      }
       if (offsetLine < lastOffset.line || offsetLine === lastOffset.line && offsetColumn < lastOffset.column) {
         throw new Error("Section offsets must be ordered and non-overlapping.");
       }
       lastOffset = offset;
+      var consumer = new SourceMapConsumer(util.getArg(s, "map"), aSourceMapURL);
+      var totalOffsetLine = offsetLine + (consumer._maxOffsetLine || 0);
+      if (totalOffsetLine > MAX_SECTION_OFFSET_LINE) {
+        throw new Error("Section offset line must not exceed " + MAX_SECTION_OFFSET_LINE + ", including offsets of nested sections.");
+      }
+      if (totalOffsetLine > maxOffsetLine) {
+        maxOffsetLine = totalOffsetLine;
+      }
       return {
         generatedOffset: {
           generatedLine: offsetLine + 1,
           generatedColumn: offsetColumn + 1
         },
-        consumer: new SourceMapConsumer(util.getArg(s, "map"), aSourceMapURL)
+        consumer
       };
     });
+    this._maxOffsetLine = maxOffsetLine;
+  }
+  function isValidOffset(aValue) {
+    return typeof aValue === "number" && aValue >= 0 && aValue <= 9007199254740991 && Math.floor(aValue) === aValue;
   }
   IndexedSourceMapConsumer.prototype = Object.create(SourceMapConsumer.prototype);
   IndexedSourceMapConsumer.prototype.constructor = SourceMapConsumer;
@@ -6726,8 +6767,9 @@ var require_source_map_consumer = __commonJS((exports) => {
     get: function() {
       var sources = [];
       for (var i = 0;i < this._sections.length; i++) {
-        for (var j = 0;j < this._sections[i].consumer.sources.length; j++) {
-          sources.push(this._sections[i].consumer.sources[j]);
+        var sectionSources = this._sections[i].consumer.sources;
+        for (var j = 0;j < sectionSources.length; j++) {
+          sources.push(sectionSources[j]);
         }
       }
       return sources;
@@ -6888,6 +6930,10 @@ var require_source_node = __commonJS((exports) => {
         }
       }
       while (lastGeneratedLine < mapping.generatedLine) {
+        if (remainingLinesIndex >= remainingLines.length) {
+          lastGeneratedLine = mapping.generatedLine;
+          break;
+        }
         node3.add(shiftNextLine());
         lastGeneratedLine++;
       }
@@ -7102,9 +7148,16 @@ var require_source_map = __commonJS((exports) => {
 
 // /zveltio-extension/node_modules/postcss/lib/previous-map.js
 var require_previous_map = __commonJS((exports, module) => {
-  var { existsSync, readFileSync } = __require("fs");
+  var { existsSync, readFileSync, realpathSync } = __require("fs");
   var { dirname, isAbsolute, join, relative, sep } = __require("path");
   var { SourceMapConsumer, SourceMapGenerator } = require_source_map();
+  function realPath(path) {
+    try {
+      return realpathSync(path);
+    } catch {
+      return path;
+    }
+  }
   function fromBase64(str) {
     if (Buffer) {
       return Buffer.from(str, "base64").toString();
@@ -7174,14 +7227,13 @@ var require_previous_map = __commonJS((exports, module) => {
     }
     loadFile(path, cssFile, trusted) {
       if (!trusted && !this.unsafeMap) {
-        if (!/\.map$/i.test(path)) {
+        if (!/\.map$/i.test(path))
           return;
-        }
-        if (cssFile) {
-          let relativePath = relative(dirname(cssFile), path);
-          if (relativePath === ".." || relativePath.startsWith(".." + sep) || isAbsolute(relativePath)) {
-            return;
-          }
+        if (!cssFile)
+          return;
+        let rel = relative(realPath(dirname(cssFile)), realPath(path));
+        if (rel === ".." || rel.startsWith(".." + sep) || isAbsolute(rel)) {
+          return;
         }
       }
       this.root = dirname(path);
@@ -7541,6 +7593,8 @@ var require_list = __commonJS((exports, module) => {
       return list.split(string4, spaces);
     },
     split(string4, separators, last) {
+      if (typeof string4 !== "string")
+        return [];
       let array2 = [];
       let current = "";
       let split = false;
@@ -7570,16 +7624,18 @@ var require_list = __commonJS((exports, module) => {
             split = true;
         }
         if (split) {
-          if (current !== "")
-            array2.push(current.trim());
+          let value2 = current.trim();
+          if (last || value2 !== "")
+            array2.push(value2);
           current = "";
           split = false;
         } else {
           current += letter;
         }
       }
-      if (last || current !== "")
-        array2.push(current.trim());
+      let value = current.trim();
+      if (last || value !== "")
+        array2.push(value);
       return array2;
     }
   };
@@ -7774,9 +7830,10 @@ var require_map_generator = __commonJS((exports, module) => {
           }
         }
       } else if (this.css) {
+        let annotation = "/*# sourceMappingURL=";
         let startIndex;
-        while ((startIndex = this.css.lastIndexOf("/*#")) !== -1) {
-          let endIndex = this.css.indexOf("*/", startIndex + 3);
+        while ((startIndex = this.css.lastIndexOf(annotation)) !== -1) {
+          let endIndex = this.css.indexOf("*/", startIndex + annotation.length);
           if (endIndex === -1)
             break;
           while (startIndex > 0 && this.css[startIndex - 1] === `
@@ -8353,7 +8410,7 @@ var require_parser = __commonJS((exports, module) => {
           prev.raws.ownSemicolon = this.spaces;
           this.spaces = "";
           prev.source.end = this.getPosition(token[2]);
-          prev.source.end.offset += prev.raws.ownSemicolon.length;
+          prev.source.end.offset++;
         }
       }
     }
@@ -9127,14 +9184,19 @@ var require_lazy_result = __commonJS((exports, module) => {
       }
       if (visit2.iterator !== 0) {
         let iterator = visit2.iterator;
+        if (visit2.descending) {
+          visit2.descending = false;
+          node3.indexes[iterator] += 1;
+        }
         let child;
         while (child = node3.nodes[node3.indexes[iterator]]) {
-          node3.indexes[iterator] += 1;
           if (!child[isClean]) {
             child[isClean] = true;
+            visit2.descending = true;
             stack.push(toStack(child));
             return;
           }
+          node3.indexes[iterator] += 1;
         }
         visit2.iterator = 0;
         delete node3.indexes[iterator];
@@ -9164,12 +9226,16 @@ var require_lazy_result = __commonJS((exports, module) => {
         let visitNode = visit2.node;
         if (visit2.iterator !== 0) {
           let iterator = visit2.iterator;
+          if (visit2.descending) {
+            visit2.descending = false;
+            visitNode.indexes[iterator] += 1;
+          }
           let child;
           let descended = false;
           while (child = visitNode.nodes[visitNode.indexes[iterator]]) {
-            visitNode.indexes[iterator] += 1;
             if (!child[isClean]) {
               child[isClean] = true;
+              visit2.descending = true;
               stack.push({
                 eventIndex: 0,
                 events: getEvents(child),
@@ -9179,6 +9245,7 @@ var require_lazy_result = __commonJS((exports, module) => {
               descended = true;
               break;
             }
+            visitNode.indexes[iterator] += 1;
           }
           if (descended)
             continue;
@@ -9339,7 +9406,7 @@ var require_processor = __commonJS((exports, module) => {
 
   class Processor {
     constructor(plugins = []) {
-      this.version = "8.5.20";
+      this.version = "8.5.28";
       this.plugins = this.normalize(plugins);
     }
     normalize(plugins) {
@@ -9417,7 +9484,7 @@ var require_postcss = __commonJS((exports, module) => {
         warningPrinted = true;
         console.warn(name + `: postcss.plugin was deprecated. Migration guide:
 ` + "https://evilmartians.com/chronicles/postcss-8-plugin-migration");
-        if (process.env.LANG && process.env.LANG.startsWith("cn")) {
+        if (process.env.LANG && process.env.LANG.startsWith("zh")) {
           console.warn(name + `: \u91CC\u9762 postcss.plugin \u88AB\u5F03\u7528. \u8FC1\u79FB\u6307\u5357:
 ` + "https://www.w3ctech.com/topic/2226");
         }
@@ -35769,10 +35836,13 @@ async function resolveWithViewer(deps, audience, lookup, block, viewer) {
   }
   const shown = fields.length > 0 ? new Set(fields) : meta3.columns;
   const authorSort = typeof content.sort_field === "string" && meta3.columns.has(content.sort_field) ? content.sort_field : meta3.columns.has("created_at") ? "created_at" : "id";
-  const sortField = typeof viewer.sort === "string" && shown.has(viewer.sort) ? viewer.sort : authorSort;
-  const sortDir = viewer.sort ? viewer.sortDir === "asc" ? "asc" : "desc" : content.sort_dir === "asc" ? "asc" : "desc";
   const limit = Math.min(Math.max(Number(content.limit) || 20, 1), 100);
   try {
+    const role = await deps.engine.resolveUserRole(audience.user ?? {});
+    const colAccess = await deps.engine.getColumnAccess(meta3.name, role, audience.user?.id);
+    const visible = [...shown].filter((c) => !colAccess?.hidden?.has(c));
+    const sortField = typeof viewer.sort === "string" && visible.includes(viewer.sort) ? viewer.sort : authorSort;
+    const sortDir = viewer.sort ? viewer.sortDir === "asc" ? "asc" : "desc" : content.sort_dir === "asc" ? "asc" : "desc";
     let q = fields.length > 0 ? deps.db.selectFrom(meta3.table).select(fields) : deps.db.selectFrom(meta3.table).selectAll();
     if (meta3.columns.has("tenant_id")) {
       q = q.where("tenant_id", "=", audience.tenantId);
@@ -35784,7 +35854,7 @@ async function resolveWithViewer(deps, audience, lookup, block, viewer) {
     }
     const term = typeof viewer.q === "string" ? viewer.q.trim() : "";
     if (term.length > 0) {
-      const searchable = [...shown].filter((c) => meta3.columns.has(c));
+      const searchable = visible.filter((c) => meta3.columns.has(c));
       if (searchable.length > 0) {
         q = q.where((eb) => eb.or(searchable.map((col) => deps.engine.buildCondition(col, { op: "ilike", value: term }))));
       }
@@ -35796,8 +35866,6 @@ async function resolveWithViewer(deps, audience, lookup, block, viewer) {
     const window2 = await q.orderBy(sortField, sortDir).limit(limit + 1).offset(Math.max(0, Math.floor(offset))).execute();
     const hasMore = window2.length > limit;
     let records = hasMore ? window2.slice(0, limit) : window2;
-    const role = await deps.engine.resolveUserRole(audience.user ?? {});
-    const colAccess = await deps.engine.getColumnAccess(meta3.name, role, audience.user?.id);
     if (colAccess) {
       records = records.map((r) => deps.engine.applyColumnAccess(r, colAccess));
     }

@@ -47,6 +47,8 @@ interface Calls {
   selected: string[] | null;
   /** True once a row filter has been applied to the query. */
   filtered: boolean;
+  /** Column names the route filtered or sorted on. */
+  predicates: string[];
 }
 
 function harness() {
@@ -56,6 +58,7 @@ function harness() {
     getColumnAccess: 0,
     selected: null,
     filtered: false,
+    predicates: [],
   };
 
   const builder = (): Any => {
@@ -65,8 +68,14 @@ function harness() {
         return b;
       },
       selectAll: () => b,
-      where: () => b,
-      orderBy: () => b,
+      where: (col: Any) => {
+        if (typeof col === 'string') calls.predicates.push(col);
+        return b;
+      },
+      orderBy: (col: Any) => {
+        if (typeof col === 'string') calls.predicates.push(col);
+        return b;
+      },
       limit: () => b,
       offset: () => b,
       values: () => b,
@@ -224,5 +233,35 @@ describe('GET /:collection — the synchronous export', () => {
   test('does not return the forbidden column', () => {
     const rows = records();
     for (const r of rows) expect(Object.keys(r)).not.toContain(HIDDEN);
+  });
+});
+
+describe('a hidden column is not a filter or sort key', () => {
+  // The projection drops `salary`; filtering on it would still answer, through
+  // the count of exported rows, whether a guess matched — and sorting on it
+  // orders rows by the value. Both read the column the projection removed.
+  test('filtering on it is refused', async () => {
+    calls.predicates = [];
+    const res = await app.request(
+      `/${COLLECTION}?format=json&filter=${encodeURIComponent(JSON.stringify({ [HIDDEN]: '100' }))}`,
+    );
+    expect(res.status).toBe(400);
+    expect(calls.predicates).not.toContain(HIDDEN);
+  });
+
+  test('sorting on it is ignored', async () => {
+    calls.predicates = [];
+    const res = await app.request(`/${COLLECTION}?format=json&sort_field=${HIDDEN}`);
+    expect(res.status).toBe(200);
+    expect(calls.predicates).not.toContain(HIDDEN);
+  });
+
+  test('a readable column still filters', async () => {
+    calls.predicates = [];
+    const res = await app.request(
+      `/${COLLECTION}?format=json&filter=${encodeURIComponent(JSON.stringify({ bucket: 'open' }))}`,
+    );
+    expect(res.status).toBe(200);
+    expect(calls.predicates).toContain('bucket');
   });
 });

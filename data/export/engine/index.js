@@ -24625,6 +24625,8 @@ async function runExportJob(ctx, tenantId, jobId, collection, format, filters, f
       const requested = fields.length > 0 ? allCols.filter((f) => fields.includes(f)) : allCols;
       const colAccess = await getColumnAccess(collection, await resolveUserRole(user));
       const selectCols = requested.filter((f) => !colAccess.hidden.has(f));
+      for (const f of colAccess.hidden)
+        allowedFields.delete(f);
       if (selectCols.length === 0) {
         throw new Error("No exportable columns for this role");
       }
@@ -24872,6 +24874,8 @@ function exportRoutes(ctx) {
     ["id", "created_at", "updated_at", "status", "created_by", "updated_by"].forEach((f) => allowedFields.add(f));
     const { getColumnAccess, resolveUserRole, getRlsFilters, applyRlsFilters } = ctx.internals;
     const colAccess = await getColumnAccess(collection, await resolveUserRole(user));
+    for (const f of colAccess.hidden)
+      allowedFields.delete(f);
     let query;
     const projectable = [...allowedFields].filter((f) => !colAccess.hidden.has(f));
     if (fields) {
@@ -24967,3 +24971,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
