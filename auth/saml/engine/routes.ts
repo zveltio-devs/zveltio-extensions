@@ -208,19 +208,12 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
     const relayState = rawRelayState.startsWith('/') && !rawRelayState.startsWith('//')
       ? rawRelayState
       : '/admin';
-    // `getAuthorizeUrl`, not `getAuthorizeUrlAsync`.
+    // `getAuthorizeUrlAsync`, not `getAuthorizeUrl`.
     //
-    // The `*Async` names belong to a different major of node-saml than the one
-    // this extension pins (`^3.1.0`), where the promise-returning methods lost
-    // the suffix. So the call was `undefined` and the route threw a TypeError —
-    // on the one endpoint that begins SSO.
-    //
-    // It stayed hidden behind two earlier failures: the config lived in a table
-    // `ctx.db` refuses, and this route sat behind the fail-closed `/ext/*` gate.
-    // Both had to be fixed before anything could get far enough to reach a
-    // method name. `/metadata` uses the one call whose name did not change,
-    // which is why the extension answered at all from the outside.
-    const loginUrl = await saml.getAuthorizeUrl('', c.req.raw.headers.get('host') ?? '', { RelayState: relayState });
+    // The promise-returning methods carry the `*Async` suffix on
+    // @node-saml/node-saml 5.x (saml.d.ts). This is the one endpoint that begins
+    // SSO, so the wrong name would be `undefined` and throw a TypeError here.
+    const loginUrl = await saml.getAuthorizeUrlAsync('', c.req.raw.headers.get('host') ?? '', { RelayState: relayState });
     return c.redirect(loginUrl);
   });
 
@@ -251,11 +244,11 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
     // Replay: this assertion must not have been accepted before.
     //
     // node-saml's InResponseTo binding is off (see the note in
-    // `createSamlInstance`): the pinned major cannot express `'ifPresent'`, so
-    // it was refusing every login rather than protecting any. This is what
-    // replaces it, and it is wider — InResponseTo can only tie an SP-initiated
-    // response to a request we issued, while an id recorded once covers the
-    // IdP-initiated flow too.
+    // `createSamlInstance`): the per-request instances share no cache, so it
+    // could only ever reject logins, never protect any. This is what replaces
+    // it, and it is wider — InResponseTo can only tie an SP-initiated response
+    // to a request we issued, while an id recorded once covers the IdP-initiated
+    // flow too.
     //
     // Placed AFTER signature validation on purpose: consuming an id from an
     // unverified document would let anyone burn a legitimate assertion by
@@ -369,11 +362,15 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
     const config = await getSamlConfig(db, internals.decryptSecret);
     if (!config) return c.json({ error: 'SAML not configured' }, 503);
 
-    const saml = await createSamlInstance(config);
-    const xml: string = await saml.generateServiceProviderMetadata(
-      config.privateKey ?? null,
-      null,
-    );
+    // Build the metadata instance without `privateKey`. On 5.x
+    // `generateServiceProviderMetadata` throws `Missing publicCert...` when the
+    // options carry a `privateKey` but no matching public cert to advertise, and
+    // this SP does not sign AuthnRequests (AuthnRequestsSigned=false), so the
+    // key is not needed here. Passing it as the first arg never worked anyway:
+    // that arg is the decryption cert, and 5.x nulls it unless `decryptionPvk`
+    // is set — so no private key was ever emitted into the public metadata.
+    const saml = await createSamlInstance({ ...config, privateKey: undefined });
+    const xml: string = saml.generateServiceProviderMetadata(null, null);
 
     c.header('Content-Type', 'application/xml');
     return c.body(xml);
