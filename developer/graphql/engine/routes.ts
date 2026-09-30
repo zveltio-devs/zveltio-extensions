@@ -37,11 +37,7 @@ import {
 } from 'graphql';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import {
-  DataLoaderRegistry,
-  checkQueryDepth,
-  checkQueryWidth,
-} from './lib/graphql-dataloader.js';
+import { checkQueryDepth, checkQueryWidth } from './lib/graphql-dataloader.js';
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 
 const PersistedQueryCreateSchema = z.object({
@@ -61,6 +57,17 @@ const FieldPolicyCreateSchema = z.object({
 });
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+/** What one caller may read from one collection — see `readGate`. */
+interface ReadGate {
+  canRead: boolean;
+  /** A column the caller may see, and so may filter or join on. */
+  readable(column: string): boolean;
+  /** Row policies onto a query builder (SELECT, UPDATE or DELETE). */
+  rows<Q>(qb: Q): Q;
+  /** Column permissions onto one row. */
+  shape(row: any): any;
+}
 
 interface RelationInfo {
   id: string;
@@ -173,7 +180,7 @@ async function getFieldPolicies(dbh: any): Promise<FieldPolicyInfo[]> {
 // ── Schema builder ────────────────────────────────────────────────────────────
 //
 // IMPORTANT: every resolver below uses the *request-scoped* context
-//   ({ user, db, loaders, checkPermission })
+//   ({ user, db, checkPermission })
 // instead of the closure-captured ctx.db. That lets us:
 //   - use the tenant-isolated transaction (`tenantTrx`) when the
 //     extension is mounted in a multi-tenant deployment, so RLS
@@ -250,6 +257,53 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
     };
   }
 
+  // ── The read gate ──
+  //
+  // Every resolver used to check read permission on the COLLECTION and then run
+  // `selectAll()`. The data API answers the same question with row policies and
+  // column permissions as well, so this surface served what `/api/data`
+  // withholds — measured on a live engine: a column hidden from `member` came
+  // back in `list_*`, and an o2m field read a collection the caller gets 403 on.
+  //
+  // One gate per collection per operation, resolved once and cached on the
+  // operation's context. Every read goes through it: list, get, all three
+  // relation kinds, and what a mutation hands back. Nothing is caught — a failed
+  // policy, role or column lookup read as "no restriction" is how rows leak, so
+  // it refuses instead. Query alters and entity-access checks, the other half of
+  // the engine's `ReadScope`, are not reachable from an extension.
+  function readGate(context: any, collection: string): Promise<ReadGate> {
+    context.__readGates ??= new Map<string, Promise<ReadGate>>();
+    let gate = context.__readGates.get(collection);
+    if (!gate) {
+      gate = (async (): Promise<ReadGate> => {
+        const { user } = context;
+        const { getRlsFilters, applyRlsFilters, getColumnAccess, resolveUserRole, applyColumnAccess } =
+          ctx.internals;
+        // This route authenticates by session only (`auth.api.getSession`).
+        const [canRead, rls, columns] = await Promise.all([
+          context.checkPermission(user.id, collection, 'read'),
+          getRlsFilters(collection, user, 'session'),
+          resolveUserRole(user).then((role: string) => getColumnAccess(collection, role, user.id)),
+        ]);
+        return {
+          canRead: canRead === true,
+          readable: (column) => !columns.hidden.has('*') && !columns.hidden.has(column),
+          rows: (qb) => applyRlsFilters(qb, rls),
+          shape: (row) => (row ? applyColumnAccess(row, columns) : row),
+        };
+      })();
+      context.__readGates.set(collection, gate);
+    }
+    return gate;
+  }
+  async function mustRead(context: any, collection: string): Promise<ReadGate> {
+    const gate = await readGate(context, collection);
+    if (!gate.canRead) throw new Error(`Forbidden: no read permission on "${collection}"`);
+    return gate;
+  }
+  // What a mutation hands back: the row as the caller may read it, or nothing.
+  const readBack = (gate: ReadGate, row: any) => (gate.canRead ? gate.shape(row) : null);
+
   const baseFields = {
     id:         { type: GraphQLID },
     created_at: { type: GraphQLString },
@@ -316,21 +370,23 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
         filter_id_in:  { type: new GraphQLList(GraphQLID) },
       },
       resolve: async (_: any, { limit, offset, filter_id, filter_id_in }: any, context: any) => {
-        if (!(await context.checkPermission(context.user.id, col.name, 'read'))) {
-          throw new Error(`Forbidden: no read permission on "${col.name}"`);
+        const gate = await mustRead(context, col.name);
+        // A predicate on a column the caller may not see answers questions
+        // about its values.
+        if ((filter_id || filter_id_in?.length) && !gate.readable('id')) {
+          throw new Error(`Forbidden: cannot filter "${col.name}" by id`);
         }
-        try {
-          const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-          let q = (trx as any).selectFrom(tableName).selectAll();
-          if (filter_id)               q = q.where('id', '=', filter_id);
-          if (filter_id_in?.length)    q = q.where('id', 'in', filter_id_in);
-          // Clamp limit to 500 so a single GraphQL query can't pull
-          // arbitrary amounts of data — matches the `routes/data.ts`
-          // QuerySchema cap.
-          const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 500));
-          const safeOffset = Math.max(0, Number(offset) || 0);
-          return await q.limit(safeLimit).offset(safeOffset).execute();
-        } catch (err) { throw err; }
+        const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
+        let q = gate.rows((trx as any).selectFrom(tableName).selectAll());
+        if (filter_id)               q = q.where('id', '=', filter_id);
+        if (filter_id_in?.length)    q = q.where('id', 'in', filter_id_in);
+        // Clamp limit to 500 so a single GraphQL query can't pull
+        // arbitrary amounts of data — matches the `routes/data.ts`
+        // QuerySchema cap.
+        const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 500));
+        const safeOffset = Math.max(0, Number(offset) || 0);
+        const rows = await q.limit(safeLimit).offset(safeOffset).execute();
+        return rows.map(gate.shape);
       },
     };
 
@@ -338,14 +394,14 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
       type: colType,
       args: { id: { type: new GraphQLNonNull(GraphQLID) } },
       resolve: async (_: any, { id }: any, context: any) => {
-        if (!(await context.checkPermission(context.user.id, col.name, 'read'))) {
-          throw new Error(`Forbidden: no read permission on "${col.name}"`);
-        }
+        const gate = await mustRead(context, col.name);
+        if (!gate.readable('id')) throw new Error(`Forbidden: cannot filter "${col.name}" by id`);
         const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        return await (trx as any)
-          .selectFrom(tableName).selectAll()
-          .where('id', '=', id)
-          .executeTakeFirst();
+        return gate.shape(
+          await gate.rows((trx as any).selectFrom(tableName).selectAll())
+            .where('id', '=', id)
+            .executeTakeFirst(),
+        );
       },
     };
 
@@ -356,10 +412,13 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
         if (!(await context.checkPermission(context.user.id, col.name, 'create'))) {
           throw new Error(`Forbidden: no create permission on "${col.name}"`);
         }
+        // Resolved before the write, so a failed lookup refuses the write too
+        // instead of committing it and failing on the way out.
+        const gate = await readGate(context, col.name);
         const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        return await (trx as any)
+        return readBack(gate, await (trx as any)
           .insertInto(tableName).values(args)
-          .returningAll().executeTakeFirst();
+          .returningAll().executeTakeFirst());
       },
     };
 
@@ -370,12 +429,13 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
         if (!(await context.checkPermission(context.user.id, col.name, 'update'))) {
           throw new Error(`Forbidden: no update permission on "${col.name}"`);
         }
+        // A row the policy hides is not found, as on the data API's write path.
+        const gate = await readGate(context, col.name);
         const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        return await (trx as any)
-          .updateTable(tableName)
+        return readBack(gate, await gate.rows((trx as any).updateTable(tableName))
           .set({ ...data, updated_at: new Date() })
           .where('id', '=', id)
-          .returningAll().executeTakeFirst();
+          .returningAll().executeTakeFirst());
       },
     };
 
@@ -386,9 +446,10 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
         if (!(await context.checkPermission(context.user.id, col.name, 'delete'))) {
           throw new Error(`Forbidden: no delete permission on "${col.name}"`);
         }
+        const gate = await readGate(context, col.name);
         const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        const res = await (trx as any)
-          .deleteFrom(tableName).where('id', '=', id).executeTakeFirst();
+        const res = await gate.rows((trx as any).deleteFrom(tableName))
+          .where('id', '=', id).executeTakeFirst();
         return (res?.numDeletedRows ?? 0n) > 0n;
       },
     };
@@ -409,16 +470,24 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
             type: targetType,
             args: [],
             description: `Many-to-one relation → ${rel.target_collection}`,
+            // `parent` has been through its own gate, so a foreign key hidden
+            // from the caller is already gone and resolves to null here.
+            //
+            // This used to call `context.loaders.get(t).load(fk)`, but `get`
+            // returns the batch function itself, which has no `.load` — the
+            // TypeError was caught and every m2o answered null. It now reads the
+            // target through the target's gate.
+            // ponytail: one query per parent row (N+1, bounded by the 500-row
+            // list cap); batch the ids through the gate if m2o lists get slow.
             resolve: async (parent: any, _args: any, context: any) => {
               const fk = parent[fieldName];
               if (!fk) return null;
+              const gate = await mustRead(context, rel.target_collection);
               try {
-                if (context?.loaders) {
-                  return await context.loaders.get(targetTableName).load(String(fk));
-                }
-                return await (db as any)
-                  .selectFrom(targetTableName).selectAll()
-                  .where('id', '=', fk).executeTakeFirst();
+                return gate.shape(
+                  await gate.rows((db as any).selectFrom(targetTableName).selectAll())
+                    .where('id', '=', fk).executeTakeFirst(),
+                );
               } catch { return null; }
             },
           };
@@ -430,11 +499,14 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
             type: new GraphQLList(targetType),
             args: [],
             description: `One-to-many relation → ${rel.target_collection}`,
-            resolve: async (parent: any) => {
+            resolve: async (parent: any, _args: any, context: any) => {
+              const gate = await mustRead(context, rel.target_collection);
+              // Joining on a column the caller may not see reveals its value.
+              if (!gate.readable(foreignKey)) return [];
               try {
-                return await (db as any)
-                  .selectFrom(targetTableName).selectAll()
+                const rows = await gate.rows((db as any).selectFrom(targetTableName).selectAll())
                   .where(foreignKey, '=', parent.id).execute();
+                return rows.map(gate.shape);
               } catch { return []; }
             },
           };
@@ -448,18 +520,19 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
             type: new GraphQLList(targetType),
             args: [],
             description: `Many-to-many relation → ${rel.target_collection}`,
-            resolve: async (parent: any) => {
+            resolve: async (parent: any, _args: any, context: any) => {
+              const gate = await mustRead(context, rel.target_collection);
               try {
-                return await (db as any)
+                // A subquery rather than a join, so the row policies' bare
+                // column names name the target table's columns.
+                const linked = (db as any)
                   .selectFrom(junctionTable)
-                  .innerJoin(
-                    targetTableName,
-                    `${junctionTable}.${targetColumn}`,
-                    `${targetTableName}.id`,
-                  )
-                  .selectAll(targetTableName)
-                  .where(`${junctionTable}.${sourceColumn}`, '=', parent.id)
+                  .select(targetColumn)
+                  .where(sourceColumn, '=', parent.id);
+                const rows = await gate.rows((db as any).selectFrom(targetTableName).selectAll())
+                  .where('id', 'in', linked)
                   .execute();
+                return rows.map(gate.shape);
               } catch { return []; }
             },
           };
@@ -612,7 +685,6 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
       // `SET LOCAL "zveltio.current_tenant"` already applied. Resolvers
       // use this in preference to the raw pool so RLS policies fire.
       const tenantTrx = (c.get as any)?.('tenantTrx') ?? null;
-      const loaders = new DataLoaderRegistry(db);
       result = await graphql({
         schema,
         source: query,
@@ -623,7 +695,6 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
           db,
           tenantTrx,
           reqDb: db,
-          loaders,
           checkPermission,
         },
       });
@@ -796,7 +867,6 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
       const tenantKey = (c.get as any)?.('tenant')?.id ?? 'default';
       const schema = await getSchema(ctx, tenantKey);
       const tenantTrx = (c.get as any)?.('tenantTrx') ?? null;
-      const loaders = new DataLoaderRegistry(db);
       const result = await graphql({
         schema,
         source: pq.query,
@@ -806,7 +876,6 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
           db,
           tenantTrx,
           reqDb: db,
-          loaders,
           checkPermission,
         },
       });

@@ -66,6 +66,13 @@ d('developer/graphql — timestamps serialize as ISO strings, not epoch millis',
         getTableName: (name: string) => `zvd_test_${name}`,
       },
       internals: {
+        // The read gate's lookups, answering "no restriction": this file is
+        // about something else, and read-gate.test.ts owns the gate.
+        getRlsFilters: async () => [],
+        applyRlsFilters: (q: Any) => q,
+        resolveUserRole: async () => 'member',
+        getColumnAccess: async () => ({ hidden: new Set(), readOnly: new Set() }),
+        applyColumnAccess: (row: Any) => row,
       },
     };
 
