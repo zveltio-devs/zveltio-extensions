@@ -177,6 +177,25 @@ d('developer/graphql — resolvers go through the read gate', () => {
             readable: (c: string) => !columns.hidden.has('*') && !columns.hidden.has(c),
           };
         },
+        // Stand-ins for the data API's writes, which answer who may write what
+        // (`engine-gate.test.ts` runs the real ones). Here only the row policy
+        // decides what is found, so these tests pin what a mutation hands BACK.
+        createRecord: async (_c: Any, collection: string, data: Any) => ({
+          status: 201,
+          body: await db.insertInto(`zvd_${collection}`).values(data).returningAll().executeTakeFirst(),
+        }),
+        updateRecord: async (_c: Any, collection: string, id: string, data: Any) => {
+          const rls = isAdmin(currentUser) ? [] : (RLS[collection] ?? []);
+          const row = await tenancy.applyRlsFilters(db.updateTable(`zvd_${collection}`), rls)
+            .set(data).where('id', '=', id).returningAll().executeTakeFirst();
+          return row ? { status: 200, body: row } : { status: 404, body: { error: 'Record not found' } };
+        },
+        deleteRecord: async (_c: Any, collection: string, id: string) => {
+          const rls = isAdmin(currentUser) ? [] : (RLS[collection] ?? []);
+          const res = await tenancy.applyRlsFilters(db.deleteFrom(`zvd_${collection}`), rls)
+            .where('id', '=', id).executeTakeFirst();
+          return res.numDeletedRows > 0n ? { status: 200, body: { success: true, id } } : { status: 404, body: { error: 'Record not found' } };
+        },
       },
     };
 
@@ -305,30 +324,8 @@ d('developer/graphql — resolvers go through the read gate', () => {
     await pool.query(`DELETE FROM zvd_rg_notes WHERE title = 'new'`);
   });
 
-  // The data API refuses these with 403 `Fields are read-only for your role`
-  // (`filterWritableFields`); a hidden column is read-only too.
-  for (const [col, value] of [['status', 'approved'], ['salary', '1000000']]) {
-    it(`create_ and update_ refuse to write ${col}, which the caller may not write`, async () => {
-      currentUser = MEMBER;
-      const r = await gql(
-        `mutation { c: create_rg_notes(title: "forged", bucket: "open", ${col}: "${value}") { title }
-                    u: update_rg_notes(id: "${ids.open}", ${col}: "${value}") { title } }`,
-      );
-      expect(r.errors?.map((e: Any) => e.message)).toEqual([
-        `Forbidden: fields are read-only for your role: ${col}`,
-        `Forbidden: fields are read-only for your role: ${col}`,
-      ]);
-      expect(await one(`SELECT 1 FROM zvd_rg_notes WHERE title = 'forged'`)).toBeUndefined();
-      expect((await one(`SELECT ${col} FROM zvd_rg_notes WHERE id = '${ids.open}'`))[col]).not.toBe(value);
-    });
-  }
-
-  it('an exempt caller writes the columns the member may not', async () => {
-    currentUser = ADMIN;
-    const r = await gql(`mutation { update_rg_notes(id: "${ids.hidden}", status: "approved", salary: "999") { status } }`);
-    expect(r.errors).toBeUndefined();
-    expect(r.data.update_rg_notes).toEqual({ status: 'approved' });
-  });
+  // Which columns a caller may write is the data API's answer (`filterWritableFields`),
+  // pinned against the real one in `engine-gate.test.ts`.
 
   it('create_ by a caller who may create but not read hands nothing back', async () => {
     currentUser = MEMBER;
