@@ -43,9 +43,12 @@ const HIDDEN: Record<string, string[]> = {
   rg_comments: ['note_id', 'id'],
   rg_tags: ['code'],
 };
+const READ_ONLY: Record<string, string[]> = {
+  rg_notes: ['status'],
+};
 
 const COLLECTIONS = [
-  { name: 'rg_notes', fields: ['title', 'bucket', 'salary'] },
+  { name: 'rg_notes', fields: ['title', 'bucket', 'salary', 'status'] },
   { name: 'rg_secrets', fields: ['note_id', 'secret'] },
   { name: 'rg_comments', fields: ['note_id', 'body', 'pinned_note', 'secret_ref'] },
   { name: 'rg_tags', fields: ['label', 'bucket', 'code', 'note_ref'] },
@@ -161,7 +164,7 @@ d('developer/graphql — resolvers go through the read gate', () => {
         applyRlsFilters: tenancy.applyRlsFilters,
         getColumnAccess: async (collection: string, role: string, userId?: string) => ({
           hidden: new Set(role === 'member' && userId !== ADMIN.id ? (HIDDEN[collection] ?? []) : []),
-          readOnly: new Set(),
+          readOnly: new Set(role === 'member' && userId !== ADMIN.id ? (READ_ONLY[collection] ?? []) : []),
         }),
         applyColumnAccess: tenancy.applyColumnAccess,
       },
@@ -286,10 +289,35 @@ d('developer/graphql — resolvers go through the read gate', () => {
 
   it('create_ returns the new row masked', async () => {
     currentUser = MEMBER;
-    const r = await gql('mutation { create_rg_notes(title: "new", bucket: "open", salary: "5") { title salary } }');
+    const r = await gql('mutation { create_rg_notes(title: "new", bucket: "open") { title salary } }');
     expect(r.errors).toBeUndefined();
     expect(r.data.create_rg_notes).toEqual({ title: 'new', salary: null });
     await pool.query(`DELETE FROM zvd_rg_notes WHERE title = 'new'`);
+  });
+
+  // The data API refuses these with 403 `Fields are read-only for your role`
+  // (`filterWritableFields`); a hidden column is read-only too.
+  for (const [col, value] of [['status', 'approved'], ['salary', '1000000']]) {
+    it(`create_ and update_ refuse to write ${col}, which the caller may not write`, async () => {
+      currentUser = MEMBER;
+      const r = await gql(
+        `mutation { c: create_rg_notes(title: "forged", bucket: "open", ${col}: "${value}") { title }
+                    u: update_rg_notes(id: "${ids.open}", ${col}: "${value}") { title } }`,
+      );
+      expect(r.errors?.map((e: Any) => e.message)).toEqual([
+        `Forbidden: fields are read-only for your role: ${col}`,
+        `Forbidden: fields are read-only for your role: ${col}`,
+      ]);
+      expect(await one(`SELECT 1 FROM zvd_rg_notes WHERE title = 'forged'`)).toBeUndefined();
+      expect((await one(`SELECT ${col} FROM zvd_rg_notes WHERE id = '${ids.open}'`))[col]).not.toBe(value);
+    });
+  }
+
+  it('an exempt caller writes the columns the member may not', async () => {
+    currentUser = ADMIN;
+    const r = await gql(`mutation { update_rg_notes(id: "${ids.hidden}", status: "approved", salary: "999") { status } }`);
+    expect(r.errors).toBeUndefined();
+    expect(r.data.update_rg_notes).toEqual({ status: 'approved' });
   });
 
   it('create_ by a caller who may create but not read hands nothing back', async () => {
