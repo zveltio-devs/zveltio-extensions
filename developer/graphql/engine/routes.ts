@@ -63,6 +63,8 @@ interface ReadGate {
   canRead: boolean;
   /** A column the caller may see, and so may filter or join on. */
   readable(column: string): boolean;
+  /** A column the caller may write: neither read-only nor hidden. */
+  writable(column: string): boolean;
   /** Row policies onto a query builder (SELECT, UPDATE or DELETE). */
   rows<Q>(qb: Q): Q;
   /** Column permissions onto one row. */
@@ -288,6 +290,9 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
         return {
           canRead: canRead === true,
           readable: (column) => !columns.hidden.has('*') && !columns.hidden.has(column),
+          // The engine's `filterWritableFields`: a hidden column is read-only too.
+          writable: (column) =>
+            !['*', column].some((c) => columns.readOnly.has(c) || columns.hidden.has(c)),
           rows: (qb) => applyRlsFilters(qb, rls),
           shape: (row) => (row ? applyColumnAccess(row, columns) : row),
         };
@@ -300,6 +305,11 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
     const gate = await readGate(context, collection);
     if (!gate.canRead) throw new Error(`Forbidden: no read permission on "${collection}"`);
     return gate;
+  }
+  // Refused, not stripped — the data API answers the same write with 403.
+  function mustWrite(gate: ReadGate, data: Record<string, unknown>): void {
+    const blocked = Object.keys(data).filter((column) => !gate.writable(column));
+    if (blocked.length) throw new Error(`Forbidden: fields are read-only for your role: ${blocked.join(', ')}`);
   }
   // What a mutation hands back: the row as the caller may read it, or nothing.
   const readBack = (gate: ReadGate, row: any) => (gate.canRead ? gate.shape(row) : null);
@@ -415,6 +425,7 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
         // Resolved before the write, so a failed lookup refuses the write too
         // instead of committing it and failing on the way out.
         const gate = await readGate(context, col.name);
+        mustWrite(gate, args);
         const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
         return readBack(gate, await (trx as any)
           .insertInto(tableName).values(args)
@@ -431,6 +442,7 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
         }
         // A row the policy hides is not found, as on the data API's write path.
         const gate = await readGate(context, col.name);
+        mustWrite(gate, data);
         const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
         return readBack(gate, await gate.rows((trx as any).updateTable(tableName))
           .set({ ...data, updated_at: new Date() })

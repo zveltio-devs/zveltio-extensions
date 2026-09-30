@@ -32826,6 +32826,7 @@ async function buildDynamicSchema(ctx) {
         return {
           canRead: canRead === true,
           readable: (column) => !columns.hidden.has("*") && !columns.hidden.has(column),
+          writable: (column) => !["*", column].some((c) => columns.readOnly.has(c) || columns.hidden.has(c)),
           rows: (qb) => applyRlsFilters(qb, rls),
           shape: (row) => row ? applyColumnAccess(row, columns) : row
         };
@@ -32839,6 +32840,11 @@ async function buildDynamicSchema(ctx) {
     if (!gate.canRead)
       throw new Error(`Forbidden: no read permission on "${collection}"`);
     return gate;
+  }
+  function mustWrite(gate, data) {
+    const blocked = Object.keys(data).filter((column) => !gate.writable(column));
+    if (blocked.length)
+      throw new Error(`Forbidden: fields are read-only for your role: ${blocked.join(", ")}`);
   }
   const readBack = (gate, row) => gate.canRead ? gate.shape(row) : null;
   const baseFields = {
@@ -32932,6 +32938,7 @@ async function buildDynamicSchema(ctx) {
           throw new Error(`Forbidden: no create permission on "${col.name}"`);
         }
         const gate = await readGate(context, col.name);
+        mustWrite(gate, args);
         const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
         return readBack(gate, await trx.insertInto(tableName).values(args).returningAll().executeTakeFirst());
       }
@@ -32944,6 +32951,7 @@ async function buildDynamicSchema(ctx) {
           throw new Error(`Forbidden: no update permission on "${col.name}"`);
         }
         const gate = await readGate(context, col.name);
+        mustWrite(gate, data);
         const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
         return readBack(gate, await gate.rows(trx.updateTable(tableName)).set({ ...data, updated_at: new Date }).where("id", "=", id).returningAll().executeTakeFirst());
       }
