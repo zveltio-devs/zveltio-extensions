@@ -418,4 +418,7 @@ jobs:
           # secret for its token hash, communications/mail its own keyring.
           BETTER_AUTH_SECRET: test-secret-000000000000000000000000
           MAIL_ENCRYPTION_KEY: '1111111111111111111111111111111111111111111111111111111111111111'
+          # developer/graphql engine-gate.test.ts signs a god up through the
+          # engine harness (createGodSession), as the migrate step above does.
+          ZVELTIO_REGISTRATION_ENABLED: '1'
         run: bun test --timeout 20000
