@@ -32811,6 +32811,36 @@ async function buildDynamicSchema(ctx) {
       return value;
     };
   }
+  function readGate(context, collection) {
+    context.__readGates ??= new Map;
+    let gate = context.__readGates.get(collection);
+    if (!gate) {
+      gate = (async () => {
+        const { user } = context;
+        const { getRlsFilters, applyRlsFilters, getColumnAccess, resolveUserRole, applyColumnAccess } = ctx.internals;
+        const [canRead, rls, columns] = await Promise.all([
+          context.checkPermission(user.id, collection, "read"),
+          getRlsFilters(collection, user, "session"),
+          resolveUserRole(user).then((role) => getColumnAccess(collection, role, user.id))
+        ]);
+        return {
+          canRead: canRead === true,
+          readable: (column) => !columns.hidden.has("*") && !columns.hidden.has(column),
+          rows: (qb) => applyRlsFilters(qb, rls),
+          shape: (row) => row ? applyColumnAccess(row, columns) : row
+        };
+      })();
+      context.__readGates.set(collection, gate);
+    }
+    return gate;
+  }
+  async function mustRead(context, collection) {
+    const gate = await readGate(context, collection);
+    if (!gate.canRead)
+      throw new Error(`Forbidden: no read permission on "${collection}"`);
+    return gate;
+  }
+  const readBack = (gate, row) => gate.canRead ? gate.shape(row) : null;
   const baseFields = {
     id: { type: GraphQLID },
     created_at: { type: GraphQLString },
@@ -32867,33 +32897,31 @@ async function buildDynamicSchema(ctx) {
         filter_id_in: { type: new GraphQLList(GraphQLID) }
       },
       resolve: async (_, { limit, offset, filter_id, filter_id_in }, context) => {
-        if (!await context.checkPermission(context.user.id, col.name, "read")) {
-          throw new Error(`Forbidden: no read permission on "${col.name}"`);
+        const gate = await mustRead(context, col.name);
+        if ((filter_id || filter_id_in?.length) && !gate.readable("id")) {
+          throw new Error(`Forbidden: cannot filter "${col.name}" by id`);
         }
-        try {
-          const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-          let q = trx.selectFrom(tableName).selectAll();
-          if (filter_id)
-            q = q.where("id", "=", filter_id);
-          if (filter_id_in?.length)
-            q = q.where("id", "in", filter_id_in);
-          const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 500));
-          const safeOffset = Math.max(0, Number(offset) || 0);
-          return await q.limit(safeLimit).offset(safeOffset).execute();
-        } catch (err) {
-          throw err;
-        }
+        const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
+        let q = gate.rows(trx.selectFrom(tableName).selectAll());
+        if (filter_id)
+          q = q.where("id", "=", filter_id);
+        if (filter_id_in?.length)
+          q = q.where("id", "in", filter_id_in);
+        const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 500));
+        const safeOffset = Math.max(0, Number(offset) || 0);
+        const rows = await q.limit(safeLimit).offset(safeOffset).execute();
+        return rows.map(gate.shape);
       }
     };
     queryFields[`get_${col.name}`] = {
       type: colType,
       args: { id: { type: new GraphQLNonNull(GraphQLID) } },
       resolve: async (_, { id }, context) => {
-        if (!await context.checkPermission(context.user.id, col.name, "read")) {
-          throw new Error(`Forbidden: no read permission on "${col.name}"`);
-        }
+        const gate = await mustRead(context, col.name);
+        if (!gate.readable("id"))
+          throw new Error(`Forbidden: cannot filter "${col.name}" by id`);
         const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        return await trx.selectFrom(tableName).selectAll().where("id", "=", id).executeTakeFirst();
+        return gate.shape(await gate.rows(trx.selectFrom(tableName).selectAll()).where("id", "=", id).executeTakeFirst());
       }
     };
     mutationFields[`create_${col.name}`] = {
@@ -32903,8 +32931,9 @@ async function buildDynamicSchema(ctx) {
         if (!await context.checkPermission(context.user.id, col.name, "create")) {
           throw new Error(`Forbidden: no create permission on "${col.name}"`);
         }
+        const gate = await readGate(context, col.name);
         const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        return await trx.insertInto(tableName).values(args).returningAll().executeTakeFirst();
+        return readBack(gate, await trx.insertInto(tableName).values(args).returningAll().executeTakeFirst());
       }
     };
     mutationFields[`update_${col.name}`] = {
@@ -32914,8 +32943,9 @@ async function buildDynamicSchema(ctx) {
         if (!await context.checkPermission(context.user.id, col.name, "update")) {
           throw new Error(`Forbidden: no update permission on "${col.name}"`);
         }
+        const gate = await readGate(context, col.name);
         const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        return await trx.updateTable(tableName).set({ ...data, updated_at: new Date }).where("id", "=", id).returningAll().executeTakeFirst();
+        return readBack(gate, await gate.rows(trx.updateTable(tableName)).set({ ...data, updated_at: new Date }).where("id", "=", id).returningAll().executeTakeFirst());
       }
     };
     mutationFields[`delete_${col.name}`] = {
@@ -32925,8 +32955,9 @@ async function buildDynamicSchema(ctx) {
         if (!await context.checkPermission(context.user.id, col.name, "delete")) {
           throw new Error(`Forbidden: no delete permission on "${col.name}"`);
         }
+        const gate = await readGate(context, col.name);
         const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        const res = await trx.deleteFrom(tableName).where("id", "=", id).executeTakeFirst();
+        const res = await gate.rows(trx.deleteFrom(tableName)).where("id", "=", id).executeTakeFirst();
         return (res?.numDeletedRows ?? 0n) > 0n;
       }
     };
@@ -32949,11 +32980,9 @@ async function buildDynamicSchema(ctx) {
               const fk = parent[fieldName];
               if (!fk)
                 return null;
+              const gate = await mustRead(context, rel.target_collection);
               try {
-                if (context?.loaders) {
-                  return await context.loaders.get(targetTableName).load(String(fk));
-                }
-                return await db.selectFrom(targetTableName).selectAll().where("id", "=", fk).executeTakeFirst();
+                return gate.shape(await gate.rows(db.selectFrom(targetTableName).selectAll()).where("id", "=", fk).executeTakeFirst());
               } catch {
                 return null;
               }
@@ -32966,9 +32995,13 @@ async function buildDynamicSchema(ctx) {
             type: new GraphQLList(targetType),
             args: [],
             description: `One-to-many relation \u2192 ${rel.target_collection}`,
-            resolve: async (parent) => {
+            resolve: async (parent, _args, context) => {
+              const gate = await mustRead(context, rel.target_collection);
+              if (!gate.readable(foreignKey))
+                return [];
               try {
-                return await db.selectFrom(targetTableName).selectAll().where(foreignKey, "=", parent.id).execute();
+                const rows = await gate.rows(db.selectFrom(targetTableName).selectAll()).where(foreignKey, "=", parent.id).execute();
+                return rows.map(gate.shape);
               } catch {
                 return [];
               }
@@ -32983,9 +33016,12 @@ async function buildDynamicSchema(ctx) {
             type: new GraphQLList(targetType),
             args: [],
             description: `Many-to-many relation \u2192 ${rel.target_collection}`,
-            resolve: async (parent) => {
+            resolve: async (parent, _args, context) => {
+              const gate = await mustRead(context, rel.target_collection);
               try {
-                return await db.selectFrom(junctionTable).innerJoin(targetTableName, `${junctionTable}.${targetColumn}`, `${targetTableName}.id`).selectAll(targetTableName).where(`${junctionTable}.${sourceColumn}`, "=", parent.id).execute();
+                const linked = db.selectFrom(junctionTable).select(targetColumn).where(sourceColumn, "=", parent.id);
+                const rows = await gate.rows(db.selectFrom(targetTableName).selectAll()).where("id", "in", linked).execute();
+                return rows.map(gate.shape);
               } catch {
                 return [];
               }
@@ -33086,7 +33122,6 @@ function graphqlRoutes(ctx) {
       const tenantKey = c.get?.("tenant")?.id ?? "default";
       const schema = await getSchema(ctx, tenantKey);
       const tenantTrx = c.get?.("tenantTrx") ?? null;
-      const loaders = new DataLoaderRegistry(db);
       result = await graphql({
         schema,
         source: query,
@@ -33097,7 +33132,6 @@ function graphqlRoutes(ctx) {
           db,
           tenantTrx,
           reqDb: db,
-          loaders,
           checkPermission
         }
       });
@@ -33226,7 +33260,6 @@ function graphqlRoutes(ctx) {
       const tenantKey = c.get?.("tenant")?.id ?? "default";
       const schema = await getSchema(ctx, tenantKey);
       const tenantTrx = c.get?.("tenantTrx") ?? null;
-      const loaders = new DataLoaderRegistry(db);
       const result = await graphql({
         schema,
         source: pq.query,
@@ -33236,7 +33269,6 @@ function graphqlRoutes(ctx) {
           db,
           tenantTrx,
           reqDb: db,
-          loaders,
           checkPermission
         }
       });
@@ -33380,3 +33412,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1

@@ -110,6 +110,13 @@ d('developer/graphql — field policies are enforced', () => {
         // to answer the same question the `checkPermission` stub above answers,
         // or every query throws and all three cases fail for the wrong reason.
         isTenantAdmin: async (userId: string) => userId === ADMIN_USER.id,
+        // The read gate's lookups, answering "no restriction": this file is
+        // about something else, and read-gate.test.ts owns the gate.
+        getRlsFilters: async () => [],
+        applyRlsFilters: (q: Any) => q,
+        resolveUserRole: async () => 'member',
+        getColumnAccess: async () => ({ hidden: new Set(), readOnly: new Set() }),
+        applyColumnAccess: (row: Any) => row,
       },
     };
 
