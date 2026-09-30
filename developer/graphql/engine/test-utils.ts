@@ -27,3 +27,21 @@ export async function applyOwnMigrations(exec: (q: string) => Promise<unknown>) 
     await exec(up);
   }
 }
+
+/**
+ * `ctx.internals.readScope` for a hand-built ctx whose test is about something
+ * else: restricts nothing. `read-gate.test.ts` and `engine-gate.test.ts` own the
+ * gate.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: test double for an engine object
+export const openReadScope = async (): Promise<any> => ({
+  table: '',
+  rls: [],
+  columns: { hidden: new Set(), readOnly: new Set() },
+  altersRestrict: false,
+  query: <Q>(q: Q) => q,
+  keep: async <R>(rows: R[]) => rows,
+  admits: () => true,
+  shape: <R>(row: R) => row,
+  readable: () => true,
+});

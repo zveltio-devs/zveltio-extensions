@@ -11,7 +11,7 @@
 // TEST_DATABASE_URL, same convention as the generic contract suite).
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
-import { applyOwnMigrations } from './test-utils';
+import { applyOwnMigrations, openReadScope } from './test-utils';
 
 // biome-ignore lint/suspicious/noExplicitAny: test doubles and the packed module
 type Any = any;
@@ -110,13 +110,8 @@ d('developer/graphql — field policies are enforced', () => {
         // to answer the same question the `checkPermission` stub above answers,
         // or every query throws and all three cases fail for the wrong reason.
         isTenantAdmin: async (userId: string) => userId === ADMIN_USER.id,
-        // The read gate's lookups, answering "no restriction": this file is
-        // about something else, and read-gate.test.ts owns the gate.
-        getRlsFilters: async () => [],
+        readScope: openReadScope,
         applyRlsFilters: (q: Any) => q,
-        resolveUserRole: async () => 'member',
-        getColumnAccess: async () => ({ hidden: new Set(), readOnly: new Set() }),
-        applyColumnAccess: (row: Any) => row,
       },
     };
 

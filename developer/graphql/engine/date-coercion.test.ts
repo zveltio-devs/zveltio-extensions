@@ -11,7 +11,7 @@
 // TEST_DATABASE_URL).
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
-import { applyOwnMigrations } from './test-utils';
+import { applyOwnMigrations, openReadScope } from './test-utils';
 
 // biome-ignore lint/suspicious/noExplicitAny: test doubles and the packed module
 type Any = any;
@@ -66,13 +66,9 @@ d('developer/graphql — timestamps serialize as ISO strings, not epoch millis',
         getTableName: (name: string) => `zvd_test_${name}`,
       },
       internals: {
-        // The read gate's lookups, answering "no restriction": this file is
-        // about something else, and read-gate.test.ts owns the gate.
-        getRlsFilters: async () => [],
+        isTenantAdmin: async () => false,
+        readScope: openReadScope,
         applyRlsFilters: (q: Any) => q,
-        resolveUserRole: async () => 'member',
-        getColumnAccess: async () => ({ hidden: new Set(), readOnly: new Set() }),
-        applyColumnAccess: (row: Any) => row,
       },
     };
 

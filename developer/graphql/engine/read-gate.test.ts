@@ -156,17 +156,27 @@ d('developer/graphql — resolvers go through the read gate', () => {
       },
       internals: {
         isTenantAdmin: async (userId: string) => userId === ADMIN.id,
-        resolveUserRole: async (u: Any) => (isAdmin(u) ? 'god' : 'member'),
-        getRlsFilters: async (collection: string, u: Any) => {
-          if (rlsLookupFails) throw new Error('policy lookup failed');
-          return isAdmin(u) ? [] : (RLS[collection] ?? []);
-        },
         applyRlsFilters: tenancy.applyRlsFilters,
-        getColumnAccess: async (collection: string, role: string, userId?: string) => ({
-          hidden: new Set(role === 'member' && userId !== ADMIN.id ? (HIDDEN[collection] ?? []) : []),
-          readOnly: new Set(role === 'member' && userId !== ADMIN.id ? (READ_ONLY[collection] ?? []) : []),
-        }),
-        applyColumnAccess: tenancy.applyColumnAccess,
+        // The engine's `readScope` with its lookups answered from the tables
+        // above; alters and entity access are `engine-gate.test.ts`'s.
+        readScope: async (collection: string, u: Any) => {
+          if (rlsLookupFails) throw new Error('policy lookup failed');
+          const member = !isAdmin(u);
+          const rls = member ? (RLS[collection] ?? []) : [];
+          const columns = {
+            hidden: new Set(member ? (HIDDEN[collection] ?? []) : []),
+            readOnly: new Set(member ? (READ_ONLY[collection] ?? []) : []),
+          };
+          return {
+            rls,
+            columns,
+            query: (q: Any) => tenancy.applyRlsFilters(q, rls),
+            keep: async (rows: Any[]) => rows,
+            admits: (row: Any) => tenancy.matchesRlsFilters(row, rls),
+            shape: (row: Any) => tenancy.applyColumnAccess(row, columns),
+            readable: (c: string) => !columns.hidden.has('*') && !columns.hidden.has(c),
+          };
+        },
       },
     };
 
@@ -326,6 +336,20 @@ d('developer/graphql — resolvers go through the read gate', () => {
     expect(r.errors).toBeUndefined();
     expect(r.data.create_rg_secrets).toBeNull();
     await pool.query(`DELETE FROM zvd_rg_secrets WHERE secret = 'drop-box'`);
+  });
+
+  // The schema is cached per tenant, not per caller, so it names the columns
+  // this caller's permissions hide. The engine serves schemas to admins only.
+  it('a caller who is not an admin cannot introspect the schema', async () => {
+    const q = '{ __type(name: "Rg_notes") { fields { name } } }';
+    currentUser = MEMBER;
+    const r = await gql(q);
+    expect(r.errors?.[0]?.message).toContain('introspection has been disabled');
+    expect(JSON.stringify(r)).not.toContain('salary');
+    currentUser = ADMIN;
+    const a = await gql(q);
+    expect(a.errors).toBeUndefined();
+    expect(a.data.__type.fields.map((f: Any) => f.name)).toContain('salary');
   });
 
   it('a failed policy lookup refuses instead of reading as "no restriction"', async () => {
