@@ -286,14 +286,40 @@ async function resolveWithViewer(
         ? 'created_at'
         : 'id';
 
-  const sortField =
-    typeof viewer.sort === 'string' && shown.has(viewer.sort) ? viewer.sort : authorSort;
-  const sortDir = viewer.sort
-    ? viewer.sortDir === 'asc' ? 'asc' : 'desc'
-    : content.sort_dir === 'asc' ? 'asc' : 'desc';
   const limit = Math.min(Math.max(Number(content.limit) || 20, 1), 100);
 
   try {
+    // Column permissions, looked up before the query rather than after it: the
+    // mask on the rows below hides a column's VALUE, but a visitor who may sort
+    // or search by it reads the value back anyway — `?q=` matching or not, one
+    // guess at a time, and `?sort=` ordering rows by it. So a hidden column
+    // leaves the visitor's vocabulary here. The author's own filters and sort
+    // stay as written: the visitor cannot change them.
+    //
+    // Third argument is the acting user's id, and it is what lets a god see
+    // every column here as it does everywhere else: the host resolves
+    // `data:view_all_columns` for that identity. Omitting it means no
+    // exemption at all, which is the refusing direction but would mask a god.
+    //
+    // `ctx.internals.getColumnAccess` takes (collection, role, userId?) — the host
+    // resolves the db handle itself. Portals called it as
+    // `getColumnAccess(db, collection, role)`, the engine-side spelling, so the
+    // handle arrived as the collection name and the collection name as the
+    // role. The lookup then asked for a collection called "[object Object]",
+    // matched nothing, and the mask came back empty: column permissions were
+    // silently not applied on the portal render path either. `_engine` is typed
+    // `any`, so nothing said so.
+    const role = await deps.engine.resolveUserRole(audience.user ?? {});
+    const colAccess = await deps.engine
+      .getColumnAccess(meta.name, role, audience.user?.id);
+    const visible = [...shown].filter((c) => !colAccess?.hidden?.has(c));
+
+    const sortField =
+      typeof viewer.sort === 'string' && visible.includes(viewer.sort) ? viewer.sort : authorSort;
+    const sortDir = viewer.sort
+      ? viewer.sortDir === 'asc' ? 'asc' : 'desc'
+      : content.sort_dir === 'asc' ? 'asc' : 'desc';
+
     let q =
       fields.length > 0
         ? deps.db.selectFrom(meta.table).select(fields)
@@ -322,7 +348,7 @@ async function resolveWithViewer(
     // term is a bound parameter rather than anything spliced into SQL.
     const term = typeof viewer.q === 'string' ? viewer.q.trim() : '';
     if (term.length > 0) {
-      const searchable = [...shown].filter((c) => meta.columns.has(c));
+      const searchable = visible.filter((c) => meta.columns.has(c));
       if (searchable.length > 0) {
         q = q.where((eb: Any) =>
           eb.or(
@@ -360,24 +386,6 @@ async function resolveWithViewer(
     const hasMore = window.length > limit;
     let records = hasMore ? window.slice(0, limit) : window;
 
-    // Column permissions.
-    //
-    // Third argument is the acting user's id, and it is what lets a god see
-    // every column here as it does everywhere else: the host resolves
-    // `data:view_all_columns` for that identity. Omitting it means no
-    // exemption at all, which is the refusing direction but would mask a god.
-    //
-    // `ctx.internals.getColumnAccess` takes (collection, role, userId?) — the host
-    // resolves the db handle itself. Portals called it as
-    // `getColumnAccess(db, collection, role)`, the engine-side spelling, so the
-    // handle arrived as the collection name and the collection name as the
-    // role. The lookup then asked for a collection called "[object Object]",
-    // matched nothing, and the mask came back empty: column permissions were
-    // silently not applied on the portal render path either. `_engine` is typed
-    // `any`, so nothing said so.
-    const role = await deps.engine.resolveUserRole(audience.user ?? {});
-    const colAccess = await deps.engine
-      .getColumnAccess(meta.name, role, audience.user?.id);
     if (colAccess) {
       records = records.map((r: Record<string, unknown>) =>
         deps.engine.applyColumnAccess(r, colAccess),

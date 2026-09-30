@@ -647,6 +647,44 @@ describe('what a visitor may vary', () => {
     expect(calls.orderBy.at(-1)?.[0]).toBe('notes');
   });
 
+  test('a column hidden from the role does not sort, even with no field list', async () => {
+    // The mask removes `notes` from each row; ordering by it would read the
+    // value back one comparison at a time.
+    const { db, calls } = makeDb({ collections: ['contacts'] });
+    const { resolveBlockAt } = await import('./hydrate.js');
+    await resolveBlockAt(
+      {
+        db,
+        engine: makeEngine({
+          getColumnAccess: async () => ({ hidden: new Set(['notes']), readOnly: new Set() }),
+        }),
+      },
+      { user: { id: 'u1', role: 'member' }, tenantId: 't1' },
+      listBlock({ collection: 'contacts', sort_field: 'first_name' }),
+      { sort: 'notes' },
+    );
+    expect(calls.orderBy.at(-1)?.[0]).toBe('first_name');
+  });
+
+  test('search never reaches a column hidden from the role', async () => {
+    const built: string[] = [];
+    const { db } = makeDb({ collections: ['contacts'] });
+    const { resolveBlockAt } = await import('./hydrate.js');
+    await resolveBlockAt(
+      {
+        db,
+        engine: makeEngine({
+          buildCondition: (f: string) => { built.push(f); return {}; },
+          getColumnAccess: async () => ({ hidden: new Set(['notes']), readOnly: new Set() }),
+        }),
+      },
+      { user: { id: 'u1', role: 'member' }, tenantId: 't1' },
+      listBlock({ collection: 'contacts', display_fields: 'first_name,notes' }),
+      { q: 'secret' },
+    );
+    expect(built).toEqual(['first_name']);
+  });
+
   test('search builds one condition per displayed column', async () => {
     const built: string[] = [];
     const { db } = makeDb({ collections: ['contacts'] });

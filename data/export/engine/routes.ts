@@ -92,6 +92,10 @@ async function runExportJob(
     const requested = fields.length > 0 ? allCols.filter((f) => fields.includes(f)) : allCols;
     const colAccess = await getColumnAccess(collection, await resolveUserRole(user));
     const selectCols = requested.filter((f: string) => !colAccess.hidden.has(f));
+    // A hidden column is not a filter or sort key either: the count of rows a
+    // `{"secret": "guess"}` filter exports, or the order a sort puts them in,
+    // reads the value the projection just removed.
+    for (const f of colAccess.hidden) allowedFields.delete(f);
 
     if (selectCols.length === 0) {
       throw new Error('No exportable columns for this role');
@@ -524,6 +528,8 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
       const { getColumnAccess, resolveUserRole, getRlsFilters, applyRlsFilters } =
         ctx.internals;
       const colAccess = await getColumnAccess(collection, await resolveUserRole(user));
+      // Not a projection, filter or sort key: see runExportJob.
+      for (const f of colAccess.hidden) allowedFields.delete(f);
 
       // Build select — optional field projection
       let query: any;
