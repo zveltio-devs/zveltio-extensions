@@ -55,14 +55,24 @@ function createIdp() {
       `<saml:AuthnStatement AuthnInstant="${at}" SessionIndex="${aid}"><saml:AuthnContext><saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:Password</saml:AuthnContextClassRef></saml:AuthnContext></saml:AuthnStatement>` +
       `<saml:AttributeStatement><saml:Attribute Name="email"><saml:AttributeValue>${email}</saml:AttributeValue></saml:Attribute></saml:AttributeStatement>` +
       `</saml:Assertion></samlp:Response>`;
-    const sig = new SignedXml();
-    sig.signatureAlgorithm = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
-    sig.addReference(
-      "//*[local-name(.)='Response']",
-      ['http://www.w3.org/2000/09/xmldsig#enveloped-signature', 'http://www.w3.org/2001/10/xml-exc-c14n#'],
-      'http://www.w3.org/2001/04/xmlenc#sha256',
-    );
-    sig.signingKey = keyPem;
+    // Sign the Response (its enveloped signature covers the assertion), which is
+    // what the SP requires by default (wantAuthnResponseSigned). xml-crypto 6
+    // (pulled in by @node-saml/node-saml 5.x) takes an options object and uses
+    // `privateKey`/`getSignedXml`, not the 2.x `signingKey`/positional-
+    // `addReference` API this used to call.
+    const sig = new SignedXml({
+      privateKey: keyPem,
+      signatureAlgorithm: 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
+      canonicalizationAlgorithm: 'http://www.w3.org/2001/10/xml-exc-c14n#',
+    });
+    sig.addReference({
+      xpath: "//*[local-name(.)='Response']",
+      transforms: [
+        'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
+        'http://www.w3.org/2001/10/xml-exc-c14n#',
+      ],
+      digestAlgorithm: 'http://www.w3.org/2001/04/xmlenc#sha256',
+    });
     sig.computeSignature(xml, {
       location: { reference: "//*[local-name(.)='Issuer']", action: 'after' },
     });

@@ -1,78 +1,125 @@
-// SAML SSO could not complete a login in either flow.
+// SAML sign-in is exercised against the real @node-saml/node-saml, not a stub:
+// the failures this file guards against were the library's, on input the
+// extension formed correctly, and a stub would pass against broken wiring.
 //
-// Two independent causes, and neither is visible from reading the extension —
-// both live in how the pinned node-saml interprets what this code hands it.
-//
-// 1. `createSamlInstance` passed `validateInResponseTo: 'ifPresent'`, a node-saml
-//    4.x idiom. `peerDependencies` asks for `^3.1.0`, and in 3.1.2 the option is
-//    a plain boolean (`options.validateInResponseTo || false`, saml.js:39). The
-//    string coerced to `true`, which means "ALWAYS require InResponseTo" — and an
-//    IdP-initiated response has none by construction. Every one was refused.
-//
-// 2. SP-initiated was refused too, independently: node-saml's default
-//    cacheProvider is a fresh InMemoryCacheProvider per instance (saml.js:41),
-//    and `samlRoutes` builds a new instance per request. The id saved while
-//    generating the AuthnRequest was never in the cache of the instance
-//    validating the response.
-//
-// These tests mint a genuinely signed assertion rather than stubbing the
-// validator, because a stub would have passed against the broken code: the
-// failure was node-saml's, on input the extension formed correctly.
-//
-// The last test is the one that matters for the future. The bug class here has
-// now bitten this file twice — `getAuthorizeUrlAsync`/`validatePostResponseAsync`
-// were the same 3.x-vs-4.x boundary — so what is asserted is the INSTALLED
-// library's behaviour, not the version string. Tightening the range would not
-// have caught either bug; the code was wrong for the major it already pinned.
+// The move from the unmaintained `node-saml` (<= 3.1.2, critical
+// GHSA-m837-g268-mmv7 SAML auth bypass) to `@node-saml/node-saml` 5.x renamed
+// options and methods that have bitten this file before — `cert` -> `idpCert`,
+// the `*Async` suffix on the promise methods, and `validateInResponseTo` from a
+// value to an enum. So what is asserted here is the INSTALLED library's
+// behaviour through `createSamlInstance`/`validateSamlResponse`: a validly
+// signed assertion is accepted and its audience is checked, while a tampered
+// signature, an unsigned assertion, and a wrong audience are each refused.
 import { describe, expect, it } from 'bun:test';
 import { createSamlInstance, validateSamlResponse, extractAssertionId } from './saml-provider.js';
-import { generateKeyPairSync, createSign, X509Certificate } from 'node:crypto';
+// @ts-ignore — node-forge ships no types in this repository.
+import forge from 'node-forge';
+// @ts-ignore — xml-crypto ships no types.
+import { SignedXml } from 'xml-crypto';
 
-const ACS = 'https://app.test/ext/auth/saml/callback';
 const SP = 'zveltio-sp';
+const ACS = 'http://localhost/ext/auth/saml/callback';
 
-/** A self-signed IdP certificate and a matching signed Response, built in-process. */
-function idp() {
-  const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
-  return { privateKey, publicKey };
+/** A self-signed IdP and a Response with an enveloped signature over it. */
+function createIdp() {
+  const keys = forge.pki.rsa.generateKeyPair(2048);
+  const cert = forge.pki.createCertificate();
+  cert.publicKey = keys.publicKey;
+  cert.serialNumber = '01';
+  cert.validity.notBefore = new Date(Date.now() - 86_400_000);
+  cert.validity.notAfter = new Date(Date.now() + 86_400_000);
+  cert.setSubject([{ name: 'commonName', value: 'test-idp' }]);
+  cert.setIssuer([{ name: 'commonName', value: 'test-idp' }]);
+  cert.sign(keys.privateKey, forge.md.sha256.create());
+  const keyPem = forge.pki.privateKeyToPem(keys.privateKey);
+  const certPem = forge.pki.certificateToPem(cert);
+
+  const response = (email: string, audience = SP) => {
+    const at = new Date().toISOString();
+    const later = new Date(Date.now() + 5 * 60_000).toISOString();
+    const aid = `_a${crypto.randomUUID().replaceAll('-', '')}`;
+    const xml =
+      `<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="_r${aid}" Version="2.0" IssueInstant="${at}" Destination="${ACS}">` +
+      `<saml:Issuer>https://idp.test</saml:Issuer>` +
+      `<samlp:Status><samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/></samlp:Status>` +
+      `<saml:Assertion ID="${aid}" Version="2.0" IssueInstant="${at}"><saml:Issuer>https://idp.test</saml:Issuer>` +
+      `<saml:Subject><saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">${email}</saml:NameID>` +
+      `<saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer"><saml:SubjectConfirmationData NotOnOrAfter="${later}" Recipient="${ACS}"/></saml:SubjectConfirmation></saml:Subject>` +
+      `<saml:Conditions NotBefore="${at}" NotOnOrAfter="${later}"><saml:AudienceRestriction><saml:Audience>${audience}</saml:Audience></saml:AudienceRestriction></saml:Conditions>` +
+      `<saml:AuthnStatement AuthnInstant="${at}" SessionIndex="${aid}"><saml:AuthnContext><saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:Password</saml:AuthnContextClassRef></saml:AuthnContext></saml:AuthnStatement>` +
+      `<saml:AttributeStatement><saml:Attribute Name="email"><saml:AttributeValue>${email}</saml:AttributeValue></saml:Attribute></saml:AttributeStatement>` +
+      `</saml:Assertion></samlp:Response>`;
+    const sig = new SignedXml({
+      privateKey: keyPem,
+      signatureAlgorithm: 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
+      canonicalizationAlgorithm: 'http://www.w3.org/2001/10/xml-exc-c14n#',
+    });
+    sig.addReference({
+      xpath: "//*[local-name(.)='Response']",
+      transforms: [
+        'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
+        'http://www.w3.org/2001/10/xml-exc-c14n#',
+      ],
+      digestAlgorithm: 'http://www.w3.org/2001/04/xmlenc#sha256',
+    });
+    sig.computeSignature(xml, {
+      location: { reference: "//*[local-name(.)='Issuer']", action: 'after' },
+    });
+    return Buffer.from(sig.getSignedXml()).toString('base64');
+  };
+  return { certPem, response };
 }
 
-describe('auth/saml — createSamlInstance', () => {
-  it('does not hand node-saml a value it will read as "always require InResponseTo"', () => {
-    const saml = createSamlInstance({
-      entryPoint: 'https://idp.test/sso',
-      issuer: SP,
-      cert: 'unused-for-this-assertion',
-      callbackUrl: ACS,
-    }) as unknown as { options: { validateInResponseTo: unknown } };
-
-    // The precise failure: `'ifPresent'` is truthy, and truthy means "always"
-    // in the pinned major. Anything truthy here refuses every IdP-initiated
-    // login, which is what shipped.
-    expect(saml.options.validateInResponseTo).toBeFalsy();
+const idp = createIdp();
+const instance = (audience?: string | false) =>
+  createSamlInstance({
+    entryPoint: 'https://idp.test/sso',
+    issuer: SP,
+    cert: idp.certPem,
+    callbackUrl: ACS,
+    audience,
   });
 
-  it('reads the option back as a boolean, which is what the pinned major stores', () => {
-    // Guards the version boundary itself. If a future node-saml keeps the string
-    // (as 4.x does, where it is an enum), this fails and the fix has to be
-    // reconsidered rather than silently changing meaning.
-    const saml = createSamlInstance({
-      entryPoint: 'https://idp.test/sso',
-      issuer: SP,
-      cert: 'unused-for-this-assertion',
-      callbackUrl: ACS,
-    }) as unknown as { options: { validateInResponseTo: unknown } };
-    expect(typeof saml.options.validateInResponseTo).toBe('boolean');
+describe('auth/saml — createSamlInstance option mapping (5.x)', () => {
+  it('maps to the 5.x option names the library actually reads', () => {
+    const saml = instance() as unknown as {
+      options: { idpCert: string; validateInResponseTo: unknown; audience: unknown; wantAuthnResponseSigned: unknown };
+    };
+    // `cert` -> `idpCert`; a missing idpCert throws in the constructor.
+    expect(saml.options.idpCert).toBe(idp.certPem);
+    // enum value, not a boolean or the 4.x-era 'ifPresent' string.
+    expect(saml.options.validateInResponseTo).toBe('never');
+    // audience defaults to our own entityID so the check cannot be silently off.
+    expect(saml.options.audience).toBe(SP);
+    // a signature is required — the response must be signed by default.
+    expect(saml.options.wantAuthnResponseSigned).toBe(true);
+  });
+});
+
+describe('auth/saml — validateSamlResponse (real @node-saml/node-saml 5.x)', () => {
+  it('accepts a validly signed assertion and returns the profile', async () => {
+    const profile = await validateSamlResponse(instance(), { SAMLResponse: idp.response('carol@saml.test') });
+    expect(profile.nameID).toBe('carol@saml.test');
+    expect(profile.email).toBe('carol@saml.test');
   });
 
-  it('builds a fresh cacheProvider per instance — why InResponseTo cannot be relied on here', () => {
-    // Not a defect of node-saml: it is a consequence of `samlRoutes` constructing
-    // an instance per request. Asserted so that anyone re-enabling the
-    // InResponseTo binding sees why it cannot work without a shared store.
-    const cfg = { entryPoint: 'https://idp.test/sso', issuer: SP, cert: 'x', callbackUrl: ACS };
-    const a = createSamlInstance(cfg) as unknown as { cacheProvider: unknown };
-    const b = createSamlInstance(cfg) as unknown as { cacheProvider: unknown };
-    expect(a.cacheProvider).not.toBe(b.cacheProvider);
+  it('rejects a tampered signature', async () => {
+    let xml = Buffer.from(idp.response('carol@saml.test'), 'base64').toString('utf8');
+    xml = xml.replace(/(SignatureValue[^>]*>)([A-Za-z0-9+/])/, (_m, a, ch) => a + (ch === 'A' ? 'B' : 'A'));
+    const tampered = Buffer.from(xml).toString('base64');
+    await expect(validateSamlResponse(instance(), { SAMLResponse: tampered })).rejects.toThrow();
+  });
+
+  it('rejects an unsigned assertion', async () => {
+    let xml = Buffer.from(idp.response('carol@saml.test'), 'base64').toString('utf8');
+    xml = xml.replace(/<(?:ds:)?Signature[\s\S]*?<\/(?:ds:)?Signature>/, '');
+    const unsigned = Buffer.from(xml).toString('base64');
+    await expect(validateSamlResponse(instance(), { SAMLResponse: unsigned })).rejects.toThrow();
+  });
+
+  it('rejects an assertion minted for a different audience', async () => {
+    const other = idp.response('carol@saml.test', 'some-other-sp');
+    await expect(validateSamlResponse(instance(), { SAMLResponse: other })).rejects.toThrow(/audience/i);
   });
 });
 
