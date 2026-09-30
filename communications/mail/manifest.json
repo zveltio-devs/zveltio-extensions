@@ -3,7 +3,7 @@
   "displayName": "Mail Client",
   "category": "communications",
   "description": "IMAP/SMTP email client with AI features, filter rules, attachments and contacts. Password or OAuth2 (Gmail/Outlook). Background sync on a schedule. Filter actions and read/star/delete are pushed to the mail server.",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-mail",
@@ -24,7 +24,7 @@
   "peerDependencies": {
     "imapflow": "^1.0.0",
     "mailparser": "^3.6.0",
-    "nodemailer": "^9.0.0"
+    "nodemailer": "^10.0.13"
   },
   "studio": {
     "pages": [
