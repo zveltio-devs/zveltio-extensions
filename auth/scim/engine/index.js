@@ -24674,8 +24674,10 @@ function buildScimApp(ctx) {
     const r = await sql`
       SELECT EXISTS (
         SELECT 1 FROM zv_tenant_users tu
+          LEFT JOIN zv_scim_users s ON s.tenant_id = tu.tenant_id AND s.user_id = tu.user_id
          WHERE tu.user_id = ${userId} AND tu.tenant_id = ${tenantId}::uuid
-           AND ${MEMBERSHIP_IN_FORCE}) AS in_force
+           AND (${MEMBERSHIP_IN_FORCE}
+                OR (tu.valid_from <= now() AND tu.valid_to = s.suspended_at))) AS in_force
     `.execute(db);
     if (r.rows[0]?.in_force === true)
       return null;
@@ -24771,7 +24773,7 @@ function buildScimApp(ctx) {
         VALUES (${tenantId}::uuid, ${userId}, ${body?.externalId ?? null}, ${active})
         ON CONFLICT (tenant_id, user_id) DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active, updated_at = NOW()
       `.execute(trx);
-      await ctx.internals.setUserActive(trx, userId, active);
+      await setActive(trx, userId, tenantId, active);
     });
     const row = await sql`
       SELECT id, email, name, "createdAt", "updatedAt" FROM "user" WHERE id = ${userId}
@@ -24784,7 +24786,58 @@ function buildScimApp(ctx) {
       VALUES (${tenantId}::uuid, ${userId}, ${active})
       ON CONFLICT (tenant_id, user_id) DO UPDATE SET active = EXCLUDED.active, updated_at = NOW()
     `.execute(trx);
-    await ctx.internals.setUserActive(trx, userId, active);
+    if (await instanceIsSingleTenant()) {
+      await ctx.internals.setUserActive(trx, userId, active);
+      return;
+    }
+    if (active) {
+      await sql`
+        UPDATE zv_tenant_users tu SET valid_to = s.held_valid_to
+          FROM zv_scim_users s
+         WHERE tu.tenant_id = ${tenantId}::uuid AND tu.user_id = ${userId}
+           AND s.tenant_id = tu.tenant_id AND s.user_id = tu.user_id
+           AND tu.valid_to = s.suspended_at
+      `.execute(trx);
+      await sql`
+        UPDATE zv_scim_users SET suspended_at = NULL, held_valid_to = NULL
+         WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId}
+      `.execute(trx);
+      if (await inForceAnywhere(trx, userId) === 0)
+        return;
+      const ours = await sql`
+        DELETE FROM zv_scim_sign_in_blocks WHERE user_id = ${userId} RETURNING user_id
+      `.execute(trx);
+      if (ours.rows.length > 0)
+        await ctx.internals.setUserActive(trx, userId, true);
+      return;
+    }
+    await sql`
+      WITH held AS (
+        SELECT tu.valid_to FROM zv_tenant_users tu
+         WHERE tu.tenant_id = ${tenantId}::uuid AND tu.user_id = ${userId} AND ${MEMBERSHIP_IN_FORCE}
+           FOR UPDATE
+      ), ended AS (
+        UPDATE zv_tenant_users SET valid_to = now()
+         WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId} AND EXISTS (SELECT 1 FROM held)
+      )
+      UPDATE zv_scim_users SET suspended_at = now(), held_valid_to = (SELECT valid_to FROM held)
+       WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId} AND EXISTS (SELECT 1 FROM held)
+    `.execute(trx);
+    if (await inForceAnywhere(trx, userId) > 0)
+      return;
+    await sql`
+      INSERT INTO zv_scim_sign_in_blocks (user_id)
+      SELECT id FROM "user" WHERE id = ${userId} AND banned IS NOT TRUE
+      ON CONFLICT (user_id) DO NOTHING
+    `.execute(trx);
+    await ctx.internals.setUserActive(trx, userId, false);
+  }
+  async function inForceAnywhere(trx, userId) {
+    const r = await sql`
+      SELECT COUNT(*)::int AS n FROM zv_tenant_users tu
+       WHERE tu.user_id = ${userId} AND ${MEMBERSHIP_IN_FORCE}
+    `.execute(trx);
+    return r.rows[0]?.n ?? 0;
   }
   app.put("/Users/:id", async (c) => {
     const id = c.req.param("id");
@@ -24896,7 +24949,8 @@ var extension = {
   getMigrations() {
     return [
       join(import.meta.dir, "migrations/001_initial.sql"),
-      join(import.meta.dir, "migrations/002_tenant_scoped_tokens.sql")
+      join(import.meta.dir, "migrations/002_tenant_scoped_tokens.sql"),
+      join(import.meta.dir, "migrations/003_per_tenant_deactivation.sql")
     ];
   },
   async register(app, ctx) {

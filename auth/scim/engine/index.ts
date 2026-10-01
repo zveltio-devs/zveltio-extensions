@@ -17,6 +17,7 @@ const extension: ZveltioExtension = {
     return [
       join(import.meta.dir, 'migrations/001_initial.sql'),
       join(import.meta.dir, 'migrations/002_tenant_scoped_tokens.sql'),
+      join(import.meta.dir, 'migrations/003_per_tenant_deactivation.sql'),
     ];
   },
 
