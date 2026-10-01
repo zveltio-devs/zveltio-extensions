@@ -8,9 +8,10 @@
  *     AD / Entra and Okta drive — ServiceProviderConfig, Users CRUD with
  *     `userName eq` filtering and PatchOp `active` handling.
  *
- * Deactivation: SCIM active=false records the flag and has the host revoke the
- * user's sessions (instant sign-out) and block every sign-in method; active=true
- * lifts the block and the user's own credentials work again.
+ * Deactivation: SCIM active=false records the flag. On a multi-tenant instance
+ * it ends the membership of the token's tenant only, and blocks sign-in (with
+ * instant sign-out) once no tenant is left in force; on a single-tenant one it
+ * blocks sign-in outright. active=true undoes what the IdP did — see `setActive`.
  */
 
 import { Hono } from 'hono';
@@ -279,6 +280,8 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
    *
    * A lapsed tenant has no claim on the account: the business ended the
    * membership with a date (a contract end), and that date wins over the IdP.
+   * The exception is the IdP's own suspension (`setActive`): a `valid_to` still
+   * equal to the `suspended_at` it wrote is the IdP's to lift.
    * One rule, two consequences:
    *   • `active: true` does not reopen the membership — there is no reopen path,
    *     and `stateOf` keeps reporting `active: false` while it is lapsed;
@@ -300,8 +303,10 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     const r = await sql<{ in_force: boolean }>`
       SELECT EXISTS (
         SELECT 1 FROM zv_tenant_users tu
+          LEFT JOIN zv_scim_users s ON s.tenant_id = tu.tenant_id AND s.user_id = tu.user_id
          WHERE tu.user_id = ${userId} AND tu.tenant_id = ${tenantId}::uuid
-           AND ${MEMBERSHIP_IN_FORCE}) AS in_force
+           AND (${MEMBERSHIP_IN_FORCE}
+                OR (tu.valid_from <= now() AND tu.valid_to = s.suspended_at))) AS in_force
     `.execute(db);
     if (r.rows[0]?.in_force === true) return null;
     return scimError(
@@ -451,8 +456,8 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
         VALUES (${tenantId}::uuid, ${userId}, ${body?.externalId ?? null}, ${active})
         ON CONFLICT (tenant_id, user_id) DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active, updated_at = NOW()
       `.execute(trx);
-      // Provisioned inactive means unable to sign in, as a later `active=false` would.
-      await ctx.internals.setUserActive(trx, userId, active);
+      // Provisioned inactive is what a later `active=false` would make it.
+      await setActive(trx, userId, tenantId, active);
     });
 
     const row = await sql<Record<string, unknown>>`
@@ -462,53 +467,96 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
   });
 
   /**
-   * Record the active flag and, on deactivation, enforce it.
+   * Record the active flag and enforce it, in the caller's transaction.
    *
-   * All three statements are one security decision and they now commit or fail
-   * together. Before, the flag was written first and the two enforcement
-   * statements each carried `.catch(() => undefined)`.
+   * Enforcement and flag commit or fail together: a deactivation the IdP is told
+   * succeeded while the person is still signed in is the one outcome that must
+   * not exist, so nothing here swallows an error — the IdP retries instead.
+   * Sessions and the sign-in block are the host's (`auth:users`): `session` is
+   * refused to the request's role, and with Valkey sessions live only in the
+   * cache. The block stops every method (password, passkey, magic link, SSO) and
+   * leaves the credentials alone, so lifting it gives them all back.
    *
-   * That is a hole, not a nicety. A failed session delete meant the directory
-   * recorded the user as inactive, this function returned normally, and the IdP
-   * was told the deactivation succeeded — while the user's session was still
-   * live and they stayed signed in. Deprovisioning is the one operation an
-   * administrator must be able to believe: somebody is removed at the IdP
-   * precisely because they should no longer have access, and the request that
-   * says "done" is the only signal anybody gets.
+   * Single-tenant: the IdP owns the only tenant, so `active: false` blocks
+   * sign-in and revokes the sessions; `active: true` lifts it.
    *
-   * The swallows could not contain anything either. Inside the surrounding
-   * transaction Postgres refuses every statement after a failed one, so
-   * catching the session delete only moved the error to the password reset and
-   * reported it as that.
+   * Multi-tenant: sign-in is instance-wide but this IdP speaks for one tenant.
+   * Blocking it locked the person out of every other tenant too, and let any
+   * tenant's IdP lift a block another had placed. So `active: false` ends the
+   * membership HERE (`valid_to = now()`), which the engine's membership gate
+   * reads uncached on the next request and its realtime sweep within a tick.
+   * The session stays: it still opens the tenants that have them. Only when no
+   * tenant is left in force is sign-in blocked — nothing is left to sign in to —
+   * and the block is recorded as SCIM's.
    *
-   * Failing loudly is the correct answer here: the IdP retries deprovisioning,
-   * and a half-deactivated account never exists.
-   *
-   * The enforcement is the host's (`auth:users`). As SQL here it could not work:
-   * `session` and `account` are refused to the request's role since engine
-   * migration 044, so every deactivation answered 500 — and with Valkey,
-   * better-auth keeps sessions only in the cache, which no SQL reaches. It runs
-   * before the flag commits, so a failure still leaves the user active.
-   *
-   * It blocks sign-in by every method rather than clearing the password, which
-   * left a passkey, a magic link and OAuth working, and which `active=true` could
-   * not undo. Reactivation lifts the block and the credentials work again.
-   * Sign-in is instance-wide, so so is the block — see SETUP.md.
+   * `active: true` puts back the end date the business had set (open-ended if
+   * none), only while the membership still carries the IdP's own `valid_to`: a
+   * date the business wrote since wins. It lifts the block only if SCIM placed
+   * it and a tenant is in force again — whichever tenant's IdP that is.
    */
   // biome-ignore lint/suspicious/noExplicitAny: Kysely transaction handle
-  async function setActive(
-    trx: any,
-    userId: string,
-    tenantId: string,
-    active: boolean,
-  ): Promise<void> {
+  async function setActive(trx: any, userId: string, tenantId: string, active: boolean): Promise<void> {
     await sql`
       INSERT INTO zv_scim_users (tenant_id, user_id, active)
       VALUES (${tenantId}::uuid, ${userId}, ${active})
       ON CONFLICT (tenant_id, user_id) DO UPDATE SET active = EXCLUDED.active, updated_at = NOW()
     `.execute(trx);
-    // Deactivation signs the user out and blocks every sign-in; activation lifts it.
-    await ctx.internals.setUserActive(trx, userId, active);
+    if (await instanceIsSingleTenant()) {
+      await ctx.internals.setUserActive(trx, userId, active);
+      return;
+    }
+    if (active) {
+      await sql`
+        UPDATE zv_tenant_users tu SET valid_to = s.held_valid_to
+          FROM zv_scim_users s
+         WHERE tu.tenant_id = ${tenantId}::uuid AND tu.user_id = ${userId}
+           AND s.tenant_id = tu.tenant_id AND s.user_id = tu.user_id
+           AND tu.valid_to = s.suspended_at
+      `.execute(trx);
+      await sql`
+        UPDATE zv_scim_users SET suspended_at = NULL, held_valid_to = NULL
+         WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId}
+      `.execute(trx);
+      if ((await inForceAnywhere(trx, userId)) === 0) return;
+      const ours = await sql`
+        DELETE FROM zv_scim_sign_in_blocks WHERE user_id = ${userId} RETURNING user_id
+      `.execute(trx);
+      if (ours.rows.length > 0) await ctx.internals.setUserActive(trx, userId, true);
+      return;
+    }
+    // Only a membership in force is suspended: a resend must not overwrite the
+    // end date it holds with its own `valid_to`. One statement, so the held
+    // date is the one read under the lock.
+    await sql`
+      WITH held AS (
+        SELECT tu.valid_to FROM zv_tenant_users tu
+         WHERE tu.tenant_id = ${tenantId}::uuid AND tu.user_id = ${userId} AND ${MEMBERSHIP_IN_FORCE}
+           FOR UPDATE
+      ), ended AS (
+        UPDATE zv_tenant_users SET valid_to = now()
+         WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId} AND EXISTS (SELECT 1 FROM held)
+      )
+      UPDATE zv_scim_users SET suspended_at = now(), held_valid_to = (SELECT valid_to FROM held)
+       WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId} AND EXISTS (SELECT 1 FROM held)
+    `.execute(trx);
+    if ((await inForceAnywhere(trx, userId)) > 0) return;
+    // A block already there is somebody else's, and is not recorded as ours.
+    await sql`
+      INSERT INTO zv_scim_sign_in_blocks (user_id)
+      SELECT id FROM "user" WHERE id = ${userId} AND banned IS NOT TRUE
+      ON CONFLICT (user_id) DO NOTHING
+    `.execute(trx);
+    await ctx.internals.setUserActive(trx, userId, false);
+  }
+
+  /** Memberships of `userId` in force, any tenant (`zv_tenant_users` carries no tenant RLS). */
+  // biome-ignore lint/suspicious/noExplicitAny: Kysely transaction handle
+  async function inForceAnywhere(trx: any, userId: string): Promise<number> {
+    const r = await sql<{ n: number }>`
+      SELECT COUNT(*)::int AS n FROM zv_tenant_users tu
+       WHERE tu.user_id = ${userId} AND ${MEMBERSHIP_IN_FORCE}
+    `.execute(trx);
+    return r.rows[0]?.n ?? 0;
   }
 
   /**

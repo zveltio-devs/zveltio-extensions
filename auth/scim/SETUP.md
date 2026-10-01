@@ -90,8 +90,13 @@ answers, the rest will work.
 
 ## What happens on deactivation
 
-**Deactivation** (`active: false`, by PATCH or PUT, or a user provisioned
-inactive):
+A person has one account and one sign-in on the instance, not one per tenant.
+What a provider's `active: false` (by PATCH or PUT, or a user provisioned
+inactive) does depends on whether the instance has more than one tenant.
+
+### Single-tenant instance
+
+The provider owns the only tenant, so deactivation:
 
 1. **deletes all their sessions, immediately**;
 2. **blocks every way of signing in** — password, magic link, passkey, OAuth and
@@ -99,6 +104,32 @@ inactive):
 
 **Reactivation** (`active: true`) lifts the block, and the user signs in again
 with the password, passkeys and SSO accounts they already had.
+
+### Multi-tenant instance — per tenant
+
+A provider speaks for **its own tenant only**. Deactivation:
+
+1. **ends the person's membership of this tenant, immediately** — the membership
+   gets an end date of now. Their next request to this tenant is refused (403),
+   and open realtime connections to it close within a minute;
+2. **leaves every other tenant alone** — their session stays, and keeps working
+   in the tenants that still have them;
+3. **blocks sign-in on the instance only when no tenant has them any more** —
+   then their sessions are deleted and every sign-in method is blocked, exactly
+   as on a single-tenant instance.
+
+**Reactivation** (`active: true`) from the same tenant's provider restores the
+membership: an end date the business had set before the deactivation comes back
+with it, otherwise it is open-ended again. If the sign-in block was placed by
+SCIM, it is lifted as soon as a tenant has the person again — whichever tenant's
+provider reactivates them. A block an administrator placed is never lifted by a
+provider.
+
+A membership the **business** ended (an end date in the past, or a start date in
+the future) is not the provider's to reopen: on such a member `PUT` and `PATCH`
+answer **403**, `active: true` included, and `GET` reports `active: false`. The
+provider can still read and delete the user. The same holds when the business
+re-dates a membership the provider had deactivated — the business's date wins.
 
 **Deletion** (`DELETE /Users/{id}`):
 
@@ -111,20 +142,12 @@ with the password, passkeys and SSO accounts they already had.
 The sessions are the important part. An employee who leaves on Friday must not
 still get in on Monday with a browser left open.
 
-### Instance-wide, by design
+### What stays instance-wide
 
-A person has one account and one sign-in on the instance, not one per tenant,
-and a session belongs to no tenant. So when one tenant's provider deactivates or
-deletes someone who is also a member of another tenant on the same instance:
-
-- their sessions end **everywhere**, including the other tenant's — they sign in
-  again to keep working there;
-- a **deactivation** blocks their sign-in **everywhere** until a provider
-  reactivates them;
-- a **deletion** removes only this tenant's membership; the account stays while
-  another tenant still has them.
-
-Verified: a deactivation with two active sessions leaves zero.
+A session belongs to no tenant. So when one tenant's provider **deletes** someone
+who is also a member of another tenant on the same instance, their sessions end
+**everywhere**, including the other tenant's — they sign in again to keep working
+there. The account itself stays while another tenant still has them.
 
 ---
 
