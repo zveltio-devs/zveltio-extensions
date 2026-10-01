@@ -52,8 +52,8 @@ d('auth/scim — active=false blocks sign-in, active=true restores it', () => {
     `.execute(db);
 
     const state = async () => {
-      const r = await sql<{ banned: boolean | null; sessions: number; passwords: string[] }>`
-        SELECT u.banned,
+      const r = await sql<{ banned: boolean | null; source: string | null; sessions: number; passwords: string[] }>`
+        SELECT u.banned, u.ban_source AS source,
                (SELECT COUNT(*)::int FROM session s WHERE s."userId" = u.id) AS sessions,
                ARRAY(SELECT a.password FROM account a
                       WHERE a."userId" = u.id AND a.password LIKE '$argon2id$kept') AS passwords
@@ -73,7 +73,12 @@ d('auth/scim — active=false blocks sign-in, active=true restores it', () => {
       });
 
     expect((await setActive('PATCH', false)).status).toBe(200);
-    expect(await state()).toEqual({ banned: true, sessions: 0, passwords: ['$argon2id$kept'] });
+    expect(await state()).toEqual({
+      banned: true,
+      source: 'ext:auth/scim',
+      sessions: 0,
+      passwords: ['$argon2id$kept'],
+    });
 
     expect((await setActive('PATCH', true)).status).toBe(200);
     expect((await state()).banned).toBe(false);
@@ -82,7 +87,54 @@ d('auth/scim — active=false blocks sign-in, active=true restores it', () => {
     expect((await state()).banned).toBe(true);
 
     expect((await setActive('PUT', true)).status).toBe(200);
-    expect(await state()).toEqual({ banned: false, sessions: 0, passwords: ['$argon2id$kept'] });
+    expect(await state()).toEqual({ banned: false, source: null, sessions: 0, passwords: ['$argon2id$kept'] });
+  });
+
+  // Single-tenant too: the IdP owns the only tenant, not the instance's bans.
+  // IdPs resend `active: true` on every sync, so lifting any ban would undo an
+  // administrator's within one sync cycle.
+  it('active=true does not lift a ban SCIM did not place, even single-tenant', async () => {
+    const tenants = await sql<{ n: number }>`SELECT COUNT(*)::int AS n FROM zv_tenants`.execute(db);
+    expect(tenants.rows[0]!.n).toBeLessThanOrEqual(1); // the branch under test
+    const { app } = await mountForTest(import.meta.dir);
+    const mint = await app.request('/tokens', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Okta' }),
+    });
+    const token = ((await mint.json()) as { token: string }).token;
+    const json = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const email = `scim-adminban-${Date.now()}@test.local`;
+    const create = await app.request('/scim/v2/Users', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ schemas: [SCIM_USER], userName: email }),
+    });
+    expect(create.status).toBe(201);
+    const { id } = (await create.json()) as { id: string };
+    const ban = async () =>
+      (
+        await sql<{ banned: boolean | null; source: string | null }>`
+          SELECT banned, ban_source AS source FROM "user" WHERE id = ${id}`.execute(db)
+      ).rows[0];
+
+    await sql`UPDATE "user" SET banned = true WHERE id = ${id}`.execute(db);
+    for (const body of [
+      { schemas: [PATCH_OP], Operations: [{ op: 'replace', path: 'active', value: true }] },
+      { schemas: [PATCH_OP], Operations: [{ op: 'replace', path: 'active', value: false }] },
+      { schemas: [PATCH_OP], Operations: [{ op: 'replace', path: 'active', value: true }] },
+    ]) {
+      const res = await app.request(`/scim/v2/Users/${id}`, { method: 'PATCH', headers: json, body: JSON.stringify(body) });
+      expect(res.status).toBe(200);
+      expect(await ban()).toEqual({ banned: true, source: 'unknown' });
+    }
+    const put = await app.request(`/scim/v2/Users/${id}`, {
+      method: 'PUT',
+      headers: json,
+      body: JSON.stringify({ schemas: [SCIM_USER], userName: email, active: true }),
+    });
+    expect(put.status).toBe(200);
+    expect(await ban()).toEqual({ banned: true, source: 'unknown' });
   });
 
   it('refuses to deactivate or delete the instance owner, with a 400 naming why', async () => {

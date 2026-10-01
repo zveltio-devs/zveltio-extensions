@@ -103,7 +103,8 @@ The provider owns the only tenant, so deactivation:
    SSO (LDAP, SAML). Their credentials are left as they are.
 
 **Reactivation** (`active: true`) lifts the block, and the user signs in again
-with the password, passkeys and SSO accounts they already had.
+with the password, passkeys and SSO accounts they already had. Only a block SCIM
+placed: one an administrator placed stays, on every sync — see below.
 
 ### Multi-tenant instance — per tenant
 
@@ -122,9 +123,22 @@ A provider speaks for **its own tenant only**. Deactivation:
 membership: an end date the business had set before the deactivation comes back
 with it, otherwise it is open-ended again. If the sign-in block was placed by
 SCIM, it is lifted as soon as a tenant has the person again — whichever tenant's
-provider reactivates them. A block an administrator placed is never lifted by a
-provider — including one placed after the administrator lifted SCIM's: SCIM's
-claim on a block ends with that block.
+provider reactivates them.
+
+### Whose block it is
+
+The engine records who placed a sign-in block (`"user".ban_source`): SCIM's read
+`ext:auth/scim`. A provider lifts only those — never a block an administrator
+placed, including one placed after the administrator lifted SCIM's, and never one
+that was already there when the provider deactivated the person (the first block
+keeps its source). Lifting a block by hand clears its source.
+
+Version 1.0.16 needs engine 3.0.0-beta.76 and replaces SCIM's own record of its
+blocks (the `zv_scim_sign_in_blocks` table) with that column. On a single-tenant
+instance, earlier versions lifted any block on `active: true`; a block placed
+before engine 3.0.0-beta.76 of a person the provider holds inactive is taken as
+SCIM's on upgrade, so reactivation still lifts it. Any other block from that time
+is the administrator's to lift.
 
 A membership the **business** ended (an end date in the past, or a start date in
 the future) is not the provider's to reopen: on such a member `PUT` and `PATCH`
