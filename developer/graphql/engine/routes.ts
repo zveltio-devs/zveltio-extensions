@@ -24,7 +24,11 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import * as crypto from 'crypto';
 import {
-  graphql,
+  execute,
+  parse,
+  validate,
+  specifiedRules,
+  NoSchemaIntrospectionCustomRule,
   GraphQLSchema,
   GraphQLObjectType,
   GraphQLString,
@@ -65,10 +69,14 @@ interface ReadGate {
   readable(column: string): boolean;
   /** A column the caller may write: neither read-only nor hidden. */
   writable(column: string): boolean;
-  /** Row policies onto a query builder (SELECT, UPDATE or DELETE). */
+  /** Query alters + row policies onto a SELECT. */
   rows<Q>(qb: Q): Q;
-  /** Column permissions onto one row. */
-  shape(row: any): any;
+  /** Row policies onto an UPDATE or DELETE; alters are SELECT-shaped. */
+  writeRows<Q>(qb: Q): Q;
+  /** The fetched rows entity access lets the caller view, each column-masked. */
+  keep(rows: any[]): Promise<any[]>;
+  /** A row a write handed back, as the caller may read it, or null. */
+  readBack(row: any): Promise<any>;
 }
 
 interface RelationInfo {
@@ -269,32 +277,35 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
   //
   // One gate per collection per operation, resolved once and cached on the
   // operation's context. Every read goes through it: list, get, all three
-  // relation kinds, and what a mutation hands back. Nothing is caught — a failed
-  // policy, role or column lookup read as "no restriction" is how rows leak, so
-  // it refuses instead. Query alters and entity-access checks, the other half of
-  // the engine's `ReadScope`, are not reachable from an extension.
+  // relation kinds, and what a mutation hands back. It is the engine's own
+  // `readScope` — row policies, query alters, entity access and column
+  // permissions together. Composing the lookups here left out the alters and the
+  // entity checks: a row another extension hid came back from `list_*`. Nothing
+  // is caught — a failed lookup read as "no restriction" is how rows leak.
   function readGate(context: any, collection: string): Promise<ReadGate> {
     context.__readGates ??= new Map<string, Promise<ReadGate>>();
     let gate = context.__readGates.get(collection);
     if (!gate) {
       gate = (async (): Promise<ReadGate> => {
         const { user } = context;
-        const { getRlsFilters, applyRlsFilters, getColumnAccess, resolveUserRole, applyColumnAccess } =
-          ctx.internals;
         // This route authenticates by session only (`auth.api.getSession`).
-        const [canRead, rls, columns] = await Promise.all([
+        const [canRead, scope] = await Promise.all([
           context.checkPermission(user.id, collection, 'read'),
-          getRlsFilters(collection, user, 'session'),
-          resolveUserRole(user).then((role: string) => getColumnAccess(collection, role, user.id)),
+          ctx.internals.readScope(collection, user, 'session'),
         ]);
+        const { hidden, readOnly } = scope.columns;
         return {
           canRead: canRead === true,
-          readable: (column) => !columns.hidden.has('*') && !columns.hidden.has(column),
+          readable: scope.readable,
           // The engine's `filterWritableFields`: a hidden column is read-only too.
-          writable: (column) =>
-            !['*', column].some((c) => columns.readOnly.has(c) || columns.hidden.has(c)),
-          rows: (qb) => applyRlsFilters(qb, rls),
-          shape: (row) => (row ? applyColumnAccess(row, columns) : row),
+          writable: (column) => !['*', column].some((c) => readOnly.has(c) || hidden.has(c)),
+          rows: scope.query,
+          writeRows: (qb) => ctx.internals.applyRlsFilters(qb, scope.rls),
+          keep: async (rows) => (await scope.keep(rows)).map((row) => scope.shape(row)),
+          // A RETURNING row did not come through `query`, so all three row gates
+          // run on it in memory; an alter that restricts this caller refuses.
+          readBack: async (row) =>
+            canRead === true && row && (await scope.admits(row)) ? scope.shape(row) : null,
         };
       })();
       context.__readGates.set(collection, gate);
@@ -311,8 +322,7 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
     const blocked = Object.keys(data).filter((column) => !gate.writable(column));
     if (blocked.length) throw new Error(`Forbidden: fields are read-only for your role: ${blocked.join(', ')}`);
   }
-  // What a mutation hands back: the row as the caller may read it, or nothing.
-  const readBack = (gate: ReadGate, row: any) => (gate.canRead ? gate.shape(row) : null);
+  const first = async (gate: ReadGate, row: any) => (row ? ((await gate.keep([row]))[0] ?? null) : null);
 
   const baseFields = {
     id:         { type: GraphQLID },
@@ -395,8 +405,7 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
         // QuerySchema cap.
         const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 500));
         const safeOffset = Math.max(0, Number(offset) || 0);
-        const rows = await q.limit(safeLimit).offset(safeOffset).execute();
-        return rows.map(gate.shape);
+        return gate.keep(await q.limit(safeLimit).offset(safeOffset).execute());
       },
     };
 
@@ -407,11 +416,9 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
         const gate = await mustRead(context, col.name);
         if (!gate.readable('id')) throw new Error(`Forbidden: cannot filter "${col.name}" by id`);
         const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        return gate.shape(
-          await gate.rows((trx as any).selectFrom(tableName).selectAll())
-            .where('id', '=', id)
-            .executeTakeFirst(),
-        );
+        return first(gate, await gate.rows((trx as any).selectFrom(tableName).selectAll())
+          .where('id', '=', id)
+          .executeTakeFirst());
       },
     };
 
@@ -427,7 +434,7 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
         const gate = await readGate(context, col.name);
         mustWrite(gate, args);
         const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        return readBack(gate, await (trx as any)
+        return gate.readBack(await (trx as any)
           .insertInto(tableName).values(args)
           .returningAll().executeTakeFirst());
       },
@@ -444,7 +451,7 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
         const gate = await readGate(context, col.name);
         mustWrite(gate, data);
         const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        return readBack(gate, await gate.rows((trx as any).updateTable(tableName))
+        return gate.readBack(await gate.writeRows((trx as any).updateTable(tableName))
           .set({ ...data, updated_at: new Date() })
           .where('id', '=', id)
           .returningAll().executeTakeFirst());
@@ -460,7 +467,7 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
         }
         const gate = await readGate(context, col.name);
         const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        const res = await gate.rows((trx as any).deleteFrom(tableName))
+        const res = await gate.writeRows((trx as any).deleteFrom(tableName))
           .where('id', '=', id).executeTakeFirst();
         return (res?.numDeletedRows ?? 0n) > 0n;
       },
@@ -496,10 +503,8 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
               if (!fk) return null;
               const gate = await mustRead(context, rel.target_collection);
               try {
-                return gate.shape(
-                  await gate.rows((db as any).selectFrom(targetTableName).selectAll())
-                    .where('id', '=', fk).executeTakeFirst(),
-                );
+                return await first(gate, await gate.rows((db as any).selectFrom(targetTableName).selectAll())
+                  .where('id', '=', fk).executeTakeFirst());
               } catch { return null; }
             },
           };
@@ -516,9 +521,8 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
               // Joining on a column the caller may not see reveals its value.
               if (!gate.readable(foreignKey)) return [];
               try {
-                const rows = await gate.rows((db as any).selectFrom(targetTableName).selectAll())
-                  .where(foreignKey, '=', parent.id).execute();
-                return rows.map(gate.shape);
+                return await gate.keep(await gate.rows((db as any).selectFrom(targetTableName).selectAll())
+                  .where(foreignKey, '=', parent.id).execute());
               } catch { return []; }
             },
           };
@@ -541,10 +545,9 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
                   .selectFrom(junctionTable)
                   .select(targetColumn)
                   .where(sourceColumn, '=', parent.id);
-                const rows = await gate.rows((db as any).selectFrom(targetTableName).selectAll())
+                return await gate.keep(await gate.rows((db as any).selectFrom(targetTableName).selectAll())
                   .where('id', 'in', linked)
-                  .execute();
-                return rows.map(gate.shape);
+                  .execute());
               } catch { return []; }
             },
           };
@@ -643,6 +646,37 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
 
   const app = new Hono();
 
+  // `graphql()`, plus one validation rule for a caller who is not a tenant admin:
+  // no introspection. The schema is cached per tenant, not per caller, so it
+  // names every collection and every column — including the ones this caller's
+  // column permissions hide. The engine serves collection schemas to admins only
+  // (`/api/collections` sits behind `guardAdmin`).
+  async function run(c: any, user: any, schema: GraphQLSchema, source: string, variableValues?: Record<string, any>, operationName?: string): Promise<any> {
+    let document;
+    try {
+      document = parse(source);
+    } catch (err) {
+      return { errors: [err] };
+    }
+    const isAdmin = ctx.internals.isTenantAdmin(user.id);
+    const rules = (await isAdmin) ? specifiedRules : [...specifiedRules, NoSchemaIntrospectionCustomRule];
+    const errors = validate(schema, document, rules);
+    if (errors.length) return { errors };
+    // Route handler is mounted inside the engine's tenantMiddleware →
+    // c.get('tenantTrx') exposes the per-request transaction with
+    // `SET LOCAL "zveltio.current_tenant"` already applied. Resolvers
+    // use this in preference to the raw pool so RLS policies fire.
+    const tenantTrx = (c.get as any)?.('tenantTrx') ?? null;
+    return execute({
+      schema,
+      document,
+      variableValues,
+      operationName,
+      // `__isAdminPromise` is the field-policy resolvers' cache of the same answer.
+      contextValue: { user, db, tenantTrx, reqDb: db, checkPermission, __isAdminPromise: isAdmin },
+    });
+  }
+
   // ── GET / — GraphiQL playground ───────────────────────────────────────────
   // In production we gate the playground behind admin auth because
   // (a) it exposes the entire schema via introspection and
@@ -692,24 +726,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
     try {
       const tenantKey = (c.get as any)?.('tenant')?.id ?? 'default';
       const schema = await getSchema(ctx, tenantKey);
-      // Route handler is mounted inside the engine's tenantMiddleware →
-      // c.get('tenantTrx') exposes the per-request transaction with
-      // `SET LOCAL "zveltio.current_tenant"` already applied. Resolvers
-      // use this in preference to the raw pool so RLS policies fire.
-      const tenantTrx = (c.get as any)?.('tenantTrx') ?? null;
-      result = await graphql({
-        schema,
-        source: query,
-        variableValues: variables,
-        operationName,
-        contextValue: {
-          user: session.user,
-          db,
-          tenantTrx,
-          reqDb: db,
-          checkPermission,
-        },
-      });
+      result = await run(c, session.user, schema, query, variables, operationName);
       errorCount = result.errors?.length ?? 0;
     } catch (err) {
       errorCount = 1;
@@ -878,19 +895,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
     try {
       const tenantKey = (c.get as any)?.('tenant')?.id ?? 'default';
       const schema = await getSchema(ctx, tenantKey);
-      const tenantTrx = (c.get as any)?.('tenantTrx') ?? null;
-      const result = await graphql({
-        schema,
-        source: pq.query,
-        variableValues: variables,
-        contextValue: {
-          user: session.user,
-          db,
-          tenantTrx,
-          reqDb: db,
-          checkPermission,
-        },
-      });
+      const result = await run(c, session.user, schema, pq.query, variables);
 
       // Update use stats
       sql`

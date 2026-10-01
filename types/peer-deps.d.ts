@@ -49,6 +49,9 @@ declare module 'graphql' {
   export const parse: (source: string) => any;
   export const validate: (...args: any[]) => any[];
   export const graphql: (...args: any[]) => Promise<any>;
+  export const execute: (args: any) => Promise<any>;
+  export const specifiedRules: readonly any[];
+  export const NoSchemaIntrospectionCustomRule: any;
   export const buildSchema: (source: string) => any;
   const _default: any;
   export default _default;

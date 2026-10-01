@@ -61,8 +61,8 @@ describe('developer/graphql — the schema cache is keyed per tenant', () => {
         getCollections: async () => COLLECTIONS[currentTenant],
         getTableName: (name: string) => `zvd_test_${name}`,
       },
-      internals: {
-      },
+      // Introspection is for tenant admins; this caller is one.
+      internals: { isTenantAdmin: async () => true },
     };
 
     app = new Hono();
