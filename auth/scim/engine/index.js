@@ -14,7 +14,7 @@ var __export = (target, all) => {
     });
 };
 
-// engine/index.ts
+// ../../../../scim6/zveltio-extensions/auth/scim/engine/index.ts
 import { join } from "path";
 
 // /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/compose.js
@@ -24527,7 +24527,7 @@ function parseParameter(param) {
   }
   return parseValueExpression(param);
 }
-// engine/routes.ts
+// ../../../../scim6/zveltio-extensions/auth/scim/engine/routes.ts
 import { randomBytes, randomUUID } from "crypto";
 var DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 var SCIM_USER = "urn:ietf:params:scim:schemas:core:2.0:User";
@@ -24787,7 +24787,10 @@ function buildScimApp(ctx) {
       ON CONFLICT (tenant_id, user_id) DO UPDATE SET active = EXCLUDED.active, updated_at = NOW()
     `.execute(trx);
     if (await instanceIsSingleTenant()) {
-      await ctx.internals.setUserActive(trx, userId, active);
+      if (active)
+        await ctx.internals.liftOwnBan(trx, userId);
+      else
+        await ctx.internals.setUserActive(trx, userId, false);
       return;
     }
     if (active) {
@@ -24802,13 +24805,8 @@ function buildScimApp(ctx) {
         UPDATE zv_scim_users SET suspended_at = NULL, held_valid_to = NULL
          WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId}
       `.execute(trx);
-      if (await inForceAnywhere(trx, userId) === 0)
-        return;
-      const ours = await sql`
-        DELETE FROM zv_scim_sign_in_blocks WHERE user_id = ${userId} RETURNING user_id
-      `.execute(trx);
-      if (ours.rows.length > 0)
-        await ctx.internals.setUserActive(trx, userId, true);
+      if (await inForceAnywhere(trx, userId) > 0)
+        await ctx.internals.liftOwnBan(trx, userId);
       return;
     }
     await sql`
@@ -24825,11 +24823,6 @@ function buildScimApp(ctx) {
     `.execute(trx);
     if (await inForceAnywhere(trx, userId) > 0)
       return;
-    await sql`
-      INSERT INTO zv_scim_sign_in_blocks (user_id)
-      SELECT id FROM "user" WHERE id = ${userId} AND banned IS NOT TRUE
-      ON CONFLICT (user_id) DO NOTHING
-    `.execute(trx);
     await ctx.internals.setUserActive(trx, userId, false);
   }
   async function inForceAnywhere(trx, userId) {
@@ -24941,7 +24934,7 @@ function buildScimApp(ctx) {
   return app;
 }
 
-// engine/index.ts
+// ../../../../scim6/zveltio-extensions/auth/scim/engine/index.ts
 var extension = {
   name: "auth/scim",
   category: "auth",
@@ -24951,7 +24944,8 @@ var extension = {
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_tenant_scoped_tokens.sql"),
       join(import.meta.dir, "migrations/003_per_tenant_deactivation.sql"),
-      join(import.meta.dir, "migrations/004_block_ends_with_ban.sql")
+      join(import.meta.dir, "migrations/004_block_ends_with_ban.sql"),
+      join(import.meta.dir, "migrations/005_engine_ban_source.sql")
     ];
   },
   async register(app, ctx) {

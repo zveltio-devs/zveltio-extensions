@@ -347,7 +347,7 @@ async function makeCtx(
     });
   }
   const { createRestrictedDb } = (await restrictP) as any;
-  const { gateInternals } = (await capsP) as any;
+  const { gateInternals, bindsCaller } = (await capsP) as any;
   const extName = wiring?.extName ?? 'harness';
   const allowedTables = wiring?.allowedTables ?? new Set<string>();
   const capabilities = wiring?.capabilities ?? [];
@@ -413,7 +413,7 @@ async function makeCtx(
     // packages/engine/src/lib/security/keyring.ts and its compatibility tests.
     // NOTE: anyStub()'s `get` trap ignores its target, so Object.assign onto it
     // is invisible. The real members have to be consulted BEFORE falling back.
-    internals: gateInternals(extName, realInternals({
+    internals: gateInternals(extName, bindsCaller(realInternals({
       // ── URL guards: REAL, all three ────────────────────────────────────
       //
       // These are the members whose stub fails OPEN, and the direction is decided
@@ -491,15 +491,23 @@ async function makeCtx(
         const { users, pool } = await engineUsers();
         return users.revokeUserSessions(pool, userId);
       },
-      setUserActive: async (handle: any, userId: string, active: boolean) => {
-        const { users, pool } = await engineUsers();
-        return users.setUserActive(handle, pool, userId, active);
-      },
       createBetterAuthSession: async (handle: any, userId: string, o?: any) => {
         const { users, pool } = await engineUsers();
         return users.createBetterAuthSession(handle, pool, userId, o);
       },
-    }), capabilities, []),
+    }), (caller: string) => ({
+      // Bound to the caller (`ext:<name>`) by the engine's own `bindsCaller`, as
+      // `buildExtensionInternals` does: the ban records who placed it, and
+      // `liftOwnBan` lifts only that. Unbound, every ban read as 'unknown'.
+      setUserActive: async (handle: any, userId: string, active: boolean) => {
+        const { users, pool } = await engineUsers();
+        return users.setUserActive(handle, pool, userId, active, caller);
+      },
+      liftOwnBan: async (handle: any, userId: string) => {
+        const { users } = await engineUsers();
+        return users.liftOwnBan(handle, userId, caller);
+      },
+    })), capabilities, []),
     registerPublicRoute(spec: any) {
       publicRoutes?.push(spec);
     },

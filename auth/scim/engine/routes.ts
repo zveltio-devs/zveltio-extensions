@@ -477,8 +477,14 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
    * cache. The block stops every method (password, passkey, magic link, SSO) and
    * leaves the credentials alone, so lifting it gives them all back.
    *
+   * The engine records whose block it is (`ban_source`, `ext:auth/scim` for
+   * SCIM's) and `liftOwnBan` lifts only that one: an administrator's block, or
+   * one placed before SCIM's and so kept, is never the IdP's to lift.
+   *
    * Single-tenant: the IdP owns the only tenant, so `active: false` blocks
-   * sign-in and revokes the sessions; `active: true` lifts it.
+   * sign-in and revokes the sessions; `active: true` lifts SCIM's block. Not
+   * any block: IdPs resend `active: true` on every sync, which would undo an
+   * administrator's within one cycle.
    *
    * Multi-tenant: sign-in is instance-wide but this IdP speaks for one tenant.
    * Blocking it locked the person out of every other tenant too, and let any
@@ -486,15 +492,12 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
    * membership HERE (`valid_to = now()`), which the engine's membership gate
    * reads uncached on the next request and its realtime sweep within a tick.
    * The session stays: it still opens the tenants that have them. Only when no
-   * tenant is left in force is sign-in blocked — nothing is left to sign in to —
-   * and the block is recorded as SCIM's.
+   * tenant is left in force is sign-in blocked — nothing is left to sign in to.
    *
    * `active: true` puts back the end date the business had set (open-ended if
    * none), only while the membership still carries the IdP's own `valid_to`: a
-   * date the business wrote since wins. It lifts the block only if SCIM placed
-   * it and a tenant is in force again — whichever tenant's IdP that is. SCIM's
-   * record of a block ends with the block (migration 004), so a block an
-   * administrator places after lifting SCIM's is theirs.
+   * date the business wrote since wins. It lifts SCIM's block once a tenant is
+   * in force again — whichever tenant's IdP that is.
    */
   // biome-ignore lint/suspicious/noExplicitAny: Kysely transaction handle
   async function setActive(trx: any, userId: string, tenantId: string, active: boolean): Promise<void> {
@@ -504,7 +507,8 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
       ON CONFLICT (tenant_id, user_id) DO UPDATE SET active = EXCLUDED.active, updated_at = NOW()
     `.execute(trx);
     if (await instanceIsSingleTenant()) {
-      await ctx.internals.setUserActive(trx, userId, active);
+      if (active) await ctx.internals.liftOwnBan(trx, userId);
+      else await ctx.internals.setUserActive(trx, userId, false);
       return;
     }
     if (active) {
@@ -519,11 +523,7 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
         UPDATE zv_scim_users SET suspended_at = NULL, held_valid_to = NULL
          WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId}
       `.execute(trx);
-      if ((await inForceAnywhere(trx, userId)) === 0) return;
-      const ours = await sql`
-        DELETE FROM zv_scim_sign_in_blocks WHERE user_id = ${userId} RETURNING user_id
-      `.execute(trx);
-      if (ours.rows.length > 0) await ctx.internals.setUserActive(trx, userId, true);
+      if ((await inForceAnywhere(trx, userId)) > 0) await ctx.internals.liftOwnBan(trx, userId);
       return;
     }
     // Only a membership in force is suspended: a resend must not overwrite the
@@ -542,12 +542,7 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
        WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId} AND EXISTS (SELECT 1 FROM held)
     `.execute(trx);
     if ((await inForceAnywhere(trx, userId)) > 0) return;
-    // A block already there is somebody else's, and is not recorded as ours.
-    await sql`
-      INSERT INTO zv_scim_sign_in_blocks (user_id)
-      SELECT id FROM "user" WHERE id = ${userId} AND banned IS NOT TRUE
-      ON CONFLICT (user_id) DO NOTHING
-    `.execute(trx);
+    // A block already there keeps its source: the engine records the first.
     await ctx.internals.setUserActive(trx, userId, false);
   }
 

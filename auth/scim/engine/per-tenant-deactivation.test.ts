@@ -89,6 +89,9 @@ d('auth/scim — multi-tenant deactivation is per tenant', () => {
   const banned = async (id: string) =>
     (await sql<{ banned: boolean | null }>`SELECT banned FROM "user" WHERE id = ${id}`.execute(db)).rows[0]
       ?.banned === true;
+  const source = async (id: string) =>
+    (await sql<{ s: string | null }>`SELECT ban_source AS s FROM "user" WHERE id = ${id}`.execute(db)).rows[0]
+      ?.s ?? null;
   const validTo = async (t: { id: string }, id: string) =>
     (
       await sql<{ valid_to: Date | null }>`
@@ -131,12 +134,14 @@ d('auth/scim — multi-tenant deactivation is per tenant', () => {
     // The last tenant in force goes: nothing left to sign in to.
     expect((await put(A, p, false)).status).toBe(200);
     expect(await banned(p.userId)).toBe(true);
+    expect(await source(p.userId)).toBe('ext:auth/scim'); // the engine records whose ban it is
     expect(await me(p, A)).toBe(401); // sessions revoked with the ban
 
     const on = await patch(B, p.userId, true);
     expect(on.status).toBe(200);
     expect(((await on.json()) as { active: boolean }).active).toBe(true);
     expect(await banned(p.userId)).toBe(false);
+    expect(await source(p.userId)).toBeNull();
     expect(await validTo(B, p.userId)).toBeNull();
     p = await signIn(p);
     expect([await me(p, A), await me(p, B)]).toEqual([403, 200]);
@@ -173,16 +178,28 @@ d('auth/scim — multi-tenant deactivation is per tenant', () => {
     expect(await banned(p.userId)).toBe(false);
   });
 
-  it('a ban the IdP did not place is not the IdP to lift', async () => {
-    const p = await person([{ id: A.id }]);
-    await sql`UPDATE "user" SET banned = true WHERE id = ${p.userId}`.execute(db);
-    expect((await patch(A, p.userId, true)).status).toBe(200);
-    expect(await banned(p.userId)).toBe(true);
-    expect((await patch(A, p.userId, false)).status).toBe(200);
-    expect((await put(A, p, true)).status).toBe(200);
-    expect(await banned(p.userId)).toBe(true);
-    expect(await validTo(A, p.userId)).toBeNull(); // the membership itself is restored
-  });
+  // Raw SQL and better-auth's admin plugin record no source ('unknown'); a ban
+  // that names another source is no more SCIM's.
+  for (const [how, ban] of [
+    ['raw SQL', sql`banned = true`],
+    ["ban_source 'admin'", sql`banned = true, ban_source = 'admin'`],
+  ] as const) {
+    it(`a ban the IdP did not place (${how}) is not the IdP to lift`, async () => {
+      const p = await person([{ id: A.id }]);
+      await sql`UPDATE "user" SET ${ban} WHERE id = ${p.userId}`.execute(db);
+      const placed = await source(p.userId);
+      expect(placed).not.toBe('ext:auth/scim');
+      expect((await patch(A, p.userId, true)).status).toBe(200);
+      expect(await banned(p.userId)).toBe(true);
+      // Deactivating on top of it does not make it SCIM's: the first ban stands.
+      expect((await patch(A, p.userId, false)).status).toBe(200);
+      expect(await source(p.userId)).toBe(placed);
+      expect((await put(A, p, true)).status).toBe(200);
+      expect(await banned(p.userId)).toBe(true);
+      expect(await source(p.userId)).toBe(placed);
+      expect(await validTo(A, p.userId)).toBeNull(); // the membership itself is restored
+    });
+  }
 
   // The engine has no ban route: an administrator blocks and unblocks by writing
   // `"user".banned`. A block they place after lifting SCIM's is theirs.
