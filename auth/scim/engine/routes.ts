@@ -46,6 +46,13 @@ function hashToken(internals: ExtensionInternals, raw: string): Promise<string> 
   return internals.deriveTokenHash(raw);
 }
 
+/**
+ * A membership in force — the engine's `activeMembership()` in
+ * lib/tenancy/tenant-scope.ts, inlined because an extension cannot import it.
+ * Keep the two identical. `tu` is the alias of `zv_tenant_users`.
+ */
+const MEMBERSHIP_IN_FORCE = sql`(tu.valid_from <= now() AND (tu.valid_to IS NULL OR tu.valid_to > now()))`;
+
 function scimError(c: Ctx, status: number, detail: string) {
   return c.json({ schemas: [SCIM_ERROR], status: String(status), detail }, status);
 }
@@ -137,6 +144,9 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
    * issued by one tenant could list, rename, deactivate and DELETE every user
    * on the instance. Membership is what makes a user visible to an IdP, so it
    * is the condition every route asks.
+   *
+   * Any row, in force or not: a lapsed member is still this tenant's resource
+   * and the IdP must be able to update or deprovision it. `stateOf` reports it.
    */
   async function isMember(userId: string, tenantId: string): Promise<boolean> {
     // Single-tenant installs have no membership rows at all — the engine's own
@@ -238,15 +248,29 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     }),
   );
 
+  /**
+   * What the IdP is told about a user. `active` is the flag the IdP last wrote
+   * AND a membership in force: an expired or not-yet-started member cannot use
+   * this tenant, and RFC 7643 §4.1.1 leaves `active`'s meaning to us. Reported,
+   * not hidden — a hidden member makes the IdP's `userName eq` probe come back
+   * empty, and its re-POST answers 409 for somebody it cannot find.
+   */
   async function stateOf(
     userId: string,
     tenantId: string,
+    soloInstance: boolean,
   ): Promise<{ external_id: string | null; active: boolean }> {
-    const r = await sql<{ external_id: string | null; active: boolean }>`
-      SELECT external_id, active FROM zv_scim_users
-       WHERE user_id = ${userId} AND tenant_id = ${tenantId}::uuid
+    const r = await sql<{ external_id: string | null; active: boolean | null; in_force: boolean }>`
+      SELECT s.external_id, s.active,
+             (${soloInstance} OR EXISTS (
+               SELECT 1 FROM zv_tenant_users tu
+                WHERE tu.user_id = ${userId} AND tu.tenant_id = ${tenantId}::uuid
+                  AND ${MEMBERSHIP_IN_FORCE})) AS in_force
+        FROM (SELECT 1) AS one
+        LEFT JOIN zv_scim_users s ON s.user_id = ${userId} AND s.tenant_id = ${tenantId}::uuid
     `.execute(db);
-    return r.rows[0] ?? { external_id: null, active: true };
+    const row = r.rows[0];
+    return { external_id: row?.external_id ?? null, active: (row?.active ?? true) && row?.in_force === true };
   }
 
   // GET /Users — list; supports the `userName eq "email"` probe every IdP does.
@@ -285,7 +309,7 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
       rows = r.rows;
     }
     const resources = await Promise.all(
-      rows.map(async (u) => toScimUser(u, await stateOf(u.id, tenantId))),
+      rows.map(async (u) => toScimUser(u, await stateOf(u.id, tenantId, soloInstance))),
     );
     return c.json({
       schemas: [SCIM_LIST],
@@ -311,7 +335,7 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
                 WHERE tu.user_id = u.id AND tu.tenant_id = ${tenantId}::uuid))
     `.execute(db);
     if (r.rows.length === 0) return scimError(c, 404, 'User not found');
-    return c.json(toScimUser(r.rows[0], await stateOf(id, tenantId)));
+    return c.json(toScimUser(r.rows[0], await stateOf(id, tenantId, soloInstance)));
   });
 
   // POST /Users — provision. Uses the engine's own signup path (better-auth).
@@ -488,7 +512,7 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
 
     const row = await sql`SELECT id, name, email, "createdAt" FROM "user" WHERE id = ${id}`.execute(db);
     if (!row.rows[0]) return scimError(c, 404, 'User not found');
-    return c.json(toScimUser(row.rows[0], { external_id: body?.externalId ?? null, active }));
+    return c.json(toScimUser(row.rows[0], await stateOf(id, tenantId, await instanceIsSingleTenant())));
   });
 
   // PATCH /Users/:id — Azure/Okta PatchOp; v1 honors `active` (the operation
@@ -530,7 +554,7 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     const row = await sql<Record<string, unknown>>`
       SELECT id, email, name, "createdAt", "updatedAt" FROM "user" WHERE id = ${id}
     `.execute(db);
-    return c.json(toScimUser(row.rows[0], await stateOf(id, tenantId)));
+    return c.json(toScimUser(row.rows[0], await stateOf(id, tenantId, await instanceIsSingleTenant())));
   });
 
   // DELETE /Users/:id — deprovision from THIS tenant.
@@ -577,6 +601,8 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
         DELETE FROM zv_scim_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
       `.execute(trx);
 
+      // Every row, lapsed ones too: another tenant's expired membership is its
+      // history, and deleting the account would cascade into it (as engine purge).
       const remaining = await sql<{ n: number }>`
         SELECT COUNT(*)::int AS n FROM zv_tenant_users WHERE user_id = ${id}
       `.execute(trx);

@@ -24666,14 +24666,16 @@ async function computeWidgetData(db, ids, config2, tenantId) {
   }
   if (want.has("people")) {
     const isDefault = tenantId === DEFAULT_TENANT_ID;
+    const inForce = sql`valid_from <= now() AND (valid_to IS NULL OR valid_to > now())`;
     const total = isDefault ? countOf("user", sql`SELECT COUNT(*) AS count FROM "user"`.execute(db)) : countOf("zv_tenant_users", sql`
-          SELECT COUNT(*) AS count FROM zv_tenant_users WHERE tenant_id = ${tenantId}::uuid
+          SELECT COUNT(*) AS count FROM zv_tenant_users
+           WHERE tenant_id = ${tenantId}::uuid AND ${inForce}
         `.execute(db));
     const admins = isDefault ? countOf("user", sql`
           SELECT COUNT(*) AS count FROM "user" WHERE role IN ('god', 'admin')
         `.execute(db)) : countOf("zv_tenant_users", sql`
           SELECT COUNT(*) AS count FROM zv_tenant_users
-           WHERE tenant_id = ${tenantId}::uuid AND role IN ('owner', 'admin')
+           WHERE tenant_id = ${tenantId}::uuid AND role IN ('owner', 'admin') AND ${inForce}
         `.execute(db));
     set2("people", Promise.all([total, admins]).then(([t, a]) => ({ total: t, admins: a })));
   }
@@ -24819,3 +24821,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
