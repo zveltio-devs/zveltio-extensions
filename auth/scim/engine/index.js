@@ -24931,7 +24931,7 @@ function buildScimApp(ctx) {
           reason: "scim.deprovision",
           metadata: { tenant_id: tenantId }
         });
-      } else {
+      } else if (await inForceAnywhere(trx, id) === 0) {
         await ctx.internals.revokeUserSessions(id);
       }
     });
@@ -24950,7 +24950,8 @@ var extension = {
     return [
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_tenant_scoped_tokens.sql"),
-      join(import.meta.dir, "migrations/003_per_tenant_deactivation.sql")
+      join(import.meta.dir, "migrations/003_per_tenant_deactivation.sql"),
+      join(import.meta.dir, "migrations/004_block_ends_with_ban.sql")
     ];
   },
   async register(app, ctx) {

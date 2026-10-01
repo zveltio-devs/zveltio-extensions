@@ -123,7 +123,8 @@ membership: an end date the business had set before the deactivation comes back
 with it, otherwise it is open-ended again. If the sign-in block was placed by
 SCIM, it is lifted as soon as a tenant has the person again — whichever tenant's
 provider reactivates them. A block an administrator placed is never lifted by a
-provider.
+provider — including one placed after the administrator lifted SCIM's: SCIM's
+claim on a block ends with that block.
 
 A membership the **business** ended (an end date in the past, or a start date in
 the future) is not the provider's to reopen: on such a member `PUT` and `PATCH`
@@ -133,21 +134,19 @@ re-dates a membership the provider had deactivated — the business's date wins.
 
 **Deletion** (`DELETE /Users/{id}`):
 
-1. removes their membership of this tenant;
-2. **deletes all their sessions, immediately**;
-3. if the user no longer belongs to any tenant, deletes the account too — the
-   same way an administrator's delete does: grants removed, and a `user.deleted`
-   audit entry naming the SCIM token (`scim:<token id>`) and the tenant.
+1. removes their membership of this tenant — their next request to it is refused
+   (403), and open realtime connections to it close within a minute;
+2. if the user no longer belongs to any tenant, deletes the account too, with all
+   its sessions — the same way an administrator's delete does: grants removed,
+   and a `user.deleted` audit entry naming the SCIM token (`scim:<token id>`) and
+   the tenant. On a single-tenant instance this is every deletion;
+3. otherwise **deletes all their sessions, immediately**, once no tenant has them
+   in force (the other memberships have ended or not started). While another
+   tenant still has them, their session stays and keeps working there, as on
+   deactivation.
 
 The sessions are the important part. An employee who leaves on Friday must not
 still get in on Monday with a browser left open.
-
-### What stays instance-wide
-
-A session belongs to no tenant. So when one tenant's provider **deletes** someone
-who is also a member of another tenant on the same instance, their sessions end
-**everywhere**, including the other tenant's — they sign in again to keep working
-there. The account itself stays while another tenant still has them.
 
 ---
 
