@@ -156,6 +156,9 @@ d('developer/graphql — resolvers go through the read gate', () => {
       },
       internals: {
         isTenantAdmin: async (userId: string) => userId === ADMIN.id,
+        // The collection-level check the resolvers ask, as the stub above answers it.
+        checkAccess: async (_db: unknown, u: Any, resource: string, action: string) =>
+          u.id === ADMIN.id || (GRANTS[resource] ?? []).includes(action),
         applyRlsFilters: tenancy.applyRlsFilters,
         // The engine's `readScope` with its lookups answered from the tables
         // above; alters and entity access are `engine-gate.test.ts`'s.

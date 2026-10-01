@@ -110,6 +110,8 @@ d('developer/graphql — field policies are enforced', () => {
         // to answer the same question the `checkPermission` stub above answers,
         // or every query throws and all three cases fail for the wrong reason.
         isTenantAdmin: async (userId: string) => userId === ADMIN_USER.id,
+        // The collection-level check, passing for everyone as above.
+        checkAccess: async () => true,
         readScope: openReadScope,
         applyRlsFilters: (q: Any) => q,
       },

@@ -32676,6 +32676,9 @@ function readFieldValue(parent, fieldName) {
   const value = parent[fieldName];
   return value instanceof Date ? value.toISOString() : value;
 }
+function isApiKey(user) {
+  return String(user?.id ?? "").startsWith("apikey:");
+}
 function mapFieldType(fieldType) {
   const map2 = {
     text: GraphQLString,
@@ -32778,8 +32781,8 @@ async function buildDynamicSchema(ctx) {
       gate = (async () => {
         const { user } = context;
         const [canRead, scope] = await Promise.all([
-          context.checkPermission(user.id, collection, "read"),
-          ctx.internals.readScope(collection, user, "session")
+          ctx.internals.checkAccess(db, user, collection, "read"),
+          ctx.internals.readScope(collection, user, isApiKey(user) ? "api_key" : "session")
         ]);
         return {
           canRead: canRead === true,
@@ -33030,6 +33033,12 @@ function detectOperationType(query) {
 function graphqlRoutes(ctx) {
   const { db, DDLManager, auth, checkPermission } = ctx;
   const app = new Hono2;
+  async function caller(c) {
+    const admitted = c.get("user");
+    if (admitted)
+      return admitted;
+    return (await auth.api.getSession({ headers: c.req.raw.headers }))?.user ?? null;
+  }
   async function run(c, user, schema, source, variableValues, operationName) {
     let document;
     try {
@@ -33037,7 +33046,7 @@ function graphqlRoutes(ctx) {
     } catch (err) {
       return { errors: [err] };
     }
-    const isAdmin = ctx.internals.isTenantAdmin(user.id);
+    const isAdmin = isApiKey(user) ? Promise.resolve(false) : ctx.internals.isTenantAdmin(user.id);
     const rules = await isAdmin ? specifiedRules : [...specifiedRules, NoSchemaIntrospectionCustomRule];
     const errors3 = validate2(schema, document, rules);
     if (errors3.length)
@@ -33048,7 +33057,7 @@ function graphqlRoutes(ctx) {
       document,
       variableValues,
       operationName,
-      contextValue: { c, user, db, tenantTrx, reqDb: db, checkPermission, __isAdminPromise: isAdmin }
+      contextValue: { c, user, db, tenantTrx, reqDb: db, __isAdminPromise: isAdmin }
     });
   }
   app.get("/", async (c) => {
@@ -33063,8 +33072,8 @@ function graphqlRoutes(ctx) {
     return c.html(PLAYGROUND_HTML);
   });
   app.post("/", async (c) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session)
+    const user = await caller(c);
+    if (!user)
       return c.json({ errors: [{ message: "Unauthorized" }] }, 401);
     let body;
     try {
@@ -33090,7 +33099,7 @@ function graphqlRoutes(ctx) {
     try {
       const tenantKey = c.get?.("tenant")?.id ?? "default";
       const schema = await getSchema(ctx, tenantKey);
-      result = await run(c, session.user, schema, query, variables, operationName);
+      result = await run(c, user, schema, query, variables, operationName);
       errorCount = result.errors?.length ?? 0;
     } catch (err) {
       errorCount = 1;
@@ -33107,7 +33116,7 @@ function graphqlRoutes(ctx) {
         (${operationName ?? null}, ${opType}, ${queryHash},
          ${variables ? JSON.stringify(variables) : null}::jsonb,
          ${durationMs}, ${resultSizeBytes}, ${errorCount},
-         ${session.user.id}, ${ip})
+         ${user.id}, ${ip})
     `.execute(db).catch(() => {});
     if (errorCount > 0 && !result.data) {
       return c.json(result, 400);
@@ -33179,8 +33188,8 @@ function graphqlRoutes(ctx) {
     return c.json({ success: true });
   });
   app.post("/persisted/:name/execute", async (c) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session)
+    const user = await caller(c);
+    if (!user)
       return c.json({ errors: [{ message: "Unauthorized" }] }, 401);
     const name = c.req.param("name");
     const pqRes = await sql`
@@ -33191,10 +33200,10 @@ function graphqlRoutes(ctx) {
       return c.json({ errors: [{ message: "Persisted query not found" }] }, 404);
     if (!pq.is_public) {
       const allowed = Array.isArray(pq.allowed_roles) ? pq.allowed_roles : [];
-      const roles = await ctx.getUserRoles(session.user.id);
+      const roles = isApiKey(user) ? [] : await ctx.getUserRoles(user.id);
       const hasRole = allowed.some((r) => roles.includes(r));
       if (!hasRole) {
-        const isAdmin = await checkPermission(session.user.id, "admin", "*");
+        const isAdmin = !isApiKey(user) && await ctx.internals.isTenantAdmin(user.id);
         if (!isAdmin) {
           return c.json({ errors: [{ message: "Access denied to this persisted query" }] }, 403);
         }
@@ -33215,7 +33224,7 @@ function graphqlRoutes(ctx) {
     try {
       const tenantKey = c.get?.("tenant")?.id ?? "default";
       const schema = await getSchema(ctx, tenantKey);
-      const result = await run(c, session.user, schema, pq.query, variables);
+      const result = await run(c, user, schema, pq.query, variables);
       sql`
         UPDATE zvd_graphql_persisted_queries
         SET use_count = use_count + 1, last_used_at = NOW(), updated_at = NOW()
