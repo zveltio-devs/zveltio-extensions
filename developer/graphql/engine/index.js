@@ -32781,13 +32781,10 @@ async function buildDynamicSchema(ctx) {
           context.checkPermission(user.id, collection, "read"),
           ctx.internals.readScope(collection, user, "session")
         ]);
-        const { hidden, readOnly } = scope.columns;
         return {
           canRead: canRead === true,
           readable: scope.readable,
-          writable: (column) => !["*", column].some((c) => readOnly.has(c) || hidden.has(c)),
           rows: scope.query,
-          writeRows: (qb) => ctx.internals.applyRlsFilters(qb, scope.rls),
           keep: async (rows) => (await scope.keep(rows)).map((row) => scope.shape(row)),
           readBack: async (row) => canRead === true && row && await scope.admits(row) ? scope.shape(row) : null
         };
@@ -32802,10 +32799,13 @@ async function buildDynamicSchema(ctx) {
       throw new Error(`Forbidden: no read permission on "${collection}"`);
     return gate;
   }
-  function mustWrite(gate, data) {
-    const blocked = Object.keys(data).filter((column) => !gate.writable(column));
-    if (blocked.length)
-      throw new Error(`Forbidden: fields are read-only for your role: ${blocked.join(", ")}`);
+  function answered(res, notFound) {
+    if (res.status < 300)
+      return res.body;
+    if (res.status === 404 && notFound !== undefined)
+      return notFound;
+    const b = res.body ?? {};
+    throw new Error(b.errors?.join("; ") ?? b.message ?? b.reason ?? b.error ?? `HTTP ${res.status}`);
   }
   const first = async (gate, row) => row ? (await gate.keep([row]))[0] ?? null : null;
   const baseFields = {
@@ -32894,40 +32894,22 @@ async function buildDynamicSchema(ctx) {
       type: colType,
       args: inputFields,
       resolve: async (_, args, context) => {
-        if (!await context.checkPermission(context.user.id, col.name, "create")) {
-          throw new Error(`Forbidden: no create permission on "${col.name}"`);
-        }
         const gate = await readGate(context, col.name);
-        mustWrite(gate, args);
-        const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        return gate.readBack(await trx.insertInto(tableName).values(args).returningAll().executeTakeFirst());
+        return gate.readBack(answered(await ctx.internals.createRecord(context.c, col.name, args)));
       }
     };
     mutationFields[`update_${col.name}`] = {
       type: colType,
       args: { id: { type: new GraphQLNonNull(GraphQLID) }, ...inputFields },
       resolve: async (_, { id, ...data }, context) => {
-        if (!await context.checkPermission(context.user.id, col.name, "update")) {
-          throw new Error(`Forbidden: no update permission on "${col.name}"`);
-        }
         const gate = await readGate(context, col.name);
-        mustWrite(gate, data);
-        const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        return gate.readBack(await gate.writeRows(trx.updateTable(tableName)).set({ ...data, updated_at: new Date }).where("id", "=", id).returningAll().executeTakeFirst());
+        return gate.readBack(answered(await ctx.internals.updateRecord(context.c, col.name, id, data), null));
       }
     };
     mutationFields[`delete_${col.name}`] = {
       type: GraphQLBoolean,
       args: { id: { type: new GraphQLNonNull(GraphQLID) } },
-      resolve: async (_, { id }, context) => {
-        if (!await context.checkPermission(context.user.id, col.name, "delete")) {
-          throw new Error(`Forbidden: no delete permission on "${col.name}"`);
-        }
-        const gate = await readGate(context, col.name);
-        const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        const res = await gate.writeRows(trx.deleteFrom(tableName)).where("id", "=", id).executeTakeFirst();
-        return (res?.numDeletedRows ?? 0n) > 0n;
-      }
+      resolve: async (_, { id }, context) => answered(await ctx.internals.deleteRecord(context.c, col.name, id), false) !== false
     };
     const collectionRelations = relations.filter((r) => r.source_collection === col.name);
     if (collectionRelations.length > 0) {
@@ -33066,7 +33048,7 @@ function graphqlRoutes(ctx) {
       document,
       variableValues,
       operationName,
-      contextValue: { user, db, tenantTrx, reqDb: db, checkPermission, __isAdminPromise: isAdmin }
+      contextValue: { c, user, db, tenantTrx, reqDb: db, checkPermission, __isAdminPromise: isAdmin }
     });
   }
   app.get("/", async (c) => {

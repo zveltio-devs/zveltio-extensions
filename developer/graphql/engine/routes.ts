@@ -67,12 +67,8 @@ interface ReadGate {
   canRead: boolean;
   /** A column the caller may see, and so may filter or join on. */
   readable(column: string): boolean;
-  /** A column the caller may write: neither read-only nor hidden. */
-  writable(column: string): boolean;
   /** Query alters + row policies onto a SELECT. */
   rows<Q>(qb: Q): Q;
-  /** Row policies onto an UPDATE or DELETE; alters are SELECT-shaped. */
-  writeRows<Q>(qb: Q): Q;
   /** The fetched rows entity access lets the caller view, each column-masked. */
   keep(rows: any[]): Promise<any[]>;
   /** A row a write handed back, as the caller may read it, or null. */
@@ -293,14 +289,10 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
           context.checkPermission(user.id, collection, 'read'),
           ctx.internals.readScope(collection, user, 'session'),
         ]);
-        const { hidden, readOnly } = scope.columns;
         return {
           canRead: canRead === true,
           readable: scope.readable,
-          // The engine's `filterWritableFields`: a hidden column is read-only too.
-          writable: (column) => !['*', column].some((c) => readOnly.has(c) || hidden.has(c)),
           rows: scope.query,
-          writeRows: (qb) => ctx.internals.applyRlsFilters(qb, scope.rls),
           keep: async (rows) => (await scope.keep(rows)).map((row) => scope.shape(row)),
           // A RETURNING row did not come through `query`, so all three row gates
           // run on it in memory; an alter that restricts this caller refuses.
@@ -317,10 +309,23 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
     if (!gate.canRead) throw new Error(`Forbidden: no read permission on "${collection}"`);
     return gate;
   }
-  // Refused, not stripped — the data API answers the same write with 403.
-  function mustWrite(gate: ReadGate, data: Record<string, unknown>): void {
-    const blocked = Object.keys(data).filter((column) => !gate.writable(column));
-    if (blocked.length) throw new Error(`Forbidden: fields are read-only for your role: ${blocked.join(', ')}`);
+  // ── Writes ──
+  //
+  // A mutation is the data API's own write — `ctx.internals.createRecord` and
+  // friends run `POST`/`PATCH`/`DELETE /api/data` as the caller the engine
+  // authenticated for this request (`context.c`). They used to be Kysely
+  // through `ctx.db`, which applied row policies and nothing else: an update or
+  // delete reached rows an alter hides or entity access locks, `created_by`
+  // stayed NULL, no revision, webhook, flow or realtime event followed, and
+  // hooks ran as `system:developer/graphql` instead of the caller.
+  //
+  // The data API's answer, as GraphQL: its body on success, `notFound` for a
+  // 404 (a row the caller cannot see is not there), its message otherwise.
+  function answered(res: { status: number; body: any }, notFound?: unknown): any {
+    if (res.status < 300) return res.body;
+    if (res.status === 404 && notFound !== undefined) return notFound;
+    const b = res.body ?? {};
+    throw new Error(b.errors?.join('; ') ?? b.message ?? b.reason ?? b.error ?? `HTTP ${res.status}`);
   }
   const first = async (gate: ReadGate, row: any) => (row ? ((await gate.keep([row]))[0] ?? null) : null);
 
@@ -426,17 +431,10 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
       type: colType,
       args: inputFields,
       resolve: async (_: any, args: any, context: any) => {
-        if (!(await context.checkPermission(context.user.id, col.name, 'create'))) {
-          throw new Error(`Forbidden: no create permission on "${col.name}"`);
-        }
         // Resolved before the write, so a failed lookup refuses the write too
         // instead of committing it and failing on the way out.
         const gate = await readGate(context, col.name);
-        mustWrite(gate, args);
-        const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        return gate.readBack(await (trx as any)
-          .insertInto(tableName).values(args)
-          .returningAll().executeTakeFirst());
+        return gate.readBack(answered(await ctx.internals.createRecord(context.c, col.name, args)));
       },
     };
 
@@ -444,33 +442,16 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
       type: colType,
       args: { id: { type: new GraphQLNonNull(GraphQLID) }, ...inputFields },
       resolve: async (_: any, { id, ...data }: any, context: any) => {
-        if (!(await context.checkPermission(context.user.id, col.name, 'update'))) {
-          throw new Error(`Forbidden: no update permission on "${col.name}"`);
-        }
-        // A row the policy hides is not found, as on the data API's write path.
         const gate = await readGate(context, col.name);
-        mustWrite(gate, data);
-        const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        return gate.readBack(await gate.writeRows((trx as any).updateTable(tableName))
-          .set({ ...data, updated_at: new Date() })
-          .where('id', '=', id)
-          .returningAll().executeTakeFirst());
+        return gate.readBack(answered(await ctx.internals.updateRecord(context.c, col.name, id, data), null));
       },
     };
 
     mutationFields[`delete_${col.name}`] = {
       type: GraphQLBoolean,
       args: { id: { type: new GraphQLNonNull(GraphQLID) } },
-      resolve: async (_: any, { id }: any, context: any) => {
-        if (!(await context.checkPermission(context.user.id, col.name, 'delete'))) {
-          throw new Error(`Forbidden: no delete permission on "${col.name}"`);
-        }
-        const gate = await readGate(context, col.name);
-        const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        const res = await gate.writeRows((trx as any).deleteFrom(tableName))
-          .where('id', '=', id).executeTakeFirst();
-        return (res?.numDeletedRows ?? 0n) > 0n;
-      },
+      resolve: async (_: any, { id }: any, context: any) =>
+        answered(await ctx.internals.deleteRecord(context.c, col.name, id), false) !== false,
     };
 
     const collectionRelations = relations.filter((r) => r.source_collection === col.name);
@@ -673,7 +654,8 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
       variableValues,
       operationName,
       // `__isAdminPromise` is the field-policy resolvers' cache of the same answer.
-      contextValue: { user, db, tenantTrx, reqDb: db, checkPermission, __isAdminPromise: isAdmin },
+      // `c` is what a mutation hands `ctx.internals` to write as this caller.
+      contextValue: { c, user, db, tenantTrx, reqDb: db, checkPermission, __isAdminPromise: isAdmin },
     });
   }
 
