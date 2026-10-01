@@ -316,11 +316,17 @@ async function computeWidgetData(
     // Single-tenant installs have no membership rows (the engine's membership
     // middleware no-ops for the default tenant), so there the count is the
     // instance, which is the same thing.
+    //
+    // Only memberships in force: the engine's `activeMembership()`
+    // (lib/tenancy/tenant-scope.ts), inlined because an extension cannot import
+    // it. An expired or not-yet-started member is not a person in this tenant.
     const isDefault = tenantId === DEFAULT_TENANT_ID;
+    const inForce = sql`valid_from <= now() AND (valid_to IS NULL OR valid_to > now())`;
     const total = isDefault
       ? countOf('user', sql<{ count: string }>`SELECT COUNT(*) AS count FROM "user"`.execute(db))
       : countOf('zv_tenant_users', sql<{ count: string }>`
-          SELECT COUNT(*) AS count FROM zv_tenant_users WHERE tenant_id = ${tenantId}::uuid
+          SELECT COUNT(*) AS count FROM zv_tenant_users
+           WHERE tenant_id = ${tenantId}::uuid AND ${inForce}
         `.execute(db));
     // "admins" now means admins OF THIS TENANT. The number of instance-wide
     // superusers is not a fact a tenant dashboard should be reporting.
@@ -330,7 +336,7 @@ async function computeWidgetData(
         `.execute(db))
       : countOf('zv_tenant_users', sql<{ count: string }>`
           SELECT COUNT(*) AS count FROM zv_tenant_users
-           WHERE tenant_id = ${tenantId}::uuid AND role IN ('owner', 'admin')
+           WHERE tenant_id = ${tenantId}::uuid AND role IN ('owner', 'admin') AND ${inForce}
         `.execute(db));
     set('people', Promise.all([total, admins]).then(([t, a]) => ({ total: t, admins: a })));
   }

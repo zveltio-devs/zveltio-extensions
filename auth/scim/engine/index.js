@@ -24537,6 +24537,7 @@ var SCIM_PATCH = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 function hashToken(internals, raw2) {
   return internals.deriveTokenHash(raw2);
 }
+var MEMBERSHIP_IN_FORCE = sql`(tu.valid_from <= now() AND (tu.valid_to IS NULL OR tu.valid_to > now()))`;
 function scimError(c, status, detail) {
   return c.json({ schemas: [SCIM_ERROR], status: String(status), detail }, status);
 }
@@ -24654,12 +24655,18 @@ function buildScimApp(ctx) {
       { type: "oauthbearertoken", name: "Bearer token", description: "Long-lived bearer token configured in Zveltio Studio" }
     ]
   }));
-  async function stateOf(userId, tenantId) {
+  async function stateOf(userId, tenantId, soloInstance) {
     const r = await sql`
-      SELECT external_id, active FROM zv_scim_users
-       WHERE user_id = ${userId} AND tenant_id = ${tenantId}::uuid
+      SELECT s.external_id, s.active,
+             (${soloInstance} OR EXISTS (
+               SELECT 1 FROM zv_tenant_users tu
+                WHERE tu.user_id = ${userId} AND tu.tenant_id = ${tenantId}::uuid
+                  AND ${MEMBERSHIP_IN_FORCE})) AS in_force
+        FROM (SELECT 1) AS one
+        LEFT JOIN zv_scim_users s ON s.user_id = ${userId} AND s.tenant_id = ${tenantId}::uuid
     `.execute(db);
-    return r.rows[0] ?? { external_id: null, active: true };
+    const row = r.rows[0];
+    return { external_id: row?.external_id ?? null, active: (row?.active ?? true) && row?.in_force === true };
   }
   app.get("/Users", async (c) => {
     const tenantId = tenantOf(c);
@@ -24690,7 +24697,7 @@ function buildScimApp(ctx) {
       `.execute(db);
       rows = r.rows;
     }
-    const resources = await Promise.all(rows.map(async (u) => toScimUser(u, await stateOf(u.id, tenantId))));
+    const resources = await Promise.all(rows.map(async (u) => toScimUser(u, await stateOf(u.id, tenantId, soloInstance))));
     return c.json({
       schemas: [SCIM_LIST],
       totalResults: resources.length,
@@ -24713,7 +24720,7 @@ function buildScimApp(ctx) {
     `.execute(db);
     if (r.rows.length === 0)
       return scimError(c, 404, "User not found");
-    return c.json(toScimUser(r.rows[0], await stateOf(id, tenantId)));
+    return c.json(toScimUser(r.rows[0], await stateOf(id, tenantId, soloInstance)));
   });
   app.post("/Users", async (c) => {
     const body = await c.req.json().catch(() => null);
@@ -24797,7 +24804,7 @@ function buildScimApp(ctx) {
     const row = await sql`SELECT id, name, email, "createdAt" FROM "user" WHERE id = ${id}`.execute(db);
     if (!row.rows[0])
       return scimError(c, 404, "User not found");
-    return c.json(toScimUser(row.rows[0], { external_id: body?.externalId ?? null, active }));
+    return c.json(toScimUser(row.rows[0], await stateOf(id, tenantId, await instanceIsSingleTenant())));
   });
   app.patch("/Users/:id", async (c) => {
     const id = c.req.param("id");
@@ -24831,7 +24838,7 @@ function buildScimApp(ctx) {
     const row = await sql`
       SELECT id, email, name, "createdAt", "updatedAt" FROM "user" WHERE id = ${id}
     `.execute(db);
-    return c.json(toScimUser(row.rows[0], await stateOf(id, tenantId)));
+    return c.json(toScimUser(row.rows[0], await stateOf(id, tenantId, await instanceIsSingleTenant())));
   });
   app.delete("/Users/:id", async (c) => {
     const id = c.req.param("id");
