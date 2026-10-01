@@ -123,6 +123,10 @@ d('developer/graphql — the engine read gate, not a copy of half of it', () => 
     const sub = new Hono();
     await mod.default.register(sub, ctx);
     app.route('/ext/developer/graphql', sub);
+    // The bundle's schema cache is per tenant and shared by every file in this
+    // process; one built before C and P existed does not name them.
+    const refreshed = await app.request('/ext/developer/graphql/refresh-schema', { method: 'POST', headers: { cookie } });
+    expect(refreshed.status).toBe(200);
   }, 60_000);
 
   afterAll(async () => {

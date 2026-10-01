@@ -66,6 +66,7 @@ d('developer/graphql — timestamps serialize as ISO strings, not epoch millis',
         getTableName: (name: string) => `zvd_test_${name}`,
       },
       internals: {
+        checkAccess: async () => true,
         isTenantAdmin: async () => false,
         readScope: openReadScope,
         applyRlsFilters: (q: Any) => q,

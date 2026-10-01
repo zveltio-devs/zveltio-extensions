@@ -106,6 +106,11 @@ function readFieldValue(parent: any, fieldName: string): any {
   return value instanceof Date ? value.toISOString() : value;
 }
 
+/** An API-key principal: the engine names it `apikey:<uuid>`. It holds no role and is never an admin. */
+function isApiKey(user: { id?: unknown } | null | undefined): boolean {
+  return String(user?.id ?? '').startsWith('apikey:');
+}
+
 // ── Field type mapping ────────────────────────────────────────────────────────
 
 function mapFieldType(fieldType: string): any {
@@ -186,13 +191,13 @@ async function getFieldPolicies(dbh: any): Promise<FieldPolicyInfo[]> {
 // ── Schema builder ────────────────────────────────────────────────────────────
 //
 // IMPORTANT: every resolver below uses the *request-scoped* context
-//   ({ user, db, checkPermission })
+//   ({ user, db })
 // instead of the closure-captured ctx.db. That lets us:
 //   - use the tenant-isolated transaction (`tenantTrx`) when the
 //     extension is mounted in a multi-tenant deployment, so RLS
 //     policies see the right `zveltio.current_tenant` GUC;
-//   - call `checkPermission(userId, collection, action)` so the
-//     GraphQL surface honours the same RBAC as `routes/data.ts`.
+//   - call `checkAccess(db, user, collection, action)` so the
+//     GraphQL surface honours the same RBAC and key scopes as `routes/data.ts`.
 //
 // Without this every authenticated user could `query { list_users { ... } }`
 // and bypass every tenant isolation and RBAC policy the rest of the engine
@@ -284,10 +289,12 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
     if (!gate) {
       gate = (async (): Promise<ReadGate> => {
         const { user } = context;
-        // This route authenticates by session only (`auth.api.getSession`).
+        // `checkAccess`, as `GET /api/data` asks it: a key by its collection
+        // scopes. `ctx.checkPermission` answers a key from `$ext:developer/graphql`
+        // for every collection — a key granted that and `read` on A listed B.
         const [canRead, scope] = await Promise.all([
-          context.checkPermission(user.id, collection, 'read'),
-          ctx.internals.readScope(collection, user, 'session'),
+          ctx.internals.checkAccess(db, user, collection, 'read'),
+          ctx.internals.readScope(collection, user, isApiKey(user) ? 'api_key' : 'session'),
         ]);
         return {
           canRead: canRead === true,
@@ -627,6 +634,15 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
 
   const app = new Hono();
 
+  // Who the `/ext/*` gate admitted: a session, or an API key on a manifest
+  // `apiKeyRoutes` route — for which `getSession` is null. With the gate off
+  // (`ZVELTIO_EXT_AUTH_GATE=0`) nothing is set, and only a session gets in.
+  async function caller(c: any): Promise<any> {
+    const admitted = c.get('user');
+    if (admitted) return admitted;
+    return (await auth.api.getSession({ headers: c.req.raw.headers }))?.user ?? null;
+  }
+
   // `graphql()`, plus one validation rule for a caller who is not a tenant admin:
   // no introspection. The schema is cached per tenant, not per caller, so it
   // names every collection and every column — including the ones this caller's
@@ -639,7 +655,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
     } catch (err) {
       return { errors: [err] };
     }
-    const isAdmin = ctx.internals.isTenantAdmin(user.id);
+    const isAdmin = isApiKey(user) ? Promise.resolve(false) : ctx.internals.isTenantAdmin(user.id);
     const rules = (await isAdmin) ? specifiedRules : [...specifiedRules, NoSchemaIntrospectionCustomRule];
     const errors = validate(schema, document, rules);
     if (errors.length) return { errors };
@@ -655,7 +671,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
       operationName,
       // `__isAdminPromise` is the field-policy resolvers' cache of the same answer.
       // `c` is what a mutation hands `ctx.internals` to write as this caller.
-      contextValue: { c, user, db, tenantTrx, reqDb: db, checkPermission, __isAdminPromise: isAdmin },
+      contextValue: { c, user, db, tenantTrx, reqDb: db, __isAdminPromise: isAdmin },
     });
   }
 
@@ -676,8 +692,8 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
 
   // ── POST / — Execute GraphQL operation ───────────────────────────────────
   app.post('/', async (c) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) return c.json({ errors: [{ message: 'Unauthorized' }] }, 401);
+    const user = await caller(c);
+    if (!user) return c.json({ errors: [{ message: 'Unauthorized' }] }, 401);
 
     let body: { query?: string; variables?: Record<string, any>; operationName?: string };
     try {
@@ -708,7 +724,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
     try {
       const tenantKey = (c.get as any)?.('tenant')?.id ?? 'default';
       const schema = await getSchema(ctx, tenantKey);
-      result = await run(c, session.user, schema, query, variables, operationName);
+      result = await run(c, user, schema, query, variables, operationName);
       errorCount = result.errors?.length ?? 0;
     } catch (err) {
       errorCount = 1;
@@ -728,7 +744,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
         (${operationName ?? null}, ${opType}, ${queryHash},
          ${variables ? JSON.stringify(variables) : null}::jsonb,
          ${durationMs}, ${resultSizeBytes}, ${errorCount},
-         ${session.user.id}, ${ip})
+         ${user.id}, ${ip})
     `.execute(db).catch(() => {});
 
     if (errorCount > 0 && !result.data) {
@@ -820,8 +836,8 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
 
   // ── POST /persisted/:name/execute — execute persisted query by name ────────
   app.post('/persisted/:name/execute', async (c) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) return c.json({ errors: [{ message: 'Unauthorized' }] }, 401);
+    const user = await caller(c);
+    if (!user) return c.json({ errors: [{ message: 'Unauthorized' }] }, 401);
 
     const name = c.req.param('name');
     const pqRes = await sql<any>`
@@ -848,14 +864,18 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
     // An empty list on a private query now denies: a restriction naming nobody
     // restricts to nobody. Admin still passes — the instance-wide override the
     // rest of this file already grants.
+    //
+    // A key holds no role and is no admin, so it runs public queries only. Not
+    // `checkPermission(id, 'admin', '*')`: for a key that reads `$ext:developer/graphql`
+    // with `*`, and admitted it to every private query.
     if (!pq.is_public) {
       const allowed: string[] = Array.isArray(pq.allowed_roles) ? pq.allowed_roles : [];
       // `getUserRoles` is on ctx, NOT ctx.internals — a distinction this repo has
       // tripped over before, and typecheck is the only thing that catches it.
-      const roles = await ctx.getUserRoles(session.user.id);
+      const roles = isApiKey(user) ? [] : await ctx.getUserRoles(user.id);
       const hasRole = allowed.some((r) => roles.includes(r));
       if (!hasRole) {
-        const isAdmin = await checkPermission(session.user.id, 'admin', '*');
+        const isAdmin = !isApiKey(user) && (await ctx.internals.isTenantAdmin(user.id));
         if (!isAdmin) {
           return c.json({ errors: [{ message: 'Access denied to this persisted query' }] }, 403);
         }
@@ -877,7 +897,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
     try {
       const tenantKey = (c.get as any)?.('tenant')?.id ?? 'default';
       const schema = await getSchema(ctx, tenantKey);
-      const result = await run(c, session.user, schema, pq.query, variables);
+      const result = await run(c, user, schema, pq.query, variables);
 
       // Update use stats
       sql`
