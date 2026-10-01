@@ -53,8 +53,8 @@ function hashToken(internals: ExtensionInternals, raw: string): Promise<string> 
  */
 const MEMBERSHIP_IN_FORCE = sql`(tu.valid_from <= now() AND (tu.valid_to IS NULL OR tu.valid_to > now()))`;
 
-function scimError(c: Ctx, status: number, detail: string) {
-  return c.json({ schemas: [SCIM_ERROR], status: String(status), detail }, status);
+function scimError(c: Ctx, status: number, detail: string, scimType?: string) {
+  return c.json({ schemas: [SCIM_ERROR], status: String(status), scimType, detail }, status);
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: DB row
@@ -286,8 +286,8 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
    *     instance-wide, so a lapsed tenant's IdP could otherwise block — or
    *     rename — somebody who now works only for another tenant.
    * Reading (GET) and deprovisioning (DELETE) stay open: the IdP must still see
-   * the user and be able to remove them from this tenant. POST of an existing
-   * lapsed member answers 409 (`isMember` counts any row) and reopens nothing.
+   * the user and be able to remove them from this tenant. POST of any existing
+   * account answers 409 and reopens nothing — nor does DELETE then POST.
    *
    * A single-tenant instance has no membership to lapse — in force by
    * definition, as in `stateOf`.
@@ -386,30 +386,46 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     const name: string = body?.name?.formatted ?? body?.displayName ?? email;
 
     const tenantId = tenantOf(c);
-    // A user with this email may already exist on the instance without being a
-    // member here — two tenants can employ the same person. In that case this
-    // tenant is granted membership rather than being told the account exists
-    // (which would leak the other tenant's directory) or being handed a 409 it
-    // cannot act on.
+    // POST provisions a NEW account. An email that already has one answers 409
+    // `uniqueness` and changes nothing — on every instance, whoever's member the
+    // account is.
+    //
+    // It used to grant this tenant membership of the existing account and apply
+    // `active`, so any tenant's IdP could claim any account on the instance by
+    // asserting its email — and, with `active: false`, ban its sign-in
+    // instance-wide. A lapsed tenant could also DELETE its dated row and re-POST
+    // a fresh membership in force. Joining an existing account to a tenant is a
+    // tenant administrator's act (invitation / POST /api/tenants/:id/members),
+    // not something an IdP can do by naming an email.
+    //
+    // Single-tenant loses nothing: there `isMember` counted every account, so an
+    // existing email was already a 409. The 409 tells the caller that the email
+    // is taken on the instance — the same answer sign-up gives — and the detail
+    // is identical whether or not the account belongs to this tenant.
     const existing = await sql<{ id: string }>`
       SELECT id FROM "user" WHERE lower(email) = ${email.toLowerCase()}
     `.execute(db);
-    let userId: string | undefined = existing.rows[0]?.id;
-
-    if (userId) {
-      if (await isMember(userId, tenantId)) return scimError(c, 409, 'User already exists');
-    } else {
-      try {
-        // biome-ignore lint/suspicious/noExplicitAny: better-auth api is untyped on ctx
-        const res = await (auth.api as any).signUpEmail({
-          body: { email, name, password: `Scim!${randomUUID()}` },
-        });
-        userId = res?.user?.id;
-      } catch (e) {
-        return scimError(c, 500, `signup failed: ${e instanceof Error ? e.message : String(e)}`);
-      }
-      if (!userId) return scimError(c, 500, 'signup did not return a user');
+    if (existing.rows.length > 0) {
+      return scimError(
+        c,
+        409,
+        'A user with this userName already exists on this instance. An existing account is added ' +
+          "to a tenant by that tenant's administrator (invitation), not by provisioning.",
+        'uniqueness',
+      );
     }
+
+    let userId: string | undefined;
+    try {
+      // biome-ignore lint/suspicious/noExplicitAny: better-auth api is untyped on ctx
+      const res = await (auth.api as any).signUpEmail({
+        body: { email, name, password: `Scim!${randomUUID()}` },
+      });
+      userId = res?.user?.id;
+    } catch (e) {
+      return scimError(c, 500, `signup failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (!userId) return scimError(c, 500, 'signup did not return a user');
 
     // Membership is what actually provisions the user INTO this tenant.
     // Without it the account exists and belongs nowhere, and the very next
