@@ -24538,8 +24538,8 @@ function hashToken(internals, raw2) {
   return internals.deriveTokenHash(raw2);
 }
 var MEMBERSHIP_IN_FORCE = sql`(tu.valid_from <= now() AND (tu.valid_to IS NULL OR tu.valid_to > now()))`;
-function scimError(c, status, detail) {
-  return c.json({ schemas: [SCIM_ERROR], status: String(status), detail }, status);
+function scimError(c, status, detail, scimType) {
+  return c.json({ schemas: [SCIM_ERROR], status: String(status), scimType, detail }, status);
 }
 function toScimUser(u, state = {}) {
   return {
@@ -24745,22 +24745,20 @@ function buildScimApp(ctx) {
     const existing = await sql`
       SELECT id FROM "user" WHERE lower(email) = ${email3.toLowerCase()}
     `.execute(db);
-    let userId = existing.rows[0]?.id;
-    if (userId) {
-      if (await isMember(userId, tenantId))
-        return scimError(c, 409, "User already exists");
-    } else {
-      try {
-        const res = await auth.api.signUpEmail({
-          body: { email: email3, name, password: `Scim!${randomUUID()}` }
-        });
-        userId = res?.user?.id;
-      } catch (e) {
-        return scimError(c, 500, `signup failed: ${e instanceof Error ? e.message : String(e)}`);
-      }
-      if (!userId)
-        return scimError(c, 500, "signup did not return a user");
+    if (existing.rows.length > 0) {
+      return scimError(c, 409, "A user with this userName already exists on this instance. An existing account is added " + "to a tenant by that tenant's administrator (invitation), not by provisioning.", "uniqueness");
     }
+    let userId;
+    try {
+      const res = await auth.api.signUpEmail({
+        body: { email: email3, name, password: `Scim!${randomUUID()}` }
+      });
+      userId = res?.user?.id;
+    } catch (e) {
+      return scimError(c, 500, `signup failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (!userId)
+      return scimError(c, 500, "signup did not return a user");
     const active = body?.active !== false;
     await db.transaction().execute(async (trx) => {
       await sql`

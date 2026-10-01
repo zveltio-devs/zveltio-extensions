@@ -66,6 +66,12 @@ Each token belongs to a single tenant. The users the provider provisions land in
 that token's tenant — there is no ambiguity and no way to get the tenant wrong
 from outside.
 
+Provisioning creates **new** accounts. If the email already has an account on
+the instance — for example, the person also works for another tenant — the
+provider gets `409 uniqueness` and nothing changes. A tenant administrator adds
+an existing account to the tenant by invitation; from then on the provider can
+read, update and deprovision it.
+
 ---
 
 ## Step 3 — Configure the provider
