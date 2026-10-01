@@ -184,6 +184,42 @@ d('auth/scim — multi-tenant deactivation is per tenant', () => {
     expect(await validTo(A, p.userId)).toBeNull(); // the membership itself is restored
   });
 
+  // The engine has no ban route: an administrator blocks and unblocks by writing
+  // `"user".banned`. A block they place after lifting SCIM's is theirs.
+  it("a block the administrator re-placed after lifting SCIM's is not the IdP's to lift", async () => {
+    const p = await person([{ id: A.id }]);
+    expect((await patch(A, p.userId, false)).status).toBe(200);
+    expect(await banned(p.userId)).toBe(true);
+    await sql`UPDATE "user" SET banned = false WHERE id = ${p.userId}`.execute(db);
+    await sql`UPDATE "user" SET banned = true WHERE id = ${p.userId}`.execute(db);
+    expect((await patch(A, p.userId, true)).status).toBe(200);
+    expect(await banned(p.userId)).toBe(true);
+    expect(await validTo(A, p.userId)).toBeNull(); // the membership itself is restored
+  });
+
+  const del = (t: { id: string }, id: string) =>
+    scim.request(`/scim/v2/Users/${id}`, { method: 'DELETE', headers: hdr[t.id] });
+  const sessions = async (id: string) =>
+    (await sql<{ n: number }>`SELECT COUNT(*)::int AS n FROM session WHERE "userId" = ${id}`.execute(db))
+      .rows[0]!.n;
+
+  it('DELETE by one tenant keeps the session another tenant still opens', async () => {
+    const p = await person([{ id: A.id }, { id: B.id }]);
+    expect((await del(B, p.userId)).status).toBe(204);
+    expect([await me(p, A), await me(p, B)]).toEqual([200, 403]);
+    expect(await banned(p.userId)).toBe(false);
+  });
+
+  it('DELETE that leaves no tenant in force signs the person out', async () => {
+    const lapsed = new Date(Date.now() - 3_600_000).toISOString();
+    const p = await person([{ id: A.id, validTo: lapsed }, { id: B.id }]);
+    expect(await sessions(p.userId)).toBeGreaterThan(0);
+    expect((await del(B, p.userId)).status).toBe(204);
+    expect(await sessions(p.userId)).toBe(0);
+    // A's lapsed row is A's history: the account stays.
+    expect((await sql`SELECT 1 FROM "user" WHERE id = ${p.userId}`.execute(db)).rows).toHaveLength(1);
+  });
+
   it('DELETE of a suspended member removes only that tenant; the last one takes the account', async () => {
     const p = await person([{ id: A.id }, { id: B.id }]);
     expect((await patch(B, p.userId, false)).status).toBe(200);

@@ -492,7 +492,9 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
    * `active: true` puts back the end date the business had set (open-ended if
    * none), only while the membership still carries the IdP's own `valid_to`: a
    * date the business wrote since wins. It lifts the block only if SCIM placed
-   * it and a tenant is in force again — whichever tenant's IdP that is.
+   * it and a tenant is in force again — whichever tenant's IdP that is. SCIM's
+   * record of a block ends with the block (migration 004), so a block an
+   * administrator places after lifting SCIM's is theirs.
    */
   // biome-ignore lint/suspicious/noExplicitAny: Kysely transaction handle
   async function setActive(trx: any, userId: string, tenantId: string, active: boolean): Promise<void> {
@@ -720,9 +722,11 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
           reason: 'scim.deprovision',
           metadata: { tenant_id: tenantId },
         });
-      } else {
-        // Still someone else's member: only the sessions go, and they go now —
-        // a session is instance-wide.
+      } else if ((await inForceAnywhere(trx, id)) === 0) {
+        // Only lapsed memberships left: nothing to sign in to, so the sessions go.
+        // While another tenant has them in force the session stays — it is
+        // instance-wide, and the engine's membership gate already refuses this
+        // tenant on the next request (realtime within a tick), as for `active: false`.
         await ctx.internals.revokeUserSessions(id);
       }
     });
