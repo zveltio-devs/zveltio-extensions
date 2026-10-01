@@ -24668,6 +24668,19 @@ function buildScimApp(ctx) {
     const row = r.rows[0];
     return { external_id: row?.external_id ?? null, active: (row?.active ?? true) && row?.in_force === true };
   }
+  async function refuseIfLapsed(c, userId, tenantId) {
+    if (await instanceIsSingleTenant())
+      return null;
+    const r = await sql`
+      SELECT EXISTS (
+        SELECT 1 FROM zv_tenant_users tu
+         WHERE tu.user_id = ${userId} AND tu.tenant_id = ${tenantId}::uuid
+           AND ${MEMBERSHIP_IN_FORCE}) AS in_force
+    `.execute(db);
+    if (r.rows[0]?.in_force === true)
+      return null;
+    return scimError(c, 403, "The user's membership in this tenant is not in force (expired or not yet started): " + "it can be read or deprovisioned, not modified.");
+  }
   app.get("/Users", async (c) => {
     const tenantId = tenantOf(c);
     const soloInstance = await instanceIsSingleTenant();
@@ -24780,6 +24793,9 @@ function buildScimApp(ctx) {
     const tenantId = tenantOf(c);
     if (!await isMember(id, tenantId))
       return scimError(c, 404, "User not found");
+    const lapsed = await refuseIfLapsed(c, id, tenantId);
+    if (lapsed)
+      return lapsed;
     const body = await c.req.json().catch(() => null);
     if (!body || body.schemas && !body.schemas.includes(SCIM_USER)) {
       return scimError(c, 400, "Expected a SCIM User payload");
@@ -24811,6 +24827,9 @@ function buildScimApp(ctx) {
     const tenantId = tenantOf(c);
     if (!await isMember(id, tenantId))
       return scimError(c, 404, "User not found");
+    const lapsed = await refuseIfLapsed(c, id, tenantId);
+    if (lapsed)
+      return lapsed;
     const body = await c.req.json().catch(() => null);
     if (!body?.schemas?.includes(SCIM_PATCH) || !Array.isArray(body.Operations)) {
       return scimError(c, 400, "Expected a SCIM PatchOp payload");

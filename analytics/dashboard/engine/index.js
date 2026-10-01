@@ -24665,13 +24665,14 @@ async function computeWidgetData(db, ids, config2, tenantId) {
     set2("health", sql`SELECT 1`.execute(db).then(() => ({ ok: true, database: true })).catch(() => ({ ok: false, database: false })));
   }
   if (want.has("people")) {
-    const isDefault = tenantId === DEFAULT_TENANT_ID;
+    const tenants = await sql`SELECT COUNT(*)::int AS n FROM zv_tenants`.execute(db);
+    const wholeInstance = tenantId === DEFAULT_TENANT_ID && (tenants.rows[0]?.n ?? 0) <= 1;
     const inForce = sql`valid_from <= now() AND (valid_to IS NULL OR valid_to > now())`;
-    const total = isDefault ? countOf("user", sql`SELECT COUNT(*) AS count FROM "user"`.execute(db)) : countOf("zv_tenant_users", sql`
+    const total = wholeInstance ? countOf("user", sql`SELECT COUNT(*) AS count FROM "user"`.execute(db)) : countOf("zv_tenant_users", sql`
           SELECT COUNT(*) AS count FROM zv_tenant_users
            WHERE tenant_id = ${tenantId}::uuid AND ${inForce}
         `.execute(db));
-    const admins = isDefault ? countOf("user", sql`
+    const admins = wholeInstance ? countOf("user", sql`
           SELECT COUNT(*) AS count FROM "user" WHERE role IN ('god', 'admin')
         `.execute(db)) : countOf("zv_tenant_users", sql`
           SELECT COUNT(*) AS count FROM zv_tenant_users

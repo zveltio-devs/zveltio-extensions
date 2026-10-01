@@ -146,7 +146,8 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
    * is the condition every route asks.
    *
    * Any row, in force or not: a lapsed member is still this tenant's resource
-   * and the IdP must be able to update or deprovision it. `stateOf` reports it.
+   * and the IdP must be able to read and deprovision it. `stateOf` reports it;
+   * `refuseIfLapsed` keeps PUT and PATCH away from it.
    */
   async function isMember(userId: string, tenantId: string): Promise<boolean> {
     // Single-tenant installs have no membership rows at all — the engine's own
@@ -271,6 +272,44 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     `.execute(db);
     const row = r.rows[0];
     return { external_id: row?.external_id ?? null, active: (row?.active ?? true) && row?.in_force === true };
+  }
+
+  /**
+   * PUT and PATCH answer 403 for a member whose membership here is not in force.
+   *
+   * A lapsed tenant has no claim on the account: the business ended the
+   * membership with a date (a contract end), and that date wins over the IdP.
+   * One rule, two consequences:
+   *   • `active: true` does not reopen the membership — there is no reopen path,
+   *     and `stateOf` keeps reporting `active: false` while it is lapsed;
+   *   • `active: false` and profile writes are refused too. Sign-in is
+   *     instance-wide, so a lapsed tenant's IdP could otherwise block — or
+   *     rename — somebody who now works only for another tenant.
+   * Reading (GET) and deprovisioning (DELETE) stay open: the IdP must still see
+   * the user and be able to remove them from this tenant. POST of an existing
+   * lapsed member answers 409 (`isMember` counts any row) and reopens nothing.
+   *
+   * A single-tenant instance has no membership to lapse — in force by
+   * definition, as in `stateOf`.
+   *
+   * ponytail: checked before the write transaction, not under a row lock; a
+   * revocation committed between the two lands one request late.
+   */
+  async function refuseIfLapsed(c: Ctx, userId: string, tenantId: string): Promise<Response | null> {
+    if (await instanceIsSingleTenant()) return null;
+    const r = await sql<{ in_force: boolean }>`
+      SELECT EXISTS (
+        SELECT 1 FROM zv_tenant_users tu
+         WHERE tu.user_id = ${userId} AND tu.tenant_id = ${tenantId}::uuid
+           AND ${MEMBERSHIP_IN_FORCE}) AS in_force
+    `.execute(db);
+    if (r.rows[0]?.in_force === true) return null;
+    return scimError(
+      c,
+      403,
+      "The user's membership in this tenant is not in force (expired or not yet started): " +
+        'it can be read or deprovisioned, not modified.',
+    );
   }
 
   // GET /Users — list; supports the `userName eq "email"` probe every IdP does.
@@ -476,6 +515,8 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     // Membership, not existence — the same reason PATCH checks it this way: a
     // token from one tenant must not be able to write another tenant's users.
     if (!(await isMember(id, tenantId))) return scimError(c, 404, 'User not found');
+    const lapsed = await refuseIfLapsed(c, id, tenantId);
+    if (lapsed) return lapsed;
 
     // biome-ignore lint/suspicious/noExplicitAny: SCIM payload
     const body = (await c.req.json().catch(() => null)) as any;
@@ -523,6 +564,8 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     // Membership, not existence. Checking existence is what let a token from
     // one tenant deactivate another tenant's users.
     if (!(await isMember(id, tenantId))) return scimError(c, 404, 'User not found');
+    const lapsed = await refuseIfLapsed(c, id, tenantId);
+    if (lapsed) return lapsed;
     // biome-ignore lint/suspicious/noExplicitAny: SCIM payload
     const body = (await c.req.json().catch(() => null)) as any;
     if (!body?.schemas?.includes(SCIM_PATCH) || !Array.isArray(body.Operations)) {

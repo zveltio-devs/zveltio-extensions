@@ -313,16 +313,23 @@ async function computeWidgetData(
     // table carries no tenant_id and no RLS, so `db` does not scope this
     // on its own; membership does.
     //
-    // Single-tenant installs have no membership rows (the engine's membership
-    // middleware no-ops for the default tenant), so there the count is the
-    // instance, which is the same thing.
+    // A single-tenant instance needs no membership rows, so there the count is
+    // the instance, which is the same thing.
+    //
+    // The question is whether the INSTANCE is single-tenant, not whether this is
+    // the default tenant — auth/scim's `instanceIsSingleTenant()` asks it the
+    // same way. On a multi-tenant install the default tenant is a tenant like any
+    // other: "default tenant = everyone" is the engine's ACCESS rule
+    // (middleware/tenant-membership.ts), not a headcount, and counting the whole
+    // `user` table there reported every other tenant's staff.
     //
     // Only memberships in force: the engine's `activeMembership()`
     // (lib/tenancy/tenant-scope.ts), inlined because an extension cannot import
     // it. An expired or not-yet-started member is not a person in this tenant.
-    const isDefault = tenantId === DEFAULT_TENANT_ID;
+    const tenants = await sql<{ n: number }>`SELECT COUNT(*)::int AS n FROM zv_tenants`.execute(db);
+    const wholeInstance = tenantId === DEFAULT_TENANT_ID && (tenants.rows[0]?.n ?? 0) <= 1;
     const inForce = sql`valid_from <= now() AND (valid_to IS NULL OR valid_to > now())`;
-    const total = isDefault
+    const total = wholeInstance
       ? countOf('user', sql<{ count: string }>`SELECT COUNT(*) AS count FROM "user"`.execute(db))
       : countOf('zv_tenant_users', sql<{ count: string }>`
           SELECT COUNT(*) AS count FROM zv_tenant_users
@@ -330,7 +337,7 @@ async function computeWidgetData(
         `.execute(db));
     // "admins" now means admins OF THIS TENANT. The number of instance-wide
     // superusers is not a fact a tenant dashboard should be reporting.
-    const admins = isDefault
+    const admins = wholeInstance
       ? countOf('user', sql<{ count: string }>`
           SELECT COUNT(*) AS count FROM "user" WHERE role IN ('god', 'admin')
         `.execute(db))
