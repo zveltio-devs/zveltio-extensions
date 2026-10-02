@@ -1546,6 +1546,30 @@ var Hono2 = class extends Hono {
   }
 };
 
+// /zveltio-extension/node_modules/hono/dist/http-exception.js
+var HTTPException2 = class extends Error {
+  res;
+  status;
+  constructor(status = 500, options) {
+    super(options?.message, { cause: options?.cause });
+    this.res = options?.res;
+    this.status = status;
+  }
+  getResponse() {
+    if (this.res)
+      return new Response(this.res.body, {
+        status: this.status,
+        headers: this.res.headers
+      });
+    return new Response(this.message, { status: this.status });
+  }
+};
+
+// /zveltio-extension/node_modules/hono/dist/utils/buffer.js
+var bufferToFormData2 = (arrayBuffer, contentType) => {
+  return new Response(arrayBuffer, { headers: { "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase()) } }).formData();
+};
+
 // /zveltio-extension/node_modules/hono/dist/utils/url.js
 var tryDecode2 = (str, decoder) => {
   try {
@@ -1571,44 +1595,37 @@ var trimCookieWhitespace = (value) => {
   let end = value.length;
   while (start < end) {
     const charCode = value.charCodeAt(start);
-    if (charCode !== 32 && charCode !== 9) {
+    if (charCode !== 32 && charCode !== 9)
       break;
-    }
     start++;
   }
   while (end > start) {
     const charCode = value.charCodeAt(end - 1);
-    if (charCode !== 32 && charCode !== 9) {
+    if (charCode !== 32 && charCode !== 9)
       break;
-    }
     end--;
   }
   return start === 0 && end === value.length ? value : value.slice(start, end);
 };
 var parse = (cookie, name) => {
-  if (name && cookie.indexOf(name) === -1) {
+  if (name && cookie.indexOf(name) === -1)
     return {};
-  }
   const pairs = cookie.split(";");
-  const parsedCookie = /* @__PURE__ */ Object.create(null);
+  const parsedCookie = Object.create(null);
   for (const pairStr of pairs) {
     const valueStartPos = pairStr.indexOf("=");
-    if (valueStartPos === -1) {
+    if (valueStartPos === -1)
       continue;
-    }
     const cookieName = trimCookieWhitespace(pairStr.substring(0, valueStartPos));
-    if (name && name !== cookieName || !relaxedCookieNameRegEx.test(cookieName) || cookieName in parsedCookie) {
+    if (name && name !== cookieName || !relaxedCookieNameRegEx.test(cookieName) || cookieName in parsedCookie)
       continue;
-    }
     let cookieValue = trimCookieWhitespace(pairStr.substring(valueStartPos + 1));
-    if (cookieValue.startsWith('"') && cookieValue.endsWith('"')) {
+    if (cookieValue.startsWith('"') && cookieValue.endsWith('"'))
       cookieValue = cookieValue.slice(1, -1);
-    }
     if (validCookieValueRegEx.test(cookieValue)) {
       parsedCookie[cookieName] = tryDecodeURIComponent2(cookieValue);
-      if (name) {
+      if (name)
         break;
-      }
     }
   }
   return parsedCookie;
@@ -1618,56 +1635,18 @@ var parse = (cookie, name) => {
 var getCookie = (c, key, prefix) => {
   const cookie = c.req.raw.headers.get("Cookie");
   if (typeof key === "string") {
-    if (!cookie) {
+    if (!cookie)
       return;
-    }
     let finalKey = key;
-    if (prefix === "secure") {
+    if (prefix === "secure")
       finalKey = "__Secure-" + key;
-    } else if (prefix === "host") {
+    else if (prefix === "host")
       finalKey = "__Host-" + key;
-    }
-    const obj2 = parse(cookie, finalKey);
-    return obj2[finalKey];
+    return parse(cookie, finalKey)[finalKey];
   }
-  if (!cookie) {
+  if (!cookie)
     return {};
-  }
-  const obj = parse(cookie);
-  return obj;
-};
-
-// /zveltio-extension/node_modules/hono/dist/http-exception.js
-var HTTPException2 = class extends Error {
-  res;
-  status;
-  constructor(status = 500, options) {
-    super(options?.message, { cause: options?.cause });
-    this.res = options?.res;
-    this.status = status;
-  }
-  getResponse() {
-    if (this.res) {
-      const newResponse = new Response(this.res.body, {
-        status: this.status,
-        headers: this.res.headers
-      });
-      return newResponse;
-    }
-    return new Response(this.message, {
-      status: this.status
-    });
-  }
-};
-
-// /zveltio-extension/node_modules/hono/dist/utils/buffer.js
-var bufferToFormData2 = (arrayBuffer, contentType) => {
-  const response = new Response(arrayBuffer, {
-    headers: {
-      "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase())
-    }
-  });
-  return response.formData();
+  return parse(cookie);
 };
 
 // /zveltio-extension/node_modules/hono/dist/validator/validator.js
@@ -1680,24 +1659,21 @@ var validator = (target, validationFunc) => {
     const contentType = c.req.header("Content-Type");
     switch (target) {
       case "json":
-        if (!contentType || !jsonRegex.test(contentType)) {
+        if (!contentType || !jsonRegex.test(contentType))
           break;
-        }
         try {
           value = await c.req.json();
         } catch {
-          const message = "Malformed JSON in request body";
-          throw new HTTPException2(400, { message });
+          throw new HTTPException2(400, { message: "Malformed JSON in request body" });
         }
         break;
       case "form": {
-        if (!contentType || !(multipartRegex.test(contentType) || urlencodedRegex.test(contentType))) {
+        if (!contentType || !(multipartRegex.test(contentType) || urlencodedRegex.test(contentType)))
           break;
-        }
         let formData;
-        if (c.req.bodyCache.formData) {
+        if (c.req.bodyCache.formData)
           formData = await c.req.bodyCache.formData;
-        } else {
+        else
           try {
             const arrayBuffer = await c.req.arrayBuffer();
             formData = await bufferToFormData2(arrayBuffer, contentType);
@@ -1707,18 +1683,16 @@ var validator = (target, validationFunc) => {
             message += e instanceof Error ? ` ${e.message}` : ` ${String(e)}`;
             throw new HTTPException2(400, { message });
           }
-        }
-        const form = /* @__PURE__ */ Object.create(null);
+        const form = Object.create(null);
         formData.forEach((value2, key) => {
-          if (key.endsWith("[]")) {
+          if (key.endsWith("[]"))
             (form[key] ??= []).push(value2);
-          } else if (Array.isArray(form[key])) {
+          else if (Array.isArray(form[key]))
             form[key].push(value2);
-          } else if (Object.hasOwn(form, key)) {
+          else if (Object.hasOwn(form, key))
             form[key] = [form[key], value2];
-          } else {
+          else
             form[key] = value2;
-          }
         });
         value = form;
         break;
@@ -1736,12 +1710,10 @@ var validator = (target, validationFunc) => {
         break;
       case "cookie":
         value = getCookie(c);
-        break;
     }
     const res = await validationFunc(value, c);
-    if (res instanceof Response) {
+    if (res instanceof Response)
       return res;
-    }
     c.req.addValidatedData(target, res);
     return await next();
   };
@@ -24611,7 +24583,7 @@ async function withOrderNumberRetry(fn, maxAttempts = 5) {
       return await fn();
     } catch (err) {
       const pgErr = err;
-      const isOrderNumberClash = pgErr?.code === "23505" && String(pgErr?.constraint ?? "").includes("order_number");
+      const isOrderNumberClash = String(pgErr?.errno ?? pgErr?.code) === "23505" && String(pgErr?.constraint ?? "").includes("order_number");
       if (!isOrderNumberClash || attempt >= maxAttempts)
         throw err;
     }
@@ -24730,7 +24702,7 @@ function ecommerceRoutes(ctx) {
     const d = c.req.valid("json");
     const row = await sql`
       INSERT INTO zvd_ec_abandoned_carts (session_id, customer_email, customer_name, items, subtotal)
-      VALUES (${d.session_id}, ${d.customer_email ?? null}, ${d.customer_name ?? null}, ${JSON.stringify(d.items)}, ${d.subtotal})
+      VALUES (${d.session_id}, ${d.customer_email ?? null}, ${d.customer_name ?? null}, ${JSON.stringify(d.items)}::text::jsonb, ${d.subtotal})
       ON CONFLICT (session_id) DO UPDATE SET items = EXCLUDED.items, subtotal = EXCLUDED.subtotal,
         customer_email = COALESCE(EXCLUDED.customer_email, zvd_ec_abandoned_carts.customer_email),
         updated_at = NOW()
@@ -24938,7 +24910,7 @@ function ecommerceRoutes(ctx) {
     const d = c.req.valid("json");
     const row = await sql`
       INSERT INTO zvd_ec_product_variants (product_id, sku, name, attributes, price, compare_price, cost, stock_qty, weight, image_url, sort_order)
-      VALUES (${c.req.param("id")}, ${d.sku}, ${d.name}, ${JSON.stringify(d.attributes)},
+      VALUES (${c.req.param("id")}, ${d.sku}, ${d.name}, ${JSON.stringify(d.attributes)}::text::jsonb,
         ${d.price ?? null}, ${d.compare_price ?? null}, ${d.cost ?? null}, ${d.stock_qty},
         ${d.weight ?? null}, ${d.image_url ?? null}, ${d.sort_order})
       RETURNING *
@@ -24992,7 +24964,7 @@ function ecommerceRoutes(ctx) {
     const d = c.req.valid("json");
     const row = await sql`
       INSERT INTO zvd_ec_shipping_zones (name, countries, regions, sort_order, created_by)
-      VALUES (${d.name}, ${JSON.stringify(d.countries)}, ${JSON.stringify(d.regions)}, ${d.sort_order}, ${user.id})
+      VALUES (${d.name}, ${d.countries}, ${d.regions}, ${d.sort_order}, ${user.id})
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
@@ -25141,8 +25113,8 @@ function ecommerceRoutes(ctx) {
         INSERT INTO zvd_ec_orders (order_number, customer_email, customer_name, canonical_contact_id, billing_address, shipping_address,
           payment_method, currency, subtotal, shipping_cost, discount, tax_amount, total,
           coupon_code, shipping_zone_id, notes, created_by)
-        VALUES (${orderNumber}, ${d.customer_email}, ${d.customer_name}, ${canonicalContactId}, ${JSON.stringify(d.billing_address)},
-          ${JSON.stringify(d.shipping_address)}, ${d.payment_method ?? null}, ${d.currency},
+        VALUES (${orderNumber}, ${d.customer_email}, ${d.customer_name}, ${canonicalContactId}, ${JSON.stringify(d.billing_address)}::text::jsonb,
+          ${JSON.stringify(d.shipping_address)}::text::jsonb, ${d.payment_method ?? null}, ${d.currency},
           ${subtotal}, ${shippingCost}, ${discount}, ${taxAmount}, ${total},
           ${couponCode}, ${shippingZoneId}, ${d.notes ?? null}, 'guest')
         RETURNING *
@@ -25358,7 +25330,8 @@ var extension = {
     return [
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
-      join(import.meta.dir, "migrations/003_tenant_scoped_unique_keys.sql")
+      join(import.meta.dir, "migrations/003_tenant_scoped_unique_keys.sql"),
+      join(import.meta.dir, "migrations/004_jsonb_unwrap_string.sql")
     ];
   },
   async register(app, ctx) {
@@ -25369,3 +25342,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
