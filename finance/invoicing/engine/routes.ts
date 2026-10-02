@@ -849,7 +849,7 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
           ${d.issue_date ?? new Date().toISOString().slice(0,10)}, ${d.delivery_date ?? null}, ${d.due_date},
           ${d.currency}, ${subtotal}, ${d.tax_rate}, ${tax_amount}, ${total}, ${discount_amount},
           ${d.discount_percent},
-          ${JSON.stringify(vatBreakdown)}::jsonb, ${d.vat_regime}, ${d.vat_exemption_reason ?? null},
+          ${JSON.stringify(vatBreakdown)}::text::jsonb, ${d.vat_regime}, ${d.vat_exemption_reason ?? null},
           ${d.exchange_rate ?? null}, ${d.exchange_date ?? null}, ${taxAmountRon},
           ${d.notes ?? null}, ${d.footer_notes ?? null}, ${d.po_number ?? null},
           ${d.recurring_interval ?? null}, 0, ${user.authorUserId ?? user.id})
@@ -1202,7 +1202,12 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
           ${newIssue.toISOString().slice(0,10)}, ${newDue.toISOString().slice(0,10)},
           ${i.currency}, ${i.subtotal}, ${i.tax_rate}, ${i.tax_amount}, ${i.total},
           ${i.discount_amount}, ${i.discount_percent},
-          ${i.vat_breakdown}, ${i.vat_regime}, ${i.vat_exemption_reason},
+          ${
+            // Bun.SQL binds a JS array into jsonb as a string scalar, so the
+            // copied breakdown goes through text. A row written before
+            // migration 013 may still hold the JSON as a string: pass its text.
+            typeof i.vat_breakdown === 'string' ? i.vat_breakdown : JSON.stringify(i.vat_breakdown ?? [])
+          }::text::jsonb, ${i.vat_regime}, ${i.vat_exemption_reason},
           ${i.exchange_rate}, ${i.exchange_date}, ${i.tax_amount_ron},
           ${i.notes}, ${i.footer_notes}, ${i.po_number}, ${i.recurring_interval}, 0, ${user.id})
         RETURNING *
