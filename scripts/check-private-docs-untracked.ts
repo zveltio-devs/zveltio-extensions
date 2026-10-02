@@ -42,9 +42,17 @@ for (const root of roots) {
   // `Bun.spawnSync` rather than the `$` shell: this repository's TypeScript
   // config does not see `$` as an export of `bun`, and every other gate here
   // spawns git the same way.
-  const tracked = new TextDecoder()
-    .decode(Bun.spawnSync(['git', '-C', root, 'ls-files', '--', PROTECTED]).stdout)
-    .trim();
+  // The pathspec has no trailing slash: `docs/private/` matches only what is
+  // under a directory, so a FILE tracked at exactly `docs/private` (git add -f,
+  // a merge resurrecting it) was invisible here and the gate passed with it in
+  // the index.
+  const ls = Bun.spawnSync(['git', '-C', root, 'ls-files', '--', PROTECTED.replace(/\/$/, '')]);
+  if (ls.exitCode !== 0) {
+    console.error(`\n❌ ${label}: git ls-files failed — not a repository?\n${ls.stderr}`);
+    failed = true;
+    continue;
+  }
+  const tracked = new TextDecoder().decode(ls.stdout).trim();
 
   if (tracked) {
     const files = tracked.split('\n').filter(Boolean);
@@ -54,7 +62,7 @@ for (const root of roots) {
     console.error(
       `\n   These are working documents in a PUBLIC repository. Untrack them, keeping\n` +
         `   the files on disk:\n\n` +
-        `     git -C ${root} rm -r --cached ${PROTECTED}\n\n` +
+        `     git -C ${root} rm -r --cached ${PROTECTED.replace(/\/$/, '')}\n\n` +
         `   If a document belongs in the open, move it out of ${PROTECTED} rather than\n` +
         `   weakening this gate — the directory is the signal.\n`,
     );
