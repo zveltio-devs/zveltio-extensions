@@ -269,7 +269,7 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
         await sql`
           INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, ip, created_at)
           VALUES ('auth.login_failed', NULL, 'session',
-                  ${JSON.stringify({ provider: 'ldap', username, user_agent: userAgent, error: err?.message })}::jsonb,
+                  ${JSON.stringify({ provider: 'ldap', username, user_agent: userAgent, error: err?.message })}::text::jsonb,
                   ${remoteIp}, NOW())
         `.execute(db);
       } catch (auditErr) {
@@ -324,7 +324,7 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
         await sql`
           INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, ip, created_at)
           VALUES ('auth.login_success', ${u.id}, 'session',
-                  ${JSON.stringify({ provider: 'ldap', username, user_agent: userAgent })}::jsonb,
+                  ${JSON.stringify({ provider: 'ldap', username, user_agent: userAgent })}::text::jsonb,
                   ${remoteIp}, NOW())
         `.execute(trx);
 

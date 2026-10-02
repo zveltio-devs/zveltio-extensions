@@ -151,6 +151,14 @@ d('auth/ldap — a directory sign-in is a session the engine accepts', () => {
     expect(second.status).toBe(200);
     expect(await engineSession(second.headers.get('set-cookie') ?? '')).toBe(id);
     expect(await engineSession(firstCookie)).toBeUndefined();
+    // The audit row's metadata is a JSON object, not a string holding the JSON
+    // (a single `::jsonb` cast under Bun.SQL; run with EXT_HARNESS_DRIVER=bun).
+    const shape = await sql<{ t: string }>`
+      SELECT jsonb_typeof(metadata) AS t FROM zv_audit_log
+       WHERE event_type = 'auth.login_success' AND user_id = ${id}
+    `.execute(db);
+    expect(shape.rows.length).toBeGreaterThan(0);
+    for (const r of shape.rows) expect(r.t).toBe('object');
   });
 
   it('refuses a deactivated user with 403 and no cookie', async () => {

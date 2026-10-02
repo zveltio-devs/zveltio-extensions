@@ -25566,6 +25566,30 @@ function bigint3(params) {
 function date4(params) {
   return _coercedDate(ZodDate, params);
 }
+// /zveltio-extension/node_modules/hono/dist/http-exception.js
+var HTTPException2 = class extends Error {
+  res;
+  status;
+  constructor(status = 500, options) {
+    super(options?.message, { cause: options?.cause });
+    this.res = options?.res;
+    this.status = status;
+  }
+  getResponse() {
+    if (this.res)
+      return new Response(this.res.body, {
+        status: this.status,
+        headers: this.res.headers
+      });
+    return new Response(this.message, { status: this.status });
+  }
+};
+
+// /zveltio-extension/node_modules/hono/dist/utils/buffer.js
+var bufferToFormData2 = (arrayBuffer, contentType) => {
+  return new Response(arrayBuffer, { headers: { "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase()) } }).formData();
+};
+
 // /zveltio-extension/node_modules/hono/dist/utils/url.js
 var tryDecode2 = (str, decoder) => {
   try {
@@ -25591,44 +25615,37 @@ var trimCookieWhitespace = (value) => {
   let end = value.length;
   while (start < end) {
     const charCode = value.charCodeAt(start);
-    if (charCode !== 32 && charCode !== 9) {
+    if (charCode !== 32 && charCode !== 9)
       break;
-    }
     start++;
   }
   while (end > start) {
     const charCode = value.charCodeAt(end - 1);
-    if (charCode !== 32 && charCode !== 9) {
+    if (charCode !== 32 && charCode !== 9)
       break;
-    }
     end--;
   }
   return start === 0 && end === value.length ? value : value.slice(start, end);
 };
 var parse5 = (cookie, name) => {
-  if (name && cookie.indexOf(name) === -1) {
+  if (name && cookie.indexOf(name) === -1)
     return {};
-  }
   const pairs = cookie.split(";");
-  const parsedCookie = /* @__PURE__ */ Object.create(null);
+  const parsedCookie = Object.create(null);
   for (const pairStr of pairs) {
     const valueStartPos = pairStr.indexOf("=");
-    if (valueStartPos === -1) {
+    if (valueStartPos === -1)
       continue;
-    }
     const cookieName = trimCookieWhitespace(pairStr.substring(0, valueStartPos));
-    if (name && name !== cookieName || !relaxedCookieNameRegEx.test(cookieName) || cookieName in parsedCookie) {
+    if (name && name !== cookieName || !relaxedCookieNameRegEx.test(cookieName) || cookieName in parsedCookie)
       continue;
-    }
     let cookieValue = trimCookieWhitespace(pairStr.substring(valueStartPos + 1));
-    if (cookieValue.startsWith('"') && cookieValue.endsWith('"')) {
+    if (cookieValue.startsWith('"') && cookieValue.endsWith('"'))
       cookieValue = cookieValue.slice(1, -1);
-    }
     if (validCookieValueRegEx.test(cookieValue)) {
       parsedCookie[cookieName] = tryDecodeURIComponent2(cookieValue);
-      if (name) {
+      if (name)
         break;
-      }
     }
   }
   return parsedCookie;
@@ -25638,56 +25655,18 @@ var parse5 = (cookie, name) => {
 var getCookie = (c, key, prefix) => {
   const cookie = c.req.raw.headers.get("Cookie");
   if (typeof key === "string") {
-    if (!cookie) {
+    if (!cookie)
       return;
-    }
     let finalKey = key;
-    if (prefix === "secure") {
+    if (prefix === "secure")
       finalKey = "__Secure-" + key;
-    } else if (prefix === "host") {
+    else if (prefix === "host")
       finalKey = "__Host-" + key;
-    }
-    const obj2 = parse5(cookie, finalKey);
-    return obj2[finalKey];
+    return parse5(cookie, finalKey)[finalKey];
   }
-  if (!cookie) {
+  if (!cookie)
     return {};
-  }
-  const obj = parse5(cookie);
-  return obj;
-};
-
-// /zveltio-extension/node_modules/hono/dist/http-exception.js
-var HTTPException2 = class extends Error {
-  res;
-  status;
-  constructor(status = 500, options) {
-    super(options?.message, { cause: options?.cause });
-    this.res = options?.res;
-    this.status = status;
-  }
-  getResponse() {
-    if (this.res) {
-      const newResponse = new Response(this.res.body, {
-        status: this.status,
-        headers: this.res.headers
-      });
-      return newResponse;
-    }
-    return new Response(this.message, {
-      status: this.status
-    });
-  }
-};
-
-// /zveltio-extension/node_modules/hono/dist/utils/buffer.js
-var bufferToFormData2 = (arrayBuffer, contentType) => {
-  const response = new Response(arrayBuffer, {
-    headers: {
-      "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase())
-    }
-  });
-  return response.formData();
+  return parse5(cookie);
 };
 
 // /zveltio-extension/node_modules/hono/dist/validator/validator.js
@@ -25700,24 +25679,21 @@ var validator = (target, validationFunc) => {
     const contentType = c.req.header("Content-Type");
     switch (target) {
       case "json":
-        if (!contentType || !jsonRegex.test(contentType)) {
+        if (!contentType || !jsonRegex.test(contentType))
           break;
-        }
         try {
           value = await c.req.json();
         } catch {
-          const message = "Malformed JSON in request body";
-          throw new HTTPException2(400, { message });
+          throw new HTTPException2(400, { message: "Malformed JSON in request body" });
         }
         break;
       case "form": {
-        if (!contentType || !(multipartRegex.test(contentType) || urlencodedRegex.test(contentType))) {
+        if (!contentType || !(multipartRegex.test(contentType) || urlencodedRegex.test(contentType)))
           break;
-        }
         let formData;
-        if (c.req.bodyCache.formData) {
+        if (c.req.bodyCache.formData)
           formData = await c.req.bodyCache.formData;
-        } else {
+        else
           try {
             const arrayBuffer = await c.req.arrayBuffer();
             formData = await bufferToFormData2(arrayBuffer, contentType);
@@ -25727,18 +25703,16 @@ var validator = (target, validationFunc) => {
             message += e instanceof Error ? ` ${e.message}` : ` ${String(e)}`;
             throw new HTTPException2(400, { message });
           }
-        }
-        const form = /* @__PURE__ */ Object.create(null);
+        const form = Object.create(null);
         formData.forEach((value2, key) => {
-          if (key.endsWith("[]")) {
+          if (key.endsWith("[]"))
             (form[key] ??= []).push(value2);
-          } else if (Array.isArray(form[key])) {
+          else if (Array.isArray(form[key]))
             form[key].push(value2);
-          } else if (Object.hasOwn(form, key)) {
+          else if (Object.hasOwn(form, key))
             form[key] = [form[key], value2];
-          } else {
+          else
             form[key] = value2;
-          }
         });
         value = form;
         break;
@@ -25756,12 +25730,10 @@ var validator = (target, validationFunc) => {
         break;
       case "cookie":
         value = getCookie(c);
-        break;
     }
     const res = await validationFunc(value, c);
-    if (res instanceof Response) {
+    if (res instanceof Response)
       return res;
-    }
     c.req.addValidatedData(target, res);
     return await next();
   };
@@ -32397,7 +32369,7 @@ function ldapRoutes(ctx) {
         await sql`
           INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, ip, created_at)
           VALUES ('auth.login_failed', NULL, 'session',
-                  ${JSON.stringify({ provider: "ldap", username, user_agent: userAgent, error: err?.message })}::jsonb,
+                  ${JSON.stringify({ provider: "ldap", username, user_agent: userAgent, error: err?.message })}::text::jsonb,
                   ${remoteIp}, NOW())
         `.execute(db);
       } catch (auditErr) {
@@ -32427,7 +32399,7 @@ function ldapRoutes(ctx) {
         await sql`
           INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, ip, created_at)
           VALUES ('auth.login_success', ${u.id}, 'session',
-                  ${JSON.stringify({ provider: "ldap", username, user_agent: userAgent })}::jsonb,
+                  ${JSON.stringify({ provider: "ldap", username, user_agent: userAgent })}::text::jsonb,
                   ${remoteIp}, NOW())
         `.execute(trx);
         return { user: u, ...session };
