@@ -350,7 +350,11 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
         });
         break;
       } catch (e: any) {
-        const isNumberClash = e?.code === '23505' && String(e?.constraint ?? '').includes('employee_number');
+        // SQLSTATE is on `errno` under Bun.SQL (its `code` is the generic
+        // ERR_POSTGRES_SERVER_ERROR) and on `code` under `pg`. Reading `code`
+        // alone made this retry dead in production.
+        const isNumberClash =
+          String(e?.errno ?? e?.code) === '23505' && String(e?.constraint ?? '').includes('employee_number');
         if (!isNumberClash || attempt >= 4) throw e;
       }
     }

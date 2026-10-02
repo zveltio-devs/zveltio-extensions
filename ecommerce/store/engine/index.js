@@ -24611,7 +24611,7 @@ async function withOrderNumberRetry(fn, maxAttempts = 5) {
       return await fn();
     } catch (err) {
       const pgErr = err;
-      const isOrderNumberClash = pgErr?.code === "23505" && String(pgErr?.constraint ?? "").includes("order_number");
+      const isOrderNumberClash = String(pgErr?.errno ?? pgErr?.code) === "23505" && String(pgErr?.constraint ?? "").includes("order_number");
       if (!isOrderNumberClash || attempt >= maxAttempts)
         throw err;
     }
