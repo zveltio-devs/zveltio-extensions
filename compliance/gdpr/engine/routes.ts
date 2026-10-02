@@ -158,7 +158,7 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
         // Its id names this erasure in the `user.deleted` row written below.
         const erasure = await sql<{ id: string }>`
           INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, created_at)
-          VALUES ('gdpr.account_deleted', ${userId}, 'user', ${JSON.stringify({ gdpr: true, requested_at: new Date().toISOString() })}::jsonb, NOW())
+          VALUES ('gdpr.account_deleted', ${userId}, 'user', ${JSON.stringify({ gdpr: true, requested_at: new Date().toISOString() })}::text::jsonb, NOW())
           RETURNING id::text
         `.execute(trx);
         // Each optional delete inside a SAVEPOINT, because a try/catch is not

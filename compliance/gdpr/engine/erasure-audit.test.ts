@@ -65,5 +65,11 @@ d('compliance/gdpr — DELETE /delete-my-account', () => {
       SELECT event_type FROM zv_audit_log WHERE id = ${String(metadata.erasure_id)}::uuid
     `.execute(db);
     expect(erasure.rows).toEqual([{ event_type: 'gdpr.account_deleted' }]);
+    // Stored as a JSON object, not as a string holding the JSON — the shape a
+    // single `::jsonb` cast produced under Bun.SQL (run with EXT_HARNESS_DRIVER=bun).
+    const shape = await sql<{ t: string }>`
+      SELECT jsonb_typeof(metadata) AS t FROM zv_audit_log WHERE id = ${String(metadata.erasure_id)}::uuid
+    `.execute(db);
+    expect(shape.rows).toEqual([{ t: 'object' }]);
   });
 });
