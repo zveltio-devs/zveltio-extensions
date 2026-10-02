@@ -40,9 +40,13 @@ async function withOrderNumberRetry<T>(fn: () => Promise<T>, maxAttempts = 5): P
     try {
       return await fn();
     } catch (err) {
-      const pgErr = err as { code?: string; constraint?: string };
+      // SQLSTATE is on `errno` under Bun.SQL, the engine's driver — its `code`
+      // is the generic ERR_POSTGRES_SERVER_ERROR — and on `code` under `pg`.
+      // Reading `code` alone made this retry dead in production.
+      const pgErr = err as { code?: string; errno?: string; constraint?: string };
       const isOrderNumberClash =
-        pgErr?.code === '23505' && String(pgErr?.constraint ?? '').includes('order_number');
+        String(pgErr?.errno ?? pgErr?.code) === '23505' &&
+        String(pgErr?.constraint ?? '').includes('order_number');
       if (!isOrderNumberClash || attempt >= maxAttempts) throw err;
     }
   }
