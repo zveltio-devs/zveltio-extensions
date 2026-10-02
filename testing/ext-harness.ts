@@ -224,7 +224,19 @@ async function getDb(): Promise<any> {
   const { Kysely, PostgresDialect } = (await kyselyP) as any;
   const pg = (await import('pg')) as any;
   _pool = new (pg.Pool ?? pg.default.Pool)({ connectionString: DB_URL, max: 4 });
-  _db = new Kysely({ dialect: new PostgresDialect({ pool: _pool }) });
+  // `EXT_HARNESS_DRIVER=bun` runs the extension on the engine's own Bun.SQL
+  // Kysely instead of `pg`. The two drivers bind a string parameter
+  // differently: `pg` sends text, which Postgres parses, while Bun.SQL types it
+  // as json — so `${JSON.stringify(x)}::jsonb` stores an object under `pg` and
+  // a string scalar in production. A suite on `pg` alone cannot see that class.
+  // Migrations still run on the `pg` pool (multi-statement simple queries).
+  if (process.env.EXT_HARNESS_DRIVER === 'bun') {
+    const src = join(REPO, '..', 'zveltio', 'packages', 'engine', 'src');
+    const { createDb } = (await import(join(src, 'db', 'index.js'))) as any;
+    _db = createDb(DB_URL);
+  } else {
+    _db = new Kysely({ dialect: new PostgresDialect({ pool: _pool }) });
+  }
   // Seed the mock session's user as a REAL row: extension tables commonly carry
   // FK constraints to "user"(id), so writes from route tests would otherwise
   // fail on a foreign-key violation that has nothing to do with the extension.

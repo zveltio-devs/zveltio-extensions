@@ -4928,6 +4928,30 @@ var Hono2 = class extends Hono {
   }
 };
 
+// /zveltio-extension/node_modules/hono/dist/http-exception.js
+var HTTPException2 = class extends Error {
+  res;
+  status;
+  constructor(status = 500, options) {
+    super(options?.message, { cause: options?.cause });
+    this.res = options?.res;
+    this.status = status;
+  }
+  getResponse() {
+    if (this.res)
+      return new Response(this.res.body, {
+        status: this.status,
+        headers: this.res.headers
+      });
+    return new Response(this.message, { status: this.status });
+  }
+};
+
+// /zveltio-extension/node_modules/hono/dist/utils/buffer.js
+var bufferToFormData2 = (arrayBuffer, contentType) => {
+  return new Response(arrayBuffer, { headers: { "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase()) } }).formData();
+};
+
 // /zveltio-extension/node_modules/hono/dist/utils/url.js
 var tryDecode2 = (str, decoder) => {
   try {
@@ -4953,44 +4977,37 @@ var trimCookieWhitespace = (value) => {
   let end = value.length;
   while (start < end) {
     const charCode = value.charCodeAt(start);
-    if (charCode !== 32 && charCode !== 9) {
+    if (charCode !== 32 && charCode !== 9)
       break;
-    }
     start++;
   }
   while (end > start) {
     const charCode = value.charCodeAt(end - 1);
-    if (charCode !== 32 && charCode !== 9) {
+    if (charCode !== 32 && charCode !== 9)
       break;
-    }
     end--;
   }
   return start === 0 && end === value.length ? value : value.slice(start, end);
 };
 var parse = (cookie, name) => {
-  if (name && cookie.indexOf(name) === -1) {
+  if (name && cookie.indexOf(name) === -1)
     return {};
-  }
   const pairs = cookie.split(";");
-  const parsedCookie = /* @__PURE__ */ Object.create(null);
+  const parsedCookie = Object.create(null);
   for (const pairStr of pairs) {
     const valueStartPos = pairStr.indexOf("=");
-    if (valueStartPos === -1) {
+    if (valueStartPos === -1)
       continue;
-    }
     const cookieName = trimCookieWhitespace(pairStr.substring(0, valueStartPos));
-    if (name && name !== cookieName || !relaxedCookieNameRegEx.test(cookieName) || cookieName in parsedCookie) {
+    if (name && name !== cookieName || !relaxedCookieNameRegEx.test(cookieName) || cookieName in parsedCookie)
       continue;
-    }
     let cookieValue = trimCookieWhitespace(pairStr.substring(valueStartPos + 1));
-    if (cookieValue.startsWith('"') && cookieValue.endsWith('"')) {
+    if (cookieValue.startsWith('"') && cookieValue.endsWith('"'))
       cookieValue = cookieValue.slice(1, -1);
-    }
     if (validCookieValueRegEx.test(cookieValue)) {
       parsedCookie[cookieName] = tryDecodeURIComponent2(cookieValue);
-      if (name) {
+      if (name)
         break;
-      }
     }
   }
   return parsedCookie;
@@ -5000,56 +5017,18 @@ var parse = (cookie, name) => {
 var getCookie = (c, key, prefix) => {
   const cookie = c.req.raw.headers.get("Cookie");
   if (typeof key === "string") {
-    if (!cookie) {
+    if (!cookie)
       return;
-    }
     let finalKey = key;
-    if (prefix === "secure") {
+    if (prefix === "secure")
       finalKey = "__Secure-" + key;
-    } else if (prefix === "host") {
+    else if (prefix === "host")
       finalKey = "__Host-" + key;
-    }
-    const obj2 = parse(cookie, finalKey);
-    return obj2[finalKey];
+    return parse(cookie, finalKey)[finalKey];
   }
-  if (!cookie) {
+  if (!cookie)
     return {};
-  }
-  const obj = parse(cookie);
-  return obj;
-};
-
-// /zveltio-extension/node_modules/hono/dist/http-exception.js
-var HTTPException2 = class extends Error {
-  res;
-  status;
-  constructor(status = 500, options) {
-    super(options?.message, { cause: options?.cause });
-    this.res = options?.res;
-    this.status = status;
-  }
-  getResponse() {
-    if (this.res) {
-      const newResponse = new Response(this.res.body, {
-        status: this.status,
-        headers: this.res.headers
-      });
-      return newResponse;
-    }
-    return new Response(this.message, {
-      status: this.status
-    });
-  }
-};
-
-// /zveltio-extension/node_modules/hono/dist/utils/buffer.js
-var bufferToFormData2 = (arrayBuffer, contentType) => {
-  const response = new Response(arrayBuffer, {
-    headers: {
-      "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase())
-    }
-  });
-  return response.formData();
+  return parse(cookie);
 };
 
 // /zveltio-extension/node_modules/hono/dist/validator/validator.js
@@ -5062,24 +5041,21 @@ var validator = (target, validationFunc) => {
     const contentType = c.req.header("Content-Type");
     switch (target) {
       case "json":
-        if (!contentType || !jsonRegex.test(contentType)) {
+        if (!contentType || !jsonRegex.test(contentType))
           break;
-        }
         try {
           value = await c.req.json();
         } catch {
-          const message = "Malformed JSON in request body";
-          throw new HTTPException2(400, { message });
+          throw new HTTPException2(400, { message: "Malformed JSON in request body" });
         }
         break;
       case "form": {
-        if (!contentType || !(multipartRegex.test(contentType) || urlencodedRegex.test(contentType))) {
+        if (!contentType || !(multipartRegex.test(contentType) || urlencodedRegex.test(contentType)))
           break;
-        }
         let formData;
-        if (c.req.bodyCache.formData) {
+        if (c.req.bodyCache.formData)
           formData = await c.req.bodyCache.formData;
-        } else {
+        else
           try {
             const arrayBuffer = await c.req.arrayBuffer();
             formData = await bufferToFormData2(arrayBuffer, contentType);
@@ -5089,18 +5065,16 @@ var validator = (target, validationFunc) => {
             message += e instanceof Error ? ` ${e.message}` : ` ${String(e)}`;
             throw new HTTPException2(400, { message });
           }
-        }
-        const form = /* @__PURE__ */ Object.create(null);
+        const form = Object.create(null);
         formData.forEach((value2, key) => {
-          if (key.endsWith("[]")) {
+          if (key.endsWith("[]"))
             (form[key] ??= []).push(value2);
-          } else if (Array.isArray(form[key])) {
+          else if (Array.isArray(form[key]))
             form[key].push(value2);
-          } else if (Object.hasOwn(form, key)) {
+          else if (Object.hasOwn(form, key))
             form[key] = [form[key], value2];
-          } else {
+          else
             form[key] = value2;
-          }
         });
         value = form;
         break;
@@ -5118,12 +5092,10 @@ var validator = (target, validationFunc) => {
         break;
       case "cookie":
         value = getCookie(c);
-        break;
     }
     const res = await validationFunc(value, c);
-    if (res instanceof Response) {
+    if (res instanceof Response)
       return res;
-    }
     c.req.addValidatedData(target, res);
     return await next();
   };
@@ -24775,7 +24747,7 @@ function crmRoutes(ctx) {
           (${d.first_name}, ${d.last_name ?? null}, ${d.email ?? null},
            ${d.phone ?? null}, ${d.company ?? null}, ${d.job_title ?? null},
            ${d.avatar_url ?? null}, ${d.tags ?? []}, ${d.notes ?? null},
-           ${d.source ?? null}, ${JSON.stringify(d.metadata ?? {})}::jsonb, ${user.id})
+           ${d.source ?? null}, ${JSON.stringify(d.metadata ?? {})}::text::jsonb, ${user.id})
         RETURNING *
       `.execute(db);
     const contact = result.rows[0];
@@ -24812,7 +24784,7 @@ function crmRoutes(ctx) {
       if (k === "organization_id" || k === "organization_role")
         continue;
       if (v !== undefined) {
-        sets.push(`${k} = $${i++}`);
+        sets.push(k === "metadata" ? `${k} = $${i++}::text::jsonb` : `${k} = $${i++}`);
         vals.push(k === "metadata" ? JSON.stringify(v) : v);
       }
     }
@@ -24921,7 +24893,7 @@ function crmRoutes(ctx) {
            ${d.registration_no ?? null}, ${d.type}, ${d.industry ?? null},
            ${d.website ?? null}, ${d.email ?? null}, ${d.phone ?? null},
            ${d.logo_url ?? null}, ${d.tags ?? []}, ${d.notes ?? null},
-           ${JSON.stringify(d.metadata ?? {})}::jsonb, ${user.id})
+           ${JSON.stringify(d.metadata ?? {})}::text::jsonb, ${user.id})
         RETURNING *
       `.execute(db);
     const organization = result.rows[0];
@@ -24952,7 +24924,7 @@ function crmRoutes(ctx) {
     let i = 1;
     for (const [k, v] of Object.entries(d)) {
       if (v !== undefined) {
-        sets.push(`${k} = $${i++}`);
+        sets.push(k === "metadata" ? `${k} = $${i++}::text::jsonb` : `${k} = $${i++}`);
         vals.push(k === "metadata" ? JSON.stringify(v) : v);
       }
     }
@@ -25059,9 +25031,9 @@ function crmRoutes(ctx) {
            ${d.organization_id ?? null}, ${d.contact_id ?? null}, ${d.currency},
            ${d.amount}, ${d.tax_amount}, ${d.total_amount},
            ${d.due_date ?? null}, ${d.paid_date ?? null},
-           ${JSON.stringify(d.line_items ?? [])}::jsonb,
+           ${JSON.stringify(d.line_items ?? [])}::text::jsonb,
            ${d.notes ?? null}, ${d.reference ?? null},
-           ${JSON.stringify(d.metadata ?? {})}::jsonb, ${user.id})
+           ${JSON.stringify(d.metadata ?? {})}::text::jsonb, ${user.id})
         RETURNING *
       `.execute(db);
     return c.json({ data: result.rows[0] }, 201);
@@ -25089,8 +25061,9 @@ function crmRoutes(ctx) {
     let i = 1;
     for (const [k, v] of Object.entries(d)) {
       if (v !== undefined) {
-        sets.push(`${k} = $${i++}`);
-        vals.push(k === "metadata" || k === "line_items" ? JSON.stringify(v) : v);
+        const json2 = k === "metadata" || k === "line_items";
+        sets.push(json2 ? `${k} = $${i++}::text::jsonb` : `${k} = $${i++}`);
+        vals.push(json2 ? JSON.stringify(v) : v);
       }
     }
     if (!sets.length)
@@ -25189,7 +25162,8 @@ var extension = {
       join(import.meta.dir, "migrations/003_tenant_scoped_unique_keys.sql"),
       join(import.meta.dir, "migrations/004_contact_organization_role.sql"),
       join(import.meta.dir, "migrations/005_contact_org_relation.sql"),
-      join(import.meta.dir, "migrations/006_payment_status_compat.sql")
+      join(import.meta.dir, "migrations/006_payment_status_compat.sql"),
+      join(import.meta.dir, "migrations/007_jsonb_unwrap_string.sql")
     ];
   },
   async register(app, ctx) {
@@ -25250,3 +25224,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
