@@ -21,8 +21,9 @@
 -- extension migrations on its own connection, which owns the tables but need
 -- not be a superuser. Without a tenant GUC the policy shows such a role only
 -- the rows with no tenant, so the loop would have repaired those and silently
--- skipped every tenant's data. Where the role does not bypass RLS, FORCE is
--- lifted for the loop and restored after it. The engine runs this file inside
+-- skipped every tenant's data. Where the role does not bypass RLS and owns the
+-- table, FORCE is lifted for the loop and restored after it; a role that does
+-- not own it gets a WARNING instead of an aborted migration chain. The engine runs this file inside
 -- the migration chain's transaction, so a failure cannot leave it lifted.
 --
 -- Idempotent; a no-op where no row is of type `string`.
@@ -36,6 +37,7 @@ DECLARE
   skipped   BIGINT;
   bypass    BOOLEAN;
   forced    BOOLEAN;
+  lift      BOOLEAN;
 BEGIN
   SELECT rolsuper OR rolbypassrls INTO bypass FROM pg_roles WHERE rolname = current_user;
   FOR t IN SELECT * FROM (VALUES
@@ -46,9 +48,15 @@ BEGIN
   LOOP
     recovered := 0;
     skipped := 0;
-    SELECT relforcerowsecurity INTO forced FROM pg_class WHERE oid = t.tbl::regclass;
-    IF forced AND NOT bypass THEN
+    SELECT relforcerowsecurity, relforcerowsecurity AND NOT bypass
+           AND pg_has_role(current_user, relowner, 'MEMBER')
+      INTO forced, lift FROM pg_class WHERE oid = t.tbl::regclass;
+    IF lift THEN
       EXECUTE format('ALTER TABLE %I NO FORCE ROW LEVEL SECURITY', t.tbl);
+    ELSIF forced AND NOT bypass THEN
+      -- Not the owner: ALTER would abort the whole migration chain. Repair what
+      -- is visible and say that the rest was not reached.
+      RAISE WARNING '%: not the owner of %, FORCE RLS kept; rows of other tenants were not repaired.', 'crm 007', t.tbl;
     END IF;
     FOR r IN EXECUTE format(
         'SELECT id, %I #>> ''{}'' AS txt FROM %I WHERE jsonb_typeof(%I) = ''string''',
@@ -67,7 +75,7 @@ BEGIN
         skipped := skipped + 1;
       END IF;
     END LOOP;
-    IF forced AND NOT bypass THEN
+    IF lift THEN
       EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t.tbl);
     END IF;
     IF recovered > 0 THEN
