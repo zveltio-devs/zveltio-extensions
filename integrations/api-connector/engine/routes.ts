@@ -106,6 +106,24 @@ async function resolveOAuth2Token(safeFetch: SafeFetch, dbh: any, connectionId: 
 }
 
 /** HMAC-SHA256 of `body` under `secret`, hex — the shape senders put in the header. */
+/**
+ * The response body as the jsonb the log column holds. A JSON body is kept as
+ * JSON; anything else — HTML, plain text, a body cut at the 10 000-character
+ * cap — is kept as a JSON string. Binding the raw text instead was refused by
+ * Postgres (22P02) on `pg` whenever the body was not JSON, and stored as a
+ * string scalar either way on Bun.SQL.
+ */
+function logBody(text: string): string {
+  if (text.length <= 10_000) {
+    try {
+      return JSON.stringify(JSON.parse(text));
+    } catch {
+      /* not JSON */
+    }
+  }
+  return JSON.stringify(text.slice(0, 10_000));
+}
+
 async function hmacHex(secret: string, body: string): Promise<string> {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -202,7 +220,7 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
     }
     const row = await sql`
       INSERT INTO zvd_api_connections (name, base_url, auth_type, auth_config, headers, default_headers, retry_count, timeout_ms, created_by)
-      VALUES (${d.name}, ${d.base_url}, ${d.auth_type}, ${JSON.stringify(d.auth_config)}, ${JSON.stringify(d.default_headers)}, ${JSON.stringify(d.default_headers)}, ${d.retry_count}, ${d.timeout_ms}, ${user.id})
+      VALUES (${d.name}, ${d.base_url}, ${d.auth_type}, ${JSON.stringify(d.auth_config)}::text::jsonb, ${JSON.stringify(d.default_headers)}::text::jsonb, ${JSON.stringify(d.default_headers)}::text::jsonb, ${d.retry_count}, ${d.timeout_ms}, ${user.id})
       RETURNING id, name, base_url, auth_type, is_active, retry_count, timeout_ms, created_at
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
@@ -220,8 +238,8 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       UPDATE zvd_api_connections SET
         name = COALESCE(${d.name ?? null}, name),
-        auth_config = COALESCE(${d.auth_config ? JSON.stringify(d.auth_config) : null}::jsonb, auth_config),
-        default_headers = COALESCE(${d.default_headers ? JSON.stringify(d.default_headers) : null}::jsonb, default_headers),
+        auth_config = COALESCE(${d.auth_config ? JSON.stringify(d.auth_config) : null}::text::jsonb, auth_config),
+        default_headers = COALESCE(${d.default_headers ? JSON.stringify(d.default_headers) : null}::text::jsonb, default_headers),
         is_active = COALESCE(${d.is_active ?? null}, is_active),
         retry_count = COALESCE(${d.retry_count ?? null}, retry_count),
         timeout_ms = COALESCE(${d.timeout_ms ?? null}, timeout_ms),
@@ -275,7 +293,7 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
     const row = await sql`
       INSERT INTO zvd_api_endpoints (connection_id, name, method, path, description, default_body, default_headers, response_mapping, created_by)
       VALUES (${c.req.param('id')}, ${d.name}, ${d.method}, ${d.path}, ${d.description ?? null},
-        ${d.default_body ?? null}, ${JSON.stringify(d.default_headers)}, ${JSON.stringify(d.response_mapping)}, ${user.id})
+        ${d.default_body ?? null}, ${JSON.stringify(d.default_headers)}::text::jsonb, ${JSON.stringify(d.response_mapping)}::text::jsonb, ${user.id})
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
@@ -318,7 +336,8 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const d = c.req.valid('json');
     const ep = await sql`
-      SELECT e.*, conn.base_url, conn.auth_type, conn.auth_config, conn.default_headers,
+      SELECT e.*, conn.base_url, conn.auth_type, conn.auth_config,
+        conn.default_headers AS conn_default_headers,
         conn.retry_count, conn.timeout_ms
       FROM zvd_api_endpoints e
       JOIN zvd_api_connections conn ON conn.id = e.connection_id
@@ -334,9 +353,15 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
     const qs = new URLSearchParams(d.query_params as Record<string, string>).toString();
     const url = endpoint.base_url.replace(/\/$/, '') + path + (qs ? `?${qs}` : '');
     // Build headers
-    const connHeaders = JSON.parse(typeof endpoint.default_headers === 'string' ? endpoint.default_headers : JSON.stringify(endpoint.default_headers));
-    const epHeaders = JSON.parse(typeof endpoint.default_headers_ep === 'string' ? (endpoint.default_headers_ep || '{}') : '{}');
-    const authConfig = JSON.parse(typeof endpoint.auth_config === 'string' ? endpoint.auth_config : JSON.stringify(endpoint.auth_config));
+    // `conn.default_headers` used to be selected under the same name as
+    // `e.default_headers`, so it overwrote the endpoint's own headers in the
+    // row, and the endpoint side read a `default_headers_ep` column that no
+    // query produces: an endpoint's default headers were never sent.
+    // A value written before migration 004 may still be a JSON string.
+    const asObject = (v: unknown) => (typeof v === 'string' ? JSON.parse(v || '{}') : (v ?? {}));
+    const connHeaders = asObject(endpoint.conn_default_headers);
+    const epHeaders = asObject(endpoint.default_headers);
+    const authConfig = asObject(endpoint.auth_config);
     const headers: Record<string, string> = { 'Content-Type': 'application/json', ...connHeaders, ...epHeaders, ...d.headers };
 
     if (endpoint.auth_type === 'bearer') {
@@ -368,8 +393,8 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
     await sql`
       INSERT INTO zvd_api_logs (endpoint_id, user_id, url, method, request_body, response_status, response_body, duration_ms, error_message, retry_count)
       VALUES (${endpoint.id}, ${user.id}, ${url}, ${endpoint.method},
-        ${d.body ? JSON.stringify(d.body) : null}, ${status_code},
-        ${response_body.slice(0, 10000)}, ${duration_ms}, ${fetchError}, ${retries})
+        ${d.body ? JSON.stringify(d.body) : null}::text::jsonb, ${status_code},
+        ${logBody(response_body)}::text::jsonb, ${duration_ms}, ${fetchError}, ${retries})
     `.execute(db);
 
     if (fetchError) return c.json({ error: fetchError }, 502);
@@ -495,7 +520,7 @@ export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
     await db.transaction().execute(async (trx) => {
       await sql`
         INSERT INTO zvd_webhook_events (webhook_id, payload, headers, source_ip)
-        VALUES (${w.id}, ${JSON.stringify(payload)}, ${JSON.stringify(headers)}, ${c.req.header('x-forwarded-for') ?? null})
+        VALUES (${w.id}, ${JSON.stringify(payload)}::text::jsonb, ${JSON.stringify(headers)}::text::jsonb, ${c.req.header('x-forwarded-for') ?? null})
       `.execute(trx);
       await sql`UPDATE zvd_incoming_webhooks SET last_received_at = NOW() WHERE id = ${w.id}`.execute(trx);
     });

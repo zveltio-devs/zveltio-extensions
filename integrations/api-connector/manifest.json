@@ -3,7 +3,7 @@
   "displayName": "API Connector",
   "category": "integrations",
   "description": "No-code HTTP integrations — connect external REST APIs with field mapping, retry logic and execution logs",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-api-connector",
@@ -41,8 +41,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "f589c790b5209672735166799ea0529354b2830c57d5ef7348f21e166cbf07b2",
-    "sourceSha256": "ba2272a47314bae2749443d8134f3e9048b91aa78499132ad17f703fb1f15dcc"
+    "engineSha256": "d084d5ba826d5963b32605177729f12e002c287d7cb3f7ddbf98b1e6f9d519b2",
+    "sourceSha256": "2324eb126393c6c4aa162a38eeddd3f98a4349bf79c50d59f1100200e67568c9"
   },
   "resources": [
     "api-connector"
