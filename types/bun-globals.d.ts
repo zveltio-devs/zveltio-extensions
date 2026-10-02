@@ -41,3 +41,11 @@ declare module 'bun' {
   const _default: any;
   export default _default;
 }
+
+// `@better-auth/core`'s option types name `bun:sqlite`'s Database. The engine's
+// `lib/runtime/cache.ts` imports a type from `better-auth`, which pulls those
+// declarations into this typecheck through the `../zveltio` alias.
+declare module 'bun:sqlite' {
+  export const Database: any;
+  export type Database = any;
+}
