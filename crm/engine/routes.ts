@@ -238,7 +238,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
           (${d.first_name}, ${d.last_name ?? null}, ${d.email ?? null},
            ${d.phone ?? null}, ${d.company ?? null}, ${d.job_title ?? null},
            ${d.avatar_url ?? null}, ${d.tags ?? []}, ${d.notes ?? null},
-           ${d.source ?? null}, ${JSON.stringify(d.metadata ?? {})}::jsonb, ${user.id})
+           ${d.source ?? null}, ${JSON.stringify(d.metadata ?? {})}::text::jsonb, ${user.id})
         RETURNING *
       `.execute(db);
       const contact = result.rows[0] as any;
@@ -282,7 +282,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
         // an unused legacy `organization_id` column, so this would have written
         // silently to the wrong place and still shown no organization.
         if (k === 'organization_id' || k === 'organization_role') continue;
-        if (v !== undefined) { sets.push(`${k} = $${i++}`); vals.push(k === 'metadata' ? JSON.stringify(v) : v); }
+        if (v !== undefined) { sets.push(k === 'metadata' ? `${k} = $${i++}::text::jsonb` : `${k} = $${i++}`); vals.push(k === 'metadata' ? JSON.stringify(v) : v); }
       }
       if (d.organization_id) {
         await linkContactOrganization(id, d.organization_id, d.organization_role, true);
@@ -405,7 +405,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
            ${d.registration_no ?? null}, ${d.type}, ${d.industry ?? null},
            ${d.website ?? null}, ${d.email ?? null}, ${d.phone ?? null},
            ${d.logo_url ?? null}, ${d.tags ?? []}, ${d.notes ?? null},
-           ${JSON.stringify(d.metadata ?? {})}::jsonb, ${user.id})
+           ${JSON.stringify(d.metadata ?? {})}::text::jsonb, ${user.id})
         RETURNING *
       `.execute(db);
       const organization = result.rows[0] as any;
@@ -438,7 +438,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       const vals: any[] = [];
       let i = 1;
       for (const [k, v] of Object.entries(d)) {
-        if (v !== undefined) { sets.push(`${k} = $${i++}`); vals.push(k === 'metadata' ? JSON.stringify(v) : v); }
+        if (v !== undefined) { sets.push(k === 'metadata' ? `${k} = $${i++}::text::jsonb` : `${k} = $${i++}`); vals.push(k === 'metadata' ? JSON.stringify(v) : v); }
       }
       if (!sets.length) return c.json({ error: 'No fields to update' }, 400);
       const result = await db.executeQuery({ sql: `UPDATE zvd_organizations SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] } as any);
@@ -554,9 +554,9 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
            ${d.organization_id ?? null}, ${d.contact_id ?? null}, ${d.currency},
            ${d.amount}, ${d.tax_amount}, ${d.total_amount},
            ${d.due_date ?? null}, ${d.paid_date ?? null},
-           ${JSON.stringify(d.line_items ?? [])}::jsonb,
+           ${JSON.stringify(d.line_items ?? [])}::text::jsonb,
            ${d.notes ?? null}, ${d.reference ?? null},
-           ${JSON.stringify(d.metadata ?? {})}::jsonb, ${user.id})
+           ${JSON.stringify(d.metadata ?? {})}::text::jsonb, ${user.id})
         RETURNING *
       `.execute(db);
       return c.json({ data: result.rows[0] }, 201);
@@ -587,8 +587,12 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       let i = 1;
       for (const [k, v] of Object.entries(d)) {
         if (v !== undefined) {
-          sets.push(`${k} = $${i++}`);
-          vals.push(k === 'metadata' || k === 'line_items' ? JSON.stringify(v) : v);
+          // `::text::jsonb`, not a bare parameter: Bun.SQL types a string bound
+          // into a jsonb column as json, so the column would hold a STRING whose
+          // text is the JSON (see migration 007).
+          const json = k === 'metadata' || k === 'line_items';
+          sets.push(json ? `${k} = $${i++}::text::jsonb` : `${k} = $${i++}`);
+          vals.push(json ? JSON.stringify(v) : v);
         }
       }
       if (!sets.length) return c.json({ error: 'No fields to update' }, 400);
