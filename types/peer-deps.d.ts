@@ -57,13 +57,3 @@ declare module 'graphql' {
   export default _default;
 }
 
-/**
- * `better-auth` is part of the engine bundle, not an extension peer
- * dep — but extensions that bridge SSO (SAML, LDAP, OIDC) reach into
- * it for type names. Same shape as graphql so namespace uses don't
- * trip TS2709.
- */
-declare module 'better-auth' {
-  const x: any;
-  export = x;
-}

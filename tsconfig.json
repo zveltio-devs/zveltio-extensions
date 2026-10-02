@@ -42,7 +42,7 @@
       ],
       "kysely/*": ["../zveltio/packages/engine/node_modules/kysely/dist/cjs/*"],
       "better-auth": [
-        "../zveltio/packages/engine/node_modules/better-auth/dist/index.d.ts"
+        "../zveltio/packages/engine/node_modules/better-auth/dist/index.d.mts"
       ],
       "better-auth/*": [
         "../zveltio/packages/engine/node_modules/better-auth/dist/*"
