@@ -24702,7 +24702,7 @@ function ecommerceRoutes(ctx) {
     const d = c.req.valid("json");
     const row = await sql`
       INSERT INTO zvd_ec_abandoned_carts (session_id, customer_email, customer_name, items, subtotal)
-      VALUES (${d.session_id}, ${d.customer_email ?? null}, ${d.customer_name ?? null}, ${JSON.stringify(d.items)}, ${d.subtotal})
+      VALUES (${d.session_id}, ${d.customer_email ?? null}, ${d.customer_name ?? null}, ${JSON.stringify(d.items)}::text::jsonb, ${d.subtotal})
       ON CONFLICT (session_id) DO UPDATE SET items = EXCLUDED.items, subtotal = EXCLUDED.subtotal,
         customer_email = COALESCE(EXCLUDED.customer_email, zvd_ec_abandoned_carts.customer_email),
         updated_at = NOW()
@@ -24910,7 +24910,7 @@ function ecommerceRoutes(ctx) {
     const d = c.req.valid("json");
     const row = await sql`
       INSERT INTO zvd_ec_product_variants (product_id, sku, name, attributes, price, compare_price, cost, stock_qty, weight, image_url, sort_order)
-      VALUES (${c.req.param("id")}, ${d.sku}, ${d.name}, ${JSON.stringify(d.attributes)},
+      VALUES (${c.req.param("id")}, ${d.sku}, ${d.name}, ${JSON.stringify(d.attributes)}::text::jsonb,
         ${d.price ?? null}, ${d.compare_price ?? null}, ${d.cost ?? null}, ${d.stock_qty},
         ${d.weight ?? null}, ${d.image_url ?? null}, ${d.sort_order})
       RETURNING *
@@ -24964,7 +24964,7 @@ function ecommerceRoutes(ctx) {
     const d = c.req.valid("json");
     const row = await sql`
       INSERT INTO zvd_ec_shipping_zones (name, countries, regions, sort_order, created_by)
-      VALUES (${d.name}, ${JSON.stringify(d.countries)}, ${JSON.stringify(d.regions)}, ${d.sort_order}, ${user.id})
+      VALUES (${d.name}, ${d.countries}, ${d.regions}, ${d.sort_order}, ${user.id})
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
@@ -25113,8 +25113,8 @@ function ecommerceRoutes(ctx) {
         INSERT INTO zvd_ec_orders (order_number, customer_email, customer_name, canonical_contact_id, billing_address, shipping_address,
           payment_method, currency, subtotal, shipping_cost, discount, tax_amount, total,
           coupon_code, shipping_zone_id, notes, created_by)
-        VALUES (${orderNumber}, ${d.customer_email}, ${d.customer_name}, ${canonicalContactId}, ${JSON.stringify(d.billing_address)},
-          ${JSON.stringify(d.shipping_address)}, ${d.payment_method ?? null}, ${d.currency},
+        VALUES (${orderNumber}, ${d.customer_email}, ${d.customer_name}, ${canonicalContactId}, ${JSON.stringify(d.billing_address)}::text::jsonb,
+          ${JSON.stringify(d.shipping_address)}::text::jsonb, ${d.payment_method ?? null}, ${d.currency},
           ${subtotal}, ${shippingCost}, ${discount}, ${taxAmount}, ${total},
           ${couponCode}, ${shippingZoneId}, ${d.notes ?? null}, 'guest')
         RETURNING *
@@ -25330,7 +25330,8 @@ var extension = {
     return [
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
-      join(import.meta.dir, "migrations/003_tenant_scoped_unique_keys.sql")
+      join(import.meta.dir, "migrations/003_tenant_scoped_unique_keys.sql"),
+      join(import.meta.dir, "migrations/004_jsonb_unwrap_string.sql")
     ];
   },
   async register(app, ctx) {
