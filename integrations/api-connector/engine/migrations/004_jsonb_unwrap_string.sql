@@ -1,0 +1,92 @@
+-- Recover api-connector jsonb values that were stored as JSON string scalars.
+--
+-- Connection auth_config/headers/default_headers, endpoint default_headers/
+-- response_mapping and webhook event payload/headers were bound as
+-- `JSON.stringify(x)` with no cast or a single `::jsonb`. Under Bun.SQL, the
+-- engine's driver, that stores a jsonb STRING whose text is the JSON (measured
+-- 2026-10-02, Bun 1.3.14). The routes now write `::text::jsonb`; this unwraps
+-- the rows already written. Call logs are left alone: a response body is now
+-- deliberately kept as a JSON string when it is not JSON.
+--
+-- A per-row loop, not one UPDATE, for the reason analytics/dashboard 003
+-- records: Postgres does not guarantee the guard runs before the cast, so a
+-- single string that is not JSON would abort the whole statement. Only text
+-- that parses to an object is touched; anything else is left for someone to look at.
+--
+-- ROW LEVEL SECURITY. These tables are FORCE RLS (002), and the engine runs
+-- extension migrations on its own connection, which owns the tables but need
+-- not be a superuser. Without a tenant GUC the policy shows such a role only
+-- the rows with no tenant, so the loop would have repaired those and silently
+-- skipped every tenant's data. Where the role does not bypass RLS and owns the
+-- table, FORCE is lifted for the loop and restored after it; a role that does
+-- not own it gets a WARNING instead of an aborted migration chain. The engine runs this file inside
+-- the migration chain's transaction, so a failure cannot leave it lifted.
+--
+-- Idempotent; a no-op where no row is of type `string`.
+
+DO $$
+DECLARE
+  t         RECORD;
+  r         RECORD;
+  parsed    JSONB;
+  recovered BIGINT;
+  skipped   BIGINT;
+  bypass    BOOLEAN;
+  forced    BOOLEAN;
+  lift      BOOLEAN;
+BEGIN
+  SELECT rolsuper OR rolbypassrls INTO bypass FROM pg_roles WHERE rolname = current_user;
+  FOR t IN SELECT * FROM (VALUES
+      ('zvd_api_connections', 'auth_config', 'object'),
+      ('zvd_api_connections', 'headers', 'object'),
+      ('zvd_api_connections', 'default_headers', 'object'),
+      ('zvd_api_endpoints', 'default_headers', 'object'),
+      ('zvd_api_endpoints', 'response_mapping', 'object'),
+      ('zvd_webhook_events', 'payload', 'object'),
+      ('zvd_webhook_events', 'headers', 'object')) AS v(tbl, col, shape)
+  LOOP
+    recovered := 0;
+    skipped := 0;
+    SELECT relforcerowsecurity, relforcerowsecurity AND NOT bypass
+           AND pg_has_role(current_user, relowner, 'MEMBER')
+      INTO forced, lift FROM pg_class WHERE oid = t.tbl::regclass;
+    IF lift THEN
+      EXECUTE format('ALTER TABLE %I NO FORCE ROW LEVEL SECURITY', t.tbl);
+    ELSIF forced AND NOT bypass THEN
+      -- Not the owner: ALTER would abort the whole migration chain. Repair what
+      -- is visible and say that the rest was not reached.
+      RAISE WARNING '%: not the owner of %, FORCE RLS kept; rows of other tenants were not repaired.', 'integrations/api-connector 004', t.tbl;
+    END IF;
+    FOR r IN EXECUTE format(
+        'SELECT id, %I #>> ''{}'' AS txt FROM %I WHERE jsonb_typeof(%I) = ''string''',
+        t.col, t.tbl, t.col)
+    LOOP
+      BEGIN
+        parsed := r.txt::jsonb;
+      EXCEPTION WHEN others THEN
+        skipped := skipped + 1;
+        CONTINUE;
+      END;
+      IF jsonb_typeof(parsed) = t.shape THEN
+        EXECUTE format('UPDATE %I SET %I = $1 WHERE id = $2', t.tbl, t.col) USING parsed, r.id;
+        recovered := recovered + 1;
+      ELSE
+        skipped := skipped + 1;
+      END IF;
+    END LOOP;
+    IF lift THEN
+      EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t.tbl);
+    END IF;
+    IF recovered > 0 THEN
+      RAISE NOTICE 'integrations/api-connector 004: recovered % %.% value(s) stored as a JSON string.', recovered, t.tbl, t.col;
+    END IF;
+    IF skipped > 0 THEN
+      RAISE WARNING 'integrations/api-connector 004: % %.% value(s) hold a string that is not a JSON %; left untouched.', skipped, t.tbl, t.col, t.shape;
+    END IF;
+  END LOOP;
+END $$;
+
+-- DOWN
+-- Not reversed: re-wrapping recovered values as strings would re-break them,
+-- and nothing tells a recovered row from one written correctly afterwards.
+SELECT 1;
