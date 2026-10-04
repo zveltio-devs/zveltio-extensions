@@ -9,9 +9,9 @@
 // "signed in" here means the engine's `getSession` read the cookie back.
 //
 // The directory is real LDAP over a socket, spoken by the real `ldapts` client.
-// The harness runs no request transaction, so the users already have accounts
-// (as after SCIM, or an earlier login); first-login provisioning inside the
-// request transaction is the engine's harness (`sso-session.test.ts`).
+// The account is the engine's to find or create (`provisionUser`): a first
+// sign-in provisions it, and an address the tenant has no claim to — the
+// instance owner's — signs nobody in.
 import { afterAll, describe, expect, it } from 'bun:test';
 // @ts-ignore — asn1 ships no types; it is ldapts' own BER codec.
 import { Ber, BerReader, BerWriter } from 'asn1';
@@ -100,7 +100,11 @@ d('auth/ldap — a directory sign-in is a session the engine accepts', () => {
   const tag = `${Date.now()}${Math.floor(Math.random() * 1e4)}`;
   const alice = { uid: `alice${tag}`, password: 'pw-alice', mail: `alice-${tag}@ldap.test` };
   const bob = { uid: `bob${tag}`, password: 'pw-bob', mail: `bob-${tag}@ldap.test` };
-  const directory = startDirectory([alice, bob]);
+  const carol = { uid: `carol${tag}`, password: 'pw-carol', mail: `Carol-${tag}@LDAP.test` };
+  // A directory whose `mail` attribute names the instance owner — some
+  // directories let users edit their own.
+  const mallory = { uid: `mallory${tag}`, password: 'pw-mallory', mail: 'ext-harness-uuid@test.local' };
+  const directory = startDirectory([alice, bob, carol, mallory]);
   afterAll(async () => {
     directory.stop();
     await db.destroy();
@@ -162,5 +166,24 @@ d('auth/ldap — a directory sign-in is a session the engine accepts', () => {
     expect(res.headers.get('set-cookie')).toBeNull();
     const rows = await sql`SELECT 1 FROM session WHERE "userId" = ${id}`.execute(db);
     expect(rows.rows).toHaveLength(0);
+  });
+
+  it('a first sign-in provisions the account through the engine', async () => {
+    const login = await setUp();
+    const res = await login(carol);
+    expect(res.status).toBe(200);
+    const id = await engineSession(res.headers.get('set-cookie') ?? '');
+    const row = await sql<{ email: string; emailVerified: boolean; role: string | null }>`
+      SELECT email, "emailVerified", role FROM "user" WHERE id = ${id ?? ''}`.execute(db);
+    // Lower-cased, verified, never god.
+    expect(row.rows[0]).toMatchObject({ email: carol.mail.toLowerCase(), emailVerified: true });
+    expect(row.rows[0]!.role).not.toBe('god');
+  });
+
+  it('a directory address that names the instance owner signs nobody in', async () => {
+    const login = await setUp();
+    const res = await login(mallory);
+    expect(res.status).toBe(403);
+    expect(res.headers.get('set-cookie')).toBeNull();
   });
 });

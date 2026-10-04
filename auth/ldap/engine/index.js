@@ -32322,25 +32322,6 @@ async function upsertLdapConfig(db, config2, encryptSecret) {
     await db.insertInto("zvd_ldap_config").values({ config: value }).execute();
   }
 }
-async function findOrCreateSsoUser(dbh, email3, displayName) {
-  const existing = await sql`
-    SELECT * FROM "user" WHERE email = ${email3} LIMIT 1
-  `.execute(dbh).then((r) => r.rows[0]);
-  if (existing)
-    return existing;
-  const id = crypto.randomUUID();
-  const now = new Date;
-  await sql`
-    INSERT INTO "user" (id, email, name, "emailVerified", "createdAt", "updatedAt")
-    VALUES (${id}, ${email3}, ${displayName || email3.split("@")[0]}, true, ${now}, ${now})
-  `.execute(dbh);
-  const created = await sql`
-    SELECT * FROM "user" WHERE id = ${id} LIMIT 1
-  `.execute(dbh).then((r) => r.rows[0]);
-  if (!created)
-    throw new Error(`[ldap] user ${id} vanished immediately after insert`);
-  return created;
-}
 function ldapRoutes(ctx) {
   const { db, auth, checkPermission, internals } = ctx;
   if (!internals?.createBetterAuthSession) {
@@ -32393,16 +32374,14 @@ function ldapRoutes(ctx) {
     const userAgent = c.req.header("user-agent") ?? null;
     let ldapUser;
     const auditFailure = async (err) => {
-      try {
-        await sql`
-          INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, ip, created_at)
-          VALUES ('auth.login_failed', NULL, 'session',
-                  ${JSON.stringify({ provider: "ldap", username, user_agent: userAgent, error: err?.message })}::jsonb,
-                  ${remoteIp}, NOW())
-        `.execute(db);
-      } catch (auditErr) {
+      await internals.audit({
+        type: "auth.login_failed",
+        resourceType: "session",
+        ip: remoteIp,
+        metadata: { provider: "ldap", username, user_agent: userAgent, error: err?.message }
+      }).catch((auditErr) => {
         console.warn("[ldap] failed-login audit write failed:", auditErr.message);
-      }
+      });
     };
     try {
       ldapUser = await ldapAuthenticate(config2, username, password);
@@ -32417,26 +32396,35 @@ function ldapRoutes(ctx) {
     let signedIn;
     try {
       signedIn = await db.transaction().execute(async (trx) => {
-        const u = await findOrCreateSsoUser(trx, ldapUser.email, ldapUser.displayName);
+        const { user: u } = await internals.provisionUser({
+          email: ldapUser.email,
+          name: ldapUser.displayName || undefined
+        });
         const session = await internals.createBetterAuthSession(trx, u.id, {
           ipAddress: remoteIp === "unknown" ? undefined : remoteIp,
           userAgent: userAgent ?? undefined,
           crossDomain,
           replaceExisting: true
         });
-        await sql`
-          INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, ip, created_at)
-          VALUES ('auth.login_success', ${u.id}, 'session',
-                  ${JSON.stringify({ provider: "ldap", username, user_agent: userAgent })}::jsonb,
-                  ${remoteIp}, NOW())
-        `.execute(trx);
+        await internals.audit({
+          type: "auth.login_success",
+          userId: u.id,
+          resourceType: "session",
+          ip: remoteIp,
+          metadata: { provider: "ldap", username, user_agent: userAgent }
+        });
         return { user: u, ...session };
       });
     } catch (err) {
-      if (err?.code !== "account_disabled")
-        throw err;
-      await auditFailure(err);
-      return c.json({ error: "This account is disabled." }, 403);
+      if (err?.code === "account_disabled") {
+        await auditFailure(err);
+        return c.json({ error: "This account is disabled." }, 403);
+      }
+      if (err?.code === "account_exists") {
+        await auditFailure(err);
+        return c.json({ error: "This directory cannot sign in to that account." }, 403);
+      }
+      throw err;
     }
     const { user, token, setCookie } = signedIn;
     c.header("Set-Cookie", setCookie);

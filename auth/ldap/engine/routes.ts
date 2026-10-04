@@ -133,53 +133,6 @@ async function upsertLdapConfig(
   }
 }
 
-// Find or create a user by email (for SSO sign-in).
-//
-// Every statement here is raw SQL, and the two reads used to be
-// `dbh.selectFrom('user')`. That is refused: `dbh` is `ctx.db`, and
-// createRestrictedDb permits `zvd_*`, the extension's own namespace, and the
-// tables its migrations create — `user` is none of those. Measured, with this
-// extension's real allowedTables:
-//
-//   selectFrom("user"): REFUSED — ExtensionSecurityError
-//   raw SELECT:         OK
-//
-// The same defect as in `auth/saml`, found the same way. Raw SQL works because
-// the table policy guards the query builder's entry points and a raw statement
-// does not pass through them — a hole in the sandbox, not a feature. The INSERT
-// below has always taken this path, so the reads are made consistent with it
-// rather than left as the one form that throws.
-//
-// This is NOT the durable answer: when the engine closes the raw path,
-// `auth/ldap` and `auth/saml` have to be granted `user` in the SAME change, or
-// directory login breaks again — on the write this time. Sessions already go
-// through the host (`createBetterAuthSession`).
-//
-// Better-Auth's `user` table uses camelCase columns ("emailVerified",
-// "createdAt", "updatedAt"). Raw SQL keeps the casing literal so a snake_case
-// typo doesn't silently fail.
-async function findOrCreateSsoUser(dbh: any, email: string, displayName: string): Promise<any> {
-  const existing = await sql<any>`
-    SELECT * FROM "user" WHERE email = ${email} LIMIT 1
-  `.execute(dbh).then((r: any) => r.rows[0]);
-  if (existing) return existing;
-
-  const id = crypto.randomUUID();
-  const now = new Date();
-  await sql`
-    INSERT INTO "user" (id, email, name, "emailVerified", "createdAt", "updatedAt")
-    VALUES (${id}, ${email}, ${displayName || email.split('@')[0]}, true, ${now}, ${now})
-  `.execute(dbh);
-
-  const created = await sql<any>`
-    SELECT * FROM "user" WHERE id = ${id} LIMIT 1
-  `.execute(dbh).then((r: any) => r.rows[0]);
-  // `executeTakeFirstOrThrow` used to provide this. A silent undefined here
-  // would reach `createBetterAuthSession` as a session belonging to nobody.
-  if (!created) throw new Error(`[ldap] user ${id} vanished immediately after insert`);
-  return created;
-}
-
 export function ldapRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission, internals } = ctx;
 
@@ -260,21 +213,20 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
     const userAgent = c.req.header('user-agent') ?? null;
 
     let ldapUser: any;
-    // zv_audit_log column names — match the engine's auditLog() helper
-    // (`event_type` + jsonb metadata) since we can't import it from the
-    // engine module across the extension boundary. Reused for both the
-    // failure path below and the success path further down.
+    // Through the engine (`ctx.internals.audit`): `zv_audit_log` is the
+    // engine's, refused to `ctx.db` since engine #858. A failed write is logged
+    // and does not turn a refused login into a 500.
     const auditFailure = async (err: any) => {
-      try {
-        await sql`
-          INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, ip, created_at)
-          VALUES ('auth.login_failed', NULL, 'session',
-                  ${JSON.stringify({ provider: 'ldap', username, user_agent: userAgent, error: err?.message })}::jsonb,
-                  ${remoteIp}, NOW())
-        `.execute(db);
-      } catch (auditErr) {
-        console.warn('[ldap] failed-login audit write failed:', (auditErr as Error).message);
-      }
+      await internals
+        .audit({
+          type: 'auth.login_failed',
+          resourceType: 'session',
+          ip: remoteIp,
+          metadata: { provider: 'ldap', username, user_agent: userAgent, error: err?.message },
+        })
+        .catch((auditErr) => {
+          console.warn('[ldap] failed-login audit write failed:', (auditErr as Error).message);
+        });
     };
 
     try {
@@ -309,10 +261,21 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
     // better-auth reads sessions only from its cache. `replaceExisting` keeps one
     // live SSO session per user, so a leaked token stops working at the next
     // sign-in.
+    //
+    // The account is the engine's to find or create (`provisionUser`,
+    // `identity:provision`): `"user"` is refused to `ctx.db` since engine #858,
+    // which made every directory sign-in a 500. The engine matches the address
+    // case-insensitively and hands back an existing account only when the
+    // running tenant may claim it — never god, an instance admin, or another
+    // tenant's administrator. That matters here: the address comes from a
+    // directory attribute some directories let users edit themselves.
     let signedIn: { user: any; token: string; setCookie: string };
     try {
       signedIn = await db.transaction().execute(async (trx) => {
-        const u = await findOrCreateSsoUser(trx, ldapUser.email, ldapUser.displayName);
+        const { user: u } = await internals.provisionUser({
+          email: ldapUser.email,
+          name: ldapUser.displayName || undefined,
+        });
 
         const session = await internals.createBetterAuthSession(trx, u.id, {
           ipAddress: remoteIp === 'unknown' ? undefined : remoteIp,
@@ -321,20 +284,28 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
           replaceExisting: true,
         });
 
-        await sql`
-          INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, ip, created_at)
-          VALUES ('auth.login_success', ${u.id}, 'session',
-                  ${JSON.stringify({ provider: 'ldap', username, user_agent: userAgent })}::jsonb,
-                  ${remoteIp}, NOW())
-        `.execute(trx);
+        await internals.audit({
+          type: 'auth.login_success',
+          userId: u.id,
+          resourceType: 'session',
+          ip: remoteIp,
+          metadata: { provider: 'ldap', username, user_agent: userAgent },
+        });
 
         return { user: u, ...session };
       });
     } catch (err: any) {
       // A deactivated account: the directory said yes, the instance says no.
-      if (err?.code !== 'account_disabled') throw err;
-      await auditFailure(err);
-      return c.json({ error: 'This account is disabled.' }, 403);
+      // An account this tenant has no claim to: the person signs in another way.
+      if (err?.code === 'account_disabled') {
+        await auditFailure(err);
+        return c.json({ error: 'This account is disabled.' }, 403);
+      }
+      if (err?.code === 'account_exists') {
+        await auditFailure(err);
+        return c.json({ error: 'This directory cannot sign in to that account.' }, 403);
+      }
+      throw err;
     }
     const { user, token, setCookie } = signedIn;
 
