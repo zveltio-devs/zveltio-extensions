@@ -13,7 +13,7 @@ import { mountForTest } from '../../../testing/ext-harness';
 
 const d = process.env.TEST_DATABASE_URL ? describe : describe.skip;
 
-d('compliance/gdpr — DELETE /delete-my-account', () => {
+d('compliance/gdpr — erasure and export go through the engine', () => {
   const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
   const db = new Kysely<Record<string, never>>({ dialect: new PostgresDialect({ pool }) });
   afterAll(async () => {
@@ -60,10 +60,38 @@ d('compliance/gdpr — DELETE /delete-my-account', () => {
     const { user_id, metadata } = audit.rows[0]!;
     expect(user_id).toBeNull();
     expect(metadata).toMatchObject({ actor: 'self', reason: 'gdpr.erasure' });
-    // The erasure it names is this erasure's own record.
-    const erasure = await sql<{ event_type: string }>`
-      SELECT event_type FROM zv_audit_log WHERE id = ${String(metadata.erasure_id)}::uuid
+    // The erasure it names is this erasure's own record, about this subject.
+    const erasure = await sql<{ event_type: string; resource_id: string }>`
+      SELECT event_type, resource_id FROM zv_audit_log
+       WHERE metadata->>'erasure_id' = ${String(metadata.erasure_id)} AND event_type <> 'user.deleted'
     `.execute(db);
-    expect(erasure.rows).toEqual([{ event_type: 'gdpr.account_deleted' }]);
+    expect(erasure.rows).toEqual([{ event_type: 'gdpr.account_deleted', resource_id: id }]);
+  });
+
+  it('exports what the engine holds about the subject, from every tenant', async () => {
+    const id = crypto.randomUUID();
+    const email = `gdpr-export-${Date.now()}@test.local`;
+    await sql`
+      INSERT INTO "user" (id, name, email, "emailVerified", role, "createdAt", "updatedAt", "twoFactorEnabled")
+      VALUES (${id}, 'Export Me', ${email}, true, 'member', NOW(), NOW(), false)
+    `.execute(db);
+    // A sign-in is recorded with no tenant; a request-scoped read never saw it.
+    await sql`INSERT INTO zv_audit_log (event_type, user_id, resource_type, tenant_id)
+              VALUES ('auth.login_success', ${id}, 'session', NULL)`.execute(db);
+    await sql`INSERT INTO zv_notifications (user_id, title, message) VALUES (${id}, 'hello', 'm')`.execute(db);
+
+    const { app } = await mountForTest(import.meta.dir, { admin: false, user: { id, email } });
+    const res = await app.request('/export-my-data');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      profile: { id: string; email: string } | null;
+      audit_log: Array<{ action: string }>;
+      notifications: Array<{ title: string }>;
+    };
+    expect(body.profile).toMatchObject({ id, email });
+    expect(body.audit_log.map((r) => r.action)).toContain('auth.login_success');
+    expect(body.notifications.map((n) => n.title)).toEqual(['hello']);
+    await sql`DELETE FROM zv_audit_log WHERE user_id = ${id}`.execute(db);
+    await sql`DELETE FROM "user" WHERE id = ${id}`.execute(db);
   });
 });

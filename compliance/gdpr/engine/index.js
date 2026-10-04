@@ -24557,21 +24557,17 @@ function gdprRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const userId = user.id;
-    const [userRow, auditRows, notifRows, apiKeyRows, approvalRows, consentRows] = await Promise.all([
-      sql`SELECT id::text, name, email, "createdAt" AS created_at FROM "user" WHERE id = ${userId}`.execute(db),
-      sql`SELECT event_type AS action, resource_type AS collection, resource_id AS record_id, created_at FROM zv_audit_log WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 1000`.execute(db),
-      sql`SELECT title, message, type, is_read, created_at FROM zv_notifications WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 500`.execute(db),
-      sql`SELECT name, key_prefix, scopes, created_at FROM zv_api_keys WHERE created_by = ${userId}`.execute(db),
-      rowsOrEmptyIfTableAbsent(() => sql`SELECT id::text, collection, record_id, status, requested_at FROM zv_approval_requests WHERE requested_by = ${userId} ORDER BY requested_at DESC`.execute(db)),
+    const [engineData, consentRows] = await Promise.all([
+      ctx.internals.exportUserData(userId),
       rowsOrEmptyIfTableAbsent(() => sql`SELECT purpose, granted, source, created_at, withdrawn_at FROM zvd_gdpr_consents WHERE user_id = ${userId} ORDER BY created_at DESC`.execute(db))
     ]);
     const exportData = {
       exported_at: new Date().toISOString(),
-      profile: userRow.rows[0] || null,
-      audit_log: auditRows.rows,
-      notifications: notifRows.rows,
-      api_keys: apiKeyRows.rows,
-      approval_requests: approvalRows.rows,
+      profile: engineData?.profile ?? null,
+      audit_log: engineData?.audit_log ?? [],
+      notifications: engineData?.notifications ?? [],
+      api_keys: engineData?.api_keys ?? [],
+      approval_requests: engineData?.approval_requests ?? [],
       consents: consentRows.rows
     };
     const json2 = JSON.stringify(exportData, null, 2);
@@ -24603,54 +24599,32 @@ function gdprRoutes(ctx) {
       return c.json({ error: "Invalid password. Account deletion cancelled." }, 403);
     }
     const userId = user.id;
-    const skipped = [];
+    const erasureId = crypto.randomUUID();
     try {
       await db.transaction().execute(async (trx) => {
-        const erasure = await sql`
-          INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, created_at)
-          VALUES ('gdpr.account_deleted', ${userId}, 'user', ${JSON.stringify({ gdpr: true, requested_at: new Date().toISOString() })}::jsonb, NOW())
-          RETURNING id::text
-        `.execute(trx);
-        const optional2 = [
-          ["zv_api_keys", () => sql`DELETE FROM zv_api_keys WHERE created_by = ${userId}`.execute(trx)],
-          ["zv_notifications", () => sql`DELETE FROM zv_notifications WHERE user_id = ${userId}`.execute(trx)],
-          ["zvd_gdpr_consents", () => sql`DELETE FROM zvd_gdpr_consents WHERE user_id = ${userId}`.execute(trx)]
-        ];
-        for (const [index, [label, run]] of optional2.entries()) {
-          const sp = `zv_gdpr_${index}`;
-          await sql.raw(`SAVEPOINT ${sp}`).execute(trx);
-          try {
-            await run();
-            await sql.raw(`RELEASE SAVEPOINT ${sp}`).execute(trx);
-          } catch (err) {
-            await sql.raw(`ROLLBACK TO SAVEPOINT ${sp}`).execute(trx).catch(() => {});
-            skipped.push(`${label}: ${err instanceof Error ? err.message : String(err)}`);
-          }
-        }
+        await sql`DELETE FROM zvd_gdpr_consents WHERE user_id = ${userId}`.execute(trx);
         await ctx.internals.deleteUser(trx, userId, {
           actor: "self",
           reason: "gdpr.erasure",
-          metadata: { erasure_id: erasure.rows[0].id }
+          metadata: { erasure_id: erasureId }
         });
       });
     } catch (err) {
-      console.error("[gdpr] erasure failed for", userId, "| skipped so far:", skipped, "| cause:", err instanceof Error ? err.message : String(err));
+      console.error("[gdpr] erasure failed for", userId, "| cause:", err instanceof Error ? err.message : String(err));
       const status = err?.code === "user_protected" ? 409 : 500;
       return c.json({
         error: "Account deletion failed. The erasure did NOT complete \u2014 see the server log for the cause.",
-        detail: err instanceof Error ? err.message : String(err),
-        skipped
+        detail: err instanceof Error ? err.message : String(err)
       }, status);
     }
-    if (skipped.length > 0) {
-      console.error("[gdpr] erasure incomplete for", userId, skipped);
-      return c.json({
-        success: true,
-        complete: false,
-        message: "Account deleted, but some data could not be cleared and still requires manual erasure.",
-        skipped
-      });
-    }
+    await ctx.internals.audit({
+      type: "gdpr.account_deleted",
+      resourceId: userId,
+      resourceType: "user",
+      metadata: { gdpr: true, erasure_id: erasureId, requested_at: new Date().toISOString() }
+    }).catch((err) => {
+      console.error("[gdpr] erasure", erasureId, "audit write failed:", err.message);
+    });
     return c.json({ success: true, complete: true, message: "Account and all associated data has been deleted" });
   });
   app.post("/consents", zValidator("json", exports_external.object({
