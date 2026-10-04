@@ -24622,18 +24622,13 @@ async function resolveCollection(ctx, userId, collection) {
   const tableName = `zvd_${shortName}`;
   let exists = false;
   try {
-    const r = await sql`
-      SELECT EXISTS (
-        SELECT 1 FROM information_schema.tables WHERE table_name = ${tableName}
-      ) AS exists
-    `.execute(ctx.db);
-    exists = r.rows[0]?.exists ?? false;
+    exists = !!await ctx.DDLManager.getCollection(ctx.db, shortName);
   } catch (err) {
     console.warn(`[postgis] could not check whether ${tableName} exists; refusing access:`, err instanceof Error ? err.message : err);
   }
   if (!exists)
     return null;
-  const canRead = await ctx.checkPermission(userId, `data:${shortName}`, "read").catch(() => false);
+  const canRead = await ctx.checkPermission(userId, shortName, "read").catch(() => false);
   if (!canRead)
     return null;
   return tableName;
@@ -25040,3 +25035,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
