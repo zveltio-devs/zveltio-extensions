@@ -3,7 +3,7 @@
   "displayName": "Data Migrators",
   "category": "integrations",
   "description": "Import your data from HubSpot, Notion and Airtable into Zveltio collections — encrypted connections, field mapping preview, audited runs",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-migrators",
@@ -27,8 +27,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "886dec52b69fe57b2e4a7646edcb3f5c95a1b668e5371fc3c16765f14538a57c",
-    "sourceSha256": "2bd5b3111611c7c2781409af05b17fdee4448275c0027aa6ca43916745ae396f"
+    "engineSha256": "5d18aaa86a68852d6ed5235e6373a2392393c18cb2cbbbfdf51e022894e42efb",
+    "sourceSha256": "a757342cad833378e0a94684596b1a3f1d33d3575f924ac6589a9f8800b3648b"
   },
   "studio": {
     "navGroup": "developer",

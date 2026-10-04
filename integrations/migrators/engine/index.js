@@ -24799,10 +24799,11 @@ function migratorRoutes(ctx) {
       return c.json({ error: "Connection not found" }, 404);
     if (!IDENT.test(target_collection))
       return c.json({ error: "invalid target" }, 400);
-    const colsRes = await sql`
-      SELECT column_name FROM information_schema.columns WHERE table_name = ${target_collection}
-    `.execute(db);
-    const targetCols = new Set(colsRes.rows.map((r) => r.column_name));
+    const collection = target_collection.startsWith("zvd_") ? target_collection.slice(4) : target_collection;
+    if (!IDENT.test(collection))
+      return c.json({ error: "invalid target" }, 400);
+    const table = ctx.DDLManager.getTableName(collection);
+    const targetCols = new Set((await ctx.DDLManager.introspectTable(db, collection)).map((f) => f.name));
     if (targetCols.size === 0) {
       return c.json({ error: `Collection table "${target_collection}" does not exist \u2014 create the collection first` }, 400);
     }
@@ -24824,7 +24825,7 @@ function migratorRoutes(ctx) {
             continue;
           const colSql = sql.join(cols.map(({ col }) => sql.ref(col)), sql`, `);
           const valSql = sql.join(cols.map(({ f }) => sql`${row[f]}`), sql`, `);
-          await sql`INSERT INTO ${sql.table(target_collection)} (${colSql}) VALUES (${valSql})`.execute(trx);
+          await sql`INSERT INTO ${sql.table(table)} (${colSql}) VALUES (${valSql})`.execute(trx);
           imported++;
         }
         await sql`
@@ -24871,3 +24872,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1

@@ -180,11 +180,20 @@ export function migratorRoutes(ctx: ExtensionContext): Hono {
     if (!IDENT.test(target_collection)) return c.json({ error: 'invalid target' }, 400);
 
     // Target must be an existing collection table; import fills the columns
-    // that exist and reports the rest as skipped (v1 — no auto-DDL).
-    const colsRes = await sql<{ column_name: string }>`
-      SELECT column_name FROM information_schema.columns WHERE table_name = ${target_collection}
-    `.execute(db);
-    const targetCols = new Set(colsRes.rows.map((r) => r.column_name));
+    // that exist and reports the rest as skipped (v1 — no auto-DDL). Its columns
+    // come from the engine (`introspectTable`): `ctx.db` refuses
+    // `information_schema` since engine #858, which made every run a 500.
+    // Named with or without the `zvd_` prefix.
+    const collection = target_collection.startsWith('zvd_')
+      ? target_collection.slice(4)
+      : target_collection;
+    if (!IDENT.test(collection)) return c.json({ error: 'invalid target' }, 400);
+    const table: string = ctx.DDLManager.getTableName(collection);
+    const targetCols = new Set(
+      ((await ctx.DDLManager.introspectTable(db, collection)) as Array<{ name: string }>).map(
+        (f) => f.name,
+      ),
+    );
     if (targetCols.size === 0) {
       return c.json({ error: `Collection table "${target_collection}" does not exist — create the collection first` }, 400);
     }
@@ -214,7 +223,7 @@ export function migratorRoutes(ctx: ExtensionContext): Hono {
           if (cols.length === 0) continue;
           const colSql = sql.join(cols.map(({ col }) => sql.ref(col)), sql`, `);
           const valSql = sql.join(cols.map(({ f }) => sql`${row[f]}`), sql`, `);
-          await sql`INSERT INTO ${sql.table(target_collection)} (${colSql}) VALUES (${valSql})`.execute(trx);
+          await sql`INSERT INTO ${sql.table(table)} (${colSql}) VALUES (${valSql})`.execute(trx);
           imported++;
         }
 
