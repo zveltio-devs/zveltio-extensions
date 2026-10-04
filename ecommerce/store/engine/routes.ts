@@ -346,7 +346,10 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
             // "inventory unavailable", and every product was created
             // storefront-only and unlinked, without a word.
             try {
-              const create = await trx.transaction().execute((sp) =>
+              // Kysely types `transaction()` on a transaction as `never`; the
+              // host's handle answers it with a savepoint.
+              const nested = (trx as unknown as typeof db).transaction();
+              const create = await nested.execute((sp) =>
                 sql<any>`
                   INSERT INTO zvd_products (sku, name, description, sale_price, currency, tax_rate, is_active, created_by)
                   VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === 'active'}, ${user.id})

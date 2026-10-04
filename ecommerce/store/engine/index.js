@@ -24838,7 +24838,8 @@ function ecommerceRoutes(ctx) {
             canonicalProductId = existing.id;
           } else {
             try {
-              const create = await trx.transaction().execute((sp) => sql`
+              const nested = trx.transaction();
+              const create = await nested.execute((sp) => sql`
                   INSERT INTO zvd_products (sku, name, description, sale_price, currency, tax_rate, is_active, created_by)
                   VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === "active"}, ${user.id})
                   ON CONFLICT (tenant_id, sku) DO UPDATE SET name = EXCLUDED.name
