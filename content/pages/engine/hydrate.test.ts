@@ -118,6 +118,12 @@ function makeDb(opts: {
       calls.selectedTables.push(table);
       return builder(table);
     },
+    // `ctx.DDLManager`, which reads the registry and the catalog for the resolver.
+    ddl: {
+      getCollection: async (_db: Any, name: string) =>
+        collections.includes(name) ? { name } : null,
+      columnNames: async () => columns,
+    },
   };
   return { db, calls };
 }
@@ -144,7 +150,7 @@ describe('anonymous callers', () => {
   test('a collection the site has not published is refused', async () => {
     const { db } = makeDb({ collections: ['contacts'] });
     const [out] = await resolveBlocks(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: null, tenantId: 't1', publicCollections: [] },
       [listBlock({ collection: 'contacts' })],
     );
@@ -155,7 +161,7 @@ describe('anonymous callers', () => {
   test('a collection the site HAS published is served', async () => {
     const { db } = makeDb({ collections: ['contacts'] });
     const [out] = await resolveBlocks(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: null, tenantId: 't1', publicCollections: ['contacts'] },
       [listBlock({ collection: 'contacts' })],
     );
@@ -170,7 +176,7 @@ describe('anonymous callers', () => {
     for (const table of ['user', 'session', 'account', 'zv_api_keys']) {
       const { db, calls } = makeDb({ collections: ['contacts'] });
       const [out] = await resolveBlocks(
-        { db, engine: makeEngine() },
+        { db, ddl: db.ddl, engine: makeEngine() },
         // Even with the operator having published everything they could.
         { user: null, tenantId: 't1', publicCollections: ['contacts', table] },
         [listBlock({ collection: table })],
@@ -202,7 +208,7 @@ describe('anonymous callers', () => {
     for (const name of ['user', 'session', 'account']) {
       const { db, calls } = makeDb({ collections: [name] });
       const [out] = await resolveBlocks(
-        { db, engine: makeEngine() },
+        { db, ddl: db.ddl, engine: makeEngine() },
         { user: null, tenantId: 't1', publicCollections: [name] },
         [listBlock({ collection: name })],
       );
@@ -220,6 +226,7 @@ describe('anonymous callers', () => {
     await resolveBlocks(
       {
         db,
+        ddl: db.ddl,
         engine: makeEngine({
           getRlsFilters: async () => {
             rlsCalls++;
@@ -239,7 +246,7 @@ describe('authenticated callers', () => {
   test('checkAccess decides, and a refusal yields no rows', async () => {
     const { db } = makeDb({ collections: ['contacts'] });
     const [out] = await resolveBlocks(
-      { db, engine: makeEngine({ checkAccess: async () => false }) },
+      { db, ddl: db.ddl, engine: makeEngine({ checkAccess: async () => false }) },
       { user: { id: 'u1', role: 'member' }, tenantId: 't1' },
       [listBlock({ collection: 'contacts' })],
     );
@@ -250,7 +257,7 @@ describe('authenticated callers', () => {
   test('the site list is irrelevant once there is a user', async () => {
     const { db } = makeDb({ collections: ['contacts'] });
     const [out] = await resolveBlocks(
-      { db, engine: makeEngine({ checkAccess: async () => true }) },
+      { db, ddl: db.ddl, engine: makeEngine({ checkAccess: async () => true }) },
       // publicCollections empty, but the user passed checkAccess
       { user: { id: 'u1', role: 'member' }, tenantId: 't1', publicCollections: [] },
       [listBlock({ collection: 'contacts' })],
@@ -265,6 +272,7 @@ describe('authenticated callers', () => {
     await resolveBlocks(
       {
         db,
+        ddl: db.ddl,
         engine: makeEngine({
           getColumnAccess: async (...args: unknown[]) => {
             seen.push(args);
@@ -299,6 +307,7 @@ describe('authenticated callers', () => {
     const [out] = await resolveBlocks(
       {
         db,
+        ddl: db.ddl,
         engine: makeEngine({
           getColumnAccess: async () => ({ hidden: new Set(['notes']), readOnly: new Set() }),
           applyColumnAccess: (r: Any, access: Any) => {
@@ -320,7 +329,7 @@ describe('field, filter and sort names', () => {
   test('only real columns reach the select list', async () => {
     const { db, calls } = makeDb({ collections: ['contacts'] });
     await resolveBlocks(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: { id: 'u1', role: 'member' }, tenantId: 't1' },
       [listBlock({ collection: 'contacts', display_fields: 'first_name,password,nope' })],
     );
@@ -331,7 +340,7 @@ describe('field, filter and sort names', () => {
   test('naming only unknown fields is a refusal, not "all columns"', async () => {
     const { db, calls } = makeDb({ collections: ['contacts'] });
     const [out] = await resolveBlocks(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: { id: 'u1', role: 'member' }, tenantId: 't1' },
       [listBlock({ collection: 'contacts', display_fields: 'password,token' })],
     );
@@ -345,6 +354,7 @@ describe('field, filter and sort names', () => {
     await resolveBlocks(
       {
         db,
+        ddl: db.ddl,
         engine: makeEngine({
           buildCondition: (f: string) => {
             built++;
@@ -372,6 +382,7 @@ describe('field, filter and sort names', () => {
     await resolveBlocks(
       {
         db,
+        ddl: db.ddl,
         engine: makeEngine({
           buildCondition: (_f: string, cond: Any) => {
             ops.push(cond.op);
@@ -399,7 +410,7 @@ describe('field, filter and sort names', () => {
   test('an unknown sort column falls back instead of reaching the query', async () => {
     const { db, calls } = makeDb({ collections: ['contacts'] });
     await resolveBlocks(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: { id: 'u1', role: 'member' }, tenantId: 't1' },
       [listBlock({ collection: 'contacts', sort_field: 'password' })],
     );
@@ -409,7 +420,7 @@ describe('field, filter and sort names', () => {
   test('the limit is clamped', async () => {
     const { db, calls } = makeDb({ collections: ['contacts'] });
     await resolveBlocks(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: { id: 'u1', role: 'member' }, tenantId: 't1' },
       [listBlock({ collection: 'contacts', limit: 100000 })],
     );
@@ -420,7 +431,7 @@ describe('field, filter and sort names', () => {
   test('rows are scoped to the request tenant', async () => {
     const { db, calls } = makeDb({ collections: ['contacts'] });
     await resolveBlocks(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: { id: 'u1', role: 'member' }, tenantId: 'tenant-a' },
       [listBlock({ collection: 'contacts' })],
     );
@@ -436,7 +447,7 @@ describe('non-data blocks', () => {
       { type: 'richtext', content: { content: '<p>x</p>' } },
     ];
     const out = await resolveBlocks(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: null, tenantId: 't1' },
       input,
     );
@@ -447,7 +458,7 @@ describe('non-data blocks', () => {
   test('a migrated view keeps its field list, which arrives as objects', async () => {
     const { db, calls } = makeDb({ collections: ['contacts'] });
     await resolveBlocks(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: { id: 'u1', role: 'member' }, tenantId: 't1' },
       [
         listBlock({
@@ -466,7 +477,7 @@ describe('paging', () => {
     const { db, calls } = makeDb({ collections: ['contacts'] });
     const { resolveBlockAt } = await import('./hydrate.js');
     await resolveBlockAt(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: { id: 'u1', role: 'member' }, tenantId: 't1' },
       listBlock({ collection: 'contacts', limit: 5 }),
       { offset: 10 },
@@ -481,7 +492,7 @@ describe('paging', () => {
     const { db } = makeDb({ collections: ['contacts'], rows });
     const { resolveBlockAt } = await import('./hydrate.js');
     const out = await resolveBlockAt(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: { id: 'u1', role: 'member' }, tenantId: 't1' },
       listBlock({ collection: 'contacts', limit: 5 }),
       { offset: 0 },
@@ -497,7 +508,7 @@ describe('paging', () => {
     const { db } = makeDb({ collections: ['contacts'], rows });
     const { resolveBlockAt } = await import('./hydrate.js');
     const out = await resolveBlockAt(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: { id: 'u1', role: 'member' }, tenantId: 't1' },
       listBlock({ collection: 'contacts', limit: 5 }),
       { offset: 5 },
@@ -510,7 +521,7 @@ describe('paging', () => {
     const { db } = makeDb({ collections: ['contacts'] });
     const { resolveBlockAt } = await import('./hydrate.js');
     const out = await resolveBlockAt(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: null, tenantId: 't1', publicCollections: [] },
       listBlock({ collection: 'contacts' }),
       { offset: 50 },
@@ -523,7 +534,7 @@ describe('paging', () => {
     const { db, calls } = makeDb({ collections: ['contacts'] });
     const { resolveBlockAt } = await import('./hydrate.js');
     await resolveBlockAt(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: { id: 'u1', role: 'member' }, tenantId: 't1' },
       listBlock({ collection: 'contacts' }),
       { offset: -100 },
@@ -540,7 +551,7 @@ describe('containers', () => {
   test('a data block inside a container is resolved', async () => {
     const { db } = makeDb({ collections: ['contacts'] });
     const [out] = await resolveBlocks(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: { id: 'u1', role: 'member' }, tenantId: 't1' },
       [container([listBlock({ collection: 'contacts' })])],
     );
@@ -552,7 +563,7 @@ describe('containers', () => {
     // somewhere else: one gate, at every depth.
     const { db } = makeDb({ collections: ['contacts'] });
     const [out] = await resolveBlocks(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: null, tenantId: 't1', publicCollections: [] },
       [container([listBlock({ collection: 'contacts' })])],
     );
@@ -563,7 +574,7 @@ describe('containers', () => {
   test('a table that is not a collection is refused inside a container too', async () => {
     const { db, calls } = makeDb({ collections: ['contacts'] });
     const [out] = await resolveBlocks(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: null, tenantId: 't1', publicCollections: ['user'] },
       [container([listBlock({ collection: 'user' })])],
     );
@@ -574,7 +585,7 @@ describe('containers', () => {
   test('nesting goes deeper than one level', async () => {
     const { db } = makeDb({ collections: ['contacts'] });
     const [out] = await resolveBlocks(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: { id: 'u1', role: 'member' }, tenantId: 't1' },
       [container([container([listBlock({ collection: 'contacts' })])])],
     );
@@ -585,7 +596,7 @@ describe('containers', () => {
     const { db } = makeDb({});
     const kid = { id: 'k', type: 'richtext', content: { content: '<p>x</p>' } };
     const [out] = await resolveBlocks(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: null, tenantId: 't1' },
       [container([kid])],
     );
@@ -596,7 +607,7 @@ describe('containers', () => {
     const { db } = makeDb({});
     const empty = { id: 'box', type: 'container', content: { gap: 'md' } };
     const [out] = await resolveBlocks(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: null, tenantId: 't1' },
       [empty],
     );
@@ -616,7 +627,7 @@ describe('what a visitor may vary', () => {
     const { db, calls } = makeDb({ collections: ['contacts'], ...over });
     const { resolveBlockAt } = await import('./hydrate.js');
     const out = await resolveBlockAt(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: { id: 'u1', role: 'member' }, tenantId: 't1' },
       listBlock(content),
       viewer,
@@ -655,6 +666,7 @@ describe('what a visitor may vary', () => {
     await resolveBlockAt(
       {
         db,
+        ddl: db.ddl,
         engine: makeEngine({
           getColumnAccess: async () => ({ hidden: new Set(['notes']), readOnly: new Set() }),
         }),
@@ -673,6 +685,7 @@ describe('what a visitor may vary', () => {
     await resolveBlockAt(
       {
         db,
+        ddl: db.ddl,
         engine: makeEngine({
           buildCondition: (f: string) => { built.push(f); return {}; },
           getColumnAccess: async () => ({ hidden: new Set(['notes']), readOnly: new Set() }),
@@ -692,6 +705,7 @@ describe('what a visitor may vary', () => {
     await resolveBlockAt(
       {
         db,
+        ddl: db.ddl,
         engine: makeEngine({
           buildCondition: (f: string, cond: Any) => { built.push(`${f}:${cond.op}`); return {}; },
         }),
@@ -710,6 +724,7 @@ describe('what a visitor may vary', () => {
     await resolveBlockAt(
       {
         db,
+        ddl: db.ddl,
         engine: makeEngine({
           buildCondition: (f: string) => { built.push(f); return {}; },
         }),
@@ -727,7 +742,7 @@ describe('what a visitor may vary', () => {
     const { db } = makeDb({ collections: ['contacts'] });
     const { resolveBlockAt } = await import('./hydrate.js');
     await resolveBlockAt(
-      { db, engine: makeEngine({ buildCondition: (f: string) => { built.push(f); return {}; } }) },
+      { db, ddl: db.ddl, engine: makeEngine({ buildCondition: (f: string) => { built.push(f); return {}; } }) },
       { user: { id: 'u1', role: 'member' }, tenantId: 't1' },
       listBlock({ collection: 'contacts' }),
       { q: '   ' },
@@ -747,7 +762,7 @@ describe('what a visitor may vary', () => {
     const { db } = makeDb({ collections: ['contacts'] });
     const { resolveBlockAt } = await import('./hydrate.js');
     const out = await resolveBlockAt(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: null, tenantId: 't1', publicCollections: [] },
       listBlock({ collection: 'contacts' }),
       { sort: 'first_name', q: 'ana', offset: 20 },
@@ -783,7 +798,7 @@ describe('a record page filters which rows have an address', () => {
     });
     const { resolveRecord } = await import('./hydrate.js');
     const row = await resolveRecord(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       audience,
       'contacts',
       'slug',
@@ -876,7 +891,7 @@ describe('a record page filters which rows have an address', () => {
     const { db, calls } = makeDb({ collections: ['contacts'] });
     const { resolveRecord } = await import('./hydrate.js');
     const row = await resolveRecord(
-      { db, engine: makeEngine() },
+      { db, ddl: db.ddl, engine: makeEngine() },
       { user: null, tenantId: 't1', publicCollections: [] },
       'contacts',
       'slug',
@@ -902,7 +917,7 @@ describe('a failed policy lookup hides, it does not reveal', () => {
     test(`collection_list: ${failing} failing yields no rows`, async () => {
       const { db } = makeDb({ collections: ['contacts'] });
       const [out] = await resolveBlocks(
-        { db, engine: makeEngine({ [failing]: down }) },
+        { db, ddl: db.ddl, engine: makeEngine({ [failing]: down }) },
         user,
         [listBlock({ collection: 'contacts' })],
       );
@@ -919,7 +934,7 @@ describe('a failed policy lookup hides, it does not reveal', () => {
       const { resolveRecord } = await import('./hydrate.js');
       await expect(
         resolveRecord(
-          { db, engine: makeEngine({ [failing]: down }) },
+          { db, ddl: db.ddl, engine: makeEngine({ [failing]: down }) },
           user,
           'contacts',
           'slug',

@@ -51,6 +51,15 @@ export interface HydrateDeps {
   db: Any;
   /** `ctx.internals` — the engine helpers. Never reimplement one of these. */
   engine: ExtensionInternals;
+  /**
+   * `ctx.DDLManager` — the collection registry and the table's columns. Both
+   * are engine metadata `ctx.db` refuses to an extension (#858, #870), so they
+   * are read through the host, which runs its own SQL for them.
+   */
+  ddl: {
+    getCollection(db: Any, name: string): Promise<{ name: string } | null>;
+    columnNames(db: Any, name: string): Promise<string[]>;
+  };
 }
 
 export interface HydrateAudience {
@@ -104,11 +113,7 @@ export function createCollectionCache(deps: HydrateDeps) {
     // answer, reached without ever having asked the question. Both are refusals
     // so nothing leaks either way, but the caller logs a thrown error and stays
     // silent about an absent row, and only one of those deserves attention.
-    const row = await deps.db
-      .selectFrom('zvd_collections')
-      .select(['name'])
-      .where('name', '=', name)
-      .executeTakeFirst();
+    const row = await deps.ddl.getCollection(deps.db, name);
 
     if (!row) {
       seen.set(name, null);
@@ -119,12 +124,7 @@ export function createCollectionCache(deps: HydrateDeps) {
     // cannot disagree with the table, and a field list that has drifted from the
     // DDL would otherwise decide what a caller is allowed to name.
     const table = `zvd_${name}`;
-    const cols: Array<{ column_name: string }> = await deps.db
-      .selectFrom('information_schema.columns as c')
-      .select(['c.column_name as column_name'])
-      .where('c.table_schema', '=', 'public')
-      .where('c.table_name', '=', table)
-      .execute();
+    const cols = await deps.ddl.columnNames(deps.db, name);
 
     if (cols.length === 0) {
       // Registered but not materialised — a collection mid-DDL. Nothing to read.
@@ -135,7 +135,7 @@ export function createCollectionCache(deps: HydrateDeps) {
     const meta: CollectionMeta = {
       name,
       table,
-      columns: new Set(cols.map((c: { column_name: string }) => c.column_name)),
+      columns: new Set(cols),
     };
     seen.set(name, meta);
     return meta;

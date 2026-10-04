@@ -161,6 +161,7 @@ const ENGINE_MEMBERS = [
   'audit',
   'getUserNames',
   'exportUserData',
+  'resolveUserRole',
 ] as const;
 
 /**
@@ -174,6 +175,7 @@ const DDL_READS = new Set([
   'getRelations',
   'tableExists',
   'introspectTable',
+  'columnNames',
   'getTableName',
 ]);
 

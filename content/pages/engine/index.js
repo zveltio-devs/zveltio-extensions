@@ -276,7 +276,7 @@ var init_bin_trie_flags = __esm(() => {
 });
 
 // /zveltio-extension/node_modules/entities/dist/decode.js
-function isNumber2(code) {
+function isNumber(code) {
   return code - CharCodes.ZERO >>> 0 <= 9;
 }
 function isHexadecimalCharacter(code) {
@@ -286,7 +286,7 @@ function isAlpha(code) {
   return (code | TO_LOWER_BIT) - CharCodes.LOWER_A >>> 0 <= 25;
 }
 function isEntityInAttributeInvalidEnd(code) {
-  return code === CharCodes.EQUALS || isAlpha(code) || isNumber2(code);
+  return code === CharCodes.EQUALS || isAlpha(code) || isNumber(code);
 }
 
 class EntityDecoder {
@@ -357,7 +357,7 @@ class EntityDecoder {
     let { consumed } = this;
     while (offset < inputLength) {
       const char = input2.charCodeAt(offset);
-      if (isNumber2(char) || isHexadecimalCharacter(char)) {
+      if (isNumber(char) || isHexadecimalCharacter(char)) {
         const digit = char <= CharCodes.NINE ? char - CharCodes.ZERO : (char | TO_LOWER_BIT) - CharCodes.LOWER_A + 10;
         result = result * 16 + digit;
         consumed += 1;
@@ -2561,14 +2561,14 @@ var init_dist3 = __esm(() => {
   })(EncodingMode || (EncodingMode = {}));
 });
 
-// /zveltio-extension/node_modules/dom-serializer/dist/foreign-names.js
+// /zveltio-extension/node_modules/domutils/node_modules/dom-serializer/dist/foreign-names.js
 var elementNames, attributeNames;
 var init_foreign_names = __esm(() => {
   elementNames = new Map("altGlyph altGlyphDef altGlyphItem animateColor animateMotion animateTransform clipPath feBlend feColorMatrix feComponentTransfer feComposite feConvolveMatrix feDiffuseLighting feDisplacementMap feDistantLight feDropShadow feFlood feFuncA feFuncB feFuncG feFuncR feGaussianBlur feImage feMerge feMergeNode feMorphology feOffset fePointLight feSpecularLighting feSpotLight feTile feTurbulence foreignObject glyphRef linearGradient radialGradient textPath".split(" ").map((name) => [name.toLowerCase(), name]));
   attributeNames = new Map("definitionURL attributeName attributeType baseFrequency baseProfile calcMode clipPathUnits diffuseConstant edgeMode filterUnits glyphRef gradientTransform gradientUnits kernelMatrix kernelUnitLength keyPoints keySplines keyTimes lengthAdjust limitingConeAngle markerHeight markerUnits markerWidth maskContentUnits maskUnits numOctaves pathLength patternContentUnits patternTransform patternUnits pointsAtX pointsAtY pointsAtZ preserveAlpha preserveAspectRatio primitiveUnits refX refY repeatCount repeatDur requiredExtensions requiredFeatures specularConstant specularExponent spreadMethod startOffset stdDeviation stitchTiles surfaceScale systemLanguage tableValues targetX targetY textLength viewBox viewTarget xChannelSelector yChannelSelector zoomAndPan".split(" ").map((name) => [name.toLowerCase(), name]));
 });
 
-// /zveltio-extension/node_modules/dom-serializer/dist/index.js
+// /zveltio-extension/node_modules/domutils/node_modules/dom-serializer/dist/index.js
 function render(node3, options = {}) {
   const nodes = "length" in node3 ? node3 : [node3];
   const xmlMode = options.xmlMode ?? false;
@@ -3173,18 +3173,18 @@ var exports_is_plain_object = {};
 __export(exports_is_plain_object, {
   isPlainObject: () => isPlainObject2
 });
-function isObject3(o) {
+function isObject2(o) {
   return Object.prototype.toString.call(o) === "[object Object]";
 }
 function isPlainObject2(o) {
   var ctor, prot;
-  if (isObject3(o) === false)
+  if (isObject2(o) === false)
     return false;
   ctor = o.constructor;
   if (ctor === undefined)
     return true;
   prot = ctor.prototype;
-  if (isObject3(prot) === false)
+  if (isObject2(prot) === false)
     return false;
   if (prot.hasOwnProperty("isPrototypeOf") === false) {
     return false;
@@ -5257,7 +5257,7 @@ var require_document = __commonJS((exports, module) => {
   Document2.default = Document2;
 });
 
-// /zveltio-extension/node_modules/nanoid/non-secure/index.cjs
+// /zveltio-extension/node_modules/postcss/node_modules/nanoid/non-secure/index.cjs
 var require_non_secure = __commonJS((exports, module) => {
   var urlAlphabet = "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict";
   var customAlphabet = (alphabet, defaultSize = 21) => {
@@ -7520,7 +7520,7 @@ var require_input = __commonJS((exports, module) => {
   }
 });
 
-// /zveltio-extension/node_modules/postcss/lib/root.js
+// /zveltio-extension/node_modules/postcss/lib/zveltio-extension.js
 var require_root = __commonJS((exports, module) => {
   var Container = require_container();
   var LazyResult;
@@ -13011,3388 +13011,6 @@ function zValidatorFunction(target, schema, hook, options) {
 }
 var zValidator = zValidatorFunction;
 
-// /zveltio-extension/node_modules/kysely/dist/util/object-utils.js
-function isUndefined(obj) {
-  return typeof obj === "undefined" || obj === undefined;
-}
-function isString(obj) {
-  return typeof obj === "string";
-}
-function isNumber(obj) {
-  return typeof obj === "number";
-}
-function isBoolean(obj) {
-  return typeof obj === "boolean";
-}
-function isNull(obj) {
-  return obj === null;
-}
-function isBigInt(obj) {
-  return typeof obj === "bigint";
-}
-function isFunction(obj) {
-  return typeof obj === "function";
-}
-function isObject(obj) {
-  return typeof obj === "object" && obj !== null;
-}
-function freeze(obj) {
-  return Object.freeze(obj);
-}
-function asArray(arg) {
-  if (isReadonlyArray(arg)) {
-    return arg;
-  } else {
-    return [arg];
-  }
-}
-function isReadonlyArray(arg) {
-  return Array.isArray(arg);
-}
-function getMessage(error) {
-  return error instanceof Error ? error.message : String(error);
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/identifier-node.js
-var IdentifierNode = freeze({
-  is(node) {
-    return node.kind === "IdentifierNode";
-  },
-  create(name) {
-    return freeze({
-      kind: "IdentifierNode",
-      name
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/schemable-identifier-node.js
-var SchemableIdentifierNode = freeze({
-  is(node) {
-    return node.kind === "SchemableIdentifierNode";
-  },
-  create(identifier) {
-    return freeze({
-      kind: "SchemableIdentifierNode",
-      identifier: IdentifierNode.create(identifier)
-    });
-  },
-  createWithSchema(schema, identifier) {
-    return freeze({
-      kind: "SchemableIdentifierNode",
-      schema: IdentifierNode.create(schema),
-      identifier: IdentifierNode.create(identifier)
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/alias-node.js
-var AliasNode = freeze({
-  is(node) {
-    return node.kind === "AliasNode";
-  },
-  create(node, alias) {
-    return freeze({
-      kind: "AliasNode",
-      node,
-      alias
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/table-node.js
-var TableNode = freeze({
-  is(node) {
-    return node.kind === "TableNode";
-  },
-  create(table) {
-    return freeze({
-      kind: "TableNode",
-      table: SchemableIdentifierNode.create(table)
-    });
-  },
-  createWithSchema(schema, table) {
-    return freeze({
-      kind: "TableNode",
-      table: SchemableIdentifierNode.createWithSchema(schema, table)
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/operation-node-source.js
-function isOperationNodeSource(obj) {
-  return isObject(obj) && isFunction(obj.toOperationNode);
-}
-
-// /zveltio-extension/node_modules/kysely/dist/expression/expression.js
-function isExpression(obj) {
-  return isObject(obj) && "expressionType" in obj && isOperationNodeSource(obj);
-}
-function isAliasedExpression(obj) {
-  return isObject(obj) && "expression" in obj && isString(obj.alias) && isOperationNodeSource(obj);
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/select-modifier-node.js
-var SelectModifierNode = freeze({
-  is(node) {
-    return node.kind === "SelectModifierNode";
-  },
-  create(modifier, of) {
-    return freeze({
-      kind: "SelectModifierNode",
-      modifier,
-      of
-    });
-  },
-  createWithExpression(modifier) {
-    return freeze({
-      kind: "SelectModifierNode",
-      rawModifier: modifier
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/and-node.js
-var AndNode = freeze({
-  is(node) {
-    return node.kind === "AndNode";
-  },
-  create(left, right) {
-    return freeze({
-      kind: "AndNode",
-      left,
-      right
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/or-node.js
-var OrNode = freeze({
-  is(node) {
-    return node.kind === "OrNode";
-  },
-  create(left, right) {
-    return freeze({
-      kind: "OrNode",
-      left,
-      right
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/on-node.js
-var OnNode = freeze({
-  is(node) {
-    return node.kind === "OnNode";
-  },
-  create(filter) {
-    return freeze({
-      kind: "OnNode",
-      on: filter
-    });
-  },
-  cloneWithOperation(onNode, operator, operation) {
-    return freeze({
-      ...onNode,
-      on: operator === "And" ? AndNode.create(onNode.on, operation) : OrNode.create(onNode.on, operation)
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/join-node.js
-var JoinNode = freeze({
-  is(node) {
-    return node.kind === "JoinNode";
-  },
-  create(joinType, table) {
-    return freeze({
-      kind: "JoinNode",
-      joinType,
-      table,
-      on: undefined
-    });
-  },
-  createWithOn(joinType, table, on) {
-    return freeze({
-      kind: "JoinNode",
-      joinType,
-      table,
-      on: OnNode.create(on)
-    });
-  },
-  cloneWithOn(joinNode, operation) {
-    return freeze({
-      ...joinNode,
-      on: joinNode.on ? OnNode.cloneWithOperation(joinNode.on, "And", operation) : OnNode.create(operation)
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/binary-operation-node.js
-var BinaryOperationNode = freeze({
-  is(node) {
-    return node.kind === "BinaryOperationNode";
-  },
-  create(leftOperand, operator, rightOperand) {
-    return freeze({
-      kind: "BinaryOperationNode",
-      leftOperand,
-      operator,
-      rightOperand
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/operator-node.js
-var COMPARISON_OPERATORS_DICTIONARY = freeze({
-  "=": true,
-  "==": true,
-  "!=": true,
-  "<>": true,
-  ">": true,
-  ">=": true,
-  "<": true,
-  "<=": true,
-  in: true,
-  "not in": true,
-  is: true,
-  "is not": true,
-  like: true,
-  "not like": true,
-  match: true,
-  ilike: true,
-  "not ilike": true,
-  "@>": true,
-  "<@": true,
-  "^@": true,
-  "&&": true,
-  "?": true,
-  "?&": true,
-  "?|": true,
-  "!<": true,
-  "!>": true,
-  "<=>": true,
-  "!~": true,
-  "~": true,
-  "~*": true,
-  "!~*": true,
-  "@@": true,
-  "@@@": true,
-  "!!": true,
-  "<->": true,
-  regexp: true,
-  "is distinct from": true,
-  "is not distinct from": true
-});
-var COMPARISON_OPERATORS = Object.keys(COMPARISON_OPERATORS_DICTIONARY);
-var ARITHMETIC_OPERATORS_DICTIONARY = freeze({
-  "+": true,
-  "-": true,
-  "*": true,
-  "/": true,
-  "%": true,
-  "^": true,
-  "&": true,
-  "|": true,
-  "#": true,
-  "<<": true,
-  ">>": true
-});
-var ARITHMETIC_OPERATORS = Object.keys(ARITHMETIC_OPERATORS_DICTIONARY);
-var JSON_OPERATORS_DICTIONARY = freeze({
-  "->": true,
-  "->>": true
-});
-var JSON_OPERATORS = Object.keys(JSON_OPERATORS_DICTIONARY);
-var BINARY_OPERATORS_DICTIONARY = freeze({
-  ...COMPARISON_OPERATORS_DICTIONARY,
-  ...ARITHMETIC_OPERATORS_DICTIONARY,
-  "||": true
-});
-var BINARY_OPERATORS = Object.keys(BINARY_OPERATORS_DICTIONARY);
-var UNARY_FILTER_OPERATORS_DICTIONARY = freeze({
-  exists: true,
-  "not exists": true
-});
-var UNARY_FILTER_OPERATORS = Object.keys(UNARY_FILTER_OPERATORS_DICTIONARY);
-var UNARY_OPERATORS_DICTIONARY = freeze({
-  ...UNARY_FILTER_OPERATORS_DICTIONARY,
-  "-": true,
-  not: true
-});
-var UNARY_OPERATORS = Object.keys(UNARY_OPERATORS_DICTIONARY);
-var OPERATORS = [
-  ...BINARY_OPERATORS,
-  ...JSON_OPERATORS,
-  ...UNARY_OPERATORS,
-  "between",
-  "between symmetric"
-];
-var OperatorNode = freeze({
-  is(node) {
-    return node.kind === "OperatorNode";
-  },
-  create(operator) {
-    return freeze({
-      kind: "OperatorNode",
-      operator
-    });
-  }
-});
-function isBinaryOperator(op) {
-  return isString(op) && BINARY_OPERATORS_DICTIONARY[op];
-}
-function isJSONOperator(op) {
-  return isString(op) && JSON_OPERATORS_DICTIONARY[op];
-}
-function isUnaryOperator(op) {
-  return isString(op) && UNARY_OPERATORS_DICTIONARY[op];
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/column-node.js
-var ColumnNode = freeze({
-  is(node) {
-    return node.kind === "ColumnNode";
-  },
-  create(column) {
-    return freeze({
-      kind: "ColumnNode",
-      column: IdentifierNode.create(column)
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/select-all-node.js
-var SelectAllNode = freeze({
-  is(node) {
-    return node.kind === "SelectAllNode";
-  },
-  create() {
-    return freeze({
-      kind: "SelectAllNode"
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/reference-node.js
-var ReferenceNode = freeze({
-  is(node) {
-    return node.kind === "ReferenceNode";
-  },
-  create(column, table) {
-    return freeze({
-      kind: "ReferenceNode",
-      table,
-      column
-    });
-  },
-  createSelectAll(table) {
-    return freeze({
-      kind: "ReferenceNode",
-      table,
-      column: SelectAllNode.create()
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/dynamic/dynamic-reference-builder.js
-class DynamicReferenceBuilder {
-  #dynamicReference;
-  get dynamicReference() {
-    return this.#dynamicReference;
-  }
-  get refType() {
-    return;
-  }
-  constructor(reference) {
-    this.#dynamicReference = reference;
-  }
-  toOperationNode() {
-    return parseSimpleReferenceExpression(this.#dynamicReference);
-  }
-}
-function isDynamicReferenceBuilder(obj) {
-  return isObject(obj) && isOperationNodeSource(obj) && isString(obj.dynamicReference);
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/order-by-item-node.js
-var OrderByItemNode = freeze({
-  is(node) {
-    return node.kind === "OrderByItemNode";
-  },
-  create(orderBy, direction) {
-    return freeze({
-      kind: "OrderByItemNode",
-      orderBy,
-      direction
-    });
-  },
-  cloneWith(node, props) {
-    return freeze({
-      ...node,
-      ...props
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/raw-node.js
-var RawNode = freeze({
-  is(node) {
-    return node.kind === "RawNode";
-  },
-  create(sqlFragments, parameters) {
-    return freeze({
-      kind: "RawNode",
-      sqlFragments: freeze(sqlFragments),
-      parameters: freeze(parameters)
-    });
-  },
-  createWithSql(sql) {
-    return RawNode.create([sql], []);
-  },
-  createWithChild(child) {
-    return RawNode.create(["", ""], [child]);
-  },
-  createWithChildren(children) {
-    return RawNode.create(new Array(children.length + 1).fill(""), children);
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/collate-node.js
-var CollateNode = freeze({
-  is(node) {
-    return node.kind === "CollateNode";
-  },
-  create(collation) {
-    return freeze({
-      kind: "CollateNode",
-      collation: IdentifierNode.create(collation)
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/query-builder/order-by-item-builder.js
-class OrderByItemBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  desc() {
-    return new OrderByItemBuilder({
-      node: OrderByItemNode.cloneWith(this.#props.node, {
-        direction: RawNode.createWithSql("desc")
-      })
-    });
-  }
-  asc() {
-    return new OrderByItemBuilder({
-      node: OrderByItemNode.cloneWith(this.#props.node, {
-        direction: RawNode.createWithSql("asc")
-      })
-    });
-  }
-  nullsLast() {
-    return new OrderByItemBuilder({
-      node: OrderByItemNode.cloneWith(this.#props.node, { nulls: "last" })
-    });
-  }
-  nullsFirst() {
-    return new OrderByItemBuilder({
-      node: OrderByItemNode.cloneWith(this.#props.node, { nulls: "first" })
-    });
-  }
-  collate(collation) {
-    return new OrderByItemBuilder({
-      node: OrderByItemNode.cloneWith(this.#props.node, {
-        collation: CollateNode.create(collation)
-      })
-    });
-  }
-  toOperationNode() {
-    return this.#props.node;
-  }
-}
-
-// /zveltio-extension/node_modules/kysely/dist/util/log-once.js
-var LOGGED_MESSAGES = new Set;
-function logOnce(message) {
-  if (LOGGED_MESSAGES.has(message)) {
-    return;
-  }
-  LOGGED_MESSAGES.add(message);
-  console.log(message);
-}
-
-// /zveltio-extension/node_modules/kysely/dist/parser/order-by-parser.js
-function isOrderByDirection(thing) {
-  return thing === "asc" || thing === "desc";
-}
-function parseOrderBy(args) {
-  if (args.length === 2) {
-    return [parseOrderByItem(args[0], args[1])];
-  }
-  if (args.length === 1) {
-    const [orderBy] = args;
-    if (Array.isArray(orderBy)) {
-      logOnce("orderBy(array) is deprecated, use multiple orderBy calls instead.");
-      return orderBy.map((item) => parseOrderByItem(item));
-    }
-    return [parseOrderByItem(orderBy)];
-  }
-  throw new Error(`Invalid number of arguments at order by! expected 1-2, received ${args.length}`);
-}
-function parseOrderByItem(expr, modifiers) {
-  const parsedRef = parseOrderByExpression(expr);
-  if (OrderByItemNode.is(parsedRef)) {
-    if (modifiers) {
-      throw new Error("Cannot specify direction twice!");
-    }
-    return parsedRef;
-  }
-  return parseOrderByWithModifiers(parsedRef, modifiers);
-}
-function parseOrderByExpression(expr) {
-  if (isExpressionOrFactory(expr)) {
-    return parseExpression(expr);
-  }
-  if (isDynamicReferenceBuilder(expr)) {
-    return expr.toOperationNode();
-  }
-  const [ref, direction] = expr.split(" ");
-  if (direction) {
-    logOnce("`orderBy('column asc')` is deprecated. Use `orderBy('column', 'asc')` instead.");
-    return parseOrderByWithModifiers(parseStringReference(ref), direction);
-  }
-  return parseStringReference(expr);
-}
-function parseOrderByWithModifiers(expr, modifiers) {
-  if (typeof modifiers === "string") {
-    if (!isOrderByDirection(modifiers)) {
-      throw new Error(`Invalid order by direction: ${modifiers}`);
-    }
-    return OrderByItemNode.create(expr, RawNode.createWithSql(modifiers));
-  }
-  if (isExpression(modifiers)) {
-    logOnce("`orderBy(..., expr)` is deprecated. Use `orderBy(..., 'asc')` or `orderBy(..., (ob) => ...)` instead.");
-    return OrderByItemNode.create(expr, modifiers.toOperationNode());
-  }
-  const node = OrderByItemNode.create(expr);
-  if (!modifiers) {
-    return node;
-  }
-  return modifiers(new OrderByItemBuilder({ node })).toOperationNode();
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/json-reference-node.js
-var JSONReferenceNode = freeze({
-  is(node) {
-    return node.kind === "JSONReferenceNode";
-  },
-  create(reference, traversal) {
-    return freeze({
-      kind: "JSONReferenceNode",
-      reference,
-      traversal
-    });
-  },
-  cloneWithTraversal(node, traversal) {
-    return freeze({
-      ...node,
-      traversal
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/json-operator-chain-node.js
-var JSONOperatorChainNode = freeze({
-  is(node) {
-    return node.kind === "JSONOperatorChainNode";
-  },
-  create(operator) {
-    return freeze({
-      kind: "JSONOperatorChainNode",
-      operator,
-      values: freeze([])
-    });
-  },
-  cloneWithValue(node, value) {
-    return freeze({
-      ...node,
-      values: freeze([...node.values, value])
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/json-path-node.js
-var JSONPathNode = freeze({
-  is(node) {
-    return node.kind === "JSONPathNode";
-  },
-  create(inOperator) {
-    return freeze({
-      kind: "JSONPathNode",
-      inOperator,
-      pathLegs: freeze([])
-    });
-  },
-  cloneWithLeg(jsonPathNode, pathLeg) {
-    return freeze({
-      ...jsonPathNode,
-      pathLegs: freeze([...jsonPathNode.pathLegs, pathLeg])
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/parser/reference-parser.js
-function parseSimpleReferenceExpression(exp) {
-  if (isString(exp)) {
-    return parseStringReference(exp);
-  }
-  return exp.toOperationNode();
-}
-function parseReferenceExpressionOrList(arg) {
-  if (isReadonlyArray(arg)) {
-    return arg.map((it) => parseReferenceExpression(it));
-  } else {
-    return [parseReferenceExpression(arg)];
-  }
-}
-function parseReferenceExpression(exp) {
-  if (isExpressionOrFactory(exp)) {
-    return parseExpression(exp);
-  }
-  return parseSimpleReferenceExpression(exp);
-}
-function parseJSONReference(ref, op) {
-  if (isJSONOperator(op)) {
-    return JSONReferenceNode.create(parseStringReference(ref), JSONOperatorChainNode.create(OperatorNode.create(op)));
-  }
-  if (op === "->$" || op === "->>$") {
-    return JSONReferenceNode.create(parseStringReference(ref), JSONPathNode.create(OperatorNode.create(op.slice(0, -1))));
-  }
-  throw new Error(`Invalid JSON operator: ${op}`);
-}
-function parseStringReference(ref) {
-  const COLUMN_SEPARATOR = ".";
-  if (!ref.includes(COLUMN_SEPARATOR)) {
-    return ReferenceNode.create(ColumnNode.create(ref));
-  }
-  const parts = ref.split(COLUMN_SEPARATOR).map(trim);
-  if (parts.length === 3) {
-    return parseStringReferenceWithTableAndSchema(parts);
-  }
-  if (parts.length === 2) {
-    return parseStringReferenceWithTable(parts);
-  }
-  throw new Error(`invalid column reference ${ref}`);
-}
-function parseAliasedStringReference(ref) {
-  const ALIAS_SEPARATOR = " as ";
-  if (ref.includes(ALIAS_SEPARATOR)) {
-    const [columnRef, alias] = ref.split(ALIAS_SEPARATOR).map(trim);
-    return AliasNode.create(parseStringReference(columnRef), IdentifierNode.create(alias));
-  } else {
-    return parseStringReference(ref);
-  }
-}
-function parseStringReferenceWithTableAndSchema(parts) {
-  const [schema, table, column] = parts;
-  return ReferenceNode.create(ColumnNode.create(column), TableNode.createWithSchema(schema, table));
-}
-function parseStringReferenceWithTable(parts) {
-  const [table, column] = parts;
-  return ReferenceNode.create(ColumnNode.create(column), TableNode.create(table));
-}
-function trim(str) {
-  return str.trim();
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/primitive-value-list-node.js
-var PrimitiveValueListNode = freeze({
-  is(node) {
-    return node.kind === "PrimitiveValueListNode";
-  },
-  create(values) {
-    return freeze({
-      kind: "PrimitiveValueListNode",
-      values: freeze([...values])
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/value-list-node.js
-var ValueListNode = freeze({
-  is(node) {
-    return node.kind === "ValueListNode";
-  },
-  create(values) {
-    return freeze({
-      kind: "ValueListNode",
-      values: freeze(values)
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/value-node.js
-var ValueNode = freeze({
-  is(node) {
-    return node.kind === "ValueNode";
-  },
-  create(value) {
-    return freeze({
-      kind: "ValueNode",
-      value
-    });
-  },
-  createImmediate(value) {
-    return freeze({
-      kind: "ValueNode",
-      value,
-      immediate: true
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/parser/value-parser.js
-function parseValueExpressionOrList(arg) {
-  if (isReadonlyArray(arg)) {
-    return parseValueExpressionList(arg);
-  }
-  return parseValueExpression(arg);
-}
-function parseValueExpression(exp) {
-  if (isExpressionOrFactory(exp)) {
-    return parseExpression(exp);
-  }
-  return ValueNode.create(exp);
-}
-function isSafeImmediateValue(value) {
-  return isNumber(value) || isBoolean(value) || isNull(value);
-}
-function parseSafeImmediateValue(value) {
-  if (!isSafeImmediateValue(value)) {
-    throw new Error(`unsafe immediate value ${JSON.stringify(value)}`);
-  }
-  return ValueNode.createImmediate(value);
-}
-function parseValueExpressionList(arg) {
-  if (arg.some(isExpressionOrFactory)) {
-    return ValueListNode.create(arg.map((it) => parseValueExpression(it)));
-  }
-  return PrimitiveValueListNode.create(arg);
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/parens-node.js
-var ParensNode = freeze({
-  is(node) {
-    return node.kind === "ParensNode";
-  },
-  create(node) {
-    return freeze({
-      kind: "ParensNode",
-      node
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/parser/binary-operation-parser.js
-function parseValueBinaryOperationOrExpression(args) {
-  if (args.length === 3) {
-    return parseValueBinaryOperation(args[0], args[1], args[2]);
-  } else if (args.length === 1) {
-    return parseValueExpression(args[0]);
-  }
-  throw new Error(`invalid arguments: ${JSON.stringify(args)}`);
-}
-function parseValueBinaryOperation(left, operator, right) {
-  if (isIsOperator(operator) && needsIsOperator(right)) {
-    return BinaryOperationNode.create(parseReferenceExpression(left), parseBinaryOperator(operator), ValueNode.createImmediate(right));
-  }
-  return BinaryOperationNode.create(parseReferenceExpression(left), parseBinaryOperator(operator), parseValueExpressionOrList(right));
-}
-function parseReferentialBinaryOperation(left, operator, right) {
-  return BinaryOperationNode.create(parseReferenceExpression(left), parseBinaryOperator(operator), parseReferenceExpression(right));
-}
-function parseFilterObject(obj, combinator) {
-  return parseFilterList(Object.entries(obj).filter(([, v]) => !isUndefined(v)).map(([k, v]) => parseValueBinaryOperation(k, needsIsOperator(v) ? "is" : "=", v)), combinator);
-}
-function parseFilterList(list, combinator, withParens = true) {
-  const combine = combinator === "and" ? AndNode.create : OrNode.create;
-  if (list.length === 0) {
-    return BinaryOperationNode.create(ValueNode.createImmediate(1), OperatorNode.create("="), ValueNode.createImmediate(combinator === "and" ? 1 : 0));
-  }
-  let node = toOperationNode(list[0]);
-  for (let i = 1;i < list.length; ++i) {
-    node = combine(node, toOperationNode(list[i]));
-  }
-  if (list.length > 1 && withParens) {
-    return ParensNode.create(node);
-  }
-  return node;
-}
-function isIsOperator(operator) {
-  return operator === "is" || operator === "is not";
-}
-function needsIsOperator(value) {
-  return isNull(value) || isBoolean(value);
-}
-function parseBinaryOperator(operator) {
-  if (isBinaryOperator(operator)) {
-    return OperatorNode.create(operator);
-  }
-  if (isOperationNodeSource(operator)) {
-    return operator.toOperationNode();
-  }
-  throw new Error(`invalid operator ${JSON.stringify(operator)}`);
-}
-function toOperationNode(nodeOrSource) {
-  return isOperationNodeSource(nodeOrSource) ? nodeOrSource.toOperationNode() : nodeOrSource;
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/order-by-node.js
-var OrderByNode = freeze({
-  is(node) {
-    return node.kind === "OrderByNode";
-  },
-  create(items) {
-    return freeze({
-      kind: "OrderByNode",
-      items: freeze([...items])
-    });
-  },
-  cloneWithItems(orderBy, items) {
-    return freeze({
-      ...orderBy,
-      items: freeze([...orderBy.items, ...items])
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/partition-by-node.js
-var PartitionByNode = freeze({
-  is(node) {
-    return node.kind === "PartitionByNode";
-  },
-  create(items) {
-    return freeze({
-      kind: "PartitionByNode",
-      items: freeze(items)
-    });
-  },
-  cloneWithItems(partitionBy, items) {
-    return freeze({
-      ...partitionBy,
-      items: freeze([...partitionBy.items, ...items])
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/over-node.js
-var OverNode = freeze({
-  is(node) {
-    return node.kind === "OverNode";
-  },
-  create() {
-    return freeze({
-      kind: "OverNode"
-    });
-  },
-  cloneWithOrderByItems(overNode, items) {
-    return freeze({
-      ...overNode,
-      orderBy: overNode.orderBy ? OrderByNode.cloneWithItems(overNode.orderBy, items) : OrderByNode.create(items)
-    });
-  },
-  cloneWithPartitionByItems(overNode, items) {
-    return freeze({
-      ...overNode,
-      partitionBy: overNode.partitionBy ? PartitionByNode.cloneWithItems(overNode.partitionBy, items) : PartitionByNode.create(items)
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/from-node.js
-var FromNode = freeze({
-  is(node) {
-    return node.kind === "FromNode";
-  },
-  create(froms) {
-    return freeze({
-      kind: "FromNode",
-      froms: freeze(froms)
-    });
-  },
-  cloneWithFroms(from, froms) {
-    return freeze({
-      ...from,
-      froms: freeze([...from.froms, ...froms])
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/group-by-node.js
-var GroupByNode = freeze({
-  is(node) {
-    return node.kind === "GroupByNode";
-  },
-  create(items) {
-    return freeze({
-      kind: "GroupByNode",
-      items: freeze(items)
-    });
-  },
-  cloneWithItems(groupBy, items) {
-    return freeze({
-      ...groupBy,
-      items: freeze([...groupBy.items, ...items])
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/having-node.js
-var HavingNode = freeze({
-  is(node) {
-    return node.kind === "HavingNode";
-  },
-  create(filter) {
-    return freeze({
-      kind: "HavingNode",
-      having: filter
-    });
-  },
-  cloneWithOperation(havingNode, operator, operation) {
-    return freeze({
-      ...havingNode,
-      having: operator === "And" ? AndNode.create(havingNode.having, operation) : OrNode.create(havingNode.having, operation)
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/insert-query-node.js
-var InsertQueryNode = freeze({
-  is(node) {
-    return node.kind === "InsertQueryNode";
-  },
-  create(into, withNode, replace) {
-    return freeze({
-      kind: "InsertQueryNode",
-      into,
-      ...withNode && { with: withNode },
-      replace
-    });
-  },
-  createWithoutInto() {
-    return freeze({
-      kind: "InsertQueryNode"
-    });
-  },
-  cloneWith(insertQuery, props) {
-    return freeze({
-      ...insertQuery,
-      ...props
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/list-node.js
-var ListNode = freeze({
-  is(node) {
-    return node.kind === "ListNode";
-  },
-  create(items) {
-    return freeze({
-      kind: "ListNode",
-      items: freeze(items)
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/update-query-node.js
-var UpdateQueryNode = freeze({
-  is(node) {
-    return node.kind === "UpdateQueryNode";
-  },
-  create(tables, withNode) {
-    return freeze({
-      kind: "UpdateQueryNode",
-      table: tables.length === 1 ? tables[0] : ListNode.create(tables),
-      ...withNode && { with: withNode }
-    });
-  },
-  createWithoutTable() {
-    return freeze({
-      kind: "UpdateQueryNode"
-    });
-  },
-  cloneWithFromItems(updateQuery, fromItems) {
-    return freeze({
-      ...updateQuery,
-      from: updateQuery.from ? FromNode.cloneWithFroms(updateQuery.from, fromItems) : FromNode.create(fromItems)
-    });
-  },
-  cloneWithUpdates(updateQuery, updates) {
-    return freeze({
-      ...updateQuery,
-      updates: updateQuery.updates ? freeze([...updateQuery.updates, ...updates]) : updates
-    });
-  },
-  cloneWithLimit(updateQuery, limit) {
-    return freeze({
-      ...updateQuery,
-      limit
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/using-node.js
-var UsingNode = freeze({
-  is(node) {
-    return node.kind === "UsingNode";
-  },
-  create(tables) {
-    return freeze({
-      kind: "UsingNode",
-      tables: freeze(tables)
-    });
-  },
-  cloneWithTables(using, tables) {
-    return freeze({
-      ...using,
-      tables: freeze([...using.tables, ...tables])
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/delete-query-node.js
-var DeleteQueryNode = freeze({
-  is(node) {
-    return node.kind === "DeleteQueryNode";
-  },
-  create(fromItems, withNode) {
-    return freeze({
-      kind: "DeleteQueryNode",
-      from: FromNode.create(fromItems),
-      ...withNode && { with: withNode }
-    });
-  },
-  cloneWithOrderByItems: (node, items) => QueryNode.cloneWithOrderByItems(node, items),
-  cloneWithoutOrderBy: (node) => QueryNode.cloneWithoutOrderBy(node),
-  cloneWithLimit(deleteNode, limit) {
-    return freeze({
-      ...deleteNode,
-      limit
-    });
-  },
-  cloneWithoutLimit(deleteNode) {
-    return freeze({
-      ...deleteNode,
-      limit: undefined
-    });
-  },
-  cloneWithUsing(deleteNode, tables) {
-    return freeze({
-      ...deleteNode,
-      using: deleteNode.using !== undefined ? UsingNode.cloneWithTables(deleteNode.using, tables) : UsingNode.create(tables)
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/where-node.js
-var WhereNode = freeze({
-  is(node) {
-    return node.kind === "WhereNode";
-  },
-  create(filter) {
-    return freeze({
-      kind: "WhereNode",
-      where: filter
-    });
-  },
-  cloneWithOperation(whereNode, operator, operation) {
-    return freeze({
-      ...whereNode,
-      where: operator === "And" ? AndNode.create(whereNode.where, operation) : OrNode.create(whereNode.where, operation)
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/returning-node.js
-var ReturningNode = freeze({
-  is(node) {
-    return node.kind === "ReturningNode";
-  },
-  create(selections) {
-    return freeze({
-      kind: "ReturningNode",
-      selections: freeze(selections)
-    });
-  },
-  cloneWithSelections(returning, selections) {
-    return freeze({
-      ...returning,
-      selections: returning.selections ? freeze([...returning.selections, ...selections]) : freeze(selections)
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/explain-node.js
-var ExplainNode = freeze({
-  is(node) {
-    return node.kind === "ExplainNode";
-  },
-  create(format, options) {
-    return freeze({
-      kind: "ExplainNode",
-      format,
-      options
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/when-node.js
-var WhenNode = freeze({
-  is(node) {
-    return node.kind === "WhenNode";
-  },
-  create(condition) {
-    return freeze({
-      kind: "WhenNode",
-      condition
-    });
-  },
-  cloneWithResult(whenNode, result) {
-    return freeze({
-      ...whenNode,
-      result
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/merge-query-node.js
-var MergeQueryNode = freeze({
-  is(node) {
-    return node.kind === "MergeQueryNode";
-  },
-  create(into, withNode) {
-    return freeze({
-      kind: "MergeQueryNode",
-      into,
-      ...withNode && { with: withNode }
-    });
-  },
-  cloneWithUsing(mergeNode, using) {
-    return freeze({
-      ...mergeNode,
-      using
-    });
-  },
-  cloneWithWhen(mergeNode, when) {
-    return freeze({
-      ...mergeNode,
-      whens: mergeNode.whens ? freeze([...mergeNode.whens, when]) : freeze([when])
-    });
-  },
-  cloneWithThen(mergeNode, then) {
-    return freeze({
-      ...mergeNode,
-      whens: mergeNode.whens ? freeze([
-        ...mergeNode.whens.slice(0, -1),
-        WhenNode.cloneWithResult(mergeNode.whens[mergeNode.whens.length - 1], then)
-      ]) : undefined
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/output-node.js
-var OutputNode = freeze({
-  is(node) {
-    return node.kind === "OutputNode";
-  },
-  create(selections) {
-    return freeze({
-      kind: "OutputNode",
-      selections: freeze(selections)
-    });
-  },
-  cloneWithSelections(output, selections) {
-    return freeze({
-      ...output,
-      selections: output.selections ? freeze([...output.selections, ...selections]) : freeze(selections)
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/query-node.js
-var QueryNode = freeze({
-  is(node) {
-    return SelectQueryNode.is(node) || InsertQueryNode.is(node) || UpdateQueryNode.is(node) || DeleteQueryNode.is(node) || MergeQueryNode.is(node);
-  },
-  cloneWithEndModifier(node, modifier) {
-    return freeze({
-      ...node,
-      endModifiers: node.endModifiers ? freeze([...node.endModifiers, modifier]) : freeze([modifier])
-    });
-  },
-  cloneWithWhere(node, operation) {
-    return freeze({
-      ...node,
-      where: node.where ? WhereNode.cloneWithOperation(node.where, "And", operation) : WhereNode.create(operation)
-    });
-  },
-  cloneWithJoin(node, join) {
-    return freeze({
-      ...node,
-      joins: node.joins ? freeze([...node.joins, join]) : freeze([join])
-    });
-  },
-  cloneWithReturning(node, selections) {
-    return freeze({
-      ...node,
-      returning: node.returning ? ReturningNode.cloneWithSelections(node.returning, selections) : ReturningNode.create(selections)
-    });
-  },
-  cloneWithoutReturning(node) {
-    return freeze({
-      ...node,
-      returning: undefined
-    });
-  },
-  cloneWithoutWhere(node) {
-    return freeze({
-      ...node,
-      where: undefined
-    });
-  },
-  cloneWithExplain(node, format, options) {
-    return freeze({
-      ...node,
-      explain: ExplainNode.create(format, options?.toOperationNode())
-    });
-  },
-  cloneWithTop(node, top) {
-    return freeze({
-      ...node,
-      top
-    });
-  },
-  cloneWithOutput(node, selections) {
-    return freeze({
-      ...node,
-      output: node.output ? OutputNode.cloneWithSelections(node.output, selections) : OutputNode.create(selections)
-    });
-  },
-  cloneWithOrderByItems(node, items) {
-    return freeze({
-      ...node,
-      orderBy: node.orderBy ? OrderByNode.cloneWithItems(node.orderBy, items) : OrderByNode.create(items)
-    });
-  },
-  cloneWithoutOrderBy(node) {
-    return freeze({
-      ...node,
-      orderBy: undefined
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/select-query-node.js
-var SelectQueryNode = freeze({
-  is(node) {
-    return node.kind === "SelectQueryNode";
-  },
-  create(withNode) {
-    return freeze({
-      kind: "SelectQueryNode",
-      ...withNode && { with: withNode }
-    });
-  },
-  createFrom(fromItems, withNode) {
-    return freeze({
-      kind: "SelectQueryNode",
-      from: FromNode.create(fromItems),
-      ...withNode && { with: withNode }
-    });
-  },
-  cloneWithSelections(select, selections) {
-    return freeze({
-      ...select,
-      selections: select.selections ? freeze([...select.selections, ...selections]) : freeze(selections)
-    });
-  },
-  cloneWithDistinctOn(select, expressions) {
-    return freeze({
-      ...select,
-      distinctOn: select.distinctOn ? freeze([...select.distinctOn, ...expressions]) : freeze(expressions)
-    });
-  },
-  cloneWithFrontModifier(select, modifier) {
-    return freeze({
-      ...select,
-      frontModifiers: select.frontModifiers ? freeze([...select.frontModifiers, modifier]) : freeze([modifier])
-    });
-  },
-  cloneWithOrderByItems: (node, items) => QueryNode.cloneWithOrderByItems(node, items),
-  cloneWithGroupByItems(selectNode, items) {
-    return freeze({
-      ...selectNode,
-      groupBy: selectNode.groupBy ? GroupByNode.cloneWithItems(selectNode.groupBy, items) : GroupByNode.create(items)
-    });
-  },
-  cloneWithLimit(selectNode, limit) {
-    return freeze({
-      ...selectNode,
-      limit
-    });
-  },
-  cloneWithOffset(selectNode, offset) {
-    return freeze({
-      ...selectNode,
-      offset
-    });
-  },
-  cloneWithFetch(selectNode, fetch) {
-    return freeze({
-      ...selectNode,
-      fetch
-    });
-  },
-  cloneWithHaving(selectNode, operation) {
-    return freeze({
-      ...selectNode,
-      having: selectNode.having ? HavingNode.cloneWithOperation(selectNode.having, "And", operation) : HavingNode.create(operation)
-    });
-  },
-  cloneWithSetOperations(selectNode, setOperations) {
-    return freeze({
-      ...selectNode,
-      setOperations: selectNode.setOperations ? freeze([...selectNode.setOperations, ...setOperations]) : freeze([...setOperations])
-    });
-  },
-  cloneWithoutSelections(select) {
-    return freeze({
-      ...select,
-      selections: []
-    });
-  },
-  cloneWithoutLimit(select) {
-    return freeze({
-      ...select,
-      limit: undefined
-    });
-  },
-  cloneWithoutOffset(select) {
-    return freeze({
-      ...select,
-      offset: undefined
-    });
-  },
-  cloneWithoutOrderBy: (node) => QueryNode.cloneWithoutOrderBy(node),
-  cloneWithoutGroupBy(select) {
-    return freeze({
-      ...select,
-      groupBy: undefined
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/query-builder/join-builder.js
-class JoinBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  on(...args) {
-    return new JoinBuilder({
-      ...this.#props,
-      joinNode: JoinNode.cloneWithOn(this.#props.joinNode, parseValueBinaryOperationOrExpression(args))
-    });
-  }
-  onRef(lhs, op, rhs) {
-    return new JoinBuilder({
-      ...this.#props,
-      joinNode: JoinNode.cloneWithOn(this.#props.joinNode, parseReferentialBinaryOperation(lhs, op, rhs))
-    });
-  }
-  onTrue() {
-    return new JoinBuilder({
-      ...this.#props,
-      joinNode: JoinNode.cloneWithOn(this.#props.joinNode, RawNode.createWithSql("true"))
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  toOperationNode() {
-    return this.#props.joinNode;
-  }
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/partition-by-item-node.js
-var PartitionByItemNode = freeze({
-  is(node) {
-    return node.kind === "PartitionByItemNode";
-  },
-  create(partitionBy) {
-    return freeze({
-      kind: "PartitionByItemNode",
-      partitionBy
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/parser/partition-by-parser.js
-function parsePartitionBy(partitionBy) {
-  return parseReferenceExpressionOrList(partitionBy).map(PartitionByItemNode.create);
-}
-
-// /zveltio-extension/node_modules/kysely/dist/query-builder/over-builder.js
-class OverBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  orderBy(...args) {
-    return new OverBuilder({
-      overNode: OverNode.cloneWithOrderByItems(this.#props.overNode, parseOrderBy(args))
-    });
-  }
-  clearOrderBy() {
-    return new OverBuilder({
-      overNode: QueryNode.cloneWithoutOrderBy(this.#props.overNode)
-    });
-  }
-  partitionBy(partitionBy) {
-    return new OverBuilder({
-      overNode: OverNode.cloneWithPartitionByItems(this.#props.overNode, parsePartitionBy(partitionBy))
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  toOperationNode() {
-    return this.#props.overNode;
-  }
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/selection-node.js
-var SelectionNode = freeze({
-  is(node) {
-    return node.kind === "SelectionNode";
-  },
-  create(selection) {
-    return freeze({
-      kind: "SelectionNode",
-      selection
-    });
-  },
-  createSelectAll() {
-    return freeze({
-      kind: "SelectionNode",
-      selection: SelectAllNode.create()
-    });
-  },
-  createSelectAllFromTable(table) {
-    return freeze({
-      kind: "SelectionNode",
-      selection: ReferenceNode.createSelectAll(table)
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/parser/select-parser.js
-function parseSelectArg(selection) {
-  if (isFunction(selection)) {
-    return parseSelectArg(selection(expressionBuilder()));
-  } else if (isReadonlyArray(selection)) {
-    return selection.map((it) => parseSelectExpression(it));
-  } else {
-    return [parseSelectExpression(selection)];
-  }
-}
-function parseSelectExpression(selection) {
-  if (isString(selection)) {
-    return SelectionNode.create(parseAliasedStringReference(selection));
-  } else if (isDynamicReferenceBuilder(selection)) {
-    return SelectionNode.create(selection.toOperationNode());
-  } else {
-    return SelectionNode.create(parseAliasedExpression(selection));
-  }
-}
-function parseSelectAll(table) {
-  if (!table) {
-    return [SelectionNode.createSelectAll()];
-  } else if (Array.isArray(table)) {
-    return table.map(parseSelectAllArg);
-  } else {
-    return [parseSelectAllArg(table)];
-  }
-}
-function parseSelectAllArg(table) {
-  if (isString(table)) {
-    return SelectionNode.createSelectAllFromTable(parseTable(table));
-  }
-  throw new Error(`invalid value selectAll expression: ${JSON.stringify(table)}`);
-}
-
-// /zveltio-extension/node_modules/kysely/dist/query-builder/no-result-error.js
-class NoResultError extends Error {
-  node;
-  constructor(node) {
-    super("no result");
-    this.node = node;
-  }
-}
-function isNoResultErrorConstructor(fn) {
-  return Object.prototype.hasOwnProperty.call(fn, "prototype");
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/top-node.js
-var TopNode = freeze({
-  is(node) {
-    return node.kind === "TopNode";
-  },
-  create(expression, modifiers) {
-    return freeze({
-      kind: "TopNode",
-      expression,
-      modifiers
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/parser/top-parser.js
-function parseTop(expression, modifiers) {
-  if (!isNumber(expression) && !isBigInt(expression)) {
-    throw new Error(`Invalid top expression: ${expression}`);
-  }
-  if (!isUndefined(modifiers) && !isTopModifiers(modifiers)) {
-    throw new Error(`Invalid top modifiers: ${modifiers}`);
-  }
-  return TopNode.create(expression, modifiers);
-}
-function isTopModifiers(modifiers) {
-  return modifiers === "percent" || modifiers === "with ties" || modifiers === "percent with ties";
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/limit-node.js
-var LimitNode = freeze({
-  is(node) {
-    return node.kind === "LimitNode";
-  },
-  create(limit) {
-    return freeze({
-      kind: "LimitNode",
-      limit
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/util/random-string.js
-var CHARS = [
-  "A",
-  "B",
-  "C",
-  "D",
-  "E",
-  "F",
-  "G",
-  "H",
-  "I",
-  "J",
-  "K",
-  "L",
-  "M",
-  "N",
-  "O",
-  "P",
-  "Q",
-  "R",
-  "S",
-  "T",
-  "U",
-  "V",
-  "W",
-  "X",
-  "Y",
-  "Z",
-  "a",
-  "b",
-  "c",
-  "d",
-  "e",
-  "f",
-  "g",
-  "h",
-  "i",
-  "j",
-  "k",
-  "l",
-  "m",
-  "n",
-  "o",
-  "p",
-  "q",
-  "r",
-  "s",
-  "t",
-  "u",
-  "v",
-  "w",
-  "x",
-  "y",
-  "z",
-  "0",
-  "1",
-  "2",
-  "3",
-  "4",
-  "5",
-  "6",
-  "7",
-  "8",
-  "9"
-];
-function randomString(length) {
-  let chars = "";
-  for (let i = 0;i < length; ++i) {
-    chars += randomChar();
-  }
-  return chars;
-}
-function randomChar() {
-  return CHARS[~~(Math.random() * CHARS.length)];
-}
-
-// /zveltio-extension/node_modules/kysely/dist/util/query-id.js
-function createQueryId() {
-  return new LazyQueryId;
-}
-
-class LazyQueryId {
-  #queryId;
-  get queryId() {
-    if (this.#queryId === undefined) {
-      this.#queryId = randomString(8);
-    }
-    return this.#queryId;
-  }
-}
-
-// /zveltio-extension/node_modules/kysely/dist/util/deferred.js
-class Deferred {
-  #promise;
-  #resolve;
-  #reject;
-  constructor() {
-    this.#promise = new Promise((resolve, reject) => {
-      this.#reject = reject;
-      this.#resolve = resolve;
-    });
-  }
-  get promise() {
-    return this.#promise;
-  }
-  resolve = (value) => {
-    this.#resolve?.(value);
-    this.#resolve = this.#reject = undefined;
-  };
-  reject = (reason) => {
-    this.#reject?.(reason);
-    this.#reject = this.#resolve = undefined;
-  };
-}
-
-// /zveltio-extension/node_modules/kysely/dist/util/provide-controlled-connection.js
-async function provideControlledConnection(connectionProvider, options) {
-  const connectionDefer = new Deferred;
-  const connectionReleaseDefer = new Deferred;
-  connectionProvider.provideConnection(async (connection) => {
-    connectionDefer.resolve(connection);
-    return await connectionReleaseDefer.promise;
-  }, options).catch((ex) => connectionDefer.reject(ex));
-  return freeze({
-    connection: await connectionDefer.promise,
-    release: connectionReleaseDefer.resolve
-  });
-}
-
-// /zveltio-extension/node_modules/kysely/dist/util/abort.js
-function getInflightQueryAbortHandler(abortStrategy = "ignore query", connection, beforeThrow) {
-  if (abortStrategy === "ignore query") {
-    return;
-  }
-  if (abortStrategy === "cancel query") {
-    const handler = connection.cancelQuery;
-    if (!handler) {
-      beforeThrow();
-      throwUnsupportedInflightQueryAbortStrategyError(abortStrategy, connection.killSession ? "kill session" : undefined);
-    }
-    return handler.bind(connection);
-  }
-  if (abortStrategy === "kill session") {
-    const handler = connection.killSession;
-    if (!handler) {
-      beforeThrow();
-      throwUnsupportedInflightQueryAbortStrategyError(abortStrategy, connection.cancelQuery ? "cancel query" : undefined);
-    }
-    return handler.bind(connection);
-  }
-  beforeThrow();
-  throw new Error(`Unexpected \`inflightQueryAbortStrategy\`: "${abortStrategy}"`);
-}
-function throwUnsupportedInflightQueryAbortStrategyError(abortStrategy, alt) {
-  throw new Error(`This dialect doesn't support \`inflightQueryAbortStrategy\` "${abortStrategy}". Use "${"ignore query"}"${alt ? ` or "${alt}"` : ""} instead.`);
-}
-function assertNotAborted(signal, timing, beforeThrow) {
-  if (signal?.aborted) {
-    beforeThrow?.();
-    throwReasonWithTiming(signal.reason, timing);
-  }
-}
-function throwReasonWithTiming(reason, timing) {
-  decorateWithTiming(reason, timing);
-  throw reason;
-}
-var ABORTED = {};
-function printBackgroundFail(name) {
-  return (reason) => console.error(`\`${name}\` failed in the background after abortion: ${getMessage(reason)}`);
-}
-function decorateWithTiming(reason, timing) {
-  if (reason !== null && typeof reason === "object" && !Object.isFrozen(reason)) {
-    Object.defineProperty(reason, "__kysely_timing__", {
-      configurable: true,
-      enumerable: false,
-      value: timing,
-      writable: false
-    });
-  }
-}
-
-// /zveltio-extension/node_modules/kysely/dist/query-executor/query-executor-base.js
-var NO_PLUGINS = freeze([]);
-
-class QueryExecutorBase {
-  #plugins;
-  constructor(plugins = NO_PLUGINS) {
-    this.#plugins = plugins;
-  }
-  get plugins() {
-    return this.#plugins;
-  }
-  transformQuery(node, queryId) {
-    for (const plugin of this.#plugins) {
-      const transformedNode = plugin.transformQuery({ node, queryId });
-      if (transformedNode.kind === node.kind) {
-        node = transformedNode;
-      } else {
-        throw new Error([
-          `KyselyPlugin.transformQuery must return a node`,
-          `of the same kind that was given to it.`,
-          `The plugin was given a ${node.kind}`,
-          `but it returned a ${transformedNode.kind}`
-        ].join(" "));
-      }
-    }
-    return node;
-  }
-  async executeQuery(compiledQuery, options) {
-    const { inflightQueryAbortStrategy = "ignore query", signal } = options || {};
-    if (!signal) {
-      const result = await this.provideConnection(async (connection2) => {
-        return await connection2.executeQuery(compiledQuery);
-      }, options);
-      return await this.#transformResult(result, compiledQuery.queryId);
-    }
-    assertNotAborted(signal, "before query execution");
-    options = freeze({ signal });
-    const { connection, release } = await provideControlledConnection(this, options);
-    const controlConnectionProvider = this.provideConnection.bind(this);
-    const { promise: abortPromise, resolve } = new Deferred;
-    const abortListener = () => resolve(ABORTED);
-    signal.addEventListener("abort", abortListener, { once: true });
-    try {
-      assertNotAborted(signal, "before query execution", release);
-      const inflightQueryAbortHandler = getInflightQueryAbortHandler(inflightQueryAbortStrategy, connection, release);
-      if (inflightQueryAbortHandler && connection.collectSessionInfo) {
-        assertNotAborted(signal, "before query execution", release);
-        const collectPromise = connection.collectSessionInfo();
-        const result2 = await Promise.race([abortPromise, collectPromise]).catch((error) => {
-          release();
-          throw error;
-        });
-        if (result2 === ABORTED) {
-          collectPromise.catch(printBackgroundFail("collectSessionInfo")).finally(release);
-          throwReasonWithTiming(signal.reason, "before query execution");
-        }
-      }
-      const queryPromise = connection.executeQuery(compiledQuery, options);
-      const result = await Promise.race([abortPromise, queryPromise]).catch((error) => {
-        release();
-        throw error;
-      });
-      if (result === ABORTED) {
-        Promise.allSettled([
-          queryPromise.catch(printBackgroundFail("query")),
-          inflightQueryAbortHandler?.(controlConnectionProvider).catch(printBackgroundFail("inflightQueryAbortHandler"))
-        ]).finally(release);
-        throwReasonWithTiming(signal.reason, "during query execution");
-      } else {
-        release();
-      }
-      const transformPromise = this.#transformResult(result, compiledQuery.queryId, options);
-      const transformedResult = await Promise.race([
-        abortPromise,
-        transformPromise
-      ]);
-      if (transformedResult === ABORTED) {
-        transformPromise.catch(printBackgroundFail("plugins.transformResult"));
-        throwReasonWithTiming(signal.reason, "during result transformation");
-      }
-      return transformedResult;
-    } finally {
-      resolve(ABORTED);
-      signal.removeEventListener("abort", abortListener);
-    }
-  }
-  async* stream(compiledQuery, chunkSize, options) {
-    const { signal } = options || {};
-    if (!signal) {
-      const { connection: connection2, release: release2 } = await provideControlledConnection(this);
-      try {
-        for await (const result of connection2.streamQuery(compiledQuery, chunkSize)) {
-          yield await this.#transformResult(result, compiledQuery.queryId, options);
-        }
-      } finally {
-        release2();
-      }
-      return;
-    }
-    options = freeze({ signal });
-    assertNotAborted(signal, "before connection acquisition");
-    const { connection, release } = await provideControlledConnection(this, options);
-    const { promise: abortPromise, resolve } = new Deferred;
-    const abortListener = () => resolve(ABORTED);
-    signal.addEventListener("abort", abortListener, { once: true });
-    let asyncIterator;
-    let releasePrerequisite;
-    assertNotAborted(signal, "before query streaming", release);
-    const { queryId } = compiledQuery;
-    try {
-      asyncIterator = connection.streamQuery(compiledQuery, chunkSize, options);
-      while (true) {
-        assertNotAborted(signal, "during query streaming");
-        const nextPromise = asyncIterator.next();
-        const result = await Promise.race([abortPromise, nextPromise]);
-        if (result === ABORTED) {
-          releasePrerequisite = nextPromise.catch(printBackgroundFail("iterator.next"));
-          throwReasonWithTiming(signal.reason, "during query streaming");
-        }
-        if (result.done) {
-          break;
-        }
-        const transformPromise = this.#transformResult(result.value, queryId, options);
-        const transformedResult = await Promise.race([
-          abortPromise,
-          transformPromise
-        ]);
-        if (transformedResult === ABORTED) {
-          releasePrerequisite = transformPromise.catch(printBackgroundFail("plugins.transformResult"));
-          throwReasonWithTiming(signal.reason, "during result transformation");
-        }
-        yield transformedResult;
-      }
-    } finally {
-      resolve(ABORTED);
-      signal.removeEventListener("abort", abortListener);
-      const cleanup = (asyncIterator?.return?.() || Promise.resolve()).finally(() => releasePrerequisite).finally(release);
-      if (!releasePrerequisite) {
-        await cleanup;
-      }
-    }
-  }
-  async#transformResult(result, queryId, options) {
-    const { signal } = options || {};
-    for (const plugin of this.#plugins) {
-      result = await plugin.transformResult(freeze({ queryId, result, signal }));
-    }
-    return result;
-  }
-}
-
-// /zveltio-extension/node_modules/kysely/dist/query-executor/noop-query-executor.js
-class NoopQueryExecutor extends QueryExecutorBase {
-  get adapter() {
-    throw new Error("this query cannot be compiled to SQL");
-  }
-  compileQuery() {
-    throw new Error("this query cannot be compiled to SQL");
-  }
-  provideConnection() {
-    throw new Error("this query cannot be executed");
-  }
-  withConnectionProvider() {
-    throw new Error("this query cannot have a connection provider");
-  }
-  withPlugin(plugin) {
-    return new NoopQueryExecutor([...this.plugins, plugin]);
-  }
-  withPlugins(plugins) {
-    return new NoopQueryExecutor([...this.plugins, ...plugins]);
-  }
-  withPluginAtFront(plugin) {
-    return new NoopQueryExecutor([plugin, ...this.plugins]);
-  }
-  withoutPlugins() {
-    return new NoopQueryExecutor([]);
-  }
-}
-var NOOP_QUERY_EXECUTOR = new NoopQueryExecutor;
-
-// /zveltio-extension/node_modules/kysely/dist/parser/parse-utils.js
-function createJoinBuilder(joinType, table) {
-  return new JoinBuilder({
-    joinNode: JoinNode.create(joinType, parseTableExpression(table))
-  });
-}
-function createOverBuilder() {
-  return new OverBuilder({
-    overNode: OverNode.create()
-  });
-}
-
-// /zveltio-extension/node_modules/kysely/dist/parser/join-parser.js
-function parseJoin(joinType, args) {
-  if (args.length === 3) {
-    return parseSingleOnJoin(joinType, args[0], args[1], args[2]);
-  } else if (args.length === 2) {
-    return parseCallbackJoin(joinType, args[0], args[1]);
-  } else if (args.length === 1) {
-    return parseOnlessJoin(joinType, args[0]);
-  } else {
-    throw new Error("not implemented");
-  }
-}
-function parseCallbackJoin(joinType, from, callback) {
-  return callback(createJoinBuilder(joinType, from)).toOperationNode();
-}
-function parseSingleOnJoin(joinType, from, lhsColumn, rhsColumn) {
-  return JoinNode.createWithOn(joinType, parseTableExpression(from), parseReferentialBinaryOperation(lhsColumn, "=", rhsColumn));
-}
-function parseOnlessJoin(joinType, from) {
-  return JoinNode.create(joinType, parseTableExpression(from));
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/offset-node.js
-var OffsetNode = freeze({
-  is(node) {
-    return node.kind === "OffsetNode";
-  },
-  create(offset) {
-    return freeze({
-      kind: "OffsetNode",
-      offset
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/group-by-item-node.js
-var GroupByItemNode = freeze({
-  is(node) {
-    return node.kind === "GroupByItemNode";
-  },
-  create(groupBy) {
-    return freeze({
-      kind: "GroupByItemNode",
-      groupBy
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/parser/group-by-parser.js
-function parseGroupBy(groupBy) {
-  groupBy = isFunction(groupBy) ? groupBy(expressionBuilder()) : groupBy;
-  return parseReferenceExpressionOrList(groupBy).map(GroupByItemNode.create);
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/set-operation-node.js
-var SetOperationNode = freeze({
-  is(node) {
-    return node.kind === "SetOperationNode";
-  },
-  create(operator, expression, all) {
-    return freeze({
-      kind: "SetOperationNode",
-      operator,
-      expression,
-      all
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/parser/set-operation-parser.js
-function parseSetOperations(operator, expression, all) {
-  if (isFunction(expression)) {
-    expression = expression(createExpressionBuilder());
-  }
-  if (!isReadonlyArray(expression)) {
-    expression = [expression];
-  }
-  return expression.map((expr) => SetOperationNode.create(operator, parseExpression(expr), all));
-}
-
-// /zveltio-extension/node_modules/kysely/dist/expression/expression-wrapper.js
-class ExpressionWrapper {
-  #node;
-  constructor(node) {
-    this.#node = node;
-  }
-  get expressionType() {
-    return;
-  }
-  as(alias) {
-    return new AliasedExpressionWrapper(this, alias);
-  }
-  or(...args) {
-    return new OrWrapper(OrNode.create(this.#node, parseValueBinaryOperationOrExpression(args)));
-  }
-  and(...args) {
-    return new AndWrapper(AndNode.create(this.#node, parseValueBinaryOperationOrExpression(args)));
-  }
-  $castTo() {
-    return new ExpressionWrapper(this.#node);
-  }
-  $notNull() {
-    return new ExpressionWrapper(this.#node);
-  }
-  toOperationNode() {
-    return this.#node;
-  }
-}
-
-class AliasedExpressionWrapper {
-  #expr;
-  #alias;
-  constructor(expr, alias) {
-    this.#expr = expr;
-    this.#alias = alias;
-  }
-  get expression() {
-    return this.#expr;
-  }
-  get alias() {
-    return this.#alias;
-  }
-  toOperationNode() {
-    return AliasNode.create(this.#expr.toOperationNode(), isOperationNodeSource(this.#alias) ? this.#alias.toOperationNode() : IdentifierNode.create(this.#alias));
-  }
-}
-
-class OrWrapper {
-  #node;
-  constructor(node) {
-    this.#node = node;
-  }
-  get expressionType() {
-    return;
-  }
-  as(alias) {
-    return new AliasedExpressionWrapper(this, alias);
-  }
-  or(...args) {
-    return new OrWrapper(OrNode.create(this.#node, parseValueBinaryOperationOrExpression(args)));
-  }
-  $castTo() {
-    return new OrWrapper(this.#node);
-  }
-  toOperationNode() {
-    return ParensNode.create(this.#node);
-  }
-}
-
-class AndWrapper {
-  #node;
-  constructor(node) {
-    this.#node = node;
-  }
-  get expressionType() {
-    return;
-  }
-  as(alias) {
-    return new AliasedExpressionWrapper(this, alias);
-  }
-  and(...args) {
-    return new AndWrapper(AndNode.create(this.#node, parseValueBinaryOperationOrExpression(args)));
-  }
-  $castTo() {
-    return new AndWrapper(this.#node);
-  }
-  toOperationNode() {
-    return ParensNode.create(this.#node);
-  }
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/fetch-node.js
-var FetchNode = freeze({
-  is(node) {
-    return node.kind === "FetchNode";
-  },
-  create(rowCount, modifier) {
-    return {
-      kind: "FetchNode",
-      rowCount: ValueNode.create(rowCount),
-      modifier
-    };
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/parser/fetch-parser.js
-function parseFetch(rowCount, modifier) {
-  if (!isNumber(rowCount) && !isBigInt(rowCount)) {
-    throw new Error(`Invalid fetch row count: ${rowCount}`);
-  }
-  if (!isFetchModifier(modifier)) {
-    throw new Error(`Invalid fetch modifier: ${modifier}`);
-  }
-  return FetchNode.create(rowCount, modifier);
-}
-function isFetchModifier(value) {
-  return value === "only" || value === "with ties";
-}
-
-// /zveltio-extension/node_modules/kysely/dist/query-builder/select-query-builder.js
-var _a;
-
-class SelectQueryBuilderImpl {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  get expressionType() {
-    return;
-  }
-  get isSelectQueryBuilder() {
-    return true;
-  }
-  where(...args) {
-    return new _a({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithWhere(this.#props.queryNode, parseValueBinaryOperationOrExpression(args))
-    });
-  }
-  whereRef(lhs, op, rhs) {
-    return new _a({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithWhere(this.#props.queryNode, parseReferentialBinaryOperation(lhs, op, rhs))
-    });
-  }
-  having(...args) {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithHaving(this.#props.queryNode, parseValueBinaryOperationOrExpression(args))
-    });
-  }
-  havingRef(lhs, op, rhs) {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithHaving(this.#props.queryNode, parseReferentialBinaryOperation(lhs, op, rhs))
-    });
-  }
-  select(selection) {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithSelections(this.#props.queryNode, parseSelectArg(selection))
-    });
-  }
-  distinctOn(selection) {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithDistinctOn(this.#props.queryNode, parseReferenceExpressionOrList(selection))
-    });
-  }
-  modifyFront(modifier) {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithFrontModifier(this.#props.queryNode, SelectModifierNode.createWithExpression(modifier.toOperationNode()))
-    });
-  }
-  modifyEnd(modifier) {
-    return new _a({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.createWithExpression(modifier.toOperationNode()))
-    });
-  }
-  distinct() {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithFrontModifier(this.#props.queryNode, SelectModifierNode.create("Distinct"))
-    });
-  }
-  forUpdate(of) {
-    return new _a({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("ForUpdate", of ? asArray(of).map(parseTable) : undefined))
-    });
-  }
-  forShare(of) {
-    return new _a({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("ForShare", of ? asArray(of).map(parseTable) : undefined))
-    });
-  }
-  forKeyShare(of) {
-    return new _a({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("ForKeyShare", of ? asArray(of).map(parseTable) : undefined))
-    });
-  }
-  forNoKeyUpdate(of) {
-    return new _a({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("ForNoKeyUpdate", of ? asArray(of).map(parseTable) : undefined))
-    });
-  }
-  skipLocked() {
-    return new _a({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("SkipLocked"))
-    });
-  }
-  noWait() {
-    return new _a({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("NoWait"))
-    });
-  }
-  selectAll(table) {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithSelections(this.#props.queryNode, parseSelectAll(table))
-    });
-  }
-  innerJoin(...args) {
-    return this.#join("InnerJoin", args);
-  }
-  leftJoin(...args) {
-    return this.#join("LeftJoin", args);
-  }
-  rightJoin(...args) {
-    return this.#join("RightJoin", args);
-  }
-  fullJoin(...args) {
-    return this.#join("FullJoin", args);
-  }
-  crossJoin(...args) {
-    return this.#join("CrossJoin", args);
-  }
-  innerJoinLateral(...args) {
-    return this.#join("LateralInnerJoin", args);
-  }
-  leftJoinLateral(...args) {
-    return this.#join("LateralLeftJoin", args);
-  }
-  crossJoinLateral(...args) {
-    return this.#join("LateralCrossJoin", args);
-  }
-  crossApply(...args) {
-    return this.#join("CrossApply", args);
-  }
-  outerApply(...args) {
-    return this.#join("OuterApply", args);
-  }
-  #join(joinType, args) {
-    return new _a({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithJoin(this.#props.queryNode, parseJoin(joinType, args))
-    });
-  }
-  orderBy(...args) {
-    return new _a({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithOrderByItems(this.#props.queryNode, parseOrderBy(args))
-    });
-  }
-  groupBy(groupBy) {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithGroupByItems(this.#props.queryNode, parseGroupBy(groupBy))
-    });
-  }
-  limit(limit) {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithLimit(this.#props.queryNode, LimitNode.create(parseValueExpression(limit)))
-    });
-  }
-  offset(offset) {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithOffset(this.#props.queryNode, OffsetNode.create(parseValueExpression(offset)))
-    });
-  }
-  fetch(rowCount, modifier = "only") {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithFetch(this.#props.queryNode, parseFetch(rowCount, modifier))
-    });
-  }
-  top(expression, modifiers) {
-    return new _a({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithTop(this.#props.queryNode, parseTop(expression, modifiers))
-    });
-  }
-  union(expression) {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("union", expression, false))
-    });
-  }
-  unionAll(expression) {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("union", expression, true))
-    });
-  }
-  intersect(expression) {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("intersect", expression, false))
-    });
-  }
-  intersectAll(expression) {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("intersect", expression, true))
-    });
-  }
-  except(expression) {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("except", expression, false))
-    });
-  }
-  exceptAll(expression) {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("except", expression, true))
-    });
-  }
-  as(alias) {
-    return new AliasedSelectQueryBuilderImpl(this, alias);
-  }
-  clearSelect() {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithoutSelections(this.#props.queryNode)
-    });
-  }
-  clearWhere() {
-    return new _a({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithoutWhere(this.#props.queryNode)
-    });
-  }
-  clearLimit() {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithoutLimit(this.#props.queryNode)
-    });
-  }
-  clearOffset() {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithoutOffset(this.#props.queryNode)
-    });
-  }
-  clearOrderBy() {
-    return new _a({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithoutOrderBy(this.#props.queryNode)
-    });
-  }
-  clearGroupBy() {
-    return new _a({
-      ...this.#props,
-      queryNode: SelectQueryNode.cloneWithoutGroupBy(this.#props.queryNode)
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  $if(condition, func) {
-    if (condition) {
-      return func(this);
-    }
-    return new _a({
-      ...this.#props
-    });
-  }
-  $castTo() {
-    return new _a(this.#props);
-  }
-  $narrowType() {
-    return new _a(this.#props);
-  }
-  $assertType() {
-    return new _a(this.#props);
-  }
-  $asTuple() {
-    return new ExpressionWrapper(this.toOperationNode());
-  }
-  $asScalar() {
-    return new ExpressionWrapper(this.toOperationNode());
-  }
-  withPlugin(plugin) {
-    return new _a({
-      ...this.#props,
-      executor: this.#props.executor.withPlugin(plugin)
-    });
-  }
-  toOperationNode() {
-    return this.#props.executor.transformQuery(this.#props.queryNode, this.#props.queryId);
-  }
-  compile() {
-    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
-  }
-  async execute(options) {
-    const compiledQuery = this.compile();
-    const result = await this.#props.executor.executeQuery(compiledQuery, options);
-    return result.rows;
-  }
-  async executeTakeFirst(options) {
-    const [result] = await this.execute(options);
-    return result;
-  }
-  async executeTakeFirstOrThrow(errorConstructorOrOptions) {
-    if (typeof errorConstructorOrOptions === "function") {
-      errorConstructorOrOptions = {
-        errorConstructor: errorConstructorOrOptions
-      };
-    }
-    const result = await this.executeTakeFirst(errorConstructorOrOptions);
-    if (result === undefined) {
-      const errorConstructor = errorConstructorOrOptions?.errorConstructor ?? NoResultError;
-      const error = isNoResultErrorConstructor(errorConstructor) ? new errorConstructor(this.toOperationNode()) : errorConstructor(this.toOperationNode());
-      throw error;
-    }
-    return result;
-  }
-  async* stream(chunkSizeOrOptions) {
-    if (typeof chunkSizeOrOptions !== "object") {
-      chunkSizeOrOptions = {
-        chunkSize: chunkSizeOrOptions
-      };
-    }
-    const compiledQuery = this.compile();
-    const stream = this.#props.executor.stream(compiledQuery, chunkSizeOrOptions.chunkSize ?? 100, chunkSizeOrOptions);
-    for await (const item of stream) {
-      yield* item.rows;
-    }
-  }
-  async explain(format, options) {
-    const builder = new _a({
-      ...this.#props,
-      queryNode: QueryNode.cloneWithExplain(this.#props.queryNode, format, options)
-    });
-    return await builder.execute();
-  }
-}
-_a = SelectQueryBuilderImpl;
-function createSelectQueryBuilder(props) {
-  return new SelectQueryBuilderImpl(props);
-}
-
-class AliasedSelectQueryBuilderImpl {
-  #queryBuilder;
-  #alias;
-  constructor(queryBuilder, alias) {
-    this.#queryBuilder = queryBuilder;
-    this.#alias = alias;
-  }
-  get expression() {
-    return this.#queryBuilder;
-  }
-  get alias() {
-    return this.#alias;
-  }
-  get isAliasedSelectQueryBuilder() {
-    return true;
-  }
-  toOperationNode() {
-    return AliasNode.create(this.#queryBuilder.toOperationNode(), IdentifierNode.create(this.#alias));
-  }
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/aggregate-function-node.js
-var AggregateFunctionNode = freeze({
-  is(node) {
-    return node.kind === "AggregateFunctionNode";
-  },
-  create(aggregateFunction, aggregated = []) {
-    return freeze({
-      kind: "AggregateFunctionNode",
-      func: aggregateFunction,
-      aggregated
-    });
-  },
-  cloneWithDistinct(aggregateFunctionNode) {
-    return freeze({
-      ...aggregateFunctionNode,
-      distinct: true
-    });
-  },
-  cloneWithOrderBy(aggregateFunctionNode, orderItems, withinGroup = false) {
-    const prop = withinGroup ? "withinGroup" : "orderBy";
-    return freeze({
-      ...aggregateFunctionNode,
-      [prop]: aggregateFunctionNode[prop] ? OrderByNode.cloneWithItems(aggregateFunctionNode[prop], orderItems) : OrderByNode.create(orderItems)
-    });
-  },
-  cloneWithFilter(aggregateFunctionNode, filter) {
-    return freeze({
-      ...aggregateFunctionNode,
-      filter: aggregateFunctionNode.filter ? WhereNode.cloneWithOperation(aggregateFunctionNode.filter, "And", filter) : WhereNode.create(filter)
-    });
-  },
-  cloneWithOrFilter(aggregateFunctionNode, filter) {
-    return freeze({
-      ...aggregateFunctionNode,
-      filter: aggregateFunctionNode.filter ? WhereNode.cloneWithOperation(aggregateFunctionNode.filter, "Or", filter) : WhereNode.create(filter)
-    });
-  },
-  cloneWithOver(aggregateFunctionNode, over) {
-    return freeze({
-      ...aggregateFunctionNode,
-      over
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/function-node.js
-var FunctionNode = freeze({
-  is(node) {
-    return node.kind === "FunctionNode";
-  },
-  create(func, args) {
-    return freeze({
-      kind: "FunctionNode",
-      func,
-      arguments: args
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/query-builder/aggregate-function-builder.js
-class AggregateFunctionBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  get expressionType() {
-    return;
-  }
-  as(alias) {
-    return new AliasedAggregateFunctionBuilder(this, alias);
-  }
-  distinct() {
-    return new AggregateFunctionBuilder({
-      ...this.#props,
-      aggregateFunctionNode: AggregateFunctionNode.cloneWithDistinct(this.#props.aggregateFunctionNode)
-    });
-  }
-  orderBy(...args) {
-    return new AggregateFunctionBuilder({
-      ...this.#props,
-      aggregateFunctionNode: QueryNode.cloneWithOrderByItems(this.#props.aggregateFunctionNode, parseOrderBy(args))
-    });
-  }
-  clearOrderBy() {
-    return new AggregateFunctionBuilder({
-      ...this.#props,
-      aggregateFunctionNode: QueryNode.cloneWithoutOrderBy(this.#props.aggregateFunctionNode)
-    });
-  }
-  withinGroupOrderBy(...args) {
-    return new AggregateFunctionBuilder({
-      ...this.#props,
-      aggregateFunctionNode: AggregateFunctionNode.cloneWithOrderBy(this.#props.aggregateFunctionNode, parseOrderBy(args), true)
-    });
-  }
-  filterWhere(...args) {
-    return new AggregateFunctionBuilder({
-      ...this.#props,
-      aggregateFunctionNode: AggregateFunctionNode.cloneWithFilter(this.#props.aggregateFunctionNode, parseValueBinaryOperationOrExpression(args))
-    });
-  }
-  filterWhereRef(lhs, op, rhs) {
-    return new AggregateFunctionBuilder({
-      ...this.#props,
-      aggregateFunctionNode: AggregateFunctionNode.cloneWithFilter(this.#props.aggregateFunctionNode, parseReferentialBinaryOperation(lhs, op, rhs))
-    });
-  }
-  over(over) {
-    const builder = createOverBuilder();
-    return new AggregateFunctionBuilder({
-      ...this.#props,
-      aggregateFunctionNode: AggregateFunctionNode.cloneWithOver(this.#props.aggregateFunctionNode, (over ? over(builder) : builder).toOperationNode())
-    });
-  }
-  $call(func) {
-    return func(this);
-  }
-  $castTo() {
-    return new AggregateFunctionBuilder(this.#props);
-  }
-  $notNull() {
-    return new AggregateFunctionBuilder(this.#props);
-  }
-  toOperationNode() {
-    return this.#props.aggregateFunctionNode;
-  }
-}
-
-class AliasedAggregateFunctionBuilder {
-  #aggregateFunctionBuilder;
-  #alias;
-  constructor(aggregateFunctionBuilder, alias) {
-    this.#aggregateFunctionBuilder = aggregateFunctionBuilder;
-    this.#alias = alias;
-  }
-  get expression() {
-    return this.#aggregateFunctionBuilder;
-  }
-  get alias() {
-    return this.#alias;
-  }
-  toOperationNode() {
-    return AliasNode.create(this.#aggregateFunctionBuilder.toOperationNode(), IdentifierNode.create(this.#alias));
-  }
-}
-
-// /zveltio-extension/node_modules/kysely/dist/query-builder/function-module.js
-function createFunctionModule() {
-  const fn = (name, args) => {
-    return new ExpressionWrapper(FunctionNode.create(name, parseReferenceExpressionOrList(args ?? [])));
-  };
-  const agg = (name, args) => {
-    return new AggregateFunctionBuilder({
-      aggregateFunctionNode: AggregateFunctionNode.create(name, args ? parseReferenceExpressionOrList(args) : undefined)
-    });
-  };
-  return Object.assign(fn, {
-    agg,
-    avg(column) {
-      return agg("avg", [column]);
-    },
-    coalesce(...values) {
-      return fn("coalesce", values);
-    },
-    count(column) {
-      return agg("count", [column]);
-    },
-    countAll(table) {
-      return new AggregateFunctionBuilder({
-        aggregateFunctionNode: AggregateFunctionNode.create("count", parseSelectAll(table))
-      });
-    },
-    max(column) {
-      return agg("max", [column]);
-    },
-    min(column) {
-      return agg("min", [column]);
-    },
-    sum(column) {
-      return agg("sum", [column]);
-    },
-    any(column) {
-      return fn("any", [column]);
-    },
-    jsonAgg(table) {
-      return new AggregateFunctionBuilder({
-        aggregateFunctionNode: AggregateFunctionNode.create("json_agg", [
-          isString(table) ? parseTable(table) : table.toOperationNode()
-        ])
-      });
-    },
-    toJson(table) {
-      return new ExpressionWrapper(FunctionNode.create("to_json", [
-        isString(table) ? parseTable(table) : table.toOperationNode()
-      ]));
-    }
-  });
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/unary-operation-node.js
-var UnaryOperationNode = freeze({
-  is(node) {
-    return node.kind === "UnaryOperationNode";
-  },
-  create(operator, operand) {
-    return freeze({
-      kind: "UnaryOperationNode",
-      operator,
-      operand
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/parser/unary-operation-parser.js
-function parseUnaryOperation(operator, operand) {
-  if (isUnaryOperator(operator)) {
-    return UnaryOperationNode.create(OperatorNode.create(operator), parseReferenceExpression(operand));
-  }
-  throw new Error(`invalid unary operator ${JSON.stringify(operator)}`);
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/case-node.js
-var CaseNode = freeze({
-  is(node) {
-    return node.kind === "CaseNode";
-  },
-  create(value) {
-    return freeze({
-      kind: "CaseNode",
-      value
-    });
-  },
-  cloneWithWhen(caseNode, when) {
-    return freeze({
-      ...caseNode,
-      when: freeze(caseNode.when ? [...caseNode.when, when] : [when])
-    });
-  },
-  cloneWithThen(caseNode, then) {
-    return freeze({
-      ...caseNode,
-      when: caseNode.when ? freeze([
-        ...caseNode.when.slice(0, -1),
-        WhenNode.cloneWithResult(caseNode.when[caseNode.when.length - 1], then)
-      ]) : undefined
-    });
-  },
-  cloneWith(caseNode, props) {
-    return freeze({
-      ...caseNode,
-      ...props
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/query-builder/case-builder.js
-class CaseBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  when(...args) {
-    return new CaseThenBuilder({
-      ...this.#props,
-      node: CaseNode.cloneWithWhen(this.#props.node, WhenNode.create(parseValueBinaryOperationOrExpression(args)))
-    });
-  }
-  whenRef(lhs, op, rhs) {
-    return new CaseThenBuilder({
-      ...this.#props,
-      node: CaseNode.cloneWithWhen(this.#props.node, WhenNode.create(parseReferentialBinaryOperation(lhs, op, rhs)))
-    });
-  }
-}
-
-class CaseThenBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  then(valueExpression) {
-    return new CaseWhenBuilder({
-      ...this.#props,
-      node: CaseNode.cloneWithThen(this.#props.node, isSafeImmediateValue(valueExpression) ? parseSafeImmediateValue(valueExpression) : parseValueExpression(valueExpression))
-    });
-  }
-  thenRef(expression) {
-    return new CaseWhenBuilder({
-      ...this.#props,
-      node: CaseNode.cloneWithThen(this.#props.node, parseReferenceExpression(expression))
-    });
-  }
-}
-
-class CaseWhenBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  when(...args) {
-    return new CaseThenBuilder({
-      ...this.#props,
-      node: CaseNode.cloneWithWhen(this.#props.node, WhenNode.create(parseValueBinaryOperationOrExpression(args)))
-    });
-  }
-  whenRef(lhs, op, rhs) {
-    return new CaseThenBuilder({
-      ...this.#props,
-      node: CaseNode.cloneWithWhen(this.#props.node, WhenNode.create(parseReferentialBinaryOperation(lhs, op, rhs)))
-    });
-  }
-  else(valueExpression) {
-    return new CaseEndBuilder({
-      ...this.#props,
-      node: CaseNode.cloneWith(this.#props.node, {
-        else: isSafeImmediateValue(valueExpression) ? parseSafeImmediateValue(valueExpression) : parseValueExpression(valueExpression)
-      })
-    });
-  }
-  elseRef(expression) {
-    return new CaseEndBuilder({
-      ...this.#props,
-      node: CaseNode.cloneWith(this.#props.node, {
-        else: parseReferenceExpression(expression)
-      })
-    });
-  }
-  end() {
-    return new ExpressionWrapper(CaseNode.cloneWith(this.#props.node, { isStatement: false }));
-  }
-  endCase() {
-    return new ExpressionWrapper(CaseNode.cloneWith(this.#props.node, { isStatement: true }));
-  }
-}
-
-class CaseEndBuilder {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  end() {
-    return new ExpressionWrapper(CaseNode.cloneWith(this.#props.node, { isStatement: false }));
-  }
-  endCase() {
-    return new ExpressionWrapper(CaseNode.cloneWith(this.#props.node, { isStatement: true }));
-  }
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/json-path-leg-node.js
-var JSONPathLegNode = freeze({
-  is(node) {
-    return node.kind === "JSONPathLegNode";
-  },
-  create(type, value) {
-    return freeze({
-      kind: "JSONPathLegNode",
-      type,
-      value
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/query-builder/json-path-builder.js
-var HASH_NEGATIVE_INDEX_REGEX = /^#-\d+$/;
-
-class JSONPathBuilder {
-  #node;
-  constructor(node) {
-    this.#node = node;
-  }
-  at(index) {
-    if (typeof index !== "number" && typeof index !== "string" || typeof index === "number" && !Number.isInteger(index) || typeof index === "string" && index !== "last" && !HASH_NEGATIVE_INDEX_REGEX.test(index)) {
-      throw new Error(`Unexpected index value in .at(...): ${index}`);
-    }
-    return this.#createBuilderWithPathLeg("ArrayLocation", index);
-  }
-  key(key) {
-    return this.#createBuilderWithPathLeg("Member", key);
-  }
-  #createBuilderWithPathLeg(legType, value) {
-    if (JSONReferenceNode.is(this.#node)) {
-      return new TraversedJSONPathBuilder(JSONReferenceNode.cloneWithTraversal(this.#node, JSONPathNode.is(this.#node.traversal) ? JSONPathNode.cloneWithLeg(this.#node.traversal, JSONPathLegNode.create(legType, value)) : JSONOperatorChainNode.cloneWithValue(this.#node.traversal, ValueNode.createImmediate(value))));
-    }
-    return new TraversedJSONPathBuilder(JSONPathNode.cloneWithLeg(this.#node, JSONPathLegNode.create(legType, value)));
-  }
-}
-
-class TraversedJSONPathBuilder extends JSONPathBuilder {
-  #node;
-  constructor(node) {
-    super(node);
-    this.#node = node;
-  }
-  get expressionType() {
-    return;
-  }
-  as(alias) {
-    return new AliasedJSONPathBuilder(this, alias);
-  }
-  $castTo() {
-    return new TraversedJSONPathBuilder(this.#node);
-  }
-  $notNull() {
-    return new TraversedJSONPathBuilder(this.#node);
-  }
-  toOperationNode() {
-    return this.#node;
-  }
-}
-
-class AliasedJSONPathBuilder {
-  #jsonPath;
-  #alias;
-  constructor(jsonPath, alias) {
-    this.#jsonPath = jsonPath;
-    this.#alias = alias;
-  }
-  get expression() {
-    return this.#jsonPath;
-  }
-  get alias() {
-    return this.#alias;
-  }
-  toOperationNode() {
-    return AliasNode.create(this.#jsonPath.toOperationNode(), isOperationNodeSource(this.#alias) ? this.#alias.toOperationNode() : IdentifierNode.create(this.#alias));
-  }
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/tuple-node.js
-var TupleNode = freeze({
-  is(node) {
-    return node.kind === "TupleNode";
-  },
-  create(values) {
-    return freeze({
-      kind: "TupleNode",
-      values: freeze(values)
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/data-type-node.js
-var SIMPLE_COLUMN_DATA_TYPES = freeze({
-  bigint: true,
-  bigserial: true,
-  binary: true,
-  blob: true,
-  boolean: true,
-  bytea: true,
-  char: true,
-  date: true,
-  datemultirange: true,
-  daterange: true,
-  datetime: true,
-  datetime2: true,
-  decimal: true,
-  "double precision": true,
-  float4: true,
-  float8: true,
-  int2: true,
-  int4: true,
-  int4multirange: true,
-  int4range: true,
-  int8: true,
-  int8multirange: true,
-  int8range: true,
-  integer: true,
-  json: true,
-  jsonb: true,
-  numeric: true,
-  nummultirange: true,
-  numrange: true,
-  real: true,
-  serial: true,
-  smallint: true,
-  text: true,
-  time: true,
-  timestamp: true,
-  timestamptz: true,
-  timetz: true,
-  tsmultirange: true,
-  tsrange: true,
-  tstzmultirange: true,
-  tstzrange: true,
-  uuid: true,
-  varbinary: true,
-  varchar: true
-});
-var COLUMN_DATA_TYPE_REGEX = freeze([
-  /^varchar\(\d+\)$/,
-  /^char\(\d+\)$/,
-  /^decimal\(\d+, \d+\)$/,
-  /^numeric\(\d+, \d+\)$/,
-  /^binary\(\d+\)$/,
-  /^datetime\(\d+\)$/,
-  /^time\(\d+\)$/,
-  /^timetz\(\d+\)$/,
-  /^timestamp\(\d+\)$/,
-  /^timestamptz\(\d+\)$/,
-  /^datetime2\(\d+\)$/,
-  /^varbinary\(\d+\)$/
-]);
-var DataTypeNode = freeze({
-  is(node) {
-    return node.kind === "DataTypeNode";
-  },
-  create(dataType) {
-    return freeze({
-      kind: "DataTypeNode",
-      dataType
-    });
-  }
-});
-function isColumnDataType(dataType) {
-  return SIMPLE_COLUMN_DATA_TYPES[dataType] || COLUMN_DATA_TYPE_REGEX.some((r) => r.test(dataType));
-}
-
-// /zveltio-extension/node_modules/kysely/dist/parser/data-type-parser.js
-function parseDataTypeExpression(dataType) {
-  if (isOperationNodeSource(dataType)) {
-    return dataType.toOperationNode();
-  }
-  if (isColumnDataType(dataType)) {
-    return DataTypeNode.create(dataType);
-  }
-  throw new Error(`invalid column data type ${JSON.stringify(dataType)}`);
-}
-
-// /zveltio-extension/node_modules/kysely/dist/operation-node/cast-node.js
-var CastNode = freeze({
-  is(node) {
-    return node.kind === "CastNode";
-  },
-  create(expression, dataType) {
-    return freeze({
-      kind: "CastNode",
-      expression,
-      dataType
-    });
-  }
-});
-
-// /zveltio-extension/node_modules/kysely/dist/expression/expression-builder.js
-function createExpressionBuilder(executor = NOOP_QUERY_EXECUTOR) {
-  function binary(lhs, op, rhs) {
-    return new ExpressionWrapper(parseValueBinaryOperation(lhs, op, rhs));
-  }
-  function unary(op, expr) {
-    return new ExpressionWrapper(parseUnaryOperation(op, expr));
-  }
-  const eb = Object.assign(binary, {
-    fn: undefined,
-    eb: undefined,
-    selectFrom(table) {
-      return createSelectQueryBuilder({
-        queryId: createQueryId(),
-        executor,
-        queryNode: SelectQueryNode.createFrom(parseTableExpressionOrList(table))
-      });
-    },
-    case(reference) {
-      return new CaseBuilder({
-        node: CaseNode.create(isUndefined(reference) ? undefined : parseReferenceExpression(reference))
-      });
-    },
-    ref(reference, op) {
-      if (isUndefined(op)) {
-        return new ExpressionWrapper(parseStringReference(reference));
-      }
-      return new JSONPathBuilder(parseJSONReference(reference, op));
-    },
-    jsonPath() {
-      return new JSONPathBuilder(JSONPathNode.create());
-    },
-    table(table) {
-      return new ExpressionWrapper(parseTable(table));
-    },
-    val(value) {
-      return new ExpressionWrapper(parseValueExpression(value));
-    },
-    refTuple(...values) {
-      return new ExpressionWrapper(TupleNode.create(values.map(parseReferenceExpression)));
-    },
-    tuple(...values) {
-      return new ExpressionWrapper(TupleNode.create(values.map(parseValueExpression)));
-    },
-    lit(value) {
-      return new ExpressionWrapper(parseSafeImmediateValue(value));
-    },
-    unary,
-    not(expr) {
-      return unary("not", expr);
-    },
-    exists(expr) {
-      return unary("exists", expr);
-    },
-    neg(expr) {
-      return unary("-", expr);
-    },
-    between(expr, start, end) {
-      return new ExpressionWrapper(BinaryOperationNode.create(parseReferenceExpression(expr), OperatorNode.create("between"), AndNode.create(parseValueExpression(start), parseValueExpression(end))));
-    },
-    betweenSymmetric(expr, start, end) {
-      return new ExpressionWrapper(BinaryOperationNode.create(parseReferenceExpression(expr), OperatorNode.create("between symmetric"), AndNode.create(parseValueExpression(start), parseValueExpression(end))));
-    },
-    and(exprs) {
-      if (isReadonlyArray(exprs)) {
-        return new ExpressionWrapper(parseFilterList(exprs, "and"));
-      }
-      return new ExpressionWrapper(parseFilterObject(exprs, "and"));
-    },
-    or(exprs) {
-      if (isReadonlyArray(exprs)) {
-        return new ExpressionWrapper(parseFilterList(exprs, "or"));
-      }
-      return new ExpressionWrapper(parseFilterObject(exprs, "or"));
-    },
-    parens(...args) {
-      const node = parseValueBinaryOperationOrExpression(args);
-      if (ParensNode.is(node)) {
-        return new ExpressionWrapper(node);
-      } else {
-        return new ExpressionWrapper(ParensNode.create(node));
-      }
-    },
-    cast(expr, dataType) {
-      return new ExpressionWrapper(CastNode.create(parseReferenceExpression(expr), parseDataTypeExpression(dataType)));
-    }
-  });
-  eb.fn = createFunctionModule();
-  eb.eb = eb;
-  return eb;
-}
-function expressionBuilder(_) {
-  return createExpressionBuilder();
-}
-
-// /zveltio-extension/node_modules/kysely/dist/parser/expression-parser.js
-function parseExpression(exp) {
-  if (isOperationNodeSource(exp)) {
-    return exp.toOperationNode();
-  } else if (isFunction(exp)) {
-    return exp(expressionBuilder()).toOperationNode();
-  }
-  throw new Error(`invalid expression: ${JSON.stringify(exp)}`);
-}
-function parseAliasedExpression(exp) {
-  if (isOperationNodeSource(exp)) {
-    return exp.toOperationNode();
-  } else if (isFunction(exp)) {
-    return exp(expressionBuilder()).toOperationNode();
-  }
-  throw new Error(`invalid aliased expression: ${JSON.stringify(exp)}`);
-}
-function isExpressionOrFactory(obj) {
-  return isExpression(obj) || isAliasedExpression(obj) || isFunction(obj);
-}
-
-// /zveltio-extension/node_modules/kysely/dist/dynamic/dynamic-table-builder.js
-class DynamicTableBuilder {
-  #table;
-  get table() {
-    return this.#table;
-  }
-  constructor(table) {
-    this.#table = table;
-  }
-  as(alias) {
-    return new AliasedDynamicTableBuilder(this.#table, alias);
-  }
-}
-
-class AliasedDynamicTableBuilder {
-  #table;
-  #alias;
-  get table() {
-    return this.#table;
-  }
-  get alias() {
-    return this.#alias;
-  }
-  constructor(table, alias) {
-    this.#table = table;
-    this.#alias = alias;
-  }
-  toOperationNode() {
-    return AliasNode.create(parseTable(this.#table), IdentifierNode.create(this.#alias));
-  }
-}
-function isAliasedDynamicTableBuilder(obj) {
-  return isObject(obj) && isOperationNodeSource(obj) && isString(obj.table) && isString(obj.alias);
-}
-
-// /zveltio-extension/node_modules/kysely/dist/parser/table-parser.js
-function parseTableExpressionOrList(table) {
-  if (isReadonlyArray(table)) {
-    return table.map((it) => parseTableExpression(it));
-  } else {
-    return [parseTableExpression(table)];
-  }
-}
-function parseTableExpression(table) {
-  if (isString(table)) {
-    return parseAliasedTable(table);
-  } else if (isAliasedDynamicTableBuilder(table)) {
-    return table.toOperationNode();
-  } else {
-    return parseAliasedExpression(table);
-  }
-}
-function parseAliasedTable(from) {
-  const ALIAS_SEPARATOR = " as ";
-  if (from.includes(ALIAS_SEPARATOR)) {
-    const [table, alias] = from.split(ALIAS_SEPARATOR).map(trim2);
-    return AliasNode.create(parseTable(table), IdentifierNode.create(alias));
-  } else {
-    return parseTable(from);
-  }
-}
-function parseTable(from) {
-  const SCHEMA_SEPARATOR = ".";
-  if (from.includes(SCHEMA_SEPARATOR)) {
-    const [schema, table] = from.split(SCHEMA_SEPARATOR).map(trim2);
-    return TableNode.createWithSchema(schema, table);
-  } else {
-    return TableNode.create(from);
-  }
-}
-function trim2(str) {
-  return str.trim();
-}
-// /zveltio-extension/node_modules/kysely/dist/raw-builder/raw-builder.js
-class RawBuilderImpl {
-  #props;
-  constructor(props) {
-    this.#props = freeze(props);
-  }
-  get expressionType() {
-    return;
-  }
-  get isRawBuilder() {
-    return true;
-  }
-  as(alias) {
-    return new AliasedRawBuilderImpl(this, alias);
-  }
-  $castTo() {
-    return new RawBuilderImpl({ ...this.#props });
-  }
-  $notNull() {
-    return new RawBuilderImpl(this.#props);
-  }
-  withPlugin(plugin) {
-    return new RawBuilderImpl({
-      ...this.#props,
-      plugins: this.#props.plugins !== undefined ? freeze([...this.#props.plugins, plugin]) : freeze([plugin])
-    });
-  }
-  toOperationNode() {
-    return this.#toOperationNode(this.#getExecutor());
-  }
-  compile(executorProvider) {
-    return this.#compile(this.#getExecutor(executorProvider));
-  }
-  async execute(executorProvider, options) {
-    const executor = this.#getExecutor(executorProvider);
-    return executor.executeQuery(this.#compile(executor), options);
-  }
-  #getExecutor(executorProvider) {
-    const executor = executorProvider !== undefined ? executorProvider.getExecutor() : NOOP_QUERY_EXECUTOR;
-    return this.#props.plugins !== undefined ? executor.withPlugins(this.#props.plugins) : executor;
-  }
-  #toOperationNode(executor) {
-    return executor.transformQuery(this.#props.rawNode, this.#props.queryId);
-  }
-  #compile(executor) {
-    return executor.compileQuery(this.#toOperationNode(executor), this.#props.queryId);
-  }
-}
-function createRawBuilder(props) {
-  return new RawBuilderImpl(props);
-}
-
-class AliasedRawBuilderImpl {
-  #rawBuilder;
-  #alias;
-  constructor(rawBuilder, alias) {
-    this.#rawBuilder = rawBuilder;
-    this.#alias = alias;
-  }
-  get expression() {
-    return this.#rawBuilder;
-  }
-  get alias() {
-    return this.#alias;
-  }
-  get rawBuilder() {
-    return this.#rawBuilder;
-  }
-  toOperationNode() {
-    return AliasNode.create(this.#rawBuilder.toOperationNode(), isOperationNodeSource(this.#alias) ? this.#alias.toOperationNode() : IdentifierNode.create(this.#alias));
-  }
-}
-// /zveltio-extension/node_modules/kysely/dist/raw-builder/sql.js
-var sql = Object.assign((sqlFragments, ...parameters) => {
-  return createRawBuilder({
-    queryId: createQueryId(),
-    rawNode: RawNode.create(sqlFragments, parameters?.map(parseParameter) ?? [])
-  });
-}, {
-  ref(columnReference) {
-    return createRawBuilder({
-      queryId: createQueryId(),
-      rawNode: RawNode.createWithChild(parseStringReference(columnReference))
-    });
-  },
-  val(value) {
-    return createRawBuilder({
-      queryId: createQueryId(),
-      rawNode: RawNode.createWithChild(parseValueExpression(value))
-    });
-  },
-  table(tableReference) {
-    return createRawBuilder({
-      queryId: createQueryId(),
-      rawNode: RawNode.createWithChild(parseTable(tableReference))
-    });
-  },
-  id(...ids) {
-    const fragments = new Array(ids.length + 1).fill(".");
-    fragments[0] = "";
-    fragments[fragments.length - 1] = "";
-    return createRawBuilder({
-      queryId: createQueryId(),
-      rawNode: RawNode.create(fragments, ids.map(IdentifierNode.create))
-    });
-  },
-  lit(value) {
-    return createRawBuilder({
-      queryId: createQueryId(),
-      rawNode: RawNode.createWithChild(ValueNode.createImmediate(value))
-    });
-  },
-  raw(sql2) {
-    return createRawBuilder({
-      queryId: createQueryId(),
-      rawNode: RawNode.createWithSql(sql2)
-    });
-  },
-  join(array, separator = sql`, `) {
-    const nodes = new Array(Math.max(2 * array.length - 1, 0));
-    const sep = separator.toOperationNode();
-    for (let i = 0;i < array.length; ++i) {
-      nodes[2 * i] = parseParameter(array[i]);
-      if (i !== array.length - 1) {
-        nodes[2 * i + 1] = sep;
-      }
-    }
-    return createRawBuilder({
-      queryId: createQueryId(),
-      rawNode: RawNode.createWithChildren(nodes)
-    });
-  }
-});
-function parseParameter(param) {
-  if (isOperationNodeSource(param)) {
-    return param.toOperationNode();
-  }
-  return parseValueExpression(param);
-}
 // /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/classic/external.js
 var exports_external = {};
 __export(exports_external, {
@@ -16987,7 +13605,7 @@ __export(exports_util, {
   safeExtend: () => safeExtend,
   required: () => required,
   rawShape: () => rawShape,
-  randomString: () => randomString2,
+  randomString: () => randomString,
   propertyKeyTypes: () => propertyKeyTypes,
   promiseAllObject: () => promiseAllObject,
   primitiveTypes: () => primitiveTypes,
@@ -17009,7 +13627,7 @@ __export(exports_util, {
   joinValues: () => joinValues,
   issue: () => issue,
   isPlainObject: () => isPlainObject,
-  isObject: () => isObject2,
+  isObject: () => isObject,
   installLazyProp: () => installLazyProp,
   hide: () => hide,
   hexToUint8Array: () => hexToUint8Array,
@@ -17223,7 +13841,7 @@ function promiseAllObject(promisesObj) {
     return resolvedObj;
   });
 }
-function randomString2(length = 10) {
+function randomString(length = 10) {
   const chars = "abcdefghijklmnopqrstuvwxyz";
   let str = "";
   for (let i = 0;i < length; i++) {
@@ -17238,7 +13856,7 @@ function slugify(input) {
   return input.toLowerCase().trim().replace(/[^\w\s-]/g, "").replace(/[\s_-]+/g, "-").replace(/^-+|-+$/g, "");
 }
 var captureStackTrace = "captureStackTrace" in Error ? Error.captureStackTrace : (..._args) => {};
-function isObject2(data) {
+function isObject(data) {
   return typeof data === "object" && data !== null && !Array.isArray(data);
 }
 var allowsEval = /* @__PURE__ */ cached(() => {
@@ -17257,7 +13875,7 @@ var allowsEval = /* @__PURE__ */ cached(() => {
   }
 });
 function isPlainObject(o) {
-  if (isObject2(o) === false)
+  if (isObject(o) === false)
     return false;
   const ctor = o.constructor;
   if (ctor === undefined)
@@ -17265,7 +13883,7 @@ function isPlainObject(o) {
   if (typeof ctor !== "function")
     return true;
   const prot = ctor.prototype;
-  if (isObject2(prot) === false)
+  if (isObject(prot) === false)
     return false;
   if (Object.prototype.hasOwnProperty.call(prot, "isPrototypeOf") === false) {
     return false;
@@ -17548,8 +14166,8 @@ function explicitlyAborted(x, startIndex = 0) {
 }
 function prefixIssues(path, issues) {
   return issues.map((iss) => {
-    var _a2;
-    (_a2 = iss).path ?? (_a2.path = []);
+    var _a;
+    (_a = iss).path ?? (_a.path = []);
     iss.path.unshift(path);
     return iss;
   });
@@ -17558,17 +14176,17 @@ function unwrapMessage(message) {
   return typeof message === "string" ? message : message?.message;
 }
 function attachSchema(issues, start, inst) {
-  var _a2;
+  var _a;
   for (let i = start;i < issues.length; i++) {
-    (_a2 = issues[i]).schema ?? (_a2.schema = inst);
+    (_a = issues[i]).schema ?? (_a.schema = inst);
   }
 }
 function finalizeIssue(iss, ctx, config) {
-  var _a2;
+  var _a;
   const traits = iss.inst?._zod?.traits;
   if (traits?.has("$ZodType")) {
     if (traits.has("$ZodCheck"))
-      (_a2 = iss).schema ?? (_a2.schema = iss.inst);
+      (_a = iss).schema ?? (_a.schema = iss.inst);
     else
       iss.schema = iss.inst;
   }
@@ -17810,7 +14428,7 @@ function constantCatch(value) {
 }
 
 // /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/core.js
-var _a2;
+var _a;
 var NEVER = /* @__PURE__ */ Object.freeze({
   status: "aborted"
 });
@@ -17925,7 +14543,7 @@ class $ZodEncodeError extends Error {
     this.name = "ZodEncodeError";
   }
 }
-(_a2 = globalThis).__zod_globalConfig ?? (_a2.__zod_globalConfig = {});
+(_a = globalThis).__zod_globalConfig ?? (_a.__zod_globalConfig = {});
 var globalConfig = globalThis.__zod_globalConfig;
 function config(newConfig) {
   if (newConfig)
@@ -18049,7 +14667,7 @@ function formatError(error, mapper = (issue2) => issue2.message) {
 function treeifyError(error, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
   const processError = (error2, path = []) => {
-    var _a3;
+    var _a2;
     for (const issue2 of error2.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
         issue2.errors.map((issues) => processError({ issues }, [...path, ...issue2.path]));
@@ -18081,7 +14699,7 @@ function treeifyError(error, mapper = (issue2) => issue2.message) {
             curr = curr.properties[el];
           } else {
             curr.items ?? (curr.items = []);
-            (_a3 = curr.items)[el] ?? (_a3[el] = { errors: [] });
+            (_a2 = curr.items)[el] ?? (_a2[el] = { errors: [] });
             curr = curr.items[el];
           }
           if (terminal) {
@@ -18458,10 +15076,10 @@ var sha512_base64url = /* @__PURE__ */ fixedBase64url(86);
 
 // /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
-  var _a3;
+  var _a2;
   inst._zod ?? (inst._zod = {});
   inst._zod.def = def;
-  (_a3 = inst._zod).onattach ?? (_a3.onattach = []);
+  (_a2 = inst._zod).onattach ?? (_a2.onattach = []);
 });
 var _whenHasSize = (payload) => {
   const val = payload.value;
@@ -18631,9 +15249,9 @@ var $ZodCheckBigIntFormat = /* @__PURE__ */ $constructor("$ZodCheckBigIntFormat"
   };
 });
 var $ZodCheckMaxSize = /* @__PURE__ */ $constructor("$ZodCheckMaxSize", (inst, def) => {
-  var _a3;
+  var _a2;
   $ZodCheck.init(inst, def);
-  (_a3 = inst._zod.def).when ?? (_a3.when = _whenHasSize);
+  (_a2 = inst._zod.def).when ?? (_a2.when = _whenHasSize);
   inst._zod.check = (payload) => {
     const input = payload.value;
     const size = input.size;
@@ -18651,9 +15269,9 @@ var $ZodCheckMaxSize = /* @__PURE__ */ $constructor("$ZodCheckMaxSize", (inst, d
   };
 });
 var $ZodCheckMinSize = /* @__PURE__ */ $constructor("$ZodCheckMinSize", (inst, def) => {
-  var _a3;
+  var _a2;
   $ZodCheck.init(inst, def);
-  (_a3 = inst._zod.def).when ?? (_a3.when = _whenHasSize);
+  (_a2 = inst._zod.def).when ?? (_a2.when = _whenHasSize);
   inst._zod.check = (payload) => {
     const input = payload.value;
     const size = input.size;
@@ -18671,9 +15289,9 @@ var $ZodCheckMinSize = /* @__PURE__ */ $constructor("$ZodCheckMinSize", (inst, d
   };
 });
 var $ZodCheckSizeEquals = /* @__PURE__ */ $constructor("$ZodCheckSizeEquals", (inst, def) => {
-  var _a3;
+  var _a2;
   $ZodCheck.init(inst, def);
-  (_a3 = inst._zod.def).when ?? (_a3.when = _whenHasSize);
+  (_a2 = inst._zod.def).when ?? (_a2.when = _whenHasSize);
   inst._zod.check = (payload) => {
     const input = payload.value;
     const size = input.size;
@@ -18692,9 +15310,9 @@ var $ZodCheckSizeEquals = /* @__PURE__ */ $constructor("$ZodCheckSizeEquals", (i
   };
 });
 var $ZodCheckMaxLength = /* @__PURE__ */ $constructor("$ZodCheckMaxLength", (inst, def) => {
-  var _a3;
+  var _a2;
   $ZodCheck.init(inst, def);
-  (_a3 = inst._zod.def).when ?? (_a3.when = _whenHasLength);
+  (_a2 = inst._zod.def).when ?? (_a2.when = _whenHasLength);
   inst._zod.check = (payload) => {
     const input = payload.value;
     const units = input.length;
@@ -18714,9 +15332,9 @@ var $ZodCheckMaxLength = /* @__PURE__ */ $constructor("$ZodCheckMaxLength", (ins
   };
 });
 var $ZodCheckMinLength = /* @__PURE__ */ $constructor("$ZodCheckMinLength", (inst, def) => {
-  var _a3;
+  var _a2;
   $ZodCheck.init(inst, def);
-  (_a3 = inst._zod.def).when ?? (_a3.when = _whenHasLength);
+  (_a2 = inst._zod.def).when ?? (_a2.when = _whenHasLength);
   inst._zod.check = (payload) => {
     const input = payload.value;
     const units = input.length;
@@ -18736,9 +15354,9 @@ var $ZodCheckMinLength = /* @__PURE__ */ $constructor("$ZodCheckMinLength", (ins
   };
 });
 var $ZodCheckLengthEquals = /* @__PURE__ */ $constructor("$ZodCheckLengthEquals", (inst, def) => {
-  var _a3;
+  var _a2;
   $ZodCheck.init(inst, def);
-  (_a3 = inst._zod.def).when ?? (_a3.when = _whenHasLength);
+  (_a2 = inst._zod.def).when ?? (_a2.when = _whenHasLength);
   inst._zod.check = (payload) => {
     const input = payload.value;
     const units = input.length;
@@ -18759,10 +15377,10 @@ var $ZodCheckLengthEquals = /* @__PURE__ */ $constructor("$ZodCheckLengthEquals"
   };
 });
 var $ZodCheckStringFormat = /* @__PURE__ */ $constructor("$ZodCheckStringFormat", (inst, def) => {
-  var _a3, _b;
+  var _a2, _b;
   $ZodCheck.init(inst, def);
   if (def.pattern)
-    (_a3 = inst._zod).check ?? (_a3.check = (payload) => {
+    (_a2 = inst._zod).check ?? (_a2.check = (payload) => {
       def.pattern.lastIndex = 0;
       if (def.pattern.test(payload.value))
         return;
@@ -18981,7 +15599,7 @@ var version = {
 
 // /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
-  var _a3;
+  var _a2;
   inst ?? (inst = {});
   inst._zod.def = def;
   inst._zod.bag = inst._zod.bag || {};
@@ -18994,7 +15612,7 @@ var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
     }
   }
   if (checks.length === 0) {
-    (_a3 = inst._zod).deferred ?? (_a3.deferred = []);
+    (_a2 = inst._zod).deferred ?? (_a2.deferred = []);
     inst._zod.deferred?.push(() => {
       inst._zod.run = inst._zod.parse;
     });
@@ -19900,7 +16518,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     }
     return propValues;
   });
-  const isObject3 = isObject2;
+  const isObject2 = isObject;
   const catchall = def.catchall;
   let value;
   const memo = globalConfig.memoizer;
@@ -19908,7 +16526,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
   inst._zod.parse = (payload, ctx) => {
     value ?? (value = _normalized.value);
     const input = payload.value;
-    if (!isObject3(input)) {
+    if (!isObject2(input)) {
       payload.issues.push({
         expected: "object",
         code: "invalid_type",
@@ -20044,7 +16662,7 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
     return doc.compile();
   };
   let fastpass;
-  const isObject3 = isObject2;
+  const isObject2 = isObject;
   const jit = !globalConfig.jitless;
   const allowsEval2 = allowsEval;
   const fastEnabled = jit && allowsEval2.value;
@@ -20053,7 +16671,7 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
   inst._zod.parse = (payload, ctx) => {
     value ?? (value = _normalized.value);
     const input = payload.value;
-    if (!isObject3(input)) {
+    if (!isObject2(input)) {
       payload.issues.push({
         expected: "object",
         code: "invalid_type",
@@ -20261,7 +16879,7 @@ var $ZodDiscriminatedUnion = /* @__PURE__ */ $constructor("$ZodDiscriminatedUnio
   const disc = cached(() => discriminatorMap(def));
   inst._zod.parse = (payload, ctx) => {
     const input = payload.value;
-    if (!isObject2(input)) {
+    if (!isObject(input)) {
       payload.issues.push({
         code: "invalid_type",
         expected: "object",
@@ -21557,8 +18175,8 @@ var memo = {
     return empty;
   },
   guard(inst) {
-    var _a3;
-    (_a3 = inst._zod).deferred ?? (_a3.deferred = []);
+    var _a2;
+    (_a2 = inst._zod).deferred ?? (_a2.deferred = []);
     inst._zod.deferred.push(() => {
       const base = inst._zod.parse;
       const wrapped = (payload, ctx) => {
@@ -21572,12 +18190,12 @@ var memo = {
     });
   },
   attach(inst) {
-    var _a3;
+    var _a2;
     let isRecursiveInst;
     let rechecked = false;
     let lastCtx;
     let lastBucket;
-    (_a3 = inst._zod).deferred ?? (_a3.deferred = []);
+    (_a2 = inst._zod).deferred ?? (_a2.deferred = []);
     inst._zod.deferred.push(() => {
       const base = inst._zod.parse;
       const wrapped = (payload, ctx) => {
@@ -29151,7 +25769,7 @@ function yo_default() {
   };
 }
 // /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/registries.js
-var _a3;
+var _a2;
 var $output = /* @__PURE__ */ Symbol("ZodOutput");
 var $input = /* @__PURE__ */ Symbol("ZodInput");
 
@@ -29198,7 +25816,7 @@ class $ZodRegistry {
 function registry() {
   return new $ZodRegistry;
 }
-(_a3 = globalThis).__zod_globalRegistry ?? (_a3.__zod_globalRegistry = registry());
+(_a2 = globalThis).__zod_globalRegistry ?? (_a2.__zod_globalRegistry = registry());
 var globalRegistry = globalThis.__zod_globalRegistry;
 // /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/compile.js
 var INVALID = Symbol.for("zod.compile.invalid");
@@ -31780,7 +28398,7 @@ function handleUnrepresentable(schema, ctx, json, params, message) {
   return true;
 }
 function processSchema(schema, ctx, _params = { path: [], schemaPath: [] }) {
-  var _a4;
+  var _a3;
   const def = schema._zod.def;
   const seen = ctx.seen.get(schema);
   if (seen) {
@@ -31830,7 +28448,7 @@ function processSchema(schema, ctx, _params = { path: [], schemaPath: [] }) {
     delete result.schema.default;
   }
   if (ctx.io === "input" && "_prefault" in result.schema)
-    (_a4 = result.schema).default ?? (_a4.default = result.schema._prefault);
+    (_a3 = result.schema).default ?? (_a3.default = result.schema._prefault);
   delete result.schema._prefault;
   const _result = ctx.seen.get(schema);
   return _result.schema;
@@ -35771,13 +32389,13 @@ function createCollectionCache(deps) {
       return null;
     if (seen.has(name))
       return seen.get(name) ?? null;
-    const row = await deps.db.selectFrom("zvd_collections").select(["name"]).where("name", "=", name).executeTakeFirst();
+    const row = await deps.ddl.getCollection(deps.db, name);
     if (!row) {
       seen.set(name, null);
       return null;
     }
     const table = `zvd_${name}`;
-    const cols = await deps.db.selectFrom("information_schema.columns as c").select(["c.column_name as column_name"]).where("c.table_schema", "=", "public").where("c.table_name", "=", table).execute();
+    const cols = await deps.ddl.columnNames(deps.db, name);
     if (cols.length === 0) {
       seen.set(name, null);
       return null;
@@ -35785,7 +32403,7 @@ function createCollectionCache(deps) {
     const meta3 = {
       name,
       table,
-      columns: new Set(cols.map((c) => c.column_name))
+      columns: new Set(cols)
     };
     seen.set(name, meta3);
     return meta3;
@@ -35903,7 +32521,7 @@ async function resolveRecord(deps, audience, collection, keyField, keyValue, rec
     q = q.where("tenant_id", "=", audience.tenantId);
   const declared = typeof recordFilter === "string" ? safeParse3(recordFilter) : recordFilter;
   const declaredCount = Array.isArray(declared) ? declared.length : 0;
-  const filters = parseFilterList2(recordFilter);
+  const filters = parseFilterList(recordFilter);
   if (filters.length !== declaredCount)
     return null;
   for (const f of filters) {
@@ -35981,9 +32599,9 @@ var KNOWN_OPS = new Set([
   "not_null"
 ]);
 function parseFilters(content) {
-  return parseFilterList2(content.filters);
+  return parseFilterList(content.filters);
 }
-function parseFilterList2(raw2) {
+function parseFilterList(raw2) {
   const list = typeof raw2 === "string" ? safeParse3(raw2) : raw2;
   if (!Array.isArray(list))
     return [];
@@ -36172,6 +32790,3388 @@ function placeholdersIn(block) {
     }
   }
 }
+// /zveltio-extension/node_modules/kysely/dist/util/object-utils.js
+function isUndefined(obj) {
+  return typeof obj === "undefined" || obj === undefined;
+}
+function isString(obj) {
+  return typeof obj === "string";
+}
+function isNumber2(obj) {
+  return typeof obj === "number";
+}
+function isBoolean(obj) {
+  return typeof obj === "boolean";
+}
+function isNull(obj) {
+  return obj === null;
+}
+function isBigInt(obj) {
+  return typeof obj === "bigint";
+}
+function isFunction(obj) {
+  return typeof obj === "function";
+}
+function isObject3(obj) {
+  return typeof obj === "object" && obj !== null;
+}
+function freeze(obj) {
+  return Object.freeze(obj);
+}
+function asArray(arg) {
+  if (isReadonlyArray(arg)) {
+    return arg;
+  } else {
+    return [arg];
+  }
+}
+function isReadonlyArray(arg) {
+  return Array.isArray(arg);
+}
+function getMessage(error62) {
+  return error62 instanceof Error ? error62.message : String(error62);
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/identifier-node.js
+var IdentifierNode = freeze({
+  is(node3) {
+    return node3.kind === "IdentifierNode";
+  },
+  create(name) {
+    return freeze({
+      kind: "IdentifierNode",
+      name
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/schemable-identifier-node.js
+var SchemableIdentifierNode = freeze({
+  is(node3) {
+    return node3.kind === "SchemableIdentifierNode";
+  },
+  create(identifier) {
+    return freeze({
+      kind: "SchemableIdentifierNode",
+      identifier: IdentifierNode.create(identifier)
+    });
+  },
+  createWithSchema(schema, identifier) {
+    return freeze({
+      kind: "SchemableIdentifierNode",
+      schema: IdentifierNode.create(schema),
+      identifier: IdentifierNode.create(identifier)
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/alias-node.js
+var AliasNode = freeze({
+  is(node3) {
+    return node3.kind === "AliasNode";
+  },
+  create(node3, alias) {
+    return freeze({
+      kind: "AliasNode",
+      node: node3,
+      alias
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/table-node.js
+var TableNode = freeze({
+  is(node3) {
+    return node3.kind === "TableNode";
+  },
+  create(table) {
+    return freeze({
+      kind: "TableNode",
+      table: SchemableIdentifierNode.create(table)
+    });
+  },
+  createWithSchema(schema, table) {
+    return freeze({
+      kind: "TableNode",
+      table: SchemableIdentifierNode.createWithSchema(schema, table)
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/operation-node-source.js
+function isOperationNodeSource(obj) {
+  return isObject3(obj) && isFunction(obj.toOperationNode);
+}
+
+// /zveltio-extension/node_modules/kysely/dist/expression/expression.js
+function isExpression(obj) {
+  return isObject3(obj) && "expressionType" in obj && isOperationNodeSource(obj);
+}
+function isAliasedExpression(obj) {
+  return isObject3(obj) && "expression" in obj && isString(obj.alias) && isOperationNodeSource(obj);
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/select-modifier-node.js
+var SelectModifierNode = freeze({
+  is(node3) {
+    return node3.kind === "SelectModifierNode";
+  },
+  create(modifier, of) {
+    return freeze({
+      kind: "SelectModifierNode",
+      modifier,
+      of
+    });
+  },
+  createWithExpression(modifier) {
+    return freeze({
+      kind: "SelectModifierNode",
+      rawModifier: modifier
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/and-node.js
+var AndNode = freeze({
+  is(node3) {
+    return node3.kind === "AndNode";
+  },
+  create(left, right) {
+    return freeze({
+      kind: "AndNode",
+      left,
+      right
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/or-node.js
+var OrNode = freeze({
+  is(node3) {
+    return node3.kind === "OrNode";
+  },
+  create(left, right) {
+    return freeze({
+      kind: "OrNode",
+      left,
+      right
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/on-node.js
+var OnNode = freeze({
+  is(node3) {
+    return node3.kind === "OnNode";
+  },
+  create(filter2) {
+    return freeze({
+      kind: "OnNode",
+      on: filter2
+    });
+  },
+  cloneWithOperation(onNode, operator, operation) {
+    return freeze({
+      ...onNode,
+      on: operator === "And" ? AndNode.create(onNode.on, operation) : OrNode.create(onNode.on, operation)
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/join-node.js
+var JoinNode = freeze({
+  is(node3) {
+    return node3.kind === "JoinNode";
+  },
+  create(joinType, table) {
+    return freeze({
+      kind: "JoinNode",
+      joinType,
+      table,
+      on: undefined
+    });
+  },
+  createWithOn(joinType, table, on) {
+    return freeze({
+      kind: "JoinNode",
+      joinType,
+      table,
+      on: OnNode.create(on)
+    });
+  },
+  cloneWithOn(joinNode, operation) {
+    return freeze({
+      ...joinNode,
+      on: joinNode.on ? OnNode.cloneWithOperation(joinNode.on, "And", operation) : OnNode.create(operation)
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/binary-operation-node.js
+var BinaryOperationNode = freeze({
+  is(node3) {
+    return node3.kind === "BinaryOperationNode";
+  },
+  create(leftOperand, operator, rightOperand) {
+    return freeze({
+      kind: "BinaryOperationNode",
+      leftOperand,
+      operator,
+      rightOperand
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/operator-node.js
+var COMPARISON_OPERATORS_DICTIONARY = freeze({
+  "=": true,
+  "==": true,
+  "!=": true,
+  "<>": true,
+  ">": true,
+  ">=": true,
+  "<": true,
+  "<=": true,
+  in: true,
+  "not in": true,
+  is: true,
+  "is not": true,
+  like: true,
+  "not like": true,
+  match: true,
+  ilike: true,
+  "not ilike": true,
+  "@>": true,
+  "<@": true,
+  "^@": true,
+  "&&": true,
+  "?": true,
+  "?&": true,
+  "?|": true,
+  "!<": true,
+  "!>": true,
+  "<=>": true,
+  "!~": true,
+  "~": true,
+  "~*": true,
+  "!~*": true,
+  "@@": true,
+  "@@@": true,
+  "!!": true,
+  "<->": true,
+  regexp: true,
+  "is distinct from": true,
+  "is not distinct from": true
+});
+var COMPARISON_OPERATORS = Object.keys(COMPARISON_OPERATORS_DICTIONARY);
+var ARITHMETIC_OPERATORS_DICTIONARY = freeze({
+  "+": true,
+  "-": true,
+  "*": true,
+  "/": true,
+  "%": true,
+  "^": true,
+  "&": true,
+  "|": true,
+  "#": true,
+  "<<": true,
+  ">>": true
+});
+var ARITHMETIC_OPERATORS = Object.keys(ARITHMETIC_OPERATORS_DICTIONARY);
+var JSON_OPERATORS_DICTIONARY = freeze({
+  "->": true,
+  "->>": true
+});
+var JSON_OPERATORS = Object.keys(JSON_OPERATORS_DICTIONARY);
+var BINARY_OPERATORS_DICTIONARY = freeze({
+  ...COMPARISON_OPERATORS_DICTIONARY,
+  ...ARITHMETIC_OPERATORS_DICTIONARY,
+  "||": true
+});
+var BINARY_OPERATORS = Object.keys(BINARY_OPERATORS_DICTIONARY);
+var UNARY_FILTER_OPERATORS_DICTIONARY = freeze({
+  exists: true,
+  "not exists": true
+});
+var UNARY_FILTER_OPERATORS = Object.keys(UNARY_FILTER_OPERATORS_DICTIONARY);
+var UNARY_OPERATORS_DICTIONARY = freeze({
+  ...UNARY_FILTER_OPERATORS_DICTIONARY,
+  "-": true,
+  not: true
+});
+var UNARY_OPERATORS = Object.keys(UNARY_OPERATORS_DICTIONARY);
+var OPERATORS = [
+  ...BINARY_OPERATORS,
+  ...JSON_OPERATORS,
+  ...UNARY_OPERATORS,
+  "between",
+  "between symmetric"
+];
+var OperatorNode = freeze({
+  is(node3) {
+    return node3.kind === "OperatorNode";
+  },
+  create(operator) {
+    return freeze({
+      kind: "OperatorNode",
+      operator
+    });
+  }
+});
+function isBinaryOperator(op) {
+  return isString(op) && BINARY_OPERATORS_DICTIONARY[op];
+}
+function isJSONOperator(op) {
+  return isString(op) && JSON_OPERATORS_DICTIONARY[op];
+}
+function isUnaryOperator(op) {
+  return isString(op) && UNARY_OPERATORS_DICTIONARY[op];
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/column-node.js
+var ColumnNode = freeze({
+  is(node3) {
+    return node3.kind === "ColumnNode";
+  },
+  create(column) {
+    return freeze({
+      kind: "ColumnNode",
+      column: IdentifierNode.create(column)
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/select-all-node.js
+var SelectAllNode = freeze({
+  is(node3) {
+    return node3.kind === "SelectAllNode";
+  },
+  create() {
+    return freeze({
+      kind: "SelectAllNode"
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/reference-node.js
+var ReferenceNode = freeze({
+  is(node3) {
+    return node3.kind === "ReferenceNode";
+  },
+  create(column, table) {
+    return freeze({
+      kind: "ReferenceNode",
+      table,
+      column
+    });
+  },
+  createSelectAll(table) {
+    return freeze({
+      kind: "ReferenceNode",
+      table,
+      column: SelectAllNode.create()
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/dynamic/dynamic-reference-builder.js
+class DynamicReferenceBuilder {
+  #dynamicReference;
+  get dynamicReference() {
+    return this.#dynamicReference;
+  }
+  get refType() {
+    return;
+  }
+  constructor(reference) {
+    this.#dynamicReference = reference;
+  }
+  toOperationNode() {
+    return parseSimpleReferenceExpression(this.#dynamicReference);
+  }
+}
+function isDynamicReferenceBuilder(obj) {
+  return isObject3(obj) && isOperationNodeSource(obj) && isString(obj.dynamicReference);
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/order-by-item-node.js
+var OrderByItemNode = freeze({
+  is(node3) {
+    return node3.kind === "OrderByItemNode";
+  },
+  create(orderBy, direction) {
+    return freeze({
+      kind: "OrderByItemNode",
+      orderBy,
+      direction
+    });
+  },
+  cloneWith(node3, props) {
+    return freeze({
+      ...node3,
+      ...props
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/raw-node.js
+var RawNode = freeze({
+  is(node3) {
+    return node3.kind === "RawNode";
+  },
+  create(sqlFragments, parameters) {
+    return freeze({
+      kind: "RawNode",
+      sqlFragments: freeze(sqlFragments),
+      parameters: freeze(parameters)
+    });
+  },
+  createWithSql(sql) {
+    return RawNode.create([sql], []);
+  },
+  createWithChild(child) {
+    return RawNode.create(["", ""], [child]);
+  },
+  createWithChildren(children) {
+    return RawNode.create(new Array(children.length + 1).fill(""), children);
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/collate-node.js
+var CollateNode = freeze({
+  is(node3) {
+    return node3.kind === "CollateNode";
+  },
+  create(collation) {
+    return freeze({
+      kind: "CollateNode",
+      collation: IdentifierNode.create(collation)
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/query-builder/order-by-item-builder.js
+class OrderByItemBuilder {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  desc() {
+    return new OrderByItemBuilder({
+      node: OrderByItemNode.cloneWith(this.#props.node, {
+        direction: RawNode.createWithSql("desc")
+      })
+    });
+  }
+  asc() {
+    return new OrderByItemBuilder({
+      node: OrderByItemNode.cloneWith(this.#props.node, {
+        direction: RawNode.createWithSql("asc")
+      })
+    });
+  }
+  nullsLast() {
+    return new OrderByItemBuilder({
+      node: OrderByItemNode.cloneWith(this.#props.node, { nulls: "last" })
+    });
+  }
+  nullsFirst() {
+    return new OrderByItemBuilder({
+      node: OrderByItemNode.cloneWith(this.#props.node, { nulls: "first" })
+    });
+  }
+  collate(collation) {
+    return new OrderByItemBuilder({
+      node: OrderByItemNode.cloneWith(this.#props.node, {
+        collation: CollateNode.create(collation)
+      })
+    });
+  }
+  toOperationNode() {
+    return this.#props.node;
+  }
+}
+
+// /zveltio-extension/node_modules/kysely/dist/util/log-once.js
+var LOGGED_MESSAGES = new Set;
+function logOnce(message) {
+  if (LOGGED_MESSAGES.has(message)) {
+    return;
+  }
+  LOGGED_MESSAGES.add(message);
+  console.log(message);
+}
+
+// /zveltio-extension/node_modules/kysely/dist/parser/order-by-parser.js
+function isOrderByDirection(thing) {
+  return thing === "asc" || thing === "desc";
+}
+function parseOrderBy(args) {
+  if (args.length === 2) {
+    return [parseOrderByItem(args[0], args[1])];
+  }
+  if (args.length === 1) {
+    const [orderBy] = args;
+    if (Array.isArray(orderBy)) {
+      logOnce("orderBy(array) is deprecated, use multiple orderBy calls instead.");
+      return orderBy.map((item) => parseOrderByItem(item));
+    }
+    return [parseOrderByItem(orderBy)];
+  }
+  throw new Error(`Invalid number of arguments at order by! expected 1-2, received ${args.length}`);
+}
+function parseOrderByItem(expr, modifiers) {
+  const parsedRef = parseOrderByExpression(expr);
+  if (OrderByItemNode.is(parsedRef)) {
+    if (modifiers) {
+      throw new Error("Cannot specify direction twice!");
+    }
+    return parsedRef;
+  }
+  return parseOrderByWithModifiers(parsedRef, modifiers);
+}
+function parseOrderByExpression(expr) {
+  if (isExpressionOrFactory(expr)) {
+    return parseExpression(expr);
+  }
+  if (isDynamicReferenceBuilder(expr)) {
+    return expr.toOperationNode();
+  }
+  const [ref, direction] = expr.split(" ");
+  if (direction) {
+    logOnce("`orderBy('column asc')` is deprecated. Use `orderBy('column', 'asc')` instead.");
+    return parseOrderByWithModifiers(parseStringReference(ref), direction);
+  }
+  return parseStringReference(expr);
+}
+function parseOrderByWithModifiers(expr, modifiers) {
+  if (typeof modifiers === "string") {
+    if (!isOrderByDirection(modifiers)) {
+      throw new Error(`Invalid order by direction: ${modifiers}`);
+    }
+    return OrderByItemNode.create(expr, RawNode.createWithSql(modifiers));
+  }
+  if (isExpression(modifiers)) {
+    logOnce("`orderBy(..., expr)` is deprecated. Use `orderBy(..., 'asc')` or `orderBy(..., (ob) => ...)` instead.");
+    return OrderByItemNode.create(expr, modifiers.toOperationNode());
+  }
+  const node3 = OrderByItemNode.create(expr);
+  if (!modifiers) {
+    return node3;
+  }
+  return modifiers(new OrderByItemBuilder({ node: node3 })).toOperationNode();
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/json-reference-node.js
+var JSONReferenceNode = freeze({
+  is(node3) {
+    return node3.kind === "JSONReferenceNode";
+  },
+  create(reference, traversal2) {
+    return freeze({
+      kind: "JSONReferenceNode",
+      reference,
+      traversal: traversal2
+    });
+  },
+  cloneWithTraversal(node3, traversal2) {
+    return freeze({
+      ...node3,
+      traversal: traversal2
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/json-operator-chain-node.js
+var JSONOperatorChainNode = freeze({
+  is(node3) {
+    return node3.kind === "JSONOperatorChainNode";
+  },
+  create(operator) {
+    return freeze({
+      kind: "JSONOperatorChainNode",
+      operator,
+      values: freeze([])
+    });
+  },
+  cloneWithValue(node3, value) {
+    return freeze({
+      ...node3,
+      values: freeze([...node3.values, value])
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/json-path-node.js
+var JSONPathNode = freeze({
+  is(node3) {
+    return node3.kind === "JSONPathNode";
+  },
+  create(inOperator) {
+    return freeze({
+      kind: "JSONPathNode",
+      inOperator,
+      pathLegs: freeze([])
+    });
+  },
+  cloneWithLeg(jsonPathNode, pathLeg) {
+    return freeze({
+      ...jsonPathNode,
+      pathLegs: freeze([...jsonPathNode.pathLegs, pathLeg])
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/parser/reference-parser.js
+function parseSimpleReferenceExpression(exp) {
+  if (isString(exp)) {
+    return parseStringReference(exp);
+  }
+  return exp.toOperationNode();
+}
+function parseReferenceExpressionOrList(arg) {
+  if (isReadonlyArray(arg)) {
+    return arg.map((it) => parseReferenceExpression(it));
+  } else {
+    return [parseReferenceExpression(arg)];
+  }
+}
+function parseReferenceExpression(exp) {
+  if (isExpressionOrFactory(exp)) {
+    return parseExpression(exp);
+  }
+  return parseSimpleReferenceExpression(exp);
+}
+function parseJSONReference(ref, op) {
+  if (isJSONOperator(op)) {
+    return JSONReferenceNode.create(parseStringReference(ref), JSONOperatorChainNode.create(OperatorNode.create(op)));
+  }
+  if (op === "->$" || op === "->>$") {
+    return JSONReferenceNode.create(parseStringReference(ref), JSONPathNode.create(OperatorNode.create(op.slice(0, -1))));
+  }
+  throw new Error(`Invalid JSON operator: ${op}`);
+}
+function parseStringReference(ref) {
+  const COLUMN_SEPARATOR = ".";
+  if (!ref.includes(COLUMN_SEPARATOR)) {
+    return ReferenceNode.create(ColumnNode.create(ref));
+  }
+  const parts = ref.split(COLUMN_SEPARATOR).map(trim);
+  if (parts.length === 3) {
+    return parseStringReferenceWithTableAndSchema(parts);
+  }
+  if (parts.length === 2) {
+    return parseStringReferenceWithTable(parts);
+  }
+  throw new Error(`invalid column reference ${ref}`);
+}
+function parseAliasedStringReference(ref) {
+  const ALIAS_SEPARATOR = " as ";
+  if (ref.includes(ALIAS_SEPARATOR)) {
+    const [columnRef, alias] = ref.split(ALIAS_SEPARATOR).map(trim);
+    return AliasNode.create(parseStringReference(columnRef), IdentifierNode.create(alias));
+  } else {
+    return parseStringReference(ref);
+  }
+}
+function parseStringReferenceWithTableAndSchema(parts) {
+  const [schema, table, column] = parts;
+  return ReferenceNode.create(ColumnNode.create(column), TableNode.createWithSchema(schema, table));
+}
+function parseStringReferenceWithTable(parts) {
+  const [table, column] = parts;
+  return ReferenceNode.create(ColumnNode.create(column), TableNode.create(table));
+}
+function trim(str) {
+  return str.trim();
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/primitive-value-list-node.js
+var PrimitiveValueListNode = freeze({
+  is(node3) {
+    return node3.kind === "PrimitiveValueListNode";
+  },
+  create(values) {
+    return freeze({
+      kind: "PrimitiveValueListNode",
+      values: freeze([...values])
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/value-list-node.js
+var ValueListNode = freeze({
+  is(node3) {
+    return node3.kind === "ValueListNode";
+  },
+  create(values) {
+    return freeze({
+      kind: "ValueListNode",
+      values: freeze(values)
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/value-node.js
+var ValueNode = freeze({
+  is(node3) {
+    return node3.kind === "ValueNode";
+  },
+  create(value) {
+    return freeze({
+      kind: "ValueNode",
+      value
+    });
+  },
+  createImmediate(value) {
+    return freeze({
+      kind: "ValueNode",
+      value,
+      immediate: true
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/parser/value-parser.js
+function parseValueExpressionOrList(arg) {
+  if (isReadonlyArray(arg)) {
+    return parseValueExpressionList(arg);
+  }
+  return parseValueExpression(arg);
+}
+function parseValueExpression(exp) {
+  if (isExpressionOrFactory(exp)) {
+    return parseExpression(exp);
+  }
+  return ValueNode.create(exp);
+}
+function isSafeImmediateValue(value) {
+  return isNumber2(value) || isBoolean(value) || isNull(value);
+}
+function parseSafeImmediateValue(value) {
+  if (!isSafeImmediateValue(value)) {
+    throw new Error(`unsafe immediate value ${JSON.stringify(value)}`);
+  }
+  return ValueNode.createImmediate(value);
+}
+function parseValueExpressionList(arg) {
+  if (arg.some(isExpressionOrFactory)) {
+    return ValueListNode.create(arg.map((it) => parseValueExpression(it)));
+  }
+  return PrimitiveValueListNode.create(arg);
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/parens-node.js
+var ParensNode = freeze({
+  is(node3) {
+    return node3.kind === "ParensNode";
+  },
+  create(node3) {
+    return freeze({
+      kind: "ParensNode",
+      node: node3
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/parser/binary-operation-parser.js
+function parseValueBinaryOperationOrExpression(args) {
+  if (args.length === 3) {
+    return parseValueBinaryOperation(args[0], args[1], args[2]);
+  } else if (args.length === 1) {
+    return parseValueExpression(args[0]);
+  }
+  throw new Error(`invalid arguments: ${JSON.stringify(args)}`);
+}
+function parseValueBinaryOperation(left, operator, right) {
+  if (isIsOperator(operator) && needsIsOperator(right)) {
+    return BinaryOperationNode.create(parseReferenceExpression(left), parseBinaryOperator(operator), ValueNode.createImmediate(right));
+  }
+  return BinaryOperationNode.create(parseReferenceExpression(left), parseBinaryOperator(operator), parseValueExpressionOrList(right));
+}
+function parseReferentialBinaryOperation(left, operator, right) {
+  return BinaryOperationNode.create(parseReferenceExpression(left), parseBinaryOperator(operator), parseReferenceExpression(right));
+}
+function parseFilterObject(obj, combinator) {
+  return parseFilterList2(Object.entries(obj).filter(([, v]) => !isUndefined(v)).map(([k, v]) => parseValueBinaryOperation(k, needsIsOperator(v) ? "is" : "=", v)), combinator);
+}
+function parseFilterList2(list2, combinator, withParens = true) {
+  const combine = combinator === "and" ? AndNode.create : OrNode.create;
+  if (list2.length === 0) {
+    return BinaryOperationNode.create(ValueNode.createImmediate(1), OperatorNode.create("="), ValueNode.createImmediate(combinator === "and" ? 1 : 0));
+  }
+  let node3 = toOperationNode(list2[0]);
+  for (let i = 1;i < list2.length; ++i) {
+    node3 = combine(node3, toOperationNode(list2[i]));
+  }
+  if (list2.length > 1 && withParens) {
+    return ParensNode.create(node3);
+  }
+  return node3;
+}
+function isIsOperator(operator) {
+  return operator === "is" || operator === "is not";
+}
+function needsIsOperator(value) {
+  return isNull(value) || isBoolean(value);
+}
+function parseBinaryOperator(operator) {
+  if (isBinaryOperator(operator)) {
+    return OperatorNode.create(operator);
+  }
+  if (isOperationNodeSource(operator)) {
+    return operator.toOperationNode();
+  }
+  throw new Error(`invalid operator ${JSON.stringify(operator)}`);
+}
+function toOperationNode(nodeOrSource) {
+  return isOperationNodeSource(nodeOrSource) ? nodeOrSource.toOperationNode() : nodeOrSource;
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/order-by-node.js
+var OrderByNode = freeze({
+  is(node3) {
+    return node3.kind === "OrderByNode";
+  },
+  create(items) {
+    return freeze({
+      kind: "OrderByNode",
+      items: freeze([...items])
+    });
+  },
+  cloneWithItems(orderBy, items) {
+    return freeze({
+      ...orderBy,
+      items: freeze([...orderBy.items, ...items])
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/partition-by-node.js
+var PartitionByNode = freeze({
+  is(node3) {
+    return node3.kind === "PartitionByNode";
+  },
+  create(items) {
+    return freeze({
+      kind: "PartitionByNode",
+      items: freeze(items)
+    });
+  },
+  cloneWithItems(partitionBy, items) {
+    return freeze({
+      ...partitionBy,
+      items: freeze([...partitionBy.items, ...items])
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/over-node.js
+var OverNode = freeze({
+  is(node3) {
+    return node3.kind === "OverNode";
+  },
+  create() {
+    return freeze({
+      kind: "OverNode"
+    });
+  },
+  cloneWithOrderByItems(overNode, items) {
+    return freeze({
+      ...overNode,
+      orderBy: overNode.orderBy ? OrderByNode.cloneWithItems(overNode.orderBy, items) : OrderByNode.create(items)
+    });
+  },
+  cloneWithPartitionByItems(overNode, items) {
+    return freeze({
+      ...overNode,
+      partitionBy: overNode.partitionBy ? PartitionByNode.cloneWithItems(overNode.partitionBy, items) : PartitionByNode.create(items)
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/from-node.js
+var FromNode = freeze({
+  is(node3) {
+    return node3.kind === "FromNode";
+  },
+  create(froms) {
+    return freeze({
+      kind: "FromNode",
+      froms: freeze(froms)
+    });
+  },
+  cloneWithFroms(from, froms) {
+    return freeze({
+      ...from,
+      froms: freeze([...from.froms, ...froms])
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/group-by-node.js
+var GroupByNode = freeze({
+  is(node3) {
+    return node3.kind === "GroupByNode";
+  },
+  create(items) {
+    return freeze({
+      kind: "GroupByNode",
+      items: freeze(items)
+    });
+  },
+  cloneWithItems(groupBy, items) {
+    return freeze({
+      ...groupBy,
+      items: freeze([...groupBy.items, ...items])
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/having-node.js
+var HavingNode = freeze({
+  is(node3) {
+    return node3.kind === "HavingNode";
+  },
+  create(filter2) {
+    return freeze({
+      kind: "HavingNode",
+      having: filter2
+    });
+  },
+  cloneWithOperation(havingNode, operator, operation) {
+    return freeze({
+      ...havingNode,
+      having: operator === "And" ? AndNode.create(havingNode.having, operation) : OrNode.create(havingNode.having, operation)
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/insert-query-node.js
+var InsertQueryNode = freeze({
+  is(node3) {
+    return node3.kind === "InsertQueryNode";
+  },
+  create(into, withNode, replace) {
+    return freeze({
+      kind: "InsertQueryNode",
+      into,
+      ...withNode && { with: withNode },
+      replace
+    });
+  },
+  createWithoutInto() {
+    return freeze({
+      kind: "InsertQueryNode"
+    });
+  },
+  cloneWith(insertQuery, props) {
+    return freeze({
+      ...insertQuery,
+      ...props
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/list-node.js
+var ListNode = freeze({
+  is(node3) {
+    return node3.kind === "ListNode";
+  },
+  create(items) {
+    return freeze({
+      kind: "ListNode",
+      items: freeze(items)
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/update-query-node.js
+var UpdateQueryNode = freeze({
+  is(node3) {
+    return node3.kind === "UpdateQueryNode";
+  },
+  create(tables, withNode) {
+    return freeze({
+      kind: "UpdateQueryNode",
+      table: tables.length === 1 ? tables[0] : ListNode.create(tables),
+      ...withNode && { with: withNode }
+    });
+  },
+  createWithoutTable() {
+    return freeze({
+      kind: "UpdateQueryNode"
+    });
+  },
+  cloneWithFromItems(updateQuery, fromItems) {
+    return freeze({
+      ...updateQuery,
+      from: updateQuery.from ? FromNode.cloneWithFroms(updateQuery.from, fromItems) : FromNode.create(fromItems)
+    });
+  },
+  cloneWithUpdates(updateQuery, updates) {
+    return freeze({
+      ...updateQuery,
+      updates: updateQuery.updates ? freeze([...updateQuery.updates, ...updates]) : updates
+    });
+  },
+  cloneWithLimit(updateQuery, limit) {
+    return freeze({
+      ...updateQuery,
+      limit
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/using-node.js
+var UsingNode = freeze({
+  is(node3) {
+    return node3.kind === "UsingNode";
+  },
+  create(tables) {
+    return freeze({
+      kind: "UsingNode",
+      tables: freeze(tables)
+    });
+  },
+  cloneWithTables(using, tables) {
+    return freeze({
+      ...using,
+      tables: freeze([...using.tables, ...tables])
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/delete-query-node.js
+var DeleteQueryNode = freeze({
+  is(node3) {
+    return node3.kind === "DeleteQueryNode";
+  },
+  create(fromItems, withNode) {
+    return freeze({
+      kind: "DeleteQueryNode",
+      from: FromNode.create(fromItems),
+      ...withNode && { with: withNode }
+    });
+  },
+  cloneWithOrderByItems: (node3, items) => QueryNode.cloneWithOrderByItems(node3, items),
+  cloneWithoutOrderBy: (node3) => QueryNode.cloneWithoutOrderBy(node3),
+  cloneWithLimit(deleteNode, limit) {
+    return freeze({
+      ...deleteNode,
+      limit
+    });
+  },
+  cloneWithoutLimit(deleteNode) {
+    return freeze({
+      ...deleteNode,
+      limit: undefined
+    });
+  },
+  cloneWithUsing(deleteNode, tables) {
+    return freeze({
+      ...deleteNode,
+      using: deleteNode.using !== undefined ? UsingNode.cloneWithTables(deleteNode.using, tables) : UsingNode.create(tables)
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/where-node.js
+var WhereNode = freeze({
+  is(node3) {
+    return node3.kind === "WhereNode";
+  },
+  create(filter2) {
+    return freeze({
+      kind: "WhereNode",
+      where: filter2
+    });
+  },
+  cloneWithOperation(whereNode, operator, operation) {
+    return freeze({
+      ...whereNode,
+      where: operator === "And" ? AndNode.create(whereNode.where, operation) : OrNode.create(whereNode.where, operation)
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/returning-node.js
+var ReturningNode = freeze({
+  is(node3) {
+    return node3.kind === "ReturningNode";
+  },
+  create(selections) {
+    return freeze({
+      kind: "ReturningNode",
+      selections: freeze(selections)
+    });
+  },
+  cloneWithSelections(returning, selections) {
+    return freeze({
+      ...returning,
+      selections: returning.selections ? freeze([...returning.selections, ...selections]) : freeze(selections)
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/explain-node.js
+var ExplainNode = freeze({
+  is(node3) {
+    return node3.kind === "ExplainNode";
+  },
+  create(format, options) {
+    return freeze({
+      kind: "ExplainNode",
+      format,
+      options
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/when-node.js
+var WhenNode = freeze({
+  is(node3) {
+    return node3.kind === "WhenNode";
+  },
+  create(condition) {
+    return freeze({
+      kind: "WhenNode",
+      condition
+    });
+  },
+  cloneWithResult(whenNode, result) {
+    return freeze({
+      ...whenNode,
+      result
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/merge-query-node.js
+var MergeQueryNode = freeze({
+  is(node3) {
+    return node3.kind === "MergeQueryNode";
+  },
+  create(into, withNode) {
+    return freeze({
+      kind: "MergeQueryNode",
+      into,
+      ...withNode && { with: withNode }
+    });
+  },
+  cloneWithUsing(mergeNode, using) {
+    return freeze({
+      ...mergeNode,
+      using
+    });
+  },
+  cloneWithWhen(mergeNode, when) {
+    return freeze({
+      ...mergeNode,
+      whens: mergeNode.whens ? freeze([...mergeNode.whens, when]) : freeze([when])
+    });
+  },
+  cloneWithThen(mergeNode, then) {
+    return freeze({
+      ...mergeNode,
+      whens: mergeNode.whens ? freeze([
+        ...mergeNode.whens.slice(0, -1),
+        WhenNode.cloneWithResult(mergeNode.whens[mergeNode.whens.length - 1], then)
+      ]) : undefined
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/output-node.js
+var OutputNode = freeze({
+  is(node3) {
+    return node3.kind === "OutputNode";
+  },
+  create(selections) {
+    return freeze({
+      kind: "OutputNode",
+      selections: freeze(selections)
+    });
+  },
+  cloneWithSelections(output2, selections) {
+    return freeze({
+      ...output2,
+      selections: output2.selections ? freeze([...output2.selections, ...selections]) : freeze(selections)
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/query-node.js
+var QueryNode = freeze({
+  is(node3) {
+    return SelectQueryNode.is(node3) || InsertQueryNode.is(node3) || UpdateQueryNode.is(node3) || DeleteQueryNode.is(node3) || MergeQueryNode.is(node3);
+  },
+  cloneWithEndModifier(node3, modifier) {
+    return freeze({
+      ...node3,
+      endModifiers: node3.endModifiers ? freeze([...node3.endModifiers, modifier]) : freeze([modifier])
+    });
+  },
+  cloneWithWhere(node3, operation) {
+    return freeze({
+      ...node3,
+      where: node3.where ? WhereNode.cloneWithOperation(node3.where, "And", operation) : WhereNode.create(operation)
+    });
+  },
+  cloneWithJoin(node3, join) {
+    return freeze({
+      ...node3,
+      joins: node3.joins ? freeze([...node3.joins, join]) : freeze([join])
+    });
+  },
+  cloneWithReturning(node3, selections) {
+    return freeze({
+      ...node3,
+      returning: node3.returning ? ReturningNode.cloneWithSelections(node3.returning, selections) : ReturningNode.create(selections)
+    });
+  },
+  cloneWithoutReturning(node3) {
+    return freeze({
+      ...node3,
+      returning: undefined
+    });
+  },
+  cloneWithoutWhere(node3) {
+    return freeze({
+      ...node3,
+      where: undefined
+    });
+  },
+  cloneWithExplain(node3, format, options) {
+    return freeze({
+      ...node3,
+      explain: ExplainNode.create(format, options?.toOperationNode())
+    });
+  },
+  cloneWithTop(node3, top) {
+    return freeze({
+      ...node3,
+      top
+    });
+  },
+  cloneWithOutput(node3, selections) {
+    return freeze({
+      ...node3,
+      output: node3.output ? OutputNode.cloneWithSelections(node3.output, selections) : OutputNode.create(selections)
+    });
+  },
+  cloneWithOrderByItems(node3, items) {
+    return freeze({
+      ...node3,
+      orderBy: node3.orderBy ? OrderByNode.cloneWithItems(node3.orderBy, items) : OrderByNode.create(items)
+    });
+  },
+  cloneWithoutOrderBy(node3) {
+    return freeze({
+      ...node3,
+      orderBy: undefined
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/select-query-node.js
+var SelectQueryNode = freeze({
+  is(node3) {
+    return node3.kind === "SelectQueryNode";
+  },
+  create(withNode) {
+    return freeze({
+      kind: "SelectQueryNode",
+      ...withNode && { with: withNode }
+    });
+  },
+  createFrom(fromItems, withNode) {
+    return freeze({
+      kind: "SelectQueryNode",
+      from: FromNode.create(fromItems),
+      ...withNode && { with: withNode }
+    });
+  },
+  cloneWithSelections(select, selections) {
+    return freeze({
+      ...select,
+      selections: select.selections ? freeze([...select.selections, ...selections]) : freeze(selections)
+    });
+  },
+  cloneWithDistinctOn(select, expressions) {
+    return freeze({
+      ...select,
+      distinctOn: select.distinctOn ? freeze([...select.distinctOn, ...expressions]) : freeze(expressions)
+    });
+  },
+  cloneWithFrontModifier(select, modifier) {
+    return freeze({
+      ...select,
+      frontModifiers: select.frontModifiers ? freeze([...select.frontModifiers, modifier]) : freeze([modifier])
+    });
+  },
+  cloneWithOrderByItems: (node3, items) => QueryNode.cloneWithOrderByItems(node3, items),
+  cloneWithGroupByItems(selectNode, items) {
+    return freeze({
+      ...selectNode,
+      groupBy: selectNode.groupBy ? GroupByNode.cloneWithItems(selectNode.groupBy, items) : GroupByNode.create(items)
+    });
+  },
+  cloneWithLimit(selectNode, limit) {
+    return freeze({
+      ...selectNode,
+      limit
+    });
+  },
+  cloneWithOffset(selectNode, offset) {
+    return freeze({
+      ...selectNode,
+      offset
+    });
+  },
+  cloneWithFetch(selectNode, fetch2) {
+    return freeze({
+      ...selectNode,
+      fetch: fetch2
+    });
+  },
+  cloneWithHaving(selectNode, operation) {
+    return freeze({
+      ...selectNode,
+      having: selectNode.having ? HavingNode.cloneWithOperation(selectNode.having, "And", operation) : HavingNode.create(operation)
+    });
+  },
+  cloneWithSetOperations(selectNode, setOperations) {
+    return freeze({
+      ...selectNode,
+      setOperations: selectNode.setOperations ? freeze([...selectNode.setOperations, ...setOperations]) : freeze([...setOperations])
+    });
+  },
+  cloneWithoutSelections(select) {
+    return freeze({
+      ...select,
+      selections: []
+    });
+  },
+  cloneWithoutLimit(select) {
+    return freeze({
+      ...select,
+      limit: undefined
+    });
+  },
+  cloneWithoutOffset(select) {
+    return freeze({
+      ...select,
+      offset: undefined
+    });
+  },
+  cloneWithoutOrderBy: (node3) => QueryNode.cloneWithoutOrderBy(node3),
+  cloneWithoutGroupBy(select) {
+    return freeze({
+      ...select,
+      groupBy: undefined
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/query-builder/join-builder.js
+class JoinBuilder {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  on(...args) {
+    return new JoinBuilder({
+      ...this.#props,
+      joinNode: JoinNode.cloneWithOn(this.#props.joinNode, parseValueBinaryOperationOrExpression(args))
+    });
+  }
+  onRef(lhs, op, rhs) {
+    return new JoinBuilder({
+      ...this.#props,
+      joinNode: JoinNode.cloneWithOn(this.#props.joinNode, parseReferentialBinaryOperation(lhs, op, rhs))
+    });
+  }
+  onTrue() {
+    return new JoinBuilder({
+      ...this.#props,
+      joinNode: JoinNode.cloneWithOn(this.#props.joinNode, RawNode.createWithSql("true"))
+    });
+  }
+  $call(func) {
+    return func(this);
+  }
+  toOperationNode() {
+    return this.#props.joinNode;
+  }
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/partition-by-item-node.js
+var PartitionByItemNode = freeze({
+  is(node3) {
+    return node3.kind === "PartitionByItemNode";
+  },
+  create(partitionBy) {
+    return freeze({
+      kind: "PartitionByItemNode",
+      partitionBy
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/parser/partition-by-parser.js
+function parsePartitionBy(partitionBy) {
+  return parseReferenceExpressionOrList(partitionBy).map(PartitionByItemNode.create);
+}
+
+// /zveltio-extension/node_modules/kysely/dist/query-builder/over-builder.js
+class OverBuilder {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  orderBy(...args) {
+    return new OverBuilder({
+      overNode: OverNode.cloneWithOrderByItems(this.#props.overNode, parseOrderBy(args))
+    });
+  }
+  clearOrderBy() {
+    return new OverBuilder({
+      overNode: QueryNode.cloneWithoutOrderBy(this.#props.overNode)
+    });
+  }
+  partitionBy(partitionBy) {
+    return new OverBuilder({
+      overNode: OverNode.cloneWithPartitionByItems(this.#props.overNode, parsePartitionBy(partitionBy))
+    });
+  }
+  $call(func) {
+    return func(this);
+  }
+  toOperationNode() {
+    return this.#props.overNode;
+  }
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/selection-node.js
+var SelectionNode = freeze({
+  is(node3) {
+    return node3.kind === "SelectionNode";
+  },
+  create(selection) {
+    return freeze({
+      kind: "SelectionNode",
+      selection
+    });
+  },
+  createSelectAll() {
+    return freeze({
+      kind: "SelectionNode",
+      selection: SelectAllNode.create()
+    });
+  },
+  createSelectAllFromTable(table) {
+    return freeze({
+      kind: "SelectionNode",
+      selection: ReferenceNode.createSelectAll(table)
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/parser/select-parser.js
+function parseSelectArg(selection) {
+  if (isFunction(selection)) {
+    return parseSelectArg(selection(expressionBuilder()));
+  } else if (isReadonlyArray(selection)) {
+    return selection.map((it) => parseSelectExpression(it));
+  } else {
+    return [parseSelectExpression(selection)];
+  }
+}
+function parseSelectExpression(selection) {
+  if (isString(selection)) {
+    return SelectionNode.create(parseAliasedStringReference(selection));
+  } else if (isDynamicReferenceBuilder(selection)) {
+    return SelectionNode.create(selection.toOperationNode());
+  } else {
+    return SelectionNode.create(parseAliasedExpression(selection));
+  }
+}
+function parseSelectAll(table) {
+  if (!table) {
+    return [SelectionNode.createSelectAll()];
+  } else if (Array.isArray(table)) {
+    return table.map(parseSelectAllArg);
+  } else {
+    return [parseSelectAllArg(table)];
+  }
+}
+function parseSelectAllArg(table) {
+  if (isString(table)) {
+    return SelectionNode.createSelectAllFromTable(parseTable(table));
+  }
+  throw new Error(`invalid value selectAll expression: ${JSON.stringify(table)}`);
+}
+
+// /zveltio-extension/node_modules/kysely/dist/query-builder/no-result-error.js
+class NoResultError extends Error {
+  node;
+  constructor(node3) {
+    super("no result");
+    this.node = node3;
+  }
+}
+function isNoResultErrorConstructor(fn) {
+  return Object.prototype.hasOwnProperty.call(fn, "prototype");
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/top-node.js
+var TopNode = freeze({
+  is(node3) {
+    return node3.kind === "TopNode";
+  },
+  create(expression, modifiers) {
+    return freeze({
+      kind: "TopNode",
+      expression,
+      modifiers
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/parser/top-parser.js
+function parseTop(expression, modifiers) {
+  if (!isNumber2(expression) && !isBigInt(expression)) {
+    throw new Error(`Invalid top expression: ${expression}`);
+  }
+  if (!isUndefined(modifiers) && !isTopModifiers(modifiers)) {
+    throw new Error(`Invalid top modifiers: ${modifiers}`);
+  }
+  return TopNode.create(expression, modifiers);
+}
+function isTopModifiers(modifiers) {
+  return modifiers === "percent" || modifiers === "with ties" || modifiers === "percent with ties";
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/limit-node.js
+var LimitNode = freeze({
+  is(node3) {
+    return node3.kind === "LimitNode";
+  },
+  create(limit) {
+    return freeze({
+      kind: "LimitNode",
+      limit
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/util/random-string.js
+var CHARS = [
+  "A",
+  "B",
+  "C",
+  "D",
+  "E",
+  "F",
+  "G",
+  "H",
+  "I",
+  "J",
+  "K",
+  "L",
+  "M",
+  "N",
+  "O",
+  "P",
+  "Q",
+  "R",
+  "S",
+  "T",
+  "U",
+  "V",
+  "W",
+  "X",
+  "Y",
+  "Z",
+  "a",
+  "b",
+  "c",
+  "d",
+  "e",
+  "f",
+  "g",
+  "h",
+  "i",
+  "j",
+  "k",
+  "l",
+  "m",
+  "n",
+  "o",
+  "p",
+  "q",
+  "r",
+  "s",
+  "t",
+  "u",
+  "v",
+  "w",
+  "x",
+  "y",
+  "z",
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9"
+];
+function randomString2(length) {
+  let chars = "";
+  for (let i = 0;i < length; ++i) {
+    chars += randomChar();
+  }
+  return chars;
+}
+function randomChar() {
+  return CHARS[~~(Math.random() * CHARS.length)];
+}
+
+// /zveltio-extension/node_modules/kysely/dist/util/query-id.js
+function createQueryId() {
+  return new LazyQueryId;
+}
+
+class LazyQueryId {
+  #queryId;
+  get queryId() {
+    if (this.#queryId === undefined) {
+      this.#queryId = randomString2(8);
+    }
+    return this.#queryId;
+  }
+}
+
+// /zveltio-extension/node_modules/kysely/dist/util/deferred.js
+class Deferred {
+  #promise;
+  #resolve;
+  #reject;
+  constructor() {
+    this.#promise = new Promise((resolve, reject) => {
+      this.#reject = reject;
+      this.#resolve = resolve;
+    });
+  }
+  get promise() {
+    return this.#promise;
+  }
+  resolve = (value) => {
+    this.#resolve?.(value);
+    this.#resolve = this.#reject = undefined;
+  };
+  reject = (reason) => {
+    this.#reject?.(reason);
+    this.#reject = this.#resolve = undefined;
+  };
+}
+
+// /zveltio-extension/node_modules/kysely/dist/util/provide-controlled-connection.js
+async function provideControlledConnection(connectionProvider, options) {
+  const connectionDefer = new Deferred;
+  const connectionReleaseDefer = new Deferred;
+  connectionProvider.provideConnection(async (connection) => {
+    connectionDefer.resolve(connection);
+    return await connectionReleaseDefer.promise;
+  }, options).catch((ex) => connectionDefer.reject(ex));
+  return freeze({
+    connection: await connectionDefer.promise,
+    release: connectionReleaseDefer.resolve
+  });
+}
+
+// /zveltio-extension/node_modules/kysely/dist/util/abort.js
+function getInflightQueryAbortHandler(abortStrategy = "ignore query", connection, beforeThrow) {
+  if (abortStrategy === "ignore query") {
+    return;
+  }
+  if (abortStrategy === "cancel query") {
+    const handler = connection.cancelQuery;
+    if (!handler) {
+      beforeThrow();
+      throwUnsupportedInflightQueryAbortStrategyError(abortStrategy, connection.killSession ? "kill session" : undefined);
+    }
+    return handler.bind(connection);
+  }
+  if (abortStrategy === "kill session") {
+    const handler = connection.killSession;
+    if (!handler) {
+      beforeThrow();
+      throwUnsupportedInflightQueryAbortStrategyError(abortStrategy, connection.cancelQuery ? "cancel query" : undefined);
+    }
+    return handler.bind(connection);
+  }
+  beforeThrow();
+  throw new Error(`Unexpected \`inflightQueryAbortStrategy\`: "${abortStrategy}"`);
+}
+function throwUnsupportedInflightQueryAbortStrategyError(abortStrategy, alt) {
+  throw new Error(`This dialect doesn't support \`inflightQueryAbortStrategy\` "${abortStrategy}". Use "${"ignore query"}"${alt ? ` or "${alt}"` : ""} instead.`);
+}
+function assertNotAborted(signal, timing, beforeThrow) {
+  if (signal?.aborted) {
+    beforeThrow?.();
+    throwReasonWithTiming(signal.reason, timing);
+  }
+}
+function throwReasonWithTiming(reason, timing) {
+  decorateWithTiming(reason, timing);
+  throw reason;
+}
+var ABORTED = {};
+function printBackgroundFail(name) {
+  return (reason) => console.error(`\`${name}\` failed in the background after abortion: ${getMessage(reason)}`);
+}
+function decorateWithTiming(reason, timing) {
+  if (reason !== null && typeof reason === "object" && !Object.isFrozen(reason)) {
+    Object.defineProperty(reason, "__kysely_timing__", {
+      configurable: true,
+      enumerable: false,
+      value: timing,
+      writable: false
+    });
+  }
+}
+
+// /zveltio-extension/node_modules/kysely/dist/query-executor/query-executor-base.js
+var NO_PLUGINS = freeze([]);
+
+class QueryExecutorBase {
+  #plugins;
+  constructor(plugins = NO_PLUGINS) {
+    this.#plugins = plugins;
+  }
+  get plugins() {
+    return this.#plugins;
+  }
+  transformQuery(node3, queryId) {
+    for (const plugin2 of this.#plugins) {
+      const transformedNode = plugin2.transformQuery({ node: node3, queryId });
+      if (transformedNode.kind === node3.kind) {
+        node3 = transformedNode;
+      } else {
+        throw new Error([
+          `KyselyPlugin.transformQuery must return a node`,
+          `of the same kind that was given to it.`,
+          `The plugin was given a ${node3.kind}`,
+          `but it returned a ${transformedNode.kind}`
+        ].join(" "));
+      }
+    }
+    return node3;
+  }
+  async executeQuery(compiledQuery, options) {
+    const { inflightQueryAbortStrategy = "ignore query", signal } = options || {};
+    if (!signal) {
+      const result = await this.provideConnection(async (connection2) => {
+        return await connection2.executeQuery(compiledQuery);
+      }, options);
+      return await this.#transformResult(result, compiledQuery.queryId);
+    }
+    assertNotAborted(signal, "before query execution");
+    options = freeze({ signal });
+    const { connection, release } = await provideControlledConnection(this, options);
+    const controlConnectionProvider = this.provideConnection.bind(this);
+    const { promise: abortPromise, resolve } = new Deferred;
+    const abortListener = () => resolve(ABORTED);
+    signal.addEventListener("abort", abortListener, { once: true });
+    try {
+      assertNotAborted(signal, "before query execution", release);
+      const inflightQueryAbortHandler = getInflightQueryAbortHandler(inflightQueryAbortStrategy, connection, release);
+      if (inflightQueryAbortHandler && connection.collectSessionInfo) {
+        assertNotAborted(signal, "before query execution", release);
+        const collectPromise = connection.collectSessionInfo();
+        const result2 = await Promise.race([abortPromise, collectPromise]).catch((error62) => {
+          release();
+          throw error62;
+        });
+        if (result2 === ABORTED) {
+          collectPromise.catch(printBackgroundFail("collectSessionInfo")).finally(release);
+          throwReasonWithTiming(signal.reason, "before query execution");
+        }
+      }
+      const queryPromise = connection.executeQuery(compiledQuery, options);
+      const result = await Promise.race([abortPromise, queryPromise]).catch((error62) => {
+        release();
+        throw error62;
+      });
+      if (result === ABORTED) {
+        Promise.allSettled([
+          queryPromise.catch(printBackgroundFail("query")),
+          inflightQueryAbortHandler?.(controlConnectionProvider).catch(printBackgroundFail("inflightQueryAbortHandler"))
+        ]).finally(release);
+        throwReasonWithTiming(signal.reason, "during query execution");
+      } else {
+        release();
+      }
+      const transformPromise = this.#transformResult(result, compiledQuery.queryId, options);
+      const transformedResult = await Promise.race([
+        abortPromise,
+        transformPromise
+      ]);
+      if (transformedResult === ABORTED) {
+        transformPromise.catch(printBackgroundFail("plugins.transformResult"));
+        throwReasonWithTiming(signal.reason, "during result transformation");
+      }
+      return transformedResult;
+    } finally {
+      resolve(ABORTED);
+      signal.removeEventListener("abort", abortListener);
+    }
+  }
+  async* stream(compiledQuery, chunkSize, options) {
+    const { signal } = options || {};
+    if (!signal) {
+      const { connection: connection2, release: release2 } = await provideControlledConnection(this);
+      try {
+        for await (const result of connection2.streamQuery(compiledQuery, chunkSize)) {
+          yield await this.#transformResult(result, compiledQuery.queryId, options);
+        }
+      } finally {
+        release2();
+      }
+      return;
+    }
+    options = freeze({ signal });
+    assertNotAborted(signal, "before connection acquisition");
+    const { connection, release } = await provideControlledConnection(this, options);
+    const { promise: abortPromise, resolve } = new Deferred;
+    const abortListener = () => resolve(ABORTED);
+    signal.addEventListener("abort", abortListener, { once: true });
+    let asyncIterator;
+    let releasePrerequisite;
+    assertNotAborted(signal, "before query streaming", release);
+    const { queryId } = compiledQuery;
+    try {
+      asyncIterator = connection.streamQuery(compiledQuery, chunkSize, options);
+      while (true) {
+        assertNotAborted(signal, "during query streaming");
+        const nextPromise = asyncIterator.next();
+        const result = await Promise.race([abortPromise, nextPromise]);
+        if (result === ABORTED) {
+          releasePrerequisite = nextPromise.catch(printBackgroundFail("iterator.next"));
+          throwReasonWithTiming(signal.reason, "during query streaming");
+        }
+        if (result.done) {
+          break;
+        }
+        const transformPromise = this.#transformResult(result.value, queryId, options);
+        const transformedResult = await Promise.race([
+          abortPromise,
+          transformPromise
+        ]);
+        if (transformedResult === ABORTED) {
+          releasePrerequisite = transformPromise.catch(printBackgroundFail("plugins.transformResult"));
+          throwReasonWithTiming(signal.reason, "during result transformation");
+        }
+        yield transformedResult;
+      }
+    } finally {
+      resolve(ABORTED);
+      signal.removeEventListener("abort", abortListener);
+      const cleanup = (asyncIterator?.return?.() || Promise.resolve()).finally(() => releasePrerequisite).finally(release);
+      if (!releasePrerequisite) {
+        await cleanup;
+      }
+    }
+  }
+  async#transformResult(result, queryId, options) {
+    const { signal } = options || {};
+    for (const plugin2 of this.#plugins) {
+      result = await plugin2.transformResult(freeze({ queryId, result, signal }));
+    }
+    return result;
+  }
+}
+
+// /zveltio-extension/node_modules/kysely/dist/query-executor/noop-query-executor.js
+class NoopQueryExecutor extends QueryExecutorBase {
+  get adapter() {
+    throw new Error("this query cannot be compiled to SQL");
+  }
+  compileQuery() {
+    throw new Error("this query cannot be compiled to SQL");
+  }
+  provideConnection() {
+    throw new Error("this query cannot be executed");
+  }
+  withConnectionProvider() {
+    throw new Error("this query cannot have a connection provider");
+  }
+  withPlugin(plugin2) {
+    return new NoopQueryExecutor([...this.plugins, plugin2]);
+  }
+  withPlugins(plugins) {
+    return new NoopQueryExecutor([...this.plugins, ...plugins]);
+  }
+  withPluginAtFront(plugin2) {
+    return new NoopQueryExecutor([plugin2, ...this.plugins]);
+  }
+  withoutPlugins() {
+    return new NoopQueryExecutor([]);
+  }
+}
+var NOOP_QUERY_EXECUTOR = new NoopQueryExecutor;
+
+// /zveltio-extension/node_modules/kysely/dist/parser/parse-utils.js
+function createJoinBuilder(joinType, table) {
+  return new JoinBuilder({
+    joinNode: JoinNode.create(joinType, parseTableExpression(table))
+  });
+}
+function createOverBuilder() {
+  return new OverBuilder({
+    overNode: OverNode.create()
+  });
+}
+
+// /zveltio-extension/node_modules/kysely/dist/parser/join-parser.js
+function parseJoin(joinType, args) {
+  if (args.length === 3) {
+    return parseSingleOnJoin(joinType, args[0], args[1], args[2]);
+  } else if (args.length === 2) {
+    return parseCallbackJoin(joinType, args[0], args[1]);
+  } else if (args.length === 1) {
+    return parseOnlessJoin(joinType, args[0]);
+  } else {
+    throw new Error("not implemented");
+  }
+}
+function parseCallbackJoin(joinType, from, callback) {
+  return callback(createJoinBuilder(joinType, from)).toOperationNode();
+}
+function parseSingleOnJoin(joinType, from, lhsColumn, rhsColumn) {
+  return JoinNode.createWithOn(joinType, parseTableExpression(from), parseReferentialBinaryOperation(lhsColumn, "=", rhsColumn));
+}
+function parseOnlessJoin(joinType, from) {
+  return JoinNode.create(joinType, parseTableExpression(from));
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/offset-node.js
+var OffsetNode = freeze({
+  is(node3) {
+    return node3.kind === "OffsetNode";
+  },
+  create(offset) {
+    return freeze({
+      kind: "OffsetNode",
+      offset
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/group-by-item-node.js
+var GroupByItemNode = freeze({
+  is(node3) {
+    return node3.kind === "GroupByItemNode";
+  },
+  create(groupBy) {
+    return freeze({
+      kind: "GroupByItemNode",
+      groupBy
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/parser/group-by-parser.js
+function parseGroupBy(groupBy) {
+  groupBy = isFunction(groupBy) ? groupBy(expressionBuilder()) : groupBy;
+  return parseReferenceExpressionOrList(groupBy).map(GroupByItemNode.create);
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/set-operation-node.js
+var SetOperationNode = freeze({
+  is(node3) {
+    return node3.kind === "SetOperationNode";
+  },
+  create(operator, expression, all) {
+    return freeze({
+      kind: "SetOperationNode",
+      operator,
+      expression,
+      all
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/parser/set-operation-parser.js
+function parseSetOperations(operator, expression, all) {
+  if (isFunction(expression)) {
+    expression = expression(createExpressionBuilder());
+  }
+  if (!isReadonlyArray(expression)) {
+    expression = [expression];
+  }
+  return expression.map((expr) => SetOperationNode.create(operator, parseExpression(expr), all));
+}
+
+// /zveltio-extension/node_modules/kysely/dist/expression/expression-wrapper.js
+class ExpressionWrapper {
+  #node;
+  constructor(node3) {
+    this.#node = node3;
+  }
+  get expressionType() {
+    return;
+  }
+  as(alias) {
+    return new AliasedExpressionWrapper(this, alias);
+  }
+  or(...args) {
+    return new OrWrapper(OrNode.create(this.#node, parseValueBinaryOperationOrExpression(args)));
+  }
+  and(...args) {
+    return new AndWrapper(AndNode.create(this.#node, parseValueBinaryOperationOrExpression(args)));
+  }
+  $castTo() {
+    return new ExpressionWrapper(this.#node);
+  }
+  $notNull() {
+    return new ExpressionWrapper(this.#node);
+  }
+  toOperationNode() {
+    return this.#node;
+  }
+}
+
+class AliasedExpressionWrapper {
+  #expr;
+  #alias;
+  constructor(expr, alias) {
+    this.#expr = expr;
+    this.#alias = alias;
+  }
+  get expression() {
+    return this.#expr;
+  }
+  get alias() {
+    return this.#alias;
+  }
+  toOperationNode() {
+    return AliasNode.create(this.#expr.toOperationNode(), isOperationNodeSource(this.#alias) ? this.#alias.toOperationNode() : IdentifierNode.create(this.#alias));
+  }
+}
+
+class OrWrapper {
+  #node;
+  constructor(node3) {
+    this.#node = node3;
+  }
+  get expressionType() {
+    return;
+  }
+  as(alias) {
+    return new AliasedExpressionWrapper(this, alias);
+  }
+  or(...args) {
+    return new OrWrapper(OrNode.create(this.#node, parseValueBinaryOperationOrExpression(args)));
+  }
+  $castTo() {
+    return new OrWrapper(this.#node);
+  }
+  toOperationNode() {
+    return ParensNode.create(this.#node);
+  }
+}
+
+class AndWrapper {
+  #node;
+  constructor(node3) {
+    this.#node = node3;
+  }
+  get expressionType() {
+    return;
+  }
+  as(alias) {
+    return new AliasedExpressionWrapper(this, alias);
+  }
+  and(...args) {
+    return new AndWrapper(AndNode.create(this.#node, parseValueBinaryOperationOrExpression(args)));
+  }
+  $castTo() {
+    return new AndWrapper(this.#node);
+  }
+  toOperationNode() {
+    return ParensNode.create(this.#node);
+  }
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/fetch-node.js
+var FetchNode = freeze({
+  is(node3) {
+    return node3.kind === "FetchNode";
+  },
+  create(rowCount, modifier) {
+    return {
+      kind: "FetchNode",
+      rowCount: ValueNode.create(rowCount),
+      modifier
+    };
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/parser/fetch-parser.js
+function parseFetch(rowCount, modifier) {
+  if (!isNumber2(rowCount) && !isBigInt(rowCount)) {
+    throw new Error(`Invalid fetch row count: ${rowCount}`);
+  }
+  if (!isFetchModifier(modifier)) {
+    throw new Error(`Invalid fetch modifier: ${modifier}`);
+  }
+  return FetchNode.create(rowCount, modifier);
+}
+function isFetchModifier(value) {
+  return value === "only" || value === "with ties";
+}
+
+// /zveltio-extension/node_modules/kysely/dist/query-builder/select-query-builder.js
+var _a3;
+
+class SelectQueryBuilderImpl {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  get expressionType() {
+    return;
+  }
+  get isSelectQueryBuilder() {
+    return true;
+  }
+  where(...args) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithWhere(this.#props.queryNode, parseValueBinaryOperationOrExpression(args))
+    });
+  }
+  whereRef(lhs, op, rhs) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithWhere(this.#props.queryNode, parseReferentialBinaryOperation(lhs, op, rhs))
+    });
+  }
+  having(...args) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithHaving(this.#props.queryNode, parseValueBinaryOperationOrExpression(args))
+    });
+  }
+  havingRef(lhs, op, rhs) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithHaving(this.#props.queryNode, parseReferentialBinaryOperation(lhs, op, rhs))
+    });
+  }
+  select(selection) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithSelections(this.#props.queryNode, parseSelectArg(selection))
+    });
+  }
+  distinctOn(selection) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithDistinctOn(this.#props.queryNode, parseReferenceExpressionOrList(selection))
+    });
+  }
+  modifyFront(modifier) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithFrontModifier(this.#props.queryNode, SelectModifierNode.createWithExpression(modifier.toOperationNode()))
+    });
+  }
+  modifyEnd(modifier) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.createWithExpression(modifier.toOperationNode()))
+    });
+  }
+  distinct() {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithFrontModifier(this.#props.queryNode, SelectModifierNode.create("Distinct"))
+    });
+  }
+  forUpdate(of) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("ForUpdate", of ? asArray(of).map(parseTable) : undefined))
+    });
+  }
+  forShare(of) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("ForShare", of ? asArray(of).map(parseTable) : undefined))
+    });
+  }
+  forKeyShare(of) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("ForKeyShare", of ? asArray(of).map(parseTable) : undefined))
+    });
+  }
+  forNoKeyUpdate(of) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("ForNoKeyUpdate", of ? asArray(of).map(parseTable) : undefined))
+    });
+  }
+  skipLocked() {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("SkipLocked"))
+    });
+  }
+  noWait() {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithEndModifier(this.#props.queryNode, SelectModifierNode.create("NoWait"))
+    });
+  }
+  selectAll(table) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithSelections(this.#props.queryNode, parseSelectAll(table))
+    });
+  }
+  innerJoin(...args) {
+    return this.#join("InnerJoin", args);
+  }
+  leftJoin(...args) {
+    return this.#join("LeftJoin", args);
+  }
+  rightJoin(...args) {
+    return this.#join("RightJoin", args);
+  }
+  fullJoin(...args) {
+    return this.#join("FullJoin", args);
+  }
+  crossJoin(...args) {
+    return this.#join("CrossJoin", args);
+  }
+  innerJoinLateral(...args) {
+    return this.#join("LateralInnerJoin", args);
+  }
+  leftJoinLateral(...args) {
+    return this.#join("LateralLeftJoin", args);
+  }
+  crossJoinLateral(...args) {
+    return this.#join("LateralCrossJoin", args);
+  }
+  crossApply(...args) {
+    return this.#join("CrossApply", args);
+  }
+  outerApply(...args) {
+    return this.#join("OuterApply", args);
+  }
+  #join(joinType, args) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithJoin(this.#props.queryNode, parseJoin(joinType, args))
+    });
+  }
+  orderBy(...args) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithOrderByItems(this.#props.queryNode, parseOrderBy(args))
+    });
+  }
+  groupBy(groupBy) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithGroupByItems(this.#props.queryNode, parseGroupBy(groupBy))
+    });
+  }
+  limit(limit) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithLimit(this.#props.queryNode, LimitNode.create(parseValueExpression(limit)))
+    });
+  }
+  offset(offset) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithOffset(this.#props.queryNode, OffsetNode.create(parseValueExpression(offset)))
+    });
+  }
+  fetch(rowCount, modifier = "only") {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithFetch(this.#props.queryNode, parseFetch(rowCount, modifier))
+    });
+  }
+  top(expression, modifiers) {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithTop(this.#props.queryNode, parseTop(expression, modifiers))
+    });
+  }
+  union(expression) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("union", expression, false))
+    });
+  }
+  unionAll(expression) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("union", expression, true))
+    });
+  }
+  intersect(expression) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("intersect", expression, false))
+    });
+  }
+  intersectAll(expression) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("intersect", expression, true))
+    });
+  }
+  except(expression) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("except", expression, false))
+    });
+  }
+  exceptAll(expression) {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithSetOperations(this.#props.queryNode, parseSetOperations("except", expression, true))
+    });
+  }
+  as(alias) {
+    return new AliasedSelectQueryBuilderImpl(this, alias);
+  }
+  clearSelect() {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithoutSelections(this.#props.queryNode)
+    });
+  }
+  clearWhere() {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithoutWhere(this.#props.queryNode)
+    });
+  }
+  clearLimit() {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithoutLimit(this.#props.queryNode)
+    });
+  }
+  clearOffset() {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithoutOffset(this.#props.queryNode)
+    });
+  }
+  clearOrderBy() {
+    return new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithoutOrderBy(this.#props.queryNode)
+    });
+  }
+  clearGroupBy() {
+    return new _a3({
+      ...this.#props,
+      queryNode: SelectQueryNode.cloneWithoutGroupBy(this.#props.queryNode)
+    });
+  }
+  $call(func) {
+    return func(this);
+  }
+  $if(condition, func) {
+    if (condition) {
+      return func(this);
+    }
+    return new _a3({
+      ...this.#props
+    });
+  }
+  $castTo() {
+    return new _a3(this.#props);
+  }
+  $narrowType() {
+    return new _a3(this.#props);
+  }
+  $assertType() {
+    return new _a3(this.#props);
+  }
+  $asTuple() {
+    return new ExpressionWrapper(this.toOperationNode());
+  }
+  $asScalar() {
+    return new ExpressionWrapper(this.toOperationNode());
+  }
+  withPlugin(plugin2) {
+    return new _a3({
+      ...this.#props,
+      executor: this.#props.executor.withPlugin(plugin2)
+    });
+  }
+  toOperationNode() {
+    return this.#props.executor.transformQuery(this.#props.queryNode, this.#props.queryId);
+  }
+  compile() {
+    return this.#props.executor.compileQuery(this.toOperationNode(), this.#props.queryId);
+  }
+  async execute(options) {
+    const compiledQuery = this.compile();
+    const result = await this.#props.executor.executeQuery(compiledQuery, options);
+    return result.rows;
+  }
+  async executeTakeFirst(options) {
+    const [result] = await this.execute(options);
+    return result;
+  }
+  async executeTakeFirstOrThrow(errorConstructorOrOptions) {
+    if (typeof errorConstructorOrOptions === "function") {
+      errorConstructorOrOptions = {
+        errorConstructor: errorConstructorOrOptions
+      };
+    }
+    const result = await this.executeTakeFirst(errorConstructorOrOptions);
+    if (result === undefined) {
+      const errorConstructor = errorConstructorOrOptions?.errorConstructor ?? NoResultError;
+      const error62 = isNoResultErrorConstructor(errorConstructor) ? new errorConstructor(this.toOperationNode()) : errorConstructor(this.toOperationNode());
+      throw error62;
+    }
+    return result;
+  }
+  async* stream(chunkSizeOrOptions) {
+    if (typeof chunkSizeOrOptions !== "object") {
+      chunkSizeOrOptions = {
+        chunkSize: chunkSizeOrOptions
+      };
+    }
+    const compiledQuery = this.compile();
+    const stream = this.#props.executor.stream(compiledQuery, chunkSizeOrOptions.chunkSize ?? 100, chunkSizeOrOptions);
+    for await (const item of stream) {
+      yield* item.rows;
+    }
+  }
+  async explain(format, options) {
+    const builder = new _a3({
+      ...this.#props,
+      queryNode: QueryNode.cloneWithExplain(this.#props.queryNode, format, options)
+    });
+    return await builder.execute();
+  }
+}
+_a3 = SelectQueryBuilderImpl;
+function createSelectQueryBuilder(props) {
+  return new SelectQueryBuilderImpl(props);
+}
+
+class AliasedSelectQueryBuilderImpl {
+  #queryBuilder;
+  #alias;
+  constructor(queryBuilder, alias) {
+    this.#queryBuilder = queryBuilder;
+    this.#alias = alias;
+  }
+  get expression() {
+    return this.#queryBuilder;
+  }
+  get alias() {
+    return this.#alias;
+  }
+  get isAliasedSelectQueryBuilder() {
+    return true;
+  }
+  toOperationNode() {
+    return AliasNode.create(this.#queryBuilder.toOperationNode(), IdentifierNode.create(this.#alias));
+  }
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/aggregate-function-node.js
+var AggregateFunctionNode = freeze({
+  is(node3) {
+    return node3.kind === "AggregateFunctionNode";
+  },
+  create(aggregateFunction, aggregated = []) {
+    return freeze({
+      kind: "AggregateFunctionNode",
+      func: aggregateFunction,
+      aggregated
+    });
+  },
+  cloneWithDistinct(aggregateFunctionNode) {
+    return freeze({
+      ...aggregateFunctionNode,
+      distinct: true
+    });
+  },
+  cloneWithOrderBy(aggregateFunctionNode, orderItems, withinGroup = false) {
+    const prop = withinGroup ? "withinGroup" : "orderBy";
+    return freeze({
+      ...aggregateFunctionNode,
+      [prop]: aggregateFunctionNode[prop] ? OrderByNode.cloneWithItems(aggregateFunctionNode[prop], orderItems) : OrderByNode.create(orderItems)
+    });
+  },
+  cloneWithFilter(aggregateFunctionNode, filter2) {
+    return freeze({
+      ...aggregateFunctionNode,
+      filter: aggregateFunctionNode.filter ? WhereNode.cloneWithOperation(aggregateFunctionNode.filter, "And", filter2) : WhereNode.create(filter2)
+    });
+  },
+  cloneWithOrFilter(aggregateFunctionNode, filter2) {
+    return freeze({
+      ...aggregateFunctionNode,
+      filter: aggregateFunctionNode.filter ? WhereNode.cloneWithOperation(aggregateFunctionNode.filter, "Or", filter2) : WhereNode.create(filter2)
+    });
+  },
+  cloneWithOver(aggregateFunctionNode, over) {
+    return freeze({
+      ...aggregateFunctionNode,
+      over
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/function-node.js
+var FunctionNode = freeze({
+  is(node3) {
+    return node3.kind === "FunctionNode";
+  },
+  create(func, args) {
+    return freeze({
+      kind: "FunctionNode",
+      func,
+      arguments: args
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/query-builder/aggregate-function-builder.js
+class AggregateFunctionBuilder {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  get expressionType() {
+    return;
+  }
+  as(alias) {
+    return new AliasedAggregateFunctionBuilder(this, alias);
+  }
+  distinct() {
+    return new AggregateFunctionBuilder({
+      ...this.#props,
+      aggregateFunctionNode: AggregateFunctionNode.cloneWithDistinct(this.#props.aggregateFunctionNode)
+    });
+  }
+  orderBy(...args) {
+    return new AggregateFunctionBuilder({
+      ...this.#props,
+      aggregateFunctionNode: QueryNode.cloneWithOrderByItems(this.#props.aggregateFunctionNode, parseOrderBy(args))
+    });
+  }
+  clearOrderBy() {
+    return new AggregateFunctionBuilder({
+      ...this.#props,
+      aggregateFunctionNode: QueryNode.cloneWithoutOrderBy(this.#props.aggregateFunctionNode)
+    });
+  }
+  withinGroupOrderBy(...args) {
+    return new AggregateFunctionBuilder({
+      ...this.#props,
+      aggregateFunctionNode: AggregateFunctionNode.cloneWithOrderBy(this.#props.aggregateFunctionNode, parseOrderBy(args), true)
+    });
+  }
+  filterWhere(...args) {
+    return new AggregateFunctionBuilder({
+      ...this.#props,
+      aggregateFunctionNode: AggregateFunctionNode.cloneWithFilter(this.#props.aggregateFunctionNode, parseValueBinaryOperationOrExpression(args))
+    });
+  }
+  filterWhereRef(lhs, op, rhs) {
+    return new AggregateFunctionBuilder({
+      ...this.#props,
+      aggregateFunctionNode: AggregateFunctionNode.cloneWithFilter(this.#props.aggregateFunctionNode, parseReferentialBinaryOperation(lhs, op, rhs))
+    });
+  }
+  over(over) {
+    const builder = createOverBuilder();
+    return new AggregateFunctionBuilder({
+      ...this.#props,
+      aggregateFunctionNode: AggregateFunctionNode.cloneWithOver(this.#props.aggregateFunctionNode, (over ? over(builder) : builder).toOperationNode())
+    });
+  }
+  $call(func) {
+    return func(this);
+  }
+  $castTo() {
+    return new AggregateFunctionBuilder(this.#props);
+  }
+  $notNull() {
+    return new AggregateFunctionBuilder(this.#props);
+  }
+  toOperationNode() {
+    return this.#props.aggregateFunctionNode;
+  }
+}
+
+class AliasedAggregateFunctionBuilder {
+  #aggregateFunctionBuilder;
+  #alias;
+  constructor(aggregateFunctionBuilder, alias) {
+    this.#aggregateFunctionBuilder = aggregateFunctionBuilder;
+    this.#alias = alias;
+  }
+  get expression() {
+    return this.#aggregateFunctionBuilder;
+  }
+  get alias() {
+    return this.#alias;
+  }
+  toOperationNode() {
+    return AliasNode.create(this.#aggregateFunctionBuilder.toOperationNode(), IdentifierNode.create(this.#alias));
+  }
+}
+
+// /zveltio-extension/node_modules/kysely/dist/query-builder/function-module.js
+function createFunctionModule() {
+  const fn = (name, args) => {
+    return new ExpressionWrapper(FunctionNode.create(name, parseReferenceExpressionOrList(args ?? [])));
+  };
+  const agg = (name, args) => {
+    return new AggregateFunctionBuilder({
+      aggregateFunctionNode: AggregateFunctionNode.create(name, args ? parseReferenceExpressionOrList(args) : undefined)
+    });
+  };
+  return Object.assign(fn, {
+    agg,
+    avg(column) {
+      return agg("avg", [column]);
+    },
+    coalesce(...values) {
+      return fn("coalesce", values);
+    },
+    count(column) {
+      return agg("count", [column]);
+    },
+    countAll(table) {
+      return new AggregateFunctionBuilder({
+        aggregateFunctionNode: AggregateFunctionNode.create("count", parseSelectAll(table))
+      });
+    },
+    max(column) {
+      return agg("max", [column]);
+    },
+    min(column) {
+      return agg("min", [column]);
+    },
+    sum(column) {
+      return agg("sum", [column]);
+    },
+    any(column) {
+      return fn("any", [column]);
+    },
+    jsonAgg(table) {
+      return new AggregateFunctionBuilder({
+        aggregateFunctionNode: AggregateFunctionNode.create("json_agg", [
+          isString(table) ? parseTable(table) : table.toOperationNode()
+        ])
+      });
+    },
+    toJson(table) {
+      return new ExpressionWrapper(FunctionNode.create("to_json", [
+        isString(table) ? parseTable(table) : table.toOperationNode()
+      ]));
+    }
+  });
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/unary-operation-node.js
+var UnaryOperationNode = freeze({
+  is(node3) {
+    return node3.kind === "UnaryOperationNode";
+  },
+  create(operator, operand) {
+    return freeze({
+      kind: "UnaryOperationNode",
+      operator,
+      operand
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/parser/unary-operation-parser.js
+function parseUnaryOperation(operator, operand) {
+  if (isUnaryOperator(operator)) {
+    return UnaryOperationNode.create(OperatorNode.create(operator), parseReferenceExpression(operand));
+  }
+  throw new Error(`invalid unary operator ${JSON.stringify(operator)}`);
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/case-node.js
+var CaseNode = freeze({
+  is(node3) {
+    return node3.kind === "CaseNode";
+  },
+  create(value) {
+    return freeze({
+      kind: "CaseNode",
+      value
+    });
+  },
+  cloneWithWhen(caseNode, when) {
+    return freeze({
+      ...caseNode,
+      when: freeze(caseNode.when ? [...caseNode.when, when] : [when])
+    });
+  },
+  cloneWithThen(caseNode, then) {
+    return freeze({
+      ...caseNode,
+      when: caseNode.when ? freeze([
+        ...caseNode.when.slice(0, -1),
+        WhenNode.cloneWithResult(caseNode.when[caseNode.when.length - 1], then)
+      ]) : undefined
+    });
+  },
+  cloneWith(caseNode, props) {
+    return freeze({
+      ...caseNode,
+      ...props
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/query-builder/case-builder.js
+class CaseBuilder {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  when(...args) {
+    return new CaseThenBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWithWhen(this.#props.node, WhenNode.create(parseValueBinaryOperationOrExpression(args)))
+    });
+  }
+  whenRef(lhs, op, rhs) {
+    return new CaseThenBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWithWhen(this.#props.node, WhenNode.create(parseReferentialBinaryOperation(lhs, op, rhs)))
+    });
+  }
+}
+
+class CaseThenBuilder {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  then(valueExpression) {
+    return new CaseWhenBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWithThen(this.#props.node, isSafeImmediateValue(valueExpression) ? parseSafeImmediateValue(valueExpression) : parseValueExpression(valueExpression))
+    });
+  }
+  thenRef(expression) {
+    return new CaseWhenBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWithThen(this.#props.node, parseReferenceExpression(expression))
+    });
+  }
+}
+
+class CaseWhenBuilder {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  when(...args) {
+    return new CaseThenBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWithWhen(this.#props.node, WhenNode.create(parseValueBinaryOperationOrExpression(args)))
+    });
+  }
+  whenRef(lhs, op, rhs) {
+    return new CaseThenBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWithWhen(this.#props.node, WhenNode.create(parseReferentialBinaryOperation(lhs, op, rhs)))
+    });
+  }
+  else(valueExpression) {
+    return new CaseEndBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWith(this.#props.node, {
+        else: isSafeImmediateValue(valueExpression) ? parseSafeImmediateValue(valueExpression) : parseValueExpression(valueExpression)
+      })
+    });
+  }
+  elseRef(expression) {
+    return new CaseEndBuilder({
+      ...this.#props,
+      node: CaseNode.cloneWith(this.#props.node, {
+        else: parseReferenceExpression(expression)
+      })
+    });
+  }
+  end() {
+    return new ExpressionWrapper(CaseNode.cloneWith(this.#props.node, { isStatement: false }));
+  }
+  endCase() {
+    return new ExpressionWrapper(CaseNode.cloneWith(this.#props.node, { isStatement: true }));
+  }
+}
+
+class CaseEndBuilder {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  end() {
+    return new ExpressionWrapper(CaseNode.cloneWith(this.#props.node, { isStatement: false }));
+  }
+  endCase() {
+    return new ExpressionWrapper(CaseNode.cloneWith(this.#props.node, { isStatement: true }));
+  }
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/json-path-leg-node.js
+var JSONPathLegNode = freeze({
+  is(node3) {
+    return node3.kind === "JSONPathLegNode";
+  },
+  create(type, value) {
+    return freeze({
+      kind: "JSONPathLegNode",
+      type,
+      value
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/query-builder/json-path-builder.js
+var HASH_NEGATIVE_INDEX_REGEX = /^#-\d+$/;
+
+class JSONPathBuilder {
+  #node;
+  constructor(node3) {
+    this.#node = node3;
+  }
+  at(index) {
+    if (typeof index !== "number" && typeof index !== "string" || typeof index === "number" && !Number.isInteger(index) || typeof index === "string" && index !== "last" && !HASH_NEGATIVE_INDEX_REGEX.test(index)) {
+      throw new Error(`Unexpected index value in .at(...): ${index}`);
+    }
+    return this.#createBuilderWithPathLeg("ArrayLocation", index);
+  }
+  key(key) {
+    return this.#createBuilderWithPathLeg("Member", key);
+  }
+  #createBuilderWithPathLeg(legType, value) {
+    if (JSONReferenceNode.is(this.#node)) {
+      return new TraversedJSONPathBuilder(JSONReferenceNode.cloneWithTraversal(this.#node, JSONPathNode.is(this.#node.traversal) ? JSONPathNode.cloneWithLeg(this.#node.traversal, JSONPathLegNode.create(legType, value)) : JSONOperatorChainNode.cloneWithValue(this.#node.traversal, ValueNode.createImmediate(value))));
+    }
+    return new TraversedJSONPathBuilder(JSONPathNode.cloneWithLeg(this.#node, JSONPathLegNode.create(legType, value)));
+  }
+}
+
+class TraversedJSONPathBuilder extends JSONPathBuilder {
+  #node;
+  constructor(node3) {
+    super(node3);
+    this.#node = node3;
+  }
+  get expressionType() {
+    return;
+  }
+  as(alias) {
+    return new AliasedJSONPathBuilder(this, alias);
+  }
+  $castTo() {
+    return new TraversedJSONPathBuilder(this.#node);
+  }
+  $notNull() {
+    return new TraversedJSONPathBuilder(this.#node);
+  }
+  toOperationNode() {
+    return this.#node;
+  }
+}
+
+class AliasedJSONPathBuilder {
+  #jsonPath;
+  #alias;
+  constructor(jsonPath, alias) {
+    this.#jsonPath = jsonPath;
+    this.#alias = alias;
+  }
+  get expression() {
+    return this.#jsonPath;
+  }
+  get alias() {
+    return this.#alias;
+  }
+  toOperationNode() {
+    return AliasNode.create(this.#jsonPath.toOperationNode(), isOperationNodeSource(this.#alias) ? this.#alias.toOperationNode() : IdentifierNode.create(this.#alias));
+  }
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/tuple-node.js
+var TupleNode = freeze({
+  is(node3) {
+    return node3.kind === "TupleNode";
+  },
+  create(values) {
+    return freeze({
+      kind: "TupleNode",
+      values: freeze(values)
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/data-type-node.js
+var SIMPLE_COLUMN_DATA_TYPES = freeze({
+  bigint: true,
+  bigserial: true,
+  binary: true,
+  blob: true,
+  boolean: true,
+  bytea: true,
+  char: true,
+  date: true,
+  datemultirange: true,
+  daterange: true,
+  datetime: true,
+  datetime2: true,
+  decimal: true,
+  "double precision": true,
+  float4: true,
+  float8: true,
+  int2: true,
+  int4: true,
+  int4multirange: true,
+  int4range: true,
+  int8: true,
+  int8multirange: true,
+  int8range: true,
+  integer: true,
+  json: true,
+  jsonb: true,
+  numeric: true,
+  nummultirange: true,
+  numrange: true,
+  real: true,
+  serial: true,
+  smallint: true,
+  text: true,
+  time: true,
+  timestamp: true,
+  timestamptz: true,
+  timetz: true,
+  tsmultirange: true,
+  tsrange: true,
+  tstzmultirange: true,
+  tstzrange: true,
+  uuid: true,
+  varbinary: true,
+  varchar: true
+});
+var COLUMN_DATA_TYPE_REGEX = freeze([
+  /^varchar\(\d+\)$/,
+  /^char\(\d+\)$/,
+  /^decimal\(\d+, \d+\)$/,
+  /^numeric\(\d+, \d+\)$/,
+  /^binary\(\d+\)$/,
+  /^datetime\(\d+\)$/,
+  /^time\(\d+\)$/,
+  /^timetz\(\d+\)$/,
+  /^timestamp\(\d+\)$/,
+  /^timestamptz\(\d+\)$/,
+  /^datetime2\(\d+\)$/,
+  /^varbinary\(\d+\)$/
+]);
+var DataTypeNode = freeze({
+  is(node3) {
+    return node3.kind === "DataTypeNode";
+  },
+  create(dataType) {
+    return freeze({
+      kind: "DataTypeNode",
+      dataType
+    });
+  }
+});
+function isColumnDataType(dataType) {
+  return SIMPLE_COLUMN_DATA_TYPES[dataType] || COLUMN_DATA_TYPE_REGEX.some((r) => r.test(dataType));
+}
+
+// /zveltio-extension/node_modules/kysely/dist/parser/data-type-parser.js
+function parseDataTypeExpression(dataType) {
+  if (isOperationNodeSource(dataType)) {
+    return dataType.toOperationNode();
+  }
+  if (isColumnDataType(dataType)) {
+    return DataTypeNode.create(dataType);
+  }
+  throw new Error(`invalid column data type ${JSON.stringify(dataType)}`);
+}
+
+// /zveltio-extension/node_modules/kysely/dist/operation-node/cast-node.js
+var CastNode = freeze({
+  is(node3) {
+    return node3.kind === "CastNode";
+  },
+  create(expression, dataType) {
+    return freeze({
+      kind: "CastNode",
+      expression,
+      dataType
+    });
+  }
+});
+
+// /zveltio-extension/node_modules/kysely/dist/expression/expression-builder.js
+function createExpressionBuilder(executor = NOOP_QUERY_EXECUTOR) {
+  function binary(lhs, op, rhs) {
+    return new ExpressionWrapper(parseValueBinaryOperation(lhs, op, rhs));
+  }
+  function unary(op, expr) {
+    return new ExpressionWrapper(parseUnaryOperation(op, expr));
+  }
+  const eb = Object.assign(binary, {
+    fn: undefined,
+    eb: undefined,
+    selectFrom(table) {
+      return createSelectQueryBuilder({
+        queryId: createQueryId(),
+        executor,
+        queryNode: SelectQueryNode.createFrom(parseTableExpressionOrList(table))
+      });
+    },
+    case(reference) {
+      return new CaseBuilder({
+        node: CaseNode.create(isUndefined(reference) ? undefined : parseReferenceExpression(reference))
+      });
+    },
+    ref(reference, op) {
+      if (isUndefined(op)) {
+        return new ExpressionWrapper(parseStringReference(reference));
+      }
+      return new JSONPathBuilder(parseJSONReference(reference, op));
+    },
+    jsonPath() {
+      return new JSONPathBuilder(JSONPathNode.create());
+    },
+    table(table) {
+      return new ExpressionWrapper(parseTable(table));
+    },
+    val(value) {
+      return new ExpressionWrapper(parseValueExpression(value));
+    },
+    refTuple(...values) {
+      return new ExpressionWrapper(TupleNode.create(values.map(parseReferenceExpression)));
+    },
+    tuple(...values) {
+      return new ExpressionWrapper(TupleNode.create(values.map(parseValueExpression)));
+    },
+    lit(value) {
+      return new ExpressionWrapper(parseSafeImmediateValue(value));
+    },
+    unary,
+    not(expr) {
+      return unary("not", expr);
+    },
+    exists(expr) {
+      return unary("exists", expr);
+    },
+    neg(expr) {
+      return unary("-", expr);
+    },
+    between(expr, start, end) {
+      return new ExpressionWrapper(BinaryOperationNode.create(parseReferenceExpression(expr), OperatorNode.create("between"), AndNode.create(parseValueExpression(start), parseValueExpression(end))));
+    },
+    betweenSymmetric(expr, start, end) {
+      return new ExpressionWrapper(BinaryOperationNode.create(parseReferenceExpression(expr), OperatorNode.create("between symmetric"), AndNode.create(parseValueExpression(start), parseValueExpression(end))));
+    },
+    and(exprs) {
+      if (isReadonlyArray(exprs)) {
+        return new ExpressionWrapper(parseFilterList2(exprs, "and"));
+      }
+      return new ExpressionWrapper(parseFilterObject(exprs, "and"));
+    },
+    or(exprs) {
+      if (isReadonlyArray(exprs)) {
+        return new ExpressionWrapper(parseFilterList2(exprs, "or"));
+      }
+      return new ExpressionWrapper(parseFilterObject(exprs, "or"));
+    },
+    parens(...args) {
+      const node3 = parseValueBinaryOperationOrExpression(args);
+      if (ParensNode.is(node3)) {
+        return new ExpressionWrapper(node3);
+      } else {
+        return new ExpressionWrapper(ParensNode.create(node3));
+      }
+    },
+    cast(expr, dataType) {
+      return new ExpressionWrapper(CastNode.create(parseReferenceExpression(expr), parseDataTypeExpression(dataType)));
+    }
+  });
+  eb.fn = createFunctionModule();
+  eb.eb = eb;
+  return eb;
+}
+function expressionBuilder(_) {
+  return createExpressionBuilder();
+}
+
+// /zveltio-extension/node_modules/kysely/dist/parser/expression-parser.js
+function parseExpression(exp) {
+  if (isOperationNodeSource(exp)) {
+    return exp.toOperationNode();
+  } else if (isFunction(exp)) {
+    return exp(expressionBuilder()).toOperationNode();
+  }
+  throw new Error(`invalid expression: ${JSON.stringify(exp)}`);
+}
+function parseAliasedExpression(exp) {
+  if (isOperationNodeSource(exp)) {
+    return exp.toOperationNode();
+  } else if (isFunction(exp)) {
+    return exp(expressionBuilder()).toOperationNode();
+  }
+  throw new Error(`invalid aliased expression: ${JSON.stringify(exp)}`);
+}
+function isExpressionOrFactory(obj) {
+  return isExpression(obj) || isAliasedExpression(obj) || isFunction(obj);
+}
+
+// /zveltio-extension/node_modules/kysely/dist/dynamic/dynamic-table-builder.js
+class DynamicTableBuilder {
+  #table;
+  get table() {
+    return this.#table;
+  }
+  constructor(table) {
+    this.#table = table;
+  }
+  as(alias) {
+    return new AliasedDynamicTableBuilder(this.#table, alias);
+  }
+}
+
+class AliasedDynamicTableBuilder {
+  #table;
+  #alias;
+  get table() {
+    return this.#table;
+  }
+  get alias() {
+    return this.#alias;
+  }
+  constructor(table, alias) {
+    this.#table = table;
+    this.#alias = alias;
+  }
+  toOperationNode() {
+    return AliasNode.create(parseTable(this.#table), IdentifierNode.create(this.#alias));
+  }
+}
+function isAliasedDynamicTableBuilder(obj) {
+  return isObject3(obj) && isOperationNodeSource(obj) && isString(obj.table) && isString(obj.alias);
+}
+
+// /zveltio-extension/node_modules/kysely/dist/parser/table-parser.js
+function parseTableExpressionOrList(table) {
+  if (isReadonlyArray(table)) {
+    return table.map((it) => parseTableExpression(it));
+  } else {
+    return [parseTableExpression(table)];
+  }
+}
+function parseTableExpression(table) {
+  if (isString(table)) {
+    return parseAliasedTable(table);
+  } else if (isAliasedDynamicTableBuilder(table)) {
+    return table.toOperationNode();
+  } else {
+    return parseAliasedExpression(table);
+  }
+}
+function parseAliasedTable(from) {
+  const ALIAS_SEPARATOR = " as ";
+  if (from.includes(ALIAS_SEPARATOR)) {
+    const [table, alias] = from.split(ALIAS_SEPARATOR).map(trim2);
+    return AliasNode.create(parseTable(table), IdentifierNode.create(alias));
+  } else {
+    return parseTable(from);
+  }
+}
+function parseTable(from) {
+  const SCHEMA_SEPARATOR = ".";
+  if (from.includes(SCHEMA_SEPARATOR)) {
+    const [schema, table] = from.split(SCHEMA_SEPARATOR).map(trim2);
+    return TableNode.createWithSchema(schema, table);
+  } else {
+    return TableNode.create(from);
+  }
+}
+function trim2(str) {
+  return str.trim();
+}
+// /zveltio-extension/node_modules/kysely/dist/raw-builder/raw-builder.js
+class RawBuilderImpl {
+  #props;
+  constructor(props) {
+    this.#props = freeze(props);
+  }
+  get expressionType() {
+    return;
+  }
+  get isRawBuilder() {
+    return true;
+  }
+  as(alias) {
+    return new AliasedRawBuilderImpl(this, alias);
+  }
+  $castTo() {
+    return new RawBuilderImpl({ ...this.#props });
+  }
+  $notNull() {
+    return new RawBuilderImpl(this.#props);
+  }
+  withPlugin(plugin2) {
+    return new RawBuilderImpl({
+      ...this.#props,
+      plugins: this.#props.plugins !== undefined ? freeze([...this.#props.plugins, plugin2]) : freeze([plugin2])
+    });
+  }
+  toOperationNode() {
+    return this.#toOperationNode(this.#getExecutor());
+  }
+  compile(executorProvider) {
+    return this.#compile(this.#getExecutor(executorProvider));
+  }
+  async execute(executorProvider, options) {
+    const executor = this.#getExecutor(executorProvider);
+    return executor.executeQuery(this.#compile(executor), options);
+  }
+  #getExecutor(executorProvider) {
+    const executor = executorProvider !== undefined ? executorProvider.getExecutor() : NOOP_QUERY_EXECUTOR;
+    return this.#props.plugins !== undefined ? executor.withPlugins(this.#props.plugins) : executor;
+  }
+  #toOperationNode(executor) {
+    return executor.transformQuery(this.#props.rawNode, this.#props.queryId);
+  }
+  #compile(executor) {
+    return executor.compileQuery(this.#toOperationNode(executor), this.#props.queryId);
+  }
+}
+function createRawBuilder(props) {
+  return new RawBuilderImpl(props);
+}
+
+class AliasedRawBuilderImpl {
+  #rawBuilder;
+  #alias;
+  constructor(rawBuilder, alias) {
+    this.#rawBuilder = rawBuilder;
+    this.#alias = alias;
+  }
+  get expression() {
+    return this.#rawBuilder;
+  }
+  get alias() {
+    return this.#alias;
+  }
+  get rawBuilder() {
+    return this.#rawBuilder;
+  }
+  toOperationNode() {
+    return AliasNode.create(this.#rawBuilder.toOperationNode(), isOperationNodeSource(this.#alias) ? this.#alias.toOperationNode() : IdentifierNode.create(this.#alias));
+  }
+}
+// /zveltio-extension/node_modules/kysely/dist/raw-builder/sql.js
+var sql = Object.assign((sqlFragments, ...parameters) => {
+  return createRawBuilder({
+    queryId: createQueryId(),
+    rawNode: RawNode.create(sqlFragments, parameters?.map(parseParameter) ?? [])
+  });
+}, {
+  ref(columnReference) {
+    return createRawBuilder({
+      queryId: createQueryId(),
+      rawNode: RawNode.createWithChild(parseStringReference(columnReference))
+    });
+  },
+  val(value) {
+    return createRawBuilder({
+      queryId: createQueryId(),
+      rawNode: RawNode.createWithChild(parseValueExpression(value))
+    });
+  },
+  table(tableReference) {
+    return createRawBuilder({
+      queryId: createQueryId(),
+      rawNode: RawNode.createWithChild(parseTable(tableReference))
+    });
+  },
+  id(...ids) {
+    const fragments = new Array(ids.length + 1).fill(".");
+    fragments[0] = "";
+    fragments[fragments.length - 1] = "";
+    return createRawBuilder({
+      queryId: createQueryId(),
+      rawNode: RawNode.create(fragments, ids.map(IdentifierNode.create))
+    });
+  },
+  lit(value) {
+    return createRawBuilder({
+      queryId: createQueryId(),
+      rawNode: RawNode.createWithChild(ValueNode.createImmediate(value))
+    });
+  },
+  raw(sql2) {
+    return createRawBuilder({
+      queryId: createQueryId(),
+      rawNode: RawNode.createWithSql(sql2)
+    });
+  },
+  join(array2, separator = sql`, `) {
+    const nodes = new Array(Math.max(2 * array2.length - 1, 0));
+    const sep = separator.toOperationNode();
+    for (let i = 0;i < array2.length; ++i) {
+      nodes[2 * i] = parseParameter(array2[i]);
+      if (i !== array2.length - 1) {
+        nodes[2 * i + 1] = sep;
+      }
+    }
+    return createRawBuilder({
+      queryId: createQueryId(),
+      rawNode: RawNode.createWithChildren(nodes)
+    });
+  }
+});
+function parseParameter(param) {
+  if (isOperationNodeSource(param)) {
+    return param.toOperationNode();
+  }
+  return parseValueExpression(param);
+}
 // /zveltio-extension/packages/sdk/src/extension/jsonb.ts
 function toJsonb(value) {
   return sql`${JSON.stringify(value ?? null)}::text::jsonb`;
@@ -36293,10 +36293,9 @@ function sitesRoutes(ctx) {
     try {
       const session = await auth.api.getSession({ headers: c.req.raw.headers });
       if (session?.user) {
-        const row = await sql`
-          SELECT role FROM "user" WHERE id = ${session.user.id} LIMIT 1
-        `.execute(db).then((r) => r.rows[0]);
-        c.set("user", { ...session.user, role: row?.role ?? session.user.role });
+        const resolved = await engine.resolveUserRole({ id: session.user.id });
+        const role = resolved === "public" ? undefined : resolved;
+        c.set("user", { ...session.user, role: role ?? session.user.role });
       }
     } catch {}
     await next();
@@ -36525,7 +36524,7 @@ function sitesRoutes(ctx) {
       sortDir: c.req.query("dir") === "asc" ? "asc" : "desc",
       q: c.req.query("q") || undefined
     };
-    const resolved = await resolveBlockAt({ db, engine }, {
+    const resolved = await resolveBlockAt({ db, engine, ddl: ctx.DDLManager }, {
       user,
       authType: c.get("authType") ?? "session",
       tenantId: tenantId(c),
@@ -36573,7 +36572,7 @@ function sitesRoutes(ctx) {
     if (page.record_collection) {
       if (!recordKey)
         return c.json({ error: "Page not found" }, 404);
-      record2 = await resolveRecord({ db, engine }, audience, page.record_collection, page.record_field || "slug", recordKey, page.record_filter);
+      record2 = await resolveRecord({ db, engine, ddl: ctx.DDLManager }, audience, page.record_collection, page.record_field || "slug", recordKey, page.record_filter);
       if (!record2)
         return c.json({ error: "Page not found" }, 404);
     } else if (recordKey) {
@@ -36584,7 +36583,7 @@ function sitesRoutes(ctx) {
       const named = new Set(placeholdersIn(raw2));
       record2 = Object.fromEntries(Object.entries(record2).filter(([k]) => named.has(k)));
     }
-    const blocks = sanitizeBlocks(await resolveBlocks({ db, engine }, audience, raw2));
+    const blocks = sanitizeBlocks(await resolveBlocks({ db, engine, ddl: ctx.DDLManager }, audience, raw2));
     return c.json({
       site: {
         id: site.id,
@@ -36651,14 +36650,10 @@ function registerPublicSeoRoutes(ctx) {
         if (!published.includes(row.record_collection))
           return [];
         const field = row.record_field || "slug";
-        const cols = await sql`
-          SELECT column_name FROM information_schema.columns
-          WHERE table_schema = 'public' AND table_name = ${`zvd_${row.record_collection}`}
-        `.execute(db);
-        const names = new Set(cols.rows.map((r) => r.column_name));
+        const names = new Set(await ctx.DDLManager.columnNames(db, row.record_collection));
         if (!names.has(field))
           return [];
-        const filters = parseFilterList2(row.record_filter);
+        const filters = parseFilterList(row.record_filter);
         const declared = Array.isArray(row.record_filter) ? row.record_filter.length : 0;
         if (filters.length !== declared)
           return [];
@@ -37051,7 +37046,7 @@ function editorRoutes(ctx) {
     if (!page)
       return c.json({ error: "Page not found" }, 404);
     const raw2 = typeof page.blocks === "string" ? JSON.parse(page.blocks) : page.blocks ?? [];
-    const blocks = await resolveBlocks({ db, engine }, { user, authType: "session", tenantId: tenantId(c) }, raw2);
+    const blocks = await resolveBlocks({ db, engine, ddl: ctx.DDLManager }, { user, authType: "session", tenantId: tenantId(c) }, raw2);
     return c.json({ page: { ...page, blocks } });
   });
   app.get("/:id", async (c) => {
@@ -37316,7 +37311,7 @@ function publicPagesRoutes(ctx) {
       if (targets.length > 0 && !targets.includes(pageSlug))
         continue;
       const raw2 = typeof row.blocks === "string" ? JSON.parse(row.blocks) : row.blocks ?? [];
-      const resolved = await resolveBlocks({ db, engine }, { user: null, tenantId: site.tenant_id, publicCollections: site.public_collections ?? [] }, raw2);
+      const resolved = await resolveBlocks({ db, engine, ddl: ctx.DDLManager }, { user: null, tenantId: site.tenant_id, publicCollections: site.public_collections ?? [] }, raw2);
       out.push({ id: row.id, title: row.title, config: cfg, blocks: sanitizeBlocks(resolved) });
     }
     return out;
@@ -37358,7 +37353,7 @@ function publicPagesRoutes(ctx) {
       sortDir: c.req.query("dir") === "asc" ? "asc" : "desc",
       q: c.req.query("q") || undefined
     };
-    const resolved = await resolveBlockAt({ db, engine }, { user: null, tenantId: site.tenant_id, publicCollections: site.public_collections ?? [] }, block, viewer);
+    const resolved = await resolveBlockAt({ db, engine, ddl: ctx.DDLManager }, { user: null, tenantId: site.tenant_id, publicCollections: site.public_collections ?? [] }, block, viewer);
     const rc = resolved.content ?? {};
     return c.json({
       data: rc._data ?? [],
@@ -37385,7 +37380,7 @@ function publicPagesRoutes(ctx) {
     if (page.record_collection) {
       if (!recordKey)
         return c.json({ error: "Page not found" }, 404);
-      record2 = await resolveRecord({ db, engine }, audience, page.record_collection, page.record_field || "slug", recordKey, page.record_filter);
+      record2 = await resolveRecord({ db, engine, ddl: ctx.DDLManager }, audience, page.record_collection, page.record_field || "slug", recordKey, page.record_filter);
       if (!record2)
         return c.json({ error: "Page not found" }, 404);
       const named = new Set(placeholdersIn(raw2));
@@ -37393,7 +37388,7 @@ function publicPagesRoutes(ctx) {
     } else if (recordKey) {
       return c.json({ error: "Page not found" }, 404);
     }
-    const resolved = await resolveBlocks({ db, engine }, audience, raw2);
+    const resolved = await resolveBlocks({ db, engine, ddl: ctx.DDLManager }, audience, raw2);
     const blocks = sanitizeBlocks(resolved);
     return c.json({
       page: {

@@ -214,14 +214,15 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
         // Not fail-open: `hasRole` falls through to the Casbin lookup when
         // `user.role` is absent, which is why nothing visibly broke. What was
         // lost is the `user.role === 'god'` fast path and any caller reading the
-        // role off the context. Raw SQL is the same deliberate bypass documented
-        // in `auth/saml` — it needs the same grant when the engine closes it.
-        const row = await sql<{ role: string | null }>`
-          SELECT role FROM "user" WHERE id = ${session.user.id} LIMIT 1
-        `
-          .execute(db)
-          .then((r) => r.rows[0]);
-        c.set('user', { ...session.user, role: row?.role ?? (session.user as Any).role });
+        // role off the context.
+        //
+        // Then it became raw SQL on `"user"`, which engine #858 refuses too, so
+        // nothing changed. The role now comes from the engine's own resolver
+        // (`ctx.internals.resolveUserRole`, the same answer its gates use).
+        // It answers 'public' for a user with no role, which the row read as null.
+        const resolved: string = await engine.resolveUserRole({ id: session.user.id });
+        const role = resolved === 'public' ? undefined : resolved;
+        c.set('user', { ...session.user, role: role ?? (session.user as Any).role });
       }
     } catch {
       /* anonymous is a valid state on the render path */
@@ -623,7 +624,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
       q: c.req.query('q') || undefined,
     };
     const resolved = await resolveBlockAt(
-      { db, engine },
+      { db, engine, ddl: ctx.DDLManager },
       {
         user,
         authType: c.get('authType') ?? 'session',
@@ -703,7 +704,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
     if (page.record_collection) {
       if (!recordKey) return c.json({ error: 'Page not found' }, 404);
       record = await resolveRecord(
-        { db, engine },
+        { db, engine, ddl: ctx.DDLManager },
         audience,
         page.record_collection,
         page.record_field || 'slug',
@@ -724,7 +725,7 @@ export function sitesRoutes(ctx: ExtensionContext): Hono {
       const named = new Set(placeholdersIn(raw));
       record = Object.fromEntries(Object.entries(record).filter(([k]) => named.has(k)));
     }
-    const blocks = sanitizeBlocks(await resolveBlocks({ db, engine }, audience, raw));
+    const blocks = sanitizeBlocks(await resolveBlocks({ db, engine, ddl: ctx.DDLManager }, audience, raw));
 
     return c.json({
       site: {
