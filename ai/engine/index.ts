@@ -94,7 +94,7 @@ const extension: ZveltioExtension = {
         recordId: string,
         record: Record<string, any>,
         tenantId: string | null = null,
-      ) => triggerEmbedding(ctx.db, collection, recordId, record, tenantId),
+      ) => triggerEmbedding(ctx.DDLManager, ctx.db, collection, recordId, record, tenantId),
     );
 
     // File text extraction and indexing. Both were `ctx.internals` members, so
@@ -140,7 +140,7 @@ const extension: ZveltioExtension = {
     // own SAVEPOINT, so a throw here cannot poison the caller's transaction.
     const onWrite = async (evt: { collection: string; id: string; record: Record<string, any>; tenantId?: string | null }) => {
       try {
-        await triggerEmbedding(ctx.db, evt.collection, evt.id, evt.record, evt.tenantId ?? null);
+        await triggerEmbedding(ctx.DDLManager, ctx.db, evt.collection, evt.id, evt.record, evt.tenantId ?? null);
       } catch (err) {
         console.warn(
           `[ai] auto-embedding failed for ${evt.collection}/${evt.id}:`,

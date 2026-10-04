@@ -4,7 +4,7 @@
  * Adapted for new monorepo architecture:
  * - `db` injected via constructor (no module-level singleton)
  * - Uses extension-local aiProviderManager from ../ai-provider.js
- * - DDLManager calls replaced with direct DB queries on zvd_collections
+ * - collection metadata read through the host's DDLManager (`this.ddl`)
  * - DDL mutations go through zv_ddl_jobs queue table
  * - Admin check via casbin_rule table
  */
@@ -38,7 +38,8 @@ export class ZveltioAIEngine {
    *
    *   insertInto('zv_ddl_jobs')  -> ExtensionSecurityError: Extension "ai"
    *                                 attempted to access table "zv_ddl_jobs"
-   *   selectFrom('zvd_collections') -> ok    (control)
+   *   selectFrom('zvd_collections') -> ok    (control; engine #870 later
+   *                                 refused this too — see `ddl` below)
    *
    * So two of the fourteen tools the system prompt advertises threw on every
    * call, and the assistant reported the exception text to the user.
@@ -56,6 +57,14 @@ export class ZveltioAIEngine {
    */
   private enqueueDDLJob: (db: any, operation: string, payload: any) => Promise<unknown>;
   private withTenantIsolation: ExtensionContext['internals']['withTenantIsolation'];
+  /**
+   * The collection registry, read through the host. `zvd_collections` is the
+   * engine's metadata, and engine #870 refuses a builder read of it on `ctx.db`:
+   * the collection count, `list_collections`, `get_collection_schema`, the
+   * system stats and the text-to-SQL schema all threw, and the permission scope
+   * for model-written SQL came back empty.
+   */
+  private ddl: ExtensionContext['DDLManager'];
 
   constructor(ctx: ExtensionContext) {
     this.db = ctx.db;
@@ -63,6 +72,7 @@ export class ZveltioAIEngine {
     this.sendNotification = ctx.internals.sendNotification;
     this.enqueueDDLJob = ctx.internals.enqueueDDLJob;
     this.withTenantIsolation = ctx.internals.withTenantIsolation;
+    this.ddl = ctx.DDLManager;
   }
 
   /**
@@ -442,11 +452,7 @@ export class ZveltioAIEngine {
     // Collection count only — AI uses list_collections for details
     let collectionCount = 0;
     try {
-      const result = (await this.db
-        .selectFrom('zvd_collections')
-        .select(this.db.fn.count('name').as('cnt'))
-        .executeTakeFirst()) as any;
-      collectionCount = parseInt(result?.cnt ?? '0');
+      collectionCount = (await this.ddl.getCollections(this.db)).length;
     } catch (err) {
       // Named. This number goes into the system prompt as "The platform has N
       // collections", so a swallowed failure tells the model there are none and
@@ -955,10 +961,7 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
    * resource, which is what migration 034 writes into `zvd_permissions`.
    */
   private async accessibleCollections(userId: string): Promise<Array<{ name: string }>> {
-    const all = await this.db
-      .selectFrom('zvd_collections')
-      .select(['name'])
-      .execute();
+    const all = await this.ddl.getCollections(this.db);
     const out: Array<{ name: string }> = [];
     for (const col of all as Array<{ name: string }>) {
       if (await this.checkPermission(userId, col.name, 'read')) out.push({ name: col.name });
@@ -967,11 +970,9 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
   }
 
   private async toolListCollections() {
-    const collections = await this.db
-      .selectFrom('zvd_collections')
-      .select(['name', 'display_name', 'fields'])
-      .orderBy('display_name', 'asc')
-      .execute();
+    const collections = [...(await this.ddl.getCollections(this.db))].sort((a: any, b: any) =>
+      String(a.display_name ?? '').localeCompare(String(b.display_name ?? '')),
+    );
       // No `.catch(() => [])`. An empty list is the assistant being told this
       // instance has no collections at all, which is what it will then say.
 
@@ -1001,11 +1002,7 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
 
   private async toolGetCollectionSchema(args: any) {
     const { collection } = args;
-    const colDef = await this.db
-      .selectFrom('zvd_collections')
-      .selectAll()
-      .where('name', '=', collection)
-      .executeTakeFirst();
+    const colDef = await this.ddl.getCollection(this.db, collection);
       // No `.catch(() => null)`. It fell into the `if (!colDef) throw` below, so a
       // failed read told the assistant the collection does not exist — and it then
       // offers to create one that is already there.
@@ -1171,15 +1168,10 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
    * with thousands of each. A tool that answers a question it cannot answer is
    * worse than one that declines: nobody re-checks a number.
    *
-   * `zvd_collections` is the extension's to read, so it is still reported.
+   * The collection count comes from the host's registry, so it is still reported.
    */
   private async toolGetSystemStats() {
-    const collections = await this.db
-      .selectFrom('zvd_collections')
-      .select(this.db.fn.count('name').as('count'))
-      .executeTakeFirst();
-
-    const n = Number(collections?.count ?? 0);
+    const n = (await this.ddl.getCollections(this.db)).length;
     return {
       success: true,
       stats: { collections: n },
@@ -1452,12 +1444,8 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
     let schemaContext = '';
     try {
       const names = inScope.slice(0, 10).map((c) => c.name);
-      const collections = await this.dbWork<any[]>(request, () =>
-        (this.db as any)
-          .selectFrom('zvd_collections')
-          .selectAll()
-          .where('name', 'in', names)
-          .execute(),
+      const collections = await this.dbWork<any[]>(request, async () =>
+        (await this.ddl.getCollections(this.db)).filter((c: any) => names.includes(c.name)),
       );
 
       schemaContext = collections

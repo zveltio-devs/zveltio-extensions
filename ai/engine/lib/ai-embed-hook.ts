@@ -11,6 +11,8 @@ import { aiProviderManager } from './ai-provider.js';
 
 // Database type from engine — kept loose since extensions don't import engine internals.
 type Database = any;
+/** The slice of `ctx.DDLManager` this hook reads. */
+type CollectionRegistry = { getCollection(db: Database, name: string): Promise<any> };
 
 const SYSTEM_FIELDS = new Set([
   'id',
@@ -100,6 +102,7 @@ function parseExcludedFields(raw: unknown, collection: string): Set<string> {
  * connection this happens to run on. `null` means "use the session's tenant".
  */
 export async function triggerEmbedding(
+  ddl: CollectionRegistry,
   db: Database,
   collection: string,
   recordId: string,
@@ -112,15 +115,11 @@ export async function triggerEmbedding(
   // "AI Search is off" and returns quietly. Every embedding on the instance would
   // stop for a reason nobody could see. The caller in engine/index.ts logs and
   // drops, which is the right place to decide that.
-  const collMeta = await (db as any)
-    .selectFrom('zvd_collections')
-    .select([
-      'ai_search_enabled',
-      'ai_search_field',
-      'ai_embed_excluded_fields',
-    ])
-    .where('name', '=', collection)
-    .executeTakeFirst();
+  //
+  // Through the host's registry: engine #870 refuses a builder read of
+  // `zvd_collections` on `ctx.db`, so this threw on every write and no record
+  // was embedded.
+  const collMeta = await ddl.getCollection(db, collection);
 
   if (!collMeta?.ai_search_enabled) return;
 
