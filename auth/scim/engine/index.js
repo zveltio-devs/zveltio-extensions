@@ -14,7 +14,7 @@ var __export = (target, all) => {
     });
 };
 
-// ../../../../scim6/zveltio-extensions/auth/scim/engine/index.ts
+// engine/index.ts
 import { join } from "path";
 
 // /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/compose.js
@@ -24527,9 +24527,8 @@ function parseParameter(param) {
   }
   return parseValueExpression(param);
 }
-// ../../../../scim6/zveltio-extensions/auth/scim/engine/routes.ts
-import { randomBytes, randomUUID } from "crypto";
-var DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+// engine/routes.ts
+import { randomBytes } from "crypto";
 var SCIM_USER = "urn:ietf:params:scim:schemas:core:2.0:User";
 var SCIM_LIST = "urn:ietf:params:scim:api:messages:2.0:ListResponse";
 var SCIM_ERROR = "urn:ietf:params:scim:api:messages:2.0:Error";
@@ -24537,7 +24536,6 @@ var SCIM_PATCH = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 function hashToken(internals, raw2) {
   return internals.deriveTokenHash(raw2);
 }
-var MEMBERSHIP_IN_FORCE = sql`(tu.valid_from <= now() AND (tu.valid_to IS NULL OR tu.valid_to > now()))`;
 function scimError(c, status, detail, scimType) {
   return c.json({ schemas: [SCIM_ERROR], status: String(status), scimType, detail }, status);
 }
@@ -24589,36 +24587,73 @@ function scimAdminRoutes(ctx) {
   return app;
 }
 function buildScimApp(ctx) {
-  const { db, auth } = ctx;
+  const { db, internals } = ctx;
   const app = new Hono2().basePath("/scim/v2");
   app.onError((err, c) => {
-    if (err.code === "user_protected")
+    const code = err.code;
+    if (code === "user_protected")
       return scimError(c, 400, err.message);
+    if (err.name === "IdentityRefusedError") {
+      if (code === "no_such_user")
+        return scimError(c, 404, "User not found");
+      if (code === "account_exists" || code === "email_taken") {
+        return scimError(c, 409, err.message, "uniqueness");
+      }
+      if (code === "invalid_input")
+        return scimError(c, 400, err.message, "invalidValue");
+      if (code === "user_not_owned" || code === "role_not_allowed") {
+        return scimError(c, 400, err.message);
+      }
+    }
     console.error(err);
     return c.text("Internal Server Error", 500);
   });
   const tenantOf = (c) => c.get("scimTenantId");
-  async function isMember(userId, tenantId) {
-    if (tenantId === DEFAULT_TENANT_ID) {
-      const t = await sql`
-        SELECT COUNT(*)::int AS n FROM zv_tenants
-      `.execute(db);
-      if ((t.rows[0]?.n ?? 0) <= 1) {
-        const r2 = await sql`
-          SELECT COUNT(*)::int AS n FROM "user" WHERE id = ${userId}
-        `.execute(db);
-        return (r2.rows[0]?.n ?? 0) > 0;
-      }
-    }
-    const r = await sql`
-      SELECT COUNT(*)::int AS n FROM zv_tenant_users
-       WHERE user_id = ${userId} AND tenant_id = ${tenantId}::uuid
-    `.execute(db);
-    return (r.rows[0]?.n ?? 0) > 0;
+  const asTokenTenant = (c, fn) => internals.withTenantIsolation(tenantOf(c), fn);
+  async function memberOf(trx, userId) {
+    return (await internals.listTenantUsers(trx, { userId, limit: 1 }))[0] ?? null;
   }
-  async function instanceIsSingleTenant() {
-    const t = await sql`SELECT COUNT(*)::int AS n FROM zv_tenants`.execute(db);
-    return (t.rows[0]?.n ?? 0) <= 1;
+  async function scimRows(trx, tenantId, userIds) {
+    if (userIds.length === 0)
+      return new Map;
+    const iso = (col) => sql.raw(`to_char(${col} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`);
+    const r = await sql`
+      SELECT user_id, external_id, active,
+             ${iso("suspended_at")} AS suspended_at, ${iso("held_valid_to")} AS held_valid_to
+        FROM zv_scim_users
+       WHERE tenant_id = ${tenantId}::uuid AND user_id IN (${sql.join(userIds)})
+    `.execute(trx);
+    return new Map(r.rows.map((row) => [row.user_id, row]));
+  }
+  const stateOf = (m, row, solo) => ({
+    external_id: row?.external_id ?? null,
+    active: (row?.active ?? true) && (solo || m.membership === null || m.membership.inForce)
+  });
+  async function lapsed(c, m, row) {
+    const ms = m.membership;
+    if (!ms || ms.inForce || await internals.isSingleTenantInstance())
+      return null;
+    const started = Date.parse(ms.validFrom) <= Date.now();
+    if (started && ms.validTo !== null && ms.validTo === row?.suspended_at)
+      return null;
+    return scimError(c, 403, "The user's membership in this tenant is not in force (expired or not yet started): " + "it can be read or deprovisioned, not modified.");
+  }
+  async function updateProfile(trx, m, patch) {
+    const change = {};
+    if (patch.name !== undefined && patch.name !== m.name)
+      change.name = patch.name;
+    if (patch.email !== undefined && patch.email.trim().toLowerCase() !== m.email.toLowerCase()) {
+      change.email = patch.email;
+    }
+    if (change.name === undefined && change.email === undefined)
+      return;
+    try {
+      await internals.updateUserProfile(trx, m.id, change);
+    } catch (err) {
+      if (err.code !== "user_not_owned")
+        throw err;
+      console.warn(`[scim] profile of ${m.id} left unchanged: ${err.message}`);
+    }
   }
   app.use("*", async (c, next) => {
     const header = c.req.header("authorization") ?? "";
@@ -24627,7 +24662,7 @@ function buildScimApp(ctx) {
       return scimError(c, 401, "Bearer token required");
     let hash2;
     try {
-      hash2 = await hashToken(ctx.internals, raw2);
+      hash2 = await hashToken(internals, raw2);
     } catch {
       return scimError(c, 500, "SCIM is not configured on this server");
     }
@@ -24655,64 +24690,17 @@ function buildScimApp(ctx) {
       { type: "oauthbearertoken", name: "Bearer token", description: "Long-lived bearer token configured in Zveltio Studio" }
     ]
   }));
-  async function stateOf(userId, tenantId, soloInstance) {
-    const r = await sql`
-      SELECT s.external_id, s.active,
-             (${soloInstance} OR EXISTS (
-               SELECT 1 FROM zv_tenant_users tu
-                WHERE tu.user_id = ${userId} AND tu.tenant_id = ${tenantId}::uuid
-                  AND ${MEMBERSHIP_IN_FORCE})) AS in_force
-        FROM (SELECT 1) AS one
-        LEFT JOIN zv_scim_users s ON s.user_id = ${userId} AND s.tenant_id = ${tenantId}::uuid
-    `.execute(db);
-    const row = r.rows[0];
-    return { external_id: row?.external_id ?? null, active: (row?.active ?? true) && row?.in_force === true };
-  }
-  async function refuseIfLapsed(c, userId, tenantId) {
-    if (await instanceIsSingleTenant())
-      return null;
-    const r = await sql`
-      SELECT EXISTS (
-        SELECT 1 FROM zv_tenant_users tu
-          LEFT JOIN zv_scim_users s ON s.tenant_id = tu.tenant_id AND s.user_id = tu.user_id
-         WHERE tu.user_id = ${userId} AND tu.tenant_id = ${tenantId}::uuid
-           AND (${MEMBERSHIP_IN_FORCE}
-                OR (tu.valid_from <= now() AND tu.valid_to = s.suspended_at))) AS in_force
-    `.execute(db);
-    if (r.rows[0]?.in_force === true)
-      return null;
-    return scimError(c, 403, "The user's membership in this tenant is not in force (expired or not yet started): " + "it can be read or deprovisioned, not modified.");
-  }
   app.get("/Users", async (c) => {
-    const tenantId = tenantOf(c);
-    const soloInstance = await instanceIsSingleTenant();
     const filter = c.req.query("filter") ?? "";
     const startIndex = Math.max(1, parseInt(c.req.query("startIndex") ?? "1", 10) || 1);
     const count = Math.min(200, Math.max(0, parseInt(c.req.query("count") ?? "100", 10) || 100));
     const m = filter.match(/userName\s+eq\s+"([^"]+)"/i);
-    let rows;
-    if (m) {
-      const r = await sql`
-        SELECT u.id, u.email, u.name, u."createdAt", u."updatedAt"
-          FROM "user" u
-         WHERE lower(u.email) = ${m[1].toLowerCase()}
-           AND (${soloInstance} OR EXISTS (
-                 SELECT 1 FROM zv_tenant_users tu
-                  WHERE tu.user_id = u.id AND tu.tenant_id = ${tenantId}::uuid))
-      `.execute(db);
-      rows = r.rows;
-    } else {
-      const r = await sql`
-        SELECT u.id, u.email, u.name, u."createdAt", u."updatedAt"
-          FROM "user" u
-         WHERE (${soloInstance} OR EXISTS (
-                 SELECT 1 FROM zv_tenant_users tu
-                  WHERE tu.user_id = u.id AND tu.tenant_id = ${tenantId}::uuid))
-         ORDER BY u."createdAt" LIMIT ${count} OFFSET ${startIndex - 1}
-      `.execute(db);
-      rows = r.rows;
-    }
-    const resources = await Promise.all(rows.map(async (u) => toScimUser(u, await stateOf(u.id, tenantId, soloInstance))));
+    const resources = await asTokenTenant(c, async (trx) => {
+      const users = m ? await internals.listTenantUsers(trx, { email: m[1] }) : await internals.listTenantUsers(trx, { limit: count, offset: startIndex - 1 });
+      const rows = await scimRows(trx, tenantOf(c), users.map((u) => u.id));
+      const solo = await internals.isSingleTenantInstance();
+      return users.map((u) => toScimUser(u, stateOf(u, rows.get(u.id), solo)));
+    });
     return c.json({
       schemas: [SCIM_LIST],
       totalResults: resources.length,
@@ -24722,20 +24710,14 @@ function buildScimApp(ctx) {
     });
   });
   app.get("/Users/:id", async (c) => {
-    const tenantId = tenantOf(c);
-    const soloInstance = await instanceIsSingleTenant();
     const id = c.req.param("id");
-    const r = await sql`
-      SELECT u.id, u.email, u.name, u."createdAt", u."updatedAt"
-        FROM "user" u
-       WHERE u.id = ${id}
-         AND (${soloInstance} OR EXISTS (
-               SELECT 1 FROM zv_tenant_users tu
-                WHERE tu.user_id = u.id AND tu.tenant_id = ${tenantId}::uuid))
-    `.execute(db);
-    if (r.rows.length === 0)
-      return scimError(c, 404, "User not found");
-    return c.json(toScimUser(r.rows[0], await stateOf(id, tenantId, soloInstance)));
+    const user = await asTokenTenant(c, async (trx) => {
+      const m = await memberOf(trx, id);
+      if (!m)
+        return null;
+      return toScimUser(m, stateOf(m, (await scimRows(trx, tenantOf(c), [id])).get(id), await internals.isSingleTenantInstance()));
+    });
+    return user ? c.json(user) : scimError(c, 404, "User not found");
   });
   app.post("/Users", async (c) => {
     const body = await c.req.json().catch(() => null);
@@ -24743,42 +24725,30 @@ function buildScimApp(ctx) {
     if (!email3)
       return scimError(c, 400, "userName (email) is required");
     const name = body?.name?.formatted ?? body?.displayName ?? email3;
-    const tenantId = tenantOf(c);
-    const existing = await sql`
-      SELECT id FROM "user" WHERE lower(email) = ${email3.toLowerCase()}
-    `.execute(db);
-    if (existing.rows.length > 0) {
-      return scimError(c, 409, "A user with this userName already exists on this instance. An existing account is added " + "to a tenant by that tenant's administrator (invitation), not by provisioning.", "uniqueness");
-    }
-    let userId;
-    try {
-      const res = await auth.api.signUpEmail({
-        body: { email: email3, name, password: `Scim!${randomUUID()}` }
-      });
-      userId = res?.user?.id;
-    } catch (e) {
-      return scimError(c, 500, `signup failed: ${e instanceof Error ? e.message : String(e)}`);
-    }
-    if (!userId)
-      return scimError(c, 500, "signup did not return a user");
     const active = body?.active !== false;
-    await db.transaction().execute(async (trx) => {
-      await sql`
-        INSERT INTO zv_tenant_users (tenant_id, user_id, role)
-        VALUES (${tenantId}::uuid, ${userId}, 'member')
-        ON CONFLICT (tenant_id, user_id) DO NOTHING
-      `.execute(trx);
+    const tenantId = tenantOf(c);
+    const created = await asTokenTenant(c, async (trx) => {
+      const found = await internals.provisionUser({ email: email3, name }).catch((err) => {
+        if (err.code === "account_exists")
+          return null;
+        throw err;
+      });
+      if (!found?.created)
+        return null;
+      const { user } = found;
+      await internals.addTenantMember(trx, user.id, "member");
       await sql`
         INSERT INTO zv_scim_users (tenant_id, user_id, external_id, active)
-        VALUES (${tenantId}::uuid, ${userId}, ${body?.externalId ?? null}, ${active})
+        VALUES (${tenantId}::uuid, ${user.id}, ${body?.externalId ?? null}, ${active})
         ON CONFLICT (tenant_id, user_id) DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active, updated_at = NOW()
       `.execute(trx);
-      await setActive(trx, userId, tenantId, active);
+      await setActive(trx, user.id, tenantId, active);
+      return user;
     });
-    const row = await sql`
-      SELECT id, email, name, "createdAt", "updatedAt" FROM "user" WHERE id = ${userId}
-    `.execute(db);
-    return c.json(toScimUser(row.rows[0], { external_id: body?.externalId ?? null, active }), 201);
+    if (!created) {
+      return scimError(c, 409, "A user with this userName already exists on this instance. An existing account is added " + "to a tenant by that tenant's administrator (invitation), not by provisioning.", "uniqueness");
+    }
+    return c.json(toScimUser(created, { external_id: body?.externalId ?? null, active }), 201);
   });
   async function setActive(trx, userId, tenantId, active) {
     await sql`
@@ -24786,73 +24756,62 @@ function buildScimApp(ctx) {
       VALUES (${tenantId}::uuid, ${userId}, ${active})
       ON CONFLICT (tenant_id, user_id) DO UPDATE SET active = EXCLUDED.active, updated_at = NOW()
     `.execute(trx);
-    if (await instanceIsSingleTenant()) {
+    if (await internals.isSingleTenantInstance()) {
       if (active)
-        await ctx.internals.liftOwnBan(trx, userId);
+        await internals.liftOwnBan(trx, userId);
       else
-        await ctx.internals.setUserActive(trx, userId, false);
+        await internals.setUserActive(trx, userId, false);
       return;
     }
+    const row = (await scimRows(trx, tenantId, [userId])).get(userId);
     if (active) {
+      let inForceAnywhere = (await memberOf(trx, userId))?.membership?.inForce === true;
+      if (row?.suspended_at) {
+        const back = await internals.setTenantMembershipEnd(trx, userId, row.held_valid_to, {
+          ifValidTo: row.suspended_at
+        });
+        await sql`
+          UPDATE zv_scim_users SET suspended_at = NULL, held_valid_to = NULL
+           WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId}
+        `.execute(trx);
+        inForceAnywhere = back?.inForceAnywhere ?? inForceAnywhere;
+      }
+      if (inForceAnywhere)
+        await internals.liftOwnBan(trx, userId);
+      return;
+    }
+    const ended = await internals.setTenantMembershipEnd(trx, userId, "now", { ifInForce: true });
+    if (ended?.changed) {
       await sql`
-        UPDATE zv_tenant_users tu SET valid_to = s.held_valid_to
-          FROM zv_scim_users s
-         WHERE tu.tenant_id = ${tenantId}::uuid AND tu.user_id = ${userId}
-           AND s.tenant_id = tu.tenant_id AND s.user_id = tu.user_id
-           AND tu.valid_to = s.suspended_at
-      `.execute(trx);
-      await sql`
-        UPDATE zv_scim_users SET suspended_at = NULL, held_valid_to = NULL
+        UPDATE zv_scim_users SET suspended_at = ${ended.validTo}::timestamptz,
+                                 held_valid_to = ${ended.previousValidTo}::timestamptz
          WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId}
       `.execute(trx);
-      if (await inForceAnywhere(trx, userId) > 0)
-        await ctx.internals.liftOwnBan(trx, userId);
-      return;
     }
-    await sql`
-      WITH held AS (
-        SELECT tu.valid_to FROM zv_tenant_users tu
-         WHERE tu.tenant_id = ${tenantId}::uuid AND tu.user_id = ${userId} AND ${MEMBERSHIP_IN_FORCE}
-           FOR UPDATE
-      ), ended AS (
-        UPDATE zv_tenant_users SET valid_to = now()
-         WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId} AND EXISTS (SELECT 1 FROM held)
-      )
-      UPDATE zv_scim_users SET suspended_at = now(), held_valid_to = (SELECT valid_to FROM held)
-       WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId} AND EXISTS (SELECT 1 FROM held)
-    `.execute(trx);
-    if (await inForceAnywhere(trx, userId) > 0)
+    if (ended?.inForceAnywhere)
       return;
-    await ctx.internals.setUserActive(trx, userId, false);
-  }
-  async function inForceAnywhere(trx, userId) {
-    const r = await sql`
-      SELECT COUNT(*)::int AS n FROM zv_tenant_users tu
-       WHERE tu.user_id = ${userId} AND ${MEMBERSHIP_IN_FORCE}
-    `.execute(trx);
-    return r.rows[0]?.n ?? 0;
+    await internals.setUserActive(trx, userId, false);
   }
   app.put("/Users/:id", async (c) => {
     const id = c.req.param("id");
     const tenantId = tenantOf(c);
-    if (!await isMember(id, tenantId))
-      return scimError(c, 404, "User not found");
-    const lapsed = await refuseIfLapsed(c, id, tenantId);
-    if (lapsed)
-      return lapsed;
     const body = await c.req.json().catch(() => null);
-    if (!body || body.schemas && !body.schemas.includes(SCIM_USER)) {
-      return scimError(c, 400, "Expected a SCIM User payload");
-    }
-    const email3 = body?.userName ?? body?.emails?.[0]?.value;
-    if (!email3)
-      return scimError(c, 400, "userName (email) is required");
-    const name = body?.name?.formatted ?? body?.displayName ?? email3;
-    const active = body?.active !== false;
-    await db.transaction().execute(async (trx) => {
-      await sql`
-        UPDATE "user" SET name = ${name}, email = ${email3}, "updatedAt" = NOW() WHERE id = ${id}
-      `.execute(trx);
+    return asTokenTenant(c, async (trx) => {
+      const m = await memberOf(trx, id);
+      if (!m)
+        return scimError(c, 404, "User not found");
+      const refused = await lapsed(c, m, (await scimRows(trx, tenantId, [id])).get(id));
+      if (refused)
+        return refused;
+      if (!body || body.schemas && !body.schemas.includes(SCIM_USER)) {
+        return scimError(c, 400, "Expected a SCIM User payload");
+      }
+      const email3 = body?.userName ?? body?.emails?.[0]?.value;
+      if (!email3)
+        return scimError(c, 400, "userName (email) is required");
+      const name = body?.name?.formatted ?? body?.displayName ?? email3;
+      const active = body?.active !== false;
+      await updateProfile(trx, m, { name, email: email3 });
       await sql`
         INSERT INTO zv_scim_users (tenant_id, user_id, external_id, active)
         VALUES (${tenantId}::uuid, ${id}, ${body?.externalId ?? null}, ${active})
@@ -24860,81 +24819,79 @@ function buildScimApp(ctx) {
         DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active
       `.execute(trx);
       await setActive(trx, id, tenantId, active);
+      const after = await memberOf(trx, id);
+      const solo = await internals.isSingleTenantInstance();
+      return c.json(toScimUser(after, stateOf(after, (await scimRows(trx, tenantId, [id])).get(id), solo)));
     });
-    const row = await sql`SELECT id, name, email, "createdAt" FROM "user" WHERE id = ${id}`.execute(db);
-    if (!row.rows[0])
-      return scimError(c, 404, "User not found");
-    return c.json(toScimUser(row.rows[0], await stateOf(id, tenantId, await instanceIsSingleTenant())));
   });
   app.patch("/Users/:id", async (c) => {
     const id = c.req.param("id");
     const tenantId = tenantOf(c);
-    if (!await isMember(id, tenantId))
-      return scimError(c, 404, "User not found");
-    const lapsed = await refuseIfLapsed(c, id, tenantId);
-    if (lapsed)
-      return lapsed;
     const body = await c.req.json().catch(() => null);
-    if (!body?.schemas?.includes(SCIM_PATCH) || !Array.isArray(body.Operations)) {
-      return scimError(c, 400, "Expected a SCIM PatchOp payload");
-    }
-    await db.transaction().execute(async (trx) => {
+    return asTokenTenant(c, async (trx) => {
+      const m = await memberOf(trx, id);
+      if (!m)
+        return scimError(c, 404, "User not found");
+      const refused = await lapsed(c, m, (await scimRows(trx, tenantId, [id])).get(id));
+      if (refused)
+        return refused;
+      if (!body?.schemas?.includes(SCIM_PATCH) || !Array.isArray(body.Operations)) {
+        return scimError(c, 400, "Expected a SCIM PatchOp payload");
+      }
+      const truthy = (v) => v === true || v === "True" || v === "true";
+      let current = m;
+      const rename = async (value) => {
+        await updateProfile(trx, current, { name: String(value) });
+        current = await memberOf(trx, id);
+      };
       for (const op of body.Operations) {
         const kind = String(op.op ?? "").toLowerCase();
         if (kind !== "replace" && kind !== "add")
           continue;
         const path = String(op.path ?? "").toLowerCase();
         if (path === "active") {
-          await setActive(trx, id, tenantId, op.value === true || op.value === "True" || op.value === "true");
+          await setActive(trx, id, tenantId, truthy(op.value));
         } else if (path === "displayname" || path === "name.formatted") {
-          await sql`UPDATE "user" SET name = ${String(op.value)}, "updatedAt" = NOW() WHERE id = ${id}`.execute(trx);
+          await rename(op.value);
         } else if (!path && op.value && typeof op.value === "object") {
-          if ("active" in op.value) {
-            await setActive(trx, id, tenantId, op.value.active === true || op.value.active === "True" || op.value.active === "true");
-          }
-          if (typeof op.value.displayName === "string") {
-            await sql`UPDATE "user" SET name = ${op.value.displayName}, "updatedAt" = NOW() WHERE id = ${id}`.execute(trx);
-          }
+          if ("active" in op.value)
+            await setActive(trx, id, tenantId, truthy(op.value.active));
+          if (typeof op.value.displayName === "string")
+            await rename(op.value.displayName);
         }
       }
+      const after = await memberOf(trx, id);
+      const solo = await internals.isSingleTenantInstance();
+      return c.json(toScimUser(after, stateOf(after, (await scimRows(trx, tenantId, [id])).get(id), solo)));
     });
-    const row = await sql`
-      SELECT id, email, name, "createdAt", "updatedAt" FROM "user" WHERE id = ${id}
-    `.execute(db);
-    return c.json(toScimUser(row.rows[0], await stateOf(id, tenantId, await instanceIsSingleTenant())));
   });
   app.delete("/Users/:id", async (c) => {
     const id = c.req.param("id");
     const tenantId = tenantOf(c);
-    if (!await isMember(id, tenantId))
-      return scimError(c, 404, "User not found");
-    await db.transaction().execute(async (trx) => {
-      await sql`
-        DELETE FROM zv_tenant_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
-      `.execute(trx);
+    return asTokenTenant(c, async (trx) => {
+      if (!await memberOf(trx, id))
+        return scimError(c, 404, "User not found");
+      const gone = await internals.removeTenantMember(trx, id);
       await sql`
         DELETE FROM zv_scim_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
       `.execute(trx);
-      const remaining = await sql`
-        SELECT COUNT(*)::int AS n FROM zv_tenant_users WHERE user_id = ${id}
-      `.execute(trx);
-      if ((remaining.rows[0]?.n ?? 0) === 0) {
-        await ctx.internals.deleteUser(trx, id, {
+      if (gone.orphaned) {
+        await internals.deleteUser(trx, id, {
           actor: `scim:${c.get("scimTokenId")}`,
           reason: "scim.deprovision",
           metadata: { tenant_id: tenantId }
         });
-      } else if (await inForceAnywhere(trx, id) === 0) {
-        await ctx.internals.revokeUserSessions(id);
+      } else if (!gone.inForceAnywhere) {
+        await internals.revokeUserSessions(id);
       }
+      return c.body(null, 204);
     });
-    return c.body(null, 204);
   });
   app.get("/Groups", (c) => c.json({ schemas: [SCIM_LIST], totalResults: 0, startIndex: 1, itemsPerPage: 0, Resources: [] }));
   return app;
 }
 
-// ../../../../scim6/zveltio-extensions/auth/scim/engine/index.ts
+// engine/index.ts
 var extension = {
   name: "auth/scim",
   category: "auth",

@@ -18,20 +18,15 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import { randomBytes, randomUUID } from 'crypto';
+import { randomBytes } from 'crypto';
 import type { ExtensionContext, ExtensionInternals } from '@zveltio/sdk/extension';
 
 // biome-ignore lint/suspicious/noExplicitAny: dual-kysely brand guard (see analytics/quality)
 type Db = any;
 // biome-ignore lint/suspicious/noExplicitAny: Hono context
 type Ctx = any;
-
-/**
- * The implicit tenant every single-tenant install runs as. Mirrors
- * `DEFAULT_TENANT_ID` in the engine — see `middleware/tenant-membership.ts`,
- * which also treats it as "everyone is a member".
- */
-const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
+/** A user as the engine's `listTenantUsers` returns it. */
+type IdentityMember = Awaited<ReturnType<ExtensionInternals['listTenantUsers']>>[number];
 
 const SCIM_USER = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const SCIM_LIST = 'urn:ietf:params:scim:api:messages:2.0:ListResponse';
@@ -46,13 +41,6 @@ const SCIM_PATCH = 'urn:ietf:params:scim:api:messages:2.0:PatchOp';
 function hashToken(internals: ExtensionInternals, raw: string): Promise<string> {
   return internals.deriveTokenHash(raw);
 }
-
-/**
- * A membership in force — the engine's `activeMembership()` in
- * lib/tenancy/tenant-scope.ts, inlined because an extension cannot import it.
- * Keep the two identical. `tu` is the alias of `zv_tenant_users`.
- */
-const MEMBERSHIP_IN_FORCE = sql`(tu.valid_from <= now() AND (tu.valid_to IS NULL OR tu.valid_to > now()))`;
 
 function scimError(c: Ctx, status: number, detail: string, scimType?: string) {
   return c.json({ schemas: [SCIM_ERROR], status: String(status), scimType, detail }, status);
@@ -115,15 +103,29 @@ export function scimAdminRoutes(ctx: ExtensionContext): Hono {
 
 /** The public SCIM 2.0 app, served at /scim/v2/* via registerPublicRoute. */
 export function buildScimApp(ctx: ExtensionContext): Hono {
-  const { db, auth } = ctx;
+  const { db, internals } = ctx;
   const app = new Hono().basePath('/scim/v2');
 
-  // The host refuses to deactivate or delete the instance owner (god) — an IdP
-  // sync must not be able to lock the instance out. Said to the IdP as a 400
-  // naming the reason, not a bare 500 it would retry forever. Anything else
-  // keeps Hono's default answer.
+  // Refusals the IdP can act on, said as SCIM errors rather than a bare 500 it
+  // would retry forever:
+  //   - the host refuses to deactivate or delete the instance owner (god), so an
+  //     IdP sync cannot lock the instance out (`user_protected`);
+  //   - the engine's identity rules (`IdentityRefusedError`) refuse an account
+  //     this tenant does not alone hold, an administrator, an address another
+  //     account has.
   app.onError((err, c) => {
-    if ((err as { code?: string }).code === 'user_protected') return scimError(c, 400, err.message);
+    const code = (err as { code?: string }).code;
+    if (code === 'user_protected') return scimError(c, 400, err.message);
+    if (err.name === 'IdentityRefusedError') {
+      if (code === 'no_such_user') return scimError(c, 404, 'User not found');
+      if (code === 'account_exists' || code === 'email_taken') {
+        return scimError(c, 409, err.message, 'uniqueness');
+      }
+      if (code === 'invalid_input') return scimError(c, 400, err.message, 'invalidValue');
+      if (code === 'user_not_owned' || code === 'role_not_allowed') {
+        return scimError(c, 400, err.message);
+      }
+    }
     console.error(err);
     return c.text('Internal Server Error', 500);
   });
@@ -139,72 +141,119 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
   const tenantOf = (c: Ctx): string => c.get('scimTenantId') as string;
 
   /**
-   * Is this user a member of the token's tenant?
+   * Run `fn` as the token's tenant, in one transaction.
    *
-   * SCIM used to operate directly on the global `"user"` table, so a token
-   * issued by one tenant could list, rename, deactivate and DELETE every user
-   * on the instance. Membership is what makes a user visible to an IdP, so it
-   * is the condition every route asks.
-   *
-   * Any row, in force or not: a lapsed member is still this tenant's resource
-   * and the IdP must be able to read and deprovision it. `stateOf` reports it;
-   * `refuseIfLapsed` keeps PUT and PATCH away from it.
+   * Users, memberships and the instance's tenants are the engine's: since engine
+   * #858 `ctx.db` refuses `"user"`, `zv_tenant_users` and `zv_tenants`, and the
+   * raw SQL that stood here answered 500 on every provisioning call. The
+   * engine's identity helpers (`identity:provision`) act for the tenant the
+   * work RUNS as, so the work runs as the token's (`tenant:enter`: this route is
+   * public and the request may name no tenant, or another). Membership is what
+   * makes a user visible to an IdP; `listTenantUsers` answers it, and on a
+   * single-tenant instance every user is the one tenant's.
    */
-  async function isMember(userId: string, tenantId: string): Promise<boolean> {
-    // Single-tenant installs have no membership rows at all — the engine's own
-    // membership middleware no-ops for the default tenant for exactly this
-    // reason. Requiring a row here would make SCIM list nothing and refuse every
-    // operation on the most common deployment, which is a worse bug than the one
-    // being fixed.
-    //
-    // But the question is whether the INSTANCE is single-tenant, not which
-    // tenant the token belongs to. The default tenant exists on a multi-tenant
-    // install too, so keying off it alone turned any token issued there into an
-    // instance-wide credential. An audit combined that with a separate defect
-    // that deposited every extension row in the default tenant, listed every
-    // user on the instance with a token issued for an ordinary tenant, and
-    // deleted the administrator account.
-    //
-    // The other defect is fixed (see the engine's `runWithTenantTrx`), which
-    // alone would close that path. This closes it a second way, because a rule
-    // that is only safe while another rule holds is not a rule.
-    if (tenantId === DEFAULT_TENANT_ID) {
-      const t = await sql<{ n: number }>`
-        SELECT COUNT(*)::int AS n FROM zv_tenants
-      `.execute(db);
-      if ((t.rows[0]?.n ?? 0) <= 1) {
-        const r = await sql<{ n: number }>`
-          SELECT COUNT(*)::int AS n FROM "user" WHERE id = ${userId}
-        `.execute(db);
-        return (r.rows[0]?.n ?? 0) > 0;
-      }
-      // Multi-tenant: the default tenant is a tenant like any other, and
-      // membership is what the IdP is allowed to see.
-    }
-    const r = await sql<{ n: number }>`
-      SELECT COUNT(*)::int AS n FROM zv_tenant_users
-       WHERE user_id = ${userId} AND tenant_id = ${tenantId}::uuid
-    `.execute(db);
-    return (r.rows[0]?.n ?? 0) > 0;
+  const asTokenTenant = <T>(c: Ctx, fn: (trx: Db) => Promise<T>): Promise<T> =>
+    internals.withTenantIsolation(tenantOf(c), fn);
+
+  /** The token tenant's view of a user — lapsed members included — or null. */
+  async function memberOf(trx: Db, userId: string): Promise<IdentityMember | null> {
+    return (await internals.listTenantUsers(trx, { userId, limit: 1 }))[0] ?? null;
   }
 
+  type ScimRow = {
+    user_id: string;
+    external_id: string | null;
+    active: boolean | null;
+    suspended_at: string | null;
+    held_valid_to: string | null;
+  };
 
   /**
-   * Is this a single-tenant instance?
-   *
-   * `isMember` asks this before it lets a default-tenant token stand in for
-   * membership, and its comment says exactly why: the default tenant exists on a
-   * multi-tenant install too, so keying off it alone turns any token issued
-   * there into an instance-wide credential.
-   *
-   * The three read paths did not call `isMember` — they inlined
-   * `tenantId = DEFAULT_TENANT_ID OR EXISTS(membership)`, which is that
-   * forbidden shortcut, in the module that documents why it is forbidden. This
-   * gives them the same question in a form a set query can use.
+   * This tenant's SCIM records for `userIds`. Instants in the engine's spelling
+   * (`IdentityMember`), so a suspension compares equal to the membership end it
+   * wrote.
    */
-  async function instanceIsSingleTenant(): Promise<boolean> {
-    const t = await sql<{ n: number }>`SELECT COUNT(*)::int AS n FROM zv_tenants`.execute(db);
-    return (t.rows[0]?.n ?? 0) <= 1;
+  async function scimRows(trx: Db, tenantId: string, userIds: string[]): Promise<Map<string, ScimRow>> {
+    if (userIds.length === 0) return new Map();
+    const iso = (col: string) =>
+      sql.raw(`to_char(${col} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`);
+    const r = await sql<ScimRow>`
+      SELECT user_id, external_id, active,
+             ${iso('suspended_at')} AS suspended_at, ${iso('held_valid_to')} AS held_valid_to
+        FROM zv_scim_users
+       WHERE tenant_id = ${tenantId}::uuid AND user_id IN (${sql.join(userIds)})
+    `.execute(trx);
+    return new Map(r.rows.map((row) => [row.user_id, row]));
+  }
+
+  /**
+   * What the IdP is told about a user. `active` is the flag the IdP last wrote
+   * AND a membership in force: an expired or not-yet-started member cannot use
+   * this tenant, and RFC 7643 §4.1.1 leaves `active`'s meaning to us. Reported,
+   * not hidden — a hidden member makes the IdP's `userName eq` probe come back
+   * empty, and its re-POST answers 409 for somebody it cannot find. A
+   * single-tenant instance has no membership to lapse.
+   */
+  const stateOf = (m: IdentityMember, row: ScimRow | undefined, solo: boolean) => ({
+    external_id: row?.external_id ?? null,
+    active: (row?.active ?? true) && (solo || m.membership === null || m.membership.inForce),
+  });
+
+  /**
+   * PUT and PATCH answer 403 for a member whose membership here is not in force.
+   *
+   * A lapsed tenant has no claim on the account: the business ended the
+   * membership with a date (a contract end), and that date wins over the IdP.
+   * The exception is the IdP's own suspension (`setActive`): a `valid_to` still
+   * equal to the `suspended_at` it wrote is the IdP's to lift.
+   * One rule, two consequences:
+   *   • `active: true` does not reopen the membership — there is no reopen path,
+   *     and `stateOf` keeps reporting `active: false` while it is lapsed;
+   *   • `active: false` and profile writes are refused too. Sign-in is
+   *     instance-wide, so a lapsed tenant's IdP could otherwise block — or
+   *     rename — somebody who now works only for another tenant.
+   * Reading (GET) and deprovisioning (DELETE) stay open: the IdP must still see
+   * the user and be able to remove them from this tenant. POST of any existing
+   * account answers 409 and reopens nothing — nor does DELETE then POST.
+   *
+   * A single-tenant instance has no membership to lapse.
+   */
+  async function lapsed(c: Ctx, m: IdentityMember, row: ScimRow | undefined): Promise<Response | null> {
+    const ms = m.membership;
+    if (!ms || ms.inForce || (await internals.isSingleTenantInstance())) return null;
+    const started = Date.parse(ms.validFrom) <= Date.now();
+    if (started && ms.validTo !== null && ms.validTo === row?.suspended_at) return null;
+    return scimError(
+      c,
+      403,
+      "The user's membership in this tenant is not in force (expired or not yet started): " +
+        'it can be read or deprovisioned, not modified.',
+    );
+  }
+
+  /** Rename / re-address only when the IdP's value differs: an unchanged push writes nothing. */
+  async function updateProfile(
+    trx: Db,
+    m: IdentityMember,
+    patch: { name?: string; email?: string },
+  ): Promise<void> {
+    const change: { name?: string; email?: string } = {};
+    if (patch.name !== undefined && patch.name !== m.name) change.name = patch.name;
+    if (patch.email !== undefined && patch.email.trim().toLowerCase() !== m.email.toLowerCase()) {
+      change.email = patch.email;
+    }
+    if (change.name === undefined && change.email === undefined) return;
+    try {
+      await internals.updateUserProfile(trx, m.id, change);
+    } catch (err) {
+      // An account this tenant does not ALONE hold — a member of another tenant,
+      // an instance admin, god — is not this IdP's to rename or re-address: its
+      // password reset would follow the address. The rest of the request (the
+      // `active` flag above all) still applies; the answer shows the profile as
+      // it stands.
+      if ((err as { code?: string }).code !== 'user_not_owned') throw err;
+      console.warn(`[scim] profile of ${m.id} left unchanged: ${(err as Error).message}`);
+    }
   }
 
   // Bearer-token gate for every SCIM call.
@@ -214,7 +263,7 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     if (!raw) return scimError(c, 401, 'Bearer token required');
     let hash: string;
     try {
-      hash = await hashToken(ctx.internals, raw);
+      hash = await hashToken(internals, raw);
     } catch {
       return scimError(c, 500, 'SCIM is not configured on this server');
     }
@@ -250,111 +299,22 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     }),
   );
 
-  /**
-   * What the IdP is told about a user. `active` is the flag the IdP last wrote
-   * AND a membership in force: an expired or not-yet-started member cannot use
-   * this tenant, and RFC 7643 §4.1.1 leaves `active`'s meaning to us. Reported,
-   * not hidden — a hidden member makes the IdP's `userName eq` probe come back
-   * empty, and its re-POST answers 409 for somebody it cannot find.
-   */
-  async function stateOf(
-    userId: string,
-    tenantId: string,
-    soloInstance: boolean,
-  ): Promise<{ external_id: string | null; active: boolean }> {
-    const r = await sql<{ external_id: string | null; active: boolean | null; in_force: boolean }>`
-      SELECT s.external_id, s.active,
-             (${soloInstance} OR EXISTS (
-               SELECT 1 FROM zv_tenant_users tu
-                WHERE tu.user_id = ${userId} AND tu.tenant_id = ${tenantId}::uuid
-                  AND ${MEMBERSHIP_IN_FORCE})) AS in_force
-        FROM (SELECT 1) AS one
-        LEFT JOIN zv_scim_users s ON s.user_id = ${userId} AND s.tenant_id = ${tenantId}::uuid
-    `.execute(db);
-    const row = r.rows[0];
-    return { external_id: row?.external_id ?? null, active: (row?.active ?? true) && row?.in_force === true };
-  }
-
-  /**
-   * PUT and PATCH answer 403 for a member whose membership here is not in force.
-   *
-   * A lapsed tenant has no claim on the account: the business ended the
-   * membership with a date (a contract end), and that date wins over the IdP.
-   * The exception is the IdP's own suspension (`setActive`): a `valid_to` still
-   * equal to the `suspended_at` it wrote is the IdP's to lift.
-   * One rule, two consequences:
-   *   • `active: true` does not reopen the membership — there is no reopen path,
-   *     and `stateOf` keeps reporting `active: false` while it is lapsed;
-   *   • `active: false` and profile writes are refused too. Sign-in is
-   *     instance-wide, so a lapsed tenant's IdP could otherwise block — or
-   *     rename — somebody who now works only for another tenant.
-   * Reading (GET) and deprovisioning (DELETE) stay open: the IdP must still see
-   * the user and be able to remove them from this tenant. POST of any existing
-   * account answers 409 and reopens nothing — nor does DELETE then POST.
-   *
-   * A single-tenant instance has no membership to lapse — in force by
-   * definition, as in `stateOf`.
-   *
-   * ponytail: checked before the write transaction, not under a row lock; a
-   * revocation committed between the two lands one request late.
-   */
-  async function refuseIfLapsed(c: Ctx, userId: string, tenantId: string): Promise<Response | null> {
-    if (await instanceIsSingleTenant()) return null;
-    const r = await sql<{ in_force: boolean }>`
-      SELECT EXISTS (
-        SELECT 1 FROM zv_tenant_users tu
-          LEFT JOIN zv_scim_users s ON s.tenant_id = tu.tenant_id AND s.user_id = tu.user_id
-         WHERE tu.user_id = ${userId} AND tu.tenant_id = ${tenantId}::uuid
-           AND (${MEMBERSHIP_IN_FORCE}
-                OR (tu.valid_from <= now() AND tu.valid_to = s.suspended_at))) AS in_force
-    `.execute(db);
-    if (r.rows[0]?.in_force === true) return null;
-    return scimError(
-      c,
-      403,
-      "The user's membership in this tenant is not in force (expired or not yet started): " +
-        'it can be read or deprovisioned, not modified.',
-    );
-  }
-
   // GET /Users — list; supports the `userName eq "email"` probe every IdP does.
+  // Only this tenant's users: the unfiltered list used to page through the whole
+  // instance, which is how one tenant's IdP could enumerate everybody's staff.
   app.get('/Users', async (c) => {
-    const tenantId = tenantOf(c);
-    const soloInstance = await instanceIsSingleTenant();
     const filter = c.req.query('filter') ?? '';
     const startIndex = Math.max(1, parseInt(c.req.query('startIndex') ?? '1', 10) || 1);
     const count = Math.min(200, Math.max(0, parseInt(c.req.query('count') ?? '100', 10) || 100));
-
     const m = filter.match(/userName\s+eq\s+"([^"]+)"/i);
-    // Both branches join membership. The unfiltered branch used to page through
-    // the entire instance's user table, which is how one tenant's IdP could
-    // enumerate everybody else's staff.
-    // biome-ignore lint/suspicious/noExplicitAny: user rows
-    let rows: any[];
-    if (m) {
-      const r = await sql<Record<string, unknown>>`
-        SELECT u.id, u.email, u.name, u."createdAt", u."updatedAt"
-          FROM "user" u
-         WHERE lower(u.email) = ${m[1]!.toLowerCase()}
-           AND (${soloInstance} OR EXISTS (
-                 SELECT 1 FROM zv_tenant_users tu
-                  WHERE tu.user_id = u.id AND tu.tenant_id = ${tenantId}::uuid))
-      `.execute(db);
-      rows = r.rows;
-    } else {
-      const r = await sql<Record<string, unknown>>`
-        SELECT u.id, u.email, u.name, u."createdAt", u."updatedAt"
-          FROM "user" u
-         WHERE (${soloInstance} OR EXISTS (
-                 SELECT 1 FROM zv_tenant_users tu
-                  WHERE tu.user_id = u.id AND tu.tenant_id = ${tenantId}::uuid))
-         ORDER BY u."createdAt" LIMIT ${count} OFFSET ${startIndex - 1}
-      `.execute(db);
-      rows = r.rows;
-    }
-    const resources = await Promise.all(
-      rows.map(async (u) => toScimUser(u, await stateOf(u.id, tenantId, soloInstance))),
-    );
+    const resources = await asTokenTenant(c, async (trx) => {
+      const users = m
+        ? await internals.listTenantUsers(trx, { email: m[1]! })
+        : await internals.listTenantUsers(trx, { limit: count, offset: startIndex - 1 });
+      const rows = await scimRows(trx, tenantOf(c), users.map((u) => u.id));
+      const solo = await internals.isSingleTenantInstance();
+      return users.map((u) => toScimUser(u, stateOf(u, rows.get(u.id), solo)));
+    });
     return c.json({
       schemas: [SCIM_LIST],
       totalResults: resources.length,
@@ -364,53 +324,66 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     });
   });
 
+  // 404, not 403: whether a user id exists on some other tenant is itself
+  // information this caller is not entitled to.
   app.get('/Users/:id', async (c) => {
-    const tenantId = tenantOf(c);
-    const soloInstance = await instanceIsSingleTenant();
     const id = c.req.param('id');
-    // 404, not 403: whether a user id exists on some other tenant is itself
-    // information this caller is not entitled to.
-    const r = await sql<Record<string, unknown>>`
-      SELECT u.id, u.email, u.name, u."createdAt", u."updatedAt"
-        FROM "user" u
-       WHERE u.id = ${id}
-         AND (${soloInstance} OR EXISTS (
-               SELECT 1 FROM zv_tenant_users tu
-                WHERE tu.user_id = u.id AND tu.tenant_id = ${tenantId}::uuid))
-    `.execute(db);
-    if (r.rows.length === 0) return scimError(c, 404, 'User not found');
-    return c.json(toScimUser(r.rows[0], await stateOf(id, tenantId, soloInstance)));
+    const user = await asTokenTenant(c, async (trx) => {
+      const m = await memberOf(trx, id);
+      if (!m) return null;
+      return toScimUser(
+        m,
+        stateOf(m, (await scimRows(trx, tenantOf(c), [id])).get(id), await internals.isSingleTenantInstance()),
+      );
+    });
+    return user ? c.json(user) : scimError(c, 404, 'User not found');
   });
 
-  // POST /Users — provision. Uses the engine's own signup path (better-auth).
+  // POST /Users — provision a NEW account into the token's tenant.
   app.post('/Users', async (c) => {
     // biome-ignore lint/suspicious/noExplicitAny: SCIM payload
     const body = (await c.req.json().catch(() => null)) as any;
     const email: string | undefined = body?.userName ?? body?.emails?.[0]?.value;
     if (!email) return scimError(c, 400, 'userName (email) is required');
     const name: string = body?.name?.formatted ?? body?.displayName ?? email;
-
+    const active = body?.active !== false;
     const tenantId = tenantOf(c);
+
     // POST provisions a NEW account. An email that already has one answers 409
     // `uniqueness` and changes nothing — on every instance, whoever's member the
-    // account is.
+    // account is. It used to grant this tenant membership of the existing
+    // account and apply `active`, so any tenant's IdP could claim any account on
+    // the instance by asserting its email — and, with `active: false`, ban its
+    // sign-in instance-wide. Joining an existing account to a tenant is a tenant
+    // administrator's act (invitation), not something an IdP can do by naming an
+    // email. The engine refuses the claim too (`account_exists`), for god, an
+    // instance admin or another tenant's account.
     //
-    // It used to grant this tenant membership of the existing account and apply
-    // `active`, so any tenant's IdP could claim any account on the instance by
-    // asserting its email — and, with `active: false`, ban its sign-in
-    // instance-wide. A lapsed tenant could also DELETE its dated row and re-POST
-    // a fresh membership in force. Joining an existing account to a tenant is a
-    // tenant administrator's act (invitation / POST /api/tenants/:id/members),
-    // not something an IdP can do by naming an email.
-    //
-    // Single-tenant loses nothing: there `isMember` counted every account, so an
-    // existing email was already a 409. The 409 tells the caller that the email
-    // is taken on the instance — the same answer sign-up gives — and the detail
-    // is identical whether or not the account belongs to this tenant.
-    const existing = await sql<{ id: string }>`
-      SELECT id FROM "user" WHERE lower(email) = ${email.toLowerCase()}
-    `.execute(db);
-    if (existing.rows.length > 0) {
+    // The account, its membership, the SCIM record and `active` are one act:
+    // split, the IdP is told provisioning failed and retries into a 409, or
+    // deprovisioning later finds nothing to deactivate.
+    const created = await asTokenTenant(c, async (trx) => {
+      // The same 409 whether the account is this tenant's or not: which tenant
+      // holds an address is not this caller's to learn.
+      const found = await internals.provisionUser({ email, name }).catch((err) => {
+        if ((err as { code?: string }).code === 'account_exists') return null;
+        throw err;
+      });
+      if (!found?.created) return null;
+      const { user } = found;
+      // Membership is what provisions the user INTO this tenant: without it the
+      // next `GET /Users` would not return the user SCIM just created.
+      await internals.addTenantMember(trx, user.id, 'member');
+      await sql`
+        INSERT INTO zv_scim_users (tenant_id, user_id, external_id, active)
+        VALUES (${tenantId}::uuid, ${user.id}, ${body?.externalId ?? null}, ${active})
+        ON CONFLICT (tenant_id, user_id) DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active, updated_at = NOW()
+      `.execute(trx);
+      // Provisioned inactive is what a later `active=false` would make it.
+      await setActive(trx, user.id, tenantId, active);
+      return user;
+    });
+    if (!created) {
       return scimError(
         c,
         409,
@@ -419,51 +392,7 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
         'uniqueness',
       );
     }
-
-    let userId: string | undefined;
-    try {
-      // biome-ignore lint/suspicious/noExplicitAny: better-auth api is untyped on ctx
-      const res = await (auth.api as any).signUpEmail({
-        body: { email, name, password: `Scim!${randomUUID()}` },
-      });
-      userId = res?.user?.id;
-    } catch (e) {
-      return scimError(c, 500, `signup failed: ${e instanceof Error ? e.message : String(e)}`);
-    }
-    if (!userId) return scimError(c, 500, 'signup did not return a user');
-
-    // Membership is what actually provisions the user INTO this tenant.
-    // Without it the account exists and belongs nowhere, and the very next
-    // `GET /Users` would not return the user SCIM just created.
-    const active = body?.active !== false;
-    // Membership and the SCIM record are one provisioning act.
-    //
-    // Split, the halves fail in opposite directions and both are silent. Only the
-    // membership: the user is in the tenant but SCIM has no record of them, so the
-    // identity provider believes provisioning failed and retries — or worse,
-    // deprovisioning later finds nothing to deactivate. Only the SCIM record: SCIM
-    // reports the user provisioned while the very next `GET /Users` cannot see
-    // them, because membership is what actually puts them in the tenant.
-    await db.transaction().execute(async (trx) => {
-      await sql`
-        INSERT INTO zv_tenant_users (tenant_id, user_id, role)
-        VALUES (${tenantId}::uuid, ${userId}, 'member')
-        ON CONFLICT (tenant_id, user_id) DO NOTHING
-      `.execute(trx);
-
-      await sql`
-        INSERT INTO zv_scim_users (tenant_id, user_id, external_id, active)
-        VALUES (${tenantId}::uuid, ${userId}, ${body?.externalId ?? null}, ${active})
-        ON CONFLICT (tenant_id, user_id) DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active, updated_at = NOW()
-      `.execute(trx);
-      // Provisioned inactive is what a later `active=false` would make it.
-      await setActive(trx, userId, tenantId, active);
-    });
-
-    const row = await sql<Record<string, unknown>>`
-      SELECT id, email, name, "createdAt", "updatedAt" FROM "user" WHERE id = ${userId}
-    `.execute(db);
-    return c.json(toScimUser(row.rows[0], { external_id: body?.externalId ?? null, active }), 201);
+    return c.json(toScimUser(created, { external_id: body?.externalId ?? null, active }), 201);
   });
 
   /**
@@ -472,10 +401,9 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
    * Enforcement and flag commit or fail together: a deactivation the IdP is told
    * succeeded while the person is still signed in is the one outcome that must
    * not exist, so nothing here swallows an error — the IdP retries instead.
-   * Sessions and the sign-in block are the host's (`auth:users`): `session` is
-   * refused to the request's role, and with Valkey sessions live only in the
-   * cache. The block stops every method (password, passkey, magic link, SSO) and
-   * leaves the credentials alone, so lifting it gives them all back.
+   * Sessions and the sign-in block are the host's (`auth:users`). The block
+   * stops every method (password, passkey, magic link, SSO) and leaves the
+   * credentials alone, so lifting it gives them all back.
    *
    * The engine records whose block it is (`ban_source`, `ext:auth/scim` for
    * SCIM's) and `liftOwnBan` lifts only that one: an administrator's block, or
@@ -487,84 +415,62 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
    * administrator's within one cycle.
    *
    * Multi-tenant: sign-in is instance-wide but this IdP speaks for one tenant.
-   * Blocking it locked the person out of every other tenant too, and let any
-   * tenant's IdP lift a block another had placed. So `active: false` ends the
-   * membership HERE (`valid_to = now()`), which the engine's membership gate
-   * reads uncached on the next request and its realtime sweep within a tick.
-   * The session stays: it still opens the tenants that have them. Only when no
-   * tenant is left in force is sign-in blocked — nothing is left to sign in to.
+   * So `active: false` ends the membership HERE (`setTenantMembershipEnd`, only
+   * one in force — a resend must not overwrite the end date it holds), which
+   * the engine's membership gate reads on the next request. The session stays:
+   * it still opens the tenants that have them. Only when no tenant is left in
+   * force is sign-in blocked — nothing is left to sign in to.
    *
    * `active: true` puts back the end date the business had set (open-ended if
-   * none), only while the membership still carries the IdP's own `valid_to`: a
-   * date the business wrote since wins. It lifts SCIM's block once a tenant is
-   * in force again — whichever tenant's IdP that is.
+   * none), only while the membership still carries the IdP's own end
+   * (`ifValidTo`): a date the business wrote since wins. It lifts SCIM's block
+   * once a tenant is in force again — whichever tenant's IdP that is.
    */
-  // biome-ignore lint/suspicious/noExplicitAny: Kysely transaction handle
-  async function setActive(trx: any, userId: string, tenantId: string, active: boolean): Promise<void> {
+  async function setActive(trx: Db, userId: string, tenantId: string, active: boolean): Promise<void> {
     await sql`
       INSERT INTO zv_scim_users (tenant_id, user_id, active)
       VALUES (${tenantId}::uuid, ${userId}, ${active})
       ON CONFLICT (tenant_id, user_id) DO UPDATE SET active = EXCLUDED.active, updated_at = NOW()
     `.execute(trx);
-    if (await instanceIsSingleTenant()) {
-      if (active) await ctx.internals.liftOwnBan(trx, userId);
-      else await ctx.internals.setUserActive(trx, userId, false);
+    if (await internals.isSingleTenantInstance()) {
+      if (active) await internals.liftOwnBan(trx, userId);
+      else await internals.setUserActive(trx, userId, false);
       return;
     }
+    const row = (await scimRows(trx, tenantId, [userId])).get(userId);
     if (active) {
+      let inForceAnywhere = (await memberOf(trx, userId))?.membership?.inForce === true;
+      if (row?.suspended_at) {
+        const back = await internals.setTenantMembershipEnd(trx, userId, row.held_valid_to, {
+          ifValidTo: row.suspended_at,
+        });
+        await sql`
+          UPDATE zv_scim_users SET suspended_at = NULL, held_valid_to = NULL
+           WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId}
+        `.execute(trx);
+        inForceAnywhere = back?.inForceAnywhere ?? inForceAnywhere;
+      }
+      if (inForceAnywhere) await internals.liftOwnBan(trx, userId);
+      return;
+    }
+    const ended = await internals.setTenantMembershipEnd(trx, userId, 'now', { ifInForce: true });
+    if (ended?.changed) {
       await sql`
-        UPDATE zv_tenant_users tu SET valid_to = s.held_valid_to
-          FROM zv_scim_users s
-         WHERE tu.tenant_id = ${tenantId}::uuid AND tu.user_id = ${userId}
-           AND s.tenant_id = tu.tenant_id AND s.user_id = tu.user_id
-           AND tu.valid_to = s.suspended_at
-      `.execute(trx);
-      await sql`
-        UPDATE zv_scim_users SET suspended_at = NULL, held_valid_to = NULL
+        UPDATE zv_scim_users SET suspended_at = ${ended.validTo}::timestamptz,
+                                 held_valid_to = ${ended.previousValidTo}::timestamptz
          WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId}
       `.execute(trx);
-      if ((await inForceAnywhere(trx, userId)) > 0) await ctx.internals.liftOwnBan(trx, userId);
-      return;
     }
-    // Only a membership in force is suspended: a resend must not overwrite the
-    // end date it holds with its own `valid_to`. One statement, so the held
-    // date is the one read under the lock.
-    await sql`
-      WITH held AS (
-        SELECT tu.valid_to FROM zv_tenant_users tu
-         WHERE tu.tenant_id = ${tenantId}::uuid AND tu.user_id = ${userId} AND ${MEMBERSHIP_IN_FORCE}
-           FOR UPDATE
-      ), ended AS (
-        UPDATE zv_tenant_users SET valid_to = now()
-         WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId} AND EXISTS (SELECT 1 FROM held)
-      )
-      UPDATE zv_scim_users SET suspended_at = now(), held_valid_to = (SELECT valid_to FROM held)
-       WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId} AND EXISTS (SELECT 1 FROM held)
-    `.execute(trx);
-    if ((await inForceAnywhere(trx, userId)) > 0) return;
+    if (ended?.inForceAnywhere) return;
     // A block already there keeps its source: the engine records the first.
-    await ctx.internals.setUserActive(trx, userId, false);
-  }
-
-  /** Memberships of `userId` in force, any tenant (`zv_tenant_users` carries no tenant RLS). */
-  // biome-ignore lint/suspicious/noExplicitAny: Kysely transaction handle
-  async function inForceAnywhere(trx: any, userId: string): Promise<number> {
-    const r = await sql<{ n: number }>`
-      SELECT COUNT(*)::int AS n FROM zv_tenant_users tu
-       WHERE tu.user_id = ${userId} AND ${MEMBERSHIP_IN_FORCE}
-    `.execute(trx);
-    return r.rows[0]?.n ?? 0;
+    await internals.setUserActive(trx, userId, false);
   }
 
   /**
    * PUT /Users/:id — full replace (RFC 7644 §3.5.1).
    *
-   * It was missing, and a missing method here is not a gap in coverage — it is a
-   * 404 to the identity provider. Okta's profile push uses PUT, not PATCH: a
-   * directory attribute changing on the IdP side sent a PUT, got 404, and Okta
-   * marked the app out of sync. Deactivation happened to work because that path
-   * goes through PATCH, so the failure was invisible on the operation anyone
-   * would think to test.
+   * Okta's profile push uses PUT, not PATCH: a missing method here was a 404 to
+   * the IdP, which then marked the app out of sync.
    *
    * Replace semantics, deliberately: absent `active` means `true`, because in a
    * PUT the absence of a field is an assertion about its value. That is the
@@ -573,48 +479,39 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
   app.put('/Users/:id', async (c) => {
     const id = c.req.param('id');
     const tenantId = tenantOf(c);
-    // Membership, not existence — the same reason PATCH checks it this way: a
-    // token from one tenant must not be able to write another tenant's users.
-    if (!(await isMember(id, tenantId))) return scimError(c, 404, 'User not found');
-    const lapsed = await refuseIfLapsed(c, id, tenantId);
-    if (lapsed) return lapsed;
-
     // biome-ignore lint/suspicious/noExplicitAny: SCIM payload
     const body = (await c.req.json().catch(() => null)) as any;
-    if (!body || (body.schemas && !body.schemas.includes(SCIM_USER))) {
-      return scimError(c, 400, 'Expected a SCIM User payload');
-    }
+    return asTokenTenant(c, async (trx) => {
+      // Membership, not existence: a token from one tenant must not be able to
+      // write another tenant's users.
+      const m = await memberOf(trx, id);
+      if (!m) return scimError(c, 404, 'User not found');
+      const refused = await lapsed(c, m, (await scimRows(trx, tenantId, [id])).get(id));
+      if (refused) return refused;
+      if (!body || (body.schemas && !body.schemas.includes(SCIM_USER))) {
+        return scimError(c, 400, 'Expected a SCIM User payload');
+      }
+      const email: string | undefined = body?.userName ?? body?.emails?.[0]?.value;
+      if (!email) return scimError(c, 400, 'userName (email) is required');
+      const name: string = body?.name?.formatted ?? body?.displayName ?? email;
+      const active = body?.active !== false;
 
-    const email: string | undefined = body?.userName ?? body?.emails?.[0]?.value;
-    if (!email) return scimError(c, 400, 'userName (email) is required');
-    const name: string = body?.name?.formatted ?? body?.displayName ?? email;
-    const active = body?.active !== false;
-
-    // A PUT is a full replace, so the profile, the SCIM record and the
-    // enforcement `setActive` performs are one state. A profile updated without
-    // the deactivation taking effect is the dangerous half: the IdP is told the
-    // replace succeeded, `active: false` and all.
-    await db.transaction().execute(async (trx) => {
-      await sql`
-        UPDATE "user" SET name = ${name}, email = ${email}, "updatedAt" = NOW() WHERE id = ${id}
-      `.execute(trx);
-
+      // The profile, the SCIM record and the enforcement `setActive` performs are
+      // one state: a profile updated without the deactivation taking effect is
+      // the dangerous half.
+      await updateProfile(trx, m, { name, email });
       await sql`
         INSERT INTO zv_scim_users (tenant_id, user_id, external_id, active)
         VALUES (${tenantId}::uuid, ${id}, ${body?.externalId ?? null}, ${active})
         ON CONFLICT (tenant_id, user_id)
         DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active
       `.execute(trx);
-
-      // `setActive` is what actually revokes sessions on deactivation; calling
-      // it rather than only writing the column keeps PUT and PATCH doing the
-      // same thing for the same input.
       await setActive(trx, id, tenantId, active);
-    });
 
-    const row = await sql`SELECT id, name, email, "createdAt" FROM "user" WHERE id = ${id}`.execute(db);
-    if (!row.rows[0]) return scimError(c, 404, 'User not found');
-    return c.json(toScimUser(row.rows[0], await stateOf(id, tenantId, await instanceIsSingleTenant())));
+      const after = (await memberOf(trx, id))!;
+      const solo = await internals.isSingleTenantInstance();
+      return c.json(toScimUser(after, stateOf(after, (await scimRows(trx, tenantId, [id])).get(id), solo)));
+    });
   });
 
   // PATCH /Users/:id — Azure/Okta PatchOp; v1 honors `active` (the operation
@@ -622,110 +519,78 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
   app.patch('/Users/:id', async (c) => {
     const id = c.req.param('id');
     const tenantId = tenantOf(c);
-    // Membership, not existence. Checking existence is what let a token from
-    // one tenant deactivate another tenant's users.
-    if (!(await isMember(id, tenantId))) return scimError(c, 404, 'User not found');
-    const lapsed = await refuseIfLapsed(c, id, tenantId);
-    if (lapsed) return lapsed;
     // biome-ignore lint/suspicious/noExplicitAny: SCIM payload
     const body = (await c.req.json().catch(() => null)) as any;
-    if (!body?.schemas?.includes(SCIM_PATCH) || !Array.isArray(body.Operations)) {
-      return scimError(c, 400, 'Expected a SCIM PatchOp payload');
-    }
-    // RFC 7644 §3.5.2: a PatchOp's operations are applied as a set. Half of them
-    // landing is not a partial success, it is a user whose state matches neither
-    // what the IdP sent nor what it had before — and Azure sends deactivation as
-    // one op alongside profile ops in the same request.
-    await db.transaction().execute(async (trx) => {
+    return asTokenTenant(c, async (trx) => {
+      const m = await memberOf(trx, id);
+      if (!m) return scimError(c, 404, 'User not found');
+      const refused = await lapsed(c, m, (await scimRows(trx, tenantId, [id])).get(id));
+      if (refused) return refused;
+      if (!body?.schemas?.includes(SCIM_PATCH) || !Array.isArray(body.Operations)) {
+        return scimError(c, 400, 'Expected a SCIM PatchOp payload');
+      }
+      // RFC 7644 §3.5.2: a PatchOp's operations are applied as a set — one
+      // transaction, and Azure sends deactivation alongside profile ops.
+      const truthy = (v: unknown) => v === true || v === 'True' || v === 'true';
+      let current = m;
+      const rename = async (value: unknown) => {
+        await updateProfile(trx, current, { name: String(value) });
+        current = (await memberOf(trx, id))!;
+      };
       for (const op of body.Operations) {
         const kind = String(op.op ?? '').toLowerCase();
         if (kind !== 'replace' && kind !== 'add') continue;
         const path = String(op.path ?? '').toLowerCase();
         if (path === 'active') {
-          await setActive(trx, id, tenantId, op.value === true || op.value === 'True' || op.value === 'true');
+          await setActive(trx, id, tenantId, truthy(op.value));
         } else if (path === 'displayname' || path === 'name.formatted') {
-          await sql`UPDATE "user" SET name = ${String(op.value)}, "updatedAt" = NOW() WHERE id = ${id}`.execute(trx);
+          await rename(op.value);
         } else if (!path && op.value && typeof op.value === 'object') {
-          if ('active' in op.value) {
-            await setActive(trx, id, tenantId, op.value.active === true || op.value.active === 'True' || op.value.active === 'true');
-          }
-          if (typeof op.value.displayName === 'string') {
-            await sql`UPDATE "user" SET name = ${op.value.displayName}, "updatedAt" = NOW() WHERE id = ${id}`.execute(trx);
-          }
+          if ('active' in op.value) await setActive(trx, id, tenantId, truthy(op.value.active));
+          if (typeof op.value.displayName === 'string') await rename(op.value.displayName);
         }
       }
+      const after = (await memberOf(trx, id))!;
+      const solo = await internals.isSingleTenantInstance();
+      return c.json(toScimUser(after, stateOf(after, (await scimRows(trx, tenantId, [id])).get(id), solo)));
     });
-    const row = await sql<Record<string, unknown>>`
-      SELECT id, email, name, "createdAt", "updatedAt" FROM "user" WHERE id = ${id}
-    `.execute(db);
-    return c.json(toScimUser(row.rows[0], await stateOf(id, tenantId, await instanceIsSingleTenant())));
   });
 
   // DELETE /Users/:id — deprovision from THIS tenant.
   //
-  // This used to delete the `"user"` row, its accounts and its sessions
-  // outright, for any id the caller named — so one tenant's IdP could delete
-  // any user on the instance, including other tenants' administrators.
+  // Membership is what gets removed. A person can work for two tenants on one
+  // instance, and one of them offboarding must not erase the account they still
+  // use at the other. The account goes only when the engine finds it orphaned:
+  // no tenant holds it and nothing else does (god, an instance admin, a grant
+  // elsewhere). One transaction, so two tenants deprovisioning the same person
+  // at once serialize on the user row and one of them finds it orphaned.
   //
-  // Membership is what gets removed now. A person can work for two tenants on
-  // one instance, and one of them offboarding must not erase the account they
-  // still use at the other. The user row is only deleted once no tenant claims
-  // them, which is the same condition an operator would apply by hand.
+  // Sessions and the account go through the host (`auth:users`).
   app.delete('/Users/:id', async (c) => {
     const id = c.req.param('id');
     const tenantId = tenantOf(c);
-    if (!(await isMember(id, tenantId))) return scimError(c, 404, 'User not found');
-
-    // Offboarding is one act, and the count that decides whether the account
-    // itself goes is a read taken BETWEEN the writes.
-    //
-    // Outside a transaction that read sees a database other requests are
-    // changing: two tenants deprovisioning the same person at once can each
-    // still see the other's membership and each decline to remove the account,
-    // leaving a `"user"` row no tenant claims and nobody will ever look at
-    // again. Splitting the writes is worse — membership gone but sessions
-    // untouched means somebody who has just been offboarded is still signed in,
-    // and the IdP has already been told the removal succeeded.
-    //
-    // The `.catch(() => undefined)` on three of these is gone with them. It
-    // contained nothing (Postgres refuses every statement after a failed one
-    // inside a transaction) and it turned a failed session delete — the whole
-    // point of the operation — into a silent success.
-    //
-    // Sessions and the account itself go through the host (`auth:users`). The
-    // raw `DELETE FROM "session"` that stood here was refused to the request's
-    // role (engine migration 044), so this route answered 500 to every
-    // deprovisioning; and deleting the row by hand wrote no `user.deleted`, left
-    // the enforcer's grants live and, with Valkey, the session cached.
-    await db.transaction().execute(async (trx) => {
-      await sql`
-        DELETE FROM zv_tenant_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
-      `.execute(trx);
+    return asTokenTenant(c, async (trx) => {
+      if (!(await memberOf(trx, id))) return scimError(c, 404, 'User not found');
+      const gone = await internals.removeTenantMember(trx, id);
       await sql`
         DELETE FROM zv_scim_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
       `.execute(trx);
-
-      // Every row, lapsed ones too: another tenant's expired membership is its
-      // history, and deleting the account would cascade into it (as engine purge).
-      const remaining = await sql<{ n: number }>`
-        SELECT COUNT(*)::int AS n FROM zv_tenant_users WHERE user_id = ${id}
-      `.execute(trx);
-      if ((remaining.rows[0]?.n ?? 0) === 0) {
+      if (gone.orphaned) {
         // Revokes the sessions too; `account` goes with the row (ON DELETE CASCADE).
-        await ctx.internals.deleteUser(trx, id, {
+        await internals.deleteUser(trx, id, {
           actor: `scim:${(c as Ctx).get('scimTokenId')}`,
           reason: 'scim.deprovision',
           metadata: { tenant_id: tenantId },
         });
-      } else if ((await inForceAnywhere(trx, id)) === 0) {
+      } else if (!gone.inForceAnywhere) {
         // Only lapsed memberships left: nothing to sign in to, so the sessions go.
         // While another tenant has them in force the session stays — it is
         // instance-wide, and the engine's membership gate already refuses this
-        // tenant on the next request (realtime within a tick), as for `active: false`.
-        await ctx.internals.revokeUserSessions(id);
+        // tenant on the next request.
+        await internals.revokeUserSessions(id);
       }
+      return c.body(null, 204);
     });
-    return c.body(null, 204);
   });
 
   // Groups: not supported in v1 — advertise emptiness instead of erroring.
