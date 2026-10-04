@@ -54185,25 +54185,6 @@ async function upsertSamlConfig(db, config2, encryptSecret) {
     updated_at: new Date
   })).execute();
 }
-async function findOrCreateSsoUser(dbh, email3, displayName) {
-  const existing = await sql`
-    SELECT * FROM "user" WHERE email = ${email3} LIMIT 1
-  `.execute(dbh).then((r) => r.rows[0]);
-  if (existing)
-    return existing;
-  const id = crypto.randomUUID();
-  const now = new Date;
-  await sql`
-    INSERT INTO "user" (id, email, name, "emailVerified", "createdAt", "updatedAt")
-    VALUES (${id}, ${email3}, ${displayName || email3.split("@")[0]}, true, ${now}, ${now})
-  `.execute(dbh);
-  const created = await sql`
-    SELECT * FROM "user" WHERE id = ${id} LIMIT 1
-  `.execute(dbh).then((r) => r.rows[0]);
-  if (!created)
-    throw new Error(`[saml] user ${id} vanished immediately after insert`);
-  return created;
-}
 function samlRoutes(ctx) {
   const { db, auth, checkPermission, internals } = ctx;
   if (!internals?.createBetterAuthSession) {
@@ -54273,7 +54254,14 @@ function samlRoutes(ctx) {
       if (claimed.rows.length === 0)
         return { replayed: true };
       await sql`DELETE FROM zvd_saml_consumed_assertions WHERE expires_at < NOW()`.execute(trx);
-      const user = await findOrCreateSsoUser(trx, email3, name2);
+      let user;
+      try {
+        ({ user } = await internals.provisionUser({ email: String(email3), name: String(name2) }));
+      } catch (err) {
+        if (err?.code !== "account_exists")
+          throw err;
+        return { replayed: false, blocked: false, unclaimed: true };
+      }
       try {
         const { setCookie: setCookie2 } = await internals.createBetterAuthSession(trx, user.id, {
           ipAddress: remoteIp,
@@ -54281,11 +54269,11 @@ function samlRoutes(ctx) {
           crossDomain,
           replaceExisting: true
         });
-        return { replayed: false, blocked: false, setCookie: setCookie2 };
+        return { replayed: false, blocked: false, unclaimed: false, setCookie: setCookie2 };
       } catch (err) {
         if (err?.code !== "account_disabled")
           throw err;
-        return { replayed: false, blocked: true };
+        return { replayed: false, blocked: true, unclaimed: false };
       }
     });
     if (outcome.replayed) {
@@ -54294,6 +54282,9 @@ function samlRoutes(ctx) {
     }
     if (outcome.blocked)
       return c.json({ error: "This account is disabled." }, 403);
+    if (outcome.unclaimed) {
+      return c.json({ error: "This identity provider cannot sign in to that account." }, 403);
+    }
     const { setCookie } = outcome;
     const rawRedirect = body.RelayState ?? "/admin";
     const redirectTo = typeof rawRedirect === "string" && rawRedirect.startsWith("/") && !rawRedirect.startsWith("//") ? rawRedirect : "/admin";

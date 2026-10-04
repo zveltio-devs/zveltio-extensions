@@ -115,61 +115,6 @@ async function upsertSamlConfig(
     .execute();
 }
 
-// Find or create a user by email (for SSO sign-in).
-//
-// Every statement here is raw SQL, and the two reads used to be
-// `dbh.selectFrom('user')`. That is refused: `dbh` is `ctx.db`, and
-// createRestrictedDb permits `zvd_*`, the extension's own namespace, and the
-// tables its migrations create — `user` is none of those. Measured, with this
-// extension's real allowedTables:
-//
-//   selectFrom("user"): REFUSED — ExtensionSecurityError
-//   raw SELECT:         OK
-//
-// This function is called from the ACS handler with no try/catch, and the mount
-// layer renders an ExtensionSecurityError as a 500 with the cause stripped from
-// the body, so SSO answered "An unexpected error occurred." It was masked until
-// now by a second defect that refused every assertion before this line was
-// reached.
-//
-// Raw SQL works because the table policy guards the query builder's entry points
-// and a raw statement does not pass through them. That is a hole in the sandbox,
-// not a feature, and using it deliberately is worth saying out loud: the INSERT
-// below has always taken this path, so the reads are made consistent with it
-// rather than left as the one form that throws.
-//
-// This is NOT the durable answer. Provisioning an SSO user is a real need — it is
-// what a SAML extension is for — so it belongs in the category needing an
-// explicit grant or a host helper (`provisionUser`), which does not exist today.
-// When the engine closes the raw path, `auth/saml` and `auth/ldap` have to be
-// granted `user` in the SAME change, or SSO breaks again — on the write this
-// time. Sessions already go through the host (`createBetterAuthSession`).
-//
-// Better-Auth's `user` table uses camelCase columns ("emailVerified",
-// "createdAt", "updatedAt"). Raw SQL keeps the casing literal so a snake_case
-// typo doesn't silently fail.
-async function findOrCreateSsoUser(dbh: any, email: string, displayName: string): Promise<any> {
-  const existing = await sql<any>`
-    SELECT * FROM "user" WHERE email = ${email} LIMIT 1
-  `.execute(dbh).then((r: any) => r.rows[0]);
-  if (existing) return existing;
-
-  const id = crypto.randomUUID();
-  const now = new Date();
-  await sql`
-    INSERT INTO "user" (id, email, name, "emailVerified", "createdAt", "updatedAt")
-    VALUES (${id}, ${email}, ${displayName || email.split('@')[0]}, true, ${now}, ${now})
-  `.execute(dbh);
-
-  const created = await sql<any>`
-    SELECT * FROM "user" WHERE id = ${id} LIMIT 1
-  `.execute(dbh).then((r: any) => r.rows[0]);
-  // `executeTakeFirstOrThrow` used to provide this. A silent undefined here
-  // would reach `createBetterAuthSession` as a session belonging to nobody.
-  if (!created) throw new Error(`[saml] user ${id} vanished immediately after insert`);
-  return created;
-}
-
 export function samlRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission, internals } = ctx;
 
@@ -277,9 +222,11 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
     // been used. The replay guard becomes a lockout, and the only cure is
     // waiting for the IdP to mint a new one.
     //
-    // Everything below either throws — `findOrCreateSsoUser`,
+    // Everything below either throws — `provisionUser`,
     // `createBetterAuthSession` — or succeeds, so the claim now commits with the
-    // login and rolls back without it.
+    // login and rolls back without it. The two refusals that do not throw (a
+    // disabled account, an account this tenant has no claim to) return after
+    // nothing but the claim was written: that assertion is spent.
     //
     // An EXPLICIT transaction, not the request's.
     //
@@ -315,7 +262,20 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
       // down the login it was meant not to disturb.
       await sql`DELETE FROM zvd_saml_consumed_assertions WHERE expires_at < NOW()`.execute(trx);
 
-      const user = await findOrCreateSsoUser(trx, email, name);
+      // The account is the engine's to find or create (`provisionUser`,
+      // `identity:provision`): `"user"` is refused to `ctx.db` since engine #858,
+      // which made every SAML sign-in a 500. The address is matched
+      // case-insensitively, and an existing account comes back only when the
+      // running tenant may claim it — so one tenant's IdP cannot sign in as god,
+      // an instance admin or another tenant's administrator by asserting their
+      // address.
+      let user: { id: string };
+      try {
+        ({ user } = await internals.provisionUser({ email: String(email), name: String(name) }));
+      } catch (err: any) {
+        if (err?.code !== 'account_exists') throw err;
+        return { replayed: false as const, blocked: false as const, unclaimed: true as const };
+      }
 
       // The session is the engine's to write: `session` is out of `ctx.db`'s
       // reach (the `DELETE FROM session` here made every login a 500), and with
@@ -328,12 +288,12 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
           crossDomain,
           replaceExisting: true,
         });
-        return { replayed: false as const, blocked: false as const, setCookie };
+        return { replayed: false as const, blocked: false as const, unclaimed: false as const, setCookie };
       } catch (err: any) {
         // Refused before anything was written, so the claim still commits: a
         // deactivated user's assertion is spent, not kept for later.
         if (err?.code !== 'account_disabled') throw err;
-        return { replayed: false as const, blocked: true as const };
+        return { replayed: false as const, blocked: true as const, unclaimed: false as const };
       }
     });
 
@@ -342,6 +302,9 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'This SAML assertion has already been used' }, 401);
     }
     if (outcome.blocked) return c.json({ error: 'This account is disabled.' }, 403);
+    if (outcome.unclaimed) {
+      return c.json({ error: 'This identity provider cannot sign in to that account.' }, 403);
+    }
     const { setCookie } = outcome;
 
     // Open-redirect guard: relative paths only (must start with `/`).
