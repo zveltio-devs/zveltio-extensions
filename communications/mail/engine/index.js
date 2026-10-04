@@ -4493,7 +4493,7 @@ var init_operation_node = __esm(() => {
   init_object_utils();
 });
 
-// /zveltio-extension/node_modules/kysely/dist/operation-node/root-operation-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/zveltio-extension-operation-node.js
 function isRootOperationNode(thing) {
   return isOperationNode(thing) && ROOT_OPERATION_NODE_KINDS[thing.kind] === true;
 }
@@ -45746,8 +45746,12 @@ var require_address_error = __commonJS((exports) => {
 var require_common = __commonJS((exports) => {
   Object.defineProperty(exports, "__esModule", { value: true });
   exports.isInSubnet = isInSubnet;
+  exports.isHostInSubnet = isHostInSubnet;
+  exports.isGloballyReachable = isGloballyReachable;
+  exports.offsetBigInt = offsetBigInt;
   exports.isCorrect = isCorrect;
   exports.prefixLengthFromMask = prefixLengthFromMask;
+  exports.assertByteArray = assertByteArray;
   exports.numberToPaddedHex = numberToPaddedHex;
   exports.stringToPaddedHex = stringToPaddedHex;
   exports.testBit = testBit;
@@ -45756,13 +45760,39 @@ var require_common = __commonJS((exports) => {
     if (this.subnetMask < address.subnetMask) {
       return false;
     }
-    if (this.mask(address.subnetMask) === address.mask()) {
-      return true;
+    return isHostInSubnet.call(this, address);
+  }
+  function isHostInSubnet(address) {
+    if (this.binaryZeroPad().length !== address.binaryZeroPad().length) {
+      return false;
     }
-    return false;
+    return this.mask(address.subnetMask) === address.mask();
+  }
+  function isGloballyReachable(entries) {
+    let best = null;
+    for (let i = 0;i < entries.length; i++) {
+      const entry = entries[i];
+      if (entry.reachable !== null && isHostInSubnet.call(this, entry.subnet) && (best === null || entry.subnet.subnetMask > best.subnet.subnetMask)) {
+        best = entry;
+      }
+    }
+    return best === null ? true : best.reachable;
+  }
+  function offsetBigInt(value, n, bits, family) {
+    if (typeof n === "number" && !Number.isSafeInteger(n)) {
+      throw new address_error_1.AddressError(`${family} offset must be an integer`);
+    }
+    if (typeof n !== "number" && typeof n !== "bigint") {
+      throw new address_error_1.AddressError(`${family} offset must be an integer`);
+    }
+    const result = value + BigInt(n);
+    if (result < BigInt(0) || result > (BigInt(1) << BigInt(bits)) - BigInt(1)) {
+      throw new address_error_1.AddressError(`${family} offset leaves the address space`);
+    }
+    return result;
   }
   function isCorrect(defaultBits) {
-    return function() {
+    return function isCorrectForm() {
       if (this.addressMinusSuffix !== this.correctForm()) {
         return false;
       }
@@ -45786,6 +45816,16 @@ var require_common = __commonJS((exports) => {
     }
     return firstZero;
   }
+  function assertByteArray(bytes, byteCount, family, minimum) {
+    if (bytes.length !== byteCount) {
+      throw new address_error_1.AddressError(`${family} addresses require exactly ${byteCount} bytes`);
+    }
+    for (let i = 0;i < bytes.length; i++) {
+      if (!Number.isInteger(bytes[i]) || bytes[i] < minimum || bytes[i] > 255) {
+        throw new address_error_1.AddressError(`All bytes must be integers between ${minimum} and 255`);
+      }
+    }
+  }
   function numberToPaddedHex(number4) {
     return number4.toString(16).padStart(2, "0");
   }
@@ -45805,11 +45845,39 @@ var require_common = __commonJS((exports) => {
 // /zveltio-extension/node_modules/ip-address/dist/v4/constants.js
 var require_constants3 = __commonJS((exports) => {
   Object.defineProperty(exports, "__esModule", { value: true });
-  exports.RE_SUBNET_STRING = exports.RE_ADDRESS = exports.GROUPS = exports.BITS = undefined;
+  exports.SPECIAL_PURPOSE = exports.RE_SUBNET_STRING = exports.RE_ADDRESS = exports.GROUPS = exports.BITS = undefined;
   exports.BITS = 32;
   exports.GROUPS = 4;
-  exports.RE_ADDRESS = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/g;
+  exports.RE_ADDRESS = /^(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$/g;
   exports.RE_SUBNET_STRING = /\/\d{1,2}$/;
+  exports.SPECIAL_PURPOSE = [
+    ["0.0.0.0/8", "This network", false],
+    ["0.0.0.0/32", "This host on this network", false],
+    ["10.0.0.0/8", "Private-Use", false],
+    ["100.64.0.0/10", "Shared Address Space", false],
+    ["127.0.0.0/8", "Loopback", false],
+    ["169.254.0.0/16", "Link Local", false],
+    ["172.16.0.0/12", "Private-Use", false],
+    ["192.0.0.0/24", "IETF Protocol Assignments", false],
+    ["192.0.0.0/29", "IPv4 Service Continuity Prefix", false],
+    ["192.0.0.8/32", "IPv4 dummy address", false],
+    ["192.0.0.9/32", "Port Control Protocol Anycast", true],
+    ["192.0.0.10/32", "Traversal Using Relays around NAT Anycast", true],
+    ["192.0.0.170/32", "NAT64/DNS64 Discovery", false],
+    ["192.0.0.171/32", "NAT64/DNS64 Discovery", false],
+    ["192.0.2.0/24", "Documentation (TEST-NET-1)", false],
+    ["192.31.196.0/24", "AS112-v4", true],
+    ["192.52.193.0/24", "AMT", true],
+    ["192.88.99.0/24", "Deprecated (6to4 Relay Anycast)", null],
+    ["192.88.99.2/32", "6a44-relay anycast address", false],
+    ["192.168.0.0/16", "Private-Use", false],
+    ["192.175.48.0/24", "Direct Delegation AS112 Service", true],
+    ["198.18.0.0/15", "Benchmarking", false],
+    ["198.51.100.0/24", "Documentation (TEST-NET-2)", false],
+    ["203.0.113.0/24", "Documentation (TEST-NET-3)", false],
+    ["240.0.0.0/4", "Reserved", false],
+    ["255.255.255.255/32", "Limited Broadcast", false]
+  ];
 });
 
 // /zveltio-extension/node_modules/ip-address/dist/ipv4.js
@@ -45855,6 +45923,7 @@ var require_ipv4 = __commonJS((exports) => {
 
   class Address4 {
     constructor(address) {
+      this.addressMinusSuffix = "";
       this.groups = constants.GROUPS;
       this.parsedAddress = [];
       this.parsedSubnet = "";
@@ -45863,6 +45932,7 @@ var require_ipv4 = __commonJS((exports) => {
       this.v4 = true;
       this.isCorrect = isCorrect4;
       this.isInSubnet = common.isInSubnet;
+      this.isHostInSubnet = common.isHostInSubnet;
       this.address = address;
       const subnet = constants.RE_SUBNET_STRING.exec(address);
       if (subnet) {
@@ -45874,6 +45944,10 @@ var require_ipv4 = __commonJS((exports) => {
         }
         address = address.replace(constants.RE_SUBNET_STRING, "");
       }
+      const longest = constants.GROUPS * 4 - 1;
+      if (address.length > longest) {
+        throw new address_error_1.AddressError(`IPv4 addresses are at most ${longest} characters.`);
+      }
       this.addressMinusSuffix = address;
       this.parsedAddress = this.parse(address);
     }
@@ -45881,12 +45955,15 @@ var require_ipv4 = __commonJS((exports) => {
       try {
         new Address4(address);
         return true;
-      } catch (e) {
+      } catch {
         return false;
       }
     }
     parse(address) {
       const groups = address.split(".");
+      if (groups.some((group) => /^0\d/.test(group))) {
+        throw new address_error_1.AddressError("IPv4 addresses can't have leading zeroes.");
+      }
       if (!address.match(constants.RE_ADDRESS)) {
         throw new address_error_1.AddressError("Invalid IPv4 address.");
       }
@@ -45944,7 +46021,11 @@ var require_ipv4 = __commonJS((exports) => {
       return Address4.fromHex(integer2.toString(16).padStart(8, "0"));
     }
     static fromArpa(arpaFormAddress) {
-      const leader = arpaFormAddress.replace(/(\.in-addr\.arpa)?\.$/, "");
+      const longest = constants.GROUPS * 4 - 1 + "/32".length + ".in-addr.arpa.".length;
+      if (arpaFormAddress.length > longest) {
+        throw new address_error_1.AddressError(`in-addr.arpa names are at most ${longest} characters.`);
+      }
+      const leader = arpaFormAddress.replace(/(\.in-addr\.arpa)?\.?$/i, "");
       const address = leader.split(".").reverse().join(".");
       return new Address4(address);
     }
@@ -45975,6 +46056,15 @@ var require_ipv4 = __commonJS((exports) => {
       const adjust = BigInt("1");
       return Address4.fromBigInt(this._startAddress() + adjust);
     }
+    offset(n) {
+      return Address4.fromBigInt(common.offsetBigInt(this.bigInt(), n, constants.BITS, "IPv4")).withSubnetMask(this.subnetMask);
+    }
+    nextNetwork() {
+      return Address4.fromBigInt(common.offsetBigInt(this._endAddress(), 1, constants.BITS, "IPv4")).withSubnetMask(this.subnetMask);
+    }
+    withSubnetMask(subnetMask) {
+      return new Address4(`${this.correctForm()}/${subnetMask}`);
+    }
     _endAddress() {
       return BigInt(`0b${this.mask() + "1".repeat(constants.BITS - this.subnetMask)}`);
     }
@@ -45995,20 +46085,13 @@ var require_ipv4 = __commonJS((exports) => {
       return `${this.startAddress().correctForm()}/${this.subnetMask}`;
     }
     static fromBigInt(bigInt) {
-      if (bigInt < 0n || bigInt > 0xffffffffn) {
+      if (bigInt < BigInt(0) || bigInt > BigInt(4294967295)) {
         throw new address_error_1.AddressError("IPv4 BigInt must be in the range 0 to 2**32 - 1");
       }
       return Address4.fromHex(bigInt.toString(16).padStart(8, "0"));
     }
     static fromByteArray(bytes) {
-      if (bytes.length !== 4) {
-        throw new address_error_1.AddressError("IPv4 addresses require exactly 4 bytes");
-      }
-      for (let i = 0;i < bytes.length; i++) {
-        if (!Number.isInteger(bytes[i]) || bytes[i] < 0 || bytes[i] > 255) {
-          throw new address_error_1.AddressError("All bytes must be integers between 0 and 255");
-        }
-      }
+      common.assertByteArray(bytes, 4, "IPv4", 0);
       return this.fromUnsignedByteArray(bytes);
     }
     static fromUnsignedByteArray(bytes) {
@@ -46038,25 +46121,37 @@ var require_ipv4 = __commonJS((exports) => {
       return `${reversed}.in-addr.arpa.`;
     }
     isMulticast() {
-      return this.isInSubnet(MULTICAST_V4);
+      return this.isHostInSubnet(MULTICAST_V4);
     }
     isPrivate() {
-      return PRIVATE_V4.some((subnet) => this.isInSubnet(subnet));
+      return PRIVATE_V4.some((subnet) => this.isHostInSubnet(subnet));
     }
     isLoopback() {
-      return this.isInSubnet(LOOPBACK_V4);
+      return this.isHostInSubnet(LOOPBACK_V4);
     }
     isLinkLocal() {
-      return this.isInSubnet(LINK_LOCAL_V4);
+      return this.isHostInSubnet(LINK_LOCAL_V4);
     }
     isUnspecified() {
-      return this.isInSubnet(UNSPECIFIED_V4);
+      return this.isHostInSubnet(UNSPECIFIED_V4);
     }
     isBroadcast() {
-      return this.isInSubnet(BROADCAST_V4);
+      return this.isHostInSubnet(BROADCAST_V4);
     }
     isCGNAT() {
-      return this.isInSubnet(CGNAT_V4);
+      return this.isHostInSubnet(CGNAT_V4);
+    }
+    isDocumentation() {
+      return DOCUMENTATION_V4.some((subnet) => this.isHostInSubnet(subnet));
+    }
+    isBenchmarking() {
+      return this.isHostInSubnet(BENCHMARKING_V4);
+    }
+    isReserved() {
+      return this.isHostInSubnet(RESERVED_V4);
+    }
+    isGlobal() {
+      return !this.isMulticast() && common.isGloballyReachable.call(this, SPECIAL_PURPOSE_V4);
     }
     binaryZeroPad() {
       if (this._binaryZeroPad === undefined) {
@@ -46066,7 +46161,7 @@ var require_ipv4 = __commonJS((exports) => {
     }
     groupForV6() {
       const segments = this.parsedAddress;
-      return this.address.replace(constants.RE_ADDRESS, `<span class="hover-group group-v4 group-6">${segments.slice(0, 2).join(".")}</span>.<span class="hover-group group-v4 group-7">${segments.slice(2, 4).join(".")}</span>`);
+      return this.correctForm().replace(constants.RE_ADDRESS, `<span class="hover-group group-v4 group-6">${segments.slice(0, 2).join(".")}</span>.<span class="hover-group group-v4 group-7">${segments.slice(2, 4).join(".")}</span>`);
     }
   }
   exports.Address4 = Address4;
@@ -46081,12 +46176,23 @@ var require_ipv4 = __commonJS((exports) => {
   var UNSPECIFIED_V4 = new Address4("0.0.0.0/32");
   var BROADCAST_V4 = new Address4("255.255.255.255/32");
   var CGNAT_V4 = new Address4("100.64.0.0/10");
+  var DOCUMENTATION_V4 = [
+    new Address4("192.0.2.0/24"),
+    new Address4("198.51.100.0/24"),
+    new Address4("203.0.113.0/24")
+  ];
+  var BENCHMARKING_V4 = new Address4("198.18.0.0/15");
+  var RESERVED_V4 = new Address4("240.0.0.0/4");
+  var SPECIAL_PURPOSE_V4 = constants.SPECIAL_PURPOSE.map(([cidr, , reachable]) => ({
+    subnet: new Address4(cidr),
+    reachable
+  }));
 });
 
 // /zveltio-extension/node_modules/ip-address/dist/v6/constants.js
 var require_constants4 = __commonJS((exports) => {
   Object.defineProperty(exports, "__esModule", { value: true });
-  exports.RE_URL_WITH_PORT = exports.RE_URL = exports.RE_ZONE_STRING = exports.RE_SUBNET_STRING = exports.RE_BAD_ADDRESS = exports.RE_BAD_CHARACTERS = exports.TYPES = exports.SCOPES = exports.GROUPS = exports.BITS = undefined;
+  exports.SPECIAL_PURPOSE = exports.RE_URL_WITH_PORT = exports.RE_URL = exports.RE_ZONE_STRING = exports.RE_SUBNET_STRING = exports.RE_BAD_ADDRESS = exports.RE_BAD_CHARACTERS = exports.TYPES = exports.SCOPES = exports.GROUPS = exports.BITS = undefined;
   exports.BITS = 128;
   exports.GROUPS = 8;
   exports.SCOPES = {
@@ -46120,11 +46226,18 @@ var require_constants4 = __commonJS((exports) => {
     "ff05::1:3/128": "Multicast (All DHCP servers in this site)",
     "::/128": "Unspecified",
     "::1/128": "Loopback",
+    "::ffff:0:0/96": "IPv4-mapped",
     "ff00::/8": "Multicast",
     "fe80::/10": "Link-local unicast",
     "fc00::/7": "Unique local",
+    "2001::/32": "Teredo",
+    "2001:2::/48": "Benchmarking",
     "2002::/16": "6to4",
     "2001:db8::/32": "Documentation",
+    "3fff::/20": "Documentation",
+    "100::/64": "Discard-only",
+    "fec0::/10": "Site-local unicast (deprecated)",
+    "::/96": "IPv4-compatible (deprecated)",
     "64:ff9b::/96": "NAT64 (well-known)",
     "64:ff9b:1::/48": "NAT64 (local-use)"
   };
@@ -46132,8 +46245,35 @@ var require_constants4 = __commonJS((exports) => {
   exports.RE_BAD_ADDRESS = /([0-9a-f]{5,}|:{3,}|[^:]:$|^:[^:]|\/$)/gi;
   exports.RE_SUBNET_STRING = /\/\d{1,3}(?=%|$)/;
   exports.RE_ZONE_STRING = /%.*$/;
-  exports.RE_URL = /^\[{0,1}([0-9a-f:]+)\]{0,1}/;
-  exports.RE_URL_WITH_PORT = /\[([0-9a-f:]+)\]:([0-9]{1,5})/;
+  exports.RE_URL = /^(?:\[([0-9a-f:.]+)\]|([0-9a-f:.]+))(?:[/?#].*)?$/i;
+  exports.RE_URL_WITH_PORT = /^\[([0-9a-f:.]+)\]:([0-9]{1,5})(?:[/?#].*)?$/i;
+  exports.SPECIAL_PURPOSE = [
+    ["::1/128", "Loopback Address", false],
+    ["::/128", "Unspecified Address", false],
+    ["::ffff:0:0/96", "IPv4-mapped Address", false],
+    ["64:ff9b::/96", "IPv4-IPv6 Translat.", true],
+    ["64:ff9b:1::/48", "IPv4-IPv6 Translat.", false],
+    ["100::/64", "Discard-Only Address Block", false],
+    ["100:0:0:1::/64", "Dummy IPv6 Prefix", false],
+    ["2001::/23", "IETF Protocol Assignments", false],
+    ["2001::/32", "TEREDO", false],
+    ["2001:1::1/128", "Port Control Protocol Anycast", true],
+    ["2001:1::2/128", "Traversal Using Relays around NAT Anycast", true],
+    ["2001:1::3/128", "DNS-SD Service Registration Protocol Anycast", true],
+    ["2001:2::/48", "Benchmarking", false],
+    ["2001:3::/32", "AMT", true],
+    ["2001:4:112::/48", "AS112-v6", true],
+    ["2001:10::/28", "Deprecated (previously ORCHID)", null],
+    ["2001:20::/28", "ORCHIDv2", true],
+    ["2001:30::/28", "Drone Remote ID Protocol Entity Tags (DETs) Prefix", true],
+    ["2001:db8::/32", "Documentation", false],
+    ["2002::/16", "6to4", false],
+    ["2620:4f:8000::/48", "Direct Delegation AS112 Service", true],
+    ["3fff::/20", "Documentation", false],
+    ["5f00::/16", "Segment Routing (SRv6) SIDs", false],
+    ["fc00::/7", "Unique-Local", false],
+    ["fe80::/10", "Link-Local Unicast", false]
+  ];
 });
 
 // /zveltio-extension/node_modules/ip-address/dist/v6/helpers.js
@@ -46357,6 +46497,7 @@ var require_ipv6 = __commonJS((exports) => {
       this.v4 = false;
       this.zone = "";
       this.isInSubnet = common.isInSubnet;
+      this.isHostInSubnet = common.isHostInSubnet;
       this.isCorrect = isCorrect6;
       if (optionalGroups === undefined) {
         this.groups = constants6.GROUPS;
@@ -46373,13 +46514,18 @@ var require_ipv6 = __commonJS((exports) => {
           throw new address_error_1.AddressError("Invalid subnet mask.");
         }
         address = address.replace(constants6.RE_SUBNET_STRING, "");
-      } else if (/\//.test(address)) {
+      }
+      if (/\//.test(address)) {
         throw new address_error_1.AddressError("Invalid subnet mask.");
       }
       const zone = constants6.RE_ZONE_STRING.exec(address);
       if (zone) {
         this.zone = zone[0];
         address = address.replace(constants6.RE_ZONE_STRING, "");
+      }
+      const longest = this.groups * 5 + 5;
+      if (address.length > longest) {
+        throw new address_error_1.AddressError(`IPv6 addresses are at most ${longest} characters.`);
       }
       this.addressMinusSuffix = address;
       this.parsedAddress = this.parse(this.addressMinusSuffix);
@@ -46388,12 +46534,12 @@ var require_ipv6 = __commonJS((exports) => {
       try {
         new Address6(address);
         return true;
-      } catch (e) {
+      } catch {
         return false;
       }
     }
     static fromBigInt(bigInt) {
-      if (bigInt < 0n || bigInt > (1n << BigInt(constants6.BITS)) - 1n) {
+      if (bigInt < BigInt(0) || bigInt > (BigInt(1) << BigInt(constants6.BITS)) - BigInt(1)) {
         throw new address_error_1.AddressError("IPv6 BigInt must be in the range 0 to 2**128 - 1");
       }
       const hex3 = bigInt.toString(16).padStart(32, "0");
@@ -46404,46 +46550,43 @@ var require_ipv6 = __commonJS((exports) => {
       return new Address6(groups.join(":"));
     }
     static fromURL(url2) {
+      var _a7;
       let host;
       let port = null;
       let result;
-      if (url2.indexOf("[") !== -1 && url2.indexOf("]:") !== -1) {
-        result = constants6.RE_URL_WITH_PORT.exec(url2);
+      let error62;
+      const stripped = url2.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
+      if (stripped.indexOf("[") !== -1 && stripped.indexOf("]:") !== -1) {
+        error62 = "failed to parse address with port";
+        result = constants6.RE_URL_WITH_PORT.exec(stripped);
         if (result === null) {
-          return {
-            error: "failed to parse address with port",
-            address: null,
-            port: null
-          };
+          return { error: error62, address: null, port: null };
         }
         host = result[1];
         port = result[2];
-      } else if (url2.indexOf("/") !== -1) {
-        url2 = url2.replace(/^[a-z0-9]+:\/\//, "");
-        result = constants6.RE_URL.exec(url2);
-        if (result === null) {
-          return {
-            error: "failed to parse address from URL",
-            address: null,
-            port: null
-          };
-        }
-        host = result[1];
       } else {
-        host = url2;
+        error62 = "failed to parse address from URL";
+        result = constants6.RE_URL.exec(stripped);
+        if (result === null) {
+          return { error: error62, address: null, port: null };
+        }
+        host = (_a7 = result[1]) !== null && _a7 !== undefined ? _a7 : result[2];
       }
       if (port) {
         port = parseInt(port, 10);
-        if (port < 0 || port > 65536) {
+        if (port < 0 || port > 65535) {
           port = null;
         }
       } else {
         port = null;
       }
-      return {
-        address: new Address6(host),
-        port
-      };
+      let address;
+      try {
+        address = new Address6(host);
+      } catch {
+        return { error: error62, address: null, port: null };
+      }
+      return { address, port };
     }
     static fromAddressAndMask(address, mask) {
       const bits = common.prefixLengthFromMask(new Address6(mask).bigInt(), constants6.BITS);
@@ -46500,18 +46643,18 @@ var require_ipv6 = __commonJS((exports) => {
       return new Address6(`::ffff:${address4.correctForm()}/${mask6}`);
     }
     static fromArpa(arpaFormAddress) {
-      let address = arpaFormAddress.replace(/(\.ip6\.arpa)?\.$/, "");
-      const semicolonAmount = 7;
-      if (address.length !== 63) {
+      const nibbles = arpaFormAddress.replace(/(\.ip6\.arpa)?\.?$/i, "");
+      if (!/^[0-9a-f](\.[0-9a-f]){0,31}$/i.test(nibbles)) {
         throw new address_error_1.AddressError("Invalid 'ip6.arpa' form.");
       }
-      const parts = address.split(".").reverse();
-      for (let i = semicolonAmount;i > 0; i--) {
-        const insertIndex = i * 4;
-        parts.splice(insertIndex, 0, ":");
+      const reversed = nibbles.split(".").reverse();
+      const subnetMask = reversed.length * 4;
+      const hex3 = reversed.join("").padEnd(32, "0");
+      const groups = [];
+      for (let i = 0;i < constants6.GROUPS; i++) {
+        groups.push(hex3.slice(i * 4, (i + 1) * 4));
       }
-      address = parts.join("");
-      return new Address6(address);
+      return new Address6(`${groups.join(":")}/${subnetMask}`);
     }
     microsoftTranscription() {
       return `${this.correctForm().replace(/:/g, "-")}.ipv6-literal.net`;
@@ -46548,6 +46691,15 @@ var require_ipv6 = __commonJS((exports) => {
       const adjust = BigInt("1");
       return Address6.fromBigInt(this._endAddress() - adjust);
     }
+    offset(n) {
+      return Address6.fromBigInt(common.offsetBigInt(this.bigInt(), n, constants6.BITS, "IPv6")).withSubnetMask(this.subnetMask);
+    }
+    nextNetwork() {
+      return Address6.fromBigInt(common.offsetBigInt(this._endAddress(), 1, constants6.BITS, "IPv6")).withSubnetMask(this.subnetMask);
+    }
+    withSubnetMask(subnetMask) {
+      return new Address6(`${this.correctForm()}/${subnetMask}`);
+    }
     subnetMaskAddress() {
       return Address6.fromBigInt(BigInt(`0b${"1".repeat(this.subnetMask)}${"0".repeat(constants6.BITS - this.subnetMask)}`));
     }
@@ -46574,7 +46726,7 @@ var require_ipv6 = __commonJS((exports) => {
     getType() {
       for (let i = 0;i < TYPE_SUBNETS.length; i++) {
         const entry = TYPE_SUBNETS[i];
-        if (this.isInSubnet(entry[0])) {
+        if (this.isHostInSubnet(entry[0])) {
           return entry[1];
         }
       }
@@ -46663,18 +46815,20 @@ var require_ipv6 = __commonJS((exports) => {
       }
       const groups = address.split(":");
       const lastGroup = groups.slice(-1)[0];
+      const v4Octets = lastGroup.split(".");
+      if (v4Octets.length === constants4.GROUPS && v4Octets.every((octet) => /^\d{1,3}$/.test(octet))) {
+        if (v4Octets.some((octet) => /^0\d/.test(octet))) {
+          const highlighted = v4Octets.map(spanLeadingZeroes4).join(".");
+          const prefix = groups.slice(0, -1).map(helpers.escapeHtml).join(":");
+          const separator = groups.length > 1 ? ":" : "";
+          throw new address_error_1.AddressError("IPv4 addresses can't have leading zeroes.", `${prefix}${separator}${highlighted}`);
+        }
+      }
       const address4 = lastGroup.match(constants4.RE_ADDRESS);
       if (address4) {
         this.parsedAddress4 = address4[0];
-        this.address4 = new ipv4_1.Address4(this.parsedAddress4);
-        for (let i = 0;i < this.address4.groups; i++) {
-          if (/^0[0-9]+/.test(this.address4.parsedAddress[i])) {
-            const highlighted = this.address4.parsedAddress.map(spanLeadingZeroes4).join(".");
-            const prefix = groups.slice(0, -1).map(helpers.escapeHtml).join(":");
-            const separator = groups.length > 1 ? ":" : "";
-            throw new address_error_1.AddressError("IPv4 addresses can't have leading zeroes.", `${prefix}${separator}${highlighted}`);
-          }
-        }
+        const v4Suffix = this.subnetMask >= 96 ? `/${this.subnetMask - 96}` : "";
+        this.address4 = new ipv4_1.Address4(`${this.parsedAddress4}${v4Suffix}`);
         this.v4 = true;
         groups[groups.length - 1] = this.address4.toGroup6();
         address = groups.join(":");
@@ -46737,7 +46891,16 @@ var require_ipv6 = __commonJS((exports) => {
     }
     to4() {
       const binary = this.binaryZeroPad().split("");
-      return ipv4_1.Address4.fromHex(BigInt(`0b${binary.slice(96, 128).join("")}`).toString(16).padStart(8, "0"));
+      const hex3 = BigInt(`0b${binary.slice(96, 128).join("")}`).toString(16).padStart(8, "0");
+      if (this.subnetMask >= 96) {
+        const v4Mask = this.subnetMask - 96;
+        const groups = [];
+        for (let i = 0;i < 8; i += 2) {
+          groups.push(parseInt(hex3.slice(i, i + 2), 16));
+        }
+        return new ipv4_1.Address4(`${groups.join(".")}/${v4Mask}`);
+      }
+      return ipv4_1.Address4.fromHex(hex3);
     }
     to4in6() {
       const address4 = this.to4();
@@ -46747,7 +46910,7 @@ var require_ipv6 = __commonJS((exports) => {
       if (!/:$/.test(correct)) {
         infix = ":";
       }
-      return correct + infix + address4.address;
+      return correct + infix + address4.correctForm();
     }
     inspectTeredo() {
       const prefix = this.getBitsBase16(0, 32);
@@ -46812,7 +46975,13 @@ var require_ipv6 = __commonJS((exports) => {
         bits = prefixBits.slice(0, 96) + v4Bits;
       } else {
         const beforeU = 64 - pl;
-        bits = prefixBits.slice(0, pl) + v4Bits.slice(0, beforeU) + "00000000" + v4Bits.slice(beforeU) + "0".repeat(128 - 72 - (32 - beforeU));
+        bits = [
+          prefixBits.slice(0, pl),
+          v4Bits.slice(0, beforeU),
+          "00000000",
+          v4Bits.slice(beforeU),
+          "0".repeat(128 - 72 - (32 - beforeU))
+        ].join("");
       }
       const hex3 = BigInt(`0b${bits}`).toString(16).padStart(32, "0");
       const groups = [];
@@ -46827,7 +46996,7 @@ var require_ipv6 = __commonJS((exports) => {
       if (pl !== 32 && pl !== 40 && pl !== 48 && pl !== 56 && pl !== 64 && pl !== 96) {
         throw new address_error_1.AddressError("NAT64 prefix length must be 32, 40, 48, 56, 64, or 96");
       }
-      if (!this.isInSubnet(prefix6)) {
+      if (!this.isHostInSubnet(prefix6)) {
         return null;
       }
       const bits = this.binaryZeroPad();
@@ -46845,9 +47014,7 @@ var require_ipv6 = __commonJS((exports) => {
       return new ipv4_1.Address4(octets.join("."));
     }
     toByteArray() {
-      const valueWithoutPadding = this.bigInt().toString(16);
-      const leadingPad = "0".repeat(valueWithoutPadding.length % 2);
-      const value = `${leadingPad}${valueWithoutPadding}`;
+      const value = this.bigInt().toString(16).padStart(constants6.BITS / 4, "0");
       const bytes = [];
       for (let i = 0, length = value.length;i < length; i += 2) {
         bytes.push(parseInt(value.substring(i, i + 2), 16));
@@ -46858,9 +47025,11 @@ var require_ipv6 = __commonJS((exports) => {
       return this.toByteArray().map(unsignByte);
     }
     static fromByteArray(bytes) {
+      common.assertByteArray(bytes, 16, "IPv6", -128);
       return this.fromUnsignedByteArray(bytes.map(unsignByte));
     }
     static fromUnsignedByteArray(bytes) {
+      common.assertByteArray(bytes, 16, "IPv6", 0);
       const BYTE_MAX = BigInt("256");
       let result = BigInt("0");
       let multiplier = BigInt("1");
@@ -46874,12 +47043,17 @@ var require_ipv6 = __commonJS((exports) => {
       return this.addressMinusSuffix === this.canonicalForm();
     }
     isLinkLocal() {
-      if (this.getBitsBase2(0, 64) === "1111111010000000000000000000000000000000000000000000000000000000") {
-        return true;
+      const embedded = this.embeddedIPv4();
+      if (embedded) {
+        return embedded.isLinkLocal();
       }
-      return false;
+      return this.isHostInSubnet(LINK_LOCAL_SUBNET);
     }
     isMulticast() {
+      const embedded = this.embeddedIPv4();
+      if (embedded) {
+        return embedded.isMulticast();
+      }
       const type = this.getType();
       return type === "Multicast" || type.startsWith("Multicast ");
     }
@@ -46887,25 +47061,74 @@ var require_ipv6 = __commonJS((exports) => {
       return this.v4;
     }
     isMapped4() {
-      return this.isInSubnet(IPV4_MAPPED_SUBNET);
+      return this.isHostInSubnet(IPV4_MAPPED_SUBNET);
+    }
+    embeddedIPv4() {
+      if (this.isMapped4() || this.isHostInSubnet(NAT64_WELL_KNOWN_SUBNET)) {
+        return this.to4();
+      }
+      return null;
     }
     isTeredo() {
-      return this.isInSubnet(TEREDO_SUBNET);
+      return this.isHostInSubnet(TEREDO_SUBNET);
     }
     is6to4() {
-      return this.isInSubnet(SIX_TO_FOUR_SUBNET);
+      return this.isHostInSubnet(SIX_TO_FOUR_SUBNET);
     }
     isLoopback() {
+      const embedded = this.embeddedIPv4();
+      if (embedded) {
+        return embedded.isLoopback();
+      }
       return this.getType() === "Loopback";
     }
     isULA() {
-      return this.isInSubnet(ULA_SUBNET);
+      return this.isHostInSubnet(ULA_SUBNET);
+    }
+    isPrivate() {
+      const embedded = this.embeddedIPv4();
+      if (embedded) {
+        return embedded.isPrivate();
+      }
+      return this.isULA() || this.isHostInSubnet(NAT64_LOCAL_USE_SUBNET);
+    }
+    isCGNAT() {
+      const embedded = this.embeddedIPv4();
+      if (embedded) {
+        return embedded.isCGNAT();
+      }
+      return false;
+    }
+    isBroadcast() {
+      const embedded = this.embeddedIPv4();
+      if (embedded) {
+        return embedded.isBroadcast();
+      }
+      return false;
     }
     isUnspecified() {
+      const embedded = this.embeddedIPv4();
+      if (embedded) {
+        return embedded.isUnspecified();
+      }
       return this.getType() === "Unspecified";
     }
     isDocumentation() {
-      return this.isInSubnet(DOCUMENTATION_SUBNET);
+      return DOCUMENTATION_SUBNETS.some((subnet) => this.isHostInSubnet(subnet));
+    }
+    isBenchmarking() {
+      const embedded = this.embeddedIPv4();
+      if (embedded) {
+        return embedded.isBenchmarking();
+      }
+      return this.isHostInSubnet(BENCHMARKING_SUBNET);
+    }
+    isGlobal() {
+      const embedded = this.embeddedIPv4();
+      if (embedded) {
+        return embedded.isGlobal();
+      }
+      return this.isHostInSubnet(GLOBAL_UNICAST_SUBNET) && common.isGloballyReachable.call(this, SPECIAL_PURPOSE_V6);
     }
     href(optionalPort) {
       if (optionalPort === undefined) {
@@ -47015,8 +47238,17 @@ var require_ipv6 = __commonJS((exports) => {
   var TEREDO_SUBNET = new Address6("2001::/32");
   var SIX_TO_FOUR_SUBNET = new Address6("2002::/16");
   var ULA_SUBNET = new Address6("fc00::/7");
-  var DOCUMENTATION_SUBNET = new Address6("2001:db8::/32");
+  var LINK_LOCAL_SUBNET = new Address6("fe80::/10");
+  var DOCUMENTATION_SUBNETS = [new Address6("2001:db8::/32"), new Address6("3fff::/20")];
+  var BENCHMARKING_SUBNET = new Address6("2001:2::/48");
+  var GLOBAL_UNICAST_SUBNET = new Address6("2000::/3");
+  var SPECIAL_PURPOSE_V6 = constants6.SPECIAL_PURPOSE.map(([cidr, , reachable]) => ({
+    subnet: new Address6(cidr),
+    reachable
+  }));
   var IPV4_MAPPED_SUBNET = new Address6("::ffff:0:0/96");
+  var NAT64_WELL_KNOWN_SUBNET = new Address6("64:ff9b::/96");
+  var NAT64_LOCAL_USE_SUBNET = new Address6("64:ff9b:1::/48");
 });
 
 // /zveltio-extension/node_modules/ip-address/dist/ip-address.js
@@ -55254,7 +55486,7 @@ var require_imap_flow = __commonJS((exports, module) => {
   exports.ImapFlow = ImapFlow;
 });
 
-// /zveltio-extension/node_modules/encoding-japanese/src/util.js
+// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/util.js
 var require_util3 = __commonJS((exports) => {
   var config2 = require_config2();
   var fromCharCode = String.fromCharCode;
@@ -55707,7 +55939,7 @@ var require_util3 = __commonJS((exports) => {
   exports.base64decode = base64decode;
 });
 
-// /zveltio-extension/node_modules/encoding-japanese/src/utf8-to-jis-table.js
+// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/utf8-to-jis-table.js
 var require_utf8_to_jis_table2 = __commonJS((exports, module) => {
   module.exports = {
     15711649: 33,
@@ -63104,7 +63336,7 @@ var require_utf8_to_jis_table2 = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/encoding-japanese/src/utf8-to-jis-alias-table.js
+// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/utf8-to-jis-alias-table.js
 var require_utf8_to_jis_alias_table = __commonJS((exports, module) => {
   module.exports = {
     14846098: 8541,
@@ -63114,7 +63346,7 @@ var require_utf8_to_jis_alias_table = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/encoding-japanese/src/utf8-to-jisx0212-table.js
+// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/utf8-to-jisx0212-table.js
 var require_utf8_to_jisx0212_table2 = __commonJS((exports, module) => {
   module.exports = {
     52120: 8751,
@@ -69187,19 +69419,19 @@ var require_utf8_to_jisx0212_table2 = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/encoding-japanese/src/jis-to-utf8-table.js
+// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/jis-to-utf8-table.js
 var require_jis_to_utf8_table2 = __commonJS((exports, module) => {
   var JIS_TO_UTF8_TABLE = null;
   module.exports = JIS_TO_UTF8_TABLE;
 });
 
-// /zveltio-extension/node_modules/encoding-japanese/src/jisx0212-to-utf8-table.js
+// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/jisx0212-to-utf8-table.js
 var require_jisx0212_to_utf8_table2 = __commonJS((exports, module) => {
   var JISX0212_TO_UTF8_TABLE = null;
   module.exports = JISX0212_TO_UTF8_TABLE;
 });
 
-// /zveltio-extension/node_modules/encoding-japanese/src/encoding-table.js
+// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/encoding-table.js
 var require_encoding_table2 = __commonJS((exports) => {
   exports.UTF8_TO_JIS_TABLE = require_utf8_to_jis_table2();
   exports.UTF8_TO_JIS_ALIAS_TABLE = require_utf8_to_jis_alias_table();
@@ -69208,7 +69440,7 @@ var require_encoding_table2 = __commonJS((exports) => {
   exports.JISX0212_TO_UTF8_TABLE = require_jisx0212_to_utf8_table2();
 });
 
-// /zveltio-extension/node_modules/encoding-japanese/src/config.js
+// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/config.js
 var require_config2 = __commonJS((exports) => {
   var util = require_util3();
   var EncodingTable = require_encoding_table2();
@@ -69326,7 +69558,7 @@ var require_config2 = __commonJS((exports) => {
   exports.init_JIS_TO_UTF8_TABLE = init_JIS_TO_UTF8_TABLE;
 });
 
-// /zveltio-extension/node_modules/encoding-japanese/src/encoding-detect.js
+// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/encoding-detect.js
 var require_encoding_detect2 = __commonJS((exports) => {
   function isBINARY(data) {
     var i = 0;
@@ -69681,7 +69913,7 @@ var require_encoding_detect2 = __commonJS((exports) => {
   exports.isUNICODE = isUNICODE;
 });
 
-// /zveltio-extension/node_modules/encoding-japanese/src/sjis-ext.js
+// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/sjis-ext.js
 var require_sjis_ext2 = __commonJS((exports) => {
   var CP932_IBM_EXT_SYMBOL_MAP = [
     61167,
@@ -69767,7 +69999,7 @@ var require_sjis_ext2 = __commonJS((exports) => {
   exports.hasCP932DuplicateCode = hasCP932DuplicateCode;
 });
 
-// /zveltio-extension/node_modules/encoding-japanese/src/encoding-convert.js
+// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/encoding-convert.js
 var require_encoding_convert2 = __commonJS((exports) => {
   var config2 = require_config2();
   var util = require_util3();
@@ -71050,7 +71282,7 @@ var require_encoding_convert2 = __commonJS((exports) => {
   }
 });
 
-// /zveltio-extension/node_modules/encoding-japanese/src/kana-case-table.js
+// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/kana-case-table.js
 var require_kana_case_table2 = __commonJS((exports) => {
   exports.HANKANA_TABLE = {
     12289: 65380,
@@ -71190,7 +71422,7 @@ var require_kana_case_table2 = __commonJS((exports) => {
   ];
 });
 
-// /zveltio-extension/node_modules/encoding-japanese/package.json
+// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/package.json
 var require_package4 = __commonJS((exports, module) => {
   module.exports = {
     name: "encoding-japanese",
@@ -71270,7 +71502,7 @@ var require_package4 = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/encoding-japanese/src/index.js
+// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/index.js
 var require_src2 = __commonJS((exports, module) => {
   var config2 = require_config2();
   var util = require_util3();
@@ -71625,7 +71857,7 @@ var require_src2 = __commonJS((exports, module) => {
   module.exports = Encoding;
 });
 
-// /zveltio-extension/node_modules/libmime/lib/charsets.js
+// /zveltio-extension/node_modules/mailparser/node_modules/libmime/lib/charsets.js
 var require_charsets3 = __commonJS((exports, module) => {
   module.exports = {
     "866": "IBM866",
@@ -71837,7 +72069,7 @@ var require_charsets3 = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/libmime/lib/charset.js
+// /zveltio-extension/node_modules/mailparser/node_modules/libmime/lib/charset.js
 var require_charset2 = __commonJS((exports, module) => {
   var { Buffer: Buffer2 } = __require("buffer");
   var iconv = require_lib();
@@ -71899,7 +72131,406 @@ var require_charset2 = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/libmime/lib/mimetypes.js
+// /zveltio-extension/node_modules/mailparser/node_modules/libmime/node_modules/libbase64/lib/libbase64.js
+var require_libbase642 = __commonJS((exports, module) => {
+  var { Buffer: Buffer2 } = __require("buffer");
+  var stream = __require("stream");
+  var Transform = stream.Transform;
+  function encode3(buffer) {
+    if (typeof buffer === "string") {
+      buffer = Buffer2.from(buffer, "utf-8");
+    }
+    return buffer.toString("base64");
+  }
+  function decode3(str) {
+    str = str || "";
+    if (typeof str === "string") {
+      let padPos = str.indexOf("=");
+      if (padPos >= 0 && /[a-zA-Z0-9+/\-_]/.test(str.substr(padPos))) {
+        let parts = [];
+        for (let segment of str.split(/[=]+/)) {
+          if (segment) {
+            parts.push(Buffer2.from(segment, "base64"));
+          }
+        }
+        return Buffer2.concat(parts);
+      }
+    }
+    return Buffer2.from(str, "base64");
+  }
+  function wrap(str, lineLength) {
+    str = (str || "").toString();
+    lineLength = lineLength || 76;
+    if (str.length <= lineLength) {
+      return str;
+    }
+    let result = [];
+    let pos = 0;
+    let chunkLength = lineLength * 1024;
+    while (pos < str.length) {
+      let wrappedLines = str.substr(pos, chunkLength).replace(new RegExp(".{" + lineLength + "}", "g"), `$&\r
+`).trim();
+      result.push(wrappedLines);
+      pos += chunkLength;
+    }
+    return result.join(`\r
+`).trim();
+  }
+
+  class Encoder extends Transform {
+    constructor(options) {
+      super();
+      this.options = options || {};
+      if (this.options.lineLength !== false) {
+        this.options.lineLength = Number(this.options.lineLength) || 76;
+      }
+      this.skipStartBytes = Number(this.options.skipStartBytes) || 0;
+      this.limitOutbutBytes = Number(this.options.limitOutbutBytes) || 0;
+      this._curLine = this.options.startPadding || "";
+      this._remainingBytes = false;
+      this.inputBytes = 0;
+      this.outputBytes = 0;
+    }
+    _writeChunk(chunk) {
+      if (this.skipStartBytes) {
+        if (chunk.length <= this.skipStartBytes) {
+          this.skipStartBytes -= chunk.length;
+          return;
+        }
+        chunk = chunk.slice(this.skipStartBytes);
+        this.skipStartBytes = 0;
+      }
+      if (this.limitOutbutBytes) {
+        if (this.outputBytes + chunk.length <= this.limitOutbutBytes) {} else if (this.outputBytes >= this.limitOutbutBytes) {
+          return;
+        } else {
+          chunk = chunk.slice(0, this.limitOutbutBytes - this.outputBytes);
+        }
+      }
+      this.outputBytes += chunk.length;
+      this.push(chunk);
+    }
+    _getWrapped(str, isFinal) {
+      str = wrap(str, this.options.lineLength);
+      if (!isFinal && str.length === this.options.lineLength) {
+        str += `\r
+`;
+      }
+      return str;
+    }
+    _transform(chunk, encoding, done) {
+      if (encoding !== "buffer") {
+        chunk = Buffer2.from(chunk, encoding);
+      }
+      if (!chunk || !chunk.length) {
+        return setImmediate(done);
+      }
+      this.inputBytes += chunk.length;
+      if (this._remainingBytes && this._remainingBytes.length) {
+        chunk = Buffer2.concat([this._remainingBytes, chunk], this._remainingBytes.length + chunk.length);
+        this._remainingBytes = false;
+      }
+      if (chunk.length % 3) {
+        this._remainingBytes = chunk.slice(chunk.length - chunk.length % 3);
+        chunk = chunk.slice(0, chunk.length - chunk.length % 3);
+      } else {
+        this._remainingBytes = false;
+      }
+      let b64 = this._curLine + encode3(chunk);
+      if (this.options.lineLength) {
+        b64 = this._getWrapped(b64);
+        let lastLF = b64.lastIndexOf(`
+`);
+        if (lastLF < 0) {
+          this._curLine = b64;
+          b64 = "";
+        } else if (lastLF === b64.length - 1) {
+          this._curLine = "";
+        } else {
+          this._curLine = b64.substr(lastLF + 1);
+          b64 = b64.substr(0, lastLF + 1);
+        }
+      }
+      if (b64) {
+        this._writeChunk(Buffer2.from(b64, "ascii"), false);
+      }
+      setImmediate(done);
+    }
+    _flush(done) {
+      if (this._remainingBytes && this._remainingBytes.length) {
+        this._curLine += encode3(this._remainingBytes);
+      }
+      if (this._curLine) {
+        this._curLine = this._getWrapped(this._curLine, true);
+        this._writeChunk(Buffer2.from(this._curLine, "ascii"), true);
+        this._curLine = "";
+      }
+      done();
+    }
+  }
+
+  class Decoder extends Transform {
+    constructor(options) {
+      super();
+      this.options = options || {};
+      this._curLine = "";
+      this.inputBytes = 0;
+      this.outputBytes = 0;
+    }
+    _transform(chunk, encoding, done) {
+      if (!chunk || !chunk.length) {
+        return setImmediate(done);
+      }
+      this.inputBytes += chunk.length;
+      let b64 = this._curLine + chunk.toString("ascii");
+      this._curLine = "";
+      if (/[^a-zA-Z0-9+/=]/.test(b64)) {
+        b64 = b64.replace(/[^a-zA-Z0-9+/=]/g, "");
+      }
+      let padded = "";
+      let lastPad = b64.lastIndexOf("=");
+      if (lastPad >= 0) {
+        padded = b64.substr(0, lastPad + 1);
+        b64 = b64.substr(lastPad + 1);
+      }
+      if (b64.length < 4) {
+        this._curLine = b64;
+        b64 = "";
+      } else if (b64.length % 4) {
+        this._curLine = b64.substr(-b64.length % 4);
+        b64 = b64.substr(0, b64.length - this._curLine.length);
+      }
+      b64 = padded + b64;
+      if (b64) {
+        let buf = decode3(b64);
+        this.outputBytes += buf.length;
+        this.push(buf);
+      }
+      setImmediate(done);
+    }
+    _flush(done) {
+      if (this._curLine) {
+        let buf = decode3(this._curLine);
+        this.outputBytes += buf.length;
+        this.push(buf);
+        this._curLine = "";
+      }
+      setImmediate(done);
+    }
+  }
+  module.exports = {
+    encode: encode3,
+    decode: decode3,
+    wrap,
+    Encoder,
+    Decoder
+  };
+});
+
+// /zveltio-extension/node_modules/mailparser/node_modules/libmime/node_modules/libqp/lib/libqp.js
+var require_libqp2 = __commonJS((exports, module) => {
+  var { Buffer: Buffer2 } = __require("buffer");
+  var stream = __require("stream");
+  var Transform = stream.Transform;
+  function encode3(buffer) {
+    if (typeof buffer === "string") {
+      buffer = Buffer2.from(buffer, "utf-8");
+    }
+    let ranges = [
+      [9],
+      [10],
+      [13],
+      [32, 60],
+      [62, 126]
+    ];
+    let result = "";
+    let ord;
+    for (let i = 0, len = buffer.length;i < len; i++) {
+      ord = buffer[i];
+      if (checkRanges(ord, ranges) && !((ord === 32 || ord === 9) && (i === len - 1 || buffer[i + 1] === 10 || buffer[i + 1] === 13))) {
+        result += String.fromCharCode(ord);
+        continue;
+      }
+      result += "=" + (ord < 16 ? "0" : "") + ord.toString(16).toUpperCase();
+    }
+    return result;
+  }
+  function decode3(str) {
+    str = (Buffer2.isBuffer(str) ? str.toString("binary") : (str || "").toString()).replace(/[\t ]+$/gm, "").replace(/\=(?:\r?\n|$)/g, "");
+    let encodedBytesCount = (str.match(/\=[\da-fA-F]{2}/g) || []).length, bufferLength = str.length - encodedBytesCount * 2, chr, hex3, buffer = Buffer2.alloc(bufferLength), bufferPos = 0;
+    for (let i = 0, len = str.length;i < len; i++) {
+      chr = str.charAt(i);
+      if (chr === "=" && (hex3 = str.substr(i + 1, 2)) && /[\da-fA-F]{2}/.test(hex3)) {
+        buffer[bufferPos++] = parseInt(hex3, 16);
+        i += 2;
+        continue;
+      }
+      buffer[bufferPos++] = chr.charCodeAt(0);
+    }
+    return buffer;
+  }
+  function wrap(str, lineLength) {
+    str = (str || "").toString();
+    lineLength = lineLength || 76;
+    if (str.length <= lineLength) {
+      return str;
+    }
+    let pos = 0, len = str.length, match2, code, line, lineMargin = Math.floor(lineLength / 3), result = "";
+    while (pos < len) {
+      line = str.substr(pos, lineLength);
+      if (match2 = line.match(/\r\n/)) {
+        line = line.substr(0, match2.index + match2[0].length);
+        result += line;
+        pos += line.length;
+        continue;
+      }
+      if (line.substr(-1) === `
+`) {
+        result += line;
+        pos += line.length;
+        continue;
+      } else if (match2 = line.substr(-lineMargin).match(/\n.*?$/)) {
+        line = line.substr(0, line.length - (match2[0].length - 1));
+        result += line;
+        pos += line.length;
+        continue;
+      } else if (line.length > lineLength - lineMargin && (match2 = line.substr(-lineMargin).match(/[ \t\.,!\?][^ \t\.,!\?]*$/))) {
+        line = line.substr(0, line.length - (match2[0].length - 1));
+      } else if (line.match(/\=[\da-f]{0,2}$/i)) {
+        if (match2 = line.match(/\=[\da-f]{0,1}$/i)) {
+          line = line.substr(0, line.length - match2[0].length);
+        }
+        while (line.length > 3 && line.length < len - pos && !line.match(/^(?:=[\da-f]{2}){1,4}$/i) && (match2 = line.match(/\=[\da-f]{2}$/gi))) {
+          code = parseInt(match2[0].substr(1, 2), 16);
+          if (code < 128) {
+            break;
+          }
+          line = line.substr(0, line.length - 3);
+          if (code >= 192) {
+            break;
+          }
+        }
+      }
+      if (pos + line.length < len && line.substr(-1) !== `
+`) {
+        if (line.length === lineLength && line.match(/\=[\da-f]{2}$/i)) {
+          line = line.substr(0, line.length - 3);
+        } else if (line.length === lineLength) {
+          line = line.substr(0, line.length - 1);
+        }
+        pos += line.length;
+        line += `=\r
+`;
+      } else {
+        pos += line.length;
+      }
+      result += line;
+    }
+    return result;
+  }
+  function checkRanges(nr, ranges) {
+    for (let i = ranges.length - 1;i >= 0; i--) {
+      if (!ranges[i].length) {
+        continue;
+      }
+      if (ranges[i].length === 1 && nr === ranges[i][0]) {
+        return true;
+      }
+      if (ranges[i].length === 2 && nr >= ranges[i][0] && nr <= ranges[i][1]) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  class Encoder extends Transform {
+    constructor(options) {
+      super();
+      this.options = options || {};
+      if (this.options.lineLength !== false) {
+        this.options.lineLength = this.options.lineLength || 76;
+      }
+      this._curLine = "";
+      this.inputBytes = 0;
+      this.outputBytes = 0;
+      Transform.call(this, this.options);
+    }
+    _transform(chunk, encoding, done) {
+      let qp;
+      if (encoding !== "buffer") {
+        chunk = Buffer2.from(chunk, encoding);
+      }
+      if (!chunk || !chunk.length) {
+        return done();
+      }
+      this.inputBytes += chunk.length;
+      if (this.options.lineLength) {
+        qp = this._curLine + encode3(chunk);
+        qp = wrap(qp, this.options.lineLength);
+        qp = qp.replace(/(^|\n)([^\n]*)$/, (match2, lineBreak, lastLine) => {
+          this._curLine = lastLine;
+          return lineBreak;
+        });
+        if (qp) {
+          this.outputBytes += qp.length;
+          this.push(qp);
+        }
+      } else {
+        qp = encode3(chunk);
+        this.outputBytes += qp.length;
+        this.push(qp, "ascii");
+      }
+      done();
+    }
+    _flush(done) {
+      if (this._curLine) {
+        this.outputBytes += this._curLine.length;
+        this.push(this._curLine, "ascii");
+      }
+      done();
+    }
+  }
+
+  class Decoder extends Transform {
+    constructor(options) {
+      options = options || {};
+      super(options);
+      this.options = options;
+      this._curLine = "";
+      this.inputBytes = 0;
+      this.outputBytes = 0;
+      this.qpChunks = [];
+    }
+    _transform(chunk, encoding, done) {
+      if (!chunk || !chunk.length) {
+        return done();
+      }
+      if (typeof chunk === "string") {
+        chunk = Buffer2.from(chunk, encoding);
+      }
+      this.qpChunks.push(chunk);
+      this.inputBytes += chunk.length;
+      done();
+    }
+    _flush(done) {
+      if (this.inputBytes) {
+        let buf = decode3(Buffer2.concat(this.qpChunks, this.inputBytes));
+        this.outputBytes += buf.length;
+        this.push(buf);
+      }
+      done();
+    }
+  }
+  module.exports = {
+    encode: encode3,
+    decode: decode3,
+    wrap,
+    Encoder,
+    Decoder
+  };
+});
+
+// /zveltio-extension/node_modules/mailparser/node_modules/libmime/lib/mimetypes.js
 var require_mimetypes2 = __commonJS((exports, module) => {
   module.exports = {
     list: {
@@ -73947,12 +74578,12 @@ var require_mimetypes2 = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/libmime/lib/libmime.js
+// /zveltio-extension/node_modules/mailparser/node_modules/libmime/lib/libmime.js
 var require_libmime2 = __commonJS((exports, module) => {
   var { Buffer: Buffer2 } = __require("buffer");
   var libcharset = require_charset2();
-  var libbase64 = require_libbase64();
-  var libqp = require_libqp();
+  var libbase64 = require_libbase642();
+  var libqp = require_libqp2();
   var mimetypes = require_mimetypes2();
   var STAGE_KEY = 4097;
   var STAGE_VALUE = 4098;
@@ -73989,25 +74620,36 @@ var require_libmime2 = __commonJS((exports, module) => {
     decodeFlowed(str, delSp) {
       str = (str || "").toString();
       let lines = str.split(/\r?\n/);
-      let result = [], buffer = null;
+      let result = [];
+      let parts = null, partsLength = 0;
+      let pushPart = (part) => {
+        if (part) {
+          parts.push(part);
+          partsLength += part.length;
+        }
+      };
       for (let i = 0;i < lines.length; i++) {
         let line = lines[i];
-        let isSoftBreak = buffer !== null && / $/.test(buffer) && !/(^|\n)-- $/.test(buffer);
+        let last = parts !== null && parts.length ? parts[parts.length - 1] : "";
+        let isSoftBreak = last.endsWith(" ") && !(partsLength === 3 && parts.join("") === "-- ");
         if (isSoftBreak) {
           if (delSp) {
-            buffer = buffer.slice(0, -1) + line;
-          } else {
-            buffer += line;
+            parts.pop();
+            partsLength -= last.length;
+            pushPart(last.slice(0, -1));
           }
+          pushPart(line);
         } else {
-          if (buffer !== null) {
-            result.push(buffer);
+          if (parts !== null) {
+            result.push(parts.join(""));
           }
-          buffer = line;
+          parts = [];
+          partsLength = 0;
+          pushPart(line);
         }
       }
-      if (buffer) {
-        result.push(buffer);
+      if (parts !== null && partsLength) {
+        result.push(parts.join(""));
       }
       return result.join(`
 `).replace(/^ /gm, "");
@@ -74104,7 +74746,7 @@ var require_libmime2 = __commonJS((exports, module) => {
         }
         str = Buffer2.from(bytes);
       } else if (encoding === "B") {
-        str = Buffer2.concat(str.split("=").filter((s) => s !== "").map((str2) => Buffer2.from(str2, "base64")));
+        str = libbase64.decode(str);
       } else {
         str = Buffer2.from(str);
       }
@@ -74167,13 +74809,16 @@ var require_libmime2 = __commonJS((exports, module) => {
       }
       let bodyPos = lines.indexOf("", headersPos);
       lines = lines.slice(headersPos, bodyPos >= 0 ? bodyPos : lines.length);
-      for (i = lines.length - 1;i > 0; i--) {
-        if (/^[ \t]/.test(lines[i])) {
-          lines[i - 1] += `\r
+      let unfolded = [];
+      for (i = 0, len = lines.length;i < len; i++) {
+        if (unfolded.length && /^[ \t]/.test(lines[i])) {
+          unfolded[unfolded.length - 1] += `\r
 ` + lines[i];
-          lines.splice(i, 1);
+        } else {
+          unfolded.push(lines[i]);
         }
       }
+      lines = unfolded;
       for (i = 0, len = lines.length;i < len; i++) {
         header = this.decodeHeader(lines[i]);
         if (!hasOwn(headersObj, header.key)) {
@@ -74529,7 +75174,7 @@ var require_libmime2 = __commonJS((exports, module) => {
   module.exports.Libmime = Libmime;
 });
 
-// /zveltio-extension/node_modules/@zone-eu/mailsplit/lib/headers.js
+// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/lib/headers.js
 var require_headers2 = __commonJS((exports, module) => {
   var libmime = require_libmime2();
   var Libmime = libmime.Libmime;
@@ -74726,29 +75371,32 @@ var require_headers2 = __commonJS((exports, module) => {
         this.parsed = true;
         return;
       }
-      let lines = this.headers.toString("binary").replace(/[\r\n]+$/, "").split(/\r?\n/);
-      for (let i = lines.length - 1;i >= 0; i--) {
-        let currentLine = lines[i];
-        if (i && this._isFoldingChar(currentLine.charAt(0))) {
-          lines[i - 1] = lines[i - 1] + `\r
+      let rawLines = this.headers.toString("binary").replace(/[\r\n]+$/, "").split(/\r?\n/);
+      let i = 1;
+      let first = rawLines[0];
+      while (i < rawLines.length && this._isFoldingChar(rawLines[i].charAt(0))) {
+        first += `\r
+` + rawLines[i++];
+      }
+      let lines = [];
+      if (/^From /i.test(first)) {
+        this.mbox = first;
+      } else if (/^POST /i.test(first)) {
+        this.http = first;
+      } else {
+        lines.push({ key: this._normalizeHeader(first.substr(0, first.indexOf(":"))), line: first });
+      }
+      for (;i < rawLines.length; i++) {
+        let currentLine = rawLines[i];
+        if (this._isFoldingChar(currentLine.charAt(0))) {
+          let entry = lines[lines.length - 1];
+          entry.line += `\r
 ` + currentLine;
-          lines.splice(i, 1);
-        } else {
-          let line = currentLine;
-          if (!i && /^From /i.test(line)) {
-            this.mbox = line;
-            lines.splice(i, 1);
-            continue;
-          } else if (!i && /^POST /i.test(line)) {
-            this.http = line;
-            lines.splice(i, 1);
-            continue;
+          if (!entry.key) {
+            entry.key = this._normalizeHeader(entry.line.substr(0, entry.line.indexOf(":")));
           }
-          let key = this._normalizeHeader(line.substr(0, line.indexOf(":")));
-          lines[i] = {
-            key,
-            line
-          };
+        } else {
+          lines.push({ key: this._normalizeHeader(currentLine.substr(0, currentLine.indexOf(":"))), line: currentLine });
         }
       }
       this.lines = lines;
@@ -74769,15 +75417,427 @@ var require_headers2 = __commonJS((exports, module) => {
   module.exports = Headers2;
 });
 
-// /zveltio-extension/node_modules/@zone-eu/mailsplit/lib/mime-node.js
+// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/node_modules/libqp/lib/libqp.js
+var require_libqp3 = __commonJS((exports, module) => {
+  var { Buffer: Buffer2 } = __require("buffer");
+  var stream = __require("stream");
+  var Transform = stream.Transform;
+  function encode3(buffer) {
+    if (typeof buffer === "string") {
+      buffer = Buffer2.from(buffer, "utf-8");
+    }
+    let ranges = [
+      [9],
+      [10],
+      [13],
+      [32, 60],
+      [62, 126]
+    ];
+    let result = "";
+    let ord;
+    for (let i = 0, len = buffer.length;i < len; i++) {
+      ord = buffer[i];
+      if (checkRanges(ord, ranges) && !((ord === 32 || ord === 9) && (i === len - 1 || buffer[i + 1] === 10 || buffer[i + 1] === 13))) {
+        result += String.fromCharCode(ord);
+        continue;
+      }
+      result += "=" + (ord < 16 ? "0" : "") + ord.toString(16).toUpperCase();
+    }
+    return result;
+  }
+  function decode3(str) {
+    str = (Buffer2.isBuffer(str) ? str.toString("binary") : (str || "").toString()).replace(/[\t ]+$/gm, "").replace(/\=(?:\r?\n|$)/g, "");
+    let encodedBytesCount = (str.match(/\=[\da-fA-F]{2}/g) || []).length, bufferLength = str.length - encodedBytesCount * 2, chr, hex3, buffer = Buffer2.alloc(bufferLength), bufferPos = 0;
+    for (let i = 0, len = str.length;i < len; i++) {
+      chr = str.charAt(i);
+      if (chr === "=" && (hex3 = str.substr(i + 1, 2)) && /[\da-fA-F]{2}/.test(hex3)) {
+        buffer[bufferPos++] = parseInt(hex3, 16);
+        i += 2;
+        continue;
+      }
+      buffer[bufferPos++] = chr.charCodeAt(0);
+    }
+    return buffer;
+  }
+  function wrap(str, lineLength) {
+    str = (str || "").toString();
+    lineLength = lineLength || 76;
+    if (str.length <= lineLength) {
+      return str;
+    }
+    let pos = 0, len = str.length, match2, code, line, lineMargin = Math.floor(lineLength / 3), result = "";
+    while (pos < len) {
+      line = str.substr(pos, lineLength);
+      if (match2 = line.match(/\r\n/)) {
+        line = line.substr(0, match2.index + match2[0].length);
+        result += line;
+        pos += line.length;
+        continue;
+      }
+      if (line.substr(-1) === `
+`) {
+        result += line;
+        pos += line.length;
+        continue;
+      } else if (match2 = line.substr(-lineMargin).match(/\n.*?$/)) {
+        line = line.substr(0, line.length - (match2[0].length - 1));
+        result += line;
+        pos += line.length;
+        continue;
+      } else if (line.length > lineLength - lineMargin && (match2 = line.substr(-lineMargin).match(/[ \t\.,!\?][^ \t\.,!\?]*$/))) {
+        line = line.substr(0, line.length - (match2[0].length - 1));
+      } else if (line.match(/\=[\da-f]{0,2}$/i)) {
+        if (match2 = line.match(/\=[\da-f]{0,1}$/i)) {
+          line = line.substr(0, line.length - match2[0].length);
+        }
+        while (line.length > 3 && line.length < len - pos && !line.match(/^(?:=[\da-f]{2}){1,4}$/i) && (match2 = line.match(/\=[\da-f]{2}$/gi))) {
+          code = parseInt(match2[0].substr(1, 2), 16);
+          if (code < 128) {
+            break;
+          }
+          line = line.substr(0, line.length - 3);
+          if (code >= 192) {
+            break;
+          }
+        }
+      }
+      if (pos + line.length < len && line.substr(-1) !== `
+`) {
+        if (line.length === lineLength && line.match(/\=[\da-f]{2}$/i)) {
+          line = line.substr(0, line.length - 3);
+        } else if (line.length === lineLength) {
+          line = line.substr(0, line.length - 1);
+        }
+        pos += line.length;
+        line += `=\r
+`;
+      } else {
+        pos += line.length;
+      }
+      result += line;
+    }
+    return result;
+  }
+  function checkRanges(nr, ranges) {
+    for (let i = ranges.length - 1;i >= 0; i--) {
+      if (!ranges[i].length) {
+        continue;
+      }
+      if (ranges[i].length === 1 && nr === ranges[i][0]) {
+        return true;
+      }
+      if (ranges[i].length === 2 && nr >= ranges[i][0] && nr <= ranges[i][1]) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  class Encoder extends Transform {
+    constructor(options) {
+      super();
+      this.options = options || {};
+      if (this.options.lineLength !== false) {
+        this.options.lineLength = this.options.lineLength || 76;
+      }
+      this._curLine = "";
+      this.inputBytes = 0;
+      this.outputBytes = 0;
+      Transform.call(this, this.options);
+    }
+    _transform(chunk, encoding, done) {
+      let qp;
+      if (encoding !== "buffer") {
+        chunk = Buffer2.from(chunk, encoding);
+      }
+      if (!chunk || !chunk.length) {
+        return done();
+      }
+      this.inputBytes += chunk.length;
+      if (this.options.lineLength) {
+        qp = this._curLine + encode3(chunk);
+        qp = wrap(qp, this.options.lineLength);
+        qp = qp.replace(/(^|\n)([^\n]*)$/, (match2, lineBreak, lastLine) => {
+          this._curLine = lastLine;
+          return lineBreak;
+        });
+        if (qp) {
+          this.outputBytes += qp.length;
+          this.push(qp);
+        }
+      } else {
+        qp = encode3(chunk);
+        this.outputBytes += qp.length;
+        this.push(qp, "ascii");
+      }
+      done();
+    }
+    _flush(done) {
+      if (this._curLine) {
+        this.outputBytes += this._curLine.length;
+        this.push(this._curLine, "ascii");
+      }
+      done();
+    }
+  }
+
+  class Decoder extends Transform {
+    constructor(options) {
+      options = options || {};
+      super(options);
+      this.options = options;
+      this._curLine = "";
+      this.inputBytes = 0;
+      this.outputBytes = 0;
+      this.qpChunks = [];
+    }
+    _transform(chunk, encoding, done) {
+      if (!chunk || !chunk.length) {
+        return done();
+      }
+      if (typeof chunk === "string") {
+        chunk = Buffer2.from(chunk, encoding);
+      }
+      this.qpChunks.push(chunk);
+      this.inputBytes += chunk.length;
+      done();
+    }
+    _flush(done) {
+      if (this.inputBytes) {
+        let buf = decode3(Buffer2.concat(this.qpChunks, this.inputBytes));
+        this.outputBytes += buf.length;
+        this.push(buf);
+      }
+      done();
+    }
+  }
+  module.exports = {
+    encode: encode3,
+    decode: decode3,
+    wrap,
+    Encoder,
+    Decoder
+  };
+});
+
+// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/node_modules/libbase64/lib/libbase64.js
+var require_libbase643 = __commonJS((exports, module) => {
+  var { Buffer: Buffer2 } = __require("buffer");
+  var stream = __require("stream");
+  var Transform = stream.Transform;
+  function encode3(buffer) {
+    if (typeof buffer === "string") {
+      buffer = Buffer2.from(buffer, "utf-8");
+    }
+    return buffer.toString("base64");
+  }
+  function decode3(str) {
+    str = str || "";
+    if (typeof str === "string") {
+      let padPos = str.indexOf("=");
+      if (padPos >= 0 && /[a-zA-Z0-9+/\-_]/.test(str.substr(padPos))) {
+        let parts = [];
+        for (let segment of str.split(/[=]+/)) {
+          if (segment) {
+            parts.push(Buffer2.from(segment, "base64"));
+          }
+        }
+        return Buffer2.concat(parts);
+      }
+    }
+    return Buffer2.from(str, "base64");
+  }
+  function wrap(str, lineLength) {
+    str = (str || "").toString();
+    lineLength = lineLength || 76;
+    if (str.length <= lineLength) {
+      return str;
+    }
+    let result = [];
+    let pos = 0;
+    let chunkLength = lineLength * 1024;
+    while (pos < str.length) {
+      let wrappedLines = str.substr(pos, chunkLength).replace(new RegExp(".{" + lineLength + "}", "g"), `$&\r
+`).trim();
+      result.push(wrappedLines);
+      pos += chunkLength;
+    }
+    return result.join(`\r
+`).trim();
+  }
+
+  class Encoder extends Transform {
+    constructor(options) {
+      super();
+      this.options = options || {};
+      if (this.options.lineLength !== false) {
+        this.options.lineLength = Number(this.options.lineLength) || 76;
+      }
+      this.skipStartBytes = Number(this.options.skipStartBytes) || 0;
+      this.limitOutbutBytes = Number(this.options.limitOutbutBytes) || 0;
+      this._curLine = this.options.startPadding || "";
+      this._remainingBytes = false;
+      this.inputBytes = 0;
+      this.outputBytes = 0;
+    }
+    _writeChunk(chunk) {
+      if (this.skipStartBytes) {
+        if (chunk.length <= this.skipStartBytes) {
+          this.skipStartBytes -= chunk.length;
+          return;
+        }
+        chunk = chunk.slice(this.skipStartBytes);
+        this.skipStartBytes = 0;
+      }
+      if (this.limitOutbutBytes) {
+        if (this.outputBytes + chunk.length <= this.limitOutbutBytes) {} else if (this.outputBytes >= this.limitOutbutBytes) {
+          return;
+        } else {
+          chunk = chunk.slice(0, this.limitOutbutBytes - this.outputBytes);
+        }
+      }
+      this.outputBytes += chunk.length;
+      this.push(chunk);
+    }
+    _getWrapped(str, isFinal) {
+      str = wrap(str, this.options.lineLength);
+      if (!isFinal && str.length === this.options.lineLength) {
+        str += `\r
+`;
+      }
+      return str;
+    }
+    _transform(chunk, encoding, done) {
+      if (encoding !== "buffer") {
+        chunk = Buffer2.from(chunk, encoding);
+      }
+      if (!chunk || !chunk.length) {
+        return setImmediate(done);
+      }
+      this.inputBytes += chunk.length;
+      if (this._remainingBytes && this._remainingBytes.length) {
+        chunk = Buffer2.concat([this._remainingBytes, chunk], this._remainingBytes.length + chunk.length);
+        this._remainingBytes = false;
+      }
+      if (chunk.length % 3) {
+        this._remainingBytes = chunk.slice(chunk.length - chunk.length % 3);
+        chunk = chunk.slice(0, chunk.length - chunk.length % 3);
+      } else {
+        this._remainingBytes = false;
+      }
+      let b64 = this._curLine + encode3(chunk);
+      if (this.options.lineLength) {
+        b64 = this._getWrapped(b64);
+        let lastLF = b64.lastIndexOf(`
+`);
+        if (lastLF < 0) {
+          this._curLine = b64;
+          b64 = "";
+        } else if (lastLF === b64.length - 1) {
+          this._curLine = "";
+        } else {
+          this._curLine = b64.substr(lastLF + 1);
+          b64 = b64.substr(0, lastLF + 1);
+        }
+      }
+      if (b64) {
+        this._writeChunk(Buffer2.from(b64, "ascii"), false);
+      }
+      setImmediate(done);
+    }
+    _flush(done) {
+      if (this._remainingBytes && this._remainingBytes.length) {
+        this._curLine += encode3(this._remainingBytes);
+      }
+      if (this._curLine) {
+        this._curLine = this._getWrapped(this._curLine, true);
+        this._writeChunk(Buffer2.from(this._curLine, "ascii"), true);
+        this._curLine = "";
+      }
+      done();
+    }
+  }
+
+  class Decoder extends Transform {
+    constructor(options) {
+      super();
+      this.options = options || {};
+      this._curLine = "";
+      this.inputBytes = 0;
+      this.outputBytes = 0;
+    }
+    _transform(chunk, encoding, done) {
+      if (!chunk || !chunk.length) {
+        return setImmediate(done);
+      }
+      this.inputBytes += chunk.length;
+      let b64 = this._curLine + chunk.toString("ascii");
+      this._curLine = "";
+      if (/[^a-zA-Z0-9+/=]/.test(b64)) {
+        b64 = b64.replace(/[^a-zA-Z0-9+/=]/g, "");
+      }
+      let padded = "";
+      let lastPad = b64.lastIndexOf("=");
+      if (lastPad >= 0) {
+        padded = b64.substr(0, lastPad + 1);
+        b64 = b64.substr(lastPad + 1);
+      }
+      if (b64.length < 4) {
+        this._curLine = b64;
+        b64 = "";
+      } else if (b64.length % 4) {
+        this._curLine = b64.substr(-b64.length % 4);
+        b64 = b64.substr(0, b64.length - this._curLine.length);
+      }
+      b64 = padded + b64;
+      if (b64) {
+        let buf = decode3(b64);
+        this.outputBytes += buf.length;
+        this.push(buf);
+      }
+      setImmediate(done);
+    }
+    _flush(done) {
+      if (this._curLine) {
+        let buf = decode3(this._curLine);
+        this.outputBytes += buf.length;
+        this.push(buf);
+        this._curLine = "";
+      }
+      setImmediate(done);
+    }
+  }
+  module.exports = {
+    encode: encode3,
+    decode: decode3,
+    wrap,
+    Encoder,
+    Decoder
+  };
+});
+
+// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/lib/mime-node.js
 var require_mime_node2 = __commonJS((exports, module) => {
   var Headers2 = require_headers2();
   var libmime = require_libmime2();
-  var libqp = require_libqp();
-  var libbase64 = require_libbase64();
+  var libqp = require_libqp3();
+  var libbase64 = require_libbase643();
   var PassThrough = __require("stream").PassThrough;
   var pathlib = __require("path");
   var Libmime = libmime.Libmime;
+  function stripComments(value) {
+    if (value.indexOf("(") < 0) {
+      return value;
+    }
+    return value.split(/([\n\r\u2028\u2029])/).map((part) => {
+      let start = part.indexOf("(");
+      if (start < 0) {
+        return part;
+      }
+      let end = part.lastIndexOf(")");
+      return end > start ? part.slice(0, start) + part.slice(end + 1) : part;
+    }).join("");
+  }
 
   class MimeNode {
     constructor(parentNode, config2) {
@@ -74851,7 +75911,7 @@ var require_mime_node2 = __commonJS((exports, module) => {
       }
       this._parsedContentType = this.libmime.parseHeaderValue(contentHeader);
       let parsedContentType = this._parsedContentType;
-      this.encoding = headers.getFirst("Content-Transfer-Encoding").replace(/\(.*\)/g, "").toLowerCase().trim();
+      this.encoding = stripComments(headers.getFirst("Content-Transfer-Encoding")).toLowerCase().trim();
       this.contentType = (parsedContentType.value || "").toLowerCase().trim() || false;
       this.charset = parsedContentType.params.charset || false;
       this.disposition = (parsedContentDisposition.value || "").toLowerCase().trim() || false;
@@ -74991,7 +76051,7 @@ var require_mime_node2 = __commonJS((exports, module) => {
   module.exports = MimeNode;
 });
 
-// /zveltio-extension/node_modules/@zone-eu/mailsplit/lib/message-splitter.js
+// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/lib/message-splitter.js
 var require_message_splitter2 = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
   var MimeNode = require_mime_node2();
@@ -75001,6 +76061,7 @@ var require_message_splitter2 = __commonJS((exports, module) => {
   var MAX_PENDING_LINE_CHUNKS = 1024;
   var BOUNDARY_LINE_SUFFIX = 2 + 2 + 2;
   var BOUNDARY_LINE_OVERHEAD = BOUNDARY_LINE_SUFFIX + 2;
+  var YIELD_BYTES = 16 * 1024;
   var HEAD = 1;
   var BODY = 2;
   function maxLenError(message) {
@@ -75067,6 +76128,9 @@ var require_message_splitter2 = __commonJS((exports, module) => {
       };
       let groupstart = this.lineLength ? -this.lineLength : 0;
       let groupend = 0;
+      let yieldPos = 0;
+      let inLine = false;
+      let resumeInLine = false;
       let checkTrailingLinebreak = (data) => {
         if (data.type === "body" && data.node.parentNode && data.value && data.value.length) {
           if (data.value[data.value.length - 1] === 10) {
@@ -75092,72 +76156,90 @@ var require_message_splitter2 = __commonJS((exports, module) => {
           }
         }
       };
-      let iterateData = () => {
-        for (let len = chunk.length;i < len; i++) {
-          if (chunk[i] === 10) {
-            let start = Math.max(pos, 0);
-            pos = ++i;
-            return this.processLine(chunk.slice(start, i), false, (err, data, flush) => {
-              if (err) {
-                this.hasFailed = true;
-                return setImmediate(() => callback(err));
+      let iterateData;
+      let nextLine = () => {
+        if (inLine && i - yieldPos < YIELD_BYTES) {
+          resumeInLine = true;
+          return;
+        }
+        setImmediate(iterateData);
+      };
+      let onLine = (err, data, flush) => {
+        if (err) {
+          this.hasFailed = true;
+          return setImmediate(() => callback(err));
+        }
+        if (!data) {
+          return nextLine();
+        }
+        if (flush) {
+          if (group && group.type !== "none") {
+            groupend = trimBodyLineEnd(group, chunk, groupstart, groupend);
+            if (groupstart < groupend) {
+              group.value = chunk.slice(groupstart, groupend);
+              if (groupend < i && "value" in data) {
+                data.value = chunk.slice(groupend, i);
               }
-              if (!data) {
-                return setImmediate(iterateData);
+            }
+            this.push(group);
+            group = {
+              type: "none"
+            };
+            groupstart = groupend = i;
+          }
+          this.push(data);
+          groupend = i;
+          return nextLine();
+        }
+        if (data.type === group.type) {
+          groupend = i;
+        } else {
+          groupend = trimBodyLineEnd(group, chunk, groupstart, groupend);
+          if (group.type !== "none" && group.type !== "node") {
+            if (groupstart !== groupend) {
+              group.value = chunk.slice(groupstart, groupend);
+              if (group.value && group.value.length) {
+                this.push(group);
+                group = {
+                  type: "none"
+                };
               }
-              if (flush) {
-                if (group && group.type !== "none") {
-                  groupend = trimBodyLineEnd(group, chunk, groupstart, groupend);
-                  if (groupstart < groupend) {
-                    group.value = chunk.slice(groupstart, groupend);
-                    if (groupend < i && "value" in data) {
-                      data.value = chunk.slice(groupend, i);
-                    }
-                  }
-                  this.push(group);
-                  group = {
-                    type: "none"
-                  };
-                  groupstart = groupend = i;
-                }
-                this.push(data);
-                groupend = i;
-                return setImmediate(iterateData);
-              }
-              if (data.type === group.type) {
-                groupend = i;
-              } else {
-                groupend = trimBodyLineEnd(group, chunk, groupstart, groupend);
-                if (group.type !== "none" && group.type !== "node") {
-                  if (groupstart !== groupend) {
-                    group.value = chunk.slice(groupstart, groupend);
-                    if (group.value && group.value.length) {
-                      this.push(group);
-                      group = {
-                        type: "none"
-                      };
-                    }
-                  }
-                }
-                if (data.type === "node") {
-                  this.push(data);
-                  groupstart = i;
-                  groupend = i;
-                } else if (groupstart < 0) {
-                  groupstart = i;
-                  groupend = i;
-                  checkTrailingLinebreak(data);
-                  if (data.value && data.value.length) {
-                    this.push(data);
-                  }
-                } else {
-                  group = data;
-                  groupstart = groupend;
-                  groupend = i;
-                }
-              }
-              return setImmediate(iterateData);
-            });
+            }
+          }
+          if (data.type === "node") {
+            this.push(data);
+            groupstart = i;
+            groupend = i;
+          } else if (groupstart < 0) {
+            groupstart = i;
+            groupend = i;
+            checkTrailingLinebreak(data);
+            if (data.value && data.value.length) {
+              this.push(data);
+            }
+          } else {
+            group = data;
+            groupstart = groupend;
+            groupend = i;
+          }
+        }
+        return nextLine();
+      };
+      iterateData = () => {
+        yieldPos = i;
+        while (i < chunk.length) {
+          if (chunk[i] !== 10) {
+            i++;
+            continue;
+          }
+          let start = Math.max(pos, 0);
+          pos = ++i;
+          inLine = true;
+          resumeInLine = false;
+          this.processLine(chunk.slice(start, i), false, onLine);
+          inLine = false;
+          if (!resumeInLine) {
+            return;
           }
         }
         pos = trimBodyLineEnd(group, chunk, groupstart, pos);
@@ -75378,7 +76460,7 @@ var require_message_splitter2 = __commonJS((exports, module) => {
   module.exports = MessageSplitter;
 });
 
-// /zveltio-extension/node_modules/@zone-eu/mailsplit/lib/message-joiner.js
+// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/lib/message-joiner.js
 var require_message_joiner2 = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
 
@@ -75407,7 +76489,7 @@ var require_message_joiner2 = __commonJS((exports, module) => {
   module.exports = MessageJoiner;
 });
 
-// /zveltio-extension/node_modules/@zone-eu/mailsplit/lib/flowed-decoder.js
+// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/lib/flowed-decoder.js
 var require_flowed_decoder2 = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
   var libmime = require_libmime2();
@@ -75435,9 +76517,6 @@ var require_flowed_decoder2 = __commonJS((exports, module) => {
     _flush(callback) {
       if (this.chunklen) {
         let currentBody = Buffer.concat(this.chunks, this.chunklen);
-        if (this.config.encoding === "base64") {
-          currentBody = Buffer.from(currentBody.toString("binary"), "base64");
-        }
         let content = this.libmime.decodeFlowed(currentBody.toString("binary"), this.config.delSp);
         this.push(Buffer.from(content, "binary"));
       }
@@ -75447,7 +76526,7 @@ var require_flowed_decoder2 = __commonJS((exports, module) => {
   module.exports = FlowedDecoder;
 });
 
-// /zveltio-extension/node_modules/@zone-eu/mailsplit/lib/node-rewriter.js
+// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/lib/node-rewriter.js
 var require_node_rewriter2 = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
   var FlowedDecoder = require_flowed_decoder2();
@@ -75570,8 +76649,7 @@ var require_node_rewriter2 = __commonJS((exports, module) => {
       if (/^text\//.test(node2.contentType || "") && node2.flowed) {
         let flowDecoder = decoder;
         decoder = new FlowedDecoder({
-          delSp: node2.delSp,
-          encoding: node2.encoding || false
+          delSp: node2.delSp
         });
         flowDecoder.on("error", (err) => {
           decoder.emit("error", err);
@@ -75591,7 +76669,7 @@ var require_node_rewriter2 = __commonJS((exports, module) => {
   module.exports = NodeRewriter;
 });
 
-// /zveltio-extension/node_modules/@zone-eu/mailsplit/lib/node-streamer.js
+// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/lib/node-streamer.js
 var require_node_streamer2 = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
   var FlowedDecoder = require_flowed_decoder2();
@@ -75681,7 +76759,7 @@ var require_node_streamer2 = __commonJS((exports, module) => {
   module.exports = NodeStreamer;
 });
 
-// /zveltio-extension/node_modules/@zone-eu/mailsplit/lib/chunked-passthrough.js
+// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/lib/chunked-passthrough.js
 var require_chunked_passthrough2 = __commonJS((exports, module) => {
   var { Transform } = __require("stream");
 
@@ -75714,7 +76792,7 @@ var require_chunked_passthrough2 = __commonJS((exports, module) => {
   module.exports = ChunkedPassthrough;
 });
 
-// /zveltio-extension/node_modules/@zone-eu/mailsplit/index.js
+// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/index.js
 var require_mailsplit2 = __commonJS((exports, module) => {
   var MessageSplitter = require_message_splitter2();
   var MessageJoiner = require_message_joiner2();
@@ -75737,7 +76815,7 @@ var require_mailsplit2 = __commonJS((exports, module) => {
 // /zveltio-extension/node_modules/nodemailer/dist/esm/addressparser/index.js
 var exports_addressparser = {};
 __export(exports_addressparser, {
-  default: () => addressparser
+  default: () => addressparser_default
 });
 function _quoteLocalPart(address) {
   const lastAt = address.lastIndexOf("@");
@@ -75846,6 +76924,58 @@ function _recoverAddrSpec(data) {
   data.address = address;
   data.text = [data.text].concat(rest).filter((part) => part).join(" ");
 }
+function _stripAddressComments(address) {
+  const comments = [];
+  let result = "";
+  let comment = "";
+  let depth = 0;
+  let closer = "";
+  let lastChar = "";
+  for (let i = 0, len = address.length;i < len; i++) {
+    const chr = address.charAt(i);
+    if (depth) {
+      if (chr === "\\" && i < len - 1) {
+        comment += address.charAt(++i);
+      } else if (chr === "(") {
+        depth++;
+        comment += chr;
+      } else if (chr === ")" && !--depth) {
+        comments.push(comment.trim());
+        comment = "";
+        if (lastChar !== "@" && address.charAt(i + 1) !== "@") {
+          result += " ";
+          lastChar = " ";
+        }
+      } else {
+        comment += chr;
+      }
+      continue;
+    }
+    if (closer) {
+      if (chr === "\\" && closer === '"' && i < len - 1) {
+        result += chr + address.charAt(++i);
+        lastChar = address.charAt(i);
+        continue;
+      }
+      if (chr === closer) {
+        closer = "";
+      }
+    } else if (chr === '"') {
+      closer = '"';
+    } else if (chr === "[") {
+      closer = "]";
+    } else if (chr === "(") {
+      depth = 1;
+      continue;
+    }
+    result += chr;
+    lastChar = chr;
+  }
+  if (depth) {
+    comments.push(comment.trim());
+  }
+  return { address: result.trim(), comments: comments.filter((text) => text) };
+}
 function _handleAddress(tokens, depth) {
   let isGroup = false;
   let state = "text";
@@ -75919,7 +77049,7 @@ function _handleAddress(tokens, depth) {
     data.text = data.text.join(" ");
     let groupMembers = [];
     if (data.group.length) {
-      const parsedGroup = addressparser(data.group.join(","), { _depth: depth + 1 });
+      const parsedGroup = _parseAddressList(data.group.join(","), depth + 1);
       parsedGroup.forEach((member) => {
         if (member.group) {
           groupMembers = groupMembers.concat(member.group);
@@ -75933,6 +77063,22 @@ function _handleAddress(tokens, depth) {
       group: groupMembers
     });
   } else {
+    const addressComments = [];
+    const addressParts = [];
+    for (const part of data.address) {
+      if (part.indexOf("(") < 0) {
+        addressParts.push(part);
+        continue;
+      }
+      const stripped = _stripAddressComments(part);
+      for (const comment of stripped.comments) {
+        addressComments.push(comment);
+      }
+      if (stripped.address) {
+        addressParts.push(stripped.address);
+      }
+    }
+    data.address = addressParts;
     if (!data.address.length && data.text.length) {
       for (let i = data.text.length - 1;i >= 0; i--) {
         if (!data.textWasQuoted[i] && ADDR_SPEC.test(data.text[i])) {
@@ -75975,11 +77121,14 @@ function _handleAddress(tokens, depth) {
     const addressFromQuotedText = !data.address.length && data.textWasQuoted.some((wasQuoted) => wasQuoted);
     data.text = data.text.join(" ");
     data.address = data.address.join(" ");
-    if (addressFromQuotedText && data.text) {
+    if (addressFromQuotedText && data.text.indexOf("@") >= 0) {
       data.address = _quoteLocalPart(data.text);
       data.text = "";
     }
     _recoverAddrSpec(data);
+    if (!data.text && addressComments.length) {
+      data.text = addressComments.join(" ");
+    }
     const address = {
       address: data.address || data.text || "",
       name: data.text || data.address || ""
@@ -76004,6 +77153,7 @@ class Tokenizer {
     this.node = null;
     this.escaped = false;
     this.inDomainLiteral = false;
+    this.afterAt = false;
     this.list = [];
     this.operators = {
       '"': '"',
@@ -76031,7 +77181,7 @@ class Tokenizer {
   }
   checkChar(chr, nextChr) {
     if (!this.escaped && !this.operatorExpecting) {
-      if (!this.inDomainLiteral && chr === "[") {
+      if (!this.inDomainLiteral && chr === "[" && this.afterAt) {
         this.inDomainLiteral = true;
       } else if (this.inDomainLiteral && (chr === "]" || chr === "," || chr === ";")) {
         this.inDomainLiteral = false;
@@ -76048,16 +77198,22 @@ class Tokenizer {
       }
       this.list.push(this.node);
       this.node = null;
+      if (chr !== ")") {
+        this.afterAt = false;
+      }
       this.operatorExpecting = "";
       this.escaped = false;
       return;
-    } else if (!this.operatorExpecting && !this.inDomainLiteral && chr in this.operators) {
+    } else if (!this.operatorExpecting && !(this.inDomainLiteral && chr === ":") && chr in this.operators) {
       this.node = {
         type: "operator",
         value: chr
       };
       this.list.push(this.node);
       this.node = null;
+      if (chr !== "(") {
+        this.afterAt = false;
+      }
       this.operatorExpecting = this.operators[chr];
       this.escaped = false;
       return;
@@ -76078,13 +77234,14 @@ class Tokenizer {
     }
     if (chr.charCodeAt(0) >= 33 || [" ", "\t"].includes(chr)) {
       this.node.value += chr;
+      if (!this.operatorExpecting && chr !== " " && chr !== "\t") {
+        this.afterAt = chr === "@";
+      }
     }
     this.escaped = false;
   }
 }
-function addressparser(str, options) {
-  options = options || {};
-  const depth = options._depth || 0;
+function _parseAddressList(str, depth) {
   if (depth > MAX_NESTED_GROUP_DEPTH) {
     return [];
   }
@@ -76092,7 +77249,7 @@ function addressparser(str, options) {
   const tokens = tokenizer.tokenize();
   const addresses = [];
   let address = [];
-  let parsedAddresses = [];
+  const parsedAddresses = [];
   tokens.forEach((token) => {
     if (token.type === "operator" && (token.value === "," || token.value === ";")) {
       if (address.length) {
@@ -76123,8 +77280,11 @@ function addressparser(str, options) {
     }
   }
   mergedAddresses.reverse();
-  parsedAddresses = mergedAddresses;
-  if (options.flatten) {
+  return mergedAddresses;
+}
+function addressparser(str, options) {
+  const parsedAddresses = _parseAddressList(str, 0);
+  if (options?.flatten) {
     const flatAddresses = [];
     const walkAddressList = (list) => {
       list.forEach((entry) => {
@@ -76139,13 +77299,14 @@ function addressparser(str, options) {
   }
   return parsedAddresses;
 }
-var HAS_WHITESPACE, QUOTED_LOCAL_ADDR, ADDR_SPEC, LOOSE_ADDR_SPEC, LOOSE_TEXT_ADDR, MAX_NESTED_GROUP_DEPTH = 50;
+var HAS_WHITESPACE, QUOTED_LOCAL_ADDR, ADDR_SPEC, LOOSE_ADDR_SPEC, LOOSE_TEXT_ADDR, MAX_NESTED_GROUP_DEPTH = 50, addressparser_default;
 var init_addressparser = __esm(() => {
   HAS_WHITESPACE = /\s/;
   QUOTED_LOCAL_ADDR = /^("(?:[^"\\]|\\[\s\S])*"@\S+)(?:\s+([\s\S]+))?$/;
   ADDR_SPEC = /^[^@\s]+@[^@\s]+$/;
   LOOSE_ADDR_SPEC = /^[^@\s]+@\S+$/;
   LOOSE_TEXT_ADDR = /\s*\b[^@\s]+@[^\s]+\b\s*/y;
+  addressparser_default = addressparser;
 });
 
 // /zveltio-extension/node_modules/punycode.js/punycode.js
@@ -76380,7 +77541,7 @@ var require_stream_hash = __commonJS((exports, module) => {
       super();
       this.attachment = attachment;
       this.algo = (algo || "md5").toLowerCase();
-      this.hash = crypto2.createHash(algo);
+      this.hash = crypto2.createHash(this.algo);
       this.byteCount = 0;
     }
     _transform(chunk, encoding, done) {
@@ -76397,7 +77558,7 @@ var require_stream_hash = __commonJS((exports, module) => {
   module.exports = StreamHash;
 });
 
-// /zveltio-extension/node_modules/domelementtype/lib/esm/index.js
+// /zveltio-extension/node_modules/@selderee/plugin-htmlparser2/node_modules/domelementtype/lib/esm/index.js
 function isTag(elem) {
   return elem.type === ElementType.Tag || elem.type === ElementType.Script || elem.type === ElementType.Style;
 }
@@ -76425,355 +77586,17 @@ var init_esm = __esm(() => {
   Doctype = ElementType.Doctype;
 });
 
-// /zveltio-extension/node_modules/domhandler/lib/esm/node.js
-class Node3 {
-  constructor() {
-    this.parent = null;
-    this.prev = null;
-    this.next = null;
-    this.startIndex = null;
-    this.endIndex = null;
-  }
-  get parentNode() {
-    return this.parent;
-  }
-  set parentNode(parent) {
-    this.parent = parent;
-  }
-  get previousSibling() {
-    return this.prev;
-  }
-  set previousSibling(prev) {
-    this.prev = prev;
-  }
-  get nextSibling() {
-    return this.next;
-  }
-  set nextSibling(next) {
-    this.next = next;
-  }
-  cloneNode(recursive2 = false) {
-    return cloneNode(this, recursive2);
-  }
-}
+// /zveltio-extension/node_modules/@selderee/plugin-htmlparser2/node_modules/domhandler/lib/esm/node.js
 function isTag2(node2) {
   return isTag(node2);
 }
-function isCDATA(node2) {
-  return node2.type === ElementType.CDATA;
-}
-function isText(node2) {
-  return node2.type === ElementType.Text;
-}
-function isComment(node2) {
-  return node2.type === ElementType.Comment;
-}
-function isDirective(node2) {
-  return node2.type === ElementType.Directive;
-}
-function isDocument(node2) {
-  return node2.type === ElementType.Root;
-}
-function cloneNode(node2, recursive2 = false) {
-  let result;
-  if (isText(node2)) {
-    result = new Text2(node2.data);
-  } else if (isComment(node2)) {
-    result = new Comment2(node2.data);
-  } else if (isTag2(node2)) {
-    const children = recursive2 ? cloneChildren(node2.children) : [];
-    const clone2 = new Element(node2.name, { ...node2.attribs }, children);
-    children.forEach((child) => child.parent = clone2);
-    if (node2.namespace != null) {
-      clone2.namespace = node2.namespace;
-    }
-    if (node2["x-attribsNamespace"]) {
-      clone2["x-attribsNamespace"] = { ...node2["x-attribsNamespace"] };
-    }
-    if (node2["x-attribsPrefix"]) {
-      clone2["x-attribsPrefix"] = { ...node2["x-attribsPrefix"] };
-    }
-    result = clone2;
-  } else if (isCDATA(node2)) {
-    const children = recursive2 ? cloneChildren(node2.children) : [];
-    const clone2 = new CDATA2(children);
-    children.forEach((child) => child.parent = clone2);
-    result = clone2;
-  } else if (isDocument(node2)) {
-    const children = recursive2 ? cloneChildren(node2.children) : [];
-    const clone2 = new Document(children);
-    children.forEach((child) => child.parent = clone2);
-    if (node2["x-mode"]) {
-      clone2["x-mode"] = node2["x-mode"];
-    }
-    result = clone2;
-  } else if (isDirective(node2)) {
-    const instruction = new ProcessingInstruction(node2.name, node2.data);
-    if (node2["x-name"] != null) {
-      instruction["x-name"] = node2["x-name"];
-      instruction["x-publicId"] = node2["x-publicId"];
-      instruction["x-systemId"] = node2["x-systemId"];
-    }
-    result = instruction;
-  } else {
-    throw new Error(`Not implemented yet: ${node2.type}`);
-  }
-  result.startIndex = node2.startIndex;
-  result.endIndex = node2.endIndex;
-  if (node2.sourceCodeLocation != null) {
-    result.sourceCodeLocation = node2.sourceCodeLocation;
-  }
-  return result;
-}
-function cloneChildren(childs) {
-  const children = childs.map((child) => cloneNode(child, true));
-  for (let i = 1;i < children.length; i++) {
-    children[i].prev = children[i - 1];
-    children[i - 1].next = children[i];
-  }
-  return children;
-}
-var DataNode, Text2, Comment2, ProcessingInstruction, NodeWithChildren, CDATA2, Document, Element;
 var init_node = __esm(() => {
   init_esm();
-  DataNode = class DataNode extends Node3 {
-    constructor(data) {
-      super();
-      this.data = data;
-    }
-    get nodeValue() {
-      return this.data;
-    }
-    set nodeValue(data) {
-      this.data = data;
-    }
-  };
-  Text2 = class Text2 extends DataNode {
-    constructor() {
-      super(...arguments);
-      this.type = ElementType.Text;
-    }
-    get nodeType() {
-      return 3;
-    }
-  };
-  Comment2 = class Comment2 extends DataNode {
-    constructor() {
-      super(...arguments);
-      this.type = ElementType.Comment;
-    }
-    get nodeType() {
-      return 8;
-    }
-  };
-  ProcessingInstruction = class ProcessingInstruction extends DataNode {
-    constructor(name, data) {
-      super(data);
-      this.name = name;
-      this.type = ElementType.Directive;
-    }
-    get nodeType() {
-      return 1;
-    }
-  };
-  NodeWithChildren = class NodeWithChildren extends Node3 {
-    constructor(children) {
-      super();
-      this.children = children;
-    }
-    get firstChild() {
-      var _a7;
-      return (_a7 = this.children[0]) !== null && _a7 !== undefined ? _a7 : null;
-    }
-    get lastChild() {
-      return this.children.length > 0 ? this.children[this.children.length - 1] : null;
-    }
-    get childNodes() {
-      return this.children;
-    }
-    set childNodes(children) {
-      this.children = children;
-    }
-  };
-  CDATA2 = class CDATA2 extends NodeWithChildren {
-    constructor() {
-      super(...arguments);
-      this.type = ElementType.CDATA;
-    }
-    get nodeType() {
-      return 4;
-    }
-  };
-  Document = class Document extends NodeWithChildren {
-    constructor() {
-      super(...arguments);
-      this.type = ElementType.Root;
-    }
-    get nodeType() {
-      return 9;
-    }
-  };
-  Element = class Element extends NodeWithChildren {
-    constructor(name, attribs, children = [], type = name === "script" ? ElementType.Script : name === "style" ? ElementType.Style : ElementType.Tag) {
-      super(children);
-      this.name = name;
-      this.attribs = attribs;
-      this.type = type;
-    }
-    get nodeType() {
-      return 1;
-    }
-    get tagName() {
-      return this.name;
-    }
-    set tagName(name) {
-      this.name = name;
-    }
-    get attributes() {
-      return Object.keys(this.attribs).map((name) => {
-        var _a7, _b;
-        return {
-          name,
-          value: this.attribs[name],
-          namespace: (_a7 = this["x-attribsNamespace"]) === null || _a7 === undefined ? undefined : _a7[name],
-          prefix: (_b = this["x-attribsPrefix"]) === null || _b === undefined ? undefined : _b[name]
-        };
-      });
-    }
-  };
 });
 
-// /zveltio-extension/node_modules/domhandler/lib/esm/index.js
-class DomHandler {
-  constructor(callback, options, elementCB) {
-    this.dom = [];
-    this.root = new Document(this.dom);
-    this.done = false;
-    this.tagStack = [this.root];
-    this.lastNode = null;
-    this.parser = null;
-    if (typeof options === "function") {
-      elementCB = options;
-      options = defaultOpts;
-    }
-    if (typeof callback === "object") {
-      options = callback;
-      callback = undefined;
-    }
-    this.callback = callback !== null && callback !== undefined ? callback : null;
-    this.options = options !== null && options !== undefined ? options : defaultOpts;
-    this.elementCB = elementCB !== null && elementCB !== undefined ? elementCB : null;
-  }
-  onparserinit(parser) {
-    this.parser = parser;
-  }
-  onreset() {
-    this.dom = [];
-    this.root = new Document(this.dom);
-    this.done = false;
-    this.tagStack = [this.root];
-    this.lastNode = null;
-    this.parser = null;
-  }
-  onend() {
-    if (this.done)
-      return;
-    this.done = true;
-    this.parser = null;
-    this.handleCallback(null);
-  }
-  onerror(error62) {
-    this.handleCallback(error62);
-  }
-  onclosetag() {
-    this.lastNode = null;
-    const elem = this.tagStack.pop();
-    if (this.options.withEndIndices) {
-      elem.endIndex = this.parser.endIndex;
-    }
-    if (this.elementCB)
-      this.elementCB(elem);
-  }
-  onopentag(name, attribs) {
-    const type = this.options.xmlMode ? ElementType.Tag : undefined;
-    const element = new Element(name, attribs, undefined, type);
-    this.addNode(element);
-    this.tagStack.push(element);
-  }
-  ontext(data) {
-    const { lastNode } = this;
-    if (lastNode && lastNode.type === ElementType.Text) {
-      lastNode.data += data;
-      if (this.options.withEndIndices) {
-        lastNode.endIndex = this.parser.endIndex;
-      }
-    } else {
-      const node3 = new Text2(data);
-      this.addNode(node3);
-      this.lastNode = node3;
-    }
-  }
-  oncomment(data) {
-    if (this.lastNode && this.lastNode.type === ElementType.Comment) {
-      this.lastNode.data += data;
-      return;
-    }
-    const node3 = new Comment2(data);
-    this.addNode(node3);
-    this.lastNode = node3;
-  }
-  oncommentend() {
-    this.lastNode = null;
-  }
-  oncdatastart() {
-    const text = new Text2("");
-    const node3 = new CDATA2([text]);
-    this.addNode(node3);
-    text.parent = node3;
-    this.lastNode = text;
-  }
-  oncdataend() {
-    this.lastNode = null;
-  }
-  onprocessinginstruction(name, data) {
-    const node3 = new ProcessingInstruction(name, data);
-    this.addNode(node3);
-  }
-  handleCallback(error62) {
-    if (typeof this.callback === "function") {
-      this.callback(error62, this.dom);
-    } else if (error62) {
-      throw error62;
-    }
-  }
-  addNode(node3) {
-    const parent = this.tagStack[this.tagStack.length - 1];
-    const previousSibling = parent.children[parent.children.length - 1];
-    if (this.options.withStartIndices) {
-      node3.startIndex = this.parser.startIndex;
-    }
-    if (this.options.withEndIndices) {
-      node3.endIndex = this.parser.endIndex;
-    }
-    parent.children.push(node3);
-    if (previousSibling) {
-      node3.prev = previousSibling;
-      previousSibling.next = node3;
-    }
-    node3.parent = parent;
-    this.lastNode = null;
-  }
-}
-var defaultOpts;
+// /zveltio-extension/node_modules/@selderee/plugin-htmlparser2/node_modules/domhandler/lib/esm/index.js
 var init_esm2 = __esm(() => {
-  init_esm();
   init_node();
-  init_node();
-  defaultOpts = {
-    withStartIndices: false,
-    withEndIndices: false,
-    xmlMode: false
-  };
 });
 
 // /zveltio-extension/node_modules/leac/lib/leac.mjs
@@ -77973,7 +78796,7 @@ var init_hp2_builder = __esm(() => {
   };
 });
 
-// /zveltio-extension/node_modules/entities/dist/esm/decode-codepoint.js
+// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/decode-codepoint.js
 function replaceCodePoint(codePoint) {
   var _a8;
   if (codePoint >= 55296 && codePoint <= 57343 || codePoint > 1114111) {
@@ -78025,7 +78848,7 @@ var init_decode_codepoint = __esm(() => {
   };
 });
 
-// /zveltio-extension/node_modules/entities/dist/esm/internal/decode-shared.js
+// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/internal/decode-shared.js
 function decodeBase64(input2) {
   const binary = typeof atob === "function" ? atob(input2) : typeof Buffer.from === "function" ? Buffer.from(input2, "base64").toString("binary") : new Buffer(input2, "base64").toString("binary");
   const evenLength = binary.length & ~1;
@@ -78038,19 +78861,19 @@ function decodeBase64(input2) {
   return out;
 }
 
-// /zveltio-extension/node_modules/entities/dist/esm/generated/decode-data-html.js
+// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/generated/decode-data-html.js
 var htmlDecodeTree;
 var init_decode_data_html = __esm(() => {
   htmlDecodeTree = /* @__PURE__ */ decodeBase64("QR08ALkAAgH6AYsDNQR2BO0EPgXZBQEGLAbdBxMISQrvCmQLfQurDKQNLw4fD4YPpA+6D/IPAAAAAAAAAAAAAAAAKhBMEY8TmxUWF2EYLBkxGuAa3RsJHDscWR8YIC8jSCSIJcMl6ie3Ku8rEC0CLjoupS7kLgAIRU1hYmNmZ2xtbm9wcnN0dVQAWgBeAGUAaQBzAHcAfgCBAIQAhwCSAJoAoACsALMAbABpAGcAO4DGAMZAUAA7gCYAJkBjAHUAdABlADuAwQDBQHIiZXZlAAJhAAFpeW0AcgByAGMAO4DCAMJAEGRyAADgNdgE3XIAYQB2AGUAO4DAAMBA8CFoYZFj4SFjcgBhZAAAoFMqAAFncIsAjgBvAG4ABGFmAADgNdg43fAlbHlGdW5jdGlvbgCgYSBpAG4AZwA7gMUAxUAAAWNzpACoAHIAAOA12Jzc6SFnbgCgVCJpAGwAZABlADuAwwDDQG0AbAA7gMQAxEAABGFjZWZvcnN1xQDYANoA7QDxAPYA+QD8AAABY3LJAM8AayNzbGFzaAAAoBYidgHTANUAAKDnKmUAZAAAoAYjeQARZIABY3J0AOAA5QDrAGEidXNlAACgNSLuI291bGxpcwCgLCFhAJJjcgAA4DXYBd1wAGYAAOA12Dnd5SF2ZdhiYwDyAOoAbSJwZXEAAKBOIgAHSE9hY2RlZmhpbG9yc3UXARoBHwE6AVIBVQFiAWQBZgGCAakB6QHtAfIBYwB5ACdkUABZADuAqQCpQIABY3B5ACUBKAE1AfUhdGUGYWmg0iJ0KGFsRGlmZmVyZW50aWFsRAAAoEUhbCJleXMAAKAtIQACYWVpb0EBRAFKAU0B8iFvbgxhZABpAGwAO4DHAMdAcgBjAAhhbiJpbnQAAKAwIm8AdAAKYQABZG5ZAV0BaSJsbGEAuGB0I2VyRG90ALdg8gA5AWkAp2NyImNsZQAAAkRNUFRwAXQBeQF9AW8AdAAAoJkiaSJudXMAAKCWIuwhdXMAoJUiaSJtZXMAAKCXIm8AAAFjc4cBlAFrKndpc2VDb250b3VySW50ZWdyYWwAAKAyImUjQ3VybHkAAAFEUZwBpAFvJXVibGVRdW90ZQAAoB0gdSJvdGUAAKAZIAACbG5wdbABtgHNAdgBbwBuAGWgNyIAoHQqgAFnaXQAvAHBAcUB8iJ1ZW50AKBhIm4AdAAAoC8i7yV1ckludGVncmFsAKAuIgABZnLRAdMBAKACIe8iZHVjdACgECJuLnRlckNsb2Nrd2lzZUNvbnRvdXJJbnRlZ3JhbAAAoDMi7yFzcwCgLypjAHIAAOA12J7ccABDoNMiYQBwAACgTSKABURKU1phY2VmaW9zAAsCEgIVAhgCGwIsAjQCOQI9AnMCfwNvoEUh9CJyYWhkAKARKWMAeQACZGMAeQAFZGMAeQAPZIABZ3JzACECJQIoAuchZXIAoCEgcgAAoKEhaAB2AACg5CoAAWF5MAIzAvIhb24OYRRkbAB0oAciYQCUY3IAAOA12AfdAAFhZkECawIAAWNtRQJnAvIjaXRpY2FsAAJBREdUUAJUAl8CYwJjInV0ZQC0YG8AdAFZAloC2WJiJGxlQWN1dGUA3WJyImF2ZQBgYGkibGRlANxi7yFuZACgxCJmJWVyZW50aWFsRAAAoEYhcAR9AgAAAAAAAIECjgIAABoDZgAA4DXYO91EoagAhQKJAm8AdAAAoNwgcSJ1YWwAAKBQIuIhbGUAA0NETFJVVpkCqAK1Au8C/wIRA28AbgB0AG8AdQByAEkAbgB0AGUAZwByAGEA7ADEAW8AdAKvAgAAAACwAqhgbiNBcnJvdwAAoNMhAAFlb7kC0AJmAHQAgAFBUlQAwQLGAs0CciJyb3cAAKDQIekkZ2h0QXJyb3cAoNQhZQDlACsCbgBnAAABTFLWAugC5SFmdAABQVLcAuECciJyb3cAAKD4J+kkZ2h0QXJyb3cAoPon6SRnaHRBcnJvdwCg+SdpImdodAAAAUFU9gL7AnIicm93AACg0iFlAGUAAKCoInAAQQIGAwAAAAALA3Iicm93AACg0SFvJHduQXJyb3cAAKDVIWUlcnRpY2FsQmFyAACgJSJuAAADQUJMUlRhJAM2AzoDWgNxA3oDciJyb3cAAKGTIUJVLAMwA2EAcgAAoBMpcCNBcnJvdwAAoPUhciJldmUAEWPlIWZ00gJDAwAASwMAAFIDaSVnaHRWZWN0b3IAAKBQKWUkZVZlY3RvcgAAoF4p5SJjdG9yQqC9IWEAcgAAoFYpaSJnaHQA1AFiAwAAaQNlJGVWZWN0b3IAAKBfKeUiY3RvckKgwSFhAHIAAKBXKWUAZQBBoKQiciJyb3cAAKCnIXIAcgBvAPcAtAIAAWN0gwOHA3IAAOA12J/c8iFvaxBhAAhOVGFjZGZnbG1vcHFzdHV4owOlA6kDsAO/A8IDxgPNA9ID8gP9AwEEFAQeBCAEJQRHAEphSAA7gNAA0EBjAHUAdABlADuAyQDJQIABYWl5ALYDuQO+A/Ihb24aYXIAYwA7gMoAykAtZG8AdAAWYXIAAOA12AjdcgBhAHYAZQA7gMgAyEDlIm1lbnQAoAgiAAFhcNYD2QNjAHIAEmF0AHkAUwLhAwAAAADpA20lYWxsU3F1YXJlAACg+yVlJ3J5U21hbGxTcXVhcmUAAKCrJQABZ3D2A/kDbwBuABhhZgAA4DXYPN3zImlsb26VY3UAAAFhaQYEDgRsAFSgdSppImxkZQAAoEIi7CNpYnJpdW0AoMwhAAFjaRgEGwRyAACgMCFtAACgcyphAJdjbQBsADuAywDLQAABaXApBC0E8yF0cwCgAyLvJG5lbnRpYWxFAKBHIYACY2Zpb3MAPQQ/BEMEXQRyBHkAJGRyAADgNdgJ3WwibGVkAFMCTAQAAAAAVARtJWFsbFNxdWFyZQAAoPwlZSdyeVNtYWxsU3F1YXJlAACgqiVwA2UEAABpBAAAAABtBGYAAOA12D3dwSFsbACgACLyI2llcnRyZgCgMSFjAPIAcQQABkpUYWJjZGZnb3JzdIgEiwSOBJMElwSkBKcEqwStBLIE5QTqBGMAeQADZDuAPgA+QO0hbWFkoJMD3GNyImV2ZQAeYYABZWl5AJ0EoASjBOQhaWwiYXIAYwAcYRNkbwB0ACBhcgAA4DXYCt0AoNkicABmAADgNdg+3eUiYXRlcgADRUZHTFNUvwTIBM8E1QTZBOAEcSJ1YWwATKBlIuUhc3MAoNsidSRsbEVxdWFsAACgZyJyI2VhdGVyAACgoirlIXNzAKB3IuwkYW50RXF1YWwAoH4qaSJsZGUAAKBzImMAcgAA4DXYotwAoGsiAARBYWNmaW9zdfkE/QQFBQgFCwUTBSIFKwVSIkRjeQAqZAABY3QBBQQFZQBrAMdiXmDpIXJjJGFyAACgDCFsJWJlcnRTcGFjZQAAoAsh8AEYBQAAGwVmAACgDSHpJXpvbnRhbExpbmUAoAAlAAFjdCYFKAXyABIF8iFvayZhbQBwAEQBMQU5BW8AdwBuAEgAdQBtAPAAAAFxInVhbAAAoE8iAAdFSk9hY2RmZ21ub3N0dVMFVgVZBVwFYwVtBXAFcwV6BZAFtgXFBckFzQVjAHkAFWTsIWlnMmFjAHkAAWRjAHUAdABlADuAzQDNQAABaXlnBWwFcgBjADuAzgDOQBhkbwB0ADBhcgAAoBEhcgBhAHYAZQA7gMwAzEAAoREhYXB/BYsFAAFjZ4MFhQVyACphaSNuYXJ5SQAAoEghbABpAGUA8wD6AvQBlQUAAKUFZaAsIgABZ3KaBZ4F8iFhbACgKyLzI2VjdGlvbgCgwiJpI3NpYmxlAAABQ1SsBbEFbyJtbWEAAKBjIGkibWVzAACgYiCAAWdwdAC8Bb8FwwVvAG4ALmFmAADgNdhA3WEAmWNjAHIAAKAQIWkibGRlAChh6wHSBQAA1QVjAHkABmRsADuAzwDPQIACY2Zvc3UA4QXpBe0F8gX9BQABaXnlBegFcgBjADRhGWRyAADgNdgN3XAAZgAA4DXYQd3jAfcFAAD7BXIAAOA12KXc8iFjeQhk6yFjeQRkgANISmFjZm9zAAwGDwYSBhUGHQYhBiYGYwB5ACVkYwB5AAxk8CFwYZpjAAFleRkGHAbkIWlsNmEaZHIAAOA12A7dcABmAADgNdhC3WMAcgAA4DXYptyABUpUYWNlZmxtb3N0AD0GQAZDBl4GawZkB2gHcAd0B80H2gdjAHkACWQ7gDwAPECAAmNtbnByAEwGTwZSBlUGWwb1IXRlOWHiIWRhm2NnAACg6ifsI2FjZXRyZgCgEiFyAACgniGAAWFleQBkBmcGagbyIW9uPWHkIWlsO2EbZAABZnNvBjQHdAAABUFDREZSVFVWYXKABp4GpAbGBssG3AYDByEHwQIqBwABbnKEBowGZyVsZUJyYWNrZXQAAKDoJ/Ihb3cAoZAhQlKTBpcGYQByAACg5CHpJGdodEFycm93AKDGIWUjaWxpbmcAAKAII28A9QGqBgAAsgZiJWxlQnJhY2tldAAAoOYnbgDUAbcGAAC+BmUkZVZlY3RvcgAAoGEp5SJjdG9yQqDDIWEAcgAAoFkpbCJvb3IAAKAKI2kiZ2h0AAABQVbSBtcGciJyb3cAAKCUIeUiY3RvcgCgTikAAWVy4AbwBmUAAKGjIkFW5gbrBnIicm93AACgpCHlImN0b3IAoFopaSNhbmdsZQBCorIi+wYAAAAA/wZhAHIAAKDPKXEidWFsAACgtCJwAIABRFRWAAoHEQcYB+8kd25WZWN0b3IAoFEpZSRlVmVjdG9yAACgYCnlImN0b3JCoL8hYQByAACgWCnlImN0b3JCoLwhYQByAACgUilpAGcAaAB0AGEAcgByAG8A9wDMAnMAAANFRkdMU1Q/B0cHTgdUB1gHXwfxJXVhbEdyZWF0ZXIAoNoidSRsbEVxdWFsAACgZiJyI2VhdGVyAACgdiLlIXNzAKChKuwkYW50RXF1YWwAoH0qaSJsZGUAAKByInIAAOA12A/dZaDYIuYjdGFycm93AKDaIWkiZG90AD9hgAFucHcAege1B7kHZwAAAkxSbHKCB5QHmwerB+UhZnQAAUFSiAeNB3Iicm93AACg9SfpJGdodEFycm93AKD3J+kkZ2h0QXJyb3cAoPYn5SFmdAABYXLcAqEHaQBnAGgAdABhAHIAcgBvAPcA5wJpAGcAaAB0AGEAcgByAG8A9wDuAmYAAOA12EPdZQByAAABTFK/B8YHZSRmdEFycm93AACgmSHpJGdodEFycm93AKCYIYABY2h0ANMH1QfXB/IAWgYAoLAh8iFva0FhAKBqIgAEYWNlZmlvc3XpB+wH7gf/BwMICQgOCBEIcAAAoAUpeQAcZAABZGzyB/kHaSR1bVNwYWNlAACgXyBsI2ludHJmAACgMyFyAADgNdgQ3e4jdXNQbHVzAKATInAAZgAA4DXYRN1jAPIA/gecY4AESmFjZWZvc3R1ACEIJAgoCDUIgQiFCDsKQApHCmMAeQAKZGMidXRlAENhgAFhZXkALggxCDQI8iFvbkdh5CFpbEVhHWSAAWdzdwA7CGEIfQjhInRpdmWAAU1UVgBECEwIWQhlJWRpdW1TcGFjZQAAoAsgaABpAAABY25SCFMIawBTAHAAYQBjAOUASwhlAHIAeQBUAGgAaQDuAFQI9CFlZAABR0xnCHUIcgBlAGEAdABlAHIARwByAGUAYQB0AGUA8gDrBGUAcwBzAEwAZQBzAPMA2wdMImluZQAKYHIAAOA12BHdAAJCbnB0jAiRCJkInAhyImVhawAAoGAgwiZyZWFraW5nU3BhY2WgYGYAAKAVIUOq7CqzCMIIzQgAAOcIGwkAAAAAAAAtCQAAbwkAAIcJAACdCcAJGQoAADQKAAFvdbYIvAjuI2dydWVudACgYiJwIkNhcAAAoG0ibyh1YmxlVmVydGljYWxCYXIAAKAmIoABbHF4ANII1wjhCOUibWVudACgCSL1IWFsVKBgImkibGRlAADgQiI4A2kic3RzAACgBCJyI2VhdGVyAACjbyJFRkdMU1T1CPoIAgkJCQ0JFQlxInVhbAAAoHEidSRsbEVxdWFsAADgZyI4A3IjZWF0ZXIAAOBrIjgD5SFzcwCgeSLsJGFudEVxdWFsAOB+KjgDaSJsZGUAAKB1IvUhbXBEASAJJwnvI3duSHVtcADgTiI4A3EidWFsAADgTyI4A2UAAAFmczEJRgn0JFRyaWFuZ2xlQqLqIj0JAAAAAEIJYQByAADgzyk4A3EidWFsAACg7CJzAICibiJFR0xTVABRCVYJXAlhCWkJcSJ1YWwAAKBwInIjZWF0ZXIAAKB4IuUhc3MA4GoiOAPsJGFudEVxdWFsAOB9KjgDaSJsZGUAAKB0IuUic3RlZAABR0x1CX8J8iZlYXRlckdyZWF0ZXIA4KIqOAPlI3NzTGVzcwDgoSo4A/IjZWNlZGVzAKGAIkVTjwmVCXEidWFsAADgryo4A+wkYW50RXF1YWwAoOAiAAFlaaAJqQl2JmVyc2VFbGVtZW50AACgDCLnJWh0VHJpYW5nbGVCousitgkAAAAAuwlhAHIAAODQKTgDcSJ1YWwAAKDtIgABcXXDCeAJdSNhcmVTdQAAAWJwywnVCfMhZXRF4I8iOANxInVhbAAAoOIi5SJyc2V0ReCQIjgDcSJ1YWwAAKDjIoABYmNwAOYJ8AkNCvMhZXRF4IIi0iBxInVhbAAAoIgi4yJlZWRzgKGBIkVTVAD6CQAKBwpxInVhbAAA4LAqOAPsJGFudEVxdWFsAKDhImkibGRlAADgfyI4A+UicnNldEXggyLSIHEidWFsAACgiSJpImxkZQCAoUEiRUZUACIKJwouCnEidWFsAACgRCJ1JGxsRXF1YWwAAKBHImkibGRlAACgSSJlJXJ0aWNhbEJhcgAAoCQiYwByAADgNdip3GkAbABkAGUAO4DRANFAnWMAB0VhY2RmZ21vcHJzdHV2XgphCmgKcgp2CnoKgQqRCpYKqwqtCrsKyArNCuwhaWdSYWMAdQB0AGUAO4DTANNAAAFpeWwKcQpyAGMAO4DUANRAHmRiImxhYwBQYXIAAOA12BLdcgBhAHYAZQA7gNIA0kCAAWFlaQCHCooKjQpjAHIATGFnAGEAqWNjInJvbgCfY3AAZgAA4DXYRt3lI25DdXJseQABRFGeCqYKbyV1YmxlUXVvdGUAAKAcIHUib3RlAACgGCAAoFQqAAFjbLEKtQpyAADgNdiq3GEAcwBoADuA2ADYQGkAbAHACsUKZABlADuA1QDVQGUAcwAAoDcqbQBsADuA1gDWQGUAcgAAAUJQ0wrmCgABYXLXCtoKcgAAoD4gYQBjAAABZWvgCuIKAKDeI2UAdAAAoLQjYSVyZW50aGVzaXMAAKDcI4AEYWNmaGlsb3JzAP0KAwsFCwkLCwsMCxELIwtaC3IjdGlhbEQAAKACInkAH2RyAADgNdgT3WkApmOgY/Ujc01pbnVzsWAAAWlwFQsgC24AYwBhAHIAZQBwAGwAYQBuAOUACgVmAACgGSGAobsqZWlvACoLRQtJC+MiZWRlc4CheiJFU1QANAs5C0ALcSJ1YWwAAKCvKuwkYW50RXF1YWwAoHwiaSJsZGUAAKB+Im0AZQAAoDMgAAFkcE0LUQv1IWN0AKAPIm8jcnRpb24AYaA3ImwAAKAdIgABY2leC2ILcgAA4DXYq9yoYwACVWZvc2oLbwtzC3cLTwBUADuAIgAiQHIAAOA12BTdcABmAACgGiFjAHIAAOA12KzcAAZCRWFjZWZoaW9yc3WPC5MLlwupC7YL2AvbC90LhQyTDJoMowzhIXJyAKAQKUcAO4CuAK5AgAFjbnIAnQugC6ML9SF0ZVRhZwAAoOsncgB0oKAhbAAAoBYpgAFhZXkArwuyC7UL8iFvblhh5CFpbFZhIGR2oBwhZSJyc2UAAAFFVb8LzwsAAWxxwwvIC+UibWVudACgCyL1JGlsaWJyaXVtAKDLIXAmRXF1aWxpYnJpdW0AAKBvKXIAAKAcIW8AoWPnIWh0AARBQ0RGVFVWYewLCgwQDDIMNwxeDHwM9gIAAW5y8Av4C2clbGVCcmFja2V0AACg6SfyIW93AKGSIUJM/wsDDGEAcgAAoOUhZSRmdEFycm93AACgxCFlI2lsaW5nAACgCSNvAPUBFgwAAB4MYiVsZUJyYWNrZXQAAKDnJ24A1AEjDAAAKgxlJGVWZWN0b3IAAKBdKeUiY3RvckKgwiFhAHIAAKBVKWwib29yAACgCyMAAWVyOwxLDGUAAKGiIkFWQQxGDHIicm93AACgpiHlImN0b3IAoFspaSNhbmdsZQBCorMiVgwAAAAAWgxhAHIAAKDQKXEidWFsAACgtSJwAIABRFRWAGUMbAxzDO8kd25WZWN0b3IAoE8pZSRlVmVjdG9yAACgXCnlImN0b3JCoL4hYQByAACgVCnlImN0b3JCoMAhYQByAACgUykAAXB1iQyMDGYAAKAdIe4kZEltcGxpZXMAoHAp6SRnaHRhcnJvdwCg2yEAAWNongyhDHIAAKAbIQCgsSHsJGVEZWxheWVkAKD0KYAGSE9hY2ZoaW1vcXN0dQC/DMgMzAzQDOIM5gwKDQ0NFA0ZDU8NVA1YDQABQ2PDDMYMyCFjeSlkeQAoZEYiVGN5ACxkYyJ1dGUAWmEAorwqYWVpedgM2wzeDOEM8iFvbmBh5CFpbF5hcgBjAFxhIWRyAADgNdgW3e8hcnQAAkRMUlXvDPYM/QwEDW8kd25BcnJvdwAAoJMhZSRmdEFycm93AACgkCHpJGdodEFycm93AKCSIXAjQXJyb3cAAKCRIechbWGjY+EkbGxDaXJjbGUAoBgicABmAADgNdhK3XICHw0AAAAAIg10AACgGiLhIXJlgKGhJUlTVQAqDTINSg3uJXRlcnNlY3Rpb24AoJMidQAAAWJwNw1ADfMhZXRFoI8icSJ1YWwAAKCRIuUicnNldEWgkCJxInVhbAAAoJIibiJpb24AAKCUImMAcgAA4DXYrtxhAHIAAKDGIgACYmNtcF8Nag2ODZANc6DQImUAdABFoNAicSJ1YWwAAKCGIgABY2huDYkNZSJlZHMAgKF7IkVTVAB4DX0NhA1xInVhbAAAoLAq7CRhbnRFcXVhbACgfSJpImxkZQAAoH8iVABoAGEA9ADHCwCgESIAodEiZXOVDZ8NciJzZXQARaCDInEidWFsAACghyJlAHQAAKDRIoAFSFJTYWNmaGlvcnMAtQ27Db8NyA3ODdsN3w3+DRgOHQ4jDk8AUgBOADuA3gDeQMEhREUAoCIhAAFIY8MNxg1jAHkAC2R5ACZkAAFidcwNzQ0JYKRjgAFhZXkA1A3XDdoN8iFvbmRh5CFpbGJhImRyAADgNdgX3QABZWnjDe4N8gHoDQAA7Q3lImZvcmUAoDQiYQCYYwABY27yDfkNayNTcGFjZQAA4F8gCiDTInBhY2UAoAkg7CFkZYChPCJFRlQABw4MDhMOcSJ1YWwAAKBDInUkbGxFcXVhbAAAoEUiaSJsZGUAAKBIInAAZgAA4DXYS93pI3BsZURvdACg2yAAAWN0Jw4rDnIAAOA12K/c8iFva2Zh4QpFDlYOYA5qDgAAbg5yDgAAAAAAAAAAAAB5DnwOqA6zDgAADg8RDxYPGg8AAWNySA5ODnUAdABlADuA2gDaQHIAb6CfIeMhaXIAoEkpcgDjAVsOAABdDnkADmR2AGUAbGEAAWl5Yw5oDnIAYwA7gNsA20AjZGIibGFjAHBhcgAA4DXYGN1yAGEAdgBlADuA2QDZQOEhY3JqYQABZGl/Dp8OZQByAAABQlCFDpcOAAFhcokOiw5yAF9gYQBjAAABZWuRDpMOAKDfI2UAdAAAoLUjYSVyZW50aGVzaXMAAKDdI28AbgBQoMMi7CF1cwCgjiIAAWdwqw6uDm8AbgByYWYAAOA12EzdAARBREVUYWRwc78O0g7ZDuEOBQPqDvMOBw9yInJvdwDCoZEhyA4AAMwOYQByAACgEilvJHduQXJyb3cAAKDFIW8kd25BcnJvdwAAoJUhcSV1aWxpYnJpdW0AAKBuKWUAZQBBoKUiciJyb3cAAKClIW8AdwBuAGEAcgByAG8A9wAQA2UAcgAAAUxS+Q4AD2UkZnRBcnJvdwAAoJYh6SRnaHRBcnJvdwCglyFpAGyg0gNvAG4ApWPpIW5nbmFjAHIAAOA12LDcaSJsZGUAaGFtAGwAO4DcANxAgAREYmNkZWZvc3YALQ8xDzUPNw89D3IPdg97D4AP4SFzaACgqyJhAHIAAKDrKnkAEmThIXNobKCpIgCg5ioAAWVyQQ9DDwCgwSKAAWJ0eQBJD00Paw9hAHIAAKAWIGmgFiDjIWFsAAJCTFNUWA9cD18PZg9hAHIAAKAjIukhbmV8YGUkcGFyYXRvcgAAoFgnaSJsZGUAAKBAItQkaGluU3BhY2UAoAogcgAA4DXYGd1wAGYAAOA12E3dYwByAADgNdix3GQiYXNoAACgqiKAAmNlZm9zAI4PkQ+VD5kPng/pIXJjdGHkIWdlAKDAInIAAOA12BrdcABmAADgNdhO3WMAcgAA4DXYstwAAmZpb3OqD64Prw+0D3IAAOA12BvdnmNwAGYAAOA12E/dYwByAADgNdiz3IAEQUlVYWNmb3N1AMgPyw/OD9EP2A/gD+QP6Q/uD2MAeQAvZGMAeQAHZGMAeQAuZGMAdQB0AGUAO4DdAN1AAAFpedwP3w9yAGMAdmErZHIAAOA12BzdcABmAADgNdhQ3WMAcgAA4DXYtNxtAGwAeGEABEhhY2RlZm9z/g8BEAUQDRAQEB0QIBAkEGMAeQAWZGMidXRlAHlhAAFheQkQDBDyIW9ufWEXZG8AdAB7YfIBFRAAABwQbwBXAGkAZAB0AOgAVAhhAJZjcgAAoCghcABmAACgJCFjAHIAAOA12LXc4QtCEEkQTRAAAGcQbRByEAAAAAAAAAAAeRCKEJcQ8hD9EAAAGxEhETIROREAAD4RYwB1AHQAZQA7gOEA4UByImV2ZQADYYCiPiJFZGl1eQBWEFkQWxBgEGUQAOA+IjMDAKA/InIAYwA7gOIA4kB0AGUAO4C0ALRAMGRsAGkAZwA7gOYA5kByoGEgAOA12B7dcgBhAHYAZQA7gOAA4EAAAWVwfBCGEAABZnCAEIQQ8yF5bQCgNSHoAIMQaABhALFjAAFhcI0QWwAAAWNskRCTEHIAAWFnAACgPypkApwQAAAAALEQAKInImFkc3ajEKcQqRCuEG4AZAAAoFUqAKBcKmwib3BlAACgWCoAoFoqAKMgImVsbXJzersQvRDAEN0Q5RDtEACgpCllAACgICJzAGQAYaAhImEEzhDQENIQ1BDWENgQ2hDcEACgqCkAoKkpAKCqKQCgqykAoKwpAKCtKQCgrikAoK8pdAB2oB8iYgBkoL4iAKCdKQABcHTpEOwQaAAAoCIixWDhIXJyAKB8IwABZ3D1EPgQbwBuAAVhZgAA4DXYUt0Ao0giRWFlaW9wBxEJEQ0RDxESERQRAKBwKuMhaXIAoG8qAKBKImQAAKBLInMAJ2DyIW94ZaBIIvEADhFpAG4AZwA7gOUA5UCAAWN0eQAmESoRKxFyAADgNdi23CpgbQBwAGWgSCLxAPgBaQBsAGQAZQA7gOMA40BtAGwAO4DkAORAAAFjaUERRxFvAG4AaQBuAPQA6AFuAHQAAKARKgAITmFiY2RlZmlrbG5vcHJzdWQRaBGXEZ8RpxGrEdIR1hErEjASexKKEn0RThNbE3oTbwB0AACg7SoAAWNybBGJEWsAAAJjZXBzdBF4EX0RghHvIW5nAKBMInAjc2lsb24A9mNyImltZQAAoDUgaQBtAGWgPSJxAACgzSJ2AY0RkRFlAGUAAKC9ImUAZABnoAUjZQAAoAUjcgBrAHSgtSPiIXJrAKC2IwABb3mjEaYRbgDnAHcRMWTxIXVvAKAeIIACY21wcnQAtBG5Eb4RwRHFEeEhdXPloDUi5ABwInR5dgAAoLApcwDpAH0RbgBvAPUA6gCAAWFodwDLEcwRzhGyYwCgNiHlIWVuAKBsInIAAOA12B/dZwCAA2Nvc3R1dncA4xHyEQUSEhIhEiYSKRKAAWFpdQDpEesR7xHwAKMFcgBjAACg7yVwAACgwyKAAWRwdAD4EfwRABJvAHQAAKAAKuwhdXMAoAEqaSJtZXMAAKACKnECCxIAAAAADxLjIXVwAKAGKmEAcgAAoAUm8iNpYW5nbGUAAWR1GhIeEu8hd24AoL0lcAAAoLMlcCJsdXMAAKAEKmUA5QBCD+UAkg9hInJvdwAAoA0pgAFha28ANhJoEncSAAFjbjoSZRJrAIABbHN0AEESRxJNEm8jemVuZ2UAAKDrKXEAdQBhAHIA5QBcBPIjaWFuZ2xlgKG0JWRscgBYElwSYBLvIXduAKC+JeUhZnQAoMIlaSJnaHQAAKC4JWsAAKAjJLEBbRIAAHUSsgFxEgAAcxIAoJIlAKCRJTQAAKCTJWMAawAAoIglAAFlb38ShxJx4D0A5SD1IWl2AOBhIuUgdAAAoBAjAAJwdHd4kRKVEpsSnxJmAADgNdhT3XSgpSJvAG0AAKClIvQhaWUAoMgiAAZESFVWYmRobXB0dXayEsES0RLgEvcS+xIKExoTHxMjEygTNxMAAkxSbHK5ErsSvRK/EgCgVyUAoFQlAKBWJQCgUyUAolAlRFVkdckSyxLNEs8SAKBmJQCgaSUAoGQlAKBnJQACTFJsctgS2hLcEt4SAKBdJQCgWiUAoFwlAKBZJQCjUSVITFJobHLrEu0S7xLxEvMS9RIAoGwlAKBjJQCgYCUAoGslAKBiJQCgXyVvAHgAAKDJKQACTFJscgITBBMGEwgTAKBVJQCgUiUAoBAlAKAMJQCiACVEVWR1EhMUExYTGBMAoGUlAKBoJQCgLCUAoDQlaSJudXMAAKCfIuwhdXMAoJ4iaSJtZXMAAKCgIgACTFJsci8TMRMzEzUTAKBbJQCgWCUAoBglAKAUJQCjAiVITFJobHJCE0QTRhNIE0oTTBMAoGolAKBhJQCgXiUAoDwlAKAkJQCgHCUAAWV2UhNVE3YA5QD5AGIAYQByADuApgCmQAACY2Vpb2ITZhNqE24TcgAA4DXYt9xtAGkAAKBPIG0A5aA9IogRbAAAoVwAYmh0E3YTAKDFKfMhdWIAoMgnbAF+E4QTbABloCIgdAAAoCIgcAAAoU4iRWWJE4sTAKCuKvGgTyI8BeEMqRMAAN8TABQDFB8UAAAjFDQUAAAAAIUUAAAAAI0UAAAAANcU4xT3FPsUAACIFQAAlhWAAWNwcgCuE7ET1RP1IXRlB2GAoikiYWJjZHMAuxO/E8QTzhPSE24AZAAAoEQqciJjdXAAAKBJKgABYXXIE8sTcAAAoEsqcAAAoEcqbwB0AACgQCoA4CkiAP4AAWVv2RPcE3QAAKBBIO4ABAUAAmFlaXXlE+8T9RP4E/AB6hMAAO0TcwAAoE0qbwBuAA1hZABpAGwAO4DnAOdAcgBjAAlhcABzAHOgTCptAACgUCpvAHQAC2GAAWRtbgAIFA0UEhRpAGwAO4C4ALhAcCJ0eXYAAKCyKXQAAIGiADtlGBQZFKJAcgBkAG8A9ABiAXIAAOA12CDdgAFjZWkAKBQqFDIUeQBHZGMAawBtoBMn4SFyawCgEyfHY3IAAKPLJUVjZWZtcz8UQRRHFHcUfBSAFACgwykAocYCZWxGFEkUcQAAoFciZQBhAlAUAAAAAGAUciJyb3cAAAFsclYUWhTlIWZ0AKC6IWkiZ2h0AACguyGAAlJTYWNkAGgUaRRrFG8UcxSuYACgyCRzAHQAAKCbIukhcmMAoJoi4SFzaACgnSJuImludAAAoBAqaQBkAACg7yrjIWlyAKDCKfUhYnN1oGMmaQB0AACgYybsApMUmhS2FAAAwxRvAG4AZaA6APGgVCKrAG0CnxQAAAAAoxRhAHSgLABAYAChASJmbKcUqRTuABMNZQAAAW14rhSyFOUhbnQAoAEiZQDzANIB5wG6FAAAwBRkoEUibwB0AACgbSpuAPQAzAGAAWZyeQDIFMsUzhQA4DXYVN1vAOQA1wEAgakAO3MeAdMUcgAAoBchAAFhb9oU3hRyAHIAAKC1IXMAcwAAoBcnAAFjdeYU6hRyAADgNdi43AABYnDuFPIUZaDPKgCg0SploNAqAKDSKuQhb3QAoO8igANkZWxwcnZ3AAYVEBUbFSEVRBVlFYQV4SFycgABbHIMFQ4VAKA4KQCgNSlwAhYVAAAAABkVcgAAoN4iYwAAoN8i4SFycnCgtiEAoD0pgKIqImJjZG9zACsVMBU6FT4VQRVyImNhcAAAoEgqAAFhdTQVNxVwAACgRipwAACgSipvAHQAAKCNInIAAKBFKgDgKiIA/gACYWxydksVURVuFXMVcgByAG2gtyEAoDwpeQCAAWV2dwBYFWUVaRVxAHACXxUAAAAAYxVyAGUA4wAXFXUA4wAZFWUAZQAAoM4iZSJkZ2UAAKDPImUAbgA7gKQApEBlI2Fycm93AAABbHJ7FX8V5SFmdACgtiFpImdodAAAoLchZQDkAG0VAAFjaYsVkRVvAG4AaQBuAPQAkwFuAHQAAKAxImwiY3R5AACgLSOACUFIYWJjZGVmaGlqbG9yc3R1d3oAuBW7Fb8V1RXgFegV+RUKFhUWHxZUFlcWZRbFFtsW7xb7FgUXChdyAPIAtAJhAHIAAKBlKQACZ2xyc8YVyhXOFdAV5yFlcgCgICDlIXRoAKA4IfIA9QxoAHagECAAoKMiawHZFd4VYSJyb3cAAKAPKWEA4wBfAgABYXnkFecV8iFvbg9hNGQAoUYhYW/tFfQVAAFnciEC8RVyAACgyiF0InNlcQAAoHcqgAFnbG0A/xUCFgUWO4CwALBAdABhALRjcCJ0eXYAAKCxKQABaXIOFhIW8yFodACgfykA4DXYId1hAHIAAAFschsWHRYAoMMhAKDCIYACYWVnc3YAKBauAjYWOhY+Fm0AAKHEIm9zLhY0Fm4AZABzoMQi9SFpdACgZiZhIm1tYQDdY2kAbgAAoPIiAKH3AGlvQxZRFmQAZQAAgfcAO29KFksW90BuI3RpbWVzAACgxyJuAPgAUBZjAHkAUmRjAG8CXhYAAAAAYhZyAG4AAKAeI28AcAAAoA0jgAJscHR1dwBuFnEWdRaSFp4W7CFhciRgZgAA4DXYVd0AotkCZW1wc30WhBaJFo0WcQBkoFAibwB0AACgUSJpIm51cwAAoDgi7CF1cwCgFCLxInVhcmUAoKEiYgBsAGUAYgBhAHIAdwBlAGQAZwDlANcAbgCAAWFkaAClFqoWtBZyAHIAbwD3APUMbwB3AG4AYQByAHIAbwB3APMA8xVhI3Jwb29uAAABbHK8FsAWZQBmAPQAHBZpAGcAaAD0AB4WYgHJFs8WawBhAHIAbwD3AJILbwLUFgAAAADYFnIAbgAAoB8jbwBwAACgDCOAAWNvdADhFukW7BYAAXJ55RboFgDgNdi53FVkbAAAoPYp8iFvaxFhAAFkcvMW9xZvAHQAAKDxImkA5qC/JVsSAAFhaP8WAhdyAPIANQNhAPIA1wvhIm5nbGUAoKYpAAFjaQ4XEBd5AF9k5yJyYXJyAKD/JwAJRGFjZGVmZ2xtbm9wcXJzdHV4MRc4F0YXWxcyBF4XaRd5F40XrBe0F78X2RcVGCEYLRg1GEAYAAFEbzUXgRZvAPQA+BUAAWNzPBdCF3UAdABlADuA6QDpQPQhZXIAoG4qAAJhaW95TRdQF1YXWhfyIW9uG2FyAGOgViI7gOoA6kDsIW9uAKBVIk1kbwB0ABdhAAFEcmIXZhdvAHQAAKBSIgDgNdgi3XKhmipuF3QXYQB2AGUAO4DoAOhAZKCWKm8AdAAAoJgqgKGZKmlscwCAF4UXhxfuInRlcnMAoOcjAKATIWSglSpvAHQAAKCXKoABYXBzAJMXlheiF2MAcgATYXQAeQBzogUinxcAAAAAoRdlAHQAAKAFInAAMaADIDMBqRerFwCgBCAAoAUgAAFnc7AXsRdLYXAAAKACIAABZ3C4F7sXbwBuABlhZgAA4DXYVt2AAWFscwDFF8sXzxdyAHOg1SJsAACg4yl1AHMAAKBxKmkAAKG1A2x21RfYF28AbgC1Y/VjAAJjc3V24BfoF/0XEBgAAWlv5BdWF3IAYwAAoFYiaQLuFwAAAADwF+0ADQThIW50AAFnbPUX+Rd0AHIAAKCWKuUhc3MAoJUqgAFhZWkAAxgGGAoYbABzAD1gcwB0AACgXyJ2AESgYSJEAACgeCrwImFyc2wAoOUpAAFEYRkYHRhvAHQAAKBTInIAcgAAoHEpgAFjZGkAJxgqGO0XcgAAoC8hbwD0AIwCAAFhaDEYMhi3YzuA8ADwQAABbXI5GD0YbAA7gOsA60BvAACgrCCAAWNpcABGGEgYSxhsACFgcwD0ACwEAAFlb08YVxhjAHQAYQB0AGkAbwDuABoEbgBlAG4AdABpAGEAbADlADME4Ql1GAAAgRgAAIMYiBgAAAAAoRilGAAAqhgAALsYvhjRGAAA1xgnGWwAbABpAG4AZwBkAG8AdABzAGUA8QBlF3kARGRtImFsZQAAoEAmgAFpbHIAjRiRGJ0Y7CFpZwCgA/tpApcYAAAAAJoYZwAAoAD7aQBnAACgBPsA4DXYI93sIWlnAKAB++whaWcA4GYAagCAAWFsdACvGLIYthh0AACgbSZpAGcAAKAC+24AcwAAoLElbwBmAJJh8AHCGAAAxhhmAADgNdhX3QABYWvJGMwYbADsAGsEdqDUIgCg2SphI3J0aW50AACgDSoAAWFv2hgiGQABY3PeGB8ZsQPnGP0YBRkSGRUZAAAdGbID7xjyGPQY9xj5GAAA+xg7gL0AvUAAoFMhO4C8ALxAAKBVIQCgWSEAoFshswEBGQAAAxkAoFQhAKBWIbQCCxkOGQAAAAAQGTuAvgC+QACgVyEAoFwhNQAAoFghtgEZGQAAGxkAoFohAKBdITgAAKBeIWwAAKBEIHcAbgAAoCIjYwByAADgNdi73IAIRWFiY2RlZmdpamxub3JzdHYARhlKGVoZXhlmGWkZkhmWGZkZnRmgGa0ZxhnLGc8Z4BkjGmygZyIAoIwqgAFjbXAAUBlTGVgZ9SF0ZfVhbQBhAOSgswM6FgCghipyImV2ZQAfYQABaXliGWUZcgBjAB1hM2RvAHQAIWGAoWUibHFzAMYEcBl6GfGhZSLOBAAAdhlsAGEAbgD0AN8EgKF+KmNkbACBGYQZjBljAACgqSpvAHQAb6CAKmyggioAoIQqZeDbIgD+cwAAoJQqcgAA4DXYJN3noGsirATtIWVsAKA3IWMAeQBTZIChdyJFYWoApxmpGasZAKCSKgCgpSoAoKQqAAJFYWVztBm2Gb0ZwhkAoGkicABwoIoq8iFveACgiipxoIgq8aCIKrUZaQBtAACg5yJwAGYAAOA12FjdYQB2AOUAYwIAAWNp0xnWGXIAAKAKIW0AAKFzImVs3BneGQCgjioAoJAqAIM+ADtjZGxxco0E6xn0GfgZ/BkBGgABY2nvGfEZAKCnKnIAAKB6Km8AdAAAoNci0CFhcgCglSl1ImVzdAAAoHwqgAJhZGVscwAKGvQZFhrVBCAa8AEPGgAAFBpwAHIAbwD4AFkZcgAAoHgpcQAAAWxxxAQbGmwAZQBzAPMASRlpAO0A5AQAAWVuJxouGnIjdG5lcXEAAOBpIgD+xQAsGgAFQWFiY2Vma29zeUAaQxpmGmoabRqDGocalhrCGtMacgDyAMwCAAJpbG1yShpOGlAaVBpyAHMA8ABxD2YAvWBpAGwA9AASBQABZHJYGlsaYwB5AEpkAKGUIWN3YBpkGmkAcgAAoEgpAKCtIWEAcgAAoA8h6SFyYyVhgAFhbHIAcxp7Gn8a8iF0c3WgZSZpAHQAAKBlJuwhaXAAoCYg4yFvbgCguSJyAADgNdgl3XMAAAFld4wakRphInJvdwAAoCUpYSJyb3cAAKAmKYACYW1vcHIAnxqjGqcauhq+GnIAcgAAoP8h9CFodACgOyJrAAABbHKsGrMaZSRmdGFycm93AACgqSHpJGdodGFycm93AKCqIWYAAOA12Fnd4iFhcgCgFSCAAWNsdADIGswa0BpyAADgNdi93GEAcwDoAGka8iFvaydhAAFicNca2xr1IWxsAKBDIOghZW4AoBAg4Qr2GgAA/RoAAAgbExsaGwAAIRs7GwAAAAA+G2IbmRuVG6sbAACyG80b0htjAHUAdABlADuA7QDtQAChYyBpeQEbBhtyAGMAO4DuAO5AOGQAAWN4CxsNG3kANWRjAGwAO4ChAKFAAAFmcssCFhsA4DXYJt1yAGEAdgBlADuA7ADsQIChSCFpbm8AJxsyGzYbAAFpbisbLxtuAHQAAKAMKnQAAKAtIuYhaW4AoNwpdABhAACgKSHsIWlnM2GAAWFvcABDG1sbXhuAAWNndABJG0sbWRtyACthgAFlbHAAcQVRG1UbaQBuAOUAyAVhAHIA9AByBWgAMWFmAACgtyJlAGQAtWEAoggiY2ZvdGkbbRt1G3kb4SFyZQCgBSFpAG4AdKAeImkAZQAAoN0pZABvAPQAWxsAoisiY2VscIEbhRuPG5QbYQBsAACguiIAAWdyiRuNG2UAcgDzACMQ4wCCG2EicmhrAACgFyryIW9kAKA8KgACY2dwdJ8boRukG6gbeQBRZG8AbgAvYWYAAOA12FrdYQC5Y3UAZQBzAHQAO4C/AL9AAAFjabUbuRtyAADgNdi+3G4AAKIIIkVkc3bCG8QbyBvQAwCg+SJvAHQAAKD1Inag9CIAoPMiaaBiIOwhZGUpYesB1hsAANkbYwB5AFZkbAA7gO8A70AAA2NmbW9zdeYb7hvyG/Ub+hsFHAABaXnqG+0bcgBjADVhOWRyAADgNdgn3eEhdGg3YnAAZgAA4DXYW93jAf8bAAADHHIAAOA12L/c8iFjeVhk6yFjeVRkAARhY2ZnaGpvcxUcGhwiHCYcKhwtHDAcNRzwIXBhdqC6A/BjAAFleR4cIRzkIWlsN2E6ZHIAAOA12CjdciJlZW4AOGFjAHkARWRjAHkAXGRwAGYAAOA12FzdYwByAADgNdjA3IALQUJFSGFiY2RlZmdoamxtbm9wcnN0dXYAXhxtHHEcdRx5HN8cBx0dHTwd3B3tHfEdAR4EHh0eLB5FHrwewx7hHgkfPR9LH4ABYXJ0AGQcZxxpHHIA8gBvB/IAxQLhIWlsAKAbKeEhcnIAoA4pZ6BmIgCgiyphAHIAAKBiKWMJjRwAAJAcAACVHAAAAAAAAAAAAACZHJwcAACmHKgcrRwAANIc9SF0ZTph7SJwdHl2AKC0KXIAYQDuAFoG4iFkYbtjZwAAoegnZGyhHKMcAKCRKeUAiwYAoIUqdQBvADuAqwCrQHIAgKOQIWJmaGxwc3QAuhy/HMIcxBzHHMoczhxmoOQhcwAAoB8pcwAAoB0p6wCyGnAAAKCrIWwAAKA5KWkAbQAAoHMpbAAAoKIhAKGrKmFl1hzaHGkAbAAAoBkpc6CtKgDgrSoA/oABYWJyAOUc6RztHHIAcgAAoAwpcgBrAACgcicAAWFr8Rz4HGMAAAFla/Yc9xx7YFtgAAFlc/wc/hwAoIspbAAAAWR1Ax0FHQCgjykAoI0pAAJhZXV5Dh0RHRodHB3yIW9uPmEAAWRpFR0YHWkAbAA8YewAowbiAPccO2QAAmNxcnMkHScdLB05HWEAAKA2KXUAbwDyoBwgqhEAAWR1MB00HeghYXIAoGcpcyJoYXIAAKBLKWgAAKCyIQCiZCJmZ3FzRB1FB5Qdnh10AIACYWhscnQATh1WHWUdbB2NHXIicm93AHSgkCFhAOkAzxxhI3Jwb29uAAABZHVeHWId7yF3bgCgvSFwAACgvCHlJGZ0YXJyb3dzAKDHIWkiZ2h0AIABYWhzAHUdex2DHXIicm93APOglCGdBmEAcgBwAG8AbwBuAPMAzgtxAHUAaQBnAGEAcgByAG8A9wBlGugkcmVldGltZXMAoMsi8aFkIk0HAACaHWwAYQBuAPQAXgcAon0qY2Rnc6YdqR2xHbcdYwAAoKgqbwB0AG+gfypyoIEqAKCDKmXg2iIA/nMAAKCTKoACYWRlZ3MAwB3GHcod1h3ZHXAAcAByAG8A+ACmHG8AdAAAoNYicQAAAWdxzx3SHXQA8gBGB2cAdADyAHQcdADyAFMHaQDtAGMHgAFpbHIA4h3mHeod8yFodACgfClvAG8A8gDKBgDgNdgp3UWgdiIAoJEqYQH1Hf4dcgAAAWR1YB35HWygvCEAoGopbABrAACghCVjAHkAWWQAomoiYWNodAweDx4VHhkecgDyAGsdbwByAG4AZQDyAGAW4SFyZACgaylyAGkAAKD6JQABaW8hHiQe5CFvdEBh9SFzdGGgsCPjIWhlAKCwIwACRWFlczMeNR48HkEeAKBoInAAcKCJKvIhb3gAoIkqcaCHKvGghyo0HmkAbQAAoOYiAARhYm5vcHR3elIeXB5fHoUelh6mHqsetB4AAW5yVh5ZHmcAAKDsJ3IAAKD9IXIA6wCwBmcAgAFsbXIAZh52Hnse5SFmdAABYXKIB2weaQBnAGgAdABhAHIAcgBvAPcAkwfhInBzdG8AoPwnaQBnAGgAdABhAHIAcgBvAPcAmgdwI2Fycm93AAABbHKNHpEeZQBmAPQAxhxpImdodAAAoKwhgAFhZmwAnB6fHqIecgAAoIUpAOA12F3ddQBzAACgLSppIm1lcwAAoDQqYQGvHrMecwB0AACgFyLhAIoOZaHKJbkeRhLuIWdlAKDKJWEAcgBsoCgAdAAAoJMpgAJhY2htdADMHs8e1R7bHt0ecgDyAJ0GbwByAG4AZQDyANYWYQByAGSgyyEAoG0pAKAOIHIAaQAAoL8iAANhY2hpcXTrHu8e1QfzHv0eBh/xIXVvAKA5IHIAAOA12MHcbQDloXIi+h4AAPweAKCNKgCgjyoAAWJ19xwBH28AcqAYIACgGiDyIW9rQmEAhDwAO2NkaGlscXJCBhcfxh0gHyQfKB8sHzEfAAFjaRsfHR8AoKYqcgAAoHkqcgBlAOUAkx3tIWVzAKDJIuEhcnIAoHYpdSJlc3QAAKB7KgABUGk1HzkfYQByAACglillocMlAgdfEnIAAAFkdUIfRx9zImhhcgAAoEop6CFhcgCgZikAAWVuTx9WH3IjdG5lcXEAAOBoIgD+xQBUHwAHRGFjZGVmaGlsbm9wc3VuH3Ifoh+rH68ftx+7H74f5h/uH/MfBwj/HwsgxCFvdACgOiIAAmNscHJ5H30fiR+eH3IAO4CvAK9AAAFldIEfgx8AoEImZaAgJ3MAZQAAoCAnc6CmIXQAbwCAoaYhZGx1AJQfmB+cH28AdwDuAHkDZQBmAPQA6gbwAOkO6yFlcgCgriUAAW95ph+qH+0hbWEAoCkqPGThIXNoAKAUIOElc3VyZWRhbmdsZQCgISJyAADgNdgq3W8AAKAnIYABY2RuAMQfyR/bH3IAbwA7gLUAtUBhoiMi0B8AANMf1x9zAPQAKxFpAHIAAKDwKm8AdAA7gLcAt0B1AHMA4qESIh4TAADjH3WgOCIAoCoqYwHqH+0fcAAAoNsq8gB+GnAAbAB1APMACAgAAWRw9x/7H+UhbHMAoKciZgAA4DXYXt0AAWN0AyAHIHIAAOA12MLc8CFvcwCgPiJsobwDECAVIPQiaW1hcACguCJhAPAAEyAADEdMUlZhYmNkZWZnaGlqbG1vcHJzdHV2dzwgRyBmIG0geSCqILgg2iDeIBEhFSEyIUMhTSFQIZwhnyHSIQAiIyKLIrEivyIUIwABZ3RAIEMgAODZIjgD9uBrItIgBwmAAWVsdABNIF8gYiBmAHQAAAFhclMgWCByInJvdwAAoM0h6SRnaHRhcnJvdwCgziEA4NgiOAP24Goi0iBfCekkZ2h0YXJyb3cAoM8hAAFEZHEgdSDhIXNoAKCvIuEhc2gAoK4igAJiY25wdACCIIYgiSCNIKIgbABhAACgByL1IXRlRGFnAADgICLSIACiSSJFaW9wlSCYIJwgniAA4HAqOANkAADgSyI4A3MASWFyAG8A+AAyCnUAcgBhoG4mbADzoG4mmwjzAa8gAACzIHAAO4CgAKBAbQBwAOXgTiI4AyoJgAJhZW91eQDBIMogzSDWINkg8AHGIAAAyCAAoEMqbwBuAEhh5CFpbEZhbgBnAGSgRyJvAHQAAOBtKjgDcAAAoEIqPWThIXNoAKATIACjYCJBYWRxc3jpIO0g+SD+IAIhDCFyAHIAAKDXIXIAAAFocvIg9SBrAACgJClvoJch9wAGD28AdAAA4FAiOAN1AGkA9gC7CAABZWkGIQohYQByAACgKCntAN8I6SFzdPOgBCLlCHIAAOA12CvdAAJFZXN0/wgcISshLiHxoXEiIiEAABMJ8aFxIgAJAAAnIWwAYQBuAPQAEwlpAO0AGQlyoG8iAKBvIoABQWFwADghOyE/IXIA8gBeIHIAcgAAoK4hYQByAACg8ipzogsiSiEAAAAAxwtkoPwiAKD6ImMAeQBaZIADQUVhZGVzdABcIV8hYiFmIWkhkyGWIXIA8gBXIADgZiI4A3IAcgAAoJohcgAAoCUggKFwImZxcwBwIYQhjiF0AAABYXJ1IXohcgByAG8A9wBlIWkAZwBoAHQAYQByAHIAbwD3AD4h8aFwImAhAACKIWwAYQBuAPQAZwlz4H0qOAMAoG4iaQDtAG0JcqBuImkA5aDqIkUJaQDkADoKAAFwdKMhpyFmAADgNdhf3YCBrAA7aW4AriGvIcchrEBuAIChCSJFZHYAtyG6Ib8hAOD5IjgDbwB0AADg9SI4A+EB1gjEIcYhAKD3IgCg9iJpAHagDCLhAagJzyHRIQCg/iIAoP0igAFhb3IA2CHsIfEhcgCAoSYiYXN0AOAh5SHpIWwAbABlAOwAywhsAADg/SrlIADgAiI4A2wiaW50AACgFCrjoYAi9yEAAPohdQDlAJsJY+CvKjgDZaCAIvEAkwkAAkFhaXQHIgoiFyIeInIA8gBsIHIAcgAAoZshY3cRIhQiAOAzKTgDAOCdITgDZyRodGFycm93AACgmyFyAGkA5aDrIr4JgANjaGltcHF1AC8iPCJHIpwhTSJQIloigKGBImNlcgA2Iv0JOSJ1AOUABgoA4DXYw9zvIXJ0bQKdIQAAAABEImEAcgDhAOEhbQBloEEi8aBEIiYKYQDyAMsIcwB1AAABYnBWIlgi5QDUCeUA3wmAAWJjcABgInMieCKAoYQiRWVzAGci7glqIgDgxSo4A2UAdABl4IIi0iBxAPGgiCJoImMAZaCBIvEA/gmAoYUiRWVzAH8iFgqCIgDgxio4A2UAdABl4IMi0iBxAPGgiSKAIgACZ2lscpIilCKaIpwi7AAMCWwAZABlADuA8QDxQOcAWwlpI2FuZ2xlAAABbHKkIqoi5SFmdGWg6iLxAEUJaSJnaHQAZaDrIvEAvgltoL0DAKEjAGVzuCK8InIAbwAAoBYhcAAAoAcggARESGFkZ2lscnMAziLSItYi2iLeIugi7SICIw8j4SFzaACgrSLhIXJyAKAEKXAAAOBNItIg4SFzaACgrCIAAWV04iLlIgDgZSLSIADgPgDSIG4iZmluAACg3imAAUFldADzIvci+iJyAHIAAKACKQDgZCLSIHLgPADSIGkAZQAA4LQi0iAAAUF0BiMKI3IAcgAAoAMp8iFpZQDgtSLSIGkAbQAA4Dwi0iCAAUFhbgAaIx4jKiNyAHIAAKDWIXIAAAFociMjJiNrAACgIylvoJYh9wD/DuUhYXIAoCcpUxJqFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVCMAAF4jaSN/I4IjjSOeI8AUAAAAAKYjwCMAANoj3yMAAO8jHiQvJD8kRCQAAWNzVyNsFHUAdABlADuA8wDzQAABaXlhI2cjcgBjoJoiO4D0APRAPmSAAmFiaW9zAHEjdCN3I3EBeiNzAOgAdhTsIWFjUWF2AACgOCrvIWxkAKC8KewhaWdTYQABY3KFI4kjaQByAACgvykA4DXYLN1vA5QjAAAAAJYjAACcI24A22JhAHYAZQA7gPIA8kAAoMEpAAFibaEjjAphAHIAAKC1KQACYWNpdKwjryO6I70jcgDyAFkUAAFpcrMjtiNyAACgvinvIXNzAKC7KW4A5QDZCgCgwCmAAWFlaQDFI8gjyyNjAHIATWFnAGEAyWOAAWNkbgDRI9Qj1iPyIW9uv2MAoLYpdQDzAHgBcABmAADgNdhg3YABYWVsAOQj5yPrI3IAAKC3KXIAcAAAoLkpdQDzAHwBAKMoImFkaW9zdvkj/CMPJBMkFiQbJHIA8gBeFIChXSplZm0AAyQJJAwkcgBvoDQhZgAAoDQhO4CqAKpAO4C6ALpA5yFvZgCgtiJyAACgVipsIm9wZQAAoFcqAKBbKoABY2xvACMkJSQrJPIACCRhAHMAaAA7gPgA+EBsAACgmCJpAGwBMyQ4JGQAZQA7gPUA9UBlAHMAYaCXInMAAKA2Km0AbAA7gPYA9kDiIWFyAKA9I+EKXiQAAHokAAB8JJQkAACYJKkkAAAAALUkEQsAAPAkAAAAAAQleiUAAIMlcgCAoSUiYXN0AGUkbyQBCwCBtgA7bGokayS2QGwAZQDsABgDaQJ1JAAAAAB4JG0AAKDzKgCg/Sp5AD9kcgCAAmNpbXB0AIUkiCSLJJkSjyRuAHQAJWBvAGQALmBpAGwAAKAwIOUhbmsAoDEgcgAA4DXYLd2AAWltbwCdJKAkpCR2oMYD1WNtAGEA9AD+B24AZQAAoA4m9KHAA64kAAC0JGMjaGZvcmsAAKDUItZjAAFhdbgkxCRuAAABY2u9JMIkawBooA8hAKAOIfYAaRpzAACkKwBhYmNkZW1zdNMkIRPXJNsk4STjJOck6yTjIWlyAKAjKmkAcgAAoCIqAAFvdYsW3yQAoCUqAKByKm4AO4CxALFAaQBtAACgJip3AG8AAKAnKoABaXB1APUk+iT+JO4idGludACgFSpmAADgNdhh3W4AZAA7gKMAo0CApHoiRWFjZWlub3N1ABMlFSUYJRslTCVRJVklSSV1JQCgsypwAACgtyp1AOUAPwtjoK8qgKJ6ImFjZW5zACclLSU0JTYlSSVwAHAAcgBvAPgAFyV1AHIAbAB5AGUA8QA/C/EAOAuAAWFlcwA8JUElRSXwInByb3gAoLkqcQBxAACgtSppAG0AAKDoImkA7QBEC20AZQDzoDIgIguAAUVhcwBDJVclRSXwAEAlgAFkZnAATwtfJXElgAFhbHMAZSVpJW0l7CFhcgCgLiPpIW5lAKASI/UhcmYAoBMjdKAdIu8AWQvyIWVsAKCwIgABY2l9JYElcgAA4DXYxdzIY24iY3NwAACgCCAAA2Zpb3BzdZElKxuVJZolnyWkJXIAAOA12C7dcABmAADgNdhi3XIiaW1lAACgVyBjAHIAAOA12MbcgAFhZW8AqiW6JcAldAAAAWVpryW2JXIAbgBpAG8AbgDzABkFbgB0AACgFipzAHQAZaA/APEACRj0AG0LgApBQkhhYmNkZWZoaWxtbm9wcnN0dXgA4yXyJfYl+iVpJpAmpia9JtUm5ib4JlonaCdxJ3UnnietJ7EnyCfiJ+cngAFhcnQA6SXsJe4lcgDyAJkM8gD6AuEhaWwAoBwpYQByAPIA3BVhAHIAAKBkKYADY2RlbnFydAAGJhAmEyYYJiYmKyZaJgABZXUKJg0mAOA9IjEDdABlAFVhaQDjACAN7SJwdHl2AKCzKWcAgKHpJ2RlbAAgJiImJCYAoJIpAKClKeUA9wt1AG8AO4C7ALtAcgAApZIhYWJjZmhscHN0dz0mQCZFJkcmSiZMJk4mUSZVJlgmcAAAoHUpZqDlIXMAAKAgKQCgMylzAACgHinrALka8ACVHmwAAKBFKWkAbQAAoHQpbAAAoKMhAKCdIQABYWleJmImaQBsAACgGilvAG6gNiJhAGwA8wB2C4ABYWJyAG8mciZ2JnIA8gAvEnIAawAAoHMnAAFha3omgSZjAAABZWt/JoAmfWBdYAABZXOFJocmAKCMKWwAAAFkdYwmjiYAoI4pAKCQKQACYWV1eZcmmiajJqUm8iFvbllhAAFkaZ4moSZpAGwAV2HsAA8M4gCAJkBkAAJjbHFzrSawJrUmuiZhAACgNylkImhhcgAAoGkpdQBvAPKgHSCjAWgAAKCzIYABYWNnAMMm0iaUC2wAgKEcIWlwcwDLJs4migxuAOUAoAxhAHIA9ADaC3QAAKCtJYABaWxyANsm3ybjJvMhaHQAoH0pbwBvAPIANgwA4DXYL90AAWFv6ib1JnIAAAFkde8m8SYAoMEhbKDAIQCgbCl2oMED8WOAAWducwD+Jk4nUCdoAHQAAANhaGxyc3QKJxInISc1Jz0nRydyInJvdwB0oJIhYQDpAFYmYSNycG9vbgAAAWR1GiceJ28AdwDuAPAmcAAAoMAh5SFmdAABYWgnJy0ncgByAG8AdwDzAAkMYQByAHAAbwBvAG4A8wATBGklZ2h0YXJyb3dzAACgySFxAHUAaQBnAGEAcgByAG8A9wBZJugkcmVldGltZXMAoMwiZwDaYmkAbgBnAGQAbwB0AHMAZQDxABwYgAFhaG0AYCdjJ2YncgDyAAkMYQDyABMEAKAPIG8idXN0AGGgsSPjIWhlAKCxI+0haWQAoO4qAAJhYnB0fCeGJ4knmScAAW5ygCeDJ2cAAKDtJ3IAAKD+IXIA6wAcDIABYWZsAI8nkieVJ3IAAKCGKQDgNdhj3XUAcwAAoC4qaSJtZXMAAKA1KgABYXCiJ6gncgBnoCkAdAAAoJQp7yJsaW50AKASKmEAcgDyADwnAAJhY2hxuCe8J6EMwCfxIXVvAKA6IHIAAOA12MfcAAFidYAmxCdvAPKgGSCoAYABaGlyAM4n0ifWJ3IAZQDlAE0n7SFlcwCgyiJpAIChuSVlZmwAXAxjEt4n9CFyaQCgzinsInVoYXIAoGgpAKAeIWENBSgJKA0oSyhVKIYoAACLKLAoAAAAAOMo5ygAABApJCkxKW0pcSmHKaYpAACYKgAAAACxKmMidXRlAFthcQB1AO8ABR+ApHsiRWFjZWlucHN5ABwoHignKCooLygyKEEoRihJKACgtCrwASMoAAAlKACguCpvAG4AYWF1AOUAgw1koLAqaQBsAF9hcgBjAF1hgAFFYXMAOCg6KD0oAKC2KnAAAKC6KmkAbQAAoOki7yJsaW50AKATKmkA7QCIDUFkbwB0AGKixSKRFgAAAABTKACgZiqAA0FhY21zdHgAYChkKG8ocyh1KHkogihyAHIAAKDYIXIAAAFocmkoayjrAJAab6CYIfcAzAd0ADuApwCnQGkAO2D3IWFyAKApKW0AAAFpbn4ozQBuAHUA8wDOAHQAAKA2J3IA7+A12DDdIxkAAmFjb3mRKJUonSisKHIAcAAAoG8mAAFoeZkonChjAHkASWRIZHIAdABtAqUoAAAAAKgoaQDkAFsPYQByAGEA7ABsJDuArQCtQAABZ22zKLsobQBhAAChwwNmdroouijCY4CjPCJkZWdsbnByAMgozCjPKNMo1yjaKN4obwB0AACgairxoEMiCw5FoJ4qAKCgKkWgnSoAoJ8qZQAAoEYi7CF1cwCgJCrhIXJyAKByKWEAcgDyAPwMAAJhZWl07Sj8KAEpCCkAAWxz8Sj4KGwAcwBlAHQAbQDpAH8oaABwAACgMyrwImFyc2wAoOQpAAFkbFoPBSllAACgIyNloKoqc6CsKgDgrCoA/oABZmxwABUpGCkfKfQhY3lMZGKgLwBhoMQpcgAAoD8jZgAA4DXYZN1hAAABZHIoKRcDZQBzAHWgYCZpAHQAAKBgJoABY3N1ADYpRilhKQABYXU6KUApcABzoJMiAOCTIgD+cABzoJQiAOCUIgD+dQAAAWJwSylWKQChjyJlcz4NUCllAHQAZaCPIvEAPw0AoZAiZXNIDVspZQB0AGWgkCLxAEkNAKGhJWFmZilbBHIAZQFrKVwEAKChJWEAcgDyAAMNAAJjZW10dyl7KX8pgilyAADgNdjI3HQAbQDuAM4AaQDsAAYpYQByAOYAVw0AAWFyiimOKXIA5qAGJhESAAFhbpIpoylpImdodAAAAWVwmSmgKXAAcwBpAGwAbwDuANkXaADpAKAkcwCvYIACYmNtbnAArin8KY4NJSooKgCkgiJFZGVtbnByc7wpvinCKcgpzCnUKdgp3CkAoMUqbwB0AACgvSpkoIYibwB0AACgwyr1IWx0AKDBKgABRWXQKdIpAKDLKgCgiiLsIXVzAKC/KuEhcnIAoHkpgAFlaXUA4inxKfQpdAAAoYIiZW7oKewpcQDxoIYivSllAHEA8aCKItEpbQAAoMcqAAFicPgp+ikAoNUqAKDTKmMAgKJ7ImFjZW5zAAcqDSoUKhYqRihwAHAAcgBvAPgAIyh1AHIAbAB5AGUA8QCDDfEAfA2AAWFlcwAcKiIqPShwAHAAcgBvAPgAPChxAPEAOShnAACgaiYApoMiMTIzRWRlaGxtbnBzPCo/KkIqRSpHKlIqWCpjKmcqaypzKncqO4C5ALlAO4CyALJAO4CzALNAAKDGKgABb3NLKk4qdAAAoL4qdQBiAACg2CpkoIcibwB0AACgxCpzAAABb3VdKmAqbAAAoMknYgAAoNcq4SFycgCgeyn1IWx0AKDCKgABRWVvKnEqAKDMKgCgiyLsIXVzAKDAKoABZWl1AH0qjCqPKnQAAKGDImVugyqHKnEA8aCHIkYqZQBxAPGgiyJwKm0AAKDIKgABYnCTKpUqAKDUKgCg1iqAAUFhbgCdKqEqrCpyAHIAAKDZIXIAAAFocqYqqCrrAJUab6CZIfcAxQf3IWFyAKAqKWwAaQBnADuA3wDfQOELzyrZKtwq6SrsKvEqAAD1KjQrAAAAAAAAAAAAAEwrbCsAAHErvSsAAAAAAADRK3IC1CoAAAAA2CrnIWV0AKAWI8RjcgDrAOUKgAFhZXkA4SrkKucq8iFvbmVh5CFpbGNhQmRvAPQAIg5sInJlYwAAoBUjcgAA4DXYMd0AAmVpa2/7KhIrKCsuK/IBACsAAAkrZQAAATRm6g0EK28AcgDlAOsNYQBzorgDECsAAAAAEit5AG0A0WMAAWNuFislK2sAAAFhcxsrIStwAHAAcgBvAPgAFw5pAG0AAKA8InMA8AD9DQABYXMsKyEr8AAXDnIAbgA7gP4A/kDsATgrOyswG2QA5QBnAmUAcwCAgdcAO2JkAEMrRCtJK9dAYaCgInIAAKAxKgCgMCqAAWVwcwBRK1MraSvhAAkh4qKkIlsrXysAAAAAYytvAHQAAKA2I2kAcgAAoPEqb+A12GXdcgBrAACg2irhAHgociJpbWUAAKA0IIABYWlwAHYreSu3K2QA5QC+DYADYWRlbXBzdACFK6MrmiunK6wrsCuzK24iZ2xlAACitSVkbHFykCuUK5ornCvvIXduAKC/JeUhZnRloMMl8QACBwCgXCJpImdodABloLkl8QBdDG8AdAAAoOwlaSJudXMAAKA6KuwhdXMAoDkqYgAAoM0p6SFtZQCgOyrlInppdW0AoOIjgAFjaHQAwivKK80rAAFyecYrySsA4DXYydxGZGMAeQBbZPIhb2tnYQABaW/UK9creAD0ANERaCJlYWQAAAFsct4r5ytlAGYAdABhAHIAcgBvAPcAXQbpJGdodGFycm93AKCgIQAJQUhhYmNkZmdobG1vcHJzdHV3CiwNLBEsHSwnLDEsQCxLLFIsYix6LIQsjyzLLOgs7Sz/LAotcgDyAAkDYQByAACgYykAAWNyFSwbLHUAdABlADuA+gD6QPIACQ1yAOMBIywAACUseQBeZHYAZQBtYQABaXkrLDAscgBjADuA+wD7QENkgAFhYmgANyw6LD0scgDyANEO7CFhY3FhYQDyAOAOAAFpckQsSCzzIWh0AKB+KQDgNdgy3XIAYQB2AGUAO4D5APlAYQFWLF8scgAAAWxyWixcLACgvyEAoL4hbABrAACggCUAAWN0Zix2LG8CbCwAAAAAcyxyAG4AZaAcI3IAAKAcI28AcAAAoA8jcgBpAACg+CUAAWFsfiyBLGMAcgBrYTuAqACoQAABZ3CILIssbwBuAHNhZgAA4DXYZt0AA2FkaGxzdZksniynLLgsuyzFLHIAcgBvAPcACQ1vAHcAbgBhAHIAcgBvAPcA2A5hI3Jwb29uAAABbHKvLLMsZQBmAPQAWyxpAGcAaAD0AF0sdQDzAKYOaQAAocUDaGzBLMIs0mNvAG4AxWPwI2Fycm93cwCgyCGAAWNpdADRLOEs5CxvAtcsAAAAAN4scgBuAGWgHSNyAACgHSNvAHAAAKAOI24AZwBvYXIAaQAAoPklYwByAADgNdjK3IABZGlyAPMs9yz6LG8AdAAAoPAi7CFkZWlhaQBmoLUlAKC0JQABYW0DLQYtcgDyAMosbAA7gPwA/EDhIm5nbGUAoKcpgAdBQkRhY2RlZmxub3Byc3oAJy0qLTAtNC2bLZ0toS2/LcMtxy3TLdgt3C3gLfwtcgDyABADYQByAHag6CoAoOkqYQBzAOgA/gIAAW5yOC08LechcnQAoJwpgANla25wcnN0AJkpSC1NLVQtXi1iLYItYQBwAHAA4QAaHG8AdABoAGkAbgDnAKEXgAFoaXIAoSmzJFotbwBwAPQAdCVooJUh7wD4JgABaXVmLWotZwBtAOEAuygAAWJwbi14LXMjZXRuZXEAceCKIgD+AODLKgD+cyNldG5lcQBx4IsiAP4A4MwqAP4AAWhyhi2KLWUAdADhABIraSNhbmdsZQAAAWxyki2WLeUhZnQAoLIiaSJnaHQAAKCzInkAMmThIXNoAKCiIoABZWxyAKcttC24LWKiKCKuLQAAAACyLWEAcgAAoLsicQAAoFoi7CFpcACg7iIAAWJ0vC1eD2EA8gBfD3IAAOA12DPddAByAOkAlS1zAHUAAAFicM0t0C0A4IIi0iAA4IMi0iBwAGYAAOA12GfdcgBvAPAAWQt0AHIA6QCaLQABY3XkLegtcgAA4DXYy9wAAWJw7C30LW4AAAFFZXUt8S0A4IoiAP5uAAABRWV/LfktAOCLIgD+6SJnemFnAKCaKYADY2Vmb3BycwANLhAuJS4pLiMuLi40LukhcmN1YQABZGkULiEuAAFiZxguHC5hAHIAAKBfKmUAcaAnIgCgWSLlIXJwAKAYIXIAAOA12DTdcABmAADgNdho3WWgQCJhAHQA6ABqD2MAcgAA4DXYzNzjCuQRUC4AAFQuAABYLmIuAAAAAGMubS5wLnQuAAAAAIguki4AAJouJxIqEnQAcgDpAB0ScgAA4DXYNd0AAUFhWy5eLnIA8gDnAnIA8gCTB75jAAFBYWYuaS5yAPIA4AJyAPIAjAdhAPAAeh5pAHMAAKD7IoABZHB0APgReS6DLgABZmx9LoAuAOA12GnddQDzAP8RaQBtAOUABBIAAUFhiy6OLnIA8gDuAnIA8gCaBwABY3GVLgoScgAA4DXYzdwAAXB0nS6hLmwAdQDzACUScgDpACASAARhY2VmaW9zdbEuvC7ELsguzC7PLtQu2S5jAAABdXm2LrsudABlADuA/QD9QE9kAAFpecAuwy5yAGMAd2FLZG4AO4ClAKVAcgAA4DXYNt1jAHkAV2RwAGYAAOA12GrdYwByAADgNdjO3AABY23dLt8ueQBOZGwAO4D/AP9AAAVhY2RlZmhpb3N38y73Lv8uAi8MLxAvEy8YLx0vIi9jInV0ZQB6YQABYXn7Lv4u8iFvbn5hN2RvAHQAfGEAAWV0Bi8KL3QAcgDmAB8QYQC2Y3IAAOA12DfdYwB5ADZk5yJyYXJyAKDdIXAAZgAA4DXYa91jAHIAAOA12M/cAAFqbiYvKC8AoA0gagAAoAwg");
 });
 
-// /zveltio-extension/node_modules/entities/dist/esm/generated/decode-data-xml.js
+// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/generated/decode-data-xml.js
 var xmlDecodeTree;
 var init_decode_data_xml = __esm(() => {
   xmlDecodeTree = /* @__PURE__ */ decodeBase64("AAJhZ2xxBwARABMAFQBtAg0AAAAAAA8AcAAmYG8AcwAnYHQAPmB0ADxg9SFvdCJg");
 });
 
-// /zveltio-extension/node_modules/entities/dist/esm/internal/bin-trie-flags.js
+// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/internal/bin-trie-flags.js
 var BinTrieFlags;
 var init_bin_trie_flags = __esm(() => {
   (function(BinTrieFlags2) {
@@ -78061,7 +78884,7 @@ var init_bin_trie_flags = __esm(() => {
   })(BinTrieFlags || (BinTrieFlags = {}));
 });
 
-// /zveltio-extension/node_modules/entities/dist/esm/decode.js
+// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/decode.js
 function isNumber2(code) {
   return code >= CharCodes.ZERO && code <= CharCodes.NINE;
 }
@@ -78345,7 +79168,7 @@ var init_decode = __esm(() => {
   })(DecodingMode || (DecodingMode = {}));
 });
 
-// /zveltio-extension/node_modules/htmlparser2/dist/esm/Tokenizer.js
+// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/dist/esm/Tokenizer.js
 function isWhitespace(c) {
   return c === CharCodes2.Space || c === CharCodes2.NewLine || c === CharCodes2.Tab || c === CharCodes2.FormFeed || c === CharCodes2.CarriageReturn;
 }
@@ -79006,7 +79829,7 @@ var init_Tokenizer = __esm(() => {
   };
 });
 
-// /zveltio-extension/node_modules/htmlparser2/dist/esm/Parser.js
+// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/dist/esm/Parser.js
 class Parser {
   constructor(cbs, options = {}) {
     var _a8, _b, _c, _d, _e, _f;
@@ -79402,7 +80225,411 @@ var init_Parser = __esm(() => {
   reNameEnd = /\s|\//;
 });
 
-// /zveltio-extension/node_modules/entities/lib/esm/escape.js
+// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domelementtype/lib/esm/index.js
+function isTag3(elem) {
+  return elem.type === ElementType2.Tag || elem.type === ElementType2.Script || elem.type === ElementType2.Style;
+}
+var ElementType2, Root2, Text2, Directive2, Comment2, Script2, Style2, Tag2, CDATA2, Doctype2;
+var init_esm3 = __esm(() => {
+  (function(ElementType3) {
+    ElementType3["Root"] = "root";
+    ElementType3["Text"] = "text";
+    ElementType3["Directive"] = "directive";
+    ElementType3["Comment"] = "comment";
+    ElementType3["Script"] = "script";
+    ElementType3["Style"] = "style";
+    ElementType3["Tag"] = "tag";
+    ElementType3["CDATA"] = "cdata";
+    ElementType3["Doctype"] = "doctype";
+  })(ElementType2 || (ElementType2 = {}));
+  Root2 = ElementType2.Root;
+  Text2 = ElementType2.Text;
+  Directive2 = ElementType2.Directive;
+  Comment2 = ElementType2.Comment;
+  Script2 = ElementType2.Script;
+  Style2 = ElementType2.Style;
+  Tag2 = ElementType2.Tag;
+  CDATA2 = ElementType2.CDATA;
+  Doctype2 = ElementType2.Doctype;
+});
+
+// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domhandler/lib/esm/node.js
+class Node3 {
+  constructor() {
+    this.parent = null;
+    this.prev = null;
+    this.next = null;
+    this.startIndex = null;
+    this.endIndex = null;
+  }
+  get parentNode() {
+    return this.parent;
+  }
+  set parentNode(parent) {
+    this.parent = parent;
+  }
+  get previousSibling() {
+    return this.prev;
+  }
+  set previousSibling(prev) {
+    this.prev = prev;
+  }
+  get nextSibling() {
+    return this.next;
+  }
+  set nextSibling(next) {
+    this.next = next;
+  }
+  cloneNode(recursive3 = false) {
+    return cloneNode(this, recursive3);
+  }
+}
+function isTag4(node3) {
+  return isTag3(node3);
+}
+function isCDATA(node3) {
+  return node3.type === ElementType2.CDATA;
+}
+function isText(node3) {
+  return node3.type === ElementType2.Text;
+}
+function isComment(node3) {
+  return node3.type === ElementType2.Comment;
+}
+function isDirective(node3) {
+  return node3.type === ElementType2.Directive;
+}
+function isDocument(node3) {
+  return node3.type === ElementType2.Root;
+}
+function cloneNode(node3, recursive3 = false) {
+  let result;
+  if (isText(node3)) {
+    result = new Text3(node3.data);
+  } else if (isComment(node3)) {
+    result = new Comment3(node3.data);
+  } else if (isTag4(node3)) {
+    const children = recursive3 ? cloneChildren(node3.children) : [];
+    const clone2 = new Element(node3.name, { ...node3.attribs }, children);
+    children.forEach((child) => child.parent = clone2);
+    if (node3.namespace != null) {
+      clone2.namespace = node3.namespace;
+    }
+    if (node3["x-attribsNamespace"]) {
+      clone2["x-attribsNamespace"] = { ...node3["x-attribsNamespace"] };
+    }
+    if (node3["x-attribsPrefix"]) {
+      clone2["x-attribsPrefix"] = { ...node3["x-attribsPrefix"] };
+    }
+    result = clone2;
+  } else if (isCDATA(node3)) {
+    const children = recursive3 ? cloneChildren(node3.children) : [];
+    const clone2 = new CDATA3(children);
+    children.forEach((child) => child.parent = clone2);
+    result = clone2;
+  } else if (isDocument(node3)) {
+    const children = recursive3 ? cloneChildren(node3.children) : [];
+    const clone2 = new Document(children);
+    children.forEach((child) => child.parent = clone2);
+    if (node3["x-mode"]) {
+      clone2["x-mode"] = node3["x-mode"];
+    }
+    result = clone2;
+  } else if (isDirective(node3)) {
+    const instruction = new ProcessingInstruction(node3.name, node3.data);
+    if (node3["x-name"] != null) {
+      instruction["x-name"] = node3["x-name"];
+      instruction["x-publicId"] = node3["x-publicId"];
+      instruction["x-systemId"] = node3["x-systemId"];
+    }
+    result = instruction;
+  } else {
+    throw new Error(`Not implemented yet: ${node3.type}`);
+  }
+  result.startIndex = node3.startIndex;
+  result.endIndex = node3.endIndex;
+  if (node3.sourceCodeLocation != null) {
+    result.sourceCodeLocation = node3.sourceCodeLocation;
+  }
+  return result;
+}
+function cloneChildren(childs) {
+  const children = childs.map((child) => cloneNode(child, true));
+  for (let i = 1;i < children.length; i++) {
+    children[i].prev = children[i - 1];
+    children[i - 1].next = children[i];
+  }
+  return children;
+}
+var DataNode, Text3, Comment3, ProcessingInstruction, NodeWithChildren, CDATA3, Document, Element;
+var init_node2 = __esm(() => {
+  init_esm3();
+  DataNode = class DataNode extends Node3 {
+    constructor(data) {
+      super();
+      this.data = data;
+    }
+    get nodeValue() {
+      return this.data;
+    }
+    set nodeValue(data) {
+      this.data = data;
+    }
+  };
+  Text3 = class Text3 extends DataNode {
+    constructor() {
+      super(...arguments);
+      this.type = ElementType2.Text;
+    }
+    get nodeType() {
+      return 3;
+    }
+  };
+  Comment3 = class Comment3 extends DataNode {
+    constructor() {
+      super(...arguments);
+      this.type = ElementType2.Comment;
+    }
+    get nodeType() {
+      return 8;
+    }
+  };
+  ProcessingInstruction = class ProcessingInstruction extends DataNode {
+    constructor(name2, data) {
+      super(data);
+      this.name = name2;
+      this.type = ElementType2.Directive;
+    }
+    get nodeType() {
+      return 1;
+    }
+  };
+  NodeWithChildren = class NodeWithChildren extends Node3 {
+    constructor(children) {
+      super();
+      this.children = children;
+    }
+    get firstChild() {
+      var _a8;
+      return (_a8 = this.children[0]) !== null && _a8 !== undefined ? _a8 : null;
+    }
+    get lastChild() {
+      return this.children.length > 0 ? this.children[this.children.length - 1] : null;
+    }
+    get childNodes() {
+      return this.children;
+    }
+    set childNodes(children) {
+      this.children = children;
+    }
+  };
+  CDATA3 = class CDATA3 extends NodeWithChildren {
+    constructor() {
+      super(...arguments);
+      this.type = ElementType2.CDATA;
+    }
+    get nodeType() {
+      return 4;
+    }
+  };
+  Document = class Document extends NodeWithChildren {
+    constructor() {
+      super(...arguments);
+      this.type = ElementType2.Root;
+    }
+    get nodeType() {
+      return 9;
+    }
+  };
+  Element = class Element extends NodeWithChildren {
+    constructor(name2, attribs, children = [], type = name2 === "script" ? ElementType2.Script : name2 === "style" ? ElementType2.Style : ElementType2.Tag) {
+      super(children);
+      this.name = name2;
+      this.attribs = attribs;
+      this.type = type;
+    }
+    get nodeType() {
+      return 1;
+    }
+    get tagName() {
+      return this.name;
+    }
+    set tagName(name2) {
+      this.name = name2;
+    }
+    get attributes() {
+      return Object.keys(this.attribs).map((name2) => {
+        var _a8, _b;
+        return {
+          name: name2,
+          value: this.attribs[name2],
+          namespace: (_a8 = this["x-attribsNamespace"]) === null || _a8 === undefined ? undefined : _a8[name2],
+          prefix: (_b = this["x-attribsPrefix"]) === null || _b === undefined ? undefined : _b[name2]
+        };
+      });
+    }
+  };
+});
+
+// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domhandler/lib/esm/index.js
+class DomHandler {
+  constructor(callback, options, elementCB) {
+    this.dom = [];
+    this.root = new Document(this.dom);
+    this.done = false;
+    this.tagStack = [this.root];
+    this.lastNode = null;
+    this.parser = null;
+    if (typeof options === "function") {
+      elementCB = options;
+      options = defaultOpts;
+    }
+    if (typeof callback === "object") {
+      options = callback;
+      callback = undefined;
+    }
+    this.callback = callback !== null && callback !== undefined ? callback : null;
+    this.options = options !== null && options !== undefined ? options : defaultOpts;
+    this.elementCB = elementCB !== null && elementCB !== undefined ? elementCB : null;
+  }
+  onparserinit(parser) {
+    this.parser = parser;
+  }
+  onreset() {
+    this.dom = [];
+    this.root = new Document(this.dom);
+    this.done = false;
+    this.tagStack = [this.root];
+    this.lastNode = null;
+    this.parser = null;
+  }
+  onend() {
+    if (this.done)
+      return;
+    this.done = true;
+    this.parser = null;
+    this.handleCallback(null);
+  }
+  onerror(error63) {
+    this.handleCallback(error63);
+  }
+  onclosetag() {
+    this.lastNode = null;
+    const elem = this.tagStack.pop();
+    if (this.options.withEndIndices) {
+      elem.endIndex = this.parser.endIndex;
+    }
+    if (this.elementCB)
+      this.elementCB(elem);
+  }
+  onopentag(name2, attribs) {
+    const type = this.options.xmlMode ? ElementType2.Tag : undefined;
+    const element = new Element(name2, attribs, undefined, type);
+    this.addNode(element);
+    this.tagStack.push(element);
+  }
+  ontext(data) {
+    const { lastNode } = this;
+    if (lastNode && lastNode.type === ElementType2.Text) {
+      lastNode.data += data;
+      if (this.options.withEndIndices) {
+        lastNode.endIndex = this.parser.endIndex;
+      }
+    } else {
+      const node4 = new Text3(data);
+      this.addNode(node4);
+      this.lastNode = node4;
+    }
+  }
+  oncomment(data) {
+    if (this.lastNode && this.lastNode.type === ElementType2.Comment) {
+      this.lastNode.data += data;
+      return;
+    }
+    const node4 = new Comment3(data);
+    this.addNode(node4);
+    this.lastNode = node4;
+  }
+  oncommentend() {
+    this.lastNode = null;
+  }
+  oncdatastart() {
+    const text = new Text3("");
+    const node4 = new CDATA3([text]);
+    this.addNode(node4);
+    text.parent = node4;
+    this.lastNode = text;
+  }
+  oncdataend() {
+    this.lastNode = null;
+  }
+  onprocessinginstruction(name2, data) {
+    const node4 = new ProcessingInstruction(name2, data);
+    this.addNode(node4);
+  }
+  handleCallback(error63) {
+    if (typeof this.callback === "function") {
+      this.callback(error63, this.dom);
+    } else if (error63) {
+      throw error63;
+    }
+  }
+  addNode(node4) {
+    const parent = this.tagStack[this.tagStack.length - 1];
+    const previousSibling = parent.children[parent.children.length - 1];
+    if (this.options.withStartIndices) {
+      node4.startIndex = this.parser.startIndex;
+    }
+    if (this.options.withEndIndices) {
+      node4.endIndex = this.parser.endIndex;
+    }
+    parent.children.push(node4);
+    if (previousSibling) {
+      node4.prev = previousSibling;
+      previousSibling.next = node4;
+    }
+    node4.parent = parent;
+    this.lastNode = null;
+  }
+}
+var defaultOpts;
+var init_esm4 = __esm(() => {
+  init_esm3();
+  init_node2();
+  init_node2();
+  defaultOpts = {
+    withStartIndices: false,
+    withEndIndices: false,
+    xmlMode: false
+  };
+});
+
+// /zveltio-extension/node_modules/dom-serializer/node_modules/domelementtype/lib/esm/index.js
+var ElementType3, Root3, Text4, Directive3, Comment4, Script3, Style3, Tag3, CDATA4, Doctype3;
+var init_esm5 = __esm(() => {
+  (function(ElementType4) {
+    ElementType4["Root"] = "root";
+    ElementType4["Text"] = "text";
+    ElementType4["Directive"] = "directive";
+    ElementType4["Comment"] = "comment";
+    ElementType4["Script"] = "script";
+    ElementType4["Style"] = "style";
+    ElementType4["Tag"] = "tag";
+    ElementType4["CDATA"] = "cdata";
+    ElementType4["Doctype"] = "doctype";
+  })(ElementType3 || (ElementType3 = {}));
+  Root3 = ElementType3.Root;
+  Text4 = ElementType3.Text;
+  Directive3 = ElementType3.Directive;
+  Comment4 = ElementType3.Comment;
+  Script3 = ElementType3.Script;
+  Style3 = ElementType3.Style;
+  Tag3 = ElementType3.Tag;
+  CDATA4 = ElementType3.CDATA;
+  Doctype3 = ElementType3.Doctype;
+});
+
+// /zveltio-extension/node_modules/dom-serializer/node_modules/entities/lib/esm/escape.js
 function encodeXML(str) {
   let ret = "";
   let lastIdx = 0;
@@ -79461,9 +80688,9 @@ var init_escape = __esm(() => {
   ]));
 });
 
-// /zveltio-extension/node_modules/entities/lib/esm/index.js
+// /zveltio-extension/node_modules/dom-serializer/node_modules/entities/lib/esm/index.js
 var EntityLevel, EncodingMode;
-var init_esm3 = __esm(() => {
+var init_esm6 = __esm(() => {
   init_escape();
   (function(EntityLevel2) {
     EntityLevel2[EntityLevel2["XML"] = 0] = "XML";
@@ -79604,31 +80831,31 @@ function formatAttributes(attributes, opts) {
     return `${key}="${encode3(value)}"`;
   }).join(" ");
 }
-function render(node3, options = {}) {
-  const nodes = "length" in node3 ? node3 : [node3];
+function render(node4, options = {}) {
+  const nodes = "length" in node4 ? node4 : [node4];
   let output2 = "";
   for (let i = 0;i < nodes.length; i++) {
     output2 += renderNode(nodes[i], options);
   }
   return output2;
 }
-function renderNode(node3, options) {
-  switch (node3.type) {
-    case Root:
-      return render(node3.children, options);
-    case Doctype:
-    case Directive:
-      return renderDirective(node3);
-    case Comment:
-      return renderComment(node3);
-    case CDATA:
-      return renderCdata(node3);
-    case Script:
-    case Style:
-    case Tag:
-      return renderTag(node3, options);
-    case Text:
-      return renderText(node3, options);
+function renderNode(node4, options) {
+  switch (node4.type) {
+    case Root3:
+      return render(node4.children, options);
+    case Doctype3:
+    case Directive3:
+      return renderDirective(node4);
+    case Comment4:
+      return renderComment(node4);
+    case CDATA4:
+      return renderCdata(node4);
+    case Script3:
+    case Style3:
+    case Tag3:
+      return renderTag(node4, options);
+    case Text4:
+      return renderText(node4, options);
   }
 }
 function renderTag(elem, opts) {
@@ -79680,9 +80907,9 @@ function renderComment(elem) {
   return `<!--${elem.data}-->`;
 }
 var unencodedElements, singleTag, foreignModeIntegrationPoints, foreignElements;
-var init_esm4 = __esm(() => {
-  init_esm();
-  init_esm3();
+var init_esm7 = __esm(() => {
+  init_esm5();
+  init_esm6();
   init_foreignNames();
   unencodedElements = new Set([
     "style",
@@ -79729,19 +80956,19 @@ var init_esm4 = __esm(() => {
   foreignElements = new Set(["svg", "math"]);
 });
 
-// /zveltio-extension/node_modules/domutils/lib/esm/stringify.js
+// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domutils/lib/esm/stringify.js
 var init_stringify = () => {};
 
-// /zveltio-extension/node_modules/domutils/lib/esm/traversal.js
+// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domutils/lib/esm/traversal.js
 var init_traversal = () => {};
 
-// /zveltio-extension/node_modules/domutils/lib/esm/querying.js
+// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domutils/lib/esm/querying.js
 var init_querying = () => {};
 
-// /zveltio-extension/node_modules/domutils/lib/esm/legacy.js
+// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domutils/lib/esm/legacy.js
 var init_legacy = () => {};
 
-// /zveltio-extension/node_modules/domutils/lib/esm/helpers.js
+// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domutils/lib/esm/helpers.js
 var DocumentPosition;
 var init_helpers = __esm(() => {
   (function(DocumentPosition2) {
@@ -79753,11 +80980,11 @@ var init_helpers = __esm(() => {
   })(DocumentPosition || (DocumentPosition = {}));
 });
 
-// /zveltio-extension/node_modules/domutils/lib/esm/feeds.js
+// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domutils/lib/esm/feeds.js
 var init_feeds = () => {};
 
-// /zveltio-extension/node_modules/domutils/lib/esm/index.js
-var init_esm5 = __esm(() => {
+// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domutils/lib/esm/index.js
+var init_esm8 = __esm(() => {
   init_stringify();
   init_traversal();
   init_querying();
@@ -79766,17 +80993,17 @@ var init_esm5 = __esm(() => {
   init_feeds();
 });
 
-// /zveltio-extension/node_modules/htmlparser2/dist/esm/index.js
+// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/dist/esm/index.js
 function parseDocument(data, options) {
   const handler = new DomHandler(undefined, options);
   new Parser(handler, options).end(data);
   return handler.root;
 }
-var init_esm6 = __esm(() => {
+var init_esm9 = __esm(() => {
   init_Parser();
-  init_esm2();
-  init_esm();
-  init_esm5();
+  init_esm4();
+  init_esm3();
+  init_esm8();
 });
 
 // /zveltio-extension/node_modules/deepmerge-ts/dist/index.mjs
@@ -81115,9 +82342,9 @@ function formatList(elem, walk, builder, formatOptions, nextPrefixCallback) {
     maxPrefixLength,
     prefixAlign: "left"
   });
-  for (const { node: node3, prefix } of listItems) {
+  for (const { node: node4, prefix } of listItems) {
     builder.openListItem({ prefix });
-    walk([node3], builder);
+    walk([node4], builder);
     builder.closeListItem();
   }
   builder.closeList({ trailingLineBreaks: isNestedList ? 1 : formatOptions.trailingLineBreaks || 2 });
@@ -81283,9 +82510,9 @@ var I, V, BlockStackItem, ListStackItem, ListItemStackItem, TableStackItem, Tabl
 }, deepMergeWithOverwriteArrays, deepMergeWithOptionsComposeRules, textFormatters, DEFAULT_OPTIONS;
 var init_html_to_text = __esm(() => {
   init_hp2_builder();
-  init_esm6();
+  init_esm9();
   init_selderee();
-  init_esm4();
+  init_esm7();
   init_dist2();
   I = ["I", "X", "C", "M"];
   V = ["V", "L", "D"];
@@ -83634,6 +84861,8 @@ var require_mail_parser = __commonJS((exports, module) => {
   var MAX_LINKIFY_SEGMENT_LENGTH = 4096;
   var MAX_LINKIFY_HOST_LABELS = 6;
   var MAX_LINKIFY_WORK = 768 * 1024 * 1024;
+  var MAX_INLINED_IMAGES_SIZE = 20 * 1024 * 1024;
+  var UNSAFE_LIST_KEYS = new Set(["__proto__", "constructor", "prototype"]);
   linkify.tlds(tlds).tlds("onion", true).add("git:", "http:").add("ftp:", null).set({ fuzzyIP: true, fuzzyLink: true, fuzzyEmail: true });
   function isHostChar(code) {
     return code >= 97 && code <= 122 || code >= 65 && code <= 90 || code >= 48 && code <= 57 || code === 45 || code >= 128;
@@ -83656,6 +84885,26 @@ var require_mail_parser = __commonJS((exports, module) => {
       match2.url = "https://twitter.com/" + match2.url.replace(/^@/, "");
     }
   });
+  function hasBracketedAddress(str) {
+    let start = -1;
+    let at = -1;
+    for (let i = 0, len = str.length;i < len; i++) {
+      let chr = str.charAt(i);
+      if (chr === "<") {
+        start = i;
+        at = -1;
+      } else if (chr === ">") {
+        if (start >= 0 && at >= 0 && at < i - 1) {
+          return true;
+        }
+        start = -1;
+        at = -1;
+      } else if (chr === "@" && start >= 0 && at < 0 && i > start + 1) {
+        at = i;
+      }
+    }
+    return false;
+  }
 
   class IconvDecoder extends Transform {
     constructor(Iconv, charset) {
@@ -83747,7 +84996,6 @@ var require_mail_parser = __commonJS((exports, module) => {
       this.textAsHtml = false;
       this.linkifyWork = 0;
       this.attachmentList = [];
-      this.boundaries = [];
       this.textTypes = ["text/plain", "text/html"].concat(!this.options.keepDeliveryStatus ? "message/delivery-status" : []);
       this.decoder = this.getDecoder();
       this.chunkedPassthrough.on("error", (err) => {
@@ -83786,7 +85034,7 @@ var require_mail_parser = __commonJS((exports, module) => {
         return {
           decodeStream(charset) {
             charset = libmime.normalizeCharset((charset || "ascii").toString());
-            if (/^jis|^iso-?2022-?jp|^EUCJP/i.test(charset)) {
+            if (/^jis|^iso-?2022-?jp/i.test(charset)) {
               return new JPDecoder(charset);
             }
             return iconv.decodeStream(charset);
@@ -83843,7 +85091,11 @@ var require_mail_parser = __commonJS((exports, module) => {
       if (this.finished) {
         return this.cleanup(done);
       }
-      this.waitingEnd = () => {
+      this.waitingEnd = (err) => {
+        this.waitingEnd = false;
+        if (err) {
+          return done(err);
+        }
         this.cleanup(done);
       };
     }
@@ -83993,6 +85245,9 @@ var require_mail_parser = __commonJS((exports, module) => {
       return headers;
     }
     parseListHeader(key, value) {
+      if (UNSAFE_LIST_KEYS.has(key)) {
+        return false;
+      }
       let addresses = addressparser2(value);
       let response = {};
       let data = addresses.map((address) => {
@@ -84062,7 +85317,7 @@ var require_mail_parser = __commonJS((exports, module) => {
         address.name = (address.name || "").toString().trim();
         if (!address.address && /^(=\?([^?]+)\?[Bb]\?[^?]*\?=)(\s*=\?([^?]+)\?[Bb]\?[^?]*\?=)*$/.test(address.name) && !processedAddress.has(address)) {
           let decoded = this.libmime.decodeWords(address.name);
-          if (/<[^<>]+@[^<>]+>/.test(decoded)) {
+          if (hasBracketedAddress(decoded)) {
             let parsed = addressparser2(decoded);
             if (parsed.length) {
               parsed.forEach((entry) => {
@@ -84105,18 +85360,18 @@ var require_mail_parser = __commonJS((exports, module) => {
         }
       }
     }
-    createNode(node3) {
-      let contentType = node3.contentType;
-      let disposition = node3.disposition;
-      let encoding = node3.encoding;
-      let charset = node3.charset;
-      if (!contentType && node3.root) {
+    createNode(node4) {
+      let contentType = node4.contentType;
+      let disposition = node4.disposition;
+      let encoding = node4.encoding;
+      let charset = node4.charset;
+      if (!contentType && node4.root) {
         contentType = "text/plain";
       }
       let newNode = {
-        node: node3,
-        headerLines: node3.headers.lines,
-        headers: this.processHeaders(node3.headers.getList()),
+        node: node4,
+        headerLines: node4.headers.lines,
+        headers: this.processHeaders(node4.headers.getList()),
         contentType,
         children: []
       };
@@ -84134,13 +85389,13 @@ var require_mail_parser = __commonJS((exports, module) => {
         if (charset) {
           newNode.charset = charset;
         }
-        let decoder = node3.getDecoder();
+        let decoder = node4.getDecoder();
         decoder.on("end", () => {
           this.decoderEnded = true;
         });
         newNode.decoder = decoder;
       }
-      if (node3.root) {
+      if (node4.root) {
         this.headers = newNode.headers;
         this.headerLines = newNode.headerLines;
       }
@@ -84155,13 +85410,13 @@ var require_mail_parser = __commonJS((exports, module) => {
         this.curnode = newNode;
         return newNode;
       }
-      if (this.curnode.parent.node === node3.parentNode) {
+      if (this.curnode.parent.node === node4.parentNode) {
         newNode.parent = this.curnode.parent;
         this.curnode.parent.children.push(newNode);
         this.curnode = newNode;
         return newNode;
       }
-      if (this.curnode.node === node3.parentNode) {
+      if (this.curnode.node === node4.parentNode) {
         newNode.parent = this.curnode;
         this.curnode.children.push(newNode);
         this.curnode = newNode;
@@ -84169,7 +85424,7 @@ var require_mail_parser = __commonJS((exports, module) => {
       }
       let parentNode = this.curnode;
       while (parentNode = parentNode.parent) {
-        if (parentNode.node === node3.parentNode) {
+        if (parentNode.node === node4.parentNode) {
           newNode.parent = parentNode;
           parentNode.children.push(newNode);
           this.curnode = newNode;
@@ -84182,14 +85437,14 @@ var require_mail_parser = __commonJS((exports, module) => {
     getTextContent() {
       let text = [];
       let html = [];
-      let processNode = (alternative, level, node3) => {
-        if (node3.showMeta) {
+      let processNode = (alternative, level, node4) => {
+        if (node4.showMeta) {
           let meta3 = ["From", "Subject", "Date", "To", "Cc", "Bcc"].map((fkey) => {
             let key = fkey.toLowerCase();
-            if (!node3.headers.has(key)) {
+            if (!node4.headers.has(key)) {
               return false;
             }
-            let value = node3.headers.get(key);
+            let value = node4.headers.get(key);
             if (!value) {
               return false;
             }
@@ -84242,29 +85497,29 @@ var require_mail_parser = __commonJS((exports, module) => {
 `);
           }
         }
-        if (node3.textContent) {
-          if (node3.contentType === "text/plain") {
-            text.push(node3.textContent);
+        if (node4.textContent) {
+          if (node4.contentType === "text/plain") {
+            text.push(node4.textContent);
             if (!alternative && this.hasHtml) {
-              html.push(this.textToHtml(node3.textContent));
+              html.push(this.textToHtml(node4.textContent));
             }
-          } else if (node3.contentType === "message/delivery-status" && !this.options.keepDeliveryStatus) {
-            text.push(node3.textContent);
+          } else if (node4.contentType === "message/delivery-status" && !this.options.keepDeliveryStatus) {
+            text.push(node4.textContent);
             if (!alternative && this.hasHtml) {
-              html.push(this.textToHtml(node3.textContent));
+              html.push(this.textToHtml(node4.textContent));
             }
-          } else if (node3.contentType === "text/html") {
+          } else if (node4.contentType === "text/html") {
             let failedToParseHtml = false;
-            if (!alternative && this.hasText || node3.root && !this.hasText) {
+            if (!alternative && this.hasText || node4.root && !this.hasText) {
               if (this.options.skipHtmlToText) {
                 text.push("");
-              } else if (node3.textContent.length > this.options.maxHtmlLengthToParse) {
-                this.emit("error", new Error(`HTML too long for parsing ${node3.textContent.length} bytes`));
+              } else if (node4.textContent.length > this.options.maxHtmlLengthToParse) {
+                this.emit("error", new Error(`HTML too long for parsing ${node4.textContent.length} bytes`));
                 text.push("Invalid HTML content (too long)");
                 failedToParseHtml = true;
               } else {
                 try {
-                  text.push(htmlToText(node3.textContent));
+                  text.push(htmlToText(node4.textContent));
                 } catch (err) {
                   this.emit("error", new Error("Failed to parse HTML"));
                   text.push("Invalid HTML content");
@@ -84273,13 +85528,13 @@ var require_mail_parser = __commonJS((exports, module) => {
               }
             }
             if (!failedToParseHtml) {
-              html.push(node3.textContent);
+              html.push(node4.textContent);
             }
           }
         }
-        alternative = alternative || node3.contentType === "multipart/alternative";
-        if (node3.children) {
-          node3.children.forEach((subNode) => {
+        alternative = alternative || node4.contentType === "multipart/alternative";
+        if (node4.children) {
+          node4.children.forEach((subNode) => {
             processNode(alternative, level + 1, subNode);
           });
         }
@@ -84303,33 +85558,36 @@ var require_mail_parser = __commonJS((exports, module) => {
     processChunk(data, done) {
       let partId = null;
       if (data._parentBoundary) {
-        partId = this._getPartId(data._parentBoundary);
+        partId = (data.partNr || []).filter((nr) => typeof nr === "number").join(".") || null;
       }
       switch (data.type) {
         case "node": {
-          let node3 = this.createNode(data);
-          if (node3 === this.tree) {
+          let node4 = this.createNode(data);
+          if (node4 === this.tree) {
             ["subject", "references", "date", "to", "from", "to", "cc", "bcc", "message-id", "in-reply-to", "reply-to"].forEach((key) => {
-              if (node3.headers.has(key)) {
-                this[key.replace(/-([a-z])/g, (m, c) => c.toUpperCase())] = node3.headers.get(key);
+              if (node4.headers.has(key)) {
+                this[key.replace(/-([a-z])/g, (m, c) => c.toUpperCase())] = node4.headers.get(key);
               }
             });
-            this.emit("headers", node3.headers);
-            if (node3.headerLines) {
-              this.emit("headerLines", node3.headerLines);
+            this.emit("headers", node4.headers);
+            if (node4.headerLines) {
+              this.emit("headerLines", node4.headerLines);
             }
           }
           if (data.contentType === "message/rfc822" && data.messageNode) {
             break;
           }
           if (data.parentNode && data.parentNode.contentType === "message/rfc822") {
-            node3.showMeta = true;
+            node4.showMeta = true;
           }
-          if (node3.isAttachment) {
-            let contentType = node3.contentType;
-            if (node3.contentType === "application/octet-stream" && data.filename) {
+          if (node4.isAttachment) {
+            let contentType = node4.contentType;
+            if (node4.contentType === "application/octet-stream" && data.filename) {
               contentType = this.libmime.detectMimeType(data.filename) || "application/octet-stream";
             }
+            let released = false;
+            let waitingDrain = false;
+            let pump = null;
             let attachment = {
               type: "attachment",
               content: null,
@@ -84337,6 +85595,11 @@ var require_mail_parser = __commonJS((exports, module) => {
               partId,
               release: () => {
                 attachment.release = null;
+                released = true;
+                if (waitingDrain) {
+                  waitingDrain = false;
+                  pump();
+                }
                 if (this.waitUntilAttachmentEnd && typeof this.attachmentCallback === "function") {
                   setImmediate(this.attachmentCallback);
                 }
@@ -84345,17 +85608,34 @@ var require_mail_parser = __commonJS((exports, module) => {
               }
             };
             let algo = this.options.checksumAlgo || "md5";
-            let hasher = new StreamHash(attachment, algo);
-            node3.decoder.on("error", (err) => {
+            let hasher;
+            try {
+              hasher = new StreamHash(attachment, algo);
+            } catch (err) {
+              err.message = `Checksum algorithm "${algo}" is not available: ${err.message}`;
+              return done(err);
+            }
+            node4.decoder.on("error", (err) => {
               hasher.emit("error", err);
             });
-            node3.decoder.on("readable", () => {
+            pump = () => {
               let chunk;
-              while ((chunk = node3.decoder.read()) !== null) {
-                hasher.write(chunk);
+              while ((chunk = node4.decoder.read()) !== null) {
+                if (hasher.write(chunk) === false && !released) {
+                  waitingDrain = true;
+                  return hasher.once("drain", () => {
+                    waitingDrain = false;
+                    pump();
+                  });
+                }
+              }
+            };
+            node4.decoder.on("readable", () => {
+              if (!waitingDrain) {
+                pump();
               }
             });
-            node3.decoder.once("end", () => {
+            node4.decoder.once("end", () => {
               hasher.end();
             });
             attachment.content = hasher;
@@ -84366,56 +85646,56 @@ var require_mail_parser = __commonJS((exports, module) => {
             if (data.filename) {
               attachment.filename = data.filename;
             }
-            if (node3.headers.has("content-id")) {
-              attachment.contentId = [].concat(node3.headers.get("content-id") || []).shift();
+            if (node4.headers.has("content-id")) {
+              attachment.contentId = [].concat(node4.headers.get("content-id") || []).shift();
               attachment.cid = attachment.contentId.trim().replace(/^<|>$/g, "").trim();
-              let parentNode = node3;
+              let parentNode = node4;
               while (parentNode = parentNode.parent) {
                 if (parentNode.contentType === "multipart/related") {
                   attachment.related = true;
                 }
               }
             }
-            attachment.headers = node3.headers;
+            attachment.headers = node4.headers;
             this.push(attachment);
             this.attachmentList.push(attachment);
-          } else if (node3.disposition === "inline") {
+          } else if (node4.disposition === "inline") {
             let chunks = [];
             let chunklen = 0;
-            node3.contentStream = node3.decoder;
-            if (node3.contentType === "text/plain") {
+            node4.contentStream = node4.decoder;
+            if (node4.contentType === "text/plain") {
               this.hasText = true;
-            } else if (node3.contentType === "text/html") {
+            } else if (node4.contentType === "text/html") {
               this.hasHtml = true;
-            } else if (node3.contentType === "message/delivery-status" && !this.options.keepDeliveryStatus) {
+            } else if (node4.contentType === "message/delivery-status" && !this.options.keepDeliveryStatus) {
               this.hasText = true;
             }
-            if (node3.node.flowed) {
-              let contentStream = node3.contentStream;
+            if (node4.node.flowed) {
+              let contentStream = node4.contentStream;
               let flowDecoder = new FlowedDecoder({
-                delSp: node3.node.delSp
+                delSp: node4.node.delSp
               });
               contentStream.on("error", (err) => {
                 flowDecoder.emit("error", err);
               });
               contentStream.pipe(flowDecoder);
-              node3.contentStream = flowDecoder;
+              node4.contentStream = flowDecoder;
             }
-            let charset = node3.charset || "utf-8";
+            let charset = node4.charset || "utf-8";
             if (!["ascii", "usascii", "utf8"].includes(charset.toLowerCase().replace(/[^a-z0-9]+/g, ""))) {
               try {
-                let contentStream = node3.contentStream;
+                let contentStream = node4.contentStream;
                 let decodeStream = this.decoder.decodeStream(charset);
                 contentStream.on("error", (err) => {
                   decodeStream.emit("error", err);
                 });
                 contentStream.pipe(decodeStream);
-                node3.contentStream = decodeStream;
+                node4.contentStream = decodeStream;
               } catch (E) {}
             }
-            node3.contentStream.on("readable", () => {
+            node4.contentStream.on("readable", () => {
               let chunk;
-              while ((chunk = node3.contentStream.read()) !== null) {
+              while ((chunk = node4.contentStream.read()) !== null) {
                 if (typeof chunk === "string") {
                   chunk = Buffer.from(chunk);
                 }
@@ -84423,11 +85703,11 @@ var require_mail_parser = __commonJS((exports, module) => {
                 chunklen += chunk.length;
               }
             });
-            node3.contentStream.once("end", () => {
-              node3.textContent = Buffer.concat(chunks, chunklen).toString().replace(/\r?\n/g, `
+            node4.contentStream.once("end", () => {
+              node4.textContent = Buffer.concat(chunks, chunklen).toString().replace(/\r?\n/g, `
 `);
             });
-            node3.contentStream.once("error", (err) => {
+            node4.contentStream.once("error", (err) => {
               this.emit("error", err);
             });
           }
@@ -84451,23 +85731,6 @@ var require_mail_parser = __commonJS((exports, module) => {
           break;
       }
       setImmediate(done);
-    }
-    _getPartId(parentBoundary) {
-      let boundaryIndex = this.boundaries.findIndex((item) => item.name === parentBoundary);
-      if (boundaryIndex === -1) {
-        this.boundaries.push({ name: parentBoundary, count: 1 });
-        boundaryIndex = this.boundaries.length - 1;
-      } else {
-        this.boundaries[boundaryIndex].count++;
-      }
-      let partId = "1";
-      for (let i = 0;i <= boundaryIndex; i++) {
-        if (i === 0)
-          partId = this.boundaries[i].count.toString();
-        else
-          partId += "." + this.boundaries[i].count.toString();
-      }
-      return partId;
     }
     getAddressesHTML(value) {
       let formatSingleLevel = (addresses) => addresses.map((address) => {
@@ -84538,12 +85801,27 @@ var require_mail_parser = __commonJS((exports, module) => {
       let pos = 0;
       let processNext = () => {
         if (pos >= cidList.length) {
-          html = html.replace(/\bcid:([^'"\s]{1,256})/g, (match2, cid) => {
-            if (cids.has(cid) && cids.get(cid).url) {
-              return cids.get(cid).url;
-            }
-            return match2;
-          });
+          let maxSize = this.options.maxInlinedImagesSize;
+          if (typeof maxSize !== "number" || !(maxSize >= 0)) {
+            maxSize = MAX_INLINED_IMAGES_SIZE;
+          }
+          let inlinedSize = 0;
+          try {
+            html = html.replace(/\bcid:([^'"\s]{1,256})/g, (match2, cid) => {
+              let url2 = cids.has(cid) && cids.get(cid).url;
+              if (!url2) {
+                return match2;
+              }
+              url2 = String(url2);
+              if (inlinedSize + url2.length > maxSize) {
+                return match2;
+              }
+              inlinedSize += url2.length;
+              return url2;
+            });
+          } catch (err) {
+            return done(err);
+          }
           return done(null, html);
         }
         let entry = cidList[pos++];
@@ -84661,6 +85939,15 @@ var require_simple_parser = __commonJS((exports, module) => {
         callback = callbackPromise(resolve, reject);
       });
     }
+    let settled = false;
+    let settle2 = callback;
+    callback = (...args) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      settle2(...args);
+    };
     options = options || {};
     let keepCidLinks = !!options.keepCidLinks;
     let mail = {
@@ -85077,55 +86364,42 @@ async function executeLocalActions(db, account, msgId, actions2) {
     WHERE m.id = ${msgId}
   `.execute(db);
   const here = loc.rows[0];
-  for (const [i, action] of actions2.entries()) {
-    const sp = `sieve_action_${i}`;
-    let savepoint = false;
+  for (const action of actions2) {
     try {
-      await sql.raw(`SAVEPOINT ${sp}`).execute(db);
-      savepoint = true;
-    } catch {
-      savepoint = false;
-    }
-    try {
-      switch (action.type) {
-        case "mark_read":
-          if (here)
-            await flagMessages(account, here.path, [here.uid], { add: ["\\Seen"] });
-          await sql`UPDATE zv_mail_messages SET is_read = true WHERE id = ${msgId}`.execute(db);
-          break;
-        case "mark_starred":
-          if (here)
-            await flagMessages(account, here.path, [here.uid], { add: ["\\Flagged"] });
-          await sql`UPDATE zv_mail_messages SET is_starred = true WHERE id = ${msgId}`.execute(db);
-          break;
-        case "move":
-          if (action.folder) {
-            const folderRes = await sql`
-              SELECT id FROM zv_mail_folders WHERE account_id = ${account.id} AND path = ${action.folder} LIMIT 1
-            `.execute(db);
-            if (folderRes.rows[0]) {
-              if (here)
-                await moveMessages(account, here.path, [here.uid], action.folder);
-              await sql`
-                UPDATE zv_mail_messages SET folder_id = ${folderRes.rows[0].id} WHERE id = ${msgId}
-              `.execute(db);
+      await db.transaction().execute(async (db2) => {
+        switch (action.type) {
+          case "mark_read":
+            if (here)
+              await flagMessages(account, here.path, [here.uid], { add: ["\\Seen"] });
+            await sql`UPDATE zv_mail_messages SET is_read = true WHERE id = ${msgId}`.execute(db2);
+            break;
+          case "mark_starred":
+            if (here)
+              await flagMessages(account, here.path, [here.uid], { add: ["\\Flagged"] });
+            await sql`UPDATE zv_mail_messages SET is_starred = true WHERE id = ${msgId}`.execute(db2);
+            break;
+          case "move":
+            if (action.folder) {
+              const folderRes = await sql`
+                SELECT id FROM zv_mail_folders WHERE account_id = ${account.id} AND path = ${action.folder} LIMIT 1
+              `.execute(db2);
+              if (folderRes.rows[0]) {
+                if (here)
+                  await moveMessages(account, here.path, [here.uid], action.folder);
+                await sql`
+                  UPDATE zv_mail_messages SET folder_id = ${folderRes.rows[0].id} WHERE id = ${msgId}
+                `.execute(db2);
+              }
             }
-          }
-          break;
-        case "delete":
-          if (here)
-            await deleteMessagesFromServer(account, here.path, [here.uid]);
-          await sql`DELETE FROM zv_mail_messages WHERE id = ${msgId}`.execute(db);
-          break;
-      }
-      if (savepoint)
-        await sql.raw(`RELEASE SAVEPOINT ${sp}`).execute(db);
+            break;
+          case "delete":
+            if (here)
+              await deleteMessagesFromServer(account, here.path, [here.uid]);
+            await sql`DELETE FROM zv_mail_messages WHERE id = ${msgId}`.execute(db2);
+            break;
+        }
+      });
     } catch (err) {
-      if (savepoint) {
-        await sql.raw(`ROLLBACK TO SAVEPOINT ${sp}`).execute(db).catch(() => {
-          return;
-        });
-      }
       console.warn(`[mail] filter action "${action.type}" failed for message ${msgId}:`, err.message);
     }
   }
@@ -85191,916 +86465,1309 @@ var init_config = __esm(() => {
   ];
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/fetch/cookies.js
-var require_cookies = __commonJS((exports, module) => {
-  var urllib = __require("url");
-  var SESSION_TIMEOUT = 1800;
-
-  class Cookies {
-    constructor(options) {
-      this.options = options || {};
-      this.cookies = [];
-    }
-    set(cookieStr, url2) {
-      let urlparts = urllib.parse(url2 || "");
-      let cookie = this.parse(cookieStr);
-      let domain2;
-      if (cookie.domain) {
-        domain2 = cookie.domain.replace(/^\./, "");
-        if (urlparts.hostname.length < domain2.length || ("." + urlparts.hostname).substr(-domain2.length + 1) !== "." + domain2) {
-          cookie.domain = urlparts.hostname;
-        }
+// /zveltio-extension/node_modules/nodemailer/dist/esm/punycode/index.js
+function error63(type) {
+  throw new RangeError(errors3[type]);
+}
+function map3(array2, callback) {
+  const result = [];
+  let length = array2.length;
+  while (length--) {
+    result[length] = callback(array2[length]);
+  }
+  return result;
+}
+function mapDomain(domain2, callback) {
+  const parts = domain2.split("@");
+  let result = "";
+  if (parts.length > 1) {
+    result = parts[0] + "@";
+    domain2 = parts[1];
+  }
+  domain2 = domain2.replace(regexSeparators, ".");
+  const labels = domain2.split(".");
+  const encoded = map3(labels, callback).join(".");
+  return result + encoded;
+}
+function ucs2decode(string4) {
+  const output2 = [];
+  let counter = 0;
+  const length = string4.length;
+  while (counter < length) {
+    const value = string4.charCodeAt(counter++);
+    if (value >= 55296 && value <= 56319 && counter < length) {
+      const extra = string4.charCodeAt(counter++);
+      if ((extra & 64512) == 56320) {
+        output2.push(((value & 1023) << 10) + (extra & 1023) + 65536);
       } else {
-        cookie.domain = urlparts.hostname;
+        output2.push(value);
+        counter--;
       }
-      if (!cookie.path) {
-        cookie.path = this.getPath(urlparts.pathname);
-      }
-      if (!cookie.expires) {
-        cookie.expires = new Date(Date.now() + (Number(this.options.sessionTimeout || SESSION_TIMEOUT) || SESSION_TIMEOUT) * 1000);
-      }
-      return this.add(cookie);
-    }
-    get(url2) {
-      return this.list(url2).map((cookie) => cookie.name + "=" + cookie.value).join("; ");
-    }
-    list(url2) {
-      let result = [];
-      let i;
-      let cookie;
-      for (i = this.cookies.length - 1;i >= 0; i--) {
-        cookie = this.cookies[i];
-        if (this.isExpired(cookie)) {
-          this.cookies.splice(i, i);
-          continue;
-        }
-        if (this.match(cookie, url2)) {
-          result.unshift(cookie);
-        }
-      }
-      return result;
-    }
-    parse(cookieStr) {
-      let cookie = {};
-      (cookieStr || "").toString().split(";").forEach((cookiePart) => {
-        let valueParts = cookiePart.split("=");
-        let key = valueParts.shift().trim().toLowerCase();
-        let value = valueParts.join("=").trim();
-        let domain2;
-        if (!key) {
-          return;
-        }
-        switch (key) {
-          case "expires":
-            value = new Date(value);
-            if (value.toString() !== "Invalid Date") {
-              cookie.expires = value;
-            }
-            break;
-          case "path":
-            cookie.path = value;
-            break;
-          case "domain":
-            domain2 = value.toLowerCase();
-            if (domain2.length && domain2.charAt(0) !== ".") {
-              domain2 = "." + domain2;
-            }
-            cookie.domain = domain2;
-            break;
-          case "max-age":
-            cookie.expires = new Date(Date.now() + (Number(value) || 0) * 1000);
-            break;
-          case "secure":
-            cookie.secure = true;
-            break;
-          case "httponly":
-            cookie.httponly = true;
-            break;
-          default:
-            if (!cookie.name) {
-              cookie.name = key;
-              cookie.value = value;
-            }
-        }
-      });
-      return cookie;
-    }
-    match(cookie, url2) {
-      let urlparts = urllib.parse(url2 || "");
-      if (urlparts.hostname !== cookie.domain && (cookie.domain.charAt(0) !== "." || ("." + urlparts.hostname).substr(-cookie.domain.length) !== cookie.domain)) {
-        return false;
-      }
-      let path = this.getPath(urlparts.pathname);
-      if (path.substr(0, cookie.path.length) !== cookie.path) {
-        return false;
-      }
-      if (cookie.secure && urlparts.protocol !== "https:") {
-        return false;
-      }
-      return true;
-    }
-    add(cookie) {
-      let i;
-      let len;
-      if (!cookie || !cookie.name) {
-        return false;
-      }
-      for (i = 0, len = this.cookies.length;i < len; i++) {
-        if (this.compare(this.cookies[i], cookie)) {
-          if (this.isExpired(cookie)) {
-            this.cookies.splice(i, 1);
-            return false;
-          }
-          this.cookies[i] = cookie;
-          return true;
-        }
-      }
-      if (!this.isExpired(cookie)) {
-        this.cookies.push(cookie);
-      }
-      return true;
-    }
-    compare(a, b) {
-      return a.name === b.name && a.path === b.path && a.domain === b.domain && a.secure === b.secure && a.httponly === a.httponly;
-    }
-    isExpired(cookie) {
-      return cookie.expires && cookie.expires < new Date || !cookie.value;
-    }
-    getPath(pathname) {
-      let path = (pathname || "/").split("/");
-      path.pop();
-      path = path.join("/").trim();
-      if (path.charAt(0) !== "/") {
-        path = "/" + path;
-      }
-      if (path.substr(-1) !== "/") {
-        path += "/";
-      }
-      return path;
+    } else {
+      output2.push(value);
     }
   }
-  module.exports = Cookies;
-});
-
-// /zveltio-extension/node_modules/nodemailer/package.json
-var require_package5 = __commonJS((exports, module) => {
-  module.exports = {
-    name: "nodemailer",
-    version: "6.10.1",
-    description: "Easy as cake e-mail sending from your Node.js applications",
-    main: "lib/nodemailer.js",
-    scripts: {
-      test: "node --test --test-concurrency=1 test/**/*.test.js test/**/*-test.js",
-      "test:coverage": "c8 node --test --test-concurrency=1 test/**/*.test.js test/**/*-test.js",
-      lint: "eslint .",
-      update: "rm -rf node_modules/ package-lock.json && ncu -u && npm install"
-    },
-    repository: {
-      type: "git",
-      url: "https://github.com/nodemailer/nodemailer.git"
-    },
-    keywords: [
-      "Nodemailer"
-    ],
-    author: "Andris Reinman",
-    license: "MIT-0",
-    bugs: {
-      url: "https://github.com/nodemailer/nodemailer/issues"
-    },
-    homepage: "https://nodemailer.com/",
-    devDependencies: {
-      "@aws-sdk/client-ses": "3.731.1",
-      bunyan: "1.8.15",
-      c8: "10.1.3",
-      eslint: "8.57.0",
-      "eslint-config-nodemailer": "1.2.0",
-      "eslint-config-prettier": "9.1.0",
-      libbase64: "1.3.0",
-      libmime: "5.3.6",
-      libqp: "2.1.1",
-      "nodemailer-ntlm-auth": "1.0.4",
-      proxy: "1.0.2",
-      "proxy-test-server": "1.0.0",
-      "smtp-server": "3.13.6"
-    },
-    engines: {
-      node: ">=6.0.0"
+  return output2;
+}
+var maxInt = 2147483647, base = 36, tMin = 1, tMax = 26, skew = 38, damp = 700, initialBias = 72, initialN = 128, delimiter = "-", regexPunycode, regexNonASCII, regexSeparators, errors3, baseMinusTMin, floor, stringFromCharCode, basicToDigit = function(codePoint) {
+  if (codePoint >= 48 && codePoint < 58) {
+    return 26 + (codePoint - 48);
+  }
+  if (codePoint >= 65 && codePoint < 91) {
+    return codePoint - 65;
+  }
+  if (codePoint >= 97 && codePoint < 123) {
+    return codePoint - 97;
+  }
+  return base;
+}, digitToBasic = function(digit, flag) {
+  return digit + 22 + 75 * Number(digit < 26) - (Number(flag != 0) << 5);
+}, adapt = function(delta, numPoints, firstTime) {
+  let k = 0;
+  delta = firstTime ? floor(delta / damp) : delta >> 1;
+  delta += floor(delta / numPoints);
+  for (;delta > baseMinusTMin * tMax >> 1; k += base) {
+    delta = floor(delta / baseMinusTMin);
+  }
+  return floor(k + (baseMinusTMin + 1) * delta / (delta + skew));
+}, decode3 = function(input2) {
+  const output2 = [];
+  const inputLength = input2.length;
+  let i = 0;
+  let n = initialN;
+  let bias = initialBias;
+  let basic = input2.lastIndexOf(delimiter);
+  if (basic < 0) {
+    basic = 0;
+  }
+  for (let j = 0;j < basic; ++j) {
+    if (input2.charCodeAt(j) >= 128) {
+      error63("not-basic");
     }
-  };
-});
-
-// /zveltio-extension/node_modules/nodemailer/lib/fetch/index.js
-var require_fetch2 = __commonJS((exports, module) => {
-  var http = __require("http");
-  var https = __require("https");
-  var urllib = __require("url");
-  var zlib = __require("zlib");
-  var PassThrough = __require("stream").PassThrough;
-  var Cookies = require_cookies();
-  var packageData = require_package5();
-  var net = __require("net");
-  var MAX_REDIRECTS = 5;
-  module.exports = function(url2, options) {
-    return nmfetch(url2, options);
-  };
-  module.exports.Cookies = Cookies;
-  function nmfetch(url2, options) {
-    options = options || {};
-    options.fetchRes = options.fetchRes || new PassThrough;
-    options.cookies = options.cookies || new Cookies;
-    options.redirects = options.redirects || 0;
-    options.maxRedirects = isNaN(options.maxRedirects) ? MAX_REDIRECTS : options.maxRedirects;
-    if (options.cookie) {
-      [].concat(options.cookie || []).forEach((cookie) => {
-        options.cookies.set(cookie, url2);
-      });
-      options.cookie = false;
-    }
-    let fetchRes = options.fetchRes;
-    let parsed = urllib.parse(url2);
-    let method = (options.method || "").toString().trim().toUpperCase() || "GET";
-    let finished = false;
-    let cookies;
-    let body;
-    let handler = parsed.protocol === "https:" ? https : http;
-    let headers = {
-      "accept-encoding": "gzip,deflate",
-      "user-agent": "nodemailer/" + packageData.version
-    };
-    Object.keys(options.headers || {}).forEach((key) => {
-      headers[key.toLowerCase().trim()] = options.headers[key];
-    });
-    if (options.userAgent) {
-      headers["user-agent"] = options.userAgent;
-    }
-    if (parsed.auth) {
-      headers.Authorization = "Basic " + Buffer.from(parsed.auth).toString("base64");
-    }
-    if (cookies = options.cookies.get(url2)) {
-      headers.cookie = cookies;
-    }
-    if (options.body) {
-      if (options.contentType !== false) {
-        headers["Content-Type"] = options.contentType || "application/x-www-form-urlencoded";
+    output2.push(input2.charCodeAt(j));
+  }
+  for (let index = basic > 0 ? basic + 1 : 0;index < inputLength; ) {
+    const oldi = i;
+    for (let w = 1, k = base;; k += base) {
+      if (index >= inputLength) {
+        error63("invalid-input");
       }
-      if (typeof options.body.pipe === "function") {
-        headers["Transfer-Encoding"] = "chunked";
-        body = options.body;
-        body.on("error", (err) => {
-          if (finished) {
-            return;
+      const digit = basicToDigit(input2.charCodeAt(index++));
+      if (digit >= base) {
+        error63("invalid-input");
+      }
+      if (digit > floor((maxInt - i) / w)) {
+        error63("overflow");
+      }
+      i += digit * w;
+      const t = k <= bias ? tMin : k >= bias + tMax ? tMax : k - bias;
+      if (digit < t) {
+        break;
+      }
+      const baseMinusT = base - t;
+      if (w > floor(maxInt / baseMinusT)) {
+        error63("overflow");
+      }
+      w *= baseMinusT;
+    }
+    const out = output2.length + 1;
+    bias = adapt(i - oldi, out, oldi == 0);
+    if (floor(i / out) > maxInt - n) {
+      error63("overflow");
+    }
+    n += floor(i / out);
+    i %= out;
+    output2.splice(i++, 0, n);
+  }
+  return String.fromCodePoint(...output2);
+}, encode3 = function(input2) {
+  const output2 = [];
+  const codePoints = ucs2decode(input2);
+  const inputLength = codePoints.length;
+  let n = initialN;
+  let delta = 0;
+  let bias = initialBias;
+  for (const currentValue of codePoints) {
+    if (currentValue < 128) {
+      output2.push(stringFromCharCode(currentValue));
+    }
+  }
+  const basicLength = output2.length;
+  let handledCPCount = basicLength;
+  if (basicLength) {
+    output2.push(delimiter);
+  }
+  while (handledCPCount < inputLength) {
+    let m = maxInt;
+    for (const currentValue of codePoints) {
+      if (currentValue >= n && currentValue < m) {
+        m = currentValue;
+      }
+    }
+    const handledCPCountPlusOne = handledCPCount + 1;
+    if (m - n > floor((maxInt - delta) / handledCPCountPlusOne)) {
+      error63("overflow");
+    }
+    delta += (m - n) * handledCPCountPlusOne;
+    n = m;
+    for (const currentValue of codePoints) {
+      if (currentValue < n && ++delta > maxInt) {
+        error63("overflow");
+      }
+      if (currentValue === n) {
+        let q = delta;
+        for (let k = base;; k += base) {
+          const t = k <= bias ? tMin : k >= bias + tMax ? tMax : k - bias;
+          if (q < t) {
+            break;
           }
-          finished = true;
-          err.type = "FETCH";
-          err.sourceUrl = url2;
-          fetchRes.emit("error", err);
-        });
-      } else {
-        if (options.body instanceof Buffer) {
-          body = options.body;
-        } else if (typeof options.body === "object") {
-          try {
-            body = Buffer.from(Object.keys(options.body).map((key) => {
-              let value = options.body[key].toString().trim();
-              return encodeURIComponent(key) + "=" + encodeURIComponent(value);
-            }).join("&"));
-          } catch (E) {
-            if (finished) {
-              return;
-            }
-            finished = true;
-            E.type = "FETCH";
-            E.sourceUrl = url2;
-            fetchRes.emit("error", E);
-            return;
-          }
+          const qMinusT = q - t;
+          const baseMinusT = base - t;
+          output2.push(stringFromCharCode(digitToBasic(t + qMinusT % baseMinusT, 0)));
+          q = floor(qMinusT / baseMinusT);
+        }
+        output2.push(stringFromCharCode(digitToBasic(q, 0)));
+        bias = adapt(delta, handledCPCountPlusOne, handledCPCount === basicLength);
+        delta = 0;
+        ++handledCPCount;
+      }
+    }
+    ++delta;
+    ++n;
+  }
+  return output2.join("");
+}, toUnicode = function(input2) {
+  return mapDomain(input2, function(string4) {
+    return regexPunycode.test(string4) ? decode3(string4.slice(4).toLowerCase()) : string4;
+  });
+}, toASCII = function(input2) {
+  return mapDomain(input2, function(string4) {
+    return regexNonASCII.test(string4) ? "xn--" + encode3(string4) : string4;
+  });
+};
+var init_punycode = __esm(() => {
+  regexPunycode = /^xn--/;
+  regexNonASCII = /[^\0-\x7F]/;
+  regexSeparators = /[\x2E\u3002\uFF0E\uFF61]/g;
+  errors3 = {
+    overflow: "Overflow: input needs wider integers to process",
+    "not-basic": "Illegal input >= 0x80 (not a basic code point)",
+    "invalid-input": "Invalid input"
+  };
+  baseMinusTMin = base - tMin;
+  floor = Math.floor;
+  stringFromCharCode = String.fromCharCode;
+});
+
+// /zveltio-extension/node_modules/nodemailer/dist/esm/shared/url.js
+import net from "net";
+import urllib from "url";
+function invalidUrl(input2) {
+  const err = new TypeError("Invalid URL");
+  err.code = "ERR_INVALID_URL";
+  err.input = input2;
+  return err;
+}
+function legacyParse(input2, parseQueryString, whatwgError, slashesDenoteHost) {
+  const parsed = urllib.parse(input2, parseQueryString, slashesDenoteHost);
+  const authority = AUTHORITY.exec(input2.replace(LEGACY_TRIM, ""));
+  if (authority && (authority[1] || parsed.hostname !== null)) {
+    const written = authority[2].slice(authority[2].lastIndexOf("@") + 1);
+    if (!written || CONTROL_CHARS.test(written) || (parsed.host || "").toLowerCase() !== toASCII(written.toLowerCase())) {
+      throw whatwgError;
+    }
+    if (written.charAt(0) === "[" && !net.isIPv6(written.slice(1, written.indexOf("]")))) {
+      throw whatwgError;
+    }
+  } else if (parsed.hostname !== null) {
+    throw whatwgError;
+  }
+  const legacyAuth = parsed.auth === null || parsed.auth === undefined ? null : parsed.auth.split(":");
+  const result = parsed;
+  result.username = legacyAuth ? legacyAuth.shift() : null;
+  result.password = legacyAuth && legacyAuth.length ? legacyAuth.join(":") : null;
+  return result;
+}
+function safeDecode3(str) {
+  try {
+    return decodeURIComponent(str);
+  } catch (_err) {
+    return str;
+  }
+}
+function normalizeHostname(raw2, href) {
+  const hostname3 = raw2 || "";
+  if (!hostname3) {
+    return "";
+  }
+  if (hostname3.charAt(0) === "[" && hostname3.charAt(hostname3.length - 1) === "]") {
+    return hostname3.slice(1, -1);
+  }
+  const decoded = safeDecode3(hostname3);
+  const mapped = FORBIDDEN_HOST_CHARS.test(decoded) ? "" : urllib.domainToASCII(decoded);
+  if (!mapped) {
+    throw invalidUrl(href);
+  }
+  return mapped;
+}
+var SLASHLESS_AUTHORITY, SURROUNDING_WHITESPACE, LEGACY_TRIM, AUTHORITY, FORBIDDEN_HOST_CHARS, CONTROL_CHARS, parse7 = (input2, parseQueryString) => {
+  input2 = (input2 || "").replace(SURROUNDING_WHITESPACE, "");
+  const slashless = SLASHLESS_AUTHORITY.exec(input2);
+  const normalized = slashless ? slashless[1] + "//" + slashless[2] : input2;
+  let u;
+  try {
+    u = new URL(normalized);
+  } catch (err) {
+    return legacyParse(normalized, parseQueryString, err);
+  }
+  const hostname3 = normalizeHostname(u.hostname, u.href);
+  const port = u.port || null;
+  const pathname = u.pathname || null;
+  const search = u.search || null;
+  let auth = null;
+  let username = null;
+  let password = null;
+  if (u.username || u.password) {
+    username = safeDecode3(u.username);
+    password = u.password ? safeDecode3(u.password) : null;
+    auth = username + (password !== null ? ":" + password : "");
+  }
+  let query;
+  if (parseQueryString) {
+    const parsed = Object.create(null);
+    u.searchParams.forEach((value, key) => {
+      if (Object.prototype.hasOwnProperty.call(parsed, key)) {
+        const existing = parsed[key];
+        if (Array.isArray(existing)) {
+          existing.push(value);
         } else {
-          body = Buffer.from(options.body.toString().trim());
+          parsed[key] = [existing, value];
         }
-        headers["Content-Type"] = options.contentType || "application/x-www-form-urlencoded";
-        headers["Content-Length"] = body.length;
+      } else {
+        parsed[key] = value;
       }
-      method = (options.method || "").toString().trim().toUpperCase() || "POST";
+    });
+    query = parsed;
+  } else {
+    query = search ? search.slice(1) : null;
+  }
+  return {
+    protocol: u.protocol || null,
+    host: u.host || null,
+    hostname: hostname3,
+    port,
+    pathname,
+    search,
+    path: (pathname || "") + (search || "") || null,
+    href: u.href,
+    auth,
+    username,
+    password,
+    query
+  };
+}, resolve = (from, to) => {
+  try {
+    return new URL(to, from).href;
+  } catch (err) {
+    legacyParse(from, false, err, true);
+    legacyParse(to, false, err, true);
+    return urllib.resolve(from, to);
+  }
+};
+var init_url = __esm(() => {
+  init_punycode();
+  SLASHLESS_AUTHORITY = /^([a-zA-Z][a-zA-Z0-9+.-]*:)(?!\/\/)([\s\S]+)$/;
+  SURROUNDING_WHITESPACE = /^[\x00-\x20]+|[\x00-\x20]+$/g;
+  LEGACY_TRIM = /^[\x00-\x20\u00a0\ufeff]+/;
+  AUTHORITY = /^([a-zA-Z0-9+.-]+:)?[\\/]{2}([^\\/?#]*)/;
+  FORBIDDEN_HOST_CHARS = /[\x00-\x20#/:<>?@[\\\]^|\x7f]/;
+  CONTROL_CHARS = /[\x00-\x1f\x7f]/;
+});
+
+// /zveltio-extension/node_modules/nodemailer/dist/esm/fetch/cookies.js
+import net2 from "net";
+
+class Cookies {
+  constructor(options) {
+    this.options = options || {};
+    this.cookies = [];
+  }
+  set(cookieStr, url2) {
+    const urlparts = parse7(url2 || "");
+    const cookie = this.parse(cookieStr);
+    let domain2;
+    if (cookie.domain) {
+      domain2 = cookie.domain.replace(/^\./, "");
+      if (urlparts.hostname.length < domain2.length || domain2.indexOf(".") < 0 || domain2.endsWith(".") || net2.isIP(urlparts.hostname) || !("." + urlparts.hostname).endsWith("." + domain2)) {
+        cookie.domain = urlparts.hostname;
+      }
+    } else {
+      cookie.domain = urlparts.hostname;
     }
-    let req;
-    let reqOptions = {
-      method,
-      host: parsed.hostname,
-      path: parsed.path,
-      port: parsed.port ? parsed.port : parsed.protocol === "https:" ? 443 : 80,
-      headers,
-      rejectUnauthorized: false,
-      agent: false
-    };
-    if (options.tls) {
-      Object.keys(options.tls).forEach((key) => {
-        reqOptions[key] = options.tls[key];
-      });
+    if (!cookie.path) {
+      cookie.path = this.getPath(urlparts.pathname);
     }
-    if (parsed.protocol === "https:" && parsed.hostname && parsed.hostname !== reqOptions.host && !net.isIP(parsed.hostname) && !reqOptions.servername) {
-      reqOptions.servername = parsed.hostname;
+    if (!cookie.expires) {
+      cookie.expires = new Date(Date.now() + (Number(this.options.sessionTimeout || SESSION_TIMEOUT) || SESSION_TIMEOUT) * 1000);
     }
-    try {
-      req = handler.request(reqOptions);
-    } catch (E) {
-      finished = true;
-      setImmediate(() => {
-        E.type = "FETCH";
-        E.sourceUrl = url2;
-        fetchRes.emit("error", E);
-      });
-      return fetchRes;
+    return this.add(cookie);
+  }
+  get(url2) {
+    return this.list(url2).map((cookie) => cookie.name + "=" + cookie.value).join("; ");
+  }
+  list(url2) {
+    const result = [];
+    for (let i = this.cookies.length - 1;i >= 0; i--) {
+      const cookie = this.cookies[i];
+      if (this.isExpired(cookie)) {
+        this.cookies.splice(i, 1);
+        continue;
+      }
+      if (this.match(cookie, url2)) {
+        result.unshift(cookie);
+      }
     }
-    if (options.timeout) {
-      req.setTimeout(options.timeout, () => {
-        if (finished) {
-          return;
-        }
-        finished = true;
-        req.abort();
-        let err = new Error("Request Timeout");
-        err.type = "FETCH";
-        err.sourceUrl = url2;
-        fetchRes.emit("error", err);
-      });
-    }
-    req.on("error", (err) => {
-      if (finished) {
+    return result;
+  }
+  parse(cookieStr) {
+    const cookie = {};
+    (cookieStr || "").toString().split(";").forEach((cookiePart) => {
+      const valueParts = cookiePart.split("=");
+      const key = valueParts.shift().trim().toLowerCase();
+      let value = valueParts.join("=").trim();
+      let domain2;
+      if (!key) {
         return;
       }
-      finished = true;
-      err.type = "FETCH";
+      switch (key) {
+        case "expires": {
+          const expires = new Date(value);
+          if (expires.toString() !== "Invalid Date") {
+            cookie.expires = expires;
+          }
+          break;
+        }
+        case "path":
+          cookie.path = value;
+          break;
+        case "domain":
+          domain2 = value.toLowerCase();
+          if (domain2.length && domain2.charAt(0) !== ".") {
+            domain2 = "." + domain2;
+          }
+          cookie.domain = domain2;
+          break;
+        case "max-age":
+          cookie.expires = new Date(Date.now() + (Number(value) || 0) * 1000);
+          break;
+        case "secure":
+          cookie.secure = true;
+          break;
+        case "httponly":
+          cookie.httponly = true;
+          break;
+        default:
+          if (!cookie.name) {
+            cookie.name = key;
+            cookie.value = value;
+          }
+      }
+    });
+    return cookie;
+  }
+  match(cookie, url2) {
+    const urlparts = parse7(url2 || "");
+    if (urlparts.hostname !== cookie.domain && (cookie.domain.charAt(0) !== "." || ("." + urlparts.hostname).substr(-cookie.domain.length) !== cookie.domain)) {
+      return false;
+    }
+    const pathname = urlparts.pathname || "/";
+    const cookiePath = cookie.path;
+    const pathMatches = pathname === cookiePath || pathname.startsWith(cookiePath) && (cookiePath.endsWith("/") || pathname.charAt(cookiePath.length) === "/");
+    if (!pathMatches) {
+      return false;
+    }
+    if (cookie.secure && urlparts.protocol !== "https:") {
+      return false;
+    }
+    return true;
+  }
+  add(cookie) {
+    if (!cookie || !cookie.name) {
+      return false;
+    }
+    for (let i = 0, len = this.cookies.length;i < len; i++) {
+      if (this.compare(this.cookies[i], cookie)) {
+        if (this.isExpired(cookie)) {
+          this.cookies.splice(i, 1);
+          return false;
+        }
+        this.cookies[i] = cookie;
+        return true;
+      }
+    }
+    if (!this.isExpired(cookie)) {
+      this.cookies.push(cookie);
+    }
+    return true;
+  }
+  compare(a, b) {
+    return a.name === b.name && a.path === b.path && a.domain === b.domain && a.secure === b.secure && a.httponly === b.httponly;
+  }
+  isExpired(cookie) {
+    return cookie.expires && cookie.expires < new Date || !cookie.value;
+  }
+  getPath(pathname) {
+    const pathParts = (pathname || "/").split("/");
+    pathParts.pop();
+    const path = pathParts.join("/").trim();
+    if (path.charAt(0) !== "/") {
+      return "/";
+    }
+    return path;
+  }
+}
+var SESSION_TIMEOUT = 1800, cookies_default;
+var init_cookies = __esm(() => {
+  init_url();
+  cookies_default = Cookies;
+});
+
+// /zveltio-extension/node_modules/nodemailer/dist/esm/package-info.js
+var name2 = "nodemailer", version2 = "10.0.14", homepage = "https://nodemailer.com/";
+
+// /zveltio-extension/node_modules/nodemailer/dist/esm/errors.js
+var ECONNECTION = "ECONNECTION", ENOAUTH = "ENOAUTH", EOAUTH2 = "EOAUTH2", EMAXLIMIT = "EMAXLIMIT", EMAXRECIPIENTS = "EMAXRECIPIENTS", ESENDMAIL = "ESENDMAIL", ESES = "ESES", ECONFIG = "ECONFIG", EPROXY = "EPROXY", EFILEACCESS = "EFILEACCESS", EURLACCESS = "EURLACCESS", EFETCH = "EFETCH";
+var init_errors = () => {};
+
+// /zveltio-extension/node_modules/nodemailer/dist/esm/shared/objects.js
+var isProtoKey = (key) => key === "__proto__", copyOwnKeys = (target, source, skip) => {
+  Object.keys(source || {}).forEach((key) => {
+    if (isProtoKey(key) || skip && skip(key)) {
+      return;
+    }
+    target[key] = source[key];
+  });
+  return target;
+};
+
+// /zveltio-extension/node_modules/nodemailer/dist/esm/fetch/index.js
+import http from "http";
+import https from "https";
+import zlib from "zlib";
+import { PassThrough } from "stream";
+import net3 from "net";
+function parseFetchUrl(url2) {
+  let parsed;
+  try {
+    parsed = parse7(url2);
+  } catch (_err) {
+    return false;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return false;
+  }
+  return parsed;
+}
+function nmfetch(url2, options) {
+  options = options || {};
+  options.fetchRes = options.fetchRes || new PassThrough;
+  options.cookies = options.cookies || new cookies_default;
+  options.redirects = options.redirects || 0;
+  options.maxRedirects = isNaN(options.maxRedirects) ? MAX_REDIRECTS : options.maxRedirects;
+  const fetchRes = options.fetchRes;
+  const parsed = parseFetchUrl(url2);
+  if (!parsed) {
+    if (options.body && typeof options.body.destroy === "function") {
+      options.body.on("error", () => false);
+      options.body.destroy();
+    }
+    setImmediate(() => {
+      const err = new Error("Unsupported protocol for URL " + url2);
+      err.code = EFETCH;
       err.sourceUrl = url2;
       fetchRes.emit("error", err);
     });
-    req.on("response", (res) => {
-      let inflate;
-      if (finished) {
-        return;
-      }
-      switch (res.headers["content-encoding"]) {
-        case "gzip":
-        case "deflate":
-          inflate = zlib.createUnzip();
-          break;
-      }
-      if (res.headers["set-cookie"]) {
-        [].concat(res.headers["set-cookie"] || []).forEach((cookie) => {
-          options.cookies.set(cookie, url2);
-        });
-      }
-      if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
-        options.redirects++;
-        if (options.redirects > options.maxRedirects) {
-          finished = true;
-          let err = new Error("Maximum redirect count exceeded");
-          err.type = "FETCH";
-          err.sourceUrl = url2;
-          fetchRes.emit("error", err);
-          req.abort();
-          return;
-        }
-        options.method = "GET";
-        options.body = false;
-        return nmfetch(urllib.resolve(url2, res.headers.location), options);
-      }
-      fetchRes.statusCode = res.statusCode;
-      fetchRes.headers = res.headers;
-      if (res.statusCode >= 300 && !options.allowErrorResponse) {
-        finished = true;
-        let err = new Error("Invalid status code " + res.statusCode);
-        err.type = "FETCH";
-        err.sourceUrl = url2;
-        fetchRes.emit("error", err);
-        req.abort();
-        return;
-      }
-      res.on("error", (err) => {
+    return fetchRes;
+  }
+  if (options.cookie) {
+    [].concat(options.cookie || []).forEach((cookie) => {
+      options.cookies.set(cookie, url2);
+    });
+    options.cookie = false;
+  }
+  let method = (options.method || "").toString().trim().toUpperCase() || "GET";
+  let finished = false;
+  let cookies;
+  let body;
+  const handler = parsed.protocol === "https:" ? https : http;
+  const headers = {
+    "accept-encoding": "gzip,deflate",
+    "user-agent": "nodemailer/" + version2
+  };
+  Object.keys(options.headers || {}).forEach((key) => {
+    if (isProtoKey(key.toLowerCase().trim())) {
+      return;
+    }
+    headers[key.toLowerCase().trim()] = options.headers[key];
+  });
+  if (options.userAgent) {
+    headers["user-agent"] = options.userAgent;
+  }
+  if (parsed.auth) {
+    headers.Authorization = "Basic " + Buffer.from(parsed.auth).toString("base64");
+  }
+  if (cookies = options.cookies.get(url2)) {
+    headers.cookie = cookies;
+  }
+  if (options.body) {
+    if (options.contentType !== false) {
+      headers["Content-Type"] = options.contentType || "application/x-www-form-urlencoded";
+    }
+    if (typeof options.body.pipe === "function") {
+      headers["Transfer-Encoding"] = "chunked";
+      body = options.body;
+      body.on("error", (err) => {
         if (finished) {
           return;
         }
         finished = true;
-        err.type = "FETCH";
+        err.code = EFETCH;
         err.sourceUrl = url2;
         fetchRes.emit("error", err);
-        req.abort();
       });
-      if (inflate) {
-        res.pipe(inflate).pipe(fetchRes);
-        inflate.on("error", (err) => {
-          if (finished) {
-            return;
-          }
+    } else {
+      if (options.body instanceof Buffer) {
+        body = options.body;
+      } else if (typeof options.body === "object") {
+        try {
+          body = Buffer.from(Object.keys(options.body).map((key) => {
+            const value = options.body[key].toString().trim();
+            return encodeURIComponent(key) + "=" + encodeURIComponent(value);
+          }).join("&"));
+        } catch (E) {
           finished = true;
-          err.type = "FETCH";
-          err.sourceUrl = url2;
-          fetchRes.emit("error", err);
-          req.abort();
-        });
+          E.code = EFETCH;
+          E.sourceUrl = url2;
+          setImmediate(() => fetchRes.emit("error", E));
+          return fetchRes;
+        }
       } else {
-        res.pipe(fetchRes);
+        body = Buffer.from(options.body.toString().trim());
+      }
+      headers["Content-Type"] = options.contentType || "application/x-www-form-urlencoded";
+      headers["Content-Length"] = body.length;
+    }
+    method = (options.method || "").toString().trim().toUpperCase() || "POST";
+  }
+  let req;
+  const reqOptions = {
+    method,
+    host: parsed.hostname,
+    path: parsed.path,
+    port: parsed.port ? parsed.port : parsed.protocol === "https:" ? 443 : 80,
+    headers,
+    rejectUnauthorized: true,
+    agent: false
+  };
+  if (options.tls) {
+    Object.keys(options.tls).forEach((key) => {
+      if (TLS_OPTION_KEYS.includes(key)) {
+        reqOptions[key] = options.tls[key];
       }
     });
+  }
+  if (parsed.protocol === "https:" && parsed.hostname && parsed.hostname !== reqOptions.host && !net3.isIP(parsed.hostname) && !reqOptions.servername) {
+    reqOptions.servername = parsed.hostname;
+  }
+  try {
+    req = handler.request(reqOptions);
+  } catch (E) {
+    finished = true;
     setImmediate(() => {
-      if (body) {
-        try {
-          if (typeof body.pipe === "function") {
-            return body.pipe(req);
-          } else {
-            req.write(body);
-          }
-        } catch (err) {
-          finished = true;
-          err.type = "FETCH";
-          err.sourceUrl = url2;
-          fetchRes.emit("error", err);
-          return;
-        }
-      }
-      req.end();
+      E.code = EFETCH;
+      E.sourceUrl = url2;
+      fetchRes.emit("error", E);
     });
     return fetchRes;
   }
+  const fail = (err, sourceUrl = url2) => {
+    if (finished) {
+      return;
+    }
+    finished = true;
+    err.code = EFETCH;
+    err.sourceUrl = sourceUrl;
+    fetchRes.emit("error", err);
+    req.abort();
+  };
+  const timeout = typeof options.timeout === "number" && options.timeout >= 0 ? options.timeout : DEFAULT_TIMEOUT;
+  if (timeout) {
+    req.setTimeout(timeout, () => fail(new Error("Request Timeout")));
+  }
+  req.on("error", (err) => fail(err));
+  req.on("response", (res) => {
+    let inflate;
+    if (finished) {
+      return;
+    }
+    switch (res.headers["content-encoding"]) {
+      case "gzip":
+      case "deflate":
+        inflate = zlib.createUnzip();
+        break;
+    }
+    if (res.headers["set-cookie"]) {
+      [].concat(res.headers["set-cookie"] || []).forEach((cookie) => {
+        options.cookies.set(cookie, url2);
+      });
+    }
+    if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
+      options.redirects++;
+      if (options.redirects > options.maxRedirects) {
+        return fail(new Error("Maximum redirect count exceeded"));
+      }
+      options.method = "GET";
+      options.body = false;
+      let redirectUrl;
+      try {
+        redirectUrl = resolve(url2, res.headers.location);
+      } catch (_err) {
+        redirectUrl = res.headers.location;
+      }
+      const redirectParsed = parseFetchUrl(redirectUrl);
+      if (!redirectParsed) {
+        return fail(new Error("Unsupported protocol for URL " + redirectUrl), redirectUrl);
+      }
+      const crossHost = redirectParsed.hostname !== parsed.hostname;
+      const downgrade = parsed.protocol === "https:" && redirectParsed.protocol === "http:";
+      if (options.headers && (crossHost || downgrade)) {
+        const sensitive = ["authorization", "cookie", "proxy-authorization"];
+        Object.keys(options.headers).forEach((key) => {
+          if (sensitive.includes(key.toLowerCase())) {
+            delete options.headers[key];
+          }
+        });
+      }
+      finished = true;
+      res.resume();
+      req.abort();
+      return nmfetch(redirectUrl, options);
+    }
+    fetchRes.statusCode = res.statusCode;
+    fetchRes.headers = res.headers;
+    if (res.statusCode >= 300 && !options.allowErrorResponse) {
+      return fail(new Error("Invalid status code " + res.statusCode));
+    }
+    res.on("error", (err) => fail(err));
+    const maxBytes = typeof options.maxBytes === "number" && options.maxBytes > 0 ? options.maxBytes : DEFAULT_MAX_BYTES;
+    const source = inflate || res;
+    let received = 0;
+    source.on("data", (chunk) => {
+      received += chunk.length;
+      if (received <= maxBytes || finished) {
+        return;
+      }
+      source.unpipe(fetchRes);
+      fail(new Error("Response size exceeds the allowed " + maxBytes + " bytes"));
+    });
+    if (inflate) {
+      res.pipe(inflate).pipe(fetchRes);
+      inflate.on("error", (err) => fail(err));
+    } else {
+      res.pipe(fetchRes);
+    }
+  });
+  setImmediate(() => {
+    if (body) {
+      try {
+        if (typeof body.pipe === "function") {
+          return body.pipe(req);
+        }
+        req.write(body);
+      } catch (err) {
+        return fail(err);
+      }
+    }
+    req.end();
+  });
+  return fetchRes;
+}
+var MAX_REDIRECTS = 5, DEFAULT_TIMEOUT, DEFAULT_MAX_BYTES, TLS_OPTION_KEYS, fetch_default;
+var init_fetch = __esm(() => {
+  init_url();
+  init_cookies();
+  init_errors();
+  DEFAULT_TIMEOUT = 60 * 1000;
+  DEFAULT_MAX_BYTES = 64 * 1024 * 1024;
+  TLS_OPTION_KEYS = [
+    "ALPNProtocols",
+    "ca",
+    "cert",
+    "checkServerIdentity",
+    "ciphers",
+    "crl",
+    "dhparam",
+    "ecdhCurve",
+    "honorCipherOrder",
+    "key",
+    "maxVersion",
+    "minVersion",
+    "passphrase",
+    "pfx",
+    "rejectUnauthorized",
+    "secureContext",
+    "secureOptions",
+    "secureProtocol",
+    "servername",
+    "sessionIdContext",
+    "sigalgs"
+  ];
+  nmfetch.Cookies = cookies_default;
+  nmfetch.DEFAULT_TIMEOUT = DEFAULT_TIMEOUT;
+  fetch_default = nmfetch;
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/shared/index.js
-var require_shared = __commonJS((exports, module) => {
-  var urllib = __require("url");
-  var util = __require("util");
-  var fs = __require("fs");
-  var nmfetch = require_fetch2();
-  var dns = __require("dns");
-  var net = __require("net");
-  var os = __require("os");
-  var DNS_TTL = 5 * 60 * 1000;
-  var networkInterfaces;
-  try {
-    networkInterfaces = os.networkInterfaces();
-  } catch (err) {}
-  exports.networkInterfaces = networkInterfaces;
-  var isFamilySupported = (family, allowInternal) => {
-    let networkInterfaces2 = exports.networkInterfaces;
-    if (!networkInterfaces2) {
-      return true;
-    }
-    const familySupported = Object.keys(networkInterfaces2).map((key) => networkInterfaces2[key]).reduce((acc, val) => acc.concat(val), []).filter((i) => !i.internal || allowInternal).filter((i) => i.family === "IPv" + family || i.family === family).length > 0;
-    return familySupported;
-  };
-  var resolver = (family, hostname3, options, callback) => {
-    options = options || {};
-    const familySupported = isFamilySupported(family, options.allowInternalNetworkInterfaces);
-    if (!familySupported) {
-      return callback(null, []);
-    }
-    const resolver2 = dns.Resolver ? new dns.Resolver(options) : dns;
-    resolver2["resolve" + family](hostname3, (err, addresses) => {
-      if (err) {
-        switch (err.code) {
-          case dns.NODATA:
-          case dns.NOTFOUND:
-          case dns.NOTIMP:
-          case dns.SERVFAIL:
-          case dns.CONNREFUSED:
-          case dns.REFUSED:
-          case "EAI_AGAIN":
-            return callback(null, []);
+// /zveltio-extension/node_modules/nodemailer/dist/esm/shared/index.js
+import util from "util";
+import fs from "fs";
+import dns from "dns";
+import net4 from "net";
+import os from "os";
+function resolveContent(data, key, options, callback) {
+  if (!callback && typeof options === "function") {
+    callback = options;
+    options = false;
+  }
+  options = options || {};
+  let promise2;
+  if (!callback) {
+    promise2 = new Promise((resolve3, reject) => {
+      callback = callbackPromise(resolve3, reject);
+    });
+  }
+  resolveContentValue(data, key, options, callback);
+  return promise2;
+}
+function resolveContentValue(data, key, options, callback) {
+  let content = data && data[key] && data[key].content || data[key];
+  const encoding = (typeof data[key] === "object" && data[key].encoding || "utf8").toString().toLowerCase().replace(/[-_\s]/g, "");
+  if (!content) {
+    return callback(null, content);
+  }
+  if (typeof content === "object") {
+    if (typeof content.pipe === "function") {
+      return resolveStream(content, (err, value) => {
+        if (err) {
+          return callback(err);
         }
-        return callback(err);
+        if (data[key].content) {
+          data[key].content = value;
+        } else {
+          data[key] = value;
+        }
+        callback(null, value);
+      });
+    } else if (/^data:/i.test(content.path || content.href)) {
+      const parsedDataUri = parseDataURI(content.path || content.href);
+      return callback(null, parsedDataUri && parsedDataUri.data ? parsedDataUri.data : Buffer.alloc(0));
+    } else if (content.href || /^https?:\/\//i.test(content.path)) {
+      const url2 = content.href || content.path;
+      if (options.disableUrlAccess) {
+        setImmediate(() => {
+          const err = new Error("Url access rejected for " + url2);
+          err.code = EURLACCESS;
+          callback(err);
+        });
+        return;
       }
-      return callback(null, Array.isArray(addresses) ? addresses : [].concat(addresses || []));
+      return resolveStream(fetch_default(url2, { headers: content.httpHeaders, tls: content.tls }), callback);
+    } else if (content.path) {
+      if (options.disableFileAccess) {
+        setImmediate(() => {
+          const err = new Error("File access rejected for " + content.path);
+          err.code = EFILEACCESS;
+          callback(err);
+        });
+        return;
+      }
+      return resolveStream(fs.createReadStream(content.path), callback);
+    }
+  }
+  if (typeof data[key].content === "string" && !["utf8", "usascii", "ascii"].includes(encoding)) {
+    content = Buffer.from(data[key].content, encoding);
+  }
+  setImmediate(() => callback(null, content));
+}
+function resolveStream(stream, callback) {
+  let responded = false;
+  const chunks = [];
+  let chunklen = 0;
+  stream.on("error", (err) => {
+    if (responded) {
+      return;
+    }
+    responded = true;
+    callback(err);
+  });
+  stream.on("readable", () => {
+    let chunk;
+    while ((chunk = stream.read()) !== null) {
+      chunks.push(chunk);
+      chunklen += chunk.length;
+    }
+  });
+  stream.on("end", () => {
+    if (responded) {
+      return;
+    }
+    responded = true;
+    let value;
+    try {
+      value = Buffer.concat(chunks, chunklen);
+    } catch (E) {
+      return callback(E);
+    }
+    callback(null, value);
+  });
+}
+function createDefaultLogger(levels) {
+  const levelMaxLen = levels.reduce((max, level) => Math.max(max, level.length), 0);
+  const levelNames = new Map;
+  levels.forEach((level) => {
+    let levelName = level.toUpperCase();
+    if (levelName.length < levelMaxLen) {
+      levelName += " ".repeat(levelMaxLen - levelName.length);
+    }
+    levelNames.set(level, levelName);
+  });
+  const print = (level, entry, message, ...args) => {
+    let prefix = "";
+    if (entry) {
+      if (entry.tnx === "server") {
+        prefix = "S: ";
+      } else if (entry.tnx === "client") {
+        prefix = "C: ";
+      }
+      if (entry.sid) {
+        prefix = "[" + entry.sid + "] " + prefix;
+      }
+      if (entry.cid) {
+        prefix = "[#" + entry.cid + "] " + prefix;
+      }
+    }
+    message = util.format(message, ...args);
+    message.split(/\r?\n/).forEach((line) => {
+      console.log("[%s] %s %s", new Date().toISOString().substr(0, 19).replace(/T/, " "), levelNames.get(level), prefix + line);
     });
   };
-  var dnsCache = exports.dnsCache = new Map;
-  var formatDNSValue = (value, extra) => {
-    if (!value) {
-      return Object.assign({}, extra || {});
+  const logger = {};
+  levels.forEach((level) => {
+    logger[level] = print.bind(null, level);
+  });
+  return logger;
+}
+var DNS_TTL, CACHE_CLEANUP_INTERVAL, MAX_CACHE_SIZE = 1000, lastCacheCleanup = 0, networkInterfaces, isFamilySupported = (family, allowInternal) => {
+  const addresses = Object.values(networkInterfaces || {}).flat();
+  if (!addresses.length) {
+    return true;
+  }
+  return addresses.filter((i) => !i.internal || allowInternal).some((i) => i.family === "IPv" + family || i.family === family);
+}, resolve2 = (family, hostname3, options, callback) => {
+  options = options || {};
+  if (!isFamilySupported(family, options.allowInternalNetworkInterfaces)) {
+    return callback(null, []);
+  }
+  const dnsResolver = dns.Resolver ? new dns.Resolver(options) : dns;
+  dnsResolver["resolve" + family](hostname3, (err, addresses) => {
+    if (err) {
+      switch (err.code) {
+        case dns.NODATA:
+        case dns.NOTFOUND:
+        case dns.NOTIMP:
+        case dns.SERVFAIL:
+        case dns.CONNREFUSED:
+        case dns.REFUSED:
+        case "EAI_AGAIN":
+          return callback(null, []);
+      }
+      return callback(err);
     }
-    return Object.assign({
-      servername: value.servername,
-      host: !value.addresses || !value.addresses.length ? null : value.addresses.length === 1 ? value.addresses[0] : value.addresses[Math.floor(Math.random() * value.addresses.length)]
-    }, extra || {});
-  };
-  exports.resolveHostname = (options, callback) => {
-    options = options || {};
-    if (!options.host && options.servername) {
-      options.host = options.servername;
+    return callback(null, Array.isArray(addresses) ? addresses : [].concat(addresses || []));
+  });
+}, dnsCache, formatDNSValue = (value, extra) => {
+  if (!value) {
+    return Object.assign({}, extra || {});
+  }
+  const addresses = value.addresses || [];
+  const host = addresses.length > 0 ? addresses[Math.floor(Math.random() * addresses.length)] : null;
+  return Object.assign({
+    host,
+    _addresses: addresses
+  }, extra || {});
+}, resolveHostname = (options, callback) => {
+  options = options || {};
+  if (!options.host && options.servername) {
+    options.host = options.servername;
+  }
+  if (!options.host || net4.isIP(options.host)) {
+    const value = {
+      addresses: [options.host]
+    };
+    return callback(null, formatDNSValue(value, {
+      servername: options.servername || false,
+      cached: false
+    }));
+  }
+  const host = options.host;
+  const servername = options.servername || host;
+  let cached2;
+  if (dnsCache.has(options.host)) {
+    cached2 = dnsCache.get(options.host);
+    const now = Date.now();
+    if (now - lastCacheCleanup > CACHE_CLEANUP_INTERVAL) {
+      lastCacheCleanup = now;
+      for (const [host2, entry] of dnsCache.entries()) {
+        if (entry.expires && entry.expires < now) {
+          dnsCache.delete(host2);
+        }
+      }
+      if (dnsCache.size > MAX_CACHE_SIZE) {
+        const toDelete = Math.floor(MAX_CACHE_SIZE * 0.1);
+        const keys = Array.from(dnsCache.keys()).slice(0, toDelete);
+        keys.forEach((key) => dnsCache.delete(key));
+      }
     }
-    if (!options.host || net.isIP(options.host)) {
-      let value = {
-        addresses: [options.host],
-        servername: options.servername || false
-      };
-      return callback(null, formatDNSValue(value, {
-        cached: false
+    if (!cached2.expires || cached2.expires >= now) {
+      return callback(null, formatDNSValue(cached2.value, {
+        servername,
+        cached: true
       }));
     }
-    let cached2;
-    if (dnsCache.has(options.host)) {
-      cached2 = dnsCache.get(options.host);
-      if (!cached2.expires || cached2.expires >= Date.now()) {
-        return callback(null, formatDNSValue(cached2.value, {
-          cached: true
-        }));
-      }
+  }
+  let ipv4Addresses = [];
+  let ipv6Addresses = [];
+  let ipv4Error = null;
+  let ipv6Error = null;
+  resolve2(4, options.host, options, (err, addresses) => {
+    if (err) {
+      ipv4Error = err;
+    } else {
+      ipv4Addresses = addresses || [];
     }
-    resolver(4, options.host, options, (err, addresses) => {
-      if (err) {
-        if (cached2) {
-          return callback(null, formatDNSValue(cached2.value, {
-            cached: true,
-            error: err
-          }));
-        }
-        return callback(err);
+    resolve2(6, host, options, (err2, addresses2) => {
+      if (err2) {
+        ipv6Error = err2;
+      } else {
+        ipv6Addresses = addresses2 || [];
       }
-      if (addresses && addresses.length) {
-        let value = {
-          addresses,
-          servername: options.servername || options.host
+      const allAddresses = ipv4Addresses.concat(ipv6Addresses);
+      if (allAddresses.length) {
+        const value = {
+          addresses: allAddresses
         };
-        dnsCache.set(options.host, {
+        dnsCache.set(host, {
           value,
           expires: Date.now() + (options.dnsTtl || DNS_TTL)
         });
         return callback(null, formatDNSValue(value, {
+          servername,
           cached: false
         }));
       }
-      resolver(6, options.host, options, (err2, addresses2) => {
-        if (err2) {
-          if (cached2) {
+      if (ipv4Error && ipv6Error) {
+        if (cached2) {
+          dnsCache.set(host, {
+            value: cached2.value,
+            expires: Date.now() + (options.dnsTtl || DNS_TTL)
+          });
+          return callback(null, formatDNSValue(cached2.value, {
+            servername,
+            cached: true,
+            error: ipv4Error
+          }));
+        }
+      }
+      try {
+        dns.lookup(host, { all: true }, (err3, addresses3) => {
+          if (err3) {
+            if (cached2) {
+              dnsCache.set(host, {
+                value: cached2.value,
+                expires: Date.now() + (options.dnsTtl || DNS_TTL)
+              });
+              return callback(null, formatDNSValue(cached2.value, {
+                servername,
+                cached: true,
+                error: err3
+              }));
+            }
+            return callback(err3);
+          }
+          const supportedAddresses = addresses3 ? addresses3.filter((addr) => isFamilySupported(addr.family)).map((addr) => addr.address) : [];
+          if (addresses3 && addresses3.length && !supportedAddresses.length) {
+            console.warn(`Failed to resolve IPv${addresses3[0].family} addresses with current network`);
+          }
+          if (!supportedAddresses.length && cached2) {
             return callback(null, formatDNSValue(cached2.value, {
-              cached: true,
-              error: err2
+              servername,
+              cached: true
             }));
           }
-          return callback(err2);
-        }
-        if (addresses2 && addresses2.length) {
-          let value = {
-            addresses: addresses2,
-            servername: options.servername || options.host
+          const value = {
+            addresses: supportedAddresses.length ? supportedAddresses : [host]
           };
-          dnsCache.set(options.host, {
+          dnsCache.set(host, {
             value,
             expires: Date.now() + (options.dnsTtl || DNS_TTL)
           });
           return callback(null, formatDNSValue(value, {
+            servername,
             cached: false
           }));
-        }
-        try {
-          dns.lookup(options.host, { all: true }, (err3, addresses3) => {
-            if (err3) {
-              if (cached2) {
-                return callback(null, formatDNSValue(cached2.value, {
-                  cached: true,
-                  error: err3
-                }));
-              }
-              return callback(err3);
-            }
-            let address = addresses3 ? addresses3.filter((addr) => isFamilySupported(addr.family)).map((addr) => addr.address).shift() : false;
-            if (addresses3 && addresses3.length && !address) {
-              console.warn(`Failed to resolve IPv${addresses3[0].family} addresses with current network`);
-            }
-            if (!address && cached2) {
-              return callback(null, formatDNSValue(cached2.value, {
-                cached: true
-              }));
-            }
-            let value = {
-              addresses: address ? [address] : [options.host],
-              servername: options.servername || options.host
-            };
-            dnsCache.set(options.host, {
-              value,
-              expires: Date.now() + (options.dnsTtl || DNS_TTL)
-            });
-            return callback(null, formatDNSValue(value, {
-              cached: false
-            }));
+        });
+      } catch (lookupErr) {
+        if (cached2) {
+          dnsCache.set(host, {
+            value: cached2.value,
+            expires: Date.now() + (options.dnsTtl || DNS_TTL)
           });
-        } catch (err3) {
-          if (cached2) {
-            return callback(null, formatDNSValue(cached2.value, {
-              cached: true,
-              error: err3
-            }));
-          }
-          return callback(err3);
+          return callback(null, formatDNSValue(cached2.value, {
+            servername,
+            cached: true,
+            error: lookupErr
+          }));
         }
-      });
-    });
-  };
-  exports.parseConnectionUrl = (str) => {
-    str = str || "";
-    let options = {};
-    [urllib.parse(str, true)].forEach((url2) => {
-      let auth;
-      switch (url2.protocol) {
-        case "smtp:":
-          options.secure = false;
-          break;
-        case "smtps:":
-          options.secure = true;
-          break;
-        case "direct:":
-          options.direct = true;
-          break;
-      }
-      if (!isNaN(url2.port) && Number(url2.port)) {
-        options.port = Number(url2.port);
-      }
-      if (url2.hostname) {
-        options.host = url2.hostname;
-      }
-      if (url2.auth) {
-        auth = url2.auth.split(":");
-        if (!options.auth) {
-          options.auth = {};
-        }
-        options.auth.user = auth.shift();
-        options.auth.pass = auth.join(":");
-      }
-      Object.keys(url2.query || {}).forEach((key) => {
-        let obj = options;
-        let lKey = key;
-        let value = url2.query[key];
-        if (!isNaN(value)) {
-          value = Number(value);
-        }
-        switch (value) {
-          case "true":
-            value = true;
-            break;
-          case "false":
-            value = false;
-            break;
-        }
-        if (key.indexOf("tls.") === 0) {
-          lKey = key.substr(4);
-          if (!options.tls) {
-            options.tls = {};
-          }
-          obj = options.tls;
-        } else if (key.indexOf(".") >= 0) {
-          return;
-        }
-        if (!(lKey in obj)) {
-          obj[lKey] = value;
-        }
-      });
-    });
-    return options;
-  };
-  exports._logFunc = (logger, level, defaults, data, message, ...args) => {
-    let entry = {};
-    Object.keys(defaults || {}).forEach((key) => {
-      if (key !== "level") {
-        entry[key] = defaults[key];
+        return callback(ipv4Error || ipv6Error || lookupErr);
       }
     });
-    Object.keys(data || {}).forEach((key) => {
-      if (key !== "level") {
-        entry[key] = data[key];
-      }
-    });
-    logger[level](entry, message, ...args);
-  };
-  exports.getLogger = (options, defaults) => {
-    options = options || {};
-    let response = {};
-    let levels = ["trace", "debug", "info", "warn", "error", "fatal"];
-    if (!options.logger) {
-      levels.forEach((level) => {
-        response[level] = () => false;
-      });
-      return response;
+  });
+}, parseConnectionUrl = (str) => {
+  str = str || "";
+  const options = {};
+  const url2 = parse7(str, true);
+  switch (url2.protocol) {
+    case "smtp:":
+      options.secure = false;
+      break;
+    case "smtps:":
+      options.secure = true;
+      break;
+    case "direct:":
+      options.direct = true;
+      break;
+  }
+  if (!isNaN(url2.port) && Number(url2.port)) {
+    options.port = Number(url2.port);
+  }
+  if (url2.hostname) {
+    options.host = url2.hostname;
+  }
+  if (url2.username || url2.password) {
+    options.auth = {
+      user: url2.username || "",
+      pass: url2.password || ""
+    };
+  }
+  Object.keys(url2.query || {}).forEach((key) => {
+    let obj = options;
+    let lKey = key;
+    let value = url2.query[key];
+    if (!isNaN(value)) {
+      value = Number(value);
     }
-    let logger = options.logger;
-    if (options.logger === true) {
-      logger = createDefaultLogger(levels);
+    switch (value) {
+      case "true":
+        value = true;
+        break;
+      case "false":
+        value = false;
+        break;
     }
+    if (key.indexOf("tls.") === 0) {
+      lKey = key.substr(4);
+      if (!options.tls) {
+        options.tls = {};
+      }
+      obj = options.tls;
+    } else if (key.indexOf(".") >= 0) {
+      return;
+    }
+    if (!isProtoKey(lKey) && !(lKey in obj)) {
+      obj[lKey] = value;
+    }
+  });
+  return options;
+}, _logFunc = (logger, level, defaults, data, message, ...args) => {
+  const entry = Object.assign({}, defaults || {}, data || {});
+  delete entry.level;
+  let logLevel = level;
+  if (typeof logger[logLevel] !== "function") {
+    logLevel = ["info", "debug", "log", "trace", "warn", "error"].find((name3) => typeof logger[name3] === "function");
+  }
+  if (logLevel) {
+    logger[logLevel](entry, message, ...args);
+  }
+}, getLogger = (options, defaults) => {
+  options = options || {};
+  const response = {};
+  const levels = ["trace", "debug", "info", "warn", "error", "fatal"];
+  if (!options.logger) {
     levels.forEach((level) => {
-      response[level] = (data, message, ...args) => {
-        exports._logFunc(logger, level, defaults, data, message, ...args);
-      };
+      response[level] = () => false;
     });
     return response;
-  };
-  exports.callbackPromise = (resolve, reject) => function() {
-    let args = Array.from(arguments);
-    let err = args.shift();
-    if (err) {
-      reject(err);
-    } else {
-      resolve(...args);
-    }
-  };
-  exports.parseDataURI = (uri) => {
-    let input2 = uri;
-    let commaPos = input2.indexOf(",");
-    if (!commaPos) {
-      return uri;
-    }
-    let data = input2.substring(commaPos + 1);
-    let metaStr = input2.substring("data:".length, commaPos);
-    let encoding;
-    let metaEntries = metaStr.split(";");
-    let lastMetaEntry = metaEntries.length > 1 ? metaEntries[metaEntries.length - 1] : false;
-    if (lastMetaEntry && lastMetaEntry.indexOf("=") < 0) {
-      encoding = lastMetaEntry.toLowerCase();
+  }
+  const logger = options.logger === true ? createDefaultLogger(levels) : options.logger;
+  levels.forEach((level) => {
+    response[level] = (...args) => {
+      const data = typeof args[0] === "string" ? undefined : args.shift();
+      _logFunc(logger, level, defaults, data, ...args);
+    };
+  });
+  return response;
+}, callbackPromise = (resolve3, reject) => function(...args) {
+  const err = args.shift();
+  if (err) {
+    reject(err);
+  } else {
+    resolve3(...args);
+  }
+}, parseDataURI = (uri) => {
+  if (typeof uri !== "string") {
+    return null;
+  }
+  if (!uri.startsWith("data:")) {
+    return null;
+  }
+  const commaPos = uri.indexOf(",");
+  if (commaPos === -1) {
+    return null;
+  }
+  const data = uri.substring(commaPos + 1);
+  const metaStr = uri.substring("data:".length, commaPos);
+  let encoding;
+  const metaEntries = metaStr.split(";");
+  if (metaEntries.length > 0) {
+    const lastEntry = metaEntries[metaEntries.length - 1].toLowerCase().trim();
+    if (["base64", "utf8", "utf-8"].includes(lastEntry) && lastEntry.indexOf("=") === -1) {
+      encoding = lastEntry;
       metaEntries.pop();
     }
-    let contentType = metaEntries.shift() || "application/octet-stream";
-    let params = {};
-    for (let entry of metaEntries) {
-      let sep = entry.indexOf("=");
-      if (sep >= 0) {
-        let key = entry.substring(0, sep);
-        let value = entry.substring(sep + 1);
+  }
+  const contentType = metaEntries.length > 0 ? metaEntries.shift() : "application/octet-stream";
+  const params = {};
+  for (let i = 0;i < metaEntries.length; i++) {
+    const entry = metaEntries[i];
+    const sepPos = entry.indexOf("=");
+    if (sepPos > 0) {
+      const key = entry.substring(0, sepPos).trim();
+      const value = entry.substring(sepPos + 1).trim();
+      if (key && !isProtoKey(key)) {
         params[key] = value;
       }
     }
-    switch (encoding) {
-      case "base64":
-        data = Buffer.from(data, "base64");
-        break;
-      case "utf8":
-        data = Buffer.from(data);
-        break;
-      default:
-        try {
-          data = Buffer.from(decodeURIComponent(data));
-        } catch (err) {
-          data = Buffer.from(data);
-        }
-        data = Buffer.from(data);
-    }
-    return { data, encoding, contentType, params };
-  };
-  exports.resolveContent = (data, key, callback) => {
-    let promise2;
-    if (!callback) {
-      promise2 = new Promise((resolve, reject) => {
-        callback = exports.callbackPromise(resolve, reject);
-      });
-    }
-    let content = data && data[key] && data[key].content || data[key];
-    let contentStream;
-    let encoding = (typeof data[key] === "object" && data[key].encoding || "utf8").toString().toLowerCase().replace(/[-_\s]/g, "");
-    if (!content) {
-      return callback(null, content);
-    }
-    if (typeof content === "object") {
-      if (typeof content.pipe === "function") {
-        return resolveStream(content, (err, value) => {
-          if (err) {
-            return callback(err);
-          }
-          if (data[key].content) {
-            data[key].content = value;
-          } else {
-            data[key] = value;
-          }
-          callback(null, value);
-        });
-      } else if (/^https?:\/\//i.test(content.path || content.href)) {
-        contentStream = nmfetch(content.path || content.href);
-        return resolveStream(contentStream, callback);
-      } else if (/^data:/i.test(content.path || content.href)) {
-        let parsedDataUri = exports.parseDataURI(content.path || content.href);
-        if (!parsedDataUri || !parsedDataUri.data) {
-          return callback(null, Buffer.from(0));
-        }
-        return callback(null, parsedDataUri.data);
-      } else if (content.path) {
-        return resolveStream(fs.createReadStream(content.path), callback);
-      }
-    }
-    if (typeof data[key].content === "string" && !["utf8", "usascii", "ascii"].includes(encoding)) {
-      content = Buffer.from(data[key].content, encoding);
-    }
-    setImmediate(() => callback(null, content));
-    return promise2;
-  };
-  exports.assign = function() {
-    let args = Array.from(arguments);
-    let target = args.shift() || {};
-    args.forEach((source) => {
-      Object.keys(source || {}).forEach((key) => {
-        if (["tls", "auth"].includes(key) && source[key] && typeof source[key] === "object") {
-          if (!target[key]) {
-            target[key] = {};
-          }
-          Object.keys(source[key]).forEach((subKey) => {
-            target[key][subKey] = source[key][subKey];
-          });
-        } else {
-          target[key] = source[key];
-        }
-      });
-    });
-    return target;
-  };
-  exports.encodeXText = (str) => {
-    if (!/[^\x21-\x2A\x2C-\x3C\x3E-\x7E]/.test(str)) {
-      return str;
-    }
-    let buf = Buffer.from(str);
-    let result = "";
-    for (let i = 0, len = buf.length;i < len; i++) {
-      let c = buf[i];
-      if (c < 33 || c > 126 || c === 43 || c === 61) {
-        result += "+" + (c < 16 ? "0" : "") + c.toString(16).toUpperCase();
-      } else {
-        result += String.fromCharCode(c);
-      }
-    }
-    return result;
-  };
-  function resolveStream(stream, callback) {
-    let responded = false;
-    let chunks = [];
-    let chunklen = 0;
-    stream.on("error", (err) => {
-      if (responded) {
-        return;
-      }
-      responded = true;
-      callback(err);
-    });
-    stream.on("readable", () => {
-      let chunk;
-      while ((chunk = stream.read()) !== null) {
-        chunks.push(chunk);
-        chunklen += chunk.length;
-      }
-    });
-    stream.on("end", () => {
-      if (responded) {
-        return;
-      }
-      responded = true;
-      let value;
+  }
+  let bufferData;
+  try {
+    if (encoding === "base64") {
+      bufferData = Buffer.from(data, "base64");
+    } else {
       try {
-        value = Buffer.concat(chunks, chunklen);
-      } catch (E) {
-        return callback(E);
+        bufferData = Buffer.from(decodeURIComponent(data));
+      } catch (_decodeError) {
+        bufferData = Buffer.from(data);
       }
-      callback(null, value);
-    });
+    }
+  } catch (_bufferError) {
+    bufferData = Buffer.alloc(0);
   }
-  function createDefaultLogger(levels) {
-    let levelMaxLen = 0;
-    let levelNames = new Map;
-    levels.forEach((level) => {
-      if (level.length > levelMaxLen) {
-        levelMaxLen = level.length;
+  return {
+    data: bufferData,
+    encoding: encoding || null,
+    contentType: contentType || "application/octet-stream",
+    params
+  };
+}, assign = function(...args) {
+  const target = args.shift() || {};
+  args.forEach((source) => {
+    Object.keys(source || {}).forEach((key) => {
+      if (isProtoKey(key)) {
+        return;
+      }
+      if (["tls", "auth"].includes(key) && source[key] && typeof source[key] === "object") {
+        target[key] = copyOwnKeys(target[key] || {}, source[key]);
+      } else {
+        target[key] = source[key];
       }
     });
-    levels.forEach((level) => {
-      let levelName = level.toUpperCase();
-      if (levelName.length < levelMaxLen) {
-        levelName += " ".repeat(levelMaxLen - levelName.length);
-      }
-      levelNames.set(level, levelName);
-    });
-    let print = (level, entry, message, ...args) => {
-      let prefix = "";
-      if (entry) {
-        if (entry.tnx === "server") {
-          prefix = "S: ";
-        } else if (entry.tnx === "client") {
-          prefix = "C: ";
-        }
-        if (entry.sid) {
-          prefix = "[" + entry.sid + "] " + prefix;
-        }
-        if (entry.cid) {
-          prefix = "[#" + entry.cid + "] " + prefix;
-        }
-      }
-      message = util.format(message, ...args);
-      message.split(/\r?\n/).forEach((line) => {
-        console.log("[%s] %s %s", new Date().toISOString().substr(0, 19).replace(/T/, " "), levelNames.get(level), prefix + line);
-      });
-    };
-    let logger = {};
-    levels.forEach((level) => {
-      logger[level] = print.bind(null, level);
-    });
-    return logger;
+  });
+  return target;
+}, encodeXText = (str) => {
+  if (!/[^\x21-\x2A\x2C-\x3C\x3E-\x7E]/.test(str)) {
+    return str;
   }
+  const buf = Buffer.from(str);
+  let result = "";
+  for (let i = 0, len = buf.length;i < len; i++) {
+    const c = buf[i];
+    if (c < 33 || c > 126 || c === 43 || c === 61) {
+      result += "+" + (c < 16 ? "0" : "") + c.toString(16).toUpperCase();
+    } else {
+      result += String.fromCharCode(c);
+    }
+  }
+  return result;
+};
+var init_shared = __esm(() => {
+  init_url();
+  init_fetch();
+  init_errors();
+  DNS_TTL = 5 * 60 * 1000;
+  CACHE_CLEANUP_INTERVAL = 30 * 1000;
+  try {
+    networkInterfaces = os.networkInterfaces();
+  } catch (_err) {}
+  dnsCache = new Map;
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/mime-funcs/mime-types.js
-var require_mime_types = __commonJS((exports, module) => {
-  var path = __require("path");
-  var defaultMimeType = "application/octet-stream";
-  var defaultExtension = "bin";
-  var mimeTypes = new Map([
+// /zveltio-extension/node_modules/nodemailer/dist/esm/mime-funcs/mime-types.js
+import path from "path";
+function detectMimeType(filename) {
+  if (!filename) {
+    return defaultMimeType;
+  }
+  const parsed = path.parse(filename);
+  const extension = (parsed.ext.substr(1) || parsed.name || "").split("?").shift().trim().toLowerCase();
+  const value = extensions.has(extension) ? extensions.get(extension) : defaultMimeType;
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+  return value;
+}
+function detectExtension(mimeType) {
+  if (!mimeType) {
+    return defaultExtension;
+  }
+  const parts = mimeType.toLowerCase().trim().split("/");
+  const rootType = parts.shift().trim();
+  const subType = parts.join("/").trim();
+  if (mimeTypes.has(rootType + "/" + subType)) {
+    const value = mimeTypes.get(rootType + "/" + subType);
+    if (Array.isArray(value)) {
+      return value[0];
+    }
+    return value;
+  }
+  switch (rootType) {
+    case "text":
+      return "txt";
+    default:
+      return "bin";
+  }
+}
+var defaultMimeType = "application/octet-stream", defaultExtension = "bin", mimeTypes, extensions;
+var init_mime_types = __esm(() => {
+  mimeTypes = new Map([
     ["application/acad", "dwg"],
     ["application/applixware", "aw"],
     ["application/arj", "arj"],
@@ -87125,7 +88792,7 @@ var require_mime_types = __commonJS((exports, module) => {
     ["xgl/drawing", "xgz"],
     ["xgl/movie", "xmz"]
   ]);
-  var extensions = new Map([
+  extensions = new Map([
     ["123", "application/vnd.lotus-1-2-3"],
     ["323", "text/h323"],
     ["*", "application/octet-stream"],
@@ -87195,7 +88862,10 @@ var require_mime_types = __commonJS((exports, module) => {
     ["bdm", "application/vnd.syncml.dm+wbxml"],
     ["bed", "application/vnd.realvnc.bed"],
     ["bh2", "application/vnd.fujitsu.oasysprs"],
-    ["bin", ["application/octet-stream", "application/mac-binary", "application/macbinary", "application/x-macbinary", "application/x-binary"]],
+    [
+      "bin",
+      ["application/octet-stream", "application/mac-binary", "application/macbinary", "application/x-macbinary", "application/x-binary"]
+    ],
     ["bm", "image/bmp"],
     ["bmi", "application/vnd.bmi"],
     ["bmp", ["image/bmp", "image/x-windows-bmp"]],
@@ -87240,7 +88910,10 @@ var require_mime_types = __commonJS((exports, module) => {
     ["cii", "application/vnd.anser-web-certificate-issue-initiation"],
     ["cil", "application/vnd.ms-artgalry"],
     ["cla", "application/vnd.claymore"],
-    ["class", ["application/octet-stream", "application/java", "application/java-byte-code", "application/java-vm", "application/x-java-class"]],
+    [
+      "class",
+      ["application/octet-stream", "application/java", "application/java-byte-code", "application/java-vm", "application/x-java-class"]
+    ],
     ["clkk", "application/vnd.crick.clicker.keyboard"],
     ["clkp", "application/vnd.crick.clicker.palette"],
     ["clkt", "application/vnd.crick.clicker.template"],
@@ -87845,7 +89518,10 @@ var require_mime_types = __commonJS((exports, module) => {
     ["sbml", "application/sbml+xml"],
     ["sc", "application/vnd.ibm.secure-container"],
     ["scd", "application/x-msschedule"],
-    ["scm", ["application/vnd.lotus-screencam", "video/x-scm", "text/x-script.guile", "application/x-lotusscreencam", "text/x-script.scheme"]],
+    [
+      "scm",
+      ["application/vnd.lotus-screencam", "video/x-scm", "text/x-script.guile", "application/x-lotusscreencam", "text/x-script.scheme"]
+    ],
     ["scq", "application/scvp-cv-request"],
     ["scs", "application/scvp-cv-response"],
     ["sct", "text/scriptlet"],
@@ -88150,297 +89826,44 @@ var require_mime_types = __commonJS((exports, module) => {
     ["zoo", "application/octet-stream"],
     ["zsh", "text/x-script.zsh"]
   ]);
-  module.exports = {
-    detectMimeType(filename) {
-      if (!filename) {
-        return defaultMimeType;
-      }
-      let parsed = path.parse(filename);
-      let extension = (parsed.ext.substr(1) || parsed.name || "").split("?").shift().trim().toLowerCase();
-      let value = defaultMimeType;
-      if (extensions.has(extension)) {
-        value = extensions.get(extension);
-      }
-      if (Array.isArray(value)) {
-        return value[0];
-      }
-      return value;
-    },
-    detectExtension(mimeType) {
-      if (!mimeType) {
-        return defaultExtension;
-      }
-      let parts = (mimeType || "").toLowerCase().trim().split("/");
-      let rootType = parts.shift().trim();
-      let subType = parts.join("/").trim();
-      if (mimeTypes.has(rootType + "/" + subType)) {
-        let value = mimeTypes.get(rootType + "/" + subType);
-        if (Array.isArray(value)) {
-          return value[0];
-        }
-        return value;
-      }
-      switch (rootType) {
-        case "text":
-          return "txt";
-        default:
-          return "bin";
-      }
-    }
-  };
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/punycode/index.js
-var require_punycode2 = __commonJS((exports, module) => {
-  var maxInt = 2147483647;
-  var base = 36;
-  var tMin = 1;
-  var tMax = 26;
-  var skew = 38;
-  var damp = 700;
-  var initialBias = 72;
-  var initialN = 128;
-  var delimiter = "-";
-  var regexPunycode = /^xn--/;
-  var regexNonASCII = /[^\0-\x7F]/;
-  var regexSeparators = /[\x2E\u3002\uFF0E\uFF61]/g;
-  var errors3 = {
-    overflow: "Overflow: input needs wider integers to process",
-    "not-basic": "Illegal input >= 0x80 (not a basic code point)",
-    "invalid-input": "Invalid input"
-  };
-  var baseMinusTMin = base - tMin;
-  var floor = Math.floor;
-  var stringFromCharCode = String.fromCharCode;
-  function error63(type) {
-    throw new RangeError(errors3[type]);
-  }
-  function map3(array2, callback) {
-    const result = [];
-    let length = array2.length;
-    while (length--) {
-      result[length] = callback(array2[length]);
-    }
-    return result;
-  }
-  function mapDomain(domain2, callback) {
-    const parts = domain2.split("@");
-    let result = "";
-    if (parts.length > 1) {
-      result = parts[0] + "@";
-      domain2 = parts[1];
-    }
-    domain2 = domain2.replace(regexSeparators, ".");
-    const labels = domain2.split(".");
-    const encoded = map3(labels, callback).join(".");
-    return result + encoded;
-  }
-  function ucs2decode(string4) {
-    const output2 = [];
-    let counter = 0;
-    const length = string4.length;
-    while (counter < length) {
-      const value = string4.charCodeAt(counter++);
-      if (value >= 55296 && value <= 56319 && counter < length) {
-        const extra = string4.charCodeAt(counter++);
-        if ((extra & 64512) == 56320) {
-          output2.push(((value & 1023) << 10) + (extra & 1023) + 65536);
-        } else {
-          output2.push(value);
-          counter--;
-        }
-      } else {
-        output2.push(value);
-      }
-    }
-    return output2;
-  }
-  var ucs2encode = (codePoints) => String.fromCodePoint(...codePoints);
-  var basicToDigit = function(codePoint) {
-    if (codePoint >= 48 && codePoint < 58) {
-      return 26 + (codePoint - 48);
-    }
-    if (codePoint >= 65 && codePoint < 91) {
-      return codePoint - 65;
-    }
-    if (codePoint >= 97 && codePoint < 123) {
-      return codePoint - 97;
-    }
-    return base;
-  };
-  var digitToBasic = function(digit, flag) {
-    return digit + 22 + 75 * (digit < 26) - ((flag != 0) << 5);
-  };
-  var adapt = function(delta, numPoints, firstTime) {
-    let k = 0;
-    delta = firstTime ? floor(delta / damp) : delta >> 1;
-    delta += floor(delta / numPoints);
-    for (;delta > baseMinusTMin * tMax >> 1; k += base) {
-      delta = floor(delta / baseMinusTMin);
-    }
-    return floor(k + (baseMinusTMin + 1) * delta / (delta + skew));
-  };
-  var decode3 = function(input2) {
-    const output2 = [];
-    const inputLength = input2.length;
-    let i = 0;
-    let n = initialN;
-    let bias = initialBias;
-    let basic = input2.lastIndexOf(delimiter);
-    if (basic < 0) {
-      basic = 0;
-    }
-    for (let j = 0;j < basic; ++j) {
-      if (input2.charCodeAt(j) >= 128) {
-        error63("not-basic");
-      }
-      output2.push(input2.charCodeAt(j));
-    }
-    for (let index = basic > 0 ? basic + 1 : 0;index < inputLength; ) {
-      const oldi = i;
-      for (let w = 1, k = base;; k += base) {
-        if (index >= inputLength) {
-          error63("invalid-input");
-        }
-        const digit = basicToDigit(input2.charCodeAt(index++));
-        if (digit >= base) {
-          error63("invalid-input");
-        }
-        if (digit > floor((maxInt - i) / w)) {
-          error63("overflow");
-        }
-        i += digit * w;
-        const t = k <= bias ? tMin : k >= bias + tMax ? tMax : k - bias;
-        if (digit < t) {
-          break;
-        }
-        const baseMinusT = base - t;
-        if (w > floor(maxInt / baseMinusT)) {
-          error63("overflow");
-        }
-        w *= baseMinusT;
-      }
-      const out = output2.length + 1;
-      bias = adapt(i - oldi, out, oldi == 0);
-      if (floor(i / out) > maxInt - n) {
-        error63("overflow");
-      }
-      n += floor(i / out);
-      i %= out;
-      output2.splice(i++, 0, n);
-    }
-    return String.fromCodePoint(...output2);
-  };
-  var encode3 = function(input2) {
-    const output2 = [];
-    input2 = ucs2decode(input2);
-    const inputLength = input2.length;
-    let n = initialN;
-    let delta = 0;
-    let bias = initialBias;
-    for (const currentValue of input2) {
-      if (currentValue < 128) {
-        output2.push(stringFromCharCode(currentValue));
-      }
-    }
-    const basicLength = output2.length;
-    let handledCPCount = basicLength;
-    if (basicLength) {
-      output2.push(delimiter);
-    }
-    while (handledCPCount < inputLength) {
-      let m = maxInt;
-      for (const currentValue of input2) {
-        if (currentValue >= n && currentValue < m) {
-          m = currentValue;
-        }
-      }
-      const handledCPCountPlusOne = handledCPCount + 1;
-      if (m - n > floor((maxInt - delta) / handledCPCountPlusOne)) {
-        error63("overflow");
-      }
-      delta += (m - n) * handledCPCountPlusOne;
-      n = m;
-      for (const currentValue of input2) {
-        if (currentValue < n && ++delta > maxInt) {
-          error63("overflow");
-        }
-        if (currentValue === n) {
-          let q = delta;
-          for (let k = base;; k += base) {
-            const t = k <= bias ? tMin : k >= bias + tMax ? tMax : k - bias;
-            if (q < t) {
-              break;
-            }
-            const qMinusT = q - t;
-            const baseMinusT = base - t;
-            output2.push(stringFromCharCode(digitToBasic(t + qMinusT % baseMinusT, 0)));
-            q = floor(qMinusT / baseMinusT);
-          }
-          output2.push(stringFromCharCode(digitToBasic(q, 0)));
-          bias = adapt(delta, handledCPCountPlusOne, handledCPCount === basicLength);
-          delta = 0;
-          ++handledCPCount;
-        }
-      }
-      ++delta;
-      ++n;
-    }
-    return output2.join("");
-  };
-  var toUnicode = function(input2) {
-    return mapDomain(input2, function(string4) {
-      return regexPunycode.test(string4) ? decode3(string4.slice(4).toLowerCase()) : string4;
-    });
-  };
-  var toASCII = function(input2) {
-    return mapDomain(input2, function(string4) {
-      return regexNonASCII.test(string4) ? "xn--" + encode3(string4) : string4;
-    });
-  };
-  var punycode = {
-    version: "2.3.1",
-    ucs2: {
-      decode: ucs2decode,
-      encode: ucs2encode
-    },
-    decode: decode3,
-    encode: encode3,
-    toASCII,
-    toUnicode
-  };
-  module.exports = punycode;
+// /zveltio-extension/node_modules/nodemailer/dist/esm/base64/index.js
+var exports_base64 = {};
+__export(exports_base64, {
+  wrap: () => wrap,
+  encode: () => encode4,
+  Encoder: () => Encoder
 });
-
-// /zveltio-extension/node_modules/nodemailer/lib/base64/index.js
-var require_base64 = __commonJS((exports, module) => {
-  var Transform = __require("stream").Transform;
-  function encode3(buffer) {
-    if (typeof buffer === "string") {
-      buffer = Buffer.from(buffer, "utf-8");
-    }
-    return buffer.toString("base64");
+import { Transform } from "stream";
+function encode4(buffer) {
+  if (typeof buffer === "string") {
+    buffer = Buffer.from(buffer, "utf-8");
   }
-  function wrap(str, lineLength) {
-    str = (str || "").toString();
-    lineLength = lineLength || 76;
-    if (str.length <= lineLength) {
-      return str;
-    }
-    let result = [];
-    let pos = 0;
-    let chunkLength = lineLength * 1024;
-    while (pos < str.length) {
-      let wrappedLines = str.substr(pos, chunkLength).replace(new RegExp(".{" + lineLength + "}", "g"), `$&\r
-`).trim();
-      result.push(wrappedLines);
-      pos += chunkLength;
-    }
-    return result.join(`\r
-`).trim();
+  return buffer.toString("base64");
+}
+function wrap(str, lineLength) {
+  str = (str || "").toString();
+  lineLength = Math.max(Number(lineLength) || 76, 1);
+  if (str.length <= lineLength) {
+    return str;
   }
-
-  class Encoder extends Transform {
+  const result = [];
+  let pos = 0;
+  const chunkLength = lineLength * 1024;
+  const wrapRegex = new RegExp(".{" + lineLength + "}", "g");
+  while (pos < str.length) {
+    const wrappedLines = str.substr(pos, chunkLength).replace(wrapRegex, `$&\r
+`).trim();
+    result.push(wrappedLines);
+    pos += chunkLength;
+  }
+  return result.join(`\r
+`).trim();
+}
+var Encoder;
+var init_base64 = __esm(() => {
+  Encoder = class Encoder extends Transform {
     constructor(options) {
       super();
       this.options = options || {};
@@ -88453,27 +89876,26 @@ var require_base64 = __commonJS((exports, module) => {
       this.outputBytes = 0;
     }
     _transform(chunk, encoding, done) {
-      if (encoding !== "buffer") {
-        chunk = Buffer.from(chunk, encoding);
+      let buf = encoding !== "buffer" ? Buffer.from(chunk, encoding) : chunk;
+      if (!buf || !buf.length) {
+        setImmediate(done);
+        return;
       }
-      if (!chunk || !chunk.length) {
-        return setImmediate(done);
-      }
-      this.inputBytes += chunk.length;
+      this.inputBytes += buf.length;
       if (this._remainingBytes && this._remainingBytes.length) {
-        chunk = Buffer.concat([this._remainingBytes, chunk], this._remainingBytes.length + chunk.length);
+        buf = Buffer.concat([this._remainingBytes, buf], this._remainingBytes.length + buf.length);
         this._remainingBytes = false;
       }
-      if (chunk.length % 3) {
-        this._remainingBytes = chunk.slice(chunk.length - chunk.length % 3);
-        chunk = chunk.slice(0, chunk.length - chunk.length % 3);
+      if (buf.length % 3) {
+        this._remainingBytes = buf.slice(buf.length - buf.length % 3);
+        buf = buf.slice(0, buf.length - buf.length % 3);
       } else {
         this._remainingBytes = false;
       }
-      let b64 = this._curLine + encode3(chunk);
+      let b64 = this._curLine + encode4(buf);
       if (this.options.lineLength) {
         b64 = wrap(b64, this.options.lineLength);
-        let lastLF = b64.lastIndexOf(`
+        const lastLF = b64.lastIndexOf(`
 `);
         if (lastLF < 0) {
           this._curLine = b64;
@@ -88481,8 +89903,8 @@ var require_base64 = __commonJS((exports, module) => {
         } else if (lastLF === b64.length - 1) {
           this._curLine = "";
         } else {
-          this._curLine = b64.substr(lastLF + 1);
-          b64 = b64.substr(0, lastLF + 1);
+          this._curLine = b64.substring(lastLF + 1);
+          b64 = b64.substring(0, lastLF + 1);
         }
       }
       if (b64) {
@@ -88493,129 +89915,136 @@ var require_base64 = __commonJS((exports, module) => {
     }
     _flush(done) {
       if (this._remainingBytes && this._remainingBytes.length) {
-        this._curLine += encode3(this._remainingBytes);
+        this._curLine += encode4(this._remainingBytes);
       }
       if (this._curLine) {
         this._curLine = wrap(this._curLine, this.options.lineLength);
         this.outputBytes += this._curLine.length;
-        this.push(this._curLine, "ascii");
+        this.push(Buffer.from(this._curLine, "ascii"));
         this._curLine = "";
       }
       done();
     }
-  }
-  module.exports = {
-    encode: encode3,
-    wrap,
-    Encoder
   };
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/qp/index.js
-var require_qp = __commonJS((exports, module) => {
-  var Transform = __require("stream").Transform;
-  function encode3(buffer) {
-    if (typeof buffer === "string") {
-      buffer = Buffer.from(buffer, "utf-8");
-    }
-    let ranges = [
-      [9],
-      [10],
-      [13],
-      [32, 60],
-      [62, 126]
-    ];
-    let result = "";
-    let ord;
-    for (let i = 0, len = buffer.length;i < len; i++) {
-      ord = buffer[i];
-      if (checkRanges(ord, ranges) && !((ord === 32 || ord === 9) && (i === len - 1 || buffer[i + 1] === 10 || buffer[i + 1] === 13))) {
-        result += String.fromCharCode(ord);
-        continue;
-      }
-      result += "=" + (ord < 16 ? "0" : "") + ord.toString(16).toUpperCase();
-    }
-    return result;
+// /zveltio-extension/node_modules/nodemailer/dist/esm/qp/index.js
+var exports_qp = {};
+__export(exports_qp, {
+  wrap: () => wrap2,
+  encode: () => encode5,
+  Encoder: () => Encoder2
+});
+import { Transform as Transform2 } from "stream";
+function encode5(buffer) {
+  if (typeof buffer === "string") {
+    buffer = Buffer.from(buffer, "utf-8");
   }
-  function wrap(str, lineLength) {
-    str = (str || "").toString();
-    lineLength = lineLength || 76;
-    if (str.length <= lineLength) {
-      return str;
+  let result = "";
+  let ord;
+  for (let i = 0, len = buffer.length;i < len; i++) {
+    ord = buffer[i];
+    if (checkRanges(ord, QP_RANGES) && !((ord === 32 || ord === 9) && (i === len - 1 || buffer[i + 1] === 10 || buffer[i + 1] === 13))) {
+      result += String.fromCharCode(ord);
+      continue;
     }
-    let pos = 0;
-    let len = str.length;
-    let match2, code, line;
-    let lineMargin = Math.floor(lineLength / 3);
-    let result = "";
-    while (pos < len) {
-      line = str.substr(pos, lineLength);
-      if (match2 = line.match(/\r\n/)) {
-        line = line.substr(0, match2.index + match2[0].length);
-        result += line;
-        pos += line.length;
-        continue;
-      }
-      if (line.substr(-1) === `
-`) {
-        result += line;
-        pos += line.length;
-        continue;
-      } else if (match2 = line.substr(-lineMargin).match(/\n.*?$/)) {
-        line = line.substr(0, line.length - (match2[0].length - 1));
-        result += line;
-        pos += line.length;
-        continue;
-      } else if (line.length > lineLength - lineMargin && (match2 = line.substr(-lineMargin).match(/[ \t.,!?][^ \t.,!?]*$/))) {
-        line = line.substr(0, line.length - (match2[0].length - 1));
-      } else if (line.match(/[=][\da-f]{0,2}$/i)) {
-        if (match2 = line.match(/[=][\da-f]{0,1}$/i)) {
-          line = line.substr(0, line.length - match2[0].length);
-        }
-        while (line.length > 3 && line.length < len - pos && !line.match(/^(?:=[\da-f]{2}){1,4}$/i) && (match2 = line.match(/[=][\da-f]{2}$/gi))) {
-          code = parseInt(match2[0].substr(1, 2), 16);
-          if (code < 128) {
-            break;
-          }
-          line = line.substr(0, line.length - 3);
-          if (code >= 192) {
-            break;
-          }
-        }
-      }
-      if (pos + line.length < len && line.substr(-1) !== `
-`) {
-        if (line.length === lineLength && line.match(/[=][\da-f]{2}$/i)) {
-          line = line.substr(0, line.length - 3);
-        } else if (line.length === lineLength) {
-          line = line.substr(0, line.length - 1);
-        }
-        pos += line.length;
-        line += `=\r
-`;
-      } else {
-        pos += line.length;
-      }
+    result += "=" + (ord < 16 ? "0" : "") + ord.toString(16).toUpperCase();
+  }
+  return result;
+}
+function wrap2(str, lineLength) {
+  str = (str || "").toString();
+  lineLength = Math.max(Number(lineLength) || 76, MIN_LINE_LENGTH);
+  if (str.length <= lineLength) {
+    return str;
+  }
+  let pos = 0;
+  const len = str.length;
+  let match2, code, line;
+  const lineMargin = Math.floor(lineLength / 3);
+  let result = "";
+  while (pos < len) {
+    line = str.substr(pos, lineLength);
+    if (match2 = line.match(/\r\n/)) {
+      line = line.substr(0, match2.index + match2[0].length);
       result += line;
+      pos += line.length;
+      continue;
     }
-    return result;
-  }
-  function checkRanges(nr, ranges) {
-    for (let i = ranges.length - 1;i >= 0; i--) {
-      if (!ranges[i].length) {
-        continue;
+    if (line.substr(-1) === `
+`) {
+      result += line;
+      pos += line.length;
+      continue;
+    }
+    if (match2 = line.substr(-lineMargin).match(/\n.*?$/)) {
+      line = line.substr(0, line.length - (match2[0].length - 1));
+      result += line;
+      pos += line.length;
+      continue;
+    }
+    if (line.length > lineLength - lineMargin && (match2 = line.substr(-lineMargin).match(/[ \t.,!?][^ \t.,!?]*$/))) {
+      line = line.substr(0, line.length - (match2[0].length - 1));
+    } else if (line.match(/[=][\da-f]{0,2}$/i)) {
+      if (match2 = line.match(/[=][\da-f]{0,1}$/i)) {
+        line = line.substr(0, line.length - match2[0].length);
       }
-      if (ranges[i].length === 1 && nr === ranges[i][0]) {
-        return true;
-      }
-      if (ranges[i].length === 2 && nr >= ranges[i][0] && nr <= ranges[i][1]) {
-        return true;
+      while (line.length > 3 && line.length < len - pos && !line.match(/^(?:=[\da-f]{2}){1,4}$/i) && (match2 = line.match(/[=][\da-f]{2}$/gi))) {
+        code = parseInt(match2[0].substr(1, 2), 16);
+        if (code < 128) {
+          break;
+        }
+        line = line.substr(0, line.length - 3);
+        if (code >= 192) {
+          break;
+        }
       }
     }
-    return false;
+    if (!line.length) {
+      line = str.substr(pos, lineLength);
+    }
+    if (pos + line.length < len && line.substr(-1) !== `
+`) {
+      if (line.length === lineLength && line.match(/[=][\da-f]{2}$/i)) {
+        line = line.substr(0, line.length - 3);
+      } else if (line.length === lineLength) {
+        line = line.substr(0, line.length - 1);
+      }
+      pos += line.length;
+      line += `=\r
+`;
+    } else {
+      pos += line.length;
+    }
+    result += line;
   }
-
-  class Encoder extends Transform {
+  return result;
+}
+function checkRanges(nr, ranges) {
+  for (let i = ranges.length - 1;i >= 0; i--) {
+    const range = ranges[i];
+    if (!range.length) {
+      continue;
+    }
+    if (range.length === 1 && nr === range[0]) {
+      return true;
+    }
+    if (range.length === 2 && nr >= range[0] && nr <= range[1]) {
+      return true;
+    }
+  }
+  return false;
+}
+var MIN_LINE_LENGTH = 4, QP_RANGES, Encoder2;
+var init_qp = __esm(() => {
+  QP_RANGES = [
+    [9],
+    [10],
+    [13],
+    [32, 60],
+    [62, 126]
+  ];
+  Encoder2 = class Encoder2 extends Transform2 {
     constructor(options) {
       super();
       this.options = options || {};
@@ -88636,8 +90065,8 @@ var require_qp = __commonJS((exports, module) => {
       }
       this.inputBytes += chunk.length;
       if (this.options.lineLength) {
-        qp = this._curLine + encode3(chunk);
-        qp = wrap(qp, this.options.lineLength);
+        qp = this._curLine + encode5(chunk);
+        qp = wrap2(qp, this.options.lineLength);
         qp = qp.replace(/(^|\n)([^\n]*)$/, (match2, lineBreak, lastLine) => {
           this._curLine = lastLine;
           return lineBreak;
@@ -88647,7 +90076,7 @@ var require_qp = __commonJS((exports, module) => {
           this.push(qp);
         }
       } else {
-        qp = encode3(chunk);
+        qp = encode5(chunk);
         this.outputBytes += qp.length;
         this.push(qp, "ascii");
       }
@@ -88660,641 +90089,460 @@ var require_qp = __commonJS((exports, module) => {
       }
       done();
     }
-  }
-  module.exports = {
-    encode: encode3,
-    wrap,
-    Encoder
   };
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/mime-funcs/index.js
-var require_mime_funcs = __commonJS((exports, module) => {
-  var base643 = require_base64();
-  var qp = require_qp();
-  var mimeTypes = require_mime_types();
-  module.exports = {
-    isPlainText(value, isParam) {
-      const re = isParam ? /[\x00-\x08\x0b\x0c\x0e-\x1f"\u0080-\uFFFF]/ : /[\x00-\x08\x0b\x0c\x0e-\x1f\u0080-\uFFFF]/;
-      if (typeof value !== "string" || re.test(value)) {
-        return false;
-      } else {
-        return true;
+// /zveltio-extension/node_modules/nodemailer/dist/esm/mime-funcs/index.js
+function isPlainText(value, isParam) {
+  const re = isParam ? /[\x00-\x1f\x7f"\u0080-\uFFFF]/ : /[\x00-\x08\x0b\x0c\x0e-\x1f\u0080-\uFFFF]/;
+  return typeof value === "string" && !re.test(value);
+}
+function quoteString(value) {
+  return '"' + (value || "").toString().replace(/["\\]/g, "\\$&") + '"';
+}
+function hasLongerLines(str, lineLength) {
+  if (str.length > 128 * 1024) {
+    return true;
+  }
+  return new RegExp("^.{" + (lineLength + 1) + ",}", "m").test(str);
+}
+function encodeWord(data, mimeWordEncoding, maxLength) {
+  mimeWordEncoding = (mimeWordEncoding || "Q").toString().toUpperCase().trim().charAt(0);
+  maxLength = maxLength || 0;
+  let encodedStr;
+  const toCharset = "UTF-8";
+  if (maxLength && maxLength > 7 + toCharset.length) {
+    maxLength -= 7 + toCharset.length;
+  }
+  if (mimeWordEncoding === "Q") {
+    encodedStr = encode5(data).replace(/[^a-z0-9!*+\-/=]/gi, (chr) => {
+      const ord = chr.charCodeAt(0).toString(16).toUpperCase();
+      if (chr === " ") {
+        return "_";
       }
-    },
-    hasLongerLines(str, lineLength) {
-      if (str.length > 128 * 1024) {
-        return true;
-      }
-      return new RegExp("^.{" + (lineLength + 1) + ",}", "m").test(str);
-    },
-    encodeWord(data, mimeWordEncoding, maxLength) {
-      mimeWordEncoding = (mimeWordEncoding || "Q").toString().toUpperCase().trim().charAt(0);
-      maxLength = maxLength || 0;
-      let encodedStr;
-      let toCharset = "UTF-8";
-      if (maxLength && maxLength > 7 + toCharset.length) {
-        maxLength -= 7 + toCharset.length;
-      }
-      if (mimeWordEncoding === "Q") {
-        encodedStr = qp.encode(data).replace(/[^a-z0-9!*+\-/=]/gi, (chr) => {
-          let ord = chr.charCodeAt(0).toString(16).toUpperCase();
-          if (chr === " ") {
-            return "_";
-          } else {
-            return "=" + (ord.length === 1 ? "0" + ord : ord);
-          }
-        });
-      } else if (mimeWordEncoding === "B") {
-        encodedStr = typeof data === "string" ? data : base643.encode(data);
-        maxLength = maxLength ? Math.max(3, (maxLength - maxLength % 4) / 4 * 3) : 0;
-      }
-      if (maxLength && (mimeWordEncoding !== "B" ? encodedStr : base643.encode(data)).length > maxLength) {
-        if (mimeWordEncoding === "Q") {
-          encodedStr = this.splitMimeEncodedString(encodedStr, maxLength).join("?= =?" + toCharset + "?" + mimeWordEncoding + "?");
-        } else {
-          let parts = [];
-          let lpart = "";
-          for (let i = 0, len = encodedStr.length;i < len; i++) {
-            let chr = encodedStr.charAt(i);
-            if (/[\ud83c\ud83d\ud83e]/.test(chr) && i < len - 1) {
-              chr += encodedStr.charAt(++i);
-            }
-            if (Buffer.byteLength(lpart + chr) <= maxLength || i === 0) {
-              lpart += chr;
-            } else {
-              parts.push(base643.encode(lpart));
-              lpart = chr;
-            }
-          }
-          if (lpart) {
-            parts.push(base643.encode(lpart));
-          }
-          if (parts.length > 1) {
-            encodedStr = parts.join("?= =?" + toCharset + "?" + mimeWordEncoding + "?");
-          } else {
-            encodedStr = parts.join("");
-          }
+      return "=" + (ord.length === 1 ? "0" + ord : ord);
+    });
+  } else if (mimeWordEncoding === "B") {
+    encodedStr = typeof data === "string" ? data : data.toString("utf-8");
+    maxLength = maxLength ? Math.max(3, (maxLength - maxLength % 4) / 4 * 3) : 0;
+  }
+  if (maxLength && (mimeWordEncoding !== "B" ? encodedStr : encode4(data)).length > maxLength) {
+    if (mimeWordEncoding === "Q") {
+      encodedStr = splitMimeEncodedString(encodedStr, maxLength).join("?= =?" + toCharset + "?" + mimeWordEncoding + "?");
+    } else {
+      const parts = [];
+      let lpart = "";
+      for (let i = 0, len = encodedStr.length;i < len; i++) {
+        let chr = encodedStr.charAt(i);
+        if (/[\ud800-\udbff]/.test(chr) && /[\udc00-\udfff]/.test(encodedStr.charAt(i + 1))) {
+          chr += encodedStr.charAt(++i);
         }
-      } else if (mimeWordEncoding === "B") {
-        encodedStr = base643.encode(data);
-      }
-      return "=?" + toCharset + "?" + mimeWordEncoding + "?" + encodedStr + (encodedStr.substr(-2) === "?=" ? "" : "?=");
-    },
-    encodeWords(value, mimeWordEncoding, maxLength, encodeAll) {
-      maxLength = maxLength || 0;
-      let encodedValue;
-      let firstMatch = value.match(/(?:^|\s)([^\s]*["\u0080-\uFFFF])/);
-      if (!firstMatch) {
-        return value;
-      }
-      if (encodeAll) {
-        return this.encodeWord(value, mimeWordEncoding, maxLength);
-      }
-      let lastMatch = value.match(/(["\u0080-\uFFFF][^\s]*)[^"\u0080-\uFFFF]*$/);
-      if (!lastMatch) {
-        return value;
-      }
-      let startIndex = firstMatch.index + (firstMatch[0].match(/[^\s]/) || {
-        index: 0
-      }).index;
-      let endIndex = lastMatch.index + (lastMatch[1] || "").length;
-      encodedValue = (startIndex ? value.substr(0, startIndex) : "") + this.encodeWord(value.substring(startIndex, endIndex), mimeWordEncoding || "Q", maxLength) + (endIndex < value.length ? value.substr(endIndex) : "");
-      return encodedValue;
-    },
-    buildHeaderValue(structured) {
-      let paramsArray = [];
-      Object.keys(structured.params || {}).forEach((param) => {
-        let value = structured.params[param];
-        if (!this.isPlainText(value, true) || value.length >= 75) {
-          this.buildHeaderParam(param, value, 50).forEach((encodedParam) => {
-            if (!/[\s"\\;:/=(),<>@[\]?]|^[-']|'$/.test(encodedParam.value) || encodedParam.key.substr(-1) === "*") {
-              paramsArray.push(encodedParam.key + "=" + encodedParam.value);
-            } else {
-              paramsArray.push(encodedParam.key + "=" + JSON.stringify(encodedParam.value));
-            }
-          });
-        } else if (/[\s'"\\;:/=(),<>@[\]?]|^-/.test(value)) {
-          paramsArray.push(param + "=" + JSON.stringify(value));
+        if (Buffer.byteLength(lpart + chr) <= maxLength || i === 0) {
+          lpart += chr;
         } else {
-          paramsArray.push(param + "=" + value);
+          parts.push(encode4(lpart));
+          lpart = chr;
+        }
+      }
+      if (lpart) {
+        parts.push(encode4(lpart));
+      }
+      if (parts.length > 1) {
+        encodedStr = parts.join("?= =?" + toCharset + "?" + mimeWordEncoding + "?");
+      } else {
+        encodedStr = parts.join("");
+      }
+    }
+  } else if (mimeWordEncoding === "B") {
+    encodedStr = encode4(data);
+  }
+  return "=?" + toCharset + "?" + mimeWordEncoding + "?" + encodedStr + (encodedStr.substr(-2) === "?=" ? "" : "?=");
+}
+function encodeWords(value, mimeWordEncoding, maxLength, encodeAll) {
+  maxLength = maxLength || 0;
+  const firstMatch = value.match(/(?:^|\s)([^\s]*["\u0080-\uFFFF])/);
+  if (!firstMatch) {
+    return value;
+  }
+  if (encodeAll) {
+    return encodeWord(value, mimeWordEncoding, maxLength);
+  }
+  const lastMatch = value.match(/(["\u0080-\uFFFF][^\s]*)[^"\u0080-\uFFFF]*$/);
+  if (!lastMatch) {
+    return value;
+  }
+  const startIndex = firstMatch.index + (firstMatch[0].match(/[^\s]/) || {
+    index: 0
+  }).index;
+  const endIndex = lastMatch.index + (lastMatch[1] || "").length;
+  return (startIndex ? value.substr(0, startIndex) : "") + encodeWord(value.substring(startIndex, endIndex), mimeWordEncoding || "Q", maxLength) + (endIndex < value.length ? value.substr(endIndex) : "");
+}
+function buildHeaderValue(structured) {
+  const paramsArray = [];
+  Object.keys(structured.params || {}).forEach((key) => {
+    const value2 = structured.params[key];
+    const param = key.replace(/[\x00-\x1f\x7f]/g, "");
+    if (!isPlainText(value2, true) || value2.length >= 75) {
+      buildHeaderParam(param, value2, 50).forEach((encodedParam) => {
+        if (!/[\s"\\;:/=(),<>@[\]?]|^[-']|'$/.test(encodedParam.value) || encodedParam.key.substr(-1) === "*") {
+          paramsArray.push(encodedParam.key + "=" + encodedParam.value);
+        } else {
+          paramsArray.push(encodedParam.key + "=" + JSON.stringify(encodedParam.value));
         }
       });
-      return structured.value + (paramsArray.length ? "; " + paramsArray.join("; ") : "");
-    },
-    buildHeaderParam(key, data, maxLength) {
-      let list = [];
-      let encodedStr = typeof data === "string" ? data : (data || "").toString();
-      let encodedStrArr;
-      let chr, ord;
-      let line;
-      let startPos = 0;
-      let i, len;
-      maxLength = maxLength || 50;
-      if (this.isPlainText(data, true)) {
-        if (encodedStr.length <= maxLength) {
-          return [
-            {
-              key,
-              value: encodedStr
-            }
-          ];
+    } else if (!value2.length || /[\s'"\\;:/=(),<>@[\]?]|^-/.test(value2)) {
+      paramsArray.push(param + "=" + JSON.stringify(value2));
+    } else {
+      paramsArray.push(param + "=" + value2);
+    }
+  });
+  const value = typeof structured.value === "string" ? structured.value.replace(/[\x00-\x1f\x7f]/g, "") : structured.value;
+  return value + (paramsArray.length ? "; " + paramsArray.join("; ") : "");
+}
+function buildHeaderParam(key, data, maxLength) {
+  const list = [];
+  let encodedStr = typeof data === "string" ? data : (data || "").toString();
+  let chr;
+  let line;
+  let startPos = 0;
+  let i, len;
+  maxLength = maxLength || 50;
+  if (isPlainText(data, true)) {
+    if (encodedStr.length <= maxLength) {
+      return [
+        {
+          key,
+          value: encodedStr
         }
-        encodedStr = encodedStr.replace(new RegExp(".{" + maxLength + "}", "g"), (str) => {
-          list.push({
-            line: str
-          });
-          return "";
-        });
-        if (encodedStr) {
-          list.push({
-            line: encodedStr
-          });
+      ];
+    }
+    encodedStr = encodedStr.replace(new RegExp(".{" + maxLength + "}", "g"), (str) => {
+      list.push({
+        line: str
+      });
+      return "";
+    });
+    if (encodedStr) {
+      list.push({
+        line: encodedStr
+      });
+    }
+  } else {
+    if (/[\uD800-\uDBFF]/.test(encodedStr)) {
+      const encodedStrArr = [];
+      for (i = 0, len = encodedStr.length;i < len; i++) {
+        chr = encodedStr.charAt(i);
+        if (/[\ud800-\udbff]/.test(chr) && /[\udc00-\udfff]/.test(encodedStr.charAt(i + 1))) {
+          chr += encodedStr.charAt(i + 1);
+          encodedStrArr.push(chr);
+          i++;
+        } else {
+          encodedStrArr.push(chr);
         }
+      }
+      encodedStr = encodedStrArr;
+    }
+    line = "utf-8''";
+    let encoded = true;
+    startPos = 0;
+    for (i = 0, len = encodedStr.length;i < len; i++) {
+      chr = encodedStr[i];
+      if (encoded) {
+        chr = safeEncodeURIComponent(chr);
       } else {
-        if (/[\uD800-\uDBFF]/.test(encodedStr)) {
-          encodedStrArr = [];
-          for (i = 0, len = encodedStr.length;i < len; i++) {
-            chr = encodedStr.charAt(i);
-            ord = chr.charCodeAt(0);
-            if (ord >= 55296 && ord <= 56319 && i < len - 1) {
-              chr += encodedStr.charAt(i + 1);
-              encodedStrArr.push(chr);
-              i++;
-            } else {
-              encodedStrArr.push(chr);
-            }
-          }
-          encodedStr = encodedStrArr;
-        }
-        line = "utf-8''";
-        let encoded = true;
-        startPos = 0;
-        for (i = 0, len = encodedStr.length;i < len; i++) {
-          chr = encodedStr[i];
-          if (encoded) {
-            chr = this.safeEncodeURIComponent(chr);
-          } else {
-            chr = chr === " " ? chr : this.safeEncodeURIComponent(chr);
-            if (chr !== encodedStr[i]) {
-              if ((this.safeEncodeURIComponent(line) + chr).length >= maxLength) {
-                list.push({
-                  line,
-                  encoded
-                });
-                line = "";
-                startPos = i - 1;
-              } else {
-                encoded = true;
-                i = startPos;
-                line = "";
-                continue;
-              }
-            }
-          }
-          if ((line + chr).length >= maxLength) {
+        chr = chr === " " ? chr : safeEncodeURIComponent(chr);
+        if (chr !== encodedStr[i]) {
+          if ((safeEncodeURIComponent(line) + chr).length >= maxLength) {
             list.push({
               line,
               encoded
             });
-            line = chr = encodedStr[i] === " " ? " " : this.safeEncodeURIComponent(encodedStr[i]);
-            if (chr === encodedStr[i]) {
-              encoded = false;
-              startPos = i - 1;
-            } else {
-              encoded = true;
-            }
+            line = "";
+            encoded = true;
           } else {
-            line += chr;
-          }
-        }
-        if (line) {
-          list.push({
-            line,
-            encoded
-          });
-        }
-      }
-      return list.map((item, i2) => ({
-        key: key + "*" + i2 + (item.encoded ? "*" : ""),
-        value: item.line
-      }));
-    },
-    parseHeaderValue(str) {
-      let response = {
-        value: false,
-        params: {}
-      };
-      let key = false;
-      let value = "";
-      let type = "value";
-      let quote = false;
-      let escaped = false;
-      let chr;
-      for (let i = 0, len = str.length;i < len; i++) {
-        chr = str.charAt(i);
-        if (type === "key") {
-          if (chr === "=") {
-            key = value.trim().toLowerCase();
-            type = "value";
-            value = "";
+            encoded = true;
+            i = startPos;
+            line = "";
             continue;
           }
-          value += chr;
+        }
+      }
+      if ((line + chr).length >= maxLength) {
+        list.push({
+          line,
+          encoded
+        });
+        line = chr = encodedStr[i] === " " ? " " : safeEncodeURIComponent(encodedStr[i]);
+        if (chr === encodedStr[i]) {
+          encoded = false;
+          startPos = i - 1;
         } else {
-          if (escaped) {
-            value += chr;
-          } else if (chr === "\\") {
-            escaped = true;
-            continue;
-          } else if (quote && chr === quote) {
-            quote = false;
-          } else if (!quote && chr === '"') {
-            quote = chr;
-          } else if (!quote && chr === ";") {
-            if (key === false) {
-              response.value = value.trim();
-            } else {
-              response.params[key] = value.trim();
-            }
-            type = "key";
-            value = "";
-          } else {
-            value += chr;
-          }
-          escaped = false;
-        }
-      }
-      if (type === "value") {
-        if (key === false) {
-          response.value = value.trim();
-        } else {
-          response.params[key] = value.trim();
-        }
-      } else if (value.trim()) {
-        response.params[value.trim().toLowerCase()] = "";
-      }
-      Object.keys(response.params).forEach((key2) => {
-        let actualKey, nr, match2, value2;
-        if (match2 = key2.match(/(\*(\d+)|\*(\d+)\*|\*)$/)) {
-          actualKey = key2.substr(0, match2.index);
-          nr = Number(match2[2] || match2[3]) || 0;
-          if (!response.params[actualKey] || typeof response.params[actualKey] !== "object") {
-            response.params[actualKey] = {
-              charset: false,
-              values: []
-            };
-          }
-          value2 = response.params[key2];
-          if (nr === 0 && match2[0].substr(-1) === "*" && (match2 = value2.match(/^([^']*)'[^']*'(.*)$/))) {
-            response.params[actualKey].charset = match2[1] || "iso-8859-1";
-            value2 = match2[2];
-          }
-          response.params[actualKey].values[nr] = value2;
-          delete response.params[key2];
-        }
-      });
-      Object.keys(response.params).forEach((key2) => {
-        let value2;
-        if (response.params[key2] && Array.isArray(response.params[key2].values)) {
-          value2 = response.params[key2].values.map((val) => val || "").join("");
-          if (response.params[key2].charset) {
-            response.params[key2] = "=?" + response.params[key2].charset + "?Q?" + value2.replace(/[=?_\s]/g, (s) => {
-              let c = s.charCodeAt(0).toString(16);
-              if (s === " ") {
-                return "_";
-              } else {
-                return "%" + (c.length < 2 ? "0" : "") + c;
-              }
-            }).replace(/%/g, "=") + "?=";
-          } else {
-            response.params[key2] = value2;
-          }
-        }
-      });
-      return response;
-    },
-    detectExtension: (mimeType) => mimeTypes.detectExtension(mimeType),
-    detectMimeType: (extension) => mimeTypes.detectMimeType(extension),
-    foldLines(str, lineLength, afterSpace) {
-      str = (str || "").toString();
-      lineLength = lineLength || 76;
-      let pos = 0, len = str.length, result = "", line, match2;
-      while (pos < len) {
-        line = str.substr(pos, lineLength);
-        if (line.length < lineLength) {
-          result += line;
-          break;
-        }
-        if (match2 = line.match(/^[^\n\r]*(\r?\n|\r)/)) {
-          line = match2[0];
-          result += line;
-          pos += line.length;
-          continue;
-        } else if ((match2 = line.match(/(\s+)[^\s]*$/)) && match2[0].length - (afterSpace ? (match2[1] || "").length : 0) < line.length) {
-          line = line.substr(0, line.length - (match2[0].length - (afterSpace ? (match2[1] || "").length : 0)));
-        } else if (match2 = str.substr(pos + line.length).match(/^[^\s]+(\s*)/)) {
-          line = line + match2[0].substr(0, match2[0].length - (!afterSpace ? (match2[1] || "").length : 0));
-        }
-        result += line;
-        pos += line.length;
-        if (pos < len) {
-          result += `\r
-`;
-        }
-      }
-      return result;
-    },
-    splitMimeEncodedString: (str, maxlen) => {
-      let curLine, match2, chr, done, lines = [];
-      maxlen = Math.max(maxlen || 0, 12);
-      while (str.length) {
-        curLine = str.substr(0, maxlen);
-        if (match2 = curLine.match(/[=][0-9A-F]?$/i)) {
-          curLine = curLine.substr(0, match2.index);
-        }
-        done = false;
-        while (!done) {
-          done = true;
-          if (match2 = str.substr(curLine.length).match(/^[=]([0-9A-F]{2})/i)) {
-            chr = parseInt(match2[1], 16);
-            if (chr < 194 && chr > 127) {
-              curLine = curLine.substr(0, curLine.length - 3);
-              done = false;
-            }
-          }
-        }
-        if (curLine.length) {
-          lines.push(curLine);
-        }
-        str = str.substr(curLine.length);
-      }
-      return lines;
-    },
-    encodeURICharComponent: (chr) => {
-      let res = "";
-      let ord = chr.charCodeAt(0).toString(16).toUpperCase();
-      if (ord.length % 2) {
-        ord = "0" + ord;
-      }
-      if (ord.length > 2) {
-        for (let i = 0, len = ord.length / 2;i < len; i++) {
-          res += "%" + ord.substr(i, 2);
+          encoded = true;
         }
       } else {
-        res += "%" + ord;
+        line += chr;
       }
-      return res;
-    },
-    safeEncodeURIComponent(str) {
-      str = (str || "").toString();
-      try {
-        str = encodeURIComponent(str);
-      } catch (E) {
-        return str.replace(/[^\x00-\x1F *'()<>@,;:\\"[\]?=\u007F-\uFFFF]+/g, "");
-      }
-      return str.replace(/[\x00-\x1F *'()<>@,;:\\"[\]?=\u007F-\uFFFF]/g, (chr) => this.encodeURICharComponent(chr));
+    }
+    if (line) {
+      list.push({
+        line,
+        encoded
+      });
+    }
+  }
+  return list.map((item, i2) => ({
+    key: key + "*" + i2 + (item.encoded ? "*" : ""),
+    value: item.line
+  }));
+}
+function _isParamName(name3) {
+  return !!name3 && !isProtoKey(name3);
+}
+function parseHeaderValue(str) {
+  const response = {
+    value: "",
+    params: {}
+  };
+  const setParam = (name3, value2) => {
+    name3 = name3.toLowerCase();
+    if (_isParamName(name3) && !Object.prototype.hasOwnProperty.call(response.params, name3)) {
+      response.params[name3] = value2;
     }
   };
-});
-
-// /zveltio-extension/node_modules/nodemailer/lib/addressparser/index.js
-var require_addressparser = __commonJS((exports, module) => {
-  function _handleAddress2(tokens) {
-    let isGroup = false;
-    let state = "text";
-    let address;
-    let addresses = [];
-    let data = {
-      address: [],
-      comment: [],
-      group: [],
-      text: []
-    };
-    let i;
-    let len;
-    for (i = 0, len = tokens.length;i < len; i++) {
-      let token2 = tokens[i];
-      let prevToken = i ? tokens[i - 1] : null;
-      if (token2.type === "operator") {
-        switch (token2.value) {
-          case "<":
-            state = "address";
-            break;
-          case "(":
-            state = "comment";
-            break;
-          case ":":
-            state = "group";
-            isGroup = true;
-            break;
-          default:
-            state = "text";
-            break;
-        }
-      } else if (token2.value) {
-        if (state === "address") {
-          token2.value = token2.value.replace(/^[^<]*<\s*/, "");
-        }
-        if (prevToken && prevToken.noBreak && data[state].length) {
-          data[state][data[state].length - 1] += token2.value;
-        } else {
-          data[state].push(token2.value);
-        }
-      }
+  let key = false;
+  let value = "";
+  let stage = "value";
+  let quote = false;
+  let escaped = false;
+  let chr;
+  let pendingSpace = "";
+  let quoteClosed = false;
+  const flushSpace = () => {
+    if (value.length) {
+      value += pendingSpace;
     }
-    if (!data.text.length && data.comment.length) {
-      data.text = data.comment;
-      data.comment = [];
-    }
-    if (isGroup) {
-      data.text = data.text.join(" ");
-      addresses.push({
-        name: data.text || address && address.name,
-        group: data.group.length ? addressparser2(data.group.join(",")) : []
-      });
+    pendingSpace = "";
+  };
+  const addChr = (c) => {
+    flushSpace();
+    value += c;
+  };
+  const takeValue = () => {
+    const taken = value;
+    value = "";
+    pendingSpace = "";
+    quoteClosed = false;
+    return taken;
+  };
+  const storeValue = () => {
+    const taken = takeValue();
+    if (key === false) {
+      response.value = taken;
     } else {
-      if (!data.address.length && data.text.length) {
-        for (i = data.text.length - 1;i >= 0; i--) {
-          if (data.text[i].match(/^[^@\s]+@[^@\s]+$/)) {
-            data.address = data.text.splice(i, 1);
-            break;
-          }
-        }
-        let _regexHandler = function(address2) {
-          if (!data.address.length) {
-            data.address = [address2.trim()];
-            return " ";
-          } else {
-            return address2;
-          }
-        };
-        if (!data.address.length) {
-          for (i = data.text.length - 1;i >= 0; i--) {
-            data.text[i] = data.text[i].replace(/\s*\b[^@\s]+@[^\s]+\b\s*/, _regexHandler).trim();
-            if (data.address.length) {
-              break;
-            }
-          }
-        }
+      setParam(key, taken);
+    }
+  };
+  const storeEmptyKey = () => {
+    setParam(takeValue().trim(), "");
+  };
+  for (let i = 0, len = str.length;i < len; i++) {
+    chr = str.charAt(i);
+    if (stage === "key") {
+      if (chr === "=") {
+        key = takeValue().trim();
+        stage = "value";
+        continue;
       }
-      if (!data.text.length && data.comment.length) {
-        data.text = data.comment;
-        data.comment = [];
+      if (chr === ";") {
+        storeEmptyKey();
+        continue;
       }
-      if (data.address.length > 1) {
-        data.text = data.text.concat(data.address.splice(1));
+      value += chr;
+    } else {
+      if (quoteClosed && chr !== ";") {
+        escaped = false;
+        continue;
       }
-      data.text = data.text.join(" ");
-      data.address = data.address.join(" ");
-      if (!data.address && isGroup) {
-        return [];
+      if (escaped) {
+        addChr(chr);
+      } else if (quote && chr === "\\") {
+        escaped = true;
+        continue;
+      } else if (quote && chr === quote) {
+        quote = false;
+        quoteClosed = true;
+      } else if (!quote && chr === '"') {
+        quote = chr;
+        flushSpace();
+      } else if (!quote && chr === ";") {
+        storeValue();
+        stage = "key";
+      } else if (!quote && (chr === " " || chr === "\t")) {
+        pendingSpace += chr;
       } else {
-        address = {
-          address: data.address || data.text || "",
-          name: data.text || data.address || ""
-        };
-        if (address.address === address.name) {
-          if ((address.address || "").match(/@/)) {
-            address.name = "";
-          } else {
-            address.address = "";
-          }
-        }
-        addresses.push(address);
+        addChr(chr);
       }
-    }
-    return addresses;
-  }
-
-  class Tokenizer3 {
-    constructor(str) {
-      this.str = (str || "").toString();
-      this.operatorCurrent = "";
-      this.operatorExpecting = "";
-      this.node = null;
-      this.escaped = false;
-      this.list = [];
-      this.operators = {
-        '"': '"',
-        "(": ")",
-        "<": ">",
-        ",": "",
-        ":": ";",
-        ";": ""
-      };
-    }
-    tokenize() {
-      let list = [];
-      for (let i = 0, len = this.str.length;i < len; i++) {
-        let chr = this.str.charAt(i);
-        let nextChr = i < len - 1 ? this.str.charAt(i + 1) : null;
-        this.checkChar(chr, nextChr);
-      }
-      this.list.forEach((node3) => {
-        node3.value = (node3.value || "").toString().trim();
-        if (node3.value) {
-          list.push(node3);
-        }
-      });
-      return list;
-    }
-    checkChar(chr, nextChr) {
-      if (this.escaped) {} else if (chr === this.operatorExpecting) {
-        this.node = {
-          type: "operator",
-          value: chr
-        };
-        if (nextChr && ![" ", "\t", "\r", `
-`, ",", ";"].includes(nextChr)) {
-          this.node.noBreak = true;
-        }
-        this.list.push(this.node);
-        this.node = null;
-        this.operatorExpecting = "";
-        this.escaped = false;
-        return;
-      } else if (!this.operatorExpecting && chr in this.operators) {
-        this.node = {
-          type: "operator",
-          value: chr
-        };
-        this.list.push(this.node);
-        this.node = null;
-        this.operatorExpecting = this.operators[chr];
-        this.escaped = false;
-        return;
-      } else if (['"', "'"].includes(this.operatorExpecting) && chr === "\\") {
-        this.escaped = true;
-        return;
-      }
-      if (!this.node) {
-        this.node = {
-          type: "text",
-          value: ""
-        };
-        this.list.push(this.node);
-      }
-      if (chr === `
-`) {
-        chr = " ";
-      }
-      if (chr.charCodeAt(0) >= 33 || [" ", "\t"].includes(chr)) {
-        this.node.value += chr;
-      }
-      this.escaped = false;
+      escaped = false;
     }
   }
-  function addressparser2(str, options) {
-    options = options || {};
-    let tokenizer = new Tokenizer3(str);
-    let tokens = tokenizer.tokenize();
-    let addresses = [];
-    let address = [];
-    let parsedAddresses = [];
-    tokens.forEach((token2) => {
-      if (token2.type === "operator" && (token2.value === "," || token2.value === ";")) {
-        if (address.length) {
-          addresses.push(address);
-        }
-        address = [];
-      } else {
-        address.push(token2);
-      }
-    });
-    if (address.length) {
-      addresses.push(address);
-    }
-    addresses.forEach((address2) => {
-      address2 = _handleAddress2(address2);
-      if (address2.length) {
-        parsedAddresses = parsedAddresses.concat(address2);
-      }
-    });
-    if (options.flatten) {
-      let addresses2 = [];
-      let walkAddressList = (list) => {
-        list.forEach((address2) => {
-          if (address2.group) {
-            return walkAddressList(address2.group);
-          } else {
-            addresses2.push(address2);
-          }
-        });
-      };
-      walkAddressList(parsedAddresses);
-      return addresses2;
-    }
-    return parsedAddresses;
+  if (stage === "value") {
+    storeValue();
+  } else {
+    storeEmptyKey();
   }
-  module.exports = addressparser2;
+  const continuations = new Map;
+  Object.keys(response.params).forEach((key2) => {
+    const match2 = key2.match(/(\*(\d+)|\*(\d+)\*|\*)$/);
+    if (!match2) {
+      return;
+    }
+    const actualKey = key2.substr(0, match2.index);
+    const nr = Number(match2[2] || match2[3]) || 0;
+    const encoded = match2[0].substr(-1) === "*";
+    let value2 = response.params[key2];
+    delete response.params[key2];
+    if (!_isParamName(actualKey)) {
+      return;
+    }
+    let continuation = continuations.get(actualKey);
+    if (!continuation) {
+      continuation = { charset: false, sections: [] };
+      continuations.set(actualKey, continuation);
+    }
+    const charsetMatch = nr === 0 && encoded ? value2.match(/^([^']*)'[^']*'(.*)$/) : null;
+    if (charsetMatch) {
+      continuation.charset = TOKEN.test(charsetMatch[1]) ? charsetMatch[1] : "iso-8859-1";
+      value2 = charsetMatch[2];
+    }
+    continuation.sections.push({ nr, value: value2, encoded });
+  });
+  continuations.forEach((continuation, key2) => {
+    if (Object.prototype.hasOwnProperty.call(response.params, key2)) {
+      return;
+    }
+    continuation.sections.sort((a, b) => a.nr - b.nr);
+    if (!continuation.charset) {
+      response.params[key2] = continuation.sections.map((section) => section.value).join("");
+      return;
+    }
+    response.params[key2] = "=?" + continuation.charset + "?Q?" + continuation.sections.map(_encodeContinuationSection).join("") + "?=";
+  });
+  return response;
+}
+function _encodeContinuationSection(section) {
+  const specials = section.encoded ? /[=?_\s]/g : /[=?_\s%]/g;
+  return section.value.replace(specials, (s) => {
+    const c = s.charCodeAt(0).toString(16);
+    if (s === " ") {
+      return "_";
+    }
+    return "%" + (c.length < 2 ? "0" : "") + c;
+  }).replace(/%/g, "=");
+}
+function detectExtension2(mimeType) {
+  return detectExtension(mimeType);
+}
+function detectMimeType2(extension) {
+  return detectMimeType(extension);
+}
+function foldLines(str, lineLength, afterSpace) {
+  str = (str || "").toString();
+  lineLength = lineLength || 76;
+  let pos = 0;
+  const len = str.length;
+  let result = "";
+  let line, match2;
+  while (pos < len) {
+    line = str.substr(pos, lineLength);
+    if (line.length < lineLength) {
+      result += line;
+      break;
+    }
+    if (match2 = line.match(/^[^\n\r]*(\r?\n|\r)/)) {
+      line = match2[0];
+      result += line;
+      pos += line.length;
+      continue;
+    } else if ((match2 = line.match(/(\s+)[^\s]*$/)) && match2[0].length - (afterSpace ? (match2[1] || "").length : 0) < line.length) {
+      line = line.substr(0, line.length - (match2[0].length - (afterSpace ? (match2[1] || "").length : 0)));
+    } else if (match2 = str.substr(pos + line.length).match(/^[^\s]+(\s*)/)) {
+      line = line + match2[0].substr(0, match2[0].length - (!afterSpace ? (match2[1] || "").length : 0));
+    }
+    result += line;
+    pos += line.length;
+    if (pos < len) {
+      result += `\r
+`;
+    }
+  }
+  return result;
+}
+function splitMimeEncodedString(str, maxlen) {
+  const lines = [];
+  let curLine, fallbackLine, match2, chr, done;
+  maxlen = Math.max(maxlen || 0, 12);
+  while (str.length) {
+    curLine = str.substr(0, maxlen);
+    if (match2 = curLine.match(/[=][0-9A-F]?$/i)) {
+      curLine = curLine.substr(0, match2.index);
+    }
+    fallbackLine = curLine.length ? curLine : str.substr(0, maxlen);
+    done = false;
+    while (!done && curLine.length) {
+      done = true;
+      if (match2 = str.substr(curLine.length).match(/^[=]([0-9A-F]{2})/i)) {
+        chr = parseInt(match2[1], 16);
+        if (chr < 194 && chr > 127) {
+          curLine = curLine.substr(0, curLine.length - 3);
+          done = false;
+        }
+      }
+    }
+    if (!curLine.length) {
+      curLine = fallbackLine;
+    }
+    lines.push(curLine);
+    str = str.substr(curLine.length);
+  }
+  return lines;
+}
+function encodeURICharComponent(chr) {
+  let res = "";
+  let ord = chr.charCodeAt(0).toString(16).toUpperCase();
+  if (ord.length % 2) {
+    ord = "0" + ord;
+  }
+  if (ord.length > 2) {
+    for (let i = 0, len = ord.length / 2;i < len; i++) {
+      res += "%" + ord.substr(i, 2);
+    }
+  } else {
+    res += "%" + ord;
+  }
+  return res;
+}
+function safeEncodeURIComponent(str) {
+  str = (str || "").toString();
+  try {
+    str = encodeURIComponent(str);
+  } catch (_E2) {
+    str = encodeURIComponent(Buffer.from(str, "utf-8").toString("utf-8"));
+  }
+  return str.replace(/[\x00-\x1F *'()<>@,;:\\"[\]?=\u007F-\uFFFF]/g, (chr) => encodeURICharComponent(chr));
+}
+var TOKEN;
+var init_mime_funcs = __esm(() => {
+  init_base64();
+  init_qp();
+  init_mime_types();
+  TOKEN = /^[^\x00-\x20\x7f()<>@,;:\\"/[\]?=]+$/;
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/mime-node/last-newline.js
-var require_last_newline = __commonJS((exports, module) => {
-  var Transform = __require("stream").Transform;
-
-  class LastNewline extends Transform {
+// /zveltio-extension/node_modules/nodemailer/dist/esm/mime-node/last-newline.js
+import { Transform as Transform3 } from "stream";
+var LastNewline;
+var init_last_newline = __esm(() => {
+  LastNewline = class LastNewline extends Transform3 {
     constructor() {
       super();
       this.lastByte = false;
@@ -89319,19 +90567,16 @@ var require_last_newline = __commonJS((exports, module) => {
 `));
       return done();
     }
-  }
-  module.exports = LastNewline;
+  };
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/mime-node/le-windows.js
-var require_le_windows = __commonJS((exports, module) => {
-  var stream = __require("stream");
-  var Transform = stream.Transform;
-
-  class LeWindows extends Transform {
+// /zveltio-extension/node_modules/nodemailer/dist/esm/mime-node/le-windows.js
+import { Transform as Transform4 } from "stream";
+var LeWindows;
+var init_le_windows = __esm(() => {
+  LeWindows = class LeWindows extends Transform4 {
     constructor(options) {
       super(options);
-      this.options = options || {};
       this.lastByte = false;
     }
     _transform(chunk, encoding, done) {
@@ -89359,19 +90604,16 @@ var require_le_windows = __commonJS((exports, module) => {
       this.lastByte = chunk[chunk.length - 1];
       done();
     }
-  }
-  module.exports = LeWindows;
+  };
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/mime-node/le-unix.js
-var require_le_unix = __commonJS((exports, module) => {
-  var stream = __require("stream");
-  var Transform = stream.Transform;
-
-  class LeWindows extends Transform {
+// /zveltio-extension/node_modules/nodemailer/dist/esm/mime-node/le-unix.js
+import { Transform as Transform5 } from "stream";
+var LeUnix;
+var init_le_unix = __esm(() => {
+  LeUnix = class LeUnix extends Transform5 {
     constructor(options) {
       super(options);
-      this.options = options || {};
     }
     _transform(chunk, encoding, done) {
       let buf;
@@ -89391,1189 +90633,1348 @@ var require_le_unix = __commonJS((exports, module) => {
       }
       done();
     }
-  }
-  module.exports = LeWindows;
+  };
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/mime-node/index.js
-var require_mime_node3 = __commonJS((exports, module) => {
-  var crypto2 = __require("crypto");
-  var fs = __require("fs");
-  var punycode = require_punycode2();
-  var PassThrough = __require("stream").PassThrough;
-  var shared = require_shared();
-  var mimeFuncs = require_mime_funcs();
-  var qp = require_qp();
-  var base643 = require_base64();
-  var addressparser2 = require_addressparser();
-  var nmfetch = require_fetch2();
-  var LastNewline = require_last_newline();
-  var LeWindows = require_le_windows();
-  var LeUnix = require_le_unix();
+// /zveltio-extension/node_modules/nodemailer/dist/esm/mime-node/index.js
+import crypto2 from "crypto";
+import fs2 from "fs";
+import { PassThrough as PassThrough2 } from "stream";
+import urlModule from "url";
+function normalizeDomain(domain2, toUnicode2) {
+  const mapper = toUnicode2 ? urlModule.domainToUnicode : urlModule.domainToASCII;
+  if (typeof mapper === "function" && !URL_PARSER_UNSAFE.test(domain2)) {
+    const mapped = mapper(domain2);
+    if (mapped) {
+      return mapped;
+    }
+  }
+  return toUnicode2 ? toUnicode(domain2) : toASCII(domain2);
+}
+function _stripBoundaryControls(value) {
+  return value.replace(/[\x00-\x1f\x7f]+/g, "");
+}
 
-  class MimeNode {
-    constructor(contentType, options) {
-      this.nodeCounter = 0;
-      options = options || {};
-      this.baseBoundary = options.baseBoundary || crypto2.randomBytes(8).toString("hex");
-      this.boundaryPrefix = options.boundaryPrefix || "--_NmP";
-      this.disableFileAccess = !!options.disableFileAccess;
-      this.disableUrlAccess = !!options.disableUrlAccess;
-      this.normalizeHeaderKey = options.normalizeHeaderKey;
-      this.date = new Date;
-      this.rootNode = options.rootNode || this;
-      this.keepBcc = !!options.keepBcc;
-      if (options.filename) {
-        this.filename = options.filename;
-        if (!contentType) {
-          contentType = mimeFuncs.detectMimeType(this.filename.split(".").pop());
-        }
-      }
-      this.textEncoding = (options.textEncoding || "").toString().trim().charAt(0).toUpperCase();
-      this.parentNode = options.parentNode;
-      this.hostname = options.hostname;
-      this.newline = options.newline;
-      this.childNodes = [];
-      this._nodeId = ++this.rootNode.nodeCounter;
-      this._headers = [];
-      this._isPlainText = false;
-      this._hasLongLines = false;
-      this._envelope = false;
-      this._raw = false;
-      this._transforms = [];
-      this._processFuncs = [];
-      if (contentType) {
-        this.setHeader("Content-Type", contentType);
+class MimeNode {
+  constructor(contentType, options) {
+    this.nodeCounter = 0;
+    options = options || {};
+    this.baseBoundary = _stripBoundaryControls(options.baseBoundary || crypto2.randomBytes(8).toString("hex"));
+    this.boundaryPrefix = _stripBoundaryControls(options.boundaryPrefix || "--_NmP");
+    this.disableFileAccess = !!options.disableFileAccess;
+    this.disableUrlAccess = !!options.disableUrlAccess;
+    this.normalizeHeaderKey = options.normalizeHeaderKey;
+    this.date = options.parentNode ? null : new Date;
+    this.rootNode = options.rootNode || this;
+    this.keepBcc = !!options.keepBcc;
+    if (options.filename) {
+      this.filename = options.filename;
+      if (!contentType) {
+        contentType = detectMimeType2(this.filename.split(".").pop());
       }
     }
-    createChild(contentType, options) {
-      if (!options && typeof contentType === "object") {
-        options = contentType;
-        contentType = undefined;
-      }
-      let node3 = new MimeNode(contentType, options);
-      this.appendChild(node3);
-      return node3;
+    this.textEncoding = (options.textEncoding || "").toString().trim().charAt(0).toUpperCase();
+    this.parentNode = options.parentNode;
+    this.hostname = options.hostname;
+    this.newline = options.newline;
+    this.childNodes = [];
+    this._nodeId = ++this.rootNode.nodeCounter;
+    this._headers = [];
+    this._isPlainText = false;
+    this._hasLongLines = false;
+    this._envelope = false;
+    this._raw = false;
+    this._transforms = [];
+    this._processFuncs = [];
+    if (contentType) {
+      this.setHeader("Content-Type", contentType);
     }
-    appendChild(childNode) {
-      if (childNode.rootNode !== this.rootNode) {
-        childNode.rootNode = this.rootNode;
-        childNode._nodeId = ++this.rootNode.nodeCounter;
-      }
-      childNode.parentNode = this;
-      this.childNodes.push(childNode);
-      return childNode;
+  }
+  createChild(contentType, options) {
+    if (!options && typeof contentType === "object") {
+      options = contentType;
+      contentType = undefined;
     }
-    replace(node3) {
-      if (node3 === this) {
+    const node4 = new MimeNode(contentType, options);
+    this.appendChild(node4);
+    return node4;
+  }
+  appendChild(childNode) {
+    if (childNode.parentNode && childNode.parentNode !== this) {
+      childNode.remove();
+    }
+    if (childNode.rootNode !== this.rootNode) {
+      childNode.rootNode = this.rootNode;
+      childNode._nodeId = ++this.rootNode.nodeCounter;
+    }
+    childNode.parentNode = this;
+    this.childNodes.push(childNode);
+    return childNode;
+  }
+  replace(node4) {
+    if (node4 === this) {
+      return this;
+    }
+    this.parentNode.childNodes.forEach((childNode, i) => {
+      if (childNode === this) {
+        node4.rootNode = this.rootNode;
+        node4.parentNode = this.parentNode;
+        node4._nodeId = this._nodeId;
+        this.rootNode = this;
+        this.parentNode = undefined;
+        node4.parentNode.childNodes[i] = node4;
+      }
+    });
+    return node4;
+  }
+  remove() {
+    if (!this.parentNode) {
+      return this;
+    }
+    for (let i = this.parentNode.childNodes.length - 1;i >= 0; i--) {
+      if (this.parentNode.childNodes[i] === this) {
+        this.parentNode.childNodes.splice(i, 1);
+        this.parentNode = undefined;
+        this.rootNode = this;
         return this;
       }
-      this.parentNode.childNodes.forEach((childNode, i) => {
-        if (childNode === this) {
-          node3.rootNode = this.rootNode;
-          node3.parentNode = this.parentNode;
-          node3._nodeId = this._nodeId;
-          this.rootNode = this;
-          this.parentNode = undefined;
-          node3.parentNode.childNodes[i] = node3;
-        }
-      });
-      return node3;
     }
-    remove() {
-      if (!this.parentNode) {
-        return this;
+  }
+  setHeader(key, value) {
+    let added = false;
+    if (!value && key && typeof key === "object") {
+      if (key.key && "value" in key) {
+        this.setHeader(key.key, key.value);
+      } else if (Array.isArray(key)) {
+        key.forEach((i) => {
+          this.setHeader(i.key, i.value);
+        });
+      } else {
+        Object.keys(key).forEach((i) => {
+          this.setHeader(i, key[i]);
+        });
       }
-      for (let i = this.parentNode.childNodes.length - 1;i >= 0; i--) {
-        if (this.parentNode.childNodes[i] === this) {
-          this.parentNode.childNodes.splice(i, 1);
-          this.parentNode = undefined;
-          this.rootNode = this;
-          return this;
-        }
-      }
+      return this;
     }
-    setHeader(key, value) {
-      let added = false, headerValue;
-      if (!value && key && typeof key === "object") {
-        if (key.key && "value" in key) {
-          this.setHeader(key.key, key.value);
-        } else if (Array.isArray(key)) {
-          key.forEach((i) => {
-            this.setHeader(i.key, i.value);
-          });
+    key = this._normalizeHeaderKey(key);
+    const headerValue = {
+      key,
+      value
+    };
+    for (let i = 0, len = this._headers.length;i < len; i++) {
+      if (this._headers[i].key === key) {
+        if (!added) {
+          this._headers[i] = headerValue;
+          added = true;
         } else {
-          Object.keys(key).forEach((i) => {
-            this.setHeader(i, key[i]);
-          });
+          this._headers.splice(i, 1);
+          i--;
+          len--;
         }
-        return this;
       }
-      key = this._normalizeHeaderKey(key);
-      headerValue = {
-        key,
-        value
+    }
+    if (!added) {
+      this._headers.push(headerValue);
+    }
+    return this;
+  }
+  addHeader(key, value) {
+    if (!value && key && typeof key === "object") {
+      if (key.key && key.value) {
+        this.addHeader(key.key, key.value);
+      } else if (Array.isArray(key)) {
+        key.forEach((i) => {
+          this.addHeader(i.key, i.value);
+        });
+      } else {
+        Object.keys(key).forEach((i) => {
+          this.addHeader(i, key[i]);
+        });
+      }
+      return this;
+    } else if (Array.isArray(value)) {
+      value.forEach((val) => {
+        this.addHeader(key, val);
+      });
+      return this;
+    }
+    this._headers.push({
+      key: this._normalizeHeaderKey(key),
+      value
+    });
+    return this;
+  }
+  getHeader(key) {
+    key = this._normalizeHeaderKey(key);
+    for (let i = 0, len = this._headers.length;i < len; i++) {
+      if (this._headers[i].key === key) {
+        return this._headers[i].value;
+      }
+    }
+  }
+  setContent(content) {
+    this.content = content;
+    if (typeof this.content.pipe === "function") {
+      this._contentErrorHandler = (err) => {
+        this.content.removeListener("error", this._contentErrorHandler);
+        this.content = err;
       };
-      for (let i = 0, len = this._headers.length;i < len; i++) {
-        if (this._headers[i].key === key) {
-          if (!added) {
-            this._headers[i] = headerValue;
-            added = true;
+      this.content.once("error", this._contentErrorHandler);
+    } else if (typeof this.content === "string") {
+      this._isPlainText = isPlainText(this.content);
+      if (this._isPlainText && hasLongerLines(this.content, 76)) {
+        this._hasLongLines = true;
+      }
+    }
+    return this;
+  }
+  build(callback) {
+    let promise2;
+    if (!callback) {
+      promise2 = new Promise((resolve3, reject) => {
+        callback = callbackPromise(resolve3, reject);
+      });
+    }
+    const done = callback;
+    const stream = this.createReadStream();
+    const buf = [];
+    let buflen = 0;
+    let returned = false;
+    stream.on("readable", () => {
+      let chunk;
+      while ((chunk = stream.read()) !== null) {
+        buf.push(chunk);
+        buflen += chunk.length;
+      }
+    });
+    stream.once("error", (err) => {
+      if (returned) {
+        return;
+      }
+      returned = true;
+      return done(err);
+    });
+    stream.once("end", (chunk) => {
+      if (returned) {
+        return;
+      }
+      returned = true;
+      if (chunk && chunk.length) {
+        buf.push(chunk);
+        buflen += chunk.length;
+      }
+      return done(null, Buffer.concat(buf, buflen));
+    });
+    return promise2;
+  }
+  getTransferEncoding() {
+    let transferEncoding = false;
+    const contentType = (this.getHeader("Content-Type") || "").toString().toLowerCase().trim();
+    if (this.content) {
+      transferEncoding = (this.getHeader("Content-Transfer-Encoding") || "").toString().toLowerCase().trim();
+      if (!transferEncoding || !["base64", "quoted-printable"].includes(transferEncoding)) {
+        if (/^text\//i.test(contentType)) {
+          if (this._isPlainText && !this._hasLongLines) {
+            transferEncoding = "7bit";
+          } else if (typeof this.content === "string" || this.content instanceof Buffer) {
+            transferEncoding = this._getTextEncoding(this.content) === "Q" ? "quoted-printable" : "base64";
           } else {
-            this._headers.splice(i, 1);
-            i--;
-            len--;
+            transferEncoding = this.textEncoding === "B" ? "base64" : "quoted-printable";
           }
+        } else if (!/^(multipart|message)\//i.test(contentType)) {
+          transferEncoding = transferEncoding || "base64";
         }
       }
-      if (!added) {
-        this._headers.push(headerValue);
-      }
-      return this;
     }
-    addHeader(key, value) {
-      if (!value && key && typeof key === "object") {
-        if (key.key && key.value) {
-          this.addHeader(key.key, key.value);
-        } else if (Array.isArray(key)) {
-          key.forEach((i) => {
-            this.addHeader(i.key, i.value);
-          });
+    return transferEncoding;
+  }
+  buildHeaders() {
+    const transferEncoding = this.getTransferEncoding();
+    const headers = [];
+    if (transferEncoding) {
+      this.setHeader("Content-Transfer-Encoding", transferEncoding);
+    }
+    if (this.filename && !this.getHeader("Content-Disposition")) {
+      this.setHeader("Content-Disposition", "attachment");
+    }
+    if (this.rootNode === this) {
+      if (!this.getHeader("Date")) {
+        this.setHeader("Date", this.date.toUTCString().replace(/GMT/, "+0000"));
+      }
+      this.messageId();
+      if (!this.getHeader("MIME-Version")) {
+        this.setHeader("MIME-Version", "1.0");
+      }
+      for (let i = this._headers.length - 2;i >= 0; i--) {
+        const header = this._headers[i];
+        if (header.key === "Content-Type") {
+          this._headers.splice(i, 1);
+          this._headers.push(header);
+        }
+      }
+    }
+    this._headers.forEach((header) => {
+      let key = header.key;
+      let value = header.value;
+      let structured;
+      let param;
+      const options = {};
+      const formattedHeaders = FORMATTED_HEADERS;
+      if (value && typeof value === "object" && !formattedHeaders.includes(key)) {
+        copyOwnKeys(options, value, (optionKey) => optionKey === "value");
+        value = (value.value || "").toString();
+        if (!value.trim()) {
+          return;
+        }
+      }
+      if (options.prepared) {
+        if (options.foldLines) {
+          headers.push(foldLines(key + ": " + value));
         } else {
-          Object.keys(key).forEach((i) => {
-            this.addHeader(i, key[i]);
-          });
+          headers.push(key + ": " + value);
         }
-        return this;
-      } else if (Array.isArray(value)) {
-        value.forEach((val) => {
-          this.addHeader(key, val);
-        });
-        return this;
+        return;
       }
-      this._headers.push({
-        key: this._normalizeHeaderKey(key),
-        value
-      });
-      return this;
-    }
-    getHeader(key) {
-      key = this._normalizeHeaderKey(key);
-      for (let i = 0, len = this._headers.length;i < len; i++) {
-        if (this._headers[i].key === key) {
-          return this._headers[i].value;
-        }
-      }
-    }
-    setContent(content) {
-      this.content = content;
-      if (typeof this.content.pipe === "function") {
-        this._contentErrorHandler = (err) => {
-          this.content.removeListener("error", this._contentErrorHandler);
-          this.content = err;
-        };
-        this.content.once("error", this._contentErrorHandler);
-      } else if (typeof this.content === "string") {
-        this._isPlainText = mimeFuncs.isPlainText(this.content);
-        if (this._isPlainText && mimeFuncs.hasLongerLines(this.content, 76)) {
-          this._hasLongLines = true;
-        }
-      }
-      return this;
-    }
-    build(callback) {
-      let promise2;
-      if (!callback) {
-        promise2 = new Promise((resolve, reject) => {
-          callback = shared.callbackPromise(resolve, reject);
-        });
-      }
-      let stream = this.createReadStream();
-      let buf = [];
-      let buflen = 0;
-      let returned = false;
-      stream.on("readable", () => {
-        let chunk;
-        while ((chunk = stream.read()) !== null) {
-          buf.push(chunk);
-          buflen += chunk.length;
-        }
-      });
-      stream.once("error", (err) => {
-        if (returned) {
-          return;
-        }
-        returned = true;
-        return callback(err);
-      });
-      stream.once("end", (chunk) => {
-        if (returned) {
-          return;
-        }
-        returned = true;
-        if (chunk && chunk.length) {
-          buf.push(chunk);
-          buflen += chunk.length;
-        }
-        return callback(null, Buffer.concat(buf, buflen));
-      });
-      return promise2;
-    }
-    getTransferEncoding() {
-      let transferEncoding = false;
-      let contentType = (this.getHeader("Content-Type") || "").toString().toLowerCase().trim();
-      if (this.content) {
-        transferEncoding = (this.getHeader("Content-Transfer-Encoding") || "").toString().toLowerCase().trim();
-        if (!transferEncoding || !["base64", "quoted-printable"].includes(transferEncoding)) {
-          if (/^text\//i.test(contentType)) {
-            if (this._isPlainText && !this._hasLongLines) {
-              transferEncoding = "7bit";
-            } else if (typeof this.content === "string" || this.content instanceof Buffer) {
-              transferEncoding = this._getTextEncoding(this.content) === "Q" ? "quoted-printable" : "base64";
-            } else {
-              transferEncoding = this.textEncoding === "B" ? "base64" : "quoted-printable";
-            }
-          } else if (!/^(multipart|message)\//i.test(contentType)) {
-            transferEncoding = transferEncoding || "base64";
+      switch (header.key) {
+        case "Content-Disposition":
+          structured = parseHeaderValue(value);
+          if (this.filename) {
+            structured.params.filename = this.filename;
           }
-        }
-      }
-      return transferEncoding;
-    }
-    buildHeaders() {
-      let transferEncoding = this.getTransferEncoding();
-      let headers = [];
-      if (transferEncoding) {
-        this.setHeader("Content-Transfer-Encoding", transferEncoding);
-      }
-      if (this.filename && !this.getHeader("Content-Disposition")) {
-        this.setHeader("Content-Disposition", "attachment");
-      }
-      if (this.rootNode === this) {
-        if (!this.getHeader("Date")) {
-          this.setHeader("Date", this.date.toUTCString().replace(/GMT/, "+0000"));
-        }
-        this.messageId();
-        if (!this.getHeader("MIME-Version")) {
-          this.setHeader("MIME-Version", "1.0");
-        }
-        for (let i = this._headers.length - 2;i >= 0; i--) {
-          let header = this._headers[i];
-          if (header.key === "Content-Type") {
-            this._headers.splice(i, 1);
-            this._headers.push(header);
+          value = buildHeaderValue(structured);
+          break;
+        case "Content-Type":
+          structured = parseHeaderValue(value);
+          structured.value = (structured.value || "").toString().replace(/[\x00-\x1f\x7f]/g, "");
+          this._handleContentType(structured);
+          if (structured.value.match(/^text\/plain\b/) && typeof this.content === "string" && /[\u0080-\uFFFF]/.test(this.content)) {
+            structured.params.charset = "utf-8";
           }
-        }
-      }
-      this._headers.forEach((header) => {
-        let key = header.key;
-        let value = header.value;
-        let structured;
-        let param;
-        let options = {};
-        let formattedHeaders = ["From", "Sender", "To", "Cc", "Bcc", "Reply-To", "Date", "References"];
-        if (value && typeof value === "object" && !formattedHeaders.includes(key)) {
-          Object.keys(value).forEach((key2) => {
-            if (key2 !== "value") {
-              options[key2] = value[key2];
+          value = buildHeaderValue(structured);
+          if (this.filename) {
+            param = /[\x00-\x1f\x7f]/.test(this.filename) ? encodeWord(this.filename, this._getTextEncoding(this.filename), 52) : this._encodeWords(this.filename);
+            if (param !== this.filename || /[\s'"\\;:/=(),<>@[\]?]|^-/.test(param)) {
+              param = JSON.stringify(param);
             }
-          });
-          value = (value.value || "").toString();
-          if (!value.trim()) {
+            value += "; name=" + param;
+          }
+          break;
+        case "Bcc":
+          if (!this.keepBcc) {
             return;
           }
-        }
-        if (options.prepared) {
-          if (options.foldLines) {
-            headers.push(mimeFuncs.foldLines(key + ": " + value));
-          } else {
-            headers.push(key + ": " + value);
-          }
-          return;
-        }
-        switch (header.key) {
-          case "Content-Disposition":
-            structured = mimeFuncs.parseHeaderValue(value);
-            if (this.filename) {
-              structured.params.filename = this.filename;
-            }
-            value = mimeFuncs.buildHeaderValue(structured);
-            break;
-          case "Content-Type":
-            structured = mimeFuncs.parseHeaderValue(value);
-            this._handleContentType(structured);
-            if (structured.value.match(/^text\/plain\b/) && typeof this.content === "string" && /[\u0080-\uFFFF]/.test(this.content)) {
-              structured.params.charset = "utf-8";
-            }
-            value = mimeFuncs.buildHeaderValue(structured);
-            if (this.filename) {
-              param = this._encodeWords(this.filename);
-              if (param !== this.filename || /[\s'"\\;:/=(),<>@[\]?]|^-/.test(param)) {
-                param = '"' + param + '"';
-              }
-              value += "; name=" + param;
-            }
-            break;
-          case "Bcc":
-            if (!this.keepBcc) {
-              return;
-            }
-            break;
-        }
-        value = this._encodeHeaderValue(key, value);
-        if (!(value || "").toString().trim()) {
-          return;
-        }
-        if (typeof this.normalizeHeaderKey === "function") {
-          let normalized = this.normalizeHeaderKey(key, value);
-          if (normalized && typeof normalized === "string" && normalized.length) {
-            key = normalized;
-          }
-        }
-        headers.push(mimeFuncs.foldLines(key + ": " + value, 76));
-      });
-      return headers.join(`\r
-`);
-    }
-    createReadStream(options) {
-      options = options || {};
-      let stream = new PassThrough(options);
-      let outputStream = stream;
-      let transform2;
-      this.stream(stream, options, (err) => {
-        if (err) {
-          outputStream.emit("error", err);
-          return;
-        }
-        stream.end();
-      });
-      for (let i = 0, len = this._transforms.length;i < len; i++) {
-        transform2 = typeof this._transforms[i] === "function" ? this._transforms[i]() : this._transforms[i];
-        outputStream.once("error", (err) => {
-          transform2.emit("error", err);
-        });
-        outputStream = outputStream.pipe(transform2);
+          break;
       }
-      transform2 = new LastNewline;
+      value = this._encodeHeaderValue(key, value);
+      if (!(value || "").toString().trim()) {
+        return;
+      }
+      if (typeof this.normalizeHeaderKey === "function") {
+        const normalized = this.normalizeHeaderKey(key, value);
+        const cleaned = typeof normalized === "string" ? normalized.replace(/[\x00-\x1f\x7f]/g, "") : "";
+        if (cleaned) {
+          key = cleaned;
+        }
+      }
+      headers.push(foldLines(key + ": " + value, 76));
+    });
+    return headers.join(`\r
+`);
+  }
+  createReadStream(options) {
+    options = options || {};
+    const stream = new PassThrough2(options);
+    let outputStream = stream;
+    let transform2;
+    this.stream(stream, options, (err) => {
+      if (err) {
+        outputStream.emit("error", err);
+        return;
+      }
+      stream.end();
+    });
+    for (let i = 0, len = this._transforms.length;i < len; i++) {
+      transform2 = typeof this._transforms[i] === "function" ? this._transforms[i]() : this._transforms[i];
       outputStream.once("error", (err) => {
         transform2.emit("error", err);
       });
       outputStream = outputStream.pipe(transform2);
-      for (let i = 0, len = this._processFuncs.length;i < len; i++) {
-        transform2 = this._processFuncs[i];
-        outputStream = transform2(outputStream);
-      }
-      if (this.newline) {
-        const winbreak = ["win", "windows", "dos", `\r
+    }
+    transform2 = new LastNewline;
+    outputStream.once("error", (err) => {
+      transform2.emit("error", err);
+    });
+    outputStream = outputStream.pipe(transform2);
+    for (let i = 0, len = this._processFuncs.length;i < len; i++) {
+      transform2 = this._processFuncs[i];
+      outputStream = transform2(outputStream);
+    }
+    if (this.newline) {
+      const winbreak = ["win", "windows", "dos", `\r
 `].includes(this.newline.toString().toLowerCase());
-        const newlineTransform = winbreak ? new LeWindows : new LeUnix;
-        const stream2 = outputStream.pipe(newlineTransform);
-        outputStream.on("error", (err) => stream2.emit("error", err));
-        return stream2;
+      const newlineTransform = winbreak ? new LeWindows : new LeUnix;
+      const stream2 = outputStream.pipe(newlineTransform);
+      outputStream.on("error", (err) => stream2.emit("error", err));
+      return stream2;
+    }
+    return outputStream;
+  }
+  transform(transform2) {
+    this._transforms.push(transform2);
+  }
+  processFunc(processFunc) {
+    this._processFuncs.push(processFunc);
+  }
+  stream(outputStream, options, done) {
+    const transferEncoding = this.getTransferEncoding();
+    let contentStream;
+    let localStream;
+    let returned = false;
+    const callback = (err) => {
+      if (returned) {
+        return;
       }
-      return outputStream;
-    }
-    transform(transform2) {
-      this._transforms.push(transform2);
-    }
-    processFunc(processFunc) {
-      this._processFuncs.push(processFunc);
-    }
-    stream(outputStream, options, done) {
-      let transferEncoding = this.getTransferEncoding();
-      let contentStream;
-      let localStream;
-      let returned = false;
-      let callback = (err) => {
-        if (returned) {
-          return;
-        }
-        returned = true;
-        done(err);
-      };
-      let finalize2 = () => {
-        let childId = 0;
-        let processChildNode = () => {
-          if (childId >= this.childNodes.length) {
-            outputStream.write(`\r
+      returned = true;
+      done(err);
+    };
+    const finalize2 = () => {
+      let childId = 0;
+      const processChildNode = () => {
+        if (childId >= this.childNodes.length) {
+          outputStream.write(`\r
 --` + this.boundary + `--\r
 `);
-            return callback();
-          }
-          let child = this.childNodes[childId++];
-          outputStream.write((childId > 1 ? `\r
-` : "") + "--" + this.boundary + `\r
-`);
-          child.stream(outputStream, options, (err) => {
-            if (err) {
-              return callback(err);
-            }
-            setImmediate(processChildNode);
-          });
-        };
-        if (this.multipart) {
-          setImmediate(processChildNode);
-        } else {
           return callback();
         }
-      };
-      let sendContent = () => {
-        if (this.content) {
-          if (Object.prototype.toString.call(this.content) === "[object Error]") {
-            return callback(this.content);
+        const child = this.childNodes[childId++];
+        outputStream.write((childId > 1 ? `\r
+` : "") + "--" + this.boundary + `\r
+`);
+        child.stream(outputStream, options, (err) => {
+          if (err) {
+            return callback(err);
           }
-          if (typeof this.content.pipe === "function") {
-            this.content.removeListener("error", this._contentErrorHandler);
-            this._contentErrorHandler = (err) => callback(err);
-            this.content.once("error", this._contentErrorHandler);
-          }
-          let createStream = () => {
-            if (["quoted-printable", "base64"].includes(transferEncoding)) {
-              contentStream = new (transferEncoding === "base64" ? base643 : qp).Encoder(options);
-              contentStream.pipe(outputStream, {
-                end: false
-              });
-              contentStream.once("end", finalize2);
-              contentStream.once("error", (err) => callback(err));
-              localStream = this._getStream(this.content);
-              localStream.pipe(contentStream);
-            } else {
-              localStream = this._getStream(this.content);
-              localStream.pipe(outputStream, {
-                end: false
-              });
-              localStream.once("end", finalize2);
-            }
-            localStream.once("error", (err) => callback(err));
-          };
-          if (this.content._resolve) {
-            let chunks = [];
-            let chunklen = 0;
-            let returned2 = false;
-            let sourceStream = this._getStream(this.content);
-            sourceStream.on("error", (err) => {
-              if (returned2) {
-                return;
-              }
-              returned2 = true;
-              callback(err);
-            });
-            sourceStream.on("readable", () => {
-              let chunk;
-              while ((chunk = sourceStream.read()) !== null) {
-                chunks.push(chunk);
-                chunklen += chunk.length;
-              }
-            });
-            sourceStream.on("end", () => {
-              if (returned2) {
-                return;
-              }
-              returned2 = true;
-              this.content._resolve = false;
-              this.content._resolvedValue = Buffer.concat(chunks, chunklen);
-              setImmediate(createStream);
-            });
-          } else {
-            setImmediate(createStream);
-          }
-          return;
-        } else {
-          return setImmediate(finalize2);
-        }
-      };
-      if (this._raw) {
-        setImmediate(() => {
-          if (Object.prototype.toString.call(this._raw) === "[object Error]") {
-            return callback(this._raw);
-          }
-          if (typeof this._raw.pipe === "function") {
-            this._raw.removeListener("error", this._contentErrorHandler);
-          }
-          let raw2 = this._getStream(this._raw);
-          raw2.pipe(outputStream, {
-            end: false
-          });
-          raw2.on("error", (err) => outputStream.emit("error", err));
-          raw2.on("end", finalize2);
+          setImmediate(processChildNode);
         });
+      };
+      if (this.multipart) {
+        setImmediate(processChildNode);
       } else {
-        outputStream.write(this.buildHeaders() + `\r
+        return callback();
+      }
+    };
+    const sendContent = () => {
+      if (this.content) {
+        if (Object.prototype.toString.call(this.content) === "[object Error]") {
+          return callback(this.content);
+        }
+        if (typeof this.content.pipe === "function") {
+          this.content.removeListener("error", this._contentErrorHandler);
+          this._contentErrorHandler = (err) => callback(err);
+          this.content.once("error", this._contentErrorHandler);
+        }
+        const createStream = () => {
+          if (["quoted-printable", "base64"].includes(transferEncoding)) {
+            contentStream = new (transferEncoding === "base64" ? exports_base64 : exports_qp).Encoder(options);
+            contentStream.pipe(outputStream, {
+              end: false
+            });
+            contentStream.once("end", finalize2);
+            contentStream.once("error", (err) => callback(err));
+            localStream = this._getStream(this.content);
+            localStream.pipe(contentStream);
+          } else {
+            localStream = this._getStream(this.content);
+            localStream.pipe(outputStream, {
+              end: false
+            });
+            localStream.once("end", finalize2);
+          }
+          localStream.once("error", (err) => callback(err));
+        };
+        if (this.content._resolve) {
+          const chunks = [];
+          let chunklen = 0;
+          let returned2 = false;
+          const sourceStream = this._getStream(this.content);
+          sourceStream.on("error", (err) => {
+            if (returned2) {
+              return;
+            }
+            returned2 = true;
+            callback(err);
+          });
+          sourceStream.on("readable", () => {
+            let chunk;
+            while ((chunk = sourceStream.read()) !== null) {
+              chunks.push(chunk);
+              chunklen += chunk.length;
+            }
+          });
+          sourceStream.on("end", () => {
+            if (returned2) {
+              return;
+            }
+            returned2 = true;
+            this.content._resolve = false;
+            this.content._resolvedValue = Buffer.concat(chunks, chunklen);
+            setImmediate(createStream);
+          });
+        } else {
+          setImmediate(createStream);
+        }
+        return;
+      }
+      return setImmediate(finalize2);
+    };
+    if (this._raw) {
+      setImmediate(() => {
+        if (Object.prototype.toString.call(this._raw) === "[object Error]") {
+          return callback(this._raw);
+        }
+        if (typeof this._raw.pipe === "function") {
+          this._raw.removeListener("error", this._contentErrorHandler);
+        }
+        const raw2 = this._getStream(this._raw);
+        raw2.pipe(outputStream, {
+          end: false
+        });
+        raw2.on("error", (err) => outputStream.emit("error", err));
+        raw2.on("end", finalize2);
+      });
+    } else {
+      outputStream.write(this.buildHeaders() + `\r
 \r
 `);
-        setImmediate(sendContent);
-      }
-    }
-    setEnvelope(envelope) {
-      let list;
-      this._envelope = {
-        from: false,
-        to: []
-      };
-      if (envelope.from) {
-        list = [];
-        this._convertAddresses(this._parseAddresses(envelope.from), list);
-        list = list.filter((address) => address && address.address);
-        if (list.length && list[0]) {
-          this._envelope.from = list[0].address;
-        }
-      }
-      ["to", "cc", "bcc"].forEach((key) => {
-        if (envelope[key]) {
-          this._convertAddresses(this._parseAddresses(envelope[key]), this._envelope.to);
-        }
-      });
-      this._envelope.to = this._envelope.to.map((to) => to.address).filter((address) => address);
-      let standardFields = ["to", "cc", "bcc", "from"];
-      Object.keys(envelope).forEach((key) => {
-        if (!standardFields.includes(key)) {
-          this._envelope[key] = envelope[key];
-        }
-      });
-      return this;
-    }
-    getAddresses() {
-      let addresses = {};
-      this._headers.forEach((header) => {
-        let key = header.key.toLowerCase();
-        if (["from", "sender", "reply-to", "to", "cc", "bcc"].includes(key)) {
-          if (!Array.isArray(addresses[key])) {
-            addresses[key] = [];
-          }
-          this._convertAddresses(this._parseAddresses(header.value), addresses[key]);
-        }
-      });
-      return addresses;
-    }
-    getEnvelope() {
-      if (this._envelope) {
-        return this._envelope;
-      }
-      let envelope = {
-        from: false,
-        to: []
-      };
-      this._headers.forEach((header) => {
-        let list = [];
-        if (header.key === "From" || !envelope.from && ["Reply-To", "Sender"].includes(header.key)) {
-          this._convertAddresses(this._parseAddresses(header.value), list);
-          if (list.length && list[0]) {
-            envelope.from = list[0].address;
-          }
-        } else if (["To", "Cc", "Bcc"].includes(header.key)) {
-          this._convertAddresses(this._parseAddresses(header.value), envelope.to);
-        }
-      });
-      envelope.to = envelope.to.map((to) => to.address);
-      return envelope;
-    }
-    messageId() {
-      let messageId = this.getHeader("Message-ID");
-      if (!messageId) {
-        messageId = this._generateMessageId();
-        this.setHeader("Message-ID", messageId);
-      }
-      return messageId;
-    }
-    setRaw(raw2) {
-      this._raw = raw2;
-      if (this._raw && typeof this._raw.pipe === "function") {
-        this._contentErrorHandler = (err) => {
-          this._raw.removeListener("error", this._contentErrorHandler);
-          this._raw = err;
-        };
-        this._raw.once("error", this._contentErrorHandler);
-      }
-      return this;
-    }
-    _getStream(content) {
-      let contentStream;
-      if (content._resolvedValue) {
-        contentStream = new PassThrough;
-        setImmediate(() => {
-          try {
-            contentStream.end(content._resolvedValue);
-          } catch (err) {
-            contentStream.emit("error", err);
-          }
-        });
-        return contentStream;
-      } else if (typeof content.pipe === "function") {
-        return content;
-      } else if (content && typeof content.path === "string" && !content.href) {
-        if (this.disableFileAccess) {
-          contentStream = new PassThrough;
-          setImmediate(() => contentStream.emit("error", new Error("File access rejected for " + content.path)));
-          return contentStream;
-        }
-        return fs.createReadStream(content.path);
-      } else if (content && typeof content.href === "string") {
-        if (this.disableUrlAccess) {
-          contentStream = new PassThrough;
-          setImmediate(() => contentStream.emit("error", new Error("Url access rejected for " + content.href)));
-          return contentStream;
-        }
-        return nmfetch(content.href, { headers: content.httpHeaders });
-      } else {
-        contentStream = new PassThrough;
-        setImmediate(() => {
-          try {
-            contentStream.end(content || "");
-          } catch (err) {
-            contentStream.emit("error", err);
-          }
-        });
-        return contentStream;
-      }
-    }
-    _parseAddresses(addresses) {
-      return [].concat.apply([], [].concat(addresses).map((address) => {
-        if (address && address.address) {
-          address.address = this._normalizeAddress(address.address);
-          address.name = address.name || "";
-          return [address];
-        }
-        return addressparser2(address);
-      }));
-    }
-    _normalizeHeaderKey(key) {
-      key = (key || "").toString().replace(/\r?\n|\r/g, " ").trim().toLowerCase().replace(/^X-SMTPAPI$|^(MIME|DKIM|ARC|BIMI)\b|^[a-z]|-(SPF|FBL|ID|MD5)$|-[a-z]/gi, (c) => c.toUpperCase()).replace(/^Content-Features$/i, "Content-features");
-      return key;
-    }
-    _handleContentType(structured) {
-      this.contentType = structured.value.trim().toLowerCase();
-      this.multipart = /^multipart\//i.test(this.contentType) ? this.contentType.substr(this.contentType.indexOf("/") + 1) : false;
-      if (this.multipart) {
-        this.boundary = structured.params.boundary = structured.params.boundary || this.boundary || this._generateBoundary();
-      } else {
-        this.boundary = false;
-      }
-    }
-    _generateBoundary() {
-      return this.rootNode.boundaryPrefix + "-" + this.rootNode.baseBoundary + "-Part_" + this._nodeId;
-    }
-    _encodeHeaderValue(key, value) {
-      key = this._normalizeHeaderKey(key);
-      switch (key) {
-        case "From":
-        case "Sender":
-        case "To":
-        case "Cc":
-        case "Bcc":
-        case "Reply-To":
-          return this._convertAddresses(this._parseAddresses(value));
-        case "Message-ID":
-        case "In-Reply-To":
-        case "Content-Id":
-          value = (value || "").toString().replace(/\r?\n|\r/g, " ");
-          if (value.charAt(0) !== "<") {
-            value = "<" + value;
-          }
-          if (value.charAt(value.length - 1) !== ">") {
-            value = value + ">";
-          }
-          return value;
-        case "References":
-          value = [].concat.apply([], [].concat(value || "").map((elm) => {
-            elm = (elm || "").toString().replace(/\r?\n|\r/g, " ").trim();
-            return elm.replace(/<[^>]*>/g, (str) => str.replace(/\s/g, "")).split(/\s+/);
-          })).map((elm) => {
-            if (elm.charAt(0) !== "<") {
-              elm = "<" + elm;
-            }
-            if (elm.charAt(elm.length - 1) !== ">") {
-              elm = elm + ">";
-            }
-            return elm;
-          });
-          return value.join(" ").trim();
-        case "Date":
-          if (Object.prototype.toString.call(value) === "[object Date]") {
-            return value.toUTCString().replace(/GMT/, "+0000");
-          }
-          value = (value || "").toString().replace(/\r?\n|\r/g, " ");
-          return this._encodeWords(value);
-        case "Content-Type":
-        case "Content-Disposition":
-          return (value || "").toString().replace(/\r?\n|\r/g, " ");
-        default:
-          value = (value || "").toString().replace(/\r?\n|\r/g, " ");
-          return this._encodeWords(value);
-      }
-    }
-    _convertAddresses(addresses, uniqueList) {
-      let values = [];
-      uniqueList = uniqueList || [];
-      [].concat(addresses || []).forEach((address) => {
-        if (address.address) {
-          address.address = this._normalizeAddress(address.address);
-          if (!address.name) {
-            values.push(address.address.indexOf(" ") >= 0 ? `<${address.address}>` : `${address.address}`);
-          } else if (address.name) {
-            values.push(`${this._encodeAddressName(address.name)} <${address.address}>`);
-          }
-          if (address.address) {
-            if (!uniqueList.filter((a) => a.address === address.address).length) {
-              uniqueList.push(address);
-            }
-          }
-        } else if (address.group) {
-          let groupListAddresses = (address.group.length ? this._convertAddresses(address.group, uniqueList) : "").trim();
-          values.push(`${this._encodeAddressName(address.name)}:${groupListAddresses};`);
-        }
-      });
-      return values.join(", ");
-    }
-    _normalizeAddress(address) {
-      address = (address || "").toString().replace(/[\x00-\x1F<>]+/g, " ").trim();
-      let lastAt = address.lastIndexOf("@");
-      if (lastAt < 0) {
-        return address;
-      }
-      let user = address.substr(0, lastAt);
-      let domain2 = address.substr(lastAt + 1);
-      let encodedDomain;
-      try {
-        encodedDomain = punycode.toASCII(domain2.toLowerCase());
-      } catch (err) {}
-      if (user.indexOf(" ") >= 0) {
-        if (user.charAt(0) !== '"') {
-          user = '"' + user;
-        }
-        if (user.substr(-1) !== '"') {
-          user = user + '"';
-        }
-      }
-      return `${user}@${encodedDomain}`;
-    }
-    _encodeAddressName(name2) {
-      if (!/^[\w ]*$/.test(name2)) {
-        if (/^[\x20-\x7e]*$/.test(name2)) {
-          return '"' + name2.replace(/([\\"])/g, "\\$1") + '"';
-        } else {
-          return mimeFuncs.encodeWord(name2, this._getTextEncoding(name2), 52);
-        }
-      }
-      return name2;
-    }
-    _encodeWords(value) {
-      return mimeFuncs.encodeWords(value, this._getTextEncoding(value), 52, true);
-    }
-    _getTextEncoding(value) {
-      value = (value || "").toString();
-      let encoding = this.textEncoding;
-      let latinLen;
-      let nonLatinLen;
-      if (!encoding) {
-        nonLatinLen = (value.match(/[\x00-\x08\x0B\x0C\x0E-\x1F\u0080-\uFFFF]/g) || []).length;
-        latinLen = (value.match(/[a-z]/gi) || []).length;
-        encoding = nonLatinLen < latinLen ? "Q" : "B";
-      }
-      return encoding;
-    }
-    _generateMessageId() {
-      return "<" + [2, 2, 2, 6].reduce((prev, len) => prev + "-" + crypto2.randomBytes(len).toString("hex"), crypto2.randomBytes(4).toString("hex")) + "@" + (this.getEnvelope().from || this.hostname || "localhost").split("@").pop() + ">";
+      setImmediate(sendContent);
     }
   }
-  module.exports = MimeNode;
+  setEnvelope(envelope) {
+    let list;
+    this._envelope = {
+      from: false,
+      to: []
+    };
+    if (envelope.from) {
+      list = [];
+      this._convertAddresses(this._parseEnvelopeAddresses(envelope.from), list);
+      list = list.filter((address) => address && address.address);
+      if (list.length && list[0]) {
+        this._envelope.from = list[0].address;
+      }
+    }
+    const seenRecipients = new Set;
+    const recipients = [];
+    ["to", "cc", "bcc"].forEach((key) => {
+      if (envelope[key]) {
+        this._convertAddresses(this._parseEnvelopeAddresses(envelope[key]), recipients, seenRecipients);
+      }
+    });
+    this._envelope.to = recipients.map((to) => to.address).filter((address) => address);
+    const standardFields = ["to", "cc", "bcc", "from"];
+    copyOwnKeys(this._envelope, envelope, (key) => standardFields.includes(key));
+    return this;
+  }
+  getAddresses() {
+    const addresses = {};
+    const seenByKey = new Map;
+    this._headers.forEach((header) => {
+      const key = header.key.toLowerCase();
+      if (["from", "sender", "reply-to", "to", "cc", "bcc"].includes(key)) {
+        if (!Array.isArray(addresses[key])) {
+          addresses[key] = [];
+          seenByKey.set(key, new Set);
+        }
+        this._convertAddresses(this._parseAddresses(header.value), addresses[key], seenByKey.get(key));
+      }
+    });
+    return addresses;
+  }
+  getEnvelope() {
+    if (this._envelope) {
+      return this._envelope;
+    }
+    const envelope = {
+      from: false,
+      to: []
+    };
+    const seenRecipients = new Set;
+    const recipients = [];
+    this._headers.forEach((header) => {
+      const list = [];
+      if (header.key === "From" || !envelope.from && ["Reply-To", "Sender"].includes(header.key)) {
+        this._convertAddresses(this._parseAddresses(header.value), list);
+        if (list.length && list[0]) {
+          envelope.from = list[0].address;
+        }
+      } else if (["To", "Cc", "Bcc"].includes(header.key)) {
+        this._convertAddresses(this._parseAddresses(header.value), recipients, seenRecipients);
+      }
+    });
+    envelope.to = recipients.map((to) => to.address);
+    return envelope;
+  }
+  messageId() {
+    let messageId = this.getHeader("Message-ID");
+    if (!messageId) {
+      messageId = this._generateMessageId();
+      this.setHeader("Message-ID", messageId);
+    }
+    return messageId;
+  }
+  setRaw(raw2) {
+    this._raw = raw2;
+    if (this._raw && typeof this._raw.pipe === "function") {
+      this._contentErrorHandler = (err) => {
+        this._raw.removeListener("error", this._contentErrorHandler);
+        this._raw = err;
+      };
+      this._raw.once("error", this._contentErrorHandler);
+    }
+    return this;
+  }
+  _accessDisabled(flag) {
+    let node4 = this;
+    while (node4) {
+      if (node4[flag]) {
+        return true;
+      }
+      node4 = node4.parentNode;
+    }
+    return false;
+  }
+  _getStream(content) {
+    let contentStream;
+    if (content._resolvedValue) {
+      contentStream = new PassThrough2;
+      setImmediate(() => {
+        try {
+          contentStream.end(content._resolvedValue);
+        } catch (_err) {
+          contentStream.emit("error", _err);
+        }
+      });
+      return contentStream;
+    }
+    if (typeof content.pipe === "function") {
+      return content;
+    }
+    if (content && typeof content.path === "string" && !content.href) {
+      if (this._accessDisabled("disableFileAccess")) {
+        contentStream = new PassThrough2;
+        setImmediate(() => {
+          const err = new Error("File access rejected for " + content.path);
+          err.code = EFILEACCESS;
+          contentStream.emit("error", err);
+        });
+        return contentStream;
+      }
+      return fs2.createReadStream(content.path);
+    }
+    if (content && typeof content.href === "string") {
+      if (this._accessDisabled("disableUrlAccess")) {
+        contentStream = new PassThrough2;
+        setImmediate(() => {
+          const err = new Error("Url access rejected for " + content.href);
+          err.code = EURLACCESS;
+          contentStream.emit("error", err);
+        });
+        return contentStream;
+      }
+      return fetch_default(content.href, { headers: content.httpHeaders, tls: content.tls });
+    }
+    contentStream = new PassThrough2;
+    setImmediate(() => {
+      try {
+        contentStream.end(content || "");
+      } catch (_err) {
+        contentStream.emit("error", _err);
+      }
+    });
+    return contentStream;
+  }
+  _parseAddresses(addresses) {
+    const flattened = [];
+    const seen = new WeakSet;
+    const stack = [];
+    const enter = (list) => {
+      if (!seen.has(list)) {
+        seen.add(list);
+        stack.push({ list, pos: 0 });
+      }
+    };
+    enter(Array.isArray(addresses) ? addresses : [addresses]);
+    while (stack.length) {
+      const frame = stack[stack.length - 1];
+      if (frame.pos >= frame.list.length) {
+        stack.pop();
+        continue;
+      }
+      const address = frame.list[frame.pos++];
+      if (Array.isArray(address)) {
+        enter(address);
+        continue;
+      }
+      if (address && address.address) {
+        const normalized = this._normalizeAddress(address.address);
+        if (normalized === address.address && typeof address.name === "string") {
+          flattened.push(address);
+          continue;
+        }
+        const copy = copyOwnKeys({}, address);
+        copy.address = normalized;
+        copy.name = address.name || "";
+        flattened.push(copy);
+        continue;
+      }
+      const parsed = this._normalizeParsedAddresses(addressparser_default(address));
+      for (let i = 0;i < parsed.length; i++) {
+        flattened.push(parsed[i]);
+      }
+    }
+    return flattened;
+  }
+  _normalizeParsedAddresses(parsed) {
+    parsed.forEach((entry) => {
+      if (entry.address) {
+        entry.address = this._normalizeAddress(entry.address);
+      } else if (entry.group) {
+        this._normalizeParsedAddresses(entry.group);
+      }
+    });
+    return parsed;
+  }
+  _parseEnvelopeAddresses(addresses) {
+    return this._parseAddresses(addresses).map((entry) => {
+      if (entry.address || entry.group || !entry.name || /[\s@]/.test(entry.name)) {
+        return entry;
+      }
+      return { address: this._normalizeAddress(entry.name), name: "" };
+    });
+  }
+  _normalizeHeaderKey(key) {
+    key = (key || "").toString().replace(/\r?\n|\r/g, " ").replace(/[\x00-\x1f\x7f]/g, "").trim().toLowerCase().replace(/^X-SMTPAPI$|^(MIME|DKIM|ARC|BIMI)\b|^[a-z]|-(SPF|FBL|ID|MD5)$|-[a-z]/gi, (c) => c.toUpperCase()).replace(/^Content-Features$/i, "Content-features");
+    return key;
+  }
+  _handleContentType(structured) {
+    this.contentType = structured.value.trim().toLowerCase();
+    this.multipart = /^multipart\//i.test(this.contentType) ? this.contentType.substr(this.contentType.indexOf("/") + 1) : false;
+    if (this.multipart) {
+      const declared = _stripBoundaryControls(structured.params.boundary || this.boundary || "");
+      this.boundary = structured.params.boundary = declared || _stripBoundaryControls(this._generateBoundary());
+    } else {
+      this.boundary = false;
+    }
+  }
+  _generateBoundary() {
+    return _stripBoundaryControls(this.rootNode.boundaryPrefix + "-" + this.rootNode.baseBoundary) + "-Part_" + this._nodeId;
+  }
+  _encodeHeaderValue(key, value) {
+    key = this._normalizeHeaderKey(key);
+    switch (key) {
+      case "From":
+      case "Sender":
+      case "To":
+      case "Cc":
+      case "Bcc":
+      case "Reply-To":
+        return this._convertAddresses(this._parseAddresses(value));
+      case "Message-ID":
+      case "In-Reply-To":
+      case "Content-Id":
+        value = (value || "").toString().replace(/\r?\n|\r/g, " ").replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "");
+        if (value.charAt(0) !== "<") {
+          value = "<" + value;
+        }
+        if (value.charAt(value.length - 1) !== ">") {
+          value = value + ">";
+        }
+        return value;
+      case "References":
+        value = [].concat.apply([], [].concat(value || "").map((elm) => {
+          elm = (elm || "").toString().replace(/\r?\n|\r/g, " ").replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "").trim();
+          return elm.replace(/<[^>]*>/g, (str) => str.replace(/\s/g, "")).split(/\s+/);
+        })).map((elm) => {
+          if (elm.charAt(0) !== "<") {
+            elm = "<" + elm;
+          }
+          if (elm.charAt(elm.length - 1) !== ">") {
+            elm = elm + ">";
+          }
+          return elm;
+        });
+        return value.join(" ").trim();
+      case "Date":
+        if (Object.prototype.toString.call(value) === "[object Date]") {
+          return value.toUTCString().replace(/GMT/, "+0000");
+        }
+        value = (value || "").toString().replace(/\r?\n|\r/g, " ");
+        return this._encodeHeaderText(value);
+      case "Content-Type":
+      case "Content-Disposition":
+        return (value || "").toString().replace(/\r?\n|\r/g, " ");
+      default:
+        value = (value || "").toString().replace(/\r?\n|\r/g, " ");
+        return this._encodeHeaderText(value);
+    }
+  }
+  _convertAddresses(addresses, uniqueList, seenAddresses) {
+    const values = [];
+    uniqueList = uniqueList || [];
+    if (!seenAddresses) {
+      seenAddresses = new Set;
+      for (let i = 0;i < uniqueList.length; i++) {
+        seenAddresses.add(uniqueList[i].address);
+      }
+    }
+    [].concat(addresses || []).forEach((address) => {
+      if (address.address) {
+        address.address = this._normalizeAddress(address.address);
+        if (!address.name) {
+          values.push(PLAIN_ADDRESS.test(address.address) ? address.address : `<${address.address}>`);
+        } else {
+          values.push(`${this._encodeAddressName(address.name)} <${address.address}>`);
+        }
+        if (!seenAddresses.has(address.address)) {
+          seenAddresses.add(address.address);
+          uniqueList.push(address);
+        }
+      } else if (address.group) {
+        const groupListAddresses = (address.group.length ? this._convertAddresses(address.group, uniqueList, seenAddresses) : "").trim();
+        values.push(`${this._encodeAddressName(address.name)}:${groupListAddresses};`);
+      }
+    });
+    return values.join(", ");
+  }
+  _normalizeAddress(address) {
+    address = (address || "").toString().replace(/[\x00-\x1F\x7F<>]+/g, " ").trim();
+    if (!address) {
+      return address;
+    }
+    const lastAt = address.lastIndexOf("@");
+    if (lastAt < 0) {
+      return this._normalizeLocalPart(address);
+    }
+    const user = address.substr(0, lastAt);
+    const domain2 = address.substr(lastAt + 1);
+    let encodedDomain = domain2;
+    const smtputf8 = /[\x80-\uFFFF]/.test(user);
+    try {
+      encodedDomain = normalizeDomain(domain2.toLowerCase(), smtputf8);
+    } catch (_err) {}
+    return `${this._normalizeLocalPart(user)}@${encodedDomain}`;
+  }
+  _normalizeLocalPart(user) {
+    if (DOT_ATOM.test(user) || QUOTED_STRING.test(user)) {
+      return user;
+    }
+    return quoteString(user);
+  }
+  _encodeAddressName(name3) {
+    if (!/^[\w ]*$/.test(name3)) {
+      if (/^[\x20-\x7e]*$/.test(name3)) {
+        return quoteString(name3);
+      } else {
+        return encodeWord(name3, this._getTextEncoding(name3), 52);
+      }
+    }
+    return name3;
+  }
+  _encodeHeaderText(value) {
+    return /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(value) ? encodeWord(value, this._getTextEncoding(value), 52) : this._encodeWords(value);
+  }
+  _encodeWords(value) {
+    return encodeWords(value, this._getTextEncoding(value), 52, true);
+  }
+  _getTextEncoding(value) {
+    value = (value || "").toString();
+    if (this.textEncoding) {
+      return this.textEncoding;
+    }
+    let nonLatinLen = 0;
+    let latinLen = 0;
+    for (let i = 0, len = value.length;i < len; i++) {
+      const code = value.charCodeAt(i);
+      if (code >= 0 && code <= 8 || code === 11 || code === 12 || code >= 14 && code <= 31 || code >= 128) {
+        nonLatinLen++;
+      } else if (code >= 65 && code <= 90 || code >= 97 && code <= 122) {
+        latinLen++;
+      }
+    }
+    return nonLatinLen < latinLen ? "Q" : "B";
+  }
+  _generateMessageId() {
+    return "<" + [2, 2, 2, 6].reduce((prev, len) => prev + "-" + crypto2.randomBytes(len).toString("hex"), crypto2.randomBytes(4).toString("hex")) + "@" + (this.getEnvelope().from || this.hostname || "localhost").split("@").pop() + ">";
+  }
+}
+var FORMATTED_HEADERS, ATEXT = "[A-Za-z0-9!#$%&'*+\\-/=?^_`{|}~\\x80-\\uFFFF]", DOT_ATOM, QUOTED_STRING, PLAIN_ADDRESS, URL_PARSER_UNSAFE, mime_node_default;
+var init_mime_node = __esm(() => {
+  init_punycode();
+  init_shared();
+  init_mime_funcs();
+  init_qp();
+  init_base64();
+  init_addressparser();
+  init_fetch();
+  init_errors();
+  init_last_newline();
+  init_le_windows();
+  init_le_unix();
+  FORMATTED_HEADERS = ["From", "Sender", "To", "Cc", "Bcc", "Reply-To", "Date", "References"];
+  DOT_ATOM = new RegExp("^" + ATEXT + "+(?:\\." + ATEXT + "+)*$");
+  QUOTED_STRING = /^"(?:[^"\\]|\\[\s\S])*"$/;
+  PLAIN_ADDRESS = /^[^\s"(),:;<>@[\\\]]+@[^\s"(),:;<>@[\\\]]+$/;
+  URL_PARSER_UNSAFE = /[/\\?#%\x00-\x20\x7F]/;
+  mime_node_default = MimeNode;
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/mail-composer/index.js
-var require_mail_composer = __commonJS((exports, module) => {
-  var MimeNode = require_mime_node3();
-  var mimeFuncs = require_mime_funcs();
-  var parseDataURI = require_shared().parseDataURI;
+// /zveltio-extension/node_modules/nodemailer/dist/esm/mail-composer/index.js
+function isContentObject(value) {
+  const content = value;
+  return typeof value === "object" && !!(content.content || content.path || content.href || content.raw);
+}
 
-  class MailComposer {
-    constructor(mail) {
-      this.mail = mail || {};
-      this.message = false;
+class MailComposer {
+  constructor(mail) {
+    this.mail = mail || {};
+    this.message = false;
+  }
+  compile() {
+    this._alternatives = this.getAlternatives();
+    this._htmlNode = this._alternatives.filter((alternative) => /^text\/html\b/i.test(alternative.contentType)).pop();
+    this._attachments = this.getAttachments(!!this._htmlNode);
+    this._useRelated = !!(this._htmlNode && this._attachments.related.length);
+    this._useAlternative = this._alternatives.length > 1;
+    this._useMixed = this._attachments.attached.length > 1 || this._alternatives.length && this._attachments.attached.length === 1;
+    if (this.mail.raw) {
+      this.message = new mime_node_default("message/rfc822", {
+        newline: this.mail.newline,
+        disableUrlAccess: this.mail.disableUrlAccess,
+        disableFileAccess: this.mail.disableFileAccess
+      }).setRaw(this.mail.raw);
+    } else if (this._useMixed) {
+      this.message = this._createMixed();
+    } else if (this._useAlternative) {
+      this.message = this._createAlternative();
+    } else if (this._useRelated) {
+      this.message = this._createRelated();
+    } else {
+      this.message = this._createContentNode(false, [].concat(this._alternatives || []).concat(this._attachments.attached || []).shift() || {
+        contentType: "text/plain",
+        content: ""
+      });
     }
-    compile() {
-      this._alternatives = this.getAlternatives();
-      this._htmlNode = this._alternatives.filter((alternative) => /^text\/html\b/i.test(alternative.contentType)).pop();
-      this._attachments = this.getAttachments(!!this._htmlNode);
-      this._useRelated = !!(this._htmlNode && this._attachments.related.length);
-      this._useAlternative = this._alternatives.length > 1;
-      this._useMixed = this._attachments.attached.length > 1 || this._alternatives.length && this._attachments.attached.length === 1;
-      if (this.mail.raw) {
-        this.message = new MimeNode("message/rfc822", { newline: this.mail.newline }).setRaw(this.mail.raw);
-      } else if (this._useMixed) {
-        this.message = this._createMixed();
-      } else if (this._useAlternative) {
-        this.message = this._createAlternative();
-      } else if (this._useRelated) {
-        this.message = this._createRelated();
+    if (this.mail.headers) {
+      this.message.addHeader(this.mail.headers);
+    }
+    ["from", "sender", "to", "cc", "bcc", "reply-to", "in-reply-to", "references", "subject", "message-id", "date"].forEach((header) => {
+      const key = header.replace(/-(\w)/g, (o, c) => c.toUpperCase());
+      if (this.mail[key]) {
+        this.message.setHeader(header, this.mail[key]);
+      }
+    });
+    if (this.mail.envelope) {
+      this.message.setEnvelope(this.mail.envelope);
+    }
+    this.message.messageId();
+    return this.message;
+  }
+  getAttachments(findRelated) {
+    let eventObject;
+    const attachments = [].concat(this.mail.attachments || []).map((attachment, i) => {
+      if (/^data:/i.test(attachment.path || attachment.href)) {
+        attachment = this._processDataUrl(attachment);
+      }
+      const contentType = attachment.contentType || detectMimeType2(attachment.filename || attachment.path || attachment.href || "bin");
+      const isImage = /^image\//i.test(contentType);
+      const isMessageNode = /^message\//i.test(contentType);
+      const contentDisposition = attachment.contentDisposition || (isMessageNode || isImage && attachment.cid ? "inline" : "attachment");
+      let contentTransferEncoding;
+      if ("contentTransferEncoding" in attachment) {
+        contentTransferEncoding = attachment.contentTransferEncoding;
+      } else if (isMessageNode) {
+        contentTransferEncoding = "8bit";
       } else {
-        this.message = this._createContentNode(false, [].concat(this._alternatives || []).concat(this._attachments.attached || []).shift() || {
-          contentType: "text/plain",
-          content: ""
-        });
+        contentTransferEncoding = "base64";
       }
-      if (this.mail.headers) {
-        this.message.addHeader(this.mail.headers);
-      }
-      ["from", "sender", "to", "cc", "bcc", "reply-to", "in-reply-to", "references", "subject", "message-id", "date"].forEach((header) => {
-        let key = header.replace(/-(\w)/g, (o, c) => c.toUpperCase());
-        if (this.mail[key]) {
-          this.message.setHeader(header, this.mail[key]);
+      const data = {
+        contentType,
+        contentDisposition,
+        contentTransferEncoding
+      };
+      if (attachment.filename) {
+        data.filename = attachment.filename;
+      } else if (!isMessageNode && attachment.filename !== false) {
+        data.filename = (attachment.path || attachment.href || "").split(/[/\\]/).pop().split("?").shift() || "attachment-" + (i + 1);
+        if (data.filename.indexOf(".") < 0) {
+          data.filename += "." + detectExtension2(data.contentType);
         }
-      });
-      if (this.mail.envelope) {
-        this.message.setEnvelope(this.mail.envelope);
       }
-      this.message.messageId();
-      return this.message;
-    }
-    getAttachments(findRelated) {
-      let icalEvent, eventObject;
-      let attachments = [].concat(this.mail.attachments || []).map((attachment, i) => {
-        let data;
-        let isMessageNode = /^message\//i.test(attachment.contentType);
-        if (/^data:/i.test(attachment.path || attachment.href)) {
-          attachment = this._processDataUrl(attachment);
-        }
-        let contentType = attachment.contentType || mimeFuncs.detectMimeType(attachment.filename || attachment.path || attachment.href || "bin");
-        let isImage = /^image\//i.test(contentType);
-        let contentDisposition = attachment.contentDisposition || (isMessageNode || isImage && attachment.cid ? "inline" : "attachment");
-        data = {
-          contentType,
-          contentDisposition,
-          contentTransferEncoding: "contentTransferEncoding" in attachment ? attachment.contentTransferEncoding : "base64"
+      if (/^https?:\/\//i.test(attachment.path)) {
+        attachment.href = attachment.path;
+        attachment.path = undefined;
+      }
+      if (attachment.cid) {
+        data.cid = attachment.cid;
+      }
+      if (attachment.raw) {
+        data.raw = attachment.raw;
+      } else if (attachment.path) {
+        data.content = {
+          path: attachment.path
         };
-        if (attachment.filename) {
-          data.filename = attachment.filename;
-        } else if (!isMessageNode && attachment.filename !== false) {
-          data.filename = (attachment.path || attachment.href || "").split("/").pop().split("?").shift() || "attachment-" + (i + 1);
-          if (data.filename.indexOf(".") < 0) {
-            data.filename += "." + mimeFuncs.detectExtension(data.contentType);
-          }
-        }
-        if (/^https?:\/\//i.test(attachment.path)) {
-          attachment.href = attachment.path;
-          attachment.path = undefined;
-        }
-        if (attachment.cid) {
-          data.cid = attachment.cid;
-        }
-        if (attachment.raw) {
-          data.raw = attachment.raw;
-        } else if (attachment.path) {
-          data.content = {
-            path: attachment.path
-          };
-        } else if (attachment.href) {
-          data.content = {
-            href: attachment.href,
-            httpHeaders: attachment.httpHeaders
-          };
-        } else {
-          data.content = attachment.content || "";
-        }
-        if (attachment.encoding) {
-          data.encoding = attachment.encoding;
-        }
-        if (attachment.headers) {
-          data.headers = attachment.headers;
-        }
-        return data;
-      });
-      if (this.mail.icalEvent) {
-        if (typeof this.mail.icalEvent === "object" && (this.mail.icalEvent.content || this.mail.icalEvent.path || this.mail.icalEvent.href || this.mail.icalEvent.raw)) {
-          icalEvent = this.mail.icalEvent;
-        } else {
-          icalEvent = {
-            content: this.mail.icalEvent
-          };
-        }
-        eventObject = {};
-        Object.keys(icalEvent).forEach((key) => {
-          eventObject[key] = icalEvent[key];
-        });
-        eventObject.contentType = "application/ics";
-        if (!eventObject.headers) {
-          eventObject.headers = {};
-        }
-        eventObject.filename = eventObject.filename || "invite.ics";
-        eventObject.headers["Content-Disposition"] = "attachment";
-        eventObject.headers["Content-Transfer-Encoding"] = "base64";
-      }
-      if (!findRelated) {
-        return {
-          attached: attachments.concat(eventObject || []),
-          related: []
+      } else if (attachment.href) {
+        data.content = {
+          href: attachment.href,
+          httpHeaders: attachment.httpHeaders,
+          tls: attachment.tls
         };
       } else {
-        return {
-          attached: attachments.filter((attachment) => !attachment.cid).concat(eventObject || []),
-          related: attachments.filter((attachment) => !!attachment.cid)
+        data.content = attachment.content || "";
+      }
+      if (attachment.encoding) {
+        data.encoding = attachment.encoding;
+      }
+      if (attachment.headers) {
+        data.headers = attachment.headers;
+      }
+      return data;
+    });
+    if (this.mail.icalEvent) {
+      eventObject = Object.assign({}, this._getIcalEvent());
+      eventObject.contentType = "application/ics";
+      if (!eventObject.headers) {
+        eventObject.headers = {};
+      }
+      eventObject.filename = eventObject.filename || "invite.ics";
+      eventObject.headers["Content-Disposition"] = "attachment";
+      eventObject.headers["Content-Transfer-Encoding"] = "base64";
+    }
+    if (!findRelated) {
+      return {
+        attached: attachments.concat(eventObject || []),
+        related: []
+      };
+    }
+    return {
+      attached: attachments.filter((attachment) => !attachment.cid).concat(eventObject || []),
+      related: attachments.filter((attachment) => !!attachment.cid)
+    };
+  }
+  _getIcalEvent() {
+    if (!this._icalEvent) {
+      let icalEvent;
+      if (isContentObject(this.mail.icalEvent)) {
+        icalEvent = copyOwnKeys({}, this.mail.icalEvent);
+      } else {
+        icalEvent = {
+          content: this.mail.icalEvent
         };
       }
+      if (/^data:/i.test(icalEvent.path || icalEvent.href)) {
+        icalEvent = this._processDataUrl(icalEvent);
+      }
+      if (/^https?:\/\//i.test(icalEvent.path)) {
+        icalEvent.href = icalEvent.path;
+        icalEvent.path = undefined;
+      }
+      if (!icalEvent.raw) {
+        if (icalEvent.path) {
+          icalEvent.content = {
+            path: icalEvent.path
+          };
+          icalEvent.path = undefined;
+        } else if (icalEvent.href) {
+          icalEvent.content = {
+            href: icalEvent.href,
+            httpHeaders: icalEvent.httpHeaders,
+            tls: icalEvent.tls
+          };
+          icalEvent.href = undefined;
+        }
+      }
+      if (icalEvent.content && typeof icalEvent.content === "object") {
+        icalEvent.content._resolve = true;
+      }
+      this._icalEvent = icalEvent;
     }
-    getAlternatives() {
-      let alternatives = [], text, html, watchHtml, amp, icalEvent, eventObject;
-      if (this.mail.text) {
-        if (typeof this.mail.text === "object" && (this.mail.text.content || this.mail.text.path || this.mail.text.href || this.mail.text.raw)) {
-          text = this.mail.text;
-        } else {
-          text = {
-            content: this.mail.text
-          };
-        }
-        text.contentType = "text/plain; charset=utf-8";
-      }
-      if (this.mail.watchHtml) {
-        if (typeof this.mail.watchHtml === "object" && (this.mail.watchHtml.content || this.mail.watchHtml.path || this.mail.watchHtml.href || this.mail.watchHtml.raw)) {
-          watchHtml = this.mail.watchHtml;
-        } else {
-          watchHtml = {
-            content: this.mail.watchHtml
-          };
-        }
-        watchHtml.contentType = "text/watch-html; charset=utf-8";
-      }
-      if (this.mail.amp) {
-        if (typeof this.mail.amp === "object" && (this.mail.amp.content || this.mail.amp.path || this.mail.amp.href || this.mail.amp.raw)) {
-          amp = this.mail.amp;
-        } else {
-          amp = {
-            content: this.mail.amp
-          };
-        }
-        amp.contentType = "text/x-amp-html; charset=utf-8";
-      }
-      if (this.mail.icalEvent) {
-        if (typeof this.mail.icalEvent === "object" && (this.mail.icalEvent.content || this.mail.icalEvent.path || this.mail.icalEvent.href || this.mail.icalEvent.raw)) {
-          icalEvent = this.mail.icalEvent;
-        } else {
-          icalEvent = {
-            content: this.mail.icalEvent
-          };
-        }
-        eventObject = {};
-        Object.keys(icalEvent).forEach((key) => {
-          eventObject[key] = icalEvent[key];
-        });
-        if (eventObject.content && typeof eventObject.content === "object") {
-          eventObject.content._resolve = true;
-        }
-        eventObject.filename = false;
-        eventObject.contentType = "text/calendar; charset=utf-8; method=" + (eventObject.method || "PUBLISH").toString().trim().toUpperCase();
-        if (!eventObject.headers) {
-          eventObject.headers = {};
-        }
-      }
-      if (this.mail.html) {
-        if (typeof this.mail.html === "object" && (this.mail.html.content || this.mail.html.path || this.mail.html.href || this.mail.html.raw)) {
-          html = this.mail.html;
-        } else {
-          html = {
-            content: this.mail.html
-          };
-        }
-        html.contentType = "text/html; charset=utf-8";
-      }
-      [].concat(text || []).concat(watchHtml || []).concat(amp || []).concat(html || []).concat(eventObject || []).concat(this.mail.alternatives || []).forEach((alternative) => {
-        let data;
-        if (/^data:/i.test(alternative.path || alternative.href)) {
-          alternative = this._processDataUrl(alternative);
-        }
-        data = {
-          contentType: alternative.contentType || mimeFuncs.detectMimeType(alternative.filename || alternative.path || alternative.href || "txt"),
-          contentTransferEncoding: alternative.contentTransferEncoding
+    return this._icalEvent;
+  }
+  getAlternatives() {
+    const alternatives = [];
+    let text, html, watchHtml, amp, eventObject;
+    if (this.mail.text) {
+      if (isContentObject(this.mail.text)) {
+        text = this.mail.text;
+      } else {
+        text = {
+          content: this.mail.text
         };
-        if (alternative.filename) {
-          data.filename = alternative.filename;
-        }
-        if (/^https?:\/\//i.test(alternative.path)) {
-          alternative.href = alternative.path;
-          alternative.path = undefined;
-        }
-        if (alternative.raw) {
-          data.raw = alternative.raw;
-        } else if (alternative.path) {
-          data.content = {
-            path: alternative.path
-          };
-        } else if (alternative.href) {
-          data.content = {
-            href: alternative.href
-          };
-        } else {
-          data.content = alternative.content || "";
-        }
-        if (alternative.encoding) {
-          data.encoding = alternative.encoding;
-        }
-        if (alternative.headers) {
-          data.headers = alternative.headers;
-        }
-        alternatives.push(data);
-      });
-      return alternatives;
+      }
+      text.contentType = "text/plain; charset=utf-8";
     }
-    _createMixed(parentNode) {
-      let node3;
-      if (!parentNode) {
-        node3 = new MimeNode("multipart/mixed", {
-          baseBoundary: this.mail.baseBoundary,
-          textEncoding: this.mail.textEncoding,
-          boundaryPrefix: this.mail.boundaryPrefix,
-          disableUrlAccess: this.mail.disableUrlAccess,
-          disableFileAccess: this.mail.disableFileAccess,
-          normalizeHeaderKey: this.mail.normalizeHeaderKey,
-          newline: this.mail.newline
-        });
+    if (this.mail.watchHtml) {
+      if (isContentObject(this.mail.watchHtml)) {
+        watchHtml = this.mail.watchHtml;
       } else {
-        node3 = parentNode.createChild("multipart/mixed", {
-          disableUrlAccess: this.mail.disableUrlAccess,
-          disableFileAccess: this.mail.disableFileAccess,
-          normalizeHeaderKey: this.mail.normalizeHeaderKey,
-          newline: this.mail.newline
-        });
+        watchHtml = {
+          content: this.mail.watchHtml
+        };
       }
-      if (this._useAlternative) {
-        this._createAlternative(node3);
-      } else if (this._useRelated) {
-        this._createRelated(node3);
-      }
-      [].concat(!this._useAlternative && this._alternatives || []).concat(this._attachments.attached || []).forEach((element) => {
-        if (!this._useRelated || element !== this._htmlNode) {
-          this._createContentNode(node3, element);
-        }
-      });
-      return node3;
+      watchHtml.contentType = "text/watch-html; charset=utf-8";
     }
-    _createAlternative(parentNode) {
-      let node3;
-      if (!parentNode) {
-        node3 = new MimeNode("multipart/alternative", {
-          baseBoundary: this.mail.baseBoundary,
-          textEncoding: this.mail.textEncoding,
-          boundaryPrefix: this.mail.boundaryPrefix,
-          disableUrlAccess: this.mail.disableUrlAccess,
-          disableFileAccess: this.mail.disableFileAccess,
-          normalizeHeaderKey: this.mail.normalizeHeaderKey,
-          newline: this.mail.newline
-        });
+    if (this.mail.amp) {
+      if (isContentObject(this.mail.amp)) {
+        amp = this.mail.amp;
       } else {
-        node3 = parentNode.createChild("multipart/alternative", {
-          disableUrlAccess: this.mail.disableUrlAccess,
-          disableFileAccess: this.mail.disableFileAccess,
-          normalizeHeaderKey: this.mail.normalizeHeaderKey,
-          newline: this.mail.newline
-        });
+        amp = {
+          content: this.mail.amp
+        };
       }
-      this._alternatives.forEach((alternative) => {
-        if (this._useRelated && this._htmlNode === alternative) {
-          this._createRelated(node3);
-        } else {
-          this._createContentNode(node3, alternative);
-        }
-      });
-      return node3;
+      amp.contentType = "text/x-amp-html; charset=utf-8";
     }
-    _createRelated(parentNode) {
-      let node3;
-      if (!parentNode) {
-        node3 = new MimeNode('multipart/related; type="text/html"', {
-          baseBoundary: this.mail.baseBoundary,
-          textEncoding: this.mail.textEncoding,
-          boundaryPrefix: this.mail.boundaryPrefix,
-          disableUrlAccess: this.mail.disableUrlAccess,
-          disableFileAccess: this.mail.disableFileAccess,
-          normalizeHeaderKey: this.mail.normalizeHeaderKey,
-          newline: this.mail.newline
-        });
-      } else {
-        node3 = parentNode.createChild('multipart/related; type="text/html"', {
-          disableUrlAccess: this.mail.disableUrlAccess,
-          disableFileAccess: this.mail.disableFileAccess,
-          normalizeHeaderKey: this.mail.normalizeHeaderKey,
-          newline: this.mail.newline
-        });
+    if (this.mail.icalEvent) {
+      eventObject = Object.assign({}, this._getIcalEvent());
+      eventObject.filename = false;
+      eventObject.contentType = "text/calendar; charset=utf-8; method=" + (eventObject.method || "PUBLISH").toString().trim().toUpperCase();
+      if (!eventObject.headers) {
+        eventObject.headers = {};
       }
-      this._createContentNode(node3, this._htmlNode);
-      this._attachments.related.forEach((alternative) => this._createContentNode(node3, alternative));
-      return node3;
     }
-    _createContentNode(parentNode, element) {
-      element = element || {};
-      element.content = element.content || "";
-      let node3;
-      let encoding = (element.encoding || "utf8").toString().toLowerCase().replace(/[-_\s]/g, "");
-      if (!parentNode) {
-        node3 = new MimeNode(element.contentType, {
-          filename: element.filename,
-          baseBoundary: this.mail.baseBoundary,
-          textEncoding: this.mail.textEncoding,
-          boundaryPrefix: this.mail.boundaryPrefix,
-          disableUrlAccess: this.mail.disableUrlAccess,
-          disableFileAccess: this.mail.disableFileAccess,
-          normalizeHeaderKey: this.mail.normalizeHeaderKey,
-          newline: this.mail.newline
-        });
+    if (this.mail.html) {
+      if (isContentObject(this.mail.html)) {
+        html = this.mail.html;
       } else {
-        node3 = parentNode.createChild(element.contentType, {
-          filename: element.filename,
-          textEncoding: this.mail.textEncoding,
-          disableUrlAccess: this.mail.disableUrlAccess,
-          disableFileAccess: this.mail.disableFileAccess,
-          normalizeHeaderKey: this.mail.normalizeHeaderKey,
-          newline: this.mail.newline
-        });
+        html = {
+          content: this.mail.html
+        };
       }
-      if (element.headers) {
-        node3.addHeader(element.headers);
-      }
-      if (element.cid) {
-        node3.setHeader("Content-Id", "<" + element.cid.replace(/[<>]/g, "") + ">");
-      }
-      if (element.contentTransferEncoding) {
-        node3.setHeader("Content-Transfer-Encoding", element.contentTransferEncoding);
-      } else if (this.mail.encoding && /^text\//i.test(element.contentType)) {
-        node3.setHeader("Content-Transfer-Encoding", this.mail.encoding);
-      }
-      if (!/^text\//i.test(element.contentType) || element.contentDisposition) {
-        node3.setHeader("Content-Disposition", element.contentDisposition || (element.cid && /^image\//i.test(element.contentType) ? "inline" : "attachment"));
-      }
-      if (typeof element.content === "string" && !["utf8", "usascii", "ascii"].includes(encoding)) {
-        element.content = Buffer.from(element.content, encoding);
-      }
-      if (element.raw) {
-        node3.setRaw(element.raw);
-      } else {
-        node3.setContent(element.content);
-      }
-      return node3;
+      html.contentType = "text/html; charset=utf-8";
     }
-    _processDataUrl(element) {
-      let parsedDataUri;
-      if ((element.path || element.href).match(/^data:/)) {
-        parsedDataUri = parseDataURI(element.path || element.href);
+    [].concat(text || []).concat(watchHtml || []).concat(amp || []).concat(html || []).concat(eventObject || []).concat(this.mail.alternatives || []).forEach((alternative) => {
+      if (/^data:/i.test(alternative.path || alternative.href)) {
+        alternative = this._processDataUrl(alternative);
       }
-      if (!parsedDataUri) {
-        return element;
+      const data = {
+        contentType: alternative.contentType || detectMimeType2(alternative.filename || alternative.path || alternative.href || "txt"),
+        contentTransferEncoding: alternative.contentTransferEncoding
+      };
+      if (alternative.filename) {
+        data.filename = alternative.filename;
       }
-      element.content = parsedDataUri.data;
-      element.contentType = element.contentType || parsedDataUri.contentType;
-      if ("path" in element) {
-        element.path = false;
+      if (/^https?:\/\//i.test(alternative.path)) {
+        alternative.href = alternative.path;
+        alternative.path = undefined;
       }
-      if ("href" in element) {
-        element.href = false;
+      if (alternative.raw) {
+        data.raw = alternative.raw;
+      } else if (alternative.path) {
+        data.content = {
+          path: alternative.path
+        };
+      } else if (alternative.href) {
+        data.content = {
+          href: alternative.href,
+          httpHeaders: alternative.httpHeaders,
+          tls: alternative.tls
+        };
+      } else {
+        data.content = alternative.content || "";
       }
+      if (alternative.encoding) {
+        data.encoding = alternative.encoding;
+      }
+      if (alternative.headers) {
+        data.headers = alternative.headers;
+      }
+      alternatives.push(data);
+    });
+    return alternatives;
+  }
+  _createMixed(parentNode) {
+    const node4 = parentNode ? parentNode.createChild("multipart/mixed", {
+      disableUrlAccess: this.mail.disableUrlAccess,
+      disableFileAccess: this.mail.disableFileAccess,
+      normalizeHeaderKey: this.mail.normalizeHeaderKey,
+      newline: this.mail.newline
+    }) : new mime_node_default("multipart/mixed", {
+      baseBoundary: this.mail.baseBoundary,
+      textEncoding: this.mail.textEncoding,
+      boundaryPrefix: this.mail.boundaryPrefix,
+      disableUrlAccess: this.mail.disableUrlAccess,
+      disableFileAccess: this.mail.disableFileAccess,
+      normalizeHeaderKey: this.mail.normalizeHeaderKey,
+      newline: this.mail.newline
+    });
+    if (this._useAlternative) {
+      this._createAlternative(node4);
+    } else if (this._useRelated) {
+      this._createRelated(node4);
+    }
+    [].concat(!this._useAlternative && this._alternatives || []).concat(this._attachments.attached || []).forEach((element) => {
+      if (!this._useRelated || element !== this._htmlNode) {
+        this._createContentNode(node4, element);
+      }
+    });
+    return node4;
+  }
+  _createAlternative(parentNode) {
+    const node4 = parentNode ? parentNode.createChild("multipart/alternative", {
+      disableUrlAccess: this.mail.disableUrlAccess,
+      disableFileAccess: this.mail.disableFileAccess,
+      normalizeHeaderKey: this.mail.normalizeHeaderKey,
+      newline: this.mail.newline
+    }) : new mime_node_default("multipart/alternative", {
+      baseBoundary: this.mail.baseBoundary,
+      textEncoding: this.mail.textEncoding,
+      boundaryPrefix: this.mail.boundaryPrefix,
+      disableUrlAccess: this.mail.disableUrlAccess,
+      disableFileAccess: this.mail.disableFileAccess,
+      normalizeHeaderKey: this.mail.normalizeHeaderKey,
+      newline: this.mail.newline
+    });
+    this._alternatives.forEach((alternative) => {
+      if (this._useRelated && this._htmlNode === alternative) {
+        this._createRelated(node4);
+      } else {
+        this._createContentNode(node4, alternative);
+      }
+    });
+    return node4;
+  }
+  _createRelated(parentNode) {
+    const node4 = parentNode ? parentNode.createChild('multipart/related; type="text/html"', {
+      disableUrlAccess: this.mail.disableUrlAccess,
+      disableFileAccess: this.mail.disableFileAccess,
+      normalizeHeaderKey: this.mail.normalizeHeaderKey,
+      newline: this.mail.newline
+    }) : new mime_node_default('multipart/related; type="text/html"', {
+      baseBoundary: this.mail.baseBoundary,
+      textEncoding: this.mail.textEncoding,
+      boundaryPrefix: this.mail.boundaryPrefix,
+      disableUrlAccess: this.mail.disableUrlAccess,
+      disableFileAccess: this.mail.disableFileAccess,
+      normalizeHeaderKey: this.mail.normalizeHeaderKey,
+      newline: this.mail.newline
+    });
+    this._createContentNode(node4, this._htmlNode);
+    this._attachments.related.forEach((alternative) => this._createContentNode(node4, alternative));
+    return node4;
+  }
+  _createContentNode(parentNode, element) {
+    element = element || {};
+    element.content = element.content || "";
+    const encoding = (element.encoding || "utf8").toString().toLowerCase().replace(/[-_\s]/g, "");
+    const node4 = parentNode ? parentNode.createChild(element.contentType, {
+      filename: element.filename,
+      textEncoding: this.mail.textEncoding,
+      disableUrlAccess: this.mail.disableUrlAccess,
+      disableFileAccess: this.mail.disableFileAccess,
+      normalizeHeaderKey: this.mail.normalizeHeaderKey,
+      newline: this.mail.newline
+    }) : new mime_node_default(element.contentType, {
+      filename: element.filename,
+      baseBoundary: this.mail.baseBoundary,
+      textEncoding: this.mail.textEncoding,
+      boundaryPrefix: this.mail.boundaryPrefix,
+      disableUrlAccess: this.mail.disableUrlAccess,
+      disableFileAccess: this.mail.disableFileAccess,
+      normalizeHeaderKey: this.mail.normalizeHeaderKey,
+      newline: this.mail.newline
+    });
+    if (element.headers) {
+      node4.addHeader(element.headers);
+    }
+    if (element.cid) {
+      node4.setHeader("Content-Id", "<" + element.cid.replace(/[<>]/g, "") + ">");
+    }
+    if (element.contentTransferEncoding) {
+      node4.setHeader("Content-Transfer-Encoding", element.contentTransferEncoding);
+    } else if (this.mail.encoding && /^text\//i.test(element.contentType)) {
+      node4.setHeader("Content-Transfer-Encoding", this.mail.encoding);
+    }
+    if (!/^text\//i.test(element.contentType) || element.contentDisposition) {
+      node4.setHeader("Content-Disposition", element.contentDisposition || (element.cid && /^image\//i.test(element.contentType) ? "inline" : "attachment"));
+    }
+    if (typeof element.content === "string" && !["utf8", "usascii", "ascii"].includes(encoding)) {
+      element.content = Buffer.from(element.content, encoding);
+    }
+    if (element.raw) {
+      node4.setRaw(element.raw);
+    } else {
+      node4.setContent(element.content);
+    }
+    return node4;
+  }
+  _processDataUrl(element) {
+    const dataUrl = element.path || element.href;
+    if (!dataUrl || typeof dataUrl !== "string") {
       return element;
     }
+    if (!dataUrl.startsWith("data:")) {
+      return element;
+    }
+    if (dataUrl.length > 52428800) {
+      let detectedType = "application/octet-stream";
+      const commaPos = dataUrl.indexOf(",");
+      if (commaPos > 0 && commaPos < 200) {
+        const header = dataUrl.substring(5, commaPos);
+        const parts = header.split(";");
+        if (parts[0] && parts[0].includes("/")) {
+          detectedType = parts[0].trim();
+        }
+      }
+      return Object.assign(copyOwnKeys({}, element), {
+        path: false,
+        href: false,
+        content: Buffer.alloc(0),
+        contentType: element.contentType || detectedType
+      });
+    }
+    let parsedDataUri;
+    try {
+      parsedDataUri = parseDataURI(dataUrl);
+    } catch (_err) {
+      return element;
+    }
+    if (!parsedDataUri) {
+      return element;
+    }
+    element.content = parsedDataUri.data;
+    element.contentType = element.contentType || parsedDataUri.contentType;
+    if ("path" in element) {
+      element.path = false;
+    }
+    if ("href" in element) {
+      element.href = false;
+    }
+    return element;
   }
-  module.exports = MailComposer;
+}
+var mail_composer_default;
+var init_mail_composer = __esm(() => {
+  init_mime_node();
+  init_mime_funcs();
+  init_shared();
+  mail_composer_default = MailComposer;
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/dkim/message-parser.js
-var require_message_parser = __commonJS((exports, module) => {
-  var Transform = __require("stream").Transform;
-
-  class MessageParser extends Transform {
+// /zveltio-extension/node_modules/nodemailer/dist/esm/dkim/message-parser.js
+import { Transform as Transform6 } from "stream";
+function _trimFieldName(str) {
+  let start = 0;
+  let end = str.length;
+  while (start < end && (str.charCodeAt(start) === 32 || str.charCodeAt(start) === 9)) {
+    start++;
+  }
+  while (end > start && (str.charCodeAt(end - 1) === 32 || str.charCodeAt(end - 1) === 9)) {
+    end--;
+  }
+  return str.slice(start, end);
+}
+var MessageParser, message_parser_default;
+var init_message_parser = __esm(() => {
+  MessageParser = class MessageParser extends Transform6 {
     constructor(options) {
       super(options);
       this.lastBytes = Buffer.alloc(4);
@@ -90584,8 +91985,8 @@ var require_message_parser = __commonJS((exports, module) => {
       this.bodySize = 0;
     }
     updateLastBytes(data) {
-      let lblen = this.lastBytes.length;
-      let nblen = Math.min(data.length, lblen);
+      const lblen = this.lastBytes.length;
+      const nblen = Math.min(data.length, lblen);
       for (let i = 0, len = lblen - nblen;i < len; i++) {
         this.lastBytes[i] = this.lastBytes[i + nblen];
       }
@@ -90597,9 +91998,8 @@ var require_message_parser = __commonJS((exports, module) => {
       if (this.headersParsed) {
         return true;
       }
-      let lblen = this.lastBytes.length;
+      const lblen = this.lastBytes.length;
       let headerPos = 0;
-      this.curLinePos = 0;
       for (let i = 0, len = this.lastBytes.length + data.length;i < len; i++) {
         let chr;
         if (i < lblen) {
@@ -90608,8 +92008,8 @@ var require_message_parser = __commonJS((exports, module) => {
           chr = data[i - lblen];
         }
         if (chr === 10 && i) {
-          let pr1 = i - 1 < lblen ? this.lastBytes[i - 1] : data[i - 1 - lblen];
-          let pr2 = i > 1 ? i - 2 < lblen ? this.lastBytes[i - 2] : data[i - 2 - lblen] : false;
+          const pr1 = i - 1 < lblen ? this.lastBytes[i - 1] : data[i - 1 - lblen];
+          const pr2 = i > 1 ? i - 2 < lblen ? this.lastBytes[i - 2] : data[i - 2 - lblen] : false;
           if (pr1 === 10) {
             this.headersParsed = true;
             headerPos = i - lblen + 1;
@@ -90628,16 +92028,15 @@ var require_message_parser = __commonJS((exports, module) => {
         this.rawHeaders = Buffer.concat(this.headerChunks, this.headerBytes);
         this.headerChunks = null;
         this.emit("headers", this.parseHeaders());
-        if (data.length - 1 > headerPos) {
-          let chunk = data.slice(headerPos);
+        if (data.length > headerPos) {
+          const chunk = data.slice(headerPos);
           this.bodySize += chunk.length;
           setImmediate(() => this.push(chunk));
         }
         return false;
-      } else {
-        this.headerBytes += data.length;
-        this.headerChunks.push(data);
       }
+      this.headerBytes += data.length;
+      this.headerChunks.push(data);
       this.updateLastBytes(data);
       return false;
     }
@@ -90662,111 +92061,119 @@ var require_message_parser = __commonJS((exports, module) => {
     }
     _flush(callback) {
       if (this.headerChunks) {
-        let chunk = Buffer.concat(this.headerChunks, this.headerBytes);
-        this.bodySize += chunk.length;
-        this.push(chunk);
+        this.rawHeaders = Buffer.concat(this.headerChunks, this.headerBytes);
         this.headerChunks = null;
+        this.emit("headers", this.parseHeaders());
       }
       callback();
     }
     parseHeaders() {
-      let lines = (this.rawHeaders || "").toString().split(/\r?\n/);
-      for (let i = lines.length - 1;i > 0; i--) {
-        if (/^\s/.test(lines[i])) {
-          lines[i - 1] += `
-` + lines[i];
-          lines.splice(i, 1);
+      const rawLines = (this.rawHeaders || Buffer.alloc(0)).toString("binary").split(/\r?\n/);
+      const lines = [];
+      for (const rawLine of rawLines) {
+        if (lines.length && /^[ \t]/.test(rawLine)) {
+          lines[lines.length - 1] += `
+` + rawLine;
+        } else {
+          lines.push(rawLine);
         }
       }
-      return lines.filter((line) => line.trim()).map((line) => ({
-        key: line.substr(0, line.indexOf(":")).trim().toLowerCase(),
+      return lines.filter((line) => /[^ \t\r]/.test(line)).map((line) => ({
+        key: _trimFieldName(line.substr(0, line.indexOf(":"))).toLowerCase(),
         line
       }));
     }
-  }
-  module.exports = MessageParser;
+  };
+  message_parser_default = MessageParser;
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/dkim/relaxed-body.js
-var require_relaxed_body = __commonJS((exports, module) => {
-  var Transform = __require("stream").Transform;
-  var crypto2 = __require("crypto");
-
-  class RelaxedBody extends Transform {
+// /zveltio-extension/node_modules/nodemailer/dist/esm/dkim/relaxed-body.js
+import { Transform as Transform7 } from "stream";
+import crypto3 from "crypto";
+var CHAR_CR = 13, CHAR_LF = 10, CHAR_SPACE = 32, CHAR_TAB = 9, CRLF, EMPTY_LINES, RelaxedBody, relaxed_body_default;
+var init_relaxed_body = __esm(() => {
+  CRLF = Buffer.from(`\r
+`);
+  EMPTY_LINES = Buffer.alloc(4096, CRLF);
+  RelaxedBody = class RelaxedBody extends Transform7 {
     constructor(options) {
       super();
       options = options || {};
-      this.chunkBuffer = [];
-      this.chunkBufferLen = 0;
-      this.bodyHash = crypto2.createHash(options.hashAlgo || "sha1");
-      this.remainder = "";
+      this.bodyHash = crypto3.createHash(options.hashAlgo || "sha256");
       this.byteLength = 0;
       this.debug = options.debug;
       this._debugBody = options.debug ? [] : false;
+      this._lineHasContent = false;
+      this._pendingWsp = false;
+      this._pendingCr = false;
+      this._pendingEmptyLines = 0;
     }
-    updateHash(chunk) {
-      let bodyStr;
-      let nextRemainder = "";
-      let state = "file";
-      for (let i = chunk.length - 1;i >= 0; i--) {
-        let c = chunk[i];
-        if (state === "file" && (c === 10 || c === 13)) {} else if (state === "file" && (c === 9 || c === 32)) {
-          state = "line";
-        } else if (state === "line" && (c === 9 || c === 32)) {} else if (state === "file" || state === "line") {
-          state = "body";
-          if (i === chunk.length - 1) {
-            break;
-          }
+    _hashCanonical(data) {
+      if (!data.length) {
+        return;
+      }
+      this.bodyHash.update(data);
+      if (this._debugBody) {
+        this._debugBody.push(Buffer.from(data));
+      }
+    }
+    _hashEmptyLines() {
+      while (this._pendingEmptyLines > 0) {
+        const count = Math.min(this._pendingEmptyLines, EMPTY_LINES.length / 2);
+        this._hashCanonical(EMPTY_LINES.subarray(0, count * 2));
+        this._pendingEmptyLines -= count;
+      }
+    }
+    _emitContent(out, outPos, c) {
+      if (!this._lineHasContent) {
+        if (this._pendingEmptyLines) {
+          this._hashCanonical(out.subarray(0, outPos));
+          outPos = 0;
+          this._hashEmptyLines();
         }
-        if (i === 0) {
-          if (state === "file" && (!this.remainder || /[\r\n]$/.test(this.remainder)) || state === "line" && (!this.remainder || /[ \t]$/.test(this.remainder))) {
-            this.remainder += chunk.toString("binary");
-            return;
-          } else if (state === "line" || state === "file") {
-            nextRemainder = chunk.toString("binary");
-            chunk = false;
-            break;
+        this._lineHasContent = true;
+      }
+      if (this._pendingWsp) {
+        out[outPos++] = CHAR_SPACE;
+        this._pendingWsp = false;
+      }
+      out[outPos++] = c;
+      return outPos;
+    }
+    updateHash(chunk, final) {
+      const out = Buffer.allocUnsafe(chunk.length * 2 + 2);
+      let outPos = 0;
+      for (let i = 0;i < chunk.length; i++) {
+        const c = chunk[i];
+        if (c === CHAR_LF) {
+          if (this._lineHasContent) {
+            out[outPos++] = CHAR_CR;
+            out[outPos++] = CHAR_LF;
+            this._lineHasContent = false;
+          } else {
+            this._pendingEmptyLines++;
           }
-        }
-        if (state !== "body") {
+          this._pendingWsp = false;
+          this._pendingCr = false;
           continue;
         }
-        nextRemainder = chunk.slice(i + 1).toString("binary");
-        chunk = chunk.slice(0, i + 1);
-        break;
-      }
-      let needsFixing = !!this.remainder;
-      if (chunk && !needsFixing) {
-        for (let i = 0, len = chunk.length;i < len; i++) {
-          if (i && chunk[i] === 10 && chunk[i - 1] !== 13) {
-            needsFixing = true;
-            break;
-          } else if (i && chunk[i] === 13 && chunk[i - 1] === 32) {
-            needsFixing = true;
-            break;
-          } else if (i && chunk[i] === 32 && chunk[i - 1] === 32) {
-            needsFixing = true;
-            break;
-          } else if (chunk[i] === 9) {
-            needsFixing = true;
-            break;
-          }
+        if (this._pendingCr) {
+          outPos = this._emitContent(out, outPos, CHAR_CR);
+          this._pendingCr = false;
+        }
+        if (c === CHAR_CR) {
+          this._pendingCr = true;
+        } else if (c === CHAR_SPACE || c === CHAR_TAB) {
+          this._pendingWsp = true;
+        } else {
+          outPos = this._emitContent(out, outPos, c);
         }
       }
-      if (needsFixing) {
-        bodyStr = this.remainder + (chunk ? chunk.toString("binary") : "");
-        this.remainder = nextRemainder;
-        bodyStr = bodyStr.replace(/\r?\n/g, `
-`).replace(/[ \t]*$/gm, "").replace(/[ \t]+/gm, " ").replace(/\n/g, `\r
-`);
-        chunk = Buffer.from(bodyStr, "binary");
-      } else if (nextRemainder) {
-        this.remainder = nextRemainder;
+      if (final && this._pendingCr) {
+        outPos = this._emitContent(out, outPos, CHAR_CR);
+        this._pendingCr = false;
       }
-      if (this.debug) {
-        this._debugBody.push(chunk);
-      }
-      this.bodyHash.update(chunk);
+      this._hashCanonical(out.subarray(0, outPos));
     }
     _transform(chunk, encoding, callback) {
       if (!chunk || !chunk.length) {
@@ -90781,664 +92188,709 @@ var require_relaxed_body = __commonJS((exports, module) => {
       callback();
     }
     _flush(callback) {
-      if (/[\r\n]$/.test(this.remainder) && this.byteLength > 2) {
-        this.bodyHash.update(Buffer.from(`\r
-`));
-      }
-      if (!this.byteLength) {
-        this.push(Buffer.from(`\r
-`));
+      this.updateHash(Buffer.alloc(0), true);
+      if (this._lineHasContent) {
+        this._hashCanonical(CRLF);
       }
       this.emit("hash", this.bodyHash.digest("base64"), this.debug ? Buffer.concat(this._debugBody) : false);
       callback();
     }
-  }
-  module.exports = RelaxedBody;
+  };
+  relaxed_body_default = RelaxedBody;
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/dkim/sign.js
-var require_sign = __commonJS((exports, module) => {
-  var punycode = require_punycode2();
-  var mimeFuncs = require_mime_funcs();
-  var crypto2 = __require("crypto");
-  module.exports = (headers, hashAlgo, bodyHash, options) => {
-    options = options || {};
-    let defaultFieldNames = "From:Sender:Reply-To:Subject:Date:Message-ID:To:" + "Cc:MIME-Version:Content-Type:Content-Transfer-Encoding:Content-ID:" + "Content-Description:Resent-Date:Resent-From:Resent-Sender:" + "Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:" + "List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:" + "List-Owner:List-Archive";
-    let fieldNames = options.headerFieldNames || defaultFieldNames;
-    let canonicalizedHeaderData = relaxedHeaders(headers, fieldNames, options.skipFields);
-    let dkimHeader = generateDKIMHeader(options.domainName, options.keySelector, canonicalizedHeaderData.fieldNames, hashAlgo, bodyHash);
-    let signer, signature;
-    canonicalizedHeaderData.headers += "dkim-signature:" + relaxedHeaderLine(dkimHeader);
-    signer = crypto2.createSign(("rsa-" + hashAlgo).toUpperCase());
-    signer.update(canonicalizedHeaderData.headers);
-    try {
-      signature = signer.sign(options.privateKey, "base64");
-    } catch (E) {
-      return false;
-    }
-    return dkimHeader + signature.replace(/(^.{73}|.{75}(?!\r?\n|\r))/g, `$&\r
- `).trim();
-  };
-  module.exports.relaxedHeaders = relaxedHeaders;
-  function generateDKIMHeader(domainName, keySelector, fieldNames, hashAlgo, bodyHash) {
-    let dkim = [
-      "v=1",
-      "a=rsa-" + hashAlgo,
-      "c=relaxed/relaxed",
-      "d=" + punycode.toASCII(domainName),
-      "q=dns/txt",
-      "s=" + keySelector,
-      "bh=" + bodyHash,
-      "h=" + fieldNames
-    ].join("; ");
-    return mimeFuncs.foldLines("DKIM-Signature: " + dkim, 76) + `;\r
- b=`;
+// /zveltio-extension/node_modules/nodemailer/dist/esm/dkim/sign.js
+import crypto4 from "crypto";
+function unsupportedHashAlgoError(hashAlgo) {
+  const err = new Error('Unsupported DKIM hash algorithm "' + hashAlgo + '"');
+  err.code = ECONFIG;
+  return err;
+}
+function sign(headers, hashAlgo, bodyHash, options) {
+  options = options || {};
+  const defaultFieldNames = "From:Sender:Reply-To:Subject:Date:Message-ID:To:" + "Cc:MIME-Version:Content-Type:Content-Transfer-Encoding:Content-ID:" + "Content-Description:Resent-Date:Resent-From:Resent-Sender:" + "Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:" + "List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:" + "List-Owner:List-Archive";
+  const fieldNames = options.headerFieldNames || defaultFieldNames;
+  const canonicalizedHeaderData = relaxedHeaders(headers, fieldNames, options.skipFields);
+  const dkimHeader = generateDKIMHeader(options.domainName, options.keySelector, canonicalizedHeaderData.fieldNames, hashAlgo, bodyHash);
+  canonicalizedHeaderData.headers += "dkim-signature:" + relaxedHeaderLine(dkimHeader);
+  let signer;
+  try {
+    signer = crypto4.createSign(("rsa-" + hashAlgo).toUpperCase());
+  } catch (_E2) {
+    throw unsupportedHashAlgoError(hashAlgo);
   }
-  function relaxedHeaders(headers, fieldNames, skipFields) {
-    let includedFields = new Set;
-    let skip = new Set;
-    let headerFields = new Map;
-    (skipFields || "").toLowerCase().split(":").forEach((field) => {
-      skip.add(field.trim());
-    });
-    (fieldNames || "").toLowerCase().split(":").filter((field) => !skip.has(field.trim())).forEach((field) => {
-      includedFields.add(field.trim());
-    });
-    for (let i = headers.length - 1;i >= 0; i--) {
-      let line = headers[i];
-      if (includedFields.has(line.key) && !headerFields.has(line.key)) {
-        headerFields.set(line.key, relaxedHeaderLine(line.line));
-      }
+  signer.update(canonicalizedHeaderData.headers, "latin1");
+  let signature;
+  try {
+    signature = signer.sign(options.privateKey, "base64");
+  } catch (_E2) {
+    return false;
+  }
+  return dkimHeader + signature.replace(/(^.{73}|.{75}(?!\r?\n|\r))/g, `$&\r
+ `).trim();
+}
+function generateDKIMHeader(domainName, keySelector, fieldNames, hashAlgo, bodyHash) {
+  const cleanTagValue = (value) => (value || "").toString().replace(/[\x00-\x1f\x7f;=]/g, "");
+  const dkim = [
+    "v=1",
+    "a=rsa-" + hashAlgo,
+    "c=relaxed/relaxed",
+    "d=" + toASCII(cleanTagValue(domainName)),
+    "q=dns/txt",
+    "s=" + cleanTagValue(keySelector),
+    "bh=" + bodyHash,
+    "h=" + cleanTagValue(fieldNames)
+  ].join("; ");
+  return foldLines("DKIM-Signature: " + dkim, 76) + `;\r
+ b=`;
+}
+function relaxedHeaders(headers, fieldNames, skipFields) {
+  const includedFields = new Set;
+  const skip = new Set;
+  const headerFields = new Map;
+  (skipFields || "").toLowerCase().split(":").forEach((field) => {
+    skip.add(field.trim());
+  });
+  (fieldNames || "").toLowerCase().split(":").filter((field) => !skip.has(field.trim())).forEach((field) => {
+    includedFields.add(field.trim());
+  });
+  for (let i = headers.length - 1;i >= 0; i--) {
+    const line = headers[i];
+    if (includedFields.has(line.key) && !headerFields.has(line.key)) {
+      headerFields.set(line.key, relaxedHeaderLine(line.line));
     }
-    let headersList = [];
-    let fields = [];
-    includedFields.forEach((field) => {
-      if (headerFields.has(field)) {
-        fields.push(field);
-        headersList.push(field + ":" + headerFields.get(field));
-      }
-    });
-    return {
-      headers: headersList.join(`\r
+  }
+  const headersList = [];
+  const fields = [];
+  includedFields.forEach((field) => {
+    if (headerFields.has(field)) {
+      fields.push(field);
+      headersList.push(field + ":" + headerFields.get(field));
+    }
+  });
+  return {
+    headers: headersList.join(`\r
 `) + `\r
 `,
-      fieldNames: fields.join(":")
-    };
-  }
-  function relaxedHeaderLine(line) {
-    return line.substr(line.indexOf(":") + 1).replace(/\r?\n/g, "").replace(/\s+/g, " ").trim();
-  }
+    fieldNames: fields.join(":")
+  };
+}
+function relaxedHeaderLine(line) {
+  return line.substr(line.indexOf(":") + 1).replace(/\r?\n/g, "").replace(/[ \t]+/g, " ").replace(/^ | $/g, "");
+}
+var sign_default;
+var init_sign = __esm(() => {
+  init_punycode();
+  init_mime_funcs();
+  init_errors();
+  sign.relaxedHeaders = relaxedHeaders;
+  sign.unsupportedHashAlgoError = unsupportedHashAlgoError;
+  sign_default = sign;
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/dkim/index.js
-var require_dkim = __commonJS((exports, module) => {
-  var MessageParser = require_message_parser();
-  var RelaxedBody = require_relaxed_body();
-  var sign = require_sign();
-  var PassThrough = __require("stream").PassThrough;
-  var fs = __require("fs");
-  var path = __require("path");
-  var crypto2 = __require("crypto");
-  var DKIM_ALGO = "sha256";
-  var MAX_MESSAGE_SIZE = 128 * 1024;
+// /zveltio-extension/node_modules/nodemailer/dist/esm/dkim/index.js
+import { PassThrough as PassThrough3 } from "stream";
+import fs3 from "fs";
+import path2 from "path";
+import crypto5 from "crypto";
 
-  class DKIMSigner {
-    constructor(options, keys, input2, output2) {
-      this.options = options || {};
-      this.keys = keys;
-      this.cacheTreshold = Number(this.options.cacheTreshold) || MAX_MESSAGE_SIZE;
-      this.hashAlgo = this.options.hashAlgo || DKIM_ALGO;
-      this.cacheDir = this.options.cacheDir || false;
-      this.chunks = [];
-      this.chunklen = 0;
-      this.readPos = 0;
-      this.cachePath = this.cacheDir ? path.join(this.cacheDir, "message." + Date.now() + "-" + crypto2.randomBytes(14).toString("hex")) : false;
-      this.cache = false;
-      this.headers = false;
-      this.bodyHash = false;
-      this.parser = false;
-      this.relaxedBody = false;
-      this.input = input2;
-      this.output = output2;
-      this.output.usingCache = false;
-      this.hasErrored = false;
-      this.input.on("error", (err) => {
-        this.hasErrored = true;
-        this.cleanup();
-        output2.emit("error", err);
-      });
+class DKIMSigner {
+  constructor(options, keys, input2, output2) {
+    this.options = options || {};
+    this.keys = keys;
+    this.cacheTreshold = Number(this.options.cacheTreshold) || MAX_MESSAGE_SIZE;
+    this.hashAlgo = this.options.hashAlgo || DKIM_ALGO;
+    this.cacheDir = this.options.cacheDir || false;
+    this.chunks = [];
+    this.chunklen = 0;
+    this.readPos = 0;
+    this.cachePath = this.cacheDir ? path2.join(this.cacheDir, "message." + Date.now() + "-" + crypto5.randomBytes(14).toString("hex")) : false;
+    this.cache = false;
+    this.headers = false;
+    this.bodyHash = false;
+    this.parser = false;
+    this.relaxedBody = false;
+    this.input = input2;
+    this.output = output2;
+    this.output.usingCache = false;
+    this.hasErrored = false;
+    this.input.on("error", (err) => {
+      this.hasErrored = true;
+      this.cleanup();
+      output2.emit("error", err);
+    });
+  }
+  cleanup() {
+    if (!this.cache || !this.cachePath) {
+      return;
     }
-    cleanup() {
-      if (!this.cache || !this.cachePath) {
+    fs3.unlink(this.cachePath, () => false);
+  }
+  createReadCache() {
+    this.cache = fs3.createReadStream(this.cachePath);
+    this.cache.once("error", (err) => {
+      this.cleanup();
+      this.output.emit("error", err);
+    });
+    this.cache.once("close", () => {
+      this.cleanup();
+    });
+    this.cache.pipe(this.output);
+  }
+  sendNextChunk() {
+    if (this.hasErrored) {
+      return;
+    }
+    if (this.readPos >= this.chunks.length) {
+      if (!this.cache) {
+        this.output.end();
         return;
       }
-      fs.unlink(this.cachePath, () => false);
+      return this.createReadCache();
     }
-    createReadCache() {
-      this.cache = fs.createReadStream(this.cachePath);
-      this.cache.once("error", (err) => {
-        this.cleanup();
-        this.output.emit("error", err);
+    const chunk = this.chunks[this.readPos++];
+    if (this.output.write(chunk) === false) {
+      this.output.once("drain", () => {
+        this.sendNextChunk();
       });
-      this.cache.once("close", () => {
-        this.cleanup();
-      });
-      this.cache.pipe(this.output);
+      return;
     }
-    sendNextChunk() {
-      if (this.hasErrored) {
+    setImmediate(() => this.sendNextChunk());
+  }
+  sendSignedOutput() {
+    let keyPos = 0;
+    const signNextKey = () => {
+      if (keyPos >= this.keys.length) {
+        this.output.write(this.parser.rawHeaders);
+        setImmediate(() => this.sendNextChunk());
         return;
       }
-      if (this.readPos >= this.chunks.length) {
-        if (!this.cache) {
-          return this.output.end();
-        }
-        return this.createReadCache();
-      }
-      let chunk = this.chunks[this.readPos++];
-      if (this.output.write(chunk) === false) {
-        return this.output.once("drain", () => {
-          this.sendNextChunk();
-        });
-      }
-      setImmediate(() => this.sendNextChunk());
-    }
-    sendSignedOutput() {
-      let keyPos = 0;
-      let signNextKey = () => {
-        if (keyPos >= this.keys.length) {
-          this.output.write(this.parser.rawHeaders);
-          return setImmediate(() => this.sendNextChunk());
-        }
-        let key = this.keys[keyPos++];
-        let dkimField = sign(this.headers, this.hashAlgo, this.bodyHash, {
+      const key = this.keys[keyPos++];
+      let dkimField;
+      try {
+        dkimField = sign_default(this.headers, this.hashAlgo, this.bodyHash, {
           domainName: key.domainName,
           keySelector: key.keySelector,
           privateKey: key.privateKey,
           headerFieldNames: this.options.headerFieldNames,
           skipFields: this.options.skipFields
         });
-        if (dkimField) {
-          this.output.write(Buffer.from(dkimField + `\r
-`));
-        }
-        return setImmediate(signNextKey);
-      };
-      if (this.bodyHash && this.headers) {
-        return signNextKey();
-      }
-      this.output.write(this.parser.rawHeaders);
-      this.sendNextChunk();
-    }
-    createWriteCache() {
-      this.output.usingCache = true;
-      this.cache = fs.createWriteStream(this.cachePath);
-      this.cache.once("error", (err) => {
-        this.cleanup();
-        this.relaxedBody.unpipe(this.cache);
-        this.relaxedBody.on("readable", () => {
-          while (this.relaxedBody.read() !== null) {}
-        });
+      } catch (err) {
         this.hasErrored = true;
+        this.cleanup();
         this.output.emit("error", err);
-      });
-      this.cache.once("close", () => {
-        this.sendSignedOutput();
-      });
-      this.relaxedBody.removeAllListeners("readable");
-      this.relaxedBody.pipe(this.cache);
+        return;
+      }
+      if (dkimField) {
+        this.output.write(Buffer.from(dkimField + `\r
+`));
+      }
+      setImmediate(signNextKey);
+    };
+    if (this.bodyHash && this.headers) {
+      return signNextKey();
     }
-    signStream() {
-      this.parser = new MessageParser;
-      this.relaxedBody = new RelaxedBody({
-        hashAlgo: this.hashAlgo
-      });
-      this.parser.on("headers", (value) => {
-        this.headers = value;
-      });
-      this.relaxedBody.on("hash", (value) => {
-        this.bodyHash = value;
-      });
+    this.output.write(this.parser.rawHeaders);
+    this.sendNextChunk();
+  }
+  createWriteCache() {
+    this.output.usingCache = true;
+    this.cache = fs3.createWriteStream(this.cachePath);
+    this.cache.once("error", (err) => {
+      this.cleanup();
+      this.relaxedBody.unpipe(this.cache);
       this.relaxedBody.on("readable", () => {
-        let chunk;
-        if (this.cache) {
-          return;
-        }
-        while ((chunk = this.relaxedBody.read()) !== null) {
-          this.chunks.push(chunk);
-          this.chunklen += chunk.length;
-          if (this.chunklen >= this.cacheTreshold && this.cachePath) {
-            return this.createWriteCache();
-          }
-        }
+        while (this.relaxedBody.read() !== null) {}
       });
-      this.relaxedBody.on("end", () => {
-        if (this.cache) {
-          return;
-        }
-        this.sendSignedOutput();
-      });
-      this.parser.pipe(this.relaxedBody);
-      setImmediate(() => this.input.pipe(this.parser));
-    }
+      this.hasErrored = true;
+      this.output.emit("error", err);
+    });
+    this.cache.once("close", () => {
+      this.sendSignedOutput();
+    });
+    this.relaxedBody.removeAllListeners("readable");
+    this.relaxedBody.pipe(this.cache);
   }
+  signStream() {
+    this.parser = new message_parser_default;
+    this.relaxedBody = new relaxed_body_default({
+      hashAlgo: this.hashAlgo
+    });
+    this.parser.on("headers", (value) => {
+      this.headers = value;
+    });
+    this.relaxedBody.on("hash", (value) => {
+      this.bodyHash = value;
+    });
+    this.relaxedBody.on("readable", () => {
+      let chunk;
+      if (this.cache) {
+        return;
+      }
+      while ((chunk = this.relaxedBody.read()) !== null) {
+        this.chunks.push(chunk);
+        this.chunklen += chunk.length;
+        if (this.chunklen >= this.cacheTreshold && this.cachePath) {
+          return this.createWriteCache();
+        }
+      }
+    });
+    this.relaxedBody.on("end", () => {
+      if (this.cache) {
+        return;
+      }
+      this.sendSignedOutput();
+    });
+    this.parser.pipe(this.relaxedBody);
+    setImmediate(() => this.input.pipe(this.parser));
+  }
+}
 
-  class DKIM {
-    constructor(options) {
-      this.options = options || {};
-      this.keys = [].concat(this.options.keys || {
-        domainName: options.domainName,
-        keySelector: options.keySelector,
-        privateKey: options.privateKey
-      });
-    }
-    sign(input2, extraOptions) {
-      let output2 = new PassThrough;
-      let inputStream = input2;
-      let writeValue = false;
-      if (Buffer.isBuffer(input2)) {
-        writeValue = input2;
-        inputStream = new PassThrough;
-      } else if (typeof input2 === "string") {
-        writeValue = Buffer.from(input2);
-        inputStream = new PassThrough;
-      }
-      let options = this.options;
-      if (extraOptions && Object.keys(extraOptions).length) {
-        options = {};
-        Object.keys(this.options || {}).forEach((key) => {
-          options[key] = this.options[key];
-        });
-        Object.keys(extraOptions || {}).forEach((key) => {
-          if (!(key in options)) {
-            options[key] = extraOptions[key];
-          }
-        });
-      }
-      let signer = new DKIMSigner(options, this.keys, inputStream, output2);
-      setImmediate(() => {
-        signer.signStream();
-        if (writeValue) {
-          setImmediate(() => {
-            inputStream.end(writeValue);
-          });
-        }
-      });
-      return output2;
-    }
+class DKIM {
+  constructor(options) {
+    this.options = options || {};
+    this.keys = [].concat(this.options.keys || {
+      domainName: options.domainName,
+      keySelector: options.keySelector,
+      privateKey: options.privateKey
+    });
   }
-  module.exports = DKIM;
+  sign(input2, extraOptions) {
+    const output2 = new PassThrough3;
+    let inputStream = input2;
+    let writeValue = false;
+    if (Buffer.isBuffer(input2)) {
+      writeValue = input2;
+      inputStream = new PassThrough3;
+    } else if (typeof input2 === "string") {
+      writeValue = Buffer.from(input2);
+      inputStream = new PassThrough3;
+    }
+    let options = this.options;
+    if (extraOptions && Object.keys(extraOptions).length) {
+      options = copyOwnKeys({}, extraOptions);
+      copyOwnKeys(options, this.options);
+    }
+    const signer = new DKIMSigner(options, this.keys, inputStream, output2);
+    setImmediate(() => {
+      try {
+        signer.signStream();
+      } catch (_E2) {
+        output2.emit("error", sign_default.unsupportedHashAlgoError(signer.hashAlgo));
+        return;
+      }
+      if (writeValue) {
+        setImmediate(() => {
+          inputStream.end(writeValue);
+        });
+      }
+    });
+    return output2;
+  }
+}
+var DKIM_ALGO = "sha256", MAX_MESSAGE_SIZE, dkim_default;
+var init_dkim = __esm(() => {
+  init_message_parser();
+  init_relaxed_body();
+  init_sign();
+  MAX_MESSAGE_SIZE = 10 * 1024 * 1024;
+  dkim_default = DKIM;
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/smtp-connection/http-proxy-client.js
-var require_http_proxy_client = __commonJS((exports, module) => {
-  var net = __require("net");
-  var tls = __require("tls");
-  var urllib = __require("url");
-  function httpProxyClient(proxyUrl, destinationPort, destinationHost, callback) {
-    let proxy = urllib.parse(proxyUrl);
-    let options;
-    let connect;
-    let socket;
-    options = {
-      host: proxy.hostname,
-      port: Number(proxy.port) ? Number(proxy.port) : proxy.protocol === "https:" ? 443 : 80
-    };
-    if (proxy.protocol === "https:") {
-      options.rejectUnauthorized = false;
-      connect = tls.connect.bind(tls);
-    } else {
-      connect = net.connect.bind(net);
+// /zveltio-extension/node_modules/nodemailer/dist/esm/smtp-connection/http-proxy-client.js
+import net5 from "net";
+import tls from "tls";
+function httpProxyClient(proxyUrl, destinationPort, destinationHost, tlsOptions, callback) {
+  if (typeof tlsOptions === "function") {
+    callback = tlsOptions;
+    tlsOptions = {};
+  }
+  tlsOptions = tlsOptions || {};
+  const done = callback;
+  destinationPort = Number(destinationPort) || 0;
+  if (!destinationPort || /[\r\n]/.test(destinationHost)) {
+    const err = new Error("Invalid proxy destination");
+    err.code = EPROXY;
+    setImmediate(() => done(err));
+    return;
+  }
+  const proxy = parse7(proxyUrl);
+  const connectOptions = {
+    host: proxy.hostname,
+    port: Number(proxy.port) ? Number(proxy.port) : proxy.protocol === "https:" ? 443 : 80
+  };
+  let connect;
+  if (proxy.protocol === "https:") {
+    connectOptions.rejectUnauthorized = tlsOptions.rejectUnauthorized !== false;
+    connect = tls.connect.bind(tls);
+  } else {
+    connect = net5.connect.bind(net5);
+  }
+  let socket;
+  let finished = false;
+  const tempSocketErr = (err) => {
+    if (finished) {
+      return;
     }
-    let finished = false;
-    let tempSocketErr = (err) => {
-      if (finished) {
-        return;
-      }
-      finished = true;
-      try {
-        socket.destroy();
-      } catch (E) {}
-      callback(err);
+    finished = true;
+    try {
+      socket.destroy();
+    } catch (_E2) {}
+    done(err);
+  };
+  const timeoutErr = () => {
+    const err = new Error("Proxy socket timed out");
+    err.code = "ETIMEDOUT";
+    tempSocketErr(err);
+  };
+  socket = connect(connectOptions, () => {
+    if (finished) {
+      return;
+    }
+    const reqHeaders = {
+      Host: destinationHost + ":" + destinationPort,
+      Connection: "close"
     };
-    let timeoutErr = () => {
-      let err = new Error("Proxy socket timed out");
-      err.code = "ETIMEDOUT";
-      tempSocketErr(err);
-    };
-    socket = connect(options, () => {
-      if (finished) {
-        return;
-      }
-      let reqHeaders = {
-        Host: destinationHost + ":" + destinationPort,
-        Connection: "close"
-      };
-      if (proxy.auth) {
-        reqHeaders["Proxy-Authorization"] = "Basic " + Buffer.from(proxy.auth).toString("base64");
-      }
-      socket.write("CONNECT " + destinationHost + ":" + destinationPort + ` HTTP/1.1\r
+    if (proxy.auth) {
+      reqHeaders["Proxy-Authorization"] = "Basic " + Buffer.from(proxy.auth).toString("base64");
+    }
+    socket.write("CONNECT " + destinationHost + ":" + destinationPort + ` HTTP/1.1\r
 ` + Object.keys(reqHeaders).map((key) => key + ": " + reqHeaders[key]).join(`\r
 `) + `\r
 \r
 `);
-      let headers = "";
-      let onSocketData = (chunk) => {
-        let match2;
-        let remainder;
-        if (finished) {
-          return;
+    const chunks = [];
+    let received = 0;
+    let tail = "";
+    const onSocketData = (chunk) => {
+      let match2;
+      if (finished) {
+        return;
+      }
+      const window = tail + chunk.toString("binary");
+      const windowEnd = window.indexOf(`\r
+\r
+`);
+      chunks.push(chunk);
+      received += chunk.length;
+      tail = window.slice(-3);
+      if (windowEnd >= 0) {
+        socket.removeListener("data", onSocketData);
+        const headerEnd = received - window.length + windowEnd;
+        const response = Buffer.concat(chunks, received).toString("binary");
+        const headers = response.substr(0, headerEnd);
+        const remainder = response.substr(headerEnd + 4);
+        if (remainder) {
+          socket.unshift(Buffer.from(remainder, "binary"));
         }
-        headers += chunk.toString("binary");
-        if (match2 = headers.match(/\r\n\r\n/)) {
-          socket.removeListener("data", onSocketData);
-          remainder = headers.substr(match2.index + match2[0].length);
-          headers = headers.substr(0, match2.index);
-          if (remainder) {
-            socket.unshift(Buffer.from(remainder, "binary"));
-          }
-          finished = true;
-          match2 = headers.match(/^HTTP\/\d+\.\d+ (\d+)/i);
-          if (!match2 || (match2[1] || "").charAt(0) !== "2") {
-            try {
-              socket.destroy();
-            } catch (E) {}
-            return callback(new Error("Invalid response from proxy" + (match2 && ": " + match2[1] || "")));
-          }
-          socket.removeListener("error", tempSocketErr);
-          socket.removeListener("timeout", timeoutErr);
-          socket.setTimeout(0);
-          return callback(null, socket);
+        finished = true;
+        match2 = headers.match(/^HTTP\/\d+\.\d+ (\d+)/i);
+        if (!match2 || (match2[1] || "").charAt(0) !== "2") {
+          try {
+            socket.destroy();
+          } catch (_E2) {}
+          const err = new Error("Invalid response from proxy" + (match2 && ": " + match2[1] || ""));
+          err.code = EPROXY;
+          return done(err);
         }
-      };
-      socket.on("data", onSocketData);
-    });
-    socket.setTimeout(httpProxyClient.timeout || 30 * 1000);
-    socket.on("timeout", timeoutErr);
-    socket.once("error", tempSocketErr);
-  }
-  module.exports = httpProxyClient;
+        socket.removeListener("error", tempSocketErr);
+        socket.removeListener("timeout", timeoutErr);
+        socket.setTimeout(0);
+        return done(null, socket);
+      }
+      if (received > MAX_RESPONSE_HEADER_BYTES) {
+        socket.removeListener("data", onSocketData);
+        const err = new Error("Proxy response headers too large");
+        err.code = EPROXY;
+        return tempSocketErr(err);
+      }
+    };
+    socket.on("data", onSocketData);
+  });
+  socket.setTimeout(httpProxyClient.timeout || 30 * 1000);
+  socket.on("timeout", timeoutErr);
+  socket.once("error", tempSocketErr);
+}
+var MAX_RESPONSE_HEADER_BYTES, http_proxy_client_default;
+var init_http_proxy_client = __esm(() => {
+  init_url();
+  init_errors();
+  MAX_RESPONSE_HEADER_BYTES = 64 * 1024;
+  http_proxy_client_default = httpProxyClient;
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/mailer/mail-message.js
-var require_mail_message = __commonJS((exports, module) => {
-  var shared = require_shared();
-  var MimeNode = require_mime_node3();
-  var mimeFuncs = require_mime_funcs();
-
-  class MailMessage {
-    constructor(mailer, data) {
-      this.mailer = mailer;
-      this.data = {};
-      this.message = null;
-      data = data || {};
-      let options = mailer.options || {};
-      let defaults = mailer._defaults || {};
-      Object.keys(data).forEach((key) => {
-        this.data[key] = data[key];
-      });
-      this.data.headers = this.data.headers || {};
-      Object.keys(defaults).forEach((key) => {
-        if (!(key in this.data)) {
-          this.data[key] = defaults[key];
-        } else if (key === "headers") {
-          Object.keys(defaults.headers).forEach((key2) => {
-            if (!(key2 in this.data.headers)) {
-              this.data.headers[key2] = defaults.headers[key2];
-            }
-          });
-        }
-      });
-      ["disableFileAccess", "disableUrlAccess", "normalizeHeaderKey"].forEach((key) => {
-        if (key in options) {
-          this.data[key] = options[key];
-        }
-      });
-    }
-    resolveContent(...args) {
-      return shared.resolveContent(...args);
-    }
-    resolveAll(callback) {
-      let keys = [
-        [this.data, "html"],
-        [this.data, "text"],
-        [this.data, "watchHtml"],
-        [this.data, "amp"],
-        [this.data, "icalEvent"]
-      ];
-      if (this.data.alternatives && this.data.alternatives.length) {
-        this.data.alternatives.forEach((alternative, i) => {
-          keys.push([this.data.alternatives, i]);
-        });
+// /zveltio-extension/node_modules/nodemailer/dist/esm/mailer/mail-message.js
+class MailMessage {
+  constructor(mailer, data) {
+    this.mailer = mailer;
+    this.data = {};
+    this.message = null;
+    data = data || {};
+    const options = mailer.options || {};
+    const defaults = mailer._defaults || {};
+    copyOwnKeys(this.data, data);
+    this.data.headers = this.data.headers || {};
+    copyOwnKeys(this.data, defaults, (key) => hasOwn(this.data, key));
+    copyOwnKeys(this.data.headers, defaults.headers, (key) => hasOwn(this.data.headers, key));
+    ["disableFileAccess", "disableUrlAccess", "normalizeHeaderKey", "maxRecipients"].forEach((key) => {
+      if (key in options) {
+        this.data[key] = options[key];
       }
-      if (this.data.attachments && this.data.attachments.length) {
-        this.data.attachments.forEach((attachment, i) => {
-          if (!attachment.filename) {
-            attachment.filename = (attachment.path || attachment.href || "").split("/").pop().split("?").shift() || "attachment-" + (i + 1);
-            if (attachment.filename.indexOf(".") < 0) {
-              attachment.filename += "." + mimeFuncs.detectExtension(attachment.contentType);
-            }
-          }
-          if (!attachment.contentType) {
-            attachment.contentType = mimeFuncs.detectMimeType(attachment.filename || attachment.path || attachment.href || "bin");
-          }
-          keys.push([this.data.attachments, i]);
-        });
+    });
+    ["disableFileAccess", "disableUrlAccess"].forEach((key) => {
+      if (!(key in options) && hasOwn(defaults, key)) {
+        this.data[key] = this.data[key] || defaults[key];
       }
-      let mimeNode = new MimeNode;
-      let addressKeys = ["from", "to", "cc", "bcc", "sender", "replyTo"];
-      addressKeys.forEach((address) => {
-        let value;
-        if (this.message) {
-          value = [].concat(mimeNode._parseAddresses(this.message.getHeader(address === "replyTo" ? "reply-to" : address)) || []);
-        } else if (this.data[address]) {
-          value = [].concat(mimeNode._parseAddresses(this.data[address]) || []);
-        }
-        if (value && value.length) {
-          this.data[address] = value;
-        } else if (address in this.data) {
-          this.data[address] = null;
-        }
-      });
-      let singleKeys = ["from", "sender"];
-      singleKeys.forEach((address) => {
-        if (this.data[address]) {
-          this.data[address] = this.data[address].shift();
-        }
-      });
-      let pos = 0;
-      let resolveNext = () => {
-        if (pos >= keys.length) {
-          return callback(null, this.data);
-        }
-        let args = keys[pos++];
-        if (!args[0] || !args[0][args[1]]) {
-          return resolveNext();
-        }
-        shared.resolveContent(...args, (err, value) => {
-          if (err) {
-            return callback(err);
-          }
-          let node3 = {
-            content: value
-          };
-          if (args[0][args[1]] && typeof args[0][args[1]] === "object" && !Buffer.isBuffer(args[0][args[1]])) {
-            Object.keys(args[0][args[1]]).forEach((key) => {
-              if (!(key in node3) && !["content", "path", "href", "raw"].includes(key)) {
-                node3[key] = args[0][args[1]][key];
-              }
-            });
-          }
-          args[0][args[1]] = node3;
-          resolveNext();
-        });
-      };
-      setImmediate(() => resolveNext());
+    });
+  }
+  resolveContent(data, key, options, callback) {
+    if (!callback && typeof options === "function") {
+      callback = options;
+      options = false;
     }
-    normalize(callback) {
-      let envelope = this.data.envelope || this.message.getEnvelope();
-      let messageId = this.message.messageId();
-      this.resolveAll((err, data) => {
+    options = options || {};
+    const policy = {
+      disableFileAccess: this.data.disableFileAccess || options.disableFileAccess,
+      disableUrlAccess: this.data.disableUrlAccess || options.disableUrlAccess
+    };
+    return resolveContent(data, key, policy, callback);
+  }
+  resolveAll(callback) {
+    const keys = [
+      [this.data, "html"],
+      [this.data, "text"],
+      [this.data, "watchHtml"],
+      [this.data, "amp"],
+      [this.data, "icalEvent"]
+    ];
+    if (this.data.alternatives && this.data.alternatives.length) {
+      this.data.alternatives.forEach((alternative, i) => {
+        keys.push([this.data.alternatives, i]);
+      });
+    }
+    if (this.data.attachments && this.data.attachments.length) {
+      this.data.attachments.forEach((attachment, i) => {
+        if (!attachment.filename) {
+          attachment.filename = (attachment.path || attachment.href || "").split(/[/\\]/).pop().split("?").shift() || "attachment-" + (i + 1);
+          if (attachment.filename.indexOf(".") < 0) {
+            attachment.filename += "." + detectExtension2(attachment.contentType);
+          }
+        }
+        if (!attachment.contentType) {
+          attachment.contentType = detectMimeType2(attachment.filename || attachment.path || attachment.href || "bin");
+        }
+        keys.push([this.data.attachments, i]);
+      });
+    }
+    const mimeNode = new mime_node_default;
+    const addressKeys = ["from", "to", "cc", "bcc", "sender", "replyTo"];
+    addressKeys.forEach((address) => {
+      let value;
+      if (this.message) {
+        value = [].concat(mimeNode._parseAddresses(this.message.getHeader(address === "replyTo" ? "reply-to" : address)) || []);
+      } else if (this.data[address]) {
+        value = [].concat(mimeNode._parseAddresses(this.data[address]) || []);
+      }
+      if (value && value.length) {
+        this.data[address] = value;
+      } else if (address in this.data) {
+        this.data[address] = null;
+      }
+    });
+    const singleKeys = ["from", "sender"];
+    singleKeys.forEach((address) => {
+      if (this.data[address]) {
+        this.data[address] = this.data[address].shift();
+      }
+    });
+    let pos = 0;
+    const resolveNext = () => {
+      if (pos >= keys.length) {
+        return callback(null, this.data);
+      }
+      const args = keys[pos++];
+      if (!args[0] || !args[0][args[1]]) {
+        return resolveNext();
+      }
+      resolveContent(...args, { disableFileAccess: this.data.disableFileAccess, disableUrlAccess: this.data.disableUrlAccess }, (err, value) => {
         if (err) {
           return callback(err);
         }
-        data.envelope = envelope;
-        data.messageId = messageId;
-        ["html", "text", "watchHtml", "amp"].forEach((key) => {
-          if (data[key] && data[key].content) {
-            if (typeof data[key].content === "string") {
-              data[key] = data[key].content;
-            } else if (Buffer.isBuffer(data[key].content)) {
-              data[key] = data[key].content.toString();
-            }
-          }
-        });
-        if (data.icalEvent && Buffer.isBuffer(data.icalEvent.content)) {
-          data.icalEvent.content = data.icalEvent.content.toString("base64");
-          data.icalEvent.encoding = "base64";
+        const node4 = {
+          content: value
+        };
+        if (args[0][args[1]] && typeof args[0][args[1]] === "object" && !Buffer.isBuffer(args[0][args[1]])) {
+          copyOwnKeys(node4, args[0][args[1]], (key) => (key in node4) || ["content", "path", "href", "raw"].includes(key));
         }
-        if (data.alternatives && data.alternatives.length) {
-          data.alternatives.forEach((alternative) => {
-            if (alternative && alternative.content && Buffer.isBuffer(alternative.content)) {
-              alternative.content = alternative.content.toString("base64");
-              alternative.encoding = "base64";
-            }
-          });
-        }
-        if (data.attachments && data.attachments.length) {
-          data.attachments.forEach((attachment) => {
-            if (attachment && attachment.content && Buffer.isBuffer(attachment.content)) {
-              attachment.content = attachment.content.toString("base64");
-              attachment.encoding = "base64";
-            }
-          });
-        }
-        data.normalizedHeaders = {};
-        Object.keys(data.headers || {}).forEach((key) => {
-          let value = [].concat(data.headers[key] || []).shift();
-          value = value && value.value || value;
-          if (value) {
-            if (["references", "in-reply-to", "message-id", "content-id"].includes(key)) {
-              value = this.message._encodeHeaderValue(key, value);
-            }
-            data.normalizedHeaders[key] = value;
-          }
-        });
-        if (data.list && typeof data.list === "object") {
-          let listHeaders = this._getListHeaders(data.list);
-          listHeaders.forEach((entry) => {
-            data.normalizedHeaders[entry.key] = entry.value.map((val) => val && val.value || val).join(", ");
-          });
-        }
-        if (data.references) {
-          data.normalizedHeaders.references = this.message._encodeHeaderValue("references", data.references);
-        }
-        if (data.inReplyTo) {
-          data.normalizedHeaders["in-reply-to"] = this.message._encodeHeaderValue("in-reply-to", data.inReplyTo);
-        }
-        return callback(null, data);
+        args[0][args[1]] = node4;
+        resolveNext();
       });
-    }
-    setMailerHeader() {
-      if (!this.message || !this.data.xMailer) {
-        return;
+    };
+    setImmediate(() => resolveNext());
+  }
+  normalize(callback) {
+    const envelope = this.message.getEnvelope();
+    const messageId = this.message.messageId();
+    this.resolveAll((err, data) => {
+      if (err) {
+        return callback(err);
       }
-      this.message.setHeader("X-Mailer", this.data.xMailer);
-    }
-    setPriorityHeaders() {
-      if (!this.message || !this.data.priority) {
-        return;
+      data.envelope = envelope;
+      data.messageId = messageId;
+      ["html", "text", "watchHtml", "amp"].forEach((key) => {
+        if (data[key] && data[key].content) {
+          if (typeof data[key].content === "string") {
+            data[key] = data[key].content;
+          } else if (Buffer.isBuffer(data[key].content)) {
+            data[key] = data[key].content.toString();
+          }
+        }
+      });
+      if (data.icalEvent && Buffer.isBuffer(data.icalEvent.content)) {
+        data.icalEvent.content = data.icalEvent.content.toString("base64");
+        data.icalEvent.encoding = "base64";
       }
-      switch ((this.data.priority || "").toString().toLowerCase()) {
-        case "high":
-          this.message.setHeader("X-Priority", "1 (Highest)");
-          this.message.setHeader("X-MSMail-Priority", "High");
-          this.message.setHeader("Importance", "High");
-          break;
-        case "low":
-          this.message.setHeader("X-Priority", "5 (Lowest)");
-          this.message.setHeader("X-MSMail-Priority", "Low");
-          this.message.setHeader("Importance", "Low");
-          break;
-        default:
-      }
-    }
-    setListHeaders() {
-      if (!this.message || !this.data.list || typeof this.data.list !== "object") {
-        return;
-      }
-      if (this.data.list && typeof this.data.list === "object") {
-        this._getListHeaders(this.data.list).forEach((listHeader) => {
-          listHeader.value.forEach((value) => {
-            this.message.addHeader(listHeader.key, value);
-          });
+      if (data.alternatives && data.alternatives.length) {
+        data.alternatives.forEach((alternative) => {
+          if (alternative && alternative.content && Buffer.isBuffer(alternative.content)) {
+            alternative.content = alternative.content.toString("base64");
+            alternative.encoding = "base64";
+          }
         });
       }
-    }
-    _getListHeaders(listData) {
-      return Object.keys(listData).map((key) => ({
-        key: "list-" + key.toLowerCase().trim(),
-        value: [].concat(listData[key] || []).map((value) => ({
-          prepared: true,
-          foldLines: true,
-          value: [].concat(value || []).map((value2) => {
-            if (typeof value2 === "string") {
-              value2 = {
-                url: value2
-              };
-            }
-            if (value2 && value2.url) {
-              if (key.toLowerCase().trim() === "id") {
-                let comment2 = value2.comment || "";
-                if (mimeFuncs.isPlainText(comment2)) {
-                  comment2 = '"' + comment2 + '"';
-                } else {
-                  comment2 = mimeFuncs.encodeWord(comment2);
-                }
-                return (value2.comment ? comment2 + " " : "") + this._formatListUrl(value2.url).replace(/^<[^:]+\/{,2}/, "");
-              }
-              let comment = value2.comment || "";
-              if (!mimeFuncs.isPlainText(comment)) {
-                comment = mimeFuncs.encodeWord(comment);
-              }
-              return this._formatListUrl(value2.url) + (value2.comment ? " (" + comment + ")" : "");
-            }
-            return "";
-          }).filter((value2) => value2).join(", ")
-        }))
-      }));
-    }
-    _formatListUrl(url2) {
-      url2 = url2.replace(/[\s<]+|[\s>]+/g, "");
-      if (/^(https?|mailto|ftp):/.test(url2)) {
-        return "<" + url2 + ">";
+      if (data.attachments && data.attachments.length) {
+        data.attachments.forEach((attachment) => {
+          if (attachment && attachment.content && Buffer.isBuffer(attachment.content)) {
+            attachment.content = attachment.content.toString("base64");
+            attachment.encoding = "base64";
+          }
+        });
       }
-      if (/^[^@]+@[^@]+$/.test(url2)) {
-        return "<mailto:" + url2 + ">";
+      data.normalizedHeaders = {};
+      Object.keys(data.headers || {}).forEach((key) => {
+        if (isProtoKey(key)) {
+          return;
+        }
+        let value = [].concat(data.headers[key] || []).shift();
+        value = value && value.value || value;
+        if (value) {
+          if (["references", "in-reply-to", "message-id", "content-id"].includes(key)) {
+            value = this.message._encodeHeaderValue(key, value);
+          }
+          data.normalizedHeaders[key] = value;
+        }
+      });
+      if (data.list && typeof data.list === "object") {
+        const listHeaders = this._getListHeaders(data.list);
+        listHeaders.forEach((entry) => {
+          data.normalizedHeaders[entry.key] = entry.value.map((val) => val && val.value || val).join(", ");
+        });
       }
-      return "<http://" + url2 + ">";
+      if (data.references) {
+        data.normalizedHeaders.references = this.message._encodeHeaderValue("references", data.references);
+      }
+      if (data.inReplyTo) {
+        data.normalizedHeaders["in-reply-to"] = this.message._encodeHeaderValue("in-reply-to", data.inReplyTo);
+      }
+      return callback(null, data);
+    });
+  }
+  setMailerHeader() {
+    if (!this.message || !this.data.xMailer) {
+      return;
+    }
+    this.message.setHeader("X-Mailer", this.data.xMailer);
+  }
+  setPriorityHeaders() {
+    if (!this.message || !this.data.priority) {
+      return;
+    }
+    switch ((this.data.priority || "").toString().toLowerCase()) {
+      case "high":
+        this.message.setHeader("X-Priority", "1 (Highest)");
+        this.message.setHeader("X-MSMail-Priority", "High");
+        this.message.setHeader("Importance", "High");
+        break;
+      case "low":
+        this.message.setHeader("X-Priority", "5 (Lowest)");
+        this.message.setHeader("X-MSMail-Priority", "Low");
+        this.message.setHeader("Importance", "Low");
+        break;
+      default:
     }
   }
-  module.exports = MailMessage;
+  setListHeaders() {
+    if (!this.message || !this.data.list || typeof this.data.list !== "object") {
+      return;
+    }
+    this._getListHeaders(this.data.list).forEach((listHeader) => {
+      listHeader.value.forEach((value) => {
+        this.message.addHeader(listHeader.key, value);
+      });
+    });
+  }
+  _getListHeaders(listData) {
+    return Object.keys(listData).map((key) => ({
+      key: "list-" + key.toLowerCase().trim(),
+      value: [].concat(listData[key] || []).map((value) => ({
+        prepared: true,
+        foldLines: true,
+        value: [].concat(value || []).map((value2) => {
+          if (typeof value2 === "string") {
+            value2 = {
+              url: value2
+            };
+          }
+          if (value2 && value2.url) {
+            let comment = (value2.comment || "").toString().replace(/\r?\n|\r/g, " ");
+            const needsEncoding = !isPlainText(comment) || /\x7f/.test(comment);
+            if (key.toLowerCase().trim() === "id") {
+              comment = needsEncoding ? encodeWord(comment) : quoteString(comment);
+              return (value2.comment ? comment + " " : "") + this._formatListUrl(value2.url).replace(/^<[^:]+:\/{0,2}/, "<");
+            }
+            comment = needsEncoding ? encodeWord(comment) : comment.replace(/[()\\]/g, "\\$&");
+            return this._formatListUrl(value2.url) + (value2.comment ? " (" + comment + ")" : "");
+          }
+          return "";
+        }).filter((value2) => value2).join(", ")
+      }))
+    }));
+  }
+  _formatListUrl(url2) {
+    url2 = url2.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "").replace(/[\s<]+|[\s>]+/g, "");
+    if (/^(https?|mailto|ftp):/.test(url2)) {
+      return "<" + url2 + ">";
+    }
+    if (/^[^@]+@[^@]+$/.test(url2)) {
+      return "<mailto:" + url2 + ">";
+    }
+    return "<http://" + url2 + ">";
+  }
+}
+var hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+var init_mail_message = __esm(() => {
+  init_shared();
+  init_mime_node();
+  init_mime_funcs();
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/mailer/index.js
-var require_mailer = __commonJS((exports, module) => {
-  var EventEmitter = __require("events");
-  var shared = require_shared();
-  var mimeTypes = require_mime_types();
-  var MailComposer = require_mail_composer();
-  var DKIM = require_dkim();
-  var httpProxyClient = require_http_proxy_client();
-  var util = __require("util");
-  var urllib = __require("url");
-  var packageData = require_package5();
-  var MailMessage = require_mail_message();
-  var net = __require("net");
-  var dns = __require("dns");
-  var crypto2 = __require("crypto");
-
-  class Mail extends EventEmitter {
+// /zveltio-extension/node_modules/nodemailer/dist/esm/mailer/index.js
+import { EventEmitter } from "events";
+import util2 from "util";
+import net6 from "net";
+import dns2 from "dns";
+import crypto6 from "crypto";
+var DEFAULT_MAX_RECIPIENTS = 1e5, Mail, mailer_default;
+var init_mailer = __esm(() => {
+  init_shared();
+  init_mime_types();
+  init_mail_composer();
+  init_dkim();
+  init_http_proxy_client();
+  init_errors();
+  init_url();
+  init_mail_message();
+  Mail = class Mail extends EventEmitter {
     constructor(transporter, options, defaults) {
       super();
       this.options = options || {};
@@ -91452,10 +92904,10 @@ var require_mailer = __commonJS((exports, module) => {
         stream: []
       };
       this.meta = new Map;
-      this.dkim = this.options.dkim ? new DKIM(this.options.dkim) : false;
+      this.dkim = this.options.dkim ? new dkim_default(this.options.dkim) : false;
       this.transporter = transporter;
       this.transporter.mailer = this;
-      this.logger = shared.getLogger(this.options, {
+      this.logger = getLogger(this.options, {
         component: this.options.component || "mail"
       });
       this.logger.debug({
@@ -91477,6 +92929,9 @@ var require_mailer = __commonJS((exports, module) => {
         this.transporter.on("idle", (...args) => {
           this.emit("idle", ...args);
         });
+        this.transporter.on("clear", (...args) => {
+          this.emit("clear", ...args);
+        });
       }
       ["close", "isIdle", "verify"].forEach((method) => {
         this[method] = (...args) => {
@@ -91486,13 +92941,12 @@ var require_mailer = __commonJS((exports, module) => {
               this.getSocket = false;
             }
             return this.transporter[method](...args);
-          } else {
-            this.logger.warn({
-              tnx: "transport",
-              methodName: method
-            }, "Non existing method %s called for transport", method);
-            return false;
           }
+          this.logger.warn({
+            tnx: "transport",
+            methodName: method
+          }, "Non existing method %s called for transport", method);
+          return false;
         };
       });
       if (this.options.proxy && typeof this.options.proxy === "string") {
@@ -91511,15 +92965,16 @@ var require_mailer = __commonJS((exports, module) => {
     sendMail(data, callback = null) {
       let promise2;
       if (!callback) {
-        promise2 = new Promise((resolve, reject) => {
-          callback = shared.callbackPromise(resolve, reject);
+        promise2 = new Promise((resolve3, reject) => {
+          callback = callbackPromise(resolve3, reject);
         });
       }
+      const done = callback;
       if (typeof this.getSocket === "function") {
         this.transporter.getSocket = this.getSocket;
         this.getSocket = false;
       }
-      let mail = new MailMessage(this, data);
+      const mail = new MailMessage(this, data);
       this.logger.debug({
         tnx: "transport",
         name: this.transporter.name,
@@ -91533,12 +92988,34 @@ var require_mailer = __commonJS((exports, module) => {
             tnx: "plugin",
             action: "compile"
           }, "PluginCompile Error: %s", err.message);
-          return callback(err);
+          return done(err);
         }
-        mail.message = new MailComposer(mail.data).compile();
-        mail.setMailerHeader();
-        mail.setPriorityHeaders();
-        mail.setListHeaders();
+        let recipientCount;
+        try {
+          mail.message = new mail_composer_default(mail.data).compile();
+          mail.setMailerHeader();
+          mail.setPriorityHeaders();
+          mail.setListHeaders();
+          recipientCount = mail.message.getEnvelope().to.length;
+        } catch (err2) {
+          this.logger.error({
+            err: err2,
+            tnx: "transport",
+            action: "send"
+          }, "Compile Error: %s", err2.message);
+          return done(err2);
+        }
+        const maxRecipients = mail.data.maxRecipients === undefined ? DEFAULT_MAX_RECIPIENTS : mail.data.maxRecipients;
+        if (maxRecipients && recipientCount > maxRecipients) {
+          const err2 = new Error(`Message has ${recipientCount} recipients, which is over the ${maxRecipients} allowed by maxRecipients`);
+          err2.code = EMAXRECIPIENTS;
+          this.logger.error({
+            err: err2,
+            tnx: "transport",
+            action: "send"
+          }, "Send Error: %s", err2.message);
+          return done(err2);
+        }
         this._processPlugins("stream", mail, (err2) => {
           if (err2) {
             this.logger.error({
@@ -91546,11 +93023,11 @@ var require_mailer = __commonJS((exports, module) => {
               tnx: "plugin",
               action: "stream"
             }, "PluginStream Error: %s", err2.message);
-            return callback(err2);
+            return done(err2);
           }
           if (mail.data.dkim || this.dkim) {
             mail.message.processFunc((input2) => {
-              let dkim = mail.data.dkim ? new DKIM(mail.data.dkim) : this.dkim;
+              const dkim = mail.data.dkim ? new dkim_default(mail.data.dkim) : this.dkim;
               this.logger.debug({
                 tnx: "DKIM",
                 messageId: mail.message.messageId(),
@@ -91567,22 +93044,22 @@ var require_mailer = __commonJS((exports, module) => {
                 action: "send"
               }, "Send Error: %s", args[0].message);
             }
-            callback(...args);
+            done(...args);
           });
         });
       });
       return promise2;
     }
     getVersionString() {
-      return util.format("%s (%s; +%s; %s/%s)", packageData.name, packageData.version, packageData.homepage, this.transporter.name, this.transporter.version);
+      return util2.format("%s (%s; +%s; %s/%s)", name2, version2, homepage, this.transporter.name, this.transporter.version);
     }
     _processPlugins(step, mail, callback) {
       step = (step || "").toString();
       if (!this._userPlugins.hasOwnProperty(step)) {
         return callback();
       }
-      let userPlugins = this._userPlugins[step] || [];
-      let defaultPlugins = this._defaultPlugins[step] || [];
+      const userPlugins = this._userPlugins[step] || [];
+      const defaultPlugins = this._defaultPlugins[step] || [];
       if (userPlugins.length) {
         this.logger.debug({
           tnx: "transaction",
@@ -91595,7 +93072,7 @@ var require_mailer = __commonJS((exports, module) => {
       }
       let pos = 0;
       let block = "default";
-      let processPlugins = () => {
+      const processPlugins = () => {
         let curplugins = block === "default" ? defaultPlugins : userPlugins;
         if (pos >= curplugins.length) {
           if (block === "default" && userPlugins.length) {
@@ -91606,7 +93083,7 @@ var require_mailer = __commonJS((exports, module) => {
             return callback();
           }
         }
-        let plugin = curplugins[pos++];
+        const plugin = curplugins[pos++];
         plugin(mail, (err) => {
           if (err) {
             return callback(err);
@@ -91617,18 +93094,18 @@ var require_mailer = __commonJS((exports, module) => {
       processPlugins();
     }
     setupProxy(proxyUrl) {
-      let proxy = urllib.parse(proxyUrl);
+      const proxy = parse7(proxyUrl);
       this.getSocket = (options, callback) => {
-        let protocol = proxy.protocol.replace(/:$/, "").toLowerCase();
+        const protocol = proxy.protocol.replace(/:$/, "").toLowerCase();
         if (this.meta.has("proxy_handler_" + protocol)) {
           return this.meta.get("proxy_handler_" + protocol)(proxy, options, callback);
         }
         switch (protocol) {
           case "http":
           case "https":
-            httpProxyClient(proxy.href, options.port, options.host, (err, socket) => {
-              if (err) {
-                return callback(err);
+            http_proxy_client_default(proxy.href, options.port, options.host, this.options.tls || {}, (err2, socket) => {
+              if (err2) {
+                return callback(err2);
               }
               return callback(null, {
                 connection: socket
@@ -91640,13 +93117,15 @@ var require_mailer = __commonJS((exports, module) => {
           case "socks4":
           case "socks4a": {
             if (!this.meta.has("proxy_socks_module")) {
-              return callback(new Error("Socks module not loaded"));
+              let err2 = new Error("Socks module not loaded");
+              err2.code = EPROXY;
+              return callback(err2);
             }
-            let connect = (ipaddress) => {
-              let proxyV2 = !!this.meta.get("proxy_socks_module").SocksClient;
-              let socksClient = proxyV2 ? this.meta.get("proxy_socks_module").SocksClient : this.meta.get("proxy_socks_module");
-              let proxyType = Number(proxy.protocol.replace(/\D/g, "")) || 5;
-              let connectionOpts = {
+            const connect = (ipaddress) => {
+              const proxyV2 = !!this.meta.get("proxy_socks_module").SocksClient;
+              const socksClient = proxyV2 ? this.meta.get("proxy_socks_module").SocksClient : this.meta.get("proxy_socks_module");
+              const proxyType = Number(proxy.protocol.replace(/\D/g, "")) || 5;
+              const connectionOpts = {
                 proxy: {
                   ipaddress,
                   port: Number(proxy.port),
@@ -91658,9 +93137,9 @@ var require_mailer = __commonJS((exports, module) => {
                 },
                 command: "connect"
               };
-              if (proxy.auth) {
-                let username = decodeURIComponent(proxy.auth.split(":").shift());
-                let password = decodeURIComponent(proxy.auth.split(":").pop());
+              if (proxy.username || proxy.password) {
+                const username = proxy.username || "";
+                const password = proxy.password || "";
                 if (proxyV2) {
                   connectionOpts.proxy.userId = username;
                   connectionOpts.proxy.password = password;
@@ -91673,40 +93152,42 @@ var require_mailer = __commonJS((exports, module) => {
                   };
                 }
               }
-              socksClient.createConnection(connectionOpts, (err, info) => {
-                if (err) {
-                  return callback(err);
+              socksClient.createConnection(connectionOpts, (err2, info) => {
+                if (err2) {
+                  return callback(err2);
                 }
                 return callback(null, {
                   connection: info.socket || info
                 });
               });
             };
-            if (net.isIP(proxy.hostname)) {
+            if (net6.isIP(proxy.hostname)) {
               return connect(proxy.hostname);
             }
-            return dns.resolve(proxy.hostname, (err, address) => {
-              if (err) {
-                return callback(err);
+            return dns2.resolve(proxy.hostname, (err2, address) => {
+              if (err2) {
+                return callback(err2);
               }
               connect(Array.isArray(address) ? address[0] : address);
             });
           }
         }
-        callback(new Error("Unknown proxy configuration"));
+        let err = new Error("Unknown proxy configuration");
+        err.code = EPROXY;
+        callback(err);
       };
     }
     _convertDataImages(mail, callback) {
       if (!this.options.attachDataUrls && !mail.data.attachDataUrls || !mail.data.html) {
         return callback();
       }
-      mail.resolveContent(mail.data, "html", (err, html) => {
+      mail.resolveContent(mail.data, "html", { disableFileAccess: mail.data.disableFileAccess, disableUrlAccess: mail.data.disableUrlAccess }, (err, html) => {
         if (err) {
           return callback(err);
         }
         let cidCounter = 0;
         html = (html || "").toString().replace(/(<img\b[^<>]{0,1024} src\s{0,20}=[\s"']{0,20})(data:([^;]+);[^"'>\s]+)/gi, (match2, prefix, dataUri, mimeType) => {
-          let cid = crypto2.randomBytes(10).toString("hex") + "@localhost";
+          const cid = crypto6.randomBytes(10).toString("hex") + "@localhost";
           if (!mail.data.attachments) {
             mail.data.attachments = [];
           }
@@ -91716,7 +93197,7 @@ var require_mailer = __commonJS((exports, module) => {
           mail.data.attachments.push({
             path: dataUri,
             cid,
-            filename: "image-" + ++cidCounter + "." + mimeTypes.detectExtension(mimeType)
+            filename: "image-" + ++cidCounter + "." + detectExtension(mimeType)
           });
           return prefix + "cid:" + cid;
         });
@@ -91730,26 +93211,30 @@ var require_mailer = __commonJS((exports, module) => {
     get(key) {
       return this.meta.get(key);
     }
-  }
-  module.exports = Mail;
+  };
+  mailer_default = Mail;
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/smtp-connection/data-stream.js
-var require_data_stream = __commonJS((exports, module) => {
-  var stream = __require("stream");
-  var Transform = stream.Transform;
-
-  class DataStream extends Transform {
+// /zveltio-extension/node_modules/nodemailer/dist/esm/smtp-connection/data-stream.js
+import { Transform as Transform8 } from "stream";
+var INSERT_LF, INSERT_LF_DOT, INSERT_CR, INSERT_DOT, DataStream;
+var init_data_stream = __esm(() => {
+  INSERT_LF = Buffer.from(`
+`);
+  INSERT_LF_DOT = Buffer.from(`
+.`);
+  INSERT_CR = Buffer.from("\r");
+  INSERT_DOT = Buffer.from(".");
+  DataStream = class DataStream extends Transform8 {
     constructor(options) {
       super(options);
       this.options = options || {};
-      this._curLine = "";
       this.inByteCount = 0;
       this.outByteCount = 0;
       this.lastByte = false;
     }
     _transform(chunk, encoding, done) {
-      let chunks = [];
+      const chunks = [];
       let chunklen = 0;
       let i, len, lastPos = 0;
       let buf;
@@ -91761,30 +93246,28 @@ var require_data_stream = __commonJS((exports, module) => {
       }
       this.inByteCount += chunk.length;
       for (i = 0, len = chunk.length;i < len; i++) {
-        if (chunk[i] === 46) {
-          if (i && chunk[i - 1] === 10 || !i && (!this.lastByte || this.lastByte === 10)) {
-            buf = chunk.slice(lastPos, i + 1);
+        const byte = chunk[i];
+        const prev = i ? chunk[i - 1] : this.lastByte;
+        let insert = false;
+        if (prev === 13 && byte !== 10) {
+          insert = byte === 46 ? INSERT_LF_DOT : INSERT_LF;
+        } else if (byte === 10 && prev !== 13) {
+          insert = INSERT_CR;
+        } else if (byte === 46 && (prev === 10 || prev === false)) {
+          insert = INSERT_DOT;
+        }
+        if (insert) {
+          if (i > lastPos) {
+            buf = chunk.slice(lastPos, i);
             chunks.push(buf);
-            chunks.push(Buffer.from("."));
-            chunklen += buf.length + 1;
-            lastPos = i + 1;
+            chunklen += buf.length;
           }
-        } else if (chunk[i] === 10) {
-          if (i && chunk[i - 1] !== 13 || !i && this.lastByte !== 13) {
-            if (i > lastPos) {
-              buf = chunk.slice(lastPos, i);
-              chunks.push(buf);
-              chunklen += buf.length + 2;
-            } else {
-              chunklen += 2;
-            }
-            chunks.push(Buffer.from(`\r
-`));
-            lastPos = i + 1;
-          }
+          chunks.push(insert);
+          chunklen += insert.length;
+          lastPos = i;
         }
       }
-      if (chunklen) {
+      if (chunks.length) {
         if (lastPos < chunk.length) {
           buf = chunk.slice(lastPos);
           chunks.push(buf);
@@ -91817,60 +93300,76 @@ var require_data_stream = __commonJS((exports, module) => {
       this.push(buf);
       done();
     }
-  }
-  module.exports = DataStream;
+  };
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/smtp-connection/index.js
-var require_smtp_connection = __commonJS((exports, module) => {
-  var packageInfo = require_package5();
-  var EventEmitter = __require("events").EventEmitter;
-  var net = __require("net");
-  var tls = __require("tls");
-  var os = __require("os");
-  var crypto2 = __require("crypto");
-  var DataStream = require_data_stream();
-  var PassThrough = __require("stream").PassThrough;
-  var shared = require_shared();
-  var CONNECTION_TIMEOUT = 2 * 60 * 1000;
-  var SOCKET_TIMEOUT = 10 * 60 * 1000;
-  var GREETING_TIMEOUT = 30 * 1000;
-  var DNS_TIMEOUT = 30 * 1000;
-
-  class SMTPConnection extends EventEmitter {
+// /zveltio-extension/node_modules/nodemailer/dist/esm/smtp-connection/index.js
+import { EventEmitter as EventEmitter2 } from "events";
+import net7 from "net";
+import tls2 from "tls";
+import os2 from "os";
+import crypto7 from "crypto";
+import { PassThrough as PassThrough4 } from "stream";
+function decodeServerResponse(str) {
+  if (!str) {
+    return str;
+  }
+  const utf8 = Buffer.from(str, "binary").toString("utf8");
+  return utf8.includes("\uFFFD") ? str : utf8;
+}
+function isPartialResponse(str) {
+  return isPartialLine(str.slice(str.lastIndexOf(`
+`) + 1));
+}
+function isPartialLine(line) {
+  return /^\d+-/.test(line);
+}
+var CONNECTION_TIMEOUT, SOCKET_TIMEOUT, GREETING_TIMEOUT, DNS_TIMEOUT, TEARDOWN_NOOP = () => {}, MAX_RESPONSE_SIZE, SMTPConnection, smtp_connection_default;
+var init_smtp_connection = __esm(() => {
+  init_data_stream();
+  init_shared();
+  CONNECTION_TIMEOUT = 2 * 60 * 1000;
+  SOCKET_TIMEOUT = 10 * 60 * 1000;
+  GREETING_TIMEOUT = 30 * 1000;
+  DNS_TIMEOUT = 30 * 1000;
+  MAX_RESPONSE_SIZE = 1024 * 1024;
+  SMTPConnection = class SMTPConnection extends EventEmitter2 {
     constructor(options) {
       super(options);
-      this.id = crypto2.randomBytes(8).toString("base64").replace(/\W/g, "");
+      this.id = crypto7.randomBytes(8).toString("base64").replace(/\W/g, "");
       this.stage = "init";
       this.options = options || {};
+      if (this.options.requireTLS && (this.options.ignoreTLS || this.options.opportunisticTLS)) {
+        this.options = Object.assign({}, this.options, { ignoreTLS: false, opportunisticTLS: false });
+      }
       this.secureConnection = !!this.options.secure;
       this.alreadySecured = !!this.options.secured;
       this.port = Number(this.options.port) || (this.secureConnection ? 465 : 587);
       this.host = this.options.host || "localhost";
-      this.servername = this.options.servername ? this.options.servername : !net.isIP(this.host) ? this.host : false;
+      this.servername = this.options.servername ? this.options.servername : !net7.isIP(this.host) ? this.host : false;
       this.allowInternalNetworkInterfaces = this.options.allowInternalNetworkInterfaces || false;
       if (typeof this.options.secure === "undefined" && this.port === 465) {
         this.secureConnection = true;
       }
-      this.name = this.options.name || this._getHostname();
-      this.logger = shared.getLogger(this.options, {
+      this.name = (this.options.name || this._getHostname()).toString().replace(/[\r\n]+/g, "");
+      this.logger = getLogger(this.options, {
         component: this.options.component || "smtp-connection",
         sid: this.id
       });
       this.customAuth = new Map;
-      Object.keys(this.options.customAuth || {}).forEach((key) => {
-        let mapKey = (key || "").toString().trim().toUpperCase();
-        if (!mapKey) {
-          return;
+      for (const key of Object.keys(this.options.customAuth || {})) {
+        const mapKey = (key || "").toString().trim().toUpperCase();
+        if (mapKey) {
+          this.customAuth.set(mapKey, this.options.customAuth[key]);
         }
-        this.customAuth.set(mapKey, this.options.customAuth[key]);
-      });
-      this.version = packageInfo.version;
+      }
+      this.version = version2;
       this.authenticated = false;
       this.destroyed = false;
       this.secure = !!this.secureConnection;
       this._remainder = "";
       this._responseQueue = [];
+      this._responsePartial = false;
       this.lastServerResponse = false;
       this._socket = false;
       this._supportedAuth = [];
@@ -91884,15 +93383,22 @@ var require_smtp_connection = __commonJS((exports, module) => {
       this._connectionTimeout = false;
       this._destroyed = false;
       this._closing = false;
+      this._currentDataStream = false;
+      this._pendingSend = false;
+      this._connectCallback = false;
       this._onSocketData = (chunk) => this._onData(chunk);
-      this._onSocketError = (error63) => this._onError(error63, "ESOCKET", false, "CONN");
+      this._onSocketError = (error64) => this._onError(error64, "ESOCKET", false, "CONN");
       this._onSocketClose = () => this._onClose();
       this._onSocketEnd = () => this._onEnd();
       this._onSocketTimeout = () => this._onTimeout();
+      this._onConnectionSocketError = (err) => this._onConnectionError(err, "ESOCKET");
+      this._connectionAttemptId = 0;
     }
     connect(connectCallback) {
       if (typeof connectCallback === "function") {
+        this._connectCallback = connectCallback;
         this.once("connect", () => {
+          this._connectCallback = false;
           this.logger.debug({
             tnx: "smtp"
           }, "SMTP handshake finished");
@@ -91912,15 +93418,9 @@ var require_smtp_connection = __commonJS((exports, module) => {
       if (this.options.localAddress) {
         opts.localAddress = this.options.localAddress;
       }
-      let setupConnectionHandlers = () => {
-        this._connectionTimeout = setTimeout(() => {
-          this._onError("Connection timeout", "ETIMEDOUT", false, "CONN");
-        }, this.options.connectionTimeout || CONNECTION_TIMEOUT);
-        this._socket.on("error", this._onSocketError);
-      };
       if (this.options.connection) {
         this._socket = this.options.connection;
-        setupConnectionHandlers();
+        this._setupConnectionHandlers();
         if (this.secureConnection && !this.alreadySecured) {
           setImmediate(() => this._upgradeConnection((err) => {
             if (err) {
@@ -91935,92 +93435,111 @@ var require_smtp_connection = __commonJS((exports, module) => {
         return;
       } else if (this.options.socket) {
         this._socket = this.options.socket;
-        return shared.resolveHostname(opts, (err, resolved) => {
-          if (err) {
-            return setImmediate(() => this._onError(err, "EDNS", false, "CONN"));
-          }
-          this.logger.debug({
-            tnx: "dns",
-            source: opts.host,
-            resolved: resolved.host,
-            cached: !!resolved.cached
-          }, "Resolved %s as %s [cache %s]", opts.host, resolved.host, resolved.cached ? "hit" : "miss");
-          Object.keys(resolved).forEach((key) => {
-            if (key.charAt(0) !== "_" && resolved[key]) {
-              opts[key] = resolved[key];
-            }
-          });
+        return this._resolveAndConnect(opts, (_resolved) => {
           try {
             this._socket.connect(this.port, this.host, () => {
               this._socket.setKeepAlive(true);
+              if (this.secureConnection && !this.alreadySecured) {
+                return this._upgradeConnection((err) => {
+                  if (err) {
+                    this._onError(new Error("Error initiating TLS - " + (err.message || err)), "ETLS", false, "CONN");
+                    return;
+                  }
+                  this._onConnect();
+                });
+              }
               this._onConnect();
             });
-            setupConnectionHandlers();
+            this._setupConnectionHandlers();
           } catch (E) {
-            return setImmediate(() => this._onError(E, "ECONNECTION", false, "CONN"));
-          }
-        });
-      } else if (this.secureConnection) {
-        if (this.options.tls) {
-          Object.keys(this.options.tls).forEach((key) => {
-            opts[key] = this.options.tls[key];
-          });
-        }
-        if (this.servername && !opts.servername) {
-          opts.servername = this.servername;
-        }
-        return shared.resolveHostname(opts, (err, resolved) => {
-          if (err) {
-            return setImmediate(() => this._onError(err, "EDNS", false, "CONN"));
-          }
-          this.logger.debug({
-            tnx: "dns",
-            source: opts.host,
-            resolved: resolved.host,
-            cached: !!resolved.cached
-          }, "Resolved %s as %s [cache %s]", opts.host, resolved.host, resolved.cached ? "hit" : "miss");
-          Object.keys(resolved).forEach((key) => {
-            if (key.charAt(0) !== "_" && resolved[key]) {
-              opts[key] = resolved[key];
-            }
-          });
-          try {
-            this._socket = tls.connect(opts, () => {
-              this._socket.setKeepAlive(true);
-              this._onConnect();
-            });
-            setupConnectionHandlers();
-          } catch (E) {
-            return setImmediate(() => this._onError(E, "ECONNECTION", false, "CONN"));
+            setImmediate(() => this._onError(E, "ECONNECTION", false, "CONN"));
+            return;
           }
         });
       } else {
-        return shared.resolveHostname(opts, (err, resolved) => {
-          if (err) {
-            return setImmediate(() => this._onError(err, "EDNS", false, "CONN"));
+        if (this.secureConnection) {
+          Object.assign(opts, this.options.tls || {});
+          if (this.servername && !opts.servername) {
+            opts.servername = this.servername;
           }
-          this.logger.debug({
-            tnx: "dns",
-            source: opts.host,
-            resolved: resolved.host,
-            cached: !!resolved.cached
-          }, "Resolved %s as %s [cache %s]", opts.host, resolved.host, resolved.cached ? "hit" : "miss");
-          Object.keys(resolved).forEach((key) => {
-            if (key.charAt(0) !== "_" && resolved[key]) {
-              opts[key] = resolved[key];
-            }
-          });
-          try {
-            this._socket = net.connect(opts, () => {
-              this._socket.setKeepAlive(true);
-              this._onConnect();
-            });
-            setupConnectionHandlers();
-          } catch (E) {
-            return setImmediate(() => this._onError(E, "ECONNECTION", false, "CONN"));
-          }
+        }
+        return this._resolveAndConnect(opts, (resolved) => {
+          this._fallbackAddresses = (resolved._addresses || []).filter((addr) => addr !== opts.host);
+          this._connectOpts = Object.assign({}, opts);
+          this._connectToHost(opts, this.secureConnection);
         });
       }
+    }
+    _resolveAndConnect(opts, callback) {
+      return resolveHostname(opts, (err, resolved) => {
+        if (err) {
+          return setImmediate(() => this._onError(err, "EDNS", false, "CONN"));
+        }
+        this.logger.debug({
+          tnx: "dns",
+          source: opts.host,
+          resolved: resolved.host,
+          cached: !!resolved.cached
+        }, "Resolved %s as %s [cache %s]", opts.host, resolved.host, resolved.cached ? "hit" : "miss");
+        for (const key of Object.keys(resolved)) {
+          if (key.charAt(0) !== "_" && resolved[key]) {
+            opts[key] = resolved[key];
+          }
+        }
+        callback(resolved);
+      });
+    }
+    _connectToHost(opts, secure) {
+      if (this._destroyed || this._closing) {
+        return;
+      }
+      this._connectionAttemptId++;
+      const currentAttemptId = this._connectionAttemptId;
+      const connectFn = secure ? tls2.connect : net7.connect;
+      try {
+        this._socket = connectFn(opts, () => {
+          if (this._connectionAttemptId !== currentAttemptId) {
+            return;
+          }
+          this._socket.setKeepAlive(true);
+          this._onConnect();
+        });
+        this._setupConnectionHandlers();
+      } catch (E) {
+        setImmediate(() => this._onError(E, "ECONNECTION", false, "CONN"));
+        return;
+      }
+    }
+    _setupConnectionHandlers() {
+      this._connectionTimeout = setTimeout(() => {
+        this._onConnectionError("Connection timeout", "ETIMEDOUT");
+      }, this.options.connectionTimeout || CONNECTION_TIMEOUT);
+      this._socket.on("error", this._onConnectionSocketError);
+    }
+    _onConnectionError(err, code) {
+      clearTimeout(this._connectionTimeout);
+      const canFallback = this._fallbackAddresses && this._fallbackAddresses.length && this.stage === "init" && !this._destroyed;
+      if (!canFallback) {
+        this._onError(err, code, false, "CONN");
+        return;
+      }
+      const nextHost = this._fallbackAddresses.shift();
+      this.logger.info({
+        tnx: "network",
+        failedHost: this._connectOpts.host,
+        nextHost,
+        error: err.message || err
+      }, "Connection to %s failed, trying %s", this._connectOpts.host, nextHost);
+      if (this._socket) {
+        try {
+          this._socket.removeListener("error", this._onConnectionSocketError);
+          this._socket.on("error", TEARDOWN_NOOP);
+          this._socket.destroy();
+        } catch (_E2) {}
+        this._socket = null;
+      }
+      this._connectOpts.host = nextHost;
+      this._connectToHost(this._connectOpts, this.secureConnection);
     }
     quit() {
       this._sendCommand("QUIT");
@@ -92034,18 +93553,37 @@ var require_smtp_connection = __commonJS((exports, module) => {
         return;
       }
       this._closing = true;
-      let closeMethod = "end";
-      if (this.stage === "init") {
-        closeMethod = "destroy";
-      }
+      const closeMethod = this.stage === "init" ? "destroy" : "end";
       this.logger.debug({
         tnx: "smtp"
       }, 'Closing connection to the server using "%s"', closeMethod);
-      let socket = this._socket && this._socket.socket || this._socket;
+      const socket = this._socket && this._socket.socket || this._socket;
+      if (this._currentDataStream) {
+        try {
+          this._currentDataStream.unpipe(this._socket);
+        } catch (_E2) {}
+        this._currentDataStream = false;
+      }
+      if (this._pendingSend) {
+        const { stream, onStreamError } = this._pendingSend;
+        if (stream) {
+          stream.removeListener("error", onStreamError);
+          stream.on("error", TEARDOWN_NOOP);
+        }
+        this._pendingSend = false;
+      }
       if (socket && !socket.destroyed) {
         try {
+          socket.setTimeout(0);
+          socket.removeListener("data", this._onSocketData);
+          socket.removeListener("timeout", this._onSocketTimeout);
+          socket.removeListener("close", this._onSocketClose);
+          socket.removeListener("end", this._onSocketEnd);
+          socket.removeListener("error", this._onSocketError);
+          socket.removeListener("error", this._onConnectionSocketError);
+          socket.on("error", TEARDOWN_NOOP);
           socket[closeMethod]();
-        } catch (E) {}
+        } catch (_E2) {}
       }
       this._destroy();
     }
@@ -92056,12 +93594,14 @@ var require_smtp_connection = __commonJS((exports, module) => {
       }
       this._auth = authData || {};
       this._authMethod = (this._auth.method || "").toString().trim().toUpperCase() || false;
+      const canUseXOAuth2 = !!this._auth.oauth2 || this.customAuth.has("XOAUTH2");
       if (!this._authMethod && this._auth.oauth2 && !this._auth.credentials) {
         this._authMethod = "XOAUTH2";
       } else if (!this._authMethod || this._authMethod === "XOAUTH2" && !this._auth.oauth2) {
-        this._authMethod = (this._supportedAuth[0] || "PLAIN").toUpperCase().trim();
+        const supported = this._supportedAuth.find((method) => method !== "XOAUTH2" || canUseXOAuth2);
+        this._authMethod = (supported || "PLAIN").toUpperCase().trim();
       }
-      if (this._authMethod !== "XOAUTH2" && (!this._auth.credentials || !this._auth.credentials.user || !this._auth.credentials.pass)) {
+      if ((this._authMethod !== "XOAUTH2" || this.customAuth.has("XOAUTH2")) && (!this._auth.credentials || !this._auth.credentials.user || !this._auth.credentials.pass)) {
         if (this._auth.user && this._auth.pass || this.customAuth.has(this._authMethod)) {
           this._auth.credentials = {
             user: this._auth.user,
@@ -92073,10 +93613,10 @@ var require_smtp_connection = __commonJS((exports, module) => {
         }
       }
       if (this.customAuth.has(this._authMethod)) {
-        let handler = this.customAuth.get(this._authMethod);
+        const handler = this.customAuth.get(this._authMethod);
         let lastResponse;
         let returned = false;
-        let resolve = () => {
+        const resolve3 = () => {
           if (returned) {
             return;
           }
@@ -92090,53 +93630,54 @@ var require_smtp_connection = __commonJS((exports, module) => {
           this.authenticated = true;
           callback(null, true);
         };
-        let reject = (err) => {
+        const reject = (err) => {
           if (returned) {
             return;
           }
           returned = true;
           callback(this._formatError(err, "EAUTH", lastResponse, "AUTH " + this._authMethod));
         };
-        let handlerResponse = handler({
+        const sendCommand = (cmd, done) => {
+          let promise2;
+          if (!done) {
+            promise2 = new Promise((resolve4, reject2) => {
+              done = callbackPromise(resolve4, reject2);
+            });
+          }
+          this._responseActions.push((str) => {
+            lastResponse = str;
+            let codes = str.match(/^(\d+)(?:\s(\d+\.\d+\.\d+))?\s/);
+            let data = {
+              command: cmd,
+              response: str
+            };
+            if (codes) {
+              data.status = Number(codes[1]) || 0;
+              if (codes[2]) {
+                data.code = codes[2];
+              }
+              data.text = str.substr(codes[0].length);
+            } else {
+              data.text = str;
+              data.status = 0;
+            }
+            done(null, data);
+          });
+          setImmediate(() => this._sendCommand(cmd));
+          return promise2;
+        };
+        const handlerResponse = handler({
           auth: this._auth,
           method: this._authMethod,
           extensions: [].concat(this._supportedExtensions),
           authMethods: [].concat(this._supportedAuth),
           maxAllowedSize: this._maxAllowedSize || false,
-          sendCommand: (cmd, done) => {
-            let promise2;
-            if (!done) {
-              promise2 = new Promise((resolve2, reject2) => {
-                done = shared.callbackPromise(resolve2, reject2);
-              });
-            }
-            this._responseActions.push((str) => {
-              lastResponse = str;
-              let codes = str.match(/^(\d+)(?:\s(\d+\.\d+\.\d+))?\s/);
-              let data = {
-                command: cmd,
-                response: str
-              };
-              if (codes) {
-                data.status = Number(codes[1]) || 0;
-                if (codes[2]) {
-                  data.code = codes[2];
-                }
-                data.text = str.substr(codes[0].length);
-              } else {
-                data.text = str;
-                data.status = 0;
-              }
-              done(null, data);
-            });
-            setImmediate(() => this._sendCommand(cmd));
-            return promise2;
-          },
-          resolve,
+          sendCommand,
+          resolve: resolve3,
           reject
         });
         if (handlerResponse && typeof handlerResponse.catch === "function") {
-          handlerResponse.then(resolve).catch(reject);
+          handlerResponse.then(resolve3).catch(reject);
         }
         return;
       }
@@ -92166,33 +93707,44 @@ var require_smtp_connection = __commonJS((exports, module) => {
       return callback(this._formatError('Unknown authentication method "' + this._authMethod + '"', "EAUTH", false, "API"));
     }
     send(envelope, message, done) {
-      if (!message) {
-        return done(this._formatError("Empty message", "EMESSAGE", false, "API"));
-      }
-      const isDestroyedMessage = this._isDestroyedMessage("send message");
-      if (isDestroyedMessage) {
-        return done(this._formatError(isDestroyedMessage, "ECONNECTION", false, "API"));
-      }
-      if (this._maxAllowedSize && envelope.size > this._maxAllowedSize) {
-        return setImmediate(() => {
-          done(this._formatError("Message size larger than allowed " + this._maxAllowedSize, "EMESSAGE", false, "MAIL FROM"));
-        });
-      }
       let returned = false;
-      let callback = function() {
+      const callback = (err, info) => {
         if (returned) {
           return;
         }
         returned = true;
-        done(...arguments);
+        if (this._pendingSend && this._pendingSend.callback === callback) {
+          this._pendingSend = false;
+        }
+        done(err, info);
+      };
+      if (!message) {
+        return callback(this._formatError("Empty message", "EMESSAGE", false, "API"));
+      }
+      const isDestroyedMessage = this._isDestroyedMessage("send message");
+      if (isDestroyedMessage) {
+        return callback(this._formatError(isDestroyedMessage, "ECONNECTION", false, "API"));
+      }
+      if (this._maxAllowedSize && envelope.size > this._maxAllowedSize) {
+        setImmediate(() => {
+          callback(this._formatError("Message size larger than allowed " + this._maxAllowedSize, "EMESSAGE", false, "MAIL FROM"));
+        });
+        return;
+      }
+      const pendingSend = {
+        callback,
+        stream: false,
+        onStreamError: (err) => callback(this._formatError(err, "ESTREAM", false, "API"))
       };
       if (typeof message.on === "function") {
-        message.on("error", (err) => callback(this._formatError(err, "ESTREAM", false, "API")));
+        pendingSend.stream = message;
+        pendingSend.stream.on("error", pendingSend.onStreamError);
       }
-      let startTime = Date.now();
+      this._pendingSend = pendingSend;
+      const startTime = Date.now();
       this._setEnvelope(envelope, (err, info) => {
         if (err) {
-          let stream2 = new PassThrough;
+          const stream2 = new PassThrough4;
           if (typeof message.pipe === "function") {
             message.pipe(stream2);
           } else {
@@ -92201,16 +93753,17 @@ var require_smtp_connection = __commonJS((exports, module) => {
           }
           return callback(err);
         }
-        let envelopeTime = Date.now();
-        let stream = this._createSendStream((err2, str) => {
+        const envelopeTime = Date.now();
+        const stream = this._createSendStream((err2, str) => {
           if (err2) {
             return callback(err2);
           }
-          info.envelopeTime = envelopeTime - startTime;
-          info.messageTime = Date.now() - envelopeTime;
-          info.messageSize = stream.outByteCount;
-          info.response = str;
-          return callback(null, info);
+          const result = info;
+          result.envelopeTime = envelopeTime - startTime;
+          result.messageTime = Date.now() - envelopeTime;
+          result.messageSize = stream.outByteCount;
+          result.response = str;
+          return callback(null, result);
         });
         if (typeof message.pipe === "function") {
           message.pipe(stream);
@@ -92221,6 +93774,10 @@ var require_smtp_connection = __commonJS((exports, module) => {
       });
     }
     reset(callback) {
+      const isDestroyedMessage = this._isDestroyedMessage("reset");
+      if (isDestroyedMessage) {
+        return callback(this._formatError(isDestroyedMessage, "ECONNECTION", false, "API"));
+      }
       this._sendCommand("RSET");
       this._responseActions.push((str) => {
         if (str.charAt(0) !== "2") {
@@ -92231,64 +93788,81 @@ var require_smtp_connection = __commonJS((exports, module) => {
       });
     }
     _onConnect() {
+      const socket = this._socket;
       clearTimeout(this._connectionTimeout);
       this.logger.info({
         tnx: "network",
-        localAddress: this._socket.localAddress,
-        localPort: this._socket.localPort,
-        remoteAddress: this._socket.remoteAddress,
-        remotePort: this._socket.remotePort
-      }, "%s established to %s:%s", this.secure ? "Secure connection" : "Connection", this._socket.remoteAddress, this._socket.remotePort);
+        localAddress: socket.localAddress,
+        localPort: socket.localPort,
+        remoteAddress: socket.remoteAddress,
+        remotePort: socket.remotePort
+      }, "%s established to %s:%s", this.secure ? "Secure connection" : "Connection", socket.remoteAddress, socket.remotePort);
       if (this._destroyed) {
         this.close();
         return;
       }
       this.stage = "connected";
-      this._socket.removeListener("data", this._onSocketData);
-      this._socket.removeListener("timeout", this._onSocketTimeout);
-      this._socket.removeListener("close", this._onSocketClose);
-      this._socket.removeListener("end", this._onSocketEnd);
-      this._socket.on("data", this._onSocketData);
-      this._socket.once("close", this._onSocketClose);
-      this._socket.once("end", this._onSocketEnd);
-      this._socket.setTimeout(this.options.socketTimeout || SOCKET_TIMEOUT);
-      this._socket.on("timeout", this._onSocketTimeout);
+      socket.removeListener("data", this._onSocketData);
+      socket.removeListener("timeout", this._onSocketTimeout);
+      socket.removeListener("close", this._onSocketClose);
+      socket.removeListener("end", this._onSocketEnd);
+      socket.removeListener("error", this._onConnectionSocketError);
+      socket.removeListener("error", this._onSocketError);
+      socket.on("error", this._onSocketError);
+      socket.on("data", this._onSocketData);
+      socket.once("close", this._onSocketClose);
+      socket.once("end", this._onSocketEnd);
+      socket.setTimeout(this.options.socketTimeout || SOCKET_TIMEOUT);
+      socket.on("timeout", this._onSocketTimeout);
       this._greetingTimeout = setTimeout(() => {
         if (this._socket && !this._destroyed && this._responseActions[0] === this._actionGreeting) {
           this._onError("Greeting never received", "ETIMEDOUT", false, "CONN");
         }
       }, this.options.greetingTimeout || GREETING_TIMEOUT);
       this._responseActions.push(this._actionGreeting);
-      this._socket.resume();
+      socket.resume();
     }
     _onData(chunk) {
       if (this._destroyed || !chunk || !chunk.length) {
         return;
       }
-      let data = (chunk || "").toString("binary");
-      let lines = (this._remainder + data).split(/\r?\n/);
-      let lastline;
+      const maxResponseSize = this.options.maxResponseSize || MAX_RESPONSE_SIZE;
+      const data = chunk.toString("binary");
+      if (!data.includes(`
+`)) {
+        this._remainder += data;
+        if (this._remainder.length > maxResponseSize) {
+          return this._onResponseTooLarge();
+        }
+        return;
+      }
+      const lines = (this._remainder + data).split(/\r?\n/);
       this._remainder = lines.pop();
       for (let i = 0, len = lines.length;i < len; i++) {
-        if (this._responseQueue.length) {
-          lastline = this._responseQueue[this._responseQueue.length - 1];
-          if (/^\d+-/.test(lastline.split(`
-`).pop())) {
-            this._responseQueue[this._responseQueue.length - 1] += `
+        if (this._responsePartial) {
+          this._responseQueue[this._responseQueue.length - 1] += `
 ` + lines[i];
-            continue;
-          }
+        } else {
+          this._responseQueue.push(lines[i]);
         }
-        this._responseQueue.push(lines[i]);
+        this._responsePartial = isPartialLine(lines[i]);
+        if (this._responsePartial && this._responseQueue[this._responseQueue.length - 1].length > maxResponseSize) {
+          return this._onResponseTooLarge();
+        }
       }
-      if (this._responseQueue.length) {
-        lastline = this._responseQueue[this._responseQueue.length - 1];
-        if (/^\d+-/.test(lastline.split(`
-`).pop())) {
-          return;
-        }
+      if (this._remainder.length > maxResponseSize) {
+        return this._onResponseTooLarge();
+      }
+      if (this._responsePartial) {
+        return;
       }
       this._processResponse();
+    }
+    _onResponseTooLarge() {
+      this._remainder = "";
+      this._responseQueue = [];
+      this._responsePartial = false;
+      this._onError(new Error("Server response exceeds maximum allowed size"), "EPROTOCOL", false, "CONN");
     }
     _onError(err, type, data, command) {
       clearTimeout(this._connectionTimeout);
@@ -92297,9 +93871,18 @@ var require_smtp_connection = __commonJS((exports, module) => {
         return;
       }
       err = this._formatError(err, type, data, command);
-      this.logger.error(data, err.message);
+      const transientCodes = ["ETIMEDOUT", "ESOCKET", "ECONNECTION"];
+      if (transientCodes.includes(err.code)) {
+        this.logger.warn(data, err.message);
+      } else {
+        this.logger.error(data, err.message);
+      }
+      const pendingSend = this._pendingSend;
       this.emit("error", err);
       this.close();
+      if (pendingSend) {
+        pendingSend.callback(err);
+      }
     }
     _formatError(message, type, response, command) {
       let err;
@@ -92315,7 +93898,7 @@ var require_smtp_connection = __commonJS((exports, module) => {
         err.response = response;
         err.message += ": " + response;
       }
-      let responseCode = typeof response === "string" && Number((response.match(/^\d+/) || [])[0]) || false;
+      const responseCode = typeof response === "string" && Number((response.match(/^\d+/) || [])[0]) || false;
       if (responseCode) {
         err.responseCode = responseCode;
       }
@@ -92327,28 +93910,37 @@ var require_smtp_connection = __commonJS((exports, module) => {
     _onClose() {
       let serverResponse = false;
       if (this._remainder && this._remainder.trim()) {
+        this.lastServerResponse = serverResponse = decodeServerResponse(this._remainder.trim());
         if (this.options.debug || this.options.transactionLog) {
           this.logger.debug({
             tnx: "server"
-          }, this._remainder.replace(/\r?\n$/, ""));
+          }, serverResponse);
         }
-        this.lastServerResponse = serverResponse = this._remainder.trim();
       }
       this.logger.info({
         tnx: "network"
       }, "Connection closed");
+      const failureResponse = typeof serverResponse === "string" && /^[45]\d{2}[ -]/.test(serverResponse) ? serverResponse : false;
       if (this.upgrading && !this._destroyed) {
-        return this._onError(new Error("Connection closed unexpectedly"), "ETLS", serverResponse, "CONN");
-      } else if (![this._actionGreeting, this.close].includes(this._responseActions[0]) && !this._destroyed) {
-        return this._onError(new Error("Connection closed unexpectedly"), "ECONNECTION", serverResponse, "CONN");
-      } else if (/^[45]\d{2}\b/.test(serverResponse)) {
-        return this._onError(new Error("Connection closed unexpectedly"), "ECONNECTION", serverResponse, "CONN");
+        return this._onError(new Error("Connection closed unexpectedly"), "ETLS", failureResponse, "CONN");
+      }
+      if (!failureResponse && this._responseActions[0] === this._actionGreeting && this._connectCallback && !this._destroyed) {
+        const connectCallback = this._connectCallback;
+        this._connectCallback = false;
+        const err = this._formatError(new Error("Connection closed unexpectedly"), "ECONNECTION", false, "CONN");
+        this.logger.warn({ tnx: "network" }, err.message);
+        connectCallback(err);
+        this.close();
+        return;
+      }
+      if (failureResponse || this._responseActions[0] !== this.close && !this._destroyed) {
+        return this._onError(new Error("Connection closed unexpectedly"), "ECONNECTION", failureResponse, "CONN");
       }
       this._destroy();
     }
     _onEnd() {
       if (this._socket && !this._socket.destroyed) {
-        this._socket.destroy();
+        this._socket.end();
       }
     }
     _onTimeout() {
@@ -92359,33 +93951,44 @@ var require_smtp_connection = __commonJS((exports, module) => {
         return;
       }
       this._destroyed = true;
+      this.destroyed = true;
+      clearTimeout(this._connectionTimeout);
+      clearTimeout(this._greetingTimeout);
+      this._connectionTimeout = false;
+      this._greetingTimeout = false;
       this.emit("end");
     }
     _upgradeConnection(callback) {
-      this._socket.removeListener("data", this._onSocketData);
-      this._socket.removeListener("timeout", this._onSocketTimeout);
-      let socketPlain = this._socket;
-      let opts = {
-        socket: this._socket,
+      this._remainder = "";
+      this._responseQueue = [];
+      this._responsePartial = false;
+      const socketPlain = this._socket;
+      socketPlain.removeListener("data", this._onSocketData);
+      socketPlain.removeListener("timeout", this._onSocketTimeout);
+      const opts = Object.assign({
+        socket: socketPlain,
         host: this.host
-      };
-      Object.keys(this.options.tls || {}).forEach((key) => {
-        opts[key] = this.options.tls[key];
-      });
+      }, this.options.tls || {});
       if (this.servername && !opts.servername) {
         opts.servername = this.servername;
       }
+      const removePlainSocketListeners = () => {
+        socketPlain.removeListener("close", this._onSocketClose);
+        socketPlain.removeListener("end", this._onSocketEnd);
+        socketPlain.removeListener("error", this._onSocketError);
+        socketPlain.removeListener("error", this._onConnectionSocketError);
+      };
       this.upgrading = true;
       try {
-        this._socket = tls.connect(opts, () => {
+        this._socket = tls2.connect(opts, () => {
           this.secure = true;
           this.upgrading = false;
           this._socket.on("data", this._onSocketData);
-          socketPlain.removeListener("close", this._onSocketClose);
-          socketPlain.removeListener("end", this._onSocketEnd);
+          removePlainSocketListeners();
           return callback(null, true);
         });
       } catch (err) {
+        removePlainSocketListeners();
         return callback(err);
       }
       this._socket.on("error", this._onSocketError);
@@ -92399,20 +94002,22 @@ var require_smtp_connection = __commonJS((exports, module) => {
       if (!this._responseQueue.length) {
         return false;
       }
-      let str = this.lastServerResponse = (this._responseQueue.shift() || "").toString();
-      if (/^\d+-/.test(str.split(`
-`).pop())) {
+      const raw2 = (this._responseQueue.shift() || "").toString();
+      if (!raw2.trim()) {
+        setImmediate(() => this._processResponse());
         return;
       }
+      if (isPartialResponse(raw2)) {
+        this._responseQueue.unshift(raw2);
+        return;
+      }
+      const str = this.lastServerResponse = decodeServerResponse(raw2);
       if (this.options.debug || this.options.transactionLog) {
         this.logger.debug({
           tnx: "server"
         }, str.replace(/\r?\n$/, ""));
       }
-      if (!str.trim()) {
-        setImmediate(() => this._processResponse());
-      }
-      let action = this._responseActions.shift();
+      const action = this._responseActions.shift();
       if (typeof action === "function") {
         action.call(this, str);
         setImmediate(() => this._processResponse());
@@ -92424,7 +94029,8 @@ var require_smtp_connection = __commonJS((exports, module) => {
       if (this._destroyed) {
         return;
       }
-      if (this._socket.destroyed) {
+      const socket = this._socket;
+      if (socket.destroyed) {
         return this.close();
       }
       if (this.options.debug || this.options.transactionLog) {
@@ -92432,11 +94038,11 @@ var require_smtp_connection = __commonJS((exports, module) => {
           tnx: "client"
         }, (logStr || str || "").toString().replace(/\r?\n$/, ""));
       }
-      this._socket.write(Buffer.from(str + `\r
+      socket.write(Buffer.from(str + `\r
 `, "utf-8"));
     }
     _setEnvelope(envelope, callback) {
-      let args = [];
+      const args = [];
       let useSmtpUtf8 = false;
       this._envelope = envelope || {};
       this._envelope.from = (this._envelope.from && this._envelope.from.address || this._envelope.from || "").toString().trim();
@@ -92458,7 +94064,7 @@ var require_smtp_connection = __commonJS((exports, module) => {
           useSmtpUtf8 = true;
         }
       }
-      this._envelope.rcptQueue = JSON.parse(JSON.stringify(this._envelope.to || []));
+      this._envelope.rcptQueue = [].concat(this._envelope.to || []);
       this._envelope.rejected = [];
       this._envelope.rejectedErrors = [];
       this._envelope.accepted = [];
@@ -92467,6 +94073,14 @@ var require_smtp_connection = __commonJS((exports, module) => {
           this._envelope.dsn = this._setDsnEnvelope(this._envelope.dsn);
         } catch (err) {
           return callback(this._formatError("Invalid DSN " + err.message, "EENVELOPE", false, "API"));
+        }
+      }
+      if (this._envelope.requireTLSExtensionEnabled) {
+        if (!this.secure) {
+          return callback(this._formatError("REQUIRETLS can only be used over TLS connections (RFC 8689)", "EREQUIRETLS", false, "MAIL FROM"));
+        }
+        if (!this._supportedExtensions.includes("REQUIRETLS")) {
+          return callback(this._formatError("Server does not support REQUIRETLS extension (RFC 8689)", "EREQUIRETLS", false, "MAIL FROM"));
         }
       }
       this._responseActions.push((str) => {
@@ -92481,15 +94095,21 @@ var require_smtp_connection = __commonJS((exports, module) => {
         this._using8BitMime = true;
       }
       if (this._envelope.size && this._supportedExtensions.includes("SIZE")) {
-        args.push("SIZE=" + this._envelope.size);
+        const sizeValue = Number(this._envelope.size) || 0;
+        if (sizeValue > 0) {
+          args.push("SIZE=" + sizeValue);
+        }
       }
       if (this._envelope.dsn && this._supportedExtensions.includes("DSN")) {
         if (this._envelope.dsn.ret) {
-          args.push("RET=" + shared.encodeXText(this._envelope.dsn.ret));
+          args.push("RET=" + encodeXText(this._envelope.dsn.ret));
         }
         if (this._envelope.dsn.envid) {
-          args.push("ENVID=" + shared.encodeXText(this._envelope.dsn.envid));
+          args.push("ENVID=" + encodeXText(this._envelope.dsn.envid));
         }
+      }
+      if (this._envelope.requireTLSExtensionEnabled) {
+        args.push("REQUIRETLS");
       }
       this._sendCommand("MAIL FROM:<" + this._envelope.from + ">" + (args.length ? " " + args.join(" ") : ""));
     }
@@ -92510,16 +94130,16 @@ var require_smtp_connection = __commonJS((exports, module) => {
       if (ret && !["FULL", "HDRS"].includes(ret)) {
         throw new Error("ret: " + JSON.stringify(ret));
       }
-      let envid = (params.envid || params.id || "").toString() || null;
+      const envid = (params.envid || params.id || "").toString() || null;
       let notify = params.notify || null;
       if (notify) {
         if (typeof notify === "string") {
           notify = notify.split(",");
         }
         notify = notify.map((n) => n.trim().toUpperCase());
-        let validNotify = ["NEVER", "SUCCESS", "FAILURE", "DELAY"];
-        let invaliNotify = notify.filter((n) => !validNotify.includes(n));
-        if (invaliNotify.length || notify.length > 1 && notify.includes("NEVER")) {
+        const validNotify = ["NEVER", "SUCCESS", "FAILURE", "DELAY"];
+        const invalidNotify = notify.filter((n) => !validNotify.includes(n));
+        if (invalidNotify.length || notify.length > 1 && notify.includes("NEVER")) {
           throw new Error("notify: " + JSON.stringify(notify.join(",")));
         }
         notify = notify.join(",");
@@ -92536,23 +94156,24 @@ var require_smtp_connection = __commonJS((exports, module) => {
       };
     }
     _getDsnRcptToArgs() {
-      let args = [];
-      if (this._envelope.dsn && this._supportedExtensions.includes("DSN")) {
-        if (this._envelope.dsn.notify) {
-          args.push("NOTIFY=" + shared.encodeXText(this._envelope.dsn.notify));
+      const envelope = this._envelope;
+      const args = [];
+      if (envelope.dsn && this._supportedExtensions.includes("DSN")) {
+        if (envelope.dsn.notify) {
+          args.push("NOTIFY=" + encodeXText(envelope.dsn.notify));
         }
-        if (this._envelope.dsn.orcpt) {
-          args.push("ORCPT=" + shared.encodeXText(this._envelope.dsn.orcpt));
+        if (envelope.dsn.orcpt) {
+          args.push("ORCPT=" + encodeXText(envelope.dsn.orcpt));
         }
       }
       return args.length ? " " + args.join(" ") : "";
     }
     _createSendStream(callback) {
-      let dataStream = new DataStream;
-      let logStream;
+      const envelope = this._envelope;
+      const dataStream = new DataStream;
       if (this.options.lmtp) {
-        this._envelope.accepted.forEach((recipient, i) => {
-          let final = i === this._envelope.accepted.length - 1;
+        envelope.accepted.forEach((recipient, i) => {
+          const final = i === envelope.accepted.length - 1;
           this._responseActions.push((str) => {
             this._actionLMTPStream(recipient, final, str, callback);
           });
@@ -92562,11 +94183,12 @@ var require_smtp_connection = __commonJS((exports, module) => {
           this._actionSMTPStream(str, callback);
         });
       }
+      this._currentDataStream = dataStream;
       dataStream.pipe(this._socket, {
         end: false
       });
       if (this.options.debug) {
-        logStream = new PassThrough;
+        const logStream = new PassThrough4;
         logStream.on("readable", () => {
           let chunk;
           while (chunk = logStream.read()) {
@@ -92578,6 +94200,9 @@ var require_smtp_connection = __commonJS((exports, module) => {
         dataStream.pipe(logStream);
       }
       dataStream.once("end", () => {
+        if (this._currentDataStream === dataStream) {
+          this._currentDataStream = false;
+        }
         this.logger.info({
           tnx: "message",
           inByteCount: dataStream.inByteCount,
@@ -92637,23 +94262,28 @@ var require_smtp_connection = __commonJS((exports, module) => {
       if (/[ -]8BITMIME\b/im.test(str)) {
         this._supportedExtensions.push("8BITMIME");
       }
+      if (/[ -]REQUIRETLS\b/im.test(str)) {
+        this._supportedExtensions.push("REQUIRETLS");
+      }
       if (/[ -]PIPELINING\b/im.test(str)) {
         this._supportedExtensions.push("PIPELINING");
       }
       if (/[ -]AUTH\b/i.test(str)) {
         this.allowsAuth = true;
       }
-      if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)PLAIN/i.test(str)) {
-        this._supportedAuth.push("PLAIN");
+      const authMechanisms = new Set;
+      for (const line of this._ehloLines) {
+        const authMatch = /^AUTH[\s=](.*)/i.exec(line);
+        if (authMatch) {
+          for (const mechanism of authMatch[1].split(/[\s=]+/)) {
+            authMechanisms.add(mechanism.toUpperCase());
+          }
+        }
       }
-      if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)LOGIN/i.test(str)) {
-        this._supportedAuth.push("LOGIN");
-      }
-      if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)CRAM-MD5/i.test(str)) {
-        this._supportedAuth.push("CRAM-MD5");
-      }
-      if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)XOAUTH2/i.test(str)) {
-        this._supportedAuth.push("XOAUTH2");
+      for (const mechanism of ["PLAIN", "LOGIN", "CRAM-MD5", "XOAUTH2"]) {
+        if (authMechanisms.has(mechanism)) {
+          this._supportedAuth.push(mechanism);
+        }
       }
       if (match2 = str.match(/[ -]SIZE(?:[ \t]+(\d+))?/im)) {
         this._supportedExtensions.push("SIZE");
@@ -92675,7 +94305,8 @@ var require_smtp_connection = __commonJS((exports, module) => {
           this.logger.info({
             tnx: "smtp"
           }, "Failed STARTTLS upgrade, continuing unencrypted");
-          return this.emit("connect");
+          this.emit("connect");
+          return;
         }
         this._onError(new Error("Error upgrading connection with STARTTLS"), "ETLS", str, "STARTTLS");
         return;
@@ -92712,16 +94343,14 @@ var require_smtp_connection = __commonJS((exports, module) => {
       this._sendCommand(Buffer.from(this._auth.credentials.user + "", "utf-8").toString("base64"));
     }
     _actionAUTH_CRAM_MD5(str, callback) {
-      let challengeMatch = str.match(/^334\s+(.+)$/);
-      let challengeString = "";
+      const challengeMatch = str.match(/^334\s+(.+)$/);
       if (!challengeMatch) {
         return callback(this._formatError("Invalid login sequence while waiting for server challenge string", "EAUTH", str, "AUTH CRAM-MD5"));
-      } else {
-        challengeString = challengeMatch[1];
       }
-      let base64decoded = Buffer.from(challengeString, "base64").toString("ascii"), hmacMD5 = crypto2.createHmac("md5", this._auth.credentials.pass);
+      const base64decoded = Buffer.from(challengeMatch[1], "base64").toString("ascii");
+      const hmacMD5 = crypto7.createHmac("md5", this._auth.credentials.pass);
       hmacMD5.update(base64decoded);
-      let prepended = this._auth.credentials.user + " " + hmacMD5.digest("hex");
+      const prepended = this._auth.credentials.user + " " + hmacMD5.digest("hex");
       this._responseActions.push((str2) => {
         this._actionAUTH_CRAM_MD5_PASS(str2, callback);
       });
@@ -92784,107 +94413,95 @@ var require_smtp_connection = __commonJS((exports, module) => {
       callback(null, true);
     }
     _actionMAIL(str, callback) {
-      let message, curRecipient;
+      const envelope = this._envelope;
       if (Number(str.charAt(0)) !== 2) {
-        if (this._usingSmtpUtf8 && /^550 /.test(str) && /[\x80-\uFFFF]/.test(this._envelope.from)) {
-          message = "Internationalized mailbox name not allowed";
-        } else {
-          message = "Mail command failed";
-        }
+        const message = this._usingSmtpUtf8 && /^550 /.test(str) && /[\x80-\uFFFF]/.test(envelope.from) ? "Internationalized mailbox name not allowed" : "Mail command failed";
         return callback(this._formatError(message, "EENVELOPE", str, "MAIL FROM"));
       }
-      if (!this._envelope.rcptQueue.length) {
+      if (!envelope.rcptQueue.length) {
         return callback(this._formatError("Can't send mail - no recipients defined", "EENVELOPE", false, "API"));
-      } else {
-        this._recipientQueue = [];
-        if (this._supportedExtensions.includes("PIPELINING")) {
-          while (this._envelope.rcptQueue.length) {
-            curRecipient = this._envelope.rcptQueue.shift();
-            this._recipientQueue.push(curRecipient);
-            this._responseActions.push((str2) => {
-              this._actionRCPT(str2, callback);
-            });
-            this._sendCommand("RCPT TO:<" + curRecipient + ">" + this._getDsnRcptToArgs());
-          }
-        } else {
-          curRecipient = this._envelope.rcptQueue.shift();
-          this._recipientQueue.push(curRecipient);
-          this._responseActions.push((str2) => {
-            this._actionRCPT(str2, callback);
-          });
-          this._sendCommand("RCPT TO:<" + curRecipient + ">" + this._getDsnRcptToArgs());
-        }
       }
-    }
-    _actionRCPT(str, callback) {
-      let message, err, curRecipient = this._recipientQueue.shift();
-      if (Number(str.charAt(0)) !== 2) {
-        if (this._usingSmtpUtf8 && /^553 /.test(str) && /[\x80-\uFFFF]/.test(curRecipient)) {
-          message = "Internationalized mailbox name not allowed";
-        } else {
-          message = "Recipient command failed";
-        }
-        this._envelope.rejected.push(curRecipient);
-        err = this._formatError(message, "EENVELOPE", str, "RCPT TO");
-        err.recipient = curRecipient;
-        this._envelope.rejectedErrors.push(err);
-      } else {
-        this._envelope.accepted.push(curRecipient);
-      }
-      if (!this._envelope.rcptQueue.length && !this._recipientQueue.length) {
-        if (this._envelope.rejected.length < this._envelope.to.length) {
-          this._responseActions.push((str2) => {
-            this._actionDATA(str2, callback);
-          });
-          this._sendCommand("DATA");
-        } else {
-          err = this._formatError("Can't send mail - all recipients were rejected", "EENVELOPE", str, "RCPT TO");
-          err.rejected = this._envelope.rejected;
-          err.rejectedErrors = this._envelope.rejectedErrors;
-          return callback(err);
-        }
-      } else if (this._envelope.rcptQueue.length) {
-        curRecipient = this._envelope.rcptQueue.shift();
+      this._recipientQueue = [];
+      const usePipelining = this._supportedExtensions.includes("PIPELINING");
+      do {
+        const curRecipient = envelope.rcptQueue.shift();
         this._recipientQueue.push(curRecipient);
         this._responseActions.push((str2) => {
           this._actionRCPT(str2, callback);
         });
         this._sendCommand("RCPT TO:<" + curRecipient + ">" + this._getDsnRcptToArgs());
+      } while (usePipelining && envelope.rcptQueue.length);
+    }
+    _actionRCPT(str, callback) {
+      const envelope = this._envelope;
+      let err;
+      const curRecipient = this._recipientQueue.shift();
+      if (Number(str.charAt(0)) !== 2) {
+        const message = this._usingSmtpUtf8 && /^553 /.test(str) && /[\x80-\uFFFF]/.test(curRecipient) ? "Internationalized mailbox name not allowed" : "Recipient command failed";
+        envelope.rejected.push(curRecipient);
+        err = this._formatError(message, "EENVELOPE", str, "RCPT TO");
+        err.recipient = curRecipient;
+        envelope.rejectedErrors.push(err);
+      } else {
+        envelope.accepted.push(curRecipient);
+      }
+      if (!envelope.rcptQueue.length && !this._recipientQueue.length) {
+        if (envelope.rejected.length < envelope.to.length) {
+          this._responseActions.push((str2) => {
+            this._actionDATA(str2, callback);
+          });
+          this._sendCommand("DATA");
+        } else {
+          const deferred = envelope.rejectedErrors.find((rejectedErr) => rejectedErr.responseCode && rejectedErr.responseCode < 500);
+          const reply = deferred?.response ?? str;
+          err = this._formatError("Can't send mail - all recipients were rejected", "EENVELOPE", reply, "RCPT TO");
+          err.rejected = envelope.rejected;
+          err.rejectedErrors = envelope.rejectedErrors;
+          return callback(err);
+        }
+      } else if (envelope.rcptQueue.length) {
+        const nextRecipient = envelope.rcptQueue.shift();
+        this._recipientQueue.push(nextRecipient);
+        this._responseActions.push((str2) => {
+          this._actionRCPT(str2, callback);
+        });
+        this._sendCommand("RCPT TO:<" + nextRecipient + ">" + this._getDsnRcptToArgs());
       }
     }
     _actionDATA(str, callback) {
+      const envelope = this._envelope;
       if (!/^[23]/.test(str)) {
         return callback(this._formatError("Data command failed", "EENVELOPE", str, "DATA"));
       }
-      let response = {
-        accepted: this._envelope.accepted,
-        rejected: this._envelope.rejected
+      const response = {
+        accepted: envelope.accepted,
+        rejected: envelope.rejected
       };
       if (this._ehloLines && this._ehloLines.length) {
         response.ehlo = this._ehloLines;
       }
-      if (this._envelope.rejectedErrors.length) {
-        response.rejectedErrors = this._envelope.rejectedErrors;
+      if (envelope.rejectedErrors.length) {
+        response.rejectedErrors = envelope.rejectedErrors;
       }
       callback(null, response);
     }
     _actionSMTPStream(str, callback) {
       if (Number(str.charAt(0)) !== 2) {
         return callback(this._formatError("Message failed", "EMESSAGE", str, "DATA"));
-      } else {
-        return callback(null, str);
       }
+      return callback(null, str);
     }
     _actionLMTPStream(recipient, final, str, callback) {
+      const envelope = this._envelope;
       let err;
       if (Number(str.charAt(0)) !== 2) {
         err = this._formatError("Message failed for recipient " + recipient, "EMESSAGE", str, "DATA");
         err.recipient = recipient;
-        this._envelope.rejected.push(recipient);
-        this._envelope.rejectedErrors.push(err);
-        for (let i = 0, len = this._envelope.accepted.length;i < len; i++) {
-          if (this._envelope.accepted[i] === recipient) {
-            this._envelope.accepted.splice(i, 1);
+        envelope.rejected.push(recipient);
+        envelope.rejectedErrors.push(err);
+        for (let i = 0, len = envelope.accepted.length;i < len; i++) {
+          if (envelope.accepted[i] === recipient) {
+            envelope.accepted.splice(i, 1);
           }
         }
       }
@@ -92925,8 +94542,8 @@ var require_smtp_connection = __commonJS((exports, module) => {
     _getHostname() {
       let defaultHostname;
       try {
-        defaultHostname = os.hostname() || "";
-      } catch (err) {
+        defaultHostname = os2.hostname() || "";
+      } catch (_err) {
         defaultHostname = "localhost";
       }
       if (!defaultHostname || defaultHostname.indexOf(".") < 0) {
@@ -92937,30 +94554,33 @@ var require_smtp_connection = __commonJS((exports, module) => {
       }
       return defaultHostname;
     }
-  }
-  module.exports = SMTPConnection;
+  };
+  smtp_connection_default = SMTPConnection;
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/xoauth2/index.js
-var require_xoauth2 = __commonJS((exports, module) => {
-  var Stream = __require("stream").Stream;
-  var nmfetch = require_fetch2();
-  var crypto2 = __require("crypto");
-  var shared = require_shared();
-
-  class XOAuth2 extends Stream {
+// /zveltio-extension/node_modules/nodemailer/dist/esm/xoauth2/index.js
+import { Stream } from "stream";
+import crypto8 from "crypto";
+var XOAuth2, xoauth2_default;
+var init_xoauth2 = __esm(() => {
+  init_fetch();
+  init_shared();
+  init_errors();
+  XOAuth2 = class XOAuth2 extends Stream {
     constructor(options, logger) {
       super();
       this.options = options || {};
+      this.configError = false;
       if (options && options.serviceClient) {
         if (!options.privateKey || !options.user) {
-          setImmediate(() => this.emit("error", new Error('Options "privateKey" and "user" are required for service account!')));
-          return;
+          const err = new Error('Options "privateKey" and "user" are required for service account!');
+          err.code = EOAUTH2;
+          this.configError = err;
         }
-        let serviceRequestTimeout = Math.min(Math.max(Number(this.options.serviceRequestTimeout) || 0, 0), 3600);
+        const serviceRequestTimeout = Math.min(Math.max(Number(this.options.serviceRequestTimeout) || 0, 0), 3600);
         this.options.serviceRequestTimeout = serviceRequestTimeout || 5 * 60;
       }
-      this.logger = shared.getLogger({
+      this.logger = getLogger({
         logger
       }, {
         component: this.options.component || "OAuth2"
@@ -92973,18 +94593,55 @@ var require_xoauth2 = __commonJS((exports, module) => {
       if (this.options.expires && Number(this.options.expires)) {
         this.expires = this.options.expires;
       } else {
-        let timeout = Math.max(Number(this.options.timeout) || 0, 0);
+        const timeout = Math.max(Number(this.options.timeout) || 0, 0);
         this.expires = timeout && Date.now() + timeout * 1000 || 0;
       }
+      this.renewing = false;
+      this.renewalQueue = [];
     }
     getToken(renew, callback) {
+      const done = callback;
+      if (this.configError) {
+        return done(this.configError);
+      }
       if (!renew && this.accessToken && (!this.expires || this.expires > Date.now())) {
+        this.logger.debug({
+          tnx: "OAUTH2",
+          user: this.options.user,
+          action: "reuse"
+        }, "Reusing existing access token for %s", this.options.user);
         return callback(null, this.accessToken);
       }
-      let generateCallback = (...args) => {
-        if (args[0]) {
+      if (!this.provisionCallback && !this.options.refreshToken && !this.options.serviceClient) {
+        if (this.accessToken) {
+          this.logger.debug({
+            tnx: "OAUTH2",
+            user: this.options.user,
+            action: "reuse"
+          }, "Reusing existing access token (no refresh capability) for %s", this.options.user);
+          return callback(null, this.accessToken);
+        }
+        this.logger.error({
+          tnx: "OAUTH2",
+          user: this.options.user,
+          action: "renew"
+        }, "Cannot renew access token for %s: No refresh mechanism available", this.options.user);
+        const err = new Error("Can't create new access token for user");
+        err.code = EOAUTH2;
+        return done(err);
+      }
+      if (this.renewing) {
+        this.renewalQueue.push({ renew, callback: done });
+        return;
+      }
+      this.renewing = true;
+      const generateCallback = (err, accessToken) => {
+        this.renewalQueue.forEach((item) => item.callback(err, accessToken));
+        this.renewalQueue = [];
+        this.renewing = false;
+        if (err) {
           this.logger.error({
-            err: args[0],
+            err,
             tnx: "OAUTH2",
             user: this.options.user,
             action: "renew"
@@ -92996,7 +94653,7 @@ var require_xoauth2 = __commonJS((exports, module) => {
             action: "renew"
           }, "Generated new Access Token for %s", this.options.user);
         }
-        callback(...args);
+        done(err, accessToken);
       };
       if (this.provisionCallback) {
         this.provisionCallback(this.options.user, !!renew, (err, accessToken, expires) => {
@@ -93021,11 +94678,12 @@ var require_xoauth2 = __commonJS((exports, module) => {
       });
     }
     generateToken(callback) {
+      const done = callback;
       let urlOptions;
       let loggedUrlOptions;
       if (this.options.serviceClient) {
-        let iat = Math.floor(Date.now() / 1000);
-        let tokenData = {
+        const iat = Math.floor(Date.now() / 1000);
+        const tokenData = {
           iss: this.options.serviceClient,
           scope: this.options.scope || "https://mail.google.com/",
           sub: this.options.user,
@@ -93036,8 +94694,10 @@ var require_xoauth2 = __commonJS((exports, module) => {
         let token2;
         try {
           token2 = this.jwtSignRS256(tokenData);
-        } catch (err) {
-          return callback(new Error("Can't generate token. Check your auth options"));
+        } catch (_err) {
+          const err = new Error("Can't generate token. Check your auth options");
+          err.code = EOAUTH2;
+          return done(err);
         }
         urlOptions = {
           grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
@@ -93049,7 +94709,9 @@ var require_xoauth2 = __commonJS((exports, module) => {
         };
       } else {
         if (!this.options.refreshToken) {
-          return callback(new Error("Can't create new access token for user"));
+          const err = new Error("Can't create new access token for user");
+          err.code = EOAUTH2;
+          return done(err);
         }
         urlOptions = {
           client_id: this.options.clientId || "",
@@ -93064,24 +94726,22 @@ var require_xoauth2 = __commonJS((exports, module) => {
           grant_type: "refresh_token"
         };
       }
-      Object.keys(this.options.customParams).forEach((key) => {
-        urlOptions[key] = this.options.customParams[key];
-        loggedUrlOptions[key] = this.options.customParams[key];
-      });
+      Object.assign(urlOptions, this.options.customParams);
+      Object.assign(loggedUrlOptions, this.options.customParams);
       this.logger.debug({
         tnx: "OAUTH2",
         user: this.options.user,
         action: "generate"
       }, "Requesting token using: %s", JSON.stringify(loggedUrlOptions));
-      this.postRequest(this.options.accessUrl, urlOptions, this.options, (error63, body) => {
+      this.postRequest(this.options.accessUrl, urlOptions, this.options, (error64, body) => {
         let data;
-        if (error63) {
-          return callback(error63);
+        if (error64) {
+          return done(error64);
         }
         try {
           data = JSON.parse(body.toString());
         } catch (E) {
-          return callback(E);
+          return done(E);
         }
         if (!data || typeof data !== "object") {
           this.logger.debug({
@@ -93089,16 +94749,14 @@ var require_xoauth2 = __commonJS((exports, module) => {
             user: this.options.user,
             action: "post"
           }, "Response: %s", (body || "").toString());
-          return callback(new Error("Invalid authentication response"));
+          const err2 = new Error("Invalid authentication response");
+          err2.code = EOAUTH2;
+          return done(err2);
         }
-        let logData = {};
-        Object.keys(data).forEach((key) => {
-          if (key !== "access_token") {
-            logData[key] = data[key];
-          } else {
-            logData[key] = (data[key] || "").toString().substr(0, 6) + "...";
-          }
-        });
+        const logData = Object.assign({}, data);
+        if (logData.access_token) {
+          logData.access_token = (logData.access_token || "").toString().substr(0, 6) + "...";
+        }
         this.logger.debug({
           tnx: "OAUTH2",
           user: this.options.user,
@@ -93112,29 +94770,38 @@ var require_xoauth2 = __commonJS((exports, module) => {
           if (data.error_uri) {
             errorMessage += " (" + data.error_uri + ")";
           }
-          return callback(new Error(errorMessage));
+          const err2 = new Error(errorMessage);
+          err2.code = EOAUTH2;
+          return done(err2);
         }
         if (data.access_token) {
           this.updateToken(data.access_token, data.expires_in);
           return callback(null, this.accessToken);
         }
-        return callback(new Error("No access token"));
+        const err = new Error("No access token");
+        err.code = EOAUTH2;
+        return done(err);
       });
     }
     buildXOAuth2Token(accessToken) {
-      let authData = ["user=" + (this.options.user || ""), "auth=Bearer " + (accessToken || this.accessToken), "", ""];
+      const authData = ["user=" + (this.options.user || ""), "auth=Bearer " + (accessToken || this.accessToken), "", ""];
       return Buffer.from(authData.join("\x01"), "utf-8").toString("base64");
     }
     postRequest(url2, payload, params, callback) {
       let returned = false;
-      let chunks = [];
+      const chunks = [];
       let chunklen = 0;
-      let req = nmfetch(url2, {
+      const fetchOptions = {
         method: "post",
         headers: params.customHeaders,
         body: payload,
-        allowErrorResponse: true
-      });
+        allowErrorResponse: true,
+        timeout: params.requestTimeout
+      };
+      if (/^https:/i.test(url2)) {
+        fetchOptions.tls = Object.assign({ rejectUnauthorized: true }, params.tls || {});
+      }
+      const req = fetch_default(url2, fetchOptions);
       req.on("readable", () => {
         let chunk;
         while ((chunk = req.read()) !== null) {
@@ -93164,22 +94831,23 @@ var require_xoauth2 = __commonJS((exports, module) => {
       return data.toString("base64").replace(/[=]+/g, "").replace(/\+/g, "-").replace(/\//g, "_");
     }
     jwtSignRS256(payload) {
-      payload = ['{"alg":"RS256","typ":"JWT"}', JSON.stringify(payload)].map((val) => this.toBase64URL(val)).join(".");
-      let signature = crypto2.createSign("RSA-SHA256").update(payload).sign(this.options.privateKey);
-      return payload + "." + this.toBase64URL(signature);
+      const signedPayload = ['{"alg":"RS256","typ":"JWT"}', JSON.stringify(payload)].map((val) => this.toBase64URL(val)).join(".");
+      const signature = crypto8.createSign("RSA-SHA256").update(signedPayload).sign(this.options.privateKey);
+      return signedPayload + "." + this.toBase64URL(signature);
     }
-  }
-  module.exports = XOAuth2;
+  };
+  xoauth2_default = XOAuth2;
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/smtp-pool/pool-resource.js
-var require_pool_resource = __commonJS((exports, module) => {
-  var SMTPConnection = require_smtp_connection();
-  var assign = require_shared().assign;
-  var XOAuth2 = require_xoauth2();
-  var EventEmitter = __require("events");
-
-  class PoolResource extends EventEmitter {
+// /zveltio-extension/node_modules/nodemailer/dist/esm/smtp-pool/pool-resource.js
+import { EventEmitter as EventEmitter3 } from "events";
+var PoolResource;
+var init_pool_resource = __esm(() => {
+  init_smtp_connection();
+  init_shared();
+  init_xoauth2();
+  init_errors();
+  PoolResource = class PoolResource extends EventEmitter3 {
     constructor(pool) {
       super();
       this.pool = pool;
@@ -93188,7 +94856,7 @@ var require_pool_resource = __commonJS((exports, module) => {
       if (this.options.auth) {
         switch ((this.options.auth.type || "").toString().toUpperCase()) {
           case "OAUTH2": {
-            let oauth2 = new XOAuth2(this.options.auth, this.logger);
+            const oauth2 = new xoauth2_default(this.options.auth, this.logger);
             oauth2.provisionCallback = this.pool.mailer && this.pool.mailer.get("oauth2_provision_cb") || oauth2.provisionCallback;
             this.auth = {
               type: "OAUTH2",
@@ -93197,7 +94865,7 @@ var require_pool_resource = __commonJS((exports, module) => {
               method: "XOAUTH2"
             };
             oauth2.on("token", (token2) => this.pool.mailer.emit("token", token2));
-            oauth2.on("error", (err) => this.emit("error", err));
+            oauth2.on("error", (err) => this._fail(err));
             break;
           }
           default:
@@ -93220,10 +94888,19 @@ var require_pool_resource = __commonJS((exports, module) => {
       this._connected = false;
       this.messages = 0;
       this.available = true;
+      this._failed = false;
+    }
+    _fail(err) {
+      if (this._failed) {
+        return;
+      }
+      this._failed = true;
+      this.emit("error", err);
     }
     connect(callback) {
       this.pool.getSocket(this.options, (err, socketOptions) => {
         if (err) {
+          this._fail(err);
           return callback(err);
         }
         let returned = false;
@@ -93237,14 +94914,11 @@ var require_pool_resource = __commonJS((exports, module) => {
             destPort: options.port || "",
             action: "connected"
           }, "Using proxied socket from %s:%s to %s:%s", socketOptions.connection.remoteAddress, socketOptions.connection.remotePort, options.host || "", options.port || "");
-          options = assign(false, options);
-          Object.keys(socketOptions).forEach((key) => {
-            options[key] = socketOptions[key];
-          });
+          options = Object.assign(assign(false, options), socketOptions);
         }
-        this.connection = new SMTPConnection(options);
-        this.connection.once("error", (err2) => {
-          this.emit("error", err2);
+        this.connection = new smtp_connection_default(options);
+        this.connection.on("error", (err2) => {
+          this._fail(err2);
           if (returned) {
             return;
           }
@@ -93253,38 +94927,26 @@ var require_pool_resource = __commonJS((exports, module) => {
         });
         this.connection.once("end", () => {
           this.close();
+          returned = true;
+        });
+        this.connection.connect((err2) => {
           if (returned) {
             return;
           }
-          returned = true;
-          let timer = setTimeout(() => {
-            if (returned) {
-              return;
-            }
-            let err2 = new Error("Unexpected socket close");
-            if (this.connection && this.connection._socket && this.connection._socket.upgrading) {
-              err2.code = "ETLS";
-            }
-            callback(err2);
-          }, 1000);
-          try {
-            timer.unref();
-          } catch (E) {}
-        });
-        this.connection.connect(() => {
-          if (returned) {
+          if (err2) {
+            returned = true;
             return;
           }
           if (this.auth && (this.connection.allowsAuth || options.forceAuth)) {
-            this.connection.login(this.auth, (err2) => {
+            this.connection.login(this.auth, (err3) => {
               if (returned) {
                 return;
               }
               returned = true;
-              if (err2) {
+              if (err3) {
                 this.connection.close();
-                this.emit("error", err2);
-                return callback(err2);
+                this._fail(err3);
+                return callback(err3);
               }
               this._connected = true;
               callback(null, true);
@@ -93306,9 +94968,9 @@ var require_pool_resource = __commonJS((exports, module) => {
           return this.send(mail, callback);
         });
       }
-      let envelope = mail.message.getEnvelope();
-      let messageId = mail.message.messageId();
-      let recipients = [].concat(envelope.to || []);
+      const envelope = mail.message.getEnvelope();
+      const messageId = mail.message.messageId();
+      const recipients = [].concat(envelope.to || []);
       if (recipients.length > 3) {
         recipients.push("...and " + recipients.splice(2).length + " more");
       }
@@ -93320,11 +94982,14 @@ var require_pool_resource = __commonJS((exports, module) => {
       if (mail.data.dsn) {
         envelope.dsn = mail.data.dsn;
       }
+      if (mail.data.requireTLSExtensionEnabled) {
+        envelope.requireTLSExtensionEnabled = mail.data.requireTLSExtensionEnabled;
+      }
       this.connection.send(envelope, mail.message.createReadStream(), (err, info) => {
         this.messages++;
         if (err) {
           this.connection.close();
-          this.emit("error", err);
+          this._fail(err);
           return callback(err);
         }
         info.envelope = {
@@ -93333,12 +94998,11 @@ var require_pool_resource = __commonJS((exports, module) => {
         };
         info.messageId = messageId;
         setImmediate(() => {
-          let err2;
           if (this.messages >= this.options.maxMessages) {
-            err2 = new Error("Resource exhausted");
-            err2.code = "EMAXLIMIT";
+            const err2 = new Error("Resource exhausted");
+            err2.code = EMAXLIMIT;
             this.connection.close();
-            this.emit("error", err2);
+            this._fail(err2);
           } else {
             this.pool._checkRateLimit(() => {
               this.available = true;
@@ -93359,369 +95023,728 @@ var require_pool_resource = __commonJS((exports, module) => {
       }
       this.emit("close");
     }
-  }
-  module.exports = PoolResource;
+  };
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/well-known/services.json
-var require_services = __commonJS((exports, module) => {
-  module.exports = {
+// /zveltio-extension/node_modules/nodemailer/dist/esm/well-known/services.js
+var services;
+var init_services = __esm(() => {
+  services = {
+    "126": {
+      description: "126 Mail (NetEase)",
+      host: "smtp.126.com",
+      port: 465,
+      secure: true
+    },
+    "163": {
+      description: "163 Mail (NetEase)",
+      host: "smtp.163.com",
+      port: 465,
+      secure: true
+    },
     "1und1": {
+      description: "1&1 Mail (German hosting provider)",
       host: "smtp.1und1.de",
       port: 465,
       secure: true,
       authMethod: "LOGIN"
     },
     Aliyun: {
-      domains: ["aliyun.com"],
+      description: "Alibaba Cloud Mail",
+      domains: [
+        "aliyun.com"
+      ],
       host: "smtp.aliyun.com",
       port: 465,
       secure: true
     },
+    AliyunQiye: {
+      description: "Alibaba Cloud Enterprise Mail",
+      host: "smtp.qiye.aliyun.com",
+      port: 465,
+      secure: true
+    },
     AOL: {
-      domains: ["aol.com"],
+      description: "AOL Mail",
+      domains: [
+        "aol.com"
+      ],
       host: "smtp.aol.com",
       port: 587
     },
+    Aruba: {
+      description: "Aruba PEC (Italian email provider)",
+      domains: [
+        "aruba.it",
+        "pec.aruba.it"
+      ],
+      aliases: [
+        "Aruba PEC"
+      ],
+      host: "smtps.aruba.it",
+      port: 465,
+      secure: true,
+      authMethod: "LOGIN"
+    },
     Bluewin: {
+      description: "Bluewin (Swiss email provider)",
       host: "smtpauths.bluewin.ch",
-      domains: ["bluewin.ch"],
+      domains: [
+        "bluewin.ch"
+      ],
       port: 465
     },
+    BOL: {
+      description: "BOL Mail (Brazilian provider)",
+      domains: [
+        "bol.com.br"
+      ],
+      host: "smtp.bol.com.br",
+      port: 587,
+      requireTLS: true
+    },
     DebugMail: {
+      description: "DebugMail (email testing service)",
       host: "debugmail.io",
       port: 25
     },
+    Disroot: {
+      description: "Disroot (privacy-focused provider)",
+      domains: [
+        "disroot.org"
+      ],
+      host: "disroot.org",
+      port: 587,
+      secure: false,
+      authMethod: "LOGIN"
+    },
     DynectEmail: {
-      aliases: ["Dynect"],
+      description: "Dyn Email Delivery",
+      aliases: [
+        "Dynect"
+      ],
       host: "smtp.dynect.net",
       port: 25
     },
+    ElasticEmail: {
+      description: "Elastic Email",
+      aliases: [
+        "Elastic Email"
+      ],
+      host: "smtp.elasticemail.com",
+      port: 465,
+      secure: true
+    },
     Ethereal: {
-      aliases: ["ethereal.email"],
+      description: "Ethereal Email (email testing service)",
+      aliases: [
+        "ethereal.email"
+      ],
       host: "smtp.ethereal.email",
       port: 587
     },
     FastMail: {
-      domains: ["fastmail.fm"],
+      description: "FastMail",
+      domains: [
+        "fastmail.com",
+        "fastmail.fm"
+      ],
       host: "smtp.fastmail.com",
       port: 465,
       secure: true
     },
-    "Forward Email": {
-      aliases: ["FE", "ForwardEmail"],
-      domains: ["forwardemail.net"],
-      host: "smtp.forwardemail.net",
-      port: 465,
-      secure: true
-    },
     "Feishu Mail": {
-      aliases: ["Feishu", "FeishuMail"],
-      domains: ["www.feishu.cn"],
+      description: "Feishu Mail (Lark)",
+      aliases: [
+        "Feishu",
+        "FeishuMail"
+      ],
+      domains: [
+        "www.feishu.cn"
+      ],
       host: "smtp.feishu.cn",
       port: 465,
       secure: true
     },
+    "Forward Email": {
+      description: "Forward Email (email forwarding service)",
+      aliases: [
+        "FE",
+        "ForwardEmail"
+      ],
+      domains: [
+        "forwardemail.net"
+      ],
+      host: "smtp.forwardemail.net",
+      port: 465,
+      secure: true
+    },
     GandiMail: {
-      aliases: ["Gandi", "Gandi Mail"],
+      description: "Gandi Mail",
+      aliases: [
+        "Gandi",
+        "Gandi Mail"
+      ],
       host: "mail.gandi.net",
       port: 587
     },
     Gmail: {
-      aliases: ["Google Mail"],
-      domains: ["gmail.com", "googlemail.com"],
+      description: "Gmail",
+      aliases: [
+        "Google Mail"
+      ],
+      domains: [
+        "gmail.com",
+        "googlemail.com"
+      ],
       host: "smtp.gmail.com",
       port: 465,
       secure: true
     },
+    GmailWorkspace: {
+      description: "Gmail Workspace",
+      aliases: [
+        "Google Workspace Mail"
+      ],
+      host: "smtp-relay.gmail.com",
+      port: 465,
+      secure: true
+    },
+    GMX: {
+      description: "GMX Mail",
+      domains: [
+        "gmx.com",
+        "gmx.net",
+        "gmx.de"
+      ],
+      host: "mail.gmx.com",
+      port: 587
+    },
     Godaddy: {
+      description: "GoDaddy Email (US)",
       host: "smtpout.secureserver.net",
       port: 25
     },
     GodaddyAsia: {
+      description: "GoDaddy Email (Asia)",
       host: "smtp.asia.secureserver.net",
       port: 25
     },
     GodaddyEurope: {
+      description: "GoDaddy Email (Europe)",
       host: "smtp.europe.secureserver.net",
       port: 25
     },
     "hot.ee": {
+      description: "Hot.ee (Estonian email provider)",
       host: "mail.hot.ee"
     },
     Hotmail: {
-      aliases: ["Outlook", "Outlook.com", "Hotmail.com"],
-      domains: ["hotmail.com", "outlook.com"],
+      description: "Outlook.com / Hotmail",
+      aliases: [
+        "Outlook",
+        "Outlook.com",
+        "Hotmail.com"
+      ],
+      domains: [
+        "hotmail.com",
+        "outlook.com"
+      ],
       host: "smtp-mail.outlook.com",
       port: 587
     },
     iCloud: {
-      aliases: ["Me", "Mac"],
-      domains: ["me.com", "mac.com"],
+      description: "iCloud Mail",
+      aliases: [
+        "Me",
+        "Mac"
+      ],
+      domains: [
+        "icloud.com",
+        "me.com",
+        "mac.com"
+      ],
       host: "smtp.mail.me.com",
       port: 587
     },
     Infomaniak: {
+      description: "Infomaniak Mail (Swiss hosting provider)",
       host: "mail.infomaniak.com",
-      domains: ["ik.me", "ikmail.com", "etik.com"],
+      domains: [
+        "ik.me",
+        "ikmail.com",
+        "etik.com"
+      ],
       port: 587
     },
+    KolabNow: {
+      description: "KolabNow (secure email service)",
+      domains: [
+        "kolabnow.com"
+      ],
+      aliases: [
+        "Kolab"
+      ],
+      host: "smtp.kolabnow.com",
+      port: 465,
+      secure: true,
+      authMethod: "LOGIN"
+    },
     Loopia: {
+      description: "Loopia (Swedish hosting provider)",
       host: "mailcluster.loopia.se",
       port: 465
     },
+    Loops: {
+      description: "Loops",
+      host: "smtp.loops.so",
+      port: 587
+    },
     "mail.ee": {
+      description: "Mail.ee (Estonian email provider)",
       host: "smtp.mail.ee"
     },
     "Mail.ru": {
+      description: "Mail.ru",
       host: "smtp.mail.ru",
       port: 465,
       secure: true
     },
     "Mailcatch.app": {
+      description: "Mailcatch (email testing service)",
       host: "sandbox-smtp.mailcatch.app",
       port: 2525
     },
     Maildev: {
+      description: "MailDev (local email testing)",
       port: 1025,
       ignoreTLS: true
     },
+    MailerSend: {
+      description: "MailerSend",
+      host: "smtp.mailersend.net",
+      port: 587
+    },
     Mailgun: {
+      description: "Mailgun",
       host: "smtp.mailgun.org",
       port: 465,
       secure: true
     },
     Mailjet: {
+      description: "Mailjet",
       host: "in.mailjet.com",
       port: 587
     },
     Mailosaur: {
+      description: "Mailosaur (email testing service)",
       host: "mailosaur.io",
       port: 25
     },
+    MailSenpai: {
+      description: "MailSenpai (SMTP Senpai, EU)",
+      host: "relay.mailsenpai.com",
+      port: 2525,
+      secure: false
+    },
     Mailtrap: {
+      description: "Mailtrap",
       host: "live.smtp.mailtrap.io",
       port: 587
     },
     Mandrill: {
+      description: "Mandrill (by Mailchimp)",
       host: "smtp.mandrillapp.com",
       port: 587
     },
     Naver: {
+      description: "Naver Mail (Korean email provider)",
       host: "smtp.naver.com",
       port: 587
     },
+    OhMySMTP: {
+      description: "OhMySMTP (email delivery service)",
+      host: "smtp.ohmysmtp.com",
+      port: 587,
+      secure: false
+    },
     One: {
+      description: "One.com Email",
       host: "send.one.com",
       port: 465,
       secure: true
     },
     OpenMailBox: {
-      aliases: ["OMB", "openmailbox.org"],
+      description: "OpenMailBox",
+      aliases: [
+        "OMB",
+        "openmailbox.org"
+      ],
       host: "smtp.openmailbox.org",
       port: 465,
       secure: true
     },
     Outlook365: {
+      description: "Microsoft 365 / Office 365",
       host: "smtp.office365.com",
       port: 587,
       secure: false
     },
-    OhMySMTP: {
-      host: "smtp.ohmysmtp.com",
-      port: 587,
-      secure: false
-    },
     Postmark: {
-      aliases: ["PostmarkApp"],
+      description: "Postmark",
+      aliases: [
+        "PostmarkApp"
+      ],
       host: "smtp.postmarkapp.com",
       port: 2525
     },
     Proton: {
-      aliases: ["ProtonMail", "Proton.me", "Protonmail.com", "Protonmail.ch"],
-      domains: ["proton.me", "protonmail.com", "pm.me", "protonmail.ch"],
+      description: "Proton Mail",
+      aliases: [
+        "ProtonMail",
+        "Proton.me",
+        "Protonmail.com",
+        "Protonmail.ch"
+      ],
+      domains: [
+        "proton.me",
+        "protonmail.com",
+        "pm.me",
+        "protonmail.ch"
+      ],
       host: "smtp.protonmail.ch",
       port: 587,
       requireTLS: true
     },
     "qiye.aliyun": {
+      description: "Alibaba Mail Enterprise Edition",
       host: "smtp.mxhichina.com",
       port: "465",
       secure: true
     },
     QQ: {
-      domains: ["qq.com"],
+      description: "QQ Mail",
+      domains: [
+        "qq.com"
+      ],
       host: "smtp.qq.com",
       port: 465,
       secure: true
     },
     QQex: {
-      aliases: ["QQ Enterprise"],
-      domains: ["exmail.qq.com"],
+      description: "QQ Enterprise Mail",
+      aliases: [
+        "QQ Enterprise"
+      ],
+      domains: [
+        "exmail.qq.com"
+      ],
       host: "smtp.exmail.qq.com",
       port: 465,
       secure: true
     },
+    Resend: {
+      description: "Resend",
+      host: "smtp.resend.com",
+      port: 465,
+      secure: true
+    },
+    Runbox: {
+      description: "Runbox (Norwegian email provider)",
+      domains: [
+        "runbox.com"
+      ],
+      host: "smtp.runbox.com",
+      port: 465,
+      secure: true
+    },
     SendCloud: {
+      description: "SendCloud (Chinese email delivery)",
       host: "smtp.sendcloud.net",
       port: 2525
     },
     SendGrid: {
+      description: "SendGrid",
       host: "smtp.sendgrid.net",
       port: 587
     },
     SendinBlue: {
-      aliases: ["Brevo"],
+      description: "Brevo (formerly Sendinblue)",
+      aliases: [
+        "Brevo"
+      ],
       host: "smtp-relay.brevo.com",
       port: 587
     },
     SendPulse: {
+      description: "SendPulse",
       host: "smtp-pulse.com",
       port: 465,
       secure: true
     },
     SES: {
+      description: "AWS SES US East (N. Virginia)",
       host: "email-smtp.us-east-1.amazonaws.com",
-      port: 465,
-      secure: true
-    },
-    "SES-US-EAST-1": {
-      host: "email-smtp.us-east-1.amazonaws.com",
-      port: 465,
-      secure: true
-    },
-    "SES-US-WEST-2": {
-      host: "email-smtp.us-west-2.amazonaws.com",
-      port: 465,
-      secure: true
-    },
-    "SES-EU-WEST-1": {
-      host: "email-smtp.eu-west-1.amazonaws.com",
-      port: 465,
-      secure: true
-    },
-    "SES-AP-SOUTH-1": {
-      host: "email-smtp.ap-south-1.amazonaws.com",
       port: 465,
       secure: true
     },
     "SES-AP-NORTHEAST-1": {
+      description: "AWS SES Asia Pacific (Tokyo)",
       host: "email-smtp.ap-northeast-1.amazonaws.com",
       port: 465,
       secure: true
     },
     "SES-AP-NORTHEAST-2": {
+      description: "AWS SES Asia Pacific (Seoul)",
       host: "email-smtp.ap-northeast-2.amazonaws.com",
       port: 465,
       secure: true
     },
     "SES-AP-NORTHEAST-3": {
+      description: "AWS SES Asia Pacific (Osaka)",
       host: "email-smtp.ap-northeast-3.amazonaws.com",
       port: 465,
       secure: true
     },
+    "SES-AP-SOUTH-1": {
+      description: "AWS SES Asia Pacific (Mumbai)",
+      host: "email-smtp.ap-south-1.amazonaws.com",
+      port: 465,
+      secure: true
+    },
     "SES-AP-SOUTHEAST-1": {
+      description: "AWS SES Asia Pacific (Singapore)",
       host: "email-smtp.ap-southeast-1.amazonaws.com",
       port: 465,
       secure: true
     },
     "SES-AP-SOUTHEAST-2": {
+      description: "AWS SES Asia Pacific (Sydney)",
       host: "email-smtp.ap-southeast-2.amazonaws.com",
       port: 465,
       secure: true
     },
+    "SES-CA-CENTRAL-1": {
+      description: "AWS SES Canada (Central)",
+      host: "email-smtp.ca-central-1.amazonaws.com",
+      port: 465,
+      secure: true
+    },
+    "SES-EU-CENTRAL-1": {
+      description: "AWS SES Europe (Frankfurt)",
+      host: "email-smtp.eu-central-1.amazonaws.com",
+      port: 465,
+      secure: true
+    },
+    "SES-EU-NORTH-1": {
+      description: "AWS SES Europe (Stockholm)",
+      host: "email-smtp.eu-north-1.amazonaws.com",
+      port: 465,
+      secure: true
+    },
+    "SES-EU-WEST-1": {
+      description: "AWS SES Europe (Ireland)",
+      host: "email-smtp.eu-west-1.amazonaws.com",
+      port: 465,
+      secure: true
+    },
+    "SES-EU-WEST-2": {
+      description: "AWS SES Europe (London)",
+      host: "email-smtp.eu-west-2.amazonaws.com",
+      port: 465,
+      secure: true
+    },
+    "SES-EU-WEST-3": {
+      description: "AWS SES Europe (Paris)",
+      host: "email-smtp.eu-west-3.amazonaws.com",
+      port: 465,
+      secure: true
+    },
+    "SES-SA-EAST-1": {
+      description: "AWS SES South America (S\xE3o Paulo)",
+      host: "email-smtp.sa-east-1.amazonaws.com",
+      port: 465,
+      secure: true
+    },
+    "SES-US-EAST-1": {
+      description: "AWS SES US East (N. Virginia)",
+      host: "email-smtp.us-east-1.amazonaws.com",
+      port: 465,
+      secure: true
+    },
+    "SES-US-EAST-2": {
+      description: "AWS SES US East (Ohio)",
+      host: "email-smtp.us-east-2.amazonaws.com",
+      port: 465,
+      secure: true
+    },
+    "SES-US-GOV-EAST-1": {
+      description: "AWS SES GovCloud (US-East)",
+      host: "email-smtp.us-gov-east-1.amazonaws.com",
+      port: 465,
+      secure: true
+    },
+    "SES-US-GOV-WEST-1": {
+      description: "AWS SES GovCloud (US-West)",
+      host: "email-smtp.us-gov-west-1.amazonaws.com",
+      port: 465,
+      secure: true
+    },
+    "SES-US-WEST-1": {
+      description: "AWS SES US West (N. California)",
+      host: "email-smtp.us-west-1.amazonaws.com",
+      port: 465,
+      secure: true
+    },
+    "SES-US-WEST-2": {
+      description: "AWS SES US West (Oregon)",
+      host: "email-smtp.us-west-2.amazonaws.com",
+      port: 465,
+      secure: true
+    },
     Seznam: {
-      aliases: ["Seznam Email"],
-      domains: ["seznam.cz", "email.cz", "post.cz", "spoluzaci.cz"],
+      description: "Seznam Email (Czech email provider)",
+      aliases: [
+        "Seznam Email"
+      ],
+      domains: [
+        "seznam.cz",
+        "email.cz",
+        "post.cz",
+        "spoluzaci.cz"
+      ],
       host: "smtp.seznam.cz",
       port: 465,
       secure: true
     },
+    SMTP2GO: {
+      description: "SMTP2GO",
+      host: "mail.smtp2go.com",
+      port: 2525
+    },
     Sparkpost: {
-      aliases: ["SparkPost", "SparkPost Mail"],
-      domains: ["sparkpost.com"],
+      description: "SparkPost",
+      aliases: [
+        "SparkPost",
+        "SparkPost Mail"
+      ],
+      domains: [
+        "sparkpost.com"
+      ],
       host: "smtp.sparkpostmail.com",
       port: 587,
       secure: false
     },
     Tipimail: {
+      description: "Tipimail (email delivery service)",
       host: "smtp.tipimail.com",
       port: 587
     },
+    TurboSMTP: {
+      description: "TurboSMTP",
+      host: "pro.turbo-smtp.com",
+      port: 465,
+      secure: true
+    },
+    "TurboSMTP-EU": {
+      description: "TurboSMTP (EU region)",
+      host: "pro.eu.turbo-smtp.com",
+      port: 465,
+      secure: true
+    },
+    Tutanota: {
+      description: "Tutanota (Tuta Mail)",
+      domains: [
+        "tutanota.com",
+        "tuta.com",
+        "tutanota.de",
+        "tuta.io"
+      ],
+      host: "smtp.tutanota.com",
+      port: 465,
+      secure: true
+    },
     Yahoo: {
-      domains: ["yahoo.com"],
+      description: "Yahoo Mail",
+      domains: [
+        "yahoo.com"
+      ],
       host: "smtp.mail.yahoo.com",
       port: 465,
       secure: true
     },
     Yandex: {
-      domains: ["yandex.ru"],
+      description: "Yandex Mail",
+      domains: [
+        "yandex.ru"
+      ],
       host: "smtp.yandex.ru",
       port: 465,
       secure: true
     },
+    Zimbra: {
+      description: "Zimbra Mail Server",
+      aliases: [
+        "Zimbra Collaboration"
+      ],
+      host: "smtp.zimbra.com",
+      port: 587,
+      requireTLS: true
+    },
     Zoho: {
+      description: "Zoho Mail",
       host: "smtp.zoho.com",
       port: 465,
       secure: true,
       authMethod: "LOGIN"
-    },
-    "126": {
-      host: "smtp.126.com",
-      port: 465,
-      secure: true
-    },
-    "163": {
-      host: "smtp.163.com",
-      port: 465,
-      secure: true
     }
   };
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/well-known/index.js
-var require_well_known = __commonJS((exports, module) => {
-  var services = require_services();
-  var normalized = {};
+// /zveltio-extension/node_modules/nodemailer/dist/esm/well-known/index.js
+function normalizeKey(key) {
+  return key.replace(/[^a-zA-Z0-9.-]/g, "").toLowerCase();
+}
+function normalizeService(service) {
+  const response = {};
+  Object.keys(service).forEach((key) => {
+    if (!["domains", "aliases"].includes(key)) {
+      response[key] = service[key];
+    }
+  });
+  return response;
+}
+function wellKnown(key) {
+  key = normalizeKey(key.split("@").pop());
+  return normalized[key] || false;
+}
+var normalized;
+var init_well_known = __esm(() => {
+  init_services();
+  normalized = {};
   Object.keys(services).forEach((key) => {
-    let service = services[key];
-    normalized[normalizeKey(key)] = normalizeService(service);
+    const service = services[key];
+    const normalizedService = normalizeService(service);
+    normalized[normalizeKey(key)] = normalizedService;
     [].concat(service.aliases || []).forEach((alias) => {
-      normalized[normalizeKey(alias)] = normalizeService(service);
+      normalized[normalizeKey(alias)] = normalizedService;
     });
     [].concat(service.domains || []).forEach((domain2) => {
-      normalized[normalizeKey(domain2)] = normalizeService(service);
+      normalized[normalizeKey(domain2)] = normalizedService;
     });
   });
-  function normalizeKey(key) {
-    return key.replace(/[^a-zA-Z0-9.-]/g, "").toLowerCase();
-  }
-  function normalizeService(service) {
-    let filter2 = ["domains", "aliases"];
-    let response = {};
-    Object.keys(service).forEach((key) => {
-      if (filter2.indexOf(key) < 0) {
-        response[key] = service[key];
-      }
-    });
-    return response;
-  }
-  module.exports = function(key) {
-    key = normalizeKey(key.split("@").pop());
-    return normalized[key] || false;
-  };
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/smtp-pool/index.js
-var require_smtp_pool = __commonJS((exports, module) => {
-  var EventEmitter = __require("events");
-  var PoolResource = require_pool_resource();
-  var SMTPConnection = require_smtp_connection();
-  var wellKnown = require_well_known();
-  var shared = require_shared();
-  var packageData = require_package5();
-
-  class SMTPPool extends EventEmitter {
+// /zveltio-extension/node_modules/nodemailer/dist/esm/smtp-pool/index.js
+import { EventEmitter as EventEmitter4 } from "events";
+var REQUEUE_BASE_DELAY = 50, REQUEUE_MAX_DELAY = 2000, SMTPPool, smtp_pool_default;
+var init_smtp_pool = __esm(() => {
+  init_pool_resource();
+  init_smtp_connection();
+  init_well_known();
+  init_shared();
+  init_errors();
+  SMTPPool = class SMTPPool extends EventEmitter4 {
     constructor(options) {
       super();
       options = options || {};
@@ -93736,18 +95759,18 @@ var require_smtp_pool = __commonJS((exports, module) => {
         this.getSocket = options.getSocket;
       }
       if (options.url) {
-        urlData = shared.parseConnectionUrl(options.url);
+        urlData = parseConnectionUrl(options.url);
         service = service || urlData.service;
       }
-      this.options = shared.assign(false, options, urlData, service && wellKnown(service));
+      this.options = assign(false, options, urlData, service && wellKnown(service));
       this.options.maxConnections = this.options.maxConnections || 5;
       this.options.maxMessages = this.options.maxMessages || 100;
-      this.logger = shared.getLogger(this.options, {
+      this.options.maxRequeues = typeof this.options.maxRequeues === "number" ? this.options.maxRequeues : 5;
+      this.logger = getLogger(this.options, {
         component: this.options.component || "smtp-pool"
       });
-      let connection = new SMTPConnection(this.options);
       this.name = "SMTP (pool)";
-      this.version = packageData.version + "[client:" + connection.version + "]";
+      this.version = version2 + "[client:" + version2 + "]";
       this._rateLimit = {
         counter: 0,
         timeout: null,
@@ -93768,10 +95791,13 @@ var require_smtp_pool = __commonJS((exports, module) => {
       });
     }
     getSocket(options, callback) {
-      return setImmediate(() => callback(null, false));
+      setImmediate(() => callback(null, false));
     }
     send(mail, callback) {
       if (this._closed) {
+        const err = new Error("Connection pool was closed");
+        err.code = ECONNECTION;
+        setImmediate(() => callback(err));
         return false;
       }
       this._queue.push({
@@ -93787,9 +95813,9 @@ var require_smtp_pool = __commonJS((exports, module) => {
     }
     close() {
       let connection;
-      let len = this._connections.length;
+      const len = this._connections.length;
       this._closed = true;
-      clearTimeout(this._rateLimit.timeout);
+      this._clearRateLimit();
       if (!len && !this._queue.length) {
         return;
       }
@@ -93812,23 +95838,22 @@ var require_smtp_pool = __commonJS((exports, module) => {
       if (!this._queue.length) {
         return;
       }
-      let invokeCallbacks = () => {
+      const invokeCallbacks = () => {
         if (!this._queue.length) {
           this.logger.debug({
             tnx: "connection"
           }, "Pending queue entries cleared");
           return;
         }
-        let entry = this._queue.shift();
+        const entry = this._queue.shift();
         if (entry && typeof entry.callback === "function") {
           try {
             entry.callback(new Error("Connection pool was closed"));
           } catch (E) {
             this.logger.error({
               err: E,
-              tnx: "callback",
-              cid: connection.id
-            }, "Callback error for #%s: %s", connection.id, E.message);
+              tnx: "callback"
+            }, "Callback error: %s", E.message);
           }
         }
         setImmediate(invokeCallbacks);
@@ -93836,8 +95861,6 @@ var require_smtp_pool = __commonJS((exports, module) => {
       setImmediate(invokeCallbacks);
     }
     _processMessages() {
-      let connection;
-      let i, len;
       if (this._closed) {
         return;
       }
@@ -93848,12 +95871,7 @@ var require_smtp_pool = __commonJS((exports, module) => {
         }
         return;
       }
-      for (i = 0, len = this._connections.length;i < len; i++) {
-        if (this._connections[i].available) {
-          connection = this._connections[i];
-          break;
-        }
-      }
+      let connection = this._connections.find((c) => c.available);
       if (!connection && this._connections.length < this.options.maxConnections) {
         connection = this._createConnection();
       }
@@ -93865,7 +95883,7 @@ var require_smtp_pool = __commonJS((exports, module) => {
         this.idling = true;
         this.emit("idle");
       }
-      let entry = connection.queueEntry = this._queue.shift();
+      const entry = connection.queueEntry = this._queue.shift();
       entry.messageId = (connection.queueEntry.mail.message.getHeader("message-id") || "").replace(/[<>\s]/g, "");
       connection.available = false;
       this.logger.debug({
@@ -93896,7 +95914,7 @@ var require_smtp_pool = __commonJS((exports, module) => {
       });
     }
     _createConnection() {
-      let connection = new PoolResource(this);
+      const connection = new PoolResource(this);
       connection.id = ++this._connectionCounter;
       this.logger.info({
         tnx: "pool",
@@ -93916,8 +95934,8 @@ var require_smtp_pool = __commonJS((exports, module) => {
         }
       });
       connection.once("error", (err) => {
-        if (err.code !== "EMAXLIMIT") {
-          this.logger.error({
+        if (err.code !== EMAXLIMIT) {
+          this.logger.warn({
             err,
             tnx: "pool",
             cid: connection.id
@@ -93953,16 +95971,24 @@ var require_smtp_pool = __commonJS((exports, module) => {
         this._removeConnection(connection);
         if (connection.queueEntry) {
           setTimeout(() => {
+            let delay = 0;
             if (connection.queueEntry) {
               if (this._shouldRequeuOnConnectionClose(connection.queueEntry)) {
-                this._requeueEntryOnConnectionClose(connection);
+                delay = this._requeueEntryOnConnectionClose(connection);
               } else {
                 this._failDeliveryOnConnectionClose(connection);
               }
             }
-            this._continueProcessing();
+            if (delay) {
+              setTimeout(() => this._continueProcessing(), delay);
+            } else {
+              this._continueProcessing();
+            }
           }, 50);
         } else {
+          if (!this._closed && this.idling && !this._connections.length) {
+            this.emit("clear");
+          }
           this._continueProcessing();
         }
       });
@@ -93970,7 +95996,7 @@ var require_smtp_pool = __commonJS((exports, module) => {
       return connection;
     }
     _shouldRequeuOnConnectionClose(queueEntry) {
-      if (this.options.maxRequeues === undefined || this.options.maxRequeues < 0) {
+      if (this.options.maxRequeues < 0) {
         return true;
       }
       return queueEntry.requeueAttempts < this.options.maxRequeues;
@@ -93978,7 +96004,9 @@ var require_smtp_pool = __commonJS((exports, module) => {
     _failDeliveryOnConnectionClose(connection) {
       if (connection.queueEntry && connection.queueEntry.callback) {
         try {
-          connection.queueEntry.callback(new Error("Reached maximum number of retries after connection was closed"));
+          const err = new Error("Reached maximum number of retries after connection was closed");
+          err.code = ECONNECTION;
+          connection.queueEntry.callback(err);
         } catch (E) {
           this.logger.error({
             err: E,
@@ -93991,7 +96019,8 @@ var require_smtp_pool = __commonJS((exports, module) => {
       }
     }
     _requeueEntryOnConnectionClose(connection) {
-      connection.queueEntry.requeueAttempts = connection.queueEntry.requeueAttempts + 1;
+      const delay = Math.min(REQUEUE_BASE_DELAY * 2 ** connection.queueEntry.requeueAttempts, REQUEUE_MAX_DELAY);
+      connection.queueEntry.requeueAttempts += 1;
       this.logger.debug({
         tnx: "pool",
         cid: connection.id,
@@ -94000,6 +96029,7 @@ var require_smtp_pool = __commonJS((exports, module) => {
       }, "Re-queued message <%s> for #%s. Attempt: #%s", connection.queueEntry.messageId, connection.id, connection.queueEntry.requeueAttempts);
       this._queue.unshift(connection.queueEntry);
       connection.queueEntry = false;
+      return delay;
     }
     _continueProcessing() {
       if (this._closed) {
@@ -94009,7 +96039,7 @@ var require_smtp_pool = __commonJS((exports, module) => {
       }
     }
     _removeConnection(connection) {
-      let index = this._connections.indexOf(connection);
+      const index = this._connections.indexOf(connection);
       if (index !== -1) {
         this._connections.splice(index, 1);
       }
@@ -94018,14 +96048,15 @@ var require_smtp_pool = __commonJS((exports, module) => {
       if (!this._rateLimit.limit) {
         return callback();
       }
-      let now = Date.now();
+      const now = Date.now();
       if (this._rateLimit.counter < this._rateLimit.limit) {
         return callback();
       }
       this._rateLimit.waiting.push(callback);
       if (this._rateLimit.checkpoint <= now - this._rateLimit.delta) {
         return this._clearRateLimit();
-      } else if (!this._rateLimit.timeout) {
+      }
+      if (!this._rateLimit.timeout) {
         this._rateLimit.timeout = setTimeout(() => this._clearRateLimit(), this._rateLimit.delta - (now - this._rateLimit.checkpoint));
         this._rateLimit.checkpoint = now;
       }
@@ -94036,7 +96067,7 @@ var require_smtp_pool = __commonJS((exports, module) => {
       this._rateLimit.counter = 0;
       this._rateLimit.checkpoint = false;
       while (this._rateLimit.waiting.length) {
-        let cb = this._rateLimit.waiting.shift();
+        const cb = this._rateLimit.waiting.shift();
         setImmediate(cb);
       }
     }
@@ -94046,14 +96077,15 @@ var require_smtp_pool = __commonJS((exports, module) => {
     verify(callback) {
       let promise2;
       if (!callback) {
-        promise2 = new Promise((resolve, reject) => {
-          callback = shared.callbackPromise(resolve, reject);
+        promise2 = new Promise((resolve3, reject) => {
+          callback = callbackPromise(resolve3, reject);
         });
       }
-      let auth = new PoolResource(this).auth;
+      const done = callback;
+      const auth = new PoolResource(this).auth;
       this.getSocket(this.options, (err, socketOptions) => {
         if (err) {
-          return callback(err);
+          return done(err);
         }
         let options = this.options;
         if (socketOptions && socketOptions.connection) {
@@ -94065,12 +96097,9 @@ var require_smtp_pool = __commonJS((exports, module) => {
             destPort: options.port || "",
             action: "connected"
           }, "Using proxied socket from %s:%s to %s:%s", socketOptions.connection.remoteAddress, socketOptions.connection.remotePort, options.host || "", options.port || "");
-          options = shared.assign(false, options);
-          Object.keys(socketOptions).forEach((key) => {
-            options[key] = socketOptions[key];
-          });
+          options = Object.assign(assign(false, options), socketOptions);
         }
-        let connection = new SMTPConnection(options);
+        const connection = new smtp_connection_default(options);
         let returned = false;
         connection.once("error", (err2) => {
           if (returned) {
@@ -94078,45 +96107,50 @@ var require_smtp_pool = __commonJS((exports, module) => {
           }
           returned = true;
           connection.close();
-          return callback(err2);
+          return done(err2);
         });
         connection.once("end", () => {
           if (returned) {
             return;
           }
           returned = true;
-          return callback(new Error("Connection closed"));
+          return done(new Error("Connection closed"));
         });
-        let finalize2 = () => {
+        const finalize2 = () => {
           if (returned) {
             return;
           }
           returned = true;
           connection.quit();
-          return callback(null, true);
+          return done(null, true);
         };
-        connection.connect(() => {
+        connection.connect((err2) => {
           if (returned) {
             return;
           }
+          if (err2) {
+            returned = true;
+            connection.close();
+            return done(err2);
+          }
           if (auth && (connection.allowsAuth || options.forceAuth)) {
-            connection.login(auth, (err2) => {
+            connection.login(auth, (err3) => {
               if (returned) {
                 return;
               }
-              if (err2) {
+              if (err3) {
                 returned = true;
                 connection.close();
-                return callback(err2);
+                return done(err3);
               }
               finalize2();
             });
           } else if (!auth && connection.allowsAuth && options.forceAuth) {
-            let err2 = new Error("Authentication info was not provided");
-            err2.code = "NoAuth";
+            const err3 = new Error("Authentication info was not provided");
+            err3.code = ENOAUTH;
             returned = true;
             connection.close();
-            return callback(err2);
+            return done(err3);
           } else {
             finalize2();
           }
@@ -94124,20 +96158,20 @@ var require_smtp_pool = __commonJS((exports, module) => {
       });
       return promise2;
     }
-  }
-  module.exports = SMTPPool;
+  };
+  smtp_pool_default = SMTPPool;
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/smtp-transport/index.js
-var require_smtp_transport = __commonJS((exports, module) => {
-  var EventEmitter = __require("events");
-  var SMTPConnection = require_smtp_connection();
-  var wellKnown = require_well_known();
-  var shared = require_shared();
-  var XOAuth2 = require_xoauth2();
-  var packageData = require_package5();
-
-  class SMTPTransport extends EventEmitter {
+// /zveltio-extension/node_modules/nodemailer/dist/esm/smtp-transport/index.js
+import { EventEmitter as EventEmitter5 } from "events";
+var SMTPTransport, smtp_transport_default;
+var init_smtp_transport = __esm(() => {
+  init_smtp_connection();
+  init_well_known();
+  init_shared();
+  init_xoauth2();
+  init_errors();
+  SMTPTransport = class SMTPTransport extends EventEmitter5 {
     constructor(options) {
       super();
       options = options || {};
@@ -94152,42 +96186,31 @@ var require_smtp_transport = __commonJS((exports, module) => {
         this.getSocket = options.getSocket;
       }
       if (options.url) {
-        urlData = shared.parseConnectionUrl(options.url);
+        urlData = parseConnectionUrl(options.url);
         service = service || urlData.service;
       }
-      this.options = shared.assign(false, options, urlData, service && wellKnown(service));
-      this.logger = shared.getLogger(this.options, {
+      this.options = assign(false, options, urlData, service && wellKnown(service));
+      this.logger = getLogger(this.options, {
         component: this.options.component || "smtp-transport"
       });
-      let connection = new SMTPConnection(this.options);
       this.name = "SMTP";
-      this.version = packageData.version + "[client:" + connection.version + "]";
+      this.version = version2 + "[client:" + version2 + "]";
       if (this.options.auth) {
         this.auth = this.getAuth({});
       }
     }
     getSocket(options, callback) {
-      return setImmediate(() => callback(null, false));
+      setImmediate(() => callback(null, false));
     }
     getAuth(authOpts) {
       if (!authOpts) {
+        if (this.auth && this.auth.oauth2 && this.mailer) {
+          this.auth.oauth2.provisionCallback = this.mailer.get("oauth2_provision_cb") || this.auth.oauth2.provisionCallback;
+        }
         return this.auth;
       }
-      let hasAuth = false;
-      let authData = {};
-      if (this.options.auth && typeof this.options.auth === "object") {
-        Object.keys(this.options.auth).forEach((key) => {
-          hasAuth = true;
-          authData[key] = this.options.auth[key];
-        });
-      }
-      if (authOpts && typeof authOpts === "object") {
-        Object.keys(authOpts).forEach((key) => {
-          hasAuth = true;
-          authData[key] = authOpts[key];
-        });
-      }
-      if (!hasAuth) {
+      const authData = Object.assign({}, this.options.auth && typeof this.options.auth === "object" ? this.options.auth : {}, typeof authOpts === "object" ? authOpts : {});
+      if (Object.keys(authData).length === 0) {
         return false;
       }
       switch ((authData.type || "").toString().toUpperCase()) {
@@ -94195,7 +96218,7 @@ var require_smtp_transport = __commonJS((exports, module) => {
           if (!authData.service && !authData.user) {
             return false;
           }
-          let oauth2 = new XOAuth2(authData, this.logger);
+          const oauth2 = new xoauth2_default(authData, this.logger);
           oauth2.provisionCallback = this.mailer && this.mailer.get("oauth2_provision_cb") || oauth2.provisionCallback;
           oauth2.on("token", (token2) => this.mailer.emit("token", token2));
           oauth2.on("error", (err) => this.emit("error", err));
@@ -94235,55 +96258,48 @@ var require_smtp_transport = __commonJS((exports, module) => {
             destPort: options.port || "",
             action: "connected"
           }, "Using proxied socket from %s:%s to %s:%s", socketOptions.connection.remoteAddress, socketOptions.connection.remotePort, options.host || "", options.port || "");
-          options = shared.assign(false, options);
-          Object.keys(socketOptions).forEach((key) => {
-            options[key] = socketOptions[key];
-          });
+          options = Object.assign(assign(false, options), socketOptions);
         }
-        let connection = new SMTPConnection(options);
+        const connection = new smtp_connection_default(options);
+        let perCallAuth;
+        const cleanupPerCallAuth = () => {
+          if (perCallAuth && perCallAuth !== this.auth && perCallAuth.oauth2) {
+            perCallAuth.oauth2.removeAllListeners();
+          }
+          perCallAuth = null;
+        };
         connection.once("error", (err2) => {
           if (returned) {
             return;
           }
           returned = true;
+          cleanupPerCallAuth();
           connection.close();
           return callback(err2);
         });
-        connection.once("end", () => {
-          if (returned) {
-            return;
-          }
-          let timer = setTimeout(() => {
-            if (returned) {
-              return;
-            }
-            returned = true;
-            let err2 = new Error("Unexpected socket close");
-            if (connection && connection._socket && connection._socket.upgrading) {
-              err2.code = "ETLS";
-            }
-            callback(err2);
-          }, 1000);
-          try {
-            timer.unref();
-          } catch (E) {}
-        });
-        let sendMessage = () => {
-          let envelope = mail.message.getEnvelope();
-          let messageId = mail.message.messageId();
-          let recipients = [].concat(envelope.to || []);
+        const sendMessage = () => {
+          const envelope = mail.message.getEnvelope();
+          const messageId = mail.message.messageId();
+          const recipients = [].concat(envelope.to || []);
           if (recipients.length > 3) {
             recipients.push("...and " + recipients.splice(2).length + " more");
           }
           if (mail.data.dsn) {
             envelope.dsn = mail.data.dsn;
           }
+          if (mail.data.requireTLSExtensionEnabled) {
+            envelope.requireTLSExtensionEnabled = mail.data.requireTLSExtensionEnabled;
+          }
           this.logger.info({
             tnx: "send",
             messageId
           }, "Sending message %s to <%s>", messageId, recipients.join(", "));
           connection.send(envelope, mail.message.createReadStream(), (err2, info) => {
+            if (returned) {
+              return;
+            }
             returned = true;
+            cleanupPerCallAuth();
             connection.close();
             if (err2) {
               this.logger.error({
@@ -94307,23 +96323,26 @@ var require_smtp_transport = __commonJS((exports, module) => {
             }
           });
         };
-        connection.connect(() => {
+        connection.connect((err2) => {
           if (returned) {
             return;
           }
-          let auth = this.getAuth(mail.data.auth);
-          if (auth && (connection.allowsAuth || options.forceAuth)) {
-            connection.login(auth, (err2) => {
-              if (auth && auth !== this.auth && auth.oauth2) {
-                auth.oauth2.removeAllListeners();
-              }
+          if (err2) {
+            returned = true;
+            connection.close();
+            return callback(err2);
+          }
+          perCallAuth = this.getAuth(mail.data.auth);
+          if (perCallAuth && (connection.allowsAuth || options.forceAuth)) {
+            connection.login(perCallAuth, (err3) => {
+              cleanupPerCallAuth();
               if (returned) {
                 return;
               }
-              if (err2) {
+              if (err3) {
                 returned = true;
                 connection.close();
-                return callback(err2);
+                return callback(err3);
               }
               sendMessage();
             });
@@ -94336,13 +96355,14 @@ var require_smtp_transport = __commonJS((exports, module) => {
     verify(callback) {
       let promise2;
       if (!callback) {
-        promise2 = new Promise((resolve, reject) => {
-          callback = shared.callbackPromise(resolve, reject);
+        promise2 = new Promise((resolve3, reject) => {
+          callback = callbackPromise(resolve3, reject);
         });
       }
+      const done = callback;
       this.getSocket(this.options, (err, socketOptions) => {
         if (err) {
-          return callback(err);
+          return done(err);
         }
         let options = this.options;
         if (socketOptions && socketOptions.connection) {
@@ -94354,59 +96374,73 @@ var require_smtp_transport = __commonJS((exports, module) => {
             destPort: options.port || "",
             action: "connected"
           }, "Using proxied socket from %s:%s to %s:%s", socketOptions.connection.remoteAddress, socketOptions.connection.remotePort, options.host || "", options.port || "");
-          options = shared.assign(false, options);
-          Object.keys(socketOptions).forEach((key) => {
-            options[key] = socketOptions[key];
-          });
+          options = Object.assign(assign(false, options), socketOptions);
         }
-        let connection = new SMTPConnection(options);
+        const connection = new smtp_connection_default(options);
         let returned = false;
+        let perCallAuth;
+        const cleanupPerCallAuth = () => {
+          if (perCallAuth && perCallAuth !== this.auth && perCallAuth.oauth2) {
+            perCallAuth.oauth2.removeAllListeners();
+          }
+          perCallAuth = null;
+        };
         connection.once("error", (err2) => {
           if (returned) {
             return;
           }
           returned = true;
+          cleanupPerCallAuth();
           connection.close();
-          return callback(err2);
+          return done(err2);
         });
         connection.once("end", () => {
           if (returned) {
             return;
           }
           returned = true;
-          return callback(new Error("Connection closed"));
+          cleanupPerCallAuth();
+          return done(new Error("Connection closed"));
         });
-        let finalize2 = () => {
+        const finalize2 = () => {
           if (returned) {
             return;
           }
           returned = true;
+          cleanupPerCallAuth();
           connection.quit();
-          return callback(null, true);
+          return done(null, true);
         };
-        connection.connect(() => {
+        connection.connect((err2) => {
           if (returned) {
             return;
           }
-          let authData = this.getAuth({});
-          if (authData && (connection.allowsAuth || options.forceAuth)) {
-            connection.login(authData, (err2) => {
+          if (err2) {
+            returned = true;
+            connection.close();
+            return done(err2);
+          }
+          perCallAuth = this.getAuth({});
+          if (perCallAuth && (connection.allowsAuth || options.forceAuth)) {
+            connection.login(perCallAuth, (err3) => {
+              cleanupPerCallAuth();
               if (returned) {
                 return;
               }
-              if (err2) {
+              if (err3) {
                 returned = true;
                 connection.close();
-                return callback(err2);
+                return done(err3);
               }
               finalize2();
             });
-          } else if (!authData && connection.allowsAuth && options.forceAuth) {
-            let err2 = new Error("Authentication info was not provided");
-            err2.code = "NoAuth";
+          } else if (!perCallAuth && connection.allowsAuth && options.forceAuth) {
+            const err3 = new Error("Authentication info was not provided");
+            err3.code = ENOAUTH;
             returned = true;
+            cleanupPerCallAuth();
             connection.close();
-            return callback(err2);
+            return done(err3);
           } else {
             finalize2();
           }
@@ -94420,391 +96454,109 @@ var require_smtp_transport = __commonJS((exports, module) => {
       }
       this.emit("close");
     }
-  }
-  module.exports = SMTPTransport;
+  };
+  smtp_transport_default = SMTPTransport;
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/sendmail-transport/index.js
-var require_sendmail_transport = __commonJS((exports, module) => {
-  var spawn = __require("child_process").spawn;
-  var packageData = require_package5();
-  var shared = require_shared();
+// /zveltio-extension/node_modules/nodemailer/dist/esm/sendmail-transport/index.js
+import { spawn } from "child_process";
 
-  class SendmailTransport {
-    constructor(options) {
-      options = options || {};
-      this._spawn = spawn;
-      this.options = options || {};
-      this.name = "Sendmail";
-      this.version = packageData.version;
-      this.path = "sendmail";
-      this.args = false;
-      this.winbreak = false;
-      this.logger = shared.getLogger(this.options, {
-        component: this.options.component || "sendmail"
-      });
-      if (options) {
-        if (typeof options === "string") {
-          this.path = options;
-        } else if (typeof options === "object") {
-          if (options.path) {
-            this.path = options.path;
-          }
-          if (Array.isArray(options.args)) {
-            this.args = options.args;
-          }
-          this.winbreak = ["win", "windows", "dos", `\r
-`].includes((options.newline || "").toString().toLowerCase());
-        }
+class SendmailTransport {
+  constructor(options) {
+    options = options || {};
+    this._spawn = spawn;
+    this.options = options;
+    this.name = "Sendmail";
+    this.version = version2;
+    this.path = "sendmail";
+    this.args = false;
+    this.logger = getLogger(this.options, {
+      component: this.options.component || "sendmail"
+    });
+    if (typeof options === "string") {
+      this.path = options;
+    } else if (typeof options === "object") {
+      if (options.path) {
+        this.path = options.path;
+      }
+      if (Array.isArray(options.args)) {
+        this.args = options.args;
       }
     }
-    send(mail, done) {
-      mail.message.keepBcc = true;
-      let envelope = mail.data.envelope || mail.message.getEnvelope();
-      let messageId = mail.message.messageId();
-      let args;
-      let sendmail;
-      let returned;
-      const hasInvalidAddresses = [].concat(envelope.from || []).concat(envelope.to || []).some((addr) => /^-/.test(addr));
-      if (hasInvalidAddresses) {
-        return done(new Error("Can not send mail. Invalid envelope addresses."));
+    this.winbreak = ["win", "windows", "dos", `\r
+`].includes((options.newline || "").toString().toLowerCase());
+  }
+  send(mail, done) {
+    mail.message.keepBcc = true;
+    const envelope = mail.message.getEnvelope();
+    const messageId = mail.message.messageId();
+    let returned;
+    const hasInvalidAddresses = [].concat(envelope.from || []).concat(envelope.to || []).some((addr) => /^"?-/.test(addr));
+    if (hasInvalidAddresses) {
+      const err = new Error("Can not send mail. Invalid envelope addresses.");
+      err.code = ESENDMAIL;
+      return done(err);
+    }
+    const args = this.args ? ["-i"].concat(this.args).concat(envelope.to) : ["-i"].concat(envelope.from ? ["-f", envelope.from] : []).concat(envelope.to);
+    const callback = (err) => {
+      if (returned) {
+        return;
       }
-      if (this.args) {
-        args = ["-i"].concat(this.args).concat(envelope.to);
-      } else {
-        args = ["-i"].concat(envelope.from ? ["-f", envelope.from] : []).concat(envelope.to);
+      returned = true;
+      if (typeof done === "function") {
+        if (err) {
+          return done(err);
+        }
+        return done(null, {
+          envelope,
+          messageId,
+          response: "Messages queued for delivery"
+        });
       }
-      let callback = (err) => {
-        if (returned) {
-          return;
-        }
-        returned = true;
-        if (typeof done === "function") {
-          if (err) {
-            return done(err);
-          } else {
-            return done(null, {
-              envelope: mail.data.envelope || mail.message.getEnvelope(),
-              messageId,
-              response: "Messages queued for delivery"
-            });
-          }
-        }
-      };
-      try {
-        sendmail = this._spawn(this.path, args);
-      } catch (E) {
+    };
+    let sendmail;
+    try {
+      sendmail = this._spawn(this.path, args);
+    } catch (E) {
+      this.logger.error({
+        err: E,
+        tnx: "spawn",
+        messageId
+      }, "Error occurred while spawning sendmail. %s", E.message);
+      return callback(E);
+    }
+    if (sendmail) {
+      sendmail.on("error", (err) => {
         this.logger.error({
-          err: E,
+          err,
           tnx: "spawn",
           messageId
-        }, "Error occurred while spawning sendmail. %s", E.message);
-        return callback(E);
-      }
-      if (sendmail) {
-        sendmail.on("error", (err) => {
-          this.logger.error({
-            err,
-            tnx: "spawn",
-            messageId
-          }, "Error occurred when sending message %s. %s", messageId, err.message);
-          callback(err);
-        });
-        sendmail.once("exit", (code) => {
-          if (!code) {
-            return callback();
-          }
-          let err;
-          if (code === 127) {
-            err = new Error("Sendmail command not found, process exited with code " + code);
-          } else {
-            err = new Error("Sendmail exited with code " + code);
-          }
-          this.logger.error({
-            err,
-            tnx: "stdin",
-            messageId
-          }, "Error sending message %s to sendmail. %s", messageId, err.message);
-          callback(err);
-        });
-        sendmail.once("close", callback);
-        sendmail.stdin.on("error", (err) => {
-          this.logger.error({
-            err,
-            tnx: "stdin",
-            messageId
-          }, "Error occurred when piping message %s to sendmail. %s", messageId, err.message);
-          callback(err);
-        });
-        let recipients = [].concat(envelope.to || []);
-        if (recipients.length > 3) {
-          recipients.push("...and " + recipients.splice(2).length + " more");
+        }, "Error occurred when sending message %s. %s", messageId, err.message);
+        callback(err);
+      });
+      sendmail.once("exit", (code) => {
+        if (!code) {
+          return callback();
         }
-        this.logger.info({
-          tnx: "send",
+        const err = new Error(code === 127 ? "Sendmail command not found, process exited with code " + code : "Sendmail exited with code " + code);
+        err.code = ESENDMAIL;
+        this.logger.error({
+          err,
+          tnx: "stdin",
           messageId
-        }, "Sending message %s to <%s>", messageId, recipients.join(", "));
-        let sourceStream = mail.message.createReadStream();
-        sourceStream.once("error", (err) => {
-          this.logger.error({
-            err,
-            tnx: "stdin",
-            messageId
-          }, "Error occurred when generating message %s. %s", messageId, err.message);
-          sendmail.kill("SIGINT");
-          callback(err);
-        });
-        sourceStream.pipe(sendmail.stdin);
-      } else {
-        return callback(new Error("sendmail was not found"));
-      }
-    }
-  }
-  module.exports = SendmailTransport;
-});
-
-// /zveltio-extension/node_modules/nodemailer/lib/stream-transport/index.js
-var require_stream_transport = __commonJS((exports, module) => {
-  var packageData = require_package5();
-  var shared = require_shared();
-
-  class StreamTransport {
-    constructor(options) {
-      options = options || {};
-      this.options = options || {};
-      this.name = "StreamTransport";
-      this.version = packageData.version;
-      this.logger = shared.getLogger(this.options, {
-        component: this.options.component || "stream-transport"
+        }, "Error sending message %s to sendmail. %s", messageId, err.message);
+        callback(err);
       });
-      this.winbreak = ["win", "windows", "dos", `\r
-`].includes((options.newline || "").toString().toLowerCase());
-    }
-    send(mail, done) {
-      mail.message.keepBcc = true;
-      let envelope = mail.data.envelope || mail.message.getEnvelope();
-      let messageId = mail.message.messageId();
-      let recipients = [].concat(envelope.to || []);
-      if (recipients.length > 3) {
-        recipients.push("...and " + recipients.splice(2).length + " more");
-      }
-      this.logger.info({
-        tnx: "send",
-        messageId
-      }, "Sending message %s to <%s> using %s line breaks", messageId, recipients.join(", "), this.winbreak ? "<CR><LF>" : "<LF>");
-      setImmediate(() => {
-        let stream;
-        try {
-          stream = mail.message.createReadStream();
-        } catch (E) {
-          this.logger.error({
-            err: E,
-            tnx: "send",
-            messageId
-          }, "Creating send stream failed for %s. %s", messageId, E.message);
-          return done(E);
-        }
-        if (!this.options.buffer) {
-          stream.once("error", (err) => {
-            this.logger.error({
-              err,
-              tnx: "send",
-              messageId
-            }, "Failed creating message for %s. %s", messageId, err.message);
-          });
-          return done(null, {
-            envelope: mail.data.envelope || mail.message.getEnvelope(),
-            messageId,
-            message: stream
-          });
-        }
-        let chunks = [];
-        let chunklen = 0;
-        stream.on("readable", () => {
-          let chunk;
-          while ((chunk = stream.read()) !== null) {
-            chunks.push(chunk);
-            chunklen += chunk.length;
-          }
-        });
-        stream.once("error", (err) => {
-          this.logger.error({
-            err,
-            tnx: "send",
-            messageId
-          }, "Failed creating message for %s. %s", messageId, err.message);
-          return done(err);
-        });
-        stream.on("end", () => done(null, {
-          envelope: mail.data.envelope || mail.message.getEnvelope(),
-          messageId,
-          message: Buffer.concat(chunks, chunklen)
-        }));
+      sendmail.once("close", callback);
+      sendmail.stdin.on("error", (err) => {
+        this.logger.error({
+          err,
+          tnx: "stdin",
+          messageId
+        }, "Error occurred when piping message %s to sendmail. %s", messageId, err.message);
+        callback(err);
       });
-    }
-  }
-  module.exports = StreamTransport;
-});
-
-// /zveltio-extension/node_modules/nodemailer/lib/json-transport/index.js
-var require_json_transport = __commonJS((exports, module) => {
-  var packageData = require_package5();
-  var shared = require_shared();
-
-  class JSONTransport {
-    constructor(options) {
-      options = options || {};
-      this.options = options || {};
-      this.name = "JSONTransport";
-      this.version = packageData.version;
-      this.logger = shared.getLogger(this.options, {
-        component: this.options.component || "json-transport"
-      });
-    }
-    send(mail, done) {
-      mail.message.keepBcc = true;
-      let envelope = mail.data.envelope || mail.message.getEnvelope();
-      let messageId = mail.message.messageId();
-      let recipients = [].concat(envelope.to || []);
-      if (recipients.length > 3) {
-        recipients.push("...and " + recipients.splice(2).length + " more");
-      }
-      this.logger.info({
-        tnx: "send",
-        messageId
-      }, "Composing JSON structure of %s to <%s>", messageId, recipients.join(", "));
-      setImmediate(() => {
-        mail.normalize((err, data) => {
-          if (err) {
-            this.logger.error({
-              err,
-              tnx: "send",
-              messageId
-            }, "Failed building JSON structure for %s. %s", messageId, err.message);
-            return done(err);
-          }
-          delete data.envelope;
-          delete data.normalizedHeaders;
-          return done(null, {
-            envelope,
-            messageId,
-            message: this.options.skipEncoding ? data : JSON.stringify(data)
-          });
-        });
-      });
-    }
-  }
-  module.exports = JSONTransport;
-});
-
-// /zveltio-extension/node_modules/nodemailer/lib/ses-transport/index.js
-var require_ses_transport = __commonJS((exports, module) => {
-  var EventEmitter = __require("events");
-  var packageData = require_package5();
-  var shared = require_shared();
-  var LeWindows = require_le_windows();
-
-  class SESTransport extends EventEmitter {
-    constructor(options) {
-      super();
-      options = options || {};
-      this.options = options || {};
-      this.ses = this.options.SES;
-      this.name = "SESTransport";
-      this.version = packageData.version;
-      this.logger = shared.getLogger(this.options, {
-        component: this.options.component || "ses-transport"
-      });
-      this.maxConnections = Number(this.options.maxConnections) || Infinity;
-      this.connections = 0;
-      this.sendingRate = Number(this.options.sendingRate) || Infinity;
-      this.sendingRateTTL = null;
-      this.rateInterval = 1000;
-      this.rateMessages = [];
-      this.pending = [];
-      this.idling = true;
-      setImmediate(() => {
-        if (this.idling) {
-          this.emit("idle");
-        }
-      });
-    }
-    send(mail, callback) {
-      if (this.connections >= this.maxConnections) {
-        this.idling = false;
-        return this.pending.push({
-          mail,
-          callback
-        });
-      }
-      if (!this._checkSendingRate()) {
-        this.idling = false;
-        return this.pending.push({
-          mail,
-          callback
-        });
-      }
-      this._send(mail, (...args) => {
-        setImmediate(() => callback(...args));
-        this._sent();
-      });
-    }
-    _checkRatedQueue() {
-      if (this.connections >= this.maxConnections || !this._checkSendingRate()) {
-        return;
-      }
-      if (!this.pending.length) {
-        if (!this.idling) {
-          this.idling = true;
-          this.emit("idle");
-        }
-        return;
-      }
-      let next = this.pending.shift();
-      this._send(next.mail, (...args) => {
-        setImmediate(() => next.callback(...args));
-        this._sent();
-      });
-    }
-    _checkSendingRate() {
-      clearTimeout(this.sendingRateTTL);
-      let now = Date.now();
-      let oldest = false;
-      for (let i = this.rateMessages.length - 1;i >= 0; i--) {
-        if (this.rateMessages[i].ts >= now - this.rateInterval && (!oldest || this.rateMessages[i].ts < oldest)) {
-          oldest = this.rateMessages[i].ts;
-        }
-        if (this.rateMessages[i].ts < now - this.rateInterval && !this.rateMessages[i].pending) {
-          this.rateMessages.splice(i, 1);
-        }
-      }
-      if (this.rateMessages.length < this.sendingRate) {
-        return true;
-      }
-      let delay = Math.max(oldest + 1001, now + 20);
-      this.sendingRateTTL = setTimeout(() => this._checkRatedQueue(), now - delay);
-      try {
-        this.sendingRateTTL.unref();
-      } catch (E) {}
-      return false;
-    }
-    _sent() {
-      this.connections--;
-      this._checkRatedQueue();
-    }
-    isIdle() {
-      return this.idling;
-    }
-    _send(mail, callback) {
-      let statObject = {
-        ts: Date.now(),
-        pending: true
-      };
-      this.connections++;
-      this.rateMessages.push(statObject);
-      let envelope = mail.data.envelope || mail.message.getEnvelope();
-      let messageId = mail.message.messageId();
-      let recipients = [].concat(envelope.to || []);
+      const recipients = [].concat(envelope.to || []);
       if (recipients.length > 3) {
         recipients.push("...and " + recipients.splice(2).length + " more");
       }
@@ -94812,7 +96564,231 @@ var require_ses_transport = __commonJS((exports, module) => {
         tnx: "send",
         messageId
       }, "Sending message %s to <%s>", messageId, recipients.join(", "));
-      let getRawMessage = (next) => {
+      const sourceStream = mail.message.createReadStream();
+      let stream = sourceStream;
+      if (this.options.newline) {
+        stream = sourceStream.pipe(this.winbreak ? new LeWindows : new LeUnix);
+        sourceStream.once("error", (err) => stream.emit("error", err));
+      }
+      stream.once("error", (err) => {
+        this.logger.error({
+          err,
+          tnx: "stdin",
+          messageId
+        }, "Error occurred when generating message %s. %s", messageId, err.message);
+        sendmail.kill("SIGINT");
+        callback(err);
+      });
+      stream.pipe(sendmail.stdin);
+    } else {
+      const err = new Error("sendmail was not found");
+      err.code = ESENDMAIL;
+      return callback(err);
+    }
+  }
+}
+var sendmail_transport_default;
+var init_sendmail_transport = __esm(() => {
+  init_shared();
+  init_errors();
+  init_le_windows();
+  init_le_unix();
+  sendmail_transport_default = SendmailTransport;
+});
+
+// /zveltio-extension/node_modules/nodemailer/dist/esm/stream-transport/index.js
+class StreamTransport {
+  constructor(options) {
+    options = options || {};
+    this.options = options;
+    this.name = "StreamTransport";
+    this.version = version2;
+    this.logger = getLogger(this.options, {
+      component: this.options.component || "stream-transport"
+    });
+    this.winbreak = ["win", "windows", "dos", `\r
+`].includes((options.newline || "").toString().toLowerCase());
+  }
+  send(mail, done) {
+    mail.message.keepBcc = true;
+    const envelope = mail.message.getEnvelope();
+    const messageId = mail.message.messageId();
+    const recipients = [].concat(envelope.to || []);
+    if (recipients.length > 3) {
+      recipients.push("...and " + recipients.splice(2).length + " more");
+    }
+    this.logger.info({
+      tnx: "send",
+      messageId
+    }, "Sending message %s to <%s> using %s line breaks", messageId, recipients.join(", "), this.winbreak ? "<CR><LF>" : "<LF>");
+    setImmediate(() => {
+      let stream;
+      try {
+        stream = mail.message.createReadStream();
+        if (this.options.newline) {
+          const sourceStream = stream;
+          stream = sourceStream.pipe(this.winbreak ? new LeWindows : new LeUnix);
+          sourceStream.once("error", (err) => stream.emit("error", err));
+        }
+      } catch (E) {
+        this.logger.error({
+          err: E,
+          tnx: "send",
+          messageId
+        }, "Creating send stream failed for %s. %s", messageId, E.message);
+        return done(E);
+      }
+      if (!this.options.buffer) {
+        stream.once("error", (err) => {
+          this.logger.error({
+            err,
+            tnx: "send",
+            messageId
+          }, "Failed creating message for %s. %s", messageId, err.message);
+        });
+        return done(null, {
+          envelope,
+          messageId,
+          message: stream
+        });
+      }
+      const chunks = [];
+      let chunklen = 0;
+      stream.on("readable", () => {
+        let chunk;
+        while ((chunk = stream.read()) !== null) {
+          chunks.push(chunk);
+          chunklen += chunk.length;
+        }
+      });
+      stream.once("error", (err) => {
+        this.logger.error({
+          err,
+          tnx: "send",
+          messageId
+        }, "Failed creating message for %s. %s", messageId, err.message);
+        return done(err);
+      });
+      stream.on("end", () => done(null, {
+        envelope,
+        messageId,
+        message: Buffer.concat(chunks, chunklen)
+      }));
+    });
+  }
+}
+var stream_transport_default;
+var init_stream_transport = __esm(() => {
+  init_shared();
+  init_le_windows();
+  init_le_unix();
+  stream_transport_default = StreamTransport;
+});
+
+// /zveltio-extension/node_modules/nodemailer/dist/esm/json-transport/index.js
+class JSONTransport {
+  constructor(options) {
+    options = options || {};
+    this.options = options;
+    this.name = "JSONTransport";
+    this.version = version2;
+    this.logger = getLogger(this.options, {
+      component: this.options.component || "json-transport"
+    });
+  }
+  send(mail, done) {
+    mail.message.keepBcc = true;
+    const envelope = mail.message.getEnvelope();
+    const messageId = mail.message.messageId();
+    const recipients = [].concat(envelope.to || []);
+    if (recipients.length > 3) {
+      recipients.push("...and " + recipients.splice(2).length + " more");
+    }
+    this.logger.info({
+      tnx: "send",
+      messageId
+    }, "Composing JSON structure of %s to <%s>", messageId, recipients.join(", "));
+    setImmediate(() => {
+      mail.normalize((err, data) => {
+        if (err) {
+          this.logger.error({
+            err,
+            tnx: "send",
+            messageId
+          }, "Failed building JSON structure for %s. %s", messageId, err.message);
+          return done(err);
+        }
+        delete data.envelope;
+        delete data.normalizedHeaders;
+        return done(null, {
+          envelope,
+          messageId,
+          message: this.options.skipEncoding ? data : JSON.stringify(data)
+        });
+      });
+    });
+  }
+}
+var json_transport_default;
+var init_json_transport = __esm(() => {
+  init_shared();
+  json_transport_default = JSONTransport;
+});
+
+// /zveltio-extension/node_modules/nodemailer/dist/esm/ses-transport/index.js
+import EventEmitter6 from "events";
+function tagSesError(err) {
+  if (err && typeof err === "object" && !err.code) {
+    err.code = ESES;
+  }
+  return err;
+}
+var SESTransport, ses_transport_default;
+var init_ses_transport = __esm(() => {
+  init_shared();
+  init_errors();
+  init_le_windows();
+  init_mime_node();
+  SESTransport = class SESTransport extends EventEmitter6 {
+    constructor(options) {
+      super();
+      if (!options || !options.SES || !options.SES.sesClient) {
+        const error64 = new Error("Missing SES configuration, expecting { sesClient, SendEmailCommand } from @aws-sdk/client-sesv2, see https://nodemailer.com/transports/ses/");
+        error64.code = ECONFIG;
+        throw error64;
+      }
+      this.options = options;
+      this.ses = this.options.SES;
+      this.name = "SESTransport";
+      this.version = version2;
+      this.logger = getLogger(this.options, {
+        component: this.options.component || "ses-transport"
+      });
+    }
+    getRegion(cb) {
+      if (this.ses.sesClient.config && typeof this.ses.sesClient.config.region === "function") {
+        this.ses.sesClient.config.region().then((region) => cb(null, region), (err) => cb(err));
+        return;
+      }
+      return cb(null, false);
+    }
+    send(mail, callback) {
+      let fromHeader = mail.message._headers.find((header) => /^from$/i.test(header.key));
+      if (fromHeader) {
+        const mimeNode = new mime_node_default("text/plain");
+        fromHeader = mimeNode._convertAddresses(mimeNode._parseAddresses(fromHeader.value));
+      }
+      const envelope = mail.message.getEnvelope();
+      const messageId = mail.message.messageId();
+      const recipients = [].concat(envelope.to || []);
+      if (recipients.length > 3) {
+        recipients.push("...and " + recipients.splice(2).length + " more");
+      }
+      this.logger.info({
+        tnx: "send",
+        messageId
+      }, "Sending message %s to <%s>", messageId, recipients.join(", "));
+      const getRawMessage = (next) => {
         if (!mail.data._dkim) {
           mail.data._dkim = {};
         }
@@ -94821,9 +96797,9 @@ var require_ses_transport = __commonJS((exports, module) => {
         } else {
           mail.data._dkim.skipFields = "date:message-id";
         }
-        let sourceStream = mail.message.createReadStream();
-        let stream = sourceStream.pipe(new LeWindows);
-        let chunks = [];
+        const sourceStream = mail.message.createReadStream();
+        const stream = sourceStream.pipe(new LeWindows);
+        const chunks = [];
         let chunklen = 0;
         stream.on("readable", () => {
           let chunk;
@@ -94833,9 +96809,7 @@ var require_ses_transport = __commonJS((exports, module) => {
           }
         });
         sourceStream.once("error", (err) => stream.emit("error", err));
-        stream.once("error", (err) => {
-          next(err);
-        });
+        stream.once("error", (err) => next(err));
         stream.once("end", () => next(null, Buffer.concat(chunks, chunklen)));
       };
       setImmediate(() => getRawMessage((err, raw2) => {
@@ -94845,43 +96819,41 @@ var require_ses_transport = __commonJS((exports, module) => {
             tnx: "send",
             messageId
           }, "Failed creating message for %s. %s", messageId, err.message);
-          statObject.pending = false;
           return callback(err);
         }
-        let sesMessage = {
-          RawMessage: {
-            Data: raw2
+        const sesMessage = copyOwnKeys({
+          Content: {
+            Raw: {
+              Data: raw2
+            }
           },
-          Source: envelope.from,
-          Destinations: envelope.to
-        };
-        Object.keys(mail.data.ses || {}).forEach((key) => {
-          sesMessage[key] = mail.data.ses[key];
-        });
-        let ses = (this.ses.aws ? this.ses.ses : this.ses) || {};
-        let aws = this.ses.aws || {};
-        let getRegion = (cb) => {
-          if (ses.config && typeof ses.config.region === "function") {
-            return ses.config.region().then((region) => cb(null, region)).catch((err2) => cb(err2));
+          FromEmailAddress: fromHeader || envelope.from,
+          Destination: {
+            ToAddresses: envelope.to
           }
-          return cb(null, ses.config && ses.config.region || "us-east-1");
-        };
-        getRegion((err2, region) => {
+        }, mail.data.ses);
+        this.getRegion((err2, region) => {
           if (err2 || !region) {
             region = "us-east-1";
           }
           let sendPromise;
-          if (typeof ses.send === "function" && aws.SendRawEmailCommand) {
-            sendPromise = ses.send(new aws.SendRawEmailCommand(sesMessage));
-          } else {
-            sendPromise = ses.sendRawEmail(sesMessage).promise();
+          try {
+            const command = new this.ses.SendEmailCommand(sesMessage);
+            sendPromise = this.ses.sesClient.send(command);
+          } catch (err3) {
+            tagSesError(err3);
+            this.logger.error({
+              err: err3,
+              tnx: "send"
+            }, "Send error for %s: %s", messageId, err3.message);
+            setImmediate(() => callback(err3));
+            return;
           }
           sendPromise.then((data) => {
             if (region === "us-east-1") {
               region = "email";
             }
-            statObject.pending = false;
-            callback(null, {
+            const info = {
               envelope: {
                 from: envelope.from,
                 to: envelope.to
@@ -94889,176 +96861,203 @@ var require_ses_transport = __commonJS((exports, module) => {
               messageId: "<" + data.MessageId + (!/@/.test(data.MessageId) ? "@" + region + ".amazonses.com" : "") + ">",
               response: data.MessageId,
               raw: raw2
-            });
+            };
+            setImmediate(() => callback(null, info));
           }).catch((err3) => {
+            tagSesError(err3);
             this.logger.error({
               err: err3,
               tnx: "send"
             }, "Send error for %s: %s", messageId, err3.message);
-            statObject.pending = false;
-            callback(err3);
+            setImmediate(() => callback(err3));
           });
         });
       }));
     }
     verify(callback) {
       let promise2;
-      let ses = (this.ses.aws ? this.ses.ses : this.ses) || {};
-      let aws = this.ses.aws || {};
-      const sesMessage = {
-        RawMessage: {
-          Data: `From: invalid@invalid\r
-To: invalid@invalid\r
- Subject: Invalid\r
-\r
-Invalid`
-        },
-        Source: "invalid@invalid",
-        Destinations: ["invalid@invalid"]
-      };
       if (!callback) {
-        promise2 = new Promise((resolve, reject) => {
-          callback = shared.callbackPromise(resolve, reject);
+        promise2 = new Promise((resolve3, reject) => {
+          callback = callbackPromise(resolve3, reject);
         });
       }
+      const done = callback;
       const cb = (err) => {
-        if (err && (err.code || err.Code) !== "InvalidParameterValue") {
-          return callback(err);
+        if (err && !["InvalidParameterValue", "MessageRejected"].includes(err.code || err.Code || err.name)) {
+          return done(tagSesError(err));
         }
-        return callback(null, true);
+        return done(null, true);
       };
-      if (typeof ses.send === "function" && aws.SendRawEmailCommand) {
-        sesMessage.RawMessage.Data = Buffer.from(sesMessage.RawMessage.Data);
-        ses.send(new aws.SendRawEmailCommand(sesMessage), cb);
-      } else {
-        ses.sendRawEmail(sesMessage, cb);
-      }
+      const sesMessage = {
+        Content: {
+          Raw: {
+            Data: Buffer.from(`From: <invalid@invalid>\r
+To: <invalid@invalid>\r
+ Subject: Invalid\r
+\r
+Invalid`)
+          }
+        },
+        FromEmailAddress: "invalid@invalid",
+        Destination: {
+          ToAddresses: ["invalid@invalid"]
+        }
+      };
+      this.getRegion(() => {
+        let sendPromise;
+        try {
+          const command = new this.ses.SendEmailCommand(sesMessage);
+          sendPromise = this.ses.sesClient.send(command);
+        } catch (err) {
+          setImmediate(() => cb(err));
+          return;
+        }
+        sendPromise.then(() => setImmediate(() => cb(null))).catch((err) => setImmediate(() => cb(err)));
+      });
       return promise2;
     }
-  }
-  module.exports = SESTransport;
+  };
+  ses_transport_default = SESTransport;
 });
 
-// /zveltio-extension/node_modules/nodemailer/lib/nodemailer.js
-var require_nodemailer = __commonJS((exports, module) => {
-  var Mailer = require_mailer();
-  var shared = require_shared();
-  var SMTPPool = require_smtp_pool();
-  var SMTPTransport = require_smtp_transport();
-  var SendmailTransport = require_sendmail_transport();
-  var StreamTransport = require_stream_transport();
-  var JSONTransport = require_json_transport();
-  var SESTransport = require_ses_transport();
-  var nmfetch = require_fetch2();
-  var packageData = require_package5();
-  var ETHEREAL_API = (process.env.ETHEREAL_API || "https://api.nodemailer.com").replace(/\/+$/, "");
-  var ETHEREAL_WEB = (process.env.ETHEREAL_WEB || "https://ethereal.email").replace(/\/+$/, "");
-  var ETHEREAL_API_KEY = (process.env.ETHEREAL_API_KEY || "").replace(/\s*/g, "") || null;
-  var ETHEREAL_CACHE = ["true", "yes", "y", "1"].includes((process.env.ETHEREAL_CACHE || "yes").toString().trim().toLowerCase());
-  var testAccount = false;
-  exports.createTransport = function(transporter, defaults) {
-    let urlConfig;
-    let options;
-    let mailer;
-    if (typeof transporter === "object" && typeof transporter.send !== "function" || typeof transporter === "string" && /^(smtps?|direct):/i.test(transporter)) {
-      if (urlConfig = typeof transporter === "string" ? transporter : transporter.url) {
-        options = shared.parseConnectionUrl(urlConfig);
-      } else {
-        options = transporter;
+// /zveltio-extension/node_modules/nodemailer/dist/esm/nodemailer.js
+function createTransport(transporter, defaults) {
+  let options;
+  if (typeof transporter === "object" && typeof transporter.send !== "function" || typeof transporter === "string" && /^(smtps?|direct):/i.test(transporter)) {
+    const urlConfig = typeof transporter === "string" ? transporter : transporter.url;
+    if (urlConfig) {
+      const parsed = parseConnectionUrl(urlConfig);
+      options = typeof transporter === "object" ? assign(false, copyOwnKeys({}, transporter, (key) => key === "url"), parsed) : parsed;
+    } else {
+      options = transporter;
+    }
+    if (options.pool) {
+      transporter = new smtp_pool_default(options);
+    } else if (options.sendmail) {
+      transporter = new sendmail_transport_default(options);
+    } else if (options.streamTransport) {
+      transporter = new stream_transport_default(options);
+    } else if (options.jsonTransport) {
+      transporter = new json_transport_default(options);
+    } else if (options.SES) {
+      const ses = options.SES;
+      if (ses.ses && ses.aws) {
+        const error64 = new Error("Using legacy SES configuration, expecting @aws-sdk/client-sesv2, see https://nodemailer.com/transports/ses/");
+        error64.code = ECONFIG;
+        throw error64;
       }
-      if (options.pool) {
-        transporter = new SMTPPool(options);
-      } else if (options.sendmail) {
-        transporter = new SendmailTransport(options);
-      } else if (options.streamTransport) {
-        transporter = new StreamTransport(options);
-      } else if (options.jsonTransport) {
-        transporter = new JSONTransport(options);
-      } else if (options.SES) {
-        transporter = new SESTransport(options);
-      } else {
-        transporter = new SMTPTransport(options);
-      }
+      transporter = new ses_transport_default(options);
+    } else {
+      transporter = new smtp_transport_default(options);
     }
-    mailer = new Mailer(transporter, options, defaults);
-    return mailer;
-  };
-  exports.createTestAccount = function(apiUrl, callback) {
-    let promise2;
-    if (!callback && typeof apiUrl === "function") {
-      callback = apiUrl;
-      apiUrl = false;
-    }
-    if (!callback) {
-      promise2 = new Promise((resolve, reject) => {
-        callback = shared.callbackPromise(resolve, reject);
-      });
-    }
-    if (ETHEREAL_CACHE && testAccount) {
-      setImmediate(() => callback(null, testAccount));
-      return promise2;
-    }
-    apiUrl = apiUrl || ETHEREAL_API;
-    let chunks = [];
-    let chunklen = 0;
-    let requestHeaders = {};
-    let requestBody = {
-      requestor: packageData.name,
-      version: packageData.version
-    };
-    if (ETHEREAL_API_KEY) {
-      requestHeaders.Authorization = "Bearer " + ETHEREAL_API_KEY;
-    }
-    let req = nmfetch(apiUrl + "/user", {
-      contentType: "application/json",
-      method: "POST",
-      headers: requestHeaders,
-      body: Buffer.from(JSON.stringify(requestBody))
+  }
+  return new mailer_default(transporter, options, defaults);
+}
+function createTestAccount(apiUrl, callback) {
+  let promise2;
+  if (!callback && typeof apiUrl === "function") {
+    callback = apiUrl;
+    apiUrl = false;
+  }
+  if (!callback) {
+    promise2 = new Promise((resolve3, reject) => {
+      callback = callbackPromise(resolve3, reject);
     });
-    req.on("readable", () => {
-      let chunk;
-      while ((chunk = req.read()) !== null) {
-        chunks.push(chunk);
-        chunklen += chunk.length;
-      }
-    });
-    req.once("error", (err) => callback(err));
-    req.once("end", () => {
-      let res = Buffer.concat(chunks, chunklen);
-      let data;
-      let err;
-      try {
-        data = JSON.parse(res.toString());
-      } catch (E) {
-        err = E;
-      }
-      if (err) {
-        return callback(err);
-      }
-      if (data.status !== "success" || data.error) {
-        return callback(new Error(data.error || "Request failed"));
-      }
-      delete data.status;
-      testAccount = data;
-      callback(null, testAccount);
-    });
+  }
+  const done = callback;
+  if (ETHEREAL_CACHE && testAccount) {
+    setImmediate(() => done(null, testAccount));
     return promise2;
+  }
+  apiUrl = apiUrl || ETHEREAL_API;
+  const chunks = [];
+  let chunklen = 0;
+  const requestHeaders = {};
+  const requestBody = {
+    requestor: name2,
+    version: version2
   };
-  exports.getTestMessageUrl = function(info) {
-    if (!info || !info.response) {
-      return false;
+  if (ETHEREAL_API_KEY) {
+    requestHeaders.Authorization = "Bearer " + ETHEREAL_API_KEY;
+  }
+  const fetchOptions = {
+    contentType: "application/json",
+    method: "POST",
+    headers: requestHeaders,
+    body: Buffer.from(JSON.stringify(requestBody))
+  };
+  if (/^https:/i.test(apiUrl)) {
+    fetchOptions.tls = { rejectUnauthorized: true };
+  }
+  const req = fetch_default(apiUrl + "/user", fetchOptions);
+  req.on("readable", () => {
+    let chunk;
+    while ((chunk = req.read()) !== null) {
+      chunks.push(chunk);
+      chunklen += chunk.length;
     }
-    let infoProps = new Map;
-    info.response.replace(/\[([^\]]+)\]$/, (m, props) => {
-      props.replace(/\b([A-Z0-9]+)=([^\s]+)/g, (m2, key, value) => {
-        infoProps.set(key, value);
-      });
-    });
-    if (infoProps.has("STATUS") && infoProps.has("MSGID")) {
-      return (testAccount.web || ETHEREAL_WEB) + "/message/" + infoProps.get("MSGID");
+  });
+  req.once("error", (err) => done(err));
+  req.once("end", () => {
+    const res = Buffer.concat(chunks, chunklen);
+    let data;
+    try {
+      data = JSON.parse(res.toString());
+    } catch (E) {
+      return done(E);
     }
+    if (data.status !== "success" || data.error) {
+      return done(new Error(data.error || "Request failed"));
+    }
+    delete data.status;
+    testAccount = data;
+    done(null, testAccount);
+  });
+  return promise2;
+}
+function getTestMessageUrl(info) {
+  if (!info || !info.response) {
     return false;
+  }
+  const infoProps = new Map;
+  const response = info.response.toString();
+  if (response.length > 2 && response.charAt(response.length - 1) === "]") {
+    const open2 = response.indexOf("[", response.lastIndexOf("]", response.length - 2) + 1);
+    if (open2 >= 0 && open2 < response.length - 2) {
+      const props = response.substring(open2 + 1, response.length - 1);
+      props.replace(/\b([A-Z0-9]+)=([^\s]+)/g, (m, key, value) => {
+        infoProps.set(key, value);
+        return m;
+      });
+    }
+  }
+  if (infoProps.has("STATUS") && infoProps.has("MSGID")) {
+    return (testAccount && testAccount.web || ETHEREAL_WEB) + "/message/" + infoProps.get("MSGID");
+  }
+  return false;
+}
+var ETHEREAL_API, ETHEREAL_WEB, ETHEREAL_API_KEY, ETHEREAL_CACHE, testAccount = false, nodemailer, nodemailer_default;
+var init_nodemailer = __esm(() => {
+  init_mailer();
+  init_shared();
+  init_smtp_pool();
+  init_smtp_transport();
+  init_sendmail_transport();
+  init_stream_transport();
+  init_json_transport();
+  init_ses_transport();
+  init_errors();
+  init_fetch();
+  ETHEREAL_API = (process.env.ETHEREAL_API || "https://api.nodemailer.com").replace(/\/+$/, "");
+  ETHEREAL_WEB = (process.env.ETHEREAL_WEB || "https://ethereal.email").replace(/\/+$/, "");
+  ETHEREAL_API_KEY = (process.env.ETHEREAL_API_KEY || "").replace(/\s*/g, "") || null;
+  ETHEREAL_CACHE = ["true", "yes", "y", "1"].includes((process.env.ETHEREAL_CACHE || "yes").toString().trim().toLowerCase());
+  nodemailer = {
+    createTransport,
+    createTestAccount,
+    getTestMessageUrl
   };
+  nodemailer_default = nodemailer;
 });
 
 // engine/lib/oauth.ts
@@ -95176,8 +97175,8 @@ __export(exports_imap_client, {
   fetchMessageBody: () => fetchMessageBody,
   collectAttachments: () => collectAttachments
 });
-function collectAttachments(node3, out = []) {
-  const n = node3;
+function collectAttachments(node4, out = []) {
+  const n = node4;
   if (!n || typeof n !== "object")
     return out;
   const disposition = typeof n.disposition === "string" ? n.disposition.toLowerCase() : null;
@@ -95380,7 +97379,7 @@ async function fetchMessageBody(account, folderPath, uid) {
 async function sendMail(account, to, subject, bodyHtml, bodyText, cc, bcc, replyTo, inReplyTo, attachments) {
   const imapPassword = await decryptPassword(account.imap_password);
   const smtpPassword = await decryptPassword(account.smtp_password ?? "");
-  const transport = import_nodemailer.default.createTransport({
+  const transport = nodemailer_default.createTransport({
     host: account.smtp_host,
     port: account.smtp_port,
     secure: account.smtp_secure,
@@ -95407,18 +97406,18 @@ async function sendMail(account, to, subject, bodyHtml, bodyText, cc, bcc, reply
   });
   return { messageId: result.messageId };
 }
-function detectFolderType(path, specialUse) {
-  if (specialUse === "\\Inbox" || path.toUpperCase() === "INBOX")
+function detectFolderType(path3, specialUse) {
+  if (specialUse === "\\Inbox" || path3.toUpperCase() === "INBOX")
     return "inbox";
-  if (specialUse === "\\Sent" || /sent/i.test(path))
+  if (specialUse === "\\Sent" || /sent/i.test(path3))
     return "sent";
-  if (specialUse === "\\Drafts" || /draft/i.test(path))
+  if (specialUse === "\\Drafts" || /draft/i.test(path3))
     return "drafts";
-  if (specialUse === "\\Trash" || /trash|deleted/i.test(path))
+  if (specialUse === "\\Trash" || /trash|deleted/i.test(path3))
     return "trash";
-  if (specialUse === "\\Junk" || /spam|junk/i.test(path))
+  if (specialUse === "\\Junk" || /spam|junk/i.test(path3))
     return "spam";
-  if (specialUse === "\\Archive" || /archive/i.test(path))
+  if (specialUse === "\\Archive" || /archive/i.test(path3))
     return "archive";
   return "other";
 }
@@ -95436,15 +97435,15 @@ function parseEnvelope(msg) {
     headers: msg.headers || {}
   };
 }
-var import_imapflow2, import_mailparser, import_nodemailer, FIRST_SYNC_LIMIT = 50;
+var import_imapflow2, import_mailparser, FIRST_SYNC_LIMIT = 50;
 var init_imap_client = __esm(() => {
   init_sieve();
   init_config();
+  init_nodemailer();
   init_dist();
   init_oauth();
   import_imapflow2 = __toESM(require_imap_flow(), 1);
   import_mailparser = __toESM(require_mailparser(), 1);
-  import_nodemailer = __toESM(require_nodemailer(), 1);
 });
 
 // engine/index.ts
@@ -117267,15 +119266,15 @@ Please draft a reply to this email.`
     parent_path: exports_external.string().optional()
   })), async (c) => {
     const user = c.get("user");
-    const { account_id, name: name2, parent_path } = c.req.valid("json");
+    const { account_id, name: name3, parent_path } = c.req.valid("json");
     const accountResult = await sql`SELECT * FROM zv_mail_accounts WHERE id = ${account_id} AND user_id = ${user.id}`.execute(db);
     if (!accountResult.rows[0])
       return c.json({ error: "Account not found" }, 404);
-    const fullPath = parent_path ? `${parent_path}.${name2}` : name2;
+    const fullPath = parent_path ? `${parent_path}.${name3}` : name3;
     await createImapFolder(accountResult.rows[0], fullPath);
     await sql`
       INSERT INTO zv_mail_folders (account_id, name, path, type)
-      VALUES (${account_id}, ${name2}, ${fullPath}, 'other')
+      VALUES (${account_id}, ${name3}, ${fullPath}, 'other')
       ON CONFLICT (account_id, path) DO NOTHING
     `.execute(db);
     return c.json({ success: true, path: fullPath });
@@ -117983,3 +119982,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
