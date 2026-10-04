@@ -17,7 +17,7 @@ import type { Context } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { ExtensionConfig, ExtensionContext } from '@zveltio/sdk/extension';
+import type { ExtensionConfig, ExtensionContext, ExtensionInternals } from '@zveltio/sdk/extension';
 
 type WidgetId = 'welcome' | 'health' | 'people' | 'data' | 'activity' | 'trust';
 
@@ -228,36 +228,33 @@ async function setUserLayout(
 // ── Widget data (only for the requested widgets) ─────────────────────
 
 /**
- * A widget's count, with a failure that says so.
- *
- * The fallback stays — one broken widget must not take the dashboard down —
- * but the silence does not. This swallowed a query against `zv_collections`, a
- * table that does not exist (the schema has `zvd_collections`), into a
- * confident zero. The card read "0 collections" on an instance that had them,
- * which looks like an empty install rather than a broken query, and the engine's
- * own admin stats carried the identical mistake against the identical table.
- *
- * `label` names which count failed, because "a widget is wrong" is not
- * something anyone can act on.
+ * What a widget reports about the instance comes from the engine
+ * (`ctx.internals`, engine #859): `zv_settings`, `zv_tenants`,
+ * `zv_tenant_users`, `"user"`, `pg_class`, `zvd_collections`, `zvd_permissions`
+ * and `zv_audit_log` are refused to an extension's `ctx.db` since engine #858,
+ * which made every widget below fail and the dashboard answer 500.
  */
-const countOf = (label: string, p: Promise<{ rows: Array<{ count: string }> }>) =>
-  p
-    .then((r) => Number(r.rows[0]?.count ?? 0))
-    .catch((err) => {
-      console.error(
-        `[dashboard] widget count "${label}" failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-      return 0;
-    });
+type Facts = Pick<
+  ExtensionInternals,
+  | 'getPublicSetting'
+  | 'countMembers'
+  | 'getDataStats'
+  | 'countAuditActivity'
+  | 'readAuditActivity'
+>;
 
-/** The implicit tenant on a single-tenant install — see the `people` widget. */
-const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
+const failed = <T>(label: string, fallback: T) => (err: unknown): T => {
+  console.error(
+    `[dashboard] widget "${label}" failed: ${err instanceof Error ? err.message : String(err)}`,
+  );
+  return fallback;
+};
 
 async function computeWidgetData(
   db: Db,
   ids: Iterable<WidgetId>,
   config: ExtensionConfig | undefined,
-  tenantId: string,
+  facts: Facts,
 ): Promise<Record<string, unknown>> {
   const want = new Set(ids);
   const out: Record<string, unknown> = {};
@@ -267,31 +264,17 @@ async function computeWidgetData(
   };
 
   if (want.has('welcome')) {
+    // The first of these the instance publishes; a setting that is not public
+    // is not the engine's to hand an extension.
     set(
       'welcome',
-      sql<{ value: string }>`
-        SELECT value FROM zv_settings WHERE key IN ('company_name','app_name','site_name') LIMIT 1
-      `
-        .execute(db)
-        .then((r) => {
-          const raw = r.rows[0]?.value;
-          let org: string | null = null;
-          if (typeof raw === 'string') {
-            try {
-              const v = JSON.parse(raw);
-              org = typeof v === 'string' ? v : raw;
-            } catch {
-              org = raw;
-            }
-          }
-          return { organization: org ?? 'Your organization' };
-        })
-        .catch((err) => {
-          console.error(
-            `[dashboard] widget "welcome" failed: ${err instanceof Error ? err.message : String(err)}`,
-          );
-          return { organization: 'Your organization' };
-        }),
+      (async () => {
+        for (const key of ['company_name', 'app_name', 'site_name']) {
+          const v = await facts.getPublicSetting(key);
+          if (typeof v === 'string' && v) return { organization: v };
+        }
+        return { organization: 'Your organization' };
+      })().catch(failed('welcome', { organization: 'Your organization' })),
     );
   }
 
@@ -307,93 +290,35 @@ async function computeWidgetData(
   }
 
   if (want.has('people')) {
-    // Counted across the whole instance, and the second number counted
-    // `role = 'god'` — so a tenant's dashboard reported how many users every
-    // other customer had, plus how many instance superusers exist. The `user`
-    // table carries no tenant_id and no RLS, so `db` does not scope this
-    // on its own; membership does.
-    //
-    // A single-tenant instance needs no membership rows, so there the count is
-    // the instance, which is the same thing.
-    //
-    // The question is whether the INSTANCE is single-tenant, not whether this is
-    // the default tenant — auth/scim's `instanceIsSingleTenant()` asks it the
-    // same way. On a multi-tenant install the default tenant is a tenant like any
-    // other: "default tenant = everyone" is the engine's ACCESS rule
-    // (middleware/tenant-membership.ts), not a headcount, and counting the whole
-    // `user` table there reported every other tenant's staff.
-    //
-    // Only memberships in force: the engine's `activeMembership()`
-    // (lib/tenancy/tenant-scope.ts), inlined because an extension cannot import
-    // it. An expired or not-yet-started member is not a person in this tenant.
-    const tenants = await sql<{ n: number }>`SELECT COUNT(*)::int AS n FROM zv_tenants`.execute(db);
-    const wholeInstance = tenantId === DEFAULT_TENANT_ID && (tenants.rows[0]?.n ?? 0) <= 1;
-    const inForce = sql`valid_from <= now() AND (valid_to IS NULL OR valid_to > now())`;
-    const total = wholeInstance
-      ? countOf('user', sql<{ count: string }>`SELECT COUNT(*) AS count FROM "user"`.execute(db))
-      : countOf('zv_tenant_users', sql<{ count: string }>`
-          SELECT COUNT(*) AS count FROM zv_tenant_users
-           WHERE tenant_id = ${tenantId}::uuid AND ${inForce}
-        `.execute(db));
-    // "admins" now means admins OF THIS TENANT. The number of instance-wide
-    // superusers is not a fact a tenant dashboard should be reporting.
-    const admins = wholeInstance
-      ? countOf('user', sql<{ count: string }>`
-          SELECT COUNT(*) AS count FROM "user" WHERE role IN ('god', 'admin')
-        `.execute(db))
-      : countOf('zv_tenant_users', sql<{ count: string }>`
-          SELECT COUNT(*) AS count FROM zv_tenant_users
-           WHERE tenant_id = ${tenantId}::uuid AND role IN ('owner', 'admin') AND ${inForce}
-        `.execute(db));
-    set('people', Promise.all([total, admins]).then(([t, a]) => ({ total: t, admins: a })));
+    // Members in force of the tenant the request runs as — on a single-tenant
+    // instance every user — and of those its owners and admins. Never the whole
+    // instance on a multi-tenant one: that reported every other customer's staff
+    // and how many instance superusers exist.
+    set('people', facts.countMembers().catch(failed('people', { total: 0, admins: 0 })));
   }
 
   if (want.has('data')) {
+    // `records_estimate` is a planner estimate across collection tables, and
+    // null on a multi-tenant instance, where it would count every tenant's rows.
     set(
       'data',
-      Promise.all([
-        // Fast planner estimate across collection tables (`zvd_*`) — order of
-        // magnitude, not a live per-table COUNT.
-        countOf('pg_class', 
-          sql<{ count: string }>`
-            SELECT COALESCE(SUM(reltuples), 0)::bigint AS count
-            FROM pg_class WHERE relkind = 'r' AND relname LIKE 'zvd_%'
-          `.execute(db),
-        ),
-        countOf('zvd_collections', sql<{ count: string }>`SELECT COUNT(*) AS count FROM zvd_collections`.execute(db)),
-      ]).then(([records_estimate, collections]) => ({ records_estimate, collections })),
+      facts
+        .getDataStats()
+        .then((s) => ({ records_estimate: s.records_estimate, collections: s.collections }))
+        .catch(failed('data', { records_estimate: null, collections: 0 })),
     );
   }
 
   if (want.has('activity')) {
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
     set(
       'activity',
       Promise.all([
-        countOf('zv_audit_log', 
-          sql<{ count: string }>`SELECT COUNT(*) AS count FROM zv_audit_log WHERE created_at >= CURRENT_DATE`.execute(
-            db,
-          ),
-        ),
-        sql<{
-          event_type: string;
-          user_id: string;
-          resource_type: string;
-          resource_id: string;
-          created_at: string;
-        }>`
-          SELECT event_type, user_id, resource_type, resource_id, created_at
-          FROM zv_audit_log ORDER BY created_at DESC LIMIT 6
-        `
-          .execute(db)
-          .then((r) => r.rows)
-          .catch((err) => {
-            // "Nothing happened here recently" is a claim about the audit log,
-            // and it must not be made because reading the audit log failed.
-            console.error(
-              `[dashboard] recent activity failed: ${err instanceof Error ? err.message : String(err)}`,
-            );
-            return [];
-          }),
+        facts.countAuditActivity({ since: midnight }).catch(failed('activity', 0)),
+        // "Nothing happened here recently" is a claim about the audit log, and
+        // it must not be made because reading the audit log failed — logged.
+        facts.readAuditActivity({ limit: 6 }).catch(failed('activity', [])),
       ]).then(([today, recent]) => ({ today, recent })),
     );
   }
@@ -407,20 +332,24 @@ async function computeWidgetData(
     // that could not fail, on the one screen where a false yes is expensive.
     // It now reports whether the log is actually readable and has entries, and
     // carries the timestamp of the last one so a stalled writer is visible too.
-    const lastOf = (label: string, table: 'zv_backups' | 'zv_audit_log') =>
-      sql<{ ts: string | null }>`SELECT MAX(created_at)::text AS ts FROM ${sql.raw(table)}`
-        .execute(db)
-        .then((r) => r.rows[0]?.ts ?? null)
-        .catch((err) => {
-          console.error(
-            `[dashboard] trust "${label}" failed: ${err instanceof Error ? err.message : String(err)}`,
-          );
-          return null;
-        });
+    //
+    // `last_backup` reads `zv_backups`, which the engine does not yet hand an
+    // extension; while it refuses, the field is null and the refusal is logged.
+    const lastBackup = sql<{ ts: string | null }>`SELECT MAX(created_at)::text AS ts FROM zv_backups`
+      .execute(db)
+      .then((r) => r.rows[0]?.ts ?? null)
+      .catch(failed('trust', null));
+    const lastAudit = facts
+      .readAuditActivity({ limit: 1 })
+      .then((rows) => {
+        const at = rows[0]?.created_at;
+        return at ? new Date(at).toISOString() : null;
+      })
+      .catch(failed('trust', null));
 
     set(
       'trust',
-      Promise.all([lastOf('last_backup', 'zv_backups'), lastOf('audit_log', 'zv_audit_log')]).then(
+      Promise.all([lastBackup, lastAudit]).then(
         ([last_backup, last_audit_entry]) => ({
           // The invisible safeguards, made visible for a board / auditor.
           encryption: config?.encryptionConfigured ?? false,
@@ -443,11 +372,6 @@ async function computeWidgetData(
 export function dashboardRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission, getUserRoles } = ctx;
 
-  // Per-request tenant-scoped DB handle so this extension's tables (FORCE RLS
-  // keyed on `zveltio.current_tenant`) resolve inside the tenant transaction.
-  /** Tenant of the request; the default tenant on a single-tenant install. */
-  const tenantOf = (c: Context): string =>
-    ((c.get('tenant') as { id?: string } | null)?.id ?? DEFAULT_TENANT_ID);
   const userId = (c: Context) => (c.get('user') as { id: string }).id;
 
   const app = new Hono();
@@ -463,7 +387,7 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
   app.get('/', async (c) => {
     const uid = userId(c);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
-    const data = await computeWidgetData(db, resolved.widgets, ctx.config, tenantOf(c));
+    const data = await computeWidgetData(db, resolved.widgets, ctx.config, ctx.internals);
     return c.json({
       widgets: resolved.widgets,
       available: resolved.available,
@@ -478,7 +402,7 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
   app.put('/', zValidator('json', z.object({ widgets: z.array(z.string()).max(50) })), async (c) => {
     const uid = userId(c);
     const saved = await setUserLayout(db, uid, c.req.valid('json').widgets, checkPermission);
-    const data = await computeWidgetData(db, saved, ctx.config, tenantOf(c));
+    const data = await computeWidgetData(db, saved, ctx.config, ctx.internals);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
     return c.json({
       widgets: saved,
@@ -494,7 +418,7 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
     const uid = userId(c);
     await deleteUserLayout(db, uid);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
-    const data = await computeWidgetData(db, resolved.widgets, ctx.config, tenantOf(c));
+    const data = await computeWidgetData(db, resolved.widgets, ctx.config, ctx.internals);
     return c.json({
       widgets: resolved.widgets,
       available: resolved.available,
@@ -513,22 +437,13 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
 
   app.get('/admin/catalog', async (c) => {
     if (!(await requireAdmin(c))) return c.json({ error: 'Forbidden' }, 403);
-    // Role names come from Casbin grouping policies (ptype='g', v1=role) in the
-    // engine's zvd_permissions table — best-effort, tenant-scoped via reqDb.
-    const rolesRes = await sql<{ role: string }>`
-      SELECT DISTINCT v1 AS role FROM zvd_permissions WHERE ptype = 'g' AND v1 IS NOT NULL
-    `
-      .execute(db)
-      .catch((err) => {
-        // An empty list here renders as "this instance has no roles", which is
-        // indistinguishable from a broken query on the screen where IT is about
-        // to configure per-role layouts.
-        console.error(
-          `[dashboard] listing roles failed: ${err instanceof Error ? err.message : String(err)}`,
-        );
-        return { rows: [] as Array<{ role: string }> };
-      });
-    const roles = rolesRes.rows.map((r) => r.role).filter(Boolean);
+    // The roles of the tenant the request runs as, from the engine's model.
+    // An empty list renders as "this instance has no roles", indistinguishable
+    // from a failed read on the screen where IT configures per-role layouts —
+    // so a failure is logged.
+    const roles = (await ctx.internals.listRoles().catch(failed('roles', [] as string[]))).filter(
+      Boolean,
+    );
     return c.json({
       catalog: WIDGET_CATALOG.map((w) => ({ id: w.id, removable: w.removable, permission: w.permission })),
       roles,
