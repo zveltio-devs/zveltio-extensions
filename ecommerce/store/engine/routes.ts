@@ -302,10 +302,9 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     // becomes a storefront overlay (slug, SEO, images) on top of the canonical row.
     let canonicalProductId: string | null = null;
     const findBySku = ctx.services.get<(sku: string) => Promise<any | null>>('inventory.products.findBySku');
-    // This handler uses a SAVEPOINT, and a savepoint outside a transaction is an
-    // error in Postgres — it worked only because the tenant transaction happened
-    // to span the request. Asking for the transaction here is what keeps the
-    // fallback below legal once that boundary moves.
+    // The best-effort insert below needs a savepoint, and a savepoint needs a
+    // transaction to live in: asking for one here keeps the fallback legal
+    // whatever the request's transaction boundary is.
     //
     // The canonical product and the storefront product are also one creation:
     // linking a shop item to inventory after the fact means finding it by SKU
@@ -338,25 +337,25 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
             // possible: `inventory` owns this schema, and nothing checks that a
             // caller from outside still satisfies it. The savepoint makes the
             // fallback actually fall back; the coupling is worth revisiting.
-            // The savepoint is rolled back on a THROW, which is the only way this
-            // insert reports failure. The previous version rolled back on
-            // `create === null` — a value `.execute()` never returns — so the real
-            // error path skipped both the ROLLBACK and the RELEASE and left the
-            // transaction aborted. The storefront insert below then died with
-            // "current transaction is aborted", which is exactly the outcome the
-            // savepoint was added to prevent.
-            await sql`SAVEPOINT canonical_product`.execute(trx);
+            //
+            // The savepoint is the host's: a nested `transaction()` joins this
+            // one inside a savepoint the engine opens, and rolls back to it on a
+            // throw — the only way this insert reports failure. It used to open
+            // its own `SAVEPOINT`, which `ctx.db` refuses from an extension
+            // (engine #858); the `catch {}` below took the refusal for
+            // "inventory unavailable", and every product was created
+            // storefront-only and unlinked, without a word.
             try {
-              const create = await sql<any>`
-                INSERT INTO zvd_products (sku, name, description, sale_price, currency, tax_rate, is_active, created_by)
-                VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === 'active'}, ${user.id})
-                ON CONFLICT (tenant_id, sku) DO UPDATE SET name = EXCLUDED.name
-                RETURNING id
-              `.execute(trx);
-              await sql`RELEASE SAVEPOINT canonical_product`.execute(trx);
+              const create = await trx.transaction().execute((sp) =>
+                sql<any>`
+                  INSERT INTO zvd_products (sku, name, description, sale_price, currency, tax_rate, is_active, created_by)
+                  VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === 'active'}, ${user.id})
+                  ON CONFLICT (tenant_id, sku) DO UPDATE SET name = EXCLUDED.name
+                  RETURNING id
+                `.execute(sp),
+              );
               canonicalProductId = create?.rows[0]?.id ?? null;
             } catch (err) {
-              await sql`ROLLBACK TO SAVEPOINT canonical_product`.execute(trx);
               console.warn(
                 '[store] canonical product not created — the storefront product will not be linked to inventory:',
                 (err as Error).message,

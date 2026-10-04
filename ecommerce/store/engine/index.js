@@ -24837,18 +24837,15 @@ function ecommerceRoutes(ctx) {
           if (existing) {
             canonicalProductId = existing.id;
           } else {
-            await sql`SAVEPOINT canonical_product`.execute(trx);
             try {
-              const create = await sql`
-                INSERT INTO zvd_products (sku, name, description, sale_price, currency, tax_rate, is_active, created_by)
-                VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === "active"}, ${user.id})
-                ON CONFLICT (tenant_id, sku) DO UPDATE SET name = EXCLUDED.name
-                RETURNING id
-              `.execute(trx);
-              await sql`RELEASE SAVEPOINT canonical_product`.execute(trx);
+              const create = await trx.transaction().execute((sp) => sql`
+                  INSERT INTO zvd_products (sku, name, description, sale_price, currency, tax_rate, is_active, created_by)
+                  VALUES (${d.sku}, ${d.name}, ${d.description ?? null}, ${d.price}, ${d.currency}, ${d.tax_rate}, ${d.status === "active"}, ${user.id})
+                  ON CONFLICT (tenant_id, sku) DO UPDATE SET name = EXCLUDED.name
+                  RETURNING id
+                `.execute(sp));
               canonicalProductId = create?.rows[0]?.id ?? null;
             } catch (err) {
-              await sql`ROLLBACK TO SAVEPOINT canonical_product`.execute(trx);
               console.warn("[store] canonical product not created \u2014 the storefront product will not be linked to inventory:", err.message);
               canonicalProductId = null;
             }
@@ -25369,3 +25366,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
