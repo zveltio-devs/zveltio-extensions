@@ -32707,20 +32707,6 @@ function mapFieldType(fieldType) {
   };
   return map2[fieldType] ?? GraphQLString;
 }
-async function getRelations(dbh) {
-  try {
-    const result = await sql`
-      SELECT id, name, type,
-             source_collection, source_field,
-             target_collection, target_field,
-             junction_table
-      FROM zvd_relations
-    `.execute(dbh);
-    return result.rows;
-  } catch {
-    return [];
-  }
-}
 async function getFieldPolicies(dbh) {
   try {
     const result = await sql`
@@ -32739,7 +32725,7 @@ async function buildDynamicSchema(ctx) {
   let fieldPolicies = [];
   try {
     collections = await DDLManager.getCollections(db);
-    relations = await getRelations(db);
+    relations = await DDLManager.getRelations(db);
     fieldPolicies = await getFieldPolicies(db);
   } catch {}
   const fieldPolicyMap = new Map;

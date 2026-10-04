@@ -152,6 +152,9 @@ d('developer/graphql — resolvers go through the read gate', () => {
       getUserRoles: async () => [],
       DDLManager: {
         getCollections: async () => COLLECTIONS,
+        // The engine's registry, as `ctx.DDLManager.getRelations` reads it.
+        getRelations: async () =>
+          (await pool.query(`SELECT * FROM zvd_relations WHERE name LIKE 'rg\\_%'`)).rows,
         getTableName: (name: string) => `zvd_${name}`,
       },
       internals: {

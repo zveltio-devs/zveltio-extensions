@@ -58,6 +58,7 @@ describe('developer/graphql — the schema cache is keyed per tenant', () => {
       checkPermission: async () => true,
       getUserRoles: async () => [],
       DDLManager: {
+        getRelations: async () => [],
         getCollections: async () => COLLECTIONS[currentTenant],
         getTableName: (name: string) => `zvd_test_${name}`,
       },

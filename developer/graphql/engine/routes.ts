@@ -142,23 +142,6 @@ function mapFieldType(fieldType: string): any {
   return map[fieldType] ?? GraphQLString;
 }
 
-// ── Relations loader ──────────────────────────────────────────────────────────
-
-async function getRelations(dbh: any): Promise<RelationInfo[]> {
-  try {
-    const result = await sql<RelationInfo>`
-      SELECT id, name, type,
-             source_collection, source_field,
-             target_collection, target_field,
-             junction_table
-      FROM zvd_relations
-    `.execute(dbh);
-    return result.rows;
-  } catch {
-    return [];
-  }
-}
-
 // ── Field policies loader ─────────────────────────────────────────────────────
 //
 // `/field-policies` (admin) writes here; nothing had ever read it back. The
@@ -218,7 +201,9 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
 
   try {
     collections = await DDLManager.getCollections(db);
-    relations = await getRelations(db);
+    // The engine's registry: `ctx.db` refuses `zvd_relations` since engine #858,
+    // and the swallowed refusal built every schema without a single relation.
+    relations = (await DDLManager.getRelations(db)) as RelationInfo[];
     fieldPolicies = await getFieldPolicies(db);
   } catch { /* no collections yet */ }
 

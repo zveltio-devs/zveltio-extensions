@@ -62,6 +62,7 @@ d('developer/graphql — timestamps serialize as ISO strings, not epoch millis',
       checkPermission: async () => true,
       getUserRoles: async () => [],
       DDLManager: {
+        getRelations: async () => [],
         getCollections: async () => [{ name: 'widgets_dates', fields: [{ name: 'title', type: 'text' }] }],
         getTableName: (name: string) => `zvd_test_${name}`,
       },

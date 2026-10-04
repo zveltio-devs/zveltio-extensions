@@ -92,6 +92,7 @@ d('developer/graphql — field policies are enforced', () => {
         resource === 'admin' ? userId === ADMIN_USER.id : true,
       getUserRoles: async (userId: string) => ROLES[userId] ?? [],
       DDLManager: {
+        getRelations: async () => [],
         getCollections: async () => [
           {
             name: 'employees',
