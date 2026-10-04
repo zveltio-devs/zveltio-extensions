@@ -7,7 +7,7 @@
  * call in extensions raise TS2769 ("Argument of type 'user' is not
  * assignable to parameter of type 'never'"). The engine declares its
  * own map in `packages/engine/src/middleware/tenant.ts` for the
- * `tenant`, `tenantTrx`, `environment` and `tenantSchema` keys;
+ * `tenant`, `tenantTrx` and `environment` keys;
  * extensions live in a separate tsconfig so they don't see that
  * augmentation. Declaring the keys here gives every extension
  * route handler typed access without each one casting.
@@ -32,8 +32,6 @@ declare module 'hono' {
     tenantTrx: any;
     /** Tenant environment (prod/staging/...). */
     environment: any;
-    /** Active PostgreSQL schema name for the request. */
-    tenantSchema: string;
     /** Auth path: 'session' for cookie/header auth, 'api_key' for API keys. */
     authType: 'session' | 'api_key';
     /** API-key row when authType === 'api_key'. */

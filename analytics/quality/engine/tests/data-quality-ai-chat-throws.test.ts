@@ -53,7 +53,6 @@ describe('AI normalization — provider failure', () => {
       'contacts',
       'normalization',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     const end = await awaitScanEnd(db);

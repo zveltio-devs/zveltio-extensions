@@ -24537,7 +24537,6 @@ async function detectDuplicates(db, tableName, fields) {
   const textFields = fields.filter((f) => ["text", "email", "url", "richtext"].includes(f.type)).slice(0, 3);
   if (textFields.length === 0)
     return issues;
-  await sql`CREATE EXTENSION IF NOT EXISTS pg_trgm`.execute(db).catch(() => {});
   for (const field of textFields) {
     try {
       const pairs = await sql`
@@ -24751,13 +24750,13 @@ async function runScanAsync(deps, db, scanId, collection, tableName, scanType) {
 }
 async function runQualityScan(deps, params) {
   const { db, withTenantIsolation } = deps;
-  const { collection, scanType, userId, tenantSchema } = params;
+  const { collection, scanType, userId } = params;
   const scanTenant = params.tenantId;
   const scan = await db.insertInto("zv_quality_scans").values({ collection, scan_type: scanType, status: "running", triggered_by: userId }).returningAll().executeTakeFirst();
   if (!scan)
     throw new Error("Failed to create quality scan record");
   const scanId = scan.id;
-  const tableName = tenantSchema ? `${tenantSchema}.zvd_${collection}` : `zvd_${collection}`;
+  const tableName = `zvd_${collection}`;
   withTenantIsolation(scanTenant, (trx) => runScanAsync(deps, trx, scanId, collection, tableName, scanType)).catch((err) => {
     console.error(`Quality scan ${scanId} failed:`, err);
     db.updateTable("zv_quality_scans").set({ status: "failed", completed_at: new Date }).where("id", "=", scanId).execute().catch(() => {});
@@ -25002,3 +25001,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1

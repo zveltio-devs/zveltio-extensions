@@ -46,7 +46,6 @@ describe('missing-data detection — COUNT failure', () => {
       'contacts',
       'missing_data',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     const end = await awaitScanEnd(db);

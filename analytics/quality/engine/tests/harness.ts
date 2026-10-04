@@ -77,7 +77,6 @@ export interface Scanner {
     collection: string,
     scanType: 'duplicates' | 'anomalies' | 'missing_data' | 'normalization' | 'full',
     userId: string,
-    tenantSchema?: string,
     tenantId?: string,
   ): Promise<string>;
   /** Tenants `withTenantIsolation` was asked for, in order. */
@@ -97,7 +96,6 @@ export function scanWith(db: CannedDb): Scanner {
     collection: string,
     scanType: 'duplicates' | 'anomalies' | 'missing_data' | 'normalization' | 'full',
     userId: string,
-    tenantSchema?: string,
     tenantId = 'tenant-1',
   ): Promise<string> =>
     runQualityScan(
@@ -115,7 +113,7 @@ export function scanWith(db: CannedDb): Scanner {
         DDLManager,
         services: serviceRegistry,
       },
-      { collection, scanType, userId, tenantSchema, tenantId },
+      { collection, scanType, userId, tenantId },
     )) as Scanner;
 
   Object.defineProperty(scan, 'tenants', { get: () => tenants });

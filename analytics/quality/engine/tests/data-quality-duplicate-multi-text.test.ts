@@ -54,7 +54,6 @@ describe('duplicate detection — multiple text fields', () => {
       'contacts',
       'duplicates',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     await awaitScanEnd(db);
@@ -81,7 +80,6 @@ describe('duplicate detection — multiple text fields', () => {
       'contacts',
       'duplicates',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     await awaitScanEnd(db);
