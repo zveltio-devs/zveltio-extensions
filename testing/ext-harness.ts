@@ -643,23 +643,30 @@ async function makeCtx(
  * A Hono app whose every request runs as a tenant, as the engine's tenant
  * middleware makes it: on a single-tenant install that is the default tenant.
  *
- * Only the domain, not a transaction: `ctx.db` stays the pool here, so an
- * extension's own tables answer as before. What it gives is the "running
+ * Only the domain by default, not a transaction: `ctx.db` stays the pool, so an
+ * extension's own tables answer as before. `transaction` opens the tenant
+ * transaction too, as the engine does for every request: `ctx.db` then
+ * resolves to it, and a statement that fails aborts the request's work — the
+ * path a test of savepoints or of error recovery has to be on. What it gives is the "running
  * tenant" the engine's helpers act for — `countMembers`, `addTenantMember` and
  * the rest refuse without one, as they do in the product.
  */
-async function tenantApp(tenant?: string): Promise<any> {
+async function tenantApp(tenant?: string, transaction = false): Promise<any> {
   const { Hono } = (await honoP) as any;
-  const { runWithDomain, DEFAULT_TENANT_ID } = (await tenancyP) as any;
+  const { runWithDomain, withTenantIsolation, DEFAULT_TENANT_ID } = (await tenancyP) as any;
   const app = new Hono();
+  const id = tenant ?? DEFAULT_TENANT_ID;
+  // The tenant manager runs on the pool only the engine's boot hands it.
+  if (transaction) await engineUsers();
   // What the engine's tenant middleware sets on every /ext/* request: the
   // domain, and `c.get('tenant')`, which a route scoping a check to the
   // request's own tenant reads (without it, it refuses everything).
   // biome-ignore lint/suspicious/noExplicitAny: Hono context, untyped here
   app.use('*', (c: any, next: () => Promise<void>) => {
-    const id = tenant ?? DEFAULT_TENANT_ID;
     c.set('tenant', { id });
-    return runWithDomain(id, () => next());
+    return transaction
+      ? runWithDomain(id, () => withTenantIsolation(id, () => next()))
+      : runWithDomain(id, () => next());
   });
   return app;
 }
@@ -721,6 +728,8 @@ export async function mountForTest(
     user?: { id: string; email: string };
     /** The tenant requests run as; the default tenant when absent. */
     tenant?: string;
+    /** Run each request in the tenant transaction, as the engine does. */
+    transaction?: boolean;
   } = {},
 ): Promise<{ app: any; publicRoutes: any[]; migrated: boolean; ctx: any }> {
   const { authed = true, admin = true, user } = opts;
@@ -735,7 +744,7 @@ export async function mountForTest(
   // can't support them (e.g. postgis not installed) → the extension's tables
   // never materialised and DB-backed assertions must be skipped by the caller.
   const migrated = await applyMigrations(mod.default);
-  const app = await tenantApp(opts.tenant);
+  const app = await tenantApp(opts.tenant, opts.transaction);
   const publicRoutes: any[] = [];
   // `mountForTest` receives the ENGINE dir; the extension is its parent, which
   // is what names it and where its manifest lives.
