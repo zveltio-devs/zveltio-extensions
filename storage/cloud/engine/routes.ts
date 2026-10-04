@@ -14,6 +14,19 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 export function cloudRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
+
+  // Who trashed a file, who uploaded a version: names from the engine. The
+  // lists joined `"user"`, which `ctx.db` refuses since engine #858 — the trash
+  // and the version history answered 500. An id with no name stays unnamed.
+  async function withNames<R extends Record<string, unknown>>(
+    rows: R[],
+    idKey: string,
+    nameKey: string,
+  ): Promise<Array<R & Record<string, unknown>>> {
+    const ids = rows.map((r) => r[idKey]).filter((v): v is string => typeof v === 'string');
+    const names = ids.length ? await ctx.internals.getUserNames(ids) : {};
+    return rows.map((r) => ({ ...r, [nameKey]: names[r[idKey] as string] ?? null }));
+  }
   // Owner-or-tenant-admin, the same rule `content/media` applies to these tables.
   const isTenantAdmin = (userId: string): Promise<boolean> =>
     (ctx.internals as any).isTenantAdmin(userId);
@@ -97,7 +110,11 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.get('/files/:id/versions', requireAuth, async (c) => {
-    const versions = await listFileVersions(db, c.req.param('id'));
+    const versions = await withNames(
+      await listFileVersions(db, c.req.param('id')),
+      'uploaded_by',
+      'uploaded_by_name',
+    );
     return c.json({ versions });
   });
 
@@ -146,7 +163,7 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
 
   app.get('/trash', requireAuth, async (c) => {
     const user = c.get('user') as any;
-    const items = await listTrash(db, user.id);
+    const items = await withNames(await listTrash(db, user.id), 'deleted_by', 'deleted_by_name');
     return c.json({ items });
   });
 

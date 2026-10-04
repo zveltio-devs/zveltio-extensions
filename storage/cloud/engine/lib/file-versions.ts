@@ -121,10 +121,9 @@ export async function createFileVersion(
  */
 export async function listFileVersions(db: Database, fileId: string) {
   return sql`
-    SELECT v.*, u.name AS uploaded_by_name
+    SELECT v.*
     FROM zv_media_versions v
     INNER JOIN zv_media_files f ON f.id = v.file_id
-    LEFT JOIN "user" u ON u.id = v.uploaded_by
     WHERE v.file_id = ${fileId}
     ORDER BY v.version_num DESC
   `.execute(db).then(r => r.rows);

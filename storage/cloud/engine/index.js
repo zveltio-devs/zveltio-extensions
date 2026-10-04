@@ -24986,10 +24986,9 @@ async function createFileVersion(db, fileId, newBuffer, newMimeType, newSize, up
 }
 async function listFileVersions(db, fileId) {
   return sql`
-    SELECT v.*, u.name AS uploaded_by_name
+    SELECT v.*
     FROM zv_media_versions v
     INNER JOIN zv_media_files f ON f.id = v.file_id
-    LEFT JOIN "user" u ON u.id = v.uploaded_by
     WHERE v.file_id = ${fileId}
     ORDER BY v.version_num DESC
   `.execute(db).then((r) => r.rows);
@@ -25053,11 +25052,10 @@ async function restoreFromTrash(db, fileId) {
 async function listTrash(db, userId) {
   const userFilter = userId ? sql`AND (f.deleted_by = ${userId} OR f.created_by = ${userId})` : sql``;
   return sql`
-    SELECT f.*, u.name AS deleted_by_name,
+    SELECT f.*,
       ROUND(EXTRACT(EPOCH FROM (NOW() - f.deleted_at)) / 86400) AS days_in_trash,
       ${TRASH_RETENTION_DAYS} - ROUND(EXTRACT(EPOCH FROM (NOW() - f.deleted_at)) / 86400) AS days_remaining
     FROM zv_media_files f
-    LEFT JOIN "user" u ON u.id = f.deleted_by
     WHERE f.deleted_at IS NOT NULL
     ${userFilter}
     ORDER BY f.deleted_at DESC
@@ -25198,6 +25196,11 @@ async function revokeShare(db, shareId, userId) {
 var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function cloudRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
+  async function withNames(rows, idKey, nameKey) {
+    const ids = rows.map((r) => r[idKey]).filter((v) => typeof v === "string");
+    const names = ids.length ? await ctx.internals.getUserNames(ids) : {};
+    return rows.map((r) => ({ ...r, [nameKey]: names[r[idKey]] ?? null }));
+  }
   const isTenantAdmin = (userId) => ctx.internals.isTenantAdmin(userId);
   const requestTenant = (c) => c.get("tenant")?.id;
   async function visible(c, table, id) {
@@ -25244,7 +25247,7 @@ function cloudRoutes(ctx) {
     }
   });
   app.get("/files/:id/versions", requireAuth, async (c) => {
-    const versions2 = await listFileVersions(db, c.req.param("id"));
+    const versions2 = await withNames(await listFileVersions(db, c.req.param("id")), "uploaded_by", "uploaded_by_name");
     return c.json({ versions: versions2 });
   });
   app.post("/files/:id/versions/:num/restore", requireAuth, async (c) => {
@@ -25282,7 +25285,7 @@ function cloudRoutes(ctx) {
   });
   app.get("/trash", requireAuth, async (c) => {
     const user = c.get("user");
-    const items = await listTrash(db, user.id);
+    const items = await withNames(await listTrash(db, user.id), "deleted_by", "deleted_by_name");
     return c.json({ items });
   });
   app.delete("/trash/purge", requireAuth, async (c) => {
