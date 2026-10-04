@@ -101,29 +101,6 @@ const honoP = import(join(REPO, 'node_modules/hono/dist/index.js'));
 const kyselyP = import(join(REPO, 'node_modules/kysely/dist/index.js'));
 
 /**
- * The tenant the harness database writes to: every tenant_id column defaults to
- * it when no tenant GUC is set, which is how the harness runs.
- */
-const HARNESS_TENANT_ID = '00000000-0000-0000-0000-000000000001';
-
-/**
- * A Hono app carrying what the engine's tenant middleware sets on every /ext/*
- * request, `c.get('tenant')`. A route that scopes a check to the request's own
- * tenant (a foreign-key parent must be the request tenant's) reads it, and
- * without it refuses everything.
- */
-// biome-ignore lint/suspicious/noExplicitAny: Hono is loaded by path, untyped
-function tenantApp(Hono: any): any {
-  const app = new Hono();
-  // biome-ignore lint/suspicious/noExplicitAny: Hono context, untyped here
-  app.use('*', async (c: any, next: () => Promise<void>) => {
-    c.set('tenant', { id: HARNESS_TENANT_ID });
-    await next();
-  });
-  return app;
-}
-
-/**
  * The engine's OWN restriction code, not a copy of it.
  *
  * `ctx.db` here used to be the raw Kysely handle. In production it is a proxy
@@ -152,6 +129,52 @@ const ENGINE_LIB = join(REPO, '..', 'zveltio', 'packages', 'engine', 'src', 'lib
 const restrictP = import(join(ENGINE_LIB, 'extension-context.js'));
 const capsP = import(join(ENGINE_LIB, 'capabilities.js'));
 const registerP = import(join(ENGINE_LIB, 'register.js'));
+const internalsP = import(join(ENGINE_LIB, 'internals.js'));
+const tenancyP = import(join(ENGINE_LIB, '..', 'tenancy', 'index.js'));
+const ddlP = import(join(ENGINE_LIB, '..', 'data', 'index.js'));
+const engineHandleP = import(join(ENGINE_LIB, '..', 'engine-handle.js'));
+
+/**
+ * Members of `ctx.internals` that are the ENGINE's here, called through the
+ * engine's own bag (`buildExtensionInternals`) and capability gate.
+ *
+ * They are what replaced the raw SQL #858 refuses on `"user"`, `zv_tenants`,
+ * `zv_tenant_users`, `zv_audit_log` and the catalogue. Each one reads the tenant
+ * the work RUNS as and refuses a god, an instance admin or another tenant's
+ * account. A copy here would decide those questions for itself, and a test that
+ * passes against a copy proves nothing about the product.
+ */
+const ENGINE_MEMBERS = [
+  'isSingleTenantInstance',
+  'provisionUser',
+  'listTenantUsers',
+  'updateUserProfile',
+  'addTenantMember',
+  'removeTenantMember',
+  'setTenantMembershipEnd',
+  'countMembers',
+  'getDataStats',
+  'listRoles',
+  'getPublicSetting',
+  'readAuditActivity',
+  'countAuditActivity',
+  'audit',
+  'getUserNames',
+] as const;
+
+/**
+ * `ctx.DDLManager` reads, the engine's: the catalogue an extension may not read
+ * through `ctx.db` since #858 is what these answer from. Mutations stay stubbed —
+ * a contract test that creates a collection is asserting the extension's half.
+ */
+const DDL_READS = new Set([
+  'getCollections',
+  'getCollection',
+  'getRelations',
+  'tableExists',
+  'introspectTable',
+  'getTableName',
+]);
 
 /**
  * The wiring production gives an extension: its name, the tables it may touch,
@@ -214,9 +237,16 @@ let _engineUsersP: Promise<{ users: any; pool: any; auth: any }> | null = null;
 function engineUsers(): Promise<{ users: any; pool: any; auth: any }> {
   _engineUsersP ??= (async () => {
     const src = join(REPO, '..', 'zveltio', 'packages', 'engine', 'src');
-    const { createDb } = (await import(join(src, 'db', 'index.js'))) as any;
-    const { initPermissions } = (await import(join(src, 'lib', 'tenancy', 'index.js'))) as any;
+    const { createDb, _internalForTests } = (await import(join(src, 'db', 'index.js'))) as any;
     const pool = createDb(DB_URL);
+    // The engine's helpers default to its global pool (`getDb()`) and the tenant
+    // manager's, which only the engine's boot sets: provisioning and tenant
+    // entry run there.
+    _internalForTests.swapDbForTests(pool);
+    const { initPermissions, initTenantManager } = (await import(
+      join(src, 'lib', 'tenancy', 'index.js')
+    )) as any;
+    initTenantManager(pool);
     await initPermissions(pool);
     // better-auth opens its own pool from DATABASE_URL.
     process.env.DATABASE_URL ??= DB_URL;
@@ -378,7 +408,48 @@ async function makeCtx(
   // The same proxy production hands over: `zvd_*` and this extension's own
   // `zv_<name>_*` namespace, plus whatever its migrations created. Anything else
   // throws here exactly as it would in the engine.
-  const restrictedDb = createRestrictedDb(db, extName, allowedTables);
+  // A resolver, as the engine's `ctx.db` is: inside `withTenantIsolation` it is
+  // that tenant's transaction, so a statement there runs as `zveltio_rls` under
+  // the tenant's row policy rather than on the pool beside it.
+  const { getCurrentTenantTrx } = (await tenancyP) as any;
+  const restrictedDb = createRestrictedDb(
+    () => getCurrentTenantTrx() ?? db,
+    extName,
+    allowedTables,
+  );
+  const { buildExtensionInternals } = (await internalsP) as any;
+  const { DDLManager: engineDDL } = (await ddlP) as any;
+  const { engineHandle } = (await engineHandleP) as any;
+  // The engine's bag behind the engine's gate, bound to this extension as the
+  // caller: what `provisionUser` records as the actor, and what decides whether
+  // `withTenantIsolation` may enter a tenant other than the running one.
+  const engineBag = gateInternals(extName, buildExtensionInternals(), capabilities);
+  const engineMembers: Record<string, unknown> = {};
+  for (const m of ENGINE_MEMBERS) {
+    engineMembers[m] = async (...a: unknown[]) => {
+      await engineUsers();
+      return engineBag[m](...a);
+    };
+  }
+  // As `guardTenantTrx` hands it over: the callback's handle is the extension's
+  // table guard over the tenant transaction, not the bare transaction.
+  engineMembers.withTenantIsolation = async (tenantId: string, fn: (trx: any) => unknown) => {
+    await engineUsers();
+    return engineBag.withTenantIsolation(tenantId, (trx: any) =>
+      fn(createRestrictedDb(trx, extName, allowedTables)),
+    );
+  };
+  const ddlManager = new Proxy(
+    {},
+    {
+      get: (_t, p) => {
+        if (typeof p !== 'string' || !DDL_READS.has(p)) return anyStub();
+        // `engineHandle`, as `engineSqlHelper` applies it: the helper's SQL is the
+        // engine's, on whatever handle the extension passed.
+        return (...a: unknown[]) => engineDDL[p](...a.map((x) => engineHandle(x)));
+      },
+    },
+  );
 
   return {
     db: restrictedDb,
@@ -437,6 +508,7 @@ async function makeCtx(
     // NOTE: anyStub()'s `get` trap ignores its target, so Object.assign onto it
     // is invisible. The real members have to be consulted BEFORE falling back.
     internals: gateInternals(extName, bindsCaller(realInternals({
+      ...engineMembers,
       // ── URL guards: REAL, all three ────────────────────────────────────
       //
       // These are the members whose stub fails OPEN, and the direction is decided
@@ -538,7 +610,7 @@ async function makeCtx(
     entityAccess: { register() {} },
     queryAlter: { register() {} },
     fieldTypeRegistry: { register() {}, get: () => undefined, getAll: () => [], list: () => [] },
-    DDLManager: anyStub(),
+    DDLManager: ddlManager,
     /**
      * The host builds this on every load, so an extension that reads
      * `ctx.config.vars.SOMETHING` is reading a real object in production. The
@@ -565,6 +637,31 @@ async function makeCtx(
     env: {},
     log: console,
   };
+}
+
+/**
+ * A Hono app whose every request runs as a tenant, as the engine's tenant
+ * middleware makes it: on a single-tenant install that is the default tenant.
+ *
+ * Only the domain, not a transaction: `ctx.db` stays the pool here, so an
+ * extension's own tables answer as before. What it gives is the "running
+ * tenant" the engine's helpers act for — `countMembers`, `addTenantMember` and
+ * the rest refuse without one, as they do in the product.
+ */
+async function tenantApp(tenant?: string): Promise<any> {
+  const { Hono } = (await honoP) as any;
+  const { runWithDomain, DEFAULT_TENANT_ID } = (await tenancyP) as any;
+  const app = new Hono();
+  // What the engine's tenant middleware sets on every /ext/* request: the
+  // domain, and `c.get('tenant')`, which a route scoping a check to the
+  // request's own tenant reads (without it, it refuses everything).
+  // biome-ignore lint/suspicious/noExplicitAny: Hono context, untyped here
+  app.use('*', (c: any, next: () => Promise<void>) => {
+    const id = tenant ?? DEFAULT_TENANT_ID;
+    c.set('tenant', { id });
+    return runWithDomain(id, () => next());
+  });
+  return app;
 }
 
 export interface ContractOptions {
@@ -618,10 +715,15 @@ async function applyMigrations(ext: any): Promise<boolean> {
  */
 export async function mountForTest(
   engineDir: string,
-  opts: { authed?: boolean; admin?: boolean; user?: { id: string; email: string } } = {},
+  opts: {
+    authed?: boolean;
+    admin?: boolean;
+    user?: { id: string; email: string };
+    /** The tenant requests run as; the default tenant when absent. */
+    tenant?: string;
+  } = {},
 ): Promise<{ app: any; publicRoutes: any[]; migrated: boolean; ctx: any }> {
   const { authed = true, admin = true, user } = opts;
-  const { Hono } = (await honoP) as any;
   const db = await getDb();
   const mod = await import(join(engineDir, 'index.js'));
   // Apply the extension's OWN migrations so DB-backed routes have their tables,
@@ -633,7 +735,7 @@ export async function mountForTest(
   // can't support them (e.g. postgis not installed) → the extension's tables
   // never materialised and DB-backed assertions must be skipped by the caller.
   const migrated = await applyMigrations(mod.default);
-  const app = tenantApp(Hono);
+  const app = await tenantApp(opts.tenant);
   const publicRoutes: any[] = [];
   // `mountForTest` receives the ENGINE dir; the extension is its parent, which
   // is what names it and where its manifest lives.
@@ -693,18 +795,16 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
     });
 
     it('register(app, ctx) mounts without throwing', async () => {
-      const { Hono } = (await honoP) as any;
       const db = await getDb();
-      const app = tenantApp(Hono);
+      const app = await tenantApp();
       await ext.register(app, await makeCtx(db, { authed: true, admin: true }, undefined, await productionWiring(extDir, name, ext)));
       expect(Array.isArray(app.routes)).toBe(true);
     });
 
     it('no parameterless GET route crashes (authed admin)', async () => {
       if (envUnsupported) return; // migrations env-skipped → tables absent by design
-      const { Hono } = (await honoP) as any;
       const db = await getDb();
-      const app = tenantApp(Hono);
+      const app = await tenantApp();
       await ext.register(app, await makeCtx(db, { authed: true, admin: true }, undefined, await productionWiring(extDir, name, ext)));
       const gets: string[] = [
         ...new Set(
@@ -725,9 +825,8 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
 
     it('no parameterless POST route crashes on an empty body', async () => {
       if (envUnsupported) return; // migrations env-skipped → tables absent by design
-      const { Hono } = (await honoP) as any;
       const db = await getDb();
-      const app = tenantApp(Hono);
+      const app = await tenantApp();
       await ext.register(app, await makeCtx(db, { authed: true, admin: true }, undefined, await productionWiring(extDir, name, ext)));
       const posts: string[] = [
         ...new Set(
@@ -761,9 +860,8 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
 
     it('unauthenticated request does not crash', async () => {
       if (envUnsupported) return; // migrations env-skipped → tables absent by design
-      const { Hono } = (await honoP) as any;
       const db = await getDb();
-      const app = tenantApp(Hono);
+      const app = await tenantApp();
       await ext.register(app, await makeCtx(db, { authed: false, admin: false }, undefined, await productionWiring(extDir, name, ext)));
       const first = (app.routes as Array<{ method: string; path: string }>).find(
         (r) => r.method === 'GET' && !r.path.includes(':') && !r.path.includes('*'),
