@@ -6,7 +6,6 @@
  * `syncFieldsFromDB` so Studio matches the live CRM schema (status, deal
  * columns, etc.) rather than a stale core ideal shape.
  */
-import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 const CRM_COLLECTIONS = [
@@ -55,17 +54,8 @@ export async function adoptCrmCollections(ctx: ExtensionContext): Promise<void> 
     }
   }
 
-  try {
-    await sql`
-      INSERT INTO zvd_relations
-        (name, type, source_collection, source_field, target_collection, target_field,
-         junction_table, on_delete, on_update)
-      VALUES
-        ('contact_organizations', 'm2m', 'contacts', 'id', 'organizations', 'id',
-         'zvd_contact_organizations', 'CASCADE', 'CASCADE')
-      ON CONFLICT (source_collection, source_field) DO NOTHING
-    `.execute(ctx.db);
-  } catch (err) {
-    console.warn('   ⚠  CRM contact_organizations relation failed:', (err as Error).message);
-  }
+  // The contact ↔ organization relation is registered by migration 005, which
+  // runs as the engine. This used to insert it again here, through `ctx.db`,
+  // which engine #858 refuses to an extension: a refused write and a warning at
+  // every boot, for a row the migration had already written.
 }
