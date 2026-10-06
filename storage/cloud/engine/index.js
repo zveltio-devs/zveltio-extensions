@@ -25195,9 +25195,18 @@ async function revokeShare(db, shareId, userId) {
 }
 
 // engine/routes.ts
+var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function cloudRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
   const isTenantAdmin = (userId) => ctx.internals.isTenantAdmin(userId);
+  const requestTenant = (c) => c.get("tenant")?.id;
+  async function visible(c, table, id) {
+    const tenant = requestTenant(c);
+    if (!tenant || typeof id !== "string" || !UUID_RE.test(id))
+      return false;
+    const row = await db.selectFrom(table).select(["id"]).where("id", "=", id).where("tenant_id", "=", tenant).executeTakeFirst();
+    return Boolean(row);
+  }
   const app = new Hono2;
   const requireAuth = async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -25290,6 +25299,12 @@ function cloudRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const data = c.req.valid("json");
+    if (data.file_id && !await visible(c, "zv_media_files", data.file_id)) {
+      return c.json({ error: "File not found" }, 404);
+    }
+    if (data.folder_id && !await visible(c, "zv_media_folders", data.folder_id)) {
+      return c.json({ error: "Folder not found" }, 404);
+    }
     try {
       const result = await createShareLink(db, {
         fileId: data.file_id,
@@ -25360,6 +25375,9 @@ function cloudRoutes(ctx) {
       await db.deleteFrom("zv_media_favorites").where("user_id", "=", user.id).where("file_id", "=", fileId).execute();
       return c.json({ favorited: false });
     }
+    if (!await visible(c, "zv_media_files", fileId)) {
+      return c.json({ error: "File not found" }, 404);
+    }
     await db.insertInto("zv_media_favorites").values({ user_id: user.id, file_id: fileId, created_at: new Date }).execute();
     return c.json({ favorited: true });
   });
@@ -25375,10 +25393,13 @@ function cloudRoutes(ctx) {
     return c.json({ files: files.rows });
   });
   async function resolveFolder(c, path, create = false) {
+    const tenant = requestTenant(c);
+    if (!tenant)
+      return null;
     const parts = path.split("/").filter(Boolean);
     let parentId = null;
     for (const name of parts) {
-      const existing = await db.selectFrom("zv_media_folders").select(["id"]).where("name", "=", name).where("deleted_at", "is", null).where((eb) => parentId === null ? eb("parent_id", "is", null) : eb("parent_id", "=", parentId)).executeTakeFirst();
+      const existing = await db.selectFrom("zv_media_folders").select(["id"]).where("tenant_id", "=", tenant).where("name", "=", name).where("deleted_at", "is", null).where((eb) => parentId === null ? eb("parent_id", "is", null) : eb("parent_id", "=", parentId)).executeTakeFirst();
       if (existing) {
         parentId = existing.id;
         continue;
@@ -25441,6 +25462,8 @@ function cloudRoutes(ctx) {
       return c.json({ error: "Storage quota exceeded" }, 413);
     }
     const folder = await resolveFolder(c, path, true);
+    if (!folder)
+      return c.json({ error: "Folder not found" }, 404);
     const ext = file2.name.includes(".") ? `.${file2.name.split(".").pop()}` : "";
     const id = crypto.randomUUID();
     const filename = `${id.replace(/-/g, "")}${ext}`;

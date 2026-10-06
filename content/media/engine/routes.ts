@@ -10,6 +10,8 @@ import type {
 } from '@zveltio/sdk/extension';
 import { permissionGate, readMultipart, MULTIPART_REQUIRED } from '@zveltio/sdk/extension';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // Lazy aws4fetch client — mirrors the CORE media routes exactly
 // (packages/engine/src/routes/media.ts). Returns null when object storage is
 // not configured, so uploads on a bare self-hosted install skip object storage
@@ -111,6 +113,34 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     return isTenantAdmin(userId).catch(() => false);
   }
 
+  /**
+   * Can this request see the row a write is about to point at?
+   *
+   * PostgreSQL checks a foreign key outside row-level security, so a folder,
+   * file, tag or collection id from another tenant satisfied every FK here: the
+   * new row hung under the other tenant's row, and the success-versus-error
+   * answer told the caller which of its ids exist. Asked before any side effect.
+   *
+   * The request's OWN tenant, not "whatever RLS lets it read": RLS is wider than
+   * one tenant for a god or a consolidating parent (`zveltio_visible_tenants`),
+   * and the new row is stamped with the request's tenant, so a readable foreign
+   * row would still be a cross-tenant parent. Same rule as the engine's
+   * `folderVisible` (routes/storage.ts). A malformed id never reaches SQL: a
+   * failed statement would abort the request transaction (25P02).
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: Hono context
+  async function visible(c: any, table: string, id: unknown): Promise<boolean> {
+    const tenant = (c.get('tenant') as { id?: string } | null | undefined)?.id;
+    if (!tenant || typeof id !== 'string' || !UUID_RE.test(id)) return false;
+    const row = await (db as any)
+      .selectFrom(table)
+      .select(['id'])
+      .where('id', '=', id)
+      .where('tenant_id', '=', tenant)
+      .executeTakeFirst();
+    return Boolean(row);
+  }
+
   const router = new Hono();
 
   // Auth middleware — all media routes require authentication
@@ -146,6 +176,9 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const user = c.get('user' as never) as any;
       const data = c.req.valid('json');
+      if (data.parent_id && !(await visible(c, 'zv_media_folders', data.parent_id))) {
+        return c.json({ error: 'Folder not found' }, 404);
+      }
       const folder = {
         // Canonical UUID, dashes included. The column is `uuid`, so Postgres
         // accepts the 32-hex form and normalises it on the way in — but the
@@ -172,6 +205,9 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const id = c.req.param('id');
       const data = c.req.valid('json');
+      if (data.parent_id && !(await visible(c, 'zv_media_folders', data.parent_id))) {
+        return c.json({ error: 'Folder not found' }, 404);
+      }
       await (db as any)
         .updateTable('zv_media_folders')
         .set({ ...data, updated_at: new Date() })
@@ -311,6 +347,10 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     const altText = formData.get('alt_text') as string | null;
 
     if (!file) return c.json({ error: 'No file provided' }, 400);
+    // Before anything is stored: a refused folder must not leave an object behind.
+    if (folderId && !(await visible(c, 'zv_media_folders', folderId))) {
+      return c.json({ error: 'Folder not found' }, 404);
+    }
 
     // Check storage quota
     const usageResult = await (db as any)
@@ -436,6 +476,9 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const id = c.req.param('id');
       const data = c.req.valid('json');
+      if (data.folder_id && !(await visible(c, 'zv_media_folders', data.folder_id))) {
+        return c.json({ error: 'Folder not found' }, 404);
+      }
       await (db as any)
         .updateTable('zv_media_files')
         .set({ ...data, updated_at: new Date() })
@@ -547,6 +590,12 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     async (c) => {
       const fileId = c.req.param('id');
       const { tag_id } = c.req.valid('json');
+      if (!(await visible(c, 'zv_media_files', fileId))) {
+        return c.json({ error: 'File not found' }, 404);
+      }
+      if (!(await visible(c, 'zv_media_tags', tag_id))) {
+        return c.json({ error: 'Tag not found' }, 404);
+      }
       try {
         await (db as any)
           .insertInto('zv_media_file_tags')
@@ -639,6 +688,9 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user' as never) as any;
     const data = c.req.valid('json');
+    if (data.cover_file_id && !(await visible(c, 'zv_media_files', data.cover_file_id))) {
+      return c.json({ error: 'File not found' }, 404);
+    }
     const coll = await (db as any)
       .insertInto('zv_media_collections')
       .values({ ...data, cover_file_id: data.cover_file_id || null, created_by: user.id })
@@ -658,6 +710,10 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     const existing = await (db as any).selectFrom('zv_media_collections').select(['id', 'created_by']).where('id', '=', id).executeTakeFirst();
     if (!existing) return c.json({ error: 'Collection not found' }, 404);
     if (existing.created_by !== user.id) return c.json({ error: 'Forbidden' }, 403);
+    const { cover_file_id } = c.req.valid('json');
+    if (cover_file_id && !(await visible(c, 'zv_media_files', cover_file_id))) {
+      return c.json({ error: 'File not found' }, 404);
+    }
     const updated = await (db as any).updateTable('zv_media_collections').set({ ...c.req.valid('json'), updated_at: new Date() }).where('id', '=', id).returningAll().executeTakeFirst();
     return c.json({ collection: updated });
   });
@@ -698,6 +754,14 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user' as never) as any;
     const collId = c.req.param('id');
     const { file_ids } = c.req.valid('json');
+    if (!(await visible(c, 'zv_media_collections', collId))) {
+      return c.json({ error: 'Collection not found' }, 404);
+    }
+    for (const fid of new Set(file_ids)) {
+      if (!(await visible(c, 'zv_media_files', fid))) {
+        return c.json({ error: 'File not found' }, 404);
+      }
+    }
     const existing = await (db as any)
       .selectFrom('zv_media_collection_files')
       .select('file_id')

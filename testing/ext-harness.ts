@@ -101,6 +101,29 @@ const honoP = import(join(REPO, 'node_modules/hono/dist/index.js'));
 const kyselyP = import(join(REPO, 'node_modules/kysely/dist/index.js'));
 
 /**
+ * The tenant the harness database writes to: every tenant_id column defaults to
+ * it when no tenant GUC is set, which is how the harness runs.
+ */
+const HARNESS_TENANT_ID = '00000000-0000-0000-0000-000000000001';
+
+/**
+ * A Hono app carrying what the engine's tenant middleware sets on every /ext/*
+ * request, `c.get('tenant')`. A route that scopes a check to the request's own
+ * tenant (a foreign-key parent must be the request tenant's) reads it, and
+ * without it refuses everything.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: Hono is loaded by path, untyped
+function tenantApp(Hono: any): any {
+  const app = new Hono();
+  // biome-ignore lint/suspicious/noExplicitAny: Hono context, untyped here
+  app.use('*', async (c: any, next: () => Promise<void>) => {
+    c.set('tenant', { id: HARNESS_TENANT_ID });
+    await next();
+  });
+  return app;
+}
+
+/**
  * The engine's OWN restriction code, not a copy of it.
  *
  * `ctx.db` here used to be the raw Kysely handle. In production it is a proxy
@@ -610,7 +633,7 @@ export async function mountForTest(
   // can't support them (e.g. postgis not installed) → the extension's tables
   // never materialised and DB-backed assertions must be skipped by the caller.
   const migrated = await applyMigrations(mod.default);
-  const app = new Hono();
+  const app = tenantApp(Hono);
   const publicRoutes: any[] = [];
   // `mountForTest` receives the ENGINE dir; the extension is its parent, which
   // is what names it and where its manifest lives.
@@ -672,7 +695,7 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
     it('register(app, ctx) mounts without throwing', async () => {
       const { Hono } = (await honoP) as any;
       const db = await getDb();
-      const app = new Hono();
+      const app = tenantApp(Hono);
       await ext.register(app, await makeCtx(db, { authed: true, admin: true }, undefined, await productionWiring(extDir, name, ext)));
       expect(Array.isArray(app.routes)).toBe(true);
     });
@@ -681,7 +704,7 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
       if (envUnsupported) return; // migrations env-skipped → tables absent by design
       const { Hono } = (await honoP) as any;
       const db = await getDb();
-      const app = new Hono();
+      const app = tenantApp(Hono);
       await ext.register(app, await makeCtx(db, { authed: true, admin: true }, undefined, await productionWiring(extDir, name, ext)));
       const gets: string[] = [
         ...new Set(
@@ -704,7 +727,7 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
       if (envUnsupported) return; // migrations env-skipped → tables absent by design
       const { Hono } = (await honoP) as any;
       const db = await getDb();
-      const app = new Hono();
+      const app = tenantApp(Hono);
       await ext.register(app, await makeCtx(db, { authed: true, admin: true }, undefined, await productionWiring(extDir, name, ext)));
       const posts: string[] = [
         ...new Set(
@@ -740,7 +763,7 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
       if (envUnsupported) return; // migrations env-skipped → tables absent by design
       const { Hono } = (await honoP) as any;
       const db = await getDb();
-      const app = new Hono();
+      const app = tenantApp(Hono);
       await ext.register(app, await makeCtx(db, { authed: false, admin: false }, undefined, await productionWiring(extDir, name, ext)));
       const first = (app.routes as Array<{ method: string; path: string }>).find(
         (r) => r.method === 'GET' && !r.path.includes(':') && !r.path.includes('*'),
