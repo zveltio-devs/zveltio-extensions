@@ -25198,6 +25198,12 @@ async function revokeShare(db, shareId, userId) {
 function cloudRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
   const isTenantAdmin = (userId) => ctx.internals.isTenantAdmin(userId);
+  async function visible(table, id) {
+    const row = await db.selectFrom(table).select(["id"]).where("id", "=", id).executeTakeFirst().catch(() => {
+      return;
+    });
+    return Boolean(row);
+  }
   const app = new Hono2;
   const requireAuth = async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -25290,6 +25296,12 @@ function cloudRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const data = c.req.valid("json");
+    if (data.file_id && !await visible("zv_media_files", data.file_id)) {
+      return c.json({ error: "File not found" }, 404);
+    }
+    if (data.folder_id && !await visible("zv_media_folders", data.folder_id)) {
+      return c.json({ error: "Folder not found" }, 404);
+    }
     try {
       const result = await createShareLink(db, {
         fileId: data.file_id,
@@ -25359,6 +25371,9 @@ function cloudRoutes(ctx) {
     if (existing) {
       await db.deleteFrom("zv_media_favorites").where("user_id", "=", user.id).where("file_id", "=", fileId).execute();
       return c.json({ favorited: false });
+    }
+    if (!await visible("zv_media_files", fileId)) {
+      return c.json({ error: "File not found" }, 404);
     }
     await db.insertInto("zv_media_favorites").values({ user_id: user.id, file_id: fileId, created_at: new Date }).execute();
     return c.json({ favorited: true });

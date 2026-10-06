@@ -21563,6 +21563,12 @@ function mediaRoutes(ctx) {
       return true;
     return isTenantAdmin(userId).catch(() => false);
   }
+  async function visible(table, id) {
+    const row = await db.selectFrom(table).select(["id"]).where("id", "=", id).executeTakeFirst().catch(() => {
+      return;
+    });
+    return Boolean(row);
+  }
   const router = new Hono2;
   router.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -21583,6 +21589,9 @@ function mediaRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const data = c.req.valid("json");
+    if (data.parent_id && !await visible("zv_media_folders", data.parent_id)) {
+      return c.json({ error: "Folder not found" }, 404);
+    }
     const folder = {
       id: randomUUID(),
       name: data.name,
@@ -21600,6 +21609,9 @@ function mediaRoutes(ctx) {
   })), async (c) => {
     const id = c.req.param("id");
     const data = c.req.valid("json");
+    if (data.parent_id && !await visible("zv_media_folders", data.parent_id)) {
+      return c.json({ error: "Folder not found" }, 404);
+    }
     await db.updateTable("zv_media_folders").set({ ...data, updated_at: new Date }).where("id", "=", id).execute();
     return c.json({ success: true });
   });
@@ -21675,6 +21687,9 @@ function mediaRoutes(ctx) {
     const altText = formData.get("alt_text");
     if (!file2)
       return c.json({ error: "No file provided" }, 400);
+    if (folderId && !await visible("zv_media_folders", folderId)) {
+      return c.json({ error: "Folder not found" }, 404);
+    }
     const usageResult = await db.selectFrom("zv_media_files").select(({ fn }) => fn.sum("size").as("total")).where("created_by", "=", user.id).where("deleted_at", "is", null).executeTakeFirst();
     const quotaRecord = await db.selectFrom("zv_storage_quotas").selectAll().where("user_id", "=", user.id).executeTakeFirst();
     const usedBytes = Number(usageResult?.total || 0);
@@ -21762,6 +21777,9 @@ function mediaRoutes(ctx) {
   })), async (c) => {
     const id = c.req.param("id");
     const data = c.req.valid("json");
+    if (data.folder_id && !await visible("zv_media_folders", data.folder_id)) {
+      return c.json({ error: "Folder not found" }, 404);
+    }
     await db.updateTable("zv_media_files").set({ ...data, updated_at: new Date }).where("id", "=", id).execute();
     return c.json({ success: true });
   });
@@ -21828,6 +21846,12 @@ function mediaRoutes(ctx) {
   router.post("/files/:id/tags", zValidator("json", exports_external.object({ tag_id: exports_external.string() })), async (c) => {
     const fileId = c.req.param("id");
     const { tag_id } = c.req.valid("json");
+    if (!await visible("zv_media_files", fileId)) {
+      return c.json({ error: "File not found" }, 404);
+    }
+    if (!await visible("zv_media_tags", tag_id)) {
+      return c.json({ error: "Tag not found" }, 404);
+    }
     try {
       await db.insertInto("zv_media_file_tags").values({ file_id: fileId, tag_id }).onConflict((oc) => oc.doNothing()).execute();
       return c.json({ success: true });
@@ -21871,6 +21895,9 @@ function mediaRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const data = c.req.valid("json");
+    if (data.cover_file_id && !await visible("zv_media_files", data.cover_file_id)) {
+      return c.json({ error: "File not found" }, 404);
+    }
     const coll = await db.insertInto("zv_media_collections").values({ ...data, cover_file_id: data.cover_file_id || null, created_by: user.id }).returningAll().executeTakeFirst();
     return c.json({ collection: coll }, 201);
   });
@@ -21887,6 +21914,10 @@ function mediaRoutes(ctx) {
       return c.json({ error: "Collection not found" }, 404);
     if (existing.created_by !== user.id)
       return c.json({ error: "Forbidden" }, 403);
+    const { cover_file_id } = c.req.valid("json");
+    if (cover_file_id && !await visible("zv_media_files", cover_file_id)) {
+      return c.json({ error: "File not found" }, 404);
+    }
     const updated = await db.updateTable("zv_media_collections").set({ ...c.req.valid("json"), updated_at: new Date }).where("id", "=", id).returningAll().executeTakeFirst();
     return c.json({ collection: updated });
   });
@@ -21919,6 +21950,14 @@ function mediaRoutes(ctx) {
     const user = c.get("user");
     const collId = c.req.param("id");
     const { file_ids } = c.req.valid("json");
+    if (!await visible("zv_media_collections", collId)) {
+      return c.json({ error: "Collection not found" }, 404);
+    }
+    for (const fid of new Set(file_ids)) {
+      if (!await visible("zv_media_files", fid)) {
+        return c.json({ error: "File not found" }, 404);
+      }
+    }
     const existing = await db.selectFrom("zv_media_collection_files").select("file_id").where("collection_id", "=", collId).execute();
     const existingIds = new Set(existing.map((r) => r.file_id));
     const toInsert = file_ids.filter((id) => !existingIds.has(id));
@@ -21981,3 +22020,4 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled @hono/zod-validator@0.9.1

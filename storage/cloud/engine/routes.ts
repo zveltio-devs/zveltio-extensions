@@ -21,6 +21,21 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
   // a handler is therefore already RLS-scoped — there is one spelling, so there
   // is none to forget.
 
+  /**
+   * Can this request see the row a write is about to point at? PostgreSQL checks
+   * a foreign key outside row-level security, so another tenant's file or folder
+   * id satisfied the FK: a share or favourite pointed into that tenant, and the
+   * answer told the caller the id exists. Same rule as `content/media`.
+   */
+  async function visible(table: string, id: string): Promise<boolean> {
+    const row = await (db as any)
+      .selectFrom(table)
+      .select(['id'])
+      .where('id', '=', id)
+      .executeTakeFirst()
+      .catch(() => undefined);
+    return Boolean(row);
+  }
 
   const app = new Hono();
 
@@ -141,6 +156,12 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const data = c.req.valid('json');
+    if (data.file_id && !(await visible('zv_media_files', data.file_id))) {
+      return c.json({ error: 'File not found' }, 404);
+    }
+    if (data.folder_id && !(await visible('zv_media_folders', data.folder_id))) {
+      return c.json({ error: 'Folder not found' }, 404);
+    }
 
     try {
       const result = await createShareLink(db, {
@@ -272,6 +293,9 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
       return c.json({ favorited: false });
     }
 
+    if (!(await visible('zv_media_files', fileId))) {
+      return c.json({ error: 'File not found' }, 404);
+    }
     await (db as any).insertInto('zv_media_favorites')
       .values({ user_id: user.id, file_id: fileId, created_at: new Date() })
       .execute();
