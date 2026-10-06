@@ -2,7 +2,7 @@
   "_": "See scripts/check-harness-stubs.ts. Every `ctx.internals` member the contract harness stubs, with the category that says WHICH question it answers. A member not listed here throws when a test reaches it.",
   "categories": {
     "inert-by-nature": "A stub returning `undefined` is a fair answer. The member does work that is not what the test is about, and its absence cannot make a guard pass.",
-    "fails-closed-if-stubbed": "The stub's `undefined` reads as 'no' at the call site, so a route becomes unreachable rather than unguarded. Visible when it happens \u2014 a route that always 403s gets noticed \u2014 but it hides the allow path, which is how the editor gate went untested in both directions.",
+    "fails-closed-if-stubbed": "The stub's `undefined` reads as 'no' at the call site, so a route becomes unreachable rather than unguarded. Visible when it happens — a route that always 403s gets noticed — but it hides the allow path, which is how the editor gate went untested in both directions.",
     "fails-open-if-stubbed": "The member REFUSES BY THROWING, so a stub that resolves silently means allowed. A test written to prove the refusal passes with the guard deleted. Nothing may sit here: this category exists so the word is available when triaging a new member, and an entry in it is a bug to fix, not a state to record."
   },
   "members": [
@@ -39,12 +39,7 @@
     {
       "member": "generatePDFAsync",
       "category": "inert-by-nature",
-      "reason": "queues a PDF render and returns a handle. Absent, the caller gets undefined where it expected an id \u2014 loud at the call site, and no extension test asserts on a rendered document."
-    },
-    {
-      "member": "getUserNames",
-      "category": "inert-by-nature",
-      "reason": "maps user ids to display names for rendering. workflow/approvals degrades to the id when the host cannot answer, so a stubbed undefined costs a label and cannot make a guard pass."
+      "reason": "queues a PDF render and returns a handle. Absent, the caller gets undefined where it expected an id — loud at the call site, and no extension test asserts on a rendered document."
     },
     {
       "member": "introspectSchema",
@@ -84,7 +79,7 @@
     {
       "member": "safeFetch",
       "category": "fails-closed-if-stubbed",
-      "reason": "an SSRF-guarded fetch. The stub resolves to `undefined` rather than a Response, so a caller reading `.ok` or `.json()` throws \u2014 loud, not silent. NOT fails-open: the guard is inside it and a stub performs no request at all."
+      "reason": "an SSRF-guarded fetch. The stub resolves to `undefined` rather than a Response, so a caller reading `.ok` or `.json()` throws — loud, not silent. NOT fails-open: the guard is inside it and a stub performs no request at all."
     },
     {
       "member": "scheduleFileIndexing",
@@ -95,11 +90,6 @@
       "member": "sendNotification",
       "category": "inert-by-nature",
       "reason": "writes a notification row through the engine. Extensions assert on their own tables; ai/runBackgroundTask counts the calls it makes, not the rows."
-    },
-    {
-      "member": "withTenantIsolation",
-      "category": "inert-by-nature",
-      "reason": "opens a tenant transaction and runs a callback inside it. Stubbed, the callback never runs at all — so the isolated work does not happen, rather than happening unscoped. Nothing is read or written without a tenant, which is why this is inert and not fails-open. Replaces the `runQualityScan` entry: analytics/quality now ships that scanner itself and reaches this instead, destructuring it in register(). The real behaviour is covered in that extension's own tests, where isolation is injected and the assertion is which tenant it was asked for."
     }
   ]
 }
