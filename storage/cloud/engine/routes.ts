@@ -10,6 +10,8 @@ import { getAws, presignedGetUrl, putObject, getObject, s3Url } from './lib/s3.j
 import { objectStorage } from './lib/config.js';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function cloudRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
   // Owner-or-tenant-admin, the same rule `content/media` applies to these tables.
@@ -21,19 +23,30 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
   // a handler is therefore already RLS-scoped — there is one spelling, so there
   // is none to forget.
 
+  /** The tenant the engine's middleware resolved for this request. */
+  // biome-ignore lint/suspicious/noExplicitAny: Hono context
+  const requestTenant = (c: any): string | undefined =>
+    (c.get('tenant') as { id?: string } | null | undefined)?.id;
+
   /**
    * Can this request see the row a write is about to point at? PostgreSQL checks
    * a foreign key outside row-level security, so another tenant's file or folder
    * id satisfied the FK: a share or favourite pointed into that tenant, and the
-   * answer told the caller the id exists. Same rule as `content/media`.
+   * answer told the caller the id exists. Same rule as `content/media` and the
+   * engine's `folderVisible`: the request's OWN tenant (RLS reads wider for a god
+   * or a parent tenant), and a malformed id never reaches SQL, where a failed
+   * statement would abort the request transaction (25P02).
    */
-  async function visible(table: string, id: string): Promise<boolean> {
+  // biome-ignore lint/suspicious/noExplicitAny: Hono context
+  async function visible(c: any, table: string, id: unknown): Promise<boolean> {
+    const tenant = requestTenant(c);
+    if (!tenant || typeof id !== 'string' || !UUID_RE.test(id)) return false;
     const row = await (db as any)
       .selectFrom(table)
       .select(['id'])
       .where('id', '=', id)
-      .executeTakeFirst()
-      .catch(() => undefined);
+      .where('tenant_id', '=', tenant)
+      .executeTakeFirst();
     return Boolean(row);
   }
 
@@ -156,10 +169,10 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const user = c.get('user') as any;
     const data = c.req.valid('json');
-    if (data.file_id && !(await visible('zv_media_files', data.file_id))) {
+    if (data.file_id && !(await visible(c, 'zv_media_files', data.file_id))) {
       return c.json({ error: 'File not found' }, 404);
     }
-    if (data.folder_id && !(await visible('zv_media_folders', data.folder_id))) {
+    if (data.folder_id && !(await visible(c, 'zv_media_folders', data.folder_id))) {
       return c.json({ error: 'Folder not found' }, 404);
     }
 
@@ -293,7 +306,7 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
       return c.json({ favorited: false });
     }
 
-    if (!(await visible('zv_media_files', fileId))) {
+    if (!(await visible(c, 'zv_media_files', fileId))) {
       return c.json({ error: 'File not found' }, 404);
     }
     await (db as any).insertInto('zv_media_favorites')
@@ -330,12 +343,18 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
     path: string,
     create = false,
   ): Promise<{ id: string | null } | null> {
+    // The request's own tenant, as in `visible`: a god or a parent tenant READS
+    // other tenants' folders, so "/x" could otherwise resolve to another
+    // tenant's root folder "x" — and an upload would hang under it.
+    const tenant = requestTenant(c);
+    if (!tenant) return null;
     const parts = path.split('/').filter(Boolean);
     let parentId: string | null = null;
     for (const name of parts) {
       const existing: any = await (db as any)
         .selectFrom('zv_media_folders')
         .select(['id'])
+        .where('tenant_id', '=', tenant)
         .where('name', '=', name)
         .where('deleted_at', 'is', null)
         .where((eb: any) =>
@@ -434,6 +453,7 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
     }
 
     const folder = await resolveFolder(c, path, true);
+    if (!folder) return c.json({ error: 'Folder not found' }, 404);
     const ext = file.name.includes('.') ? `.${file.name.split('.').pop()}` : '';
     const id = crypto.randomUUID();
     const filename = `${id.replace(/-/g, '')}${ext}`;

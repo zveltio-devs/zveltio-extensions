@@ -21513,6 +21513,7 @@ async function readMultipart(c) {
   }
 }
 // engine/routes.ts
+var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 var _config;
 var _aws = null;
 var _awsKey = "";
@@ -21563,10 +21564,11 @@ function mediaRoutes(ctx) {
       return true;
     return isTenantAdmin(userId).catch(() => false);
   }
-  async function visible(table, id) {
-    const row = await db.selectFrom(table).select(["id"]).where("id", "=", id).executeTakeFirst().catch(() => {
-      return;
-    });
+  async function visible(c, table, id) {
+    const tenant = c.get("tenant")?.id;
+    if (!tenant || typeof id !== "string" || !UUID_RE.test(id))
+      return false;
+    const row = await db.selectFrom(table).select(["id"]).where("id", "=", id).where("tenant_id", "=", tenant).executeTakeFirst();
     return Boolean(row);
   }
   const router = new Hono2;
@@ -21589,7 +21591,7 @@ function mediaRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const data = c.req.valid("json");
-    if (data.parent_id && !await visible("zv_media_folders", data.parent_id)) {
+    if (data.parent_id && !await visible(c, "zv_media_folders", data.parent_id)) {
       return c.json({ error: "Folder not found" }, 404);
     }
     const folder = {
@@ -21609,7 +21611,7 @@ function mediaRoutes(ctx) {
   })), async (c) => {
     const id = c.req.param("id");
     const data = c.req.valid("json");
-    if (data.parent_id && !await visible("zv_media_folders", data.parent_id)) {
+    if (data.parent_id && !await visible(c, "zv_media_folders", data.parent_id)) {
       return c.json({ error: "Folder not found" }, 404);
     }
     await db.updateTable("zv_media_folders").set({ ...data, updated_at: new Date }).where("id", "=", id).execute();
@@ -21687,7 +21689,7 @@ function mediaRoutes(ctx) {
     const altText = formData.get("alt_text");
     if (!file2)
       return c.json({ error: "No file provided" }, 400);
-    if (folderId && !await visible("zv_media_folders", folderId)) {
+    if (folderId && !await visible(c, "zv_media_folders", folderId)) {
       return c.json({ error: "Folder not found" }, 404);
     }
     const usageResult = await db.selectFrom("zv_media_files").select(({ fn }) => fn.sum("size").as("total")).where("created_by", "=", user.id).where("deleted_at", "is", null).executeTakeFirst();
@@ -21777,7 +21779,7 @@ function mediaRoutes(ctx) {
   })), async (c) => {
     const id = c.req.param("id");
     const data = c.req.valid("json");
-    if (data.folder_id && !await visible("zv_media_folders", data.folder_id)) {
+    if (data.folder_id && !await visible(c, "zv_media_folders", data.folder_id)) {
       return c.json({ error: "Folder not found" }, 404);
     }
     await db.updateTable("zv_media_files").set({ ...data, updated_at: new Date }).where("id", "=", id).execute();
@@ -21846,10 +21848,10 @@ function mediaRoutes(ctx) {
   router.post("/files/:id/tags", zValidator("json", exports_external.object({ tag_id: exports_external.string() })), async (c) => {
     const fileId = c.req.param("id");
     const { tag_id } = c.req.valid("json");
-    if (!await visible("zv_media_files", fileId)) {
+    if (!await visible(c, "zv_media_files", fileId)) {
       return c.json({ error: "File not found" }, 404);
     }
-    if (!await visible("zv_media_tags", tag_id)) {
+    if (!await visible(c, "zv_media_tags", tag_id)) {
       return c.json({ error: "Tag not found" }, 404);
     }
     try {
@@ -21895,7 +21897,7 @@ function mediaRoutes(ctx) {
   })), async (c) => {
     const user = c.get("user");
     const data = c.req.valid("json");
-    if (data.cover_file_id && !await visible("zv_media_files", data.cover_file_id)) {
+    if (data.cover_file_id && !await visible(c, "zv_media_files", data.cover_file_id)) {
       return c.json({ error: "File not found" }, 404);
     }
     const coll = await db.insertInto("zv_media_collections").values({ ...data, cover_file_id: data.cover_file_id || null, created_by: user.id }).returningAll().executeTakeFirst();
@@ -21915,7 +21917,7 @@ function mediaRoutes(ctx) {
     if (existing.created_by !== user.id)
       return c.json({ error: "Forbidden" }, 403);
     const { cover_file_id } = c.req.valid("json");
-    if (cover_file_id && !await visible("zv_media_files", cover_file_id)) {
+    if (cover_file_id && !await visible(c, "zv_media_files", cover_file_id)) {
       return c.json({ error: "File not found" }, 404);
     }
     const updated = await db.updateTable("zv_media_collections").set({ ...c.req.valid("json"), updated_at: new Date }).where("id", "=", id).returningAll().executeTakeFirst();
@@ -21950,11 +21952,11 @@ function mediaRoutes(ctx) {
     const user = c.get("user");
     const collId = c.req.param("id");
     const { file_ids } = c.req.valid("json");
-    if (!await visible("zv_media_collections", collId)) {
+    if (!await visible(c, "zv_media_collections", collId)) {
       return c.json({ error: "Collection not found" }, 404);
     }
     for (const fid of new Set(file_ids)) {
-      if (!await visible("zv_media_files", fid)) {
+      if (!await visible(c, "zv_media_files", fid)) {
         return c.json({ error: "File not found" }, 404);
       }
     }
