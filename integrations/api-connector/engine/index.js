@@ -4961,6 +4961,30 @@ var Hono2 = class extends Hono {
   }
 };
 
+// /zveltio-extension/node_modules/hono/dist/http-exception.js
+var HTTPException2 = class extends Error {
+  res;
+  status;
+  constructor(status = 500, options) {
+    super(options?.message, { cause: options?.cause });
+    this.res = options?.res;
+    this.status = status;
+  }
+  getResponse() {
+    if (this.res)
+      return new Response(this.res.body, {
+        status: this.status,
+        headers: this.res.headers
+      });
+    return new Response(this.message, { status: this.status });
+  }
+};
+
+// /zveltio-extension/node_modules/hono/dist/utils/buffer.js
+var bufferToFormData2 = (arrayBuffer, contentType) => {
+  return new Response(arrayBuffer, { headers: { "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase()) } }).formData();
+};
+
 // /zveltio-extension/node_modules/hono/dist/utils/url.js
 var tryDecode2 = (str, decoder) => {
   try {
@@ -4986,44 +5010,37 @@ var trimCookieWhitespace = (value) => {
   let end = value.length;
   while (start < end) {
     const charCode = value.charCodeAt(start);
-    if (charCode !== 32 && charCode !== 9) {
+    if (charCode !== 32 && charCode !== 9)
       break;
-    }
     start++;
   }
   while (end > start) {
     const charCode = value.charCodeAt(end - 1);
-    if (charCode !== 32 && charCode !== 9) {
+    if (charCode !== 32 && charCode !== 9)
       break;
-    }
     end--;
   }
   return start === 0 && end === value.length ? value : value.slice(start, end);
 };
 var parse = (cookie, name) => {
-  if (name && cookie.indexOf(name) === -1) {
+  if (name && cookie.indexOf(name) === -1)
     return {};
-  }
   const pairs = cookie.split(";");
-  const parsedCookie = /* @__PURE__ */ Object.create(null);
+  const parsedCookie = Object.create(null);
   for (const pairStr of pairs) {
     const valueStartPos = pairStr.indexOf("=");
-    if (valueStartPos === -1) {
+    if (valueStartPos === -1)
       continue;
-    }
     const cookieName = trimCookieWhitespace(pairStr.substring(0, valueStartPos));
-    if (name && name !== cookieName || !relaxedCookieNameRegEx.test(cookieName) || cookieName in parsedCookie) {
+    if (name && name !== cookieName || !relaxedCookieNameRegEx.test(cookieName) || cookieName in parsedCookie)
       continue;
-    }
     let cookieValue = trimCookieWhitespace(pairStr.substring(valueStartPos + 1));
-    if (cookieValue.startsWith('"') && cookieValue.endsWith('"')) {
+    if (cookieValue.startsWith('"') && cookieValue.endsWith('"'))
       cookieValue = cookieValue.slice(1, -1);
-    }
     if (validCookieValueRegEx.test(cookieValue)) {
       parsedCookie[cookieName] = tryDecodeURIComponent2(cookieValue);
-      if (name) {
+      if (name)
         break;
-      }
     }
   }
   return parsedCookie;
@@ -5033,56 +5050,18 @@ var parse = (cookie, name) => {
 var getCookie = (c, key, prefix) => {
   const cookie = c.req.raw.headers.get("Cookie");
   if (typeof key === "string") {
-    if (!cookie) {
+    if (!cookie)
       return;
-    }
     let finalKey = key;
-    if (prefix === "secure") {
+    if (prefix === "secure")
       finalKey = "__Secure-" + key;
-    } else if (prefix === "host") {
+    else if (prefix === "host")
       finalKey = "__Host-" + key;
-    }
-    const obj2 = parse(cookie, finalKey);
-    return obj2[finalKey];
+    return parse(cookie, finalKey)[finalKey];
   }
-  if (!cookie) {
+  if (!cookie)
     return {};
-  }
-  const obj = parse(cookie);
-  return obj;
-};
-
-// /zveltio-extension/node_modules/hono/dist/http-exception.js
-var HTTPException2 = class extends Error {
-  res;
-  status;
-  constructor(status = 500, options) {
-    super(options?.message, { cause: options?.cause });
-    this.res = options?.res;
-    this.status = status;
-  }
-  getResponse() {
-    if (this.res) {
-      const newResponse = new Response(this.res.body, {
-        status: this.status,
-        headers: this.res.headers
-      });
-      return newResponse;
-    }
-    return new Response(this.message, {
-      status: this.status
-    });
-  }
-};
-
-// /zveltio-extension/node_modules/hono/dist/utils/buffer.js
-var bufferToFormData2 = (arrayBuffer, contentType) => {
-  const response = new Response(arrayBuffer, {
-    headers: {
-      "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase())
-    }
-  });
-  return response.formData();
+  return parse(cookie);
 };
 
 // /zveltio-extension/node_modules/hono/dist/validator/validator.js
@@ -5095,24 +5074,21 @@ var validator = (target, validationFunc) => {
     const contentType = c.req.header("Content-Type");
     switch (target) {
       case "json":
-        if (!contentType || !jsonRegex.test(contentType)) {
+        if (!contentType || !jsonRegex.test(contentType))
           break;
-        }
         try {
           value = await c.req.json();
         } catch {
-          const message = "Malformed JSON in request body";
-          throw new HTTPException2(400, { message });
+          throw new HTTPException2(400, { message: "Malformed JSON in request body" });
         }
         break;
       case "form": {
-        if (!contentType || !(multipartRegex.test(contentType) || urlencodedRegex.test(contentType))) {
+        if (!contentType || !(multipartRegex.test(contentType) || urlencodedRegex.test(contentType)))
           break;
-        }
         let formData;
-        if (c.req.bodyCache.formData) {
+        if (c.req.bodyCache.formData)
           formData = await c.req.bodyCache.formData;
-        } else {
+        else
           try {
             const arrayBuffer = await c.req.arrayBuffer();
             formData = await bufferToFormData2(arrayBuffer, contentType);
@@ -5122,18 +5098,16 @@ var validator = (target, validationFunc) => {
             message += e instanceof Error ? ` ${e.message}` : ` ${String(e)}`;
             throw new HTTPException2(400, { message });
           }
-        }
-        const form = /* @__PURE__ */ Object.create(null);
+        const form = Object.create(null);
         formData.forEach((value2, key) => {
-          if (key.endsWith("[]")) {
+          if (key.endsWith("[]"))
             (form[key] ??= []).push(value2);
-          } else if (Array.isArray(form[key])) {
+          else if (Array.isArray(form[key]))
             form[key].push(value2);
-          } else if (Object.hasOwn(form, key)) {
+          else if (Object.hasOwn(form, key))
             form[key] = [form[key], value2];
-          } else {
+          else
             form[key] = value2;
-          }
         });
         value = form;
         break;
@@ -5151,12 +5125,10 @@ var validator = (target, validationFunc) => {
         break;
       case "cookie":
         value = getCookie(c);
-        break;
     }
     const res = await validationFunc(value, c);
-    if (res instanceof Response) {
+    if (res instanceof Response)
       return res;
-    }
     c.req.addValidatedData(target, res);
     return await next();
   };
@@ -24696,6 +24668,14 @@ async function resolveOAuth2Token(safeFetch, dbh, connectionId, authConfig) {
   }
   return authConfig.access_token ?? "";
 }
+function logBody(text) {
+  if (text.length <= 1e4) {
+    try {
+      return JSON.stringify(JSON.parse(text));
+    } catch {}
+  }
+  return JSON.stringify(text.slice(0, 1e4));
+}
 async function hmacHex(secret, body) {
   const enc = new TextEncoder;
   const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
@@ -24758,7 +24738,7 @@ function apiConnectorRoutes(ctx) {
     }
     const row = await sql`
       INSERT INTO zvd_api_connections (name, base_url, auth_type, auth_config, headers, default_headers, retry_count, timeout_ms, created_by)
-      VALUES (${d.name}, ${d.base_url}, ${d.auth_type}, ${JSON.stringify(d.auth_config)}, ${JSON.stringify(d.default_headers)}, ${JSON.stringify(d.default_headers)}, ${d.retry_count}, ${d.timeout_ms}, ${user.id})
+      VALUES (${d.name}, ${d.base_url}, ${d.auth_type}, ${JSON.stringify(d.auth_config)}::text::jsonb, ${JSON.stringify(d.default_headers)}::text::jsonb, ${JSON.stringify(d.default_headers)}::text::jsonb, ${d.retry_count}, ${d.timeout_ms}, ${user.id})
       RETURNING id, name, base_url, auth_type, is_active, retry_count, timeout_ms, created_at
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
@@ -24775,8 +24755,8 @@ function apiConnectorRoutes(ctx) {
     const row = await sql`
       UPDATE zvd_api_connections SET
         name = COALESCE(${d.name ?? null}, name),
-        auth_config = COALESCE(${d.auth_config ? JSON.stringify(d.auth_config) : null}::jsonb, auth_config),
-        default_headers = COALESCE(${d.default_headers ? JSON.stringify(d.default_headers) : null}::jsonb, default_headers),
+        auth_config = COALESCE(${d.auth_config ? JSON.stringify(d.auth_config) : null}::text::jsonb, auth_config),
+        default_headers = COALESCE(${d.default_headers ? JSON.stringify(d.default_headers) : null}::text::jsonb, default_headers),
         is_active = COALESCE(${d.is_active ?? null}, is_active),
         retry_count = COALESCE(${d.retry_count ?? null}, retry_count),
         timeout_ms = COALESCE(${d.timeout_ms ?? null}, timeout_ms),
@@ -24826,7 +24806,7 @@ function apiConnectorRoutes(ctx) {
     const row = await sql`
       INSERT INTO zvd_api_endpoints (connection_id, name, method, path, description, default_body, default_headers, response_mapping, created_by)
       VALUES (${c.req.param("id")}, ${d.name}, ${d.method}, ${d.path}, ${d.description ?? null},
-        ${d.default_body ?? null}, ${JSON.stringify(d.default_headers)}, ${JSON.stringify(d.response_mapping)}, ${user.id})
+        ${d.default_body ?? null}, ${JSON.stringify(d.default_headers)}::text::jsonb, ${JSON.stringify(d.response_mapping)}::text::jsonb, ${user.id})
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
@@ -24866,7 +24846,8 @@ function apiConnectorRoutes(ctx) {
     const user = c.get("user");
     const d = c.req.valid("json");
     const ep = await sql`
-      SELECT e.*, conn.base_url, conn.auth_type, conn.auth_config, conn.default_headers,
+      SELECT e.*, conn.base_url, conn.auth_type, conn.auth_config,
+        conn.default_headers AS conn_default_headers,
         conn.retry_count, conn.timeout_ms
       FROM zvd_api_endpoints e
       JOIN zvd_api_connections conn ON conn.id = e.connection_id
@@ -24881,9 +24862,10 @@ function apiConnectorRoutes(ctx) {
     }
     const qs = new URLSearchParams(d.query_params).toString();
     const url2 = endpoint.base_url.replace(/\/$/, "") + path + (qs ? `?${qs}` : "");
-    const connHeaders = JSON.parse(typeof endpoint.default_headers === "string" ? endpoint.default_headers : JSON.stringify(endpoint.default_headers));
-    const epHeaders = JSON.parse(typeof endpoint.default_headers_ep === "string" ? endpoint.default_headers_ep || "{}" : "{}");
-    const authConfig = JSON.parse(typeof endpoint.auth_config === "string" ? endpoint.auth_config : JSON.stringify(endpoint.auth_config));
+    const asObject = (v) => typeof v === "string" ? JSON.parse(v || "{}") : v ?? {};
+    const connHeaders = asObject(endpoint.conn_default_headers);
+    const epHeaders = asObject(endpoint.default_headers);
+    const authConfig = asObject(endpoint.auth_config);
     const headers = { "Content-Type": "application/json", ...connHeaders, ...epHeaders, ...d.headers };
     if (endpoint.auth_type === "bearer") {
       headers["Authorization"] = `Bearer ${authConfig.token}`;
@@ -24911,8 +24893,8 @@ function apiConnectorRoutes(ctx) {
     await sql`
       INSERT INTO zvd_api_logs (endpoint_id, user_id, url, method, request_body, response_status, response_body, duration_ms, error_message, retry_count)
       VALUES (${endpoint.id}, ${user.id}, ${url2}, ${endpoint.method},
-        ${d.body ? JSON.stringify(d.body) : null}, ${status_code},
-        ${response_body.slice(0, 1e4)}, ${duration_ms}, ${fetchError}, ${retries})
+        ${d.body ? JSON.stringify(d.body) : null}::text::jsonb, ${status_code},
+        ${logBody(response_body)}::text::jsonb, ${duration_ms}, ${fetchError}, ${retries})
     `.execute(db);
     if (fetchError)
       return c.json({ error: fetchError }, 502);
@@ -25003,7 +24985,7 @@ function apiConnectorRoutes(ctx) {
     await db.transaction().execute(async (trx) => {
       await sql`
         INSERT INTO zvd_webhook_events (webhook_id, payload, headers, source_ip)
-        VALUES (${w.id}, ${JSON.stringify(payload)}, ${JSON.stringify(headers)}, ${c.req.header("x-forwarded-for") ?? null})
+        VALUES (${w.id}, ${JSON.stringify(payload)}::text::jsonb, ${JSON.stringify(headers)}::text::jsonb, ${c.req.header("x-forwarded-for") ?? null})
       `.execute(trx);
       await sql`UPDATE zvd_incoming_webhooks SET last_received_at = NOW() WHERE id = ${w.id}`.execute(trx);
     });
@@ -25029,7 +25011,8 @@ var extension = {
     return [
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
-      join(import.meta.dir, "migrations/003_tenant_scoped_unique_keys.sql")
+      join(import.meta.dir, "migrations/003_tenant_scoped_unique_keys.sql"),
+      join(import.meta.dir, "migrations/004_jsonb_unwrap_string.sql")
     ];
   },
   async register(app, ctx) {
@@ -25041,3 +25024,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
