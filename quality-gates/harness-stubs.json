@@ -69,7 +69,7 @@
     {
       "member": "requireInstanceAdmin",
       "category": "fails-closed-if-stubbed",
-      "reason": "returns a boolean; `undefined` is falsy, so developer/database answers 403 on every route. DELIBERATELY not aliased to the harness's `admin` switch: instance-wide power is a different thing from tenant-admin, and a test needing it should say so rather than inherit a tenant-level answer."
+      "reason": "returns a boolean; `undefined` is falsy, so a route gated on it (content/pages' editor) answers 403. DELIBERATELY not aliased to the harness's `admin` switch: instance-wide power is a different thing from tenant-admin, and a test needing it should say so rather than inherit a tenant-level answer."
     },
     {
       "member": "runEdgeFunction",
