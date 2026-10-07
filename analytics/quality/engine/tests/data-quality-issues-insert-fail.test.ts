@@ -39,7 +39,6 @@ describe('runQualityScan — issues insert failure', () => {
       'contacts',
       'duplicates',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     const end = await awaitScanEnd(db);

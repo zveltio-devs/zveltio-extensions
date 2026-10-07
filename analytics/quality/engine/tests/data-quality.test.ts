@@ -54,7 +54,6 @@ describe('runQualityScan — lifecycle', () => {
       'contacts',
       'full',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     expect(scanId).toBe(SCAN_ID);
@@ -74,7 +73,6 @@ describe('runQualityScan — lifecycle', () => {
         'contacts',
         'full',
         'user-1',
-        undefined,
         '00000000-0000-0000-0000-0000000000aa',
       ),
     ).rejects.toThrow('Failed to create quality scan record');
@@ -93,31 +91,30 @@ describe('runQualityScan — lifecycle', () => {
       'contacts',
       'full',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     const end = await awaitScanEnd(db);
     expect(end.parameters).toContain('failed');
   });
 
-  it('scopes the scan to the tenant schema when one is passed', async () => {
+  it('scans zvd_<collection>, and leaves installing pg_trgm to the engine', async () => {
+    // Tenants are rows under RLS, not schemas (engine #866): there is no schema
+    // to qualify the table with. And `CREATE EXTENSION` is a statement `ctx.db`
+    // refuses from an extension (engine #871); the engine installs pg_trgm.
     const db = setup('contacts', [{ name: 'email', type: 'email' }]);
     await runQualityScan(
       asDb(db),
       'contacts',
       'duplicates',
       'user-1',
-      't_acme',
       '00000000-0000-0000-0000-0000000000aa',
     );
     await awaitScanEnd(db);
 
     const dupQueries = db.executed(/similarity/);
     expect(dupQueries.length).toBeGreaterThan(0);
-    // sql.id() quotes the dotted name as ONE identifier — this pins the
-    // current behavior; the tenantSchema path needs sql.table()/split to
-    // actually resolve a schema-qualified table.
-    expect(dupQueries[0]!.sql).toContain('"t_acme.zvd_contacts"');
+    expect(dupQueries[0]!.sql).toContain('"zvd_contacts"');
+    expect(db.executed(/create extension/i)).toEqual([]);
   });
 
   it('runs the scan under the tenant it was given, not another', async () => {
@@ -131,7 +128,7 @@ describe('runQualityScan — lifecycle', () => {
     // The GUC itself stays the engine's to prove; 16 engine tests cover
     // `withTenantIsolation` today.
     const db = setup('contacts', []);
-    await runQualityScan(asDb(db), 'contacts', 'full', 'user-1', undefined, 'tenant-42');
+    await runQualityScan(asDb(db), 'contacts', 'full', 'user-1', 'tenant-42');
     await awaitScanEnd(db);
 
     expect(runQualityScan.tenants).toEqual(['tenant-42']);
@@ -155,7 +152,6 @@ describe('duplicate detection', () => {
       'contacts',
       'full',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     await awaitScanEnd(db);
@@ -175,7 +171,6 @@ describe('duplicate detection', () => {
       'contacts',
       'duplicates',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     const end = await awaitScanEnd(db);
@@ -196,7 +191,6 @@ describe('duplicate detection', () => {
       'contacts',
       'duplicates',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     await awaitScanEnd(db);
@@ -225,7 +219,6 @@ describe('missing-data detection', () => {
       'contacts',
       'missing_data',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     await awaitScanEnd(db);
@@ -251,7 +244,6 @@ describe('missing-data detection', () => {
       'contacts',
       'missing_data',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     await awaitScanEnd(db);
@@ -271,7 +263,6 @@ describe('missing-data detection', () => {
       'contacts',
       'missing_data',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     await awaitScanEnd(db);
@@ -295,7 +286,6 @@ describe('missing-data detection', () => {
       'contacts',
       'missing_data',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     await awaitScanEnd(db);
@@ -326,7 +316,6 @@ describe('outlier detection', () => {
       'orders',
       'anomalies',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     await awaitScanEnd(db);
@@ -350,7 +339,6 @@ describe('outlier detection', () => {
       'orders',
       'anomalies',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     await awaitScanEnd(db);
@@ -390,7 +378,6 @@ describe('AI normalization pass', () => {
       'contacts',
       'normalization',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     await awaitScanEnd(db);
@@ -412,7 +399,6 @@ describe('AI normalization pass', () => {
       'contacts',
       'normalization',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     const end = await awaitScanEnd(db);
@@ -431,7 +417,6 @@ describe('AI normalization pass', () => {
       'contacts',
       'normalization',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     await awaitScanEnd(db);
@@ -453,7 +438,6 @@ describe('AI normalization pass', () => {
       'contacts',
       'normalization',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     await awaitScanEnd(db);
@@ -478,7 +462,6 @@ describe('AI normalization pass', () => {
       'contacts',
       'normalization',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     await awaitScanEnd(db);
@@ -500,7 +483,6 @@ describe('scan-type routing', () => {
       'contacts',
       'duplicates',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     await awaitScanEnd(db);
@@ -520,7 +502,6 @@ describe('scan-type routing', () => {
       'contacts',
       'full',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     await awaitScanEnd(db);
@@ -540,7 +521,6 @@ describe('scan-type routing', () => {
       'contacts',
       'full',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     const end = await awaitScanEnd(db);

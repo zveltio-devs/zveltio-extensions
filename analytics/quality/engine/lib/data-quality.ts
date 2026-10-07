@@ -91,7 +91,9 @@ async function detectDuplicates(
     .slice(0, 3);
   if (textFields.length === 0) return issues;
 
-  await sql`CREATE EXTENSION IF NOT EXISTS pg_trgm`.execute(db).catch(() => {});
+  // `similarity()` is pg_trgm's, which the engine installs (its migration 059).
+  // This used to `CREATE EXTENSION` here: a statement `ctx.db` refuses from an
+  // extension (engine #871), swallowed by a `.catch`.
 
   for (const field of textFields) {
     try {
@@ -439,11 +441,10 @@ export async function runQualityScan(
     userId: string;
     /** The firm whose data is scanned. Required — see above. */
     tenantId: string;
-    tenantSchema?: string;
   },
 ): Promise<string> {
   const { db, withTenantIsolation } = deps;
-  const { collection, scanType, userId, tenantSchema } = params;
+  const { collection, scanType, userId } = params;
   const scanTenant = params.tenantId;
   const scan = await db
     .insertInto('zv_quality_scans')
@@ -453,7 +454,9 @@ export async function runQualityScan(
 
   if (!scan) throw new Error('Failed to create quality scan record');
   const scanId: string = scan.id;
-  const tableName = tenantSchema ? `${tenantSchema}.zvd_${collection}` : `zvd_${collection}`;
+  // One schema: tenants are rows under RLS, not schemas (engine #866), so the
+  // table is always `zvd_<collection>`.
+  const tableName = `zvd_${collection}`;
 
   // The scan reads FORCE-RLS'd collection rows, so it must run inside a tenant
   // transaction (the GUC), or it sees zero rows. Holds one connection for the

@@ -48,7 +48,6 @@ describe('outlier detection — stats query failure', () => {
       'orders',
       'anomalies',
       'user-1',
-      undefined,
       '00000000-0000-0000-0000-0000000000aa',
     );
     await awaitScanEnd(db);
