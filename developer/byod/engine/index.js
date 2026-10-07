@@ -24749,12 +24749,8 @@ function introspectRoutes(ctx) {
     return c.json({ history: rows.rows });
   });
   router.get("/stats", async (c) => {
-    const [importedRes, lastScanRes, profilesRes] = await Promise.all([
-      sql`
-        SELECT COUNT(*)::int AS total
-        FROM zvd_collections
-        WHERE is_managed = false
-      `.execute(db),
+    const [collections, lastScanRes, profilesRes] = await Promise.all([
+      ctx.DDLManager.getCollections(db),
       sql`
         SELECT created_at FROM zvd_byod_scan_history
         ORDER BY created_at DESC LIMIT 1
@@ -24764,7 +24760,7 @@ function introspectRoutes(ctx) {
       `.execute(db)
     ]);
     return c.json({
-      imported_tables: importedRes.rows[0]?.total ?? 0,
+      imported_tables: collections.filter((col) => col.is_managed === false).length,
       last_scan_at: lastScanRes.rows[0]?.created_at ?? null,
       profiles_count: profilesRes.rows[0]?.total ?? 0
     });
@@ -24791,3 +24787,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
