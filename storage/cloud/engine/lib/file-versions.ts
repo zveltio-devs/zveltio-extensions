@@ -120,7 +120,7 @@ export async function createFileVersion(
  * throws `File not found`. Two functions on the same table, one guarded.
  */
 export async function listFileVersions(db: Database, fileId: string) {
-  return sql`
+  return sql<Record<string, unknown>>`
     SELECT v.*
     FROM zv_media_versions v
     INNER JOIN zv_media_files f ON f.id = v.file_id
