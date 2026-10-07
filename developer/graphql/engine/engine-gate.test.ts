@@ -47,6 +47,7 @@ d('developer/graphql — the engine read gate, not a copy of half of it', () => 
     const harness = (await import(join(ENGINE, 'testing', 'app-harness.js'))) as Any;
     const { sql } = (await import(join(ENGINE, '..', 'node_modules', 'kysely', 'dist', 'index.js'))) as Any;
     const data = (await import(join(ENGINE, 'lib', 'data', 'index.js'))) as Any;
+    const { engineHandle } = (await import(join(ENGINE, 'lib', 'engine-handle.js'))) as Any;
     const tenancy = (await import(join(ENGINE, 'lib', 'tenancy', 'index.js'))) as Any;
     const { engineEvents } = (await import(join(ENGINE, 'lib', 'runtime', 'index.js'))) as Any;
     const { buildExtensionInternals } = (await import(join(ENGINE, 'lib', 'extensions', 'internals.js'))) as Any;
@@ -109,7 +110,12 @@ d('developer/graphql — the engine read gate, not a copy of half of it', () => 
       auth: getAuth(),
       checkPermission: tenancy.checkPermission,
       getUserRoles: async () => [],
-      DDLManager: data.DDLManager,
+      // As `register.ts` hands it over: the helper's own SQL on the engine's view
+      // of whatever handle the extension passes (`engineSqlHelper`).
+      DDLManager: new Proxy(data.DDLManager, {
+        get: (t: Any, p: string) =>
+          typeof t[p] === 'function' ? (...a: Any[]) => t[p](...a.map(engineHandle)) : t[p],
+      }),
       internals: gateInternals('developer/graphql', buildExtensionInternals(), manifest.permissions ?? []),
     };
     const { Hono } = (await import(join(import.meta.dir, '..', '..', '..', 'node_modules', 'hono', 'dist', 'index.js'))) as Any;
