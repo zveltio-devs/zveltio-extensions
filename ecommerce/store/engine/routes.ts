@@ -40,9 +40,13 @@ async function withOrderNumberRetry<T>(fn: () => Promise<T>, maxAttempts = 5): P
     try {
       return await fn();
     } catch (err) {
-      const pgErr = err as { code?: string; constraint?: string };
+      // SQLSTATE is on `errno` under Bun.SQL, the engine's driver — its `code`
+      // is the generic ERR_POSTGRES_SERVER_ERROR — and on `code` under `pg`.
+      // Reading `code` alone made this retry dead in production.
+      const pgErr = err as { code?: string; errno?: string; constraint?: string };
       const isOrderNumberClash =
-        pgErr?.code === '23505' && String(pgErr?.constraint ?? '').includes('order_number');
+        String(pgErr?.errno ?? pgErr?.code) === '23505' &&
+        String(pgErr?.constraint ?? '').includes('order_number');
       if (!isOrderNumberClash || attempt >= maxAttempts) throw err;
     }
   }
@@ -192,7 +196,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     const row = await sql`
       INSERT INTO zvd_ec_abandoned_carts (session_id, customer_email, customer_name, items, subtotal)
-      VALUES (${d.session_id}, ${d.customer_email ?? null}, ${d.customer_name ?? null}, ${JSON.stringify(d.items)}, ${d.subtotal})
+      VALUES (${d.session_id}, ${d.customer_email ?? null}, ${d.customer_name ?? null}, ${JSON.stringify(d.items)}::text::jsonb, ${d.subtotal})
       ON CONFLICT (session_id) DO UPDATE SET items = EXCLUDED.items, subtotal = EXCLUDED.subtotal,
         customer_email = COALESCE(EXCLUDED.customer_email, zvd_ec_abandoned_carts.customer_email),
         updated_at = NOW()
@@ -453,7 +457,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     const row = await sql`
       INSERT INTO zvd_ec_product_variants (product_id, sku, name, attributes, price, compare_price, cost, stock_qty, weight, image_url, sort_order)
-      VALUES (${c.req.param('id')}, ${d.sku}, ${d.name}, ${JSON.stringify(d.attributes)},
+      VALUES (${c.req.param('id')}, ${d.sku}, ${d.name}, ${JSON.stringify(d.attributes)}::text::jsonb,
         ${d.price ?? null}, ${d.compare_price ?? null}, ${d.cost ?? null}, ${d.stock_qty},
         ${d.weight ?? null}, ${d.image_url ?? null}, ${d.sort_order})
       RETURNING *
@@ -509,7 +513,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     const d = c.req.valid('json');
     const row = await sql`
       INSERT INTO zvd_ec_shipping_zones (name, countries, regions, sort_order, created_by)
-      VALUES (${d.name}, ${JSON.stringify(d.countries)}, ${JSON.stringify(d.regions)}, ${d.sort_order}, ${user.id})
+      VALUES (${d.name}, ${d.countries}, ${d.regions}, ${d.sort_order}, ${user.id})
       RETURNING *
     `.execute(db);
     return c.json({ data: row.rows[0] }, 201);
@@ -685,8 +689,8 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
         INSERT INTO zvd_ec_orders (order_number, customer_email, customer_name, canonical_contact_id, billing_address, shipping_address,
           payment_method, currency, subtotal, shipping_cost, discount, tax_amount, total,
           coupon_code, shipping_zone_id, notes, created_by)
-        VALUES (${orderNumber}, ${d.customer_email}, ${d.customer_name}, ${canonicalContactId}, ${JSON.stringify(d.billing_address)},
-          ${JSON.stringify(d.shipping_address)}, ${d.payment_method ?? null}, ${d.currency},
+        VALUES (${orderNumber}, ${d.customer_email}, ${d.customer_name}, ${canonicalContactId}, ${JSON.stringify(d.billing_address)}::text::jsonb,
+          ${JSON.stringify(d.shipping_address)}::text::jsonb, ${d.payment_method ?? null}, ${d.currency},
           ${subtotal}, ${shippingCost}, ${discount}, ${taxAmount}, ${total},
           ${couponCode}, ${shippingZoneId}, ${d.notes ?? null}, 'guest')
         RETURNING *
