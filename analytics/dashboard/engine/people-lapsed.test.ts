@@ -8,7 +8,6 @@
 // The single-tenant test runs FIRST: it needs the default tenant to be the only
 // one, and the tests after it add more.
 import { afterAll, describe, expect, it } from 'bun:test';
-import { join } from 'node:path';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import { Pool } from 'pg';
 import { mountForTest } from '../../../testing/ext-harness';
@@ -53,18 +52,9 @@ d('analytics/dashboard — people counts only memberships in force', () => {
 
   /** The `people` card as the host serves it to a request resolved to `tenant`. */
   const people = async (tenant: string): Promise<People> => {
-    const { app } = await mountForTest(import.meta.dir);
-    // biome-ignore lint/suspicious/noExplicitAny: the bundled Hono has no types here
-    const { Hono } = (await import(join(import.meta.dir, '../../../node_modules/hono/dist/index.js'))) as any;
-    // The host puts the resolved tenant on the context before the extension runs.
-    const outer = new Hono();
-    // biome-ignore lint/suspicious/noExplicitAny: Hono context
-    outer.use('*', async (c: any, next: () => Promise<void>) => {
-      c.set('tenant', { id: tenant });
-      await next();
-    });
-    outer.route('/', app);
-    const res = await outer.request('/', {
+    // The request runs as `tenant`, as the engine's tenant middleware makes it.
+    const { app } = await mountForTest(import.meta.dir, { tenant });
+    const res = await app.request('/', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ widgets: ['people'] }),

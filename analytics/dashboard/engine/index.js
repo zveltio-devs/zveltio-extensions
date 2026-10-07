@@ -24629,12 +24629,11 @@ async function setUserLayout(db, userId, widgets, checkPermission) {
   await writeLayout(db, "user", userId, withMandatory, userId);
   return withMandatory;
 }
-var countOf = (label, p) => p.then((r) => Number(r.rows[0]?.count ?? 0)).catch((err) => {
-  console.error(`[dashboard] widget count "${label}" failed: ${err instanceof Error ? err.message : String(err)}`);
-  return 0;
-});
-var DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
-async function computeWidgetData(db, ids, config2, tenantId) {
+var failed = (label, fallback) => (err) => {
+  console.error(`[dashboard] widget "${label}" failed: ${err instanceof Error ? err.message : String(err)}`);
+  return fallback;
+};
+async function computeWidgetData(db, ids, config2, facts) {
   const want = new Set(ids);
   const out = {};
   const tasks = [];
@@ -24642,71 +24641,39 @@ async function computeWidgetData(db, ids, config2, tenantId) {
     tasks.push(p.then((v) => void (out[id] = v)));
   };
   if (want.has("welcome")) {
-    set2("welcome", sql`
-        SELECT value FROM zv_settings WHERE key IN ('company_name','app_name','site_name') LIMIT 1
-      `.execute(db).then((r) => {
-      const raw2 = r.rows[0]?.value;
-      let org = null;
-      if (typeof raw2 === "string") {
-        try {
-          const v = JSON.parse(raw2);
-          org = typeof v === "string" ? v : raw2;
-        } catch {
-          org = raw2;
-        }
+    set2("welcome", (async () => {
+      for (const key of ["company_name", "app_name", "site_name"]) {
+        const v = await facts.getPublicSetting(key);
+        if (typeof v === "string" && v)
+          return { organization: v };
       }
-      return { organization: org ?? "Your organization" };
-    }).catch((err) => {
-      console.error(`[dashboard] widget "welcome" failed: ${err instanceof Error ? err.message : String(err)}`);
       return { organization: "Your organization" };
-    }));
+    })().catch(failed("welcome", { organization: "Your organization" })));
   }
   if (want.has("health")) {
     set2("health", sql`SELECT 1`.execute(db).then(() => ({ ok: true, database: true })).catch(() => ({ ok: false, database: false })));
   }
   if (want.has("people")) {
-    const tenants = await sql`SELECT COUNT(*)::int AS n FROM zv_tenants`.execute(db);
-    const wholeInstance = tenantId === DEFAULT_TENANT_ID && (tenants.rows[0]?.n ?? 0) <= 1;
-    const inForce = sql`valid_from <= now() AND (valid_to IS NULL OR valid_to > now())`;
-    const total = wholeInstance ? countOf("user", sql`SELECT COUNT(*) AS count FROM "user"`.execute(db)) : countOf("zv_tenant_users", sql`
-          SELECT COUNT(*) AS count FROM zv_tenant_users
-           WHERE tenant_id = ${tenantId}::uuid AND ${inForce}
-        `.execute(db));
-    const admins = wholeInstance ? countOf("user", sql`
-          SELECT COUNT(*) AS count FROM "user" WHERE role IN ('god', 'admin')
-        `.execute(db)) : countOf("zv_tenant_users", sql`
-          SELECT COUNT(*) AS count FROM zv_tenant_users
-           WHERE tenant_id = ${tenantId}::uuid AND role IN ('owner', 'admin') AND ${inForce}
-        `.execute(db));
-    set2("people", Promise.all([total, admins]).then(([t, a]) => ({ total: t, admins: a })));
+    set2("people", facts.countMembers().catch(failed("people", { total: 0, admins: 0 })));
   }
   if (want.has("data")) {
-    set2("data", Promise.all([
-      countOf("pg_class", sql`
-            SELECT COALESCE(SUM(reltuples), 0)::bigint AS count
-            FROM pg_class WHERE relkind = 'r' AND relname LIKE 'zvd_%'
-          `.execute(db)),
-      countOf("zvd_collections", sql`SELECT COUNT(*) AS count FROM zvd_collections`.execute(db))
-    ]).then(([records_estimate, collections]) => ({ records_estimate, collections })));
+    set2("data", facts.getDataStats().then((s) => ({ records_estimate: s.records_estimate, collections: s.collections })).catch(failed("data", { records_estimate: null, collections: 0 })));
   }
   if (want.has("activity")) {
+    const midnight = new Date;
+    midnight.setHours(0, 0, 0, 0);
     set2("activity", Promise.all([
-      countOf("zv_audit_log", sql`SELECT COUNT(*) AS count FROM zv_audit_log WHERE created_at >= CURRENT_DATE`.execute(db)),
-      sql`
-          SELECT event_type, user_id, resource_type, resource_id, created_at
-          FROM zv_audit_log ORDER BY created_at DESC LIMIT 6
-        `.execute(db).then((r) => r.rows).catch((err) => {
-        console.error(`[dashboard] recent activity failed: ${err instanceof Error ? err.message : String(err)}`);
-        return [];
-      })
+      facts.countAuditActivity({ since: midnight }).catch(failed("activity", 0)),
+      facts.readAuditActivity({ limit: 6 }).catch(failed("activity", []))
     ]).then(([today, recent]) => ({ today, recent })));
   }
   if (want.has("trust")) {
-    const lastOf = (label, table) => sql`SELECT MAX(created_at)::text AS ts FROM ${sql.raw(table)}`.execute(db).then((r) => r.rows[0]?.ts ?? null).catch((err) => {
-      console.error(`[dashboard] trust "${label}" failed: ${err instanceof Error ? err.message : String(err)}`);
-      return null;
-    });
-    set2("trust", Promise.all([lastOf("last_backup", "zv_backups"), lastOf("audit_log", "zv_audit_log")]).then(([last_backup, last_audit_entry]) => ({
+    const lastBackup = sql`SELECT MAX(created_at)::text AS ts FROM zv_backups`.execute(db).then((r) => r.rows[0]?.ts ?? null).catch(failed("trust", null));
+    const lastAudit = facts.readAuditActivity({ limit: 1 }).then((rows) => {
+      const at = rows[0]?.created_at;
+      return at ? new Date(at).toISOString() : null;
+    }).catch(failed("trust", null));
+    set2("trust", Promise.all([lastBackup, lastAudit]).then(([last_backup, last_audit_entry]) => ({
       encryption: config2?.encryptionConfigured ?? false,
       audit_log: last_audit_entry !== null,
       last_audit_entry,
@@ -24719,7 +24686,6 @@ async function computeWidgetData(db, ids, config2, tenantId) {
 }
 function dashboardRoutes(ctx) {
   const { db, auth, checkPermission, getUserRoles } = ctx;
-  const tenantOf = (c) => c.get("tenant")?.id ?? DEFAULT_TENANT_ID;
   const userId = (c) => c.get("user").id;
   const app = new Hono2;
   app.use("*", async (c, next) => {
@@ -24732,7 +24698,7 @@ function dashboardRoutes(ctx) {
   app.get("/", async (c) => {
     const uid = userId(c);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
-    const data = await computeWidgetData(db, resolved.widgets, ctx.config, tenantOf(c));
+    const data = await computeWidgetData(db, resolved.widgets, ctx.config, ctx.internals);
     return c.json({
       widgets: resolved.widgets,
       available: resolved.available,
@@ -24744,7 +24710,7 @@ function dashboardRoutes(ctx) {
   app.put("/", zValidator("json", exports_external.object({ widgets: exports_external.array(exports_external.string()).max(50) })), async (c) => {
     const uid = userId(c);
     const saved = await setUserLayout(db, uid, c.req.valid("json").widgets, checkPermission);
-    const data = await computeWidgetData(db, saved, ctx.config, tenantOf(c));
+    const data = await computeWidgetData(db, saved, ctx.config, ctx.internals);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
     return c.json({
       widgets: saved,
@@ -24758,7 +24724,7 @@ function dashboardRoutes(ctx) {
     const uid = userId(c);
     await deleteUserLayout(db, uid);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
-    const data = await computeWidgetData(db, resolved.widgets, ctx.config, tenantOf(c));
+    const data = await computeWidgetData(db, resolved.widgets, ctx.config, ctx.internals);
     return c.json({
       widgets: resolved.widgets,
       available: resolved.available,
@@ -24771,13 +24737,7 @@ function dashboardRoutes(ctx) {
   app.get("/admin/catalog", async (c) => {
     if (!await requireAdmin(c))
       return c.json({ error: "Forbidden" }, 403);
-    const rolesRes = await sql`
-      SELECT DISTINCT v1 AS role FROM zvd_permissions WHERE ptype = 'g' AND v1 IS NOT NULL
-    `.execute(db).catch((err) => {
-      console.error(`[dashboard] listing roles failed: ${err instanceof Error ? err.message : String(err)}`);
-      return { rows: [] };
-    });
-    const roles = rolesRes.rows.map((r) => r.role).filter(Boolean);
+    const roles = (await ctx.internals.listRoles().catch(failed("roles", []))).filter(Boolean);
     return c.json({
       catalog: WIDGET_CATALOG.map((w) => ({ id: w.id, removable: w.removable, permission: w.permission })),
       roles,
