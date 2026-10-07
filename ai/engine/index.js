@@ -10311,17 +10311,18 @@ async function createCacheSecondaryStorage() {
   const cache = getCache() ?? await initCache();
   if (!cache)
     return null;
-  return {
-    get: async (key, _ttl) => {
-      const value = await cache.get(key);
-      if (!value)
-        return null;
-      try {
-        return JSON.parse(value);
-      } catch {
-        return null;
-      }
-    },
+  const parse6 = (value) => {
+    if (!value)
+      return null;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  };
+  const storage = {
+    get: async (key, _ttl) => parse6(await cache.get(key)),
+    getAndDelete: async (key) => parse6(await cache.getdel(key)),
     set: async (key, value, ttl = 300) => {
       await cache.setex(key, ttl, JSON.stringify(value));
     },
@@ -10354,6 +10355,7 @@ async function createCacheSecondaryStorage() {
       return results.map((r) => r[0] ? null : r[1]);
     }
   };
+  return storage;
 }
 var import_ioredis, _cache = null;
 var init_cache = __esm(() => {
@@ -11892,30 +11894,6 @@ var Hono2 = class extends Hono {
   }
 };
 
-// /zveltio-extension/node_modules/hono/dist/http-exception.js
-var HTTPException2 = class extends Error {
-  res;
-  status;
-  constructor(status = 500, options) {
-    super(options?.message, { cause: options?.cause });
-    this.res = options?.res;
-    this.status = status;
-  }
-  getResponse() {
-    if (this.res)
-      return new Response(this.res.body, {
-        status: this.status,
-        headers: this.res.headers
-      });
-    return new Response(this.message, { status: this.status });
-  }
-};
-
-// /zveltio-extension/node_modules/hono/dist/utils/buffer.js
-var bufferToFormData2 = (arrayBuffer, contentType) => {
-  return new Response(arrayBuffer, { headers: { "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase()) } }).formData();
-};
-
 // /zveltio-extension/node_modules/hono/dist/utils/url.js
 var tryDecode2 = (str, decoder) => {
   try {
@@ -11941,37 +11919,44 @@ var trimCookieWhitespace = (value) => {
   let end = value.length;
   while (start < end) {
     const charCode = value.charCodeAt(start);
-    if (charCode !== 32 && charCode !== 9)
+    if (charCode !== 32 && charCode !== 9) {
       break;
+    }
     start++;
   }
   while (end > start) {
     const charCode = value.charCodeAt(end - 1);
-    if (charCode !== 32 && charCode !== 9)
+    if (charCode !== 32 && charCode !== 9) {
       break;
+    }
     end--;
   }
   return start === 0 && end === value.length ? value : value.slice(start, end);
 };
 var parse = (cookie, name) => {
-  if (name && cookie.indexOf(name) === -1)
+  if (name && cookie.indexOf(name) === -1) {
     return {};
+  }
   const pairs = cookie.split(";");
-  const parsedCookie = Object.create(null);
+  const parsedCookie = /* @__PURE__ */ Object.create(null);
   for (const pairStr of pairs) {
     const valueStartPos = pairStr.indexOf("=");
-    if (valueStartPos === -1)
+    if (valueStartPos === -1) {
       continue;
+    }
     const cookieName = trimCookieWhitespace(pairStr.substring(0, valueStartPos));
-    if (name && name !== cookieName || !relaxedCookieNameRegEx.test(cookieName) || cookieName in parsedCookie)
+    if (name && name !== cookieName || !relaxedCookieNameRegEx.test(cookieName) || cookieName in parsedCookie) {
       continue;
+    }
     let cookieValue = trimCookieWhitespace(pairStr.substring(valueStartPos + 1));
-    if (cookieValue.startsWith('"') && cookieValue.endsWith('"'))
+    if (cookieValue.startsWith('"') && cookieValue.endsWith('"')) {
       cookieValue = cookieValue.slice(1, -1);
+    }
     if (validCookieValueRegEx.test(cookieValue)) {
       parsedCookie[cookieName] = tryDecodeURIComponent2(cookieValue);
-      if (name)
+      if (name) {
         break;
+      }
     }
   }
   return parsedCookie;
@@ -11981,18 +11966,56 @@ var parse = (cookie, name) => {
 var getCookie = (c, key, prefix) => {
   const cookie = c.req.raw.headers.get("Cookie");
   if (typeof key === "string") {
-    if (!cookie)
+    if (!cookie) {
       return;
+    }
     let finalKey = key;
-    if (prefix === "secure")
+    if (prefix === "secure") {
       finalKey = "__Secure-" + key;
-    else if (prefix === "host")
+    } else if (prefix === "host") {
       finalKey = "__Host-" + key;
-    return parse(cookie, finalKey)[finalKey];
+    }
+    const obj2 = parse(cookie, finalKey);
+    return obj2[finalKey];
   }
-  if (!cookie)
+  if (!cookie) {
     return {};
-  return parse(cookie);
+  }
+  const obj = parse(cookie);
+  return obj;
+};
+
+// /zveltio-extension/node_modules/hono/dist/http-exception.js
+var HTTPException2 = class extends Error {
+  res;
+  status;
+  constructor(status = 500, options) {
+    super(options?.message, { cause: options?.cause });
+    this.res = options?.res;
+    this.status = status;
+  }
+  getResponse() {
+    if (this.res) {
+      const newResponse = new Response(this.res.body, {
+        status: this.status,
+        headers: this.res.headers
+      });
+      return newResponse;
+    }
+    return new Response(this.message, {
+      status: this.status
+    });
+  }
+};
+
+// /zveltio-extension/node_modules/hono/dist/utils/buffer.js
+var bufferToFormData2 = (arrayBuffer, contentType) => {
+  const response = new Response(arrayBuffer, {
+    headers: {
+      "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase())
+    }
+  });
+  return response.formData();
 };
 
 // /zveltio-extension/node_modules/hono/dist/validator/validator.js
@@ -12005,21 +12028,24 @@ var validator = (target, validationFunc) => {
     const contentType = c.req.header("Content-Type");
     switch (target) {
       case "json":
-        if (!contentType || !jsonRegex.test(contentType))
+        if (!contentType || !jsonRegex.test(contentType)) {
           break;
+        }
         try {
           value = await c.req.json();
         } catch {
-          throw new HTTPException2(400, { message: "Malformed JSON in request body" });
+          const message = "Malformed JSON in request body";
+          throw new HTTPException2(400, { message });
         }
         break;
       case "form": {
-        if (!contentType || !(multipartRegex.test(contentType) || urlencodedRegex.test(contentType)))
+        if (!contentType || !(multipartRegex.test(contentType) || urlencodedRegex.test(contentType))) {
           break;
+        }
         let formData;
-        if (c.req.bodyCache.formData)
+        if (c.req.bodyCache.formData) {
           formData = await c.req.bodyCache.formData;
-        else
+        } else {
           try {
             const arrayBuffer = await c.req.arrayBuffer();
             formData = await bufferToFormData2(arrayBuffer, contentType);
@@ -12029,16 +12055,18 @@ var validator = (target, validationFunc) => {
             message += e instanceof Error ? ` ${e.message}` : ` ${String(e)}`;
             throw new HTTPException2(400, { message });
           }
-        const form = Object.create(null);
+        }
+        const form = /* @__PURE__ */ Object.create(null);
         formData.forEach((value2, key) => {
-          if (key.endsWith("[]"))
+          if (key.endsWith("[]")) {
             (form[key] ??= []).push(value2);
-          else if (Array.isArray(form[key]))
+          } else if (Array.isArray(form[key])) {
             form[key].push(value2);
-          else if (Object.hasOwn(form, key))
+          } else if (Object.hasOwn(form, key)) {
             form[key] = [form[key], value2];
-          else
+          } else {
             form[key] = value2;
+          }
         });
         value = form;
         break;
@@ -12056,10 +12084,12 @@ var validator = (target, validationFunc) => {
         break;
       case "cookie":
         value = getCookie(c);
+        break;
     }
     const res = await validationFunc(value, c);
-    if (res instanceof Response)
+    if (res instanceof Response) {
       return res;
+    }
     c.req.addValidatedData(target, res);
     return await next();
   };
@@ -35220,24 +35250,8 @@ function aiRoutes(ctx) {
     return isAdmin ? user : null;
   }
   async function logUsage(row) {
-    const write = () => db.insertInto("zv_ai_usage").values(row).execute();
     const complain = (err) => console.warn(`[ai] usage accounting failed for ${row.operation}/${row.provider}:`, err.message);
-    if (!db.isTransaction) {
-      await write().catch(complain);
-      return;
-    }
-    let savepointHeld = false;
-    try {
-      await sql.raw("SAVEPOINT zv_ai_usage").execute(db);
-      savepointHeld = true;
-      await write();
-      await sql.raw("RELEASE SAVEPOINT zv_ai_usage").execute(db);
-    } catch (err) {
-      if (savepointHeld) {
-        await sql.raw("ROLLBACK TO SAVEPOINT zv_ai_usage").execute(db).catch(() => {});
-      }
-      complain(err);
-    }
+    await db.transaction().execute((trx) => trx.insertInto("zv_ai_usage").values(row).execute()).catch(complain);
   }
   app.get("/providers", async (c) => {
     const user = await requireAuth(c);
@@ -36366,16 +36380,20 @@ RESPONSE FORMAT (JSON only):
 }
 
 // engine/lib/sql-guard.ts
+var READ_DONE = Symbol("read-only window closed");
 async function runReadOnly(db, query) {
-  await sql.raw("SAVEPOINT zv_ai_ro").execute(db);
+  let rows = [];
   try {
-    await sql`SET TRANSACTION READ ONLY`.execute(db);
-    const result = await sql.raw(query).execute(db);
-    return result;
-  } finally {
-    await sql.raw("ROLLBACK TO SAVEPOINT zv_ai_ro").execute(db).catch(() => {});
-    await sql.raw("RELEASE SAVEPOINT zv_ai_ro").execute(db).catch(() => {});
+    await db.transaction().execute(async (trx) => {
+      await sql`SET TRANSACTION READ ONLY`.execute(trx);
+      rows = (await sql.raw(query).execute(trx)).rows;
+      throw READ_DONE;
+    });
+  } catch (err) {
+    if (err !== READ_DONE)
+      throw err;
   }
+  return { rows };
 }
 function validateGeneratedSQL(query, accessibleCollections) {
   const upper = query.toUpperCase().trim();
@@ -36895,19 +36913,24 @@ function aiAnalyticsRoutes(ctx) {
     const days = parseDays(c.req.query("range") || "30d");
     const limit = Math.min(parseInt(c.req.query("limit") || "10"), 50);
     const since = new Date(Date.now() - days * 86400000);
-    const topUsers = await sql`
+    const counted = await sql`
       SELECT
-        u.user_id,
-        COALESCE(usr.name, u.user_id) AS user_name,
+        u.user_id::text                AS user_id,
         COUNT(*)::text                 AS requests,
         COALESCE(SUM(u.prompt_tokens + u.response_tokens), 0)::text AS total_tokens
       FROM zv_ai_usage u
-      LEFT JOIN "user" usr ON usr.id::text = u.user_id::text
       WHERE u.created_at >= ${since.toISOString()}
-      GROUP BY u.user_id, usr.name
-      ORDER BY total_tokens DESC
+      GROUP BY u.user_id
+      ORDER BY COALESCE(SUM(u.prompt_tokens + u.response_tokens), 0) DESC
       LIMIT ${limit}
     `.execute(db).then((r) => r.rows).catch(logAndFallback("top-users", []));
+    const names = await ctx.internals.getUserNames(counted.map((r) => r.user_id).filter(Boolean)).catch(logAndFallback("top-users-names", {}));
+    const topUsers = counted.map((r) => ({
+      user_id: r.user_id,
+      user_name: names[r.user_id] ?? r.user_id,
+      requests: r.requests,
+      total_tokens: r.total_tokens
+    }));
     return c.json({ users: topUsers });
   });
   app.get("/recommendations", async (c) => {
@@ -37256,12 +37279,14 @@ class ZveltioAIEngine {
   sendNotification;
   enqueueDDLJob;
   withTenantIsolation;
+  ddl;
   constructor(ctx) {
     this.db = ctx.db;
     this.checkPermission = ctx.checkPermission;
     this.sendNotification = ctx.internals.sendNotification;
     this.enqueueDDLJob = ctx.internals.enqueueDDLJob;
     this.withTenantIsolation = ctx.internals.withTenantIsolation;
+    this.ddl = ctx.DDLManager;
   }
   dbWork(request, fn) {
     const tenantId = request.context?.tenantId;
@@ -37482,8 +37507,7 @@ class ZveltioAIEngine {
   async buildContext(request) {
     let collectionCount = 0;
     try {
-      const result = await this.db.selectFrom("zvd_collections").select(this.db.fn.count("name").as("cnt")).executeTakeFirst();
-      collectionCount = parseInt(result?.cnt ?? "0");
+      collectionCount = (await this.ddl.getCollections(this.db)).length;
     } catch (err) {
       console.warn('[zveltio-ai] collection count failed, prompt will say "several":', err.message);
     }
@@ -37800,7 +37824,7 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
     };
   }
   async accessibleCollections(userId) {
-    const all = await this.db.selectFrom("zvd_collections").select(["name"]).execute();
+    const all = await this.ddl.getCollections(this.db);
     const out = [];
     for (const col of all) {
       if (await this.checkPermission(userId, col.name, "read"))
@@ -37809,7 +37833,7 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
     return out;
   }
   async toolListCollections() {
-    const collections = await this.db.selectFrom("zvd_collections").select(["name", "display_name", "fields"]).orderBy("display_name", "asc").execute();
+    const collections = [...await this.ddl.getCollections(this.db)].sort((a, b) => String(a.display_name ?? "").localeCompare(String(b.display_name ?? "")));
     const mapped = collections.map((c) => {
       let fieldCount = 0;
       try {
@@ -37830,7 +37854,7 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
   }
   async toolGetCollectionSchema(args) {
     const { collection } = args;
-    const colDef = await this.db.selectFrom("zvd_collections").selectAll().where("name", "=", collection).executeTakeFirst();
+    const colDef = await this.ddl.getCollection(this.db, collection);
     if (!colDef)
       throw new Error(`Collection '${collection}' not found`);
     let fields = [];
@@ -37937,8 +37961,7 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
     }
   }
   async toolGetSystemStats() {
-    const collections = await this.db.selectFrom("zvd_collections").select(this.db.fn.count("name").as("count")).executeTakeFirst();
-    const n = Number(collections?.count ?? 0);
+    const n = (await this.ddl.getCollections(this.db)).length;
     return {
       success: true,
       stats: { collections: n },
@@ -38057,7 +38080,7 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
     let schemaContext = "";
     try {
       const names = inScope.slice(0, 10).map((c) => c.name);
-      const collections = await this.dbWork(request, () => this.db.selectFrom("zvd_collections").selectAll().where("name", "in", names).execute());
+      const collections = await this.dbWork(request, async () => (await this.ddl.getCollections(this.db)).filter((c) => names.includes(c.name)));
       schemaContext = collections.map((c) => {
         const parsed = typeof c.fields === "string" ? JSON.parse(c.fields) : c.fields;
         const fields = (Array.isArray(parsed) ? parsed : []).map((f) => `${f.name} ${f.type}`).join(", ");
@@ -38270,12 +38293,8 @@ function parseExcludedFields(raw2, collection) {
   }
   throw new Error(`collection "${collection}": ai_embed_excluded_fields has an unexpected shape ` + `(${typeof raw2}) \u2014 refusing to embed rather than ignore the exclusion list`);
 }
-async function triggerEmbedding(db, collection, recordId, record2, tenantId = null) {
-  const collMeta = await db.selectFrom("zvd_collections").select([
-    "ai_search_enabled",
-    "ai_search_field",
-    "ai_embed_excluded_fields"
-  ]).where("name", "=", collection).executeTakeFirst();
+async function triggerEmbedding(ddl, db, collection, recordId, record2, tenantId = null) {
+  const collMeta = await ddl.getCollection(db, collection);
   if (!collMeta?.ai_search_enabled)
     return;
   const textField = collMeta.ai_search_field ?? null;
@@ -38361,7 +38380,7 @@ var extension = {
         throw new Error("No AI provider is configured.");
       return p.chat(messages, opts);
     });
-    ctx.services.register("ai.triggerEmbedding", async (collection, recordId, record2, tenantId = null) => triggerEmbedding(ctx.db, collection, recordId, record2, tenantId));
+    ctx.services.register("ai.triggerEmbedding", async (collection, recordId, record2, tenantId = null) => triggerEmbedding(ctx.DDLManager, ctx.db, collection, recordId, record2, tenantId));
     ctx.services.register("ai.extractText", async (buffer, mimeType) => await extractTextFromFile(buffer, mimeType) ?? "");
     ctx.services.register("ai.indexFile", async (db, fileId, buffer, mimeType) => scheduleFileIndexing(db, fileId, buffer, mimeType));
     ctx.services.register("ai.runBackgroundTask", async (userId, instruction, opts) => {
@@ -38370,7 +38389,7 @@ var extension = {
     });
     const onWrite = async (evt) => {
       try {
-        await triggerEmbedding(ctx.db, evt.collection, evt.id, evt.record, evt.tenantId ?? null);
+        await triggerEmbedding(ctx.DDLManager, ctx.db, evt.collection, evt.id, evt.record, evt.tenantId ?? null);
       } catch (err) {
         console.warn(`[ai] auto-embedding failed for ${evt.collection}/${evt.id}:`, err.message);
       }

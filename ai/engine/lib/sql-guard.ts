@@ -55,31 +55,31 @@ import type { Database } from '@zveltio/engine-db';
  * results — the rows are already in JS, and a read changes no state. Confirmed
  * both ways: an INSERT inside the window is still refused, and an INSERT after it
  * commits.
+ *
+ * The savepoint is the host's, not ours. `ctx.db` refuses a raw `SAVEPOINT`
+ * from an extension (engine #858 admits queries and DML only), so this used to
+ * fail on every call: the AI query route and both assistant tools answered with
+ * the refusal. `ctx.db.transaction()` now joins the request's transaction INSIDE
+ * a savepoint the engine opens, and rolls back to it when the callback throws.
+ * So the callback always throws: a `RELEASE` would keep the read-only flag for
+ * the rest of the request — the bug above — and only the rollback undoes it.
+ * Off a request transaction, `transaction()` is a transaction of its own, and
+ * the same throw ends it the same way.
  */
+const READ_DONE = Symbol('read-only window closed');
+
 export async function runReadOnly(db: Database, query: string): Promise<{ rows: unknown[] }> {
-  await sql.raw('SAVEPOINT zv_ai_ro').execute(db);
+  let rows: unknown[] = [];
   try {
-    await sql`SET TRANSACTION READ ONLY`.execute(db);
-    const result = await sql.raw(query).execute(db);
-    return result as { rows: unknown[] };
-  } finally {
-    // Unconditional: on success it drops the read-only flag, on failure it also
-    // clears the aborted state, and either way the caller gets a usable
-    // transaction back. Awaited inside `finally` — a synchronous `finally`
-    // around an async call is how a previous audit lost a whole tenant context.
-    await sql
-      .raw('ROLLBACK TO SAVEPOINT zv_ai_ro')
-      .execute(db)
-      .catch(() => {
-        /* transaction gone entirely; the caller's error is the useful one */
-      });
-    await sql
-      .raw('RELEASE SAVEPOINT zv_ai_ro')
-      .execute(db)
-      .catch(() => {
-        /* released with the rollback, or the transaction is gone */
-      });
+    await db.transaction().execute(async (trx) => {
+      await sql`SET TRANSACTION READ ONLY`.execute(trx);
+      rows = (await sql.raw(query).execute(trx)).rows as unknown[];
+      throw READ_DONE;
+    });
+  } catch (err) {
+    if (err !== READ_DONE) throw err;
   }
+  return { rows };
 }
 
 // ── Security validation ──────────────────────────────────────────────────────

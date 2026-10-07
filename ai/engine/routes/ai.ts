@@ -58,12 +58,13 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
    * that was discarded. The savepoint scopes the damage to this one statement,
    * which is what the engine's event bus does around extension listeners.
    *
-   * A SAVEPOINT is only legal inside a transaction block. Off a pool handle
-   * Postgres answers `SAVEPOINT can only be used in transaction blocks`
-   * (measured), so accounting would be silently dead wherever `ctx.db` resolves
-   * to the pool. There is nothing to protect there either: with no enclosing
-   * transaction a failed statement damages only itself, which is the entire
-   * reason the savepoint exists.
+   * The savepoint is the host's: `ctx.db.transaction()` joins the request's
+   * transaction inside one the engine opens, and rolls back to it when the
+   * callback throws. This opened its own, and `ctx.db` refuses a raw
+   * `SAVEPOINT` from an extension (engine #858), so every completion logged
+   * "usage accounting failed" and recorded nothing. Off a request transaction,
+   * `transaction()` is a short transaction of its own, which is all a single
+   * INSERT needs there.
    *
    * Nothing here is claimed or spent before a check — this runs AFTER the
    * provider has already answered and the user has already been charged by them.
@@ -71,35 +72,16 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
    * failure is logged with its reason and the request continues.
    */
   async function logUsage(row: Record<string, unknown>): Promise<void> {
-    const write = () => (db as any).insertInto('zv_ai_usage').values(row).execute();
     const complain = (err: Error) =>
       console.warn(
         `[ai] usage accounting failed for ${row.operation}/${row.provider}:`,
         err.message,
       );
 
-    if (!(db as unknown as { isTransaction?: boolean }).isTransaction) {
-      await write().catch(complain);
-      return;
-    }
-
-    let savepointHeld = false;
-    try {
-      await sql.raw('SAVEPOINT zv_ai_usage').execute(db);
-      savepointHeld = true;
-      await write();
-      await sql.raw('RELEASE SAVEPOINT zv_ai_usage').execute(db);
-    } catch (err) {
-      if (savepointHeld) {
-        await sql
-          .raw('ROLLBACK TO SAVEPOINT zv_ai_usage')
-          .execute(db)
-          .catch(() => {
-            /* transaction is gone entirely; nothing left to salvage */
-          });
-      }
-      complain(err as Error);
-    }
+    await (db as any)
+      .transaction()
+      .execute((trx: any) => trx.insertInto('zv_ai_usage').values(row).execute())
+      .catch(complain);
   }
 
   // ─── Providers ────────────────────────────────────────────────

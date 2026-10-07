@@ -183,24 +183,33 @@ export function aiAnalyticsRoutes(ctx: ExtensionContext): Hono {
     const limit = Math.min(parseInt(c.req.query('limit') || '10'), 50);
     const since = new Date(Date.now() - days * 86_400_000);
 
-    const topUsers = await sql<{
+    // Named through the engine, not a join: `"user"` is engine-owned and
+    // `ctx.db` refuses it (engine #858), so this answered `[]` — the fallback
+    // below — on every install. A user with no name keeps their id.
+    const counted = await sql<{
       user_id: string;
-      user_name: string;
       requests: string;
       total_tokens: string;
     }>`
       SELECT
-        u.user_id,
-        COALESCE(usr.name, u.user_id) AS user_name,
+        u.user_id::text                AS user_id,
         COUNT(*)::text                 AS requests,
         COALESCE(SUM(u.prompt_tokens + u.response_tokens), 0)::text AS total_tokens
       FROM zv_ai_usage u
-      LEFT JOIN "user" usr ON usr.id::text = u.user_id::text
       WHERE u.created_at >= ${since.toISOString()}
-      GROUP BY u.user_id, usr.name
-      ORDER BY total_tokens DESC
+      GROUP BY u.user_id
+      ORDER BY COALESCE(SUM(u.prompt_tokens + u.response_tokens), 0) DESC
       LIMIT ${limit}
     `.execute(db).then((r) => r.rows).catch(logAndFallback('top-users', []));
+    const names = await ctx.internals
+      .getUserNames(counted.map((r) => r.user_id).filter(Boolean))
+      .catch(logAndFallback('top-users-names', {} as Record<string, string>));
+    const topUsers = counted.map((r) => ({
+      user_id: r.user_id,
+      user_name: names[r.user_id] ?? r.user_id,
+      requests: r.requests,
+      total_tokens: r.total_tokens,
+    }));
 
     return c.json({ users: topUsers });
   });

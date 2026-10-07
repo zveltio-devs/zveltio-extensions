@@ -73,6 +73,13 @@ describe('ai: background task transactions', () => {
     const ctx = {
       db: db.kysely,
       checkPermission: async () => true,
+      // The engine's registry reads run on the handle they are given, so a read
+      // outside a transaction shows up here as one.
+      DDLManager: {
+        getCollections: (d: any) => d.selectFrom('zvd_collections').selectAll().execute(),
+        getCollection: (d: any, name: string) =>
+          d.selectFrom('zvd_collections').selectAll().where('name', '=', name).executeTakeFirst(),
+      },
       internals: {
         enqueueDDLJob: async () => undefined,
         sendNotification: async () => {
