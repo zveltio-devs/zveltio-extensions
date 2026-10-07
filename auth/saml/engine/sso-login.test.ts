@@ -9,9 +9,9 @@
 // "signed in" here means the engine's `getSession` read the cookie back.
 //
 // The assertion is genuinely signed and validated by the real node-saml. The
-// harness runs no request transaction, so the users already have accounts;
-// first-login provisioning inside the request transaction is the engine's
-// harness (`sso-session.test.ts`).
+// account is the engine's to find or create (`provisionUser`): a first sign-in
+// provisions it, and an address the tenant has no claim to — the instance
+// owner's — signs nobody in.
 import { afterAll, describe, expect, it } from 'bun:test';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 // @ts-ignore — node-forge ships no types in this repository.
@@ -149,5 +149,24 @@ d('auth/saml — an assertion is a session the engine accepts', () => {
     // Reactivated, the refused assertion still cannot be presented again.
     await sql`UPDATE "user" SET banned = false WHERE id = ${id}`.execute(db);
     expect((await acs(email, assertion)).status).toBe(401);
+  });
+
+  it('a first sign-in provisions the account through the engine', async () => {
+    const email = `Erin-${Date.now()}@SAML.test`;
+    const acs = await setUp();
+    const res = await acs(email);
+    expect(res.status).toBe(302);
+    const id = await engineSession(res.headers.get('set-cookie') ?? '');
+    const row = await sql<{ email: string; emailVerified: boolean; role: string | null }>`
+      SELECT email, "emailVerified", role FROM "user" WHERE id = ${id ?? ''}`.execute(db);
+    expect(row.rows[0]).toMatchObject({ email: email.toLowerCase(), emailVerified: true });
+    expect(row.rows[0]!.role).not.toBe('god');
+  });
+
+  it("an assertion naming the instance owner's address signs nobody in", async () => {
+    const acs = await setUp();
+    const res = await acs('ext-harness-uuid@test.local');
+    expect(res.status).toBe(403);
+    expect(res.headers.get('set-cookie')).toBeNull();
   });
 });
