@@ -3,7 +3,7 @@
   "displayName": "Pages",
   "category": "content",
   "description": "Pages built from blocks — content or live collection data — grouped into sites. A site is a public website with SEO and a sitemap, or an authenticated portal with its own branding, base path and access roles.",
-  "version": "1.1.10",
+  "version": "1.1.11",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-pages",
@@ -68,7 +68,7 @@
     "/robots.txt"
   ],
   "integrity": {
-    "engineSha256": "d77d67e87fbd24027adccec2b49da9ca28fdb474430e5c29bdf5424fdac6693a",
-    "sourceSha256": "db25d1e1e1e57a9127e37268ecbabfae05c31d43751333b51410f2f02f875447"
+    "engineSha256": "3e231f138c7115b3baa5c71c39a72a1b0f43c8d4a2052de67589cf77c50ef88d",
+    "sourceSha256": "d0e64de5fa2cf5a30081f5f9a8145e7db2d51a2be6686e48777220755d06c22e"
   }
 }

@@ -111,12 +111,10 @@ export function registerPublicSeoRoutes(ctx: ExtensionContext): void {
         const field = row.record_field || 'slug';
         // The collection name came from the published list, and the column from
         // the page — both are checked against the catalog before they reach a
-        // query, exactly as `resolveRecord` checks them.
-        const cols = await sql<{ column_name: string }>`
-          SELECT column_name FROM information_schema.columns
-          WHERE table_schema = 'public' AND table_name = ${`zvd_${row.record_collection}`}
-        `.execute(db);
-        const names = new Set(cols.rows.map((r) => r.column_name));
+        // query, exactly as `resolveRecord` checks them. The catalog is read by
+        // the engine: `ctx.db` refuses `information_schema` to an extension
+        // (#858), so every record page fell out of the sitemap.
+        const names = new Set(await ctx.DDLManager.columnNames(db, row.record_collection));
         if (!names.has(field)) return [];
 
         /**

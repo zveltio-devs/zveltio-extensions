@@ -95,7 +95,7 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
 
       const raw: Any[] = typeof row.blocks === 'string' ? JSON.parse(row.blocks) : (row.blocks ?? []);
       const resolved = await resolveBlocks(
-        { db, engine },
+        { db, engine, ddl: ctx.DDLManager },
         { user: null, tenantId: site.tenant_id, publicCollections: site.public_collections ?? [] },
         raw,
       );
@@ -210,7 +210,7 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
       q: c.req.query('q') || undefined,
     };
     const resolved = await resolveBlockAt(
-      { db, engine },
+      { db, engine, ddl: ctx.DDLManager },
       { user: null, tenantId: site.tenant_id, publicCollections: site.public_collections ?? [] },
       block,
       viewer,
@@ -270,7 +270,7 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
     if (page.record_collection) {
       if (!recordKey) return c.json({ error: 'Page not found' }, 404);
       record = await resolveRecord(
-        { db, engine },
+        { db, engine, ddl: ctx.DDLManager },
         audience,
         page.record_collection,
         page.record_field || 'slug',
@@ -298,7 +298,7 @@ export function publicPagesRoutes(ctx: ExtensionContext): Hono {
     // No user, deliberately: this endpoint never reads a session, so a data
     // block here is judged only against the site's published collection list.
     const resolved = await resolveBlocks(
-      { db, engine },
+      { db, engine, ddl: ctx.DDLManager },
       audience,
       raw,
     );

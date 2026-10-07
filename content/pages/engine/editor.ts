@@ -575,7 +575,7 @@ export function editorRoutes(ctx: ExtensionContext): Hono {
 
     const raw: Any[] = typeof page.blocks === 'string' ? JSON.parse(page.blocks) : (page.blocks ?? []);
     const blocks = await resolveBlocks(
-      { db, engine },
+      { db, engine, ddl: ctx.DDLManager },
       { user, authType: 'session', tenantId: tenantId(c) },
       raw,
     );
