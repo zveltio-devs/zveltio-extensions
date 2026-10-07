@@ -422,3 +422,12 @@ jobs:
           # engine harness (createGodSession), as the migrate step above does.
           ZVELTIO_REGISTRATION_ENABLED: '1'
         run: bun test --timeout 20000
+      - name: Run jsonb shape tests on the engine's driver (Bun.SQL)
+        # `pg` (the harness default) sends a string parameter as text, so a
+        # `${JSON.stringify(x)}::jsonb` write stores an object; Bun.SQL, which
+        # the engine runs, stores a JSON string scalar. These tests only mean
+        # something on the production driver.
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/zveltio_ext_test
+          EXT_HARNESS_DRIVER: bun
+        run: bun test --timeout 20000 jsonb-shape

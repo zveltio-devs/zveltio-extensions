@@ -24775,7 +24775,7 @@ function crmRoutes(ctx) {
           (${d.first_name}, ${d.last_name ?? null}, ${d.email ?? null},
            ${d.phone ?? null}, ${d.company ?? null}, ${d.job_title ?? null},
            ${d.avatar_url ?? null}, ${d.tags ?? []}, ${d.notes ?? null},
-           ${d.source ?? null}, ${JSON.stringify(d.metadata ?? {})}::jsonb, ${user.id})
+           ${d.source ?? null}, ${JSON.stringify(d.metadata ?? {})}::text::jsonb, ${user.id})
         RETURNING *
       `.execute(db);
     const contact = result.rows[0];
@@ -24812,7 +24812,7 @@ function crmRoutes(ctx) {
       if (k === "organization_id" || k === "organization_role")
         continue;
       if (v !== undefined) {
-        sets.push(`${k} = $${i++}`);
+        sets.push(k === "metadata" ? `${k} = $${i++}::text::jsonb` : `${k} = $${i++}`);
         vals.push(k === "metadata" ? JSON.stringify(v) : v);
       }
     }
@@ -24921,7 +24921,7 @@ function crmRoutes(ctx) {
            ${d.registration_no ?? null}, ${d.type}, ${d.industry ?? null},
            ${d.website ?? null}, ${d.email ?? null}, ${d.phone ?? null},
            ${d.logo_url ?? null}, ${d.tags ?? []}, ${d.notes ?? null},
-           ${JSON.stringify(d.metadata ?? {})}::jsonb, ${user.id})
+           ${JSON.stringify(d.metadata ?? {})}::text::jsonb, ${user.id})
         RETURNING *
       `.execute(db);
     const organization = result.rows[0];
@@ -24952,7 +24952,7 @@ function crmRoutes(ctx) {
     let i = 1;
     for (const [k, v] of Object.entries(d)) {
       if (v !== undefined) {
-        sets.push(`${k} = $${i++}`);
+        sets.push(k === "metadata" ? `${k} = $${i++}::text::jsonb` : `${k} = $${i++}`);
         vals.push(k === "metadata" ? JSON.stringify(v) : v);
       }
     }
@@ -25059,9 +25059,9 @@ function crmRoutes(ctx) {
            ${d.organization_id ?? null}, ${d.contact_id ?? null}, ${d.currency},
            ${d.amount}, ${d.tax_amount}, ${d.total_amount},
            ${d.due_date ?? null}, ${d.paid_date ?? null},
-           ${JSON.stringify(d.line_items ?? [])}::jsonb,
+           ${JSON.stringify(d.line_items ?? [])}::text::jsonb,
            ${d.notes ?? null}, ${d.reference ?? null},
-           ${JSON.stringify(d.metadata ?? {})}::jsonb, ${user.id})
+           ${JSON.stringify(d.metadata ?? {})}::text::jsonb, ${user.id})
         RETURNING *
       `.execute(db);
     return c.json({ data: result.rows[0] }, 201);
@@ -25089,8 +25089,9 @@ function crmRoutes(ctx) {
     let i = 1;
     for (const [k, v] of Object.entries(d)) {
       if (v !== undefined) {
-        sets.push(`${k} = $${i++}`);
-        vals.push(k === "metadata" || k === "line_items" ? JSON.stringify(v) : v);
+        const json2 = k === "metadata" || k === "line_items";
+        sets.push(json2 ? `${k} = $${i++}::text::jsonb` : `${k} = $${i++}`);
+        vals.push(json2 ? JSON.stringify(v) : v);
       }
     }
     if (!sets.length)
@@ -25176,7 +25177,8 @@ var extension = {
       join(import.meta.dir, "migrations/003_tenant_scoped_unique_keys.sql"),
       join(import.meta.dir, "migrations/004_contact_organization_role.sql"),
       join(import.meta.dir, "migrations/005_contact_org_relation.sql"),
-      join(import.meta.dir, "migrations/006_payment_status_compat.sql")
+      join(import.meta.dir, "migrations/006_payment_status_compat.sql"),
+      join(import.meta.dir, "migrations/007_jsonb_unwrap_string.sql")
     ];
   },
   async register(app, ctx) {
