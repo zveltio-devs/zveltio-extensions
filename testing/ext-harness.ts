@@ -160,6 +160,7 @@ const ENGINE_MEMBERS = [
   'countAuditActivity',
   'audit',
   'getUserNames',
+  'exportUserData',
 ] as const;
 
 /**

@@ -86,23 +86,23 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     const userId = user.id;
 
-    const [userRow, auditRows, notifRows, apiKeyRows, approvalRows, consentRows] =
-      await Promise.all([
-        sql<any>`SELECT id::text, name, email, "createdAt" AS created_at FROM "user" WHERE id = ${userId}`.execute(db),
-        sql<any>`SELECT event_type AS action, resource_type AS collection, resource_id AS record_id, created_at FROM zv_audit_log WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 1000`.execute(db),
-        sql<any>`SELECT title, message, type, is_read, created_at FROM zv_notifications WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 500`.execute(db),
-        sql<any>`SELECT name, key_prefix, scopes, created_at FROM zv_api_keys WHERE created_by = ${userId}`.execute(db),
-        rowsOrEmptyIfTableAbsent<any>(() => sql<any>`SELECT id::text, collection, record_id, status, requested_at FROM zv_approval_requests WHERE requested_by = ${userId} ORDER BY requested_at DESC`.execute(db)),
-        rowsOrEmptyIfTableAbsent<any>(() => sql<any>`SELECT purpose, granted, source, created_at, withdrawn_at FROM zvd_gdpr_consents WHERE user_id = ${userId} ORDER BY created_at DESC`.execute(db)),
-      ]);
+    // The engine's tables are the engine's to read (`exportUserData`,
+    // `auth:users`): `ctx.db` refuses them since engine #858, which made this
+    // export a 500. The engine reads every tenant's rows about the subject, and
+    // the instance-level ones (sign-ins), which a read in this request's tenant
+    // left out. Consents are this extension's own table.
+    const [engineData, consentRows] = await Promise.all([
+      ctx.internals.exportUserData(userId),
+      rowsOrEmptyIfTableAbsent<any>(() => sql<any>`SELECT purpose, granted, source, created_at, withdrawn_at FROM zvd_gdpr_consents WHERE user_id = ${userId} ORDER BY created_at DESC`.execute(db)),
+    ]);
 
     const exportData = {
       exported_at: new Date().toISOString(),
-      profile: userRow.rows[0] || null,
-      audit_log: auditRows.rows,
-      notifications: notifRows.rows,
-      api_keys: apiKeyRows.rows,
-      approval_requests: approvalRows.rows,
+      profile: engineData?.profile ?? null,
+      audit_log: engineData?.audit_log ?? [],
+      notifications: engineData?.notifications ?? [],
+      api_keys: engineData?.api_keys ?? [],
+      approval_requests: engineData?.approval_requests ?? [],
       consents: consentRows.rows,
     };
 
@@ -140,75 +140,31 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
 
     const userId = user.id;
 
-    // Erasure under GDPR Article 17 must be COMPLETE — a half-deleted
-    // user leaves orphan rows that still tie back to them (e.g. an
-    // active `session` row keeps the user logged in until cookie TTL,
-    // a `twoFactor` row leaks the email via TOTP secrets, an `account`
-    // row keeps the password hash). Wrap in a transaction so a partial
-    // failure rolls back cleanly instead of leaving fragments.
+    // Erasure under GDPR Article 17 must be COMPLETE — a half-deleted user
+    // leaves rows that still tie back to them. The account goes through the host
+    // (`deleteUser`, `auth:users`), which revokes the sessions (database and
+    // cache), drops the grants, stops the API keys the user created and deletes
+    // the row — `account`, `twoFactor` and the notifications go with it (ON
+    // DELETE CASCADE). The raw deletes of `zv_api_keys` and `zv_notifications`
+    // that stood here, each in its own SAVEPOINT, are refused to an extension
+    // since engine #858; the host's helper does what they did. What is left to
+    // this extension is its own table, in the same transaction.
     //
-    // Audit row is written BEFORE the delete so the audit survives —
-    // event_type matches the engine's auditLog() schema (not the
-    // legacy `action` column the older code used).
-    // Tables that could not be cleared, so the answer can say so rather than
-    // claiming a completeness it did not achieve.
-    const skipped: string[] = [];
+    // The erasure is recorded once it happened (`ctx.internals.audit`): the
+    // `user.deleted` row the host writes names it by `erasure_id`, and so does
+    // `gdpr.account_deleted`. The subject's id is the resource — the user row,
+    // and with it any `user_id` reference, is gone by then.
+    const erasureId = crypto.randomUUID();
     try {
       await (db as any).transaction().execute(async (trx: any) => {
-        // Its id names this erasure in the `user.deleted` row written below.
-        const erasure = await sql<{ id: string }>`
-          INSERT INTO zv_audit_log (event_type, user_id, resource_type, metadata, created_at)
-          VALUES ('gdpr.account_deleted', ${userId}, 'user', ${JSON.stringify({ gdpr: true, requested_at: new Date().toISOString() })}::jsonb, NOW())
-          RETURNING id::text
-        `.execute(trx);
-        // Each optional delete inside a SAVEPOINT, because a try/catch is not
-        // isolation in Postgres.
-        //
-        // These were `.catch(() => {})`, which reads as "best effort, carry
-        // on". It is not: a failed statement aborts the whole transaction, so
-        // every later delete — including the user row — fails too, and the
-        // caller received "Account deletion failed — referential integrity"
-        // with a detail reading "current transaction is aborted". That names
-        // the wrong cause entirely. The erasure did not fail on referential
-        // integrity; it failed because a table that may not even exist on this
-        // install could not be deleted from, and nothing said which one.
-        //
-        // With a savepoint the intent finally holds: a peripheral table that is
-        // absent or empty no longer stops the erasure, and the ones that DO
-        // fail are collected and returned. An erasure that only partly happened
-        // must say so — under GDPR the difference between "deleted" and "mostly
-        // deleted" is the whole obligation.
-        //
-        // `session`, `account` and `twoFactor` are not here: they are refused to
-        // the request's role (engine migration 044), so they were "skipped" on
-        // every erasure. The host revokes the sessions below, and the other two
-        // go with the user row (ON DELETE CASCADE).
-        const optional: Array<[string, () => Promise<unknown>]> = [
-          ['zv_api_keys', () => sql`DELETE FROM zv_api_keys WHERE created_by = ${userId}`.execute(trx)],
-          ['zv_notifications', () => sql`DELETE FROM zv_notifications WHERE user_id = ${userId}`.execute(trx)],
-          ['zvd_gdpr_consents', () => sql`DELETE FROM zvd_gdpr_consents WHERE user_id = ${userId}`.execute(trx)],
-        ];
-        for (const [index, [label, run]] of optional.entries()) {
-          const sp = `zv_gdpr_${index}`;
-          await sql.raw(`SAVEPOINT ${sp}`).execute(trx);
-          try {
-            await run();
-            await sql.raw(`RELEASE SAVEPOINT ${sp}`).execute(trx);
-          } catch (err) {
-            await sql.raw(`ROLLBACK TO SAVEPOINT ${sp}`).execute(trx).catch(() => {});
-            skipped.push(`${label}: ${err instanceof Error ? err.message : String(err)}`);
-          }
-        }
-        // Finally the user row itself, through the host (`auth:users`): the raw
-        // delete that stood here left the session cached in Valkey — the erased
-        // user's cookie kept signing them in — the enforcer's grants live, and
-        // no `user.deleted`. Anything still FK-referencing the row fails loudly
-        // here, which is what we want. The actor is the subject, who no longer
-        // exists, so the audit row names the erasure instead.
+        await sql`DELETE FROM zvd_gdpr_consents WHERE user_id = ${userId}`.execute(trx);
+        // Anything still FK-referencing the row fails loudly here, which is what
+        // we want. The actor is the subject, who no longer exists, so the audit
+        // row names the erasure instead.
         await ctx.internals.deleteUser(trx, userId, {
           actor: 'self',
           reason: 'gdpr.erasure',
-          metadata: { erasure_id: erasure.rows[0]!.id },
+          metadata: { erasure_id: erasureId },
         });
       });
     } catch (err) {
@@ -219,7 +175,6 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
       // unfinished; whoever has to finish it needs the actual reason.
       console.error(
         '[gdpr] erasure failed for', userId,
-        '| skipped so far:', skipped,
         '| cause:', err instanceof Error ? err.message : String(err),
       );
       // The instance owner (god) is refused by the host: the account would go
@@ -229,21 +184,21 @@ export function gdprRoutes(ctx: ExtensionContext): Hono {
       return c.json({
         error: 'Account deletion failed. The erasure did NOT complete — see the server log for the cause.',
         detail: err instanceof Error ? err.message : String(err),
-        skipped,
       }, status);
     }
 
-    if (skipped.length > 0) {
-      // Reported, not hidden. Somebody has to finish this by hand, and they
-      // cannot if the response says it is done.
-      console.error('[gdpr] erasure incomplete for', userId, skipped);
-      return c.json({
-        success: true,
-        complete: false,
-        message: 'Account deleted, but some data could not be cleared and still requires manual erasure.',
-        skipped,
+    // The account is gone whatever happens here; the host's `user.deleted` row
+    // already records it. A failed write of this second record is logged.
+    await ctx.internals
+      .audit({
+        type: 'gdpr.account_deleted',
+        resourceId: userId,
+        resourceType: 'user',
+        metadata: { gdpr: true, erasure_id: erasureId, requested_at: new Date().toISOString() },
+      })
+      .catch((err) => {
+        console.error('[gdpr] erasure', erasureId, 'audit write failed:', (err as Error).message);
       });
-    }
     return c.json({ success: true, complete: true, message: 'Account and all associated data has been deleted' });
   });
 
