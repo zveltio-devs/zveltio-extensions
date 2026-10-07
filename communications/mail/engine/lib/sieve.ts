@@ -255,71 +255,59 @@ async function executeLocalActions(
   `.execute(db);
   const here = loc.rows[0];
 
-  for (const [i, action] of actions.entries()) {
-    // A SAVEPOINT per action, so the `catch` below contains something.
+  for (const action of actions) {
+    // A savepoint per action, so the `catch` below contains something.
     //
     // Inside a transaction Postgres refuses every statement after a failed one,
     // so without this the first rule that errors takes down every rule after it
     // — while the loop keeps going and logs each of them as its own failure.
     // The operator reads five broken filters where there was one.
     //
-    // Attempted, not assumed: `SAVEPOINT` is an error outside a transaction, and
-    // this function is also reachable from paths that autocommit. There the
-    // catch already contains, so no savepoint is needed.
-    const sp = `sieve_action_${i}`;
-    let savepoint = false;
+    // The savepoint is the host's: `ctx.db.transaction()` joins the request's
+    // transaction inside one and rolls back to it when the callback throws; off
+    // a transaction it is a short one of its own. This opened its own
+    // `SAVEPOINT`, which `ctx.db` refuses from an extension (engine #858) — and
+    // the refusal was read as "no transaction here", so a failed action aborted
+    // the sync and every action after it.
     try {
-      await sql.raw(`SAVEPOINT ${sp}`).execute(db);
-      savepoint = true;
-    } catch {
-      savepoint = false;
-    }
-    try {
-      switch (action.type) {
-        case 'mark_read':
-          if (here) await flagMessages(account as never, here.path, [here.uid], { add: ['\\Seen'] });
-          await sql`UPDATE zv_mail_messages SET is_read = true WHERE id = ${msgId}`.execute(db);
-          break;
-        case 'mark_starred':
-          if (here) await flagMessages(account as never, here.path, [here.uid], { add: ['\\Flagged'] });
-          await sql`UPDATE zv_mail_messages SET is_starred = true WHERE id = ${msgId}`.execute(db);
-          break;
-        case 'move':
-          if (action.folder) {
-            const folderRes = await sql`
-              SELECT id FROM zv_mail_folders WHERE account_id = ${account.id} AND path = ${action.folder} LIMIT 1
-            `.execute(db);
-            if (folderRes.rows[0]) {
-              // Server first. A local-only move puts the message in a folder it
-              // is not in, and the next sync will not correct it — it only ever
-              // asks for UIDs above `last_uid`.
-              if (here) await moveMessages(account as never, here.path, [here.uid], action.folder);
-              await sql`
-                UPDATE zv_mail_messages SET folder_id = ${(folderRes.rows[0] as any).id} WHERE id = ${msgId}
+      await db.transaction().execute(async (db) => {
+        switch (action.type) {
+          case 'mark_read':
+            if (here) await flagMessages(account as never, here.path, [here.uid], { add: ['\\Seen'] });
+            await sql`UPDATE zv_mail_messages SET is_read = true WHERE id = ${msgId}`.execute(db);
+            break;
+          case 'mark_starred':
+            if (here) await flagMessages(account as never, here.path, [here.uid], { add: ['\\Flagged'] });
+            await sql`UPDATE zv_mail_messages SET is_starred = true WHERE id = ${msgId}`.execute(db);
+            break;
+          case 'move':
+            if (action.folder) {
+              const folderRes = await sql`
+                SELECT id FROM zv_mail_folders WHERE account_id = ${account.id} AND path = ${action.folder} LIMIT 1
               `.execute(db);
+              if (folderRes.rows[0]) {
+                // Server first. A local-only move puts the message in a folder it
+                // is not in, and the next sync will not correct it — it only ever
+                // asks for UIDs above `last_uid`.
+                if (here) await moveMessages(account as never, here.path, [here.uid], action.folder);
+                await sql`
+                  UPDATE zv_mail_messages SET folder_id = ${(folderRes.rows[0] as any).id} WHERE id = ${msgId}
+                `.execute(db);
+              }
             }
-          }
-          break;
-        case 'delete':
-          // The destructive corner. This used to DELETE the local row while the
-          // message stayed on the server, and a sync only fetches UIDs above
-          // `last_uid` — so the mail was gone from Zveltio, unrecoverable by it,
-          // and still sitting in the mailbox.
-          if (here) await deleteMessagesFromServer(account as never, here.path, [here.uid]);
-          await sql`DELETE FROM zv_mail_messages WHERE id = ${msgId}`.execute(db);
-          break;
-      }
-      if (savepoint) await sql.raw(`RELEASE SAVEPOINT ${sp}`).execute(db);
+            break;
+          case 'delete':
+            // The destructive corner. This used to DELETE the local row while the
+            // message stayed on the server, and a sync only fetches UIDs above
+            // `last_uid` — so the mail was gone from Zveltio, unrecoverable by it,
+            // and still sitting in the mailbox.
+            if (here) await deleteMessagesFromServer(account as never, here.path, [here.uid]);
+            await sql`DELETE FROM zv_mail_messages WHERE id = ${msgId}`.execute(db);
+            break;
+        }
+      });
     } catch (err) {
-      // Undo just this action, leaving the transaction usable for the next one.
-      if (savepoint) {
-        await sql
-          .raw(`ROLLBACK TO SAVEPOINT ${sp}`)
-          .execute(db)
-          // If even this fails the transaction is beyond saving; the warning
-          // below is then the only thing that can still be said.
-          .catch(() => undefined);
-      }
+      // This action is undone already; the transaction is usable for the next.
       // One rule failing must not stop the rest, but it is no longer silent:
       // "the filter did nothing and said nothing" is the defect this file exists
       // to end, and a swallow here would reintroduce it one level down.
