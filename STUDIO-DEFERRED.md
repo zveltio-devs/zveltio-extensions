@@ -40,7 +40,6 @@ Tier-3 pages appear only where the product calls for them (e.g.
 | `billing` | Usage progress bars / upgrade CTA |
 | `compliance/ro/efactura` | Line totals are manual (no live recalculation as in the old form) |
 | `content/documents` | Template variables are a JSON bag, not per-variable fields |
-| `developer/database` | Sample row browser (dynamic columns) |
 | `hr/time-tracking` | Live "running" timer banner |
 | `sms` | Stats strip; body/template optional in the schema (the API requires one) |
 | `storage/cloud` | Drag-upload + breadcrumb file browser |
