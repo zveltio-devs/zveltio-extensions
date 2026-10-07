@@ -25162,19 +25162,6 @@ async function adoptCrmCollections(ctx) {
       console.warn(`   \u26A0  CRM adopt '${def.name}' failed:`, err.message);
     }
   }
-  try {
-    await sql`
-      INSERT INTO zvd_relations
-        (name, type, source_collection, source_field, target_collection, target_field,
-         junction_table, on_delete, on_update)
-      VALUES
-        ('contact_organizations', 'm2m', 'contacts', 'id', 'organizations', 'id',
-         'zvd_contact_organizations', 'CASCADE', 'CASCADE')
-      ON CONFLICT (source_collection, source_field) DO NOTHING
-    `.execute(ctx.db);
-  } catch (err) {
-    console.warn("   \u26A0  CRM contact_organizations relation failed:", err.message);
-  }
 }
 
 // engine/index.ts
@@ -25250,3 +25237,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
