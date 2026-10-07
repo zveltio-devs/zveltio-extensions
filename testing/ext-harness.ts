@@ -334,7 +334,12 @@ type Session = { user: { id: string; role: string; email: string; name: string }
 /** Tolerant ctx mock covering every member the 48 extensions actually use. */
 async function makeCtx(
   db: any,
-  opts: { authed: boolean; admin: boolean; user?: { id: string; email: string } },
+  opts: {
+    authed: boolean;
+    admin: boolean;
+    user?: { id: string; email: string };
+    grants?: ReadonlyArray<{ resource: string; action: string }>;
+  },
   publicRoutes?: any[],
   wiring?: { extName?: string; allowedTables?: Set<string>; capabilities?: readonly string[] },
 ): Promise<any> {
@@ -492,7 +497,11 @@ async function makeCtx(
         },
       },
     },
-    checkPermission: async () => opts.admin,
+    // Exact resource and action, as the engine's Casbin matcher compares them:
+    // answering `admin` for every name could not tell `orders` from `data:orders`.
+    checkPermission: async (_uid: string, resource: string, action: string) =>
+      opts.admin ||
+      (opts.grants ?? []).some((g) => g.resource === resource && g.action === action),
     getUserRoles: async () => (opts.admin ? ['god'] : []),
     // `emitAsync` as well as `emit`: the host bus moved to the awaited form —
     // plain `emit` is EventEmitter's synchronous fan-out, which drops an async
@@ -745,9 +754,11 @@ export async function mountForTest(
     tenant?: string;
     /** Run each request in the tenant transaction, as the engine does. */
     transaction?: boolean;
+    /** Permissions a non-admin holds, matched exactly by `ctx.checkPermission`. */
+    grants?: ReadonlyArray<{ resource: string; action: string }>;
   } = {},
 ): Promise<{ app: any; publicRoutes: any[]; migrated: boolean; ctx: any }> {
-  const { authed = true, admin = true, user } = opts;
+  const { authed = true, admin = true, user, grants } = opts;
   const db = await getDb();
   const mod = await import(join(engineDir, 'index.js'));
   // Apply the extension's OWN migrations so DB-backed routes have their tables,
@@ -765,7 +776,7 @@ export async function mountForTest(
   // is what names it and where its manifest lives.
   const extDir = dirname(engineDir);
   const wiring = await productionWiring(extDir, relative(REPO, extDir), mod.default);
-  const ctx = await makeCtx(db, { authed, admin, user }, publicRoutes, wiring);
+  const ctx = await makeCtx(db, { authed, admin, user, grants }, publicRoutes, wiring);
   await mod.default.register(app, ctx);
   // Mount collected root-level public routes on the same app so tests can hit
   // them at their absolute paths (mirrors the engine mounting them globally).

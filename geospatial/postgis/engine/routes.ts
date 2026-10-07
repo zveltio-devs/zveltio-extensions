@@ -29,17 +29,13 @@ async function resolveCollection(ctx: ExtensionContext, userId: string, collecti
   const shortName = collection.startsWith('zvd_') ? collection.slice(4) : collection;
   if (!/^[a-z][a-z0-9_]*$/.test(shortName)) return null;
   const tableName = `zvd_${shortName}`;
-  // Whether the collection's table is there at all. A check that cannot run
-  // refuses the table rather than granting it — `if (!exists) return null` below
-  // is the refusal, and it is the direction an unreadable answer has to take.
+  // A registered collection, asked through the engine's own helper: `ctx.db`
+  // refuses `information_schema` (engine #858), so the catalogue read this used
+  // to make always threw and every route answered 403, god included. A check
+  // that cannot run still refuses rather than grants.
   let exists = false;
   try {
-    const r = await sql<{ exists: boolean }>`
-      SELECT EXISTS (
-        SELECT 1 FROM information_schema.tables WHERE table_name = ${tableName}
-      ) AS exists
-    `.execute(ctx.db);
-    exists = r.rows[0]?.exists ?? false;
+    exists = !!(await ctx.DDLManager.getCollection(ctx.db, shortName));
   } catch (err) {
     console.warn(
       `[postgis] could not check whether ${tableName} exists; refusing access:`,
@@ -47,7 +43,7 @@ async function resolveCollection(ctx: ExtensionContext, userId: string, collecti
     );
   }
   if (!exists) return null;
-  const canRead = await (ctx.checkPermission as any)(userId, `data:${shortName}`, 'read').catch(() => false);
+  const canRead = await (ctx.checkPermission as any)(userId, shortName, 'read').catch(() => false);
   if (!canRead) return null;
   return tableName;
 }
