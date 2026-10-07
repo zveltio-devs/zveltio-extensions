@@ -134,12 +134,11 @@ export async function listTrash(db: Database, userId?: string) {
   const userFilter = userId
     ? sql`AND (f.deleted_by = ${userId} OR f.created_by = ${userId})`
     : sql``;
-  return sql`
-    SELECT f.*, u.name AS deleted_by_name,
+  return sql<Record<string, unknown>>`
+    SELECT f.*,
       ROUND(EXTRACT(EPOCH FROM (NOW() - f.deleted_at)) / 86400) AS days_in_trash,
       ${TRASH_RETENTION_DAYS} - ROUND(EXTRACT(EPOCH FROM (NOW() - f.deleted_at)) / 86400) AS days_remaining
     FROM zv_media_files f
-    LEFT JOIN "user" u ON u.id = f.deleted_by
     WHERE f.deleted_at IS NOT NULL
     ${userFilter}
     ORDER BY f.deleted_at DESC
