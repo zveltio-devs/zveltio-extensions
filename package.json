@@ -6,7 +6,8 @@
   "description": "Official Zveltio extensions — analytics, auth, automation, communications, compliance, content, CRM, data, developer tools, geospatial, i18n, multitenancy, operations, storage, workflow.",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "bun test"
+    "test": "bun test",
+    "review:inventory": "bun scripts/review-inventory.ts"
   },
   "dependencies": {
     "@hono/zod-validator": "0.9.1",
