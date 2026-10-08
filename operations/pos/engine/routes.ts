@@ -345,8 +345,8 @@ export function posRoutes(ctx: ExtensionContext): Hono {
     // the same moment cannot take the same number.
     // Drive stock movements via the inventory service when active. This keeps the
     // canonical inventory in sync with POS sales without POS owning warehouses.
-    const inventoryMove = ctx.services.get<(input: any) => Promise<{ balance: number }>>('inventory.stock.move');
-    const lookupProduct = ctx.services.get<(idOrSku: string) => Promise<any | null>>('inventory.products.lookup');
+    const inventoryMove = ctx.services.get<(input: any) => Promise<{ balance: number }>>('operations/inventory.stock.move');
+    const lookupProduct = ctx.services.get<(idOrSku: string) => Promise<any | null>>('operations/inventory.products.lookup');
 
     // A sale is one thing: the order, its lines, the number it was given, and
     // the loyalty balance it moves. Any of those alone is a receipt that does

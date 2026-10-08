@@ -30,7 +30,7 @@ describe.skipIf(!DB_URL)('store: a new product is linked to inventory', () => {
     const mounted = await mountForTest(import.meta.dir, { transaction: true });
     ctx = mounted.ctx;
     // No product with this SKU yet, as inventory's own lookup would answer.
-    ctx.services.register('inventory.products.findBySku', async () => null);
+    ctx.services.register('operations/inventory.products.findBySku', async () => null);
 
     const res = await mounted.app.request('/admin/products', {
       method: 'POST',

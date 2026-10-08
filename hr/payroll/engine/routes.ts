@@ -99,7 +99,7 @@ function generateD112Xml(period: any, entries: any[]): string {
 // executed as a formula when the export was opened.
 // biome-ignore lint/suspicious/noExplicitAny: employee rows are collection data
 function generateRevisalCsv(internals: ExtensionInternals, employees: any[]): string {
-  // Fed from the `hr.employment` service now, which gives a single
+  // Fed from the `hr/employees.employment` service now, which gives a single
   // `employee_name` rather than the two columns this used to read. Split on the
   // LAST space: a person with two given names has them before the surname here,
   // and guessing wrong on a legal register is worse than one column being
@@ -221,7 +221,7 @@ function employment(ctx: ExtensionContext) {
   return ctx.services.get<{
     payrollSubjects(): Promise<any[]>;
     currentTerms(id: string): Promise<any | null>;
-  }>('hr.employment');
+  }>('hr/employees.employment');
 }
 
 /**

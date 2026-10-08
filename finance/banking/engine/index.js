@@ -24967,7 +24967,7 @@ function bankingRoutes(ctx) {
     });
     let paid = null;
     if (d.linked_type === "invoice" && d.linked_id) {
-      const recordPayment = ctx.services.get("invoicing.recordPayment");
+      const recordPayment = ctx.services.get("finance/invoicing.recordPayment");
       if (recordPayment) {
         const t = tx.rows[0];
         try {
@@ -25006,7 +25006,7 @@ function bankingRoutes(ctx) {
       WHERE expected_date BETWEEN ${fromDate} AND ${toDate}
       ORDER BY expected_date
     `.execute(db);
-    const openReceivables = ctx.services.get("invoicing.openReceivables");
+    const openReceivables = ctx.services.get("finance/invoicing.openReceivables");
     let receivables = [];
     const unavailable = [];
     if (openReceivables) {
@@ -25094,3 +25094,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1

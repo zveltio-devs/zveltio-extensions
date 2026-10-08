@@ -10,7 +10,7 @@ import { permissionGate } from '@zveltio/sdk/extension';
  *
  * `callerEmployee` and `mayActFor` used to live here AND in `hr/leave`, the same
  * twenty lines twice, both opening `zvd_employees` — another extension's table.
- * They are one implementation now, on the `hr.employment` service.
+ * They are one implementation now, on the `hr/employees.employment` service.
  *
  * Null when `hr/employees` is not enabled; callers refuse rather than guess.
  */
@@ -18,7 +18,7 @@ function employment(ctx: ExtensionContext) {
   return ctx.services.get<{
     identify(u: { id: string; email?: string }): Promise<{ id: string; manager_id: string | null } | null>;
     mayActFor(u: { id: string; email?: string }, employeeId: string): Promise<boolean>;
-  }>('hr.employment');
+  }>('hr/employees.employment');
 }
 
 export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
@@ -133,7 +133,7 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
   // ── Active Timer ───────────────────────────────────────────────
   app.get('/timer', async (c) => {
     const user = c.get('user') as any;
-    // permission: delegated to hr.employment.mayActFor
+    // permission: delegated to hr/employees.employment.mayActFor
     const svc = employment(ctx);
     if (!svc) return c.json({ error: 'hr/employees is not enabled' }, 503);
     // Was matched on email only, so somebody whose work address differs from
@@ -156,7 +156,7 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
     notes: z.string().optional(),
     employee_id: z.string().uuid().optional(),
   })), async (c) => {
-    // permission: delegated to hr.employment.mayActFor
+    // permission: delegated to hr/employees.employment.mayActFor
     const svc = employment(ctx);
     if (!svc) return c.json({ error: 'hr/employees is not enabled' }, 503);
     const user = c.get('user') as any;
@@ -183,7 +183,7 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
 
   app.post('/timer/stop', async (c) => {
     const user = c.get('user') as any;
-    // permission: delegated to hr.employment.mayActFor
+    // permission: delegated to hr/employees.employment.mayActFor
     const svc = employment(ctx);
     if (!svc) return c.json({ error: 'hr/employees is not enabled' }, 503);
     const me = await svc.identify(user);
@@ -255,7 +255,7 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
     start_time: z.string().optional(),
     end_time: z.string().optional(),
   })), async (c) => {
-    // permission: delegated to hr.employment.mayActFor
+    // permission: delegated to hr/employees.employment.mayActFor
     const svc = employment(ctx);
     if (!svc) return c.json({ error: 'hr/employees is not enabled' }, 503);
     const user = c.get('user') as any;
@@ -411,7 +411,7 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/timesheets/:id/submit', async (c) => {
-    // permission: delegated to hr.employment.mayActFor
+    // permission: delegated to hr/employees.employment.mayActFor
     const svc = employment(ctx);
     if (!svc) return c.json({ error: 'hr/employees is not enabled' }, 503);
     const _u = c.get('user') as any;
@@ -431,7 +431,7 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/timesheets/:id/approve', async (c) => {
-    // permission: delegated to hr.employment.mayActFor
+    // permission: delegated to hr/employees.employment.mayActFor
     const svc = employment(ctx);
     if (!svc) return c.json({ error: 'hr/employees is not enabled' }, 503);
     const user = c.get('user') as any;
@@ -462,7 +462,7 @@ export function timeTrackingRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/timesheets/:id/reject', zValidator('json', z.object({ reason: z.string().min(1) })), async (c) => {
-    // permission: delegated to hr.employment.mayActFor
+    // permission: delegated to hr/employees.employment.mayActFor
     const svc = employment(ctx);
     if (!svc) return c.json({ error: 'hr/employees is not enabled' }, 503);
     const { reason } = c.req.valid('json');

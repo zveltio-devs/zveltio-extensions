@@ -2,7 +2,7 @@
  * Romanian national identifier (CNP), for whoever asks the instance what a
  * valid one looks like.
  *
- * Registered on the service registry as `identity.nationalId`. `hr/employees`
+ * Registered on the service registry as `compliance/ro/documents.nationalId`. `hr/employees`
  * looks it up when somebody types a national identifier and applies it if it is
  * there — it does not know what a CNP is, and should not: a CNP, an NI number
  * and a social security number share nothing but a column. An HR module that

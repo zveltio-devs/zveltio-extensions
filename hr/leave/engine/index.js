@@ -24650,7 +24650,7 @@ async function countWorkingDays(dbh, startDate, endDate, isHalfDay = false) {
   return days;
 }
 function employment(ctx) {
-  return ctx.services.get("hr.employment");
+  return ctx.services.get("hr/employees.employment");
 }
 function yearOf(isoDate) {
   return Number.parseInt(String(isoDate).slice(0, 4), 10);
@@ -25063,3 +25063,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1

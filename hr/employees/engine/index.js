@@ -4996,30 +4996,6 @@ var Hono2 = class extends Hono {
   }
 };
 
-// /zveltio-extension/node_modules/hono/dist/http-exception.js
-var HTTPException2 = class extends Error {
-  res;
-  status;
-  constructor(status = 500, options) {
-    super(options?.message, { cause: options?.cause });
-    this.res = options?.res;
-    this.status = status;
-  }
-  getResponse() {
-    if (this.res)
-      return new Response(this.res.body, {
-        status: this.status,
-        headers: this.res.headers
-      });
-    return new Response(this.message, { status: this.status });
-  }
-};
-
-// /zveltio-extension/node_modules/hono/dist/utils/buffer.js
-var bufferToFormData2 = (arrayBuffer, contentType) => {
-  return new Response(arrayBuffer, { headers: { "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase()) } }).formData();
-};
-
 // /zveltio-extension/node_modules/hono/dist/utils/url.js
 var tryDecode2 = (str, decoder) => {
   try {
@@ -5045,37 +5021,44 @@ var trimCookieWhitespace = (value) => {
   let end = value.length;
   while (start < end) {
     const charCode = value.charCodeAt(start);
-    if (charCode !== 32 && charCode !== 9)
+    if (charCode !== 32 && charCode !== 9) {
       break;
+    }
     start++;
   }
   while (end > start) {
     const charCode = value.charCodeAt(end - 1);
-    if (charCode !== 32 && charCode !== 9)
+    if (charCode !== 32 && charCode !== 9) {
       break;
+    }
     end--;
   }
   return start === 0 && end === value.length ? value : value.slice(start, end);
 };
 var parse = (cookie, name) => {
-  if (name && cookie.indexOf(name) === -1)
+  if (name && cookie.indexOf(name) === -1) {
     return {};
+  }
   const pairs = cookie.split(";");
-  const parsedCookie = Object.create(null);
+  const parsedCookie = /* @__PURE__ */ Object.create(null);
   for (const pairStr of pairs) {
     const valueStartPos = pairStr.indexOf("=");
-    if (valueStartPos === -1)
+    if (valueStartPos === -1) {
       continue;
+    }
     const cookieName = trimCookieWhitespace(pairStr.substring(0, valueStartPos));
-    if (name && name !== cookieName || !relaxedCookieNameRegEx.test(cookieName) || cookieName in parsedCookie)
+    if (name && name !== cookieName || !relaxedCookieNameRegEx.test(cookieName) || cookieName in parsedCookie) {
       continue;
+    }
     let cookieValue = trimCookieWhitespace(pairStr.substring(valueStartPos + 1));
-    if (cookieValue.startsWith('"') && cookieValue.endsWith('"'))
+    if (cookieValue.startsWith('"') && cookieValue.endsWith('"')) {
       cookieValue = cookieValue.slice(1, -1);
+    }
     if (validCookieValueRegEx.test(cookieValue)) {
       parsedCookie[cookieName] = tryDecodeURIComponent2(cookieValue);
-      if (name)
+      if (name) {
         break;
+      }
     }
   }
   return parsedCookie;
@@ -5085,18 +5068,56 @@ var parse = (cookie, name) => {
 var getCookie = (c, key, prefix) => {
   const cookie = c.req.raw.headers.get("Cookie");
   if (typeof key === "string") {
-    if (!cookie)
+    if (!cookie) {
       return;
+    }
     let finalKey = key;
-    if (prefix === "secure")
+    if (prefix === "secure") {
       finalKey = "__Secure-" + key;
-    else if (prefix === "host")
+    } else if (prefix === "host") {
       finalKey = "__Host-" + key;
-    return parse(cookie, finalKey)[finalKey];
+    }
+    const obj2 = parse(cookie, finalKey);
+    return obj2[finalKey];
   }
-  if (!cookie)
+  if (!cookie) {
     return {};
-  return parse(cookie);
+  }
+  const obj = parse(cookie);
+  return obj;
+};
+
+// /zveltio-extension/node_modules/hono/dist/http-exception.js
+var HTTPException2 = class extends Error {
+  res;
+  status;
+  constructor(status = 500, options) {
+    super(options?.message, { cause: options?.cause });
+    this.res = options?.res;
+    this.status = status;
+  }
+  getResponse() {
+    if (this.res) {
+      const newResponse = new Response(this.res.body, {
+        status: this.status,
+        headers: this.res.headers
+      });
+      return newResponse;
+    }
+    return new Response(this.message, {
+      status: this.status
+    });
+  }
+};
+
+// /zveltio-extension/node_modules/hono/dist/utils/buffer.js
+var bufferToFormData2 = (arrayBuffer, contentType) => {
+  const response = new Response(arrayBuffer, {
+    headers: {
+      "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase())
+    }
+  });
+  return response.formData();
 };
 
 // /zveltio-extension/node_modules/hono/dist/validator/validator.js
@@ -5109,21 +5130,24 @@ var validator = (target, validationFunc) => {
     const contentType = c.req.header("Content-Type");
     switch (target) {
       case "json":
-        if (!contentType || !jsonRegex.test(contentType))
+        if (!contentType || !jsonRegex.test(contentType)) {
           break;
+        }
         try {
           value = await c.req.json();
         } catch {
-          throw new HTTPException2(400, { message: "Malformed JSON in request body" });
+          const message = "Malformed JSON in request body";
+          throw new HTTPException2(400, { message });
         }
         break;
       case "form": {
-        if (!contentType || !(multipartRegex.test(contentType) || urlencodedRegex.test(contentType)))
+        if (!contentType || !(multipartRegex.test(contentType) || urlencodedRegex.test(contentType))) {
           break;
+        }
         let formData;
-        if (c.req.bodyCache.formData)
+        if (c.req.bodyCache.formData) {
           formData = await c.req.bodyCache.formData;
-        else
+        } else {
           try {
             const arrayBuffer = await c.req.arrayBuffer();
             formData = await bufferToFormData2(arrayBuffer, contentType);
@@ -5133,16 +5157,18 @@ var validator = (target, validationFunc) => {
             message += e instanceof Error ? ` ${e.message}` : ` ${String(e)}`;
             throw new HTTPException2(400, { message });
           }
-        const form = Object.create(null);
+        }
+        const form = /* @__PURE__ */ Object.create(null);
         formData.forEach((value2, key) => {
-          if (key.endsWith("[]"))
+          if (key.endsWith("[]")) {
             (form[key] ??= []).push(value2);
-          else if (Array.isArray(form[key]))
+          } else if (Array.isArray(form[key])) {
             form[key].push(value2);
-          else if (Object.hasOwn(form, key))
+          } else if (Object.hasOwn(form, key)) {
             form[key] = [form[key], value2];
-          else
+          } else {
             form[key] = value2;
+          }
         });
         value = form;
         break;
@@ -5160,10 +5186,12 @@ var validator = (target, validationFunc) => {
         break;
       case "cookie":
         value = getCookie(c);
+        break;
     }
     const res = await validationFunc(value, c);
-    if (res instanceof Response)
+    if (res instanceof Response) {
       return res;
+    }
     c.req.addValidatedData(target, res);
     return await next();
   };
@@ -24798,7 +24826,7 @@ function employeesRoutes(ctx) {
     national_id: exports_external.string().optional().refine((v) => {
       if (v === undefined || v === "")
         return true;
-      const validate2 = ctx.services.get("identity.nationalId");
+      const validate2 = ctx.services.get("compliance/ro/documents.nationalId");
       return validate2 ? validate2(v) : true;
     }, { message: "Invalid national identifier for this country / identificator national invalid" }),
     tax_id: exports_external.string().optional(),
@@ -25496,7 +25524,7 @@ var extension = {
     ];
   },
   async register(app, ctx) {
-    ctx.services.register("hr.employment", buildEmploymentService(ctx));
+    ctx.services.register("hr/employees.employment", buildEmploymentService(ctx));
     const { auth } = ctx;
     app.use("*", async (c, next) => {
       const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -25508,19 +25536,19 @@ var extension = {
     app.use("*", permissionGate(ctx, "employees"));
     app.route("/", contractRoutes(ctx));
     app.route("/", employeesRoutes(ctx));
-    ctx.services.register("employees.lookup", async (id) => {
+    ctx.services.register("hr/employees.lookup", async (id) => {
       const r = await sql`SELECT * FROM zvd_employees WHERE id = ${id} LIMIT 1`.execute(ctx.db);
       return r.rows[0] ?? null;
     });
-    ctx.services.register("employees.findByEmail", async (email3) => {
+    ctx.services.register("hr/employees.findByEmail", async (email3) => {
       const r = await sql`SELECT * FROM zvd_employees WHERE email = ${email3} LIMIT 1`.execute(ctx.db);
       return r.rows[0] ?? null;
     });
-    ctx.services.register("employees.findByUserId", async (userId) => {
+    ctx.services.register("hr/employees.findByUserId", async (userId) => {
       const r = await sql`SELECT * FROM zvd_employees WHERE user_id = ${userId} LIMIT 1`.execute(ctx.db);
       return r.rows[0] ?? null;
     });
-    ctx.services.register("employees.list", async (opts = {}) => {
+    ctx.services.register("hr/employees.list", async (opts = {}) => {
       let q = sql`SELECT * FROM zvd_employees WHERE 1=1`;
       if (opts.active !== undefined) {
         q = sql`${q} AND is_active = ${opts.active}`;
@@ -25532,7 +25560,7 @@ var extension = {
       const r = await q.execute(ctx.db);
       return r.rows;
     });
-    ctx.services.register("departments.lookup", async (id) => {
+    ctx.services.register("hr/employees.departments.lookup", async (id) => {
       const r = await sql`SELECT * FROM zvd_departments WHERE id = ${id} LIMIT 1`.execute(ctx.db);
       return r.rows[0] ?? null;
     });

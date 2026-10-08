@@ -280,7 +280,7 @@ export function employeesRoutes(ctx: ExtensionContext): Hono {
       .refine(
         (v) => {
           if (v === undefined || v === '') return true;
-          const validate = ctx.services.get<(value: string) => boolean>('identity.nationalId');
+          const validate = ctx.services.get<(value: string) => boolean>('compliance/ro/documents.nationalId');
           return validate ? validate(v) : true;
         },
         { message: 'Invalid national identifier for this country / identificator national invalid' },

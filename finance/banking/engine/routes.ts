@@ -386,7 +386,7 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
           notes?: string;
           userId: string;
         }) => Promise<unknown>
-      >('invoicing.recordPayment');
+      >('finance/invoicing.recordPayment');
       if (recordPayment) {
         const t = tx.rows[0] as any;
         try {
@@ -459,7 +459,7 @@ export function bankingRoutes(ctx: ExtensionContext): Hono {
     // absent extension is reported rather than guessed at.
     const openReceivables = ctx.services.get<
       (window: { from: string; to: string }) => Promise<Array<Record<string, unknown>>>
-    >('invoicing.openReceivables');
+    >('finance/invoicing.openReceivables');
 
     let receivables: Array<Record<string, unknown>> = [];
     const unavailable: string[] = [];

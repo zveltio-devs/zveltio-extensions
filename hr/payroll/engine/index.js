@@ -24717,7 +24717,7 @@ async function mayDecidePayroll(ctx, user, action) {
   return ctx.checkPermission(user.id, "admin", "*").catch(() => false);
 }
 function employment(ctx) {
-  return ctx.services.get("hr.employment");
+  return ctx.services.get("hr/employees.employment");
 }
 function noEmploymentService(c) {
   return c.json({
@@ -25130,3 +25130,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1

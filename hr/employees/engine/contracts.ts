@@ -17,7 +17,7 @@ import type { ExtensionContext } from '@zveltio/sdk/extension';
  * Nothing here is country-specific. `contract_type` has the two forms that exist
  * everywhere, the norm is hours per week rather than a "full-time" label, and
  * the ground for ending a contract is a free CODE whose vocabulary a country
- * extension supplies — the same shape as `identity.nationalId`. An unknown code
+ * extension supplies — the same shape as `compliance/ro/documents.nationalId`. An unknown code
  * is accepted: an instance should not have to wait for an extension before it
  * can end a contract.
  */

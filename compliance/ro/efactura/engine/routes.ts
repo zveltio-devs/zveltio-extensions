@@ -106,7 +106,7 @@ function day(v: unknown): string {
  * (index.ts) had populated correctly. Migrations 003/004 exist because ANAF's
  * BR-08/BR-10/BR-RO-081/082/091/092/110/111 require exactly those elements;
  * dropping them here defeated that fix for every invoice generated through the
- * UI. `efactura.generateXml` (index.ts), which passes the row straight through
+ * UI. `compliance/ro/efactura.generateXml` (index.ts), which passes the row straight through
  * without this function, was unaffected — which is why nothing looked broken.
  */
 function toInvoiceData(row: any, lines: any[]): Parameters<typeof generateUBLXML>[0] {
