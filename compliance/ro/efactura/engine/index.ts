@@ -132,17 +132,17 @@ const extension: ZveltioExtension = {
     });
 
     // ── Service registry: helpers other extensions can use ──────────────────
-    // efactura.submissions.lookup(invoiceId) → submission row | null
-    ctx.services.register('efactura.submissions.lookup', async (sourceInvoiceId: string) => {
+    // compliance/ro/efactura.submissions.lookup(invoiceId) → submission row | null
+    ctx.services.register('compliance/ro/efactura.submissions.lookup', async (sourceInvoiceId: string) => {
       const r = await sql<any>`
         SELECT * FROM zv_efactura_invoices WHERE source_invoice_id = ${sourceInvoiceId} LIMIT 1
       `.execute(ctx.db);
       return r.rows[0] ?? null;
     });
 
-    // efactura.generateXml(submissionId) → XML string. Other extensions (or a flow)
+    // compliance/ro/efactura.generateXml(submissionId) → XML string. Other extensions (or a flow)
     // can request the UBL XML for a submission without going through HTTP.
-    ctx.services.register('efactura.generateXml', async (submissionId: string) => {
+    ctx.services.register('compliance/ro/efactura.generateXml', async (submissionId: string) => {
       const r = await sql<any>`
         SELECT * FROM zv_efactura_invoices WHERE id = ${submissionId} LIMIT 1
       `.execute(ctx.db);

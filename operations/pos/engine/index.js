@@ -24843,8 +24843,8 @@ function posRoutes(ctx) {
       canonicalContactId = c2.rows[0]?.canonical_contact_id ?? null;
       customerName = c2.rows[0]?.name ?? null;
     }
-    const inventoryMove = ctx.services.get("inventory.stock.move");
-    const lookupProduct = ctx.services.get("inventory.products.lookup");
+    const inventoryMove = ctx.services.get("operations/inventory.stock.move");
+    const lookupProduct = ctx.services.get("operations/inventory.products.lookup");
     const { order: order2, orderId, stockToMove } = await db.transaction().execute(async (trx) => {
       const orderNumber = await claimOrderNumber(trx);
       const created = await sql`
@@ -24971,3 +24971,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1

@@ -7,9 +7,9 @@ import { invoicingRoutes } from './routes.js';
  * Invoicing extension — canonical owner of `zvd_invoices` and `zvd_invoice_lines`.
  *
  * Publishes the following services:
- *   invoicing.lookup(id)                  → invoice with lines | null
- *   invoicing.findByNumber(number)        → invoice | null
- *   invoicing.listByClient(clientId)      → invoice[] for a contact
+ *   finance/invoicing.lookup(id)                  → invoice with lines | null
+ *   finance/invoicing.findByNumber(number)        → invoice | null
+ *   finance/invoicing.listByClient(clientId)      → invoice[] for a contact
  *   invoicing.create(input)               → created invoice + lines (also emits invoice.created)
  *
  * Emits events on the engine bus:
@@ -49,7 +49,7 @@ const extension: ZveltioExtension = {
     app.route('/', invoicingRoutes(ctx));
 
     // ── Service registry — canonical invoices API ───────────────────────────
-    ctx.services.register('invoicing.lookup', async (id: string) => {
+    ctx.services.register('finance/invoicing.lookup', async (id: string) => {
       const inv = await sql<any>`SELECT * FROM zvd_invoices WHERE id = ${id} LIMIT 1`.execute(ctx.db);
       if (!inv.rows[0]) return null;
       const lines = await sql<any>`
@@ -58,7 +58,7 @@ const extension: ZveltioExtension = {
       return { ...inv.rows[0], lines: lines.rows };
     });
 
-    ctx.services.register('invoicing.findByNumber', async (number: string) => {
+    ctx.services.register('finance/invoicing.findByNumber', async (number: string) => {
       const r = await sql<any>`SELECT * FROM zvd_invoices WHERE number = ${number} LIMIT 1`.execute(ctx.db);
       return r.rows[0] ?? null;
     });
@@ -82,7 +82,7 @@ const extension: ZveltioExtension = {
      * that route's body, reachable by name.
      */
     ctx.services.register(
-      'invoicing.recordPayment',
+      'finance/invoicing.recordPayment',
       async (input: {
         invoiceId: string;
         amount: number;
@@ -161,7 +161,7 @@ const extension: ZveltioExtension = {
      * driver returns strings and the subtraction happens in PostgreSQL, not here.
      */
     ctx.services.register(
-      'invoicing.openReceivables',
+      'finance/invoicing.openReceivables',
       async (window: { from: string; to: string }) => {
         const r = await sql<any>`
           SELECT
@@ -179,7 +179,7 @@ const extension: ZveltioExtension = {
       },
     );
 
-    ctx.services.register('invoicing.listByClient', async (clientId: string) => {
+    ctx.services.register('finance/invoicing.listByClient', async (clientId: string) => {
       const r = await sql<any>`
         SELECT * FROM zvd_invoices WHERE client_id = ${clientId}::uuid ORDER BY issue_date DESC
       `.execute(ctx.db);

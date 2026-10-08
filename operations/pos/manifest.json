@@ -3,7 +3,7 @@
   "displayName": "Point of Sale",
   "category": "operations",
   "description": "Cash register, receipt generation, end-of-day reports and inventory integration",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "optionalDependencies": [
@@ -48,8 +48,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "e7b270bd015e673f7f93e2f1d8738b736a6e98c4f657367404979427015c9bc0",
-    "sourceSha256": "49c9602a7929b6b63bfc94a92167ce10d4816b302d87456939cee57ddf911ddd"
+    "engineSha256": "b5e4924065cbd0e6777cc7b859ccb36f79bf005ffbffdb41a7273862d680874a",
+    "sourceSha256": "8a79adaa6ad9fc9b37b060c1ffacb2130e00592e18d330ba7b6f38660fd3b0b0"
   },
   "resources": [
     "pos"

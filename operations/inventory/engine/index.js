@@ -25065,7 +25065,7 @@ var extension = {
   },
   async register(app, ctx) {
     app.route("/", inventoryRoutes(ctx));
-    ctx.services.register("inventory.products.lookup", async (idOrSku) => {
+    ctx.services.register("operations/inventory.products.lookup", async (idOrSku) => {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSku);
       const r = await sql`
         SELECT * FROM zvd_products
@@ -25074,11 +25074,11 @@ var extension = {
       `.execute(ctx.db);
       return r.rows[0] ?? null;
     });
-    ctx.services.register("inventory.products.findBySku", async (sku) => {
+    ctx.services.register("operations/inventory.products.findBySku", async (sku) => {
       const r = await sql`SELECT * FROM zvd_products WHERE sku = ${sku} LIMIT 1`.execute(ctx.db);
       return r.rows[0] ?? null;
     });
-    ctx.services.register("inventory.products.list", async (opts = {}) => {
+    ctx.services.register("operations/inventory.products.list", async (opts = {}) => {
       let q = sql`SELECT * FROM zvd_products WHERE 1=1`;
       if (opts.active !== undefined)
         q = sql`${q} AND is_active = ${opts.active}`;
@@ -25090,7 +25090,7 @@ var extension = {
       const r = await q.execute(ctx.db);
       return r.rows;
     });
-    ctx.services.register("inventory.stock.level", async (productId, warehouseId) => {
+    ctx.services.register("operations/inventory.stock.level", async (productId, warehouseId) => {
       const r = await sql`
         -- NOT ::int. The quantity column is NUMERIC(10,3) and the product unit
         -- CHECK permits kg, liter and meter \u2014 fractional by nature. Casting to int
@@ -25105,7 +25105,7 @@ var extension = {
       `.execute(ctx.db);
       return Number(r.rows[0]?.qty ?? 0);
     });
-    ctx.services.register("inventory.stock.reserve", async (input2) => {
+    ctx.services.register("operations/inventory.stock.reserve", async (input2) => {
       await sql`
         INSERT INTO zvd_stock_levels (product_id, warehouse_id, quantity, reserved_qty)
         VALUES (${input2.productId}::uuid, ${input2.warehouseId}::uuid, 0, ${Math.abs(input2.qty)})
@@ -25122,7 +25122,7 @@ var extension = {
       ctx.events.emit("stock.reserved", { ...input2, available });
       return { quantity: Number(row.quantity), reserved: Number(row.reserved_qty), available };
     });
-    ctx.services.register("inventory.stock.release", async (input2) => {
+    ctx.services.register("operations/inventory.stock.release", async (input2) => {
       await sql`
         UPDATE zvd_stock_levels
            SET reserved_qty = GREATEST(reserved_qty - ${Math.abs(input2.qty)}, 0), updated_at = NOW()
@@ -25139,7 +25139,7 @@ var extension = {
         available: Number(row.quantity) - Number(row.reserved_qty)
       };
     });
-    ctx.services.register("inventory.stock.move", async (input2) => {
+    ctx.services.register("operations/inventory.stock.move", async (input2) => {
       const movementType = input2.type === "adjust" ? "adjustment" : input2.type;
       await sql`
         INSERT INTO zvd_stock_movements (product_id, warehouse_id, quantity, type, reference, note, created_by)
@@ -25170,3 +25170,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1

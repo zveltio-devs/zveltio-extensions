@@ -24829,7 +24829,7 @@ function ecommerceRoutes(ctx) {
     const user = c.get("user");
     const d = c.req.valid("json");
     let canonicalProductId = null;
-    const findBySku = ctx.services.get("inventory.products.findBySku");
+    const findBySku = ctx.services.get("operations/inventory.products.findBySku");
     const row = await db.transaction().execute(async (trx) => {
       if (findBySku) {
         try {

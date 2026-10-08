@@ -215,7 +215,7 @@ d('invoicing: write path', () => {
 
   // ── The service twin, which `finance/banking` calls ───────────────────────
   //
-  // `invoicing.recordPayment` is `POST /invoices/:id/payments` reachable by
+  // `finance/invoicing.recordPayment` is `POST /invoices/:id/payments` reachable by
   // name, and its own comment says so. It carried the same absolute write, and
   // it never checked the outstanding amount at all — so a bank transaction
   // larger than the invoice was recorded in full and the invoice marked `paid`.
@@ -231,7 +231,7 @@ d('invoicing: write path', () => {
     ).json()).data;
     await app.request(`/invoices/${inv.id}/send`, { method: 'POST' });
 
-    const recordPayment = ctx.services.get('invoicing.recordPayment') as (i: any) => Promise<any>;
+    const recordPayment = ctx.services.get('finance/invoicing.recordPayment') as (i: any) => Promise<any>;
     // Positive control first: an ordinary payment settles part of the invoice.
     const ok = await recordPayment({ invoiceId: inv.id, amount: 19, userId: 'u1' });
     expect(ok.status).toBe('partially_paid');

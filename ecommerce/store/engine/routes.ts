@@ -305,7 +305,7 @@ export function ecommerceRoutes(ctx: ExtensionContext): Hono {
     // so storefront and inventory share one product identity. The ec_products row
     // becomes a storefront overlay (slug, SEO, images) on top of the canonical row.
     let canonicalProductId: string | null = null;
-    const findBySku = ctx.services.get<(sku: string) => Promise<any | null>>('inventory.products.findBySku');
+    const findBySku = ctx.services.get<(sku: string) => Promise<any | null>>('operations/inventory.products.findBySku');
     // The best-effort insert below needs a savepoint, and a savepoint needs a
     // transaction to live in: asking for one here keeps the fallback legal
     // whatever the request's transaction boundary is.

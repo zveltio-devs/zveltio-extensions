@@ -361,7 +361,7 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
    * What can go on an invoice line: stock items and services, in one list.
    *
    * `operations/inventory` already owns products — it has done all along, with
-   * `inventory.products.list` published for exactly this — and this extension
+   * `operations/inventory.products.list` published for exactly this — and this extension
    * grew its own `zvd_catalogue_items` table anyway. That is a duplicate
    * catalogue: the same goods maintained twice, drifting apart, with the price
    * on an invoice eventually disagreeing with the price in the warehouse.
@@ -384,7 +384,7 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
     const listProducts = ctx.services.get<
       // biome-ignore lint/suspicious/noExplicitAny: cross-extension service payload
       (opts?: { active?: boolean; q?: string }) => Promise<any[]>
-    >('inventory.products.list');
+    >('operations/inventory.products.list');
     if (!listProducts) return c.json({ data: local });
 
     // biome-ignore lint/suspicious/noExplicitAny: cross-extension service payload
@@ -988,7 +988,7 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
         reason?: string;
         userId?: string;
       }) => Promise<{ balance: number }>
-    >('inventory.stock.move');
+    >('operations/inventory.stock.move');
 
     const warehouseId = c.req.query('warehouse_id');
     // biome-ignore lint/suspicious/noExplicitAny: cross-extension payload

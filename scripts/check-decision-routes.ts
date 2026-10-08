@@ -33,13 +33,13 @@
  * closing brace, and asks whether the question is put THERE.
  *
  * A guard may also live in ANOTHER module, reached over `ctx.services` — that is
- * how `hr/leave` and `hr/time-tracking` ask `hr.employment` who somebody is and
+ * how `hr/leave` and `hr/time-tracking` ask `hr/employees.employment` who somebody is and
  * whether they manage them. A static reader cannot follow a call resolved at
  * runtime across an extension boundary, and pretending it can is how a gate
  * turns into theatre. Those handlers declare it instead, with a marker naming
  * where the check lives:
  *
- *     // permission: delegated to hr.employment.mayActFor
+ *     // permission: delegated to hr/employees.employment.mayActFor
  *
  * That is weaker than seeing the call — it is a claim, not a proof. It is also
  * greppable, reviewable, and forces the delegation to be written down rather

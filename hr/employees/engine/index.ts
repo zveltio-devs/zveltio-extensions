@@ -12,11 +12,11 @@ import { buildEmploymentService } from './employment-service.js';
  * read from these via SQL today and via services going forward.
  *
  * Services:
- *   employees.lookup(id)                  → employee row | null
- *   employees.findByEmail(email)          → employee row | null
- *   employees.findByUserId(authUserId)    → employee row tied to a Zveltio user
- *   employees.list({ active?, dept? })    → employee[]
- *   departments.lookup(id)                → department row | null
+ *   hr/employees.lookup(id)                  → employee row | null
+ *   hr/employees.findByEmail(email)          → employee row | null
+ *   hr/employees.findByUserId(authUserId)    → employee row tied to a Zveltio user
+ *   hr/employees.list({ active?, dept? })    → employee[]
+ *   hr/employees.departments.lookup(id)                → department row | null
  *
  * Events:
  *   employee.created    { id, employee }
@@ -47,7 +47,7 @@ const extension: ZveltioExtension = {
     // What sibling HR modules may ask about employment, so none of them has to
     // open this extension's tables. `hr/payroll` was reading `zvd_employees`
     // directly in four places.
-    ctx.services.register('hr.employment', buildEmploymentService(ctx));
+    ctx.services.register('hr/employees.employment', buildEmploymentService(ctx));
 
     // Authentication and the RBAC gate go on THIS app, above both route sets.
     //
@@ -73,22 +73,22 @@ const extension: ZveltioExtension = {
     app.route('/', contractRoutes(ctx));
     app.route('/', employeesRoutes(ctx));
 
-    ctx.services.register('employees.lookup', async (id: string) => {
+    ctx.services.register('hr/employees.lookup', async (id: string) => {
       const r = await sql<any>`SELECT * FROM zvd_employees WHERE id = ${id} LIMIT 1`.execute(ctx.db);
       return r.rows[0] ?? null;
     });
 
-    ctx.services.register('employees.findByEmail', async (email: string) => {
+    ctx.services.register('hr/employees.findByEmail', async (email: string) => {
       const r = await sql<any>`SELECT * FROM zvd_employees WHERE email = ${email} LIMIT 1`.execute(ctx.db);
       return r.rows[0] ?? null;
     });
 
-    ctx.services.register('employees.findByUserId', async (userId: string) => {
+    ctx.services.register('hr/employees.findByUserId', async (userId: string) => {
       const r = await sql<any>`SELECT * FROM zvd_employees WHERE user_id = ${userId} LIMIT 1`.execute(ctx.db);
       return r.rows[0] ?? null;
     });
 
-    ctx.services.register('employees.list', async (opts: { active?: boolean; dept?: string } = {}) => {
+    ctx.services.register('hr/employees.list', async (opts: { active?: boolean; dept?: string } = {}) => {
       let q = sql<any>`SELECT * FROM zvd_employees WHERE 1=1`;
       if (opts.active !== undefined) {
         q = sql<any>`${q} AND is_active = ${opts.active}`;
@@ -101,7 +101,7 @@ const extension: ZveltioExtension = {
       return r.rows;
     });
 
-    ctx.services.register('departments.lookup', async (id: string) => {
+    ctx.services.register('hr/employees.departments.lookup', async (id: string) => {
       const r = await sql<any>`SELECT * FROM zvd_departments WHERE id = ${id} LIMIT 1`.execute(ctx.db);
       return r.rows[0] ?? null;
     });

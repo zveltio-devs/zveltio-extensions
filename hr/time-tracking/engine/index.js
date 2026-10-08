@@ -24597,7 +24597,7 @@ function permissionGate(ctx, resource, opts = {}) {
 }
 // engine/routes.ts
 function employment(ctx) {
-  return ctx.services.get("hr.employment");
+  return ctx.services.get("hr/employees.employment");
 }
 function timeTrackingRoutes(ctx) {
   const { db, auth } = ctx;
@@ -25059,3 +25059,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1

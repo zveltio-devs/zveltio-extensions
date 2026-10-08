@@ -48,7 +48,7 @@ async function countWorkingDays(dbh: any, startDate: string, endDate: string, is
  *
  * `callerEmployee` and `mayActOnLeaveOf` used to live here, opening
  * `zvd_employees` — another extension's table — and an identical pair lived in
- * `hr/time-tracking`. They are one implementation now, on the `hr.employment`
+ * `hr/time-tracking`. They are one implementation now, on the `hr/employees.employment`
  * service that `hr/employees` registers.
  *
  * Null when `hr/employees` is not enabled. Callers refuse rather than guess:
@@ -58,7 +58,7 @@ function employment(ctx: ExtensionContext) {
   return ctx.services.get<{
     identify(u: { id: string; email?: string }): Promise<{ id: string; manager_id: string | null } | null>;
     mayActFor(u: { id: string; email?: string }, employeeId: string): Promise<boolean>;
-  }>('hr.employment');
+  }>('hr/employees.employment');
 }
 
 /**
@@ -199,7 +199,7 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
     // denormalised reads for display, not ownership of the data.
     //
     // What DID move is everything that decides: identity, manager, and
-    // authorisation now go through `hr.employment`.
+    // authorisation now go through `hr/employees.employment`.
     const employees = await sql`SELECT id FROM zvd_employees ${empQuery}`.execute(db);
     const types = await sql`SELECT id, days_per_year FROM zvd_leave_types`.execute(db);
     let created = 0;
@@ -302,7 +302,7 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
 
   app.get('/requests/my', async (c) => {
     const user = c.get('user') as any;
-    // permission: delegated to hr.employment.mayActFor
+    // permission: delegated to hr/employees.employment.mayActFor
     const svc = employment(ctx);
     if (!svc) return c.json({ error: 'hr/employees is not enabled' }, 503);
     // The last direct read of another extension's table in this file. It also
@@ -331,7 +331,7 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
   })), async (c) => {
     const d = c.req.valid('json');
     const user = c.get('user') as any;
-    // permission: delegated to hr.employment.mayActFor
+    // permission: delegated to hr/employees.employment.mayActFor
     const svc = employment(ctx);
     if (!svc) return c.json({ error: 'hr/employees is not enabled' }, 503);
     // Whose leave is this? `employee_id` comes from the body, so without this a
@@ -420,7 +420,7 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
     const req = await sql`SELECT * FROM zvd_leave_requests WHERE id = ${c.req.param('id')} AND status = 'pending'`.execute(db);
     if (!req.rows.length) return c.json({ error: 'Request not found or not pending' }, 400);
     const r = req.rows[0] as any;
-    // permission: delegated to hr.employment.mayActFor
+    // permission: delegated to hr/employees.employment.mayActFor
     const svc = employment(ctx);
     if (!svc) return c.json({ error: 'hr/employees is not enabled' }, 503);
 
@@ -463,7 +463,7 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
     const req = await sql`SELECT * FROM zvd_leave_requests WHERE id = ${c.req.param('id')} AND status = 'pending'`.execute(db);
     if (!req.rows.length) return c.json({ error: 'Request not found or not pending' }, 400);
     const r = req.rows[0] as any;
-    // permission: delegated to hr.employment.mayActFor
+    // permission: delegated to hr/employees.employment.mayActFor
     const svc = employment(ctx);
     if (!svc) return c.json({ error: 'hr/employees is not enabled' }, 503);
 
@@ -498,7 +498,7 @@ export function leaveRoutes(ctx: ExtensionContext): Hono {
     const req = await sql`SELECT * FROM zvd_leave_requests WHERE id = ${c.req.param('id')} AND status IN ('pending','approved')`.execute(db);
     if (!req.rows.length) return c.json({ error: 'Request not found or cannot be cancelled' }, 400);
     const r = req.rows[0] as any;
-    // permission: delegated to hr.employment.mayActFor
+    // permission: delegated to hr/employees.employment.mayActFor
     const svc = employment(ctx);
     if (!svc) return c.json({ error: 'hr/employees is not enabled' }, 503);
 

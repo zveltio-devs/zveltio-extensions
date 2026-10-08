@@ -10,8 +10,8 @@ import type { ExtensionContext } from '@zveltio/sdk/extension';
  * also the reason payroll could not see a contract: it was reading the
  * projection rather than the thing being projected.
  *
- * Registered on `ctx.services` as `hr.employment`. The same mechanism that
- * carries `identity.nationalId`, used the same way: the module that owns the
+ * Registered on `ctx.services` as `hr/employees.employment`. The same mechanism that
+ * carries `compliance/ro/documents.nationalId`, used the same way: the module that owns the
  * data answers questions about it, and nobody else opens the table.
  *
  * Deliberately narrow. This is not "employees, exposed" — it is the two

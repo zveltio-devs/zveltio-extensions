@@ -3,7 +3,7 @@
   "displayName": "eCommerce",
   "category": "ecommerce",
   "description": "Product catalog, orders, customer management, coupons and public storefront API",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "optionalDependencies": [
@@ -52,8 +52,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "5f0de849c37b4d09d522972188306a4407a830f910ec268294d0e8e50f290931",
-    "sourceSha256": "d20c8c977c7f9087bb90983958d8bc32f59f942b68bd17de565ffe50295daa24"
+    "engineSha256": "642e3aa2391a6bea454fda0bf9832df69ec2e04a686d3f4ed867996eebc42235",
+    "sourceSha256": "74df100e501004479f92d6bc4f3f014d85529ce8426b004bb64e46d461ef3719"
   },
   "resources": [
     "store"

@@ -26,7 +26,7 @@ const extension: ZveltioExtension = {
     // needs to ask. `hr/employees` uses it when somebody types one; it has no
     // idea what a CNP is, which is the point — an HR module that hard-codes one
     // country's identifier only fits that country.
-    ctx.services.register('identity.nationalId', isValidCnp);
+    ctx.services.register('compliance/ro/documents.nationalId', isValidCnp);
   },
 };
 

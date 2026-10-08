@@ -8,11 +8,11 @@ import { inventoryRoutes } from './routes.js';
  * `zvd_warehouses`, `zvd_stock_levels`, `zvd_stock_movements`.
  *
  * Services:
- *   inventory.products.lookup(id|sku)       → product row | null
- *   inventory.products.list({ active?, q? })→ product[]
- *   inventory.products.findBySku(sku)       → product | null
- *   inventory.stock.level(productId, wh?)   → number (sum across warehouses if wh omitted)
- *   inventory.stock.move({ productId, warehouseId, qty, type, reference })
+ *   operations/inventory.products.lookup(id|sku)       → product row | null
+ *   operations/inventory.products.list({ active?, q? })→ product[]
+ *   operations/inventory.products.findBySku(sku)       → product | null
+ *   operations/inventory.stock.level(productId, wh?)   → number (sum across warehouses if wh omitted)
+ *   operations/inventory.stock.move({ productId, warehouseId, qty, type, reference })
  *
  * Events:
  *   product.created    { id, product }
@@ -41,7 +41,7 @@ const extension: ZveltioExtension = {
   async register(app, ctx) {
     app.route('/', inventoryRoutes(ctx));
 
-    ctx.services.register('inventory.products.lookup', async (idOrSku: string) => {
+    ctx.services.register('operations/inventory.products.lookup', async (idOrSku: string) => {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSku);
       const r = await sql<any>`
         SELECT * FROM zvd_products
@@ -51,12 +51,12 @@ const extension: ZveltioExtension = {
       return r.rows[0] ?? null;
     });
 
-    ctx.services.register('inventory.products.findBySku', async (sku: string) => {
+    ctx.services.register('operations/inventory.products.findBySku', async (sku: string) => {
       const r = await sql<any>`SELECT * FROM zvd_products WHERE sku = ${sku} LIMIT 1`.execute(ctx.db);
       return r.rows[0] ?? null;
     });
 
-    ctx.services.register('inventory.products.list', async (opts: { active?: boolean; q?: string } = {}) => {
+    ctx.services.register('operations/inventory.products.list', async (opts: { active?: boolean; q?: string } = {}) => {
       let q = sql<any>`SELECT * FROM zvd_products WHERE 1=1`;
       if (opts.active !== undefined) q = sql<any>`${q} AND is_active = ${opts.active}`;
       if (opts.q) {
@@ -68,7 +68,7 @@ const extension: ZveltioExtension = {
       return r.rows;
     });
 
-    ctx.services.register('inventory.stock.level', async (productId: string, warehouseId?: string) => {
+    ctx.services.register('operations/inventory.stock.level', async (productId: string, warehouseId?: string) => {
       const r = await sql<any>`
         -- NOT ::int. The quantity column is NUMERIC(10,3) and the product unit
         -- CHECK permits kg, liter and meter — fractional by nature. Casting to int
@@ -104,7 +104,7 @@ const extension: ZveltioExtension = {
      * a warehouse service is the wrong place to decide whether this company
      * permits them.
      */
-    ctx.services.register('inventory.stock.reserve', async (input: {
+    ctx.services.register('operations/inventory.stock.reserve', async (input: {
       productId: string;
       warehouseId: string;
       qty: number;
@@ -139,7 +139,7 @@ const extension: ZveltioExtension = {
      * somewhere else, and a negative reservation would quietly inflate what the
      * warehouse thinks it can promise.
      */
-    ctx.services.register('inventory.stock.release', async (input: {
+    ctx.services.register('operations/inventory.stock.release', async (input: {
       productId: string;
       warehouseId: string;
       qty: number;
@@ -162,7 +162,7 @@ const extension: ZveltioExtension = {
       };
     });
 
-    ctx.services.register('inventory.stock.move', async (input: {
+    ctx.services.register('operations/inventory.stock.move', async (input: {
       productId: string;
       warehouseId: string;
       qty: number;
