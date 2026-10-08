@@ -4,7 +4,7 @@
   "category": "finance",
   "description": "Recurring invoices, payment tracking and overdue management",
   "version": "1.3.0",
-  "zveltioMinVersion": "3.0.0-beta.78",
+  "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "optionalDependencies": [
     {

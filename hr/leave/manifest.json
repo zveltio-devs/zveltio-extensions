@@ -4,7 +4,7 @@
   "category": "hr",
   "description": "Vacation and leave requests with balance tracking, approval workflow and calendar view",
   "version": "1.0.10",
-  "zveltioMinVersion": "3.0.0-beta.78",
+  "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-leave",
   "permissions": [

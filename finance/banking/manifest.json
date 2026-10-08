@@ -4,7 +4,7 @@
   "category": "finance",
   "description": "Import bank statements, auto-reconcile transactions with invoices and track cash flow",
   "version": "1.0.12",
-  "zveltioMinVersion": "3.0.0-beta.78",
+  "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-banking",
   "permissions": [
