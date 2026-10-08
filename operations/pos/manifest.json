@@ -3,9 +3,14 @@
   "displayName": "Point of Sale",
   "category": "operations",
   "description": "Cash register, receipt generation, end-of-day reports and inventory integration",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
+  "optionalDependencies": [
+    {
+      "name": "crm"
+    }
+  ],
   "package": "@zveltio/ext-pos",
   "permissions": [
     "database"

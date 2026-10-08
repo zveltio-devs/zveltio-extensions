@@ -3,9 +3,14 @@
   "displayName": "Data Quality",
   "category": "analytics",
   "description": "Automated data quality scans, anomaly detection and issue management",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
+  "optionalDependencies": [
+    {
+      "name": "ai"
+    }
+  ],
   "package": "@zveltio/ext-quality",
   "permissions": [
     "database",

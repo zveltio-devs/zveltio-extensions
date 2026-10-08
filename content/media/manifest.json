@@ -3,9 +3,14 @@
   "displayName": "Media Library",
   "category": "content",
   "description": "Media folders, files, and tags management",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
+  "optionalDependencies": [
+    {
+      "name": "ai"
+    }
+  ],
   "package": "@zveltio/ext-media",
   "permissions": [
     "database",
