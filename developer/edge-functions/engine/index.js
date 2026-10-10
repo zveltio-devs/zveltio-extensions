@@ -24652,7 +24652,7 @@ function edgeFunctionsRoutes(ctx) {
     const updates = { updated_at: new Date };
     for (const [k, v] of Object.entries(body)) {
       if (v !== undefined) {
-        updates[k] = k === "env_vars" ? JSON.stringify(v) : v;
+        updates[k] = k === "env_vars" ? toJsonb(v) : v;
       }
     }
     const row = await db.updateTable("zv_edge_functions").set(updates).where("id", "=", c.req.param("id")).returningAll().returning(sql`old.egress`.as("egress_before")).executeTakeFirst();

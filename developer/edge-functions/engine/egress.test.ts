@@ -116,6 +116,20 @@ d('edge function egress at save', () => {
     expect(log.every((e) => typeof e.user === 'string' && e.user.length > 0)).toBe(true);
   });
 
+  it('PATCH stores env_vars as a JSON object, not a JSON string', async () => {
+    // Under Bun.SQL a `JSON.stringify` bound to jsonb is a jsonb STRING, which
+    // `env_vars ? 'KEY'` (migration 061) cannot see into.
+    const { app } = await mountForTest(import.meta.dir);
+    const res = await send(app, 'POST', '/', { name: `eg-env-obj-${STAMP}`, display_name: 'x' });
+    const fn = (await res.json()).function;
+    created.push(fn.id);
+    expect((await send(app, 'PATCH', `/${fn.id}`, { env_vars: { A: '1' } })).status).toBe(200);
+    const r = await sql<{ t: string }>`
+      SELECT jsonb_typeof(env_vars) AS t FROM zv_edge_functions WHERE id = ${fn.id}
+    `.execute(db);
+    expect(r.rows[0]!.t).toBe('object');
+  });
+
   it('a function created without egress declares nothing and is not audited', async () => {
     const { app } = await mountForTest(import.meta.dir);
     const res = await send(app, 'POST', '/', { name: `eg-none-${STAMP}`, display_name: 'x' });

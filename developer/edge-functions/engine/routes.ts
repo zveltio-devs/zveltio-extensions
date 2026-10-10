@@ -265,7 +265,9 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
       const updates: any = { updated_at: new Date() };
       for (const [k, v] of Object.entries(body)) {
         if (v !== undefined) {
-          updates[k] = k === 'env_vars' ? JSON.stringify(v) : v;
+          // `toJsonb`, not `JSON.stringify`: under Bun.SQL a stringified value is
+          // stored as a jsonb STRING, which `env_vars ? 'KEY'` cannot see into.
+          updates[k] = k === 'env_vars' ? toJsonb(v) : v;
         }
       }
 
