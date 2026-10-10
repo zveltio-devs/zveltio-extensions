@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
+import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { toJsonb } from '@zveltio/sdk/extension';
 /**
@@ -42,7 +43,52 @@ type RunEdgeFunction = (
   request: EdgeRequestShape,
   env: Record<string, string>,
   timeoutMs: number,
+  /** The function's `egress` column; NULL declares nothing. */
+  egress: string[] | null,
 ) => Promise<EdgeRunResult>;
+
+/**
+ * The hosts a function may reach — its `egress` column (engine migration 061).
+ *
+ * NULL declares nothing: the function stays the engine's child, with the
+ * engine's network. `[]` declares no egress, and `["api.stripe.com",
+ * "hooks.slack.com:8443"]` exactly those authorities: on the extension runner
+ * the engine performs its `fetch` and refuses every other host, redirects
+ * included. Saving the function is the admin's approval, so a host that is not
+ * one is refused HERE, at save, instead of failing every invocation later.
+ *
+ * Same form as the engine's `parseEgress` and the column's CHECK, which refuses
+ * anything this lets through: a lower-case host name, an `[IPv6]` literal,
+ * optionally `:port`; no scheme, path or wildcard. Written lower-cased and
+ * without duplicates.
+ */
+const EGRESS_HOST =
+  /^(\[[0-9a-f:.]+\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:\d{1,5})?$/;
+
+const egressSchema = z
+  .array(
+    z
+      .string()
+      .trim()
+      .toLowerCase()
+      .refine((h) => EGRESS_HOST.test(h), {
+        error: (issue) =>
+          `"${String(issue.input)}" is not a host — write host or host:port, no scheme, path or wildcard`,
+      }),
+  )
+  .max(64)
+  .transform((hosts) => [...new Set(hosts)])
+  .nullable();
+
+/** `ZVELTIO_EGRESS` in env_vars granted egress before 061; now it would be silently ignored. */
+const envVarsSchema = z
+  .record(z.string(), z.string())
+  .refine((env) => !Object.hasOwn(env, 'ZVELTIO_EGRESS'), {
+    error: 'ZVELTIO_EGRESS is no longer read — list the hosts in `egress`',
+  });
+
+const sameHosts = (a: string[] | null, b: string[] | null) =>
+  a === b || (a !== null && b !== null && a.length === b.length && a.every((h, i) => h === b[i]));
 
 /**
  * Headers a sandboxed function must not be given — the caller's credentials.
@@ -97,6 +143,30 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
     return isAdmin ? session.user : null;
   }
 
+  /**
+   * Who changed what a function may reach, and when: the approval the save
+   * stands for. The engine's audit log (`ctx.internals.audit`), as a row of the
+   * running tenant. A failed write is logged; the save has already happened.
+   */
+  async function auditEgress(
+    userId: string,
+    fn: Record<string, any>,
+    before: string[] | null,
+    after: string[] | null,
+  ) {
+    await ctx.internals
+      .audit({
+        type: 'edge_function.egress_changed',
+        userId,
+        resourceType: 'edge_function',
+        resourceId: fn.id,
+        metadata: { name: fn.name, before, after },
+      })
+      .catch((err: Error) => {
+        console.warn('[edge-functions] egress audit write failed:', err.message);
+      });
+  }
+
   const app = new Hono();
 
   // ─── Admin CRUD ────────────────────────────────────────────────
@@ -107,7 +177,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
 
     const fns = await db
       .selectFrom('zv_edge_functions')
-      .select(['id', 'name', 'display_name', 'description', 'http_method', 'path', 'is_active', 'runtime', 'created_at'])
+      .select(['id', 'name', 'display_name', 'description', 'http_method', 'path', 'is_active', 'runtime', 'egress', 'created_at'])
       .orderBy('name', 'asc')
       .execute();
 
@@ -139,7 +209,8 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
         code: z.string().default(''),
         http_method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'ANY']).default('POST'),
         timeout_ms: z.number().int().min(100).max(300000).default(30000),
-        env_vars: z.record(z.string(), z.string()).default({}),
+        env_vars: envVarsSchema.default({}),
+        egress: egressSchema.default(null),
       }),
     ),
     async (c) => {
@@ -160,11 +231,13 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
           path,
           timeout_ms: body.timeout_ms,
           env_vars: toJsonb(body.env_vars),
+          egress: body.egress,
           created_by: user.id,
         })
         .returningAll()
         .executeTakeFirst();
 
+      if (fn && body.egress !== null) await auditEgress(user.id, fn, null, body.egress);
       return c.json({ function: fn }, 201);
     },
   );
@@ -180,7 +253,8 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
         http_method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'ANY']).optional(),
         is_active: z.boolean().optional(),
         timeout_ms: z.number().optional(),
-        env_vars: z.record(z.string(), z.string()).optional(),
+        env_vars: envVarsSchema.optional(),
+        egress: egressSchema.optional(),
       }),
     ),
     async (c) => {
@@ -191,18 +265,28 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
       const updates: any = { updated_at: new Date() };
       for (const [k, v] of Object.entries(body)) {
         if (v !== undefined) {
-          updates[k] = k === 'env_vars' ? JSON.stringify(v) : v;
+          // `toJsonb`, not `JSON.stringify`: under Bun.SQL a stringified value is
+          // stored as a jsonb STRING, which `env_vars ? 'KEY'` cannot see into.
+          updates[k] = k === 'env_vars' ? toJsonb(v) : v;
         }
       }
 
-      const fn = await db
+      // `old.egress` (PostgreSQL 18) is what this UPDATE replaced, read in the
+      // same statement: a separate SELECT first let a concurrent save land in
+      // between, and a change back to the value read then went unaudited.
+      const row = await db
         .updateTable('zv_edge_functions')
         .set(updates)
         .where('id', '=', c.req.param('id'))
         .returningAll()
+        .returning(sql<string[] | null>`old.egress`.as('egress_before'))
         .executeTakeFirst();
 
-      if (!fn) return c.json({ error: 'Function not found' }, 404);
+      if (!row) return c.json({ error: 'Function not found' }, 404);
+      const { egress_before: before, ...fn } = row as Record<string, any>;
+      if (body.egress !== undefined && !sameHosts(before ?? null, body.egress)) {
+        await auditEgress(user.id, fn, before ?? null, body.egress);
+      }
       return c.json({ function: fn });
     },
   );
@@ -262,6 +346,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
       },
       typeof fn.env_vars === 'string' ? JSON.parse(fn.env_vars) : (fn.env_vars ?? {}),
       fn.timeout_ms,
+      fn.egress ?? null,
     );
 
     // A RunResult is { ok, response, logs, duration_ms } — it has no `status`
@@ -404,6 +489,7 @@ export async function mountEdgeFunctions(ctx: ExtensionContext): Promise<void> {
         },
         liveEnv,
         live.timeout_ms,
+        live.egress ?? null,
       );
 
       const status = result.ok ? (result.response?.status ?? 200) : 500;
