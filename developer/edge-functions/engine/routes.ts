@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
+import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { toJsonb } from '@zveltio/sdk/extension';
 /**
@@ -261,15 +262,6 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
       const body = c.req.valid('json');
-      // What the function could reach before this save, for the audit entry.
-      const before =
-        body.egress === undefined
-          ? undefined
-          : await db
-              .selectFrom('zv_edge_functions')
-              .select(['egress'])
-              .where('id', '=', c.req.param('id'))
-              .executeTakeFirst();
       const updates: any = { updated_at: new Date() };
       for (const [k, v] of Object.entries(body)) {
         if (v !== undefined) {
@@ -277,16 +269,21 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
         }
       }
 
-      const fn = await db
+      // `old.egress` (PostgreSQL 18) is what this UPDATE replaced, read in the
+      // same statement: a separate SELECT first let a concurrent save land in
+      // between, and a change back to the value read then went unaudited.
+      const row = await db
         .updateTable('zv_edge_functions')
         .set(updates)
         .where('id', '=', c.req.param('id'))
         .returningAll()
+        .returning(sql<string[] | null>`old.egress`.as('egress_before'))
         .executeTakeFirst();
 
-      if (!fn) return c.json({ error: 'Function not found' }, 404);
-      if (body.egress !== undefined && !sameHosts(before?.egress ?? null, body.egress)) {
-        await auditEgress(user.id, fn, before?.egress ?? null, body.egress);
+      if (!row) return c.json({ error: 'Function not found' }, 404);
+      const { egress_before: before, ...fn } = row as Record<string, any>;
+      if (body.egress !== undefined && !sameHosts(before ?? null, body.egress)) {
+        await auditEgress(user.id, fn, before ?? null, body.egress);
       }
       return c.json({ function: fn });
     },

@@ -24649,18 +24649,18 @@ function edgeFunctionsRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const body = c.req.valid("json");
-    const before = body.egress === undefined ? undefined : await db.selectFrom("zv_edge_functions").select(["egress"]).where("id", "=", c.req.param("id")).executeTakeFirst();
     const updates = { updated_at: new Date };
     for (const [k, v] of Object.entries(body)) {
       if (v !== undefined) {
         updates[k] = k === "env_vars" ? JSON.stringify(v) : v;
       }
     }
-    const fn = await db.updateTable("zv_edge_functions").set(updates).where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
-    if (!fn)
+    const row = await db.updateTable("zv_edge_functions").set(updates).where("id", "=", c.req.param("id")).returningAll().returning(sql`old.egress`.as("egress_before")).executeTakeFirst();
+    if (!row)
       return c.json({ error: "Function not found" }, 404);
-    if (body.egress !== undefined && !sameHosts(before?.egress ?? null, body.egress)) {
-      await auditEgress(user.id, fn, before?.egress ?? null, body.egress);
+    const { egress_before: before, ...fn } = row;
+    if (body.egress !== undefined && !sameHosts(before ?? null, body.egress)) {
+      await auditEgress(user.id, fn, before ?? null, body.egress);
     }
     return c.json({ function: fn });
   });

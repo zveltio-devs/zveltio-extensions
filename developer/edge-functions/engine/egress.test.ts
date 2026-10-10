@@ -126,3 +126,63 @@ d('edge function egress at save', () => {
     expect(await audits(db, fn.id)).toEqual([]);
   });
 });
+
+const TENANT = crypto.randomUUID();
+
+// A save read `before` with its own SELECT, then updated: a save that landed in
+// between and was then undone by the second (y.test, then back to x.test) left
+// the trail at y.test while the row held x.test. `RETURNING old.egress` reads
+// what the UPDATE itself replaced.
+d('egress audit under a tenant and concurrency', () => {
+  const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
+  const db = new Kysely<Record<string, never>>({ dialect: new PostgresDialect({ pool }) });
+
+  afterAll(async () => {
+    await sql`DELETE FROM zv_edge_functions WHERE tenant_id = ${TENANT}::uuid`.execute(db);
+    await sql`DELETE FROM zv_audit_log WHERE tenant_id = ${TENANT}::uuid`.execute(db);
+    await sql`DELETE FROM zv_tenants WHERE id = ${TENANT}::uuid`.execute(db);
+    await db.destroy();
+  });
+
+  it('every change of egress has an audit row in the function tenant, chained', async () => {
+    await sql`INSERT INTO zv_tenants (id, slug, name) VALUES (${TENANT}::uuid, ${`eg-${STAMP}`}, 'eg')`.execute(db);
+    const { app } = await mountForTest(import.meta.dir, { tenant: TENANT, transaction: true });
+    const res = await send(app, 'POST', '/', { name: `eg-race-${STAMP}`, display_name: 'x', egress: ['x.test'] });
+    expect(res.status).toBe(201);
+    const fn = (await res.json()).function;
+    expect(fn.tenant_id).toBe(TENANT);
+
+    // Hold the row so both PATCHes read `before` and then queue on the UPDATE.
+    const lock = await pool.connect();
+    await lock.query('BEGIN');
+    await lock.query('SELECT 1 FROM zv_edge_functions WHERE id = $1 FOR UPDATE', [fn.id]);
+    const a = send(app, 'PATCH', `/${fn.id}`, { egress: ['y.test'] });
+    await Bun.sleep(300);
+    const b = send(app, 'PATCH', `/${fn.id}`, { egress: ['x.test'] });
+    await Bun.sleep(300);
+    await lock.query('COMMIT');
+    lock.release();
+    expect([(await a).status, (await b).status]).toEqual([200, 200]);
+
+    const final = (
+      await sql<{ egress: string[] }>`SELECT egress FROM zv_edge_functions WHERE id = ${fn.id}`.execute(db)
+    ).rows[0]!.egress;
+    const log = (
+      await sql<{ tenant_id: string; user_id: string; metadata: any }>`
+        SELECT tenant_id, user_id, metadata FROM zv_audit_log
+         WHERE event_type = 'edge_function.egress_changed' AND resource_id = ${fn.id}
+         ORDER BY created_at`.execute(db)
+    ).rows;
+    expect(log.every((r) => r.tenant_id === TENANT && !!r.user_id)).toBe(true);
+    const trail = log.map((r) => ({ before: r.metadata.before, after: r.metadata.after }));
+    // The trail must reach what the row now holds, each entry starting where the last ended.
+    expect({ final, trail }).toEqual({
+      final: ['x.test'],
+      trail: [
+        { before: null, after: ['x.test'] },
+        { before: ['x.test'], after: ['y.test'] },
+        { before: ['y.test'], after: ['x.test'] },
+      ],
+    });
+  });
+});

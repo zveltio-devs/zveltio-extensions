@@ -44,8 +44,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "6821e0bcb1dca3b980b103cc43ba9838d78fc52e9fb099036c164f934ddd05a0",
-    "sourceSha256": "53dc938898359517e207fa6bf9d8c937e4fbe18cfb37e852c8cf01f8ce07614c"
+    "engineSha256": "99f540e4c863c216de0cae37008f939e68793a339fde4520305e62b0679d909f",
+    "sourceSha256": "6e6c012717719875e727a7e0ce66f0377a5ec8f78fc24bd175e6be914c79782c"
   },
   "globalRoutes": [],
   "globalRoutesDynamic": true
