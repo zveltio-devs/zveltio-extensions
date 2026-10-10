@@ -13,6 +13,7 @@
         { "key": "display_name", "label": "developer.edge-functions.ui.display_name" },
         { "key": "http_method", "label": "developer.edge-functions.ui.http_method", "type": "mono" },
         { "key": "path", "label": "developer.edge-functions.form.mountedAt", "type": "mono" },
+        { "key": "egress", "label": "developer.edge-functions.ui.can_reach", "type": "tags" },
         {
           "key": "is_active",
           "label": "common.col.status",

@@ -27,5 +27,6 @@
   "developer.edge-functions.ui.name_url_safe": "Nombre (apto para URL)",
   "developer.edge-functions.ui.new_edge_function": "Nueva función Edge",
   "developer.edge-functions.ui.request_body_json": "Cuerpo de la solicitud (JSON)",
-  "developer.edgeFunctions.confirmDelete": "Delete this edge function?"
+  "developer.edgeFunctions.confirmDelete": "Delete this edge function?",
+  "developer.edge-functions.ui.can_reach": "Puede acceder a"
 }

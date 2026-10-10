@@ -27,5 +27,6 @@
   "developer.edge-functions.ui.name_url_safe": "Naam (URL-veilig)",
   "developer.edge-functions.ui.new_edge_function": "Nieuwe Edge-functie",
   "developer.edge-functions.ui.request_body_json": "Aanvraagtekst (JSON)",
-  "developer.edgeFunctions.confirmDelete": "Delete this edge function?"
+  "developer.edgeFunctions.confirmDelete": "Delete this edge function?",
+  "developer.edge-functions.ui.can_reach": "Mag bereiken"
 }

@@ -24529,6 +24529,14 @@ function toJsonb(value) {
   return sql`${JSON.stringify(value ?? null)}::text::jsonb`;
 }
 // engine/routes.ts
+var EGRESS_HOST = /^(\[[0-9a-f:.]+\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:\d{1,5})?$/;
+var egressSchema = exports_external.array(exports_external.string().trim().toLowerCase().refine((h) => EGRESS_HOST.test(h), {
+  error: (issue2) => `"${String(issue2.input)}" is not a host \u2014 write host or host:port, no scheme, path or wildcard`
+})).max(64).transform((hosts) => [...new Set(hosts)]).nullable();
+var envVarsSchema = exports_external.record(exports_external.string(), exports_external.string()).refine((env) => !Object.hasOwn(env, "ZVELTIO_EGRESS"), {
+  error: "ZVELTIO_EGRESS is no longer read \u2014 list the hosts in `egress`"
+});
+var sameHosts = (a, b) => a === b || a !== null && b !== null && a.length === b.length && a.every((h, i) => h === b[i]);
 var CREDENTIAL_HEADERS = new Set([
   "cookie",
   "authorization",
@@ -24568,12 +24576,23 @@ function edgeFunctionsRoutes(ctx) {
     const isAdmin = await checkPermission(session.user.id, "admin", "*");
     return isAdmin ? session.user : null;
   }
+  async function auditEgress(userId, fn, before, after) {
+    await ctx.internals.audit({
+      type: "edge_function.egress_changed",
+      userId,
+      resourceType: "edge_function",
+      resourceId: fn.id,
+      metadata: { name: fn.name, before, after }
+    }).catch((err) => {
+      console.warn("[edge-functions] egress audit write failed:", err.message);
+    });
+  }
   const app = new Hono2;
   app.get("/", async (c) => {
     const user = await requireAdmin(c);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const fns = await db.selectFrom("zv_edge_functions").select(["id", "name", "display_name", "description", "http_method", "path", "is_active", "runtime", "created_at"]).orderBy("name", "asc").execute();
+    const fns = await db.selectFrom("zv_edge_functions").select(["id", "name", "display_name", "description", "http_method", "path", "is_active", "runtime", "egress", "created_at"]).orderBy("name", "asc").execute();
     return c.json({ functions: fns });
   });
   app.get("/:id", zValidator("param", exports_external.object({ id: exports_external.string().uuid() })), async (c) => {
@@ -24592,7 +24611,8 @@ function edgeFunctionsRoutes(ctx) {
     code: exports_external.string().default(""),
     http_method: exports_external.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "ANY"]).default("POST"),
     timeout_ms: exports_external.number().int().min(100).max(300000).default(30000),
-    env_vars: exports_external.record(exports_external.string(), exports_external.string()).default({})
+    env_vars: envVarsSchema.default({}),
+    egress: egressSchema.default(null)
   })), async (c) => {
     const user = await requireAdmin(c);
     if (!user)
@@ -24608,8 +24628,11 @@ function edgeFunctionsRoutes(ctx) {
       path,
       timeout_ms: body.timeout_ms,
       env_vars: toJsonb(body.env_vars),
+      egress: body.egress,
       created_by: user.id
     }).returningAll().executeTakeFirst();
+    if (fn && body.egress !== null)
+      await auditEgress(user.id, fn, null, body.egress);
     return c.json({ function: fn }, 201);
   });
   app.patch("/:id", zValidator("param", exports_external.object({ id: exports_external.string().uuid() })), zValidator("json", exports_external.object({
@@ -24619,12 +24642,14 @@ function edgeFunctionsRoutes(ctx) {
     http_method: exports_external.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "ANY"]).optional(),
     is_active: exports_external.boolean().optional(),
     timeout_ms: exports_external.number().optional(),
-    env_vars: exports_external.record(exports_external.string(), exports_external.string()).optional()
+    env_vars: envVarsSchema.optional(),
+    egress: egressSchema.optional()
   })), async (c) => {
     const user = await requireAdmin(c);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const body = c.req.valid("json");
+    const before = body.egress === undefined ? undefined : await db.selectFrom("zv_edge_functions").select(["egress"]).where("id", "=", c.req.param("id")).executeTakeFirst();
     const updates = { updated_at: new Date };
     for (const [k, v] of Object.entries(body)) {
       if (v !== undefined) {
@@ -24634,6 +24659,9 @@ function edgeFunctionsRoutes(ctx) {
     const fn = await db.updateTable("zv_edge_functions").set(updates).where("id", "=", c.req.param("id")).returningAll().executeTakeFirst();
     if (!fn)
       return c.json({ error: "Function not found" }, 404);
+    if (body.egress !== undefined && !sameHosts(before?.egress ?? null, body.egress)) {
+      await auditEgress(user.id, fn, before?.egress ?? null, body.egress);
+    }
     return c.json({ function: fn });
   });
   app.delete("/:id", zValidator("param", exports_external.object({ id: exports_external.string().uuid() })), async (c) => {
@@ -24664,7 +24692,7 @@ function edgeFunctionsRoutes(ctx) {
       query: Object.fromEntries(new URL(c.req.url).searchParams),
       body: parseJsonBody(bodyText),
       path: fn.path
-    }, typeof fn.env_vars === "string" ? JSON.parse(fn.env_vars) : fn.env_vars ?? {}, fn.timeout_ms);
+    }, typeof fn.env_vars === "string" ? JSON.parse(fn.env_vars) : fn.env_vars ?? {}, fn.timeout_ms, fn.egress ?? null);
     const status = result.ok ? result.response?.status ?? 200 : 500;
     await db.insertInto("zv_edge_function_logs").values({
       function_id: fn.id,
@@ -24723,7 +24751,7 @@ async function mountEdgeFunctions(ctx) {
         query: Object.fromEntries(new URL(c.req.url).searchParams),
         body,
         path: c.req.path
-      }, liveEnv, live.timeout_ms);
+      }, liveEnv, live.timeout_ms, live.egress ?? null);
       const status = result.ok ? result.response?.status ?? 200 : 500;
       db.insertInto("zv_edge_function_logs").values({
         function_id: live.id,
@@ -24769,3 +24797,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1

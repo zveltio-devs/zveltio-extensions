@@ -51,6 +51,7 @@ const FN = {
   http_method: 'POST',
   code: 'async function handler(request, env) { return { status: 200, body: {} }; }',
   env_vars: { WHO: 'test' },
+  egress: ['api.allowed.test'],
   timeout_ms: 5000,
   is_active: true,
 };
@@ -129,6 +130,8 @@ describe('POST /:id/invoke — what reaches the runner, and what comes back', ()
     expect(request.body).toEqual({ a: 1 });
     expect(request.path).toBe('/probe');
     expect(request.query).toEqual({ tenant: 'acme', debug: '1' });
+    // The function's egress column, which the runner holds its fetch to.
+    expect(call?.[4]).toEqual(['api.allowed.test']);
   }, 20_000);
 
   it('the handler actually receives what was sent', async () => {
