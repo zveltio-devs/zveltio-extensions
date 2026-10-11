@@ -593,7 +593,8 @@ const OP_ALIASES: Record<string, FilterOp> = {
 
 const KNOWN_OPS = new Set<FilterOp>([
   'eq', 'neq', 'lt', 'lte', 'gt', 'gte',
-  'like', 'ilike', 'in', 'not_in', 'null', 'not_null',
+  'like', 'ilike', 'not_contains', 'starts_with', 'ends_with',
+  'in', 'not_in', 'null', 'not_null',
 ]);
 
 function parseFilters(content: Any): ParsedFilter[] {

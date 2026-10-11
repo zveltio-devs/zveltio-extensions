@@ -98,7 +98,8 @@ const PageCreateSchema = z.object({
         field: z.string().min(1).max(100),
         op: z.enum([
           'eq', 'neq', 'ne', 'lt', 'lte', 'gt', 'gte',
-          'like', 'ilike', 'contains', 'in', 'not_in',
+          'like', 'ilike', 'contains', 'not_contains', 'starts_with', 'ends_with',
+          'in', 'not_in',
           'null', 'not_null', 'is_null', 'is_not_null',
         ]),
         value: z.any().optional(),

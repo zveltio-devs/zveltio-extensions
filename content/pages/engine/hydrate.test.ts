@@ -876,6 +876,14 @@ describe('a record page filters which rows have an address', () => {
     }
   });
 
+  test('the business text operators pass through to the engine', async () => {
+    for (const op of ['not_contains', 'starts_with', 'ends_with'] as const) {
+      const { row, calls } = await resolve([{ field: 'status', op, value: 'x' }]);
+      expect(row).not.toBeNull();
+      expect(calls.conditions[0].cond.op).toBe(op);
+    }
+  });
+
   test('every filter must pass — they are ANDed, not ORed', async () => {
     const { row, calls } = await resolve([
       { field: 'status', op: 'eq', value: 'active' },
