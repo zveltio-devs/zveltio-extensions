@@ -24862,9 +24862,9 @@ var extension = {
     return [
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
+      join(import.meta.dir, "migrations/003_disposal_reason.sql"),
       join(import.meta.dir, "migrations/003_user_ref_text.sql"),
-      join(import.meta.dir, "migrations/004_tenant_scoped_unique_keys.sql"),
-      join(import.meta.dir, "migrations/003_disposal_reason.sql")
+      join(import.meta.dir, "migrations/004_tenant_scoped_unique_keys.sql")
     ];
   },
   async register(app, ctx) {
@@ -24875,3 +24875,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1

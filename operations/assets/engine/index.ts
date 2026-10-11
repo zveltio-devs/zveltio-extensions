@@ -12,11 +12,9 @@ const extension: ZveltioExtension = {
     return [
       join(import.meta.dir, 'migrations/001_initial.sql'),
       join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
+      join(import.meta.dir, 'migrations/003_disposal_reason.sql'),
       join(import.meta.dir, 'migrations/003_user_ref_text.sql'),
       join(import.meta.dir, 'migrations/004_tenant_scoped_unique_keys.sql'),
-      // Declared after 004 despite its number — written later, and the engine
-      // runs them in declared order.
-      join(import.meta.dir, 'migrations/003_disposal_reason.sql'),
     ];
   },
 
