@@ -104,6 +104,16 @@ for await (const indexPath of walkEngineIndexes(ROOT)) {
       console.error(`   on disk but not declared: ${diskMissing.join(', ')}`);
     }
     errors++;
+  } else if (declared.join('\n') !== onDisk.join('\n')) {
+    // The engine runs an inline extension in declared order, but a
+    // worker-isolated one — and every install-template gate — in directory
+    // order, never calling getMigrations(). Two orders means two schemas.
+    // Already-applied migrations are matched by name, so reordering the list
+    // changes fresh installs only; a new migration must sort last.
+    console.error(`❌ ${rel}: getMigrations() order differs from migrations/ sorted by name`);
+    console.error(`   declared: ${declared.join(', ')}`);
+    console.error(`   on disk:  ${onDisk.join(', ')}`);
+    errors++;
   }
 
   checked++;

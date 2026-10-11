@@ -24633,7 +24633,8 @@ function roundMoney(value, decimals = 2) {
   if (!Number.isFinite(value))
     throw new NumericConversionError(value, "roundMoney");
   const factor = 10 ** decimals;
-  return Math.round((value + Number.EPSILON) * factor) / factor;
+  const sign = value < 0 ? -1 : 1;
+  return sign * Math.round((Math.abs(value) + Number.EPSILON) * factor) / factor;
 }
 // engine/routes.ts
 function computeProration(oldPrice, newPrice, interval, daysRemaining) {
@@ -24993,8 +24994,8 @@ var extension = {
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
       join(import.meta.dir, "migrations/003_user_ref_text.sql"),
-      join(import.meta.dir, "migrations/004_invoice_due_date.sql"),
-      join(import.meta.dir, "migrations/004_cancellation_reason_and_invoice_updated_at.sql")
+      join(import.meta.dir, "migrations/004_cancellation_reason_and_invoice_updated_at.sql"),
+      join(import.meta.dir, "migrations/004_invoice_due_date.sql")
     ];
   },
   async register(app, ctx) {
@@ -25005,3 +25006,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
