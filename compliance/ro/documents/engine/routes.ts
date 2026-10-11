@@ -298,8 +298,8 @@ export function roDocumentsRoutes(ctx: ExtensionContext): Hono {
       const updates: any = { updated_at: new Date(), version_number: existing.version_number + 1 };
       if (body.title !== undefined) updates.title = body.title;
       if (body.content !== undefined) updates.content = body.content;
-      if (body.parties !== undefined) updates.parties = JSON.stringify(body.parties);
-      if (body.metadata !== undefined) updates.metadata = JSON.stringify(body.metadata);
+      if (body.parties !== undefined) updates.parties = toJsonb(body.parties);
+      if (body.metadata !== undefined) updates.metadata = toJsonb(body.metadata);
       if (body.internal_notes !== undefined) updates.internal_notes = body.internal_notes;
       if (body.category !== undefined) updates.category = body.category;
 

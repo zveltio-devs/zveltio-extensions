@@ -125,7 +125,7 @@ export function etransportRoutes(ctx: ExtensionContext): Hono {
     const body = c.req.valid('json');
     const updates: any = { updated_at: new Date() };
     for (const [k, v] of Object.entries(body)) {
-      if (v !== undefined) updates[k] = k === 'goods' ? JSON.stringify(v) : v;
+      if (v !== undefined) updates[k] = k === 'goods' ? toJsonb(v) : v;
     }
 
     const decl = await db

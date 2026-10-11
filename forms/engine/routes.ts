@@ -163,7 +163,7 @@ export function formsRoutes(
       if (data.description !== undefined)
         updates.description = data.description;
       if (data.fields !== undefined)
-        updates.fields = JSON.stringify(data.fields);
+        updates.fields = toJsonb(data.fields);
       if (data.target_collection !== undefined)
         updates.target_collection = data.target_collection;
       if (data.active !== undefined) updates.active = data.active;

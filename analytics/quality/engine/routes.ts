@@ -213,7 +213,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
     if (!(await checkPermission(user.id, 'admin', '*'))) return c.json({ error: 'Admin access required' }, 403);
     const data = c.req.valid('json');
     const updates: any = { ...data };
-    if (data.rule_config) updates.rule_config = JSON.stringify(data.rule_config);
+    if (data.rule_config) updates.rule_config = toJsonb(data.rule_config);
     const rule = await (db as any).updateTable('zvd_quality_rules').set(updates).where('id', '=', c.req.param('id')).returningAll().executeTakeFirst();
     if (!rule) return c.json({ error: 'Rule not found' }, 404);
     return c.json({ rule });

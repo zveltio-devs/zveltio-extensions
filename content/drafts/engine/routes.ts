@@ -450,7 +450,7 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
     if (!canUpdate) return c.json({ error: 'Forbidden' }, 403);
 
     const updateData: Record<string, any> = { updated_at: new Date() };
-    if (data.draft_data) updateData.draft_data = JSON.stringify(data.draft_data);
+    if (data.draft_data) updateData.draft_data = toJsonb(data.draft_data);
     if (data.notes !== undefined) updateData.notes = data.notes;
     if (data.reviewer_note !== undefined) updateData.reviewer_note = data.reviewer_note;
     if (data.scheduled_at !== undefined) updateData.scheduled_at = data.scheduled_at ? new Date(data.scheduled_at) : null;
