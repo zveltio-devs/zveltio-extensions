@@ -2561,14 +2561,14 @@ var init_dist3 = __esm(() => {
   })(EncodingMode || (EncodingMode = {}));
 });
 
-// /zveltio-extension/node_modules/domutils/node_modules/dom-serializer/dist/foreign-names.js
+// /zveltio-extension/node_modules/dom-serializer/dist/foreign-names.js
 var elementNames, attributeNames;
 var init_foreign_names = __esm(() => {
   elementNames = new Map("altGlyph altGlyphDef altGlyphItem animateColor animateMotion animateTransform clipPath feBlend feColorMatrix feComponentTransfer feComposite feConvolveMatrix feDiffuseLighting feDisplacementMap feDistantLight feDropShadow feFlood feFuncA feFuncB feFuncG feFuncR feGaussianBlur feImage feMerge feMergeNode feMorphology feOffset fePointLight feSpecularLighting feSpotLight feTile feTurbulence foreignObject glyphRef linearGradient radialGradient textPath".split(" ").map((name) => [name.toLowerCase(), name]));
   attributeNames = new Map("definitionURL attributeName attributeType baseFrequency baseProfile calcMode clipPathUnits diffuseConstant edgeMode filterUnits glyphRef gradientTransform gradientUnits kernelMatrix kernelUnitLength keyPoints keySplines keyTimes lengthAdjust limitingConeAngle markerHeight markerUnits markerWidth maskContentUnits maskUnits numOctaves pathLength patternContentUnits patternTransform patternUnits pointsAtX pointsAtY pointsAtZ preserveAlpha preserveAspectRatio primitiveUnits refX refY repeatCount repeatDur requiredExtensions requiredFeatures specularConstant specularExponent spreadMethod startOffset stdDeviation stitchTiles surfaceScale systemLanguage tableValues targetX targetY textLength viewBox viewTarget xChannelSelector yChannelSelector zoomAndPan".split(" ").map((name) => [name.toLowerCase(), name]));
 });
 
-// /zveltio-extension/node_modules/domutils/node_modules/dom-serializer/dist/index.js
+// /zveltio-extension/node_modules/dom-serializer/dist/index.js
 function render(node3, options = {}) {
   const nodes = "length" in node3 ? node3 : [node3];
   const xmlMode = options.xmlMode ?? false;
@@ -3904,16 +3904,7 @@ var require_css_syntax_error = __commonJS((exports, module) => {
 
 // /zveltio-extension/node_modules/postcss/lib/stringifier.js
 var require_stringifier = __commonJS((exports, module) => {
-  var STYLE_TAG = /(<)(\/?style\b)/gi;
-  var COMMENT_OPEN = /(<)(!--)/g;
   var AT_NAME_END = /[\t\n\f\r "#'()/;[\\\]{}]/;
-  function escapeHTMLInCSS(str) {
-    if (typeof str !== "string")
-      return str;
-    if (!str.includes("<"))
-      return str;
-    return str.replace(STYLE_TAG, "\\3c $2").replace(COMMENT_OPEN, "\\3c $2");
-  }
   var DEFAULT_RAW = {
     after: `
 `,
@@ -3951,7 +3942,7 @@ var require_stringifier = __commonJS((exports, module) => {
     if (!node3.prop.startsWith("--"))
       return false;
     let before = node3.raws.before;
-    return typeof before === "undefined" || !/\S$/.test(before);
+    return typeof before === "undefined" || !/[^\s;]$/.test(before);
   }
   function pushBody(str, stack, node3) {
     let nodes = node3.nodes;
@@ -3978,15 +3969,15 @@ var require_stringifier = __commonJS((exports, module) => {
   }
   function pushBlock(str, stack, node3, start) {
     let between = str.raw(node3, "between", "beforeOpen");
-    str.builder(escapeHTMLInCSS(start + between) + "{", node3, "start");
+    str.builder(start + between + "{", node3, "start");
     let hasNodes = node3.nodes && node3.nodes.length;
     let close = () => {
       let after = hasNodes ? str.raw(node3, "after") : str.raw(node3, "after", "emptyBody");
       if (after)
-        str.builder(escapeHTMLInCSS(after));
+        str.builder(after);
       str.builder("}", node3, "end");
       if (node3.type === "rule" && node3.raws.ownSemicolon) {
-        str.builder(escapeHTMLInCSS(node3.raws.ownSemicolon), node3, "end");
+        str.builder(node3.raws.ownSemicolon, node3, "end");
       }
     };
     if (hasNodes) {
@@ -4007,7 +3998,7 @@ var require_stringifier = __commonJS((exports, module) => {
         this.block(node3, start);
       } else {
         let end = (node3.raws.between || "") + (semicolon ? ";" : "");
-        this.builder(escapeHTMLInCSS(start + end), node3);
+        this.builder(start + end, node3);
       }
     }
     beforeAfter(node3, detect) {
@@ -4039,7 +4030,7 @@ var require_stringifier = __commonJS((exports, module) => {
     }
     block(node3, start) {
       let between = this.raw(node3, "between", "beforeOpen");
-      this.builder(escapeHTMLInCSS(start + between) + "{", node3, "start");
+      this.builder(start + between + "{", node3, "start");
       let after;
       if (node3.nodes && node3.nodes.length) {
         this.body(node3);
@@ -4048,7 +4039,7 @@ var require_stringifier = __commonJS((exports, module) => {
         after = this.raw(node3, "after", "emptyBody");
       }
       if (after)
-        this.builder(escapeHTMLInCSS(after));
+        this.builder(after);
       this.builder("}", node3, "end");
     }
     body(node3) {
@@ -4065,7 +4056,7 @@ var require_stringifier = __commonJS((exports, module) => {
         let child = entry.node;
         let before = this.raw(child, "before");
         if (before) {
-          this.builder(entry.document ? before : escapeHTMLInCSS(before));
+          this.builder(before);
         }
         if (expandable && child.type === "rule") {
           pushBlock(this, stack, child, this.rawValue(child, "selector"));
@@ -4079,7 +4070,7 @@ var require_stringifier = __commonJS((exports, module) => {
     comment(node3) {
       let left = this.raw(node3, "left", "commentLeft");
       let right = this.raw(node3, "right", "commentRight");
-      this.builder(escapeHTMLInCSS("/*" + left + node3.text + right + "*/"), node3);
+      this.builder("/*" + left + node3.text + right + "*/", node3);
     }
     decl(node3, semicolon) {
       let raws = node3.raws;
@@ -4090,7 +4081,7 @@ var require_stringifier = __commonJS((exports, module) => {
       }
       if (semicolon)
         string4 += ";";
-      this.builder(escapeHTMLInCSS(string4), node3);
+      this.builder(string4, node3);
     }
     document(node3) {
       this.body(node3);
@@ -4283,20 +4274,19 @@ var require_stringifier = __commonJS((exports, module) => {
       return value;
     }
     root(node3) {
-      if (node3.source && node3.source.input.hasBOM) {
+      let inDocument = node3.parent && node3.parent.type === "document";
+      if (!inDocument && node3.source && node3.source.input.hasBOM) {
         this.builder("\uFEFF", node3, "start");
       }
       this.body(node3);
       if (node3.raws.after) {
-        let after = node3.raws.after;
-        let isDocument2 = node3.parent && node3.parent.type === "document";
-        this.builder(isDocument2 ? after : escapeHTMLInCSS(after));
+        this.builder(node3.raws.after);
       }
     }
     rule(node3) {
       this.block(node3, this.rawValue(node3, "selector"));
       if (node3.raws.ownSemicolon) {
-        this.builder(escapeHTMLInCSS(node3.raws.ownSemicolon), node3, "end");
+        this.builder(node3.raws.ownSemicolon, node3, "end");
       }
     }
     stringify(node3, semicolon) {
@@ -4313,9 +4303,59 @@ var require_stringifier = __commonJS((exports, module) => {
 // /zveltio-extension/node_modules/postcss/lib/stringify.js
 var require_stringify = __commonJS((exports, module) => {
   var Stringifier = require_stringifier();
+  var STYLE_TAG = /(<)(\/?style\b)/gi;
+  var COMMENT_OPEN = /(<)(!--)/g;
+  function escapeHTMLInCSS(str) {
+    if (!str.includes("<"))
+      return str;
+    return str.replace(STYLE_TAG, "\\3c $2").replace(COMMENT_OPEN, "\\3c $2");
+  }
+
+  class SafeStringifier extends Stringifier {
+    escapeHTML(node3, print) {
+      let builder = this.builder;
+      let chunks, css;
+      this.builder = (str, child, type) => {
+        if (chunks) {
+          css += str;
+          chunks.push(str, child, type);
+        } else if (str.includes("<")) {
+          css = str;
+          chunks = [str, child, type];
+        } else {
+          builder(str, child, type);
+        }
+      };
+      print();
+      this.builder = builder;
+      if (!chunks)
+        return;
+      let escaped = escapeHTMLInCSS(css);
+      if (escaped === css) {
+        for (let i = 0;i < chunks.length; i += 3) {
+          builder(chunks[i], chunks[i + 1], chunks[i + 2]);
+        }
+      } else {
+        builder(escaped, node3);
+      }
+    }
+    root(node3) {
+      if (node3.parent && node3.parent.type === "document") {
+        this.escapeHTML(node3, () => this.body(node3));
+        if (node3.raws.after)
+          this.builder(node3.raws.after);
+      } else {
+        this.escapeHTML(node3, () => super.root(node3));
+      }
+    }
+  }
   function stringify2(node3, builder) {
-    let str = new Stringifier(builder);
-    str.stringify(node3);
+    let str = new SafeStringifier(builder);
+    if (node3.type === "root" || node3.type === "document") {
+      str.stringify(node3);
+    } else {
+      str.escapeHTML(node3, () => str.stringify(node3));
+    }
   }
   module.exports = stringify2;
   stringify2.default = stringify2;
@@ -5257,7 +5297,7 @@ var require_document = __commonJS((exports, module) => {
   Document2.default = Document2;
 });
 
-// /zveltio-extension/node_modules/postcss/node_modules/nanoid/non-secure/index.cjs
+// /zveltio-extension/node_modules/nanoid/non-secure/index.cjs
 var require_non_secure = __commonJS((exports, module) => {
   var urlAlphabet = "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict";
   var customAlphabet = (alphabet, defaultSize = 21) => {
@@ -7520,7 +7560,7 @@ var require_input = __commonJS((exports, module) => {
   }
 });
 
-// /zveltio-extension/node_modules/postcss/lib/zveltio-extension.js
+// /zveltio-extension/node_modules/postcss/lib/root.js
 var require_root = __commonJS((exports, module) => {
   var Container = require_container();
   var LazyResult;
@@ -7602,7 +7642,18 @@ var require_list = __commonJS((exports, module) => {
       let inQuote = false;
       let prevQuote = "";
       let escape2 = false;
-      for (let letter of string4) {
+      let inComment = false;
+      for (let i = 0;i < string4.length; i++) {
+        let letter = string4[i];
+        if (inComment) {
+          current += letter;
+          if (letter === "*" && string4[i + 1] === "/") {
+            current += "/";
+            i += 1;
+            inComment = false;
+          }
+          continue;
+        }
         if (escape2) {
           escape2 = false;
         } else if (letter === "\\") {
@@ -7614,6 +7665,11 @@ var require_list = __commonJS((exports, module) => {
         } else if (letter === '"' || letter === "'") {
           inQuote = true;
           prevQuote = letter;
+        } else if (letter === "/" && string4[i + 1] === "*") {
+          current += "/*";
+          i += 1;
+          inComment = true;
+          continue;
         } else if (letter === "(") {
           func += 1;
         } else if (letter === ")") {
@@ -7831,17 +7887,22 @@ var require_map_generator = __commonJS((exports, module) => {
         }
       } else if (this.css) {
         let annotation = "/*# sourceMappingURL=";
+        let css = "";
+        let cursor = 0;
         let startIndex;
-        while ((startIndex = this.css.lastIndexOf(annotation)) !== -1) {
+        while ((startIndex = this.css.indexOf(annotation, cursor)) !== -1) {
           let endIndex = this.css.indexOf("*/", startIndex + annotation.length);
           if (endIndex === -1)
             break;
-          while (startIndex > 0 && this.css[startIndex - 1] === `
+          while (startIndex > cursor && this.css[startIndex - 1] === `
 `) {
             startIndex--;
           }
-          this.css = this.css.slice(0, startIndex) + this.css.slice(endIndex + 2);
+          css += this.css.slice(cursor, startIndex);
+          cursor = endIndex + 2;
         }
+        if (cursor > 0)
+          this.css = css + this.css.slice(cursor);
       }
     }
     generate() {
@@ -8531,6 +8592,7 @@ var require_parser = __commonJS((exports, module) => {
       let token, type;
       let length = tokens.length;
       let value = "";
+      let last = "";
       let clean = true;
       let next, prev;
       for (let i = 0;i < length; i += 1) {
@@ -8542,16 +8604,18 @@ var require_parser = __commonJS((exports, module) => {
           prev = tokens[i - 1] ? tokens[i - 1][0] : "empty";
           next = tokens[i + 1] ? tokens[i + 1][0] : "empty";
           if (!SAFE_COMMENT_NEIGHBOR[prev] && !SAFE_COMMENT_NEIGHBOR[next]) {
-            if (value.slice(-1) === ",") {
+            if (last === ",") {
               clean = false;
             } else {
               value += token[1];
+              last = token[1].slice(-1);
             }
           } else {
             clean = false;
           }
         } else {
           value += token[1];
+          last = token[1].slice(-1);
         }
       }
       if (!clean) {
@@ -9406,7 +9470,7 @@ var require_processor = __commonJS((exports, module) => {
 
   class Processor {
     constructor(plugins = []) {
-      this.version = "8.5.28";
+      this.version = "8.5.29";
       this.plugins = this.normalize(plugins);
     }
     normalize(plugins) {
@@ -10278,6 +10342,15 @@ var require_sanitize_html = __commonJS((exports, module) => {
     "set"
   ];
   var alwaysUrlAttributes = ["href"];
+  var severities = ["debug", "info", "warn", "error"];
+  function loggerFor(options) {
+    const source = options && options.logger || console;
+    const logger = {};
+    for (const severity of severities) {
+      logger[severity] = typeof source[severity] === "function" ? (...args) => source[severity](...args) : (...args) => console[severity](...args);
+    }
+    return logger;
+  }
   function each(obj, cb) {
     if (obj) {
       Object.keys(obj).forEach(function(key) {
@@ -10347,19 +10420,13 @@ var require_sanitize_html = __commonJS((exports, module) => {
     }
     options = Object.assign({}, sanitizeHtml.defaults, options);
     options.parser = Object.assign({}, htmlParserDefaults, options.parser);
+    const logger = loggerFor(options);
     const tagAllowed = function(name) {
       return options.allowedTags === false || (options.allowedTags || []).indexOf(name) > -1;
     };
     vulnerableTags.forEach(function(tag) {
       if (tagAllowed(tag) && !options.allowVulnerableTags) {
-        console.warn(`
-
-\u26A0\uFE0F Your \`allowedTags\` option includes, \`${tag}\`, which is inherently
-vulnerable to XSS attacks. Please remove it from \`allowedTags\`.
-Or, to disable this warning, add the \`allowVulnerableTags\` option
-and ensure you are accounting for this risk.
-
-`);
+        logger.warn(`Your \`allowedTags\` option includes \`${tag}\`, which is inherently ` + "vulnerable to XSS attacks. Please remove it from `allowedTags`, or, " + "to disable this warning, add the `allowVulnerableTags` option and " + "ensure you are accounting for this risk.");
       }
     });
     const nonTextTagsArray = options.nonTextTags || [
@@ -10439,6 +10506,8 @@ and ensure you are accounting for this risk.
     let transformMap;
     let skipText;
     let skipTextDepth;
+    let rawTextEnd;
+    let skipRawText;
     let addedText = false;
     initializeState();
     const parser = new htmlparser.Parser({
@@ -10446,8 +10515,12 @@ and ensure you are accounting for this risk.
         if (options.onOpenTag) {
           options.onOpenTag(name, attribs);
         }
+        updateRawTextRegion();
         if (options.enforceHtmlBoundary && name === "html") {
           initializeState();
+        }
+        if (skipRawText) {
+          return;
         }
         if (skipText) {
           skipTextDepth++;
@@ -10484,6 +10557,9 @@ and ensure you are accounting for this risk.
             if (nonTextTagsArray.indexOf(name) !== -1) {
               skipText = true;
               skipTextDepth = 1;
+              if (frame.tag.toLowerCase() === "noscript") {
+                rawTextEnd = findRawTextEnd("noscript", parser.endIndex + 1);
+              }
             }
           }
         }
@@ -10559,6 +10635,10 @@ and ensure you are accounting for this risk.
                   return;
                 }
               }
+              if (name === "meta" && a.toLowerCase() === "content" && isRefresh(attribs) && naughtyRefresh(value)) {
+                delete frame.attribs[a];
+                return;
+              }
               if (name === "script" && a === "src") {
                 let allowed = true;
                 try {
@@ -10607,7 +10687,7 @@ and ensure you are accounting for this risk.
                 try {
                   let parsed = parseSrcset(value);
                   parsed.forEach(function(value2) {
-                    if (naughtyHref(a, value2.url)) {
+                    if (naughtyHref(name, value2.url)) {
                       value2.evil = true;
                     }
                   });
@@ -10663,7 +10743,7 @@ and ensure you are accounting for this risk.
                     }
                   } catch (e) {
                     if (typeof window !== "undefined") {
-                      console.warn('Failed to parse "' + name + " {" + value + "}" + `", If you're running this in a browser, we recommend to disable style parsing: options.parseStyleAttributes: false, since this only works in a node environment due to a postcss dependency, More info: https://github.com/apostrophecms/sanitize-html/issues/547`);
+                      logger.warn(`Failed to parse "${name} {${value}}". If you are ` + "running this in a browser, we recommend disabling " + "style parsing with the parseStyleAttributes option, " + "since it only works in a node environment due to a " + "postcss dependency. More info: " + "https://github.com/apostrophecms/sanitize-html/issues/547");
                     }
                     delete frame.attribs[a];
                     return;
@@ -10704,7 +10784,8 @@ and ensure you are accounting for this risk.
         frame.openingTagLength = result.length - frame.tagPosition;
       },
       ontext: function(text) {
-        if (skipText) {
+        updateRawTextRegion();
+        if (skipText || skipRawText) {
           return;
         }
         const lastFrame = stack[stack.length - 1];
@@ -10723,6 +10804,8 @@ and ensure you are accounting for this risk.
           } else {
             result += escapeHtml(text, false);
           }
+        } else if (tag === "iframe" && !tagAllowed(tag) && options.disallowedTagsMode === "discard") {
+          result += sanitizeHtml(text, options);
         } else if (!addedText) {
           const escaped = escapeHtml(text, false);
           if (options.textFilter) {
@@ -10740,10 +10823,19 @@ and ensure you are accounting for this risk.
         if (options.onCloseTag) {
           options.onCloseTag(name, isImplied);
         }
-        if (skipText) {
+        updateRawTextRegion();
+        if (skipRawText) {
+          const lastFrame = stack[stack.length - 1];
+          if (!lastFrame || lastFrame.tag !== name) {
+            return;
+          }
+        } else if (skipText) {
           skipTextDepth--;
           if (!skipTextDepth) {
             skipText = false;
+            if (rawTextEnd !== null) {
+              skipRawText = true;
+            }
           } else {
             return;
           }
@@ -10823,6 +10915,20 @@ and ensure you are accounting for this risk.
       transformMap = {};
       skipText = false;
       skipTextDepth = 0;
+      rawTextEnd = null;
+      skipRawText = false;
+    }
+    function updateRawTextRegion() {
+      if (rawTextEnd !== null && parser.startIndex >= rawTextEnd) {
+        rawTextEnd = null;
+        skipRawText = false;
+      }
+    }
+    function findRawTextEnd(tagName, from) {
+      const re = new RegExp("</" + tagName + "[\\t\\n\\f\\r />]", "ig");
+      re.lastIndex = from;
+      const match2 = re.exec(html);
+      return match2 ? match2.index : Infinity;
     }
     function escapeHtml(s, quote) {
       if (typeof s !== "string") {
@@ -10847,19 +10953,94 @@ and ensure you are accounting for this risk.
         allowProtocolRelative: options.allowProtocolRelative
       });
     }
+    function isRefresh(attribs) {
+      return Object.keys(attribs).some(function(a) {
+        return a.toLowerCase() === "http-equiv" && String(attribs[a]).trim().toLowerCase() === "refresh";
+      });
+    }
+    function naughtyRefresh(content) {
+      const input2 = String(content);
+      const isWhitespace2 = function(c) {
+        return c === " " || c === "\t" || c === `
+` || c === "\f" || c === "\r";
+      };
+      let position = 0;
+      const skipWhitespace = function() {
+        while (position < input2.length && isWhitespace2(input2[position])) {
+          position++;
+        }
+      };
+      const lowerAt = function(i) {
+        return (input2[i] || "").toLowerCase();
+      };
+      skipWhitespace();
+      const timeStart = position;
+      while (position < input2.length && /[0-9.]/.test(input2[position])) {
+        position++;
+      }
+      if (position === timeStart) {
+        return true;
+      }
+      if (position < input2.length) {
+        const c = input2[position];
+        if (c !== ";" && c !== "," && !isWhitespace2(c)) {
+          return true;
+        }
+        skipWhitespace();
+        if (input2[position] === ";" || input2[position] === ",") {
+          position++;
+        }
+        skipWhitespace();
+      }
+      if (position >= input2.length) {
+        return false;
+      }
+      let url2 = input2.slice(position);
+      let quoted = true;
+      if (lowerAt(position) === "u") {
+        quoted = false;
+        if (lowerAt(position + 1) === "r" && lowerAt(position + 2) === "l") {
+          position += 3;
+          skipWhitespace();
+          if (input2[position] === "=") {
+            position++;
+            skipWhitespace();
+            quoted = true;
+          }
+        }
+      }
+      if (quoted) {
+        const quote = input2[position];
+        if (quote === '"' || quote === "'") {
+          position++;
+        }
+        url2 = input2.slice(position);
+        if (quote === '"' || quote === "'") {
+          const end = url2.indexOf(quote);
+          if (end !== -1) {
+            url2 = url2.slice(0, end);
+          }
+        }
+      }
+      return naughtyHref("meta", url2);
+    }
     function animatesUrlAttribute(name, attribs) {
-      if (svgAnimationTags.indexOf(name.toLowerCase()) === -1) {
+      if (svgAnimationTags.indexOf(localPart(name)) === -1) {
         return false;
       }
       const schemeCheckedAttributes = options.allowedSchemesAppliedToAttributes || [];
       return Object.keys(attribs || {}).some(function(attributeName) {
-        if (attributeName.toLowerCase() !== "attributename") {
+        if (localPart(attributeName) !== "attributename") {
           return false;
         }
         const target = (attribs[attributeName] || "").trim().toLowerCase();
         const localName = target.slice(target.lastIndexOf(":") + 1);
         return alwaysUrlAttributes.indexOf(localName) !== -1 || schemeCheckedAttributes.indexOf(target) !== -1 || schemeCheckedAttributes.indexOf(localName) !== -1;
       });
+    }
+    function localPart(name) {
+      const lower = name.toLowerCase();
+      return lower.slice(lower.lastIndexOf(":") + 1);
     }
     function parseUrl(value) {
       value = value.replace(/^(\w+:)?\s*[\\/]\s*[\\/]/, "$1//");
@@ -32593,6 +32774,9 @@ var KNOWN_OPS = new Set([
   "gte",
   "like",
   "ilike",
+  "not_contains",
+  "starts_with",
+  "ends_with",
   "in",
   "not_in",
   "null",
@@ -36241,6 +36425,9 @@ var PageCreateSchema = exports_external.object({
       "like",
       "ilike",
       "contains",
+      "not_contains",
+      "starts_with",
+      "ends_with",
       "in",
       "not_in",
       "null",
