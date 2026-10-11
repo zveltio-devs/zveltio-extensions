@@ -342,7 +342,7 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
       if (body.has_header !== undefined) updates.has_header = body.has_header;
       if (body.encoding !== undefined) updates.encoding = body.encoding;
       if (body.on_duplicate !== undefined) updates.on_duplicate = body.on_duplicate;
-      if (body.mappings !== undefined) updates.mappings = JSON.stringify(body.mappings);
+      if (body.mappings !== undefined) updates.mappings = toJsonb(body.mappings);
       if (body.description !== undefined) updates.description = body.description;
 
       const profile = await (db as any)

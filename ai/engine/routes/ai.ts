@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { toJsonb, type ExtensionContext } from '@zveltio/sdk/extension';
 import {
   aiProviderManager,
   OpenAIProvider,
@@ -682,7 +682,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
       if (body.is_enabled !== undefined)
         updateFields.is_enabled = body.is_enabled;
       if (body.config !== undefined)
-        updateFields.config = JSON.stringify(body.config);
+        updateFields.config = toJsonb(body.config);
 
       await db
         .updateTable('zv_ai_features')

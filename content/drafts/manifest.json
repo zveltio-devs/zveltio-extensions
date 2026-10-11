@@ -3,7 +3,7 @@
   "displayName": "Content Drafts",
   "category": "content",
   "description": "Draft/publish workflow for content collections",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-drafts",
@@ -36,7 +36,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "54b88ffabd5983f2f8c072d153ab35694500430efccb814662edfde7fe170363",
-    "sourceSha256": "d59d8a059d8534d5866064c6e3e511f62ee78d657326ddf2fcf439440d6e9fd6"
+    "engineSha256": "e1e2752d743b338f1617ca0b564d0e74592b544c7c03e7e12fec5af4146a9113",
+    "sourceSha256": "3f5955cf5ef2050baded0284796920ce4b12229516a4d5161d6b63d24cb85d2b"
   }
 }

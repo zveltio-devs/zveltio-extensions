@@ -3,7 +3,7 @@
   "displayName": "Data Quality",
   "category": "analytics",
   "description": "Automated data quality scans, anomaly detection and issue management",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "optionalDependencies": [
@@ -42,7 +42,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "ac6366f141927867e12ce101bd419acc5061cf003ff4f2436f9594bc536be362",
-    "sourceSha256": "e1aa01249cd6642cd1708eb83bf7a22020f080587cbde724d629173cab8585d1"
+    "engineSha256": "1ed8fc3269c00881b3162b61e1c5f93ba41d25748c70501b3507c400af95a4a0",
+    "sourceSha256": "f3465e8fcb207567267b52cf5f75d4c86c7e6ccc4d59fa3286879ef97bbcc3aa"
   }
 }

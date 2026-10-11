@@ -444,7 +444,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
       if (body.name !== undefined) updates.name = body.name;
       if (body.format !== undefined) updates.format = body.format;
       if (body.fields !== undefined) updates.fields = body.fields;
-      if (body.filters !== undefined) updates.filters = JSON.stringify(body.filters);
+      if (body.filters !== undefined) updates.filters = toJsonb(body.filters);
       if (body.sort_field !== undefined) updates.sort_field = body.sort_field;
       if (body.sort_order !== undefined) updates.sort_order = body.sort_order;
       if (body.description !== undefined) updates.description = body.description;
