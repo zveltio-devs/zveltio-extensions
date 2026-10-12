@@ -65,6 +65,20 @@ type RunEdgeFunction = (
 const EGRESS_HOST =
   /^(\[[0-9a-f:.]+\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:\d{1,5})?$/;
 
+/**
+ * The engine matches a request against the URL parser's spelling of the host,
+ * and `parseEgress` refuses an entry the parser rewrites (`010.0.0.1`,
+ * `[2001:0db8::1]`) or rejects (a port above 65535). Refused here too, with
+ * the spelling to write, or the save succeeds and every invocation fails.
+ */
+function urlSpelling(entry: string): string | null {
+  try {
+    return new URL(`http://${entry}`).hostname;
+  } catch {
+    return null;
+  }
+}
+
 const egressSchema = z
   .array(
     z
@@ -72,8 +86,18 @@ const egressSchema = z
       .trim()
       .toLowerCase()
       .refine((h) => EGRESS_HOST.test(h), {
+        abort: true,
         error: (issue) =>
           `"${String(issue.input)}" is not a host — write host or host:port, no scheme, path or wildcard`,
+      })
+      .refine((h) => urlSpelling(h) === h.replace(/:\d{1,5}$/, ''), {
+        error: (issue) => {
+          const h = String(issue.input).trim().toLowerCase();
+          const spelled = urlSpelling(h);
+          return spelled
+            ? `"${h}" is written "${spelled}" by the URL parser — list it that way`
+            : `"${h}" is not a valid host:port`;
+        },
       }),
   )
   .max(64)

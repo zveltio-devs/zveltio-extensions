@@ -72,6 +72,20 @@ d('edge function egress at save', () => {
       expect([bad, res.status]).toEqual([bad, 400]);
       expect(JSON.stringify(await res.json())).toContain('is not a host');
     }
+    // Hosts the regex admits but the engine's parseEgress refuses at invocation.
+    for (const [bad, says] of [
+      ['010.0.0.1', 'by the URL parser'],
+      ['[2001:0db8::1]', '[2001:db8::1]'],
+      ['api.stripe.com:99999', 'is not a valid host:port'],
+    ]) {
+      const res = await send(app, 'POST', '/', {
+        name: `eg-bad-${STAMP}`,
+        display_name: 'x',
+        egress: [bad],
+      });
+      expect([bad, res.status]).toEqual([bad, 400]);
+      expect(JSON.stringify(await res.json())).toContain(says);
+    }
     const env = await send(app, 'POST', '/', {
       name: `eg-env-${STAMP}`,
       display_name: 'x',
