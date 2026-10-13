@@ -908,15 +908,27 @@ export function makePublicShareHandler(ctx: ExtensionContext) {
   // The link names no firm, and the file it shares is under that firm's RLS:
   // on the pool with no tenant a plain-role engine sees only the default
   // tenant's files, so every other firm's link answered "File has been deleted".
-  // The share row records its firm (engine migration 023); enter it. An engine
-  // without that column leaves `tenant_id` undefined and the old path runs.
+  // The share row records its firm (engine migration 023); enter it. Since
+  // engine migration 065 the share table is under RLS too, so the plain-role
+  // pool sees only the default tenant's rows: the firm comes from the engine's
+  // definer function, which answers for the token alone. An engine before 065
+  // has no such function (42883) and the direct read still works there.
+  const tenantOf = async (token: string): Promise<string | undefined> => {
+    try {
+      const r = await sql<{ t: string | null }>`SELECT zveltio_media_share_tenant(${token}) AS t`.execute(db as any);
+      return r.rows[0]?.t ?? undefined;
+    } catch (err: any) {
+      if (err?.code !== '42883' && err?.errno !== '42883') throw err;
+      const share = await (db as any)
+        .selectFrom('zv_media_shares')
+        .select('tenant_id')
+        .where('token', '=', token)
+        .executeTakeFirst();
+      return share?.tenant_id ?? undefined;
+    }
+  };
   return async (c: any) => {
-    const share = await (db as any)
-      .selectFrom('zv_media_shares')
-      .selectAll()
-      .where('token', '=', c.req.param('token'))
-      .executeTakeFirst();
-    const tenant: string | undefined = share?.tenant_id ?? undefined;
+    const tenant = await tenantOf(c.req.param('token'));
     return tenant
       ? ctx.internals.withTenantIsolation(tenant, () => serveShare(c))
       : serveShare(c);

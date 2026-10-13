@@ -65,8 +65,8 @@ describe.skipIf(!DB_URL)('storage/cloud: a share download limit is not advisory'
   const seedShare = async (token: string, max: number | null): Promise<string> => {
     await sql`DELETE FROM zv_media_shares WHERE token = ${token}`.execute(admin);
     const r = await sql<{ id: string }>`
-      INSERT INTO zv_media_shares (file_id, token, share_type, max_downloads, download_count, is_active, created_by)
-      VALUES (${fileId}, ${token}, 'download', ${max}, 0, true, 'sc-sharer')
+      INSERT INTO zv_media_shares (file_id, token, share_type, max_downloads, download_count, is_active, created_by, tenant_id)
+      VALUES (${fileId}, ${token}, 'download', ${max}, 0, true, 'sc-sharer', ${TENANT}::uuid)
       RETURNING id
     `.execute(admin);
     return r.rows[0]!.id;

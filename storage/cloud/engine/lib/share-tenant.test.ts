@@ -16,7 +16,7 @@ import extension from '../index.js';
 const FIRM = '11111111-1111-1111-1111-111111111111';
 const FUTURE = new Date(Date.now() + 60 * 60 * 1000);
 
-function harness(shareTenant: string | undefined) {
+function harness(shareTenant: string | undefined, preFunction = false) {
   let current: string | null = null;
   const share = {
     id: 's1',
@@ -35,6 +35,16 @@ function harness(shareTenant: string | undefined) {
     return c;
   };
   const db = {
+    // `zveltio_media_share_tenant(token)` (engine 065): the firm the share
+    // records. `shareTenant` undefined plays an engine that predates the column.
+    getExecutor: () => ({
+      transformQuery: (node: unknown) => node,
+      compileQuery: (node: unknown) => ({ sql: '', parameters: [], query: node }),
+      executeQuery: async () => {
+        if (preFunction) throw Object.assign(new Error('function does not exist'), { code: '42883' });
+        return { rows: [{ t: shareTenant ?? null }] };
+      },
+    }),
     selectFrom: (table: string) =>
       chain(() => {
         if (table === 'zv_media_shares') return share;
@@ -82,5 +92,12 @@ describe('public share link — tenant', () => {
     await ready;
     const res = (await get()(c)) as Response;
     expect(res.status).toBe(403);
+  });
+
+  it('reads the share row itself on an engine before migration 065', async () => {
+    const { c, ready, get } = harness(FIRM, true);
+    await ready;
+    const res = (await get()(c)) as Response;
+    expect(res.status).toBe(200);
   });
 });

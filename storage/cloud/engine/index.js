@@ -25739,9 +25739,19 @@ async function logAccess(db, fileId, userId, action, userAgent, shareToken, ip) 
 }
 function makePublicShareHandler(ctx) {
   const { db } = ctx;
+  const tenantOf = async (token) => {
+    try {
+      const r = await sql`SELECT zveltio_media_share_tenant(${token}) AS t`.execute(db);
+      return r.rows[0]?.t ?? undefined;
+    } catch (err) {
+      if (err?.code !== "42883" && err?.errno !== "42883")
+        throw err;
+      const share = await db.selectFrom("zv_media_shares").select("tenant_id").where("token", "=", token).executeTakeFirst();
+      return share?.tenant_id ?? undefined;
+    }
+  };
   return async (c) => {
-    const share = await db.selectFrom("zv_media_shares").selectAll().where("token", "=", c.req.param("token")).executeTakeFirst();
-    const tenant = share?.tenant_id ?? undefined;
+    const tenant = await tenantOf(c.req.param("token"));
     return tenant ? ctx.internals.withTenantIsolation(tenant, () => serveShare(c)) : serveShare(c);
   };
   async function serveShare(c) {

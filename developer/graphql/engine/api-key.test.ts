@@ -67,8 +67,10 @@ d('developer/graphql — API keys get the data API key semantics', () => {
     issuer = (await harness.createMemberSession(engineApp, db, { grants: [] })).userId;
     makeKey = async (scopes) => {
       const raw = generateApiKey();
-      await sql`INSERT INTO zv_api_keys (name, key_hash, key_prefix, scopes, is_active, created_by)
-                VALUES (${STAMP}, ${await hashApiKey(raw)}, 'zvk_', ${JSON.stringify(scopes)}::jsonb, true, ${issuer})`.execute(db);
+      // tenant_id named: since engine migration 065 there is no root-tenant default.
+      await sql`INSERT INTO zv_api_keys (name, key_hash, key_prefix, scopes, is_active, created_by, tenant_id)
+                VALUES (${STAMP}, ${await hashApiKey(raw)}, 'zvk_', ${JSON.stringify(scopes)}::jsonb, true, ${issuer},
+                        '00000000-0000-0000-0000-000000000001'::uuid)`.execute(db);
       return raw;
     };
 
