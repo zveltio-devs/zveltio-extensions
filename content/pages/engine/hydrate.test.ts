@@ -337,6 +337,27 @@ describe('field, filter and sort names', () => {
     expect(fields).toEqual(['first_name']);
   });
 
+  // The engine seals columns no one may read (migration 073); `SELECT *` on such
+  // a table is refused, so every read names the columns `columnNames` answered.
+  test('no read ever selects *: a block without fields and a record page name the columns', async () => {
+    const { db, calls } = makeDb({ collections: ['contacts'] });
+    await resolveBlocks(
+      { db, ddl: db.ddl, engine: makeEngine() },
+      { user: { id: 'u1', role: 'member' }, tenantId: 't1' },
+      [listBlock({ collection: 'contacts' })],
+    );
+    const { resolveRecord } = await import('./hydrate.js');
+    await resolveRecord(
+      { db, ddl: db.ddl, engine: makeEngine() },
+      { user: { id: 'u1', role: 'member' }, tenantId: 't1' },
+      'contacts',
+      'id',
+      '1',
+    );
+    expect(calls.selectedAll).toBe(0);
+    expect(calls.selectedFields).toContainEqual(['id', 'created_at', 'tenant_id', 'first_name', 'email', 'notes']);
+  });
+
   test('naming only unknown fields is a refusal, not "all columns"', async () => {
     const { db, calls } = makeDb({ collections: ['contacts'] });
     const [out] = await resolveBlocks(
