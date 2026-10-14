@@ -213,4 +213,23 @@ d('egress audit under a tenant and concurrency', () => {
       ],
     });
   });
+
+  it('a delete is audited in the function tenant, with what it could reach', async () => {
+    const { app } = await mountForTest(import.meta.dir, { tenant: TENANT, transaction: true });
+    const res = await send(app, 'POST', '/', { name: `eg-del-${STAMP}`, display_name: 'x', egress: ['z.test'] });
+    const fn = (await res.json()).function;
+    expect((await app.request(`/${fn.id}`, { method: 'DELETE' })).status).toBe(200);
+    // A second delete removes nothing and records nothing.
+    expect((await app.request(`/${fn.id}`, { method: 'DELETE' })).status).toBe(200);
+
+    const log = (
+      await sql<{ tenant_id: string; user_id: string; metadata: any }>`
+        SELECT tenant_id, user_id, metadata FROM zv_audit_log
+         WHERE event_type = 'edge_function.deleted' AND resource_id = ${fn.id}`.execute(db)
+    ).rows;
+    expect(log).toHaveLength(1);
+    expect(log[0]!.tenant_id).toBe(TENANT);
+    expect(!!log[0]!.user_id).toBe(true);
+    expect(log[0]!.metadata).toMatchObject({ name: `eg-del-${STAMP}`, egress: ['z.test'] });
+  });
 });
