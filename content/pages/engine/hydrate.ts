@@ -320,10 +320,12 @@ async function resolveWithViewer(
       ? viewer.sortDir === 'asc' ? 'asc' : 'desc'
       : content.sort_dir === 'asc' ? 'asc' : 'desc';
 
-    let q =
-      fields.length > 0
-        ? deps.db.selectFrom(meta.table).select(fields)
-        : deps.db.selectFrom(meta.table).selectAll();
+    // Named columns, never `*`: the engine seals columns no one may read
+    // (a `password` field, engine migration 073), and `SELECT *` on such a
+    // table is refused outright. `meta.columns` is what the request role may read.
+    let q = deps.db
+      .selectFrom(meta.table)
+      .select(fields.length > 0 ? fields : [...meta.columns]);
 
     // Tenant scope explicitly as well as through RLS. `ctx.db` is already
     // RLS-scoped, so this is defence in depth — and it is how the engine wrote
@@ -463,7 +465,7 @@ export async function resolveRecord(
   const field = meta.columns.has(keyField) ? keyField : null;
   if (!field) return null;
 
-  let q = deps.db.selectFrom(meta.table).selectAll().where(field, '=', keyValue);
+  let q = deps.db.selectFrom(meta.table).select([...meta.columns]).where(field, '=', keyValue);
   if (meta.columns.has('tenant_id')) q = q.where('tenant_id', '=', audience.tenantId);
 
   // The page's filter, applied before row policies rather than after: a row this
