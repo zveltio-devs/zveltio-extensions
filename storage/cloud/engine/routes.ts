@@ -87,7 +87,18 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
   // FILE VERSIONS
   // =============================================
 
+  // The request's own tenant's file, before anything is read or written: the
+  // version helpers look the file up under RLS alone, which reads wider for a
+  // god or a parent tenant, so either could write versions into a child's file.
+  // biome-ignore lint/suspicious/noExplicitAny: Hono context
+  const foreignFile = async (c: any) =>
+    (await visible(c, 'zv_media_files', c.req.param('id')))
+      ? null
+      : c.json({ error: 'File not found' }, 404);
+
   app.post('/files/:id/versions', requireAuth, async (c) => {
+    const refused = await foreignFile(c);
+    if (refused) return refused;
     const fileId = c.req.param('id');
     const user = c.get('user') as any;
     const formData = await readMultipart(c);
@@ -110,6 +121,8 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.get('/files/:id/versions', requireAuth, async (c) => {
+    const refused = await foreignFile(c);
+    if (refused) return refused;
     const versions = await withNames(
       await listFileVersions(db, c.req.param('id')),
       'uploaded_by',
@@ -119,6 +132,8 @@ export function cloudRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.post('/files/:id/versions/:num/restore', requireAuth, async (c) => {
+    const refused = await foreignFile(c);
+    if (refused) return refused;
     const user = c.get('user') as any;
     try {
       await restoreFileVersion(db, c.req.param('id'), parseInt(c.req.param('num')), user.id);

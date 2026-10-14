@@ -144,3 +144,25 @@ describe('storage/cloud — a foreign file or folder id is refused before anythi
     expect(writes).toContain('insert zv_media_folders');
   });
 });
+
+// A16: the version helpers looked the file up under RLS alone, which reads wider
+// for a god or a parent tenant, so either restored or wrote versions of a
+// child tenant's file. The routes now ask for the request's own tenant first.
+describe('storage/cloud — versions of a file outside the request tenant', () => {
+  for (const [label, id] of [
+    ['readable but another tenant', FOREIGN],
+    ['malformed', 'not-a-uuid'],
+  ] as const) {
+    it(`${label}: restore is 404 and writes nothing`, async () => {
+      const { res, writes } = await post(`/files/${id}/versions/1/restore`, undefined);
+      expect(res.status).toBe(404);
+      expect(writes).toEqual([]);
+    });
+    it(`${label}: list is 404`, async () => {
+      const { app, ready } = mount();
+      await ready;
+      expect((await app.request(`/files/${id}/versions`)).status).toBe(404);
+    });
+  }
+});
+
