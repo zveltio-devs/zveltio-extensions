@@ -4493,7 +4493,7 @@ var init_operation_node = __esm(() => {
   init_object_utils();
 });
 
-// /zveltio-extension/node_modules/kysely/dist/operation-node/zveltio-extension-operation-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/root-operation-node.js
 function isRootOperationNode(thing) {
   return isOperationNode(thing) && ROOT_OPERATION_NODE_KINDS[thing.kind] === true;
 }
@@ -46518,10 +46518,10 @@ var require_ipv6 = __commonJS((exports) => {
       if (/\//.test(address)) {
         throw new address_error_1.AddressError("Invalid subnet mask.");
       }
-      const zone = constants6.RE_ZONE_STRING.exec(address);
-      if (zone) {
-        this.zone = zone[0];
-        address = address.replace(constants6.RE_ZONE_STRING, "");
+      const zoneStart = address.indexOf("%");
+      if (zoneStart !== -1 && /^.*$/.test(address.slice(zoneStart))) {
+        this.zone = address.slice(zoneStart);
+        address = address.slice(0, zoneStart);
       }
       const longest = this.groups * 5 + 5;
       if (address.length > longest) {
@@ -72146,24 +72146,62 @@ var require_libbase642 = __commonJS((exports, module) => {
     str = str || "";
     if (typeof str === "string") {
       let padPos = str.indexOf("=");
-      if (padPos >= 0 && /[a-zA-Z0-9+/\-_]/.test(str.substr(padPos))) {
-        let parts = [];
-        for (let segment of str.split(/[=]+/)) {
-          if (segment) {
-            parts.push(Buffer2.from(segment, "base64"));
+      if (padPos >= 0 && /[a-zA-Z0-9+/\-_]/.test(str.slice(padPos))) {
+        let output2 = Buffer2.alloc(Math.floor(str.length * 3 / 4));
+        let length = 0;
+        let start = 0;
+        while (start <= str.length) {
+          let end = str.indexOf("=", start);
+          if (end < 0) {
+            end = str.length;
           }
+          if (end > start) {
+            length += output2.write(str.substring(start, end), length, "base64");
+          }
+          start = end + 1;
         }
-        return Buffer2.concat(parts);
+        return Buffer2.from(output2.subarray(0, length));
       }
     }
     return Buffer2.from(str, "base64");
   }
+  function normalizeLineLength(lineLength) {
+    lineLength = Math.floor(Number(lineLength));
+    return Number.isFinite(lineLength) && lineLength >= 1 ? lineLength : 76;
+  }
+  function wrapBuffer(src, lineLength, final) {
+    let lines = Math.ceil(src.length / lineLength);
+    let complete = Math.max(lines - 1, 0);
+    let rest = src.length - complete * lineLength;
+    let output2 = Buffer2.allocUnsafe(complete * (lineLength + 2) + (final ? rest : 0));
+    let to = 0;
+    for (let from = 0;from < complete * lineLength; from += lineLength) {
+      src.copy(output2, to, from, from + lineLength);
+      to += lineLength;
+      output2[to++] = 13;
+      output2[to++] = 10;
+    }
+    if (final) {
+      to += src.copy(output2, to, complete * lineLength);
+      rest = 0;
+    }
+    if (to !== output2.length) {
+      throw new Error("Unexpected wrapped length");
+    }
+    return { output: output2, rest };
+  }
   function wrap(str, lineLength) {
     str = (str || "").toString();
-    lineLength = lineLength || 76;
+    lineLength = normalizeLineLength(lineLength);
     if (str.length <= lineLength) {
       return str;
     }
+    if (/[^\u0000-\u00ff]|[\r\n]/.test(str) || str.trim() !== str) {
+      return legacyWrap(str, lineLength);
+    }
+    return wrapBuffer(Buffer2.from(str, "latin1"), lineLength, true).output.toString("latin1");
+  }
+  function legacyWrap(str, lineLength) {
     let result = [];
     let pos = 0;
     let chunkLength = lineLength * 1024;
@@ -72182,12 +72220,12 @@ var require_libbase642 = __commonJS((exports, module) => {
       super();
       this.options = options || {};
       if (this.options.lineLength !== false) {
-        this.options.lineLength = Number(this.options.lineLength) || 76;
+        this.options.lineLength = normalizeLineLength(this.options.lineLength);
       }
       this.skipStartBytes = Number(this.options.skipStartBytes) || 0;
-      this.limitOutbutBytes = Number(this.options.limitOutbutBytes) || 0;
+      this.limitOutputBytes = Number(this.options.limitOutputBytes || this.options.limitOutbutBytes) || 0;
       this._curLine = this.options.startPadding || "";
-      this._remainingBytes = false;
+      this._remainingBytes = null;
       this.inputBytes = 0;
       this.outputBytes = 0;
     }
@@ -72197,74 +72235,57 @@ var require_libbase642 = __commonJS((exports, module) => {
           this.skipStartBytes -= chunk.length;
           return;
         }
-        chunk = chunk.slice(this.skipStartBytes);
+        chunk = chunk.subarray(this.skipStartBytes);
         this.skipStartBytes = 0;
       }
-      if (this.limitOutbutBytes) {
-        if (this.outputBytes + chunk.length <= this.limitOutbutBytes) {} else if (this.outputBytes >= this.limitOutbutBytes) {
+      if (this.limitOutputBytes) {
+        if (this.outputBytes >= this.limitOutputBytes) {
           return;
-        } else {
-          chunk = chunk.slice(0, this.limitOutbutBytes - this.outputBytes);
+        }
+        if (this.outputBytes + chunk.length > this.limitOutputBytes) {
+          chunk = chunk.subarray(0, this.limitOutputBytes - this.outputBytes);
         }
       }
       this.outputBytes += chunk.length;
       this.push(chunk);
     }
-    _getWrapped(str, isFinal) {
-      str = wrap(str, this.options.lineLength);
-      if (!isFinal && str.length === this.options.lineLength) {
-        str += `\r
-`;
+    _emit(b64, final) {
+      let src = Buffer2.from(this._curLine + b64, "latin1");
+      if (!src.length) {
+        return;
       }
-      return str;
+      if (!this.options.lineLength) {
+        this._curLine = "";
+        return this._writeChunk(src);
+      }
+      let { output: output2, rest } = wrapBuffer(src, this.options.lineLength, final);
+      this._curLine = rest ? src.toString("latin1", src.length - rest) : "";
+      if (output2.length) {
+        this._writeChunk(output2);
+      }
     }
     _transform(chunk, encoding, done) {
       if (encoding !== "buffer") {
         chunk = Buffer2.from(chunk, encoding);
       }
       if (!chunk || !chunk.length) {
-        return setImmediate(done);
+        return done();
       }
       this.inputBytes += chunk.length;
-      if (this._remainingBytes && this._remainingBytes.length) {
+      if (this._remainingBytes) {
         chunk = Buffer2.concat([this._remainingBytes, chunk], this._remainingBytes.length + chunk.length);
-        this._remainingBytes = false;
+        this._remainingBytes = null;
       }
-      if (chunk.length % 3) {
-        this._remainingBytes = chunk.slice(chunk.length - chunk.length % 3);
-        chunk = chunk.slice(0, chunk.length - chunk.length % 3);
-      } else {
-        this._remainingBytes = false;
+      let extra = chunk.length % 3;
+      if (extra) {
+        this._remainingBytes = chunk.subarray(chunk.length - extra);
+        chunk = chunk.subarray(0, chunk.length - extra);
       }
-      let b64 = this._curLine + encode3(chunk);
-      if (this.options.lineLength) {
-        b64 = this._getWrapped(b64);
-        let lastLF = b64.lastIndexOf(`
-`);
-        if (lastLF < 0) {
-          this._curLine = b64;
-          b64 = "";
-        } else if (lastLF === b64.length - 1) {
-          this._curLine = "";
-        } else {
-          this._curLine = b64.substr(lastLF + 1);
-          b64 = b64.substr(0, lastLF + 1);
-        }
-      }
-      if (b64) {
-        this._writeChunk(Buffer2.from(b64, "ascii"), false);
-      }
-      setImmediate(done);
+      this._emit(encode3(chunk), false);
+      done();
     }
     _flush(done) {
-      if (this._remainingBytes && this._remainingBytes.length) {
-        this._curLine += encode3(this._remainingBytes);
-      }
-      if (this._curLine) {
-        this._curLine = this._getWrapped(this._curLine, true);
-        this._writeChunk(Buffer2.from(this._curLine, "ascii"), true);
-        this._curLine = "";
-      }
+      this._emit(this._remainingBytes ? encode3(this._remainingBytes) : "", true);
       done();
     }
   }
@@ -75635,24 +75656,62 @@ var require_libbase643 = __commonJS((exports, module) => {
     str = str || "";
     if (typeof str === "string") {
       let padPos = str.indexOf("=");
-      if (padPos >= 0 && /[a-zA-Z0-9+/\-_]/.test(str.substr(padPos))) {
-        let parts = [];
-        for (let segment of str.split(/[=]+/)) {
-          if (segment) {
-            parts.push(Buffer2.from(segment, "base64"));
+      if (padPos >= 0 && /[a-zA-Z0-9+/\-_]/.test(str.slice(padPos))) {
+        let output2 = Buffer2.alloc(Math.floor(str.length * 3 / 4));
+        let length = 0;
+        let start = 0;
+        while (start <= str.length) {
+          let end = str.indexOf("=", start);
+          if (end < 0) {
+            end = str.length;
           }
+          if (end > start) {
+            length += output2.write(str.substring(start, end), length, "base64");
+          }
+          start = end + 1;
         }
-        return Buffer2.concat(parts);
+        return Buffer2.from(output2.subarray(0, length));
       }
     }
     return Buffer2.from(str, "base64");
   }
+  function normalizeLineLength(lineLength) {
+    lineLength = Math.floor(Number(lineLength));
+    return Number.isFinite(lineLength) && lineLength >= 1 ? lineLength : 76;
+  }
+  function wrapBuffer(src, lineLength, final) {
+    let lines = Math.ceil(src.length / lineLength);
+    let complete = Math.max(lines - 1, 0);
+    let rest = src.length - complete * lineLength;
+    let output2 = Buffer2.allocUnsafe(complete * (lineLength + 2) + (final ? rest : 0));
+    let to = 0;
+    for (let from = 0;from < complete * lineLength; from += lineLength) {
+      src.copy(output2, to, from, from + lineLength);
+      to += lineLength;
+      output2[to++] = 13;
+      output2[to++] = 10;
+    }
+    if (final) {
+      to += src.copy(output2, to, complete * lineLength);
+      rest = 0;
+    }
+    if (to !== output2.length) {
+      throw new Error("Unexpected wrapped length");
+    }
+    return { output: output2, rest };
+  }
   function wrap(str, lineLength) {
     str = (str || "").toString();
-    lineLength = lineLength || 76;
+    lineLength = normalizeLineLength(lineLength);
     if (str.length <= lineLength) {
       return str;
     }
+    if (/[^\u0000-\u00ff]|[\r\n]/.test(str) || str.trim() !== str) {
+      return legacyWrap(str, lineLength);
+    }
+    return wrapBuffer(Buffer2.from(str, "latin1"), lineLength, true).output.toString("latin1");
+  }
+  function legacyWrap(str, lineLength) {
     let result = [];
     let pos = 0;
     let chunkLength = lineLength * 1024;
@@ -75671,12 +75730,12 @@ var require_libbase643 = __commonJS((exports, module) => {
       super();
       this.options = options || {};
       if (this.options.lineLength !== false) {
-        this.options.lineLength = Number(this.options.lineLength) || 76;
+        this.options.lineLength = normalizeLineLength(this.options.lineLength);
       }
       this.skipStartBytes = Number(this.options.skipStartBytes) || 0;
-      this.limitOutbutBytes = Number(this.options.limitOutbutBytes) || 0;
+      this.limitOutputBytes = Number(this.options.limitOutputBytes || this.options.limitOutbutBytes) || 0;
       this._curLine = this.options.startPadding || "";
-      this._remainingBytes = false;
+      this._remainingBytes = null;
       this.inputBytes = 0;
       this.outputBytes = 0;
     }
@@ -75686,74 +75745,57 @@ var require_libbase643 = __commonJS((exports, module) => {
           this.skipStartBytes -= chunk.length;
           return;
         }
-        chunk = chunk.slice(this.skipStartBytes);
+        chunk = chunk.subarray(this.skipStartBytes);
         this.skipStartBytes = 0;
       }
-      if (this.limitOutbutBytes) {
-        if (this.outputBytes + chunk.length <= this.limitOutbutBytes) {} else if (this.outputBytes >= this.limitOutbutBytes) {
+      if (this.limitOutputBytes) {
+        if (this.outputBytes >= this.limitOutputBytes) {
           return;
-        } else {
-          chunk = chunk.slice(0, this.limitOutbutBytes - this.outputBytes);
+        }
+        if (this.outputBytes + chunk.length > this.limitOutputBytes) {
+          chunk = chunk.subarray(0, this.limitOutputBytes - this.outputBytes);
         }
       }
       this.outputBytes += chunk.length;
       this.push(chunk);
     }
-    _getWrapped(str, isFinal) {
-      str = wrap(str, this.options.lineLength);
-      if (!isFinal && str.length === this.options.lineLength) {
-        str += `\r
-`;
+    _emit(b64, final) {
+      let src = Buffer2.from(this._curLine + b64, "latin1");
+      if (!src.length) {
+        return;
       }
-      return str;
+      if (!this.options.lineLength) {
+        this._curLine = "";
+        return this._writeChunk(src);
+      }
+      let { output: output2, rest } = wrapBuffer(src, this.options.lineLength, final);
+      this._curLine = rest ? src.toString("latin1", src.length - rest) : "";
+      if (output2.length) {
+        this._writeChunk(output2);
+      }
     }
     _transform(chunk, encoding, done) {
       if (encoding !== "buffer") {
         chunk = Buffer2.from(chunk, encoding);
       }
       if (!chunk || !chunk.length) {
-        return setImmediate(done);
+        return done();
       }
       this.inputBytes += chunk.length;
-      if (this._remainingBytes && this._remainingBytes.length) {
+      if (this._remainingBytes) {
         chunk = Buffer2.concat([this._remainingBytes, chunk], this._remainingBytes.length + chunk.length);
-        this._remainingBytes = false;
+        this._remainingBytes = null;
       }
-      if (chunk.length % 3) {
-        this._remainingBytes = chunk.slice(chunk.length - chunk.length % 3);
-        chunk = chunk.slice(0, chunk.length - chunk.length % 3);
-      } else {
-        this._remainingBytes = false;
+      let extra = chunk.length % 3;
+      if (extra) {
+        this._remainingBytes = chunk.subarray(chunk.length - extra);
+        chunk = chunk.subarray(0, chunk.length - extra);
       }
-      let b64 = this._curLine + encode3(chunk);
-      if (this.options.lineLength) {
-        b64 = this._getWrapped(b64);
-        let lastLF = b64.lastIndexOf(`
-`);
-        if (lastLF < 0) {
-          this._curLine = b64;
-          b64 = "";
-        } else if (lastLF === b64.length - 1) {
-          this._curLine = "";
-        } else {
-          this._curLine = b64.substr(lastLF + 1);
-          b64 = b64.substr(0, lastLF + 1);
-        }
-      }
-      if (b64) {
-        this._writeChunk(Buffer2.from(b64, "ascii"), false);
-      }
-      setImmediate(done);
+      this._emit(encode3(chunk), false);
+      done();
     }
     _flush(done) {
-      if (this._remainingBytes && this._remainingBytes.length) {
-        this._curLine += encode3(this._remainingBytes);
-      }
-      if (this._curLine) {
-        this._curLine = this._getWrapped(this._curLine, true);
-        this._writeChunk(Buffer2.from(this._curLine, "ascii"), true);
-        this._curLine = "";
-      }
+      this._emit(this._remainingBytes ? encode3(this._remainingBytes) : "", true);
       done();
     }
   }
@@ -77217,7 +77259,7 @@ class Tokenizer {
       this.operatorExpecting = this.operators[chr];
       this.escaped = false;
       return;
-    } else if (['"', "'"].includes(this.operatorExpecting) && chr === "\\") {
+    } else if (['"', "'", ")"].includes(this.operatorExpecting) && chr === "\\") {
       this.escaped = true;
       return;
     }
@@ -86831,15 +86873,24 @@ class Cookies {
   }
   parse(cookieStr) {
     const cookie = {};
+    let hasNameValue = false;
     (cookieStr || "").toString().split(";").forEach((cookiePart) => {
-      const valueParts = cookiePart.split("=");
-      const key = valueParts.shift().trim().toLowerCase();
-      let value = valueParts.join("=").trim();
-      let domain2;
-      if (!key) {
+      if (!cookiePart.trim()) {
         return;
       }
-      switch (key) {
+      const valueParts = cookiePart.split("=");
+      const name2 = valueParts.shift().trim();
+      let value = valueParts.join("=").trim();
+      let domain2;
+      if (!hasNameValue) {
+        hasNameValue = true;
+        if (name2) {
+          cookie.name = name2;
+          cookie.value = value;
+        }
+        return;
+      }
+      switch (name2.toLowerCase()) {
         case "expires": {
           const expires = new Date(value);
           if (expires.toString() !== "Invalid Date") {
@@ -86866,11 +86917,6 @@ class Cookies {
         case "httponly":
           cookie.httponly = true;
           break;
-        default:
-          if (!cookie.name) {
-            cookie.name = key;
-            cookie.value = value;
-          }
       }
     });
     return cookie;
@@ -86933,10 +86979,10 @@ var init_cookies = __esm(() => {
 });
 
 // /zveltio-extension/node_modules/nodemailer/dist/esm/package-info.js
-var name2 = "nodemailer", version2 = "10.0.14", homepage = "https://nodemailer.com/";
+var name2 = "nodemailer", version2 = "10.1.1", homepage = "https://nodemailer.com/";
 
 // /zveltio-extension/node_modules/nodemailer/dist/esm/errors.js
-var ECONNECTION = "ECONNECTION", ENOAUTH = "ENOAUTH", EOAUTH2 = "EOAUTH2", EMAXLIMIT = "EMAXLIMIT", EMAXRECIPIENTS = "EMAXRECIPIENTS", ESENDMAIL = "ESENDMAIL", ESES = "ESES", ECONFIG = "ECONFIG", EPROXY = "EPROXY", EFILEACCESS = "EFILEACCESS", EURLACCESS = "EURLACCESS", EFETCH = "EFETCH";
+var ECONNECTION = "ECONNECTION", ETIMEDOUT = "ETIMEDOUT", ESOCKET = "ESOCKET", EENVELOPE = "EENVELOPE", EMESSAGE = "EMESSAGE", ESTREAM = "ESTREAM", ENOAUTH = "ENOAUTH", EOAUTH2 = "EOAUTH2", EMAXLIMIT = "EMAXLIMIT", EMAXRECIPIENTS = "EMAXRECIPIENTS", ESENDMAIL = "ESENDMAIL", ESES = "ESES", ECONFIG = "ECONFIG", EPROXY = "EPROXY", EFILEACCESS = "EFILEACCESS", EURLACCESS = "EURLACCESS", EFETCH = "EFETCH", isTransientError = (err) => err.responseCode === 421 || err.code === ECONNECTION || err.code === ESOCKET || err.code === ETIMEDOUT, ERR_ACCESS_DENIED = "ERR_ACCESS_DENIED";
 var init_errors = () => {};
 
 // /zveltio-extension/node_modules/nodemailer/dist/esm/shared/objects.js
@@ -86956,6 +87002,11 @@ import https from "https";
 import zlib from "zlib";
 import { PassThrough } from "stream";
 import net3 from "net";
+function setFetchCode(err) {
+  if (err.code !== ERR_ACCESS_DENIED) {
+    err.code = EFETCH;
+  }
+}
 function parseFetchUrl(url2) {
   let parsed;
   try {
@@ -86967,6 +87018,9 @@ function parseFetchUrl(url2) {
     return false;
   }
   return parsed;
+}
+function fetchPort(parsed) {
+  return parsed.port ? Number(parsed.port) : parsed.protocol === "https:" ? 443 : 80;
 }
 function nmfetch(url2, options) {
   options = options || {};
@@ -87031,7 +87085,7 @@ function nmfetch(url2, options) {
           return;
         }
         finished = true;
-        err.code = EFETCH;
+        setFetchCode(err);
         err.sourceUrl = url2;
         fetchRes.emit("error", err);
       });
@@ -87064,7 +87118,7 @@ function nmfetch(url2, options) {
     method,
     host: parsed.hostname,
     path: parsed.path,
-    port: parsed.port ? parsed.port : parsed.protocol === "https:" ? 443 : 80,
+    port: fetchPort(parsed),
     headers,
     rejectUnauthorized: true,
     agent: false
@@ -87084,7 +87138,7 @@ function nmfetch(url2, options) {
   } catch (E) {
     finished = true;
     setImmediate(() => {
-      E.code = EFETCH;
+      setFetchCode(E);
       E.sourceUrl = url2;
       fetchRes.emit("error", E);
     });
@@ -87095,7 +87149,7 @@ function nmfetch(url2, options) {
       return;
     }
     finished = true;
-    err.code = EFETCH;
+    setFetchCode(err);
     err.sourceUrl = sourceUrl;
     fetchRes.emit("error", err);
     req.abort();
@@ -87105,6 +87159,13 @@ function nmfetch(url2, options) {
     req.setTimeout(timeout, () => fail(new Error("Request Timeout")));
   }
   req.on("error", (err) => fail(err));
+  fetchRes.once("close", () => {
+    if (finished || fetchRes.readableEnded) {
+      return;
+    }
+    finished = true;
+    req.destroy();
+  });
   req.on("response", (res) => {
     let inflate;
     if (finished) {
@@ -87138,12 +87199,11 @@ function nmfetch(url2, options) {
       if (!redirectParsed) {
         return fail(new Error("Unsupported protocol for URL " + redirectUrl), redirectUrl);
       }
-      const crossHost = redirectParsed.hostname !== parsed.hostname;
-      const downgrade = parsed.protocol === "https:" && redirectParsed.protocol === "http:";
-      if (options.headers && (crossHost || downgrade)) {
+      const crossOrigin = redirectParsed.protocol !== parsed.protocol || redirectParsed.hostname !== parsed.hostname || fetchPort(redirectParsed) !== fetchPort(parsed);
+      if (options.headers && crossOrigin) {
         const sensitive = ["authorization", "cookie", "proxy-authorization"];
         Object.keys(options.headers).forEach((key) => {
-          if (sensitive.includes(key.toLowerCase())) {
+          if (sensitive.includes(key.toLowerCase().trim())) {
             delete options.headers[key];
           }
         });
@@ -87233,6 +87293,7 @@ import fs from "fs";
 import dns from "dns";
 import net4 from "net";
 import os from "os";
+import { finished } from "stream";
 function resolveContent(data, key, options, callback) {
   if (!callback && typeof options === "function") {
     callback = options;
@@ -87298,36 +87359,66 @@ function resolveContentValue(data, key, options, callback) {
   }
   setImmediate(() => callback(null, content));
 }
+function recordStreamErrors(stream) {
+  stream.on("error", (err) => {
+    if (!streamErrors.has(stream)) {
+      streamErrors.set(stream, err);
+    }
+  });
+}
+function destroyStream(value) {
+  const stream = value;
+  if (stream && typeof stream.pipe === "function" && typeof stream.destroy === "function" && !stream.destroyed) {
+    stream.destroy();
+  }
+}
+function unreadableStreamError(stream) {
+  const err = streamErrors.get(stream) || stream.errored;
+  if (err) {
+    return err;
+  }
+  if (stream.readableEnded || stream.destroyed) {
+    const unreadable = new Error("Content stream was already read or destroyed");
+    unreadable.code = ESTREAM;
+    return unreadable;
+  }
+  return null;
+}
 function resolveStream(stream, callback) {
   let responded = false;
+  const respond = (err, value) => {
+    if (responded) {
+      return;
+    }
+    responded = true;
+    callback(err, value);
+  };
+  const unreadable = unreadableStreamError(stream);
+  if (unreadable) {
+    stream.on("error", () => false);
+    setImmediate(() => respond(unreadable));
+    return;
+  }
   const chunks = [];
   let chunklen = 0;
-  stream.on("error", (err) => {
-    if (responded) {
-      return;
+  stream.on("data", (chunk) => {
+    if (typeof chunk === "string") {
+      chunk = Buffer.from(chunk);
     }
-    responded = true;
-    callback(err);
+    chunks.push(chunk);
+    chunklen += chunk.length;
   });
-  stream.on("readable", () => {
-    let chunk;
-    while ((chunk = stream.read()) !== null) {
-      chunks.push(chunk);
-      chunklen += chunk.length;
+  finished(stream, { writable: false }, (err) => {
+    if (err) {
+      return respond(err);
     }
-  });
-  stream.on("end", () => {
-    if (responded) {
-      return;
-    }
-    responded = true;
     let value;
     try {
       value = Buffer.concat(chunks, chunklen);
     } catch (E) {
-      return callback(E);
+      return respond(E);
     }
-    callback(null, value);
+    respond(null, value);
   });
 }
 function createDefaultLogger(levels) {
@@ -87366,8 +87457,16 @@ function createDefaultLogger(levels) {
   });
   return logger;
 }
-var DNS_TTL, CACHE_CLEANUP_INTERVAL, MAX_CACHE_SIZE = 1000, lastCacheCleanup = 0, networkInterfaces, isFamilySupported = (family, allowInternal) => {
-  const addresses = Object.values(networkInterfaces || {}).flat();
+var DNS_TTL, CACHE_CLEANUP_INTERVAL, MAX_CACHE_SIZE = 1000, lastCacheCleanup = 0, networkInterfaces, networkInterfacesRead = false, _readNetworkInterfaces = () => {
+  if (!networkInterfacesRead) {
+    networkInterfacesRead = true;
+    try {
+      networkInterfaces = os.networkInterfaces();
+    } catch (_err) {}
+  }
+  return networkInterfaces;
+}, isFamilySupported = (family, allowInternal) => {
+  const addresses = Object.values(_readNetworkInterfaces() || {}).flat();
   if (!addresses.length) {
     return true;
   }
@@ -87375,7 +87474,8 @@ var DNS_TTL, CACHE_CLEANUP_INTERVAL, MAX_CACHE_SIZE = 1000, lastCacheCleanup = 0
 }, resolve2 = (family, hostname3, options, callback) => {
   options = options || {};
   if (!isFamilySupported(family, options.allowInternalNetworkInterfaces)) {
-    return callback(null, []);
+    callback(null, []);
+    return null;
   }
   const dnsResolver = dns.Resolver ? new dns.Resolver(options) : dns;
   dnsResolver["resolve" + family](hostname3, (err, addresses) => {
@@ -87394,6 +87494,7 @@ var DNS_TTL, CACHE_CLEANUP_INTERVAL, MAX_CACHE_SIZE = 1000, lastCacheCleanup = 0
     }
     return callback(null, Array.isArray(addresses) ? addresses : [].concat(addresses || []));
   });
+  return dns.Resolver ? dnsResolver : null;
 }, dnsCache, formatDNSValue = (value, extra) => {
   if (!value) {
     return Object.assign({}, extra || {});
@@ -87444,103 +87545,125 @@ var DNS_TTL, CACHE_CLEANUP_INTERVAL, MAX_CACHE_SIZE = 1000, lastCacheCleanup = 0
       }));
     }
   }
+  let responded = false;
+  let deadline;
+  const respond = (err, result) => {
+    if (responded) {
+      return;
+    }
+    responded = true;
+    clearTimeout(deadline);
+    callback(err, result);
+  };
+  const respondCached = (error64) => {
+    if (!cached2) {
+      return false;
+    }
+    dnsCache.set(host, {
+      value: cached2.value,
+      expires: Date.now() + (options.dnsTtl || DNS_TTL)
+    });
+    respond(null, formatDNSValue(cached2.value, {
+      servername,
+      cached: true,
+      error: error64
+    }));
+    return true;
+  };
+  const resolvers = [];
+  const timeout = Number(options.timeout) || 0;
+  if (timeout > 0) {
+    deadline = setTimeout(() => {
+      for (const resolver of resolvers) {
+        if (typeof resolver.cancel === "function") {
+          resolver.cancel();
+        }
+      }
+      const err = new Error("DNS lookup for " + host + " timed out");
+      err.code = dns.TIMEOUT;
+      if (!respondCached(err)) {
+        respond(err);
+      }
+    }, timeout);
+  }
   let ipv4Addresses = [];
   let ipv6Addresses = [];
   let ipv4Error = null;
   let ipv6Error = null;
-  resolve2(4, options.host, options, (err, addresses) => {
-    if (err) {
-      ipv4Error = err;
-    } else {
-      ipv4Addresses = addresses || [];
+  let pending = 2;
+  const onResolved = () => {
+    if (--pending || responded) {
+      return;
     }
-    resolve2(6, host, options, (err2, addresses2) => {
-      if (err2) {
-        ipv6Error = err2;
-      } else {
-        ipv6Addresses = addresses2 || [];
-      }
-      const allAddresses = ipv4Addresses.concat(ipv6Addresses);
-      if (allAddresses.length) {
+    const allAddresses = ipv4Addresses.concat(ipv6Addresses);
+    if (allAddresses.length) {
+      const value = {
+        addresses: allAddresses
+      };
+      dnsCache.set(host, {
+        value,
+        expires: Date.now() + (options.dnsTtl || DNS_TTL)
+      });
+      return respond(null, formatDNSValue(value, {
+        servername,
+        cached: false
+      }));
+    }
+    if (ipv4Error && ipv6Error && respondCached(ipv4Error)) {
+      return;
+    }
+    try {
+      dns.lookup(host, { all: true }, (err, addresses) => {
+        if (err) {
+          if (respondCached(err)) {
+            return;
+          }
+          return respond(err);
+        }
+        const supportedAddresses = addresses ? addresses.filter((addr) => isFamilySupported(addr.family)).map((addr) => addr.address) : [];
+        if (addresses && addresses.length && !supportedAddresses.length) {
+          console.warn(`Failed to resolve IPv${addresses[0].family} addresses with current network`);
+        }
+        if (!supportedAddresses.length && cached2) {
+          return respond(null, formatDNSValue(cached2.value, {
+            servername,
+            cached: true
+          }));
+        }
         const value = {
-          addresses: allAddresses
+          addresses: supportedAddresses.length ? supportedAddresses : [host]
         };
         dnsCache.set(host, {
           value,
           expires: Date.now() + (options.dnsTtl || DNS_TTL)
         });
-        return callback(null, formatDNSValue(value, {
+        return respond(null, formatDNSValue(value, {
           servername,
           cached: false
         }));
+      });
+    } catch (lookupErr) {
+      if (respondCached(lookupErr)) {
+        return;
       }
-      if (ipv4Error && ipv6Error) {
-        if (cached2) {
-          dnsCache.set(host, {
-            value: cached2.value,
-            expires: Date.now() + (options.dnsTtl || DNS_TTL)
-          });
-          return callback(null, formatDNSValue(cached2.value, {
-            servername,
-            cached: true,
-            error: ipv4Error
-          }));
-        }
+      return respond(ipv4Error || ipv6Error || lookupErr);
+    }
+  };
+  for (const family of [4, 6]) {
+    const resolver = resolve2(family, host, options, (err, addresses) => {
+      if (family === 4) {
+        ipv4Error = err;
+        ipv4Addresses = addresses || [];
+      } else {
+        ipv6Error = err;
+        ipv6Addresses = addresses || [];
       }
-      try {
-        dns.lookup(host, { all: true }, (err3, addresses3) => {
-          if (err3) {
-            if (cached2) {
-              dnsCache.set(host, {
-                value: cached2.value,
-                expires: Date.now() + (options.dnsTtl || DNS_TTL)
-              });
-              return callback(null, formatDNSValue(cached2.value, {
-                servername,
-                cached: true,
-                error: err3
-              }));
-            }
-            return callback(err3);
-          }
-          const supportedAddresses = addresses3 ? addresses3.filter((addr) => isFamilySupported(addr.family)).map((addr) => addr.address) : [];
-          if (addresses3 && addresses3.length && !supportedAddresses.length) {
-            console.warn(`Failed to resolve IPv${addresses3[0].family} addresses with current network`);
-          }
-          if (!supportedAddresses.length && cached2) {
-            return callback(null, formatDNSValue(cached2.value, {
-              servername,
-              cached: true
-            }));
-          }
-          const value = {
-            addresses: supportedAddresses.length ? supportedAddresses : [host]
-          };
-          dnsCache.set(host, {
-            value,
-            expires: Date.now() + (options.dnsTtl || DNS_TTL)
-          });
-          return callback(null, formatDNSValue(value, {
-            servername,
-            cached: false
-          }));
-        });
-      } catch (lookupErr) {
-        if (cached2) {
-          dnsCache.set(host, {
-            value: cached2.value,
-            expires: Date.now() + (options.dnsTtl || DNS_TTL)
-          });
-          return callback(null, formatDNSValue(cached2.value, {
-            servername,
-            cached: true,
-            error: lookupErr
-          }));
-        }
-        return callback(ipv4Error || ipv6Error || lookupErr);
-      }
+      onResolved();
     });
-  });
+    if (resolver) {
+      resolvers.push(resolver);
+    }
+  }
 }, parseConnectionUrl = (str) => {
   str = str || "";
   const options = {};
@@ -87717,17 +87840,15 @@ var DNS_TTL, CACHE_CLEANUP_INTERVAL, MAX_CACHE_SIZE = 1000, lastCacheCleanup = 0
     }
   }
   return result;
-};
+}, streamErrors;
 var init_shared = __esm(() => {
   init_url();
   init_fetch();
   init_errors();
   DNS_TTL = 5 * 60 * 1000;
   CACHE_CLEANUP_INTERVAL = 30 * 1000;
-  try {
-    networkInterfaces = os.networkInterfaces();
-  } catch (_err) {}
   dnsCache = new Map;
+  streamErrors = new WeakMap;
 });
 
 // /zveltio-extension/node_modules/nodemailer/dist/esm/mime-funcs/mime-types.js
@@ -89829,12 +89950,6 @@ var init_mime_types = __esm(() => {
 });
 
 // /zveltio-extension/node_modules/nodemailer/dist/esm/base64/index.js
-var exports_base64 = {};
-__export(exports_base64, {
-  wrap: () => wrap,
-  encode: () => encode4,
-  Encoder: () => Encoder
-});
 import { Transform } from "stream";
 function encode4(buffer) {
   if (typeof buffer === "string") {
@@ -89842,24 +89957,30 @@ function encode4(buffer) {
   }
   return buffer.toString("base64");
 }
-function wrap(str, lineLength) {
-  str = (str || "").toString();
-  lineLength = Math.max(Number(lineLength) || 76, 1);
-  if (str.length <= lineLength) {
-    return str;
+function normalizeLineLength(lineLength) {
+  const length = Math.floor(Number(lineLength));
+  return Number.isFinite(length) && length >= 1 ? length : 76;
+}
+function wrapBuffer(src, lineLength, final) {
+  const lines = Math.ceil(src.length / lineLength);
+  const complete = Math.max(lines - 1, 0);
+  let rest = src.length - complete * lineLength;
+  const output2 = Buffer.allocUnsafe(complete * (lineLength + 2) + (final ? rest : 0));
+  let to = 0;
+  for (let from = 0;from < complete * lineLength; from += lineLength) {
+    src.copy(output2, to, from, from + lineLength);
+    to += lineLength;
+    output2[to++] = 13;
+    output2[to++] = 10;
   }
-  const result = [];
-  let pos = 0;
-  const chunkLength = lineLength * 1024;
-  const wrapRegex = new RegExp(".{" + lineLength + "}", "g");
-  while (pos < str.length) {
-    const wrappedLines = str.substr(pos, chunkLength).replace(wrapRegex, `$&\r
-`).trim();
-    result.push(wrappedLines);
-    pos += chunkLength;
+  if (final) {
+    to += src.copy(output2, to, complete * lineLength);
+    rest = 0;
   }
-  return result.join(`\r
-`).trim();
+  if (to !== output2.length) {
+    throw new Error("Unexpected wrapped length");
+  }
+  return { output: output2, rest };
 }
 var Encoder;
 var init_base64 = __esm(() => {
@@ -89868,91 +89989,81 @@ var init_base64 = __esm(() => {
       super();
       this.options = options || {};
       if (this.options.lineLength !== false) {
-        this.options.lineLength = this.options.lineLength || 76;
+        this.options.lineLength = normalizeLineLength(this.options.lineLength);
       }
       this._curLine = "";
       this._remainingBytes = false;
       this.inputBytes = 0;
       this.outputBytes = 0;
     }
+    _emit(b64, final) {
+      const src = Buffer.from(this._curLine + b64, "latin1");
+      if (!src.length) {
+        return;
+      }
+      let output2 = src;
+      if (this.options.lineLength) {
+        const wrapped = wrapBuffer(src, this.options.lineLength, final);
+        output2 = wrapped.output;
+        this._curLine = wrapped.rest ? src.toString("latin1", src.length - wrapped.rest) : "";
+      } else {
+        this._curLine = "";
+      }
+      if (output2.length) {
+        this.outputBytes += output2.length;
+        this.push(output2);
+      }
+    }
     _transform(chunk, encoding, done) {
       let buf = encoding !== "buffer" ? Buffer.from(chunk, encoding) : chunk;
       if (!buf || !buf.length) {
-        setImmediate(done);
-        return;
+        return done();
       }
       this.inputBytes += buf.length;
-      if (this._remainingBytes && this._remainingBytes.length) {
+      if (this._remainingBytes) {
         buf = Buffer.concat([this._remainingBytes, buf], this._remainingBytes.length + buf.length);
         this._remainingBytes = false;
       }
-      if (buf.length % 3) {
-        this._remainingBytes = buf.slice(buf.length - buf.length % 3);
-        buf = buf.slice(0, buf.length - buf.length % 3);
-      } else {
-        this._remainingBytes = false;
+      const extra = buf.length % 3;
+      if (extra) {
+        this._remainingBytes = buf.subarray(buf.length - extra);
+        buf = buf.subarray(0, buf.length - extra);
       }
-      let b64 = this._curLine + encode4(buf);
-      if (this.options.lineLength) {
-        b64 = wrap(b64, this.options.lineLength);
-        const lastLF = b64.lastIndexOf(`
-`);
-        if (lastLF < 0) {
-          this._curLine = b64;
-          b64 = "";
-        } else if (lastLF === b64.length - 1) {
-          this._curLine = "";
-        } else {
-          this._curLine = b64.substring(lastLF + 1);
-          b64 = b64.substring(0, lastLF + 1);
-        }
-      }
-      if (b64) {
-        this.outputBytes += b64.length;
-        this.push(Buffer.from(b64, "ascii"));
-      }
-      setImmediate(done);
+      this._emit(encode4(buf), false);
+      done();
     }
     _flush(done) {
-      if (this._remainingBytes && this._remainingBytes.length) {
-        this._curLine += encode4(this._remainingBytes);
-      }
-      if (this._curLine) {
-        this._curLine = wrap(this._curLine, this.options.lineLength);
-        this.outputBytes += this._curLine.length;
-        this.push(Buffer.from(this._curLine, "ascii"));
-        this._curLine = "";
-      }
+      this._emit(this._remainingBytes ? encode4(this._remainingBytes) : "", true);
+      this._remainingBytes = false;
       done();
     }
   };
 });
 
 // /zveltio-extension/node_modules/nodemailer/dist/esm/qp/index.js
-var exports_qp = {};
-__export(exports_qp, {
-  wrap: () => wrap2,
-  encode: () => encode5,
-  Encoder: () => Encoder2
-});
 import { Transform as Transform2 } from "stream";
 function encode5(buffer) {
-  if (typeof buffer === "string") {
-    buffer = Buffer.from(buffer, "utf-8");
-  }
-  let result = "";
-  let ord;
-  for (let i = 0, len = buffer.length;i < len; i++) {
-    ord = buffer[i];
-    if (checkRanges(ord, QP_RANGES) && !((ord === 32 || ord === 9) && (i === len - 1 || buffer[i + 1] === 10 || buffer[i + 1] === 13))) {
-      result += String.fromCharCode(ord);
+  return encodeBytes(typeof buffer === "string" ? Buffer.from(buffer, "utf-8") : buffer);
+}
+function encodeBytes(buffer, next, binary, previous) {
+  const len = buffer.length;
+  const output2 = Buffer.allocUnsafe(len * 3);
+  let pos = 0;
+  for (let i = 0;i < len; i++) {
+    const ord = buffer[i];
+    const following = i + 1 < len ? buffer[i + 1] : next;
+    const lineBreakByte = binary && (ord === 13 || ord === 10) ? ord === 13 ? following === 10 : (i > 0 ? buffer[i - 1] : previous) === 13 : true;
+    if (QP_LITERAL[ord] && lineBreakByte && !(isWhitespace2(ord) && (following === undefined || following === 10 || following === 13))) {
+      output2[pos++] = ord;
       continue;
     }
-    result += "=" + (ord < 16 ? "0" : "") + ord.toString(16).toUpperCase();
+    output2[pos++] = 61;
+    output2[pos++] = HEX_DIGITS[Math.floor(ord / 16)];
+    output2[pos++] = HEX_DIGITS[ord % 16];
   }
-  return result;
+  return output2.toString("latin1", 0, pos);
 }
-function wrap2(str, lineLength) {
+function wrap(str, lineLength) {
   str = (str || "").toString();
   lineLength = Math.max(Number(lineLength) || 76, MIN_LINE_LENGTH);
   if (str.length <= lineLength) {
@@ -90035,7 +90146,7 @@ function checkRanges(nr, ranges) {
   }
   return false;
 }
-var MIN_LINE_LENGTH = 4, QP_RANGES, Encoder2;
+var MIN_LINE_LENGTH = 4, QP_RANGES, QP_LITERAL, HEX_DIGITS, isWhitespace2 = (c) => c === 32 || c === 9, ENCODE_SLICE_SIZE, Encoder2;
 var init_qp = __esm(() => {
   QP_RANGES = [
     [9],
@@ -90044,6 +90155,12 @@ var init_qp = __esm(() => {
     [32, 60],
     [62, 126]
   ];
+  QP_LITERAL = new Uint8Array(256);
+  for (let i = 0;i < 256; i++) {
+    QP_LITERAL[i] = checkRanges(i, QP_RANGES) ? 1 : 0;
+  }
+  HEX_DIGITS = Buffer.from("0123456789ABCDEF", "latin1");
+  ENCODE_SLICE_SIZE = 64 * 1024;
   Encoder2 = class Encoder2 extends Transform2 {
     constructor(options) {
       super();
@@ -90052,42 +90169,68 @@ var init_qp = __esm(() => {
         this.options.lineLength = this.options.lineLength || 76;
       }
       this._curLine = "";
+      this._remainingBytes = false;
+      this._lastByte = undefined;
       this.inputBytes = 0;
       this.outputBytes = 0;
     }
     _transform(chunk, encoding, done) {
-      let qp;
-      if (encoding !== "buffer") {
-        chunk = Buffer.from(chunk, encoding);
-      }
-      if (!chunk || !chunk.length) {
+      let buf = encoding !== "buffer" ? Buffer.from(chunk, encoding) : chunk;
+      if (!buf || !buf.length) {
         return done();
       }
-      this.inputBytes += chunk.length;
-      if (this.options.lineLength) {
-        qp = this._curLine + encode5(chunk);
-        qp = wrap2(qp, this.options.lineLength);
-        qp = qp.replace(/(^|\n)([^\n]*)$/, (match2, lineBreak, lastLine) => {
-          this._curLine = lastLine;
-          return lineBreak;
-        });
-        if (qp) {
-          this.outputBytes += qp.length;
-          this.push(qp);
-        }
-      } else {
-        qp = encode5(chunk);
-        this.outputBytes += qp.length;
-        this.push(qp, "ascii");
+      this.inputBytes += buf.length;
+      if (this._remainingBytes) {
+        buf = Buffer.concat([this._remainingBytes, buf], this._remainingBytes.length + buf.length);
+        this._remainingBytes = false;
       }
+      let end = buf.length;
+      while (end > 0 && (isWhitespace2(buf[end - 1]) || this.options.binary && buf[end - 1] === 13)) {
+        end--;
+      }
+      if (buf.length - end <= ENCODE_SLICE_SIZE) {
+        this._remainingBytes = end < buf.length ? Buffer.from(buf.subarray(end)) : false;
+        buf = buf.subarray(0, end);
+      }
+      this._encodeSlices(buf);
       done();
     }
     _flush(done) {
+      if (this._remainingBytes) {
+        this._encodeSlices(this._remainingBytes);
+        this._remainingBytes = false;
+      }
       if (this._curLine) {
         this.outputBytes += this._curLine.length;
         this.push(this._curLine, "ascii");
+        this._curLine = "";
       }
       done();
+    }
+    _encodeSlices(buf) {
+      for (let start = 0;start < buf.length; start += ENCODE_SLICE_SIZE) {
+        const end = Math.min(start + ENCODE_SLICE_SIZE, buf.length);
+        this._encodeSlice(buf.subarray(start, end), end < buf.length ? buf[end] : undefined);
+        this._lastByte = buf[end - 1];
+      }
+    }
+    _encodeSlice(buf, next) {
+      let qp;
+      if (this.options.lineLength) {
+        qp = wrap(this._curLine + encodeBytes(buf, next, this.options.binary, this._lastByte), this.options.lineLength);
+        const lastLF = qp.lastIndexOf(`
+`);
+        this._curLine = qp.substring(lastLF + 1);
+        qp = qp.substring(0, lastLF + 1);
+        if (qp) {
+          this.outputBytes += qp.length;
+          this.push(qp, "ascii");
+        }
+      } else {
+        qp = encodeBytes(buf, next, this.options.binary, this._lastByte);
+        this.outputBytes += qp.length;
+        this.push(qp, "ascii");
+      }
     }
   };
 });
@@ -90639,12 +90782,17 @@ var init_le_unix = __esm(() => {
 // /zveltio-extension/node_modules/nodemailer/dist/esm/mime-node/index.js
 import crypto2 from "crypto";
 import fs2 from "fs";
-import { PassThrough as PassThrough2 } from "stream";
+import { PassThrough as PassThrough2, finished as finished2, pipeline } from "stream";
 import urlModule from "url";
+function abortedError() {
+  const err = new Error("Message stream was closed before the message was generated");
+  err.code = ESTREAM;
+  return err;
+}
 function normalizeDomain(domain2, toUnicode2) {
-  const mapper = toUnicode2 ? urlModule.domainToUnicode : urlModule.domainToASCII;
-  if (typeof mapper === "function" && !URL_PARSER_UNSAFE.test(domain2)) {
-    const mapped = mapper(domain2);
+  if (typeof urlModule.domainToASCII === "function" && typeof urlModule.domainToUnicode === "function" && !URL_PARSER_UNSAFE.test(domain2)) {
+    const ascii = urlModule.domainToASCII(domain2);
+    const mapped = ascii && toUnicode2 ? urlModule.domainToUnicode(ascii) : ascii;
     if (mapped) {
       return mapped;
     }
@@ -90815,11 +90963,7 @@ class MimeNode {
   setContent(content) {
     this.content = content;
     if (typeof this.content.pipe === "function") {
-      this._contentErrorHandler = (err) => {
-        this.content.removeListener("error", this._contentErrorHandler);
-        this.content = err;
-      };
-      this.content.once("error", this._contentErrorHandler);
+      recordStreamErrors(this.content);
     } else if (typeof this.content === "string") {
       this._isPlainText = isPlainText(this.content);
       if (this._isPlainText && hasLongerLines(this.content, 76)) {
@@ -90984,38 +91128,39 @@ class MimeNode {
   createReadStream(options) {
     options = options || {};
     const stream = new PassThrough2(options);
-    let outputStream = stream;
-    let transform2;
     this.stream(stream, options, (err) => {
       if (err) {
-        outputStream.emit("error", err);
+        stream.destroy(err);
         return;
       }
       stream.end();
     });
-    for (let i = 0, len = this._transforms.length;i < len; i++) {
-      transform2 = typeof this._transforms[i] === "function" ? this._transforms[i]() : this._transforms[i];
-      outputStream.once("error", (err) => {
-        transform2.emit("error", err);
-      });
-      outputStream = outputStream.pipe(transform2);
-    }
-    transform2 = new LastNewline;
-    outputStream.once("error", (err) => {
-      transform2.emit("error", err);
+    stream.once("close", () => {
+      if (!stream.writableFinished) {
+        this._destroyContentStreams();
+      }
     });
-    outputStream = outputStream.pipe(transform2);
-    for (let i = 0, len = this._processFuncs.length;i < len; i++) {
-      transform2 = this._processFuncs[i];
-      outputStream = transform2(outputStream);
+    const stages = [stream];
+    for (const transform2 of this._transforms) {
+      stages.push(typeof transform2 === "function" ? transform2() : transform2);
+    }
+    stages.push(new LastNewline);
+    let outputStream = pipeline(stages, PIPELINE_NOOP);
+    for (const processFunc of this._processFuncs) {
+      const input2 = outputStream;
+      outputStream = processFunc(input2);
+      if (outputStream !== input2) {
+        finished2(outputStream, (err) => {
+          if (err) {
+            input2.destroy();
+          }
+        });
+      }
     }
     if (this.newline) {
       const winbreak = ["win", "windows", "dos", `\r
 `].includes(this.newline.toString().toLowerCase());
-      const newlineTransform = winbreak ? new LeWindows : new LeUnix;
-      const stream2 = outputStream.pipe(newlineTransform);
-      outputStream.on("error", (err) => stream2.emit("error", err));
-      return stream2;
+      outputStream = pipeline(outputStream, winbreak ? new LeWindows : new LeUnix, PIPELINE_NOOP);
     }
     return outputStream;
   }
@@ -91027,19 +91172,41 @@ class MimeNode {
   }
   stream(outputStream, options, done) {
     const transferEncoding = this.getTransferEncoding();
-    let contentStream;
-    let localStream;
+    let activeStreams = [];
     let returned = false;
     const callback = (err) => {
       if (returned) {
         return;
       }
       returned = true;
+      outputStream.removeListener("close", onOutputClose);
       done(err);
+    };
+    function onOutputClose() {
+      for (const stream of activeStreams) {
+        stream.destroy();
+      }
+      return callback(abortedError());
+    }
+    const readInto = (...streams) => {
+      if (!activeStreams.length) {
+        outputStream.once("close", onOutputClose);
+      }
+      activeStreams = streams;
+    };
+    const aborted2 = () => {
+      if (outputStream.destroyed) {
+        callback(abortedError());
+        return true;
+      }
+      return false;
     };
     const finalize2 = () => {
       let childId = 0;
       const processChildNode = () => {
+        if (aborted2()) {
+          return;
+        }
         if (childId >= this.childNodes.length) {
           outputStream.write(`\r
 --` + this.boundary + `--\r
@@ -91064,83 +91231,70 @@ class MimeNode {
       }
     };
     const sendContent = () => {
-      if (this.content) {
-        if (Object.prototype.toString.call(this.content) === "[object Error]") {
-          return callback(this.content);
-        }
-        if (typeof this.content.pipe === "function") {
-          this.content.removeListener("error", this._contentErrorHandler);
-          this._contentErrorHandler = (err) => callback(err);
-          this.content.once("error", this._contentErrorHandler);
-        }
-        const createStream = () => {
-          if (["quoted-printable", "base64"].includes(transferEncoding)) {
-            contentStream = new (transferEncoding === "base64" ? exports_base64 : exports_qp).Encoder(options);
-            contentStream.pipe(outputStream, {
-              end: false
-            });
-            contentStream.once("end", finalize2);
-            contentStream.once("error", (err) => callback(err));
-            localStream = this._getStream(this.content);
-            localStream.pipe(contentStream);
-          } else {
-            localStream = this._getStream(this.content);
-            localStream.pipe(outputStream, {
-              end: false
-            });
-            localStream.once("end", finalize2);
-          }
-          localStream.once("error", (err) => callback(err));
-        };
-        if (this.content._resolve) {
-          const chunks = [];
-          let chunklen = 0;
-          let returned2 = false;
-          const sourceStream = this._getStream(this.content);
-          sourceStream.on("error", (err) => {
-            if (returned2) {
-              return;
-            }
-            returned2 = true;
-            callback(err);
-          });
-          sourceStream.on("readable", () => {
-            let chunk;
-            while ((chunk = sourceStream.read()) !== null) {
-              chunks.push(chunk);
-              chunklen += chunk.length;
-            }
-          });
-          sourceStream.on("end", () => {
-            if (returned2) {
-              return;
-            }
-            returned2 = true;
-            this.content._resolve = false;
-            this.content._resolvedValue = Buffer.concat(chunks, chunklen);
-            setImmediate(createStream);
-          });
-        } else {
-          setImmediate(createStream);
-        }
+      if (aborted2()) {
         return;
       }
-      return setImmediate(finalize2);
+      if (!this.content) {
+        return setImmediate(finalize2);
+      }
+      const createStream = () => {
+        if (aborted2()) {
+          return;
+        }
+        const contentError = this._takeStreamContent(this.content);
+        if (contentError) {
+          return callback(contentError);
+        }
+        const localStream = this._getStream(this.content);
+        if (["quoted-printable", "base64"].includes(transferEncoding)) {
+          const contentStream = transferEncoding === "base64" ? new Encoder(options) : new Encoder2(Object.assign({}, options, { binary: !/^text\//i.test(this.contentType || "") }));
+          readInto(localStream, contentStream);
+          contentStream.pipe(outputStream, {
+            end: false
+          });
+          pipeline(localStream, contentStream, (err) => err && callback(err));
+          finished2(contentStream, { writable: false }, (err) => err ? callback(err) : finalize2());
+        } else {
+          readInto(localStream);
+          localStream.pipe(outputStream, {
+            end: false
+          });
+          finished2(localStream, { writable: false }, (err) => err ? callback(err) : finalize2());
+        }
+      };
+      if (this.content._resolve) {
+        const sourceStream = this._getStream(this.content);
+        readInto(sourceStream);
+        resolveStream(sourceStream, (err, value) => {
+          if (err) {
+            return callback(err);
+          }
+          if (returned) {
+            return;
+          }
+          this.content._resolve = false;
+          this.content._resolvedValue = value;
+          setImmediate(createStream);
+        });
+      } else {
+        setImmediate(createStream);
+      }
     };
     if (this._raw) {
       setImmediate(() => {
-        if (Object.prototype.toString.call(this._raw) === "[object Error]") {
-          return callback(this._raw);
+        if (aborted2()) {
+          return;
         }
-        if (typeof this._raw.pipe === "function") {
-          this._raw.removeListener("error", this._contentErrorHandler);
+        const rawError = this._takeStreamContent(this._raw);
+        if (rawError) {
+          return callback(rawError);
         }
         const raw2 = this._getStream(this._raw);
+        readInto(raw2);
         raw2.pipe(outputStream, {
           end: false
         });
-        raw2.on("error", (err) => outputStream.emit("error", err));
-        raw2.on("end", finalize2);
+        finished2(raw2, { writable: false }, (err) => err ? callback(err) : finalize2());
       });
     } else {
       outputStream.write(this.buildHeaders() + `\r
@@ -91225,11 +91379,7 @@ class MimeNode {
   setRaw(raw2) {
     this._raw = raw2;
     if (this._raw && typeof this._raw.pipe === "function") {
-      this._contentErrorHandler = (err) => {
-        this._raw.removeListener("error", this._contentErrorHandler);
-        this._raw = err;
-      };
-      this._raw.once("error", this._contentErrorHandler);
+      recordStreamErrors(this._raw);
     }
     return this;
   }
@@ -91242,6 +91392,22 @@ class MimeNode {
       node4 = node4.parentNode;
     }
     return false;
+  }
+  _destroyContentStreams() {
+    destroyStream(this.content);
+    destroyStream(this._raw);
+    for (const child of this.childNodes) {
+      child._destroyContentStreams();
+    }
+  }
+  _takeStreamContent(content) {
+    if (Object.prototype.toString.call(content) === "[object Error]") {
+      return content;
+    }
+    if (!content || typeof content.pipe !== "function" || content._resolvedValue) {
+      return null;
+    }
+    return unreadableStreamError(content);
   }
   _getStream(content) {
     let contentStream;
@@ -91507,7 +91673,7 @@ class MimeNode {
     return "<" + [2, 2, 2, 6].reduce((prev, len) => prev + "-" + crypto2.randomBytes(len).toString("hex"), crypto2.randomBytes(4).toString("hex")) + "@" + (this.getEnvelope().from || this.hostname || "localhost").split("@").pop() + ">";
   }
 }
-var FORMATTED_HEADERS, ATEXT = "[A-Za-z0-9!#$%&'*+\\-/=?^_`{|}~\\x80-\\uFFFF]", DOT_ATOM, QUOTED_STRING, PLAIN_ADDRESS, URL_PARSER_UNSAFE, mime_node_default;
+var FORMATTED_HEADERS, ATEXT = "[A-Za-z0-9!#$%&'*+\\-/=?^_`{|}~\\x80-\\uFFFF]", DOT_ATOM, QUOTED_STRING, PLAIN_ADDRESS, URL_PARSER_UNSAFE, PIPELINE_NOOP = () => false, mime_node_default;
 var init_mime_node = __esm(() => {
   init_punycode();
   init_shared();
@@ -92031,7 +92197,7 @@ var init_message_parser = __esm(() => {
         if (data.length > headerPos) {
           const chunk = data.slice(headerPos);
           this.bodySize += chunk.length;
-          setImmediate(() => this.push(chunk));
+          this.push(chunk);
         }
         return false;
       }
@@ -92057,7 +92223,7 @@ var init_message_parser = __esm(() => {
         this.bodySize += chunk.length;
         this.push(chunk);
       }
-      setImmediate(callback);
+      callback();
     }
     _flush(callback) {
       if (this.headerChunks) {
@@ -92314,50 +92480,61 @@ class DKIMSigner {
     this.output = output2;
     this.output.usingCache = false;
     this.hasErrored = false;
-    this.input.on("error", (err) => {
+    this.input.on("error", (err) => this.fail(err));
+    this.output.once("close", () => {
+      if (this.output.writableFinished) {
+        return;
+      }
       this.hasErrored = true;
+      this.input.unpipe();
+      this.input.destroy();
       this.cleanup();
-      output2.emit("error", err);
     });
+  }
+  fail(err) {
+    this.hasErrored = true;
+    this.cleanup();
+    this.output.destroy(err);
   }
   cleanup() {
     if (!this.cache || !this.cachePath) {
       return;
     }
+    const cache = this.cache;
+    this.cache = false;
+    cache.destroy();
     fs3.unlink(this.cachePath, () => false);
   }
   createReadCache() {
     this.cache = fs3.createReadStream(this.cachePath);
-    this.cache.once("error", (err) => {
-      this.cleanup();
-      this.output.emit("error", err);
-    });
+    this.cache.once("error", (err) => this.fail(err));
     this.cache.once("close", () => {
       this.cleanup();
     });
     this.cache.pipe(this.output);
   }
   sendNextChunk() {
+    while (!this.hasErrored) {
+      if (this.readPos >= this.chunks.length) {
+        if (!this.cache) {
+          this.output.end();
+          return;
+        }
+        return this.createReadCache();
+      }
+      const chunk = this.chunks[this.readPos++];
+      if (this.output.write(chunk) === false) {
+        this.output.once("drain", () => {
+          this.sendNextChunk();
+        });
+        return;
+      }
+    }
+  }
+  sendSignedOutput() {
     if (this.hasErrored) {
       return;
     }
-    if (this.readPos >= this.chunks.length) {
-      if (!this.cache) {
-        this.output.end();
-        return;
-      }
-      return this.createReadCache();
-    }
-    const chunk = this.chunks[this.readPos++];
-    if (this.output.write(chunk) === false) {
-      this.output.once("drain", () => {
-        this.sendNextChunk();
-      });
-      return;
-    }
-    setImmediate(() => this.sendNextChunk());
-  }
-  sendSignedOutput() {
     let keyPos = 0;
     const signNextKey = () => {
       if (keyPos >= this.keys.length) {
@@ -92376,9 +92553,7 @@ class DKIMSigner {
           skipFields: this.options.skipFields
         });
       } catch (err) {
-        this.hasErrored = true;
-        this.cleanup();
-        this.output.emit("error", err);
+        this.fail(err);
         return;
       }
       if (dkimField) {
@@ -92397,15 +92572,16 @@ class DKIMSigner {
     this.output.usingCache = true;
     this.cache = fs3.createWriteStream(this.cachePath);
     this.cache.once("error", (err) => {
-      this.cleanup();
       this.relaxedBody.unpipe(this.cache);
       this.relaxedBody.on("readable", () => {
         while (this.relaxedBody.read() !== null) {}
       });
-      this.hasErrored = true;
-      this.output.emit("error", err);
+      this.fail(err);
     });
     this.cache.once("close", () => {
+      if (this.hasErrored) {
+        return;
+      }
       this.sendSignedOutput();
     });
     this.relaxedBody.removeAllListeners("readable");
@@ -92476,7 +92652,7 @@ class DKIM {
       try {
         signer.signStream();
       } catch (_E2) {
-        output2.emit("error", sign_default.unsupportedHashAlgoError(signer.hashAlgo));
+        signer.fail(sign_default.unsupportedHashAlgoError(signer.hashAlgo));
         return;
       }
       if (writeValue) {
@@ -92515,6 +92691,7 @@ function httpProxyClient(proxyUrl, destinationPort, destinationHost, tlsOptions,
     return;
   }
   const proxy = parse7(proxyUrl);
+  const authority = (net5.isIPv6(unbracket(destinationHost)) ? "[" + unbracket(destinationHost) + "]" : destinationHost) + ":" + destinationPort;
   const connectOptions = {
     host: proxy.hostname,
     port: Number(proxy.port) ? Number(proxy.port) : proxy.protocol === "https:" ? 443 : 80
@@ -92526,92 +92703,105 @@ function httpProxyClient(proxyUrl, destinationPort, destinationHost, tlsOptions,
   } else {
     connect = net5.connect.bind(net5);
   }
+  const timeout = Number(tlsOptions.timeout) || httpProxyClient.timeout || 30 * 1000;
   let socket;
-  let finished = false;
-  const tempSocketErr = (err) => {
-    if (finished) {
+  let finished3 = false;
+  let timer;
+  const cleanup = () => {
+    clearTimeout(timer);
+    socket.removeListener("data", onSocketData);
+    socket.removeListener("error", fail);
+    socket.removeListener("close", onEarlyClose);
+  };
+  function fail(err) {
+    if (finished3) {
       return;
     }
-    finished = true;
+    finished3 = true;
+    cleanup();
     try {
       socket.destroy();
     } catch (_E2) {}
     done(err);
-  };
-  const timeoutErr = () => {
-    const err = new Error("Proxy socket timed out");
-    err.code = "ETIMEDOUT";
-    tempSocketErr(err);
-  };
+  }
+  function onEarlyClose() {
+    const err = new Error("Proxy closed the connection before the tunnel was established");
+    err.code = EPROXY;
+    fail(err);
+  }
+  const chunks = [];
+  let received = 0;
+  let tail = "";
+  function onSocketData(chunk) {
+    if (finished3) {
+      return;
+    }
+    const window = tail + chunk.toString("binary");
+    const windowEnd = window.indexOf(`\r
+\r
+`);
+    chunks.push(chunk);
+    received += chunk.length;
+    tail = window.slice(-3);
+    if (windowEnd < 0) {
+      if (received > MAX_RESPONSE_HEADER_BYTES) {
+        const err = new Error("Proxy response headers too large");
+        err.code = EPROXY;
+        fail(err);
+      }
+      return;
+    }
+    socket.removeListener("data", onSocketData);
+    socket.pause();
+    const headerEnd = received - window.length + windowEnd;
+    const response = Buffer.concat(chunks, received);
+    if (response.length > headerEnd + 4) {
+      socket.unshift(response.subarray(headerEnd + 4));
+    }
+    const match2 = response.toString("binary", 0, headerEnd).match(/^HTTP\/\d+\.\d+ (\d+)/i);
+    if (!match2 || (match2[1] || "").charAt(0) !== "2") {
+      const err = new Error("Invalid response from proxy" + (match2 && ": " + match2[1] || ""));
+      err.code = EPROXY;
+      return fail(err);
+    }
+    finished3 = true;
+    cleanup();
+    const resumeOnData = (event) => {
+      if (event === "data") {
+        socket.removeListener("newListener", resumeOnData);
+        socket.resume();
+      }
+    };
+    socket.on("newListener", resumeOnData);
+    return done(null, socket);
+  }
   socket = connect(connectOptions, () => {
-    if (finished) {
+    if (finished3) {
       return;
     }
     const reqHeaders = {
-      Host: destinationHost + ":" + destinationPort,
+      Host: authority,
       Connection: "close"
     };
     if (proxy.auth) {
       reqHeaders["Proxy-Authorization"] = "Basic " + Buffer.from(proxy.auth).toString("base64");
     }
-    socket.write("CONNECT " + destinationHost + ":" + destinationPort + ` HTTP/1.1\r
+    socket.write("CONNECT " + authority + ` HTTP/1.1\r
 ` + Object.keys(reqHeaders).map((key) => key + ": " + reqHeaders[key]).join(`\r
 `) + `\r
 \r
 `);
-    const chunks = [];
-    let received = 0;
-    let tail = "";
-    const onSocketData = (chunk) => {
-      let match2;
-      if (finished) {
-        return;
-      }
-      const window = tail + chunk.toString("binary");
-      const windowEnd = window.indexOf(`\r
-\r
-`);
-      chunks.push(chunk);
-      received += chunk.length;
-      tail = window.slice(-3);
-      if (windowEnd >= 0) {
-        socket.removeListener("data", onSocketData);
-        const headerEnd = received - window.length + windowEnd;
-        const response = Buffer.concat(chunks, received).toString("binary");
-        const headers = response.substr(0, headerEnd);
-        const remainder = response.substr(headerEnd + 4);
-        if (remainder) {
-          socket.unshift(Buffer.from(remainder, "binary"));
-        }
-        finished = true;
-        match2 = headers.match(/^HTTP\/\d+\.\d+ (\d+)/i);
-        if (!match2 || (match2[1] || "").charAt(0) !== "2") {
-          try {
-            socket.destroy();
-          } catch (_E2) {}
-          const err = new Error("Invalid response from proxy" + (match2 && ": " + match2[1] || ""));
-          err.code = EPROXY;
-          return done(err);
-        }
-        socket.removeListener("error", tempSocketErr);
-        socket.removeListener("timeout", timeoutErr);
-        socket.setTimeout(0);
-        return done(null, socket);
-      }
-      if (received > MAX_RESPONSE_HEADER_BYTES) {
-        socket.removeListener("data", onSocketData);
-        const err = new Error("Proxy response headers too large");
-        err.code = EPROXY;
-        return tempSocketErr(err);
-      }
-    };
     socket.on("data", onSocketData);
   });
-  socket.setTimeout(httpProxyClient.timeout || 30 * 1000);
-  socket.on("timeout", timeoutErr);
-  socket.once("error", tempSocketErr);
+  timer = setTimeout(() => {
+    const err = new Error("Proxy socket timed out");
+    err.code = ETIMEDOUT;
+    fail(err);
+  }, timeout);
+  socket.once("error", fail);
+  socket.once("close", onEarlyClose);
 }
-var MAX_RESPONSE_HEADER_BYTES, http_proxy_client_default;
+var MAX_RESPONSE_HEADER_BYTES, unbracket = (host) => typeof host === "string" && host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host, http_proxy_client_default;
 var init_http_proxy_client = __esm(() => {
   init_url();
   init_errors();
@@ -92727,6 +92917,22 @@ class MailMessage {
       });
     };
     setImmediate(() => resolveNext());
+  }
+  releaseStreams() {
+    const data = this.data;
+    const values = [data.html, data.text, data.watchHtml, data.amp, data.raw, data.icalEvent];
+    for (const key of ["attachments", "alternatives"]) {
+      if (Array.isArray(data[key])) {
+        values.push(...data[key]);
+      }
+    }
+    for (const value of values) {
+      if (value && typeof value === "object") {
+        destroyStream(value);
+        destroyStream(value.content);
+        destroyStream(value.raw);
+      }
+    }
   }
   normalize(callback) {
     const envelope = this.message.getEnvelope();
@@ -92975,6 +93181,10 @@ var init_mailer = __esm(() => {
         this.getSocket = false;
       }
       const mail = new MailMessage(this, data);
+      const fail = (err) => {
+        mail.releaseStreams();
+        done(err);
+      };
       this.logger.debug({
         tnx: "transport",
         name: this.transporter.name,
@@ -92988,7 +93198,7 @@ var init_mailer = __esm(() => {
             tnx: "plugin",
             action: "compile"
           }, "PluginCompile Error: %s", err.message);
-          return done(err);
+          return fail(err);
         }
         let recipientCount;
         try {
@@ -93003,7 +93213,7 @@ var init_mailer = __esm(() => {
             tnx: "transport",
             action: "send"
           }, "Compile Error: %s", err2.message);
-          return done(err2);
+          return fail(err2);
         }
         const maxRecipients = mail.data.maxRecipients === undefined ? DEFAULT_MAX_RECIPIENTS : mail.data.maxRecipients;
         if (maxRecipients && recipientCount > maxRecipients) {
@@ -93014,7 +93224,7 @@ var init_mailer = __esm(() => {
             tnx: "transport",
             action: "send"
           }, "Send Error: %s", err2.message);
-          return done(err2);
+          return fail(err2);
         }
         this._processPlugins("stream", mail, (err2) => {
           if (err2) {
@@ -93023,7 +93233,7 @@ var init_mailer = __esm(() => {
               tnx: "plugin",
               action: "stream"
             }, "PluginStream Error: %s", err2.message);
-            return done(err2);
+            return fail(err2);
           }
           if (mail.data.dkim || this.dkim) {
             mail.message.processFunc((input2) => {
@@ -93038,6 +93248,7 @@ var init_mailer = __esm(() => {
           }
           this.transporter.send(mail, (...args) => {
             if (args[0]) {
+              mail.releaseStreams();
               this.logger.error({
                 err: args[0],
                 tnx: "transport",
@@ -93097,13 +93308,16 @@ var init_mailer = __esm(() => {
       const proxy = parse7(proxyUrl);
       this.getSocket = (options, callback) => {
         const protocol = proxy.protocol.replace(/:$/, "").toLowerCase();
+        const configuredTimeout = Number(this.options.connectionTimeout) || 0;
+        const connectStartedAt = Number(options.connectStartedAt) || Date.now();
+        const connectionTimeout = configuredTimeout ? Math.max(connectStartedAt + configuredTimeout - Date.now(), 1) : undefined;
         if (this.meta.has("proxy_handler_" + protocol)) {
           return this.meta.get("proxy_handler_" + protocol)(proxy, options, callback);
         }
         switch (protocol) {
           case "http":
           case "https":
-            http_proxy_client_default(proxy.href, options.port, options.host, this.options.tls || {}, (err2, socket) => {
+            http_proxy_client_default(proxy.href, options.port, options.host, connectionTimeout ? Object.assign({}, this.options.tls, { timeout: connectionTimeout }) : this.options.tls || {}, (err2, socket) => {
               if (err2) {
                 return callback(err2);
               }
@@ -93137,6 +93351,9 @@ var init_mailer = __esm(() => {
                 },
                 command: "connect"
               };
+              if (connectionTimeout) {
+                connectionOpts.timeout = connectionTimeout;
+              }
               if (proxy.username || proxy.password) {
                 const username = proxy.username || "";
                 const password = proxy.password || "";
@@ -93164,11 +93381,11 @@ var init_mailer = __esm(() => {
             if (net6.isIP(proxy.hostname)) {
               return connect(proxy.hostname);
             }
-            return dns2.resolve(proxy.hostname, (err2, address) => {
+            return dns2.lookup(proxy.hostname, (err2, address) => {
               if (err2) {
                 return callback(err2);
               }
-              connect(Array.isArray(address) ? address[0] : address);
+              connect(address);
             });
           }
         }
@@ -93310,6 +93527,19 @@ import tls2 from "tls";
 import os2 from "os";
 import crypto7 from "crypto";
 import { PassThrough as PassThrough4 } from "stream";
+function shuffle(list) {
+  const result = list.slice();
+  for (let i = result.length - 1;i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+function timeoutError(message, timeoutType) {
+  const err = new Error(message);
+  err.timeoutType = timeoutType;
+  return err;
+}
 function decodeServerResponse(str) {
   if (!str) {
     return str;
@@ -93324,14 +93554,17 @@ function isPartialResponse(str) {
 function isPartialLine(line) {
   return /^\d+-/.test(line);
 }
-var CONNECTION_TIMEOUT, SOCKET_TIMEOUT, GREETING_TIMEOUT, DNS_TIMEOUT, TEARDOWN_NOOP = () => {}, MAX_RESPONSE_SIZE, SMTPConnection, smtp_connection_default;
+var CONNECTION_TIMEOUT, SOCKET_TIMEOUT, GREETING_TIMEOUT, DNS_TIMEOUT, CLOSE_TIMEOUT, KEEPALIVE_DELAY, TEARDOWN_NOOP = () => {}, MAX_RESPONSE_SIZE, SMTPConnection, smtp_connection_default;
 var init_smtp_connection = __esm(() => {
   init_data_stream();
   init_shared();
+  init_errors();
   CONNECTION_TIMEOUT = 2 * 60 * 1000;
   SOCKET_TIMEOUT = 10 * 60 * 1000;
   GREETING_TIMEOUT = 30 * 1000;
   DNS_TIMEOUT = 30 * 1000;
+  CLOSE_TIMEOUT = 5 * 1000;
+  KEEPALIVE_DELAY = 30 * 1000;
   MAX_RESPONSE_SIZE = 1024 * 1024;
   SMTPConnection = class SMTPConnection extends EventEmitter2 {
     constructor(options) {
@@ -93379,8 +93612,8 @@ var init_smtp_connection = __esm(() => {
       this._maxAllowedSize = 0;
       this._responseActions = [];
       this._recipientQueue = [];
-      this._greetingTimeout = false;
-      this._connectionTimeout = false;
+      this._phaseTimer = false;
+      this._plaintextEhlo = false;
       this._destroyed = false;
       this._closing = false;
       this._currentDataStream = false;
@@ -93391,10 +93624,19 @@ var init_smtp_connection = __esm(() => {
       this._onSocketClose = () => this._onClose();
       this._onSocketEnd = () => this._onEnd();
       this._onSocketTimeout = () => this._onTimeout();
-      this._onConnectionSocketError = (err) => this._onConnectionError(err, "ESOCKET");
-      this._connectionAttemptId = 0;
+      this._onConnectionSocketError = (err) => this._onError(err, "ESOCKET", false, "CONN");
     }
     connect(connectCallback) {
+      if (this._connectCalled && !this._destroyed) {
+        const err = this._formatError("Cannot connect - connect() was already called for this connection", "ECONNECTION", false, "API");
+        if (typeof connectCallback === "function") {
+          setImmediate(() => connectCallback(err));
+          return;
+        }
+        this.logger.warn({ tnx: "smtp" }, "%s", err.message);
+        return;
+      }
+      this._connectCalled = true;
       if (typeof connectCallback === "function") {
         this._connectCallback = connectCallback;
         this.once("connect", () => {
@@ -93409,11 +93651,13 @@ var init_smtp_connection = __esm(() => {
           return connectCallback(this._formatError(isDestroyedMessage, "ECONNECTION", false, "CONN"));
         }
       }
+      const connectionTimeout = this.options.connectionTimeout || CONNECTION_TIMEOUT;
+      this._connectionDeadline = (this._connectStartedAt || Date.now()) + connectionTimeout;
       let opts = {
         port: this.port,
         host: this.host,
         allowInternalNetworkInterfaces: this.allowInternalNetworkInterfaces,
-        timeout: this.options.dnsTimeout || DNS_TIMEOUT
+        timeout: Math.min(this.options.dnsTimeout || DNS_TIMEOUT, connectionTimeout)
       };
       if (this.options.localAddress) {
         opts.localAddress = this.options.localAddress;
@@ -93438,7 +93682,6 @@ var init_smtp_connection = __esm(() => {
         return this._resolveAndConnect(opts, (_resolved) => {
           try {
             this._socket.connect(this.port, this.host, () => {
-              this._socket.setKeepAlive(true);
               if (this.secureConnection && !this.alreadySecured) {
                 return this._upgradeConnection((err) => {
                   if (err) {
@@ -93464,8 +93707,32 @@ var init_smtp_connection = __esm(() => {
           }
         }
         return this._resolveAndConnect(opts, (resolved) => {
-          this._fallbackAddresses = (resolved._addresses || []).filter((addr) => addr !== opts.host);
-          this._connectOpts = Object.assign({}, opts);
+          let addresses = resolved._addresses || [];
+          if (opts.localAddress) {
+            const localFamily = net7.isIPv6(opts.localAddress) ? 6 : 4;
+            const sameFamily = addresses.filter((addr) => net7.isIP(addr) === localFamily);
+            addresses = sameFamily.length ? sameFamily : addresses;
+          }
+          if (addresses.length > 1) {
+            const ipv63 = addresses.filter((addr) => net7.isIPv6(addr));
+            const ipv43 = addresses.filter((addr) => !net7.isIPv6(addr));
+            const ordered = shuffle(ipv63).concat(shuffle(ipv43));
+            opts.host = this.host;
+            opts.autoSelectFamily = true;
+            if (!ipv63.length || !ipv43.length) {
+              const remaining = this._connectionDeadline - Date.now();
+              opts.autoSelectFamilyAttemptTimeout = Math.max(Math.floor(remaining / ordered.length), 10);
+            }
+            opts.lookup = (hostname3, lookupOptions, callback) => {
+              if (lookupOptions && lookupOptions.all) {
+                const all2 = ordered.map((address) => ({ address, family: net7.isIPv6(address) ? 6 : 4 }));
+                return setImmediate(() => callback(null, all2));
+              }
+              setImmediate(() => callback(null, ordered[0], net7.isIPv6(ordered[0]) ? 6 : 4));
+            };
+          } else if (addresses.length) {
+            opts.host = addresses[0];
+          }
           this._connectToHost(opts, this.secureConnection);
         });
       }
@@ -93493,17 +93760,9 @@ var init_smtp_connection = __esm(() => {
       if (this._destroyed || this._closing) {
         return;
       }
-      this._connectionAttemptId++;
-      const currentAttemptId = this._connectionAttemptId;
       const connectFn = secure ? tls2.connect : net7.connect;
       try {
-        this._socket = connectFn(opts, () => {
-          if (this._connectionAttemptId !== currentAttemptId) {
-            return;
-          }
-          this._socket.setKeepAlive(true);
-          this._onConnect();
-        });
+        this._socket = connectFn(opts, () => this._onConnect());
         this._setupConnectionHandlers();
       } catch (E) {
         setImmediate(() => this._onError(E, "ECONNECTION", false, "CONN"));
@@ -93511,43 +93770,29 @@ var init_smtp_connection = __esm(() => {
       }
     }
     _setupConnectionHandlers() {
-      this._connectionTimeout = setTimeout(() => {
-        this._onConnectionError("Connection timeout", "ETIMEDOUT");
-      }, this.options.connectionTimeout || CONNECTION_TIMEOUT);
+      this._startPhase(Math.max((this._connectionDeadline || Date.now()) - Date.now(), 0), timeoutError("Connection timeout", "CONNECT_TIMEOUT"));
       this._socket.on("error", this._onConnectionSocketError);
     }
-    _onConnectionError(err, code) {
-      clearTimeout(this._connectionTimeout);
-      const canFallback = this._fallbackAddresses && this._fallbackAddresses.length && this.stage === "init" && !this._destroyed;
-      if (!canFallback) {
-        this._onError(err, code, false, "CONN");
-        return;
-      }
-      const nextHost = this._fallbackAddresses.shift();
-      this.logger.info({
-        tnx: "network",
-        failedHost: this._connectOpts.host,
-        nextHost,
-        error: err.message || err
-      }, "Connection to %s failed, trying %s", this._connectOpts.host, nextHost);
-      if (this._socket) {
-        try {
-          this._socket.removeListener("error", this._onConnectionSocketError);
-          this._socket.on("error", TEARDOWN_NOOP);
-          this._socket.destroy();
-        } catch (_E2) {}
-        this._socket = null;
-      }
-      this._connectOpts.host = nextHost;
-      this._connectToHost(this._connectOpts, this.secureConnection);
+    _startPhase(timeout, err) {
+      this._clearPhase();
+      this._phaseTimer = setTimeout(() => {
+        this._phaseTimer = false;
+        this._onError(err, "ETIMEDOUT", false, "CONN");
+      }, timeout);
+    }
+    _remainingSetupTime() {
+      return Math.min(this.options.greetingTimeout || GREETING_TIMEOUT, Math.max((this._connectionDeadline || Infinity) - Date.now(), 1));
+    }
+    _clearPhase() {
+      clearTimeout(this._phaseTimer);
+      this._phaseTimer = false;
     }
     quit() {
       this._sendCommand("QUIT");
       this._responseActions.push(this.close);
     }
     close() {
-      clearTimeout(this._connectionTimeout);
-      clearTimeout(this._greetingTimeout);
+      this._clearPhase();
       this._responseActions = [];
       if (this._closing) {
         return;
@@ -93569,6 +93814,7 @@ var init_smtp_connection = __esm(() => {
         if (stream) {
           stream.removeListener("error", onStreamError);
           stream.on("error", TEARDOWN_NOOP);
+          stream.destroy();
         }
         this._pendingSend = false;
       }
@@ -93583,6 +93829,13 @@ var init_smtp_connection = __esm(() => {
           socket.removeListener("error", this._onConnectionSocketError);
           socket.on("error", TEARDOWN_NOOP);
           socket[closeMethod]();
+          if (closeMethod === "end") {
+            const closeTimer = setTimeout(() => socket.destroy(), CLOSE_TIMEOUT);
+            if (typeof closeTimer.unref === "function") {
+              closeTimer.unref();
+            }
+            socket.once("close", () => clearTimeout(closeTimer));
+          }
         } catch (_E2) {}
       }
       this._destroy();
@@ -93744,12 +93997,8 @@ var init_smtp_connection = __esm(() => {
       const startTime = Date.now();
       this._setEnvelope(envelope, (err, info) => {
         if (err) {
-          const stream2 = new PassThrough4;
-          if (typeof message.pipe === "function") {
-            message.pipe(stream2);
-          } else {
-            stream2.write(message);
-            stream2.end();
+          if (typeof message.destroy === "function") {
+            message.destroy();
           }
           return callback(err);
         }
@@ -93789,7 +94038,7 @@ var init_smtp_connection = __esm(() => {
     }
     _onConnect() {
       const socket = this._socket;
-      clearTimeout(this._connectionTimeout);
+      this._clearPhase();
       this.logger.info({
         tnx: "network",
         localAddress: socket.localAddress,
@@ -93814,13 +94063,27 @@ var init_smtp_connection = __esm(() => {
       socket.once("end", this._onSocketEnd);
       socket.setTimeout(this.options.socketTimeout || SOCKET_TIMEOUT);
       socket.on("timeout", this._onSocketTimeout);
-      this._greetingTimeout = setTimeout(() => {
-        if (this._socket && !this._destroyed && this._responseActions[0] === this._actionGreeting) {
-          this._onError("Greeting never received", "ETIMEDOUT", false, "CONN");
-        }
-      }, this.options.greetingTimeout || GREETING_TIMEOUT);
+      if (typeof socket.setKeepAlive === "function") {
+        socket.setKeepAlive(true, KEEPALIVE_DELAY);
+      }
+      if (typeof socket.setNoDelay === "function") {
+        socket.setNoDelay(true);
+      }
+      this._startPhase(this._remainingSetupTime(), timeoutError("Greeting never received", "GREETING_TIMEOUT"));
       this._responseActions.push(this._actionGreeting);
       socket.resume();
+    }
+    _onServerClosing(str) {
+      if (this._destroyed) {
+        return;
+      }
+      const pendingSend = this._pendingSend;
+      const envelope = this._envelope;
+      this._responseActions = [];
+      this.close();
+      if (pendingSend) {
+        pendingSend.callback(envelope && envelope.mailError || this._formatError("Server closed the connection", "ECONNECTION", str, "CONN"));
+      }
     }
     _onData(chunk) {
       if (this._destroyed || !chunk || !chunk.length) {
@@ -93865,17 +94128,15 @@ var init_smtp_connection = __esm(() => {
       this._onError(new Error("Server response exceeds maximum allowed size"), "EPROTOCOL", false, "CONN");
     }
     _onError(err, type, data, command) {
-      clearTimeout(this._connectionTimeout);
-      clearTimeout(this._greetingTimeout);
+      this._clearPhase();
       if (this._destroyed) {
         return;
       }
       err = this._formatError(err, type, data, command);
-      const transientCodes = ["ETIMEDOUT", "ESOCKET", "ECONNECTION"];
-      if (transientCodes.includes(err.code)) {
-        this.logger.warn(data, err.message);
+      if (isTransientError(err)) {
+        this.logger.warn({ tnx: "smtp", err }, "%s", err.message);
       } else {
-        this.logger.error(data, err.message);
+        this.logger.error({ tnx: "smtp", err }, "%s", err.message);
       }
       const pendingSend = this._pendingSend;
       this.emit("error", err);
@@ -93891,7 +94152,10 @@ var init_smtp_connection = __esm(() => {
       } else {
         err = new Error(message);
       }
-      if (type && type !== "Error") {
+      if (type && type !== "Error" && err.code !== ERR_ACCESS_DENIED) {
+        if (err.code && err.code !== type && !err.originalCode) {
+          err.originalCode = err.code;
+        }
         err.code = type;
       }
       if (response) {
@@ -93933,6 +94197,12 @@ var init_smtp_connection = __esm(() => {
         this.close();
         return;
       }
+      if (!failureResponse && this.stage === "connected" && !this._responseActions.length && !this._pendingSend && !this._destroyed && !this._closing) {
+        this.logger.info({
+          tnx: "network"
+        }, "Server closed the idle connection");
+        return this._destroy();
+      }
       if (failureResponse || this._responseActions[0] !== this.close && !this._destroyed) {
         return this._onError(new Error("Connection closed unexpectedly"), "ECONNECTION", failureResponse, "CONN");
       }
@@ -93944,7 +94214,7 @@ var init_smtp_connection = __esm(() => {
       }
     }
     _onTimeout() {
-      return this._onError(new Error("Timeout"), "ETIMEDOUT", false, "CONN");
+      return this._onError(timeoutError("Timeout", "SOCKET_TIMEOUT"), "ETIMEDOUT", false, "CONN");
     }
     _destroy() {
       if (this._destroyed) {
@@ -93952,19 +94222,25 @@ var init_smtp_connection = __esm(() => {
       }
       this._destroyed = true;
       this.destroyed = true;
-      clearTimeout(this._connectionTimeout);
-      clearTimeout(this._greetingTimeout);
-      this._connectionTimeout = false;
-      this._greetingTimeout = false;
+      this._clearPhase();
       this.emit("end");
     }
     _upgradeConnection(callback) {
+      const discarded = this._remainder.length + this._responseQueue.reduce((total, response) => total + response.length, 0);
+      if (discarded) {
+        this.logger.warn({
+          tnx: "smtp",
+          discarded
+        }, "Discarded %s bytes received in plaintext after the STARTTLS response", discarded);
+      }
+      this._plaintextEhlo = false;
       this._remainder = "";
       this._responseQueue = [];
       this._responsePartial = false;
       const socketPlain = this._socket;
       socketPlain.removeListener("data", this._onSocketData);
       socketPlain.removeListener("timeout", this._onSocketTimeout);
+      socketPlain.setTimeout(0);
       const opts = Object.assign({
         socket: socketPlain,
         host: this.host
@@ -93979,8 +94255,10 @@ var init_smtp_connection = __esm(() => {
         socketPlain.removeListener("error", this._onConnectionSocketError);
       };
       this.upgrading = true;
+      this._startPhase(this._remainingSetupTime(), timeoutError("TLS handshake timed out", "UPGRADE_TIMEOUT"));
       try {
         this._socket = tls2.connect(opts, () => {
+          this._clearPhase();
           this.secure = true;
           this.upgrading = false;
           this._socket.on("data", this._onSocketData);
@@ -93988,6 +94266,7 @@ var init_smtp_connection = __esm(() => {
           return callback(null, true);
         });
       } catch (err) {
+        this._clearPhase();
         removePlainSocketListeners();
         return callback(err);
       }
@@ -94018,9 +94297,18 @@ var init_smtp_connection = __esm(() => {
         }, str.replace(/\r?\n$/, ""));
       }
       const action = this._responseActions.shift();
+      const closing = /^421[ -]/.test(str);
       if (typeof action === "function") {
         action.call(this, str);
+        if (closing) {
+          return this._onServerClosing(str);
+        }
         setImmediate(() => this._processResponse());
+      } else if (closing && !this._pendingSend && this.stage === "connected") {
+        this.logger.info({
+          tnx: "smtp"
+        }, "Server closed the idle connection: %s", str);
+        this.close();
       } else {
         return this._onError(new Error("Unexpected Response"), "EPROTOCOL", str, "CONN");
       }
@@ -94083,6 +94371,7 @@ var init_smtp_connection = __esm(() => {
           return callback(this._formatError("Server does not support REQUIRETLS extension (RFC 8689)", "EREQUIRETLS", false, "MAIL FROM"));
         }
       }
+      this._envelope.pipelined = this._supportedExtensions.includes("PIPELINING");
       this._responseActions.push((str) => {
         this._actionMAIL(str, callback);
       });
@@ -94111,7 +94400,30 @@ var init_smtp_connection = __esm(() => {
       if (this._envelope.requireTLSExtensionEnabled) {
         args.push("REQUIRETLS");
       }
-      this._sendCommand("MAIL FROM:<" + this._envelope.from + ">" + (args.length ? " " + args.join(" ") : ""));
+      const mailFrom = "MAIL FROM:<" + this._envelope.from + ">" + (args.length ? " " + args.join(" ") : "");
+      this._recipientQueue = [];
+      if (!this._envelope.pipelined) {
+        this._sendCommand(mailFrom);
+        return;
+      }
+      const socket = this._socket;
+      socket.cork();
+      this._sendCommand(mailFrom);
+      while (this._envelope.rcptQueue.length) {
+        this._sendRcpt(this._envelope.rcptQueue.shift(), callback);
+      }
+      this._responseActions.push((str) => {
+        this._actionDATA(str, callback);
+      });
+      this._sendCommand("DATA");
+      socket.uncork();
+    }
+    _sendRcpt(recipient, callback) {
+      this._recipientQueue.push(recipient);
+      this._responseActions.push((str) => {
+        this._actionRCPT(str, callback);
+      });
+      this._sendCommand("RCPT TO:<" + recipient + ">" + this._getDsnRcptToArgs());
     }
     _setDsnEnvelope(params) {
       let ret = (params.ret || params.return || "").toString().toUpperCase() || null;
@@ -94212,7 +94524,7 @@ var init_smtp_connection = __esm(() => {
       return dataStream;
     }
     _actionGreeting(str) {
-      clearTimeout(this._greetingTimeout);
+      this._clearPhase();
       if (str.substr(0, 3) !== "220") {
         this._onError(new Error("Invalid greeting. response=" + str), "EPROTOCOL", str, "CONN");
         return;
@@ -94233,7 +94545,6 @@ var init_smtp_connection = __esm(() => {
       this._actionEHLO(str);
     }
     _actionEHLO(str) {
-      let match2;
       if (str.substr(0, 3) === "421") {
         this._onError(new Error("Server terminates connection. response=" + str), "ECONNECTION", str, "EHLO");
         return;
@@ -94247,12 +94558,18 @@ var init_smtp_connection = __esm(() => {
         this._sendCommand("HELO " + this.name);
         return;
       }
-      this._ehloLines = str.split(/\r?\n/).map((line) => line.replace(/^\d+[ -]/, "").trim()).filter((line) => line).slice(1);
       if (!this.secure && !this.options.ignoreTLS && (/[ -]STARTTLS\b/im.test(str) || this.options.requireTLS)) {
+        this._plaintextEhlo = str;
         this._sendCommand("STARTTLS");
         this._responseActions.push(this._actionSTARTTLS);
         return;
       }
+      this._parseEhloExtensions(str);
+      this.emit("connect");
+    }
+    _parseEhloExtensions(str) {
+      let match2;
+      this._ehloLines = str.split(/\r?\n/).map((line) => line.replace(/^\d+[ -]/, "").trim()).filter((line) => line).slice(1);
       if (/[ -]SMTPUTF8\b/im.test(str)) {
         this._supportedExtensions.push("SMTPUTF8");
       }
@@ -94289,7 +94606,6 @@ var init_smtp_connection = __esm(() => {
         this._supportedExtensions.push("SIZE");
         this._maxAllowedSize = Number(match2[1]) || 0;
       }
-      this.emit("connect");
     }
     _actionHELO(str) {
       if (str.charAt(0) !== "2") {
@@ -94305,6 +94621,12 @@ var init_smtp_connection = __esm(() => {
           this.logger.info({
             tnx: "smtp"
           }, "Failed STARTTLS upgrade, continuing unencrypted");
+          if (this._plaintextEhlo) {
+            this._parseEhloExtensions(this._plaintextEhlo);
+            this._plaintextEhlo = false;
+            this.allowsAuth = false;
+            this._supportedAuth = [];
+          }
           this.emit("connect");
           return;
         }
@@ -94416,21 +94738,9 @@ var init_smtp_connection = __esm(() => {
       const envelope = this._envelope;
       if (Number(str.charAt(0)) !== 2) {
         const message = this._usingSmtpUtf8 && /^550 /.test(str) && /[\x80-\uFFFF]/.test(envelope.from) ? "Internationalized mailbox name not allowed" : "Mail command failed";
-        return callback(this._formatError(message, "EENVELOPE", str, "MAIL FROM"));
+        envelope.mailError = this._formatError(message, "EENVELOPE", str, "MAIL FROM");
       }
-      if (!envelope.rcptQueue.length) {
-        return callback(this._formatError("Can't send mail - no recipients defined", "EENVELOPE", false, "API"));
-      }
-      this._recipientQueue = [];
-      const usePipelining = this._supportedExtensions.includes("PIPELINING");
-      do {
-        const curRecipient = envelope.rcptQueue.shift();
-        this._recipientQueue.push(curRecipient);
-        this._responseActions.push((str2) => {
-          this._actionRCPT(str2, callback);
-        });
-        this._sendCommand("RCPT TO:<" + curRecipient + ">" + this._getDsnRcptToArgs());
-      } while (usePipelining && envelope.rcptQueue.length);
+      this._advanceEnvelope(str, callback);
     }
     _actionRCPT(str, callback) {
       const envelope = this._envelope;
@@ -94445,31 +94755,64 @@ var init_smtp_connection = __esm(() => {
       } else {
         envelope.accepted.push(curRecipient);
       }
-      if (!envelope.rcptQueue.length && !this._recipientQueue.length) {
-        if (envelope.rejected.length < envelope.to.length) {
-          this._responseActions.push((str2) => {
-            this._actionDATA(str2, callback);
-          });
-          this._sendCommand("DATA");
-        } else {
-          const deferred = envelope.rejectedErrors.find((rejectedErr) => rejectedErr.responseCode && rejectedErr.responseCode < 500);
-          const reply = deferred?.response ?? str;
-          err = this._formatError("Can't send mail - all recipients were rejected", "EENVELOPE", reply, "RCPT TO");
-          err.rejected = envelope.rejected;
-          err.rejectedErrors = envelope.rejectedErrors;
-          return callback(err);
-        }
-      } else if (envelope.rcptQueue.length) {
-        const nextRecipient = envelope.rcptQueue.shift();
-        this._recipientQueue.push(nextRecipient);
-        this._responseActions.push((str2) => {
-          this._actionRCPT(str2, callback);
-        });
-        this._sendCommand("RCPT TO:<" + nextRecipient + ">" + this._getDsnRcptToArgs());
+      this._advanceEnvelope(str, callback);
+    }
+    _advanceEnvelope(str, callback) {
+      const envelope = this._envelope;
+      if (envelope.pipelined) {
+        return;
       }
+      if (envelope.mailError) {
+        return callback(envelope.mailError);
+      }
+      if (envelope.rcptQueue.length) {
+        return this._sendRcpt(envelope.rcptQueue.shift(), callback);
+      }
+      if (this._recipientQueue.length) {
+        return;
+      }
+      const err = this._envelopeError(str);
+      if (err) {
+        return callback(err);
+      }
+      this._responseActions.push((str2) => {
+        this._actionDATA(str2, callback);
+      });
+      this._sendCommand("DATA");
+    }
+    _envelopeError(str) {
+      const envelope = this._envelope;
+      if (envelope.mailError) {
+        return envelope.mailError;
+      }
+      if (envelope.accepted.length) {
+        return null;
+      }
+      const deferred = envelope.rejectedErrors.find((rejectedErr) => rejectedErr.responseCode && rejectedErr.responseCode < 500);
+      const lastRejected = envelope.rejectedErrors[envelope.rejectedErrors.length - 1];
+      const reply = deferred?.response ?? (envelope.pipelined && lastRejected ? lastRejected.response : str);
+      const err = this._formatError("Can't send mail - all recipients were rejected", "EENVELOPE", reply, "RCPT TO");
+      err.rejected = envelope.rejected;
+      err.rejectedErrors = envelope.rejectedErrors;
+      return err;
     }
     _actionDATA(str, callback) {
       const envelope = this._envelope;
+      if (envelope.pipelined) {
+        const err = this._envelopeError(str);
+        if (err) {
+          if (/^3/.test(str)) {
+            if (envelope.mailError) {
+              this.close();
+              return callback(err);
+            }
+            this._responseActions.push(() => callback(err));
+            this._sendCommand(".");
+            return;
+          }
+          return callback(err);
+        }
+      }
       if (!/^[23]/.test(str)) {
         return callback(this._formatError("Data command failed", "EENVELOPE", str, "DATA"));
       }
@@ -94889,6 +95232,8 @@ var init_pool_resource = __esm(() => {
       this.messages = 0;
       this.available = true;
       this._failed = false;
+      this._sending = false;
+      this._idleTimer = false;
     }
     _fail(err) {
       if (this._failed) {
@@ -94898,7 +95243,8 @@ var init_pool_resource = __esm(() => {
       this.emit("error", err);
     }
     connect(callback) {
-      this.pool.getSocket(this.options, (err, socketOptions) => {
+      const connectStartedAt = Date.now();
+      this.pool.getSocket(Object.assign({}, this.options, { connectStartedAt }), (err, socketOptions) => {
         if (err) {
           this._fail(err);
           return callback(err);
@@ -94917,7 +95263,18 @@ var init_pool_resource = __esm(() => {
           options = Object.assign(assign(false, options), socketOptions);
         }
         this.connection = new smtp_connection_default(options);
+        this.connection._connectStartedAt = connectStartedAt;
         this.connection.on("error", (err2) => {
+          if (this._sending) {
+            return;
+          }
+          if (this._connected && isTransientError(err2)) {
+            this.logger.info({
+              tnx: "pool",
+              cid: this.id
+            }, "Connection #%s was closed by the server: %s", this.id, err2.message);
+            return;
+          }
           this._fail(err2);
           if (returned) {
             return;
@@ -94985,9 +95342,32 @@ var init_pool_resource = __esm(() => {
       if (mail.data.requireTLSExtensionEnabled) {
         envelope.requireTLSExtensionEnabled = mail.data.requireTLSExtensionEnabled;
       }
-      this.connection.send(envelope, mail.message.createReadStream(), (err, info) => {
+      this._sending = true;
+      const reused = this.messages > 0;
+      const messageStream = mail.message.createReadStream();
+      this.connection.send(envelope, messageStream, (err, info) => {
+        this._sending = false;
         this.messages++;
         if (err) {
+          if (reused && messageStream.readableDidRead === false && isTransientError(err)) {
+            this.logger.info({
+              tnx: "pool",
+              cid: this.id,
+              messageId
+            }, "Connection #%s was closed by the server before message %s was sent: %s", this.id, messageId, err.message);
+            this.connection.close();
+            return;
+          }
+          if ((err.code === EENVELOPE || err.code === EMESSAGE) && err.responseCode !== 421 && !this.connection._destroyed) {
+            this.connection.reset((resetErr) => {
+              if (resetErr) {
+                this.connection.close();
+                return;
+              }
+              this._release();
+            });
+            return callback(err);
+          }
           this.connection.close();
           this._fail(err);
           return callback(err);
@@ -94997,24 +95377,55 @@ var init_pool_resource = __esm(() => {
           to: envelope.to
         };
         info.messageId = messageId;
-        setImmediate(() => {
-          if (this.messages >= this.options.maxMessages) {
-            const err2 = new Error("Resource exhausted");
-            err2.code = EMAXLIMIT;
-            this.connection.close();
-            this._fail(err2);
-          } else {
-            this.pool._checkRateLimit(() => {
-              this.available = true;
-              this.emit("available");
-            });
-          }
-        });
+        setImmediate(() => this._release());
         callback(null, info);
       });
     }
+    _release() {
+      if (this.messages >= this.options.maxMessages) {
+        const err = new Error("Resource exhausted");
+        err.code = EMAXLIMIT;
+        this.connection.close();
+        this._fail(err);
+        return;
+      }
+      this.pool._checkRateLimit(() => {
+        this.available = true;
+        this._startIdleTimer();
+        this.emit("available");
+      });
+    }
+    _startIdleTimer() {
+      if (!this.options.idleTimeout || this.options.idleTimeout < 0) {
+        return;
+      }
+      if (this._idleTimer && typeof this._idleTimer.refresh === "function") {
+        this._idleTimer.refresh();
+        return;
+      }
+      clearTimeout(this._idleTimer);
+      this._idleTimer = setTimeout(() => {
+        if (!this.available) {
+          return;
+        }
+        this.logger.debug({
+          tnx: "pool",
+          cid: this.id
+        }, "Closing connection #%s after it was idle for %sms", this.id, this.options.idleTimeout);
+        this.available = false;
+        this.connection.quit();
+      }, this.options.idleTimeout);
+      if (typeof this._idleTimer.unref === "function") {
+        this._idleTimer.unref();
+      }
+    }
+    _stopIdleTimer() {
+      clearTimeout(this._idleTimer);
+      this._idleTimer = false;
+    }
     close() {
       this._connected = false;
+      this._stopIdleTimer();
       if (this.auth && this.auth.oauth2) {
         this.auth.oauth2.removeAllListeners();
       }
@@ -95766,6 +96177,7 @@ var init_smtp_pool = __esm(() => {
       this.options.maxConnections = this.options.maxConnections || 5;
       this.options.maxMessages = this.options.maxMessages || 100;
       this.options.maxRequeues = typeof this.options.maxRequeues === "number" ? this.options.maxRequeues : 5;
+      this.options.idleTimeout = typeof this.options.idleTimeout === "number" ? this.options.idleTimeout : 4 * 60 * 1000;
       this.logger = getLogger(this.options, {
         component: this.options.component || "smtp-pool"
       });
@@ -96083,7 +96495,8 @@ var init_smtp_pool = __esm(() => {
       }
       const done = callback;
       const auth = new PoolResource(this).auth;
-      this.getSocket(this.options, (err, socketOptions) => {
+      const connectStartedAt = Date.now();
+      this.getSocket(Object.assign({}, this.options, { connectStartedAt }), (err, socketOptions) => {
         if (err) {
           return done(err);
         }
@@ -96100,6 +96513,7 @@ var init_smtp_pool = __esm(() => {
           options = Object.assign(assign(false, options), socketOptions);
         }
         const connection = new smtp_connection_default(options);
+        connection._connectStartedAt = connectStartedAt;
         let returned = false;
         connection.once("error", (err2) => {
           if (returned) {
@@ -96243,7 +96657,8 @@ var init_smtp_transport = __esm(() => {
       }
     }
     send(mail, callback) {
-      this.getSocket(this.options, (err, socketOptions) => {
+      const connectStartedAt = Date.now();
+      this.getSocket(Object.assign({}, this.options, { connectStartedAt }), (err, socketOptions) => {
         if (err) {
           return callback(err);
         }
@@ -96261,6 +96676,7 @@ var init_smtp_transport = __esm(() => {
           options = Object.assign(assign(false, options), socketOptions);
         }
         const connection = new smtp_connection_default(options);
+        connection._connectStartedAt = connectStartedAt;
         let perCallAuth;
         const cleanupPerCallAuth = () => {
           if (perCallAuth && perCallAuth !== this.auth && perCallAuth.oauth2) {
@@ -96360,7 +96776,8 @@ var init_smtp_transport = __esm(() => {
         });
       }
       const done = callback;
-      this.getSocket(this.options, (err, socketOptions) => {
+      const connectStartedAt = Date.now();
+      this.getSocket(Object.assign({}, this.options, { connectStartedAt }), (err, socketOptions) => {
         if (err) {
           return done(err);
         }
@@ -96377,6 +96794,7 @@ var init_smtp_transport = __esm(() => {
           options = Object.assign(assign(false, options), socketOptions);
         }
         const connection = new smtp_connection_default(options);
+        connection._connectStartedAt = connectStartedAt;
         let returned = false;
         let perCallAuth;
         const cleanupPerCallAuth = () => {
@@ -96460,6 +96878,7 @@ var init_smtp_transport = __esm(() => {
 
 // /zveltio-extension/node_modules/nodemailer/dist/esm/sendmail-transport/index.js
 import { spawn } from "child_process";
+import { pipeline as pipeline2 } from "stream";
 
 class SendmailTransport {
   constructor(options) {
@@ -96526,35 +96945,63 @@ class SendmailTransport {
       return callback(E);
     }
     if (sendmail) {
+      let stream;
+      const messageWritten = () => !!stream && stream.readableEnded;
+      let stdinError = null;
+      const release = () => {
+        if (stream && !messageWritten()) {
+          stream.destroy();
+        }
+      };
+      const fail = (err) => {
+        release();
+        callback(err);
+      };
       sendmail.on("error", (err) => {
         this.logger.error({
           err,
           tnx: "spawn",
           messageId
         }, "Error occurred when sending message %s. %s", messageId, err.message);
-        callback(err);
+        fail(err);
       });
-      sendmail.once("exit", (code) => {
-        if (!code) {
+      const onExit = (code, signal) => {
+        let err = null;
+        if (code) {
+          err = new Error(code === 127 ? "Sendmail command not found, process exited with code " + code : "Sendmail exited with code " + code);
+        } else if (signal) {
+          err = new Error("Sendmail was terminated by " + signal);
+        } else if (!messageWritten()) {
+          err = new Error("Sendmail exited before the message was written");
+        } else if (stdinError) {
+          err = stdinError;
+        }
+        if (!err) {
           return callback();
         }
-        const err = new Error(code === 127 ? "Sendmail command not found, process exited with code " + code : "Sendmail exited with code " + code);
-        err.code = ESENDMAIL;
+        err.code = err.code || ESENDMAIL;
         this.logger.error({
           err,
           tnx: "stdin",
           messageId
         }, "Error sending message %s to sendmail. %s", messageId, err.message);
-        callback(err);
-      });
-      sendmail.once("close", callback);
+        fail(err);
+      };
+      sendmail.once("exit", onExit);
+      sendmail.once("close", onExit);
       sendmail.stdin.on("error", (err) => {
         this.logger.error({
           err,
           tnx: "stdin",
           messageId
         }, "Error occurred when piping message %s to sendmail. %s", messageId, err.message);
-        callback(err);
+        if (stdinError) {
+          return;
+        }
+        stdinError = err;
+        release();
+        const exitTimer = setTimeout(() => fail(err), STDIN_ERROR_EXIT_WAIT);
+        sendmail.once("exit", () => clearTimeout(exitTimer));
       });
       const recipients = [].concat(envelope.to || []);
       if (recipients.length > 3) {
@@ -96565,10 +97012,9 @@ class SendmailTransport {
         messageId
       }, "Sending message %s to <%s>", messageId, recipients.join(", "));
       const sourceStream = mail.message.createReadStream();
-      let stream = sourceStream;
+      stream = sourceStream;
       if (this.options.newline) {
-        stream = sourceStream.pipe(this.winbreak ? new LeWindows : new LeUnix);
-        sourceStream.once("error", (err) => stream.emit("error", err));
+        stream = pipeline2(sourceStream, this.winbreak ? new LeWindows : new LeUnix, () => false);
       }
       stream.once("error", (err) => {
         this.logger.error({
@@ -96587,7 +97033,7 @@ class SendmailTransport {
     }
   }
 }
-var sendmail_transport_default;
+var STDIN_ERROR_EXIT_WAIT = 1000, sendmail_transport_default;
 var init_sendmail_transport = __esm(() => {
   init_shared();
   init_errors();
@@ -96965,11 +97411,11 @@ function createTestAccount(apiUrl, callback) {
     });
   }
   const done = callback;
-  if (ETHEREAL_CACHE && testAccount) {
+  if (etherealCache() && testAccount) {
     setImmediate(() => done(null, testAccount));
     return promise2;
   }
-  apiUrl = apiUrl || ETHEREAL_API;
+  apiUrl = apiUrl || etherealApi();
   const chunks = [];
   let chunklen = 0;
   const requestHeaders = {};
@@ -96977,8 +97423,9 @@ function createTestAccount(apiUrl, callback) {
     requestor: name2,
     version: version2
   };
-  if (ETHEREAL_API_KEY) {
-    requestHeaders.Authorization = "Bearer " + ETHEREAL_API_KEY;
+  const apiKey = etherealApiKey();
+  if (apiKey) {
+    requestHeaders.Authorization = "Bearer " + apiKey;
   }
   const fetchOptions = {
     contentType: "application/json",
@@ -97032,11 +97479,11 @@ function getTestMessageUrl(info) {
     }
   }
   if (infoProps.has("STATUS") && infoProps.has("MSGID")) {
-    return (testAccount && testAccount.web || ETHEREAL_WEB) + "/message/" + infoProps.get("MSGID");
+    return (testAccount && testAccount.web || etherealWeb()) + "/message/" + infoProps.get("MSGID");
   }
   return false;
 }
-var ETHEREAL_API, ETHEREAL_WEB, ETHEREAL_API_KEY, ETHEREAL_CACHE, testAccount = false, nodemailer, nodemailer_default;
+var etherealApi = () => (process.env.ETHEREAL_API || "https://api.nodemailer.com").replace(/\/+$/, ""), etherealWeb = () => (process.env.ETHEREAL_WEB || "https://ethereal.email").replace(/\/+$/, ""), etherealApiKey = () => (process.env.ETHEREAL_API_KEY || "").replace(/\s*/g, "") || null, etherealCache = () => ["true", "yes", "y", "1"].includes((process.env.ETHEREAL_CACHE || "yes").toString().trim().toLowerCase()), testAccount = false, nodemailer, nodemailer_default;
 var init_nodemailer = __esm(() => {
   init_mailer();
   init_shared();
@@ -97048,10 +97495,6 @@ var init_nodemailer = __esm(() => {
   init_ses_transport();
   init_errors();
   init_fetch();
-  ETHEREAL_API = (process.env.ETHEREAL_API || "https://api.nodemailer.com").replace(/\/+$/, "");
-  ETHEREAL_WEB = (process.env.ETHEREAL_WEB || "https://ethereal.email").replace(/\/+$/, "");
-  ETHEREAL_API_KEY = (process.env.ETHEREAL_API_KEY || "").replace(/\s*/g, "") || null;
-  ETHEREAL_CACHE = ["true", "yes", "y", "1"].includes((process.env.ETHEREAL_CACHE || "yes").toString().trim().toLowerCase());
   nodemailer = {
     createTransport,
     createTestAccount,
@@ -119946,6 +120389,7 @@ var extension = {
       {
         name: "mail-poll",
         intervalMs: 60000,
+        perTenant: true,
         retry: { maxAttempts: 2 },
         async handler(ctx) {
           const { sql: sql3 } = await Promise.resolve().then(() => (init_dist(), exports_dist));
@@ -119964,11 +120408,12 @@ var extension = {
               AND (last_sync_at IS NULL OR last_sync_at < NOW() - (${minutes} || ' minutes')::interval)
           `.execute(db);
           for (const { id } of due.rows) {
-            const acct = await sql3`SELECT * FROM zv_mail_accounts WHERE id = ${id}`.execute(db);
-            if (!acct.rows[0])
-              continue;
             try {
-              await syncImapAccount2(db, acct.rows[0]);
+              await db.transaction().execute(async (trx) => {
+                const acct = await sql3`SELECT * FROM zv_mail_accounts WHERE id = ${id}`.execute(trx);
+                if (acct.rows[0])
+                  await syncImapAccount2(trx, acct.rows[0]);
+              });
             } catch (err) {
               console.warn(`[mail] scheduled sync failed for ${id}:`, err.message);
             }
