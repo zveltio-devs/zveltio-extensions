@@ -48,6 +48,10 @@ const extension: ZveltioExtension = {
         // interval would otherwise mean re-registering the schedule whenever an
         // admin changed a number.
         intervalMs: 60_000,
+        // Once per tenant, inside its transaction. Without it the run had no
+        // tenant: under RLS it saw the root tenant's accounts only, and on a
+        // superuser pool it synced every tenant's mail INTO the root tenant (B02).
+        perTenant: true,
         retry: { maxAttempts: 2 },
         async handler(ctx) {
           const { sql } = await import('kysely');
@@ -70,11 +74,14 @@ const extension: ZveltioExtension = {
           `.execute(db);
 
           for (const { id } of due.rows) {
-            const acct = await sql`SELECT * FROM zv_mail_accounts WHERE id = ${id}`.execute(db);
-            if (!acct.rows[0]) continue;
             try {
-              // eslint-disable-next-line
-              await syncImapAccount(db as never, acct.rows[0] as never);
+              // A savepoint per mailbox. The run is one tenant transaction, and a
+              // statement failing for one mailbox would abort it for every
+              // mailbox after it — and roll back the ones before.
+              await db.transaction().execute(async (trx) => {
+                const acct = await sql`SELECT * FROM zv_mail_accounts WHERE id = ${id}`.execute(trx);
+                if (acct.rows[0]) await syncImapAccount(trx as never, acct.rows[0] as never);
+              });
             } catch (err) {
               // One unreachable mailbox must not stop the others. `sync_error`
               // is written by syncImapAccount itself, so the account page shows
