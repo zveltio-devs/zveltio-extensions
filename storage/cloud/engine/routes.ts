@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import { createFileVersion, listFileVersions, restoreFileVersion } from './lib/file-versions.js';
 import { mayDeleteFile, moveToTrash, restoreFromTrash, listTrash, purgeExpiredTrash } from './lib/trash.js';
-import { createShareLink, validateShareToken, claimDownload, listUserShares, revokeShare } from './lib/sharing.js';
+import { createShareLink, validateShareToken, claimDownload, listUserShares, revokeShare, shareTokenDigest } from './lib/sharing.js';
 import { getAws, presignedGetUrl, putObject, getObject, s3Url } from './lib/s3.js';
 import { objectStorage } from './lib/config.js';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
@@ -902,7 +902,7 @@ async function logAccess(
   try {
     await sql`
       INSERT INTO zv_cloud_access_logs (file_id, user_id, ip, action, share_token, user_agent)
-      VALUES (${fileId}, ${userId}, ${ip}, ${action}, ${shareToken}, ${userAgent ?? null})
+      VALUES (${fileId}, ${userId}, ${ip}, ${action}, ${shareToken && shareTokenDigest(shareToken)}, ${userAgent ?? null})
     `.execute(db);
   } catch {
     // Non-fatal: access logging should not break main flow
