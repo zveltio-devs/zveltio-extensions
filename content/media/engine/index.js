@@ -21555,9 +21555,7 @@ function mediaRoutes(ctx) {
     schedule(db, fileId, buffer, mimeType);
   };
   async function mayDeleteFile(fileId, userId) {
-    const row = await db.selectFrom("zv_media_files").select(["created_by"]).where("id", "=", fileId).executeTakeFirst().catch(() => {
-      return;
-    });
+    const row = await db.selectFrom("zv_media_files").select(["created_by"]).where("id", "=", fileId).executeTakeFirst();
     if (!row)
       return true;
     if (row.created_by === userId)
@@ -21788,6 +21786,8 @@ function mediaRoutes(ctx) {
   router.delete("/files/:id", async (c) => {
     const user = c.get("user");
     const id = c.req.param("id");
+    if (!UUID_RE.test(id))
+      return c.json({ error: "File not found" }, 404);
     if (!await mayDeleteFile(id, user.id)) {
       return c.json({ error: "Forbidden" }, 403);
     }
@@ -21798,7 +21798,7 @@ function mediaRoutes(ctx) {
       return c.json({ error: err.message }, 404);
     }
   });
-  router.post("/files/batch-delete", zValidator("json", exports_external.object({ ids: exports_external.array(exports_external.string()) })), async (c) => {
+  router.post("/files/batch-delete", zValidator("json", exports_external.object({ ids: exports_external.array(exports_external.string().uuid()) })), async (c) => {
     const user = c.get("user");
     const { ids } = c.req.valid("json");
     let moved = 0;
@@ -21946,15 +21946,22 @@ function mediaRoutes(ctx) {
     ]).where("cf.collection_id", "=", c.req.param("id")).where("f.deleted_at", "is", null).orderBy("cf.sort_order", "asc").execute();
     return c.json({ files });
   });
+  async function ownCollection(c, id, userId) {
+    const tenant = c.get("tenant")?.id;
+    const row = tenant && UUID_RE.test(id) ? await db.selectFrom("zv_media_collections").select(["created_by"]).where("id", "=", id).where("tenant_id", "=", tenant).executeTakeFirst() : undefined;
+    if (!row)
+      return c.json({ error: "Collection not found" }, 404);
+    return row.created_by === userId ? null : c.json({ error: "Forbidden" }, 403);
+  }
   router.post("/collections/:id/files", zValidator("json", exports_external.object({
     file_ids: exports_external.array(exports_external.string().uuid()).min(1)
   })), async (c) => {
     const user = c.get("user");
     const collId = c.req.param("id");
     const { file_ids } = c.req.valid("json");
-    if (!await visible(c, "zv_media_collections", collId)) {
-      return c.json({ error: "Collection not found" }, 404);
-    }
+    const refused = await ownCollection(c, collId, user.id);
+    if (refused)
+      return refused;
     for (const fid of new Set(file_ids)) {
       if (!await visible(c, "zv_media_files", fid)) {
         return c.json({ error: "File not found" }, 404);
@@ -21969,6 +21976,10 @@ function mediaRoutes(ctx) {
     return c.json({ added: toInsert.length });
   });
   router.delete("/collections/:id/files/:fileId", async (c) => {
+    const user = c.get("user");
+    const refused = await ownCollection(c, c.req.param("id"), user.id);
+    if (refused)
+      return refused;
     await db.deleteFrom("zv_media_collection_files").where("collection_id", "=", c.req.param("id")).where("file_id", "=", c.req.param("fileId")).execute();
     return c.json({ success: true });
   });

@@ -104,8 +104,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
       .selectFrom('zv_media_files')
       .select(['created_by'])
       .where('id', '=', fileId)
-      .executeTakeFirst()
-      .catch(() => undefined);
+      .executeTakeFirst();
     // Absent file: let moveToTrash produce the not-found path rather than
     // reporting "forbidden", which would confirm the id exists elsewhere.
     if (!row) return true;
@@ -491,6 +490,8 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   router.delete('/files/:id', async (c) => {
     const user = c.get('user' as never) as any;
     const id = c.req.param('id');
+    // A malformed id would fail the lookup (22P02) and abort the request's transaction.
+    if (!UUID_RE.test(id)) return c.json({ error: 'File not found' }, 404);
 
     if (!(await mayDeleteFile(id, user.id))) {
       return c.json({ error: 'Forbidden' }, 403);
@@ -507,7 +508,7 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   // POST /files/batch-delete — must be registered before /files/:id to avoid conflict
   router.post(
     '/files/batch-delete',
-    zValidator('json', z.object({ ids: z.array(z.string()) })),
+    zValidator('json', z.object({ ids: z.array(z.string().uuid()) })),
     async (c) => {
       const user = c.get('user' as never) as any;
       const { ids } = c.req.valid('json');
@@ -748,15 +749,28 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
     return c.json({ files });
   });
 
+  /**
+   * The collection a file-list change is about, when the caller made it: the
+   * same owner check PATCH and DELETE make. Adding or removing files curates
+   * somebody's collection, which tenant visibility alone does not grant.
+   */
+  async function ownCollection(c: any, id: string, userId: string): Promise<Response | null> {
+    const tenant = (c.get('tenant') as { id?: string } | null | undefined)?.id;
+    const row = tenant && UUID_RE.test(id)
+      ? await (db as any).selectFrom('zv_media_collections').select(['created_by']).where('id', '=', id).where('tenant_id', '=', tenant).executeTakeFirst()
+      : undefined;
+    if (!row) return c.json({ error: 'Collection not found' }, 404);
+    return row.created_by === userId ? null : c.json({ error: 'Forbidden' }, 403);
+  }
+
   router.post('/collections/:id/files', zValidator('json', z.object({
     file_ids: z.array(z.string().uuid()).min(1),
   })), async (c) => {
     const user = c.get('user' as never) as any;
     const collId = c.req.param('id');
     const { file_ids } = c.req.valid('json');
-    if (!(await visible(c, 'zv_media_collections', collId))) {
-      return c.json({ error: 'Collection not found' }, 404);
-    }
+    const refused = await ownCollection(c, collId, user.id);
+    if (refused) return refused;
     for (const fid of new Set(file_ids)) {
       if (!(await visible(c, 'zv_media_files', fid))) {
         return c.json({ error: 'File not found' }, 404);
@@ -778,6 +792,9 @@ export function mediaRoutes(ctx: ExtensionContext): Hono {
   });
 
   router.delete('/collections/:id/files/:fileId', async (c) => {
+    const user = c.get('user' as never) as any;
+    const refused = await ownCollection(c, c.req.param('id'), user.id);
+    if (refused) return refused;
     await (db as any)
       .deleteFrom('zv_media_collection_files')
       .where('collection_id', '=', c.req.param('id'))

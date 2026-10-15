@@ -25,6 +25,7 @@ const TENANT_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const MINE = '11111111-1111-4111-8111-111111111111';
 const FOREIGN = '22222222-2222-4222-8222-222222222222'; // exists, tenant B, readable
 const ABSENT = '33333333-3333-4333-8333-333333333333'; // what RLS hides
+const THEIRS = '44444444-4444-4444-8444-444444444444'; // tenant A, made by u2
 
 function mount() {
   const writes: string[] = [];
@@ -33,6 +34,7 @@ function mount() {
     rows[t] = [
       { id: MINE, tenant_id: TENANT_A, created_by: 'u1' },
       { id: FOREIGN, tenant_id: TENANT_B, created_by: 'u1' },
+      { id: THEIRS, tenant_id: TENANT_A, created_by: 'u2' },
     ];
   }
   const chain = (table: string, op: string): Record<string, unknown> => {
@@ -135,5 +137,39 @@ describe('content/media — a foreign parent id is refused before anything is wr
     const res = await app.request('/upload', { method: 'POST', body: fd });
     expect(res.status).toBe(404);
     expect(writes).toEqual([]);
+  });
+});
+
+// A16: a collection's file list is its maker's to change, as PATCH and DELETE
+// already held; a malformed file id answers 404/400, not a failed lookup that
+// aborts the request's transaction (and once read as "absent", allowing it).
+describe('content/media — collection files and file deletes', () => {
+  for (const [method, path, body] of [
+    ['POST', `/collections/${THEIRS}/files`, { file_ids: [MINE] }],
+    ['DELETE', `/collections/${THEIRS}/files/${MINE}`, undefined],
+  ] as const) {
+    it(`another member's collection: ${method} ${path} is 403, nothing written`, async () => {
+      const { send, writes } = mount();
+      const res = await send(method, path, body);
+      expect(res.status).toBe(403);
+      expect(writes).toEqual([]);
+    });
+  }
+
+  it('own collection: DELETE /collections/:id/files/:fileId is accepted', async () => {
+    const { send, writes } = mount();
+    const res = await send('DELETE', `/collections/${MINE}/files/${MINE}`, undefined);
+    expect(res.status).toBe(200);
+    expect(writes).toEqual(['delete zv_media_collection_files']);
+  });
+
+  it('DELETE /files/:id with a malformed id is 404 before any statement', async () => {
+    const { send } = mount();
+    expect((await send('DELETE', '/files/not-a-uuid', undefined)).status).toBe(404);
+  });
+
+  it('POST /files/batch-delete with a malformed id is 400', async () => {
+    const { send } = mount();
+    expect((await send('POST', '/files/batch-delete', { ids: ['not-a-uuid'] })).status).toBe(400);
   });
 });
