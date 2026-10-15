@@ -76,8 +76,11 @@ function stubDb(inserted: Record<string, unknown>[], code: string) {
   };
 }
 
+type PublicRoute = { method: string; path: string; handler: (c: any) => Promise<Response> };
+
 async function invoke(code: string) {
   const calls: unknown[][] = [];
+  const mounts: PublicRoute[] = [];
   const inserted: Record<string, unknown>[] = [];
   const internals = buildExtensionInternals();
   const ctx: any = {
@@ -95,9 +98,8 @@ async function invoke(code: string) {
       },
     },
     logger: { warn() {}, error() {}, info() {} },
-    // The extension also mounts each function's CUSTOM root path at boot; this
-    // test is about the admin invoke route, so collect them and assert nothing.
-    registerPublicRoute: () => {},
+    // The extension also mounts each function's CUSTOM root path at boot.
+    registerPublicRoute: (route: PublicRoute) => mounts.push(route),
   };
 
   const app = new Hono();
@@ -110,7 +112,7 @@ async function invoke(code: string) {
     headers: { 'content-type': 'application/json' },
     body: '{"a":1}',
   });
-  return { res, call: calls[0], inserted };
+  return { res, call: calls[0], inserted, mounts, calls };
 }
 
 const HANDLER = `async function handler(request, env) {
@@ -165,5 +167,29 @@ describe('POST /:id/invoke — what reaches the runner, and what comes back', ()
 
     expect(inserted[0].status).toBe(500);
     expect(String(inserted[0].error)).toContain('boom in handler');
+  }, 20_000);
+});
+
+describe('a custom root path — what reaches the runner', () => {
+  it('runs the live row, with its egress, on the method it declares', async () => {
+    const { mounts, calls, inserted } = await invoke(HANDLER);
+    expect(mounts.map((m) => `${m.method} ${m.path}`)).toEqual(['POST /probe']);
+
+    const app = new Hono();
+    app.post('/probe', mounts[0]!.handler);
+    const res = await app.request('/probe?tenant=acme', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'session=secret' },
+      body: '{"a":1}',
+    });
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ method: 'POST', a: 1, tenant: 'acme', who: 'test' });
+
+    const call = calls.at(-1)!;
+    const request = call[1] as { headers: Record<string, string> };
+    // The caller's session stays out of the sandbox.
+    expect(request.headers.cookie).toBeUndefined();
+    expect(call[4]).toEqual(['api.allowed.test']);
+    expect(inserted.at(-1)?.status).toBe(201);
   }, 20_000);
 });

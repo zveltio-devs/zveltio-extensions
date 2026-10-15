@@ -168,28 +168,35 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
   }
 
   /**
-   * Who changed what a function may reach, and when: the approval the save
-   * stands for. The engine's audit log (`ctx.internals.audit`), as a row of the
-   * running tenant. A failed write is logged; the save has already happened.
+   * Who changed what a function may reach, or deleted it, and when: the
+   * approval the save stands for. The engine's audit log
+   * (`ctx.internals.audit`), as a row of the running tenant. A failed write is
+   * logged; the change has already happened.
    */
-  async function auditEgress(
+  async function audit(
+    type: 'edge_function.egress_changed' | 'edge_function.deleted',
+    userId: string,
+    fn: Record<string, any>,
+    metadata: Record<string, unknown> = {},
+  ) {
+    await ctx.internals
+      .audit({
+        type,
+        userId,
+        resourceType: 'edge_function',
+        resourceId: fn.id,
+        metadata: { name: fn.name, ...metadata },
+      })
+      .catch((err: Error) => {
+        console.warn(`[edge-functions] ${type} audit write failed:`, err.message);
+      });
+  }
+  const auditEgress = (
     userId: string,
     fn: Record<string, any>,
     before: string[] | null,
     after: string[] | null,
-  ) {
-    await ctx.internals
-      .audit({
-        type: 'edge_function.egress_changed',
-        userId,
-        resourceType: 'edge_function',
-        resourceId: fn.id,
-        metadata: { name: fn.name, before, after },
-      })
-      .catch((err: Error) => {
-        console.warn('[edge-functions] egress audit write failed:', err.message);
-      });
-  }
+  ) => audit('edge_function.egress_changed', userId, fn, { before, after });
 
   const app = new Hono();
 
@@ -319,7 +326,13 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
     const user = await requireAdmin(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    await db.deleteFrom('zv_edge_functions').where('id', '=', c.req.param('id')).execute();
+    const fn = await db
+      .deleteFrom('zv_edge_functions')
+      .where('id', '=', c.req.param('id'))
+      .returning(['id', 'name', 'path', 'egress'])
+      .executeTakeFirst();
+    // A deleted function takes its code and its egress approval with it.
+    if (fn) await audit('edge_function.deleted', user.id, fn, { path: fn.path, egress: fn.egress });
     return c.json({ success: true });
   });
 
