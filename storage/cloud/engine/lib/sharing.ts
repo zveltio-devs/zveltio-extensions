@@ -5,6 +5,15 @@ import { nanoid } from 'nanoid';
 import type { Database } from '@zveltio/engine-db';
 
 /**
+ * What `zv_media_shares.token` holds for a link: its SHA-256, never the token
+ * (engine migration 079 hashes any raw token on write). A digest presented as a
+ * token is hashed again and matches nothing, so reading the column opens no link.
+ */
+export function shareTokenDigest(token: string): string {
+  return `sha256:${new Bun.CryptoHasher('sha256').update(token).digest('hex')}`;
+}
+
+/**
  * Creates a public share link for a file or folder.
  */
 export async function createShareLink(
@@ -33,10 +42,9 @@ export async function createShareLink(
     : null;
 
   await (db as any).insertInto('zv_media_shares').values({
-    id: nanoid(21),
     file_id: opts.fileId || null,
     folder_id: opts.folderId || null,
-    token,
+    token: shareTokenDigest(token),
     share_type: opts.shareType || 'download',
     password_hash: passwordHash,
     expires_at: opts.expiresAt || null,
@@ -102,7 +110,7 @@ export async function validateShareToken(
   const share = await (db as any)
     .selectFrom('zv_media_shares')
     .selectAll()
-    .where('token', '=', token)
+    .where('token', '=', shareTokenDigest(token))
     .where('is_active', '=', true)
     .executeTakeFirst();
 

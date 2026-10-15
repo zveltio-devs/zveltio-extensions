@@ -131,3 +131,29 @@ describe('validateShareToken — password handling', () => {
     expect(res.error).toBe('Password required');
   });
 });
+
+// Engine migration 079 stores the token's digest; a lookup by the raw token finds
+// nothing, and one that matched the stored value as given would let the digest
+// itself — readable by the request role — open the link.
+describe('validateShareToken — token lookup', () => {
+  it('looks a link up by the digest of the token it is given', async () => {
+    const asked: unknown[] = [];
+    const { db } = makeDb({ id: 's1', is_active: true, password_hash: null });
+    const select = db.selectFrom;
+    db.selectFrom = (table: string) => {
+      const c = select(table) as Record<string, unknown>;
+      const where = c.where as () => unknown;
+      c.where = (col: string, _op: string, v: unknown) => {
+        if (table === 'zv_media_shares' && col === 'token') asked.push(v);
+        return where();
+      };
+      return c;
+    };
+    await validateShareToken(db as never, 'tok');
+    // What 079's trigger stores for 'tok':
+    // 'sha256:' || encode(sha256(convert_to('tok', 'UTF8')), 'hex')
+    expect(asked).toEqual([
+      'sha256:1a7674eb4ee78df7e1ac439a93c3fa8e3c945784d4dec9fd8e3011738b2f1d62',
+    ]);
+  });
+});
