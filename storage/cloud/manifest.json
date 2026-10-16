@@ -3,8 +3,8 @@
   "displayName": "Cloud Storage",
   "category": "storage",
   "description": "File versioning, trash bin, public share links, and storage quotas",
-  "version": "1.1.9",
-  "zveltioMinVersion": "3.0.0-beta.77",
+  "version": "1.1.10",
+  "zveltioMinVersion": "3.0.0-beta.80",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-cloud",
   "permissions": [
