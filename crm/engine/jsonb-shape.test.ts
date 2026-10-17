@@ -25,27 +25,9 @@ async function shape(db: any, table: string, col: string, id: string): Promise<s
   return r.rows[0]!.t;
 }
 
+// Contacts and organizations write through the data API now; their shape is
+// pinned in `data-api-writes.test.ts`, against the engine's own driver.
 d('crm stores metadata and line_items as JSON, not as strings', () => {
-  it('contacts: create and update', async () => {
-    const { app, ctx } = await mountForTest(import.meta.dir);
-    const res = await send(app, 'POST', '/contacts', { first_name: 'J', metadata: { a: 1 } });
-    expect(res.status).toBe(201);
-    const id = (await res.json()).data.id;
-    expect(await shape(ctx.db, 'zvd_contacts', 'metadata', id)).toBe('object');
-    expect((await send(app, 'PATCH', `/contacts/${id}`, { metadata: { b: 2 } })).status).toBe(200);
-    expect(await shape(ctx.db, 'zvd_contacts', 'metadata', id)).toBe('object');
-  });
-
-  it('organizations: create and update', async () => {
-    const { app, ctx } = await mountForTest(import.meta.dir);
-    const res = await send(app, 'POST', '/organizations', { name: 'O', metadata: { a: 1 } });
-    expect(res.status).toBe(201);
-    const id = (await res.json()).data.id;
-    expect(await shape(ctx.db, 'zvd_organizations', 'metadata', id)).toBe('object');
-    expect((await send(app, 'PATCH', `/organizations/${id}`, { metadata: { b: 2 } })).status).toBe(200);
-    expect(await shape(ctx.db, 'zvd_organizations', 'metadata', id)).toBe('object');
-  });
-
   it('transactions: create and update', async () => {
     const { app, ctx } = await mountForTest(import.meta.dir);
     const res = await send(app, 'POST', '/transactions', {

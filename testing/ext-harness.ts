@@ -309,16 +309,32 @@ async function getDb(): Promise<any> {
   // A swallowed failure that turns into a distant, differently-shaped error is
   // the most expensive kind. So: demote the incumbent the way the engine's own
   // `createGodSession` does, then insert, then let a failure THROW.
-  await _pool.query(
+  await seatHarnessGodOn(_pool);
+  return _db;
+}
+
+async function seatHarnessGodOn(pool: any): Promise<void> {
+  await pool.query(
     `UPDATE "user" SET role = 'member'
        WHERE role = 'god' AND id <> '00000000-0000-4000-8000-00000000e001'`,
   );
-  await _pool.query(
+  await pool.query(
     `INSERT INTO "user" (id, name, email, "emailVerified", role, "createdAt", "updatedAt", "twoFactorEnabled")
      VALUES ('00000000-0000-4000-8000-00000000e001', 'Ext Harness', 'ext-harness-uuid@test.local', true, 'god', NOW(), NOW(), false)
      ON CONFLICT (id) DO UPDATE SET role = 'god'`,
   );
-  return _db;
+}
+
+/**
+ * Give the god seat back to the harness user. A suite that signs a god up
+ * through the engine harness (`createGodSession`) demotes the harness user, and
+ * every file is one process sharing one database: suites that run after it and
+ * assume the harness user is the instance owner (auth/scim, auth/saml) then
+ * act on an ordinary member. Call it from that suite's `afterAll`.
+ */
+export async function seatHarnessGod(): Promise<void> {
+  await getDb();
+  await seatHarnessGodOn(_pool);
 }
 afterAll(async () => {
   // Best-effort; bun runs afterAll per registering file, guard double-destroy.
