@@ -59,9 +59,32 @@ function isValidCui(value: string): boolean {
 }
 
 export function crmRoutes(ctx: ExtensionContext): Hono {
-  const { db, auth, checkPermission, events } = ctx;
+  const { db, auth, checkPermission, events, internals } = ctx;
 
   const app = new Hono();
+
+  /**
+   * Writes to `contacts` and `organizations` are the data API's own
+   * (`ctx.internals.createRecord` …), acting as the caller the engine's `/ext/*`
+   * gate admitted (transactions: see the note above their routes). They were raw SQL through `ctx.db`, which skipped
+   * everything the data API does around a write: the collection permission,
+   * column permissions, extension alters, entity access, hooks, `created_by`,
+   * revisions, webhooks, data flows, realtime and `record.*` events. An
+   * `on_create` flow on contacts never ran for a contact made from this page.
+   *
+   * So a write needs both: `crm:<action>` (the gate below) to use the CRM, and
+   * `<collection>:<action>` to write the collection's rows. The default roles
+   * hold both — the manifest declares all four resources — and god bypasses
+   * both. The `crm` grant alone no longer writes around a collection the
+   * operator refused.
+   *
+   * The data API's answer, in this route's `{ data }` envelope; its error body
+   * and status as they are.
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: Hono context
+  function answered(c: any, res: { status: number; body: unknown }): Response {
+    return res.status < 300 ? c.json({ data: res.body }, res.status) : c.json(res.body, res.status);
+  }
 
   /**
    * Per-request DB handle. Returns the tenant-isolated transaction
@@ -228,26 +251,17 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       organization_role: z.string().optional(),
     })),
     async (c) => {
-      const user = c.get('user') as any;
-      const d = c.req.valid('json');
-      const result = await sql`
-        INSERT INTO zvd_contacts
-          (first_name, last_name, email, phone, company, job_title, avatar_url,
-           tags, notes, source, metadata, created_by)
-        VALUES
-          (${d.first_name}, ${d.last_name ?? null}, ${d.email ?? null},
-           ${d.phone ?? null}, ${d.company ?? null}, ${d.job_title ?? null},
-           ${d.avatar_url ?? null}, ${d.tags ?? []}, ${d.notes ?? null},
-           ${d.source ?? null}, ${JSON.stringify(d.metadata ?? {})}::text::jsonb, ${user.id})
-        RETURNING *
-      `.execute(db);
-      const contact = result.rows[0] as any;
-      // Primary: it is the only membership a contact has when created.
-      if (d.organization_id) {
-        await linkContactOrganization(contact.id, d.organization_id, d.organization_role, true);
+      const { organization_id, organization_role, ...fields } = c.req.valid('json');
+      const res = await internals.createRecord(c, 'contacts', fields);
+      if (res.status >= 300) return answered(c, res);
+      const contact = res.body as { id: string };
+      // Primary: it is the only membership a contact has when created. Same
+      // request transaction as the insert, so a refused link takes it back.
+      if (organization_id) {
+        await linkContactOrganization(contact.id, organization_id, organization_role, true);
       }
       events.emit('contact.created', { id: contact.id, contact });
-      return c.json({ data: contact }, 201);
+      return answered(c, res);
     },
   );
 
@@ -272,35 +286,29 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       const id = c.req.param('id');
       const invalid = requireUuid(c, id);
       if (invalid) return invalid;
-      const sets: string[] = [];
-      const vals: any[] = [];
-      let i = 1;
-      for (const [k, v] of Object.entries(d)) {
-        // The membership lives in the join table, not in a column here. This
-        // UPDATE is built by walking the validated body, so anything accepted
-        // becomes a `SET` unless it is excluded — and `zvd_contacts` does carry
-        // an unused legacy `organization_id` column, so this would have written
-        // silently to the wrong place and still shown no organization.
-        if (k === 'organization_id' || k === 'organization_role') continue;
-        if (v !== undefined) { sets.push(k === 'metadata' ? `${k} = $${i++}::text::jsonb` : `${k} = $${i++}`); vals.push(k === 'metadata' ? JSON.stringify(v) : v); }
-      }
-      if (d.organization_id) {
-        await linkContactOrganization(id, d.organization_id, d.organization_role, true);
-      }
-      if (!sets.length) {
+      // The membership lives in the join table, not in a column here:
+      // `zvd_contacts` carries an unused legacy `organization_id` column, and
+      // writing it would show no organization anywhere.
+      const { organization_id, organization_role, ...fields } = d;
+      let contact: unknown;
+      if (Object.keys(fields).length) {
+        // Before the link, so a refused edit links nothing.
+        const res = await internals.updateRecord(c, 'contacts', id, fields);
+        if (res.status >= 300) return answered(c, res);
+        contact = res.body;
+        events.emit('contact.updated', { id, contact });
+      } else if (organization_id) {
         // Changing only the organization is a legitimate edit, so this is no
         // longer "nothing to update".
-        if (d.organization_id) {
-          const row = await sql`SELECT * FROM zvd_contacts WHERE id = ${id}`.execute(db);
-          if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
-          return c.json({ data: row.rows[0] });
-        }
+        const row = await sql`SELECT * FROM zvd_contacts WHERE id = ${id}`.execute(db);
+        if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
+        contact = row.rows[0];
+      } else {
         return c.json({ error: 'No fields to update' }, 400);
       }
-      const result = await db.executeQuery({ sql: `UPDATE zvd_contacts SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] } as any);
-      if (!(result as any).rows.length) return c.json({ error: 'Not found' }, 404);
-      const contact = (result as any).rows[0];
-      events.emit('contact.updated', { id: contact.id, contact });
+      if (organization_id) {
+        await linkContactOrganization(id, organization_id, organization_role, true);
+      }
       return c.json({ data: contact });
     },
   );
@@ -318,7 +326,8 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
     if (existing.rows[0].created_by !== user.id && !isAdmin) {
       return c.json({ error: 'Forbidden' }, 403);
     }
-    await sql`DELETE FROM zvd_contacts WHERE id = ${id}`.execute(db);
+    const res = await internals.deleteRecord(c, 'contacts', id);
+    if (res.status >= 300) return answered(c, res);
     events.emit('contact.deleted', { id });
     return c.json({ success: true });
   });
@@ -388,7 +397,6 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       metadata: z.record(z.string(), z.unknown()).optional(),
     })),
     async (c) => {
-      const user = c.get('user') as any;
       const d = c.req.valid('json');
       if (d.tax_id && !isValidCui(d.tax_id)) {
         return c.json(
@@ -396,21 +404,11 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
           400,
         );
       }
-      const result = await sql`
-        INSERT INTO zvd_organizations
-          (name, legal_name, tax_id, registration_no, type, industry,
-           website, email, phone, logo_url, tags, notes, metadata, created_by)
-        VALUES
-          (${d.name}, ${d.legal_name ?? null}, ${d.tax_id ?? null},
-           ${d.registration_no ?? null}, ${d.type}, ${d.industry ?? null},
-           ${d.website ?? null}, ${d.email ?? null}, ${d.phone ?? null},
-           ${d.logo_url ?? null}, ${d.tags ?? []}, ${d.notes ?? null},
-           ${JSON.stringify(d.metadata ?? {})}::text::jsonb, ${user.id})
-        RETURNING *
-      `.execute(db);
-      const organization = result.rows[0] as any;
+      const res = await internals.createRecord(c, 'organizations', d);
+      if (res.status >= 300) return answered(c, res);
+      const organization = res.body as { id: string };
       events.emit('organization.created', { id: organization.id, organization });
-      return c.json({ data: organization }, 201);
+      return answered(c, res);
     },
   );
 
@@ -434,18 +432,11 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       const id = c.req.param('id');
       const invalid = requireUuid(c, id);
       if (invalid) return invalid;
-      const sets: string[] = [];
-      const vals: any[] = [];
-      let i = 1;
-      for (const [k, v] of Object.entries(d)) {
-        if (v !== undefined) { sets.push(k === 'metadata' ? `${k} = $${i++}::text::jsonb` : `${k} = $${i++}`); vals.push(k === 'metadata' ? JSON.stringify(v) : v); }
-      }
-      if (!sets.length) return c.json({ error: 'No fields to update' }, 400);
-      const result = await db.executeQuery({ sql: `UPDATE zvd_organizations SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] } as any);
-      if (!(result as any).rows.length) return c.json({ error: 'Not found' }, 404);
-      const organization = (result as any).rows[0];
-      events.emit('organization.updated', { id: organization.id, organization });
-      return c.json({ data: organization });
+      if (!Object.keys(d).length) return c.json({ error: 'No fields to update' }, 400);
+      const res = await internals.updateRecord(c, 'organizations', id, d);
+      if (res.status >= 300) return answered(c, res);
+      events.emit('organization.updated', { id, organization: res.body });
+      return answered(c, res);
     },
   );
 
@@ -462,7 +453,8 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
     if (existing.rows[0].created_by !== user.id && !isAdmin) {
       return c.json({ error: 'Forbidden' }, 403);
     }
-    await sql`DELETE FROM zvd_organizations WHERE id = ${id}`.execute(db);
+    const res = await internals.deleteRecord(c, 'organizations', id);
+    if (res.status >= 300) return answered(c, res);
     events.emit('organization.deleted', { id });
     return c.json({ success: true });
   });
@@ -523,6 +515,13 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: row.rows[0] });
   });
 
+  // Still raw SQL, unlike contacts and organizations: `status` here is the
+  // transaction's business state (draft … refunded), and on a collection
+  // `status` is an engine system column the data API never writes (`RESERVED`
+  // in `db/dynamic.ts`, skipped by `introspectTable`). Through
+  // `createRecord` every transaction would land as the column default and a
+  // status change would be dropped. Resolving that is a schema decision (rename
+  // the column, or let a collection own its `status`), not a route change.
   app.post('/transactions',
     zValidator('json', z.object({
       type: z.enum(['invoice', 'payment', 'credit_note', 'expense', 'transfer', 'other']),
