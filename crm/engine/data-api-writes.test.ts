@@ -11,6 +11,7 @@
 // jsonb shape is still pinned by `jsonb-shape.test.ts`.
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
+import { seatHarnessGod } from '../../testing/ext-harness';
 
 // biome-ignore lint/suspicious/noExplicitAny: engine modules imported by path, and the packed bundle
 type Any = any;
@@ -127,6 +128,9 @@ d('crm writes go through the data API', () => {
   }, 60_000);
 
   afterAll(async () => {
+    // createGodSession took the god seat from the harness user; later suites
+    // (auth/scim, auth/saml) need it back.
+    await seatHarnessGod();
     if (!db) return;
     for (const id of Object.values(flowIds)) {
       await sql`DELETE FROM zv_flow_runs WHERE flow_id = ${id}::uuid`.execute(db).catch(() => undefined);

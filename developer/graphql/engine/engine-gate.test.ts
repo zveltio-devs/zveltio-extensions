@@ -11,6 +11,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
 import { applyOwnMigrations } from './test-utils';
+import { seatHarnessGod } from '../../../testing/ext-harness';
 
 // biome-ignore lint/suspicious/noExplicitAny: engine modules imported by path, and the packed bundle
 type Any = any;
@@ -136,6 +137,9 @@ d('developer/graphql — the engine read gate, not a copy of half of it', () => 
   }, 60_000);
 
   afterAll(async () => {
+    // createGodSession took the god seat from the harness user; later suites
+    // (auth/scim, auth/saml) need it back.
+    await seatHarnessGod();
     offHook();
     registries?.alter.unregisterAll(OWNER);
     registries?.entity.unregisterAll(OWNER);
