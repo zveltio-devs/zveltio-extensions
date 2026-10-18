@@ -25129,10 +25129,7 @@ var markPaid = async (input2, host) => {
   if (tx.status !== "draft" && tx.status !== "pending") {
     throw new ActionRefusal(409, "transaction_not_open", `A ${String(tx.status)} transaction cannot be marked paid.`);
   }
-  return host.collections.update("transactions", id, {
-    status: "completed",
-    paid_date: paid_date ?? new Date().toISOString().slice(0, 10)
-  });
+  return host.collections.update("transactions", id, { status: "completed", paid_date: paid_date ?? new Date().toISOString().slice(0, 10) }, { expect: { status: ["draft", "pending"] } });
 };
 var crmActions = { markPaid };
 

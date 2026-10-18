@@ -7,9 +7,9 @@ import { ActionRefusal, type ExtensionAction } from '@zveltio/sdk/extension';
  * with any status: settling one already completed, cancelled or refunded is
  * refused with 409, and one the caller cannot see answers 404.
  *
- * The check and the write are not atomic: `host.collections` has no
- * conditional update, so two concurrent calls on one open transaction both
- * succeed (same end state, two revisions).
+ * The status test is repeated as the update's precondition (`expect`), on the
+ * row locked for the write: of two concurrent calls on one open transaction,
+ * the second waits and is refused with 409 `precondition_failed`.
  *
  * The engine runs it as the caller, inside the request transaction, through
  * the data API (`host.collections`): the `transactions` collection permission,
@@ -26,10 +26,12 @@ const markPaid: ExtensionAction = async (input, host) => {
       `A ${String(tx.status)} transaction cannot be marked paid.`,
     );
   }
-  return host.collections.update('transactions', id, {
-    status: 'completed',
-    paid_date: paid_date ?? new Date().toISOString().slice(0, 10),
-  });
+  return host.collections.update(
+    'transactions',
+    id,
+    { status: 'completed', paid_date: paid_date ?? new Date().toISOString().slice(0, 10) },
+    { expect: { status: ['draft', 'pending'] } },
+  );
 };
 
 export const crmActions = { markPaid };
