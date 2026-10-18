@@ -217,6 +217,15 @@ d('crm writes go through the data API', () => {
     expect((await again.json()).code).toBe('transaction_not_open');
     expect(await revisions('transactions', txn.id)).toEqual(['create', 'update']);
 
+    // Two at once on an open transaction: one settles it, the other is refused.
+    const open = (await (await send('POST', '/transactions', { type: 'invoice', status: 'draft' })).json()).data;
+    const both = await Promise.all([
+      send('POST', '/actions/markPaid', { id: open.id }),
+      send('POST', '/actions/markPaid', { id: open.id }),
+    ]);
+    expect(both.map((r: Any) => r.status).sort()).toEqual([200, 409]);
+    expect(await revisions('transactions', open.id)).toEqual(['create', 'update']);
+
     const unknown = await send('POST', '/actions/markPaid', { id: crypto.randomUUID() });
     expect(unknown.status).toBe(404);
     for (const bad of [{ id: 'nope' }, { id: txn.id, x: 1 }, { id: txn.id, paid_date: '2026-02-30' }]) {
