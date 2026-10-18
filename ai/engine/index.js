@@ -10323,11 +10323,11 @@ async function createCacheSecondaryStorage() {
   const storage = {
     get: async (key, _ttl) => parse6(await cache.get(key)),
     getAndDelete: async (key) => parse6(await cache.getdel(key)),
-    set: async (key, value, ttl = 300) => {
-      await cache.setex(key, ttl, JSON.stringify(value));
-    },
-    setnx: async (key, value, ttl = 300) => {
-      await cache.set(key, JSON.stringify(value), "EX", ttl, "NX");
+    set: async (key, value, ttl) => {
+      if (ttl)
+        await cache.setex(key, ttl, JSON.stringify(value));
+      else
+        await cache.set(key, JSON.stringify(value));
     },
     delete: async (key) => {
       await cache.del(key);
@@ -10337,22 +10337,6 @@ async function createCacheSecondaryStorage() {
       if (n === 1)
         await cache.expire(key, ttl);
       return n;
-    },
-    pipeline: async (operations) => {
-      const pipe2 = cache.pipeline();
-      for (const op of operations) {
-        if (op.type === "get") {
-          pipe2.get(op.key);
-        } else if (op.type === "set") {
-          pipe2.setex(op.key, op.ttl || 300, JSON.stringify(op.value));
-        } else if (op.type === "del") {
-          pipe2.del(op.key);
-        }
-      }
-      const results = await pipe2.exec();
-      if (!results)
-        return [];
-      return results.map((r) => r[0] ? null : r[1]);
     }
   };
   return storage;
@@ -36613,7 +36597,7 @@ function aiQueryRoutes(ctx) {
         const fields = typeof col.fields === "string" ? JSON.parse(col.fields) : col.fields ?? [];
         const fieldList = fields.map((f) => `${f.name} (${f.type}${f.required ? ", required" : ""})`).join(", ");
         return `Table: zvd_${col.name} (${col.display_name || col.name})
-  Fields: id (uuid, PK), ${fieldList}, created_at (timestamp), updated_at (timestamp), status (text), created_by (uuid)`;
+  Fields: id (uuid, PK), ${fieldList}, created_at (timestamp), updated_at (timestamp), created_by (uuid)`;
       }).join(`
 
 `);

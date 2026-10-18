@@ -66,7 +66,7 @@ async function runExportJob(
     const allowedFields = new Set<string>(
       (collectionDef?.fields ?? []).map((f: any) => f.name),
     );
-    ['id', 'created_at', 'updated_at', 'status', 'created_by', 'updated_by'].forEach(
+    ['id', 'created_at', 'updated_at', 'created_by', 'updated_by'].forEach(
       (f) => allowedFields.add(f),
     );
 
@@ -510,7 +510,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
       const allowedFields = new Set<string>(
         (collectionDef?.fields ?? []).map((f: any) => f.name),
       );
-      ['id', 'created_at', 'updated_at', 'status', 'created_by', 'updated_by'].forEach(
+      ['id', 'created_at', 'updated_at', 'created_by', 'updated_by'].forEach(
         (f) => allowedFields.add(f),
       );
 

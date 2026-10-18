@@ -24591,7 +24591,7 @@ async function runExportJob(ctx, tenantId, jobId, collection, format, filters, f
       const tableName = DDLManager.getTableName(collection);
       const collectionDef = await DDLManager.getCollection(tdb, collection);
       const allowedFields = new Set((collectionDef?.fields ?? []).map((f) => f.name));
-      ["id", "created_at", "updated_at", "status", "created_by", "updated_by"].forEach((f) => allowedFields.add(f));
+      ["id", "created_at", "updated_at", "created_by", "updated_by"].forEach((f) => allowedFields.add(f));
       let query = tdb.selectFrom(tableName);
       const allCols = [...allowedFields];
       const requested = fields.length > 0 ? allCols.filter((f) => fields.includes(f)) : allCols;
@@ -24843,7 +24843,7 @@ function exportRoutes(ctx) {
     const tableName = DDLManager.getTableName(collection);
     const collectionDef = await DDLManager.getCollection(db, collection);
     const allowedFields = new Set((collectionDef?.fields ?? []).map((f) => f.name));
-    ["id", "created_at", "updated_at", "status", "created_by", "updated_by"].forEach((f) => allowedFields.add(f));
+    ["id", "created_at", "updated_at", "created_by", "updated_by"].forEach((f) => allowedFields.add(f));
     const { getColumnAccess, resolveUserRole, getRlsFilters, applyRlsFilters } = ctx.internals;
     const colAccess = await getColumnAccess(collection, await resolveUserRole(user));
     for (const f of colAccess.hidden)
