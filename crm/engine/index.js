@@ -14,7 +14,7 @@ var __export = (target, all) => {
     });
 };
 
-// engine/index.ts
+// ../../../zveltio-extensions/crm/engine/index.ts
 import { join } from "path";
 
 // /zveltio-extension/node_modules/kysely/dist/util/object-utils.js
@@ -4928,30 +4928,6 @@ var Hono2 = class extends Hono {
   }
 };
 
-// /zveltio-extension/node_modules/hono/dist/http-exception.js
-var HTTPException2 = class extends Error {
-  res;
-  status;
-  constructor(status = 500, options) {
-    super(options?.message, { cause: options?.cause });
-    this.res = options?.res;
-    this.status = status;
-  }
-  getResponse() {
-    if (this.res)
-      return new Response(this.res.body, {
-        status: this.status,
-        headers: this.res.headers
-      });
-    return new Response(this.message, { status: this.status });
-  }
-};
-
-// /zveltio-extension/node_modules/hono/dist/utils/buffer.js
-var bufferToFormData2 = (arrayBuffer, contentType) => {
-  return new Response(arrayBuffer, { headers: { "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase()) } }).formData();
-};
-
 // /zveltio-extension/node_modules/hono/dist/utils/url.js
 var tryDecode2 = (str, decoder) => {
   try {
@@ -4977,37 +4953,44 @@ var trimCookieWhitespace = (value) => {
   let end = value.length;
   while (start < end) {
     const charCode = value.charCodeAt(start);
-    if (charCode !== 32 && charCode !== 9)
+    if (charCode !== 32 && charCode !== 9) {
       break;
+    }
     start++;
   }
   while (end > start) {
     const charCode = value.charCodeAt(end - 1);
-    if (charCode !== 32 && charCode !== 9)
+    if (charCode !== 32 && charCode !== 9) {
       break;
+    }
     end--;
   }
   return start === 0 && end === value.length ? value : value.slice(start, end);
 };
 var parse = (cookie, name) => {
-  if (name && cookie.indexOf(name) === -1)
+  if (name && cookie.indexOf(name) === -1) {
     return {};
+  }
   const pairs = cookie.split(";");
-  const parsedCookie = Object.create(null);
+  const parsedCookie = /* @__PURE__ */ Object.create(null);
   for (const pairStr of pairs) {
     const valueStartPos = pairStr.indexOf("=");
-    if (valueStartPos === -1)
+    if (valueStartPos === -1) {
       continue;
+    }
     const cookieName = trimCookieWhitespace(pairStr.substring(0, valueStartPos));
-    if (name && name !== cookieName || !relaxedCookieNameRegEx.test(cookieName) || cookieName in parsedCookie)
+    if (name && name !== cookieName || !relaxedCookieNameRegEx.test(cookieName) || cookieName in parsedCookie) {
       continue;
+    }
     let cookieValue = trimCookieWhitespace(pairStr.substring(valueStartPos + 1));
-    if (cookieValue.startsWith('"') && cookieValue.endsWith('"'))
+    if (cookieValue.startsWith('"') && cookieValue.endsWith('"')) {
       cookieValue = cookieValue.slice(1, -1);
+    }
     if (validCookieValueRegEx.test(cookieValue)) {
       parsedCookie[cookieName] = tryDecodeURIComponent2(cookieValue);
-      if (name)
+      if (name) {
         break;
+      }
     }
   }
   return parsedCookie;
@@ -5017,18 +5000,56 @@ var parse = (cookie, name) => {
 var getCookie = (c, key, prefix) => {
   const cookie = c.req.raw.headers.get("Cookie");
   if (typeof key === "string") {
-    if (!cookie)
+    if (!cookie) {
       return;
+    }
     let finalKey = key;
-    if (prefix === "secure")
+    if (prefix === "secure") {
       finalKey = "__Secure-" + key;
-    else if (prefix === "host")
+    } else if (prefix === "host") {
       finalKey = "__Host-" + key;
-    return parse(cookie, finalKey)[finalKey];
+    }
+    const obj2 = parse(cookie, finalKey);
+    return obj2[finalKey];
   }
-  if (!cookie)
+  if (!cookie) {
     return {};
-  return parse(cookie);
+  }
+  const obj = parse(cookie);
+  return obj;
+};
+
+// /zveltio-extension/node_modules/hono/dist/http-exception.js
+var HTTPException2 = class extends Error {
+  res;
+  status;
+  constructor(status = 500, options) {
+    super(options?.message, { cause: options?.cause });
+    this.res = options?.res;
+    this.status = status;
+  }
+  getResponse() {
+    if (this.res) {
+      const newResponse = new Response(this.res.body, {
+        status: this.status,
+        headers: this.res.headers
+      });
+      return newResponse;
+    }
+    return new Response(this.message, {
+      status: this.status
+    });
+  }
+};
+
+// /zveltio-extension/node_modules/hono/dist/utils/buffer.js
+var bufferToFormData2 = (arrayBuffer, contentType) => {
+  const response = new Response(arrayBuffer, {
+    headers: {
+      "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase())
+    }
+  });
+  return response.formData();
 };
 
 // /zveltio-extension/node_modules/hono/dist/validator/validator.js
@@ -5041,21 +5062,24 @@ var validator = (target, validationFunc) => {
     const contentType = c.req.header("Content-Type");
     switch (target) {
       case "json":
-        if (!contentType || !jsonRegex.test(contentType))
+        if (!contentType || !jsonRegex.test(contentType)) {
           break;
+        }
         try {
           value = await c.req.json();
         } catch {
-          throw new HTTPException2(400, { message: "Malformed JSON in request body" });
+          const message = "Malformed JSON in request body";
+          throw new HTTPException2(400, { message });
         }
         break;
       case "form": {
-        if (!contentType || !(multipartRegex.test(contentType) || urlencodedRegex.test(contentType)))
+        if (!contentType || !(multipartRegex.test(contentType) || urlencodedRegex.test(contentType))) {
           break;
+        }
         let formData;
-        if (c.req.bodyCache.formData)
+        if (c.req.bodyCache.formData) {
           formData = await c.req.bodyCache.formData;
-        else
+        } else {
           try {
             const arrayBuffer = await c.req.arrayBuffer();
             formData = await bufferToFormData2(arrayBuffer, contentType);
@@ -5065,16 +5089,18 @@ var validator = (target, validationFunc) => {
             message += e instanceof Error ? ` ${e.message}` : ` ${String(e)}`;
             throw new HTTPException2(400, { message });
           }
-        const form = Object.create(null);
+        }
+        const form = /* @__PURE__ */ Object.create(null);
         formData.forEach((value2, key) => {
-          if (key.endsWith("[]"))
+          if (key.endsWith("[]")) {
             (form[key] ??= []).push(value2);
-          else if (Array.isArray(form[key]))
+          } else if (Array.isArray(form[key])) {
             form[key].push(value2);
-          else if (Object.hasOwn(form, key))
+          } else if (Object.hasOwn(form, key)) {
             form[key] = [form[key], value2];
-          else
+          } else {
             form[key] = value2;
+          }
         });
         value = form;
         break;
@@ -5092,10 +5118,12 @@ var validator = (target, validationFunc) => {
         break;
       case "cookie":
         value = getCookie(c);
+        break;
     }
     const res = await validationFunc(value, c);
-    if (res instanceof Response)
+    if (res instanceof Response) {
       return res;
+    }
     c.req.addValidatedData(target, res);
     return await next();
   };
@@ -24499,7 +24527,7 @@ function bigint3(params) {
 function date4(params) {
   return _coercedDate(ZodDate, params);
 }
-// /zveltio-extension/packages/sdk/src/extension/permission-gate.ts
+// ../sdk/src/extension/permission-gate.ts
 async function refuse(ctx, c, resource, action) {
   let denial = null;
   try {
@@ -24567,7 +24595,21 @@ function permissionGate(ctx, resource, opts = {}) {
     await next();
   };
 }
-// engine/briefing.ts
+// ../sdk/src/extension/action-refusal.ts
+var ACTION_REFUSAL = Symbol.for("zveltio.extension.action-refusal");
+
+class ActionRefusal extends Error {
+  status;
+  code;
+  [ACTION_REFUSAL] = true;
+  constructor(status, code, message) {
+    super(message);
+    this.status = status;
+    this.code = code;
+    this.name = "ActionRefusal";
+  }
+}
+// ../../../zveltio-extensions/crm/engine/briefing.ts
 var SETTLED = ["completed", "cancelled", "refunded"];
 async function receivables(db) {
   const empty = { overdue: [], oldestOverdueDays: null, dueSoon: [] };
@@ -24614,7 +24656,7 @@ async function receivables(db) {
   }
 }
 
-// engine/routes.ts
+// ../../../zveltio-extensions/crm/engine/routes.ts
 var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function requireUuid(c, id) {
   if (UUID_RE.test(id))
@@ -25035,7 +25077,7 @@ function crmRoutes(ctx) {
   return app;
 }
 
-// engine/adopt.ts
+// ../../../zveltio-extensions/crm/engine/adopt.ts
 var CRM_COLLECTIONS = [
   { name: "contacts", displayName: "Contacts", icon: "Users", singularName: "Contact" },
   {
@@ -25078,11 +25120,28 @@ async function adoptCrmCollections(ctx) {
   }
 }
 
-// engine/index.ts
+// ../../../zveltio-extensions/crm/engine/actions.ts
+var markPaid = async (input2, host) => {
+  const { id, paid_date } = input2;
+  const tx = await host.collections.read("transactions", id);
+  if (!tx)
+    throw new ActionRefusal(404, "transaction_not_found", "No such transaction.");
+  if (tx.status !== "draft" && tx.status !== "pending") {
+    throw new ActionRefusal(409, "transaction_not_open", `A ${String(tx.status)} transaction cannot be marked paid.`);
+  }
+  return host.collections.update("transactions", id, {
+    status: "completed",
+    paid_date: paid_date ?? new Date().toISOString().slice(0, 10)
+  });
+};
+var crmActions = { markPaid };
+
+// ../../../zveltio-extensions/crm/engine/index.ts
 var extension = {
   name: "crm",
   category: "business",
   mountStrategy: "subapp",
+  actions: crmActions,
   getMigrations() {
     return [
       join(import.meta.dir, "migrations/001_initial.sql"),

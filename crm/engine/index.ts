@@ -3,6 +3,7 @@ import { join } from 'path';
 import { sql } from 'kysely';
 import { crmRoutes } from './routes.js';
 import { adoptCrmCollections } from './adopt.js';
+import { crmActions } from './actions.js';
 
 /**
  * CRM extension — canonical owner of `zvd_contacts`, `zvd_organizations`,
@@ -33,6 +34,8 @@ const extension: ZveltioExtension = {
   // S3-01: sub-app mounted at /ext/crm by the engine. Internal routes
   // (/contacts, /organizations, /transactions) are exposed under that prefix.
   mountStrategy: 'subapp',
+
+  actions: crmActions,
 
   getMigrations() {
     return [

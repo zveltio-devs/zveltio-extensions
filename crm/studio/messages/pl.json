@@ -1,4 +1,5 @@
 {
+  "crm.action.markPaid": "Oznacz jako opłaconą",
   "crm.col.amount": "Kwota",
   "crm.col.city": "Miasto",
   "crm.col.closeDate": "Data zamknięcia",

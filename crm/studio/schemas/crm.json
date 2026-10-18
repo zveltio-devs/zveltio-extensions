@@ -341,6 +341,15 @@
           "method": "DELETE",
           "endpoint": "/ext/crm/transactions/{id}",
           "confirm": "ext.confirmDelete"
+        },
+        {
+          "id": "markPaid",
+          "icon": "CheckCircle",
+          "label": "crm.action.markPaid",
+          "method": "POST",
+          "endpoint": "/ext/crm/actions/markPaid",
+          "body": { "id": "{id}" },
+          "visibleWhen": { "field": "status", "in": ["draft", "pending"] }
         }
       ],
       "form": {

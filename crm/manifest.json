@@ -3,8 +3,8 @@
   "displayName": "CRM",
   "category": "business",
   "description": "Contacts, Organizations, and Transactions — owned by this extension, not the engine core",
-  "version": "1.0.13",
-  "zveltioMinVersion": "1.0.0",
+  "version": "1.0.14",
+  "zveltioMinVersion": "3.0.0-beta.84",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-crm",
   "permissions": [
@@ -42,13 +42,45 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "4bd234690bd31b8f5798ef90503df882732fc678ecc7e09bcf108be061e35880",
-    "sourceSha256": "369bbf9290d2a293de2d22ac80144d42caa0c2475336ff17e147f5039c5a5c1b"
+    "engineSha256": "4ddd5ef907315fa312e3782e768ed857dcb2e06be817209064521c126cb3bff3",
+    "sourceSha256": "1bda6c387d6c79b850632c574270b7040a0ad7650cd5057f45798389009a48a1"
   },
   "resources": [
     "crm",
     "contacts",
     "organizations",
     "transactions"
+  ],
+  "actions": [
+    {
+      "name": "markPaid",
+      "permission": {
+        "resource": "transactions",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paid_date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "reads": [
+        "transactions"
+      ],
+      "writes": [
+        "transactions"
+      ]
+    }
   ]
 }
