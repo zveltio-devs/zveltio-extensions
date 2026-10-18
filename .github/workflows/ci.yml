@@ -332,6 +332,12 @@ jobs:
           BASE_URL: http://127.0.0.1:3000
           TEST_EMAIL: probe@test.invalid
           TEST_PASS: ProbePass123!
+          # Both probes enable extensions, which needs the god's step-up. The
+          # first enrolls a soft passkey and saves it here; the second reuses it.
+          PROBE_PASSKEY_FILE: ${{ runner.temp }}/probe-passkey.json
+          # Every enable is a step-up (options + verify on /api/auth/*): ~120
+          # auth requests from one address, past the auth rate limit.
+          RATE_LIMIT_ALLOWLIST: 127.0.0.1/32,::1/128
         run: |
           set -e
           cd ../zveltio
