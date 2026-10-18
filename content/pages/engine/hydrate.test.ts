@@ -266,7 +266,7 @@ describe('authenticated callers', () => {
     expect(out.content._data).toHaveLength(1);
   });
 
-  test('getColumnAccess is called with (collection, role, userId) — not the engine spelling', async () => {
+  test('getColumnAccess is called with (collection, role, principal) — not the engine spelling', async () => {
     const seen: unknown[][] = [];
     const { db } = makeDb({ collections: ['contacts'] });
     await resolveBlocks(
@@ -298,7 +298,8 @@ describe('authenticated callers', () => {
     // `data:view_all_columns` for that identity, which is how a god sees every
     // column here as it does everywhere else; without it even a god is masked,
     // because there is no identity to resolve the permission for.
-    expect(seen[0]?.[2]).toBe('u1');
+    // The principal itself, so an API key arrives with its issuer.
+    expect(seen[0]?.[2]).toEqual({ id: 'u1', role: 'member' });
     expect(seen[0]).toHaveLength(3);
   });
 
