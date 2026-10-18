@@ -1,4 +1,5 @@
 {
+  "crm.action.markPaid": "Als bezahlt markieren",
   "crm.col.amount": "Betrag",
   "crm.col.city": "Stadt",
   "crm.col.closeDate": "Abschlussdatum",

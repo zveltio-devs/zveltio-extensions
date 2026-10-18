@@ -75,6 +75,8 @@ d('crm writes go through the data API', () => {
     const { sessionPrefetch } = (await import(join(ENGINE, 'middleware', 'session-prefetch.js'))) as Any;
     const { tenantMiddleware } = (await import(join(ENGINE, 'middleware', 'tenant.js'))) as Any;
     const gate = (await import(join(ENGINE, 'middleware', 'extension-auth-gate.js'))) as Any;
+    const actions = (await import(join(ENGINE, 'lib', 'extensions', 'actions.js'))) as Any;
+    const { problemOnError } = (await import(join(ENGINE, 'lib', 'problem.js'))) as Any;
 
     ({ app: engineApp, db } = await harness.getTestApp());
     godCookie = await harness.createGodSession(engineApp, db);
@@ -119,11 +121,14 @@ d('crm writes go through the data API', () => {
     };
     const { Hono } = (await import(join(import.meta.dir, '..', '..', 'node_modules', 'hono', 'dist', 'index.js'))) as Any;
     app = new Hono();
+    app.onError(problemOnError);
     app.use('/ext/*', sessionPrefetch(getAuth(), db));
     app.use('/ext/*', tenantMiddleware);
     app.use('/ext/*', gate.extensionAuthGate(getAuth(), db));
     gate.registerExtensionPublicRoutes('crm', []);
     const sub = new Hono();
+    // As the engine's loader does: the manifest's actions, mounted ahead of register().
+    actions.mountActions(sub, 'crm', actions.compileActions('crm', manifest, mod.default, false), ctx);
     await mod.default.register(sub, ctx);
     app.route('/ext/crm', sub);
   }, 60_000);
@@ -195,6 +200,28 @@ d('crm writes go through the data API', () => {
     expect((await send('PATCH', `/transactions/${crypto.randomUUID()}`, { status: 'draft' })).status).toBe(404);
     expect((await send('DELETE', `/transactions/${txn.id}`, undefined)).status).toBe(200);
     expect(await revisions('transactions', txn.id)).toEqual(['create', 'update', 'delete']);
+  });
+
+  it('markPaid settles an open transaction once, and refuses one already settled', async () => {
+    const created = await send('POST', '/transactions', { type: 'invoice', status: 'pending', amount: 5 });
+    const txn = (await created.json()).data;
+    const paid = await send('POST', '/actions/markPaid', { id: txn.id, paid_date: '2026-10-01' });
+    expect(paid.status).toBe(200);
+    expect((await paid.json()).result).toMatchObject({ id: txn.id, status: 'completed' });
+    const row = (await sql`SELECT status, paid_date::text AS paid_date FROM zvd_transactions WHERE id = ${txn.id}`.execute(db)).rows[0];
+    expect(row).toEqual({ status: 'completed', paid_date: '2026-10-01' });
+    expect(await revisions('transactions', txn.id)).toEqual(['create', 'update']);
+
+    const again = await send('POST', '/actions/markPaid', { id: txn.id });
+    expect(again.status).toBe(409);
+    expect((await again.json()).code).toBe('transaction_not_open');
+    expect(await revisions('transactions', txn.id)).toEqual(['create', 'update']);
+
+    const unknown = await send('POST', '/actions/markPaid', { id: crypto.randomUUID() });
+    expect(unknown.status).toBe(404);
+    for (const bad of [{ id: 'nope' }, { id: txn.id, x: 1 }, { id: txn.id, paid_date: '2026-02-30' }]) {
+      expect((await send('POST', '/actions/markPaid', bad)).status).toBe(400);
+    }
   });
 
   it('a contact keeps metadata as jsonb', async () => {

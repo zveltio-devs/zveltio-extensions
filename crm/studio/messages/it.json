@@ -1,4 +1,5 @@
 {
+  "crm.action.markPaid": "Segna come pagata",
   "crm.col.amount": "Importo",
   "crm.col.city": "Città",
   "crm.col.closeDate": "Data di chiusura",

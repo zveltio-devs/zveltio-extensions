@@ -109,5 +109,6 @@
   "briefing.dueSoon": "{count} due in the next 7 days",
   "briefing.oldestDays": "oldest {days} days",
   "briefing.overdueCount": "{count} overdue invoices",
-  "briefing.owedTitle": "You are owed"
+  "briefing.owedTitle": "You are owed",
+  "crm.action.markPaid": "Mark paid"
 }
