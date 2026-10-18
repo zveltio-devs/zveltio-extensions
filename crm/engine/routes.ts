@@ -64,9 +64,9 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
   const app = new Hono();
 
   /**
-   * Writes to `contacts` and `organizations` are the data API's own
+   * Writes to `contacts`, `organizations` and `transactions` are the data API's own
    * (`ctx.internals.createRecord` …), acting as the caller the engine's `/ext/*`
-   * gate admitted (transactions: see the note above their routes). They were raw SQL through `ctx.db`, which skipped
+   * gate admitted. They were raw SQL through `ctx.db`, which skipped
    * everything the data API does around a write: the collection permission,
    * column permissions, extension alters, entity access, hooks, `created_by`,
    * revisions, webhooks, data flows, realtime and `record.*` events. An
@@ -515,13 +515,6 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
     return c.json({ data: row.rows[0] });
   });
 
-  // Still raw SQL, unlike contacts and organizations: `status` here is the
-  // transaction's business state (draft … refunded), and on a collection
-  // `status` is an engine system column the data API never writes (`RESERVED`
-  // in `db/dynamic.ts`, skipped by `introspectTable`). Through
-  // `createRecord` every transaction would land as the column default and a
-  // status change would be dropped. Resolving that is a schema decision (rename
-  // the column, or let a collection own its `status`), not a route change.
   app.post('/transactions',
     zValidator('json', z.object({
       type: z.enum(['invoice', 'payment', 'credit_note', 'expense', 'transfer', 'other']),
@@ -541,24 +534,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       metadata: z.record(z.string(), z.unknown()).optional(),
     })),
     async (c) => {
-      const user = c.get('user') as any;
-      const d = c.req.valid('json');
-      const result = await sql`
-        INSERT INTO zvd_transactions
-          (type, status, number, organization_id, contact_id, currency,
-           amount, tax_amount, total_amount, due_date, paid_date,
-           line_items, notes, reference, metadata, created_by)
-        VALUES
-          (${d.type}, ${d.status}, ${d.number ?? null},
-           ${d.organization_id ?? null}, ${d.contact_id ?? null}, ${d.currency},
-           ${d.amount}, ${d.tax_amount}, ${d.total_amount},
-           ${d.due_date ?? null}, ${d.paid_date ?? null},
-           ${JSON.stringify(d.line_items ?? [])}::text::jsonb,
-           ${d.notes ?? null}, ${d.reference ?? null},
-           ${JSON.stringify(d.metadata ?? {})}::text::jsonb, ${user.id})
-        RETURNING *
-      `.execute(db);
-      return c.json({ data: result.rows[0] }, 201);
+      return answered(c, await internals.createRecord(c, 'transactions', c.req.valid('json')));
     },
   );
 
@@ -581,23 +557,8 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       const id = c.req.param('id');
       const invalid = requireUuid(c, id);
       if (invalid) return invalid;
-      const sets: string[] = [];
-      const vals: any[] = [];
-      let i = 1;
-      for (const [k, v] of Object.entries(d)) {
-        if (v !== undefined) {
-          // `::text::jsonb`, not a bare parameter: Bun.SQL types a string bound
-          // into a jsonb column as json, so the column would hold a STRING whose
-          // text is the JSON (see migration 007).
-          const json = k === 'metadata' || k === 'line_items';
-          sets.push(json ? `${k} = $${i++}::text::jsonb` : `${k} = $${i++}`);
-          vals.push(json ? JSON.stringify(v) : v);
-        }
-      }
-      if (!sets.length) return c.json({ error: 'No fields to update' }, 400);
-      const result = await db.executeQuery({ sql: `UPDATE zvd_transactions SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] } as any);
-      if (!(result as any).rows.length) return c.json({ error: 'Not found' }, 404);
-      return c.json({ data: (result as any).rows[0] });
+      if (!Object.keys(d).length) return c.json({ error: 'No fields to update' }, 400);
+      return answered(c, await internals.updateRecord(c, 'transactions', id, d));
     },
   );
 
@@ -614,7 +575,8 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
     if (existing.rows[0].created_by !== user.id && !isAdmin) {
       return c.json({ error: 'Forbidden' }, 403);
     }
-    await sql`DELETE FROM zvd_transactions WHERE id = ${id}`.execute(db);
+    const res = await internals.deleteRecord(c, 'transactions', id);
+    if (res.status >= 300) return answered(c, res);
     return c.json({ success: true });
   });
 

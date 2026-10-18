@@ -24988,24 +24988,7 @@ function crmRoutes(ctx) {
     reference: exports_external.string().optional(),
     metadata: exports_external.record(exports_external.string(), exports_external.unknown()).optional()
   })), async (c) => {
-    const user = c.get("user");
-    const d = c.req.valid("json");
-    const result = await sql`
-        INSERT INTO zvd_transactions
-          (type, status, number, organization_id, contact_id, currency,
-           amount, tax_amount, total_amount, due_date, paid_date,
-           line_items, notes, reference, metadata, created_by)
-        VALUES
-          (${d.type}, ${d.status}, ${d.number ?? null},
-           ${d.organization_id ?? null}, ${d.contact_id ?? null}, ${d.currency},
-           ${d.amount}, ${d.tax_amount}, ${d.total_amount},
-           ${d.due_date ?? null}, ${d.paid_date ?? null},
-           ${JSON.stringify(d.line_items ?? [])}::text::jsonb,
-           ${d.notes ?? null}, ${d.reference ?? null},
-           ${JSON.stringify(d.metadata ?? {})}::text::jsonb, ${user.id})
-        RETURNING *
-      `.execute(db);
-    return c.json({ data: result.rows[0] }, 201);
+    return answered(c, await internals.createRecord(c, "transactions", c.req.valid("json")));
   });
   app.patch("/transactions/:id", zValidator("json", exports_external.object({
     status: exports_external.enum(["draft", "pending", "completed", "cancelled", "refunded"]).optional(),
@@ -25025,22 +25008,9 @@ function crmRoutes(ctx) {
     const invalid = requireUuid(c, id);
     if (invalid)
       return invalid;
-    const sets = [];
-    const vals = [];
-    let i = 1;
-    for (const [k, v] of Object.entries(d)) {
-      if (v !== undefined) {
-        const json2 = k === "metadata" || k === "line_items";
-        sets.push(json2 ? `${k} = $${i++}::text::jsonb` : `${k} = $${i++}`);
-        vals.push(json2 ? JSON.stringify(v) : v);
-      }
-    }
-    if (!sets.length)
+    if (!Object.keys(d).length)
       return c.json({ error: "No fields to update" }, 400);
-    const result = await db.executeQuery({ sql: `UPDATE zvd_transactions SET ${sets.join(", ")}, updated_at = NOW() WHERE id = $${i} RETURNING *`, parameters: [...vals, id] });
-    if (!result.rows.length)
-      return c.json({ error: "Not found" }, 404);
-    return c.json({ data: result.rows[0] });
+    return answered(c, await internals.updateRecord(c, "transactions", id, d));
   });
   app.delete("/transactions/:id", async (c) => {
     const user = c.get("user");
@@ -25057,7 +25027,9 @@ function crmRoutes(ctx) {
     if (existing.rows[0].created_by !== user.id && !isAdmin) {
       return c.json({ error: "Forbidden" }, 403);
     }
-    await sql`DELETE FROM zvd_transactions WHERE id = ${id}`.execute(db);
+    const res = await internals.deleteRecord(c, "transactions", id);
+    if (res.status >= 300)
+      return answered(c, res);
     return c.json({ success: true });
   });
   return app;
