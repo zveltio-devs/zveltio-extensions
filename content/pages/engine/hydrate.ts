@@ -301,7 +301,11 @@ async function resolveWithViewer(
     // `data:view_all_columns` for that identity. Omitting it means no
     // exemption at all, which is the refusing direction but would mask a god.
     //
-    // `ctx.internals.getColumnAccess` takes (collection, role, userId?) — the host
+    // The acting principal goes whole, not its id: an API key's columns are
+    // bounded by its issuer's, and its bare `apikey:<id>` names no issuer, so
+    // the host would mask every column (engine 3.0.0-beta.83).
+    //
+    // `ctx.internals.getColumnAccess` takes (collection, role, who?) — the host
     // resolves the db handle itself. Portals called it as
     // `getColumnAccess(db, collection, role)`, the engine-side spelling, so the
     // handle arrived as the collection name and the collection name as the
@@ -311,7 +315,7 @@ async function resolveWithViewer(
     // `any`, so nothing said so.
     const role = await deps.engine.resolveUserRole(audience.user ?? {});
     const colAccess = await deps.engine
-      .getColumnAccess(meta.name, role, audience.user?.id);
+      .getColumnAccess(meta.name, role, audience.user ?? undefined);
     const visible = [...shown].filter((c) => !colAccess?.hidden?.has(c));
 
     const sortField =
@@ -505,7 +509,7 @@ export async function resolveRecord(
 
   const role = await deps.engine.resolveUserRole(audience.user ?? {});
   const colAccess = await deps.engine
-      .getColumnAccess(meta.name, role, audience.user?.id);
+      .getColumnAccess(meta.name, role, audience.user ?? undefined);
   return colAccess ? deps.engine.applyColumnAccess(row, colAccess) : row;
 }
 
