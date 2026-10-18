@@ -64,7 +64,6 @@ d('developer/graphql — API keys get the data API key semantics', () => {
 
     ({ app: engineApp, db } = await harness.getTestApp());
     cookie = await harness.createGodSession(engineApp, db);
-    issuer = (await harness.createMemberSession(engineApp, db, { grants: [] })).userId;
     makeKey = async (scopes) => {
       const raw = generateApiKey();
       // tenant_id named: since engine migration 065 there is no root-tenant default.
@@ -84,6 +83,17 @@ d('developer/graphql — API keys get the data API key semantics', () => {
       }
     }
     await applyOwnMigrations((q) => sql.raw(q).execute(db));
+    // After the collections: a create refuses a name that already has rules.
+    // The issuer holds A and B: since engine 3.0.0-beta.83 a key never exceeds
+    // its issuer's rights, so what keeps the key off B below is its own scope.
+    issuer = (
+      await harness.createMemberSession(engineApp, db, {
+        grants: [
+          { collection: A, actions: ['read', 'create', 'update'] },
+          { collection: B, actions: ['read', 'create', 'update'] },
+        ],
+      })
+    ).userId;
 
     const insert = async (table: string, row: Record<string, string>) =>
       (await db.insertInto(table).values(row).returning('id').executeTakeFirstOrThrow()).id as string;

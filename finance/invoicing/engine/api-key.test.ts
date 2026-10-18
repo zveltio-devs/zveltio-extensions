@@ -60,7 +60,10 @@ d('invoicing: API key on apiKeyRoutes', () => {
     });
     // No session at all; the extension's checks go through what the engine hands it.
     ext = await mountForTest(new URL('.', import.meta.url).pathname, { authed: false });
-    ext.ctx.checkPermission = keyAwareCheckPermission(NAME, async () => false);
+    // Casbin as the engine holds it: nothing for `apikey:<uuid>`, and the issuer
+    // holds the invoicing it issued the key for (since engine 3.0.0-beta.83 a key
+    // never exceeds its issuer's rights).
+    ext.ctx.checkPermission = keyAwareCheckPermission(NAME, async (who: string) => who === ISSUER);
     const manifest = JSON.parse(readFileSync(new URL('../manifest.json', import.meta.url), 'utf8'));
     registerExtensionPublicRoutes(NAME, manifest.publicRoutes ?? [], manifest.apiKeyRoutes ?? []);
   });
