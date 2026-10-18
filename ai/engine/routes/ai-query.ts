@@ -63,7 +63,7 @@ export function aiQueryRoutes(ctx: ExtensionContext): Hono {
         const fieldList = fields
           .map((f: any) => `${f.name} (${f.type}${f.required ? ', required' : ''})`)
           .join(', ');
-        return `Table: zvd_${col.name} (${col.display_name || col.name})\n  Fields: id (uuid, PK), ${fieldList}, created_at (timestamp), updated_at (timestamp), status (text), created_by (uuid)`;
+        return `Table: zvd_${col.name} (${col.display_name || col.name})\n  Fields: id (uuid, PK), ${fieldList}, created_at (timestamp), updated_at (timestamp), created_by (uuid)`;
       }).join('\n\n');
 
       // Generate SQL
