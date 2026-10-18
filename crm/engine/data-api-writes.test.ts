@@ -7,8 +7,9 @@
 // created from the CRM page, no revision was written, and a caller the operator
 // had refused on the `contacts` collection could still create one through
 // `/ext/crm/contacts` — the extension route was a way around the collection's
-// permission. Transactions stay on raw SQL (see the note in `routes.ts`); their
-// jsonb shape is still pinned by `jsonb-shape.test.ts`.
+// permission. Transactions followed once the engine stopped treating `status`
+// as a system column (engine migration 085): before it, the data API dropped a
+// transaction's business status on every write.
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
 import { seatHarnessGod } from '../../testing/ext-harness';
@@ -170,6 +171,30 @@ d('crm writes go through the data API', () => {
     expect(await jsonbType('zvd_organizations', 'metadata', orgId)).toBe('object');
     expect((await send('DELETE', `/organizations/${orgId}`, undefined)).status).toBe(200);
     expect(await revisions('organizations', orgId)).toEqual(['create', 'update', 'delete']);
+  });
+
+  it('a transaction keeps its own status through create and update, and leaves revisions', async () => {
+    const created = await send('POST', '/transactions', {
+      type: 'invoice',
+      status: 'pending',
+      amount: 10,
+      line_items: [{ q: 1 }],
+      metadata: { a: 1 },
+    });
+    expect(created.status).toBe(201);
+    const txn = (await created.json()).data;
+    expect(txn.status).toBe('pending');
+    expect(await jsonbType('zvd_transactions', 'line_items', txn.id)).toBe('array');
+    expect(await jsonbType('zvd_transactions', 'metadata', txn.id)).toBe('object');
+    const edited = await send('PATCH', `/transactions/${txn.id}`, { status: 'completed', metadata: { b: 2 } });
+    expect(edited.status).toBe(200);
+    expect((await edited.json()).data.status).toBe('completed');
+    expect(await jsonbType('zvd_transactions', 'metadata', txn.id)).toBe('object');
+    const row = (await sql`SELECT status, created_by FROM zvd_transactions WHERE id = ${txn.id}`.execute(db)).rows[0];
+    expect(row).toEqual({ status: 'completed', created_by: godId });
+    expect((await send('PATCH', `/transactions/${crypto.randomUUID()}`, { status: 'draft' })).status).toBe(404);
+    expect((await send('DELETE', `/transactions/${txn.id}`, undefined)).status).toBe(200);
+    expect(await revisions('transactions', txn.id)).toEqual(['create', 'update', 'delete']);
   });
 
   it('a contact keeps metadata as jsonb', async () => {
