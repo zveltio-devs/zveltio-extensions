@@ -14,7 +14,7 @@ var __export = (target, all) => {
     });
 };
 
-// ../../../zveltio-extensions/crm/engine/index.ts
+// engine/index.ts
 import { join } from "path";
 
 // /zveltio-extension/node_modules/kysely/dist/util/object-utils.js
@@ -24527,7 +24527,7 @@ function bigint3(params) {
 function date4(params) {
   return _coercedDate(ZodDate, params);
 }
-// ../sdk/src/extension/permission-gate.ts
+// /zveltio-extension/packages/sdk/src/extension/permission-gate.ts
 async function refuse(ctx, c, resource, action) {
   let denial = null;
   try {
@@ -24595,7 +24595,7 @@ function permissionGate(ctx, resource, opts = {}) {
     await next();
   };
 }
-// ../sdk/src/extension/action-refusal.ts
+// /zveltio-extension/packages/sdk/src/extension/action-refusal.ts
 var ACTION_REFUSAL = Symbol.for("zveltio.extension.action-refusal");
 
 class ActionRefusal extends Error {
@@ -24609,7 +24609,7 @@ class ActionRefusal extends Error {
     this.name = "ActionRefusal";
   }
 }
-// ../sdk/src/extension/dates.ts
+// /zveltio-extension/packages/sdk/src/extension/dates.ts
 function todayIn(timeZone, now = new Date) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone,
@@ -24618,7 +24618,7 @@ function todayIn(timeZone, now = new Date) {
     day: "2-digit"
   }).format(now);
 }
-// ../../../zveltio-extensions/crm/engine/briefing.ts
+// engine/briefing.ts
 var SETTLED = ["completed", "cancelled", "refunded"];
 async function receivables(db) {
   const empty = { overdue: [], oldestOverdueDays: null, dueSoon: [] };
@@ -24665,7 +24665,7 @@ async function receivables(db) {
   }
 }
 
-// ../../../zveltio-extensions/crm/engine/routes.ts
+// engine/routes.ts
 var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function requireUuid(c, id) {
   if (UUID_RE.test(id))
@@ -24699,8 +24699,25 @@ function isValidCui(value) {
 function crmRoutes(ctx) {
   const { db, auth, checkPermission, events, internals } = ctx;
   const app = new Hono2;
+  app.onError((err, c) => {
+    if (err instanceof Refused)
+      return answered(c, err.answer);
+    throw err;
+  });
   function answered(c, res) {
     return res.status < 300 ? c.json({ data: res.body }, res.status) : c.json(res.body, res.status);
+  }
+
+  class Refused extends Error {
+    answer;
+    constructor(answer) {
+      super(`data API refused: ${answer.status}`);
+      this.answer = answer;
+    }
+  }
+  function refuseUnless(res) {
+    if (res.status >= 300)
+      throw new Refused(res);
   }
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -24761,20 +24778,29 @@ function crmRoutes(ctx) {
       return c.json({ error: "Not found" }, 404);
     return c.json({ data: row.rows[0] });
   });
-  async function linkContactOrganization(contactId, organizationId, role, isPrimary) {
-    await db.transaction().execute(async (trx) => {
-      if (isPrimary) {
-        await sql`
-          UPDATE zvd_contact_organizations SET is_primary = FALSE WHERE contact_id = ${contactId}
-        `.execute(trx);
+  async function linkContactOrganization(c, contactId, organizationId, role, isPrimary) {
+    const links = async (filter) => {
+      const res = await internals.listRecords(c, "contact_organizations", { filter, limit: 2, count: "none" });
+      refuseUnless(res);
+      return res.body.records ?? [];
+    };
+    const [existing] = await links({ contact_id: contactId, organization_id: organizationId });
+    if (isPrimary) {
+      for (const primary of await links({ contact_id: contactId, is_primary: true })) {
+        if (primary.id === existing?.id)
+          continue;
+        refuseUnless(await internals.updateRecord(c, "contact_organizations", primary.id, { is_primary: false }));
       }
-      await sql`
-        INSERT INTO zvd_contact_organizations (contact_id, organization_id, role, is_primary)
-        VALUES (${contactId}, ${organizationId}, ${role ?? null}, ${isPrimary})
-        ON CONFLICT (contact_id, organization_id)
-        DO UPDATE SET role = EXCLUDED.role, is_primary = EXCLUDED.is_primary
-      `.execute(trx);
-    });
+    }
+    refuseUnless(existing ? await internals.updateRecord(c, "contact_organizations", existing.id, {
+      role: role ?? null,
+      is_primary: isPrimary
+    }) : await internals.createRecord(c, "contact_organizations", {
+      contact_id: contactId,
+      organization_id: organizationId,
+      role: role ?? null,
+      is_primary: isPrimary
+    }));
   }
   app.post("/contacts", zValidator("json", exports_external.object({
     first_name: exports_external.string().min(1),
@@ -24797,7 +24823,7 @@ function crmRoutes(ctx) {
       return answered(c, res);
     const contact = res.body;
     if (organization_id) {
-      await linkContactOrganization(contact.id, organization_id, organization_role, true);
+      await linkContactOrganization(c, contact.id, organization_id, organization_role, true);
     }
     events.emit("contact.created", { id: contact.id, contact });
     return answered(c, res);
@@ -24829,18 +24855,19 @@ function crmRoutes(ctx) {
       if (res.status >= 300)
         return answered(c, res);
       contact = res.body;
-      events.emit("contact.updated", { id, contact });
     } else if (organization_id) {
-      const row = await sql`SELECT * FROM zvd_contacts WHERE id = ${id}`.execute(db);
-      if (!row.rows.length)
-        return c.json({ error: "Not found" }, 404);
-      contact = row.rows[0];
+      const res = await internals.readRecord(c, "contacts", id);
+      if (res.status >= 300)
+        return answered(c, res);
+      contact = res.body;
     } else {
       return c.json({ error: "No fields to update" }, 400);
     }
     if (organization_id) {
-      await linkContactOrganization(id, organization_id, organization_role, true);
+      await linkContactOrganization(c, id, organization_id, organization_role, true);
     }
+    if (Object.keys(fields).length)
+      events.emit("contact.updated", { id, contact });
     return c.json({ data: contact });
   });
   app.delete("/contacts/:id", async (c) => {
@@ -25086,7 +25113,7 @@ function crmRoutes(ctx) {
   return app;
 }
 
-// ../../../zveltio-extensions/crm/engine/adopt.ts
+// engine/adopt.ts
 var CRM_COLLECTIONS = [
   { name: "contacts", displayName: "Contacts", icon: "Users", singularName: "Contact" },
   {
@@ -25100,6 +25127,12 @@ var CRM_COLLECTIONS = [
     displayName: "Transactions",
     icon: "Receipt",
     singularName: "Transaction"
+  },
+  {
+    name: "contact_organizations",
+    displayName: "Contact Organizations",
+    icon: "Link",
+    singularName: "Contact Organization"
   }
 ];
 async function adoptCrmCollections(ctx) {
@@ -25129,7 +25162,7 @@ async function adoptCrmCollections(ctx) {
   }
 }
 
-// ../../../zveltio-extensions/crm/engine/actions.ts
+// engine/actions.ts
 var markPaid = async (input2, host) => {
   const { id, paid_date } = input2;
   const tx = await host.collections.read("transactions", id);
@@ -25142,7 +25175,7 @@ var markPaid = async (input2, host) => {
 };
 var crmActions = { markPaid };
 
-// ../../../zveltio-extensions/crm/engine/index.ts
+// engine/index.ts
 var extension = {
   name: "crm",
   category: "business",
@@ -25157,7 +25190,8 @@ var extension = {
       join(import.meta.dir, "migrations/005_contact_org_relation.sql"),
       join(import.meta.dir, "migrations/006_payment_status_compat.sql"),
       join(import.meta.dir, "migrations/007_jsonb_unwrap_string.sql"),
-      join(import.meta.dir, "migrations/008_updated_by.sql")
+      join(import.meta.dir, "migrations/008_updated_by.sql"),
+      join(import.meta.dir, "migrations/009_contact_organization_id.sql")
     ];
   },
   async register(app, ctx) {

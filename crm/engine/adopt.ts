@@ -22,6 +22,14 @@ const CRM_COLLECTIONS = [
     icon: 'Receipt',
     singularName: 'Transaction',
   },
+  // The contact ↔ organization junction: a collection like the others, so the
+  // CRM links a contact through the data API (migration 009 gave it an `id`).
+  {
+    name: 'contact_organizations',
+    displayName: 'Contact Organizations',
+    icon: 'Link',
+    singularName: 'Contact Organization',
+  },
 ] as const;
 
 type Ddl = ExtensionContext['DDLManager'] & {
