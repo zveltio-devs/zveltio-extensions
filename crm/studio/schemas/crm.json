@@ -348,7 +348,7 @@
           "label": "crm.action.markPaid",
           "method": "POST",
           "endpoint": "/ext/crm/actions/markPaid",
-          "body": { "id": "{id}" },
+          "body": { "id": "{id}", "paid_date": "{today}" },
           "visibleWhen": { "field": "status", "in": ["draft", "pending"] }
         }
       ],

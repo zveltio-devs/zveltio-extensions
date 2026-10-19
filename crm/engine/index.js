@@ -24609,6 +24609,15 @@ class ActionRefusal extends Error {
     this.name = "ActionRefusal";
   }
 }
+// ../sdk/src/extension/dates.ts
+function todayIn(timeZone, now = new Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(now);
+}
 // ../../../zveltio-extensions/crm/engine/briefing.ts
 var SETTLED = ["completed", "cancelled", "refunded"];
 async function receivables(db) {
@@ -25129,7 +25138,7 @@ var markPaid = async (input2, host) => {
   if (tx.status !== "draft" && tx.status !== "pending") {
     throw new ActionRefusal(409, "transaction_not_open", `A ${String(tx.status)} transaction cannot be marked paid.`);
   }
-  return host.collections.update("transactions", id, { status: "completed", paid_date: paid_date ?? new Date().toISOString().slice(0, 10) }, { expect: { status: ["draft", "pending"] } });
+  return host.collections.update("transactions", id, { status: "completed", paid_date: paid_date ?? todayIn(host.timezone ?? "UTC") }, { expect: { status: ["draft", "pending"] } });
 };
 var crmActions = { markPaid };
 

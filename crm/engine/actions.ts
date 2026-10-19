@@ -1,8 +1,8 @@
-import { ActionRefusal, type ExtensionAction } from '@zveltio/sdk/extension';
+import { ActionRefusal, type ExtensionAction, todayIn } from '@zveltio/sdk/extension';
 
 /**
  * Settle a draft or pending transaction: `completed`, paid on `paid_date`
- * (today in UTC when omitted). A business rule, not a field edit — so it is an
+ * (today in the tenant's time zone when omitted). A business rule, not a field edit — so it is an
  * action (`POST /ext/crm/actions/markPaid`) and not a PATCH the form could send
  * with any status: settling one already completed, cancelled or refunded is
  * refused with 409, and one the caller cannot see answers 404.
@@ -29,7 +29,8 @@ const markPaid: ExtensionAction = async (input, host) => {
   return host.collections.update(
     'transactions',
     id,
-    { status: 'completed', paid_date: paid_date ?? new Date().toISOString().slice(0, 10) },
+    // `?? 'UTC'`: an engine older than `host.timezone` hands none.
+    { status: 'completed', paid_date: paid_date ?? todayIn(host.timezone ?? 'UTC') },
     { expect: { status: ['draft', 'pending'] } },
   );
 };
