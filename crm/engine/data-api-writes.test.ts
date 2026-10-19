@@ -256,6 +256,67 @@ d('crm writes go through the data API', () => {
     expect(left.rows[0].n).toBe(0);
   });
 
+  // The contact ↔ organization link was raw SQL into the junction (an upsert on
+  // its composite key), so it skipped the `contact_organizations` permission,
+  // revisions and flows. It is now a collection keyed by `id`, written through
+  // the data API like the other three.
+  it('moving a contact to another organization keeps exactly one primary link, written through the data API', async () => {
+    const a = (await (await send('POST', '/organizations', { name: `Primary A ${STAMP}` })).json()).data;
+    const b = (await (await send('POST', '/organizations', { name: `Primary B ${STAMP}` })).json()).data;
+    const created = await send('POST', '/contacts', { first_name: 'Mover', organization_id: a.id, organization_role: 'CFO' });
+    expect(created.status).toBe(201);
+    const id = (await created.json()).data.id;
+    const moved = await send('PATCH', `/contacts/${id}`, { organization_id: b.id, organization_role: 'CEO' });
+    expect(moved.status).toBe(200);
+    expect((await moved.json()).data.id).toBe(id);
+
+    const links = (
+      await sql`
+        SELECT id::text AS id, organization_id::text AS org, role, is_primary
+        FROM zvd_contact_organizations WHERE contact_id = ${id} ORDER BY created_at
+      `.execute(db)
+    ).rows;
+    expect(links.map((l: Any) => [l.org, l.role, l.is_primary])).toEqual([
+      [a.id, 'CFO', false],
+      [b.id, 'CEO', true],
+    ]);
+    expect(await revisions('contact_organizations', links[0].id)).toEqual(['create', 'update']);
+    expect(await revisions('contact_organizations', links[1].id)).toEqual(['create']);
+
+    // Back to A: the existing link is promoted, not duplicated.
+    expect((await send('PATCH', `/contacts/${id}`, { organization_id: a.id })).status).toBe(200);
+    const after = (
+      await sql`SELECT organization_id::text AS org FROM zvd_contact_organizations WHERE contact_id = ${id} AND is_primary`.execute(db)
+    ).rows;
+    expect(after).toEqual([{ org: a.id }]);
+  });
+
+  it('a caller refused on `contact_organizations` gets the refusal, and the contact goes with it', async () => {
+    const harness = (await import(join(ENGINE, 'testing', 'app-harness.js'))) as Any;
+    const org = (await (await send('POST', '/organizations', { name: `Refused ${STAMP}` })).json()).data;
+    const member = await harness.createMemberSession(engineApp, db, {
+      grants: [
+        { collection: 'crm', actions: ['read', 'create', 'update'] },
+        { collection: 'contacts', actions: ['read', 'create', 'update'] },
+        { collection: 'contact_organizations', actions: ['read'] },
+      ],
+    });
+    const email = `no-link-${STAMP}@example.test`;
+    const refused = await send('POST', '/contacts', { first_name: 'NoLink', email, organization_id: org.id }, member.cookie);
+    expect(refused.status).toBe(403);
+    const left = await sql`SELECT count(*)::int AS n FROM zvd_contacts WHERE email = ${email}`.execute(db);
+    expect(left.rows[0].n).toBe(0);
+    const links = await sql`SELECT count(*)::int AS n FROM zvd_contact_organizations WHERE organization_id = ${org.id}`.execute(db);
+    expect(links.rows[0].n).toBe(0);
+
+    // An edit that also moves the contact: the edit is taken back with the link.
+    const own = (await (await send('POST', '/contacts', { first_name: 'Own' }, member.cookie)).json()).data;
+    const edit = await send('PATCH', `/contacts/${own.id}`, { last_name: 'Moved', organization_id: org.id }, member.cookie);
+    expect(edit.status).toBe(403);
+    const row = (await sql`SELECT last_name FROM zvd_contacts WHERE id = ${own.id}`.execute(db)).rows[0];
+    expect(row.last_name).toBeNull();
+  });
+
   // The decision this change makes: the `crm` resource opens the CRM; the
   // collection's own permission still decides who writes its rows.
   it('a caller allowed into the CRM but refused on `contacts` cannot create one through it', async () => {

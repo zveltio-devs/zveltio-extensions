@@ -47,6 +47,7 @@ const extension: ZveltioExtension = {
       join(import.meta.dir, 'migrations/006_payment_status_compat.sql'),
       join(import.meta.dir, 'migrations/007_jsonb_unwrap_string.sql'),
       join(import.meta.dir, 'migrations/008_updated_by.sql'),
+      join(import.meta.dir, 'migrations/009_contact_organization_id.sql'),
     ];
   },
 

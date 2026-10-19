@@ -62,6 +62,10 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission, events, internals } = ctx;
 
   const app = new Hono();
+  app.onError((err, c) => {
+    if (err instanceof Refused) return answered(c, err.answer);
+    throw err;
+  });
 
   /**
    * Writes to `contacts`, `organizations` and `transactions` are the data API's own
@@ -84,6 +88,21 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
   // biome-ignore lint/suspicious/noExplicitAny: Hono context
   function answered(c: any, res: { status: number; body: unknown }): Response {
     return res.status < 300 ? c.json({ data: res.body }, res.status) : c.json(res.body, res.status);
+  }
+
+  /**
+   * A data API refusal part-way through a request that has already written:
+   * thrown, so the request transaction rolls back (the engine rolls back a
+   * request whose handler threw, and commits one that returned — any status).
+   * `app.onError` answers it with the data API's own status and body.
+   */
+  class Refused extends Error {
+    constructor(readonly answer: { status: number; body: unknown }) {
+      super(`data API refused: ${answer.status}`);
+    }
+  }
+  function refuseUnless(res: { status: number; body: unknown }): void {
+    if (res.status >= 300) throw new Refused(res);
   }
 
   /**
@@ -192,45 +211,56 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
   /**
    * Put a contact in an organization.
    *
-   * `zvd_contact_organizations` has been in the schema since the first
-   * migration, carrying `role` and `is_primary`, and BOTH read paths join it:
-   * `GET /contacts/:id` returns an `organizations` array built from it, and the
-   * organizations list counts its members through it. Nothing ever inserted a
-   * row — it was read in two places and written in none.
+   * `zvd_contact_organizations` is a collection (`contact_organizations`) like
+   * the other three, and the link is written through the data API, as the
+   * caller: their `contact_organizations` permission, column rules, revisions
+   * and flows. It was raw SQL through `ctx.db` (an upsert on the composite key
+   * the table had before migration 009), around all of that.
    *
-   * So every contact came back with an empty `organizations` array, every
-   * organization reported zero people, and the relation existed only as a
-   * drawing on the schema. That is the whole reason the CRM behaves like a flat
-   * address book: `company` is a free-text string on the contact, which is what
-   * people ended up typing, and the actual link had no way in.
+   * `is_primary` is kept unique per contact by demoting the current primary
+   * first — "primary" has to mean one of them for the list view to pick a single
+   * organization to show. Migration 004's partial unique index holds it against
+   * two callers at once.
    *
-   * `is_primary` is kept unique per contact by demoting the others first —
-   * "primary" has to mean one of them for the list view to pick a single
-   * organization to show.
+   * Everything runs in the request transaction, with the contact write before
+   * it. A refused step throws `Refused`, so the whole request rolls back: a
+   * returned refusal would commit the contact (or its edit) without the link.
    */
   async function linkContactOrganization(
+    // biome-ignore lint/suspicious/noExplicitAny: Hono context
+    c: any,
     contactId: string,
     organizationId: string,
     role: string | undefined,
     isPrimary: boolean,
   ): Promise<void> {
-    // Demoting the old primary organisation and writing the new link are one
-    // change. Split, the contact belongs to organisations but to none of them
-    // primarily — and the primary is what every list, invoice and mail-merge
-    // reads when it needs "the company this person is at".
-    await db.transaction().execute(async (trx) => {
-      if (isPrimary) {
-        await sql`
-          UPDATE zvd_contact_organizations SET is_primary = FALSE WHERE contact_id = ${contactId}
-        `.execute(trx);
+    // Both filters match one row at most: the pair is unique, and so is the
+    // primary (index 004). No paging to get wrong.
+    const links = async (filter: Record<string, unknown>) => {
+      const res = await internals.listRecords(c, 'contact_organizations', { filter, limit: 2, count: 'none' });
+      refuseUnless(res);
+      return (res.body.records ?? []) as Array<{ id: string }>;
+    };
+    const [existing] = await links({ contact_id: contactId, organization_id: organizationId });
+    if (isPrimary) {
+      for (const primary of await links({ contact_id: contactId, is_primary: true })) {
+        if (primary.id === existing?.id) continue;
+        refuseUnless(await internals.updateRecord(c, 'contact_organizations', primary.id, { is_primary: false }));
       }
-      await sql`
-        INSERT INTO zvd_contact_organizations (contact_id, organization_id, role, is_primary)
-        VALUES (${contactId}, ${organizationId}, ${role ?? null}, ${isPrimary})
-        ON CONFLICT (contact_id, organization_id)
-        DO UPDATE SET role = EXCLUDED.role, is_primary = EXCLUDED.is_primary
-      `.execute(trx);
-    });
+    }
+    refuseUnless(
+      existing
+        ? await internals.updateRecord(c, 'contact_organizations', existing.id, {
+            role: role ?? null,
+            is_primary: isPrimary,
+          })
+        : await internals.createRecord(c, 'contact_organizations', {
+            contact_id: contactId,
+            organization_id: organizationId,
+            role: role ?? null,
+            is_primary: isPrimary,
+          }),
+    );
   }
 
   app.post('/contacts',
@@ -258,7 +288,7 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       // Primary: it is the only membership a contact has when created. Same
       // request transaction as the insert, so a refused link takes it back.
       if (organization_id) {
-        await linkContactOrganization(contact.id, organization_id, organization_role, true);
+        await linkContactOrganization(c, contact.id, organization_id, organization_role, true);
       }
       events.emit('contact.created', { id: contact.id, contact });
       return answered(c, res);
@@ -296,19 +326,20 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
         const res = await internals.updateRecord(c, 'contacts', id, fields);
         if (res.status >= 300) return answered(c, res);
         contact = res.body;
-        events.emit('contact.updated', { id, contact });
       } else if (organization_id) {
         // Changing only the organization is a legitimate edit, so this is no
         // longer "nothing to update".
-        const row = await sql`SELECT * FROM zvd_contacts WHERE id = ${id}`.execute(db);
-        if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
-        contact = row.rows[0];
+        const res = await internals.readRecord(c, 'contacts', id);
+        if (res.status >= 300) return answered(c, res);
+        contact = res.body;
       } else {
         return c.json({ error: 'No fields to update' }, 400);
       }
       if (organization_id) {
-        await linkContactOrganization(id, organization_id, organization_role, true);
+        await linkContactOrganization(c, id, organization_id, organization_role, true);
       }
+      // After the link: a refused link rolls the edit back, and no event says otherwise.
+      if (Object.keys(fields).length) events.emit('contact.updated', { id, contact });
       return c.json({ data: contact });
     },
   );
