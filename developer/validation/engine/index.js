@@ -24590,7 +24590,7 @@ var BulkImportRuleSchema = exports_external.object({
   error_message: exports_external.string().min(1).max(500),
   nl_description: exports_external.string().optional()
 });
-function applyRule(ruleType, ruleConfig, inputValue, evaluate, previousValue = null) {
+function applyRule(ruleType, ruleConfig, inputValue, evaluate, previousValue = null, fieldType) {
   try {
     switch (ruleType) {
       case "required":
@@ -24612,11 +24612,11 @@ function applyRule(ruleType, ruleConfig, inputValue, evaluate, previousValue = n
       case "range":
         return Number(inputValue) >= (ruleConfig.min ?? -Infinity) && Number(inputValue) <= (ruleConfig.max ?? Infinity);
       case "nlp": {
-        const outcome = evaluate.expression(String(ruleConfig.expression ?? ""), inputValue);
+        const outcome = evaluate.expression(String(ruleConfig.expression ?? ""), inputValue, fieldType);
         return outcome.status === "passed";
       }
       case "transition":
-        return evaluate.transition(String(ruleConfig.expression ?? ""), inputValue, previousValue).status === "passed";
+        return evaluate.transition(String(ruleConfig.expression ?? ""), inputValue, previousValue, fieldType).status === "passed";
       default:
         return false;
     }
@@ -24646,6 +24646,10 @@ function validationRoutes(ctx) {
   const evaluators = {
     expression: evaluateExpressionRule,
     transition: evaluateTransitionRule
+  };
+  const fieldTypes = async (collection) => {
+    const coll = await ctx.DDLManager.getCollection(db, collection);
+    return new Map((coll?.fields ?? []).map((f) => [f.name, f.type]));
   };
   const app = new Hono2;
   app.use("*", async (c, next) => {
@@ -24677,7 +24681,7 @@ For range: rule_config = { "min": number, "max": number }
 For min/max: rule_config = { "value": number }
 For minLength/maxLength: rule_config = { "value": number }
 For pattern: rule_config = { "pattern": "regex string" }
-For nlp (complex): rule_config = { "expression": "JavaScript boolean expression using 'value'" }`;
+For nlp (complex): rule_config = { "expression": "CEL boolean expression using 'value'" }`;
     const userMessage = `Field: ${field_name} (type: ${field_type || "text"})
 Description: ${description}`;
     try {
@@ -24828,19 +24832,20 @@ Description: ${description}`;
   app.post("/:collection/bulk-test", async (c) => {
     const collection = c.req.param("collection");
     const rulesRes = await sql`
-      SELECT r.id AS rule_id, r.rule_type, r.rule_config,
+      SELECT r.id AS rule_id, r.rule_type, r.rule_config, r.field_name,
              tc.id AS tc_id, tc.input_value, tc.previous_value, tc.expected_result, tc.label
       FROM zv_validation_rules r
       LEFT JOIN zvd_validation_test_cases tc ON tc.rule_id = r.id
       WHERE r.collection = ${collection}
     `.execute(db);
     const results = [];
+    const types = await fieldTypes(collection);
     const updatePromises = [];
     for (const row of rulesRes.rows) {
       if (!row.tc_id)
         continue;
       const config2 = typeof row.rule_config === "string" ? JSON.parse(row.rule_config) : row.rule_config;
-      const actual = applyRule(row.rule_type, config2, row.input_value, evaluators, row.previous_value);
+      const actual = applyRule(row.rule_type, config2, row.input_value, evaluators, row.previous_value, types.get(row.field_name));
       const passed2 = actual === row.expected_result;
       const now = new Date;
       results.push({
@@ -24951,7 +24956,7 @@ Description: ${description}`;
   app.post("/:collection/:id/test-cases/run", async (c) => {
     const id = c.req.param("id");
     const ruleRes = await sql`
-      SELECT id, rule_type, rule_config FROM zv_validation_rules WHERE id = ${id}
+      SELECT id, rule_type, rule_config, collection, field_name FROM zv_validation_rules WHERE id = ${id}
     `.execute(db);
     const rule = ruleRes.rows[0];
     if (!rule)
@@ -24961,9 +24966,10 @@ Description: ${description}`;
     `.execute(db);
     const config2 = typeof rule.rule_config === "string" ? JSON.parse(rule.rule_config) : rule.rule_config;
     const results = [];
+    const types = await fieldTypes(rule.collection);
     const now = new Date;
     for (const tc of casesRes.rows) {
-      const actual = applyRule(rule.rule_type, config2, tc.input_value, evaluators, tc.previous_value);
+      const actual = applyRule(rule.rule_type, config2, tc.input_value, evaluators, tc.previous_value, types.get(rule.field_name));
       const passed2 = actual === tc.expected_result;
       results.push({
         id: tc.id,

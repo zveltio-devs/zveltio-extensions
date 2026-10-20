@@ -96,8 +96,11 @@ const BulkImportRuleSchema = z.object({
  */
 type Outcome = { status: 'passed' } | { status: 'failed' } | { status: 'refused'; reason: string };
 interface Evaluators {
-  expression: (expression: string, value: unknown) => Outcome;
-  transition: (expression: string, value: unknown, previous: unknown) => Outcome;
+  // `fieldType` lets the engine type a stored text input as the write path sees
+  // the column (integer, double, date): CEL does not convert, so `value > 10`
+  // on a number field errored on the raw "12".
+  expression: (expression: string, value: unknown, fieldType?: string) => Outcome;
+  transition: (expression: string, value: unknown, previous: unknown, fieldType?: string) => Outcome;
 }
 
 function applyRule(
@@ -106,6 +109,7 @@ function applyRule(
   inputValue: string,
   evaluate: Evaluators,
   previousValue: string | null = null,
+  fieldType?: string,
 ): boolean {
   try {
     switch (ruleType) {
@@ -135,19 +139,26 @@ function applyRule(
         // could store a validation rule could reach `process`, `Bun`, and the
         // filesystem from inside the engine process.
         //
-        // The engine has evaluated this exact rule type safely the whole time
-        // through expr-eval, whose grammar cannot express a call to anything it
-        // was not handed. This goes through that same function now, so the two
+        // The engine evaluates this rule type safely through CEL, whose grammar
+        // cannot express a call to anything it was not handed. This goes through that same function now, so the two
         // cannot drift apart again.
-        const outcome = evaluate.expression(String(ruleConfig.expression ?? ''), inputValue);
+        const outcome = evaluate.expression(
+          String(ruleConfig.expression ?? ''),
+          inputValue,
+          fieldType,
+        );
         // A refused expression has not passed. Reporting it as a pass would
         // tell whoever is writing the rule that it works.
         return outcome.status === 'passed';
       }
       case 'transition':
         // The engine's own evaluator, as the write path runs it; refused is not passed.
-        return evaluate.transition(String(ruleConfig.expression ?? ''), inputValue, previousValue)
-          .status === 'passed';
+        return evaluate.transition(
+          String(ruleConfig.expression ?? ''),
+          inputValue,
+          previousValue,
+          fieldType,
+        ).status === 'passed';
       default:
         return false;
     }
@@ -202,6 +213,12 @@ export function validationRoutes(ctx: ExtensionContext): Hono {
     transition: evaluateTransitionRule,
   };
 
+  /** Each field's type in `collection`, for the evaluators' `fieldType`. */
+  const fieldTypes = async (collection: string): Promise<Map<string, string>> => {
+    const coll = await ctx.DDLManager.getCollection(db, collection);
+    return new Map((coll?.fields ?? []).map((f) => [f.name, f.type]));
+  };
+
   const app = new Hono();
 
   // ── Auth middleware ───────────────────────────────────────────────────────
@@ -236,7 +253,7 @@ For range: rule_config = { "min": number, "max": number }
 For min/max: rule_config = { "value": number }
 For minLength/maxLength: rule_config = { "value": number }
 For pattern: rule_config = { "pattern": "regex string" }
-For nlp (complex): rule_config = { "expression": "JavaScript boolean expression using 'value'" }`;
+For nlp (complex): rule_config = { "expression": "CEL boolean expression using 'value'" }`;
 
     const userMessage = `Field: ${field_name} (type: ${field_type || 'text'})\nDescription: ${description}`;
 
@@ -454,7 +471,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
 
     // Fetch all rules with their test cases
     const rulesRes = await sql<any>`
-      SELECT r.id AS rule_id, r.rule_type, r.rule_config,
+      SELECT r.id AS rule_id, r.rule_type, r.rule_config, r.field_name,
              tc.id AS tc_id, tc.input_value, tc.previous_value, tc.expected_result, tc.label
       FROM zv_validation_rules r
       LEFT JOIN zvd_validation_test_cases tc ON tc.rule_id = r.id
@@ -472,6 +489,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
     }
 
     const results: TestResult[] = [];
+    const types = await fieldTypes(collection);
     const updatePromises: Promise<any>[] = [];
 
     for (const row of rulesRes.rows) {
@@ -485,6 +503,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
         row.input_value,
         evaluators,
         row.previous_value,
+        types.get(row.field_name),
       );
       const passed = actual === row.expected_result;
       const now = new Date();
@@ -638,7 +657,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
     const id = c.req.param('id');
 
     const ruleRes = await sql<any>`
-      SELECT id, rule_type, rule_config FROM zv_validation_rules WHERE id = ${id}
+      SELECT id, rule_type, rule_config, collection, field_name FROM zv_validation_rules WHERE id = ${id}
     `.execute(db);
     const rule = ruleRes.rows[0];
     if (!rule) return c.json({ error: 'Rule not found' }, 404);
@@ -661,6 +680,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
     }
 
     const results: RunResult[] = [];
+    const types = await fieldTypes(rule.collection);
     const now = new Date();
 
     for (const tc of casesRes.rows) {
@@ -670,6 +690,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
         tc.input_value,
         evaluators,
         tc.previous_value,
+        types.get(rule.field_name),
       );
       const passed = actual === tc.expected_result;
       results.push({
