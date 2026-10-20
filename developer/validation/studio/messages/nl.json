@@ -25,6 +25,7 @@
   "developer.validation.rule.min": "min",
   "developer.validation.rule.minLength": "Min. lengte",
   "developer.validation.rule.nlp": "Expressie (nlp)",
+  "developer.validation.rule.transition": "Overgang (previous → value)",
   "developer.validation.rule.pattern": "pattern (regex)",
   "developer.validation.rule.range": "Bereik",
   "developer.validation.rule.required": "verplicht",

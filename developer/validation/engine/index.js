@@ -24527,6 +24527,8 @@ function parseParameter(param) {
   }
   return parseValueExpression(param);
 }
+// /zveltio-extension/packages/sdk/src/extension/action-refusal.ts
+var ACTION_REFUSAL = Symbol.for("zveltio.extension.action-refusal");
 // /zveltio-extension/packages/sdk/src/extension/jsonb.ts
 function toJsonb(value) {
   return sql`${JSON.stringify(value ?? null)}::text::jsonb`;
@@ -24542,7 +24544,8 @@ var RULE_TYPES = [
   "url",
   "pattern",
   "range",
-  "nlp"
+  "nlp",
+  "transition"
 ];
 var RuleConfigSchema = exports_external.union([
   exports_external.object({ value: exports_external.number() }),
@@ -24568,6 +24571,7 @@ var RuleUpdateSchema = exports_external.object({
 var TestCaseCreateSchema = exports_external.object({
   label: exports_external.string().min(1).max(200),
   input_value: exports_external.string(),
+  previous_value: exports_external.string().nullable().optional(),
   expected_result: exports_external.boolean()
 });
 var RuleGroupCreateSchema = exports_external.object({
@@ -24586,7 +24590,7 @@ var BulkImportRuleSchema = exports_external.object({
   error_message: exports_external.string().min(1).max(500),
   nl_description: exports_external.string().optional()
 });
-function applyRule(ruleType, ruleConfig, inputValue, evaluateExpression) {
+function applyRule(ruleType, ruleConfig, inputValue, evaluate, previousValue = null) {
   try {
     switch (ruleType) {
       case "required":
@@ -24608,9 +24612,11 @@ function applyRule(ruleType, ruleConfig, inputValue, evaluateExpression) {
       case "range":
         return Number(inputValue) >= (ruleConfig.min ?? -Infinity) && Number(inputValue) <= (ruleConfig.max ?? Infinity);
       case "nlp": {
-        const outcome = evaluateExpression(String(ruleConfig.expression ?? ""), inputValue);
+        const outcome = evaluate.expression(String(ruleConfig.expression ?? ""), inputValue);
         return outcome.status === "passed";
       }
+      case "transition":
+        return evaluate.transition(String(ruleConfig.expression ?? ""), inputValue, previousValue).status === "passed";
       default:
         return false;
     }
@@ -24619,19 +24625,28 @@ function applyRule(ruleType, ruleConfig, inputValue, evaluateExpression) {
   }
 }
 function expressionRefusal(ruleType, ruleConfig, check2) {
-  if (ruleType !== "nlp")
+  if (ruleType !== "nlp" && ruleType !== "transition")
     return null;
   const expression2 = String(ruleConfig?.expression ?? "");
   if (expression2 === "")
-    return "An nlp rule needs an `expression`.";
-  const verdict = check2(expression2);
+    return `A ${ruleType} rule needs an \`expression\`.`;
+  const verdict = check2(expression2, ruleType);
   if (verdict.ok)
     return null;
   return `The expression ${verdict.reason ?? "was rejected"}.`;
 }
 function validationRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
-  const { invalidateRulesCache, evaluateExpressionRule, checkValidationExpression } = ctx.internals;
+  const {
+    invalidateRulesCache,
+    evaluateExpressionRule,
+    evaluateTransitionRule,
+    checkValidationExpression
+  } = ctx.internals;
+  const evaluators = {
+    expression: evaluateExpressionRule,
+    transition: evaluateTransitionRule
+  };
   const app = new Hono2;
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -24814,7 +24829,7 @@ Description: ${description}`;
     const collection = c.req.param("collection");
     const rulesRes = await sql`
       SELECT r.id AS rule_id, r.rule_type, r.rule_config,
-             tc.id AS tc_id, tc.input_value, tc.expected_result, tc.label
+             tc.id AS tc_id, tc.input_value, tc.previous_value, tc.expected_result, tc.label
       FROM zv_validation_rules r
       LEFT JOIN zvd_validation_test_cases tc ON tc.rule_id = r.id
       WHERE r.collection = ${collection}
@@ -24825,7 +24840,7 @@ Description: ${description}`;
       if (!row.tc_id)
         continue;
       const config2 = typeof row.rule_config === "string" ? JSON.parse(row.rule_config) : row.rule_config;
-      const actual = applyRule(row.rule_type, config2, row.input_value, evaluateExpressionRule);
+      const actual = applyRule(row.rule_type, config2, row.input_value, evaluators, row.previous_value);
       const passed2 = actual === row.expected_result;
       const now = new Date;
       results.push({
@@ -24948,7 +24963,7 @@ Description: ${description}`;
     const results = [];
     const now = new Date;
     for (const tc of casesRes.rows) {
-      const actual = applyRule(rule.rule_type, config2, tc.input_value, evaluateExpressionRule);
+      const actual = applyRule(rule.rule_type, config2, tc.input_value, evaluators, tc.previous_value);
       const passed2 = actual === tc.expected_result;
       results.push({
         id: tc.id,
@@ -24991,9 +25006,10 @@ Description: ${description}`;
     const body = c.req.valid("json");
     const row = await sql`
       INSERT INTO zvd_validation_test_cases
-        (rule_id, label, input_value, expected_result, created_by)
+        (rule_id, label, input_value, previous_value, expected_result, created_by)
       VALUES
-        (${id}, ${body.label}, ${body.input_value}, ${body.expected_result}, ${user.id})
+        (${id}, ${body.label}, ${body.input_value}, ${body.previous_value ?? null},
+         ${body.expected_result}, ${user.id})
       RETURNING *
     `.execute(db);
     return c.json({ test_case: row.rows[0] }, 201);
@@ -25021,7 +25037,8 @@ var extension = {
   getMigrations() {
     return [
       join(import.meta.dir, "migrations/001_initial.sql"),
-      join(import.meta.dir, "migrations/002_tenant_rls.sql")
+      join(import.meta.dir, "migrations/002_tenant_rls.sql"),
+      join(import.meta.dir, "migrations/003_test_case_previous_value.sql")
     ];
   },
   async register(app, ctx) {
@@ -25032,3 +25049,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1

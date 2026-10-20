@@ -97,7 +97,8 @@
               { "value": "range", "label": "developer.validation.rule.range" },
               { "value": "email", "label": "developer.validation.rule.email" },
               { "value": "url", "label": "developer.validation.rule.url" },
-              { "value": "nlp", "label": "developer.validation.rule.nlp" }
+              { "value": "nlp", "label": "developer.validation.rule.nlp" },
+              { "value": "transition", "label": "developer.validation.rule.transition" }
             ]
           },
           {
