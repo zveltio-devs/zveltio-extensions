@@ -64,9 +64,8 @@ async function runImport(
     on_duplicate?: string;
     dry_run?: boolean;
   },
-  collectionDef: any,
 ): Promise<void> {
-  const { DDLManager, fieldTypeRegistry } = ctx;
+  const { DDLManager } = ctx;
 
   // Background task — no `c`, so no `db`. The tenant comes from the
   // handler that ENQUEUED the import, which is the only place it is knowable,
@@ -78,7 +77,7 @@ async function runImport(
   // and pointed at this one.
   return ctx.internals.withTenantIsolation(tenantId, async (tdb: any) => {
 
-  const { dynamicInsert, maybeEncrypt } = ctx.internals;
+  const { dynamicInsert } = ctx.internals;
   const insertedIds: string[] = [];
   let processed = 0;
   let success = 0;
@@ -102,35 +101,12 @@ async function runImport(
         row[mappedCol] = value === '' ? null : value;
       }
 
-      if (collectionDef?.fields) {
-        for (const field of collectionDef.fields) {
-          if (row[field.name] === undefined) continue;
-          // `deserialize` is async, and this never awaited it — so what went
-          // into the row was a PROMISE. It reached the table anyway because
-          // Bun.SQL resolves a promise passed as a query parameter, so the bug
-          // was invisible for as long as nothing looked at the value in between.
-          //
-          // Adding encryption is exactly that: `maybeEncrypt` saw a Promise,
-          // took the `typeof value !== 'string'` exit, and handed it back
-          // untouched. The column stayed PLAINTEXT with the guard sitting right
-          // there. Found by printing the value rather than trusting the call.
-          row[field.name] = await fieldTypeRegistry.deserialize(field.type, row[field.name]);
-          // Import writes straight to the table through `dynamicInsert`, not
-          // through the host's write pipeline, so field encryption has to be
-          // applied here. Without it a column marked `encrypted: true` was
-          // stored in PLAINTEXT when the rows arrived by CSV and encrypted when
-          // the same rows arrived by API — the field still reads as encrypted
-          // everywhere in the UI, and only the bytes on disk differ. Import is
-          // the bulk path, so it is the one most likely to carry the sensitive
-          // column.
-          //
-          // The engine's own `/api/import` was given this on 2026-07-31. That
-          // route has no caller: the Studio and the SDK reach import through
-          // this extension, so the fix landed on the copy nobody runs.
-          row[field.name] = await maybeEncrypt(row[field.name], field.encrypted === true);
-        }
-      }
-
+      // The RAW row: `dynamicInsert` runs the engine's field pipeline — type
+      // validation, deserialization (a `password` hashes), field encryption and
+      // the collection's validation rules — as the data API does. This used to
+      // deserialize and encrypt here by hand and validate nothing, so a row the
+      // API refuses was imported. Doing it here as well now breaks the engine's
+      // check: an encrypted `email` arrives as ciphertext and fails as an email.
       if (!dryRun) {
         const inserted = await dynamicInsert(tdb, tableName, row) as any;
         if (inserted?.id) insertedIds.push(inserted.id);
@@ -192,8 +168,7 @@ async function runImport(
 // ─── Route factory ────────────────────────────────────────────────────────────
 
 export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any } }> {
-  const { db, auth, checkPermission, DDLManager, fieldTypeRegistry } = ctx;
-  const { dynamicInsert } = ctx.internals;
+  const { db, auth, checkPermission, DDLManager } = ctx;
 
   // `db` here is `ctx.db`, which the engine hands over as a proxy resolving the
   // CURRENT tenant transaction per query through AsyncLocalStorage (H-12). So a
@@ -556,7 +531,6 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
       return c.json({ error: 'Collection not found' }, 404);
     }
 
-    const collectionDef = await DDLManager.getCollection(db, collection);
     const contentType = c.req.header('Content-Type') ?? '';
 
     let rows: Record<string, any>[] = [];
@@ -675,7 +649,7 @@ export function importRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: a
     // then the write, through its own tenant transaction rather than a request's
     // spent one.
     const jobTenant = tenantOf(c);
-    runImport(ctx, jobTenant, job.id, collection, rows, options, collectionDef).catch(
+    runImport(ctx, jobTenant, job.id, collection, rows, options).catch(
       (err: any) => {
         console.error(`[data/import] job ${job.id} failed:`, err);
         ctx.internals
