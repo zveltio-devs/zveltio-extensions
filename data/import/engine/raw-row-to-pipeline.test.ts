@@ -1,30 +1,21 @@
 /**
- * Import does not write what the file said.
+ * Import hands the engine the row the file said, and lets the engine shape it.
  *
- * This replaces `zveltio/packages/engine/src/tests/harness/import-encrypts-
- * fields.test.ts`, which guarded the same rule while `/api/import` was an
- * engine route. That route became a 410 shim when the dual door was closed and
- * the test went with it — but the rule came HERE, and it is the one that
- * decides whether a password or a secret sits in plaintext on disk.
- *
- * Two transforms have to happen between the parsed row and the INSERT, and
- * neither is visible afterwards in the UI — a `password` field renders as a
- * password whether it was hashed or not, and an `encrypted: true` column reads
- * back decrypted either way. Only the bytes at rest differ, which is why this
- * needs a test rather than a look:
- *
- *   - `fieldTypeRegistry.deserialize` — where the `password` type hashes.
- *   - `maybeEncrypt` — for a column the collection marked `encrypted: true`.
- *
- * Import writes straight to the table through `dynamicInsert`, NOT through the
- * host's write pipeline, so both are applied here by hand and both can be lost
- * by an edit that looks harmless.
+ * `ctx.internals.dynamicInsert` runs the engine's field pipeline (engine
+ * 3.0.0-beta.86): type validation, deserialization — where a `password` hashes
+ * — field encryption, and the collection's validation rules. This extension
+ * used to deserialize and encrypt by hand, which validated nothing, and doing
+ * it now as well makes the engine judge the ciphertext: an encrypted `email`
+ * fails as an email. So the contract is the opposite of what it was: the row
+ * reaching `dynamicInsert` is RAW, and nothing here encrypts or deserializes.
+ * The engine side is proven by its harness test
+ * `internals-dynamic-insert-pipeline.test.ts`.
  *
  * ## Shape
  *
  * Against the PACKED `engine/index.js`, with `ctx` instrumented rather than a
  * database attached: the assertion is on what reaches `dynamicInsert`, which is
- * the last thing the extension controls before Postgres. `runImport` is
+ * the last thing the extension controls before the engine. `runImport` is
  * deliberately fire-and-forget (the route enqueues and answers), so the test
  * synchronises on the insert itself rather than on a sleep.
  */
@@ -38,10 +29,6 @@ type Any = any;
 const COLLECTION = 'people';
 const RAW_SECRET = 'plaintext-secret';
 const RAW_PASSWORD = 'hunter2';
-
-/** What the doubles stamp on, so a value that skipped one is recognisable. */
-const ENCRYPTED = (v: string) => `enc(${v})`;
-const DESERIALIZED = (type: string, v: string) => `${type}:${v}`;
 
 interface Deferred {
   promise: Promise<Record<string, unknown>>;
@@ -102,20 +89,17 @@ function harness() {
       }),
     },
     fieldTypeRegistry: {
-      // Async on purpose: the route once failed to await this and put a PROMISE
-      // in the row, which Bun.SQL resolved on the way to Postgres so nothing
-      // looked wrong — while `maybeEncrypt` had already seen the Promise, taken
-      // its non-string exit, and left the column in plaintext.
+      // Present so a regression that reaches for them again is recorded.
       deserialize: async (type: string, v: Any) => {
         seen.deserialize.push(type);
-        return typeof v === 'string' ? DESERIALIZED(type, v) : v;
+        return v;
       },
     },
     internals: {
       withTenantIsolation: async (_t: string, fn: Any) => fn(db),
       maybeEncrypt: async (v: Any, on: boolean) => {
         seen.maybeEncrypt.push([v, on]);
-        return on && typeof v === 'string' ? ENCRYPTED(v) : v;
+        return v;
       },
       dynamicInsert: async (_db: Any, _table: string, row: Record<string, unknown>) => {
         inserted.resolve(row);
@@ -162,33 +146,13 @@ beforeAll(async () => {
   row = await h.inserted.promise;
 });
 
-describe('what reaches the table', () => {
-  test('the encrypted column is not the value from the file', () => {
-    expect(row.secret).not.toBe(RAW_SECRET);
-    expect(row.secret).toBe(ENCRYPTED(DESERIALIZED('text', RAW_SECRET)));
+describe('what reaches the engine', () => {
+  test('the row is the file\'s, untransformed', () => {
+    expect(row).toEqual({ name: 'Ana', secret: RAW_SECRET, pwd: RAW_PASSWORD });
   });
 
-  test('the password column went through the type that hashes it', () => {
-    expect(row.pwd).not.toBe(RAW_PASSWORD);
-    expect(h.seen.deserialize).toContain('password');
-    expect(row.pwd).toBe(DESERIALIZED('password', RAW_PASSWORD));
-  });
-
-  test('a plain column is still written, so the transforms are not blanket', () => {
-    expect(row.name).toBe(DESERIALIZED('text', 'Ana'));
-  });
-});
-
-describe('how it gets there', () => {
-  test('maybeEncrypt is told which columns are marked encrypted', () => {
-    const flags = h.seen.maybeEncrypt.map(([, on]) => on);
-    expect(flags).toContain(true);
-    expect(flags).toContain(false);
-  });
-
-  test('maybeEncrypt never sees a Promise — deserialize is awaited first', () => {
-    for (const [value] of h.seen.maybeEncrypt) {
-      expect(value).not.toBeInstanceOf(Promise);
-    }
+  test('nothing here deserializes or encrypts — the engine pipeline does', () => {
+    expect(h.seen.deserialize).toEqual([]);
+    expect(h.seen.maybeEncrypt).toEqual([]);
   });
 });
