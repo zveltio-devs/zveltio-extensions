@@ -31,14 +31,14 @@ import { toJsonb } from '@zveltio/sdk/extension';
 
 const RULE_TYPES = [
   'required', 'minLength', 'maxLength', 'min', 'max',
-  'email', 'url', 'pattern', 'range', 'nlp',
+  'email', 'url', 'pattern', 'range', 'nlp', 'transition',
 ] as const;
 
 const RuleConfigSchema = z.union([
   z.object({ value: z.number() }),                               // min, max, minLength, maxLength
   z.object({ pattern: z.string() }),                             // pattern
   z.object({ min: z.number(), max: z.number() }),                // range
-  z.object({ expression: z.string() }),                          // nlp
+  z.object({ expression: z.string() }),                          // nlp, transition
   z.object({}).passthrough(),                                    // required / email / url (empty config)
 ]);
 
@@ -62,6 +62,9 @@ const RuleUpdateSchema = z.object({
 const TestCaseCreateSchema = z.object({
   label: z.string().min(1).max(200),
   input_value: z.string(),
+  // For a `transition` rule: the stored value the test moves from. Left out,
+  // the case is a create (`previous` is null).
+  previous_value: z.string().nullable().optional(),
   expected_result: z.boolean(),
 });
 
@@ -91,16 +94,18 @@ const BulkImportRuleSchema = z.object({
  * Passed as a parameter rather than imported: it lives on `ctx.internals`, and
  * this function is module-level.
  */
-type ExpressionEvaluator = (
-  expression: string,
-  value: unknown,
-) => { status: 'passed' } | { status: 'failed' } | { status: 'refused'; reason: string };
+type Outcome = { status: 'passed' } | { status: 'failed' } | { status: 'refused'; reason: string };
+interface Evaluators {
+  expression: (expression: string, value: unknown) => Outcome;
+  transition: (expression: string, value: unknown, previous: unknown) => Outcome;
+}
 
 function applyRule(
   ruleType: string,
   ruleConfig: any,
   inputValue: string,
-  evaluateExpression: ExpressionEvaluator,
+  evaluate: Evaluators,
+  previousValue: string | null = null,
 ): boolean {
   try {
     switch (ruleType) {
@@ -134,11 +139,15 @@ function applyRule(
         // through expr-eval, whose grammar cannot express a call to anything it
         // was not handed. This goes through that same function now, so the two
         // cannot drift apart again.
-        const outcome = evaluateExpression(String(ruleConfig.expression ?? ''), inputValue);
+        const outcome = evaluate.expression(String(ruleConfig.expression ?? ''), inputValue);
         // A refused expression has not passed. Reporting it as a pass would
         // tell whoever is writing the rule that it works.
         return outcome.status === 'passed';
       }
+      case 'transition':
+        // The engine's own evaluator, as the write path runs it; refused is not passed.
+        return evaluate.transition(String(ruleConfig.expression ?? ''), inputValue, previousValue)
+          .status === 'passed';
       default:
         return false;
     }
@@ -161,12 +170,13 @@ function expressionRefusal(
   // union: this repo compiles with `strict: false`, and without strictNullChecks
   // TypeScript does not narrow a union on its discriminant. The shape is
   // structurally compatible with what the engine actually returns.
-  check: (expression: string) => { ok: boolean; reason?: string },
+  check: (expression: string, ruleType?: string) => { ok: boolean; reason?: string },
 ): string | null {
-  if (ruleType !== 'nlp') return null;
+  if (ruleType !== 'nlp' && ruleType !== 'transition') return null;
   const expression = String(ruleConfig?.expression ?? '');
-  if (expression === '') return 'An nlp rule needs an `expression`.';
-  const verdict = check(expression);
+  if (expression === '') return `A ${ruleType} rule needs an \`expression\`.`;
+  // The rule type decides the scope: a transition rule also sees `previous`.
+  const verdict = check(expression, ruleType);
   if (verdict.ok) return null;
   return `The expression ${verdict.reason ?? 'was rejected'}.`;
 }
@@ -181,8 +191,16 @@ export function validationRoutes(ctx: ExtensionContext): Hono {
   // a handler is therefore already RLS-scoped — there is one spelling, so there
   // is none to forget.
 
-  const { invalidateRulesCache, evaluateExpressionRule, checkValidationExpression } =
-    ctx.internals;
+  const {
+    invalidateRulesCache,
+    evaluateExpressionRule,
+    evaluateTransitionRule,
+    checkValidationExpression,
+  } = ctx.internals;
+  const evaluators: Evaluators = {
+    expression: evaluateExpressionRule,
+    transition: evaluateTransitionRule,
+  };
 
   const app = new Hono();
 
@@ -437,7 +455,7 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
     // Fetch all rules with their test cases
     const rulesRes = await sql<any>`
       SELECT r.id AS rule_id, r.rule_type, r.rule_config,
-             tc.id AS tc_id, tc.input_value, tc.expected_result, tc.label
+             tc.id AS tc_id, tc.input_value, tc.previous_value, tc.expected_result, tc.label
       FROM zv_validation_rules r
       LEFT JOIN zvd_validation_test_cases tc ON tc.rule_id = r.id
       WHERE r.collection = ${collection}
@@ -461,7 +479,13 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
       const config = typeof row.rule_config === 'string'
         ? JSON.parse(row.rule_config)
         : row.rule_config;
-      const actual = applyRule(row.rule_type, config, row.input_value, evaluateExpressionRule);
+      const actual = applyRule(
+        row.rule_type,
+        config,
+        row.input_value,
+        evaluators,
+        row.previous_value,
+      );
       const passed = actual === row.expected_result;
       const now = new Date();
 
@@ -640,7 +664,13 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
     const now = new Date();
 
     for (const tc of casesRes.rows) {
-      const actual = applyRule(rule.rule_type, config, tc.input_value, evaluateExpressionRule);
+      const actual = applyRule(
+        rule.rule_type,
+        config,
+        tc.input_value,
+        evaluators,
+        tc.previous_value,
+      );
       const passed = actual === tc.expected_result;
       results.push({
         id: tc.id,
@@ -690,9 +720,10 @@ For nlp (complex): rule_config = { "expression": "JavaScript boolean expression 
     const body = c.req.valid('json');
     const row = await sql<any>`
       INSERT INTO zvd_validation_test_cases
-        (rule_id, label, input_value, expected_result, created_by)
+        (rule_id, label, input_value, previous_value, expected_result, created_by)
       VALUES
-        (${id}, ${body.label}, ${body.input_value}, ${body.expected_result}, ${user.id})
+        (${id}, ${body.label}, ${body.input_value}, ${body.previous_value ?? null},
+         ${body.expected_result}, ${user.id})
       RETURNING *
     `.execute(db);
     return c.json({ test_case: row.rows[0] }, 201);

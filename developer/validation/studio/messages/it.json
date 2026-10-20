@@ -25,6 +25,7 @@
   "developer.validation.rule.min": "min",
   "developer.validation.rule.minLength": "Lunghezza min.",
   "developer.validation.rule.nlp": "Espressione (nlp)",
+  "developer.validation.rule.transition": "Transizione (previous → value)",
   "developer.validation.rule.pattern": "pattern (regex)",
   "developer.validation.rule.range": "Intervallo",
   "developer.validation.rule.required": "obbligatorio",

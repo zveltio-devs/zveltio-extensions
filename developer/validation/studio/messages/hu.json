@@ -25,6 +25,7 @@
   "developer.validation.rule.min": "min",
   "developer.validation.rule.minLength": "Min. hossz",
   "developer.validation.rule.nlp": "Kifejezés (nlp)",
+  "developer.validation.rule.transition": "Átmenet (previous → value)",
   "developer.validation.rule.pattern": "pattern (regex)",
   "developer.validation.rule.range": "Tartomány",
   "developer.validation.rule.required": "kötelező",

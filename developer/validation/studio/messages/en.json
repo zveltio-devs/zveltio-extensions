@@ -24,6 +24,7 @@
   "developer.validation.rule.email": "Email",
   "developer.validation.rule.url": "URL",
   "developer.validation.rule.nlp": "Expression (nlp)",
+  "developer.validation.rule.transition": "Transition (previous → value)",
   "developer.validation.rule.pattern": "pattern (regex)",
   "developer.validation.rule.required": "required",
   "developer.validation.form.nlDescription": "NL description (optional)",

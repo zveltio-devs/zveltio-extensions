@@ -27,6 +27,11 @@
       "reason": "row-rule evaluation. Extensions that depend on the answer stub it themselves."
     },
     {
+      "member": "evaluateTransitionRule",
+      "category": "inert-by-nature",
+      "reason": "transition-rule evaluation for the validation extension's tester, same as evaluateExpressionRule."
+    },
+    {
       "member": "extensionRegistry",
       "category": "inert-by-nature",
       "reason": "the host's registry object. Reached for registration side effects the harness models separately."
