@@ -70,6 +70,8 @@ function harness() {
     insertInto: () => builder(),
     updateTable: () => builder(),
     deleteFrom: () => builder(),
+    // Inside the job's tenant transaction `transaction()` is a savepoint.
+    transaction: () => ({ execute: async (fn: Any) => fn(db) }),
   };
 
   const ctx: Any = {
@@ -154,5 +156,26 @@ describe('what reaches the engine', () => {
   test('nothing here deserializes or encrypts — the engine pipeline does', () => {
     expect(h.seen.deserialize).toEqual([]);
     expect(h.seen.maybeEncrypt).toEqual([]);
+  });
+
+  // A dry run used to skip the insert and report every row valid. It now
+  // inserts in a savepoint and rolls it back, so the engine judges each row.
+  test('a dry run hands the row to the engine too', async () => {
+    const dry = harness();
+    const dryApp = new (app.constructor as Any)();
+    dryApp.use('*', async (c: Any, next: Any) => {
+      c.set('tenant', { id: 't1' });
+      c.set('user', { id: 'u1', role: 'admin' });
+      await next();
+    });
+    const mod = await import(join(import.meta.dir, 'index.js'));
+    await mod.default.register(dryApp, dry.ctx);
+    const res = await dryApp.request(`/${COLLECTION}?dry_run=true`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows: [{ name: 'Ana' }] }),
+    });
+    expect(res.status).toBeLessThan(400);
+    expect(await dry.inserted.promise).toEqual({ name: 'Ana' });
   });
 });

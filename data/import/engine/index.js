@@ -24654,6 +24654,7 @@ function parseCSV(text, delimiter = ",") {
   }
   return rows;
 }
+var DRY_RUN = Symbol("dry-run");
 async function runImport(ctx, tenantId, jobId, collection, rows, options) {
   const { DDLManager } = ctx;
   return ctx.internals.withTenantIsolation(tenantId, async (tdb) => {
@@ -24673,14 +24674,20 @@ async function runImport(ctx, tenantId, jobId, collection, rows, options) {
           const mappedCol = mapping[col] ?? col;
           row[mappedCol] = value === "" ? null : value;
         }
-        if (!dryRun) {
-          const inserted = await dynamicInsert(tdb, tableName, row);
-          if (inserted?.id)
-            insertedIds.push(inserted.id);
-        }
+        const inserted = await tdb.transaction().execute(async (sp) => {
+          const r = await dynamicInsert(sp, tableName, row);
+          if (dryRun)
+            throw DRY_RUN;
+          return r;
+        });
+        if (inserted?.id)
+          insertedIds.push(inserted.id);
         success2++;
       } catch (err) {
-        errors3.push({ row: idx + 1, error: err?.message ?? "Unknown error" });
+        if (err === DRY_RUN)
+          success2++;
+        else
+          errors3.push({ row: idx + 1, error: err?.message ?? "Unknown error" });
       }
       processed++;
     }

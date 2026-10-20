@@ -53,6 +53,9 @@ function parseCSV(text: string, delimiter = ','): Record<string, string>[] {
 
 // ─── Background import runner ─────────────────────────────────────────────────
 
+/** Thrown to roll a dry-run row's savepoint back once its insert has passed. */
+const DRY_RUN = Symbol('dry-run');
+
 async function runImport(
   ctx: ExtensionContext,
   tenantId: string,
@@ -107,13 +110,24 @@ async function runImport(
       // deserialize and encrypt here by hand and validate nothing, so a row the
       // API refuses was imported. Doing it here as well now breaks the engine's
       // check: an encrypted `email` arrives as ciphertext and fails as an email.
-      if (!dryRun) {
-        const inserted = await dynamicInsert(tdb, tableName, row) as any;
-        if (inserted?.id) insertedIds.push(inserted.id);
-      }
+      //
+      // Each row in its own SAVEPOINT (`transaction()` inside the job's tenant
+      // transaction is one): Postgres aborts the whole transaction at the first
+      // failed statement, so one duplicate key made every later row, and the
+      // final status update, fail with 25P02 and the job stayed `running`. A
+      // dry run takes the same path and rolls its savepoint back, so it refuses
+      // exactly the rows a real import would; it used to insert nothing and
+      // report every row valid.
+      const inserted = await (tdb as any).transaction().execute(async (sp: any) => {
+        const r = await dynamicInsert(sp, tableName, row);
+        if (dryRun) throw DRY_RUN;
+        return r;
+      });
+      if (inserted?.id) insertedIds.push(inserted.id);
       success++;
     } catch (err: any) {
-      errors.push({ row: idx + 1, error: err?.message ?? 'Unknown error' });
+      if (err === DRY_RUN) success++;
+      else errors.push({ row: idx + 1, error: err?.message ?? 'Unknown error' });
     }
     processed++;
   }
