@@ -24967,6 +24967,12 @@ Description: ${description}`;
   });
   app.get("/:collection/:id/test-cases", async (c) => {
     const id = c.req.param("id");
+    const ruleRes = await sql`
+      SELECT id FROM zv_validation_rules WHERE id = ${id}
+        AND (tenant_id IS NULL OR tenant_id = ${c.get("tenant")?.id ?? null}::uuid)
+    `.execute(db);
+    if (!ruleRes.rows[0])
+      return c.json({ error: "Rule not found" }, 404);
     const rows = await sql`
       SELECT * FROM zvd_validation_test_cases
       WHERE rule_id = ${id}
