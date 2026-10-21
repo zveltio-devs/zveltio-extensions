@@ -24,6 +24,7 @@ import { describe, expect, test } from 'bun:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  MAIL_DEFAULTS,
   UNIMPLEMENTED_SETTINGS,
   enabledSetting,
   intSetting,
@@ -161,4 +162,13 @@ describe('every setting the admin page offers is either honoured or declared mis
     const advertised = new Set(advertisedSettings(files['routes.ts']!));
     for (const k of UNIMPLEMENTED_SETTINGS) expect(advertised.has(k)).toBe(true);
   });
+});
+
+test('MAIL_DEFAULTS is the seed the root tenant got', () => {
+  // A tenant with no row reads these; the root read the seed. Two copies of one
+  // document drift, so the copy is held to the original.
+  const sql = readFileSync(join(import.meta.dir, '..', 'migrations', '001_mail.sql'), 'utf8');
+  const seed = /VALUES \(\s*'mail',\s*'(\{[\s\S]*?\})'/.exec(sql);
+  expect(seed).not.toBeNull();
+  expect(MAIL_DEFAULTS).toEqual(JSON.parse(seed![1]!));
 });

@@ -45746,12 +45746,8 @@ var require_address_error = __commonJS((exports) => {
 var require_common = __commonJS((exports) => {
   Object.defineProperty(exports, "__esModule", { value: true });
   exports.isInSubnet = isInSubnet;
-  exports.isHostInSubnet = isHostInSubnet;
-  exports.isGloballyReachable = isGloballyReachable;
-  exports.offsetBigInt = offsetBigInt;
   exports.isCorrect = isCorrect;
   exports.prefixLengthFromMask = prefixLengthFromMask;
-  exports.assertByteArray = assertByteArray;
   exports.numberToPaddedHex = numberToPaddedHex;
   exports.stringToPaddedHex = stringToPaddedHex;
   exports.testBit = testBit;
@@ -45760,39 +45756,13 @@ var require_common = __commonJS((exports) => {
     if (this.subnetMask < address.subnetMask) {
       return false;
     }
-    return isHostInSubnet.call(this, address);
-  }
-  function isHostInSubnet(address) {
-    if (this.binaryZeroPad().length !== address.binaryZeroPad().length) {
-      return false;
+    if (this.mask(address.subnetMask) === address.mask()) {
+      return true;
     }
-    return this.mask(address.subnetMask) === address.mask();
-  }
-  function isGloballyReachable(entries) {
-    let best = null;
-    for (let i = 0;i < entries.length; i++) {
-      const entry = entries[i];
-      if (entry.reachable !== null && isHostInSubnet.call(this, entry.subnet) && (best === null || entry.subnet.subnetMask > best.subnet.subnetMask)) {
-        best = entry;
-      }
-    }
-    return best === null ? true : best.reachable;
-  }
-  function offsetBigInt(value, n, bits, family) {
-    if (typeof n === "number" && !Number.isSafeInteger(n)) {
-      throw new address_error_1.AddressError(`${family} offset must be an integer`);
-    }
-    if (typeof n !== "number" && typeof n !== "bigint") {
-      throw new address_error_1.AddressError(`${family} offset must be an integer`);
-    }
-    const result = value + BigInt(n);
-    if (result < BigInt(0) || result > (BigInt(1) << BigInt(bits)) - BigInt(1)) {
-      throw new address_error_1.AddressError(`${family} offset leaves the address space`);
-    }
-    return result;
+    return false;
   }
   function isCorrect(defaultBits) {
-    return function isCorrectForm() {
+    return function() {
       if (this.addressMinusSuffix !== this.correctForm()) {
         return false;
       }
@@ -45816,16 +45786,6 @@ var require_common = __commonJS((exports) => {
     }
     return firstZero;
   }
-  function assertByteArray(bytes, byteCount, family, minimum) {
-    if (bytes.length !== byteCount) {
-      throw new address_error_1.AddressError(`${family} addresses require exactly ${byteCount} bytes`);
-    }
-    for (let i = 0;i < bytes.length; i++) {
-      if (!Number.isInteger(bytes[i]) || bytes[i] < minimum || bytes[i] > 255) {
-        throw new address_error_1.AddressError(`All bytes must be integers between ${minimum} and 255`);
-      }
-    }
-  }
   function numberToPaddedHex(number4) {
     return number4.toString(16).padStart(2, "0");
   }
@@ -45845,39 +45805,11 @@ var require_common = __commonJS((exports) => {
 // /zveltio-extension/node_modules/ip-address/dist/v4/constants.js
 var require_constants3 = __commonJS((exports) => {
   Object.defineProperty(exports, "__esModule", { value: true });
-  exports.SPECIAL_PURPOSE = exports.RE_SUBNET_STRING = exports.RE_ADDRESS = exports.GROUPS = exports.BITS = undefined;
+  exports.RE_SUBNET_STRING = exports.RE_ADDRESS = exports.GROUPS = exports.BITS = undefined;
   exports.BITS = 32;
   exports.GROUPS = 4;
-  exports.RE_ADDRESS = /^(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$/g;
+  exports.RE_ADDRESS = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/g;
   exports.RE_SUBNET_STRING = /\/\d{1,2}$/;
-  exports.SPECIAL_PURPOSE = [
-    ["0.0.0.0/8", "This network", false],
-    ["0.0.0.0/32", "This host on this network", false],
-    ["10.0.0.0/8", "Private-Use", false],
-    ["100.64.0.0/10", "Shared Address Space", false],
-    ["127.0.0.0/8", "Loopback", false],
-    ["169.254.0.0/16", "Link Local", false],
-    ["172.16.0.0/12", "Private-Use", false],
-    ["192.0.0.0/24", "IETF Protocol Assignments", false],
-    ["192.0.0.0/29", "IPv4 Service Continuity Prefix", false],
-    ["192.0.0.8/32", "IPv4 dummy address", false],
-    ["192.0.0.9/32", "Port Control Protocol Anycast", true],
-    ["192.0.0.10/32", "Traversal Using Relays around NAT Anycast", true],
-    ["192.0.0.170/32", "NAT64/DNS64 Discovery", false],
-    ["192.0.0.171/32", "NAT64/DNS64 Discovery", false],
-    ["192.0.2.0/24", "Documentation (TEST-NET-1)", false],
-    ["192.31.196.0/24", "AS112-v4", true],
-    ["192.52.193.0/24", "AMT", true],
-    ["192.88.99.0/24", "Deprecated (6to4 Relay Anycast)", null],
-    ["192.88.99.2/32", "6a44-relay anycast address", false],
-    ["192.168.0.0/16", "Private-Use", false],
-    ["192.175.48.0/24", "Direct Delegation AS112 Service", true],
-    ["198.18.0.0/15", "Benchmarking", false],
-    ["198.51.100.0/24", "Documentation (TEST-NET-2)", false],
-    ["203.0.113.0/24", "Documentation (TEST-NET-3)", false],
-    ["240.0.0.0/4", "Reserved", false],
-    ["255.255.255.255/32", "Limited Broadcast", false]
-  ];
 });
 
 // /zveltio-extension/node_modules/ip-address/dist/ipv4.js
@@ -45923,7 +45855,6 @@ var require_ipv4 = __commonJS((exports) => {
 
   class Address4 {
     constructor(address) {
-      this.addressMinusSuffix = "";
       this.groups = constants.GROUPS;
       this.parsedAddress = [];
       this.parsedSubnet = "";
@@ -45932,7 +45863,6 @@ var require_ipv4 = __commonJS((exports) => {
       this.v4 = true;
       this.isCorrect = isCorrect4;
       this.isInSubnet = common.isInSubnet;
-      this.isHostInSubnet = common.isHostInSubnet;
       this.address = address;
       const subnet = constants.RE_SUBNET_STRING.exec(address);
       if (subnet) {
@@ -45944,10 +45874,6 @@ var require_ipv4 = __commonJS((exports) => {
         }
         address = address.replace(constants.RE_SUBNET_STRING, "");
       }
-      const longest = constants.GROUPS * 4 - 1;
-      if (address.length > longest) {
-        throw new address_error_1.AddressError(`IPv4 addresses are at most ${longest} characters.`);
-      }
       this.addressMinusSuffix = address;
       this.parsedAddress = this.parse(address);
     }
@@ -45955,15 +45881,12 @@ var require_ipv4 = __commonJS((exports) => {
       try {
         new Address4(address);
         return true;
-      } catch {
+      } catch (e) {
         return false;
       }
     }
     parse(address) {
       const groups = address.split(".");
-      if (groups.some((group) => /^0\d/.test(group))) {
-        throw new address_error_1.AddressError("IPv4 addresses can't have leading zeroes.");
-      }
       if (!address.match(constants.RE_ADDRESS)) {
         throw new address_error_1.AddressError("Invalid IPv4 address.");
       }
@@ -46021,11 +45944,7 @@ var require_ipv4 = __commonJS((exports) => {
       return Address4.fromHex(integer2.toString(16).padStart(8, "0"));
     }
     static fromArpa(arpaFormAddress) {
-      const longest = constants.GROUPS * 4 - 1 + "/32".length + ".in-addr.arpa.".length;
-      if (arpaFormAddress.length > longest) {
-        throw new address_error_1.AddressError(`in-addr.arpa names are at most ${longest} characters.`);
-      }
-      const leader = arpaFormAddress.replace(/(\.in-addr\.arpa)?\.?$/i, "");
+      const leader = arpaFormAddress.replace(/(\.in-addr\.arpa)?\.$/, "");
       const address = leader.split(".").reverse().join(".");
       return new Address4(address);
     }
@@ -46056,15 +45975,6 @@ var require_ipv4 = __commonJS((exports) => {
       const adjust = BigInt("1");
       return Address4.fromBigInt(this._startAddress() + adjust);
     }
-    offset(n) {
-      return Address4.fromBigInt(common.offsetBigInt(this.bigInt(), n, constants.BITS, "IPv4")).withSubnetMask(this.subnetMask);
-    }
-    nextNetwork() {
-      return Address4.fromBigInt(common.offsetBigInt(this._endAddress(), 1, constants.BITS, "IPv4")).withSubnetMask(this.subnetMask);
-    }
-    withSubnetMask(subnetMask) {
-      return new Address4(`${this.correctForm()}/${subnetMask}`);
-    }
     _endAddress() {
       return BigInt(`0b${this.mask() + "1".repeat(constants.BITS - this.subnetMask)}`);
     }
@@ -46085,13 +45995,20 @@ var require_ipv4 = __commonJS((exports) => {
       return `${this.startAddress().correctForm()}/${this.subnetMask}`;
     }
     static fromBigInt(bigInt) {
-      if (bigInt < BigInt(0) || bigInt > BigInt(4294967295)) {
+      if (bigInt < 0n || bigInt > 0xffffffffn) {
         throw new address_error_1.AddressError("IPv4 BigInt must be in the range 0 to 2**32 - 1");
       }
       return Address4.fromHex(bigInt.toString(16).padStart(8, "0"));
     }
     static fromByteArray(bytes) {
-      common.assertByteArray(bytes, 4, "IPv4", 0);
+      if (bytes.length !== 4) {
+        throw new address_error_1.AddressError("IPv4 addresses require exactly 4 bytes");
+      }
+      for (let i = 0;i < bytes.length; i++) {
+        if (!Number.isInteger(bytes[i]) || bytes[i] < 0 || bytes[i] > 255) {
+          throw new address_error_1.AddressError("All bytes must be integers between 0 and 255");
+        }
+      }
       return this.fromUnsignedByteArray(bytes);
     }
     static fromUnsignedByteArray(bytes) {
@@ -46121,37 +46038,25 @@ var require_ipv4 = __commonJS((exports) => {
       return `${reversed}.in-addr.arpa.`;
     }
     isMulticast() {
-      return this.isHostInSubnet(MULTICAST_V4);
+      return this.isInSubnet(MULTICAST_V4);
     }
     isPrivate() {
-      return PRIVATE_V4.some((subnet) => this.isHostInSubnet(subnet));
+      return PRIVATE_V4.some((subnet) => this.isInSubnet(subnet));
     }
     isLoopback() {
-      return this.isHostInSubnet(LOOPBACK_V4);
+      return this.isInSubnet(LOOPBACK_V4);
     }
     isLinkLocal() {
-      return this.isHostInSubnet(LINK_LOCAL_V4);
+      return this.isInSubnet(LINK_LOCAL_V4);
     }
     isUnspecified() {
-      return this.isHostInSubnet(UNSPECIFIED_V4);
+      return this.isInSubnet(UNSPECIFIED_V4);
     }
     isBroadcast() {
-      return this.isHostInSubnet(BROADCAST_V4);
+      return this.isInSubnet(BROADCAST_V4);
     }
     isCGNAT() {
-      return this.isHostInSubnet(CGNAT_V4);
-    }
-    isDocumentation() {
-      return DOCUMENTATION_V4.some((subnet) => this.isHostInSubnet(subnet));
-    }
-    isBenchmarking() {
-      return this.isHostInSubnet(BENCHMARKING_V4);
-    }
-    isReserved() {
-      return this.isHostInSubnet(RESERVED_V4);
-    }
-    isGlobal() {
-      return !this.isMulticast() && common.isGloballyReachable.call(this, SPECIAL_PURPOSE_V4);
+      return this.isInSubnet(CGNAT_V4);
     }
     binaryZeroPad() {
       if (this._binaryZeroPad === undefined) {
@@ -46161,7 +46066,7 @@ var require_ipv4 = __commonJS((exports) => {
     }
     groupForV6() {
       const segments = this.parsedAddress;
-      return this.correctForm().replace(constants.RE_ADDRESS, `<span class="hover-group group-v4 group-6">${segments.slice(0, 2).join(".")}</span>.<span class="hover-group group-v4 group-7">${segments.slice(2, 4).join(".")}</span>`);
+      return this.address.replace(constants.RE_ADDRESS, `<span class="hover-group group-v4 group-6">${segments.slice(0, 2).join(".")}</span>.<span class="hover-group group-v4 group-7">${segments.slice(2, 4).join(".")}</span>`);
     }
   }
   exports.Address4 = Address4;
@@ -46176,23 +46081,12 @@ var require_ipv4 = __commonJS((exports) => {
   var UNSPECIFIED_V4 = new Address4("0.0.0.0/32");
   var BROADCAST_V4 = new Address4("255.255.255.255/32");
   var CGNAT_V4 = new Address4("100.64.0.0/10");
-  var DOCUMENTATION_V4 = [
-    new Address4("192.0.2.0/24"),
-    new Address4("198.51.100.0/24"),
-    new Address4("203.0.113.0/24")
-  ];
-  var BENCHMARKING_V4 = new Address4("198.18.0.0/15");
-  var RESERVED_V4 = new Address4("240.0.0.0/4");
-  var SPECIAL_PURPOSE_V4 = constants.SPECIAL_PURPOSE.map(([cidr, , reachable]) => ({
-    subnet: new Address4(cidr),
-    reachable
-  }));
 });
 
 // /zveltio-extension/node_modules/ip-address/dist/v6/constants.js
 var require_constants4 = __commonJS((exports) => {
   Object.defineProperty(exports, "__esModule", { value: true });
-  exports.SPECIAL_PURPOSE = exports.RE_URL_WITH_PORT = exports.RE_URL = exports.RE_ZONE_STRING = exports.RE_SUBNET_STRING = exports.RE_BAD_ADDRESS = exports.RE_BAD_CHARACTERS = exports.TYPES = exports.SCOPES = exports.GROUPS = exports.BITS = undefined;
+  exports.RE_URL_WITH_PORT = exports.RE_URL = exports.RE_ZONE_STRING = exports.RE_SUBNET_STRING = exports.RE_BAD_ADDRESS = exports.RE_BAD_CHARACTERS = exports.TYPES = exports.SCOPES = exports.GROUPS = exports.BITS = undefined;
   exports.BITS = 128;
   exports.GROUPS = 8;
   exports.SCOPES = {
@@ -46226,18 +46120,11 @@ var require_constants4 = __commonJS((exports) => {
     "ff05::1:3/128": "Multicast (All DHCP servers in this site)",
     "::/128": "Unspecified",
     "::1/128": "Loopback",
-    "::ffff:0:0/96": "IPv4-mapped",
     "ff00::/8": "Multicast",
     "fe80::/10": "Link-local unicast",
     "fc00::/7": "Unique local",
-    "2001::/32": "Teredo",
-    "2001:2::/48": "Benchmarking",
     "2002::/16": "6to4",
     "2001:db8::/32": "Documentation",
-    "3fff::/20": "Documentation",
-    "100::/64": "Discard-only",
-    "fec0::/10": "Site-local unicast (deprecated)",
-    "::/96": "IPv4-compatible (deprecated)",
     "64:ff9b::/96": "NAT64 (well-known)",
     "64:ff9b:1::/48": "NAT64 (local-use)"
   };
@@ -46245,35 +46132,8 @@ var require_constants4 = __commonJS((exports) => {
   exports.RE_BAD_ADDRESS = /([0-9a-f]{5,}|:{3,}|[^:]:$|^:[^:]|\/$)/gi;
   exports.RE_SUBNET_STRING = /\/\d{1,3}(?=%|$)/;
   exports.RE_ZONE_STRING = /%.*$/;
-  exports.RE_URL = /^(?:\[([0-9a-f:.]+)\]|([0-9a-f:.]+))(?:[/?#].*)?$/i;
-  exports.RE_URL_WITH_PORT = /^\[([0-9a-f:.]+)\]:([0-9]{1,5})(?:[/?#].*)?$/i;
-  exports.SPECIAL_PURPOSE = [
-    ["::1/128", "Loopback Address", false],
-    ["::/128", "Unspecified Address", false],
-    ["::ffff:0:0/96", "IPv4-mapped Address", false],
-    ["64:ff9b::/96", "IPv4-IPv6 Translat.", true],
-    ["64:ff9b:1::/48", "IPv4-IPv6 Translat.", false],
-    ["100::/64", "Discard-Only Address Block", false],
-    ["100:0:0:1::/64", "Dummy IPv6 Prefix", false],
-    ["2001::/23", "IETF Protocol Assignments", false],
-    ["2001::/32", "TEREDO", false],
-    ["2001:1::1/128", "Port Control Protocol Anycast", true],
-    ["2001:1::2/128", "Traversal Using Relays around NAT Anycast", true],
-    ["2001:1::3/128", "DNS-SD Service Registration Protocol Anycast", true],
-    ["2001:2::/48", "Benchmarking", false],
-    ["2001:3::/32", "AMT", true],
-    ["2001:4:112::/48", "AS112-v6", true],
-    ["2001:10::/28", "Deprecated (previously ORCHID)", null],
-    ["2001:20::/28", "ORCHIDv2", true],
-    ["2001:30::/28", "Drone Remote ID Protocol Entity Tags (DETs) Prefix", true],
-    ["2001:db8::/32", "Documentation", false],
-    ["2002::/16", "6to4", false],
-    ["2620:4f:8000::/48", "Direct Delegation AS112 Service", true],
-    ["3fff::/20", "Documentation", false],
-    ["5f00::/16", "Segment Routing (SRv6) SIDs", false],
-    ["fc00::/7", "Unique-Local", false],
-    ["fe80::/10", "Link-Local Unicast", false]
-  ];
+  exports.RE_URL = /^\[{0,1}([0-9a-f:]+)\]{0,1}/;
+  exports.RE_URL_WITH_PORT = /\[([0-9a-f:]+)\]:([0-9]{1,5})/;
 });
 
 // /zveltio-extension/node_modules/ip-address/dist/v6/helpers.js
@@ -46497,7 +46357,6 @@ var require_ipv6 = __commonJS((exports) => {
       this.v4 = false;
       this.zone = "";
       this.isInSubnet = common.isInSubnet;
-      this.isHostInSubnet = common.isHostInSubnet;
       this.isCorrect = isCorrect6;
       if (optionalGroups === undefined) {
         this.groups = constants6.GROUPS;
@@ -46514,18 +46373,13 @@ var require_ipv6 = __commonJS((exports) => {
           throw new address_error_1.AddressError("Invalid subnet mask.");
         }
         address = address.replace(constants6.RE_SUBNET_STRING, "");
-      }
-      if (/\//.test(address)) {
+      } else if (/\//.test(address)) {
         throw new address_error_1.AddressError("Invalid subnet mask.");
       }
-      const zoneStart = address.indexOf("%");
-      if (zoneStart !== -1 && /^.*$/.test(address.slice(zoneStart))) {
-        this.zone = address.slice(zoneStart);
-        address = address.slice(0, zoneStart);
-      }
-      const longest = this.groups * 5 + 5;
-      if (address.length > longest) {
-        throw new address_error_1.AddressError(`IPv6 addresses are at most ${longest} characters.`);
+      const zone = constants6.RE_ZONE_STRING.exec(address);
+      if (zone) {
+        this.zone = zone[0];
+        address = address.replace(constants6.RE_ZONE_STRING, "");
       }
       this.addressMinusSuffix = address;
       this.parsedAddress = this.parse(this.addressMinusSuffix);
@@ -46534,12 +46388,12 @@ var require_ipv6 = __commonJS((exports) => {
       try {
         new Address6(address);
         return true;
-      } catch {
+      } catch (e) {
         return false;
       }
     }
     static fromBigInt(bigInt) {
-      if (bigInt < BigInt(0) || bigInt > (BigInt(1) << BigInt(constants6.BITS)) - BigInt(1)) {
+      if (bigInt < 0n || bigInt > (1n << BigInt(constants6.BITS)) - 1n) {
         throw new address_error_1.AddressError("IPv6 BigInt must be in the range 0 to 2**128 - 1");
       }
       const hex3 = bigInt.toString(16).padStart(32, "0");
@@ -46550,43 +46404,46 @@ var require_ipv6 = __commonJS((exports) => {
       return new Address6(groups.join(":"));
     }
     static fromURL(url2) {
-      var _a7;
       let host;
       let port = null;
       let result;
-      let error62;
-      const stripped = url2.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
-      if (stripped.indexOf("[") !== -1 && stripped.indexOf("]:") !== -1) {
-        error62 = "failed to parse address with port";
-        result = constants6.RE_URL_WITH_PORT.exec(stripped);
+      if (url2.indexOf("[") !== -1 && url2.indexOf("]:") !== -1) {
+        result = constants6.RE_URL_WITH_PORT.exec(url2);
         if (result === null) {
-          return { error: error62, address: null, port: null };
+          return {
+            error: "failed to parse address with port",
+            address: null,
+            port: null
+          };
         }
         host = result[1];
         port = result[2];
-      } else {
-        error62 = "failed to parse address from URL";
-        result = constants6.RE_URL.exec(stripped);
+      } else if (url2.indexOf("/") !== -1) {
+        url2 = url2.replace(/^[a-z0-9]+:\/\//, "");
+        result = constants6.RE_URL.exec(url2);
         if (result === null) {
-          return { error: error62, address: null, port: null };
+          return {
+            error: "failed to parse address from URL",
+            address: null,
+            port: null
+          };
         }
-        host = (_a7 = result[1]) !== null && _a7 !== undefined ? _a7 : result[2];
+        host = result[1];
+      } else {
+        host = url2;
       }
       if (port) {
         port = parseInt(port, 10);
-        if (port < 0 || port > 65535) {
+        if (port < 0 || port > 65536) {
           port = null;
         }
       } else {
         port = null;
       }
-      let address;
-      try {
-        address = new Address6(host);
-      } catch {
-        return { error: error62, address: null, port: null };
-      }
-      return { address, port };
+      return {
+        address: new Address6(host),
+        port
+      };
     }
     static fromAddressAndMask(address, mask) {
       const bits = common.prefixLengthFromMask(new Address6(mask).bigInt(), constants6.BITS);
@@ -46643,18 +46500,18 @@ var require_ipv6 = __commonJS((exports) => {
       return new Address6(`::ffff:${address4.correctForm()}/${mask6}`);
     }
     static fromArpa(arpaFormAddress) {
-      const nibbles = arpaFormAddress.replace(/(\.ip6\.arpa)?\.?$/i, "");
-      if (!/^[0-9a-f](\.[0-9a-f]){0,31}$/i.test(nibbles)) {
+      let address = arpaFormAddress.replace(/(\.ip6\.arpa)?\.$/, "");
+      const semicolonAmount = 7;
+      if (address.length !== 63) {
         throw new address_error_1.AddressError("Invalid 'ip6.arpa' form.");
       }
-      const reversed = nibbles.split(".").reverse();
-      const subnetMask = reversed.length * 4;
-      const hex3 = reversed.join("").padEnd(32, "0");
-      const groups = [];
-      for (let i = 0;i < constants6.GROUPS; i++) {
-        groups.push(hex3.slice(i * 4, (i + 1) * 4));
+      const parts = address.split(".").reverse();
+      for (let i = semicolonAmount;i > 0; i--) {
+        const insertIndex = i * 4;
+        parts.splice(insertIndex, 0, ":");
       }
-      return new Address6(`${groups.join(":")}/${subnetMask}`);
+      address = parts.join("");
+      return new Address6(address);
     }
     microsoftTranscription() {
       return `${this.correctForm().replace(/:/g, "-")}.ipv6-literal.net`;
@@ -46691,15 +46548,6 @@ var require_ipv6 = __commonJS((exports) => {
       const adjust = BigInt("1");
       return Address6.fromBigInt(this._endAddress() - adjust);
     }
-    offset(n) {
-      return Address6.fromBigInt(common.offsetBigInt(this.bigInt(), n, constants6.BITS, "IPv6")).withSubnetMask(this.subnetMask);
-    }
-    nextNetwork() {
-      return Address6.fromBigInt(common.offsetBigInt(this._endAddress(), 1, constants6.BITS, "IPv6")).withSubnetMask(this.subnetMask);
-    }
-    withSubnetMask(subnetMask) {
-      return new Address6(`${this.correctForm()}/${subnetMask}`);
-    }
     subnetMaskAddress() {
       return Address6.fromBigInt(BigInt(`0b${"1".repeat(this.subnetMask)}${"0".repeat(constants6.BITS - this.subnetMask)}`));
     }
@@ -46726,7 +46574,7 @@ var require_ipv6 = __commonJS((exports) => {
     getType() {
       for (let i = 0;i < TYPE_SUBNETS.length; i++) {
         const entry = TYPE_SUBNETS[i];
-        if (this.isHostInSubnet(entry[0])) {
+        if (this.isInSubnet(entry[0])) {
           return entry[1];
         }
       }
@@ -46815,20 +46663,18 @@ var require_ipv6 = __commonJS((exports) => {
       }
       const groups = address.split(":");
       const lastGroup = groups.slice(-1)[0];
-      const v4Octets = lastGroup.split(".");
-      if (v4Octets.length === constants4.GROUPS && v4Octets.every((octet) => /^\d{1,3}$/.test(octet))) {
-        if (v4Octets.some((octet) => /^0\d/.test(octet))) {
-          const highlighted = v4Octets.map(spanLeadingZeroes4).join(".");
-          const prefix = groups.slice(0, -1).map(helpers.escapeHtml).join(":");
-          const separator = groups.length > 1 ? ":" : "";
-          throw new address_error_1.AddressError("IPv4 addresses can't have leading zeroes.", `${prefix}${separator}${highlighted}`);
-        }
-      }
       const address4 = lastGroup.match(constants4.RE_ADDRESS);
       if (address4) {
         this.parsedAddress4 = address4[0];
-        const v4Suffix = this.subnetMask >= 96 ? `/${this.subnetMask - 96}` : "";
-        this.address4 = new ipv4_1.Address4(`${this.parsedAddress4}${v4Suffix}`);
+        this.address4 = new ipv4_1.Address4(this.parsedAddress4);
+        for (let i = 0;i < this.address4.groups; i++) {
+          if (/^0[0-9]+/.test(this.address4.parsedAddress[i])) {
+            const highlighted = this.address4.parsedAddress.map(spanLeadingZeroes4).join(".");
+            const prefix = groups.slice(0, -1).map(helpers.escapeHtml).join(":");
+            const separator = groups.length > 1 ? ":" : "";
+            throw new address_error_1.AddressError("IPv4 addresses can't have leading zeroes.", `${prefix}${separator}${highlighted}`);
+          }
+        }
         this.v4 = true;
         groups[groups.length - 1] = this.address4.toGroup6();
         address = groups.join(":");
@@ -46891,16 +46737,7 @@ var require_ipv6 = __commonJS((exports) => {
     }
     to4() {
       const binary = this.binaryZeroPad().split("");
-      const hex3 = BigInt(`0b${binary.slice(96, 128).join("")}`).toString(16).padStart(8, "0");
-      if (this.subnetMask >= 96) {
-        const v4Mask = this.subnetMask - 96;
-        const groups = [];
-        for (let i = 0;i < 8; i += 2) {
-          groups.push(parseInt(hex3.slice(i, i + 2), 16));
-        }
-        return new ipv4_1.Address4(`${groups.join(".")}/${v4Mask}`);
-      }
-      return ipv4_1.Address4.fromHex(hex3);
+      return ipv4_1.Address4.fromHex(BigInt(`0b${binary.slice(96, 128).join("")}`).toString(16).padStart(8, "0"));
     }
     to4in6() {
       const address4 = this.to4();
@@ -46910,7 +46747,7 @@ var require_ipv6 = __commonJS((exports) => {
       if (!/:$/.test(correct)) {
         infix = ":";
       }
-      return correct + infix + address4.correctForm();
+      return correct + infix + address4.address;
     }
     inspectTeredo() {
       const prefix = this.getBitsBase16(0, 32);
@@ -46975,13 +46812,7 @@ var require_ipv6 = __commonJS((exports) => {
         bits = prefixBits.slice(0, 96) + v4Bits;
       } else {
         const beforeU = 64 - pl;
-        bits = [
-          prefixBits.slice(0, pl),
-          v4Bits.slice(0, beforeU),
-          "00000000",
-          v4Bits.slice(beforeU),
-          "0".repeat(128 - 72 - (32 - beforeU))
-        ].join("");
+        bits = prefixBits.slice(0, pl) + v4Bits.slice(0, beforeU) + "00000000" + v4Bits.slice(beforeU) + "0".repeat(128 - 72 - (32 - beforeU));
       }
       const hex3 = BigInt(`0b${bits}`).toString(16).padStart(32, "0");
       const groups = [];
@@ -46996,7 +46827,7 @@ var require_ipv6 = __commonJS((exports) => {
       if (pl !== 32 && pl !== 40 && pl !== 48 && pl !== 56 && pl !== 64 && pl !== 96) {
         throw new address_error_1.AddressError("NAT64 prefix length must be 32, 40, 48, 56, 64, or 96");
       }
-      if (!this.isHostInSubnet(prefix6)) {
+      if (!this.isInSubnet(prefix6)) {
         return null;
       }
       const bits = this.binaryZeroPad();
@@ -47014,7 +46845,9 @@ var require_ipv6 = __commonJS((exports) => {
       return new ipv4_1.Address4(octets.join("."));
     }
     toByteArray() {
-      const value = this.bigInt().toString(16).padStart(constants6.BITS / 4, "0");
+      const valueWithoutPadding = this.bigInt().toString(16);
+      const leadingPad = "0".repeat(valueWithoutPadding.length % 2);
+      const value = `${leadingPad}${valueWithoutPadding}`;
       const bytes = [];
       for (let i = 0, length = value.length;i < length; i += 2) {
         bytes.push(parseInt(value.substring(i, i + 2), 16));
@@ -47025,11 +46858,9 @@ var require_ipv6 = __commonJS((exports) => {
       return this.toByteArray().map(unsignByte);
     }
     static fromByteArray(bytes) {
-      common.assertByteArray(bytes, 16, "IPv6", -128);
       return this.fromUnsignedByteArray(bytes.map(unsignByte));
     }
     static fromUnsignedByteArray(bytes) {
-      common.assertByteArray(bytes, 16, "IPv6", 0);
       const BYTE_MAX = BigInt("256");
       let result = BigInt("0");
       let multiplier = BigInt("1");
@@ -47043,17 +46874,12 @@ var require_ipv6 = __commonJS((exports) => {
       return this.addressMinusSuffix === this.canonicalForm();
     }
     isLinkLocal() {
-      const embedded = this.embeddedIPv4();
-      if (embedded) {
-        return embedded.isLinkLocal();
+      if (this.getBitsBase2(0, 64) === "1111111010000000000000000000000000000000000000000000000000000000") {
+        return true;
       }
-      return this.isHostInSubnet(LINK_LOCAL_SUBNET);
+      return false;
     }
     isMulticast() {
-      const embedded = this.embeddedIPv4();
-      if (embedded) {
-        return embedded.isMulticast();
-      }
       const type = this.getType();
       return type === "Multicast" || type.startsWith("Multicast ");
     }
@@ -47061,74 +46887,25 @@ var require_ipv6 = __commonJS((exports) => {
       return this.v4;
     }
     isMapped4() {
-      return this.isHostInSubnet(IPV4_MAPPED_SUBNET);
-    }
-    embeddedIPv4() {
-      if (this.isMapped4() || this.isHostInSubnet(NAT64_WELL_KNOWN_SUBNET)) {
-        return this.to4();
-      }
-      return null;
+      return this.isInSubnet(IPV4_MAPPED_SUBNET);
     }
     isTeredo() {
-      return this.isHostInSubnet(TEREDO_SUBNET);
+      return this.isInSubnet(TEREDO_SUBNET);
     }
     is6to4() {
-      return this.isHostInSubnet(SIX_TO_FOUR_SUBNET);
+      return this.isInSubnet(SIX_TO_FOUR_SUBNET);
     }
     isLoopback() {
-      const embedded = this.embeddedIPv4();
-      if (embedded) {
-        return embedded.isLoopback();
-      }
       return this.getType() === "Loopback";
     }
     isULA() {
-      return this.isHostInSubnet(ULA_SUBNET);
-    }
-    isPrivate() {
-      const embedded = this.embeddedIPv4();
-      if (embedded) {
-        return embedded.isPrivate();
-      }
-      return this.isULA() || this.isHostInSubnet(NAT64_LOCAL_USE_SUBNET);
-    }
-    isCGNAT() {
-      const embedded = this.embeddedIPv4();
-      if (embedded) {
-        return embedded.isCGNAT();
-      }
-      return false;
-    }
-    isBroadcast() {
-      const embedded = this.embeddedIPv4();
-      if (embedded) {
-        return embedded.isBroadcast();
-      }
-      return false;
+      return this.isInSubnet(ULA_SUBNET);
     }
     isUnspecified() {
-      const embedded = this.embeddedIPv4();
-      if (embedded) {
-        return embedded.isUnspecified();
-      }
       return this.getType() === "Unspecified";
     }
     isDocumentation() {
-      return DOCUMENTATION_SUBNETS.some((subnet) => this.isHostInSubnet(subnet));
-    }
-    isBenchmarking() {
-      const embedded = this.embeddedIPv4();
-      if (embedded) {
-        return embedded.isBenchmarking();
-      }
-      return this.isHostInSubnet(BENCHMARKING_SUBNET);
-    }
-    isGlobal() {
-      const embedded = this.embeddedIPv4();
-      if (embedded) {
-        return embedded.isGlobal();
-      }
-      return this.isHostInSubnet(GLOBAL_UNICAST_SUBNET) && common.isGloballyReachable.call(this, SPECIAL_PURPOSE_V6);
+      return this.isInSubnet(DOCUMENTATION_SUBNET);
     }
     href(optionalPort) {
       if (optionalPort === undefined) {
@@ -47238,17 +47015,8 @@ var require_ipv6 = __commonJS((exports) => {
   var TEREDO_SUBNET = new Address6("2001::/32");
   var SIX_TO_FOUR_SUBNET = new Address6("2002::/16");
   var ULA_SUBNET = new Address6("fc00::/7");
-  var LINK_LOCAL_SUBNET = new Address6("fe80::/10");
-  var DOCUMENTATION_SUBNETS = [new Address6("2001:db8::/32"), new Address6("3fff::/20")];
-  var BENCHMARKING_SUBNET = new Address6("2001:2::/48");
-  var GLOBAL_UNICAST_SUBNET = new Address6("2000::/3");
-  var SPECIAL_PURPOSE_V6 = constants6.SPECIAL_PURPOSE.map(([cidr, , reachable]) => ({
-    subnet: new Address6(cidr),
-    reachable
-  }));
+  var DOCUMENTATION_SUBNET = new Address6("2001:db8::/32");
   var IPV4_MAPPED_SUBNET = new Address6("::ffff:0:0/96");
-  var NAT64_WELL_KNOWN_SUBNET = new Address6("64:ff9b::/96");
-  var NAT64_LOCAL_USE_SUBNET = new Address6("64:ff9b:1::/48");
 });
 
 // /zveltio-extension/node_modules/ip-address/dist/ip-address.js
@@ -55486,7 +55254,7 @@ var require_imap_flow = __commonJS((exports, module) => {
   exports.ImapFlow = ImapFlow;
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/util.js
+// /zveltio-extension/node_modules/encoding-japanese/src/util.js
 var require_util3 = __commonJS((exports) => {
   var config2 = require_config2();
   var fromCharCode = String.fromCharCode;
@@ -55939,7 +55707,7 @@ var require_util3 = __commonJS((exports) => {
   exports.base64decode = base64decode;
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/utf8-to-jis-table.js
+// /zveltio-extension/node_modules/encoding-japanese/src/utf8-to-jis-table.js
 var require_utf8_to_jis_table2 = __commonJS((exports, module) => {
   module.exports = {
     15711649: 33,
@@ -63336,7 +63104,7 @@ var require_utf8_to_jis_table2 = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/utf8-to-jis-alias-table.js
+// /zveltio-extension/node_modules/encoding-japanese/src/utf8-to-jis-alias-table.js
 var require_utf8_to_jis_alias_table = __commonJS((exports, module) => {
   module.exports = {
     14846098: 8541,
@@ -63346,7 +63114,7 @@ var require_utf8_to_jis_alias_table = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/utf8-to-jisx0212-table.js
+// /zveltio-extension/node_modules/encoding-japanese/src/utf8-to-jisx0212-table.js
 var require_utf8_to_jisx0212_table2 = __commonJS((exports, module) => {
   module.exports = {
     52120: 8751,
@@ -69419,19 +69187,19 @@ var require_utf8_to_jisx0212_table2 = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/jis-to-utf8-table.js
+// /zveltio-extension/node_modules/encoding-japanese/src/jis-to-utf8-table.js
 var require_jis_to_utf8_table2 = __commonJS((exports, module) => {
   var JIS_TO_UTF8_TABLE = null;
   module.exports = JIS_TO_UTF8_TABLE;
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/jisx0212-to-utf8-table.js
+// /zveltio-extension/node_modules/encoding-japanese/src/jisx0212-to-utf8-table.js
 var require_jisx0212_to_utf8_table2 = __commonJS((exports, module) => {
   var JISX0212_TO_UTF8_TABLE = null;
   module.exports = JISX0212_TO_UTF8_TABLE;
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/encoding-table.js
+// /zveltio-extension/node_modules/encoding-japanese/src/encoding-table.js
 var require_encoding_table2 = __commonJS((exports) => {
   exports.UTF8_TO_JIS_TABLE = require_utf8_to_jis_table2();
   exports.UTF8_TO_JIS_ALIAS_TABLE = require_utf8_to_jis_alias_table();
@@ -69440,7 +69208,7 @@ var require_encoding_table2 = __commonJS((exports) => {
   exports.JISX0212_TO_UTF8_TABLE = require_jisx0212_to_utf8_table2();
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/config.js
+// /zveltio-extension/node_modules/encoding-japanese/src/config.js
 var require_config2 = __commonJS((exports) => {
   var util = require_util3();
   var EncodingTable = require_encoding_table2();
@@ -69558,7 +69326,7 @@ var require_config2 = __commonJS((exports) => {
   exports.init_JIS_TO_UTF8_TABLE = init_JIS_TO_UTF8_TABLE;
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/encoding-detect.js
+// /zveltio-extension/node_modules/encoding-japanese/src/encoding-detect.js
 var require_encoding_detect2 = __commonJS((exports) => {
   function isBINARY(data) {
     var i = 0;
@@ -69913,7 +69681,7 @@ var require_encoding_detect2 = __commonJS((exports) => {
   exports.isUNICODE = isUNICODE;
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/sjis-ext.js
+// /zveltio-extension/node_modules/encoding-japanese/src/sjis-ext.js
 var require_sjis_ext2 = __commonJS((exports) => {
   var CP932_IBM_EXT_SYMBOL_MAP = [
     61167,
@@ -69999,7 +69767,7 @@ var require_sjis_ext2 = __commonJS((exports) => {
   exports.hasCP932DuplicateCode = hasCP932DuplicateCode;
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/encoding-convert.js
+// /zveltio-extension/node_modules/encoding-japanese/src/encoding-convert.js
 var require_encoding_convert2 = __commonJS((exports) => {
   var config2 = require_config2();
   var util = require_util3();
@@ -71282,7 +71050,7 @@ var require_encoding_convert2 = __commonJS((exports) => {
   }
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/kana-case-table.js
+// /zveltio-extension/node_modules/encoding-japanese/src/kana-case-table.js
 var require_kana_case_table2 = __commonJS((exports) => {
   exports.HANKANA_TABLE = {
     12289: 65380,
@@ -71422,7 +71190,7 @@ var require_kana_case_table2 = __commonJS((exports) => {
   ];
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/package.json
+// /zveltio-extension/node_modules/encoding-japanese/package.json
 var require_package4 = __commonJS((exports, module) => {
   module.exports = {
     name: "encoding-japanese",
@@ -71502,7 +71270,7 @@ var require_package4 = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/encoding-japanese/src/index.js
+// /zveltio-extension/node_modules/encoding-japanese/src/index.js
 var require_src2 = __commonJS((exports, module) => {
   var config2 = require_config2();
   var util = require_util3();
@@ -71857,7 +71625,7 @@ var require_src2 = __commonJS((exports, module) => {
   module.exports = Encoding;
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/libmime/lib/charsets.js
+// /zveltio-extension/node_modules/libmime/lib/charsets.js
 var require_charsets3 = __commonJS((exports, module) => {
   module.exports = {
     "866": "IBM866",
@@ -72069,20 +71837,25 @@ var require_charsets3 = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/libmime/lib/charset.js
+// /zveltio-extension/node_modules/libmime/lib/charset.js
 var require_charset2 = __commonJS((exports, module) => {
   var { Buffer: Buffer2 } = __require("buffer");
   var iconv = require_lib();
   var encodingJapanese = require_src2();
   var charsets = require_charsets3();
+  var UNSUPPORTED_CODECS = new Set(["utf7", "utf7imap", "base64", "hex"]);
+  var isUnsupportedCodec = (name) => UNSUPPORTED_CODECS.has(name.toLowerCase().replace(/:\d{4}$|[^0-9a-z]/g, ""));
   var charset = module.exports = {
     encode(str) {
       return Buffer2.from(str, "utf-8");
     },
     decode(buf, fromCharset) {
       fromCharset = charset.normalizeCharset(fromCharset || "UTF-8");
-      if (/^(us-)?ascii|utf-8|7bit$/i.test(fromCharset)) {
+      if (/^(?:(?:us-)?ascii|utf-8|7bit)$/i.test(fromCharset)) {
         return buf.toString("utf-8");
+      }
+      if (isUnsupportedCodec(fromCharset)) {
+        return buf.toString();
       }
       try {
         if (/^jis|^iso-?2022-?jp|^EUCJP/i.test(fromCharset)) {
@@ -72109,7 +71882,7 @@ var require_charset2 = __commonJS((exports, module) => {
       fromCharset = charset.normalizeCharset(fromCharset || "UTF-8");
       let bufString;
       if (typeof data !== "string") {
-        if (/^(us-)?ascii|utf-8|7bit$/i.test(fromCharset)) {
+        if (/^(?:(?:us-)?ascii|utf-8|7bit)$/i.test(fromCharset)) {
           return data;
         }
         bufString = charset.decode(data, fromCharset);
@@ -72131,7 +71904,7 @@ var require_charset2 = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/libmime/node_modules/libbase64/lib/libbase64.js
+// /zveltio-extension/node_modules/libbase64/lib/libbase64.js
 var require_libbase642 = __commonJS((exports, module) => {
   var { Buffer: Buffer2 } = __require("buffer");
   var stream = __require("stream");
@@ -72348,7 +72121,7 @@ var require_libbase642 = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/libmime/node_modules/libqp/lib/libqp.js
+// /zveltio-extension/node_modules/libqp/lib/libqp.js
 var require_libqp2 = __commonJS((exports, module) => {
   var { Buffer: Buffer2 } = __require("buffer");
   var stream = __require("stream");
@@ -72357,6 +72130,9 @@ var require_libqp2 = __commonJS((exports, module) => {
     if (typeof buffer === "string") {
       buffer = Buffer2.from(buffer, "utf-8");
     }
+    return encodeBytes(buffer, true);
+  }
+  function encodeBytes(buffer, lineStart) {
     let ranges = [
       [9],
       [10],
@@ -72368,7 +72144,7 @@ var require_libqp2 = __commonJS((exports, module) => {
     let ord;
     for (let i = 0, len = buffer.length;i < len; i++) {
       ord = buffer[i];
-      if (checkRanges(ord, ranges) && !((ord === 32 || ord === 9) && (i === len - 1 || buffer[i + 1] === 10 || buffer[i + 1] === 13))) {
+      if (checkRanges(ord, ranges) && !((ord === 32 || ord === 9) && (i === len - 1 || buffer[i + 1] === 10 || buffer[i + 1] === 13)) && !(ord === 45 && (i === 0 ? lineStart : buffer[i - 1] === 10))) {
         result += String.fromCharCode(ord);
         continue;
       }
@@ -72377,18 +72153,43 @@ var require_libqp2 = __commonJS((exports, module) => {
     return result;
   }
   function decode3(str) {
-    str = (Buffer2.isBuffer(str) ? str.toString("binary") : (str || "").toString()).replace(/[\t ]+$/gm, "").replace(/\=(?:\r?\n|$)/g, "");
-    let encodedBytesCount = (str.match(/\=[\da-fA-F]{2}/g) || []).length, bufferLength = str.length - encodedBytesCount * 2, chr, hex3, buffer = Buffer2.alloc(bufferLength), bufferPos = 0;
-    for (let i = 0, len = str.length;i < len; i++) {
-      chr = str.charAt(i);
-      if (chr === "=" && (hex3 = str.substr(i + 1, 2)) && /[\da-fA-F]{2}/.test(hex3)) {
-        buffer[bufferPos++] = parseInt(hex3, 16);
+    str = (Buffer2.isBuffer(str) ? str.toString("binary") : (str || "").toString()).replace(/(^|[^ \t])[ \t]+(?=[\n\r\u2028\u2029]|$)/g, "$1").replace(/\=(?:\r?\n|$)/g, "");
+    let len = str.length;
+    let encodedBytesCount = 0;
+    for (let i = str.indexOf("=");i >= 0 && i < len - 2; i = str.indexOf("=", i + 1)) {
+      if (hexValue(str.charCodeAt(i + 1)) >= 0 && hexValue(str.charCodeAt(i + 2)) >= 0) {
+        encodedBytesCount++;
         i += 2;
-        continue;
       }
-      buffer[bufferPos++] = chr.charCodeAt(0);
+    }
+    let buffer = Buffer2.alloc(len - encodedBytesCount * 2);
+    let bufferPos = 0;
+    for (let i = 0;i < len; i++) {
+      let code = str.charCodeAt(i);
+      if (code === 61 && i < len - 2) {
+        let hi = hexValue(str.charCodeAt(i + 1));
+        let lo = hexValue(str.charCodeAt(i + 2));
+        if (hi >= 0 && lo >= 0) {
+          buffer[bufferPos++] = hi * 16 + lo;
+          i += 2;
+          continue;
+        }
+      }
+      buffer[bufferPos++] = code;
     }
     return buffer;
+  }
+  function hexValue(code) {
+    if (code >= 48 && code <= 57) {
+      return code - 48;
+    }
+    if (code >= 65 && code <= 70) {
+      return code - 65 + 10;
+    }
+    if (code >= 97 && code <= 102) {
+      return code - 97 + 10;
+    }
+    return -1;
   }
   function wrap(str, lineLength) {
     str = (str || "").toString();
@@ -72396,9 +72197,18 @@ var require_libqp2 = __commonJS((exports, module) => {
     if (str.length <= lineLength) {
       return str;
     }
-    let pos = 0, len = str.length, match2, code, line, lineMargin = Math.floor(lineLength / 3), result = "";
+    let pos = 0, len = str.length, match2, code, line, maxLength, afterSoftBreak = false, lineMargin = Math.floor(lineLength / 3), result = "";
     while (pos < len) {
-      line = str.substr(pos, lineLength);
+      maxLength = lineLength;
+      if (afterSoftBreak) {
+        afterSoftBreak = false;
+        if (str.charAt(pos) === "-") {
+          result += "=2D";
+          pos++;
+          maxLength -= 3;
+        }
+      }
+      line = str.substr(pos, maxLength);
       if (match2 = line.match(/\r\n/)) {
         line = line.substr(0, match2.index + match2[0].length);
         result += line;
@@ -72415,7 +72225,7 @@ var require_libqp2 = __commonJS((exports, module) => {
         result += line;
         pos += line.length;
         continue;
-      } else if (line.length > lineLength - lineMargin && (match2 = line.substr(-lineMargin).match(/[ \t\.,!\?][^ \t\.,!\?]*$/))) {
+      } else if (line.length > maxLength - lineMargin && (match2 = line.substr(-lineMargin).match(/[ \t\.,!\?][^ \t\.,!\?]*$/))) {
         line = line.substr(0, line.length - (match2[0].length - 1));
       } else if (line.match(/\=[\da-f]{0,2}$/i)) {
         if (match2 = line.match(/\=[\da-f]{0,1}$/i)) {
@@ -72434,14 +72244,15 @@ var require_libqp2 = __commonJS((exports, module) => {
       }
       if (pos + line.length < len && line.substr(-1) !== `
 `) {
-        if (line.length === lineLength && line.match(/\=[\da-f]{2}$/i)) {
+        if (line.length === maxLength && line.match(/\=[\da-f]{2}$/i)) {
           line = line.substr(0, line.length - 3);
-        } else if (line.length === lineLength) {
+        } else if (line.length === maxLength) {
           line = line.substr(0, line.length - 1);
         }
         pos += line.length;
         line += `=\r
 `;
+        afterSoftBreak = true;
       } else {
         pos += line.length;
       }
@@ -72472,6 +72283,7 @@ var require_libqp2 = __commonJS((exports, module) => {
         this.options.lineLength = this.options.lineLength || 76;
       }
       this._curLine = "";
+      this._lineStart = true;
       this.inputBytes = 0;
       this.outputBytes = 0;
       Transform.call(this, this.options);
@@ -72485,8 +72297,10 @@ var require_libqp2 = __commonJS((exports, module) => {
         return done();
       }
       this.inputBytes += chunk.length;
+      let lineStart = this._lineStart;
+      this._lineStart = chunk[chunk.length - 1] === 10;
       if (this.options.lineLength) {
-        qp = this._curLine + encode3(chunk);
+        qp = this._curLine + encodeBytes(chunk, lineStart);
         qp = wrap(qp, this.options.lineLength);
         qp = qp.replace(/(^|\n)([^\n]*)$/, (match2, lineBreak, lastLine) => {
           this._curLine = lastLine;
@@ -72497,7 +72311,7 @@ var require_libqp2 = __commonJS((exports, module) => {
           this.push(qp);
         }
       } else {
-        qp = encode3(chunk);
+        qp = encodeBytes(chunk, lineStart);
         this.outputBytes += qp.length;
         this.push(qp, "ascii");
       }
@@ -72529,13 +72343,13 @@ var require_libqp2 = __commonJS((exports, module) => {
       if (typeof chunk === "string") {
         chunk = Buffer2.from(chunk, encoding);
       }
-      this.qpChunks.push(chunk);
+      this.qpChunks.push(chunk.toString("binary"));
       this.inputBytes += chunk.length;
       done();
     }
     _flush(done) {
       if (this.inputBytes) {
-        let buf = decode3(Buffer2.concat(this.qpChunks, this.inputBytes));
+        let buf = decode3(this.qpChunks.join(""));
         this.outputBytes += buf.length;
         this.push(buf);
       }
@@ -72551,7 +72365,7 @@ var require_libqp2 = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/libmime/lib/mimetypes.js
+// /zveltio-extension/node_modules/libmime/lib/mimetypes.js
 var require_mimetypes2 = __commonJS((exports, module) => {
   module.exports = {
     list: {
@@ -74599,7 +74413,7 @@ var require_mimetypes2 = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/libmime/lib/libmime.js
+// /zveltio-extension/node_modules/libmime/lib/libmime.js
 var require_libmime2 = __commonJS((exports, module) => {
   var { Buffer: Buffer2 } = __require("buffer");
   var libcharset = require_charset2();
@@ -74785,14 +74599,15 @@ var require_libmime2 = __commonJS((exports, module) => {
       if (!firstMatch) {
         return decodedValue;
       }
-      let lastMatch = decodedValue.match(/([\u0080-\uFFFF][^\s]*)[^\u0080-\uFFFF]*$/);
-      if (!lastMatch) {
-        return decodedValue;
-      }
       let startIndex = firstMatch.index + (firstMatch[0].match(/[^\s]/) || {
         index: 0
       }).index;
-      let endIndex = lastMatch.index + (lastMatch[1] || "").length;
+      let lastIndex = decodedValue.length - 1;
+      while (lastIndex >= 0 && decodedValue.charCodeAt(lastIndex) < 128) {
+        lastIndex--;
+      }
+      let wordEnd = decodedValue.slice(lastIndex + 1).search(/\s/);
+      let endIndex = wordEnd < 0 ? decodedValue.length : lastIndex + 1 + wordEnd;
       encodedValue = (startIndex ? decodedValue.substr(0, startIndex) : "") + this.encodeWord(decodedValue.substring(startIndex, endIndex), mimeWordEncoding || "Q", maxLength) + (endIndex < decodedValue.length ? decodedValue.substr(endIndex) : "");
       return encodedValue;
     }
@@ -74875,6 +74690,12 @@ var require_libmime2 = __commonJS((exports, module) => {
         value: false,
         params: {}
       };
+      Object.defineProperty(response, "decodedParams", {
+        value: [],
+        writable: true,
+        enumerable: false,
+        configurable: true
+      });
       let key = false;
       let value = "";
       let valueEnd = 0;
@@ -74967,6 +74788,7 @@ var require_libmime2 = __commonJS((exports, module) => {
       }
       for (let [key2, continuation] of continuations) {
         let value2 = continuation.values.sort((a, b) => a.nr - b.nr).map((val) => val.value).join("");
+        response.decodedParams.push(key2);
         if (!continuation.charset) {
           setOwnProperty(response.params, key2, this.decodeWords(value2));
           continue;
@@ -75195,7 +75017,7 @@ var require_libmime2 = __commonJS((exports, module) => {
   module.exports.Libmime = Libmime;
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/lib/headers.js
+// /zveltio-extension/node_modules/@zone-eu/mailsplit/lib/headers.js
 var require_headers2 = __commonJS((exports, module) => {
   var libmime = require_libmime2();
   var Libmime = libmime.Libmime;
@@ -75392,7 +75214,12 @@ var require_headers2 = __commonJS((exports, module) => {
         this.parsed = true;
         return;
       }
-      let rawLines = this.headers.toString("binary").replace(/[\r\n]+$/, "").split(/\r?\n/);
+      let raw2 = this.headers.toString("binary");
+      let end = raw2.length;
+      while (end > 0 && (raw2.charCodeAt(end - 1) === 10 || raw2.charCodeAt(end - 1) === 13)) {
+        end--;
+      }
+      let rawLines = raw2.slice(0, end).split(/\r?\n/);
       let i = 1;
       let first = rawLines[0];
       while (i < rawLines.length && this._isFoldingChar(rawLines[i].charAt(0))) {
@@ -75407,17 +75234,25 @@ var require_headers2 = __commonJS((exports, module) => {
       } else {
         lines.push({ key: this._normalizeHeader(first.substr(0, first.indexOf(":"))), line: first });
       }
+      let keyPending = false;
       for (;i < rawLines.length; i++) {
         let currentLine = rawLines[i];
         if (this._isFoldingChar(currentLine.charAt(0))) {
           let entry = lines[lines.length - 1];
+          if (keyPending) {
+            let colon = currentLine.indexOf(":");
+            if (colon >= 0) {
+              entry.key = this._normalizeHeader(entry.line + `\r
+` + currentLine.substr(0, colon));
+              keyPending = false;
+            }
+          }
           entry.line += `\r
 ` + currentLine;
-          if (!entry.key) {
-            entry.key = this._normalizeHeader(entry.line.substr(0, entry.line.indexOf(":")));
-          }
         } else {
-          lines.push({ key: this._normalizeHeader(currentLine.substr(0, currentLine.indexOf(":"))), line: currentLine });
+          let colon = currentLine.indexOf(":");
+          lines.push({ key: this._normalizeHeader(currentLine.substr(0, colon)), line: currentLine });
+          keyPending = colon < 0;
         }
       }
       this.lines = lines;
@@ -75438,7 +75273,7 @@ var require_headers2 = __commonJS((exports, module) => {
   module.exports = Headers2;
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/node_modules/libqp/lib/libqp.js
+// /zveltio-extension/node_modules/libqp/lib/libqp.js
 var require_libqp3 = __commonJS((exports, module) => {
   var { Buffer: Buffer2 } = __require("buffer");
   var stream = __require("stream");
@@ -75447,6 +75282,9 @@ var require_libqp3 = __commonJS((exports, module) => {
     if (typeof buffer === "string") {
       buffer = Buffer2.from(buffer, "utf-8");
     }
+    return encodeBytes(buffer, true);
+  }
+  function encodeBytes(buffer, lineStart) {
     let ranges = [
       [9],
       [10],
@@ -75458,7 +75296,7 @@ var require_libqp3 = __commonJS((exports, module) => {
     let ord;
     for (let i = 0, len = buffer.length;i < len; i++) {
       ord = buffer[i];
-      if (checkRanges(ord, ranges) && !((ord === 32 || ord === 9) && (i === len - 1 || buffer[i + 1] === 10 || buffer[i + 1] === 13))) {
+      if (checkRanges(ord, ranges) && !((ord === 32 || ord === 9) && (i === len - 1 || buffer[i + 1] === 10 || buffer[i + 1] === 13)) && !(ord === 45 && (i === 0 ? lineStart : buffer[i - 1] === 10))) {
         result += String.fromCharCode(ord);
         continue;
       }
@@ -75467,18 +75305,43 @@ var require_libqp3 = __commonJS((exports, module) => {
     return result;
   }
   function decode3(str) {
-    str = (Buffer2.isBuffer(str) ? str.toString("binary") : (str || "").toString()).replace(/[\t ]+$/gm, "").replace(/\=(?:\r?\n|$)/g, "");
-    let encodedBytesCount = (str.match(/\=[\da-fA-F]{2}/g) || []).length, bufferLength = str.length - encodedBytesCount * 2, chr, hex3, buffer = Buffer2.alloc(bufferLength), bufferPos = 0;
-    for (let i = 0, len = str.length;i < len; i++) {
-      chr = str.charAt(i);
-      if (chr === "=" && (hex3 = str.substr(i + 1, 2)) && /[\da-fA-F]{2}/.test(hex3)) {
-        buffer[bufferPos++] = parseInt(hex3, 16);
+    str = (Buffer2.isBuffer(str) ? str.toString("binary") : (str || "").toString()).replace(/(^|[^ \t])[ \t]+(?=[\n\r\u2028\u2029]|$)/g, "$1").replace(/\=(?:\r?\n|$)/g, "");
+    let len = str.length;
+    let encodedBytesCount = 0;
+    for (let i = str.indexOf("=");i >= 0 && i < len - 2; i = str.indexOf("=", i + 1)) {
+      if (hexValue(str.charCodeAt(i + 1)) >= 0 && hexValue(str.charCodeAt(i + 2)) >= 0) {
+        encodedBytesCount++;
         i += 2;
-        continue;
       }
-      buffer[bufferPos++] = chr.charCodeAt(0);
+    }
+    let buffer = Buffer2.alloc(len - encodedBytesCount * 2);
+    let bufferPos = 0;
+    for (let i = 0;i < len; i++) {
+      let code = str.charCodeAt(i);
+      if (code === 61 && i < len - 2) {
+        let hi = hexValue(str.charCodeAt(i + 1));
+        let lo = hexValue(str.charCodeAt(i + 2));
+        if (hi >= 0 && lo >= 0) {
+          buffer[bufferPos++] = hi * 16 + lo;
+          i += 2;
+          continue;
+        }
+      }
+      buffer[bufferPos++] = code;
     }
     return buffer;
+  }
+  function hexValue(code) {
+    if (code >= 48 && code <= 57) {
+      return code - 48;
+    }
+    if (code >= 65 && code <= 70) {
+      return code - 65 + 10;
+    }
+    if (code >= 97 && code <= 102) {
+      return code - 97 + 10;
+    }
+    return -1;
   }
   function wrap(str, lineLength) {
     str = (str || "").toString();
@@ -75486,9 +75349,18 @@ var require_libqp3 = __commonJS((exports, module) => {
     if (str.length <= lineLength) {
       return str;
     }
-    let pos = 0, len = str.length, match2, code, line, lineMargin = Math.floor(lineLength / 3), result = "";
+    let pos = 0, len = str.length, match2, code, line, maxLength, afterSoftBreak = false, lineMargin = Math.floor(lineLength / 3), result = "";
     while (pos < len) {
-      line = str.substr(pos, lineLength);
+      maxLength = lineLength;
+      if (afterSoftBreak) {
+        afterSoftBreak = false;
+        if (str.charAt(pos) === "-") {
+          result += "=2D";
+          pos++;
+          maxLength -= 3;
+        }
+      }
+      line = str.substr(pos, maxLength);
       if (match2 = line.match(/\r\n/)) {
         line = line.substr(0, match2.index + match2[0].length);
         result += line;
@@ -75505,7 +75377,7 @@ var require_libqp3 = __commonJS((exports, module) => {
         result += line;
         pos += line.length;
         continue;
-      } else if (line.length > lineLength - lineMargin && (match2 = line.substr(-lineMargin).match(/[ \t\.,!\?][^ \t\.,!\?]*$/))) {
+      } else if (line.length > maxLength - lineMargin && (match2 = line.substr(-lineMargin).match(/[ \t\.,!\?][^ \t\.,!\?]*$/))) {
         line = line.substr(0, line.length - (match2[0].length - 1));
       } else if (line.match(/\=[\da-f]{0,2}$/i)) {
         if (match2 = line.match(/\=[\da-f]{0,1}$/i)) {
@@ -75524,14 +75396,15 @@ var require_libqp3 = __commonJS((exports, module) => {
       }
       if (pos + line.length < len && line.substr(-1) !== `
 `) {
-        if (line.length === lineLength && line.match(/\=[\da-f]{2}$/i)) {
+        if (line.length === maxLength && line.match(/\=[\da-f]{2}$/i)) {
           line = line.substr(0, line.length - 3);
-        } else if (line.length === lineLength) {
+        } else if (line.length === maxLength) {
           line = line.substr(0, line.length - 1);
         }
         pos += line.length;
         line += `=\r
 `;
+        afterSoftBreak = true;
       } else {
         pos += line.length;
       }
@@ -75562,6 +75435,7 @@ var require_libqp3 = __commonJS((exports, module) => {
         this.options.lineLength = this.options.lineLength || 76;
       }
       this._curLine = "";
+      this._lineStart = true;
       this.inputBytes = 0;
       this.outputBytes = 0;
       Transform.call(this, this.options);
@@ -75575,8 +75449,10 @@ var require_libqp3 = __commonJS((exports, module) => {
         return done();
       }
       this.inputBytes += chunk.length;
+      let lineStart = this._lineStart;
+      this._lineStart = chunk[chunk.length - 1] === 10;
       if (this.options.lineLength) {
-        qp = this._curLine + encode3(chunk);
+        qp = this._curLine + encodeBytes(chunk, lineStart);
         qp = wrap(qp, this.options.lineLength);
         qp = qp.replace(/(^|\n)([^\n]*)$/, (match2, lineBreak, lastLine) => {
           this._curLine = lastLine;
@@ -75587,7 +75463,7 @@ var require_libqp3 = __commonJS((exports, module) => {
           this.push(qp);
         }
       } else {
-        qp = encode3(chunk);
+        qp = encodeBytes(chunk, lineStart);
         this.outputBytes += qp.length;
         this.push(qp, "ascii");
       }
@@ -75619,13 +75495,13 @@ var require_libqp3 = __commonJS((exports, module) => {
       if (typeof chunk === "string") {
         chunk = Buffer2.from(chunk, encoding);
       }
-      this.qpChunks.push(chunk);
+      this.qpChunks.push(chunk.toString("binary"));
       this.inputBytes += chunk.length;
       done();
     }
     _flush(done) {
       if (this.inputBytes) {
-        let buf = decode3(Buffer2.concat(this.qpChunks, this.inputBytes));
+        let buf = decode3(this.qpChunks.join(""));
         this.outputBytes += buf.length;
         this.push(buf);
       }
@@ -75641,7 +75517,7 @@ var require_libqp3 = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/node_modules/libbase64/lib/libbase64.js
+// /zveltio-extension/node_modules/libbase64/lib/libbase64.js
 var require_libbase643 = __commonJS((exports, module) => {
   var { Buffer: Buffer2 } = __require("buffer");
   var stream = __require("stream");
@@ -75858,7 +75734,7 @@ var require_libbase643 = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/lib/mime-node.js
+// /zveltio-extension/node_modules/@zone-eu/mailsplit/lib/mime-node.js
 var require_mime_node2 = __commonJS((exports, module) => {
   var Headers2 = require_headers2();
   var libmime = require_libmime2();
@@ -75867,6 +75743,7 @@ var require_mime_node2 = __commonJS((exports, module) => {
   var PassThrough = __require("stream").PassThrough;
   var pathlib = __require("path");
   var Libmime = libmime.Libmime;
+  var HEADER_LINE_MIN_COST = 64;
   function stripComments(value) {
     if (value.indexOf("(") < 0) {
       return value;
@@ -75880,6 +75757,38 @@ var require_mime_node2 = __commonJS((exports, module) => {
       return end > start ? part.slice(0, start) + part.slice(end + 1) : part;
     }).join("");
   }
+  function rfc2231ParamNames(value) {
+    let names = new Set;
+    let quote = false;
+    let escaped = false;
+    let start = 0;
+    let addSegment = (end) => {
+      let segment = value.substring(start, end);
+      let eq2 = segment.indexOf("=");
+      if (eq2 < 0) {
+        return;
+      }
+      let match2 = segment.substring(0, eq2).trim().toLowerCase().match(/^(.+?)\*(\d+\*?)?$/);
+      if (match2) {
+        names.add(match2[1]);
+      }
+    };
+    for (let i = 0;i < value.length; i++) {
+      let chr = value.charAt(i);
+      if (escaped) {
+        escaped = false;
+      } else if (chr === "\\") {
+        escaped = true;
+      } else if (chr === '"') {
+        quote = !quote;
+      } else if (chr === ";" && !quote) {
+        addSegment(i);
+        start = i + 1;
+      }
+    }
+    addSegment(value.length);
+    return names;
+  }
 
   class MimeNode {
     constructor(parentNode, config2) {
@@ -75890,6 +75799,7 @@ var require_mime_node2 = __commonJS((exports, module) => {
       this._parentBoundaryOwner = this.parentNode || false;
       this._headersLines = [];
       this._headerlen = 0;
+      this._headerCost = 0;
       this._parsedContentType = false;
       this._parsedContentDisposition = false;
       this._boundary = false;
@@ -75920,18 +75830,26 @@ var require_mime_node2 = __commonJS((exports, module) => {
     }
     addHeaderChunk(line) {
       if (!line) {
-        return;
+        return false;
       }
       this._headersLines.push(line);
       this._headerlen += line.length;
+      let endsBlock = line.length === 1 && line[0] === 10 || line.length === 2 && line[0] === 13 && line[1] === 10;
+      this._headerCost += endsBlock ? line.length : Math.max(line.length, HEADER_LINE_MIN_COST);
+      return endsBlock;
+    }
+    headerCost(extra) {
+      return this._headerCost + (extra ? Math.max(extra, HEADER_LINE_MIN_COST) : 0);
     }
     parseHeaders() {
       if (this.headers) {
         return;
       }
       this.headers = new Headers2(Buffer.concat(this._headersLines, this._headerlen), this.config);
+      this._headersLines = [];
       let headers = this.headers;
-      this._parsedContentDisposition = this.libmime.parseHeaderValue(headers.getFirst("Content-Disposition"));
+      let dispositionHeader = headers.getFirst("Content-Disposition");
+      this._parsedContentDisposition = this.libmime.parseHeaderValue(dispositionHeader);
       let parsedContentDisposition = this._parsedContentDisposition;
       let contentHeader;
       if (headers.get("Content-Type").length) {
@@ -75970,9 +75888,12 @@ var require_mime_node2 = __commonJS((exports, module) => {
         }
       }
       if (this.filename) {
-        try {
-          this.filename = this.libmime.decodeWords(this.filename);
-        } catch (E) {}
+        let decoded = parsedContentDisposition.params.filename ? rfc2231ParamNames(dispositionHeader).has("filename") : rfc2231ParamNames(contentHeader).has("name");
+        if (!decoded) {
+          try {
+            this.filename = this.libmime.decodeWords(this.filename);
+          } catch (E) {}
+        }
       }
       this.multipart = this.contentType && this.contentType.substr(0, this.contentType.indexOf("/")) === "multipart" && this.contentType.substr(this.contentType.indexOf("/") + 1) || false;
       this._boundary = parsedContentType.params.boundary && Buffer.from(parsedContentType.params.boundary) || false;
@@ -76093,7 +76014,7 @@ var require_mime_node2 = __commonJS((exports, module) => {
   module.exports = MimeNode;
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/lib/message-splitter.js
+// /zveltio-extension/node_modules/@zone-eu/mailsplit/lib/message-splitter.js
 var require_message_splitter2 = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
   var MimeNode = require_mime_node2();
@@ -76137,6 +76058,7 @@ var require_message_splitter2 = __commonJS((exports, module) => {
       this.nodeCounter = 0;
       this.node = null;
       this.inEpilogue = false;
+      this.delimiterOwner = false;
       this.newNode();
       this.lineChunks = [];
       this.lineLength = 0;
@@ -76366,13 +76288,25 @@ var require_message_splitter2 = __commonJS((exports, module) => {
       if (!this.inEpilogue && this.node._boundary && (boundary = this.compareBoundary(line, startpos, this.node._boundary))) {
         return boundary;
       }
-      if (this.node._parentBoundary && (boundary = this.compareBoundary(line, startpos, this.node._parentBoundary))) {
-        return boundary + 2;
+      for (let owner = this.node._parentBoundaryOwner;owner; owner = owner._parentBoundaryOwner) {
+        if (owner._boundary && (boundary = this.compareBoundary(line, startpos, owner._boundary))) {
+          this.delimiterOwner = owner;
+          return boundary + 2;
+        }
       }
       return false;
     }
+    maxBoundaryLength() {
+      let max = this.node._boundary ? this.node._boundary.length : 0;
+      for (let owner = this.node._parentBoundaryOwner;owner; owner = owner._parentBoundaryOwner) {
+        if (owner._boundary && owner._boundary.length > max) {
+          max = owner._boundary.length;
+        }
+      }
+      return max;
+    }
     checkHeadSize(extra) {
-      if (this.node._headerlen + (extra || 0) > this.maxHeadSize) {
+      if (this.node.headerCost(extra) > this.maxHeadSize) {
         return maxLenError("Max header size for a MIME node exceeded");
       }
       return null;
@@ -76381,8 +76315,7 @@ var require_message_splitter2 = __commonJS((exports, module) => {
       if (!this.lineLength) {
         return null;
       }
-      let maxBoundaryLength = Math.max(this.node._boundary ? this.node._boundary.length : 0, this.node._parentBoundary ? this.node._parentBoundary.length : 0);
-      if (this.lineLength <= maxBoundaryLength + BOUNDARY_LINE_OVERHEAD) {
+      if (this.lineLength <= this.maxBoundaryLength() + BOUNDARY_LINE_OVERHEAD) {
         return null;
       }
       if (this.state === HEAD) {
@@ -76428,7 +76361,7 @@ var require_message_splitter2 = __commonJS((exports, module) => {
           case 2:
             break;
           case 3: {
-            this.newNode(this.parentMultipartNode());
+            this.newNode(this.delimiterOwner);
             flush = true;
             break;
           }
@@ -76437,7 +76370,7 @@ var require_message_splitter2 = __commonJS((exports, module) => {
               this.node.parseHeaders();
               this.push(this.node);
             }
-            let parentNode = this.parentMultipartNode();
+            let parentNode = this.delimiterOwner;
             if (parentNode) {
               this.node = parentNode;
               this.inEpilogue = true;
@@ -76454,12 +76387,12 @@ var require_message_splitter2 = __commonJS((exports, module) => {
       }
       switch (this.state) {
         case HEAD: {
-          this.node.addHeaderChunk(line);
+          let endsBlock = this.node.addHeaderChunk(line);
           let headSizeError = this.checkHeadSize();
           if (headSizeError) {
             return next(headSizeError);
           }
-          if (final || line.length === 1 && line[0] === 10 || line.length === 2 && line[0] === 13 && line[1] === 10) {
+          if (final || endsBlock) {
             let currentNode = this.node;
             currentNode.parseHeaders();
             if (currentNode.contentType === "message/rfc822" && !this.config.ignoreEmbedded && (!currentNode.encoding || ["7bit", "8bit", "binary"].includes(currentNode.encoding)) && (this.config.defaultInlineEmbedded ? currentNode.disposition !== "attachment" : currentNode.disposition === "inline")) {
@@ -76489,9 +76422,6 @@ var require_message_splitter2 = __commonJS((exports, module) => {
       }
       next(null, false);
     }
-    parentMultipartNode() {
-      return this.node._parentBoundaryOwner || false;
-    }
     newNode(parent) {
       this.node = new MimeNode(parent || false, this.config);
       this.state = HEAD;
@@ -76502,7 +76432,7 @@ var require_message_splitter2 = __commonJS((exports, module) => {
   module.exports = MessageSplitter;
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/lib/message-joiner.js
+// /zveltio-extension/node_modules/@zone-eu/mailsplit/lib/message-joiner.js
 var require_message_joiner2 = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
 
@@ -76531,7 +76461,7 @@ var require_message_joiner2 = __commonJS((exports, module) => {
   module.exports = MessageJoiner;
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/lib/flowed-decoder.js
+// /zveltio-extension/node_modules/@zone-eu/mailsplit/lib/flowed-decoder.js
 var require_flowed_decoder2 = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
   var libmime = require_libmime2();
@@ -76568,7 +76498,7 @@ var require_flowed_decoder2 = __commonJS((exports, module) => {
   module.exports = FlowedDecoder;
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/lib/node-rewriter.js
+// /zveltio-extension/node_modules/@zone-eu/mailsplit/lib/node-rewriter.js
 var require_node_rewriter2 = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
   var FlowedDecoder = require_flowed_decoder2();
@@ -76711,7 +76641,7 @@ var require_node_rewriter2 = __commonJS((exports, module) => {
   module.exports = NodeRewriter;
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/lib/node-streamer.js
+// /zveltio-extension/node_modules/@zone-eu/mailsplit/lib/node-streamer.js
 var require_node_streamer2 = __commonJS((exports, module) => {
   var Transform = __require("stream").Transform;
   var FlowedDecoder = require_flowed_decoder2();
@@ -76801,7 +76731,7 @@ var require_node_streamer2 = __commonJS((exports, module) => {
   module.exports = NodeStreamer;
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/lib/chunked-passthrough.js
+// /zveltio-extension/node_modules/@zone-eu/mailsplit/lib/chunked-passthrough.js
 var require_chunked_passthrough2 = __commonJS((exports, module) => {
   var { Transform } = __require("stream");
 
@@ -76834,7 +76764,7 @@ var require_chunked_passthrough2 = __commonJS((exports, module) => {
   module.exports = ChunkedPassthrough;
 });
 
-// /zveltio-extension/node_modules/mailparser/node_modules/@zone-eu/mailsplit/index.js
+// /zveltio-extension/node_modules/@zone-eu/mailsplit/index.js
 var require_mailsplit2 = __commonJS((exports, module) => {
   var MessageSplitter = require_message_splitter2();
   var MessageJoiner = require_message_joiner2();
@@ -76859,8 +76789,50 @@ var exports_addressparser = {};
 __export(exports_addressparser, {
   default: () => addressparser_default
 });
+
+class TokenList {
+  constructor(str) {
+    this.str = str;
+    this.slots = new Int32Array(48);
+    this.length = 0;
+    this.cleaned = new Map;
+  }
+  push(kind, start, end) {
+    if ((this.length + 1) * 3 > this.slots.length) {
+      const grown = new Int32Array(this.slots.length * 2);
+      grown.set(this.slots);
+      this.slots = grown;
+    }
+    const at = this.length * 3;
+    this.slots[at] = kind;
+    this.slots[at + 1] = start;
+    this.slots[at + 2] = end;
+    return this.length++;
+  }
+  operatorAt(index) {
+    const at = index * 3;
+    return this.slots[at] & TOKEN_OPERATOR ? this.str.charAt(this.slots[at + 1]) : "";
+  }
+  isOperator(index) {
+    return (this.slots[index * 3] & TOKEN_OPERATOR) !== 0;
+  }
+  noBreak(index) {
+    return (this.slots[index * 3] & TOKEN_NO_BREAK) !== 0;
+  }
+  value(index) {
+    const cleaned = this.cleaned.get(index);
+    if (cleaned !== undefined) {
+      return cleaned;
+    }
+    return this.str.slice(this.slots[index * 3 + 1], this.slots[index * 3 + 2]);
+  }
+}
+function _domainAt(address) {
+  const literal2 = address.charAt(address.length - 1) === "]" ? DOMAIN_LITERAL_TAIL.exec(address) : null;
+  return literal2 ? address.length - literal2[1].length - 1 : address.lastIndexOf("@");
+}
 function _quoteLocalPart(address) {
-  const lastAt = address.lastIndexOf("@");
+  const lastAt = _domainAt(address);
   if (lastAt < 0) {
     return address;
   }
@@ -76869,6 +76841,9 @@ function _quoteLocalPart(address) {
     return address;
   }
   return '"' + user.replace(/["\\]/g, "\\$&") + '"@' + address.substr(lastAt + 1);
+}
+function _isAddrSpec(value) {
+  return ADDR_SPEC.test(value) || LITERAL_ADDR_SPEC.test(value);
 }
 function _isSpaceCode(code) {
   return code === 32 || code >= 9 && code <= 13 || code === 160 || code === 5760 || code >= 8192 && code <= 8202 || code === 8232 || code === 8233 || code === 8239 || code === 8287 || code === 12288 || code === 65279;
@@ -76886,6 +76861,37 @@ function _indexOfAt(text, from, to) {
     }
   }
   return -1;
+}
+function _joinAtSpacing(value, at) {
+  if (at < 0) {
+    return value;
+  }
+  let start = at;
+  while (start > 0 && _isSpaceCode(value.charCodeAt(start - 1))) {
+    start--;
+  }
+  let end = at + 1;
+  while (end < value.length && _isSpaceCode(value.charCodeAt(end))) {
+    end++;
+  }
+  return start === at && end === at + 1 ? value : value.slice(0, start) + "@" + value.slice(end);
+}
+function _collapseAtSpacing(value) {
+  const quoted = LEADING_QUOTED_STRING.exec(value);
+  if (quoted) {
+    let at2 = quoted[0].length;
+    while (at2 < value.length && _isSpaceCode(value.charCodeAt(at2))) {
+      at2++;
+    }
+    if (value.charAt(at2) === "@" && value.indexOf("@", at2 + 1) < 0) {
+      return _joinAtSpacing(value, at2);
+    }
+  }
+  const at = value.indexOf("@");
+  if (at < 0 || value.indexOf("@", at + 1) >= 0 || value.lastIndexOf('"') > at) {
+    return value;
+  }
+  return _joinAtSpacing(value, at);
 }
 function _looseAddressStart(text) {
   const len = text.length;
@@ -76936,6 +76942,7 @@ function _looseAddressStart(text) {
   return -1;
 }
 function _recoverAddrSpec(data) {
+  data.address = _collapseAtSpacing(data.address);
   if (!HAS_WHITESPACE.test(data.address)) {
     return;
   }
@@ -76953,7 +76960,7 @@ function _recoverAddrSpec(data) {
       return;
     }
     const parts = data.address.split(/\s+/);
-    let addrIndex = parts.findIndex((part) => ADDR_SPEC.test(part));
+    let addrIndex = parts.findIndex(_isAddrSpec);
     if (addrIndex < 0) {
       addrIndex = parts.findIndex((part) => LOOSE_ADDR_SPEC.test(part));
     }
@@ -76973,6 +76980,10 @@ function _stripAddressComments(address) {
   let depth = 0;
   let closer = "";
   let lastChar = "";
+  let pendingSpace = false;
+  let firstChar = "";
+  let quoteSeen = false;
+  let routeEnd = -1;
   for (let i = 0, len = address.length;i < len; i++) {
     const chr = address.charAt(i);
     if (depth) {
@@ -76984,14 +76995,18 @@ function _stripAddressComments(address) {
       } else if (chr === ")" && !--depth) {
         comments.push(comment.trim());
         comment = "";
-        if (lastChar !== "@" && address.charAt(i + 1) !== "@") {
-          result += " ";
-          lastChar = " ";
-        }
+        pendingSpace = lastChar !== "@";
       } else {
         comment += chr;
       }
       continue;
+    }
+    if (pendingSpace && chr !== "(") {
+      pendingSpace = false;
+      if (chr !== "@" && chr !== "<" && !_isSpaceCode(address.charCodeAt(i))) {
+        result += " ";
+        lastChar = " ";
+      }
     }
     if (closer) {
       if (chr === "\\" && closer === '"' && i < len - 1) {
@@ -77004,21 +77019,38 @@ function _stripAddressComments(address) {
       }
     } else if (chr === '"') {
       closer = '"';
+      quoteSeen = true;
+    } else if (chr === ":" && routeEnd < 0 && firstChar === "@" && !quoteSeen) {
+      routeEnd = result.length + 1;
     } else if (chr === "[") {
       closer = "]";
     } else if (chr === "(") {
       depth = 1;
       continue;
+    } else if (chr === "<") {
+      result = "";
+      lastChar = "";
+      comments.length = 0;
+      firstChar = "";
+      quoteSeen = false;
+      routeEnd = -1;
+      continue;
     }
     result += chr;
     lastChar = chr;
+    if (!firstChar && !_isSpaceCode(address.charCodeAt(i))) {
+      firstChar = chr;
+    }
+  }
+  if (routeEnd >= 0 && result.indexOf("@", routeEnd) >= 0) {
+    result = result.slice(routeEnd);
   }
   if (depth) {
     comments.push(comment.trim());
   }
   return { address: result.trim(), comments: comments.filter((text) => text) };
 }
-function _handleAddress(tokens, depth) {
+function _handleAddress(tokens, from, to, depth) {
   let isGroup = false;
   let state = "text";
   const addresses = [];
@@ -77027,15 +77059,18 @@ function _handleAddress(tokens, depth) {
     comment: [],
     group: [],
     text: [],
-    textWasQuoted: []
+    textWasQuoted: [],
+    quotedLocalAt: []
   };
   let insideQuotes = false;
+  let lastTextPureQuoted = false;
   const lastChars = { address: "", comment: "", group: "", text: "" };
-  for (let i = 0, len = tokens.length;i < len; i++) {
-    const token = tokens[i];
-    const prevToken = i ? tokens[i - 1] : null;
-    if (token.type === "operator") {
-      switch (token.value) {
+  for (let i = from;i < to; i++) {
+    const value = tokens.value(i);
+    const prevOperator = i > from ? tokens.operatorAt(i - 1) : "";
+    const prevNoBreak = i > from && tokens.noBreak(i - 1);
+    if (tokens.isOperator(i)) {
+      switch (value) {
         case "<":
           state = "address";
           insideQuotes = false;
@@ -77058,34 +77093,39 @@ function _handleAddress(tokens, depth) {
           insideQuotes = false;
           break;
       }
-    } else if (token.value) {
-      const prevPrevToken = i > 1 ? tokens[i - 2] : null;
-      const opensAfterEmptyQuotedString = prevToken?.type === "operator" && prevToken.value === '"' && !!prevToken.noBreak && prevPrevToken?.type === "operator" && prevPrevToken.value === '"';
-      if (state === "address") {
-        token.value = token.value.replace(/^[^<]*<\s*/, "");
-      }
+    } else {
+      const opensAfterEmptyQuotedString = prevOperator === '"' && prevNoBreak && i > from + 1 && tokens.operatorAt(i - 2) === '"';
       const parts = data[state];
-      const joins = prevToken && prevToken.noBreak && parts.length && (prevToken.value !== ")" || lastChars[state] === "@" || token.value.charAt(0) === "@");
+      const joins = prevNoBreak && parts.length && (prevOperator !== ")" || lastChars[state] === "@" || value.charAt(0) === "@");
       if (joins) {
-        data[state][data[state].length - 1] += token.value;
-        if (token.value) {
-          lastChars[state] = token.value.charAt(token.value.length - 1);
+        const last = data[state].length - 1;
+        if (state === "text" && !insideQuotes) {
+          if (lastTextPureQuoted && value.charAt(0) === "@") {
+            data.quotedLocalAt[last] = data.text[last].length;
+          }
+          lastTextPureQuoted = false;
         }
+        data[state][last] += value;
+        lastChars[state] = value.charAt(value.length - 1);
         if (state === "text" && insideQuotes) {
-          data.textWasQuoted[data.textWasQuoted.length - 1] = true;
+          data.textWasQuoted[last] = true;
         }
       } else {
-        data[state].push(token.value);
-        lastChars[state] = token.value.charAt(token.value.length - 1);
+        data[state].push(value);
+        lastChars[state] = value.charAt(value.length - 1);
         if (state === "text") {
           data.textWasQuoted.push(insideQuotes || opensAfterEmptyQuotedString);
+          data.quotedLocalAt.push(opensAfterEmptyQuotedString && value.charAt(0) === "@" ? 0 : -1);
+          lastTextPureQuoted = insideQuotes;
         }
       }
     }
   }
+  let textFromComment = false;
   if (!data.text.length && data.comment.length) {
     data.text = data.comment;
     data.comment = [];
+    textFromComment = true;
   }
   if (isGroup) {
     data.text = data.text.join(" ");
@@ -77108,10 +77148,6 @@ function _handleAddress(tokens, depth) {
     const addressComments = [];
     const addressParts = [];
     for (const part of data.address) {
-      if (part.indexOf("(") < 0) {
-        addressParts.push(part);
-        continue;
-      }
       const stripped = _stripAddressComments(part);
       for (const comment of stripped.comments) {
         addressComments.push(comment);
@@ -77121,20 +77157,25 @@ function _handleAddress(tokens, depth) {
       }
     }
     data.address = addressParts;
-    if (!data.address.length && data.text.length) {
-      for (let i = data.text.length - 1;i >= 0; i--) {
-        if (!data.textWasQuoted[i] && ADDR_SPEC.test(data.text[i])) {
-          data.address = data.text.splice(i, 1);
+    if (!data.address.length && data.text.length && !textFromComment) {
+      const candidates = data.text.map((part) => _collapseAtSpacing(part));
+      for (let i = 0;i < data.text.length; i++) {
+        const local = data.quotedLocalAt[i];
+        const quotedLocal = data.textWasQuoted[i] && local >= 0 && QUOTED_LOCAL_DOMAIN.test(data.text[i].slice(local)) ? _quoteLocalPart(data.text[i]) : "";
+        if (quotedLocal || !data.textWasQuoted[i] && _isAddrSpec(candidates[i])) {
+          data.address = [quotedLocal || candidates[i]];
+          data.text.splice(i, 1);
           data.textWasQuoted.splice(i, 1);
+          data.quotedLocalAt.splice(i, 1);
           break;
         }
       }
       if (!data.address.length) {
         let extracted = false;
-        for (let i = data.text.length - 1;i >= 0; i--) {
+        for (let i = 0;i < data.text.length; i++) {
           if (!data.textWasQuoted[i]) {
-            const part = data.text[i];
-            let remainder = part;
+            const part = candidates[i];
+            let remainder = data.text[i];
             const at = _looseAddressStart(part);
             if (at >= 0) {
               LOOSE_TEXT_ADDR.lastIndex = at;
@@ -77164,15 +77205,16 @@ function _handleAddress(tokens, depth) {
     data.text = data.text.join(" ");
     data.address = data.address.join(" ");
     if (addressFromQuotedText && data.text.indexOf("@") >= 0) {
-      data.address = _quoteLocalPart(data.text);
+      data.address = _quoteLocalPart(_joinAtSpacing(data.text, _domainAt(data.text)));
       data.text = "";
     }
     _recoverAddrSpec(data);
     if (!data.text && addressComments.length) {
       data.text = addressComments.join(" ");
+      textFromComment = true;
     }
     const address = {
-      address: data.address || data.text || "",
+      address: data.address || (textFromComment ? "" : data.text) || "",
       name: data.text || data.address || ""
     };
     if (address.address === address.name) {
@@ -77192,11 +77234,15 @@ class Tokenizer {
     this.str = (str || "").toString();
     this.operatorCurrent = "";
     this.operatorExpecting = "";
-    this.node = null;
+    this.node = -1;
     this.escaped = false;
     this.inDomainLiteral = false;
     this.afterAt = false;
-    this.list = [];
+    this.innerQuoted = false;
+    this.innerComment = 0;
+    this.innerLiteral = false;
+    this.innerEscaped = false;
+    this.list = new TokenList(this.str);
     this.operators = {
       '"': '"',
       "(": ")",
@@ -77207,21 +77253,72 @@ class Tokenizer {
     };
   }
   tokenize() {
-    const list = [];
-    for (let i = 0, len = this.str.length;i < len; i++) {
-      const chr = this.str.charAt(i);
-      const nextChr = i < len - 1 ? this.str.charAt(i + 1) : null;
-      this.checkChar(chr, nextChr);
+    const str = this.str;
+    const len = str.length;
+    for (let i = 0;i < len; i++) {
+      this.checkChar(str.charAt(i), i);
     }
-    this.list.forEach((node2) => {
-      node2.value = (node2.value || "").toString().trim();
-      if (node2.value) {
-        list.push(node2);
+    this._closeText(len);
+    const list = this.list;
+    const slots = list.slots;
+    let kept = 0;
+    for (let i = 0, count = list.length;i < count; i++) {
+      const kind = slots[i * 3];
+      let start = slots[i * 3 + 1];
+      let end = slots[i * 3 + 2];
+      if (kind & TOKEN_DIRTY) {
+        const value = this._cleanValue(start, end, kind).trim();
+        if (!value) {
+          continue;
+        }
+        list.cleaned.set(kept, value);
+      } else if (!(kind & TOKEN_OPERATOR)) {
+        while (start < end && _isSpaceCode(str.charCodeAt(start))) {
+          start++;
+        }
+        while (end > start && _isSpaceCode(str.charCodeAt(end - 1))) {
+          end--;
+        }
+        if (start === end) {
+          continue;
+        }
       }
-    });
+      slots[kept * 3] = kind;
+      slots[kept * 3 + 1] = start;
+      slots[kept * 3 + 2] = end;
+      kept++;
+    }
+    list.length = kept;
     return list;
   }
-  checkChar(chr, nextChr) {
+  _closeText(end) {
+    if (this.node >= 0) {
+      this.list.slots[this.node * 3 + 2] = end;
+      this.node = -1;
+    }
+  }
+  _cleanValue(start, end, kind) {
+    const str = this.str;
+    const escapes = (kind & TOKEN_ESCAPES) !== 0;
+    let escaped = (kind & TOKEN_STARTS_ESCAPED) !== 0;
+    let value = "";
+    for (let i = start;i < end; i++) {
+      const chr = str.charAt(i);
+      if (escapes && !escaped && chr === "\\") {
+        escaped = true;
+        continue;
+      }
+      escaped = false;
+      if (chr === `
+`) {
+        value += " ";
+      } else if (chr.charCodeAt(0) >= 33 || chr === " " || chr === "\t") {
+        value += chr;
+      }
+    }
+    return value;
+  }
+  checkChar(chr, i) {
     if (!this.escaped && !this.operatorExpecting) {
       if (!this.inDomainLiteral && chr === "[" && this.afterAt) {
         this.inDomainLiteral = true;
@@ -77229,58 +77326,114 @@ class Tokenizer {
         this.inDomainLiteral = false;
       }
     }
-    if (this.escaped) {} else if (chr === this.operatorExpecting) {
-      this.node = {
-        type: "operator",
-        value: chr
-      };
-      if (nextChr && ![" ", "\t", "\r", `
-`, ",", ";"].includes(nextChr)) {
-        this.node.noBreak = true;
+    let nested = false;
+    if (this.operatorExpecting === ">" || this.operatorExpecting === ";") {
+      nested = this._trackInner(chr);
+    } else if (this.operatorExpecting === ")" && !this.escaped) {
+      if (chr === "(") {
+        this.innerComment++;
+      } else if (chr === ")" && this.innerComment) {
+        this.innerComment--;
+        nested = true;
       }
-      this.list.push(this.node);
-      this.node = null;
+    }
+    if (this.escaped) {} else if (chr === this.operatorExpecting && !nested) {
+      const nextChr = this.str.charAt(i + 1);
+      this._closeText(i);
+      this.list.push(nextChr && ![" ", "\t", "\r", `
+`, ",", ";"].includes(nextChr) ? TOKEN_OPERATOR | TOKEN_NO_BREAK : TOKEN_OPERATOR, i, i + 1);
       if (chr !== ")") {
         this.afterAt = false;
       }
       this.operatorExpecting = "";
       this.escaped = false;
+      this._resetInner();
       return;
     } else if (!this.operatorExpecting && !(this.inDomainLiteral && chr === ":") && chr in this.operators) {
-      this.node = {
-        type: "operator",
-        value: chr
-      };
-      this.list.push(this.node);
-      this.node = null;
+      this._closeText(i);
+      this.list.push(TOKEN_OPERATOR, i, i + 1);
       if (chr !== "(") {
         this.afterAt = false;
       }
       this.operatorExpecting = this.operators[chr];
       this.escaped = false;
+      this._resetInner();
       return;
     } else if (['"', "'", ")"].includes(this.operatorExpecting) && chr === "\\") {
       this.escaped = true;
+      if (this.node >= 0) {
+        this.list.slots[this.node * 3] |= TOKEN_DIRTY;
+      }
       return;
     }
-    if (!this.node) {
-      this.node = {
-        type: "text",
-        value: ""
-      };
-      this.list.push(this.node);
+    if (this.node < 0) {
+      this.node = this.list.push((this.operatorExpecting === '"' || this.operatorExpecting === ")" ? TOKEN_ESCAPES : 0) | (this.escaped ? TOKEN_STARTS_ESCAPED : 0), i, i);
     }
     if (chr === `
 `) {
       chr = " ";
+      this.list.slots[this.node * 3] |= TOKEN_DIRTY;
     }
-    if (chr.charCodeAt(0) >= 33 || [" ", "\t"].includes(chr)) {
-      this.node.value += chr;
+    if (chr.charCodeAt(0) >= 33 || chr === " " || chr === "\t") {
       if (!this.operatorExpecting && chr !== " " && chr !== "\t") {
         this.afterAt = chr === "@";
       }
+    } else {
+      this.list.slots[this.node * 3] |= TOKEN_DIRTY;
     }
     this.escaped = false;
+  }
+  _trackInner(chr) {
+    if (this.innerEscaped) {
+      this.innerEscaped = false;
+      return true;
+    }
+    if (this.innerQuoted) {
+      if (chr === "\\") {
+        this.innerEscaped = true;
+      } else if (chr === '"') {
+        this.innerQuoted = false;
+      }
+      return true;
+    }
+    if (this.innerComment) {
+      if (chr === "\\") {
+        this.innerEscaped = true;
+      } else if (chr === "(") {
+        this.innerComment++;
+      } else if (chr === ")") {
+        this.innerComment--;
+      }
+      return true;
+    }
+    if (this.innerLiteral) {
+      if (chr === "]") {
+        this.innerLiteral = false;
+      }
+      return true;
+    }
+    if (chr === '"') {
+      this.innerQuoted = true;
+      return true;
+    }
+    if (chr === "(") {
+      this.innerComment = 1;
+      return true;
+    }
+    if (chr === "[" && this.afterAt && this.operatorExpecting === ">") {
+      this.innerLiteral = true;
+      return true;
+    }
+    if (!_isSpaceCode(chr.charCodeAt(0))) {
+      this.afterAt = chr === "@";
+    }
+    return false;
+  }
+  _resetInner() {
+    this.innerQuoted = false;
+    this.innerComment = 0;
+    this.innerLiteral = false;
+    this.innerEscaped = false;
   }
 }
 function _parseAddressList(str, depth) {
@@ -77289,28 +77442,21 @@ function _parseAddressList(str, depth) {
   }
   const tokenizer = new Tokenizer(str);
   const tokens = tokenizer.tokenize();
-  const addresses = [];
-  let address = [];
   const parsedAddresses = [];
-  tokens.forEach((token) => {
-    if (token.type === "operator" && (token.value === "," || token.value === ";")) {
-      if (address.length) {
-        addresses.push(address);
+  let from = 0;
+  for (let i = 0, len = tokens.length;i <= len; i++) {
+    const operator = i < len ? tokens.operatorAt(i) : "";
+    if (i < len && operator !== "," && operator !== ";") {
+      continue;
+    }
+    if (i > from) {
+      const handled = _handleAddress(tokens, from, i, depth);
+      for (let j = 0;j < handled.length; j++) {
+        parsedAddresses.push(handled[j]);
       }
-      address = [];
-    } else {
-      address.push(token);
     }
-  });
-  if (address.length) {
-    addresses.push(address);
+    from = i + 1;
   }
-  addresses.forEach((addr) => {
-    const handled = _handleAddress(addr, depth);
-    for (let i = 0;i < handled.length; i++) {
-      parsedAddresses.push(handled[i]);
-    }
-  });
   const mergedAddresses = [];
   for (let i = parsedAddresses.length - 1;i >= 0; i--) {
     const current = parsedAddresses[i];
@@ -77341,13 +77487,17 @@ function addressparser(str, options) {
   }
   return parsedAddresses;
 }
-var HAS_WHITESPACE, QUOTED_LOCAL_ADDR, ADDR_SPEC, LOOSE_ADDR_SPEC, LOOSE_TEXT_ADDR, MAX_NESTED_GROUP_DEPTH = 50, addressparser_default;
+var TOKEN_OPERATOR = 1, TOKEN_NO_BREAK = 2, TOKEN_DIRTY = 4, TOKEN_ESCAPES = 8, TOKEN_STARTS_ESCAPED = 16, DOMAIN_LITERAL_TAIL, HAS_WHITESPACE, QUOTED_LOCAL_ADDR, ADDR_SPEC, LITERAL_ADDR_SPEC, QUOTED_LOCAL_DOMAIN, LOOSE_ADDR_SPEC, LOOSE_TEXT_ADDR, LEADING_QUOTED_STRING, MAX_NESTED_GROUP_DEPTH = 10, addressparser_default;
 var init_addressparser = __esm(() => {
+  DOMAIN_LITERAL_TAIL = /@(\[[^[\]\\]*\])$/;
   HAS_WHITESPACE = /\s/;
   QUOTED_LOCAL_ADDR = /^("(?:[^"\\]|\\[\s\S])*"@\S+)(?:\s+([\s\S]+))?$/;
   ADDR_SPEC = /^[^@\s]+@[^@\s]+$/;
+  LITERAL_ADDR_SPEC = /^[^@\s]+@\[[^[\]\\\s]*\]$/;
+  QUOTED_LOCAL_DOMAIN = /^@(?:[^@\s"]+|\[[^[\]\\\s]*\])$/;
   LOOSE_ADDR_SPEC = /^[^@\s]+@\S+$/;
   LOOSE_TEXT_ADDR = /\s*\b[^@\s]+@[^\s]+\b\s*/y;
+  LEADING_QUOTED_STRING = /^"(?:[^"\\]|\\[\s\S])*"/;
   addressparser_default = addressparser;
 });
 
@@ -77600,7 +77750,7 @@ var require_stream_hash = __commonJS((exports, module) => {
   module.exports = StreamHash;
 });
 
-// /zveltio-extension/node_modules/@selderee/plugin-htmlparser2/node_modules/domelementtype/lib/esm/index.js
+// /zveltio-extension/node_modules/domelementtype/lib/esm/index.js
 function isTag(elem) {
   return elem.type === ElementType.Tag || elem.type === ElementType.Script || elem.type === ElementType.Style;
 }
@@ -77628,7 +77778,7 @@ var init_esm = __esm(() => {
   Doctype = ElementType.Doctype;
 });
 
-// /zveltio-extension/node_modules/@selderee/plugin-htmlparser2/node_modules/domhandler/lib/esm/node.js
+// /zveltio-extension/node_modules/domhandler/lib/esm/node.js
 function isTag2(node2) {
   return isTag(node2);
 }
@@ -77636,7 +77786,7 @@ var init_node = __esm(() => {
   init_esm();
 });
 
-// /zveltio-extension/node_modules/@selderee/plugin-htmlparser2/node_modules/domhandler/lib/esm/index.js
+// /zveltio-extension/node_modules/domhandler/lib/esm/index.js
 var init_esm2 = __esm(() => {
   init_node();
 });
@@ -78838,7 +78988,7 @@ var init_hp2_builder = __esm(() => {
   };
 });
 
-// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/decode-codepoint.js
+// /zveltio-extension/node_modules/entities/dist/esm/decode-codepoint.js
 function replaceCodePoint(codePoint) {
   var _a8;
   if (codePoint >= 55296 && codePoint <= 57343 || codePoint > 1114111) {
@@ -78890,7 +79040,7 @@ var init_decode_codepoint = __esm(() => {
   };
 });
 
-// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/internal/decode-shared.js
+// /zveltio-extension/node_modules/entities/dist/esm/internal/decode-shared.js
 function decodeBase64(input2) {
   const binary = typeof atob === "function" ? atob(input2) : typeof Buffer.from === "function" ? Buffer.from(input2, "base64").toString("binary") : new Buffer(input2, "base64").toString("binary");
   const evenLength = binary.length & ~1;
@@ -78903,19 +79053,19 @@ function decodeBase64(input2) {
   return out;
 }
 
-// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/generated/decode-data-html.js
+// /zveltio-extension/node_modules/entities/dist/esm/generated/decode-data-html.js
 var htmlDecodeTree;
 var init_decode_data_html = __esm(() => {
   htmlDecodeTree = /* @__PURE__ */ decodeBase64("QR08ALkAAgH6AYsDNQR2BO0EPgXZBQEGLAbdBxMISQrvCmQLfQurDKQNLw4fD4YPpA+6D/IPAAAAAAAAAAAAAAAAKhBMEY8TmxUWF2EYLBkxGuAa3RsJHDscWR8YIC8jSCSIJcMl6ie3Ku8rEC0CLjoupS7kLgAIRU1hYmNmZ2xtbm9wcnN0dVQAWgBeAGUAaQBzAHcAfgCBAIQAhwCSAJoAoACsALMAbABpAGcAO4DGAMZAUAA7gCYAJkBjAHUAdABlADuAwQDBQHIiZXZlAAJhAAFpeW0AcgByAGMAO4DCAMJAEGRyAADgNdgE3XIAYQB2AGUAO4DAAMBA8CFoYZFj4SFjcgBhZAAAoFMqAAFncIsAjgBvAG4ABGFmAADgNdg43fAlbHlGdW5jdGlvbgCgYSBpAG4AZwA7gMUAxUAAAWNzpACoAHIAAOA12Jzc6SFnbgCgVCJpAGwAZABlADuAwwDDQG0AbAA7gMQAxEAABGFjZWZvcnN1xQDYANoA7QDxAPYA+QD8AAABY3LJAM8AayNzbGFzaAAAoBYidgHTANUAAKDnKmUAZAAAoAYjeQARZIABY3J0AOAA5QDrAGEidXNlAACgNSLuI291bGxpcwCgLCFhAJJjcgAA4DXYBd1wAGYAAOA12Dnd5SF2ZdhiYwDyAOoAbSJwZXEAAKBOIgAHSE9hY2RlZmhpbG9yc3UXARoBHwE6AVIBVQFiAWQBZgGCAakB6QHtAfIBYwB5ACdkUABZADuAqQCpQIABY3B5ACUBKAE1AfUhdGUGYWmg0iJ0KGFsRGlmZmVyZW50aWFsRAAAoEUhbCJleXMAAKAtIQACYWVpb0EBRAFKAU0B8iFvbgxhZABpAGwAO4DHAMdAcgBjAAhhbiJpbnQAAKAwIm8AdAAKYQABZG5ZAV0BaSJsbGEAuGB0I2VyRG90ALdg8gA5AWkAp2NyImNsZQAAAkRNUFRwAXQBeQF9AW8AdAAAoJkiaSJudXMAAKCWIuwhdXMAoJUiaSJtZXMAAKCXIm8AAAFjc4cBlAFrKndpc2VDb250b3VySW50ZWdyYWwAAKAyImUjQ3VybHkAAAFEUZwBpAFvJXVibGVRdW90ZQAAoB0gdSJvdGUAAKAZIAACbG5wdbABtgHNAdgBbwBuAGWgNyIAoHQqgAFnaXQAvAHBAcUB8iJ1ZW50AKBhIm4AdAAAoC8i7yV1ckludGVncmFsAKAuIgABZnLRAdMBAKACIe8iZHVjdACgECJuLnRlckNsb2Nrd2lzZUNvbnRvdXJJbnRlZ3JhbAAAoDMi7yFzcwCgLypjAHIAAOA12J7ccABDoNMiYQBwAACgTSKABURKU1phY2VmaW9zAAsCEgIVAhgCGwIsAjQCOQI9AnMCfwNvoEUh9CJyYWhkAKARKWMAeQACZGMAeQAFZGMAeQAPZIABZ3JzACECJQIoAuchZXIAoCEgcgAAoKEhaAB2AACg5CoAAWF5MAIzAvIhb24OYRRkbAB0oAciYQCUY3IAAOA12AfdAAFhZkECawIAAWNtRQJnAvIjaXRpY2FsAAJBREdUUAJUAl8CYwJjInV0ZQC0YG8AdAFZAloC2WJiJGxlQWN1dGUA3WJyImF2ZQBgYGkibGRlANxi7yFuZACgxCJmJWVyZW50aWFsRAAAoEYhcAR9AgAAAAAAAIECjgIAABoDZgAA4DXYO91EoagAhQKJAm8AdAAAoNwgcSJ1YWwAAKBQIuIhbGUAA0NETFJVVpkCqAK1Au8C/wIRA28AbgB0AG8AdQByAEkAbgB0AGUAZwByAGEA7ADEAW8AdAKvAgAAAACwAqhgbiNBcnJvdwAAoNMhAAFlb7kC0AJmAHQAgAFBUlQAwQLGAs0CciJyb3cAAKDQIekkZ2h0QXJyb3cAoNQhZQDlACsCbgBnAAABTFLWAugC5SFmdAABQVLcAuECciJyb3cAAKD4J+kkZ2h0QXJyb3cAoPon6SRnaHRBcnJvdwCg+SdpImdodAAAAUFU9gL7AnIicm93AACg0iFlAGUAAKCoInAAQQIGAwAAAAALA3Iicm93AACg0SFvJHduQXJyb3cAAKDVIWUlcnRpY2FsQmFyAACgJSJuAAADQUJMUlRhJAM2AzoDWgNxA3oDciJyb3cAAKGTIUJVLAMwA2EAcgAAoBMpcCNBcnJvdwAAoPUhciJldmUAEWPlIWZ00gJDAwAASwMAAFIDaSVnaHRWZWN0b3IAAKBQKWUkZVZlY3RvcgAAoF4p5SJjdG9yQqC9IWEAcgAAoFYpaSJnaHQA1AFiAwAAaQNlJGVWZWN0b3IAAKBfKeUiY3RvckKgwSFhAHIAAKBXKWUAZQBBoKQiciJyb3cAAKCnIXIAcgBvAPcAtAIAAWN0gwOHA3IA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YwAAoN8i4SFycnCgtiEAoD0pgKIqImJjZG9zACsVMBU6FT4VQRVyImNhcAAAoEgqAAFhdTQVNxVwAACgRipwAACgSipvAHQAAKCNInIAAKBFKgDgKiIA/gACYWxydksVURVuFXMVcgByAG2gtyEAoDwpeQCAAWV2dwBYFWUVaRVxAHACXxUAAAAAYxVyAGUA4wAXFXUA4wAZFWUAZQAAoM4iZSJkZ2UAAKDPImUAbgA7gKQApEBlI2Fycm93AAABbHJ7FX8V5SFmdACgtiFpImdodAAAoLchZQDkAG0VAAFjaYsVkRVvAG4AaQBuAPQAkwFuAHQAAKAxImwiY3R5AACgLSOACUFIYWJjZGVmaGlqbG9yc3R1d3oAuBW7Fb8V1RXgFegV+RUKFhUWHxZUFlcWZRbFFtsW7xb7FgUXChdyAPIAtAJhAHIAAKBlKQACZ2xyc8YVyhXOFdAV5yFlcgCgICDlIXRoAKA4IfIA9QxoAHagECAAoKMiawHZFd4VYSJyb3cAAKAPKWEA4wBfAgABYXnkFecV8iFvbg9hNGQAoUYhYW/tFfQVAAFnciEC8RVyAACgyiF0InNlcQAAoHcqgAFnbG0A/xUCFgUWO4CwALBAdABhALRjcCJ0eXYAAKCxKQABaXIOFhIW8yFodACgfykA4DXYId1hAHIAAAFschsWHRYAoMMhAKDCIYACYWVnc3YAKBauAjYWOhY+Fm0AAKHEIm9zLhY0Fm4AZABzoMQi9SFpdACgZiZhIm1tYQDdY2kAbgAAoPIiAKH3AGlvQxZRFmQAZQAAgfcAO29KFksW90BuI3RpbWVzAACgxyJuAPgAUBZjAHkAUmRjAG8CXhYAAAAAYhZyAG4AAKAeI28AcAAAoA0jgAJscHR1dwBuFnEWdRaSFp4W7CFhciRgZgAA4DXYVd0AotkCZW1wc30WhBaJFo0WcQBkoFAibwB0AACgUSJpIm51cwAAoDgi7CF1cwCgFCLxInVhcmUAoKEiYgBsAGUAYgBhAHIAdwBlAGQAZwDlANcAbgCAAWFkaAClFqoWtBZyAHIAbwD3APUMbwB3AG4AYQByAHIAbwB3APMA8xVhI3Jwb29uAAABbHK8FsAWZQBmAPQAHBZpAGcAaAD0AB4WYgHJFs8WawBhAHIAbwD3AJILbwLUFgAAAADYFnIAbgAAoB8jbwBwAACgDCOAAWNvdADhFukW7BYAAXJ55RboFgDgNdi53FVkbAAAoPYp8iFvaxFhAAFkcvMW9xZvAHQAAKDxImkA5qC/JVsSAAFhaP8WAhdyAPIANQNhAPIA1wvhIm5nbGUAoKYpAAFjaQ4XEBd5AF9k5yJyYXJyAKD/JwAJRGFjZGVmZ2xtbm9wcXJzdHV4MRc4F0YXWxcyBF4XaRd5F40XrBe0F78X2RcVGCEYLRg1GEAYAAFEbzUXgRZvAPQA+BUAAWNzPBdCF3UAdABlADuA6QDpQPQhZXIAoG4qAAJhaW95TRdQF1YXWhfyIW9uG2FyAGOgViI7gOoA6kDsIW9uAKBVIk1kbwB0ABdhAAFEcmIXZhdvAHQAAKBSIgDgNdgi3XKhmipuF3QXYQB2AGUAO4DoAOhAZKCWKm8AdAAAoJgqgKGZKmlscwCAF4UXhxfuInRlcnMAoOcjAKATIWSglSpvAHQAAKCXKoABYXBzAJMXlheiF2MAcgATYXQAeQBzogUinxcAAAAAoRdlAHQAAKAFInAAMaADIDMBqRerFwCgBCAAoAUgAAFnc7AXsRdLYXAAAKACIAABZ3C4F7sXbwBuABlhZgAA4DXYVt2AAWFscwDFF8sXzxdyAHOg1SJsAACg4yl1AHMAAKBxKmkAAKG1A2x21RfYF28AbgC1Y/VjAAJjc3V24BfoF/0XEBgAAWlv5BdWF3IAYwAAoFYiaQLuFwAAAADwF+0ADQThIW50AAFnbPUX+Rd0AHIAAKCWKuUhc3MAoJUqgAFhZWkAAxgGGAoYbABzAD1gcwB0AACgXyJ2AESgYSJEAACgeCrwImFyc2wAoOUpAAFEYRkYHRhvAHQAAKBTInIAcgAAoHEpgAFjZGkAJxgqGO0XcgAAoC8hbwD0AIwCAAFhaDEYMhi3YzuA8ADwQAABbXI5GD0YbAA7gOsA60BvAACgrCCAAWNpcABGGEgYSxhsACFgcwD0ACwEAAFlb08YVxhjAHQAYQB0AGkAbwDuABoEbgBlAG4AdABpAGEAbADlADME4Ql1GAAAgRgAAIMYiBgAAAAAoRilGAAAqhgAALsYvhjRGAAA1xgnGWwAbABpAG4AZwBkAG8AdABzAGUA8QBlF3kARGRtImFsZQAAoEAmgAFpbHIAjRiRGJ0Y7CFpZwCgA/tpApcYAAAAAJoYZwAAoAD7aQBnAACgBPsA4DXYI93sIWlnAKAB++whaWcA4GYAagCAAWFsdACvGLIYthh0AACgbSZpAGcAAKAC+24AcwAAoLElbwBmAJJh8AHCGAAAxhhmAADgNdhX3QABYWvJGMwYbADsAGsEdqDUIgCg2SphI3J0aW50AACgDSoAAWFv2hgiGQABY3PeGB8ZsQPnGP0YBRkSGRUZAAAdGbID7xjyGPQY9xj5GAAA+xg7gL0AvUAAoFMhO4C8ALxAAKBVIQCgWSEAoFshswEBGQAAAxkAoFQhAKBWIbQCCxkOGQAAAAAQGTuAvgC+QACgVyEAoFwhNQAAoFghtgEZGQAAGxkAoFohAKBdITgAAKBeIWwAAKBEIHcAbgAAoCIjYwByAADgNdi73IAIRWFiY2RlZmdpamxub3JzdHYARhlKGVoZXhlmGWkZkhmWGZkZnRmgGa0ZxhnLGc8Z4BkjGmygZyIAoIwqgAFjbXAAUBlTGVgZ9SF0ZfVhbQBhAOSgswM6FgCghipyImV2ZQAfYQABaXliGWUZcgBjAB1hM2RvAHQAIWGAoWUibHFzAMYEcBl6GfGhZSLOBAAAdhlsAGEAbgD0AN8EgKF+KmNkbACBGYQZjBljAACgqSpvAHQAb6CAKmyggioAoIQqZeDbIgD+cwAAoJQqcgAA4DXYJN3noGsirATtIWVsAKA3IWMAeQBTZIChdyJFYWoApxmpGasZAKCSKgCgpSoAoKQqAAJFYWVztBm2Gb0ZwhkAoGkicABwoIoq8iFveACgiipxoIgq8aCIKrUZaQBtAACg5yJwAGYAAOA12FjdYQB2AOUAYwIAAWNp0xnWGXIAAKAKIW0AAKFzImVs3BneGQCgjioAoJAqAIM+ADtjZGxxco0E6xn0GfgZ/BkBGgABY2nvGfEZAKCnKnIAAKB6Km8AdAAAoNci0CFhcgCglSl1ImVzdAAAoHwqgAJhZGVscwAKGvQZFhrVBCAa8AEPGgAAFBpwAHIAbwD4AFkZcgAAoHgpcQAAAWxxxAQbGmwAZQBzAPMASRlpAO0A5AQAAWVuJxouGnIjdG5lcXEAAOBpIgD+xQAsGgAFQWFiY2Vma29zeUAaQxpmGmoabRqDGocalhrCGtMacgDyAMwCAAJpbG1yShpOGlAaVBpyAHMA8ABxD2YAvWBpAGwA9AASBQABZHJYGlsaYwB5AEpkAKGUIWN3YBpkGmkAcgAAoEgpAKCtIWEAcgAAoA8h6SFyYyVhgAFhbHIAcxp7Gn8a8iF0c3WgZSZpAHQAAKBlJuwhaXAAoCYg4yFvbgCguSJyAADgNdgl3XMAAAFld4wakRphInJvdwAAoCUpYSJyb3cAAKAmKYACYW1vcHIAnxqjGqcauhq+GnIAcgAAoP8h9CFodACgOyJrAAABbHKsGrMaZSRmdGFycm93AACgqSHpJGdodGFycm93AKCqIWYAAOA12Fnd4iFhcgCgFSCAAWNsdADIGswa0BpyAADgNdi93GEAcwDoAGka8iFvaydhAAFicNca2xr1IWxsAKBDIOghZW4AoBAg4Qr2GgAA/RoAAAgbExsaGwAAIRs7GwAAAAA+G2IbmRuVG6sbAACyG80b0htjAHUAdABlADuA7QDtQAChYyBpeQEbBhtyAGMAO4DuAO5AOGQAAWN4CxsNG3kANWRjAGwAO4ChAKFAAAFmcssCFhsA4DXYJt1yAGEAdgBlADuA7ADsQIChSCFpbm8AJxsyGzYbAAFpbisbLxtuAHQAAKAMKnQAAKAtIuYhaW4AoNwpdABhAACgKSHsIWlnM2GAAWFvcABDG1sbXhuAAWNndABJG0sbWRtyACthgAFlbHAAcQVRG1UbaQBuAOUAyAVhAHIA9AByBWgAMWFmAACgtyJlAGQAtWEAoggiY2ZvdGkbbRt1G3kb4SFyZQCgBSFpAG4AdKAeImkAZQAAoN0pZABvAPQAWxsAoisiY2VscIEbhRuPG5QbYQBsAACguiIAAWdyiRuNG2UAcgDzACMQ4wCCG2EicmhrAACgFyryIW9kAKA8KgACY2dwdJ8boRukG6gbeQBRZG8AbgAvYWYAAOA12FrdYQC5Y3UAZQBzAHQAO4C/AL9AAAFjabUbuRtyAADgNdi+3G4AAKIIIkVkc3bCG8QbyBvQAwCg+SJvAHQAAKD1Inag9CIAoPMiaaBiIOwhZGUpYesB1hsAANkbYwB5AFZkbAA7gO8A70AAA2NmbW9zdeYb7hvyG/Ub+hsFHAABaXnqG+0bcgBjADVhOWRyAADgNdgn3eEhdGg3YnAAZgAA4DXYW93jAf8bAAADHHIAAOA12L/c8iFjeVhk6yFjeVRkAARhY2ZnaGpvcxUcGhwiHCYcKhwtHDAcNRzwIXBhdqC6A/BjAAFleR4cIRzkIWls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ZmdobG1vcHJzdHV3CiwNLBEsHSwnLDEsQCxLLFIsYix6LIQsjyzLLOgs7Sz/LAotcgDyAAkDYQByAACgYykAAWNyFSwbLHUAdABlADuA+gD6QPIACQ1yAOMBIywAACUseQBeZHYAZQBtYQABaXkrLDAscgBjADuA+wD7QENkgAFhYmgANyw6LD0scgDyANEO7CFhY3FhYQDyAOAOAAFpckQsSCzzIWh0AKB+KQDgNdgy3XIAYQB2AGUAO4D5APlAYQFWLF8scgAAAWxyWixcLACgvyEAoL4hbABrAACggCUAAWN0Zix2LG8CbCwAAAAAcyxyAG4AZaAcI3IAAKAcI28AcAAAoA8jcgBpAACg+CUAAWFsfiyBLGMAcgBrYTuAqACoQAABZ3CILIssbwBuAHNhZgAA4DXYZt0AA2FkaGxzdZksniynLLgsuyzFLHIAcgBvAPcACQ1vAHcAbgBhAHIAcgBvAPcA2A5hI3Jwb29uAAABbHKvLLMsZQBmAPQAWyxpAGcAaAD0AF0sdQDzAKYOaQAAocUDaGzBLMIs0mNvAG4AxWPwI2Fycm93cwCgyCGAAWNpdADRLOEs5CxvAtcsAAAAAN4scgBuAGWgHSNyAACgHSNvAHAAAKAOI24AZwBvYXIAaQAAoPklYwByAADgNdjK3IABZGlyAPMs9yz6LG8AdAAAoPAi7CFkZWlhaQBmoLUlAKC0JQABYW0DLQYtcgDyAMosbAA7gPwA/EDhIm5nbGUAoKcpgAdBQkRhY2RlZmxub3Byc3oAJy0qLTAtNC2bLZ0toS2/LcMtxy3TLdgt3C3gLfwtcgDyABADYQByAHag6CoAoOkqYQBzAOgA/gIAAW5yOC08LechcnQAoJwpgANla25wcnN0AJkpSC1NLVQtXi1iLYItYQBwAHAA4QAaHG8AdABoAGkAbgDnAKEXgAFoaXIAoSmzJFotbwBwAPQAdCVooJUh7wD4JgABaXVmLWotZwBtAOEAuygAAWJwbi14LXMjZXRuZXEAceCKIgD+AODLKgD+cyNldG5lcQBx4IsiAP4A4MwqAP4AAWhyhi2KLWUAdADhABIraSNhbmdsZQAAAWxyki2WLeUhZnQAoLIiaSJnaHQAAKCzInkAMmThIXNoAKCiIoABZWxyAKcttC24LWKiKCKuLQAAAACyLWEAcgAAoLsicQAAoFoi7CFpcACg7iIAAWJ0vC1eD2EA8gBfD3IAAOA12DPddAByAOkAlS1zAHUAAAFicM0t0C0A4IIi0iAA4IMi0iBwAGYAAOA12GfdcgBvAPAAWQt0AHIA6QCaLQABY3XkLegtcgAA4DXYy9wAAWJw7C30LW4AAAFFZXUt8S0A4IoiAP5uAAABRWV/LfktAOCLIgD+6SJnemFnAKCaKYADY2Vmb3BycwANLhAuJS4pLiMuLi40LukhcmN1YQABZGkULiEuAAFiZxguHC5hAHIAAKBfKmUAcaAnIgCgWSLlIXJwAKAYIXIAAOA12DTdcABmAADgNdho3WWgQCJhAHQA6ABqD2MAcgAA4DXYzNzjCuQRUC4AAFQuAABYLmIuAAAAAGMubS5wLnQuAAAAAIguki4AAJouJxIqEnQAcgDpAB0ScgAA4DXYNd0AAUFhWy5eLnIA8gDnAnIA8gCTB75jAAFBYWYuaS5yAPIA4AJyAPIAjAdhAPAAeh5pAHMAAKD7IoABZHB0APgReS6DLgABZmx9LoAuAOA12GnddQDzAP8RaQBtAOUABBIAAUFhiy6OLnIA8gDuAnIA8gCaBwABY3GVLgoScgAA4DXYzdwAAXB0nS6hLmwAdQDzACUScgDpACASAARhY2VmaW9zdbEuvC7ELsguzC7PLtQu2S5jAAABdXm2LrsudABlADuA/QD9QE9kAAFpecAuwy5yAGMAd2FLZG4AO4ClAKVAcgAA4DXYNt1jAHkAV2RwAGYAAOA12GrdYwByAADgNdjO3AABY23dLt8ueQBOZGwAO4D/AP9AAAVhY2RlZmhpb3N38y73Lv8uAi8MLxAvEy8YLx0vIi9jInV0ZQB6YQABYXn7Lv4u8iFvbn5hN2RvAHQAfGEAAWV0Bi8KL3QAcgDmAB8QYQC2Y3IAAOA12DfdYwB5ADZk5yJyYXJyAKDdIXAAZgAA4DXYa91jAHIAAOA12M/cAAFqbiYvKC8AoA0gagAAoAwg");
 });
 
-// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/generated/decode-data-xml.js
+// /zveltio-extension/node_modules/entities/dist/esm/generated/decode-data-xml.js
 var xmlDecodeTree;
 var init_decode_data_xml = __esm(() => {
   xmlDecodeTree = /* @__PURE__ */ decodeBase64("AAJhZ2xxBwARABMAFQBtAg0AAAAAAA8AcAAmYG8AcwAnYHQAPmB0ADxg9SFvdCJg");
 });
 
-// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/internal/bin-trie-flags.js
+// /zveltio-extension/node_modules/entities/dist/esm/internal/bin-trie-flags.js
 var BinTrieFlags;
 var init_bin_trie_flags = __esm(() => {
   (function(BinTrieFlags2) {
@@ -78926,7 +79076,7 @@ var init_bin_trie_flags = __esm(() => {
   })(BinTrieFlags || (BinTrieFlags = {}));
 });
 
-// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/entities/dist/esm/decode.js
+// /zveltio-extension/node_modules/entities/dist/esm/decode.js
 function isNumber2(code) {
   return code >= CharCodes.ZERO && code <= CharCodes.NINE;
 }
@@ -79210,7 +79360,7 @@ var init_decode = __esm(() => {
   })(DecodingMode || (DecodingMode = {}));
 });
 
-// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/dist/esm/Tokenizer.js
+// /zveltio-extension/node_modules/htmlparser2/dist/esm/Tokenizer.js
 function isWhitespace(c) {
   return c === CharCodes2.Space || c === CharCodes2.NewLine || c === CharCodes2.Tab || c === CharCodes2.FormFeed || c === CharCodes2.CarriageReturn;
 }
@@ -79871,7 +80021,7 @@ var init_Tokenizer = __esm(() => {
   };
 });
 
-// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/dist/esm/Parser.js
+// /zveltio-extension/node_modules/htmlparser2/dist/esm/Parser.js
 class Parser {
   constructor(cbs, options = {}) {
     var _a8, _b, _c, _d, _e, _f;
@@ -80267,7 +80417,7 @@ var init_Parser = __esm(() => {
   reNameEnd = /\s|\//;
 });
 
-// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domelementtype/lib/esm/index.js
+// /zveltio-extension/node_modules/domelementtype/lib/esm/index.js
 function isTag3(elem) {
   return elem.type === ElementType2.Tag || elem.type === ElementType2.Script || elem.type === ElementType2.Style;
 }
@@ -80295,7 +80445,7 @@ var init_esm3 = __esm(() => {
   Doctype2 = ElementType2.Doctype;
 });
 
-// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domhandler/lib/esm/node.js
+// /zveltio-extension/node_modules/domhandler/lib/esm/node.js
 class Node3 {
   constructor() {
     this.parent = null;
@@ -80513,7 +80663,7 @@ var init_node2 = __esm(() => {
   };
 });
 
-// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domhandler/lib/esm/index.js
+// /zveltio-extension/node_modules/domhandler/lib/esm/index.js
 class DomHandler {
   constructor(callback, options, elementCB) {
     this.dom = [];
@@ -80646,7 +80796,7 @@ var init_esm4 = __esm(() => {
   };
 });
 
-// /zveltio-extension/node_modules/dom-serializer/node_modules/domelementtype/lib/esm/index.js
+// /zveltio-extension/node_modules/domelementtype/lib/esm/index.js
 var ElementType3, Root3, Text4, Directive3, Comment4, Script3, Style3, Tag3, CDATA4, Doctype3;
 var init_esm5 = __esm(() => {
   (function(ElementType4) {
@@ -80671,7 +80821,7 @@ var init_esm5 = __esm(() => {
   Doctype3 = ElementType3.Doctype;
 });
 
-// /zveltio-extension/node_modules/dom-serializer/node_modules/entities/lib/esm/escape.js
+// /zveltio-extension/node_modules/entities/lib/esm/escape.js
 function encodeXML(str) {
   let ret = "";
   let lastIdx = 0;
@@ -80730,7 +80880,7 @@ var init_escape = __esm(() => {
   ]));
 });
 
-// /zveltio-extension/node_modules/dom-serializer/node_modules/entities/lib/esm/index.js
+// /zveltio-extension/node_modules/entities/lib/esm/index.js
 var EntityLevel, EncodingMode;
 var init_esm6 = __esm(() => {
   init_escape();
@@ -80998,19 +81148,19 @@ var init_esm7 = __esm(() => {
   foreignElements = new Set(["svg", "math"]);
 });
 
-// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domutils/lib/esm/stringify.js
+// /zveltio-extension/node_modules/domutils/lib/esm/stringify.js
 var init_stringify = () => {};
 
-// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domutils/lib/esm/traversal.js
+// /zveltio-extension/node_modules/domutils/lib/esm/traversal.js
 var init_traversal = () => {};
 
-// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domutils/lib/esm/querying.js
+// /zveltio-extension/node_modules/domutils/lib/esm/querying.js
 var init_querying = () => {};
 
-// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domutils/lib/esm/legacy.js
+// /zveltio-extension/node_modules/domutils/lib/esm/legacy.js
 var init_legacy = () => {};
 
-// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domutils/lib/esm/helpers.js
+// /zveltio-extension/node_modules/domutils/lib/esm/helpers.js
 var DocumentPosition;
 var init_helpers = __esm(() => {
   (function(DocumentPosition2) {
@@ -81022,10 +81172,10 @@ var init_helpers = __esm(() => {
   })(DocumentPosition || (DocumentPosition = {}));
 });
 
-// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domutils/lib/esm/feeds.js
+// /zveltio-extension/node_modules/domutils/lib/esm/feeds.js
 var init_feeds = () => {};
 
-// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/node_modules/domutils/lib/esm/index.js
+// /zveltio-extension/node_modules/domutils/lib/esm/index.js
 var init_esm8 = __esm(() => {
   init_stringify();
   init_traversal();
@@ -81035,7 +81185,7 @@ var init_esm8 = __esm(() => {
   init_feeds();
 });
 
-// /zveltio-extension/node_modules/html-to-text/node_modules/htmlparser2/dist/esm/index.js
+// /zveltio-extension/node_modules/htmlparser2/dist/esm/index.js
 function parseDocument(data, options) {
   const handler = new DomHandler(undefined, options);
   new Parser(handler, options).end(data);
@@ -84927,23 +85077,89 @@ var require_mail_parser = __commonJS((exports, module) => {
       match2.url = "https://twitter.com/" + match2.url.replace(/^@/, "");
     }
   });
-  function hasBracketedAddress(str) {
-    let start = -1;
-    let at = -1;
-    for (let i = 0, len = str.length;i < len; i++) {
-      let chr = str.charAt(i);
-      if (chr === "<") {
-        start = i;
-        at = -1;
-      } else if (chr === ">") {
-        if (start >= 0 && at >= 0 && at < i - 1) {
-          return true;
-        }
-        start = -1;
-        at = -1;
-      } else if (chr === "@" && start >= 0 && at < 0 && i > start + 1) {
-        at = i;
+  function rfc2231ParamNames(value) {
+    let names = new Set;
+    let quote = false;
+    let escaped = false;
+    let start = 0;
+    let addSegment = (end) => {
+      let segment = value.substring(start, end);
+      let eq2 = segment.indexOf("=");
+      if (eq2 < 0) {
+        return;
       }
+      let match2 = segment.substring(0, eq2).trim().toLowerCase().match(/^(.+?)\*(\d+\*?)?$/);
+      if (match2) {
+        names.add(match2[1]);
+      }
+    };
+    for (let i = 0;i < value.length; i++) {
+      let chr = value.charAt(i);
+      if (escaped) {
+        escaped = false;
+      } else if (chr === "\\") {
+        escaped = true;
+      } else if (chr === '"') {
+        quote = !quote;
+      } else if (chr === ";" && !quote) {
+        addSegment(i);
+        start = i + 1;
+      }
+    }
+    addSegment(value.length);
+    return names;
+  }
+  var MAX_HTML_NESTING_DEPTH = 1000;
+  var HTML_VOID_ELEMENTS = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
+  var HTML_IMPLIED_END_ELEMENTS = new Set(["p", "li", "dt", "dd", "option", "optgroup", "tr", "td", "th", "thead", "tbody", "tfoot", "rt", "rp"]);
+  function isTagNameChar(code) {
+    return code >= 97 && code <= 122 || code >= 65 && code <= 90 || code >= 48 && code <= 57 || code === 45 || code === 58 || code === 95;
+  }
+  function exceedsHtmlNestingDepth(html, maxDepth) {
+    let stack = [];
+    let open2 = new Map;
+    let len = html.length;
+    let i = html.indexOf("<");
+    while (i >= 0) {
+      let pos = i + 1;
+      if (html.startsWith("!--", pos)) {
+        let end2 = html.indexOf("-->", pos + 3);
+        i = end2 < 0 ? -1 : html.indexOf("<", end2 + 3);
+        continue;
+      }
+      let closing = html.charCodeAt(pos) === 47;
+      if (closing) {
+        pos++;
+      }
+      let nameStart = pos;
+      while (pos < len && isTagNameChar(html.charCodeAt(pos))) {
+        pos++;
+      }
+      if (pos === nameStart) {
+        i = html.indexOf("<", pos);
+        continue;
+      }
+      let name2 = html.slice(nameStart, pos).toLowerCase();
+      let end = html.indexOf(">", pos);
+      if (end < 0) {
+        break;
+      }
+      if (!HTML_VOID_ELEMENTS.has(name2) && !HTML_IMPLIED_END_ELEMENTS.has(name2)) {
+        if (!closing) {
+          stack.push(name2);
+          open2.set(name2, (open2.get(name2) || 0) + 1);
+          if (stack.length > maxDepth) {
+            return true;
+          }
+        } else if (open2.get(name2)) {
+          let popped;
+          do {
+            popped = stack.pop();
+            open2.set(popped, open2.get(popped) - 1);
+          } while (popped !== name2);
+        }
+      }
+      i = html.indexOf("<", end + 1);
     }
     return false;
   }
@@ -85171,17 +85387,22 @@ var require_mail_parser = __commonJS((exports, module) => {
         switch (key) {
           case "content-type":
           case "content-disposition":
-          case "dkim-signature":
+          case "dkim-signature": {
+            let rfc2231 = rfc2231ParamNames(value);
             value = this.libmime.parseHeaderValue(value);
             if (value.value) {
               value.value = this.libmime.decodeWords(value.value);
             }
             Object.keys(value && value.params || {}).forEach((key2) => {
+              if (rfc2231.has(key2)) {
+                return;
+              }
               try {
                 value.params[key2] = this.libmime.decodeWords(value.params[key2]);
               } catch (E) {}
             });
             break;
+          }
           case "date": {
             let dateValue = new Date(value);
             if (isNaN(dateValue)) {
@@ -85241,7 +85462,10 @@ var require_mail_parser = __commonJS((exports, module) => {
           if (!headers.has(key)) {
             headers.set(key, [].concat(value || []));
           } else if (Array.isArray(value)) {
-            headers.set(key, headers.get(key).concat(value));
+            let list = headers.get(key);
+            for (let entry of value) {
+              list.push(entry);
+            }
           } else {
             headers.get(key).push(value);
           }
@@ -85269,7 +85493,7 @@ var require_mail_parser = __commonJS((exports, module) => {
       headers.forEach((value, key) => {
         if (Array.isArray(value)) {
           if (singleKeys.includes(key) && value.length) {
-            headers.set(key, value[value.length - 1]);
+            headers.set(key, value[0]);
           } else if (value.length === 1) {
             headers.set(key, value[0]);
           }
@@ -85353,28 +85577,9 @@ var require_mail_parser = __commonJS((exports, module) => {
       return value;
     }
     decodeAddresses(addresses) {
-      let processedAddress = new WeakSet;
       for (let i = 0;i < addresses.length; i++) {
         let address = addresses[i];
         address.name = (address.name || "").toString().trim();
-        if (!address.address && /^(=\?([^?]+)\?[Bb]\?[^?]*\?=)(\s*=\?([^?]+)\?[Bb]\?[^?]*\?=)*$/.test(address.name) && !processedAddress.has(address)) {
-          let decoded = this.libmime.decodeWords(address.name);
-          if (hasBracketedAddress(decoded)) {
-            let parsed = addressparser2(decoded);
-            if (parsed.length) {
-              parsed.forEach((entry) => {
-                processedAddress.add(entry);
-                addresses.push(entry);
-              });
-            }
-            addresses.splice(i, 1);
-            i--;
-            continue;
-          } else {
-            address.name = decoded;
-            continue;
-          }
-        }
         if (address.name) {
           try {
             address.name = this.libmime.decodeWords(address.name);
@@ -85479,6 +85684,7 @@ var require_mail_parser = __commonJS((exports, module) => {
     getTextContent() {
       let text = [];
       let html = [];
+      let textConversionError = null;
       let processNode = (alternative, level, node4) => {
         if (node4.showMeta) {
           let meta3 = ["From", "Subject", "Date", "To", "Cc", "Bcc"].map((fkey) => {
@@ -85551,27 +85757,29 @@ var require_mail_parser = __commonJS((exports, module) => {
               html.push(this.textToHtml(node4.textContent));
             }
           } else if (node4.contentType === "text/html") {
-            let failedToParseHtml = false;
             if (!alternative && this.hasText || node4.root && !this.hasText) {
               if (this.options.skipHtmlToText) {
                 text.push("");
-              } else if (node4.textContent.length > this.options.maxHtmlLengthToParse) {
-                this.emit("error", new Error(`HTML too long for parsing ${node4.textContent.length} bytes`));
-                text.push("Invalid HTML content (too long)");
-                failedToParseHtml = true;
               } else {
-                try {
-                  text.push(htmlToText(node4.textContent));
-                } catch (err) {
-                  this.emit("error", new Error("Failed to parse HTML"));
-                  text.push("Invalid HTML content");
-                  failedToParseHtml = true;
+                let err = null;
+                if (node4.textContent.length > this.options.maxHtmlLengthToParse) {
+                  err = new Error(`HTML too long for parsing ${node4.textContent.length} bytes`);
+                } else if (exceedsHtmlNestingDepth(node4.textContent, MAX_HTML_NESTING_DEPTH)) {
+                  err = new Error(`HTML nested deeper than ${MAX_HTML_NESTING_DEPTH} levels`);
+                } else {
+                  try {
+                    text.push(htmlToText(node4.textContent, { limits: { maxDepth: MAX_HTML_NESTING_DEPTH } }));
+                  } catch (cause) {
+                    err = new Error("Failed to parse HTML", { cause });
+                  }
+                }
+                if (err) {
+                  text.push("");
+                  textConversionError = textConversionError || err;
                 }
               }
             }
-            if (!failedToParseHtml) {
-              html.push(node4.textContent);
-            }
+            html.push(node4.textContent);
           }
         }
         alternative = alternative || node4.contentType === "multipart/alternative";
@@ -85594,6 +85802,9 @@ var require_mail_parser = __commonJS((exports, module) => {
 `);
         this.textAsHtml = response.textAsHtml = text.map((part) => this.textToHtml(part)).join(`<br/>
 `);
+      }
+      if (textConversionError) {
+        response.textConversionError = textConversionError;
       }
       return response;
     }
@@ -85799,7 +86010,7 @@ var require_mail_parser = __commonJS((exports, module) => {
       let formatSingleLevel = (addresses) => addresses.map((address) => {
         let str = "";
         if (address.name) {
-          str += `"${address.name}"` + (address.group ? ": " : "");
+          str += `"${address.name.replace(/["\\]/g, "\\$&")}"` + (address.group ? ": " : "");
         }
         if (address.address) {
           let link = address.address;
@@ -86013,7 +86224,7 @@ var require_simple_parser = __commonJS((exports, module) => {
       }
       if (data.type === "text") {
         Object.keys(data).forEach((key) => {
-          if (["text", "html", "textAsHtml"].includes(key)) {
+          if (["text", "html", "textAsHtml", "textConversionError"].includes(key)) {
             mail[key] = data[key];
           }
         });
@@ -86458,7 +86669,8 @@ __export(exports_config, {
   loadMailConfig: () => loadMailConfig,
   intSetting: () => intSetting,
   enabledSetting: () => enabledSetting,
-  UNIMPLEMENTED_SETTINGS: () => UNIMPLEMENTED_SETTINGS
+  UNIMPLEMENTED_SETTINGS: () => UNIMPLEMENTED_SETTINGS,
+  MAIL_DEFAULTS: () => MAIL_DEFAULTS
 });
 function parseMailConfig(raw2) {
   if (raw2 == null)
@@ -86478,8 +86690,13 @@ function asConfigObject(value) {
   return value;
 }
 async function loadMailConfig(db) {
-  const row = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
-  return parseMailConfig(row.rows[0]?.value);
+  const row = await sql`
+    SELECT config AS value FROM zvd_mail_config
+     WHERE tenant_id = COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                '00000000-0000-0000-0000-000000000001'::uuid)
+  `.execute(db);
+  const own2 = row.rows[0];
+  return own2 ? parseMailConfig(own2.value) : structuredClone(MAIL_DEFAULTS);
 }
 function intSetting(config2, key, fallback) {
   const raw2 = config2[key];
@@ -86491,7 +86708,7 @@ function intSetting(config2, key, fallback) {
 function enabledSetting(config2, key) {
   return config2[key] !== false;
 }
-var UNIMPLEMENTED_SETTINGS;
+var UNIMPLEMENTED_SETTINGS, MAIL_DEFAULTS;
 var init_config = __esm(() => {
   init_dist();
   UNIMPLEMENTED_SETTINGS = [
@@ -86505,6 +86722,25 @@ var init_config = __esm(() => {
     "sieve_enabled",
     "trash_auto_delete_days"
   ];
+  MAIL_DEFAULTS = Object.freeze({
+    enabled: true,
+    max_accounts_per_user: 5,
+    max_attachment_size_mb: 25,
+    allowed_domains: [],
+    blocked_domains: [],
+    require_admin_approval: false,
+    auto_collect_contacts: true,
+    imap_idle_enabled: true,
+    sieve_enabled: true,
+    pgp_enabled: true,
+    oauth2_gmail_client_id: "",
+    oauth2_gmail_client_secret: "",
+    oauth2_outlook_client_id: "",
+    oauth2_outlook_client_secret: "",
+    max_messages_sync: 1000,
+    sync_interval_minutes: 5,
+    trash_auto_delete_days: 30
+  });
 });
 
 // /zveltio-extension/node_modules/nodemailer/dist/esm/punycode/index.js
@@ -86704,6 +86940,17 @@ var init_punycode = __esm(() => {
 // /zveltio-extension/node_modules/nodemailer/dist/esm/shared/url.js
 import net from "net";
 import urllib from "url";
+function stripSurroundingWhitespace(input2) {
+  let start = 0;
+  let end = input2.length;
+  while (start < end && input2.charCodeAt(start) <= 32) {
+    start++;
+  }
+  while (end > start && input2.charCodeAt(end - 1) <= 32) {
+    end--;
+  }
+  return input2.slice(start, end);
+}
 function invalidUrl(input2) {
   const err = new TypeError("Invalid URL");
   err.code = "ERR_INVALID_URL";
@@ -86752,8 +86999,8 @@ function normalizeHostname(raw2, href) {
   }
   return mapped;
 }
-var SLASHLESS_AUTHORITY, SURROUNDING_WHITESPACE, LEGACY_TRIM, AUTHORITY, FORBIDDEN_HOST_CHARS, CONTROL_CHARS, parse7 = (input2, parseQueryString) => {
-  input2 = (input2 || "").replace(SURROUNDING_WHITESPACE, "");
+var SLASHLESS_AUTHORITY, LEGACY_TRIM, AUTHORITY, FORBIDDEN_HOST_CHARS, CONTROL_CHARS, parse7 = (input2, parseQueryString) => {
+  input2 = stripSurroundingWhitespace(input2 || "");
   const slashless = SLASHLESS_AUTHORITY.exec(input2);
   const normalized = slashless ? slashless[1] + "//" + slashless[2] : input2;
   let u;
@@ -86819,7 +87066,6 @@ var SLASHLESS_AUTHORITY, SURROUNDING_WHITESPACE, LEGACY_TRIM, AUTHORITY, FORBIDD
 var init_url = __esm(() => {
   init_punycode();
   SLASHLESS_AUTHORITY = /^([a-zA-Z][a-zA-Z0-9+.-]*:)(?!\/\/)([\s\S]+)$/;
-  SURROUNDING_WHITESPACE = /^[\x00-\x20]+|[\x00-\x20]+$/g;
   LEGACY_TRIM = /^[\x00-\x20\u00a0\ufeff]+/;
   AUTHORITY = /^([a-zA-Z0-9+.-]+:)?[\\/]{2}([^\\/?#]*)/;
   FORBIDDEN_HOST_CHARS = /[\x00-\x20#/:<>?@[\\\]^|\x7f]/;
@@ -86979,7 +87225,7 @@ var init_cookies = __esm(() => {
 });
 
 // /zveltio-extension/node_modules/nodemailer/dist/esm/package-info.js
-var name2 = "nodemailer", version2 = "10.1.1", homepage = "https://nodemailer.com/";
+var name2 = "nodemailer", version2 = "10.1.6", homepage = "https://nodemailer.com/";
 
 // /zveltio-extension/node_modules/nodemailer/dist/esm/errors.js
 var ECONNECTION = "ECONNECTION", ETIMEDOUT = "ETIMEDOUT", ESOCKET = "ESOCKET", EENVELOPE = "EENVELOPE", EMESSAGE = "EMESSAGE", ESTREAM = "ESTREAM", ENOAUTH = "ENOAUTH", EOAUTH2 = "EOAUTH2", EMAXLIMIT = "EMAXLIMIT", EMAXRECIPIENTS = "EMAXRECIPIENTS", ESENDMAIL = "ESENDMAIL", ESES = "ESES", ECONFIG = "ECONFIG", EPROXY = "EPROXY", EFILEACCESS = "EFILEACCESS", EURLACCESS = "EURLACCESS", EFETCH = "EFETCH", isTransientError = (err) => err.responseCode === 421 || err.code === ECONNECTION || err.code === ESOCKET || err.code === ETIMEDOUT, ERR_ACCESS_DENIED = "ERR_ACCESS_DENIED";
@@ -87028,6 +87274,10 @@ function nmfetch(url2, options) {
   options.cookies = options.cookies || new cookies_default;
   options.redirects = options.redirects || 0;
   options.maxRedirects = isNaN(options.maxRedirects) ? MAX_REDIRECTS : options.maxRedirects;
+  if (!options.deadline) {
+    options.maxTime = typeof options.maxTime === "number" && options.maxTime >= 0 ? options.maxTime : DEFAULT_MAX_TIME;
+    options.deadline = options.maxTime ? Date.now() + options.maxTime : 0;
+  }
   const fetchRes = options.fetchRes;
   const parsed = parseFetchUrl(url2);
   if (!parsed) {
@@ -87144,11 +87394,19 @@ function nmfetch(url2, options) {
     });
     return fetchRes;
   }
+  let deadlineTimer;
+  const clearDeadline = () => {
+    if (deadlineTimer) {
+      clearTimeout(deadlineTimer);
+      deadlineTimer = undefined;
+    }
+  };
   const fail = (err, sourceUrl = url2) => {
     if (finished) {
       return;
     }
     finished = true;
+    clearDeadline();
     setFetchCode(err);
     err.sourceUrl = sourceUrl;
     fetchRes.emit("error", err);
@@ -87158,8 +87416,13 @@ function nmfetch(url2, options) {
   if (timeout) {
     req.setTimeout(timeout, () => fail(new Error("Request Timeout")));
   }
+  if (options.deadline) {
+    deadlineTimer = setTimeout(() => fail(new Error("Request exceeded the allowed " + options.maxTime + " ms")), Math.max(options.deadline - Date.now(), 1));
+    deadlineTimer.unref();
+  }
   req.on("error", (err) => fail(err));
   fetchRes.once("close", () => {
+    clearDeadline();
     if (finished || fetchRes.readableEnded) {
       return;
     }
@@ -87209,6 +87472,7 @@ function nmfetch(url2, options) {
         });
       }
       finished = true;
+      clearDeadline();
       res.resume();
       req.abort();
       return nmfetch(redirectUrl, options);
@@ -87219,6 +87483,7 @@ function nmfetch(url2, options) {
       return fail(new Error("Invalid status code " + res.statusCode));
     }
     res.on("error", (err) => fail(err));
+    res.once("end", () => clearDeadline());
     const maxBytes = typeof options.maxBytes === "number" && options.maxBytes > 0 ? options.maxBytes : DEFAULT_MAX_BYTES;
     const source = inflate || res;
     let received = 0;
@@ -87252,12 +87517,13 @@ function nmfetch(url2, options) {
   });
   return fetchRes;
 }
-var MAX_REDIRECTS = 5, DEFAULT_TIMEOUT, DEFAULT_MAX_BYTES, TLS_OPTION_KEYS, fetch_default;
+var MAX_REDIRECTS = 5, DEFAULT_TIMEOUT, DEFAULT_MAX_TIME, DEFAULT_MAX_BYTES, TLS_OPTION_KEYS, fetch_default;
 var init_fetch = __esm(() => {
   init_url();
   init_cookies();
   init_errors();
   DEFAULT_TIMEOUT = 60 * 1000;
+  DEFAULT_MAX_TIME = 2 * 60 * 1000;
   DEFAULT_MAX_BYTES = 64 * 1024 * 1024;
   TLS_OPTION_KEYS = [
     "ALPNProtocols",
@@ -87284,6 +87550,7 @@ var init_fetch = __esm(() => {
   ];
   nmfetch.Cookies = cookies_default;
   nmfetch.DEFAULT_TIMEOUT = DEFAULT_TIMEOUT;
+  nmfetch.DEFAULT_MAX_TIME = DEFAULT_MAX_TIME;
   fetch_default = nmfetch;
 });
 
@@ -90303,21 +90570,31 @@ function encodeWord(data, mimeWordEncoding, maxLength) {
 }
 function encodeWords(value, mimeWordEncoding, maxLength, encodeAll) {
   maxLength = maxLength || 0;
-  const firstMatch = value.match(/(?:^|\s)([^\s]*["\u0080-\uFFFF])/);
-  if (!firstMatch) {
+  let firstSpecial = -1;
+  let lastSpecial = -1;
+  for (let i = 0;i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code === 34 || code >= 128) {
+      if (firstSpecial < 0) {
+        firstSpecial = i;
+      }
+      lastSpecial = i;
+    }
+  }
+  if (firstSpecial < 0) {
     return value;
   }
   if (encodeAll) {
     return encodeWord(value, mimeWordEncoding, maxLength);
   }
-  const lastMatch = value.match(/(["\u0080-\uFFFF][^\s]*)[^"\u0080-\uFFFF]*$/);
-  if (!lastMatch) {
-    return value;
+  let startIndex = firstSpecial;
+  while (startIndex > 0 && !/\s/.test(value.charAt(startIndex - 1))) {
+    startIndex--;
   }
-  const startIndex = firstMatch.index + (firstMatch[0].match(/[^\s]/) || {
-    index: 0
-  }).index;
-  const endIndex = lastMatch.index + (lastMatch[1] || "").length;
+  let endIndex = lastSpecial + 1;
+  while (endIndex < value.length && !/\s/.test(value.charAt(endIndex))) {
+    endIndex++;
+  }
   return (startIndex ? value.substr(0, startIndex) : "") + encodeWord(value.substring(startIndex, endIndex), mimeWordEncoding || "Q", maxLength) + (endIndex < value.length ? value.substr(endIndex) : "");
 }
 function buildHeaderValue(structured) {
@@ -90681,6 +90958,725 @@ var init_mime_funcs = __esm(() => {
   TOKEN = /^[^\x00-\x20\x7f()<>@,;:\\"/[\]?=]+$/;
 });
 
+// /zveltio-extension/node_modules/nodemailer/dist/esm/addressparser/index.js
+class TokenList2 {
+  constructor(str) {
+    this.str = str;
+    this.slots = new Int32Array(48);
+    this.length = 0;
+    this.cleaned = new Map;
+  }
+  push(kind, start, end) {
+    if ((this.length + 1) * 3 > this.slots.length) {
+      const grown = new Int32Array(this.slots.length * 2);
+      grown.set(this.slots);
+      this.slots = grown;
+    }
+    const at = this.length * 3;
+    this.slots[at] = kind;
+    this.slots[at + 1] = start;
+    this.slots[at + 2] = end;
+    return this.length++;
+  }
+  operatorAt(index) {
+    const at = index * 3;
+    return this.slots[at] & TOKEN_OPERATOR2 ? this.str.charAt(this.slots[at + 1]) : "";
+  }
+  isOperator(index) {
+    return (this.slots[index * 3] & TOKEN_OPERATOR2) !== 0;
+  }
+  noBreak(index) {
+    return (this.slots[index * 3] & TOKEN_NO_BREAK2) !== 0;
+  }
+  value(index) {
+    const cleaned = this.cleaned.get(index);
+    if (cleaned !== undefined) {
+      return cleaned;
+    }
+    return this.str.slice(this.slots[index * 3 + 1], this.slots[index * 3 + 2]);
+  }
+}
+function _domainAt2(address) {
+  const literal3 = address.charAt(address.length - 1) === "]" ? DOMAIN_LITERAL_TAIL2.exec(address) : null;
+  return literal3 ? address.length - literal3[1].length - 1 : address.lastIndexOf("@");
+}
+function _quoteLocalPart2(address) {
+  const lastAt = _domainAt2(address);
+  if (lastAt < 0) {
+    return address;
+  }
+  const user = address.substr(0, lastAt);
+  if (/^[^\s"(),:;<>@[\\\]]+$/.test(user) || /^"(?:[^"\\]|\\[\s\S])*"$/.test(user)) {
+    return address;
+  }
+  return '"' + user.replace(/["\\]/g, "\\$&") + '"@' + address.substr(lastAt + 1);
+}
+function _isAddrSpec2(value) {
+  return ADDR_SPEC2.test(value) || LITERAL_ADDR_SPEC2.test(value);
+}
+function _isSpaceCode2(code) {
+  return code === 32 || code >= 9 && code <= 13 || code === 160 || code === 5760 || code >= 8192 && code <= 8202 || code === 8232 || code === 8233 || code === 8239 || code === 8287 || code === 12288 || code === 65279;
+}
+function _isWordCode2(code) {
+  return code >= 48 && code <= 57 || code >= 65 && code <= 90 || code >= 97 && code <= 122 || code === 95;
+}
+function _isBoundary2(text, at) {
+  return _isWordCode2(text.charCodeAt(at - 1)) !== _isWordCode2(text.charCodeAt(at));
+}
+function _indexOfAt2(text, from, to) {
+  for (let i = from;i < to; i++) {
+    if (text.charCodeAt(i) === 64) {
+      return i;
+    }
+  }
+  return -1;
+}
+function _joinAtSpacing2(value, at) {
+  if (at < 0) {
+    return value;
+  }
+  let start = at;
+  while (start > 0 && _isSpaceCode2(value.charCodeAt(start - 1))) {
+    start--;
+  }
+  let end = at + 1;
+  while (end < value.length && _isSpaceCode2(value.charCodeAt(end))) {
+    end++;
+  }
+  return start === at && end === at + 1 ? value : value.slice(0, start) + "@" + value.slice(end);
+}
+function _collapseAtSpacing2(value) {
+  const quoted = LEADING_QUOTED_STRING2.exec(value);
+  if (quoted) {
+    let at2 = quoted[0].length;
+    while (at2 < value.length && _isSpaceCode2(value.charCodeAt(at2))) {
+      at2++;
+    }
+    if (value.charAt(at2) === "@" && value.indexOf("@", at2 + 1) < 0) {
+      return _joinAtSpacing2(value, at2);
+    }
+  }
+  const at = value.indexOf("@");
+  if (at < 0 || value.indexOf("@", at + 1) >= 0 || value.lastIndexOf('"') > at) {
+    return value;
+  }
+  return _joinAtSpacing2(value, at);
+}
+function _looseAddressStart2(text) {
+  const len = text.length;
+  let pos = 0;
+  while (pos < len) {
+    while (pos < len && _isSpaceCode2(text.charCodeAt(pos))) {
+      pos++;
+    }
+    if (pos >= len) {
+      break;
+    }
+    const runStart = pos;
+    let runEnd = pos;
+    while (runEnd < len && !_isSpaceCode2(text.charCodeAt(runEnd))) {
+      runEnd++;
+    }
+    let at = _indexOfAt2(text, runStart, runEnd);
+    if (at >= 0) {
+      let lastBoundary = -1;
+      for (let k = runEnd;k > runStart; k--) {
+        if (_isBoundary2(text, k)) {
+          lastBoundary = k;
+          break;
+        }
+      }
+      let atomStart = runStart;
+      while (lastBoundary >= 0 && at >= 0) {
+        if (at > atomStart && runEnd > at + 1 && lastBoundary > at + 1) {
+          for (let start = atomStart;start < at; start++) {
+            if (_isBoundary2(text, start)) {
+              if (start > runStart) {
+                return start;
+              }
+              let padded = runStart;
+              while (padded > 0 && _isSpaceCode2(text.charCodeAt(padded - 1))) {
+                padded--;
+              }
+              return padded;
+            }
+          }
+        }
+        atomStart = at + 1;
+        at = _indexOfAt2(text, atomStart, runEnd);
+      }
+    }
+    pos = runEnd;
+  }
+  return -1;
+}
+function _recoverAddrSpec2(data) {
+  data.address = _collapseAtSpacing2(data.address);
+  if (!HAS_WHITESPACE2.test(data.address)) {
+    return;
+  }
+  let address;
+  let rest;
+  const quoted = data.address.match(QUOTED_LOCAL_ADDR2);
+  if (quoted) {
+    if (!quoted[2]) {
+      return;
+    }
+    address = quoted[1];
+    rest = [quoted[2]];
+  } else {
+    if (data.address.indexOf('"') >= 0) {
+      return;
+    }
+    const parts = data.address.split(/\s+/);
+    let addrIndex = parts.findIndex(_isAddrSpec2);
+    if (addrIndex < 0) {
+      addrIndex = parts.findIndex((part) => LOOSE_ADDR_SPEC2.test(part));
+    }
+    if (addrIndex < 0) {
+      return;
+    }
+    address = parts.splice(addrIndex, 1)[0];
+    rest = parts;
+  }
+  data.address = address;
+  data.text = [data.text].concat(rest).filter((part) => part).join(" ");
+}
+function _stripAddressComments2(address) {
+  const comments = [];
+  let result = "";
+  let comment = "";
+  let depth = 0;
+  let closer = "";
+  let lastChar = "";
+  let pendingSpace = false;
+  let firstChar = "";
+  let quoteSeen = false;
+  let routeEnd = -1;
+  for (let i = 0, len = address.length;i < len; i++) {
+    const chr = address.charAt(i);
+    if (depth) {
+      if (chr === "\\" && i < len - 1) {
+        comment += address.charAt(++i);
+      } else if (chr === "(") {
+        depth++;
+        comment += chr;
+      } else if (chr === ")" && !--depth) {
+        comments.push(comment.trim());
+        comment = "";
+        pendingSpace = lastChar !== "@";
+      } else {
+        comment += chr;
+      }
+      continue;
+    }
+    if (pendingSpace && chr !== "(") {
+      pendingSpace = false;
+      if (chr !== "@" && chr !== "<" && !_isSpaceCode2(address.charCodeAt(i))) {
+        result += " ";
+        lastChar = " ";
+      }
+    }
+    if (closer) {
+      if (chr === "\\" && closer === '"' && i < len - 1) {
+        result += chr + address.charAt(++i);
+        lastChar = address.charAt(i);
+        continue;
+      }
+      if (chr === closer) {
+        closer = "";
+      }
+    } else if (chr === '"') {
+      closer = '"';
+      quoteSeen = true;
+    } else if (chr === ":" && routeEnd < 0 && firstChar === "@" && !quoteSeen) {
+      routeEnd = result.length + 1;
+    } else if (chr === "[") {
+      closer = "]";
+    } else if (chr === "(") {
+      depth = 1;
+      continue;
+    } else if (chr === "<") {
+      result = "";
+      lastChar = "";
+      comments.length = 0;
+      firstChar = "";
+      quoteSeen = false;
+      routeEnd = -1;
+      continue;
+    }
+    result += chr;
+    lastChar = chr;
+    if (!firstChar && !_isSpaceCode2(address.charCodeAt(i))) {
+      firstChar = chr;
+    }
+  }
+  if (routeEnd >= 0 && result.indexOf("@", routeEnd) >= 0) {
+    result = result.slice(routeEnd);
+  }
+  if (depth) {
+    comments.push(comment.trim());
+  }
+  return { address: result.trim(), comments: comments.filter((text) => text) };
+}
+function _collectAddressParts(tokens, from, to) {
+  let state = "text";
+  const data = {
+    address: [],
+    comment: [],
+    text: [],
+    textWasQuoted: [],
+    quotedLocalAt: []
+  };
+  let insideQuotes = false;
+  let lastTextPureQuoted = false;
+  const lastChars = { address: "", comment: "", text: "" };
+  for (let i = from;i < to; i++) {
+    const value = tokens.value(i);
+    const prevOperator = i > from ? tokens.operatorAt(i - 1) : "";
+    const prevNoBreak = i > from && tokens.noBreak(i - 1);
+    if (tokens.isOperator(i)) {
+      switch (value) {
+        case "<":
+          state = "address";
+          insideQuotes = false;
+          break;
+        case "(":
+          state = "comment";
+          insideQuotes = false;
+          break;
+        case '"':
+          insideQuotes = !insideQuotes;
+          state = "text";
+          break;
+        default:
+          state = "text";
+          insideQuotes = false;
+          break;
+      }
+    } else {
+      const opensAfterEmptyQuotedString = prevOperator === '"' && prevNoBreak && i > from + 1 && tokens.operatorAt(i - 2) === '"';
+      const parts = data[state];
+      const joins = prevNoBreak && parts.length && (prevOperator !== ")" || lastChars[state] === "@" || value.charAt(0) === "@");
+      if (joins) {
+        const last = data[state].length - 1;
+        if (state === "text" && !insideQuotes) {
+          if (lastTextPureQuoted && value.charAt(0) === "@") {
+            data.quotedLocalAt[last] = data.text[last].length;
+          }
+          lastTextPureQuoted = false;
+        }
+        data[state][last] += value;
+        lastChars[state] = value.charAt(value.length - 1);
+        if (state === "text" && insideQuotes) {
+          data.textWasQuoted[last] = true;
+        }
+      } else {
+        data[state].push(value);
+        lastChars[state] = value.charAt(value.length - 1);
+        if (state === "text") {
+          data.textWasQuoted.push(insideQuotes || opensAfterEmptyQuotedString);
+          data.quotedLocalAt.push(opensAfterEmptyQuotedString && value.charAt(0) === "@" ? 0 : -1);
+          lastTextPureQuoted = insideQuotes;
+        }
+      }
+    }
+  }
+  let textFromComment = false;
+  if (!data.text.length && data.comment.length) {
+    data.text = data.comment;
+    data.comment = [];
+    textFromComment = true;
+  }
+  return { data, textFromComment };
+}
+function _groupName(tokens, from, to) {
+  return _collectAddressParts(tokens, from, to).data.text.join(" ");
+}
+function _handleAddress2(tokens, from, to) {
+  const collected = _collectAddressParts(tokens, from, to);
+  const data = collected.data;
+  let textFromComment = collected.textFromComment;
+  const addressComments = [];
+  const addressParts = [];
+  for (const part of data.address) {
+    const stripped = _stripAddressComments2(part);
+    for (const comment of stripped.comments) {
+      addressComments.push(comment);
+    }
+    if (stripped.address) {
+      addressParts.push(stripped.address);
+    }
+  }
+  data.address = addressParts;
+  if (!data.address.length && data.text.length && !textFromComment) {
+    const candidates = data.text.map((part) => _collapseAtSpacing2(part));
+    for (let i = 0;i < data.text.length; i++) {
+      const local = data.quotedLocalAt[i];
+      const quotedLocal = data.textWasQuoted[i] && local >= 0 && QUOTED_LOCAL_DOMAIN2.test(data.text[i].slice(local)) ? _quoteLocalPart2(data.text[i]) : "";
+      if (quotedLocal || !data.textWasQuoted[i] && _isAddrSpec2(candidates[i])) {
+        data.address = [quotedLocal || candidates[i]];
+        data.text.splice(i, 1);
+        data.textWasQuoted.splice(i, 1);
+        data.quotedLocalAt.splice(i, 1);
+        break;
+      }
+    }
+    if (!data.address.length) {
+      let extracted = false;
+      for (let i = 0;i < data.text.length; i++) {
+        if (!data.textWasQuoted[i]) {
+          const part = candidates[i];
+          let remainder = data.text[i];
+          const at = _looseAddressStart2(part);
+          if (at >= 0) {
+            LOOSE_TEXT_ADDR2.lastIndex = at;
+            const match2 = LOOSE_TEXT_ADDR2.exec(part);
+            if (match2) {
+              data.address = [match2[0].trim()];
+              extracted = true;
+              remainder = part.slice(0, at) + " " + part.slice(at + match2[0].length);
+            }
+          }
+          data.text[i] = remainder.trim();
+          if (extracted) {
+            break;
+          }
+        }
+      }
+    }
+  }
+  if (!data.text.length && data.comment.length) {
+    data.text = data.comment;
+    data.comment = [];
+  }
+  if (data.address.length > 1) {
+    data.text = data.text.concat(data.address.splice(1));
+  }
+  const addressFromQuotedText = !data.address.length && data.textWasQuoted.some((wasQuoted) => wasQuoted);
+  data.text = data.text.join(" ");
+  data.address = data.address.join(" ");
+  if (addressFromQuotedText && data.text.indexOf("@") >= 0) {
+    data.address = _quoteLocalPart2(_joinAtSpacing2(data.text, _domainAt2(data.text)));
+    data.text = "";
+  }
+  _recoverAddrSpec2(data);
+  if (!data.text && addressComments.length) {
+    data.text = addressComments.join(" ");
+    textFromComment = true;
+  }
+  const address = {
+    address: data.address || (textFromComment ? "" : data.text) || "",
+    name: data.text || data.address || ""
+  };
+  if (address.address === address.name) {
+    if (/@/.test(address.address || "")) {
+      address.name = "";
+    } else {
+      address.address = "";
+    }
+  }
+  return address;
+}
+
+class Tokenizer3 {
+  constructor(str) {
+    this.str = (str || "").toString();
+    this.operatorCurrent = "";
+    this.operatorExpecting = "";
+    this.node = -1;
+    this.escaped = false;
+    this.inDomainLiteral = false;
+    this.afterAt = false;
+    this.inGroup = false;
+    this.innerQuoted = false;
+    this.innerComment = 0;
+    this.innerLiteral = false;
+    this.innerEscaped = false;
+    this.list = new TokenList2(this.str);
+    this.operators = {
+      '"': '"',
+      "(": ")",
+      "<": ">",
+      ",": "",
+      ":": "",
+      ";": ""
+    };
+  }
+  tokenize() {
+    const str = this.str;
+    const len = str.length;
+    for (let i = 0;i < len; i++) {
+      this.checkChar(str.charAt(i), i);
+    }
+    this._closeText(len);
+    const list = this.list;
+    const slots = list.slots;
+    let kept = 0;
+    for (let i = 0, count = list.length;i < count; i++) {
+      const kind = slots[i * 3];
+      let start = slots[i * 3 + 1];
+      let end = slots[i * 3 + 2];
+      if (kind & TOKEN_DIRTY2) {
+        const value = this._cleanValue(start, end, kind).trim();
+        if (!value) {
+          continue;
+        }
+        list.cleaned.set(kept, value);
+      } else if (!(kind & TOKEN_OPERATOR2)) {
+        while (start < end && _isSpaceCode2(str.charCodeAt(start))) {
+          start++;
+        }
+        while (end > start && _isSpaceCode2(str.charCodeAt(end - 1))) {
+          end--;
+        }
+        if (start === end) {
+          continue;
+        }
+      }
+      slots[kept * 3] = kind;
+      slots[kept * 3 + 1] = start;
+      slots[kept * 3 + 2] = end;
+      kept++;
+    }
+    list.length = kept;
+    return list;
+  }
+  _closeText(end) {
+    if (this.node >= 0) {
+      this.list.slots[this.node * 3 + 2] = end;
+      this.node = -1;
+    }
+  }
+  _cleanValue(start, end, kind) {
+    const str = this.str;
+    const escapes = (kind & TOKEN_ESCAPES2) !== 0;
+    let escaped = (kind & TOKEN_STARTS_ESCAPED2) !== 0;
+    let value = "";
+    for (let i = start;i < end; i++) {
+      const chr = str.charAt(i);
+      if (escapes && !escaped && chr === "\\") {
+        escaped = true;
+        continue;
+      }
+      escaped = false;
+      if (chr === `
+`) {
+        value += " ";
+      } else if (chr.charCodeAt(0) >= 33 || chr === " " || chr === "\t") {
+        value += chr;
+      }
+    }
+    return value;
+  }
+  checkChar(chr, i) {
+    if (!this.escaped && !this.operatorExpecting) {
+      if (!this.inDomainLiteral && chr === "[" && this.afterAt) {
+        this.inDomainLiteral = true;
+      } else if (this.inDomainLiteral && (chr === "]" || chr === "," || chr === ";")) {
+        this.inDomainLiteral = false;
+      }
+    }
+    let nested = false;
+    if (this.operatorExpecting === ">") {
+      nested = this._trackInner(chr);
+      if (!nested && chr === ";" && this.inGroup) {
+        this._closeText(i);
+        this.operatorExpecting = "";
+        this._resetInner();
+      }
+    } else if (this.operatorExpecting === ")" && !this.escaped) {
+      if (chr === "(") {
+        this.innerComment++;
+      } else if (chr === ")" && this.innerComment) {
+        this.innerComment--;
+        nested = true;
+      }
+    }
+    if (this.escaped) {} else if (chr === this.operatorExpecting && !nested) {
+      const nextChr = this.str.charAt(i + 1);
+      this._closeText(i);
+      this.list.push(nextChr && ![" ", "\t", "\r", `
+`, ",", ";"].includes(nextChr) ? TOKEN_OPERATOR2 | TOKEN_NO_BREAK2 : TOKEN_OPERATOR2, i, i + 1);
+      if (chr !== ")") {
+        this.afterAt = false;
+      }
+      this.operatorExpecting = "";
+      this.escaped = false;
+      this._resetInner();
+      return;
+    } else if (!this.operatorExpecting && !(this.inDomainLiteral && chr === ":") && chr in this.operators) {
+      this._closeText(i);
+      this.list.push(TOKEN_OPERATOR2, i, i + 1);
+      if (chr === ":") {
+        this.inGroup = true;
+      } else if (chr === ";") {
+        this.inGroup = false;
+      }
+      if (chr !== "(") {
+        this.afterAt = false;
+      }
+      this.operatorExpecting = this.operators[chr];
+      this.escaped = false;
+      this._resetInner();
+      return;
+    } else if (['"', "'", ")"].includes(this.operatorExpecting) && chr === "\\") {
+      this.escaped = true;
+      if (this.node >= 0) {
+        this.list.slots[this.node * 3] |= TOKEN_DIRTY2;
+      }
+      return;
+    }
+    if (this.node < 0) {
+      this.node = this.list.push((this.operatorExpecting === '"' || this.operatorExpecting === ")" ? TOKEN_ESCAPES2 : 0) | (this.escaped ? TOKEN_STARTS_ESCAPED2 : 0), i, i);
+    }
+    if (chr === `
+`) {
+      chr = " ";
+      this.list.slots[this.node * 3] |= TOKEN_DIRTY2;
+    }
+    if (chr.charCodeAt(0) >= 33 || chr === " " || chr === "\t") {
+      if (!this.operatorExpecting && chr !== " " && chr !== "\t") {
+        this.afterAt = chr === "@";
+      }
+    } else {
+      this.list.slots[this.node * 3] |= TOKEN_DIRTY2;
+    }
+    this.escaped = false;
+  }
+  _trackInner(chr) {
+    if (this.innerEscaped) {
+      this.innerEscaped = false;
+      return true;
+    }
+    if (this.innerQuoted) {
+      if (chr === "\\") {
+        this.innerEscaped = true;
+      } else if (chr === '"') {
+        this.innerQuoted = false;
+      }
+      return true;
+    }
+    if (this.innerComment) {
+      if (chr === "\\") {
+        this.innerEscaped = true;
+      } else if (chr === "(") {
+        this.innerComment++;
+      } else if (chr === ")") {
+        this.innerComment--;
+      }
+      return true;
+    }
+    if (this.innerLiteral) {
+      if (chr === "]") {
+        this.innerLiteral = false;
+      }
+      return true;
+    }
+    if (chr === '"') {
+      this.innerQuoted = true;
+      return true;
+    }
+    if (chr === "(") {
+      this.innerComment = 1;
+      return true;
+    }
+    if (chr === "[" && this.afterAt) {
+      this.innerLiteral = true;
+      return true;
+    }
+    if (!_isSpaceCode2(chr.charCodeAt(0))) {
+      this.afterAt = chr === "@";
+    }
+    return false;
+  }
+  _resetInner() {
+    this.innerQuoted = false;
+    this.innerComment = 0;
+    this.innerLiteral = false;
+    this.innerEscaped = false;
+  }
+}
+function _mergeNameFragments(list) {
+  const merged = [];
+  for (let i = list.length - 1;i >= 0; i--) {
+    const current = list[i];
+    const next = merged.length ? merged[merged.length - 1] : null;
+    if (next && current.address === "" && current.name && !current.group && next.address && next.name) {
+      next.name = current.name + ", " + next.name;
+    } else {
+      merged.push(current);
+    }
+  }
+  return merged.reverse();
+}
+function _parseAddressList2(str) {
+  const tokens = new Tokenizer3(str).tokenize();
+  const parsedAddresses = [];
+  let group = null;
+  let members2 = [];
+  let from = 0;
+  for (let i = 0, len = tokens.length;i <= len; i++) {
+    const operator = i < len ? tokens.operatorAt(i) : "";
+    if (i < len && operator !== "," && operator !== ";" && operator !== ":") {
+      continue;
+    }
+    if (operator === ":") {
+      if (!group) {
+        group = { name: _groupName(tokens, from, i), group: [] };
+        members2 = [];
+      }
+      from = i + 1;
+      continue;
+    }
+    if (i > from) {
+      const address = _handleAddress2(tokens, from, i);
+      if (group) {
+        members2.push(address);
+      } else {
+        parsedAddresses.push(address);
+      }
+    }
+    from = i + 1;
+    if (group && (operator === ";" || i === len)) {
+      group.group = _mergeNameFragments(members2);
+      parsedAddresses.push(group);
+      group = null;
+    }
+  }
+  return _mergeNameFragments(parsedAddresses);
+}
+function addressparser2(str, options) {
+  const parsedAddresses = _parseAddressList2(str);
+  if (options?.flatten) {
+    const flatAddresses = [];
+    const walkAddressList = (list) => {
+      list.forEach((entry) => {
+        if (entry.group) {
+          return walkAddressList(entry.group);
+        }
+        flatAddresses.push(entry);
+      });
+    };
+    walkAddressList(parsedAddresses);
+    return flatAddresses;
+  }
+  return parsedAddresses;
+}
+var TOKEN_OPERATOR2 = 1, TOKEN_NO_BREAK2 = 2, TOKEN_DIRTY2 = 4, TOKEN_ESCAPES2 = 8, TOKEN_STARTS_ESCAPED2 = 16, DOMAIN_LITERAL_TAIL2, HAS_WHITESPACE2, QUOTED_LOCAL_ADDR2, ADDR_SPEC2, LITERAL_ADDR_SPEC2, QUOTED_LOCAL_DOMAIN2, LOOSE_ADDR_SPEC2, LOOSE_TEXT_ADDR2, LEADING_QUOTED_STRING2, addressparser_default2;
+var init_addressparser2 = __esm(() => {
+  DOMAIN_LITERAL_TAIL2 = /@(\[[^[\]\\]*\])$/;
+  HAS_WHITESPACE2 = /\s/;
+  QUOTED_LOCAL_ADDR2 = /^("(?:[^"\\]|\\[\s\S])*"@\S+)(?:\s+([\s\S]+))?$/;
+  ADDR_SPEC2 = /^[^@\s]+@[^@\s]+$/;
+  LITERAL_ADDR_SPEC2 = /^[^@\s]+@\[[^[\]\\\s]*\]$/;
+  QUOTED_LOCAL_DOMAIN2 = /^@(?:[^@\s"]+|\[[^[\]\\\s]*\])$/;
+  LOOSE_ADDR_SPEC2 = /^[^@\s]+@\S+$/;
+  LOOSE_TEXT_ADDR2 = /\s*\b[^@\s]+@[^\s]+\b\s*/y;
+  LEADING_QUOTED_STRING2 = /^"(?:[^"\\]|\\[\s\S])*"/;
+  addressparser_default2 = addressparser2;
+});
+
 // /zveltio-extension/node_modules/nodemailer/dist/esm/mime-node/last-newline.js
 import { Transform as Transform3 } from "stream";
 var LastNewline;
@@ -90784,10 +91780,40 @@ import crypto2 from "crypto";
 import fs2 from "fs";
 import { PassThrough as PassThrough2, finished as finished2, pipeline } from "stream";
 import urlModule from "url";
+function stripWhitespaceInAngleBrackets(value) {
+  let result = "";
+  let pos = 0;
+  for (;; ) {
+    const open2 = value.indexOf("<", pos);
+    if (open2 < 0) {
+      break;
+    }
+    const close = value.indexOf(">", open2 + 1);
+    if (close < 0) {
+      break;
+    }
+    result += value.slice(pos, open2) + value.slice(open2, close + 1).replace(/\s/g, "");
+    pos = close + 1;
+  }
+  return result + value.slice(pos);
+}
 function abortedError() {
   const err = new Error("Message stream was closed before the message was generated");
   err.code = ESTREAM;
   return err;
+}
+function exceedsDomainLimits(domain2) {
+  let total = 0;
+  let label = 0;
+  for (const char2 of domain2) {
+    total++;
+    if (char2 === "." || char2 === "\u3002" || char2 === "\uFF0E" || char2 === "\uFF61") {
+      label = 0;
+    } else if (++label > MAX_LABEL_LENGTH) {
+      return true;
+    }
+  }
+  return total > MAX_DOMAIN_LENGTH;
 }
 function normalizeDomain(domain2, toUnicode2) {
   if (typeof urlModule.domainToASCII === "function" && typeof urlModule.domainToUnicode === "function" && !URL_PARSER_UNSAFE.test(domain2)) {
@@ -90796,6 +91822,9 @@ function normalizeDomain(domain2, toUnicode2) {
     if (mapped) {
       return mapped;
     }
+  }
+  if (exceedsDomainLimits(domain2)) {
+    return domain2;
   }
   return toUnicode2 ? toUnicode(domain2) : toASCII(domain2);
 }
@@ -91093,6 +92122,13 @@ class MimeNode {
           this._handleContentType(structured);
           if (structured.value.match(/^text\/plain\b/) && typeof this.content === "string" && /[\u0080-\uFFFF]/.test(this.content)) {
             structured.params.charset = "utf-8";
+          }
+          if (this.filename) {
+            for (const paramKey of Object.keys(structured.params)) {
+              if (/^name(\*|$)/i.test(paramKey)) {
+                delete structured.params[paramKey];
+              }
+            }
           }
           value = buildHeaderValue(structured);
           if (this.filename) {
@@ -91493,7 +92529,7 @@ class MimeNode {
         flattened.push(copy);
         continue;
       }
-      const parsed = this._normalizeParsedAddresses(addressparser_default(address));
+      const parsed = this._normalizeParsedAddresses(addressparser_default2(address));
       for (let i = 0;i < parsed.length; i++) {
         flattened.push(parsed[i]);
       }
@@ -91519,7 +92555,7 @@ class MimeNode {
     });
   }
   _normalizeHeaderKey(key) {
-    key = (key || "").toString().replace(/\r?\n|\r/g, " ").replace(/[\x00-\x1f\x7f]/g, "").trim().toLowerCase().replace(/^X-SMTPAPI$|^(MIME|DKIM|ARC|BIMI)\b|^[a-z]|-(SPF|FBL|ID|MD5)$|-[a-z]/gi, (c) => c.toUpperCase()).replace(/^Content-Features$/i, "Content-features");
+    key = (key || "").toString().replace(/[\s\x00-\x20\x7f:]/g, "").toLowerCase().replace(/^X-SMTPAPI$|^(MIME|DKIM|ARC|BIMI)\b|^[a-z]|-(SPF|FBL|ID|MD5)$|-[a-z]/gi, (c) => c.toUpperCase()).replace(/^Content-Features$/i, "Content-features");
     return key;
   }
   _handleContentType(structured) {
@@ -91556,20 +92592,22 @@ class MimeNode {
           value = value + ">";
         }
         return value;
-      case "References":
-        value = [].concat.apply([], [].concat(value || "").map((elm) => {
-          elm = (elm || "").toString().replace(/\r?\n|\r/g, " ").replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "").trim();
-          return elm.replace(/<[^>]*>/g, (str) => str.replace(/\s/g, "")).split(/\s+/);
-        })).map((elm) => {
-          if (elm.charAt(0) !== "<") {
-            elm = "<" + elm;
+      case "References": {
+        const ids = [];
+        for (const entry of [].concat(value || "")) {
+          const elm = (entry || "").toString().replace(/\r?\n|\r/g, " ").replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "").trim();
+          for (let id of stripWhitespaceInAngleBrackets(elm).split(/\s+/)) {
+            if (id.charAt(0) !== "<") {
+              id = "<" + id;
+            }
+            if (id.charAt(id.length - 1) !== ">") {
+              id = id + ">";
+            }
+            ids.push(id);
           }
-          if (elm.charAt(elm.length - 1) !== ">") {
-            elm = elm + ">";
-          }
-          return elm;
-        });
-        return value.join(" ").trim();
+        }
+        return ids.join(" ").trim();
+      }
       case "Date":
         if (Object.prototype.toString.call(value) === "[object Date]") {
           return value.toUTCString().replace(/GMT/, "+0000");
@@ -91617,7 +92655,8 @@ class MimeNode {
     if (!address) {
       return address;
     }
-    const lastAt = address.lastIndexOf("@");
+    const literal3 = address.charAt(address.length - 1) === "]" ? DOMAIN_LITERAL_TAIL3.exec(address) : null;
+    const lastAt = literal3 ? address.length - literal3[1].length - 1 : address.lastIndexOf("@");
     if (lastAt < 0) {
       return this._normalizeLocalPart(address);
     }
@@ -91673,14 +92712,14 @@ class MimeNode {
     return "<" + [2, 2, 2, 6].reduce((prev, len) => prev + "-" + crypto2.randomBytes(len).toString("hex"), crypto2.randomBytes(4).toString("hex")) + "@" + (this.getEnvelope().from || this.hostname || "localhost").split("@").pop() + ">";
   }
 }
-var FORMATTED_HEADERS, ATEXT = "[A-Za-z0-9!#$%&'*+\\-/=?^_`{|}~\\x80-\\uFFFF]", DOT_ATOM, QUOTED_STRING, PLAIN_ADDRESS, URL_PARSER_UNSAFE, PIPELINE_NOOP = () => false, mime_node_default;
+var FORMATTED_HEADERS, ATEXT = "[A-Za-z0-9!#$%&'*+\\-/=?^_`{|}~\\x80-\\uFFFF]", DOT_ATOM, QUOTED_STRING, PLAIN_ADDRESS, DOMAIN_LITERAL_TAIL3, URL_PARSER_UNSAFE, MAX_DOMAIN_LENGTH = 253, MAX_LABEL_LENGTH = 63, PIPELINE_NOOP = () => false, mime_node_default;
 var init_mime_node = __esm(() => {
   init_punycode();
   init_shared();
   init_mime_funcs();
   init_qp();
   init_base64();
-  init_addressparser();
+  init_addressparser2();
   init_fetch();
   init_errors();
   init_last_newline();
@@ -91690,6 +92729,7 @@ var init_mime_node = __esm(() => {
   DOT_ATOM = new RegExp("^" + ATEXT + "+(?:\\." + ATEXT + "+)*$");
   QUOTED_STRING = /^"(?:[^"\\]|\\[\s\S])*"$/;
   PLAIN_ADDRESS = /^[^\s"(),:;<>@[\\\]]+@[^\s"(),:;<>@[\\\]]+$/;
+  DOMAIN_LITERAL_TAIL3 = /@(\[[^[\]\\]*\])$/;
   URL_PARSER_UNSAFE = /[/\\?#%\x00-\x20\x7F]/;
   mime_node_default = MimeNode;
 });
@@ -92570,7 +93610,7 @@ class DKIMSigner {
   }
   createWriteCache() {
     this.output.usingCache = true;
-    this.cache = fs3.createWriteStream(this.cachePath);
+    this.cache = fs3.createWriteStream(this.cachePath, { mode: 384 });
     this.cache.once("error", (err) => {
       this.relaxedBody.unpipe(this.cache);
       this.relaxedBody.on("readable", () => {
@@ -92923,7 +93963,9 @@ class MailMessage {
     const values = [data.html, data.text, data.watchHtml, data.amp, data.raw, data.icalEvent];
     for (const key of ["attachments", "alternatives"]) {
       if (Array.isArray(data[key])) {
-        values.push(...data[key]);
+        for (const entry of data[key]) {
+          values.push(entry);
+        }
       }
     }
     for (const value of values) {
@@ -93403,7 +94445,7 @@ var init_mailer = __esm(() => {
           return callback(err);
         }
         let cidCounter = 0;
-        html = (html || "").toString().replace(/(<img\b[^<>]{0,1024} src\s{0,20}=[\s"']{0,20})(data:([^;]+);[^"'>\s]+)/gi, (match2, prefix, dataUri, mimeType) => {
+        html = (html || "").toString().replace(/(<img\b[^<>]{0,1024} src\s{0,20}=[\s"']{0,20})(data:([^;"'<>\s]{1,255});[^"'>\s]+)/gi, (match2, prefix, dataUri, mimeType) => {
           const cid = crypto6.randomBytes(10).toString("hex") + "@localhost";
           if (!mail.data.attachments) {
             mail.data.attachments = [];
@@ -93553,6 +94595,13 @@ function isPartialResponse(str) {
 }
 function isPartialLine(line) {
   return /^\d+-/.test(line);
+}
+function maskAuthCommand(cmd) {
+  const match2 = (cmd || "").toString().match(/^AUTH\s+[^\s]+/i);
+  if (!match2) {
+    return "/* secret */";
+  }
+  return match2[0].length === cmd.length ? cmd : match2[0] + " /* secret */";
 }
 var CONNECTION_TIMEOUT, SOCKET_TIMEOUT, GREETING_TIMEOUT, DNS_TIMEOUT, CLOSE_TIMEOUT, KEEPALIVE_DELAY, TEARDOWN_NOOP = () => {}, MAX_RESPONSE_SIZE, SMTPConnection, smtp_connection_default;
 var init_smtp_connection = __esm(() => {
@@ -93916,7 +94965,7 @@ var init_smtp_connection = __esm(() => {
             }
             done(null, data);
           });
-          setImmediate(() => this._sendCommand(cmd));
+          setImmediate(() => this._sendCommand(cmd, maskAuthCommand(cmd)));
           return promise2;
         };
         const handlerResponse = handler({
@@ -95069,8 +96118,12 @@ var init_xoauth2 = __esm(() => {
           grant_type: "refresh_token"
         };
       }
-      Object.assign(urlOptions, this.options.customParams);
-      Object.assign(loggedUrlOptions, this.options.customParams);
+      const customParams = this.options.customParams || {};
+      Object.assign(urlOptions, customParams);
+      for (const key of Object.keys(customParams)) {
+        const param = customParams[key];
+        loggedUrlOptions[key] = (param === undefined || param === null ? "" : String(param)).substr(0, 6) + "...";
+      }
       this.logger.debug({
         tnx: "OAUTH2",
         user: this.options.user,
@@ -95800,6 +96853,13 @@ var init_services = __esm(() => {
       host: "smtp.office365.com",
       port: 587,
       secure: false
+    },
+    Oveyon: {
+      description: "Oveyon",
+      host: "smtp.oveyon.com",
+      port: 587,
+      secure: false,
+      requireTLS: true
     },
     Postmark: {
       description: "Postmark",
@@ -96578,13 +97638,14 @@ var init_smtp_pool = __esm(() => {
 
 // /zveltio-extension/node_modules/nodemailer/dist/esm/smtp-transport/index.js
 import { EventEmitter as EventEmitter5 } from "events";
-var SMTPTransport, smtp_transport_default;
+var MESSAGE_AUTH_KEYS, SMTPTransport, smtp_transport_default;
 var init_smtp_transport = __esm(() => {
   init_smtp_connection();
   init_well_known();
   init_shared();
   init_xoauth2();
   init_errors();
+  MESSAGE_AUTH_KEYS = ["type", "user", "pass", "accessToken", "refreshToken", "expires"];
   SMTPTransport = class SMTPTransport extends EventEmitter5 {
     constructor(options) {
       super();
@@ -96623,7 +97684,10 @@ var init_smtp_transport = __esm(() => {
         }
         return this.auth;
       }
-      const authData = Object.assign({}, this.options.auth && typeof this.options.auth === "object" ? this.options.auth : {}, typeof authOpts === "object" ? authOpts : {});
+      const authData = Object.assign({}, this.options.auth && typeof this.options.auth === "object" ? this.options.auth : {});
+      if (typeof authOpts === "object") {
+        copyOwnKeys(authData, authOpts, (key) => !MESSAGE_AUTH_KEYS.includes(key));
+      }
       if (Object.keys(authData).length === 0) {
         return false;
       }
