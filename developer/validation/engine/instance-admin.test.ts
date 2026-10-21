@@ -1,5 +1,7 @@
 /**
- * Every write here needs an INSTANCE admin, not a tenant admin.
+ * Groups and AI generation need an INSTANCE admin; rule writes reach the host,
+ * which lets a tenant admin write only their own tenant's rules (engine 092)
+ * and throws on anything else — answered 403 here, or a failed row on import.
  *
  * Rules are instance-wide schema metadata: every tenant's writes to the
  * collection answer to them. The routes were gated on
@@ -8,8 +10,9 @@
  * other firm's writes. Measured against the 1.1.1 bundle: `POST /rules` as the
  * harness's tenant admin answered 201 and the row landed.
  *
- * The allow path (an instance admin writes, through the engine) is the engine's
- * to prove: `validation-rules-instance-admin.test.ts` drives
+ * The allow paths (an instance admin's rule, a tenant admin's own-tenant rule)
+ * are the engine's to prove: `validation-rules-instance-admin.test.ts` and
+ * `validation-rules-per-tenant.test.ts` drive
  * `ctx.internals.writeValidationRule` behind the real `/ext/*` gate.
  */
 
@@ -36,12 +39,13 @@ describe.skipIf(!DB_URL)('developer/validation: a tenant admin writes no rule', 
     });
 
   it('refuses every write route, and nothing lands', async () => {
-    const writes: Array<[string, string, unknown?]> = [
+    const writes: Array<[string, string, unknown?, number?]> = [
       ['POST', '/rules', { ...rule, collection: COLL }],
       ['PATCH', `/rules/${ID}`, { is_active: false }],
       ['DELETE', `/rules/${ID}`],
       ['POST', `/${COLL}`, rule],
-      ['POST', `/${COLL}/import`, [rule]],
+      // Per-rule refusals on import: the batch answers 422, nothing imported.
+      ['POST', `/${COLL}/import`, [rule], 422],
       ['PATCH', `/${COLL}/${ID}`, { is_active: false }],
       ['DELETE', `/${COLL}/${ID}`],
       [
@@ -52,9 +56,9 @@ describe.skipIf(!DB_URL)('developer/validation: a tenant admin writes no rule', 
       ['DELETE', `/groups/${ID}`],
       ['POST', '/generate', { description: 'not empty' }],
     ];
-    for (const [method, path, body] of writes) {
+    for (const [method, path, body, status = 403] of writes) {
       const res = await send(method, path, body);
-      expect({ method, path, status: res.status }).toEqual({ method, path, status: 403 });
+      expect({ method, path, status: res.status }).toEqual({ method, path, status });
     }
     const pool = new Pool({ connectionString: DB_URL });
     try {

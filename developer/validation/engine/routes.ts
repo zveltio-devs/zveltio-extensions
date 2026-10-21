@@ -206,6 +206,7 @@ export function validationRoutes(ctx: ExtensionContext): Hono {
     evaluateTransitionRule,
     checkValidationExpression,
     requireInstanceAdmin,
+    isTenantAdmin,
     writeValidationRule,
     writeValidationRuleGroup,
   } = ctx.internals;
@@ -227,6 +228,25 @@ export function validationRoutes(ctx: ExtensionContext): Hono {
   // (`writeValidationRule`) and checks the caller again.
   const instanceAdmin = async (c: any) => requireInstanceAdmin(c.get('user').id);
   const ADMIN_REQUIRED = { error: 'Instance admin access required' };
+  // Rules (not groups): a tenant admin writes their own tenant's, which only add
+  // to the instance rules (engine 092). The host sets the tenant and decides
+  // which rule a caller may touch; what it refuses it throws, answered 403 here.
+  const ruleWriter = async (c: any) =>
+    (await instanceAdmin(c)) || (await isTenantAdmin(c.get('user').id));
+  const RULE_ADMIN_REQUIRED = { error: 'Admin access required' };
+  const writeRule = async (c: any, write: Parameters<typeof writeValidationRule>[1]) => {
+    try {
+      return { rule: await writeValidationRule(c, write) };
+    } catch (err: any) {
+      return { refused: String(err?.message ?? err) };
+    }
+  };
+  /** Rules this request answers to: instance rules and its own tenant's. */
+  const visibleTo = (c: any) => {
+    const tenant = (c.get('tenant') as { id?: string } | null | undefined)?.id ?? null;
+    return (eb: any) =>
+      tenant ? eb.or([eb('tenant_id', 'is', null), eb('tenant_id', '=', tenant)]) : eb('tenant_id', 'is', null);
+  };
 
   const app = new Hono();
 
@@ -344,40 +364,47 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
 
   app.get('/rules', async (c) => {
     const collection = c.req.query('collection');
-    let q = (db as any).selectFrom('zv_validation_rules').selectAll().orderBy('created_at', 'desc');
+    let q = (db as any)
+      .selectFrom('zv_validation_rules')
+      .selectAll()
+      .where(visibleTo(c))
+      .orderBy('created_at', 'desc');
     if (collection) q = q.where('collection', '=', collection);
     const rules = await q.execute();
     return c.json({ data: rules });
   });
 
   app.post('/rules', zValidator('json', FlatRuleCreateSchema), async (c) => {
-    if (!(await instanceAdmin(c))) return c.json(ADMIN_REQUIRED, 403);
+    if (!(await ruleWriter(c))) return c.json(RULE_ADMIN_REQUIRED, 403);
 
     const body = c.req.valid('json');
     const refusal = expressionRefusal(body.rule_type, body.rule_config, checkValidationExpression);
     if (refusal) return c.json({ error: refusal }, 400);
 
-    const rule = await writeValidationRule(c, {
+    const r = await writeRule(c, {
       op: 'create',
       rule: { ...body, nl_description: body.nl_description || null },
     });
-    return c.json({ rule }, 201);
+    if ('refused' in r) return c.json({ error: r.refused }, 403);
+    return c.json({ rule: r.rule }, 201);
   });
 
   app.patch('/rules/:id', zValidator('json', RuleUpdateSchema), async (c) => {
-    if (!(await instanceAdmin(c))) return c.json(ADMIN_REQUIRED, 403);
+    if (!(await ruleWriter(c))) return c.json(RULE_ADMIN_REQUIRED, 403);
 
     const { is_active } = c.req.valid('json');
-    const rule = await writeValidationRule(c, { op: 'setActive', id: c.req.param('id'), is_active });
-    if (!rule) return c.json({ error: 'Not found' }, 404);
-    return c.json({ rule });
+    const r = await writeRule(c, { op: 'setActive', id: c.req.param('id'), is_active });
+    if ('refused' in r) return c.json({ error: r.refused }, 403);
+    if (!r.rule) return c.json({ error: 'Not found' }, 404);
+    return c.json({ rule: r.rule });
   });
 
   app.delete('/rules/:id', async (c) => {
-    if (!(await instanceAdmin(c))) return c.json(ADMIN_REQUIRED, 403);
+    if (!(await ruleWriter(c))) return c.json(RULE_ADMIN_REQUIRED, 403);
 
-    const removed = await writeValidationRule(c, { op: 'delete', id: c.req.param('id') });
-    if (!removed) return c.json({ error: 'Not found' }, 404);
+    const r = await writeRule(c, { op: 'delete', id: c.req.param('id') });
+    if ('refused' in r) return c.json({ error: r.refused }, 403);
+    if (!r.rule) return c.json({ error: 'Not found' }, 404);
     return c.json({ success: true });
   });
 
@@ -388,6 +415,7 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
       .selectFrom('zv_validation_rules')
       .selectAll()
       .where('collection', '=', collection)
+      .where(visibleTo(c))
       .orderBy('field_name', 'asc')
       .execute();
     return c.json({ rules });
@@ -396,7 +424,7 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
   // ── POST /:collection — add rule ──────────────────────────────────────────
   app.post('/:collection', zValidator('json', RuleCreateSchema), async (c) => {
     const collection = c.req.param('collection');
-    if (!(await instanceAdmin(c))) return c.json(ADMIN_REQUIRED, 403);
+    if (!(await ruleWriter(c))) return c.json(RULE_ADMIN_REQUIRED, 403);
 
     const body = c.req.valid('json');
 
@@ -407,11 +435,12 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
     const refusal = expressionRefusal(body.rule_type, body.rule_config, checkValidationExpression);
     if (refusal) return c.json({ error: refusal }, 400);
 
-    const rule = await writeValidationRule(c, {
+    const r = await writeRule(c, {
       op: 'create',
       rule: { ...body, collection, nl_description: body.nl_description || null },
     });
-    return c.json({ rule }, 201);
+    if ('refused' in r) return c.json({ error: r.refused }, 403);
+    return c.json({ rule: r.rule }, 201);
   });
 
   // ── POST /:collection/bulk-test — run all test cases in collection ─────────
@@ -426,6 +455,7 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
       FROM zv_validation_rules r
       LEFT JOIN zvd_validation_test_cases tc ON tc.rule_id = r.id
       WHERE r.collection = ${collection}
+        AND (r.tenant_id IS NULL OR r.tenant_id = ${(c.get('tenant') as { id?: string } | null | undefined)?.id ?? null}::uuid)
     `.execute(db);
 
     interface TestResult {
@@ -488,7 +518,7 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
   app.post('/:collection/import', async (c) => {
     const user = c.get('user');
     const collection = c.req.param('collection');
-    if (!(await instanceAdmin(c))) return c.json(ADMIN_REQUIRED, 403);
+    if (!(await ruleWriter(c))) return c.json(RULE_ADMIN_REQUIRED, 403);
 
     let rawRules: any[];
     try {
@@ -554,20 +584,22 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
   app.patch('/:collection/:id', zValidator('json', RuleUpdateSchema), async (c) => {
     const collection = c.req.param('collection');
     const id = c.req.param('id');
-    if (!(await instanceAdmin(c))) return c.json(ADMIN_REQUIRED, 403);
+    if (!(await ruleWriter(c))) return c.json(RULE_ADMIN_REQUIRED, 403);
 
     const { is_active } = c.req.valid('json');
-    const rule = await writeValidationRule(c, { op: 'setActive', id, is_active, collection });
-    return c.json({ rule });
+    const r = await writeRule(c, { op: 'setActive', id, is_active, collection });
+    if ('refused' in r) return c.json({ error: r.refused }, 403);
+    return c.json({ rule: r.rule });
   });
 
   // ── DELETE /:collection/:id — remove rule ─────────────────────────────────
   app.delete('/:collection/:id', async (c) => {
     const collection = c.req.param('collection');
     const id = c.req.param('id');
-    if (!(await instanceAdmin(c))) return c.json(ADMIN_REQUIRED, 403);
+    if (!(await ruleWriter(c))) return c.json(RULE_ADMIN_REQUIRED, 403);
 
-    await writeValidationRule(c, { op: 'delete', id, collection });
+    const r = await writeRule(c, { op: 'delete', id, collection });
+    if ('refused' in r) return c.json({ error: r.refused }, 403);
     return c.json({ success: true });
   });
 
@@ -578,6 +610,7 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
 
     const ruleRes = await sql<any>`
       SELECT id, rule_type, rule_config, collection, field_name FROM zv_validation_rules WHERE id = ${id}
+        AND (tenant_id IS NULL OR tenant_id = ${(c.get('tenant') as { id?: string } | null | undefined)?.id ?? null}::uuid)
     `.execute(db);
     const rule = ruleRes.rows[0];
     if (!rule) return c.json({ error: 'Rule not found' }, 404);
@@ -655,6 +688,7 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
     // Verify rule exists
     const ruleRes = await sql<any>`
       SELECT id FROM zv_validation_rules WHERE id = ${id}
+        AND (tenant_id IS NULL OR tenant_id = ${(c.get('tenant') as { id?: string } | null | undefined)?.id ?? null}::uuid)
     `.execute(db);
     if (!ruleRes.rows[0]) return c.json({ error: 'Rule not found' }, 404);
 
