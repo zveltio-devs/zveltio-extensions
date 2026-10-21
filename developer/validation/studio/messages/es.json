@@ -68,5 +68,8 @@
   "developer.validation.ui.severity": "Gravedad",
   "developer.validation.ui.text": "text",
   "developer.validation.ui.uuid": "uuid",
-  "developer.validation.ui.warning_allow": "warning (allow)"
+  "developer.validation.ui.warning_allow": "warning (allow)",
+  "developer.validation.col.scope": "Ámbito",
+  "developer.validation.scope.instance": "Instancia",
+  "developer.validation.scope.tenant": "Este inquilino"
 }

@@ -68,5 +68,8 @@
   "developer.validation.ui.severity": "Ernst",
   "developer.validation.ui.text": "text",
   "developer.validation.ui.uuid": "uuid",
-  "developer.validation.ui.warning_allow": "warning (allow)"
+  "developer.validation.ui.warning_allow": "warning (allow)",
+  "developer.validation.col.scope": "Bereik",
+  "developer.validation.scope.instance": "Instantie",
+  "developer.validation.scope.tenant": "Deze tenant"
 }
