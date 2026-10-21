@@ -694,7 +694,7 @@ async function makeCtx(
  * tenant" the engine's helpers act for — `countMembers`, `addTenantMember` and
  * the rest refuse without one, as they do in the product.
  */
-async function tenantApp(tenant?: string, transaction = false): Promise<any> {
+async function tenantApp(tenant?: string, transaction = false, userId?: string): Promise<any> {
   const { Hono } = (await honoP) as any;
   const { runWithDomain, withTenantIsolation, DEFAULT_TENANT_ID } = (await tenancyP) as any;
   const app = new Hono();
@@ -708,7 +708,7 @@ async function tenantApp(tenant?: string, transaction = false): Promise<any> {
   app.use('*', (c: any, next: () => Promise<void>) => {
     c.set('tenant', { id });
     return transaction
-      ? runWithDomain(id, () => withTenantIsolation(id, () => next()))
+      ? runWithDomain(id, () => withTenantIsolation(id, () => next(), userId ? { userId } : undefined))
       : runWithDomain(id, () => next());
   });
   return app;
@@ -773,6 +773,12 @@ export async function mountForTest(
     tenant?: string;
     /** Run each request in the tenant transaction, as the engine does. */
     transaction?: boolean;
+    /**
+     * With `transaction`: open it for this user, as the engine's middleware does
+     * for a signed-in caller — so the user's READ REACH is published (a god's is
+     * every firm). Without it the transaction sees its own tenant only.
+     */
+    transactionUser?: string;
     /** Permissions a non-admin holds, matched exactly by `ctx.checkPermission`. */
     grants?: ReadonlyArray<{ resource: string; action: string }>;
   } = {},
@@ -789,7 +795,7 @@ export async function mountForTest(
   // can't support them (e.g. postgis not installed) → the extension's tables
   // never materialised and DB-backed assertions must be skipped by the caller.
   const migrated = await applyMigrations(mod.default);
-  const app = await tenantApp(opts.tenant, opts.transaction);
+  const app = await tenantApp(opts.tenant, opts.transaction, opts.transactionUser);
   const publicRoutes: any[] = [];
   // `mountForTest` receives the ENGINE dir; the extension is its parent, which
   // is what names it and where its manifest lives.

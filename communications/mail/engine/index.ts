@@ -62,7 +62,9 @@ const extension: ZveltioExtension = {
           const cfg = await loadMailConfig(db);
 
           // Absent or nonsense reads as "off", not as "every minute". A polling
-          // loop nobody asked for is worse than none.
+          // loop nobody asked for is worse than none. "Absent" means absent from
+          // a row an admin SAVED: a tenant with no row reads the shipped
+          // defaults (`MAIL_DEFAULTS`, every 5 minutes), as the root always did.
           const minutes = Number(cfg.sync_interval_minutes);
           if (!Number.isFinite(minutes) || minutes <= 0) return;
           if (cfg.enabled === false) return;

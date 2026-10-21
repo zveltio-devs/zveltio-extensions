@@ -128,11 +128,56 @@ function asConfigObject(value: unknown): MailConfig {
   return value as MailConfig;
 }
 
-/** Reads and parses the tenant's mail configuration. */
+/**
+ * What a tenant runs on before anyone saves its mail settings.
+ *
+ * The seed in `001_mail.sql`, which only ever reached the ROOT tenant (migration
+ * 005 copied it there). Every other tenant read `{}`, and the poll takes an
+ * absent interval as "off" — so mail never arrived on its own anywhere but the
+ * root. "Off" is right for a row an admin saved without an interval; it is not
+ * what a tenant that never opened the page asked for, and the root shows what
+ * the product ships: every 5 minutes. `config.test.ts` holds this to the seed.
+ */
+export const MAIL_DEFAULTS: Readonly<MailConfig> = Object.freeze({
+  enabled: true,
+  max_accounts_per_user: 5,
+  max_attachment_size_mb: 25,
+  allowed_domains: [],
+  blocked_domains: [],
+  require_admin_approval: false,
+  auto_collect_contacts: true,
+  imap_idle_enabled: true,
+  sieve_enabled: true,
+  pgp_enabled: true,
+  oauth2_gmail_client_id: '',
+  oauth2_gmail_client_secret: '',
+  oauth2_outlook_client_id: '',
+  oauth2_outlook_client_secret: '',
+  max_messages_sync: 1000,
+  sync_interval_minutes: 5,
+  trash_auto_delete_days: 30,
+});
+
+/**
+ * The OWN tenant's mail configuration, or the defaults when it has none.
+ *
+ * Filtered to the tenant the work runs as — the same expression as the column
+ * default, so this reads exactly the row `PUT /admin/config` writes. The row
+ * policy alone does not do it: it admits the caller's whole READ REACH, which is
+ * every firm for a god and the descendants for a `subtree` member. The old
+ * `LIMIT 1` over that set returned whichever row the heap gave first — another
+ * firm's IMAP host and OAuth client secret — and the save merged it into the
+ * caller's own row.
+ */
 // biome-ignore lint/suspicious/noExplicitAny: ctx.db is the engine's proxy type
 export async function loadMailConfig(db: any): Promise<MailConfig> {
-  const row = await sql`SELECT config AS value FROM zvd_mail_config LIMIT 1`.execute(db);
-  return parseMailConfig((row.rows[0] as { value?: unknown } | undefined)?.value);
+  const row = await sql`
+    SELECT config AS value FROM zvd_mail_config
+     WHERE tenant_id = COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                '00000000-0000-0000-0000-000000000001'::uuid)
+  `.execute(db);
+  const own = row.rows[0] as { value?: unknown } | undefined;
+  return own ? parseMailConfig(own.value) : structuredClone(MAIL_DEFAULTS) as MailConfig;
 }
 
 /**

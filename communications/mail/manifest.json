@@ -3,7 +3,7 @@
   "displayName": "Mail Client",
   "category": "communications",
   "description": "IMAP/SMTP email client with AI features, filter rules, attachments and contacts. Password or OAuth2 (Gmail/Outlook). Background sync on a schedule. Filter actions and read/star/delete are pushed to the mail server.",
-  "version": "1.2.7",
+  "version": "1.2.8",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-mail",
@@ -55,7 +55,7 @@
     "bundlePeers": true
   },
   "integrity": {
-    "engineSha256": "f21947e5804ab3022c2441bfffb873569c61298173e6167089750978c1c92a9e",
-    "sourceSha256": "2a51daa6454d6d733e5da7c39d8f105936b28c629fcd91ab4cf98ede8a548cbc"
+    "engineSha256": "b4061fc055ee4e7b17e75e28a414c32492edccc53a67c941f9cd210e7ef53e46",
+    "sourceSha256": "ee8bf5587b4846e2ed4e3bcf65634a6b73cb6e73747270e508d4d63ee005fec9"
   }
 }
