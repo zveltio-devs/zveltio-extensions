@@ -1,24 +1,24 @@
 /**
  * Data Validation Rules — Enterprise Edition
  *
- * POST   /api/validation/generate                        — AI → structured rule (admin)
+ * POST   /api/validation/generate                        — AI → structured rule (instance admin)
  * GET    /api/validation/rules                           — list all rules (optional ?collection=)
- * POST   /api/validation/rules                           — create rule (admin; collection in body)
- * PATCH  /api/validation/rules/:id                       — toggle is_active (admin)
- * DELETE /api/validation/rules/:id                       — delete rule (admin)
+ * POST   /api/validation/rules                           — create rule (instance admin; collection in body)
+ * PATCH  /api/validation/rules/:id                       — toggle is_active (instance admin)
+ * DELETE /api/validation/rules/:id                       — delete rule (instance admin)
  * GET    /api/validation/groups                          — list rule groups (optional ?collection=)
- * POST   /api/validation/groups                          — create rule group (admin)
- * DELETE /api/validation/groups/:id                      — delete rule group (admin)
+ * POST   /api/validation/groups                          — create rule group (instance admin)
+ * DELETE /api/validation/groups/:id                      — delete rule group (instance admin)
  * GET    /api/validation/:collection                     — list rules for collection
- * POST   /api/validation/:collection                     — add rule (admin, Zod validated)
- * PATCH  /api/validation/:collection/:id                 — toggle active (admin)
- * DELETE /api/validation/:collection/:id                 — delete rule (admin)
+ * POST   /api/validation/:collection                     — add rule (instance admin, Zod validated)
+ * PATCH  /api/validation/:collection/:id                 — toggle active (instance admin)
+ * DELETE /api/validation/:collection/:id                 — delete rule (instance admin)
  * POST   /api/validation/:collection/:id/test-cases      — add test case (admin)
  * GET    /api/validation/:collection/:id/test-cases      — list test cases for a rule
  * DELETE /api/validation/:collection/:id/test-cases/:testId — delete test case
  * POST   /api/validation/:collection/:id/test-cases/run  — run all test cases for a rule
  * POST   /api/validation/:collection/bulk-test           — run all test cases in collection
- * POST   /api/validation/:collection/import              — bulk import rules from JSON array (admin)
+ * POST   /api/validation/:collection/import              — bulk import rules from JSON array (instance admin)
  */
 
 import { Hono } from 'hono';
@@ -26,7 +26,6 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { toJsonb } from '@zveltio/sdk/extension';
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 
 const RULE_TYPES = [
@@ -203,10 +202,11 @@ export function validationRoutes(ctx: ExtensionContext): Hono {
   // is none to forget.
 
   const {
-    invalidateRulesCache,
     evaluateExpressionRule,
     evaluateTransitionRule,
     checkValidationExpression,
+    requireInstanceAdmin,
+    writeValidationRule,
   } = ctx.internals;
   const evaluators: Evaluators = {
     expression: evaluateExpressionRule,
@@ -218,6 +218,14 @@ export function validationRoutes(ctx: ExtensionContext): Hono {
     const coll = await ctx.DDLManager.getCollection(db, collection);
     return new Map((coll?.fields ?? []).map((f) => [f.name, f.type]));
   };
+
+  // Rules are instance-wide schema metadata: every tenant's writes to the
+  // collection answer to them. `checkPermission(user, 'admin', '*')` is also true
+  // for a tenant admin inside their tenant, who could then refuse every other
+  // tenant's writes. `ctx.db` only reads the table; the engine writes it
+  // (`writeValidationRule`) and checks the caller again.
+  const instanceAdmin = async (c: any) => requireInstanceAdmin(c.get('user').id);
+  const ADMIN_REQUIRED = { error: 'Instance admin access required' };
 
   const app = new Hono();
 
@@ -232,9 +240,7 @@ export function validationRoutes(ctx: ExtensionContext): Hono {
   // ── POST /generate ────────────────────────────────────────────────────────
   // Convert NL description to structured rule (admin, must come before /:collection)
   app.post('/generate', async (c) => {
-    const user = c.get('user');
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
+    if (!(await instanceAdmin(c))) return c.json(ADMIN_REQUIRED, 403);
 
     const { collection, field_name, field_type, description } = await c.req.json();
     if (!description) return c.json({ error: 'description required' }, 400);
@@ -300,10 +306,10 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
   });
 
   // ── POST /groups ──────────────────────────────────────────────────────────
+  // A group changes how the instance's rules combine, so it is the instance's too.
   app.post('/groups', zValidator('json', RuleGroupCreateSchema), async (c) => {
     const user = c.get('user');
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
+    if (!(await instanceAdmin(c))) return c.json(ADMIN_REQUIRED, 403);
 
     const body = c.req.valid('json');
     const row = await sql<any>`
@@ -320,9 +326,7 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
 
   // ── DELETE /groups/:id ────────────────────────────────────────────────────
   app.delete('/groups/:id', async (c) => {
-    const user = c.get('user');
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
+    if (!(await instanceAdmin(c))) return c.json(ADMIN_REQUIRED, 403);
 
     const id = c.req.param('id');
     await sql`DELETE FROM zvd_validation_rule_groups WHERE id = ${id}`.execute(db);
@@ -347,73 +351,33 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
   });
 
   app.post('/rules', zValidator('json', FlatRuleCreateSchema), async (c) => {
-    const user = c.get('user');
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
+    if (!(await instanceAdmin(c))) return c.json(ADMIN_REQUIRED, 403);
 
     const body = c.req.valid('json');
     const refusal = expressionRefusal(body.rule_type, body.rule_config, checkValidationExpression);
     if (refusal) return c.json({ error: refusal }, 400);
 
-    const rule = await (db as any)
-      .insertInto('zv_validation_rules')
-      .values({
-        collection: body.collection,
-        field_name: body.field_name,
-        rule_type: body.rule_type,
-        nl_description: body.nl_description || null,
-        rule_config: toJsonb(body.rule_config),
-        error_message: body.error_message,
-        is_active: true,
-        created_by: user.id,
-      })
-      .returningAll()
-      .executeTakeFirst();
-
-    invalidateRulesCache(body.collection);
+    const rule = await writeValidationRule(c, {
+      op: 'create',
+      rule: { ...body, nl_description: body.nl_description || null },
+    });
     return c.json({ rule }, 201);
   });
 
   app.patch('/rules/:id', zValidator('json', RuleUpdateSchema), async (c) => {
-    const user = c.get('user');
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
+    if (!(await instanceAdmin(c))) return c.json(ADMIN_REQUIRED, 403);
 
-    const id = c.req.param('id');
-    const body = c.req.valid('json');
-    const existing = await (db as any)
-      .selectFrom('zv_validation_rules')
-      .select(['id', 'collection'])
-      .where('id', '=', id)
-      .executeTakeFirst();
-    if (!existing) return c.json({ error: 'Not found' }, 404);
-
-    const rule = await (db as any)
-      .updateTable('zv_validation_rules')
-      .set({ is_active: body.is_active, updated_at: new Date() })
-      .where('id', '=', id)
-      .returningAll()
-      .executeTakeFirst();
-
-    invalidateRulesCache(existing.collection);
+    const { is_active } = c.req.valid('json');
+    const rule = await writeValidationRule(c, { op: 'setActive', id: c.req.param('id'), is_active });
+    if (!rule) return c.json({ error: 'Not found' }, 404);
     return c.json({ rule });
   });
 
   app.delete('/rules/:id', async (c) => {
-    const user = c.get('user');
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
+    if (!(await instanceAdmin(c))) return c.json(ADMIN_REQUIRED, 403);
 
-    const id = c.req.param('id');
-    const existing = await (db as any)
-      .selectFrom('zv_validation_rules')
-      .select(['id', 'collection'])
-      .where('id', '=', id)
-      .executeTakeFirst();
-    if (!existing) return c.json({ error: 'Not found' }, 404);
-
-    await (db as any).deleteFrom('zv_validation_rules').where('id', '=', id).execute();
-    invalidateRulesCache(existing.collection);
+    const removed = await writeValidationRule(c, { op: 'delete', id: c.req.param('id') });
+    if (!removed) return c.json({ error: 'Not found' }, 404);
     return c.json({ success: true });
   });
 
@@ -431,10 +395,8 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
 
   // ── POST /:collection — add rule ──────────────────────────────────────────
   app.post('/:collection', zValidator('json', RuleCreateSchema), async (c) => {
-    const user = c.get('user');
     const collection = c.req.param('collection');
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
+    if (!(await instanceAdmin(c))) return c.json(ADMIN_REQUIRED, 403);
 
     const body = c.req.valid('json');
 
@@ -445,22 +407,10 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
     const refusal = expressionRefusal(body.rule_type, body.rule_config, checkValidationExpression);
     if (refusal) return c.json({ error: refusal }, 400);
 
-    const rule = await (db as any)
-      .insertInto('zv_validation_rules')
-      .values({
-        collection,
-        field_name: body.field_name,
-        rule_type: body.rule_type,
-        nl_description: body.nl_description || null,
-        rule_config: toJsonb(body.rule_config),
-        error_message: body.error_message,
-        is_active: true,
-        created_by: user.id,
-      })
-      .returningAll()
-      .executeTakeFirst();
-
-    invalidateRulesCache(collection);
+    const rule = await writeValidationRule(c, {
+      op: 'create',
+      rule: { ...body, collection, nl_description: body.nl_description || null },
+    });
     return c.json({ rule }, 201);
   });
 
@@ -538,8 +488,7 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
   app.post('/:collection/import', async (c) => {
     const user = c.get('user');
     const collection = c.req.param('collection');
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
+    if (!(await instanceAdmin(c))) return c.json(ADMIN_REQUIRED, 403);
 
     let rawRules: any[];
     try {
@@ -574,28 +523,13 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
         continue;
       }
 
-      // One transaction per rule, so the per-rule catch below means something.
-      //
-      // Without it, a rule that fails on a constraint aborts the surrounding
-      // transaction, and every rule after it fails too — while this loop
-      // collects them into `errors` as if each had been judged on its own. The
-      // caller gets a list saying nineteen rules were individually invalid when
-      // one was.
+      // The engine writes each rule in a savepoint of its own, so the per-rule
+      // catch below means something: one rule refused on a constraint does not
+      // abort the transaction and fail every rule after it.
       try {
-        await db.transaction().execute(async (trx) => {
-          await (trx as any)
-            .insertInto('zv_validation_rules')
-            .values({
-              collection,
-              field_name: rule.field_name,
-              rule_type: rule.rule_type,
-              nl_description: rule.nl_description || null,
-              rule_config: toJsonb(rule.rule_config),
-              error_message: rule.error_message,
-              is_active: true,
-              created_by: user.id,
-            })
-            .execute();
+        await writeValidationRule(c, {
+          op: 'create',
+          rule: { ...rule, collection, nl_description: rule.nl_description || null },
         });
         importedCount++;
       } catch (err: any) {
@@ -613,41 +547,27 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
          ${JSON.stringify(errors)}::jsonb, ${user.id})
     `.execute(db).catch(() => {});
 
-    if (importedCount > 0) invalidateRulesCache(collection);
     return c.json({ imported: importedCount, failed: failedCount, errors }, importedCount > 0 ? 201 : 422);
   });
 
   // ── PATCH /:collection/:id — toggle active ────────────────────────────────
   app.patch('/:collection/:id', zValidator('json', RuleUpdateSchema), async (c) => {
-    const user = c.get('user');
     const collection = c.req.param('collection');
     const id = c.req.param('id');
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
+    if (!(await instanceAdmin(c))) return c.json(ADMIN_REQUIRED, 403);
 
-    const body = c.req.valid('json');
-    const rule = await (db as any)
-      .updateTable('zv_validation_rules')
-      .set({ is_active: body.is_active, updated_at: new Date() })
-      .where('id', '=', id)
-      .where('collection', '=', collection)
-      .returningAll()
-      .executeTakeFirst();
-
-    invalidateRulesCache(collection);
+    const { is_active } = c.req.valid('json');
+    const rule = await writeValidationRule(c, { op: 'setActive', id, is_active, collection });
     return c.json({ rule });
   });
 
   // ── DELETE /:collection/:id — remove rule ─────────────────────────────────
   app.delete('/:collection/:id', async (c) => {
-    const user = c.get('user');
     const collection = c.req.param('collection');
     const id = c.req.param('id');
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
+    if (!(await instanceAdmin(c))) return c.json(ADMIN_REQUIRED, 403);
 
-    await (db as any).deleteFrom('zv_validation_rules').where('id', '=', id).execute();
-    invalidateRulesCache(collection);
+    await writeValidationRule(c, { op: 'delete', id, collection });
     return c.json({ success: true });
   });
 
