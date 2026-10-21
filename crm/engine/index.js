@@ -25231,18 +25231,20 @@ var extension = {
       ctx.events.emit("contact.created", { id: contact.id, contact });
       return contact;
     });
+    const ownTenant = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                   '00000000-0000-0000-0000-000000000001'::uuid)`;
     ctx.services.register("crm.organizations.lookup", async (idOrName) => {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrName);
       const r = await sql`
         SELECT * FROM zvd_organizations
-        WHERE ${isUuid ? sql`id = ${idOrName}::uuid` : sql`name = ${idOrName}`}
+        WHERE ${isUuid ? sql`id = ${idOrName}::uuid` : sql`name = ${idOrName} AND tenant_id = ${ownTenant}`}
         LIMIT 1
       `.execute(ctx.db);
       return r.rows[0] ?? null;
     });
     ctx.services.register("crm.organizations.findByName", async (name) => {
       const r = await sql`
-        SELECT * FROM zvd_organizations WHERE name = ${name} LIMIT 1
+        SELECT * FROM zvd_organizations WHERE name = ${name} AND tenant_id = ${ownTenant} LIMIT 1
       `.execute(ctx.db);
       return r.rows[0] ?? null;
     });

@@ -42,6 +42,14 @@ import {
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { checkQueryDepth, checkQueryWidth } from './lib/graphql-dataloader.js';
+
+// The OWN tenant (the `tenant_id` column default's expression). Persisted query
+// names and field policies are unique per tenant (migration 003), but the row
+// policy admits the caller's READ REACH — every firm for a god — so a match on
+// name alone ran another firm's query, and a god's schema build merged every
+// firm's policies into the own firm's cached schema (one overwriting another).
+const OWN_TENANT = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                '00000000-0000-0000-0000-000000000001'::uuid)`;
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 
 const PersistedQueryCreateSchema = z.object({
@@ -164,6 +172,7 @@ async function getFieldPolicies(dbh: any): Promise<FieldPolicyInfo[]> {
     const result = await sql<FieldPolicyInfo>`
       SELECT collection, field, allowed_roles, deny_roles
       FROM zvd_graphql_field_policies
+      WHERE tenant_id = ${OWN_TENANT}
     `.execute(dbh);
     return result.rows;
   } catch {
@@ -826,7 +835,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
 
     const name = c.req.param('name');
     const pqRes = await sql<any>`
-      SELECT * FROM zvd_graphql_persisted_queries WHERE name = ${name}
+      SELECT * FROM zvd_graphql_persisted_queries WHERE name = ${name} AND tenant_id = ${OWN_TENANT}
     `.execute(db);
 
     const pq = pqRes.rows[0];
@@ -888,7 +897,7 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
       sql`
         UPDATE zvd_graphql_persisted_queries
         SET use_count = use_count + 1, last_used_at = NOW(), updated_at = NOW()
-        WHERE name = ${name}
+        WHERE name = ${name} AND tenant_id = ${OWN_TENANT}
       `.execute(db).catch(() => {});
 
       return c.json(result);

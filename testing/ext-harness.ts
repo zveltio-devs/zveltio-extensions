@@ -229,6 +229,33 @@ const DB_URL = process.env.TEST_DATABASE_URL ?? '';
 const d = DB_URL ? describe : describe.skip;
 
 /**
+ * The engine's `createDb`, keeping hold of the driver so its pool can be
+ * recycled the way the engine's boot recycles it (`recycleActivePool`).
+ *
+ * Bun.SQL prepares every statement by name, per connection. An extension
+ * migration that reshapes a table — `ai` adds columns to the engine's
+ * `zvd_collections` — leaves each connection's `SELECT *` plan over it
+ * describing the old row, and Postgres answers every later execution there
+ * with `0A000 cached plan must not change result type`. The engine boot runs
+ * extension migrations and then throws its pool away; `applyMigrations` below
+ * does the same, for these pools and the engine's, the first time it applies a
+ * file.
+ */
+const _bunDrivers = new Set<any>();
+async function engineDb(src: string): Promise<any> {
+  const { Kysely } = (await import(Bun.resolveSync('kysely', src))) as any;
+  const { BunSqlDialect } = (await import(join(src, 'db', 'bun-sql-dialect.js'))) as any;
+  const dialect = new BunSqlDialect({ connectionString: DB_URL });
+  const createDriver = dialect.createDriver.bind(dialect);
+  dialect.createDriver = () => {
+    const driver = createDriver();
+    _bunDrivers.add(driver);
+    return driver;
+  };
+  return new Kysely({ dialect });
+}
+
+/**
  * The engine's own `deleteUser` / `revokeUserSessions` / `setUserActive`
  * (`lib/users.ts`), wired the way `buildExtensionInternals` wires them: the
  * caller's handle for the row and the audit, a privileged engine pool for
@@ -243,8 +270,8 @@ let _engineUsersP: Promise<{ users: any; pool: any; auth: any }> | null = null;
 function engineUsers(): Promise<{ users: any; pool: any; auth: any }> {
   _engineUsersP ??= (async () => {
     const src = join(REPO, '..', 'zveltio', 'packages', 'engine', 'src');
-    const { createDb, _internalForTests } = (await import(join(src, 'db', 'index.js'))) as any;
-    const pool = createDb(DB_URL);
+    const { _internalForTests } = (await import(join(src, 'db', 'index.js'))) as any;
+    const pool = await engineDb(src);
     // The engine's helpers default to its global pool (`getDb()`) and the tenant
     // manager's, which only the engine's boot sets: provisioning and tenant
     // entry run there.
@@ -291,8 +318,7 @@ async function getDb(): Promise<any> {
   // Migrations still run on the `pg` pool (multi-statement simple queries).
   if (process.env.EXT_HARNESS_DRIVER === 'bun') {
     const src = join(REPO, '..', 'zveltio', 'packages', 'engine', 'src');
-    const { createDb } = (await import(join(src, 'db', 'index.js'))) as any;
-    _db = createDb(DB_URL);
+    _db = await engineDb(src);
   } else {
     _db = new Kysely({ dialect: new PostgresDialect({ pool: _pool }) });
   }
@@ -730,6 +756,7 @@ export interface ContractOptions {
   dependsOn?: string[];
 }
 
+const _appliedMigrations = new Set<string>();
 /**
  * Apply an extension's UP migrations (splitting at `-- DOWN`).
  * Returns false when the ENVIRONMENT can't support them (a server-side PG
@@ -738,7 +765,9 @@ export interface ContractOptions {
  */
 async function applyMigrations(ext: any): Promise<boolean> {
   if (typeof ext?.getMigrations !== 'function') return true;
-  for (const f of ext.getMigrations() as string[]) {
+  const files = ext.getMigrations() as string[];
+  const first = files.filter((f) => !_appliedMigrations.has(f));
+  for (const f of files) {
     const up = readFileSync(f, 'utf8').split(/^-- DOWN$/m)[0]!;
     try {
       await _pool.query(up);
@@ -750,6 +779,15 @@ async function applyMigrations(ext: any): Promise<boolean> {
       }
       throw new Error(`migration ${basename(f)} failed: ${msg}`);
     }
+  }
+  // A re-run of an applied file is idempotent and reshapes nothing.
+  for (const f of first) _appliedMigrations.add(f);
+  if (first.length > 0) {
+    for (const driver of _bunDrivers) await driver.recyclePool();
+    // And the engine's own pool, when a suite booted the engine app
+    // (`getTestApp`): its tenant transactions then run there.
+    const src = join(REPO, '..', 'zveltio', 'packages', 'engine', 'src');
+    await ((await import(join(src, 'db', 'index.js'))) as any).recycleActivePool();
   }
   return true;
 }

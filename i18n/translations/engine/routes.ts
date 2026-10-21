@@ -18,6 +18,13 @@ const i18nCache = new Map<string, Map<string, string>>();
 const CACHE_TTL = 5 * 60 * 1000;
 let cacheExpiry = 0;
 
+// The OWN tenant (the `tenant_id` column default's expression). Locale codes and
+// translation keys are unique per tenant (migrations 003/004), but the row
+// policy admits the caller's READ REACH — every firm for a god — so a match on
+// code, key or `is_default` alone hit every firm's rows.
+const OWN_TENANT = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                '00000000-0000-0000-0000-000000000001'::uuid)`;
+
 function invalidateCache() {
   i18nCache.clear();
   cacheExpiry = 0;
@@ -55,7 +62,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
       SELECT tk.key, t.value
       FROM zvd_translations t
       JOIN zvd_translation_keys tk ON tk.id = t.key_id
-      WHERE t.locale = ${locale}
+      WHERE t.locale = ${locale} AND t.tenant_id = ${OWN_TENANT} AND tk.tenant_id = ${OWN_TENANT}
     `.execute(db);
 
     const map = new Map<string, string>();
@@ -64,7 +71,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
     }
 
     if (rows.rows.length === 0) {
-      const allKeys = await sql`SELECT key, default_value FROM zvd_translation_keys`.execute(db);
+      const allKeys = await sql`SELECT key, default_value FROM zvd_translation_keys WHERE tenant_id = ${OWN_TENANT}`.execute(db);
       for (const row of allKeys.rows as any[]) {
         if (row.default_value) map.set(row.key, row.default_value);
       }
@@ -109,7 +116,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
       // to, so the site starts answering in nothing.
       const locale = await db.transaction().execute(async (trx) => {
         if (is_default) {
-          await (trx as any).updateTable('zvd_locales').set({ is_default: false }).where('is_default', '=', true).execute();
+          await (trx as any).updateTable('zvd_locales').set({ is_default: false }).where('is_default', '=', true).where('tenant_id', '=', OWN_TENANT).execute();
         }
         return await (trx as any).insertInto('zvd_locales').values({ code, name, is_default }).returningAll().executeTakeFirst();
       });
@@ -118,7 +125,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
   );
 
   app.delete('/locales/:code', async (c) => {
-    await (db as any).deleteFrom('zvd_locales').where('code', '=', c.req.param('code')).execute();
+    await (db as any).deleteFrom('zvd_locales').where('code', '=', c.req.param('code')).where('tenant_id', '=', OWN_TENANT).execute();
     invalidateCache();
     return c.json({ success: true });
   });
@@ -182,7 +189,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
     })),
     async (c) => {
       const data = c.req.valid('json');
-      const existing = await (db as any).selectFrom('zvd_translation_keys').where('key', '=', data.key).executeTakeFirst();
+      const existing = await (db as any).selectFrom('zvd_translation_keys').select('id').where('key', '=', data.key).where('tenant_id', '=', OWN_TENANT).executeTakeFirst();
       if (existing) return c.json({ error: `Key '${data.key}' already exists` }, 409);
       const key = await (db as any).insertInto('zvd_translation_keys').values(data).returningAll().executeTakeFirst();
       return c.json({ key }, 201);
