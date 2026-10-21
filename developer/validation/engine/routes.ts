@@ -673,6 +673,13 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
   // ── GET /:collection/:id/test-cases — list test cases for a rule ──────────
   app.get('/:collection/:id/test-cases', async (c) => {
     const id = c.req.param('id');
+    // The same rule check as POST: another tenant's rule is not found here,
+    // not answered with an empty list. RLS already hides its cases.
+    const ruleRes = await sql<any>`
+      SELECT id FROM zv_validation_rules WHERE id = ${id}
+        AND (tenant_id IS NULL OR tenant_id = ${(c.get('tenant') as { id?: string } | null | undefined)?.id ?? null}::uuid)
+    `.execute(db);
+    if (!ruleRes.rows[0]) return c.json({ error: 'Rule not found' }, 404);
     const rows = await sql<any>`
       SELECT * FROM zvd_validation_test_cases
       WHERE rule_id = ${id}
