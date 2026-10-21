@@ -48,6 +48,15 @@ async function readDocsPublic(dbh: any): Promise<boolean> {
   const row = await (dbh as any)
     .selectFrom('zvd_api_docs_config')
     .select('is_public')
+    // The OWN tenant's row (the column default's expression). The row policy
+    // admits the READ REACH — every firm for a god — so unfiltered, a god in one
+    // firm read another firm's switch.
+    .where(
+      'tenant_id',
+      '=',
+      sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                   '00000000-0000-0000-0000-000000000001'::uuid)`,
+    )
     .executeTakeFirst();
   return row?.is_public === true;
 }

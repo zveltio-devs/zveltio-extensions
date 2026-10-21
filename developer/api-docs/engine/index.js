@@ -24551,7 +24551,8 @@ var CustomDocCreateSchema = exports_external.object({
 });
 var CustomDocUpdateSchema = CustomDocCreateSchema.partial();
 async function readDocsPublic(dbh) {
-  const row = await dbh.selectFrom("zvd_api_docs_config").select("is_public").executeTakeFirst();
+  const row = await dbh.selectFrom("zvd_api_docs_config").select("is_public").where("tenant_id", "=", sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                   '00000000-0000-0000-0000-000000000001'::uuid)`).executeTakeFirst();
   return row?.is_public === true;
 }
 async function generateOpenAPISpec(ctx, baseUrl) {
@@ -25162,3 +25163,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1

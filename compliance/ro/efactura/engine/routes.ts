@@ -189,6 +189,27 @@ async function mayConfigure(ctx: ExtensionContext, user: any): Promise<boolean> 
   return ctx.internals.isTenantAdmin(user.id).catch(() => false);
 }
 
+/**
+ * The OWN firm's ANAF connection row, or `undefined` when it has none.
+ *
+ * Filtered to the tenant the work runs as — the column default's expression, so
+ * this reads exactly the row a save writes. The row policy alone does not do
+ * it: it admits the caller's READ REACH, every firm for a god and the
+ * descendants for a `subtree` member. The `LIMIT 1` this replaces returned
+ * whichever of those rows the plan met first: a god in one firm read, filed
+ * with and refreshed another firm's token, and a save overwrote that firm's
+ * connection.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: ctx.db is the engine's proxy type
+async function ownSettings(dbh: any): Promise<any | undefined> {
+  const row = await sql<any>`
+    SELECT * FROM zv_efactura_settings
+     WHERE tenant_id = COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                '00000000-0000-0000-0000-000000000001'::uuid)
+  `.execute(dbh);
+  return row.rows[0];
+}
+
 export function efacturaRoutes(ctx: ExtensionContext): Hono {
   const { db, auth } = ctx;
   const app = new Hono();
@@ -266,8 +287,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
   app.get('/settings', async (c) => {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
-    const row = await sql<any>`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
-    const r = row.rows[0];
+    const r = await ownSettings(db);
     return c.json({
       data: {
         environment: r?.environment ?? 'test',
@@ -316,8 +336,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
       );
     }
 
-    const existing = await sql<any>`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
-    const prev = existing.rows[0];
+    const prev = await ownSettings(db);
 
     // An empty secret means "leave what is there", so re-saving the form after
     // changing the environment does not silently wipe the credentials the user
@@ -369,8 +388,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
 
   /** Settings row plus a decrypted bearer token, or a reason there is none. */
   async function anafAuth(): Promise<{ cfg: any; token: string } | { error: string }> {
-    const row = await sql<any>`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
-    const cfg = row.rows[0];
+    const cfg = await ownSettings(db);
     if (!cfg?.access_token) return { error: 'Not connected to ANAF. Sign in on the ANAF connection screen first.' };
     const dec = ctx.internals?.decryptSecret;
     if (!dec) return { error: 'FIELD_ENCRYPTION_KEY is not configured.' };
@@ -403,8 +421,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
   app.get('/oauth/authorize-url', async (c) => {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
-    const row = await sql<any>`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
-    const cfg = row.rows[0];
+    const cfg = await ownSettings(db);
     if (!cfg?.client_id) {
       return c.json({ error: 'Set the ANAF client_id first, on the ANAF connection screen.' }, 400);
     }
@@ -445,8 +462,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
       if (!(await mayConfigure(ctx, user))) return c.json({ error: 'Not allowed' }, 403);
       const d = c.req.valid('json');
 
-      const row = await sql<any>`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
-      const cfg = row.rows[0];
+      const cfg = await ownSettings(db);
       const dec = ctx.internals?.decryptSecret;
       const enc = ctx.internals?.encryptSecret;
       if (!cfg?.client_id || !cfg?.client_secret || !dec || !enc) {
@@ -508,8 +524,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     if (!(await mayConfigure(ctx, user))) return c.json({ error: 'Not allowed' }, 403);
-    const row = await sql<any>`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
-    const cfg = row.rows[0];
+    const cfg = await ownSettings(db);
     const dec = ctx.internals?.decryptSecret;
     const enc = ctx.internals?.encryptSecret;
     if (!cfg?.refresh_token || !dec || !enc) return c.json({ error: 'No refresh token stored.' }, 400);
@@ -557,8 +572,7 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
   app.get('/oauth/test', async (c) => {
     const user = await getUser(c, auth);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
-    const row = await sql<any>`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
-    const cfg = row.rows[0];
+    const cfg = await ownSettings(db);
     const dec = ctx.internals?.decryptSecret;
     if (!cfg?.access_token || !dec) return c.json({ error: 'Not connected to ANAF yet.' }, 400);
     try {

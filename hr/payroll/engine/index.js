@@ -24595,6 +24595,8 @@ function permissionGate(ctx, resource, opts = {}) {
     await next();
   };
 }
+// /zveltio-extension/packages/sdk/src/extension/action-refusal.ts
+var ACTION_REFUSAL = Symbol.for("zveltio.extension.action-refusal");
 // engine/routes.ts
 var RO_RATES = {
   cas_employee: 0.25,
@@ -24691,7 +24693,11 @@ function generateRevisalCsv(internals, employees) {
 async function loadRates(dbh) {
   let rows;
   try {
-    const result = await sql`SELECT * FROM zvd_payroll_rates LIMIT 1`.execute(dbh);
+    const result = await sql`
+      SELECT * FROM zvd_payroll_rates
+       WHERE tenant_id = COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                  '00000000-0000-0000-0000-000000000001'::uuid)
+    `.execute(dbh);
     rows = result.rows;
   } catch (err) {
     const code = err.errno ?? err.code ?? "";

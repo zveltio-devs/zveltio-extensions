@@ -37,6 +37,11 @@ async function mayRefund(ctx: ExtensionContext, user: any): Promise<boolean> {
  * comes from the column DEFAULT, which reads the transaction GUC — the same
  * source RLS checks against — so a row can only appear for the tenant making
  * the request.
+ *
+ * The UPDATE names that tenant too. The row policy is not enough: it admits the
+ * caller's READ REACH, every firm for a god and the descendants for a `subtree`
+ * member, so without the WHERE a god's sale moved every visible firm's counter
+ * (or, under the engine's write predicate, was refused for touching them).
  */
 // biome-ignore lint/suspicious/noExplicitAny: extension db handle is Kysely-shaped
 async function claimOrderNumber(dbh: any): Promise<string> {
@@ -48,6 +53,8 @@ async function claimOrderNumber(dbh: any): Promise<string> {
   const row = await sql<{ next_number: string; prefix: string; padding: number }>`
     UPDATE zvd_pos_order_counters
        SET next_number = next_number + 1, updated_at = NOW()
+     WHERE tenant_id = COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                '00000000-0000-0000-0000-000000000001'::uuid)
      RETURNING prefix, next_number - 1 AS next_number, padding
   `.execute(dbh);
 

@@ -50,6 +50,10 @@ const LdapConfigSaveSchema = LdapConfigSchema.extend({
  * signpost `auth/scim` gives when its capabilities are unapproved: the symptom
  * says "set it up", the cause is "approve it" or "fix the key".
  */
+/** The tenant the work runs as: the `tenant_id` column default's expression. */
+const OWN_TENANT = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                '00000000-0000-0000-0000-000000000001'::uuid)`;
+
 class LdapConfigUnreadable extends Error {
   constructor(cause: unknown) {
     super(`Stored LDAP configuration could not be read: ${(cause as Error)?.message ?? cause}`);
@@ -81,9 +85,14 @@ async function getLdapConfig(
   db: any,
   decryptSecret: (v: string) => Promise<string>,
 ): Promise<z.infer<typeof LdapConfigSchema> | null> {
+  // The OWN tenant's row. The row policy admits the caller's READ REACH —
+  // every firm for a god, the descendants for a `subtree` member — so without
+  // this filter a god configuring firm A read (and on a save without a new
+  // password, kept) another firm's directory and bind password.
   const row = await db
     .selectFrom('zvd_ldap_config')
     .select('config')
+    .where('tenant_id', '=', OWN_TENANT)
     .executeTakeFirst();
   if (!row) return null;
 
@@ -122,15 +131,15 @@ async function upsertLdapConfig(
   // Going through `text` forces Postgres to parse it into an object.
   const value = sql`${JSON.stringify(toStore)}::text::jsonb`;
 
-  // `ctx.db` is tenant-scoped, so both statements already see only this tenant's
-  // row — no explicit tenant predicate to forget.
-  const existing = await db.selectFrom('zvd_ldap_config').select('tenant_id').executeTakeFirst();
-
-  if (existing) {
-    await db.updateTable('zvd_ldap_config').set({ config: value, updated_at: new Date() }).execute();
-  } else {
-    await db.insertInto('zvd_ldap_config').values({ config: value }).execute();
-  }
+  // One statement on the tenant key. The read-then-UPDATE it replaces assumed
+  // `ctx.db` saw only this tenant's row; it sees the READ REACH, so for a god the
+  // UPDATE (no WHERE) reached every firm's row. `tenant_id` is left to its
+  // column default, which is the current tenant.
+  await db
+    .insertInto('zvd_ldap_config')
+    .values({ config: value })
+    .onConflict((oc: any) => oc.column('tenant_id').doUpdateSet({ config: value, updated_at: new Date() }))
+    .execute();
 }
 
 export function ldapRoutes(ctx: ExtensionContext): Hono {

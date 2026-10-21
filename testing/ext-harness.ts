@@ -813,6 +813,46 @@ export async function mountForTest(
   return { app, publicRoutes, migrated, ctx };
 }
 
+/**
+ * Firms that exist, and a signed-in GOD whose requests run in one of them with
+ * the row policy binding as in production (the tenant transaction drops to
+ * `zveltio_rls`; the harness pool is a superuser, which RLS would not bind).
+ *
+ * A god's READ REACH is every firm, so a statement with no tenant filter sees
+ * the other firms' rows too. A per-tenant settings table read with `LIMIT 1`
+ * then answers with whichever firm's row the heap returns first — the shape
+ * that leaked mail's configuration (zveltio-extensions#248).
+ *
+ * `pool` is the superuser pool, for seeding and checking across firms. Call
+ * `done()` from `afterAll`.
+ */
+export async function godAcrossFirms(
+  engineDir: string,
+  firms: readonly string[],
+): Promise<{ pool: any; asGod: (tenant: string) => Promise<any>; done: () => Promise<void> }> {
+  const godId = '00000000-0000-4000-8000-00000000e001';
+  // Applies the extension's migrations and starts the engine's tenant manager.
+  await mountForTest(engineDir, { tenant: firms[0], transaction: true });
+  const restoreRole = ((await tenancyP) as any)._setRlsRoleAvailableForTests(true);
+  await seatHarnessGod();
+  for (const id of firms) {
+    await _pool.query(
+      `INSERT INTO zv_tenants (id, slug, name, status) VALUES ($1, $2, $2, 'active')
+       ON CONFLICT (id) DO NOTHING`,
+      [id, `firm-${id.slice(-6)}`],
+    );
+  }
+  return {
+    pool: _pool,
+    asGod: async (tenant) =>
+      (await mountForTest(engineDir, { tenant, transaction: true, transactionUser: godId })).app,
+    done: async () => {
+      restoreRole();
+      await _pool.query(`DELETE FROM zv_tenants WHERE id = ANY($1)`, [firms]).catch(() => undefined);
+    },
+  };
+}
+
 /** Run the uniform extension contract. `engineDir` = `<ext>/engine`. */
 export async function extensionContract(engineDir: string, opts: ContractOptions = {}) {
   const extDir = dirname(engineDir);
