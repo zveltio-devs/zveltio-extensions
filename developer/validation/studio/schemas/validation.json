@@ -25,6 +25,18 @@
           "type": "mono"
         },
         {
+          "key": "scope",
+          "label": "developer.validation.col.scope",
+          "type": "badge",
+          "badge": {
+            "colors": { "instance": "badge-info", "tenant": "badge-ghost" },
+            "labels": {
+              "instance": "developer.validation.scope.instance",
+              "tenant": "developer.validation.scope.tenant"
+            }
+          }
+        },
+        {
           "key": "rule_type",
           "label": "developer.validation.col.ruleType"
         },

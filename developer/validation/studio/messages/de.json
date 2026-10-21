@@ -68,5 +68,8 @@
   "developer.validation.ui.severity": "Schweregrad",
   "developer.validation.ui.text": "text",
   "developer.validation.ui.uuid": "uuid",
-  "developer.validation.ui.warning_allow": "Warnung (zulassen)"
+  "developer.validation.ui.warning_allow": "Warnung (zulassen)",
+  "developer.validation.col.scope": "Geltungsbereich",
+  "developer.validation.scope.instance": "Instanz",
+  "developer.validation.scope.tenant": "Dieser Mandant"
 }

@@ -371,7 +371,10 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
       .orderBy('created_at', 'desc');
     if (collection) q = q.where('collection', '=', collection);
     const rules = await q.execute();
-    return c.json({ data: rules });
+    // Instance rules bind every tenant; a tenant's own only tighten. Say which.
+    return c.json({
+      data: rules.map((r: any) => ({ ...r, scope: r.tenant_id ? 'tenant' : 'instance' })),
+    });
   });
 
   app.post('/rules', zValidator('json', FlatRuleCreateSchema), async (c) => {

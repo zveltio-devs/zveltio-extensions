@@ -68,5 +68,8 @@
   "developer.validation.ui.severity": "Ważność",
   "developer.validation.ui.text": "text",
   "developer.validation.ui.uuid": "uuid",
-  "developer.validation.ui.warning_allow": "warning (allow)"
+  "developer.validation.ui.warning_allow": "warning (allow)",
+  "developer.validation.col.scope": "Zakres",
+  "developer.validation.scope.instance": "Instancja",
+  "developer.validation.scope.tenant": "Ten najemca"
 }

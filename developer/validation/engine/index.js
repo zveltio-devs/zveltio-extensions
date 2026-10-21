@@ -24755,7 +24755,9 @@ Description: ${description}`;
     if (collection)
       q = q.where("collection", "=", collection);
     const rules = await q.execute();
-    return c.json({ data: rules });
+    return c.json({
+      data: rules.map((r) => ({ ...r, scope: r.tenant_id ? "tenant" : "instance" }))
+    });
   });
   app.post("/rules", zValidator("json", FlatRuleCreateSchema), async (c) => {
     if (!await ruleWriter(c))

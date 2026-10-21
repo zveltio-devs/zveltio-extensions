@@ -68,5 +68,8 @@
   "developer.validation.ui.severity": "Gravité",
   "developer.validation.ui.text": "text",
   "developer.validation.ui.uuid": "uuid",
-  "developer.validation.ui.warning_allow": "avertissement (autoriser)"
+  "developer.validation.ui.warning_allow": "avertissement (autoriser)",
+  "developer.validation.col.scope": "Portée",
+  "developer.validation.scope.instance": "Instance",
+  "developer.validation.scope.tenant": "Ce locataire"
 }
