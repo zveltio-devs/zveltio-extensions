@@ -24527,12 +24527,6 @@ function parseParameter(param) {
   }
   return parseValueExpression(param);
 }
-// /zveltio-extension/packages/sdk/src/extension/action-refusal.ts
-var ACTION_REFUSAL = Symbol.for("zveltio.extension.action-refusal");
-// /zveltio-extension/packages/sdk/src/extension/jsonb.ts
-function toJsonb(value) {
-  return sql`${JSON.stringify(value ?? null)}::text::jsonb`;
-}
 // engine/routes.ts
 var RULE_TYPES = [
   "required",
@@ -24638,10 +24632,13 @@ function expressionRefusal(ruleType, ruleConfig, check2) {
 function validationRoutes(ctx) {
   const { db, auth, checkPermission } = ctx;
   const {
-    invalidateRulesCache,
     evaluateExpressionRule,
     evaluateTransitionRule,
-    checkValidationExpression
+    checkValidationExpression,
+    requireInstanceAdmin,
+    isTenantAdmin,
+    writeValidationRule,
+    writeValidationRuleGroup
   } = ctx.internals;
   const evaluators = {
     expression: evaluateExpressionRule,
@@ -24650,6 +24647,21 @@ function validationRoutes(ctx) {
   const fieldTypes = async (collection) => {
     const coll = await ctx.DDLManager.getCollection(db, collection);
     return new Map((coll?.fields ?? []).map((f) => [f.name, f.type]));
+  };
+  const instanceAdmin = async (c) => requireInstanceAdmin(c.get("user").id);
+  const ADMIN_REQUIRED = { error: "Instance admin access required" };
+  const ruleWriter = async (c) => await instanceAdmin(c) || await isTenantAdmin(c.get("user").id);
+  const RULE_ADMIN_REQUIRED = { error: "Admin access required" };
+  const writeRule = async (c, write) => {
+    try {
+      return { rule: await writeValidationRule(c, write) };
+    } catch (err) {
+      return { refused: String(err?.message ?? err) };
+    }
+  };
+  const visibleTo = (c) => {
+    const tenant = c.get("tenant")?.id ?? null;
+    return (eb) => tenant ? eb.or([eb("tenant_id", "is", null), eb("tenant_id", "=", tenant)]) : eb("tenant_id", "is", null);
   };
   const app = new Hono2;
   app.use("*", async (c, next) => {
@@ -24660,10 +24672,8 @@ function validationRoutes(ctx) {
     return next();
   });
   app.post("/generate", async (c) => {
-    const user = c.get("user");
-    const isAdmin = await checkPermission(user.id, "admin", "*");
-    if (!isAdmin)
-      return c.json({ error: "Admin access required" }, 403);
+    if (!await instanceAdmin(c))
+      return c.json(ADMIN_REQUIRED, 403);
     const { collection, field_name, field_type, description } = await c.req.json();
     if (!description)
       return c.json({ error: "description required" }, 400);
@@ -24716,29 +24726,24 @@ Description: ${description}`;
     return c.json({ groups: rows.rows });
   });
   app.post("/groups", zValidator("json", RuleGroupCreateSchema), async (c) => {
-    const user = c.get("user");
-    const isAdmin = await checkPermission(user.id, "admin", "*");
-    if (!isAdmin)
-      return c.json({ error: "Admin access required" }, 403);
-    const body = c.req.valid("json");
-    const row = await sql`
-      INSERT INTO zvd_validation_rule_groups
-        (name, collection, field_name, description, logic, rule_ids, is_active, created_by)
-      VALUES
-        (${body.name}, ${body.collection}, ${body.field_name},
-         ${body.description ?? null}, ${body.logic}, ${body.rule_ids},
-         ${body.is_active}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    return c.json({ group: row.rows[0] }, 201);
+    if (!await instanceAdmin(c))
+      return c.json(ADMIN_REQUIRED, 403);
+    try {
+      const group = await writeValidationRuleGroup(c, { op: "create", group: c.req.valid("json") });
+      return c.json({ group }, 201);
+    } catch (err) {
+      if (err?.errno === "23505") {
+        return c.json({ error: "A group with this name already exists on this collection" }, 409);
+      }
+      throw err;
+    }
   });
   app.delete("/groups/:id", async (c) => {
-    const user = c.get("user");
-    const isAdmin = await checkPermission(user.id, "admin", "*");
-    if (!isAdmin)
-      return c.json({ error: "Admin access required" }, 403);
-    const id = c.req.param("id");
-    await sql`DELETE FROM zvd_validation_rule_groups WHERE id = ${id}`.execute(db);
+    if (!await instanceAdmin(c))
+      return c.json(ADMIN_REQUIRED, 403);
+    const removed = await writeValidationRuleGroup(c, { op: "delete", id: c.req.param("id") });
+    if (!removed)
+      return c.json({ error: "Not found" }, 404);
     return c.json({ success: true });
   });
   const FlatRuleCreateSchema = RuleCreateSchema.extend({
@@ -24746,88 +24751,68 @@ Description: ${description}`;
   });
   app.get("/rules", async (c) => {
     const collection = c.req.query("collection");
-    let q = db.selectFrom("zv_validation_rules").selectAll().orderBy("created_at", "desc");
+    let q = db.selectFrom("zv_validation_rules").selectAll().where(visibleTo(c)).orderBy("created_at", "desc");
     if (collection)
       q = q.where("collection", "=", collection);
     const rules = await q.execute();
     return c.json({ data: rules });
   });
   app.post("/rules", zValidator("json", FlatRuleCreateSchema), async (c) => {
-    const user = c.get("user");
-    const isAdmin = await checkPermission(user.id, "admin", "*");
-    if (!isAdmin)
-      return c.json({ error: "Admin access required" }, 403);
+    if (!await ruleWriter(c))
+      return c.json(RULE_ADMIN_REQUIRED, 403);
     const body = c.req.valid("json");
     const refusal = expressionRefusal(body.rule_type, body.rule_config, checkValidationExpression);
     if (refusal)
       return c.json({ error: refusal }, 400);
-    const rule = await db.insertInto("zv_validation_rules").values({
-      collection: body.collection,
-      field_name: body.field_name,
-      rule_type: body.rule_type,
-      nl_description: body.nl_description || null,
-      rule_config: toJsonb(body.rule_config),
-      error_message: body.error_message,
-      is_active: true,
-      created_by: user.id
-    }).returningAll().executeTakeFirst();
-    invalidateRulesCache(body.collection);
-    return c.json({ rule }, 201);
+    const r = await writeRule(c, {
+      op: "create",
+      rule: { ...body, nl_description: body.nl_description || null }
+    });
+    if ("refused" in r)
+      return c.json({ error: r.refused }, 403);
+    return c.json({ rule: r.rule }, 201);
   });
   app.patch("/rules/:id", zValidator("json", RuleUpdateSchema), async (c) => {
-    const user = c.get("user");
-    const isAdmin = await checkPermission(user.id, "admin", "*");
-    if (!isAdmin)
-      return c.json({ error: "Admin access required" }, 403);
-    const id = c.req.param("id");
-    const body = c.req.valid("json");
-    const existing = await db.selectFrom("zv_validation_rules").select(["id", "collection"]).where("id", "=", id).executeTakeFirst();
-    if (!existing)
+    if (!await ruleWriter(c))
+      return c.json(RULE_ADMIN_REQUIRED, 403);
+    const { is_active } = c.req.valid("json");
+    const r = await writeRule(c, { op: "setActive", id: c.req.param("id"), is_active });
+    if ("refused" in r)
+      return c.json({ error: r.refused }, 403);
+    if (!r.rule)
       return c.json({ error: "Not found" }, 404);
-    const rule = await db.updateTable("zv_validation_rules").set({ is_active: body.is_active, updated_at: new Date }).where("id", "=", id).returningAll().executeTakeFirst();
-    invalidateRulesCache(existing.collection);
-    return c.json({ rule });
+    return c.json({ rule: r.rule });
   });
   app.delete("/rules/:id", async (c) => {
-    const user = c.get("user");
-    const isAdmin = await checkPermission(user.id, "admin", "*");
-    if (!isAdmin)
-      return c.json({ error: "Admin access required" }, 403);
-    const id = c.req.param("id");
-    const existing = await db.selectFrom("zv_validation_rules").select(["id", "collection"]).where("id", "=", id).executeTakeFirst();
-    if (!existing)
+    if (!await ruleWriter(c))
+      return c.json(RULE_ADMIN_REQUIRED, 403);
+    const r = await writeRule(c, { op: "delete", id: c.req.param("id") });
+    if ("refused" in r)
+      return c.json({ error: r.refused }, 403);
+    if (!r.rule)
       return c.json({ error: "Not found" }, 404);
-    await db.deleteFrom("zv_validation_rules").where("id", "=", id).execute();
-    invalidateRulesCache(existing.collection);
     return c.json({ success: true });
   });
   app.get("/:collection", async (c) => {
     const collection = c.req.param("collection");
-    const rules = await db.selectFrom("zv_validation_rules").selectAll().where("collection", "=", collection).orderBy("field_name", "asc").execute();
+    const rules = await db.selectFrom("zv_validation_rules").selectAll().where("collection", "=", collection).where(visibleTo(c)).orderBy("field_name", "asc").execute();
     return c.json({ rules });
   });
   app.post("/:collection", zValidator("json", RuleCreateSchema), async (c) => {
-    const user = c.get("user");
     const collection = c.req.param("collection");
-    const isAdmin = await checkPermission(user.id, "admin", "*");
-    if (!isAdmin)
-      return c.json({ error: "Admin access required" }, 403);
+    if (!await ruleWriter(c))
+      return c.json(RULE_ADMIN_REQUIRED, 403);
     const body = c.req.valid("json");
     const refusal = expressionRefusal(body.rule_type, body.rule_config, checkValidationExpression);
     if (refusal)
       return c.json({ error: refusal }, 400);
-    const rule = await db.insertInto("zv_validation_rules").values({
-      collection,
-      field_name: body.field_name,
-      rule_type: body.rule_type,
-      nl_description: body.nl_description || null,
-      rule_config: toJsonb(body.rule_config),
-      error_message: body.error_message,
-      is_active: true,
-      created_by: user.id
-    }).returningAll().executeTakeFirst();
-    invalidateRulesCache(collection);
-    return c.json({ rule }, 201);
+    const r = await writeRule(c, {
+      op: "create",
+      rule: { ...body, collection, nl_description: body.nl_description || null }
+    });
+    if ("refused" in r)
+      return c.json({ error: r.refused }, 403);
+    return c.json({ rule: r.rule }, 201);
   });
   app.post("/:collection/bulk-test", async (c) => {
     const collection = c.req.param("collection");
@@ -24837,6 +24822,7 @@ Description: ${description}`;
       FROM zv_validation_rules r
       LEFT JOIN zvd_validation_test_cases tc ON tc.rule_id = r.id
       WHERE r.collection = ${collection}
+        AND (r.tenant_id IS NULL OR r.tenant_id = ${c.get("tenant")?.id ?? null}::uuid)
     `.execute(db);
     const results = [];
     const types = await fieldTypes(collection);
@@ -24871,9 +24857,8 @@ Description: ${description}`;
   app.post("/:collection/import", async (c) => {
     const user = c.get("user");
     const collection = c.req.param("collection");
-    const isAdmin = await checkPermission(user.id, "admin", "*");
-    if (!isAdmin)
-      return c.json({ error: "Admin access required" }, 403);
+    if (!await ruleWriter(c))
+      return c.json(RULE_ADMIN_REQUIRED, 403);
     let rawRules;
     try {
       const body = await c.req.json();
@@ -24901,17 +24886,9 @@ Description: ${description}`;
         continue;
       }
       try {
-        await db.transaction().execute(async (trx) => {
-          await trx.insertInto("zv_validation_rules").values({
-            collection,
-            field_name: rule.field_name,
-            rule_type: rule.rule_type,
-            nl_description: rule.nl_description || null,
-            rule_config: toJsonb(rule.rule_config),
-            error_message: rule.error_message,
-            is_active: true,
-            created_by: user.id
-          }).execute();
+        await writeValidationRule(c, {
+          op: "create",
+          rule: { ...rule, collection, nl_description: rule.nl_description || null }
         });
         importedCount++;
       } catch (err) {
@@ -24926,37 +24903,34 @@ Description: ${description}`;
         (${collection}, ${importedCount}, ${failedCount},
          ${JSON.stringify(errors3)}::jsonb, ${user.id})
     `.execute(db).catch(() => {});
-    if (importedCount > 0)
-      invalidateRulesCache(collection);
     return c.json({ imported: importedCount, failed: failedCount, errors: errors3 }, importedCount > 0 ? 201 : 422);
   });
   app.patch("/:collection/:id", zValidator("json", RuleUpdateSchema), async (c) => {
-    const user = c.get("user");
     const collection = c.req.param("collection");
     const id = c.req.param("id");
-    const isAdmin = await checkPermission(user.id, "admin", "*");
-    if (!isAdmin)
-      return c.json({ error: "Admin access required" }, 403);
-    const body = c.req.valid("json");
-    const rule = await db.updateTable("zv_validation_rules").set({ is_active: body.is_active, updated_at: new Date }).where("id", "=", id).where("collection", "=", collection).returningAll().executeTakeFirst();
-    invalidateRulesCache(collection);
-    return c.json({ rule });
+    if (!await ruleWriter(c))
+      return c.json(RULE_ADMIN_REQUIRED, 403);
+    const { is_active } = c.req.valid("json");
+    const r = await writeRule(c, { op: "setActive", id, is_active, collection });
+    if ("refused" in r)
+      return c.json({ error: r.refused }, 403);
+    return c.json({ rule: r.rule });
   });
   app.delete("/:collection/:id", async (c) => {
-    const user = c.get("user");
     const collection = c.req.param("collection");
     const id = c.req.param("id");
-    const isAdmin = await checkPermission(user.id, "admin", "*");
-    if (!isAdmin)
-      return c.json({ error: "Admin access required" }, 403);
-    await db.deleteFrom("zv_validation_rules").where("id", "=", id).execute();
-    invalidateRulesCache(collection);
+    if (!await ruleWriter(c))
+      return c.json(RULE_ADMIN_REQUIRED, 403);
+    const r = await writeRule(c, { op: "delete", id, collection });
+    if ("refused" in r)
+      return c.json({ error: r.refused }, 403);
     return c.json({ success: true });
   });
   app.post("/:collection/:id/test-cases/run", async (c) => {
     const id = c.req.param("id");
     const ruleRes = await sql`
       SELECT id, rule_type, rule_config, collection, field_name FROM zv_validation_rules WHERE id = ${id}
+        AND (tenant_id IS NULL OR tenant_id = ${c.get("tenant")?.id ?? null}::uuid)
     `.execute(db);
     const rule = ruleRes.rows[0];
     if (!rule)
@@ -25006,6 +24980,7 @@ Description: ${description}`;
       return c.json({ error: "Admin access required" }, 403);
     const ruleRes = await sql`
       SELECT id FROM zv_validation_rules WHERE id = ${id}
+        AND (tenant_id IS NULL OR tenant_id = ${c.get("tenant")?.id ?? null}::uuid)
     `.execute(db);
     if (!ruleRes.rows[0])
       return c.json({ error: "Rule not found" }, 404);
@@ -25044,7 +25019,8 @@ var extension = {
     return [
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
-      join(import.meta.dir, "migrations/003_test_case_previous_value.sql")
+      join(import.meta.dir, "migrations/003_test_case_previous_value.sql"),
+      join(import.meta.dir, "migrations/004_rule_groups_instance_wide.sql")
     ];
   },
   async register(app, ctx) {

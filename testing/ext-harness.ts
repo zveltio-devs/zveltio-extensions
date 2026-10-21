@@ -162,6 +162,9 @@ const ENGINE_MEMBERS = [
   'getUserNames',
   'exportUserData',
   'resolveUserRole',
+  // Refuses by throwing (no gate principal, not an instance admin): a stub would be allowed.
+  'writeValidationRule',
+  'writeValidationRuleGroup',
 ] as const;
 
 /**
