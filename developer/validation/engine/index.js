@@ -14,10 +14,10 @@ var __export = (target, all) => {
     });
 };
 
-// engine/index.ts
+// ../zveltio-extensions/developer/validation/engine/index.ts
 import { join } from "path";
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/compose.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
     let index = -1;
@@ -61,10 +61,10 @@ var compose = (middleware, onError, onNotFound) => {
   };
 };
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/request/constants.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/request/constants.js
 var GET_MATCH_RESULT = /* @__PURE__ */ Symbol();
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/utils/buffer.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/utils/buffer.js
 var bufferToFormData = (arrayBuffer, contentType) => {
   const response = new Response(arrayBuffer, {
     headers: {
@@ -74,7 +74,7 @@ var bufferToFormData = (arrayBuffer, contentType) => {
   return response.formData();
 };
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/utils/body.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/utils/body.js
 var MAX_NESTING_DEPTH = 32;
 var MAX_NESTED_OBJECTS = 1e4;
 var isRawRequest = (request) => ("headers" in request);
@@ -168,7 +168,7 @@ var throwNestingLimitExceeded = () => {
   throw new Error("Nesting limit exceeded");
 };
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/utils/url.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/utils/url.js
 var splitPath = (path) => {
   const paths = path.split("/");
   if (paths[0] === "") {
@@ -370,7 +370,7 @@ var getQueryParams = (url, key) => {
 };
 var decodeURIComponent_ = decodeURIComponent;
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/request.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/request.js
 var HonoRequest = class {
   raw;
   #validatedData;
@@ -484,7 +484,7 @@ var HonoRequest = class {
   }
 };
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/utils/html.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/utils/html.js
 var HtmlEscapedCallbackPhase = {
   Stringify: 1,
   BeforeStream: 2,
@@ -522,7 +522,7 @@ var resolveCallback = async (str, phase, preserveCallbacks, context, buffer) => 
   }
 };
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/context.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/context.js
 var TEXT_PLAIN = "text/plain; charset=UTF-8";
 var setDefaultContentType = (contentType, headers) => {
   return {
@@ -704,7 +704,7 @@ var Context = class {
   };
 };
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/router.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router.js
 var METHOD_NAME_ALL = "ALL";
 var METHOD_NAME_ALL_LOWERCASE = "all";
 var METHODS = ["get", "post", "put", "delete", "options", "patch", "query"];
@@ -712,10 +712,10 @@ var MESSAGE_MATCHER_IS_ALREADY_BUILT = "Can not add a route since the matcher is
 var UnsupportedPathError = class extends Error {
 };
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/utils/constants.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/utils/constants.js
 var COMPOSED_HANDLER = "__COMPOSED_HANDLER";
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/hono-base.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/hono-base.js
 var notFoundHandler = (c) => {
   return c.text("404 Not Found", 404);
 };
@@ -941,10 +941,10 @@ var Hono = class _Hono {
   };
 };
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/router/utils.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router/utils.js
 var createNullObject = () => /* @__PURE__ */ Object.create(null);
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/router/reg-exp-router/matcher.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router/reg-exp-router/matcher.js
 var emptyParam = [];
 function match(method, path) {
   const matchers = this.buildAllMatchers();
@@ -965,7 +965,7 @@ function match(method, path) {
   return match2(method, path);
 }
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/router/reg-exp-router/node.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router/reg-exp-router/node.js
 var LABEL_REG_EXP_STR = "[^/]+";
 var ONLY_WILDCARD_REG_EXP_STR = ".*";
 var TAIL_WILDCARD_REG_EXP_STR = "(?:|/.*)";
@@ -1068,7 +1068,7 @@ var Node = class _Node {
   }
 };
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/router/reg-exp-router/trie.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router/reg-exp-router/trie.js
 var Trie = class {
   #context = { varIndex: 0 };
   #root = new Node;
@@ -1131,7 +1131,7 @@ var Trie = class {
   }
 };
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/router/reg-exp-router/router.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router/reg-exp-router/router.js
 var wildcardRegExpCache = createNullObject();
 function buildWildcardRegExp(path) {
   return wildcardRegExpCache[path] ??= new RegExp(`^${path.replace(/\/:[^/{}]+(?:\{\[\^\/]\+})?(?=[/{]|$)|\/?\*$|([.\\+*[^\]$()?{}|])/g, (match2, metaChar) => metaChar ? `\\${metaChar}` : match2 === "/*" ? TAIL_WILDCARD_REG_EXP_STR : match2 === "*" ? ONLY_WILDCARD_REG_EXP_STR : `/:${LABEL_REG_EXP_STR}`)}$`);
@@ -1247,7 +1247,7 @@ var RegExpRouter = class {
   }
 };
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/router/reg-exp-router/prepared-router.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router/reg-exp-router/prepared-router.js
 var PreparedRegExpRouter = class {
   name = "PreparedRegExpRouter";
   #matchers;
@@ -1319,7 +1319,7 @@ var PreparedRegExpRouter = class {
   match = match;
 };
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/router/smart-router/router.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router/smart-router/router.js
 var SmartRouter = class {
   name = "SmartRouter";
   #routers = [];
@@ -1374,7 +1374,7 @@ var SmartRouter = class {
   }
 };
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/router/trie-router/node.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router/trie-router/node.js
 var emptyParams = createNullObject();
 var order = 0;
 var Node2 = class _Node2 {
@@ -1522,7 +1522,7 @@ var Node2 = class _Node2 {
   }
 };
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/router/trie-router/router.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/router/trie-router/router.js
 var TrieRouter = class {
   name = "TrieRouter";
   #node = new Node2;
@@ -1536,7 +1536,7 @@ var TrieRouter = class {
   }
 };
 
-// /zveltio-extension/.bun/hono@4.13.8/node_modules/hono/dist/hono.js
+// /zveltio-extension/node_modules/.bun/hono@4.13.8/node_modules/hono/dist/hono.js
 var Hono2 = class extends Hono {
   constructor(options = {}) {
     super(options);
@@ -1775,7 +1775,7 @@ function zValidatorFunction(target, schema, hook, options) {
 }
 var zValidator = zValidatorFunction;
 
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/classic/external.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/external.js
 var exports_external = {};
 __export(exports_external, {
   xor: () => xor,
@@ -2038,7 +2038,7 @@ __export(exports_external, {
   $brand: () => $brand
 });
 
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/index.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/index.js
 var exports_core2 = {};
 __export(exports_core2, {
   withParser: () => withParser,
@@ -2355,7 +2355,7 @@ __export(exports_core2, {
   $ZodAny: () => $ZodAny
 });
 
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/util.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/util.js
 var exports_util = {};
 __export(exports_util, {
   unwrapMessage: () => unwrapMessage,
@@ -3191,7 +3191,7 @@ function constantCatch(value) {
   return fn;
 }
 
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/core.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/core.js
 var _a;
 var NEVER = /* @__PURE__ */ Object.freeze({
   status: "aborted"
@@ -3314,7 +3314,7 @@ function config(newConfig) {
     Object.assign(globalConfig, newConfig);
   return globalConfig;
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/errors.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/errors.js
 function _getMessage() {
   const internals = this._zod;
   internals.message ?? (internals.message = JSON.stringify(internals.def, jsonStringifyReplacer, 2));
@@ -3507,7 +3507,7 @@ function prettifyError(error) {
 `);
 }
 
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/parse.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/parse.js
 function finalizeParams(callee, params) {
   return { callee: params?.callee ?? callee, Err: params?.Err };
 }
@@ -3666,7 +3666,7 @@ var _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
   return _safeParseAsync(_Err)(schema, value, _ctx);
 };
 var safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync($ZodRealError);
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/regexes.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/regexes.js
 var exports_regexes = {};
 __export(exports_regexes, {
   xid: () => xid,
@@ -3838,7 +3838,7 @@ var sha512_hex = /^[0-9a-fA-F]{128}$/;
 var sha512_base64 = /* @__PURE__ */ fixedBase64(86, "==");
 var sha512_base64url = /* @__PURE__ */ fixedBase64url(86);
 
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/checks.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a2;
   inst._zod ?? (inst._zod = {});
@@ -4312,7 +4312,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/doc.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/doc.js
 class Doc {
   constructor(args = [], closed = {}) {
     this.content = [];
@@ -4354,14 +4354,14 @@ ${content.join(`
   }
 }
 
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/versions.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 6,
   patch: 5
 };
 
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/schemas.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a2;
   inst ?? (inst = {});
@@ -6762,7 +6762,7 @@ function handleRefineResult(result, payload, input, inst) {
     payload.issues.push(issue(_iss));
   }
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/memoizer.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/memoizer.js
 class $ZodCyclicError extends Error {
   constructor() {
     super(`Cannot parse a reference cycle that closes through a transform`);
@@ -7034,7 +7034,7 @@ function isBackEdge(ctx, value) {
   const backEdges = ctx[STATE]?.backEdges;
   return backEdges !== undefined && isRef(value) && backEdges.has(value);
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/index.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/index.js
 var exports_locales = {};
 __export(exports_locales, {
   zhTW: () => zh_TW_default,
@@ -7102,7 +7102,7 @@ __export(exports_locales, {
   ar: () => ar_default
 });
 
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/ar.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/ar.js
 var error = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0641", verb: "\u0623\u0646 \u064A\u062D\u0648\u064A" },
@@ -7213,7 +7213,7 @@ function ar_default() {
     localeError: error()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/az.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/az.js
 var error2 = () => {
   const Sizable = {
     string: { unit: "simvol", verb: "olmal\u0131d\u0131r" },
@@ -7323,7 +7323,7 @@ function az_default() {
     localeError: error2()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/be.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/be.js
 function getBelarusianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -7491,7 +7491,7 @@ function be_default() {
     localeError: error3()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/bg.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/bg.js
 var error4 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0430", verb: "\u0434\u0430 \u0441\u044A\u0434\u044A\u0440\u0436\u0430" },
@@ -7616,7 +7616,7 @@ function bg_default() {
     localeError: error4()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/bn.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/bn.js
 var error5 = () => {
   const Sizable = {
     string: { unit: "\u0985\u0995\u09CD\u09B7\u09B0", verb: "\u09A5\u09BE\u0995\u09A4\u09C7 \u09B9\u09AC\u09C7" },
@@ -7729,7 +7729,7 @@ function bn_default() {
     localeError: error5()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/ca.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/ca.js
 var error6 = () => {
   const Sizable = {
     string: { unit: "car\xE0cters", verb: "contenir" },
@@ -7841,7 +7841,7 @@ function ca_default() {
     localeError: error6()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/ckb.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/ckb.js
 var error7 = () => {
   const Sizable = {
     string: { unit: "\u067E\u06CC\u062A", verb: "\u0628\u06CE\u062A" },
@@ -7973,7 +7973,7 @@ function ckb_default() {
     localeError: error7()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/cs.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/cs.js
 var error8 = () => {
   const Sizable = {
     string: { unit: "znak\u016F", verb: "m\xEDt" },
@@ -8089,7 +8089,7 @@ function cs_default() {
     localeError: error8()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/da.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/da.js
 var error9 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "havde" },
@@ -8209,7 +8209,7 @@ function da_default() {
     localeError: error9()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/de.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/de.js
 var error10 = () => {
   const Sizable = {
     string: { unit: "Zeichen", verb: "zu haben" },
@@ -8322,7 +8322,7 @@ function de_default() {
     localeError: error10()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/el.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/el.js
 var error11 = () => {
   const Sizable = {
     string: { unit: "\u03C7\u03B1\u03C1\u03B1\u03BA\u03C4\u03AE\u03C1\u03B5\u03C2", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" },
@@ -8434,7 +8434,7 @@ function el_default() {
     localeError: error11()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/en.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/en.js
 var error12 = () => {
   const Sizable = {
     string: { unit: "characters", verb: "to have" },
@@ -8556,7 +8556,7 @@ function en_default() {
     localeError: error12()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/eo.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/eo.js
 var error13 = () => {
   const Sizable = {
     string: { unit: "karaktrojn", verb: "havi" },
@@ -8670,7 +8670,7 @@ function eo_default() {
     localeError: error13()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/es.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/es.js
 var error14 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "tener" },
@@ -8806,7 +8806,7 @@ function es_default() {
     localeError: error14()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/fa.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/fa.js
 var error15 = () => {
   const Sizable = {
     string: { unit: "\u06A9\u0627\u0631\u0627\u06A9\u062A\u0631", verb: "\u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F" },
@@ -8925,7 +8925,7 @@ function fa_default() {
     localeError: error15()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/fi.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/fi.js
 var error16 = () => {
   const Sizable = {
     string: { unit: "merkki\xE4", subject: "merkkijonon" },
@@ -9042,7 +9042,7 @@ function fi_default() {
     localeError: error16()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/fr.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/fr.js
 var error17 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -9171,7 +9171,7 @@ function fr_default() {
     localeError: error17()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/fr-CA.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/fr-CA.js
 var error18 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -9283,7 +9283,7 @@ function fr_CA_default() {
     localeError: error18()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/gu.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/gu.js
 var error19 = () => {
   const Sizable = {
     string: { unit: "\u0A85\u0A95\u0ACD\u0AB7\u0AB0", verb: "\u0AB9\u0ACB\u0AB5\u0ABE \u0A9C\u0ACB\u0A88\u0A8F" },
@@ -9396,7 +9396,7 @@ function gu_default() {
     localeError: error19()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/he.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/he.js
 var error20 = () => {
   const TypeNames = {
     string: { label: "\u05DE\u05D7\u05E8\u05D5\u05D6\u05EA", gender: "f" },
@@ -9596,7 +9596,7 @@ function he_default() {
     localeError: error20()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/hi.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/hi.js
 var error21 = () => {
   const Sizable = {
     string: { unit: "\u0905\u0915\u094D\u0937\u0930", verb: "\u0930\u0916\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F" },
@@ -9707,7 +9707,7 @@ function hi_default() {
     localeError: error21()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/hr.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/hr.js
 var error22 = () => {
   const Sizable = {
     string: { unit: "znakova", verb: "imati" },
@@ -9833,7 +9833,7 @@ function hr_default() {
     localeError: error22()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/hu.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/hu.js
 var error23 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "legyen" },
@@ -9946,7 +9946,7 @@ function hu_default() {
     localeError: error23()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/hy.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/hy.js
 function getArmenianPlural(count, one, many) {
   return Math.abs(count) === 1 ? one : many;
 }
@@ -10104,7 +10104,7 @@ function hy_default() {
     localeError: error24()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/id.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/id.js
 var error25 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "memiliki" },
@@ -10215,7 +10215,7 @@ function id_default() {
     localeError: error25()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/is.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/is.js
 var error26 = () => {
   const Sizable = {
     string: { unit: "stafi", verb: "a\xF0 hafa" },
@@ -10329,7 +10329,7 @@ function is_default() {
     localeError: error26()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/it.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/it.js
 var error27 = () => {
   const Sizable = {
     string: { unit: "caratteri", verb: "avere" },
@@ -10442,7 +10442,7 @@ function it_default() {
     localeError: error27()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/ja.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/ja.js
 var error28 = () => {
   const Sizable = {
     string: { unit: "\u6587\u5B57", verb: "\u3067\u3042\u308B" },
@@ -10554,7 +10554,7 @@ function ja_default() {
     localeError: error28()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/ka.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/ka.js
 var error29 = () => {
   const Sizable = {
     string: { unit: "\u10E1\u10D8\u10DB\u10D1\u10DD\u10DA\u10DD", verb: "\u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1" },
@@ -10671,7 +10671,7 @@ function ka_default() {
     localeError: error29()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/km.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/km.js
 var error30 = () => {
   const Sizable = {
     string: { unit: "\u178F\u17BD\u17A2\u1780\u17D2\u179F\u179A", verb: "\u1782\u17BD\u179A\u1798\u17B6\u1793" },
@@ -10787,11 +10787,11 @@ function km_default() {
   };
 }
 
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/kh.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/kh.js
 function kh_default() {
   return km_default();
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/kn.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/kn.js
 var error31 = () => {
   const Sizable = {
     string: { unit: "\u0C85\u0C95\u0CCD\u0CB7\u0CB0\u0C97\u0CB3\u0CC1", verb: "\u0CB9\u0CCA\u0C82\u0CA6\u0CB2\u0CC1" },
@@ -10904,7 +10904,7 @@ function kn_default() {
     localeError: error31()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/ko.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/ko.js
 var error32 = () => {
   const Sizable = {
     string: { unit: "\uBB38\uC790", verb: "to have" },
@@ -11020,7 +11020,7 @@ function ko_default() {
     localeError: error32()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/lt.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/lt.js
 var capitalizeFirstCharacter = (text) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
@@ -11227,7 +11227,7 @@ function lt_default() {
     localeError: error33()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/mk.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/mk.js
 var error34 = () => {
   const Sizable = {
     string: { unit: "\u0437\u043D\u0430\u0446\u0438", verb: "\u0434\u0430 \u0438\u043C\u0430\u0430\u0442" },
@@ -11341,7 +11341,7 @@ function mk_default() {
     localeError: error34()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/ms.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/ms.js
 var error35 = () => {
   const Sizable = {
     string: { unit: "aksara", verb: "mempunyai" },
@@ -11453,7 +11453,7 @@ function ms_default() {
     localeError: error35()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/ne.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/ne.js
 var error36 = () => {
   const Sizable = {
     string: { unit: "\u0905\u0915\u094D\u0937\u0930", verb: "\u0939\u0941\u0928\u0941\u092A\u0930\u094D\u091B" },
@@ -11564,7 +11564,7 @@ function ne_default() {
     localeError: error36()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/nl.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/nl.js
 var error37 = () => {
   const Sizable = {
     string: { unit: "tekens", verb: "heeft" },
@@ -11679,7 +11679,7 @@ function nl_default() {
     localeError: error37()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/nn.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/nn.js
 var error38 = () => {
   const Sizable = {
     string: { unit: "teikn", verb: "\xE5 ha" },
@@ -11792,7 +11792,7 @@ function nn_default() {
     localeError: error38()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/no.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/no.js
 var error39 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "\xE5 ha" },
@@ -11905,7 +11905,7 @@ function no_default() {
     localeError: error39()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/ota.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/ota.js
 var error40 = () => {
   const Sizable = {
     string: { unit: "harf", verb: "olmal\u0131d\u0131r" },
@@ -12019,7 +12019,7 @@ function ota_default() {
     localeError: error40()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/ps.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/ps.js
 var error41 = () => {
   const Sizable = {
     string: { unit: "\u062A\u0648\u06A9\u064A", verb: "\u0648\u0644\u0631\u064A" },
@@ -12138,7 +12138,7 @@ function ps_default() {
     localeError: error41()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/pl.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/pl.js
 var error42 = () => {
   const Sizable = {
     string: { unit: "znak\xF3w", verb: "mie\u0107" },
@@ -12252,7 +12252,7 @@ function pl_default() {
     localeError: error42()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/pt.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/pt.js
 var error43 = () => {
   const Sizable = {
     string: { unit: "caracteres" },
@@ -12394,7 +12394,7 @@ function pt_default() {
     localeError: error43()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/pt-BR.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/pt-BR.js
 var error44 = () => {
   const Sizable = {
     string: { unit: "caracteres" },
@@ -12537,7 +12537,7 @@ function pt_BR_default() {
     localeError: error44()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/ro.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/ro.js
 var error45 = () => {
   const Sizable = {
     string: { unit: "caractere", verb: "s\u0103 aib\u0103" },
@@ -12659,7 +12659,7 @@ function ro_default() {
     localeError: error45()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/ru.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/ru.js
 function getRussianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -12827,7 +12827,7 @@ function ru_default() {
     localeError: error46()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/sk.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/sk.js
 var error47 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "ma\u0165" },
@@ -12943,7 +12943,7 @@ function sk_default() {
     localeError: error47()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/sl.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/sl.js
 var error48 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "imeti" },
@@ -13057,7 +13057,7 @@ function sl_default() {
     localeError: error48()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/sv.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/sv.js
 var error49 = () => {
   const Sizable = {
     string: { unit: "tecken", verb: "att ha" },
@@ -13172,7 +13172,7 @@ function sv_default() {
     localeError: error49()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/ta.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/ta.js
 var error50 = () => {
   const Sizable = {
     string: { unit: "\u0B8E\u0BB4\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1\u0B95\u0BCD\u0B95\u0BB3\u0BCD", verb: "\u0B95\u0BCA\u0BA3\u0BCD\u0B9F\u0BBF\u0BB0\u0BC1\u0B95\u0BCD\u0B95 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD" },
@@ -13287,7 +13287,7 @@ function ta_default() {
     localeError: error50()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/tg.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/tg.js
 var error51 = () => {
   const Sizable = {
     string: { unit: "\u0430\u043B\u043E\u043C\u0430\u0442", verb: "\u0434\u043E\u0448\u0442\u0430 \u0431\u043E\u0448\u0430\u0434" },
@@ -13403,7 +13403,7 @@ function tg_default() {
     localeError: error51()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/th.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/th.js
 var error52 = () => {
   const Sizable = {
     string: { unit: "\u0E15\u0E31\u0E27\u0E2D\u0E31\u0E01\u0E29\u0E23", verb: "\u0E04\u0E27\u0E23\u0E21\u0E35" },
@@ -13518,7 +13518,7 @@ function th_default() {
     localeError: error52()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/tk.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/tk.js
 var error53 = () => {
   const Sizable = {
     string: { unit: "simwol", verb: "bolmaly" },
@@ -13625,7 +13625,7 @@ function tk_default() {
     localeError: error53()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/tr.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/tr.js
 var error54 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "olmal\u0131" },
@@ -13735,7 +13735,7 @@ function tr_default() {
     localeError: error54()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/uk.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/uk.js
 var error55 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0456\u0432", verb: "\u043C\u0430\u0442\u0438\u043C\u0435" },
@@ -13849,11 +13849,11 @@ function uk_default() {
   };
 }
 
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/ua.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/ua.js
 function ua_default() {
   return uk_default();
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/ur.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/ur.js
 var error56 = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0648\u0641", verb: "\u06C1\u0648\u0646\u0627" },
@@ -13968,7 +13968,7 @@ function ur_default() {
     localeError: error56()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/uz.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/uz.js
 var error57 = () => {
   const Sizable = {
     string: { unit: "belgi", verb: "bo\u2018lishi kerak" },
@@ -14081,7 +14081,7 @@ function uz_default() {
     localeError: error57()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/vi.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/vi.js
 var error58 = () => {
   const Sizable = {
     string: { unit: "k\xFD t\u1EF1", verb: "c\xF3" },
@@ -14194,7 +14194,7 @@ function vi_default() {
     localeError: error58()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/zh-CN.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/zh-CN.js
 var error59 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u7B26", verb: "\u5305\u542B" },
@@ -14308,7 +14308,7 @@ function zh_CN_default() {
     localeError: error59()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/zh-TW.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/zh-TW.js
 var error60 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u5143", verb: "\u64C1\u6709" },
@@ -14420,7 +14420,7 @@ function zh_TW_default() {
     localeError: error60()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/locales/yo.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/yo.js
 var error61 = () => {
   const Sizable = {
     string: { unit: "\xE0mi", verb: "n\xED" },
@@ -14532,7 +14532,7 @@ function yo_default() {
     localeError: error61()
   };
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/registries.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/registries.js
 var _a2;
 var $output = /* @__PURE__ */ Symbol("ZodOutput");
 var $input = /* @__PURE__ */ Symbol("ZodInput");
@@ -14582,7 +14582,7 @@ function registry() {
 }
 (_a2 = globalThis).__zod_globalRegistry ?? (_a2.__zod_globalRegistry = registry());
 var globalRegistry = globalThis.__zod_globalRegistry;
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/compile.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/compile.js
 var INVALID = Symbol.for("zod.compile.invalid");
 var FALLBACK_FLAG = Symbol.for("zod.compile.fallback");
 
@@ -16180,7 +16180,7 @@ function generateTransformCheck(doc, ctx, schema, accessor) {
   }
   return accessor;
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/api.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/api.js
 function snapshotChecks(def) {
   if (def.checks)
     def.checks = [...def.checks];
@@ -17117,7 +17117,7 @@ function _stringFormat(Class2, format, fnOrRegex, _params = {}) {
   const inst = new Class2(def);
   return inst;
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/to-json-schema.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/to-json-schema.js
 function assignProps(target, ...sources) {
   for (const source of sources) {
     for (const key of Reflect.ownKeys(source)) {
@@ -17640,7 +17640,7 @@ var createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params) =
   extractDefs(ctx, schema);
   return finalize(ctx, schema);
 };
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/json-schema-processors.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/json-schema-processors.js
 var narrowMin = (agg, key, value) => {
   if (agg[key] === undefined || value > agg[key])
     agg[key] = value;
@@ -18383,7 +18383,7 @@ function toJSONSchema(input, params) {
   extractDefs(ctx, input);
   return finalize(ctx, input);
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/json-schema-generator.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/json-schema-generator.js
 class JSONSchemaGenerator {
   get metadataRegistry() {
     return this.ctx.metadataRegistry;
@@ -18444,9 +18444,9 @@ class JSONSchemaGenerator {
     return plainResult;
   }
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/json-schema.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/json-schema.js
 var exports_json_schema = {};
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/classic/schemas.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/schemas.js
 var exports_schemas2 = {};
 __export(exports_schemas2, {
   xor: () => xor,
@@ -18627,7 +18627,7 @@ __export(exports_schemas2, {
   ZodAny: () => ZodAny
 });
 
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/classic/checks.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/checks.js
 var exports_checks2 = {};
 __export(exports_checks2, {
   uppercase: () => _uppercase,
@@ -18662,7 +18662,7 @@ __export(exports_checks2, {
   endsWith: () => _endsWith
 });
 
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/classic/errors.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/errors.js
 var _installedErrorProtos = /* @__PURE__ */ new WeakSet([Object.prototype, Error.prototype]);
 function _lazyMethod(proto, key, make) {
   Object.defineProperty(proto, key, {
@@ -18708,7 +18708,7 @@ var ZodRealError = /* @__PURE__ */ $constructor("ZodError", initializer2, undefi
   Parent: Error
 });
 
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/classic/parse.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/parse.js
 var parse4 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse2 = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -18722,7 +18722,7 @@ var safeDecode2 = /* @__PURE__ */ _safeDecode(ZodRealError);
 var safeEncodeAsync2 = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 var safeDecodeAsync2 = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/classic/schemas.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/schemas.js
 function _ensureDefaultLocale() {
   if (!globalConfig.localeError)
     config(en_default());
@@ -20164,7 +20164,7 @@ function preprocess(fn, schema) {
     out: schema
   });
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/classic/compat.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/compat.js
 var ZodIssueCode = {
   invalid_type: "invalid_type",
   too_big: "too_big",
@@ -20188,7 +20188,7 @@ function getErrorMap() {
 }
 var ZodFirstPartyTypeKind;
 (function(ZodFirstPartyTypeKind2) {})(ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {}));
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/classic/iso.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/iso.js
 var exports_iso = {};
 __export(exports_iso, {
   time: () => time2,
@@ -20213,7 +20213,7 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/classic/from-json-schema.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/from-json-schema.js
 var z = {
   ...exports_schemas2,
   ...exports_checks2,
@@ -20933,7 +20933,7 @@ function fromJSONSchema(schema, params) {
   };
   return convertSchema(normalized, ctx);
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/core/visit.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/visit.js
 var RESOLVING = Symbol("z.visit/resolving");
 function visit(schema, fnOrHandlers) {
   const fn = typeof fnOrHandlers === "function" ? fnOrHandlers : (node2, rewritten) => {
@@ -21085,7 +21085,7 @@ function visit(schema, fnOrHandlers) {
   return run(schema);
 }
 
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/classic/deep-partial.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/deep-partial.js
 function deepPartial(schema) {
   return visit(schema, {
     object: (s) => s.partial(),
@@ -21095,7 +21095,7 @@ function deepPartial(schema) {
     }
   });
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/classic/in-out.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/in-out.js
 function withChecks(side, checks2) {
   if (!checks2?.length)
     return side;
@@ -21121,7 +21121,7 @@ function output(schema) {
     prefault: (s, rewritten) => rewritten ? s._zod.def.innerType : s
   });
 }
-// /zveltio-extension/.bun/zod@4.6.5/node_modules/zod/v4/classic/coerce.js
+// /zveltio-extension/node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/coerce.js
 var exports_coerce = {};
 __export(exports_coerce, {
   string: () => string3,
@@ -24527,7 +24527,7 @@ function parseParameter(param) {
   }
   return parseValueExpression(param);
 }
-// engine/routes.ts
+// ../zveltio-extensions/developer/validation/engine/routes.ts
 var RULE_TYPES = [
   "required",
   "minLength",
@@ -24636,7 +24636,8 @@ function validationRoutes(ctx) {
     evaluateTransitionRule,
     checkValidationExpression,
     requireInstanceAdmin,
-    writeValidationRule
+    writeValidationRule,
+    writeValidationRuleGroup
   } = ctx.internals;
   const evaluators = {
     expression: evaluateExpressionRule,
@@ -24711,26 +24712,24 @@ Description: ${description}`;
     return c.json({ groups: rows.rows });
   });
   app.post("/groups", zValidator("json", RuleGroupCreateSchema), async (c) => {
-    const user = c.get("user");
     if (!await instanceAdmin(c))
       return c.json(ADMIN_REQUIRED, 403);
-    const body = c.req.valid("json");
-    const row = await sql`
-      INSERT INTO zvd_validation_rule_groups
-        (name, collection, field_name, description, logic, rule_ids, is_active, created_by)
-      VALUES
-        (${body.name}, ${body.collection}, ${body.field_name},
-         ${body.description ?? null}, ${body.logic}, ${body.rule_ids},
-         ${body.is_active}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    return c.json({ group: row.rows[0] }, 201);
+    try {
+      const group = await writeValidationRuleGroup(c, { op: "create", group: c.req.valid("json") });
+      return c.json({ group }, 201);
+    } catch (err) {
+      if (err?.errno === "23505") {
+        return c.json({ error: "A group with this name already exists on this collection" }, 409);
+      }
+      throw err;
+    }
   });
   app.delete("/groups/:id", async (c) => {
     if (!await instanceAdmin(c))
       return c.json(ADMIN_REQUIRED, 403);
-    const id = c.req.param("id");
-    await sql`DELETE FROM zvd_validation_rule_groups WHERE id = ${id}`.execute(db);
+    const removed = await writeValidationRuleGroup(c, { op: "delete", id: c.req.param("id") });
+    if (!removed)
+      return c.json({ error: "Not found" }, 404);
     return c.json({ success: true });
   });
   const FlatRuleCreateSchema = RuleCreateSchema.extend({
@@ -24982,7 +24981,7 @@ Description: ${description}`;
   return app;
 }
 
-// engine/index.ts
+// ../zveltio-extensions/developer/validation/engine/index.ts
 var extension = {
   name: "developer/validation",
   category: "developer",
@@ -24991,7 +24990,8 @@ var extension = {
     return [
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
-      join(import.meta.dir, "migrations/003_test_case_previous_value.sql")
+      join(import.meta.dir, "migrations/003_test_case_previous_value.sql"),
+      join(import.meta.dir, "migrations/004_rule_groups_instance_wide.sql")
     ];
   },
   async register(app, ctx) {

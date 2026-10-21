@@ -207,6 +207,7 @@ export function validationRoutes(ctx: ExtensionContext): Hono {
     checkValidationExpression,
     requireInstanceAdmin,
     writeValidationRule,
+    writeValidationRuleGroup,
   } = ctx.internals;
   const evaluators: Evaluators = {
     expression: evaluateExpressionRule,
@@ -306,30 +307,29 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
   });
 
   // ── POST /groups ──────────────────────────────────────────────────────────
-  // A group changes how the instance's rules combine, so it is the instance's too.
+  // A group changes how the instance's rules combine, so it is the instance's
+  // too: `ctx.db` only reads the table, the engine writes it.
   app.post('/groups', zValidator('json', RuleGroupCreateSchema), async (c) => {
-    const user = c.get('user');
     if (!(await instanceAdmin(c))) return c.json(ADMIN_REQUIRED, 403);
 
-    const body = c.req.valid('json');
-    const row = await sql<any>`
-      INSERT INTO zvd_validation_rule_groups
-        (name, collection, field_name, description, logic, rule_ids, is_active, created_by)
-      VALUES
-        (${body.name}, ${body.collection}, ${body.field_name},
-         ${body.description ?? null}, ${body.logic}, ${body.rule_ids as any},
-         ${body.is_active}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    return c.json({ group: row.rows[0] }, 201);
+    try {
+      const group = await writeValidationRuleGroup(c, { op: 'create', group: c.req.valid('json') });
+      return c.json({ group }, 201);
+    } catch (err: any) {
+      // SQLSTATE is on errno: a name is unique per collection.
+      if (err?.errno === '23505') {
+        return c.json({ error: 'A group with this name already exists on this collection' }, 409);
+      }
+      throw err;
+    }
   });
 
   // ── DELETE /groups/:id ────────────────────────────────────────────────────
   app.delete('/groups/:id', async (c) => {
     if (!(await instanceAdmin(c))) return c.json(ADMIN_REQUIRED, 403);
 
-    const id = c.req.param('id');
-    await sql`DELETE FROM zvd_validation_rule_groups WHERE id = ${id}`.execute(db);
+    const removed = await writeValidationRuleGroup(c, { op: 'delete', id: c.req.param('id') });
+    if (!removed) return c.json({ error: 'Not found' }, 404);
     return c.json({ success: true });
   });
 
