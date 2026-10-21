@@ -35183,9 +35183,33 @@ class AIProviderManager {
       this._defaultName = name;
   }
 }
-var aiProviderManager = new AIProviderManager;
-async function initAIProviders(db) {
-  const rows = await db.selectFrom("zv_ai_providers").selectAll().where("is_active", "=", true).execute();
+var tenantProviders = new Map;
+async function currentTenant(db) {
+  const { rows } = await sql`
+    SELECT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                    '00000000-0000-0000-0000-000000000001'::uuid)::text AS t
+  `.execute(db);
+  return rows[0].t;
+}
+async function providersFor(db) {
+  const tenant = await currentTenant(db);
+  let loading = tenantProviders.get(tenant);
+  if (!loading) {
+    loading = loadProviders(db, tenant);
+    tenantProviders.set(tenant, loading);
+    loading.catch(() => {
+      if (tenantProviders.get(tenant) === loading)
+        tenantProviders.delete(tenant);
+    });
+  }
+  return loading;
+}
+async function forgetProviders(db) {
+  tenantProviders.delete(await currentTenant(db));
+}
+async function loadProviders(db, tenant) {
+  const manager = new AIProviderManager;
+  const rows = await db.selectFrom("zv_ai_providers").selectAll().where("is_active", "=", true).where("tenant_id", "=", tenant).execute();
   for (const row of rows) {
     let provider = null;
     let apiKey = row.api_key ?? null;
@@ -35228,9 +35252,10 @@ async function initAIProviders(db) {
       console.warn(`[ai] provider "${row.name}" is active in zv_ai_providers but was not loaded \u2014 ` + `either the name has no implementation (supported: openai, anthropic, ollama, ` + `or any OpenAI-compatible name with both api_key and base_url set), or its API key is missing.`);
     }
     if (provider) {
-      aiProviderManager.register(provider, row.is_default);
+      manager.register(provider, row.is_default);
     }
   }
+  return manager;
 }
 
 // engine/routes/ai.ts
@@ -35268,7 +35293,7 @@ function aiRoutes(ctx) {
       "is_active",
       eb("api_key", "is not", null).as("has_api_key")
     ]).orderBy("name", "asc").execute();
-    const loadedNames = new Set(aiProviderManager.list().map((p) => p.name));
+    const loadedNames = new Set((await providersFor(db)).list().map((p) => p.name));
     return c.json({
       providers: providers.map((p) => ({
         ...p,
@@ -35330,19 +35355,7 @@ function aiRoutes(ctx) {
         await trx.updateTable("zv_ai_providers").set({ is_default: false }).where("name", "!=", name).where("tenant_id", "=", OWN_TENANT).execute();
       }
     });
-    const updated = await db.selectFrom("zv_ai_providers").selectAll().where("name", "=", name).where("tenant_id", "=", OWN_TENANT).executeTakeFirst();
-    if (updated?.is_active && (updated.api_key || name === "ollama")) {
-      const decryptedKey = await decryptApiKey(updated.api_key ?? "");
-      let provider = null;
-      if (name === "openai")
-        provider = new OpenAIProvider(decryptedKey, updated.base_url, updated.default_model);
-      else if (name === "anthropic")
-        provider = new AnthropicProvider(decryptedKey, updated.default_model);
-      else if (name === "ollama")
-        provider = new OllamaProvider(updated.base_url, updated.default_model);
-      if (provider)
-        aiProviderManager.register(provider, updated.is_default);
-    }
+    await forgetProviders(db);
     return c.json({ success: true });
   });
   app.delete("/providers/:name", async (c) => {
@@ -35355,6 +35368,7 @@ function aiRoutes(ctx) {
     `.execute(db);
     if (result.rows.length === 0)
       return c.json({ error: "Provider not found" }, 404);
+    await forgetProviders(db);
     return c.json({ success: true });
   });
   app.post("/chat", zValidator("json", exports_external.object({
@@ -35371,7 +35385,8 @@ function aiRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const { messages, provider: providerName, ...opts } = c.req.valid("json");
-    const provider = providerName ? aiProviderManager.get(providerName) : aiProviderManager.getDefault();
+    const providers = await providersFor(db);
+    const provider = providerName ? providers.get(providerName) : providers.getDefault();
     if (!provider) {
       return c.json({
         error: "No AI provider configured. Add a provider in AI Settings."
@@ -35402,7 +35417,7 @@ function aiRoutes(ctx) {
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
     const body = c.req.valid("json");
-    const provider = aiProviderManager.getDefault();
+    const provider = (await providersFor(db)).getDefault();
     if (!provider)
       return c.json({ error: "No AI provider configured" }, 503);
     if (!provider.embed) {
@@ -35473,7 +35488,7 @@ function aiRoutes(ctx) {
       return c.json({ error: "Forbidden: no read permission on this collection" }, 403);
     }
     const tdb = db;
-    const provider = aiProviderManager.getDefault();
+    const provider = (await providersFor(db)).getDefault();
     if (provider?.embed) {
       try {
         const { embedding } = await provider.embed(query);
@@ -35679,7 +35694,8 @@ function aiChatsRoutes(ctx) {
     if (!chat)
       return c.json({ error: "Chat not found" }, 404);
     const providerName = chat.provider === "default" ? undefined : chat.provider;
-    const provider = providerName ? aiProviderManager.get(providerName) : aiProviderManager.getDefault();
+    const providers = await providersFor(db);
+    const provider = providerName ? providers.get(providerName) : providers.getDefault();
     if (!provider)
       return c.json({ error: "No AI provider configured" }, 503);
     const existingMessages = typeof chat.messages === "string" ? JSON.parse(chat.messages) : chat.messages;
@@ -35719,7 +35735,8 @@ function aiChatsRoutes(ctx) {
     const template = await db.selectFrom("zv_prompt_templates").selectAll().where("id", "=", c.req.param("id")).where("is_active", "=", true).executeTakeFirst();
     if (!template)
       return c.json({ error: "Template not found" }, 404);
-    const provider = providerName ? aiProviderManager.get(providerName) : template.provider ? aiProviderManager.get(template.provider) : aiProviderManager.getDefault();
+    const providers = await providersFor(db);
+    const provider = providerName ? providers.get(providerName) : template.provider ? providers.get(template.provider) : providers.getDefault();
     if (!provider)
       return c.json({ error: "No AI provider configured" }, 503);
     const messages = [{ role: "system", content: template.system_prompt }];
@@ -35865,7 +35882,7 @@ function aiSchemaGenRoutes(ctx) {
   router.use("/generate-schema/*", adminOnly);
   router.post("/preview-schema", zValidator("json", PreviewSchema), async (c) => {
     const { description } = c.req.valid("json");
-    const provider = aiProviderManager.getDefault();
+    const provider = (await providersFor(db)).getDefault();
     if (!provider)
       return c.json({ error: "No AI provider configured." }, 503);
     const availableTypes = fieldTypeRegistry.getAll().map((t) => t.type);
@@ -35902,7 +35919,7 @@ ${description}` }
   });
   router.post("/generate-schema", zValidator("json", GenerateSchema), async (c) => {
     const { description, seed, seed_count, confirm_token } = c.req.valid("json");
-    const provider = aiProviderManager.getDefault();
+    const provider = (await providersFor(db)).getDefault();
     let rawSchema;
     if (confirm_token) {
       cleanExpiredPreviews();
@@ -36037,10 +36054,10 @@ var INDEXABLE_MIMES = [
   "application/xml",
   "application/pdf"
 ];
-async function indexFileContent(db, fileId, content, providers = aiProviderManager) {
+async function indexFileContent(db, fileId, content, providers) {
   if (!content.trim())
     return;
-  const provider = providers.getDefault();
+  const provider = (providers ?? await providersFor(db)).getDefault();
   if (!provider?.embed)
     return;
   try {
@@ -36086,7 +36103,7 @@ async function extractTextFromFile(buffer, mimeType) {
   }
   return null;
 }
-async function scheduleFileIndexing(db, fileId, buffer, mimeType, providers = aiProviderManager) {
+async function scheduleFileIndexing(db, fileId, buffer, mimeType, providers) {
   if (!INDEXABLE_MIMES.some((m) => mimeType.startsWith(m.split("/")[0]) || mimeType === m))
     return;
   extractTextFromFile(buffer, mimeType).then(async (text) => {
@@ -36119,7 +36136,7 @@ function aiAlchemistRoutes(ctx) {
     if (!files || files.length === 0) {
       return c.json({ error: "No files provided" }, 400);
     }
-    const provider = aiProviderManager.getDefault();
+    const provider = (await providersFor(db)).getDefault();
     if (!provider?.chat) {
       return c.json({ error: "No AI provider configured" }, 503);
     }
@@ -36609,7 +36626,7 @@ function aiQueryRoutes(ctx) {
   app.post("/", zValidator("json", QuerySchema), async (c) => {
     const user = c.get("user");
     const { prompt, analyze, chart, limit } = c.req.valid("json");
-    const provider = aiProviderManager.getDefault();
+    const provider = (await providersFor(db)).getDefault();
     if (!provider?.chat) {
       return c.json({ error: "No AI provider configured" }, 503);
     }
@@ -37281,6 +37298,9 @@ class ZveltioAIEngine {
     const tenantId = request.context?.tenantId;
     return typeof tenantId === "string" && tenantId ? this.withTenantIsolation(tenantId, () => fn()) : fn();
   }
+  defaultProvider(request) {
+    return this.dbWork(request, async () => (await providersFor(this.db)).getDefault());
+  }
   async processRequest(request) {
     const startTime = Date.now();
     try {
@@ -37288,7 +37308,7 @@ class ZveltioAIEngine {
         await this.buildContext(request),
         request.conversationId ? await this.getConversationHistory(request.conversationId, request.userId) : []
       ]);
-      const provider = aiProviderManager.getDefault();
+      const provider = await this.defaultProvider(request);
       if (!provider) {
         return {
           response: `\u26A0\uFE0F No AI provider configured. Please configure one in **AI Settings**.
@@ -37965,7 +37985,7 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
     const { context_key, content, importance = 5 } = args;
     let embedding = null;
     try {
-      const provider = aiProviderManager.getDefault();
+      const provider = await this.defaultProvider(request);
       if (provider && "embed" in provider && typeof provider.embed === "function") {
         const result = await provider.embed(content, "text-embedding-3-small");
         embedding = Array.isArray(result?.embedding) ? result.embedding : null;
@@ -38001,7 +38021,7 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
     try {
       let rows = [];
       try {
-        const provider = aiProviderManager.getDefault();
+        const provider = await this.defaultProvider(request);
         if (provider && "embed" in provider && typeof provider.embed === "function") {
           const embedResult = await provider.embed(query, "text-embedding-3-small");
           const queryEmbedding = embedResult?.embedding;
@@ -38079,7 +38099,7 @@ The platform has ${context.collectionCount ?? "several"} collections (database t
     } catch (err) {
       console.warn("[zveltio-ai] text_to_sql schema lookup failed:", err.message);
     }
-    const provider = aiProviderManager.getDefault();
+    const provider = await this.defaultProvider(request);
     if (!provider)
       return { error: "No AI provider configured" };
     const sqlGenResponse = await provider.chat([
@@ -38291,7 +38311,7 @@ async function triggerEmbedding(ddl, db, collection, recordId, record2, tenantId
   const rawText = extractText(record2, textField, excludedFields);
   if (!rawText.trim())
     return;
-  const provider = aiProviderManager.getDefault();
+  const provider = (await providersFor(db)).getDefault();
   if (!provider?.embed) {
     throw new Error(`collection "${collection}" has ai_search_enabled, but no configured AI provider supports embeddings ` + `(use OpenAI or Ollama, or turn AI Search off for this collection)`);
   }
@@ -38353,22 +38373,30 @@ var extension = {
   },
   async register(app, ctx) {
     setInternals(ctx.internals);
-    await initAIProviders(ctx.db).catch((err) => {
-      console.warn("[ai extension] initAIProviders failed (non-fatal):", err.message);
+    const onDemand = (pick2) => {
+      const resolve = async () => {
+        const p = pick2(await providersFor(ctx.db));
+        if (!p)
+          throw new Error("No AI provider is configured.");
+        return p;
+      };
+      return {
+        chat: async (...a) => (await resolve()).chat(...a),
+        embed: async (text, model) => {
+          const p = await resolve();
+          if (!p.embed)
+            throw new Error("No AI provider with embedding capability is configured.");
+          return p.embed(text, model);
+        }
+      };
+    };
+    const defaultProvider = onDemand((m) => m.getDefault());
+    ctx.services.register("ai.providers", {
+      getDefault: () => defaultProvider,
+      get: (name) => onDemand((m) => m.get(name))
     });
-    ctx.services.register("ai.providers", aiProviderManager);
-    ctx.services.register("ai.embed", async (text, model) => {
-      const p = aiProviderManager.getDefault();
-      if (!p?.embed)
-        throw new Error("No AI provider with embedding capability is configured.");
-      return p.embed(text, model);
-    });
-    ctx.services.register("ai.chat", async (messages, opts) => {
-      const p = aiProviderManager.getDefault();
-      if (!p?.chat)
-        throw new Error("No AI provider is configured.");
-      return p.chat(messages, opts);
-    });
+    ctx.services.register("ai.embed", defaultProvider.embed);
+    ctx.services.register("ai.chat", defaultProvider.chat);
     ctx.services.register("ai.triggerEmbedding", async (collection, recordId, record2, tenantId = null) => triggerEmbedding(ctx.DDLManager, ctx.db, collection, recordId, record2, tenantId));
     ctx.services.register("ai.extractText", async (buffer, mimeType) => await extractTextFromFile(buffer, mimeType) ?? "");
     ctx.services.register("ai.indexFile", async (db, fileId, buffer, mimeType) => scheduleFileIndexing(db, fileId, buffer, mimeType));

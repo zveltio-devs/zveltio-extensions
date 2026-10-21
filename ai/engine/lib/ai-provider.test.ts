@@ -1,5 +1,5 @@
 /**
- * Regression tests for the boot path of the provider registry.
+ * Regression tests for loading a firm's providers (once the boot path).
  *
  * Written because `initAIProviders` read the encrypted `api_key` column without
  * decrypting it, so after any restart every provider carried
@@ -19,7 +19,7 @@ import {
   encryptWithKeyring,
 } from '../../../../zveltio/packages/engine/src/lib/security/keyring.js';
 import { encryptApiKey, setInternals } from './ai-crypto.js';
-import { AIProviderManager, aiProviderManager, initAIProviders } from './ai-provider.js';
+import { AIProviderManager, loadProviders } from './ai-provider.js';
 
 // The host holds the key now, so the test stands where the host stands: the real
 // keyring, not a re-implementation of the envelope. A hand-rolled fake here
@@ -33,16 +33,13 @@ setInternals({
     decryptWithKeyring(value, opts?.keyring ?? 'field'),
 });
 
-/** Minimal stand-in for the Kysely chain `initAIProviders` uses. */
+/** Minimal stand-in for the Kysely chain `loadProviders` uses. */
 function fakeDb(rows: Array<Record<string, unknown>>) {
-  return {
-    selectFrom: () => ({
-      selectAll: () => ({
-        where: () => ({ execute: async () => rows }),
-      }),
-    }),
-  };
+  const chain = { selectAll: () => chain, where: () => chain, execute: async () => rows };
+  return { selectFrom: () => chain };
 }
+
+const FIRM = '00000000-0000-0000-0000-000000000001';
 
 /** The key a provider will actually put on the wire. */
 function bearerOf(provider: unknown): string {
@@ -50,13 +47,13 @@ function bearerOf(provider: unknown): string {
   return (provider as { apiKey?: string }).apiKey ?? '';
 }
 
-describe('initAIProviders — stored keys', () => {
+describe('loadProviders — stored keys', () => {
   it('decrypts the api_key column instead of using the ciphertext as a bearer token', async () => {
     const plaintext = 'sk-test-not-a-real-key';
     const stored = await encryptApiKey(plaintext);
     expect(stored).toStartWith('aes256gcm-ai:');
 
-    await initAIProviders(
+    const mgr = await loadProviders(
       fakeDb([
         {
           name: 'openai',
@@ -68,9 +65,10 @@ describe('initAIProviders — stored keys', () => {
           is_active: true,
         },
       ]),
+      FIRM,
     );
 
-    const provider = aiProviderManager.get('openai');
+    const provider = mgr.get('openai');
     expect(provider).not.toBeNull();
     expect(bearerOf(provider)).toBe(plaintext);
     // The specific regression: never the stored form.
@@ -78,7 +76,7 @@ describe('initAIProviders — stored keys', () => {
   });
 
   it('leaves a legacy plaintext key untouched', async () => {
-    await initAIProviders(
+    const mgr = await loadProviders(
       fakeDb([
         {
           name: 'legacy-compat',
@@ -90,13 +88,14 @@ describe('initAIProviders — stored keys', () => {
           is_active: true,
         },
       ]),
+      FIRM,
     );
 
-    expect(bearerOf(aiProviderManager.get('legacy-compat'))).toBe('sk-plain-legacy');
+    expect(bearerOf(mgr.get('legacy-compat'))).toBe('sk-plain-legacy');
   });
 
   it('refuses a row whose key cannot be decrypted rather than registering a garbage token', async () => {
-    await initAIProviders(
+    const mgr = await loadProviders(
       fakeDb([
         {
           name: 'anthropic',
@@ -114,13 +113,14 @@ describe('initAIProviders — stored keys', () => {
           is_active: true,
         },
       ]),
+      FIRM,
     );
 
-    expect(aiProviderManager.get('anthropic')).toBeNull();
+    expect(mgr.get('anthropic')).toBeNull();
   });
 
   it('skips a provider whose base_url points at cloud metadata', async () => {
-    await initAIProviders(
+    const mgr = await loadProviders(
       fakeDb([
         {
           name: 'metadata-probe',
@@ -132,9 +132,10 @@ describe('initAIProviders — stored keys', () => {
           is_active: true,
         },
       ]),
+      FIRM,
     );
 
-    expect(aiProviderManager.get('metadata-probe')).toBeNull();
+    expect(mgr.get('metadata-probe')).toBeNull();
   });
 });
 

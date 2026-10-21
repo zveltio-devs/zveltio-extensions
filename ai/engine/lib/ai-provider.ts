@@ -5,6 +5,7 @@
  * Providers are configured in the DB table `zv_ai_providers`, and nowhere else.
  */
 
+import { sql } from 'kysely';
 import { assertNonMetadataUrl } from './endpoint-guard.js';
 import { decryptApiKey } from './ai-crypto.js';
 
@@ -341,23 +342,64 @@ export class AIProviderManager {
   }
 }
 
-export const aiProviderManager = new AIProviderManager();
+/**
+ * Each firm's providers, loaded on the firm's first AI call.
+ *
+ * This was ONE manager for the process, filled at boot from every firm's rows
+ * and keyed by provider name — but a name is unique per firm (migration 005), so
+ * two firms that both configured `openai` shared whichever key loaded last: one
+ * firm's prompts and data went to the other's account and onto its bill, the
+ * instance had one default for every firm, and a firm with no provider used
+ * someone else's. Now every caller asks for the firm its database handle runs
+ * as, and a firm with no provider of its own has none.
+ */
+export const tenantProviders = new Map<string, Promise<AIProviderManager>>();
+
+/** The firm `db` runs as — the `tenant_id` column default's expression. */
+async function currentTenant(db: any): Promise<string> {
+  const { rows } = await sql<{ t: string }>`
+    SELECT COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                    '00000000-0000-0000-0000-000000000001'::uuid)::text AS t
+  `.execute(db);
+  return rows[0].t;
+}
 
 /**
- * Initialize AI providers from DB config + env vars.
- * Called once on engine startup.
+ * The providers of the firm `db` runs as: the request's, a god's seated firm,
+ * a background job's. Never another firm's — the tenant comes from the same
+ * handle the rows are read through, so the two cannot disagree.
  */
-export async function initAIProviders(db: any): Promise<void> {
-  // Load from DB
+export async function providersFor(db: any): Promise<AIProviderManager> {
+  const tenant = await currentTenant(db);
+  let loading = tenantProviders.get(tenant);
+  if (!loading) {
+    loading = loadProviders(db, tenant);
+    tenantProviders.set(tenant, loading);
+    // A failed read is not "this firm has no provider" — try again next call.
+    loading.catch(() => {
+      if (tenantProviders.get(tenant) === loading) tenantProviders.delete(tenant);
+    });
+  }
+  return loading;
+}
+
+/** Drop the cached providers of the firm `db` runs as, after its config changed. */
+export async function forgetProviders(db: any): Promise<void> {
+  tenantProviders.delete(await currentTenant(db));
+}
+
+/** Build one firm's providers from its active `zv_ai_providers` rows. */
+export async function loadProviders(db: any, tenant: string): Promise<AIProviderManager> {
+  const manager = new AIProviderManager();
+  // `tenant_id` explicitly: a god's read reach is every firm.
   const rows = await db
     .selectFrom('zv_ai_providers' as any)
     .selectAll()
     .where('is_active' as any, '=', true)
+    .where('tenant_id' as any, '=', tenant)
     .execute();
     // No `.catch(() => [])`. An empty provider list means "AI is not configured",
-    // so a failed read turned every AI feature off and said nothing. `register()`
-    // already wraps this call and logs `initAIProviders failed (non-fatal)` — that
-    // handler was written for exactly this and the swallow made it unreachable.
+    // so a failed read turned every AI feature off and said nothing.
 
   for (const row of rows as any[]) {
     let provider: AIProvider | null = null;
@@ -437,7 +479,7 @@ export async function initAIProviders(db: any): Promise<void> {
     }
 
     if (provider) {
-      aiProviderManager.register(provider, row.is_default);
+      manager.register(provider, row.is_default);
     }
   }
 
@@ -459,6 +501,7 @@ export async function initAIProviders(db: any): Promise<void> {
   //
   // Configure providers at `PUT /api/ext/ai/providers/:name`, which is what the
   // admin UI drives.
+  return manager;
 }
 
 /** Matches {{variableName}} placeholders in template strings. */

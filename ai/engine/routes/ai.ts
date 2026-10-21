@@ -3,13 +3,8 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import { toJsonb, type ExtensionContext } from '@zveltio/sdk/extension';
-import {
-  aiProviderManager,
-  OpenAIProvider,
-  AnthropicProvider,
-  OllamaProvider,
-} from '../lib/ai-provider.js';
-import { encryptApiKey, decryptApiKey } from '../lib/ai-crypto.js';
+import { forgetProviders, providersFor } from '../lib/ai-provider.js';
+import { encryptApiKey } from '../lib/ai-crypto.js';
 import { assertNonMetadataUrl } from '../lib/endpoint-guard.js';
 
 // The OWN tenant (the `tenant_id` column default's expression). Provider names
@@ -124,7 +119,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
     // `list()` returns objects, not names: `includes(p.name)` on it was always
     // false, so every provider reported `loaded: false` even while serving
     // requests.
-    const loadedNames = new Set(aiProviderManager.list().map((p) => p.name));
+    const loadedNames = new Set((await providersFor(db)).list().map((p) => p.name));
 
     return c.json({
       providers: providers.map((p: any) => ({
@@ -231,32 +226,11 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
         }
       });
 
-      // Hot-reload provider in memory
-      const updated = await db
-        .selectFrom('zv_ai_providers')
-        .selectAll()
-        .where('name', '=', name)
-        .where('tenant_id', '=', OWN_TENANT)
-        .executeTakeFirst();
-
-      if (updated?.is_active && (updated.api_key || name === 'ollama')) {
-        const decryptedKey = await decryptApiKey(updated.api_key ?? '');
-        let provider = null;
-        if (name === 'openai')
-          provider = new OpenAIProvider(
-            decryptedKey,
-            updated.base_url,
-            updated.default_model,
-          );
-        else if (name === 'anthropic')
-          provider = new AnthropicProvider(decryptedKey, updated.default_model);
-        else if (name === 'ollama')
-          provider = new OllamaProvider(
-            updated.base_url,
-            updated.default_model,
-          );
-        if (provider) aiProviderManager.register(provider, updated.is_default);
-      }
+      // The next call of THIS firm reads its rows again; no other firm's cache
+      // is touched. This rebuilt the provider by hand instead, and only for
+      // openai/anthropic/ollama: a deactivated provider stayed loaded, as did a
+      // deleted one, until the next restart.
+      await forgetProviders(db);
 
       return c.json({ success: true });
     },
@@ -274,6 +248,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
 
     if (result.rows.length === 0)
       return c.json({ error: 'Provider not found' }, 404);
+    await forgetProviders(db);
     return c.json({ success: true });
   });
 
@@ -302,9 +277,8 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
 
       const { messages, provider: providerName, ...opts } = c.req.valid('json');
 
-      const provider = providerName
-        ? aiProviderManager.get(providerName)
-        : aiProviderManager.getDefault();
+      const providers = await providersFor(db);
+      const provider = providerName ? providers.get(providerName) : providers.getDefault();
 
       if (!provider) {
         return c.json(
@@ -359,7 +333,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
       if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
       const body = c.req.valid('json');
-      const provider = aiProviderManager.getDefault();
+      const provider = (await providersFor(db)).getDefault();
 
       if (!provider) return c.json({ error: 'No AI provider configured' }, 503);
       if (!provider.embed) {
@@ -491,7 +465,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
       // in tenant A could pull semantic-search hits — including the
       // raw `text_content` column — from tenant B's records.
       const tdb = db;
-      const provider = aiProviderManager.getDefault();
+      const provider = (await providersFor(db)).getDefault();
       if (provider?.embed) {
         try {
           const { embedding } = await provider.embed(query);

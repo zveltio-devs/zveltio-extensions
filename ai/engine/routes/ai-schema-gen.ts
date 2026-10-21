@@ -10,7 +10,7 @@ import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { createHash } from 'node:crypto';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { aiProviderManager } from '../lib/ai-provider.js';
+import { providersFor } from '../lib/ai-provider.js';
 
 // In-memory preview cache: token → { schema, expiresAt }
 const previewCache = new Map<string, { schema: any; expiresAt: number }>();
@@ -145,7 +145,7 @@ export function aiSchemaGenRoutes(ctx: ExtensionContext): Hono {
   router.post('/preview-schema', zValidator('json', PreviewSchema), async (c) => {
     const { description } = c.req.valid('json');
 
-    const provider = aiProviderManager.getDefault();
+    const provider = (await providersFor(db)).getDefault();
     if (!provider) return c.json({ error: 'No AI provider configured.' }, 503);
 
     const availableTypes = fieldTypeRegistry.getAll().map((t) => t.type);
@@ -188,7 +188,7 @@ export function aiSchemaGenRoutes(ctx: ExtensionContext): Hono {
     const { description, seed, seed_count, confirm_token } = c.req.valid('json');
 
     // If confirm_token provided, use cached preview schema (skip LLM)
-    const provider = aiProviderManager.getDefault();
+    const provider = (await providersFor(db)).getDefault();
     let rawSchema: any;
     if (confirm_token) {
       cleanExpiredPreviews();

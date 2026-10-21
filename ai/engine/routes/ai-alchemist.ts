@@ -6,7 +6,7 @@ import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 
 import { generateId } from '../lib/utils.js';
-import { aiProviderManager } from '../lib/ai-provider.js';
+import { providersFor } from '../lib/ai-provider.js';
 import { extractTextFromFile } from '../lib/document-indexer.js';
 
 /**
@@ -42,7 +42,7 @@ export function aiAlchemistRoutes(ctx: ExtensionContext): Hono {
       return c.json({ error: 'No files provided' }, 400);
     }
 
-    const provider = aiProviderManager.getDefault();
+    const provider = (await providersFor(db)).getDefault();
     if (!provider?.chat) {
       return c.json({ error: 'No AI provider configured' }, 503);
     }

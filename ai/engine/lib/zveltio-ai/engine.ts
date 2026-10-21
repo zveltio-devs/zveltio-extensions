@@ -3,7 +3,7 @@
  *
  * Adapted for new monorepo architecture:
  * - `db` injected via constructor (no module-level singleton)
- * - Uses extension-local aiProviderManager from ../ai-provider.js
+ * - Uses the request firm's providers from ../ai-provider.js
  * - collection metadata read through the host's DDLManager (`this.ddl`)
  * - DDL mutations go through zv_ddl_jobs queue table
  * - Admin check via casbin_rule table
@@ -11,7 +11,7 @@
 
 import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { aiProviderManager } from '../ai-provider.js';
+import { providersFor } from '../ai-provider.js';
 import { runReadOnly, validateGeneratedSQL } from '../sql-guard.js';
 import { zveltioAITools } from './tools.js';
 import type {
@@ -99,6 +99,11 @@ export class ZveltioAIEngine {
       : fn();
   }
 
+  /** The default provider of the request's firm — a background task's included. */
+  private defaultProvider(request: Pick<ZveltioAIRequest, 'context'>) {
+    return this.dbWork(request, async () => (await providersFor(this.db)).getDefault());
+  }
+
   // ── Public API ─────────────────────────────────────────────────
 
   async processRequest(request: ZveltioAIRequest): Promise<ZveltioAIResponse> {
@@ -112,7 +117,7 @@ export class ZveltioAIEngine {
           : [],
       ] as const);
 
-      const provider = aiProviderManager.getDefault();
+      const provider = await this.defaultProvider(request);
 
       if (!provider) {
         return {
@@ -1212,7 +1217,7 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
     // taking `saveConversation` down with it.
     let embedding: number[] | null = null;
     try {
-      const provider = aiProviderManager.getDefault();
+      const provider = await this.defaultProvider(request);
       if (
         provider &&
         'embed' in provider &&
@@ -1278,7 +1283,7 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
 
       // Try vector search if embeddings are available
       try {
-        const provider = aiProviderManager.getDefault();
+        const provider = await this.defaultProvider(request);
         if (
           provider &&
           'embed' in provider &&
@@ -1467,7 +1472,7 @@ The platform has ${context.collectionCount ?? 'several'} collections (database t
     }
 
     // Step 2: Generate SQL via AI
-    const provider = aiProviderManager.getDefault();
+    const provider = await this.defaultProvider(request);
     if (!provider) return { error: 'No AI provider configured' };
 
     const sqlGenResponse = await provider.chat(

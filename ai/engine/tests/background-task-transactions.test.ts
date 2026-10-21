@@ -15,16 +15,14 @@
 
 import { afterEach, describe, expect, it } from 'bun:test';
 import type { AIProvider, ChatResult } from '../lib/ai-provider.js';
-import { aiProviderManager } from '../lib/ai-provider.js';
+import { AIProviderManager, tenantProviders } from '../lib/ai-provider.js';
 import { ZveltioAIEngine } from '../lib/zveltio-ai/engine.js';
 import { CannedDb } from './fixtures/canned-db.js';
 
 const FIRM = '11111111-1111-1111-1111-111111111111';
 
 afterEach(() => {
-  (aiProviderManager as unknown as { providers: Map<string, AIProvider> }).providers.delete(
-    'fake-bg',
-  );
+  tenantProviders.delete(FIRM);
 });
 
 describe('ai: background task transactions', () => {
@@ -35,6 +33,8 @@ describe('ai: background task transactions', () => {
     const db = new CannedDb();
     db.when(/./, (q) => {
       events.push(`${open ? 'trx' : 'NO TRX'} db ${q.sql.slice(0, 30)}`);
+      // Which firm the provider is picked for: the transaction's.
+      if (/current_setting\('zveltio\.current_tenant'/.test(q.sql)) return open ? [{ t: open }] : [];
       return /from "zvd_collections"/.test(q.sql) ? [{ name: 'orders', fields: [] }] : [];
     });
 
@@ -68,7 +68,10 @@ describe('ai: background task transactions', () => {
         } as ChatResult;
       },
     };
-    aiProviderManager.register(provider, true);
+    // Only FIRM has a provider: picking it proves the task looked in its own firm.
+    const firmProviders = new AIProviderManager();
+    firmProviders.register(provider, true);
+    tenantProviders.set(FIRM, Promise.resolve(firmProviders));
 
     const ctx = {
       db: db.kysely,
