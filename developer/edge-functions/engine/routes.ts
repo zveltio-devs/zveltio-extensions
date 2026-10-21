@@ -420,7 +420,7 @@ export function edgeFunctionsRoutes(ctx: ExtensionContext): Hono {
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export async function mountEdgeFunctions(ctx: ExtensionContext): Promise<void> {
-  const { db, auth } = ctx;
+  const { db, auth, checkPermission } = ctx;
   const runFunction = ctx.internals.runEdgeFunction as unknown as RunEdgeFunction;
 
   // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
@@ -485,10 +485,15 @@ export async function mountEdgeFunctions(ctx: ExtensionContext): Promise<void> {
         typeof live.env_vars === 'string' ? JSON.parse(live.env_vars) : (live.env_vars ?? {});
       const livePublic = liveEnv.ZVELTIO_PUBLIC === 'true';
 
-      // N5: require auth for non-public functions
-      if (!livePublic && auth) {
-        const session = await auth.api.getSession({ headers: c.req.raw.headers });
+      // A non-public function needs a signed-in caller holding `execute` on
+      // `$edge`, as the engine's own `/api/fn/:name` does. Signing in used to be
+      // enough, and with no `auth` on the context the check was skipped.
+      if (!livePublic) {
+        const session = auth ? await auth.api.getSession({ headers: c.req.raw.headers }) : null;
         if (!session?.user) return c.json({ error: 'Unauthorized' }, 401);
+        if (!(await checkPermission(session.user.id, '$edge', 'execute'))) {
+          return c.json({ error: 'Forbidden: execute on $edge required' }, 403);
+        }
       }
 
       // An EdgeRequest, not `c.req.raw`. A `Request` JSON-stringifies to `{}`,

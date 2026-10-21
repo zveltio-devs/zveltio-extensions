@@ -24524,6 +24524,8 @@ function parseParameter(param) {
   }
   return parseValueExpression(param);
 }
+// /zveltio-extension/packages/sdk/src/extension/action-refusal.ts
+var ACTION_REFUSAL = Symbol.for("zveltio.extension.action-refusal");
 // /zveltio-extension/packages/sdk/src/extension/jsonb.ts
 function toJsonb(value) {
   return sql`${JSON.stringify(value ?? null)}::text::jsonb`;
@@ -24726,7 +24728,7 @@ function edgeFunctionsRoutes(ctx) {
   return app;
 }
 async function mountEdgeFunctions(ctx) {
-  const { db, auth } = ctx;
+  const { db, auth, checkPermission } = ctx;
   const runFunction = ctx.internals.runEdgeFunction;
   let fns;
   try {
@@ -24744,10 +24746,13 @@ async function mountEdgeFunctions(ctx) {
         return c.json({ error: "Function not found" }, 404);
       const liveEnv = typeof live.env_vars === "string" ? JSON.parse(live.env_vars) : live.env_vars ?? {};
       const livePublic = liveEnv.ZVELTIO_PUBLIC === "true";
-      if (!livePublic && auth) {
-        const session = await auth.api.getSession({ headers: c.req.raw.headers });
+      if (!livePublic) {
+        const session = auth ? await auth.api.getSession({ headers: c.req.raw.headers }) : null;
         if (!session?.user)
           return c.json({ error: "Unauthorized" }, 401);
+        if (!await checkPermission(session.user.id, "$edge", "execute")) {
+          return c.json({ error: "Forbidden: execute on $edge required" }, 403);
+        }
       }
       const headersObj = {};
       c.req.raw.headers.forEach((v, k) => {

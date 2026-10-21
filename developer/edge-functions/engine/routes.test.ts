@@ -78,7 +78,10 @@ function stubDb(inserted: Record<string, unknown>[], code: string) {
 
 type PublicRoute = { method: string; path: string; handler: (c: any) => Promise<Response> };
 
-async function invoke(code: string) {
+async function invoke(
+  code: string,
+  checkPermission: (...a: unknown[]) => Promise<boolean> = async () => true,
+) {
   const calls: unknown[][] = [];
   const mounts: PublicRoute[] = [];
   const inserted: Record<string, unknown>[] = [];
@@ -86,7 +89,7 @@ async function invoke(code: string) {
   const ctx: any = {
     db: stubDb(inserted, code),
     auth: { api: { getSession: async () => ({ user: { id: 'u1' } }) } },
-    checkPermission: async () => true,
+    checkPermission,
     // Real internals, with one member wrapped only to RECORD the call. The
     // wrapper forwards to the real implementation, so the shapes asserted below
     // are the shapes the engine actually accepts and returns.
@@ -191,5 +194,22 @@ describe('a custom root path — what reaches the runner', () => {
     expect(request.headers.cookie).toBeUndefined();
     expect(call[4]).toEqual(['api.allowed.test']);
     expect(inserted.at(-1)?.status).toBe(201);
+  }, 20_000);
+});
+
+describe('a custom root path — who may call a private function', () => {
+  it('refuses a signed-in caller without execute on $edge, before running anything', async () => {
+    const asked: unknown[][] = [];
+    const { mounts, calls } = await invoke(HANDLER, async (...a) => {
+      asked.push(a);
+      return a[1] !== '$edge';
+    });
+    const app = new Hono();
+    app.post('/probe', mounts[0]!.handler);
+    const before = calls.length;
+    const res = await app.request('/probe', { method: 'POST', body: '{}' });
+    expect(res.status).toBe(403);
+    expect(asked).toContainEqual(['u1', '$edge', 'execute']);
+    expect(calls.length).toBe(before);
   }, 20_000);
 });
