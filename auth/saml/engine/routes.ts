@@ -50,7 +50,20 @@ async function getSamlConfig(
   // engine system table and `ctx.db` refuses it, so every read here threw.
   let row: { config: any } | undefined;
   try {
-    row = await db.selectFrom('zvd_saml_config').select('config').executeTakeFirst();
+    // The OWN tenant's row. The row policy admits the caller's READ REACH —
+    // every firm for a god, the descendants for a `subtree` member — so without
+    // this filter a god in firm A read, and logged in against, another firm's
+    // identity provider. The column default's expression: the row a save writes.
+    row = await db
+      .selectFrom('zvd_saml_config')
+      .select('config')
+      .where(
+        'tenant_id',
+        '=',
+        sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                     '00000000-0000-0000-0000-000000000001'::uuid)`,
+      )
+      .executeTakeFirst();
   } catch (err) {
     // Do not answer "not configured" for a failure that is not that.
     //

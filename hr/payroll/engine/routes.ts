@@ -158,9 +158,19 @@ async function loadRates(dbh: any): Promise<typeof RO_RATES> {
   // created, so the defaults ARE the configuration. That is 42P01 and nothing
   // else. Anything else means the rates are unknown, and payroll must not be
   // computed on a guess.
+  //
+  // And the OWN firm's row, not "a" row. The row policy admits the caller's READ
+  // REACH — every firm for a god, the descendants for a `subtree` member — so the
+  // old `LIMIT 1` returned whichever firm's rates the plan met first, and
+  // payroll was computed at another firm's percentages. Filtered on the column
+  // default's expression, so it reads exactly the row `PUT /rates` writes.
   let rows: any[];
   try {
-    const result = await sql`SELECT * FROM zvd_payroll_rates LIMIT 1`.execute(dbh);
+    const result = await sql`
+      SELECT * FROM zvd_payroll_rates
+       WHERE tenant_id = COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                  '00000000-0000-0000-0000-000000000001'::uuid)
+    `.execute(dbh);
     rows = result.rows as any[];
   } catch (err) {
     const code = (err as { errno?: string; code?: string }).errno ??

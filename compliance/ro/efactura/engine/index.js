@@ -24846,6 +24846,8 @@ function permissionGate(ctx, resource, opts = {}) {
     await next();
   };
 }
+// /zveltio-extension/packages/sdk/src/extension/action-refusal.ts
+var ACTION_REFUSAL = Symbol.for("zveltio.extension.action-refusal");
 // /zveltio-extension/packages/sdk/src/extension/jsonb.ts
 function toJsonb(value) {
   return sql`${JSON.stringify(value ?? null)}::text::jsonb`;
@@ -24955,6 +24957,14 @@ async function mayConfigure(ctx, user) {
     return true;
   return ctx.internals.isTenantAdmin(user.id).catch(() => false);
 }
+async function ownSettings(dbh) {
+  const row = await sql`
+    SELECT * FROM zv_efactura_settings
+     WHERE tenant_id = COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                '00000000-0000-0000-0000-000000000001'::uuid)
+  `.execute(dbh);
+  return row.rows[0];
+}
 function efacturaRoutes(ctx) {
   const { db, auth } = ctx;
   const app = new Hono2;
@@ -25012,8 +25022,7 @@ function efacturaRoutes(ctx) {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const row = await sql`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
-    const r = row.rows[0];
+    const r = await ownSettings(db);
     return c.json({
       data: {
         environment: r?.environment ?? "test",
@@ -25051,8 +25060,7 @@ function efacturaRoutes(ctx) {
     if (needsEncryption && !enc) {
       return c.json({ error: "FIELD_ENCRYPTION_KEY is not configured, so credentials cannot be stored safely." }, 400);
     }
-    const existing = await sql`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
-    const prev = existing.rows[0];
+    const prev = await ownSettings(db);
     const secret = d.client_secret ? await enc(d.client_secret) : prev?.client_secret ?? null;
     const certPw = d.cert_password ? await enc(d.cert_password) : prev?.cert_password ?? null;
     const row = prev ? await sql`
@@ -25077,8 +25085,7 @@ function efacturaRoutes(ctx) {
   const anafApi = (env) => `https://api.anaf.ro/${env === "prod" ? "prod" : "test"}/FCTEL/rest`;
   const ANAF_PUBLIC = "https://webservicesp.anaf.ro/prod/FCTEL/rest";
   async function anafAuth() {
-    const row = await sql`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
-    const cfg = row.rows[0];
+    const cfg = await ownSettings(db);
     if (!cfg?.access_token)
       return { error: "Not connected to ANAF. Sign in on the ANAF connection screen first." };
     const dec = ctx.internals?.decryptSecret;
@@ -25094,8 +25101,7 @@ function efacturaRoutes(ctx) {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const row = await sql`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
-    const cfg = row.rows[0];
+    const cfg = await ownSettings(db);
     if (!cfg?.client_id) {
       return c.json({ error: "Set the ANAF client_id first, on the ANAF connection screen." }, 400);
     }
@@ -25117,8 +25123,7 @@ function efacturaRoutes(ctx) {
     if (!await mayConfigure(ctx, user))
       return c.json({ error: "Not allowed" }, 403);
     const d = c.req.valid("json");
-    const row = await sql`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
-    const cfg = row.rows[0];
+    const cfg = await ownSettings(db);
     const dec = ctx.internals?.decryptSecret;
     const enc = ctx.internals?.encryptSecret;
     if (!cfg?.client_id || !cfg?.client_secret || !dec || !enc) {
@@ -25168,8 +25173,7 @@ function efacturaRoutes(ctx) {
       return c.json({ error: "Unauthorized" }, 401);
     if (!await mayConfigure(ctx, user))
       return c.json({ error: "Not allowed" }, 403);
-    const row = await sql`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
-    const cfg = row.rows[0];
+    const cfg = await ownSettings(db);
     const dec = ctx.internals?.decryptSecret;
     const enc = ctx.internals?.encryptSecret;
     if (!cfg?.refresh_token || !dec || !enc)
@@ -25209,8 +25213,7 @@ function efacturaRoutes(ctx) {
     const user = await getUser(c, auth);
     if (!user)
       return c.json({ error: "Unauthorized" }, 401);
-    const row = await sql`SELECT * FROM zv_efactura_settings LIMIT 1`.execute(db);
-    const cfg = row.rows[0];
+    const cfg = await ownSettings(db);
     const dec = ctx.internals?.decryptSecret;
     if (!cfg?.access_token || !dec)
       return c.json({ error: "Not connected to ANAF yet." }, 400);

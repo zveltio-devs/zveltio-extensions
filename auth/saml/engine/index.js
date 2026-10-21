@@ -257,7 +257,7 @@ var require_common = __commonJS((exports, module) => {
       createDebug.namespaces = namespaces;
       createDebug.names = [];
       createDebug.skips = [];
-      const split = (typeof namespaces === "string" ? namespaces : "").trim().replace(" ", ",").split(",").filter(Boolean);
+      const split = (typeof namespaces === "string" ? namespaces : "").trim().replace(/\s+/g, ",").split(",").filter(Boolean);
       for (const ns of split) {
         if (ns[0] === "-") {
           createDebug.skips.push(ns.slice(1));
@@ -467,7 +467,7 @@ var require_browser = __commonJS((exports, module) => {
   function load() {
     let r;
     try {
-      r = exports.storage.getItem("debug");
+      r = exports.storage.getItem("debug") || exports.storage.getItem("DEBUG");
     } catch (error62) {}
     if (!r && typeof process !== "undefined" && "env" in process) {
       r = process.env.DEBUG;
@@ -804,6 +804,32 @@ var require_types = __commonJS((exports) => {
     }
   }
   exports.SamlStatusError = SamlStatusError;
+});
+
+// /zveltio-extension/node_modules/xml-crypto/lib/types.js
+var require_types2 = __commonJS((exports) => {
+  Object.defineProperty(exports, "__esModule", { value: true });
+  exports.createOptionalCallbackFunction = createOptionalCallbackFunction;
+  function isErrorFirstCallback(possibleCallback) {
+    return typeof possibleCallback === "function";
+  }
+  function createOptionalCallbackFunction(syncVersion) {
+    return (...args) => {
+      const possibleCallback = args[args.length - 1];
+      if (isErrorFirstCallback(possibleCallback)) {
+        let result;
+        try {
+          result = syncVersion(...args.slice(0, -1));
+        } catch (err) {
+          possibleCallback(err instanceof Error ? err : new Error("Unknown error"));
+          return;
+        }
+        possibleCallback(null, result);
+      } else {
+        return syncVersion(...args);
+      }
+    };
+  }
 });
 
 // /zveltio-extension/node_modules/xml-crypto/node_modules/xpath/xpath.js
@@ -4575,19 +4601,26 @@ var require_utils = __commonJS((exports) => {
   exports.findChilds = findChilds;
   exports.encodeSpecialCharactersInAttribute = encodeSpecialCharactersInAttribute;
   exports.encodeSpecialCharactersInText = encodeSpecialCharactersInText;
+  exports.renderProcessingInstruction = renderProcessingInstruction;
+  exports.isCanonicalDocumentChild = isCanonicalDocumentChild;
+  exports.hasDocumentLevelProcessingInstruction = hasDocumentLevelProcessingInstruction;
   exports.normalizePem = normalizePem;
   exports.pemCertificates = pemCertificates;
   exports.pemToDer = pemToDer;
   exports.bareCertificate = bareCertificate;
   exports.toPem = toPem;
+  exports.findAncestorXmlAttributes = findAncestorXmlAttributes;
   exports.findAncestorNsForElement = findAncestorNsForElement;
   exports.findAncestorNs = findAncestorNs;
   exports.isPrefixInScope = isPrefixInScope;
+  exports.insideProcess = insideProcess;
+  exports.warnOutsideProcess = warnOutsideProcess;
   exports.validateDigestValue = validateDigestValue;
   exports.isDescendantOf = isDescendantOf;
   var crypto_1 = __require("crypto");
   var xpath = require_xpath();
   var isDomNode = require_dist();
+  var util_1 = __require("util");
   function isArrayHasLength(array2) {
     return Array.isArray(array2) && array2.length > 0;
   }
@@ -4643,6 +4676,21 @@ var require_utils = __commonJS((exports) => {
     return text.replace(/([&<>\r])/g, function(str, item) {
       return xml_special_to_encoded_text[item];
     });
+  }
+  function renderProcessingInstruction(node2) {
+    const data = node2.data ? ` ${node2.data}` : "";
+    return `<?${node2.target}${data}?>`;
+  }
+  function isCanonicalDocumentChild(node2) {
+    return isDomNode.isElementNode(node2) || isDomNode.isProcessingInstructionNode(node2) && node2.target.toLowerCase() !== "xml";
+  }
+  function hasDocumentLevelProcessingInstruction(doc2) {
+    for (let child = doc2.firstChild;child != null; child = child.nextSibling) {
+      if (isDomNode.isProcessingInstructionNode(child) && child.target.toLowerCase() !== "xml") {
+        return true;
+      }
+    }
+    return false;
   }
   var LABEL_CHAR = "[\\x21-\\x2C\\x2E-\\x7E]";
   var LABEL = `${LABEL_CHAR}(?:[-\\x20]?${LABEL_CHAR}){0,47}`;
@@ -4726,13 +4774,30 @@ var require_utils = __commonJS((exports) => {
 `)}
 `;
   }
-  function formatPemMessage(label, data) {
-    if (label === "CERTIFICATE") {
-      assertX509Certificate(data);
-    }
+  function writePemMessage(label, data) {
     return `-----BEGIN ${label}-----
 ${normalizePem(canonicalBase64(data))}-----END ${label}-----
 `;
+  }
+  var PRIVATE_KEY_LABELS = ["PRIVATE KEY", "RSA PRIVATE KEY"];
+  function assertPrivateKey(label, data) {
+    try {
+      (0, crypto_1.createPrivateKey)(writePemMessage(label, data));
+    } catch {
+      throw new Error("Invalid PEM format.");
+    }
+  }
+  function assertEncapsulatedData(label, data) {
+    if (label === "CERTIFICATE") {
+      assertX509Certificate(data);
+    }
+    if (PRIVATE_KEY_LABELS.includes(label)) {
+      assertPrivateKey(label, data);
+    }
+  }
+  function formatPemMessage(label, data) {
+    assertEncapsulatedData(label, data);
+    return writePemMessage(label, data);
   }
   function pemCertificates(pem) {
     const text = normalizePemInput(pem);
@@ -4754,9 +4819,7 @@ ${normalizePem(canonicalBase64(data))}-----END ${label}-----
       throw new Error("Invalid PEM format.");
     }
     const [{ label, data }] = messages;
-    if (label === "CERTIFICATE") {
-      assertX509Certificate(data);
-    }
+    assertEncapsulatedData(label, data);
     return Buffer.from(data, "base64");
   }
   function pemText(value) {
@@ -4796,6 +4859,20 @@ ${normalizePem(canonicalBase64(data))}-----END ${label}-----
     }
     throw new Error("Invalid PEM format.");
   }
+  function findAncestorXmlAttributes(node2) {
+    const attributes = new Map;
+    let ancestor = node2.parentNode;
+    while (isDomNode.isElementNode(ancestor)) {
+      for (let i = 0;i < ancestor.attributes.length; i++) {
+        const attr = ancestor.attributes[i];
+        if (attr.namespaceURI === "http://www.w3.org/XML/1998/namespace" && !attributes.has(attr.localName)) {
+          attributes.set(attr.localName, attr.value);
+        }
+      }
+      ancestor = ancestor.parentNode;
+    }
+    return Array.from(attributes, ([localName, value]) => ({ localName, value }));
+  }
   function collectAncestorNamespaces(node2, nsArray = []) {
     if (!isDomNode.isElementNode(node2.parentNode)) {
       return nsArray;
@@ -4807,7 +4884,7 @@ ${normalizePem(canonicalBase64(data))}-----END ${label}-----
     if (parent.attributes && parent.attributes.length > 0) {
       for (let i = 0;i < parent.attributes.length; i++) {
         const attr = parent.attributes[i];
-        if (attr && attr.nodeName && attr.nodeName.search(/^xmlns:?/) !== -1) {
+        if (attr && (attr.nodeName === "xmlns" || attr.nodeName.startsWith("xmlns:"))) {
           nsArray.push({
             prefix: attr.nodeName.replace(/^xmlns:?/, ""),
             namespaceURI: attr.nodeValue || ""
@@ -4867,6 +4944,28 @@ ${normalizePem(canonicalBase64(data))}-----END ${label}-----
   function isPrefixInScope(prefixesInScope, prefix, namespaceURI) {
     const binding = prefixesInScope.filter((ns) => ns.prefix === prefix).pop();
     return binding !== undefined && binding.namespaceURI === namespaceURI;
+  }
+  var warnCanonicalizationInternals = (0, util_1.deprecate)(() => {}, "`renderNs()` and `processInner()` are deprecated and will be private in version 7.0. Call `process()` instead of calling or overriding them.", "XML_CRYPTO_CANONICALIZATION_INTERNALS");
+  var canonicalizationsInProcess = new WeakSet;
+  function insideProcess(canonicalization, ownMethods, run) {
+    const isOverridden = (method) => Reflect.get(canonicalization, method) !== Reflect.get(ownMethods, method);
+    if (["renderNs", "processInner"].some(isOverridden)) {
+      warnCanonicalizationInternals();
+    }
+    const isOutermost = !canonicalizationsInProcess.has(canonicalization);
+    canonicalizationsInProcess.add(canonicalization);
+    try {
+      return run();
+    } finally {
+      if (isOutermost) {
+        canonicalizationsInProcess.delete(canonicalization);
+      }
+    }
+  }
+  function warnOutsideProcess(canonicalization) {
+    if (!canonicalizationsInProcess.has(canonicalization)) {
+      warnCanonicalizationInternals();
+    }
   }
   function validateDigestValue(digest, expectedDigest) {
     const buffer = Buffer.from(digest, "base64");
@@ -4946,7 +5045,7 @@ var require_c14n_canonicalization = __commonJS((exports) => {
       if (node2.attributes) {
         for (i = 0;i < node2.attributes.length; ++i) {
           attr = node2.attributes[i];
-          if (attr.name.indexOf("xmlns") === 0) {
+          if (attr.name === "xmlns" || attr.prefix === "xmlns") {
             continue;
           }
           attrListToRender.push(attr);
@@ -4959,6 +5058,7 @@ var require_c14n_canonicalization = __commonJS((exports) => {
       return res.join("");
     }
     renderNs(node2, prefixesInScope, defaultNs, defaultNsForPrefix, ancestorNamespaces, namespacesInScope) {
+      utils.warnOutsideProcess(this);
       let i;
       let attr;
       const res = [];
@@ -4995,7 +5095,7 @@ var require_c14n_canonicalization = __commonJS((exports) => {
       }
       if (nodeDefaultNs !== defaultNs) {
         newDefaultNs = nodeDefaultNs;
-        res.push(' xmlns="', newDefaultNs, '"');
+        res.push(' xmlns="', utils.encodeSpecialCharactersInAttribute(newDefaultNs), '"');
       }
       if (node2.attributes) {
         for (i = 0;i < node2.attributes.length; ++i) {
@@ -5021,16 +5121,38 @@ var require_c14n_canonicalization = __commonJS((exports) => {
       }
       nsListToRender.sort(this.nsCompare);
       res.push(...nsListToRender.map((attr2) => {
+        const namespaceURI = utils.encodeSpecialCharactersInAttribute(attr2.namespaceURI);
         if (attr2.prefix) {
-          return ` xmlns:${attr2.prefix}="${attr2.namespaceURI}"`;
+          return ` xmlns:${attr2.prefix}="${namespaceURI}"`;
         }
-        return ` xmlns="${attr2.namespaceURI}"`;
+        return ` xmlns="${namespaceURI}"`;
       }));
       return { rendered: res.join(""), newDefaultNs };
     }
     processInner(node2, prefixesInScope, defaultNs, defaultNsForPrefix, ancestorNamespaces, namespacesInScope) {
+      utils.warnOutsideProcess(this);
+      if (isDomNode.isDocumentNode(node2)) {
+        const res = [];
+        for (let i = 0;i < node2.childNodes.length; i++) {
+          const child = node2.childNodes[i];
+          if (isDomNode.isCommentNode(child)) {
+            if (this.includeComments) {
+              res.push(this.renderComment(child, true));
+            }
+            continue;
+          }
+          if (utils.isCanonicalDocumentChild(child)) {
+            res.push(this.processInner(child, prefixesInScope, defaultNs, defaultNsForPrefix, ancestorNamespaces, namespacesInScope));
+          }
+        }
+        return res.join(`
+`);
+      }
       if (isDomNode.isCommentNode(node2)) {
         return this.renderComment(node2);
+      }
+      if (isDomNode.isProcessingInstructionNode(node2)) {
+        return utils.renderProcessingInstruction(node2);
       }
       if (node2.data) {
         return utils.encodeSpecialCharactersInText(node2.data);
@@ -5049,9 +5171,13 @@ var require_c14n_canonicalization = __commonJS((exports) => {
       }
       throw new Error(`Unable to canonicalize node type: ${node2.nodeType}`);
     }
-    renderComment(node2) {
+    renderComment(node2, documentChild = false) {
       if (!this.includeComments) {
         return "";
+      }
+      const encodedText = utils.encodeSpecialCharactersInText(node2.data);
+      if (documentChild) {
+        return `<!--${encodedText}-->`;
       }
       const isOutsideDocument = node2.ownerDocument === node2.parentNode;
       let isBeforeDocument = false;
@@ -5078,7 +5204,6 @@ var require_c14n_canonicalization = __commonJS((exports) => {
 ` : "";
       const beforeDocument = isBeforeDocument ? `
 ` : "";
-      const encodedText = utils.encodeSpecialCharactersInText(node2.data);
       return `${afterDocument}<!--${encodedText}-->${beforeDocument}`;
     }
     process(node2, options) {
@@ -5086,12 +5211,23 @@ var require_c14n_canonicalization = __commonJS((exports) => {
       const defaultNs = options.defaultNs || "";
       const defaultNsForPrefix = options.defaultNsForPrefix || {};
       const ancestorNamespaces = options.ancestorNamespaces || [];
+      const inheritedXmlAttributes = options.ancestorXmlAttributes ?? utils.findAncestorXmlAttributes(node2);
+      let canonicalNode = node2;
+      if (isDomNode.isElementNode(node2) && inheritedXmlAttributes.length > 0) {
+        const clone2 = node2.cloneNode(true);
+        isDomNode.assertIsElementNode(clone2);
+        for (const attr of inheritedXmlAttributes) {
+          if (!clone2.hasAttributeNS("http://www.w3.org/XML/1998/namespace", attr.localName)) {
+            clone2.setAttributeNS("http://www.w3.org/XML/1998/namespace", `xml:${attr.localName}`, attr.value);
+          }
+        }
+        canonicalNode = clone2;
+      }
       const prefixesInScope = [];
       for (let i = 0;i < ancestorNamespaces.length; i++) {
         prefixesInScope.push(ancestorNamespaces[i].prefix);
       }
-      const res = this.processInner(node2, prefixesInScope, defaultNs, defaultNsForPrefix, ancestorNamespaces, ancestorNamespaces.slice());
-      return res;
+      return utils.insideProcess(this, C14nCanonicalization.prototype, () => this.processInner(canonicalNode, prefixesInScope, defaultNs, defaultNsForPrefix, ancestorNamespaces, ancestorNamespaces.slice()));
     }
     getAlgorithmName() {
       return "http://www.w3.org/TR/2001/REC-xml-c14n-20010315";
@@ -5115,8 +5251,16 @@ var require_c14n_canonicalization = __commonJS((exports) => {
 var require_exclusive_canonicalization = __commonJS((exports) => {
   Object.defineProperty(exports, "__esModule", { value: true });
   exports.ExclusiveCanonicalizationWithComments = exports.ExclusiveCanonicalization = undefined;
+  exports.warnUnlessExclusiveC14nNamespace = warnUnlessExclusiveC14nNamespace;
   var utils = require_utils();
   var isDomNode = require_dist();
+  var util_1 = __require("util");
+  var warnInclusiveNamespacesNamespace = (0, util_1.deprecate)(() => {}, "Reading an `InclusiveNamespaces` element that is not in the `http://www.w3.org/2001/10/xml-exc-c14n#` namespace is deprecated, and a signature that has one will not verify in version 7.0. xml-crypto 6.3.2 and earlier wrote one when signing with `xml-exc-c14n#WithComments` and a prefix list, so sign those documents again.", "XML_CRYPTO_INCLUSIVE_NAMESPACES_NAMESPACE");
+  function warnUnlessExclusiveC14nNamespace(inclusiveNamespaces) {
+    if (inclusiveNamespaces.namespaceURI !== "http://www.w3.org/2001/10/xml-exc-c14n#") {
+      warnInclusiveNamespacesNamespace();
+    }
+  }
 
   class ExclusiveCanonicalization {
     constructor() {
@@ -5159,7 +5303,7 @@ var require_exclusive_canonicalization = __commonJS((exports) => {
       if (node2.attributes) {
         for (i = 0;i < node2.attributes.length; ++i) {
           attr = node2.attributes[i];
-          if (attr.name.indexOf("xmlns") === 0) {
+          if (attr.name === "xmlns" || attr.prefix === "xmlns") {
             continue;
           }
           attrListToRender.push(attr);
@@ -5172,6 +5316,7 @@ var require_exclusive_canonicalization = __commonJS((exports) => {
       return res.join("");
     }
     renderNs(node2, prefixesInScope, defaultNs, defaultNsForPrefix, inclusiveNamespacesPrefixList) {
+      utils.warnOutsideProcess(this);
       let i;
       let attr;
       const res = [];
@@ -5189,14 +5334,16 @@ var require_exclusive_canonicalization = __commonJS((exports) => {
             namespaceURI: node2.namespaceURI || defaultNsForPrefix[node2.prefix]
           });
         }
-      } else if (defaultNs !== currNs) {
-        newDefaultNs = node2.namespaceURI;
-        res.push(' xmlns="', newDefaultNs, '"');
+      }
+      const currentDefaultNs = node2.prefix ? node2.getAttributeNode("xmlns")?.value ?? defaultNs : currNs;
+      if ((!node2.prefix || inclusiveNamespacesPrefixList.includes("#default")) && defaultNs !== currentDefaultNs) {
+        newDefaultNs = currentDefaultNs;
+        res.push(' xmlns="', utils.encodeSpecialCharactersInAttribute(newDefaultNs), '"');
       }
       if (node2.attributes) {
         for (i = 0;i < node2.attributes.length; ++i) {
           attr = node2.attributes[i];
-          if (attr.prefix && !utils.isPrefixInScope(prefixesInScope, attr.localName, attr.value) && inclusiveNamespacesPrefixList.indexOf(attr.localName) >= 0) {
+          if (attr.prefix === "xmlns" && !utils.isPrefixInScope(prefixesInScope, attr.localName, attr.value) && inclusiveNamespacesPrefixList.indexOf(attr.localName) >= 0) {
             nsListToRender.push({ prefix: attr.localName, namespaceURI: attr.value });
             prefixesInScope.push({ prefix: attr.localName, namespaceURI: attr.value });
           }
@@ -5208,13 +5355,35 @@ var require_exclusive_canonicalization = __commonJS((exports) => {
       }
       nsListToRender.sort(this.nsCompare);
       for (const p of nsListToRender) {
-        res.push(" xmlns:", p.prefix, '="', p.namespaceURI, '"');
+        const namespaceURI = utils.encodeSpecialCharactersInAttribute(p.namespaceURI);
+        res.push(" xmlns:", p.prefix, '="', namespaceURI, '"');
       }
       return { rendered: res.join(""), newDefaultNs };
     }
     processInner(node2, prefixesInScope, defaultNs, defaultNsForPrefix, inclusiveNamespacesPrefixList) {
+      utils.warnOutsideProcess(this);
+      if (isDomNode.isDocumentNode(node2)) {
+        const res = [];
+        for (let i = 0;i < node2.childNodes.length; i++) {
+          const child = node2.childNodes[i];
+          if (isDomNode.isCommentNode(child)) {
+            if (this.includeComments) {
+              res.push(this.renderComment(child, true));
+            }
+            continue;
+          }
+          if (utils.isCanonicalDocumentChild(child)) {
+            res.push(this.processInner(child, prefixesInScope, defaultNs, defaultNsForPrefix, inclusiveNamespacesPrefixList));
+          }
+        }
+        return res.join(`
+`);
+      }
       if (isDomNode.isCommentNode(node2)) {
         return this.renderComment(node2);
+      }
+      if (isDomNode.isProcessingInstructionNode(node2)) {
+        return utils.renderProcessingInstruction(node2);
       }
       if (node2.data) {
         return utils.encodeSpecialCharactersInText(node2.data);
@@ -5233,9 +5402,13 @@ var require_exclusive_canonicalization = __commonJS((exports) => {
       }
       throw new Error(`Unable to exclusive canonicalize node type: ${node2.nodeType}`);
     }
-    renderComment(node2) {
+    renderComment(node2, documentChild = false) {
       if (!this.includeComments) {
         return "";
+      }
+      const encodedText = utils.encodeSpecialCharactersInText(node2.data);
+      if (documentChild) {
+        return `<!--${encodedText}-->`;
       }
       const isOutsideDocument = node2.ownerDocument === node2.parentNode;
       let isBeforeDocument = false;
@@ -5262,20 +5435,21 @@ var require_exclusive_canonicalization = __commonJS((exports) => {
 ` : "";
       const beforeDocument = isBeforeDocument ? `
 ` : "";
-      const encodedText = utils.encodeSpecialCharactersInText(node2.data);
       return `${afterDocument}<!--${encodedText}-->${beforeDocument}`;
     }
-    process(elem, options) {
+    process(node2, options) {
       options = options || {};
+      const elem = isDomNode.isDocumentNode(node2) ? node2.documentElement : node2;
       let inclusiveNamespacesPrefixList = options.inclusiveNamespacesPrefixList || [];
       const defaultNs = options.defaultNs || "";
       const defaultNsForPrefix = options.defaultNsForPrefix || {};
       const ancestorNamespaces = options.ancestorNamespaces || [];
       if (!utils.isArrayHasLength(inclusiveNamespacesPrefixList)) {
-        const CanonicalizationMethod = utils.findChildren(elem, "CanonicalizationMethod");
+        const CanonicalizationMethod = utils.findChildren(node2, "CanonicalizationMethod");
         if (CanonicalizationMethod.length !== 0) {
           const inclusiveNamespaces = utils.findChildren(CanonicalizationMethod[0], "InclusiveNamespaces");
           if (inclusiveNamespaces.length !== 0) {
+            warnUnlessExclusiveC14nNamespace(inclusiveNamespaces[0]);
             inclusiveNamespacesPrefixList = (inclusiveNamespaces[0].getAttribute("PrefixList") || "").split(" ");
           }
         }
@@ -5284,15 +5458,18 @@ var require_exclusive_canonicalization = __commonJS((exports) => {
         inclusiveNamespacesPrefixList.forEach(function(prefix) {
           if (ancestorNamespaces) {
             ancestorNamespaces.forEach(function(ancestorNamespace) {
-              if (prefix === ancestorNamespace.prefix) {
+              if (prefix === "#default" && ancestorNamespace.prefix === "") {
+                if (!elem.hasAttribute("xmlns")) {
+                  elem.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns", ancestorNamespace.namespaceURI);
+                }
+              } else if (prefix === ancestorNamespace.prefix) {
                 elem.setAttributeNS("http://www.w3.org/2000/xmlns/", `xmlns:${prefix}`, ancestorNamespace.namespaceURI);
               }
             });
           }
         });
       }
-      const res = this.processInner(elem, [], defaultNs, defaultNsForPrefix, inclusiveNamespacesPrefixList);
-      return res;
+      return utils.insideProcess(this, ExclusiveCanonicalization.prototype, () => this.processInner(node2, [], defaultNs, defaultNsForPrefix, inclusiveNamespacesPrefixList));
     }
     getAlgorithmName() {
       return "http://www.w3.org/2001/10/xml-exc-c14n#";
@@ -9754,32 +9931,6 @@ var require_hash_algorithms = __commonJS((exports) => {
   exports.Sha512 = Sha512;
 });
 
-// /zveltio-extension/node_modules/xml-crypto/lib/types.js
-var require_types2 = __commonJS((exports) => {
-  Object.defineProperty(exports, "__esModule", { value: true });
-  exports.createOptionalCallbackFunction = createOptionalCallbackFunction;
-  function isErrorFirstCallback(possibleCallback) {
-    return typeof possibleCallback === "function";
-  }
-  function createOptionalCallbackFunction(syncVersion) {
-    return (...args) => {
-      const possibleCallback = args[args.length - 1];
-      if (isErrorFirstCallback(possibleCallback)) {
-        let result;
-        try {
-          result = syncVersion(...args.slice(0, -1));
-        } catch (err) {
-          possibleCallback(err instanceof Error ? err : new Error("Unknown error"));
-          return;
-        }
-        possibleCallback(null, result);
-      } else {
-        return syncVersion(...args);
-      }
-    };
-  }
-});
-
 // /zveltio-extension/node_modules/xml-crypto/lib/signature-algorithms.js
 var require_signature_algorithms = __commonJS((exports) => {
   Object.defineProperty(exports, "__esModule", { value: true });
@@ -9930,6 +10081,20 @@ var require_signed_xml = __commonJS((exports) => {
     isDomNode.assertIsArrayOfNodes(signatures);
     return signatures.filter(isDomNode.isElementNode);
   }
+  function findSignatureValue(signature) {
+    return utils.findChildren(signature, "SignatureValue")[0]?.textContent?.replace(/[\t\n\r ]/g, "");
+  }
+  var exclusiveC14nNamespace = "http://www.w3.org/2001/10/xml-exc-c14n#";
+  function isExclusiveC14n(algorithm) {
+    return algorithm === exclusiveC14nNamespace || algorithm === "http://www.w3.org/2001/10/xml-exc-c14n#WithComments";
+  }
+  function decodeSignatureValue(signature) {
+    return Buffer.from(findSignatureValue(signature) ?? "", "base64");
+  }
+  var warnReferenceUriWithoutFragment = (0, util_1.deprecate)(() => {}, 'Resolving a `Reference` whose `URI` is neither empty nor starts with "#" as a same-document ID is deprecated, and such a signature will not verify in version 7.0. A same-document `URI` is empty, or "#" followed by an ID.', "XML_CRYPTO_REFERENCE_URI_WITHOUT_FRAGMENT");
+  var warnTransformWithoutAlgorithm = (0, util_1.deprecate)(() => {}, "Skipping a `Transform` that has no `Algorithm` attribute is deprecated, and a signature that has one will not verify in version 7.0.", "XML_CRYPTO_TRANSFORM_WITHOUT_ALGORITHM");
+  var warnLocationReferenceNotElement = (0, util_1.deprecate)(() => {}, "A `location.reference` that selects a node other than an element is deprecated and will throw in version 7.0. Select the element to place the signature in or next to.", "XML_CRYPTO_LOCATION_REFERENCE_NOT_ELEMENT");
+  var warnEmptyUriNotDocumentElement = (0, util_1.deprecate)(() => {}, '`isEmptyUri: true` on a reference whose `xpath` selects anything but the document element is deprecated and will throw in version 7.0. `URI=""` identifies the whole document, so the signature this produces does not verify.', "XML_CRYPTO_EMPTY_URI_NOT_DOCUMENT_ELEMENT");
   function certificatesToPublish(publicCert) {
     const certificates = utils.pemCertificates(publicCert);
     if (certificates.length > 0) {
@@ -9941,8 +10106,11 @@ var require_signed_xml = __commonJS((exports) => {
       return [];
     }
   }
+  var warnCallbackForm = (0, util_1.deprecate)(() => {}, "The callback form of `computeSignature()` and `checkSignature()` is deprecated and will be removed in version 7.0. Call them without a callback. For a signature algorithm that works asynchronously, implement `getSignatureAsync()` and `verifySignatureAsync()` on it and call `computeSignatureAsync()` and `checkSignatureAsync()`, which return a promise.", "XML_CRYPTO_CALLBACK_FORM");
   var warnOriginalXmlWithIds = (0, util_1.deprecate)(() => {}, "`getOriginalXmlWithIds()` is deprecated and will be removed in a future version. Use the `location` option of `computeSignature()` to place the signature, then `getSignedXml()`. For a detached signature, put an ID attribute the signer recognizes on each referenced element (`wsu:Id` for WS-Security), sign that document, and send it alongside `getSignatureXml()`.", "XML_CRYPTO_GET_ORIGINAL_XML_WITH_IDS");
+  var warnDocumentTypeDeclaration = (0, util_1.deprecate)(() => {}, "Signing or verifying a document that has a document type declaration (`<!DOCTYPE>`) is deprecated and will throw in version 7.0. The declaration is not processed, so an entity it declares is not expanded and a default attribute it declares is not added to what is signed or verified.", "XML_CRYPTO_DOCUMENT_TYPE_DECLARATION");
   var warnValidateElementAgainstReferences = (0, util_1.deprecate)(() => {}, "`validateElementAgainstReferences()` is deprecated and will be removed in a future version. After `checkSignature()` succeeds, use the XML that `getSignedReferences()` returns instead of nodes from the original document.", "XML_CRYPTO_VALIDATE_ELEMENT_AGAINST_REFERENCES");
+  var warnEnvelopedSignatureAfterCanonicalization = (0, util_1.deprecate)(() => {}, "Applying `enveloped-signature` after a transform that returns a string, such as a canonicalization, is deprecated and will throw in a future version. List `enveloped-signature` before any canonicalization in the `Reference`.", "XML_CRYPTO_ENVELOPED_SIGNATURE_AFTER_CANONICALIZATION");
 
   class SignedXml {
     constructor(options = {}) {
@@ -9966,6 +10134,7 @@ var require_signed_xml = __commonJS((exports) => {
       this.originalXmlWithIds = "";
       this.keyInfo = null;
       this.references = [];
+      this.loadedPrefixLists = new WeakMap;
       this.signedReferences = [];
       this.CanonicalizationAlgorithms = {
         "http://www.w3.org/TR/2001/REC-xml-c14n-20010315": c14n.C14nCanonicalization,
@@ -10043,10 +10212,65 @@ var require_signed_xml = __commonJS((exports) => {
       if (callback2 != null && typeof callback2 !== "function") {
         throw new Error("Last parameter must be a callback function");
       }
+      if (callback2) {
+        warnCallbackForm();
+      }
+      const pending = this.validateReferences(xml, callback2);
+      if (!pending) {
+        return pending;
+      }
+      const { signer, key, unverifiedSignedInfoCanon, accept } = pending;
+      if (!callback2) {
+        if (signer.verifySignature(unverifiedSignedInfoCanon, key, this.signatureValue) !== true) {
+          throw this.invalidSignature();
+        }
+        accept();
+        return true;
+      }
+      let answered = false;
+      const answer = (error62, isValid) => {
+        if (answered) {
+          return;
+        }
+        answered = true;
+        if (error62) {
+          callback2(error62);
+        } else if (isValid !== true) {
+          callback2(this.invalidSignature());
+        } else {
+          accept();
+          callback2(null, true);
+        }
+      };
+      const returned = signer.verifySignature(unverifiedSignedInfoCanon, key, this.signatureValue, answer);
+      if (typeof returned === "boolean") {
+        answer(null, returned);
+      }
+    }
+    async checkSignatureAsync(xml) {
+      const pending = this.validateReferences(xml);
+      if (!pending) {
+        return false;
+      }
+      const { signer, key, unverifiedSignedInfoCanon, accept } = pending;
+      const isValid = typeof signer.verifySignatureAsync === "function" ? await signer.verifySignatureAsync(unverifiedSignedInfoCanon, key, this.signatureValue) : signer.verifySignature(unverifiedSignedInfoCanon, key, this.signatureValue);
+      if (isValid !== true) {
+        throw this.invalidSignature();
+      }
+      accept();
+      return true;
+    }
+    invalidSignature() {
+      return new Error(`invalid signature: the signature value ${this.signatureValue} is incorrect`);
+    }
+    validateReferences(xml, callback2) {
       const earlierSignedReferences = this.signedReferences;
       this.signedReferences = [];
       this.signedXml = xml;
       const doc2 = new xmldom.DOMParser().parseFromString(xml);
+      if (doc2.doctype != null) {
+        warnDocumentTypeDeclaration();
+      }
       this.references = [];
       const unverifiedSignedInfoCanon = this.getCanonSignedInfoXml(doc2);
       if (!unverifiedSignedInfoCanon) {
@@ -10093,25 +10317,14 @@ var require_signed_xml = __commonJS((exports) => {
       if (key == null) {
         throw new Error("KeyInfo or publicCert or privateKey is required to validate signature");
       }
-      const sigRes = signer.verifySignature(unverifiedSignedInfoCanon, key, this.signatureValue);
-      if (sigRes === true) {
+      const loadedReferences = this.references;
+      const accept = () => {
         this.signedReferences = [...earlierSignedReferences, ...canonReferences];
-        this.references.forEach((ref, index) => {
+        loadedReferences.forEach((ref, index) => {
           ref.signedReference = canonReferences[index];
         });
-        if (callback2) {
-          callback2(null, true);
-        } else {
-          return true;
-        }
-      } else {
-        if (callback2) {
-          callback2(new Error(`invalid signature: the signature value ${this.signatureValue} is incorrect`));
-          return;
-        } else {
-          throw new Error(`invalid signature: the signature value ${this.signatureValue} is incorrect`);
-        }
-      }
+      };
+      return { signer, key, unverifiedSignedInfoCanon, accept };
     }
     getCanonSignedInfoXml(doc2) {
       if (this.signatureNode == null) {
@@ -10132,34 +10345,63 @@ var require_signed_xml = __commonJS((exports) => {
           throw new Error("When canonicalization method is non-exclusive, whole xml dom must be provided as an argument");
         }
       }
-      const ancestorNamespaces = utils.findAncestorNs(doc2, "//*[local-name()='SignedInfo']");
-      const c14nOptions = {
-        ancestorNamespaces
-      };
+      const c14nOptions = this.findSignedInfoAncestorContext(doc2);
       return this.getCanonXml([this.canonicalizationAlgorithm], signedInfo[0], c14nOptions);
+    }
+    findSignedInfoAncestorContext(doc2) {
+      const signatureInDoc = this.findLoadedSignature(doc2);
+      if (signatureInDoc == null) {
+        return { ancestorNamespaces: [], ancestorXmlAttributes: [] };
+      }
+      const signedInfoInDoc = utils.findChildren(signatureInDoc, "SignedInfo")[0];
+      if (signedInfoInDoc == null) {
+        throw new Error("could not find SignedInfo element in the message");
+      }
+      return {
+        ancestorNamespaces: utils.findAncestorNsForElement(signedInfoInDoc),
+        ancestorXmlAttributes: utils.findAncestorXmlAttributes(signedInfoInDoc)
+      };
     }
     getCanonReferenceXml(doc2, ref, node2) {
       if (Array.isArray(ref.transforms)) {
         ref.ancestorNamespaces = utils.findAncestorNs(doc2, ref.xpath, this.namespaceResolver);
       }
       const c14nOptions = {
-        inclusiveNamespacesPrefixList: ref.inclusiveNamespacesPrefixList,
-        ancestorNamespaces: ref.ancestorNamespaces
+        ancestorNamespaces: ref.ancestorNamespaces,
+        ancestorXmlAttributes: utils.findAncestorXmlAttributes(node2)
       };
       const discardComments = ref.uri === "" || ref.uri.startsWith("#");
-      return this.canonicalize(ref.transforms, node2, c14nOptions, { discardComments });
+      return this.canonicalize(ref.transforms, node2, c14nOptions, {
+        discardComments,
+        prefixLists: this.loadedPrefixLists.get(ref) ?? this.getSigningPrefixLists(ref)
+      });
     }
-    calculateSignatureValue(doc2, callback2) {
+    getSigningPrefixLists(ref) {
+      return ref.transforms.map((transform2) => isExclusiveC14n(this.findCanonicalizationAlgorithm(transform2).getAlgorithmName()) ? ref.inclusiveNamespacesPrefixList : []);
+    }
+    signingInput(doc2) {
       const signedInfoCanon = this.getCanonSignedInfoXml(doc2);
       const signer = this.findSignatureAlgorithm(this.signatureAlgorithm);
       if (this.privateKey == null) {
         throw new Error("Private key is required to compute signature");
       }
+      return { signedInfoCanon, signer, privateKey: this.privateKey };
+    }
+    calculateSignatureValue(doc2, callback2) {
+      const { signedInfoCanon, signer, privateKey } = this.signingInput(doc2);
       if (typeof callback2 === "function") {
-        signer.getSignature(signedInfoCanon, this.privateKey, callback2);
+        signer.getSignature(signedInfoCanon, privateKey, callback2);
       } else {
-        this.signatureValue = signer.getSignature(signedInfoCanon, this.privateKey);
+        this.signatureValue = signer.getSignature(signedInfoCanon, privateKey);
       }
+    }
+    async calculateSignatureValueAsync(doc2) {
+      const { signedInfoCanon, signer, privateKey } = this.signingInput(doc2);
+      const signatureValue = typeof signer.getSignatureAsync === "function" ? await signer.getSignatureAsync(signedInfoCanon, privateKey) : signer.getSignature(signedInfoCanon, privateKey);
+      if (typeof signatureValue !== "string") {
+        throw new Error("the signature algorithm returned no signature; an algorithm that signs asynchronously implements getSignatureAsync()");
+      }
+      this.signatureValue = signatureValue;
     }
     findSignatureAlgorithm(name2) {
       if (name2 == null) {
@@ -10220,8 +10462,11 @@ var require_signed_xml = __commonJS((exports) => {
     validateReference(ref, doc2) {
       const uri = ref.uri?.[0] === "#" ? ref.uri.substring(1) : ref.uri;
       let elem = null;
+      if (uri !== "" && uri === ref.uri) {
+        warnReferenceUriWithoutFragment();
+      }
       if (uri === "") {
-        elem = xpath.select1("//*", doc2);
+        elem = utils.hasDocumentLevelProcessingInstruction(doc2) ? doc2 : xpath.select1("//*", doc2);
       } else if (uri?.indexOf("'") !== -1) {
         throw new Error("Cannot validate a uri with quotes inside it");
       } else {
@@ -10306,14 +10551,8 @@ var require_signed_xml = __commonJS((exports) => {
       for (const reference of references) {
         this.loadReference(reference);
       }
-      const signatureValue = xpath.select1(".//*[local-name(.)='SignatureValue']/text()", signatureNode);
-      if (isDomNode.isTextNode(signatureValue)) {
-        this.signatureValue = signatureValue.data.replace(/\r?\n/g, "");
-      }
-      const keyInfo = xpath.select1(".//*[local-name(.)='KeyInfo']", signatureNode);
-      if (isDomNode.isNodeLike(keyInfo)) {
-        this.keyInfo = keyInfo;
-      }
+      this.signatureValue = findSignatureValue(signatureNode) ?? "";
+      this.keyInfo = utils.findChildren(signatureNode, "KeyInfo")[0] ?? null;
     }
     loadReference(refNode) {
       let nodes = utils.findChildren(refNode, "DigestMethod");
@@ -10338,7 +10577,7 @@ var require_signed_xml = __commonJS((exports) => {
         throw new Error(`could not find the value of DigestValue in ${refNode.toString()}`);
       }
       const transforms = [];
-      let inclusiveNamespacesPrefixList = [];
+      const prefixLists = [];
       nodes = utils.findChildren(refNode, "Transforms");
       if (nodes.length !== 0) {
         const transformsNode = nodes[0];
@@ -10347,16 +10586,19 @@ var require_signed_xml = __commonJS((exports) => {
           const transformAttr = utils.findAttr(transform2, "Algorithm");
           if (transformAttr) {
             transforms.push(transformAttr.value);
+            const inclusiveNamespaces = utils.findChildren(transform2, "InclusiveNamespaces");
+            inclusiveNamespaces.forEach(execC14n.warnUnlessExclusiveC14nNamespace);
+            prefixLists.push(inclusiveNamespaces.flatMap((namespace) => (namespace.getAttribute("PrefixList") ?? "").split(/[ \t\r\n]+/)).filter((value) => value.length > 0));
+          } else {
+            warnTransformWithoutAlgorithm();
           }
         }
-        const inclusiveNamespaces = utils.findChildren(transformsAll[transformsAll.length - 1], "InclusiveNamespaces");
-        if (utils.isArrayHasLength(inclusiveNamespaces)) {
-          inclusiveNamespacesPrefixList = inclusiveNamespaces.flatMap((namespace) => (namespace.getAttribute("PrefixList") ?? "").split(" ")).filter((value) => value.length > 0);
-        }
       }
+      const inclusiveNamespacesPrefixList = prefixLists.filter((_, index) => isExclusiveC14n(transforms[index])).pop() ?? [];
       if (utils.isArrayHasLength(this.implicitTransforms)) {
         this.implicitTransforms.forEach(function(t) {
           transforms.push(t);
+          prefixLists.push(inclusiveNamespacesPrefixList);
         });
       }
       if (transforms.length === 0 || transforms[transforms.length - 1] === "http://www.w3.org/2000/09/xmldsig#enveloped-signature") {
@@ -10371,6 +10613,7 @@ var require_signed_xml = __commonJS((exports) => {
         inclusiveNamespacesPrefixList,
         isEmptyUri: false
       });
+      this.loadedPrefixLists.set(this.references[this.references.length - 1], prefixLists);
     }
     addReference({ xpath: xpath2, transforms, digestAlgorithm, uri = "", digestValue, inclusiveNamespacesPrefixList = [], isEmptyUri = false, id = undefined, type = undefined }) {
       if (digestAlgorithm == null) {
@@ -10409,7 +10652,39 @@ var require_signed_xml = __commonJS((exports) => {
         callback2 = callbackParam;
         options = options ?? {};
       }
+      if (typeof callback2 === "function") {
+        warnCallbackForm();
+      }
+      const unsigned = this.prepareSignature(xml, options, callback2);
+      if (!unsigned) {
+        return;
+      }
+      if (typeof callback2 === "function") {
+        this.calculateSignatureValue(unsigned.doc, (err, signature) => {
+          if (err) {
+            callback2(err);
+          } else {
+            this.signatureValue = signature || "";
+            unsigned.insertSignatureValue();
+            callback2(null, this);
+          }
+        });
+      } else {
+        this.calculateSignatureValue(unsigned.doc);
+        unsigned.insertSignatureValue();
+      }
+    }
+    async computeSignatureAsync(xml, options = {}) {
+      const unsigned = this.prepareSignature(xml, options);
+      await this.calculateSignatureValueAsync(unsigned.doc);
+      unsigned.insertSignatureValue();
+      return this;
+    }
+    prepareSignature(xml, options, callback2) {
       const doc2 = new xmldom.DOMParser().parseFromString(xml);
+      if (doc2.doctype != null) {
+        warnDocumentTypeDeclaration();
+      }
       let xmlNsAttr = "xmlns";
       const signatureAttrs = [];
       let currentPrefix;
@@ -10480,6 +10755,9 @@ var require_signed_xml = __commonJS((exports) => {
           return;
         }
       }
+      if (!isDomNode.isElementNode(referenceNode)) {
+        warnLocationReferenceNotElement();
+      }
       const previousSignatureNode = this.signatureNode;
       this.signatureNode = signatureElem;
       try {
@@ -10492,16 +10770,12 @@ var require_signed_xml = __commonJS((exports) => {
           referenceNode.appendChild(signatureElem);
         } else if (location.action === "prepend") {
           referenceNode.insertBefore(signatureElem, referenceNode.firstChild);
-        } else if (location.action === "before") {
-          if (referenceNode.parentNode == null) {
-            throw new Error("`location.reference` refers to the root node (by default), so we can't insert `before`");
+        } else {
+          const parentNode = referenceNode.parentNode;
+          if (parentNode == null) {
+            throw new Error(`\`location.reference\` selects a node without a parent, so we can't insert \`${location.action}\``);
           }
-          referenceNode.parentNode.insertBefore(signatureElem, referenceNode);
-        } else if (location.action === "after") {
-          if (referenceNode.parentNode == null) {
-            throw new Error("`location.reference` refers to the root node (by default), so we can't insert `after`");
-          }
-          referenceNode.parentNode.insertBefore(signatureElem, referenceNode.nextSibling);
+          parentNode.insertBefore(signatureElem, location.action === "before" ? referenceNode : referenceNode.nextSibling);
         }
         this.addAllReferences(doc2, signatureElem, referenceTargets, prefix);
       } catch (error62) {
@@ -10519,24 +10793,12 @@ var require_signed_xml = __commonJS((exports) => {
         }
       }
       const signedInfoNode = signedInfoNodes[0];
-      if (typeof callback2 === "function") {
-        this.calculateSignatureValue(doc2, (err, signature) => {
-          if (err) {
-            callback2(err);
-          } else {
-            this.signatureValue = signature || "";
-            signatureElem.insertBefore(this.createSignature(prefix), signedInfoNode.nextSibling);
-            this.signatureXml = this.serialize(signatureElem);
-            this.signedXml = this.serialize(doc2);
-            callback2(null, this);
-          }
-        });
-      } else {
-        this.calculateSignatureValue(doc2);
+      const insertSignatureValue = () => {
         signatureElem.insertBefore(this.createSignature(prefix), signedInfoNode.nextSibling);
         this.signatureXml = this.serialize(signatureElem);
         this.signedXml = this.serialize(doc2);
-      }
+      };
+      return { doc: doc2, insertSignatureValue };
     }
     serialize(node2) {
       return node2.toString().replace(/\r/g, "&#xD;");
@@ -10551,11 +10813,12 @@ var require_signed_xml = __commonJS((exports) => {
       }
     }
     calculateReferenceDigest(ref, node2) {
+      const referenceNode = ref.isEmptyUri && node2 === node2.ownerDocument.documentElement && utils.hasDocumentLevelProcessingInstruction(node2.ownerDocument) ? node2.ownerDocument : node2;
       ref.ancestorNamespaces = utils.findAncestorNsForElement(node2);
-      const canonXml = this.canonicalize(ref.transforms, node2, {
-        inclusiveNamespacesPrefixList: ref.inclusiveNamespacesPrefixList,
-        ancestorNamespaces: ref.ancestorNamespaces
-      }, { discardComments: true });
+      const canonXml = this.canonicalize(ref.transforms, referenceNode, {
+        ancestorNamespaces: ref.ancestorNamespaces,
+        ancestorXmlAttributes: utils.findAncestorXmlAttributes(node2)
+      }, { discardComments: true, prefixLists: this.getSigningPrefixLists(ref) });
       return this.findHashAlgorithm(ref.digestAlgorithm).getHash(canonXml);
     }
     findSignatureContentTargets(ref, doc2, signatureElem) {
@@ -10594,6 +10857,9 @@ var require_signed_xml = __commonJS((exports) => {
           let targetUri;
           if (ref.isEmptyUri) {
             targetUri = "";
+            if (node2 !== node2.ownerDocument.documentElement) {
+              warnEmptyUriNotDocumentElement();
+            }
           } else {
             const id = this.ensureHasId(node2);
             ref.uri = id;
@@ -10612,8 +10878,8 @@ var require_signed_xml = __commonJS((exports) => {
             const transform2 = this.findCanonicalizationAlgorithm(trans);
             const transformElem = signatureDoc.createElementNS(signatureNamespace, `${currentPrefix}Transform`);
             transformElem.setAttribute("Algorithm", transform2.getAlgorithmName());
-            if (utils.isArrayHasLength(ref.inclusiveNamespacesPrefixList)) {
-              const inclusiveNamespacesElem = signatureDoc.createElementNS(transform2.getAlgorithmName(), "InclusiveNamespaces");
+            if (utils.isArrayHasLength(ref.inclusiveNamespacesPrefixList) && isExclusiveC14n(transform2.getAlgorithmName())) {
+              const inclusiveNamespacesElem = signatureDoc.createElementNS(exclusiveC14nNamespace, "InclusiveNamespaces");
               inclusiveNamespacesElem.setAttribute("PrefixList", ref.inclusiveNamespacesPrefixList.join(" "));
               transformElem.appendChild(inclusiveNamespacesElem);
             }
@@ -10668,10 +10934,12 @@ var require_signed_xml = __commonJS((exports) => {
     getCanonXml(transforms, node2, options = {}) {
       return this.canonicalize(transforms, node2, options, { discardComments: false });
     }
-    canonicalize(transforms, node2, options, { discardComments }) {
+    canonicalize(transforms, node2, options, { discardComments, prefixLists }) {
       options.defaultNsForPrefix = options.defaultNsForPrefix ?? SignedXml.defaultNsForPrefix;
+      options.ancestorXmlAttributes = options.ancestorXmlAttributes ?? utils.findAncestorXmlAttributes(node2);
       options.signatureNode = this.signatureNode;
       const canonXml = node2.cloneNode(true);
+      const preserveDocument = isDomNode.isDocumentNode(node2);
       if (transforms.includes("http://www.w3.org/2000/09/xmldsig#enveloped-signature")) {
         const signaturePath = [];
         let signatureAncestor = this.findLoadedSignature(node2);
@@ -10690,17 +10958,23 @@ var require_signed_xml = __commonJS((exports) => {
       }
       let transformedXml = canonXml;
       let transformOptions = options;
-      for (const transformName of transforms) {
+      let parsedFromOctets = false;
+      for (const [index, transformName] of transforms.entries()) {
         if (!isDomNode.isNodeLike(transformedXml)) {
-          transformedXml = this.parseTransformInput(transformedXml, transformName);
+          transformedXml = this.parseTransformInput(transformedXml, transformName, preserveDocument);
           transformOptions = {
             ...options,
             ancestorNamespaces: [],
+            ancestorXmlAttributes: [],
             defaultNs: "",
             signatureNode: this.findLoadedSignature(transformedXml) ?? options.signatureNode
           };
+          parsedFromOctets = true;
         }
-        transformedXml = this.findCanonicalizationAlgorithm(transformName).process(transformedXml, transformOptions);
+        if (parsedFromOctets && transformName === "http://www.w3.org/2000/09/xmldsig#enveloped-signature") {
+          warnEnvelopedSignatureAfterCanonicalization();
+        }
+        transformedXml = this.findCanonicalizationAlgorithm(transformName).process(transformedXml, prefixLists ? { ...transformOptions, inclusiveNamespacesPrefixList: prefixLists[index] ?? [] } : transformOptions);
       }
       if (isDomNode.isNodeLike(transformedXml)) {
         transformedXml = this.findCanonicalizationAlgorithm("http://www.w3.org/TR/2001/REC-xml-c14n-20010315").process(transformedXml, transformOptions);
@@ -10712,17 +10986,17 @@ var require_signed_xml = __commonJS((exports) => {
       if (this.signatureNode == null || this.signatureNode.ownerDocument === doc2) {
         return this.signatureNode;
       }
-      const signatureValue = utils.findChildren(this.signatureNode, "SignatureValue")[0]?.textContent;
-      if (!signatureValue) {
+      const signatureValue = decodeSignatureValue(this.signatureNode);
+      if (signatureValue.length === 0) {
         return null;
       }
-      const matches = findSignatureElements(doc2).filter((signature) => utils.findChildren(signature, "SignatureValue")[0]?.textContent === signatureValue);
+      const matches = findSignatureElements(doc2).filter((signature) => decodeSignatureValue(signature).equals(signatureValue));
       if (matches.length > 1) {
         throw new Error("Cannot validate a document which contains multiple Signature elements with the same SignatureValue, in order to prevent signature wrapping attack.");
       }
       return matches[0] ?? null;
     }
-    parseTransformInput(octets, transformName) {
+    parseTransformInput(octets, transformName, preserveDocument) {
       const parseErrors = [];
       const doc2 = new xmldom.DOMParser({
         errorHandler: (_level, message) => parseErrors.push(String(message))
@@ -10730,7 +11004,7 @@ var require_signed_xml = __commonJS((exports) => {
       if (parseErrors.length > 0 || doc2.documentElement == null) {
         throw new Error(`Cannot apply transform ${transformName}: the output of the previous transform is not well-formed XML`);
       }
-      return doc2.documentElement;
+      return preserveDocument ? doc2 : doc2.documentElement;
     }
     ensureHasId(node2) {
       let attr;
@@ -10828,8 +11102,9 @@ var require_lib2 = __commonJS((exports) => {
         __createBinding(exports2, m, p);
   };
   Object.defineProperty(exports, "__esModule", { value: true });
-  exports.BASE64_REGEX = exports.EXTRACT_X509_CERTS = exports.PEM_FORMAT_REGEX = exports.derToPem = exports.validateDigestValue = exports.encodeSpecialCharactersInText = exports.encodeSpecialCharactersInAttribute = exports.isDescendantOf = exports.findChilds = exports.findChildren = exports.findAttr = exports.isArrayHasLength = exports.toPem = exports.pemToDer = exports.pemCertificates = exports.normalizePem = exports.findAncestorNs = exports.SignedXml = exports.ExclusiveCanonicalizationWithComments = exports.ExclusiveCanonicalization = exports.C14nCanonicalizationWithComments = exports.C14nCanonicalization = undefined;
+  exports.BASE64_REGEX = exports.EXTRACT_X509_CERTS = exports.PEM_FORMAT_REGEX = exports.derToPem = exports.validateDigestValue = exports.encodeSpecialCharactersInText = exports.encodeSpecialCharactersInAttribute = exports.isDescendantOf = exports.findChilds = exports.findChildren = exports.findAttr = exports.isArrayHasLength = exports.createOptionalCallbackFunction = exports.toPem = exports.pemToDer = exports.pemCertificates = exports.normalizePem = exports.findAncestorNs = exports.SignedXml = exports.ExclusiveCanonicalizationWithComments = exports.ExclusiveCanonicalization = exports.C14nCanonicalizationWithComments = exports.C14nCanonicalization = undefined;
   var util_1 = __require("util");
+  var types = require_types2();
   var utils = require_utils();
   var c14n_canonicalization_1 = require_c14n_canonicalization();
   Object.defineProperty(exports, "C14nCanonicalization", { enumerable: true, get: function() {
@@ -10866,6 +11141,7 @@ var require_lib2 = __commonJS((exports) => {
   Object.defineProperty(exports, "toPem", { enumerable: true, get: function() {
     return utils_1.toPem;
   } });
+  exports.createOptionalCallbackFunction = (0, util_1.deprecate)(types.createOptionalCallbackFunction, "`createOptionalCallbackFunction()` is deprecated and will be removed in version 7.0. Write a signature algorithm's methods without a callback, and give it `getSignatureAsync()` and `verifySignatureAsync()` if it works asynchronously.", "XML_CRYPTO_CREATE_OPTIONAL_CALLBACK_FUNCTION");
   exports.isArrayHasLength = (0, util_1.deprecate)(utils.isArrayHasLength, "`isArrayHasLength()` is deprecated and will be removed in version 7.0. Use `Array.isArray(x) && x.length > 0` instead.", "XML_CRYPTO_IS_ARRAY_HAS_LENGTH");
   exports.findAttr = (0, util_1.deprecate)(utils.findAttr, "`findAttr()` is deprecated and will be removed in version 7.0. Use a DOM API or the `xpath` package instead.", "XML_CRYPTO_FIND_ATTR");
   exports.findChildren = (0, util_1.deprecate)(utils.findChildren, "`findChildren()` is deprecated and will be removed in version 7.0. Use a DOM API or the `xpath` package instead.", "XML_CRYPTO_FIND_CHILDREN");
@@ -19125,8 +19401,8 @@ var require_sax2 = __commonJS((exports) => {
       }
       return Stream.prototype.on.call(me, ev, handler);
     };
-    var CDATAre = /^\[CDATA\[$/i;
-    var DOCTYPEre = /^DOCTYPE$/i;
+    var CDATA = "[CDATA[";
+    var DOCTYPE = "DOCTYPE";
     var XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace";
     var XMLNS_NAMESPACE = "http://www.w3.org/2000/xmlns/";
     var rootNS = { xml: XML_NAMESPACE, xmlns: XMLNS_NAMESPACE };
@@ -19189,14 +19465,14 @@ var require_sax2 = __commonJS((exports) => {
       SCRIPT: S++,
       SCRIPT_ENDING: S++
     };
-    sax.XML_ENTITIES = Object.assign(Object.create(null), {
+    sax.XML_ENTITIES = {
       amp: "&",
       gt: ">",
       lt: "<",
       quot: '"',
       apos: "'"
-    });
-    sax.ENTITIES = Object.assign(Object.create(null), {
+    };
+    sax.ENTITIES = {
       amp: "&",
       gt: ">",
       lt: "<",
@@ -19450,7 +19726,7 @@ var require_sax2 = __commonJS((exports) => {
       clubs: 9827,
       hearts: 9829,
       diams: 9830
-    });
+    };
     Object.keys(sax.ENTITIES).forEach(function(key) {
       var e = sax.ENTITIES[key];
       var s2 = typeof e === "number" ? String.fromCharCode(e) : e;
@@ -19750,14 +20026,11 @@ Char: ` + parser.c;
         }
       }
       entity = entity.replace(/^0+/, "");
-      if (isNaN(num) || numStr.toLowerCase() !== entity || num < 0 || num > 1114111 || !isXmlChar(num)) {
+      if (isNaN(num) || numStr.toLowerCase() !== entity || num < 0 || num > 1114111) {
         strictFail(parser, "Invalid character entity");
         return "&" + parser.entity + ";";
       }
       return String.fromCodePoint(num);
-    }
-    function isXmlChar(num) {
-      return num === 9 || num === 10 || num === 13 || num >= 32 && num <= 55295 || num >= 57344 && num <= 65533 || num >= 65536 && num <= 1114111;
     }
     function beginWhiteSpace(parser, c) {
       if (c === "<") {
@@ -19900,12 +20173,12 @@ Char: ` + parser.c;
               parser.state = S.DOCTYPE_DTD;
               parser.doctype += "<!" + parser.sgmlDecl + c;
               parser.sgmlDecl = "";
-            } else if (CDATAre.test(parser.sgmlDecl + c)) {
+            } else if ((parser.sgmlDecl + c).toUpperCase() === CDATA) {
               emitNode(parser, "onopencdata");
               parser.state = S.CDATA;
               parser.sgmlDecl = "";
               parser.cdata = "";
-            } else if (DOCTYPEre.test(parser.sgmlDecl + c)) {
+            } else if ((parser.sgmlDecl + c).toUpperCase() === DOCTYPE) {
               parser.state = S.DOCTYPE;
               if (parser.doctype || parser.sawRoot) {
                 strictFail(parser, "Inappropriately located doctype declaration");
@@ -29573,6 +29846,8 @@ var require_lib6 = __commonJS((exports) => {
 
 // engine/index.ts
 import { join } from "path";
+// /zveltio-extension/packages/sdk/src/extension/action-refusal.ts
+var ACTION_REFUSAL = Symbol.for("zveltio.extension.action-refusal");
 // /zveltio-extension/packages/sdk/src/extension/multipart.ts
 var MULTIPART_REQUIRED = { error: "Expected a multipart/form-data body." };
 async function readMultipart(c) {
@@ -54156,7 +54431,8 @@ var SamlConfigSchema = exports_external.object({
 async function getSamlConfig(db, decryptSecret) {
   let row;
   try {
-    row = await db.selectFrom("zvd_saml_config").select("config").executeTakeFirst();
+    row = await db.selectFrom("zvd_saml_config").select("config").where("tenant_id", "=", sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                     '00000000-0000-0000-0000-000000000001'::uuid)`).executeTakeFirst();
   } catch (err) {
     console.error("[auth/saml] could not read zvd_saml_config:", err);
     throw err;

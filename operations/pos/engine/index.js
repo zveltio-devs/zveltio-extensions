@@ -24595,6 +24595,8 @@ function permissionGate(ctx, resource, opts = {}) {
     await next();
   };
 }
+// /zveltio-extension/packages/sdk/src/extension/action-refusal.ts
+var ACTION_REFUSAL = Symbol.for("zveltio.extension.action-refusal");
 // engine/routes.ts
 var POINTS_PER_CURRENCY_UNIT = 1;
 var POINT_VALUE = 0.01;
@@ -24611,6 +24613,8 @@ async function claimOrderNumber(dbh) {
   const row = await sql`
     UPDATE zvd_pos_order_counters
        SET next_number = next_number + 1, updated_at = NOW()
+     WHERE tenant_id = COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                '00000000-0000-0000-0000-000000000001'::uuid)
      RETURNING prefix, next_number - 1 AS next_number, padding
   `.execute(dbh);
   const r = row.rows[0];

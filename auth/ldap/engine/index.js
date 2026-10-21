@@ -708,7 +708,7 @@ var require_ms = __commonJS((exports, module) => {
   }
 });
 
-// /zveltio-extension/node_modules/debug/src/common.js
+// /zveltio-extension/node_modules/ldapts/node_modules/debug/src/common.js
 var require_common = __commonJS((exports, module) => {
   function setup(env) {
     createDebug.debug = createDebug;
@@ -883,7 +883,7 @@ var require_common = __commonJS((exports, module) => {
   module.exports = setup;
 });
 
-// /zveltio-extension/node_modules/debug/src/browser.js
+// /zveltio-extension/node_modules/ldapts/node_modules/debug/src/browser.js
 var require_browser = __commonJS((exports, module) => {
   exports.formatArgs = formatArgs;
   exports.save = save;
@@ -1043,7 +1043,7 @@ var require_browser = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/debug/src/node.js
+// /zveltio-extension/node_modules/ldapts/node_modules/debug/src/node.js
 var require_node = __commonJS((exports, module) => {
   var tty = __require("tty");
   var util = __require("util");
@@ -1214,7 +1214,7 @@ var require_node = __commonJS((exports, module) => {
   };
 });
 
-// /zveltio-extension/node_modules/debug/src/index.js
+// /zveltio-extension/node_modules/ldapts/node_modules/debug/src/index.js
 var require_src = __commonJS((exports, module) => {
   if (typeof process === "undefined" || process.type === "renderer" || false || process.__nwjs) {
     module.exports = require_browser();
@@ -32282,6 +32282,8 @@ var LdapConfigSchema = exports_external.object({
 var LdapConfigSaveSchema = LdapConfigSchema.extend({
   bindPassword: exports_external.string().optional()
 });
+var OWN_TENANT = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                '00000000-0000-0000-0000-000000000001'::uuid)`;
 
 class LdapConfigUnreadable extends Error {
   constructor(cause) {
@@ -32298,7 +32300,7 @@ var TestSchema = exports_external.object({
   password: exports_external.string().min(1)
 });
 async function getLdapConfig(db, decryptSecret) {
-  const row = await db.selectFrom("zvd_ldap_config").select("config").executeTakeFirst();
+  const row = await db.selectFrom("zvd_ldap_config").select("config").where("tenant_id", "=", OWN_TENANT).executeTakeFirst();
   if (!row)
     return null;
   try {
@@ -32315,12 +32317,7 @@ async function getLdapConfig(db, decryptSecret) {
 async function upsertLdapConfig(db, config2, encryptSecret) {
   const toStore = { ...config2, bindPassword: await encryptSecret(config2.bindPassword) };
   const value = sql`${JSON.stringify(toStore)}::text::jsonb`;
-  const existing = await db.selectFrom("zvd_ldap_config").select("tenant_id").executeTakeFirst();
-  if (existing) {
-    await db.updateTable("zvd_ldap_config").set({ config: value, updated_at: new Date }).execute();
-  } else {
-    await db.insertInto("zvd_ldap_config").values({ config: value }).execute();
-  }
+  await db.insertInto("zvd_ldap_config").values({ config: value }).onConflict((oc) => oc.column("tenant_id").doUpdateSet({ config: value, updated_at: new Date })).execute();
 }
 function ldapRoutes(ctx) {
   const { db, auth, checkPermission, internals } = ctx;

@@ -82,6 +82,8 @@ function permissionGate(ctx, resource, opts = {}) {
     await next();
   };
 }
+// /zveltio-extension/packages/sdk/src/extension/action-refusal.ts
+var ACTION_REFUSAL = Symbol.for("zveltio.extension.action-refusal");
 // /zveltio-extension/node_modules/kysely/dist/util/object-utils.js
 function isUndefined(obj) {
   return typeof obj === "undefined" || obj === undefined;
@@ -24630,13 +24632,16 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 // engine/routes.ts
+var OWN_TENANT = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                '00000000-0000-0000-0000-000000000001'::uuid)`;
 async function claimNumber(dbh, docType, series) {
   const row = await sql`
     UPDATE zvd_document_series
        SET next_number = next_number + 1, updated_at = NOW()
      WHERE id = (
        SELECT id FROM zvd_document_series
-        WHERE doc_type = ${docType}
+        WHERE tenant_id = ${OWN_TENANT}
+          AND doc_type = ${docType}
           AND (${series ?? null}::text IS NULL OR series = ${series ?? null})
         ORDER BY is_default DESC, created_at
         LIMIT 1
@@ -24652,7 +24657,7 @@ async function claimNumber(dbh, docType, series) {
   };
 }
 async function companyProfile(dbh) {
-  const row = await sql`SELECT * FROM zvd_company_profile LIMIT 1`.execute(dbh);
+  const row = await sql`SELECT * FROM zvd_company_profile WHERE tenant_id = ${OWN_TENANT}`.execute(dbh);
   return row.rows[0] ?? null;
 }
 function esc2(value) {
@@ -24781,7 +24786,8 @@ function invoicingRoutes(ctx) {
       const row = await db.transaction().execute(async (trx) => {
         if (d.is_default) {
           await sql`
-              UPDATE zvd_document_series SET is_default = FALSE WHERE doc_type = ${d.doc_type}
+              UPDATE zvd_document_series SET is_default = FALSE
+               WHERE tenant_id = ${OWN_TENANT} AND doc_type = ${d.doc_type}
             `.execute(trx);
         }
         return await sql`

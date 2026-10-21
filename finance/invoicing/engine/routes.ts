@@ -9,6 +9,18 @@ import { permissionGate } from '@zveltio/sdk/extension';
 // `db`), so they use that parameter directly. They're declared
 // outside the route factory closure, so they cannot reference `c`.
 /**
+ * The tenant the work runs as — the `tenant_id` column default's expression, so
+ * a filter on it matches exactly the rows this request's inserts land in.
+ *
+ * The row policy is NOT that filter. It admits the caller's READ REACH, which
+ * is every firm for a god and the descendants for a `subtree` member, so a
+ * statement over a per-tenant table with no tenant predicate reaches the other
+ * firms' rows too: `LIMIT 1` returns one of theirs, and an UPDATE touches theirs.
+ */
+const OWN_TENANT = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                '00000000-0000-0000-0000-000000000001'::uuid)`;
+
+/**
  * Claim the next number in a series.
  *
  * This used to be `nextval('zvd_invoice_seq')` — ONE Postgres sequence for the
@@ -36,7 +48,8 @@ async function claimNumber(
        SET next_number = next_number + 1, updated_at = NOW()
      WHERE id = (
        SELECT id FROM zvd_document_series
-        WHERE doc_type = ${docType}
+        WHERE tenant_id = ${OWN_TENANT}
+          AND doc_type = ${docType}
           AND (${series ?? null}::text IS NULL OR series = ${series ?? null})
         ORDER BY is_default DESC, created_at
         LIMIT 1
@@ -60,7 +73,7 @@ async function claimNumber(
  * every past invoice the moment someone edits the profile.
  */
 async function companyProfile(dbh: any): Promise<any | null> {
-  const row = await sql`SELECT * FROM zvd_company_profile LIMIT 1`.execute(dbh);
+  const row = await sql`SELECT * FROM zvd_company_profile WHERE tenant_id = ${OWN_TENANT}`.execute(dbh);
   return (row.rows[0] as any) ?? null;
 }
 
@@ -329,7 +342,8 @@ export function invoicingRoutes(ctx: ExtensionContext): Hono {
           // Exactly one default per document type, or issuing has to guess.
           if (d.is_default) {
             await sql`
-              UPDATE zvd_document_series SET is_default = FALSE WHERE doc_type = ${d.doc_type}
+              UPDATE zvd_document_series SET is_default = FALSE
+               WHERE tenant_id = ${OWN_TENANT} AND doc_type = ${d.doc_type}
             `.execute(trx);
           }
           return await sql`
