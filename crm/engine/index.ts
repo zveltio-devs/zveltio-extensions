@@ -109,11 +109,17 @@ const extension: ZveltioExtension = {
       return contact;
     });
 
+    // A NAME is the own tenant's (the `tenant_id` column default's expression):
+    // the row policy admits the caller's READ REACH — every firm for a god — so
+    // `name = … LIMIT 1` alone could answer with another firm's organization.
+    const ownTenant = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                   '00000000-0000-0000-0000-000000000001'::uuid)`;
+
     ctx.services.register('crm.organizations.lookup', async (idOrName: string) => {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrName);
       const r = await sql<any>`
         SELECT * FROM zvd_organizations
-        WHERE ${isUuid ? sql`id = ${idOrName}::uuid` : sql`name = ${idOrName}`}
+        WHERE ${isUuid ? sql`id = ${idOrName}::uuid` : sql`name = ${idOrName} AND tenant_id = ${ownTenant}`}
         LIMIT 1
       `.execute(ctx.db);
       return r.rows[0] ?? null;
@@ -121,7 +127,7 @@ const extension: ZveltioExtension = {
 
     ctx.services.register('crm.organizations.findByName', async (name: string) => {
       const r = await sql<any>`
-        SELECT * FROM zvd_organizations WHERE name = ${name} LIMIT 1
+        SELECT * FROM zvd_organizations WHERE name = ${name} AND tenant_id = ${ownTenant} LIMIT 1
       `.execute(ctx.db);
       return r.rows[0] ?? null;
     });

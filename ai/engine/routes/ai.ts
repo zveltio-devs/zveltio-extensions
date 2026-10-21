@@ -12,6 +12,13 @@ import {
 import { encryptApiKey, decryptApiKey } from '../lib/ai-crypto.js';
 import { assertNonMetadataUrl } from '../lib/endpoint-guard.js';
 
+// The OWN tenant (the `tenant_id` column default's expression). Provider names
+// and feature keys are unique per tenant (migration 005), but the row policy
+// admits the caller's READ REACH — every firm for a god — so a lookup or write
+// by name alone hit every firm's row of that name.
+const OWN_TENANT = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                '00000000-0000-0000-0000-000000000001'::uuid)`;
+
 export function aiRoutes(ctx: ExtensionContext): Hono {
   const { db, auth, checkPermission } = ctx;
   const app = new Hono();
@@ -171,6 +178,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
         .selectFrom('zv_ai_providers')
         .selectAll()
         .where('name', '=', name)
+        .where('tenant_id', '=', OWN_TENANT)
         .executeTakeFirst();
 
       // Saving the provider and clearing the previous default are one change.
@@ -187,6 +195,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
             .updateTable('zv_ai_providers')
             .set(updateData)
             .where('name', '=', name)
+            .where('tenant_id', '=', OWN_TENANT)
             .execute();
         } else {
           const labels: Record<string, string> = {
@@ -217,6 +226,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
             .updateTable('zv_ai_providers')
             .set({ is_default: false })
             .where('name', '!=', name)
+            .where('tenant_id', '=', OWN_TENANT)
             .execute();
         }
       });
@@ -226,6 +236,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
         .selectFrom('zv_ai_providers')
         .selectAll()
         .where('name', '=', name)
+        .where('tenant_id', '=', OWN_TENANT)
         .executeTakeFirst();
 
       if (updated?.is_active && (updated.api_key || name === 'ollama')) {
@@ -258,7 +269,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
 
     const name = c.req.param('name');
     const result = await sql`
-      DELETE FROM zv_ai_providers WHERE name = ${name} RETURNING id
+      DELETE FROM zv_ai_providers WHERE name = ${name} AND tenant_id = ${OWN_TENANT} RETURNING id
     `.execute(db);
 
     if (result.rows.length === 0)
@@ -667,6 +678,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
         .selectFrom('zv_ai_features')
         .select('id')
         .where('feature_key', '=', featureKey)
+        .where('tenant_id', '=', OWN_TENANT)
         .executeTakeFirst()
         // No `.catch(() => null)`. It fell straight into the `if (!existing)` below,
         // so a failed read answered 404 "Feature not found" for a feature that is
@@ -688,6 +700,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
         .updateTable('zv_ai_features')
         .set(updateFields)
         .where('feature_key', '=', featureKey)
+        .where('tenant_id', '=', OWN_TENANT)
         .execute();
 
       return c.json({ success: true });

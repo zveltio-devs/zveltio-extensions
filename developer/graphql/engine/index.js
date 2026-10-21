@@ -32658,6 +32658,8 @@ function checkQueryWidth(query, maxFields = 50) {
 }
 
 // engine/routes.ts
+var OWN_TENANT = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                '00000000-0000-0000-0000-000000000001'::uuid)`;
 var PersistedQueryCreateSchema = exports_external.object({
   name: exports_external.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/, "Name must be alphanumeric with underscores/hyphens"),
   description: exports_external.string().optional(),
@@ -32712,6 +32714,7 @@ async function getFieldPolicies(dbh) {
     const result = await sql`
       SELECT collection, field, allowed_roles, deny_roles
       FROM zvd_graphql_field_policies
+      WHERE tenant_id = ${OWN_TENANT}
     `.execute(dbh);
     return result.rows;
   } catch {
@@ -33179,7 +33182,7 @@ function graphqlRoutes(ctx) {
       return c.json({ errors: [{ message: "Unauthorized" }] }, 401);
     const name = c.req.param("name");
     const pqRes = await sql`
-      SELECT * FROM zvd_graphql_persisted_queries WHERE name = ${name}
+      SELECT * FROM zvd_graphql_persisted_queries WHERE name = ${name} AND tenant_id = ${OWN_TENANT}
     `.execute(db);
     const pq = pqRes.rows[0];
     if (!pq)
@@ -33214,7 +33217,7 @@ function graphqlRoutes(ctx) {
       sql`
         UPDATE zvd_graphql_persisted_queries
         SET use_count = use_count + 1, last_used_at = NOW(), updated_at = NOW()
-        WHERE name = ${name}
+        WHERE name = ${name} AND tenant_id = ${OWN_TENANT}
       `.execute(db).catch(() => {});
       return c.json(result);
     } catch (err) {

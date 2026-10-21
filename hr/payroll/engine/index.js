@@ -24691,20 +24691,11 @@ function generateRevisalCsv(internals, employees) {
 `);
 }
 async function loadRates(dbh) {
-  let rows;
-  try {
-    const result = await sql`
-      SELECT * FROM zvd_payroll_rates
-       WHERE tenant_id = COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
-                                  '00000000-0000-0000-0000-000000000001'::uuid)
-    `.execute(dbh);
-    rows = result.rows;
-  } catch (err) {
-    const code = err.errno ?? err.code ?? "";
-    if (code !== "42P01")
-      throw err;
-    rows = [];
-  }
+  const { rows } = await sql`
+    SELECT * FROM zvd_payroll_rates
+     WHERE tenant_id = COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                '00000000-0000-0000-0000-000000000001'::uuid)
+  `.execute(dbh);
   const r = rows[0];
   if (!r)
     return RO_RATES;

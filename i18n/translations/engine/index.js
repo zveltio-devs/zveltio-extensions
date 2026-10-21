@@ -24531,6 +24531,8 @@ function parseParameter(param) {
 var i18nCache = new Map;
 var CACHE_TTL = 5 * 60 * 1000;
 var cacheExpiry = 0;
+var OWN_TENANT = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                '00000000-0000-0000-0000-000000000001'::uuid)`;
 function invalidateCache() {
   i18nCache.clear();
   cacheExpiry = 0;
@@ -24556,14 +24558,14 @@ function translationsRoutes(ctx) {
       SELECT tk.key, t.value
       FROM zvd_translations t
       JOIN zvd_translation_keys tk ON tk.id = t.key_id
-      WHERE t.locale = ${locale}
+      WHERE t.locale = ${locale} AND t.tenant_id = ${OWN_TENANT} AND tk.tenant_id = ${OWN_TENANT}
     `.execute(db);
     const map2 = new Map;
     for (const row of rows.rows) {
       map2.set(row.key, row.value);
     }
     if (rows.rows.length === 0) {
-      const allKeys = await sql`SELECT key, default_value FROM zvd_translation_keys`.execute(db);
+      const allKeys = await sql`SELECT key, default_value FROM zvd_translation_keys WHERE tenant_id = ${OWN_TENANT}`.execute(db);
       for (const row of allKeys.rows) {
         if (row.default_value)
           map2.set(row.key, row.default_value);
@@ -24592,14 +24594,14 @@ function translationsRoutes(ctx) {
     const { code, name, is_default: is_default2 } = c.req.valid("json");
     const locale = await db.transaction().execute(async (trx) => {
       if (is_default2) {
-        await trx.updateTable("zvd_locales").set({ is_default: false }).where("is_default", "=", true).execute();
+        await trx.updateTable("zvd_locales").set({ is_default: false }).where("is_default", "=", true).where("tenant_id", "=", OWN_TENANT).execute();
       }
       return await trx.insertInto("zvd_locales").values({ code, name, is_default: is_default2 }).returningAll().executeTakeFirst();
     });
     return c.json({ locale }, 201);
   });
   app.delete("/locales/:code", async (c) => {
-    await db.deleteFrom("zvd_locales").where("code", "=", c.req.param("code")).execute();
+    await db.deleteFrom("zvd_locales").where("code", "=", c.req.param("code")).where("tenant_id", "=", OWN_TENANT).execute();
     invalidateCache();
     return c.json({ success: true });
   });
@@ -24652,7 +24654,7 @@ function translationsRoutes(ctx) {
     is_pluralized: exports_external.boolean().default(false)
   })), async (c) => {
     const data = c.req.valid("json");
-    const existing = await db.selectFrom("zvd_translation_keys").where("key", "=", data.key).executeTakeFirst();
+    const existing = await db.selectFrom("zvd_translation_keys").select("id").where("key", "=", data.key).where("tenant_id", "=", OWN_TENANT).executeTakeFirst();
     if (existing)
       return c.json({ error: `Key '${data.key}' already exists` }, 409);
     const key = await db.insertInto("zvd_translation_keys").values(data).returningAll().executeTakeFirst();
@@ -24795,3 +24797,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
