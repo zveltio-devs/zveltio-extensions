@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import type { Database } from '@zveltio/engine-db';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { aiProviderManager } from '../lib/ai-provider.js';
+import { providersFor } from '../lib/ai-provider.js';
 // The validator and the read-only window live in lib/sql-guard.ts so the
 // assistant's execute_sql / text_to_sql tools use the SAME ones. They had
 // neither. See the header of that file.
@@ -37,7 +37,7 @@ export function aiQueryRoutes(ctx: ExtensionContext): Hono {
     const user = c.get('user') as any;
     const { prompt, analyze, chart, limit } = c.req.valid('json');
 
-    const provider = aiProviderManager.getDefault();
+    const provider = (await providersFor(db)).getDefault();
     if (!provider?.chat) {
       return c.json({ error: 'No AI provider configured' }, 503);
     }

@@ -1,7 +1,7 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
 import { join } from 'path';
 import { buildAIRoutes } from './routes/index.js';
-import { aiProviderManager, initAIProviders } from './lib/ai-provider.js';
+import { type AIProvider, type AIProviderManager, providersFor } from './lib/ai-provider.js';
 import { setInternals } from './lib/ai-crypto.js';
 import { triggerEmbedding } from './lib/ai-embed-hook.js';
 import { ZveltioAIEngine } from './lib/zveltio-ai/engine.js';
@@ -12,7 +12,8 @@ import { extractTextFromFile, scheduleFileIndexing } from './lib/document-indexe
  * schema generation, agentic workflows.
  *
  * Publishes the following inter-extension services:
- *   ai.providers                    — the AIProviderManager (full API)
+ *   ai.providers                    — getDefault() / get(name): the request
+ *                                     firm's provider, picked when it is called
  *   ai.embed(text, model?)          — single-shot embedding helper
  *   ai.chat(messages, opts?)        — single-shot chat helper
  *   ai.triggerEmbedding(collection, recordId, record, tenantId?)
@@ -58,32 +59,39 @@ const extension: ZveltioExtension = {
   },
 
   async register(app, ctx) {
-    // Before anything that could touch a provider key. `initAIProviders` decrypts
-    // every configured key, so wiring this after it would make the first boot
-    // fail on a message about internals not being wired.
+    // Before anything that could touch a provider key: loading a firm's
+    // providers decrypts its keys.
     setInternals(ctx.internals);
 
-    // Load configured AI providers from zv_ai_providers (extension-owned table).
-    // Non-fatal: if no providers are configured, the extension stays loaded but
-    // routes return 503 / "AI not configured" responses.
-    await initAIProviders(ctx.db).catch((err: Error) => {
-      console.warn('[ai extension] initAIProviders failed (non-fatal):', err.message);
+    // Providers are per firm and loaded on the firm's first AI call
+    // (`providersFor`), so there is nothing to load here. A firm with none gets
+    // the "AI not configured" answers — never another firm's provider.
+    //
+    // Other extensions ask `ai.providers` for a provider synchronously, and the
+    // firm is only known from the database. So what they get is a stand-in that
+    // picks the CALLER's firm's provider when it is used.
+    const onDemand = (pick: (m: AIProviderManager) => AIProvider | null) => {
+      const resolve = async () => {
+        const p = pick(await providersFor(ctx.db));
+        if (!p) throw new Error('No AI provider is configured.');
+        return p;
+      };
+      return {
+        chat: async (...a: Parameters<AIProvider['chat']>) => (await resolve()).chat(...a),
+        embed: async (text: string, model?: string) => {
+          const p = await resolve();
+          if (!p.embed) throw new Error('No AI provider with embedding capability is configured.');
+          return p.embed(text, model);
+        },
+      };
+    };
+    const defaultProvider = onDemand((m) => m.getDefault());
+    ctx.services.register('ai.providers', {
+      getDefault: () => defaultProvider,
+      get: (name: string) => onDemand((m) => m.get(name)),
     });
-
-    // Publish services for other extensions to consume. Helpers default to the
-    // configured default provider; consumers can fetch ai.providers.get(name)
-    // to target a specific one.
-    ctx.services.register('ai.providers', aiProviderManager);
-    ctx.services.register('ai.embed', async (text: string, model?: string) => {
-      const p = aiProviderManager.getDefault();
-      if (!p?.embed) throw new Error('No AI provider with embedding capability is configured.');
-      return p.embed(text, model);
-    });
-    ctx.services.register('ai.chat', async (messages: any[], opts?: any) => {
-      const p = aiProviderManager.getDefault();
-      if (!p?.chat) throw new Error('No AI provider is configured.');
-      return p.chat(messages, opts);
-    });
+    ctx.services.register('ai.embed', defaultProvider.embed);
+    ctx.services.register('ai.chat', defaultProvider.chat);
     // Closed over `ctx.db` — the internal function takes the handle first, which
     // is not something a consumer in another extension can be expected to hand
     // over (and its own restricted handle would be the wrong one anyway).

@@ -1,5 +1,5 @@
 import { sql } from 'kysely';
-import { aiProviderManager } from './ai-provider.js';
+import { providersFor } from './ai-provider.js';
 
 /**
  * Text extraction and embedding for uploaded files.
@@ -17,7 +17,8 @@ import { aiProviderManager } from './ai-provider.js';
  * (`content/media` is the one consumer); callers inside this extension import
  * it directly.
  *
- * `providers` defaults to this extension's own manager and exists so the tests
+ * `providers` defaults to the providers of the firm `db` runs as — the firm the
+ * embedding row is written for — and exists so the tests
  * can hand over a fake. It is a parameter rather than a `mock.module` in the
  * tests for a measured reason: mocking `./ai-provider.js` is process-global in
  * `bun test`, and it broke the four `initAIProviders — stored keys` cases in
@@ -53,11 +54,11 @@ export async function indexFileContent(
   db: Database,
   fileId: string,
   content: string,
-  providers: Providers = aiProviderManager,
+  providers?: Providers,
 ): Promise<void> {
   if (!content.trim()) return;
 
-  const provider = providers.getDefault();
+  const provider = (providers ?? (await providersFor(db))).getDefault();
   if (!provider?.embed) return;
 
   try {
@@ -129,7 +130,7 @@ export async function scheduleFileIndexing(
   fileId: string,
   buffer: Buffer,
   mimeType: string,
-  providers: Providers = aiProviderManager,
+  providers?: Providers,
 ): Promise<void> {
   if (!INDEXABLE_MIMES.some((m) => mimeType.startsWith(m.split('/')[0]) || mimeType === m)) return;
 

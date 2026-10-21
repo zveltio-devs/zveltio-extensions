@@ -39,7 +39,7 @@ async function registeredNames(): Promise<string[]> {
   const names: string[] = [];
   const noop = () => undefined;
   const ctx = {
-    // initAIProviders() awaits this and its failure is caught as non-fatal.
+    // register() must not read it: providers load on a firm's first AI call.
     db: {
       selectFrom: () => {
         throw new Error('no database in this test');

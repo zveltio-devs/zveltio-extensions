@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { aiProviderManager, type ChatMessage } from '../lib/ai-provider.js';
+import { providersFor, type ChatMessage } from '../lib/ai-provider.js';
 import { toJsonb } from '@zveltio/sdk/extension';
 
 function escapeHtml(str: string): string {
@@ -149,9 +149,8 @@ export function aiChatsRoutes(ctx: ExtensionContext): Hono {
       if (!chat) return c.json({ error: 'Chat not found' }, 404);
 
       const providerName = chat.provider === 'default' ? undefined : chat.provider;
-      const provider = providerName
-        ? aiProviderManager.get(providerName)
-        : aiProviderManager.getDefault();
+      const providers = await providersFor(db);
+      const provider = providerName ? providers.get(providerName) : providers.getDefault();
       if (!provider) return c.json({ error: 'No AI provider configured' }, 503);
 
       const existingMessages: ChatMessage[] = typeof chat.messages === 'string'
@@ -225,9 +224,10 @@ export function aiChatsRoutes(ctx: ExtensionContext): Hono {
         .executeTakeFirst();
       if (!template) return c.json({ error: 'Template not found' }, 404);
 
+      const providers = await providersFor(db);
       const provider = providerName
-        ? aiProviderManager.get(providerName)
-        : (template.provider ? aiProviderManager.get(template.provider) : aiProviderManager.getDefault());
+        ? providers.get(providerName)
+        : (template.provider ? providers.get(template.provider) : providers.getDefault());
       if (!provider) return c.json({ error: 'No AI provider configured' }, 503);
 
       const messages: ChatMessage[] = [{ role: 'system', content: template.system_prompt }];

@@ -7,7 +7,7 @@
  */
 
 import { sql } from 'kysely';
-import { aiProviderManager } from './ai-provider.js';
+import { providersFor } from './ai-provider.js';
 
 // Database type from engine — kept loose since extensions don't import engine internals.
 type Database = any;
@@ -129,7 +129,8 @@ export async function triggerEmbedding(
   const rawText = extractText(record, textField, excludedFields);
   if (!rawText.trim()) return;
 
-  const provider = aiProviderManager.getDefault();
+  // The firm of `db` — the write's, whose rows the insert below must match.
+  const provider = (await providersFor(db)).getDefault();
   if (!provider?.embed) {
     // A collection with ai_search_enabled and no embedder is a configured
     // feature that does nothing. Silence here meant the operator saw an empty

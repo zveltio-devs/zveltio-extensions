@@ -5,8 +5,8 @@
  * Ported from the engine (src/tests/unit/document-indexer.test.ts) with the
  * module. One change, and it is the point of the move: the provider used to be
  * fetched from the host's `serviceRegistry` under 'ai.providers', so the test
- * registered a fake there. The code now reaches this extension's own
- * `aiProviderManager`, and the fake is handed to it as the last argument.
+ * registered a fake there. The code now reaches the providers of the firm its
+ * `db` runs as, and the fake is handed to it as the last argument.
  *
  * NOT `mock.module('../lib/ai-provider.js')`: that is process-global in
  * `bun test`, and it made the whole-suite run fail the four
