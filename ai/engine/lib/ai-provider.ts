@@ -383,6 +383,14 @@ export async function providersFor(db: any): Promise<AIProviderManager> {
   return loading;
 }
 
+/**
+ * The `ctx.broadcast` message a provider change sends. Every replica, the one
+ * that saved it included, drops that firm's providers on it (`index.ts`): the
+ * cache was dropped only where the request ran, so every other replica kept
+ * serving the old key — or a deleted provider — until it restarted.
+ */
+export const PROVIDERS_CHANGED = 'providers.changed';
+
 /** Drop the cached providers of the firm `db` runs as, after its config changed. */
 export async function forgetProviders(db: any): Promise<void> {
   tenantProviders.delete(await currentTenant(db));

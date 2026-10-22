@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import { toJsonb, type ExtensionContext } from '@zveltio/sdk/extension';
-import { forgetProviders, providersFor } from '../lib/ai-provider.js';
+import { PROVIDERS_CHANGED, providersFor } from '../lib/ai-provider.js';
 import { encryptApiKey } from '../lib/ai-crypto.js';
 import { assertNonMetadataUrl } from '../lib/endpoint-guard.js';
 
@@ -226,11 +226,12 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
         }
       });
 
-      // The next call of THIS firm reads its rows again; no other firm's cache
-      // is touched. This rebuilt the provider by hand instead, and only for
-      // openai/anthropic/ollama: a deactivated provider stayed loaded, as did a
-      // deleted one, until the next restart.
-      await forgetProviders(db);
+      // The next call of THIS firm reads its rows again, on every replica, once
+      // this commits; no other firm's cache is touched. This rebuilt the
+      // provider by hand instead, and only for openai/anthropic/ollama: a
+      // deactivated provider stayed loaded, as did a deleted one, until the
+      // next restart.
+      await ctx.broadcast.publish(PROVIDERS_CHANGED);
 
       return c.json({ success: true });
     },
@@ -248,7 +249,7 @@ export function aiRoutes(ctx: ExtensionContext): Hono {
 
     if (result.rows.length === 0)
       return c.json({ error: 'Provider not found' }, 404);
-    await forgetProviders(db);
+    await ctx.broadcast.publish(PROVIDERS_CHANGED);
     return c.json({ success: true });
   });
 
