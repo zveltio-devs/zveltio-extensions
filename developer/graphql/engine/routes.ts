@@ -167,17 +167,15 @@ interface FieldPolicyInfo {
   deny_roles: string[];
 }
 
+// No catch: a policy table that cannot be read must fail the request, not
+// build a schema in which every field is readable.
 async function getFieldPolicies(dbh: any): Promise<FieldPolicyInfo[]> {
-  try {
-    const result = await sql<FieldPolicyInfo>`
-      SELECT collection, field, allowed_roles, deny_roles
-      FROM zvd_graphql_field_policies
-      WHERE tenant_id = ${OWN_TENANT}
-    `.execute(dbh);
-    return result.rows;
-  } catch {
-    return [];
-  }
+  const result = await sql<FieldPolicyInfo>`
+    SELECT collection, field, allowed_roles, deny_roles
+    FROM zvd_graphql_field_policies
+    WHERE tenant_id = ${OWN_TENANT}
+  `.execute(dbh);
+  return result.rows;
 }
 
 // ── Schema builder ────────────────────────────────────────────────────────────
@@ -206,15 +204,14 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
 
   let collections: any[] = [];
   let relations: RelationInfo[] = [];
-  let fieldPolicies: FieldPolicyInfo[] = [];
 
   try {
     collections = await DDLManager.getCollections(db);
     // The engine's registry: `ctx.db` refuses `zvd_relations` since engine #858,
     // and the swallowed refusal built every schema without a single relation.
     relations = (await DDLManager.getRelations(db)) as RelationInfo[];
-    fieldPolicies = await getFieldPolicies(db);
   } catch { /* no collections yet */ }
+  const fieldPolicies = await getFieldPolicies(db);
 
   const fieldPolicyMap = new Map<string, { allowed: string[]; deny: string[] }>();
   for (const p of fieldPolicies) {
@@ -893,12 +890,13 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
       const schema = await getSchema(ctx, tenantKey);
       const result = await run(c, user, schema, pq.query, variables);
 
-      // Update use stats
-      sql`
+      // Awaited: `db` is the request transaction, which commits when the
+      // response is returned; a statement still in flight then never lands.
+      await sql`
         UPDATE zvd_graphql_persisted_queries
         SET use_count = use_count + 1, last_used_at = NOW(), updated_at = NOW()
         WHERE name = ${name} AND tenant_id = ${OWN_TENANT}
-      `.execute(db).catch(() => {});
+      `.execute(db);
 
       return c.json(result);
     } catch (err) {

@@ -48,4 +48,31 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('crm: an organization by name is
       expect(await res.json()).toEqual({ find: tag, lookup: tag });
     }
   });
+
+  // By id or email too: another firm's row is not the answer.
+  it('a lookup by another firm’s id or email answers null', async () => {
+    const b = await h.pool.query(`SELECT id FROM zvd_organizations WHERE tenant_id = $1 AND name = 'Org Shared'`, [B]);
+    await h.pool.query(
+      `INSERT INTO zvd_contacts (tenant_id, first_name, email, created_by) VALUES ($1, 'Only B', 'only-b@example.test', 'test')`,
+      [B],
+    );
+    const contact = await h.pool.query(`SELECT id FROM zvd_contacts WHERE tenant_id = $1 AND email = 'only-b@example.test'`, [B]);
+    const { app, ctx } = await mountForTest(import.meta.dir, { tenant: A, transaction: true, transactionUser: GOD });
+    app.get('/__ids', async (c: any) => {
+      const s = (n: string) => ctx.services.get(n);
+      return c.json([
+        await s('crm.organizations.lookup')(b.rows[0].id),
+        await s('crm.contacts.lookup')(contact.rows[0].id),
+        await s('crm.contacts.lookup')('only-b@example.test'),
+        await s('crm.contacts.findByEmail')('only-b@example.test'),
+      ]);
+    });
+    try {
+      const res = await app.request('/__ids');
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual([null, null, null, null]);
+    } finally {
+      await h.pool.query(`DELETE FROM zvd_contacts WHERE tenant_id = $1`, [B]);
+    }
+  });
 });

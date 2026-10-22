@@ -25198,18 +25198,20 @@ var extension = {
     const routes = crmRoutes(ctx);
     app.route("/", routes);
     await adoptCrmCollections(ctx);
+    const ownTenant = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                   '00000000-0000-0000-0000-000000000001'::uuid)`;
     ctx.services.register("crm.contacts.lookup", async (idOrEmail) => {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrEmail);
       const r = await sql`
         SELECT * FROM zvd_contacts
-        WHERE ${isUuid ? sql`id = ${idOrEmail}::uuid` : sql`email = ${idOrEmail}`}
+        WHERE ${isUuid ? sql`id = ${idOrEmail}::uuid` : sql`email = ${idOrEmail}`} AND tenant_id = ${ownTenant}
         LIMIT 1
       `.execute(ctx.db);
       return r.rows[0] ?? null;
     });
     ctx.services.register("crm.contacts.findByEmail", async (email3) => {
       const r = await sql`
-        SELECT * FROM zvd_contacts WHERE email = ${email3} LIMIT 1
+        SELECT * FROM zvd_contacts WHERE email = ${email3} AND tenant_id = ${ownTenant} LIMIT 1
       `.execute(ctx.db);
       return r.rows[0] ?? null;
     });
@@ -25231,13 +25233,11 @@ var extension = {
       ctx.events.emit("contact.created", { id: contact.id, contact });
       return contact;
     });
-    const ownTenant = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
-                                   '00000000-0000-0000-0000-000000000001'::uuid)`;
     ctx.services.register("crm.organizations.lookup", async (idOrName) => {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrName);
       const r = await sql`
         SELECT * FROM zvd_organizations
-        WHERE ${isUuid ? sql`id = ${idOrName}::uuid` : sql`name = ${idOrName} AND tenant_id = ${ownTenant}`}
+        WHERE ${isUuid ? sql`id = ${idOrName}::uuid` : sql`name = ${idOrName}`} AND tenant_id = ${ownTenant}
         LIMIT 1
       `.execute(ctx.db);
       return r.rows[0] ?? null;

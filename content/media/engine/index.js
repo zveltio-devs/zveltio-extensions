@@ -21503,6 +21503,8 @@ function permissionGate(ctx, resource, opts = {}) {
     await next();
   };
 }
+// /zveltio-extension/packages/sdk/src/extension/action-refusal.ts
+var ACTION_REFUSAL = Symbol.for("zveltio.extension.action-refusal");
 // /zveltio-extension/packages/sdk/src/extension/multipart.ts
 var MULTIPART_REQUIRED = { error: "Expected a multipart/form-data body." };
 async function readMultipart(c) {

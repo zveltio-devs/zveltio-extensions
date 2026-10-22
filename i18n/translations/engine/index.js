@@ -24673,7 +24673,7 @@ function translationsRoutes(ctx) {
         COALESCE(json_agg(json_build_object('locale', t.locale, 'value', t.value, 'reviewed', t.reviewed)) FILTER (WHERE t.id IS NOT NULL), '[]') AS translations
       FROM zvd_translation_keys tk
       LEFT JOIN zvd_translations t ON t.key_id = tk.id
-      WHERE tk.id = ${c.req.param("keyId")}
+      WHERE tk.id = ${c.req.param("keyId")} AND tk.tenant_id = ${OWN_TENANT}
       GROUP BY tk.id
     `.execute(db);
     if (!rows.rows[0])
@@ -24681,7 +24681,7 @@ function translationsRoutes(ctx) {
     return c.json({ key: rows.rows[0] });
   });
   app.delete("/:keyId", async (c) => {
-    await db.deleteFrom("zvd_translation_keys").where("id", "=", c.req.param("keyId")).execute();
+    await db.deleteFrom("zvd_translation_keys").where("id", "=", c.req.param("keyId")).where("tenant_id", "=", OWN_TENANT).execute();
     invalidateCache();
     return c.json({ success: true });
   });
@@ -24693,7 +24693,7 @@ function translationsRoutes(ctx) {
     const user = c.get("user");
     const { keyId, locale } = c.req.param();
     const data = c.req.valid("json");
-    const key = await db.selectFrom("zvd_translation_keys").where("id", "=", keyId).executeTakeFirst();
+    const key = await db.selectFrom("zvd_translation_keys").where("id", "=", keyId).where("tenant_id", "=", OWN_TENANT).executeTakeFirst();
     if (!key)
       return c.json({ error: "Translation key not found" }, 404);
     const translation = await sql`
@@ -24713,7 +24713,7 @@ function translationsRoutes(ctx) {
     const result = await sql`
       UPDATE zvd_translations
       SET reviewed = true, approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
-      WHERE key_id = ${keyId}::uuid AND locale = ${locale}
+      WHERE key_id = ${keyId}::uuid AND locale = ${locale} AND tenant_id = ${OWN_TENANT}
       RETURNING id
     `.execute(db);
     if (!result.rows[0])
@@ -24722,7 +24722,7 @@ function translationsRoutes(ctx) {
     return c.json({ success: true });
   });
   app.delete("/:keyId/:locale", async (c) => {
-    await db.deleteFrom("zvd_translations").where("key_id", "=", c.req.param("keyId")).where("locale", "=", c.req.param("locale")).execute();
+    await db.deleteFrom("zvd_translations").where("key_id", "=", c.req.param("keyId")).where("locale", "=", c.req.param("locale")).where("tenant_id", "=", OWN_TENANT).execute();
     invalidateCache();
     return c.json({ success: true });
   });
