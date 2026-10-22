@@ -90,6 +90,9 @@ const extension: ZveltioExtension = {
         return p;
       };
       return {
+        // The stand-in is never null, so "is there one?" is this, not `!provider`:
+        // a caller that answers 503 for a firm with none asks before chatting.
+        configured: async () => pick(await providersFor(ctx.db)) !== null,
         chat: async (...a: Parameters<AIProvider['chat']>) => (await resolve()).chat(...a),
         embed: async (text: string, model?: string) => {
           const p = await resolve();

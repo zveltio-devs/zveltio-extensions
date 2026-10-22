@@ -120291,6 +120291,10 @@ function mailRoutes(ctx) {
     ctx.internals.assertNonMetadataUrl(`http://${authority}:${port}`, label);
   }
   const aiProviderManager = ctx.services.get("ai.providers");
+  async function aiProvider() {
+    const provider = aiProviderManager?.getDefault?.();
+    return provider?.chat && await provider.configured?.() !== false ? provider : null;
+  }
   const app = new Hono2;
   app.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -120711,8 +120715,8 @@ function mailRoutes(ctx) {
     if (!msgResult.rows[0])
       return c.json({ error: "Not found" }, 404);
     const { subject, body_text } = msgResult.rows[0];
-    const provider = aiProviderManager?.getDefault?.();
-    if (!provider?.chat)
+    const provider = await aiProvider();
+    if (!provider)
       return c.json({ error: "No AI provider configured" }, 503);
     const result = await provider.chat([
       { role: "system", content: "Summarize this email in 2-3 bullet points. Be concise." },
@@ -120732,8 +120736,8 @@ ${body_text || "(no body)"}` }
     if (!msgResult.rows[0])
       return c.json({ error: "Not found" }, 404);
     const { subject, body_text, from_address, from_name } = msgResult.rows[0];
-    const provider = aiProviderManager?.getDefault?.();
-    if (!provider?.chat)
+    const provider = await aiProvider();
+    if (!provider)
       return c.json({ error: "No AI provider configured" }, 503);
     const result = await provider.chat([
       { role: "system", content: "Draft a professional, concise email reply. Return only the reply body, no subject line." },

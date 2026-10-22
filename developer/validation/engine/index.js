@@ -24697,7 +24697,7 @@ Description: ${description}`;
     try {
       const aiProviders = ctx.services.get("ai.providers");
       const provider = aiProviders?.getDefault?.();
-      if (!provider)
+      if (!provider || await provider.configured?.() === false)
         return c.json({ error: "AI extension is not active or no AI provider is configured" }, 503);
       const response = await provider.chat([{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }], { temperature: 0.2 });
       const text = response.content || "";

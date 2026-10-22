@@ -73,6 +73,12 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
   // AI access goes through the cross-extension service registry. Returns null
   // if the `ai` extension isn't active — AI compose/summarize endpoints will 503.
   const aiProviderManager = ctx.services.get<{ getDefault(): any }>('ai.providers');
+  // `getDefault()` is a stand-in, never null; `configured()` says whether the
+  // caller's firm has a provider at all.
+  async function aiProvider(): Promise<any | null> {
+    const provider = aiProviderManager?.getDefault?.();
+    return provider?.chat && (await provider.configured?.()) !== false ? provider : null;
+  }
 
   const app = new Hono();
 
@@ -691,8 +697,8 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     if (!msgResult.rows[0]) return c.json({ error: 'Not found' }, 404);
     const { subject, body_text } = msgResult.rows[0] as any;
 
-    const provider = aiProviderManager?.getDefault?.();
-    if (!provider?.chat) return c.json({ error: 'No AI provider configured' }, 503);
+    const provider = await aiProvider();
+    if (!provider) return c.json({ error: 'No AI provider configured' }, 503);
 
     const result = await provider.chat([
       { role: 'system', content: 'Summarize this email in 2-3 bullet points. Be concise.' },
@@ -714,8 +720,8 @@ export function mailRoutes(ctx: ExtensionContext): Hono {
     if (!msgResult.rows[0]) return c.json({ error: 'Not found' }, 404);
     const { subject, body_text, from_address, from_name } = msgResult.rows[0] as any;
 
-    const provider = aiProviderManager?.getDefault?.();
-    if (!provider?.chat) return c.json({ error: 'No AI provider configured' }, 503);
+    const provider = await aiProvider();
+    if (!provider) return c.json({ error: 'No AI provider configured' }, 503);
 
     const result = await provider.chat([
       { role: 'system', content: 'Draft a professional, concise email reply. Return only the reply body, no subject line.' },
