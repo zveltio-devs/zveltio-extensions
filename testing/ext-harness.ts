@@ -128,6 +128,7 @@ const RECORDED_STUBS = new Set(
 const ENGINE_LIB = join(REPO, '..', 'zveltio', 'packages', 'engine', 'src', 'lib', 'extensions');
 const restrictP = import(join(ENGINE_LIB, 'extension-context.js'));
 const capsP = import(join(ENGINE_LIB, 'capabilities.js'));
+const broadcastP = import(join(ENGINE_LIB, 'broadcast.js'));
 const registerP = import(join(ENGINE_LIB, 'register.js'));
 const internalsP = import(join(ENGINE_LIB, 'internals.js'));
 const tenancyP = import(join(ENGINE_LIB, '..', 'tenancy', 'index.js'));
@@ -676,6 +677,8 @@ async function makeCtx(
       publicRoutes?.push(spec);
     },
     onHealthCheck() {},
+    // The engine's own: messages go on its bus and reach this process's handlers too.
+    broadcast: ((await broadcastP) as any).extensionBroadcast(extName),
     entityAccess: { register() {} },
     queryAlter: { register() {} },
     fieldTypeRegistry: { register() {}, get: () => undefined, getAll: () => [], list: () => [] },

@@ -47,6 +47,7 @@ async function registeredNames(): Promise<string[]> {
     },
     services: { register: (n: string) => names.push(n), get: () => null, has: () => false },
     events: { on: noop, emit: noop, emitAsync: async () => undefined },
+    broadcast: { on: noop, onMissed: noop, publish: async () => undefined },
     internals: new Proxy({}, { get: () => noop }),
     config: { vars: {} },
     auth: {},

@@ -1,7 +1,14 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
 import { join } from 'path';
 import { buildAIRoutes } from './routes/index.js';
-import { type AIProvider, type AIProviderManager, providersFor } from './lib/ai-provider.js';
+import {
+  type AIProvider,
+  type AIProviderManager,
+  forgetProviders,
+  PROVIDERS_CHANGED,
+  providersFor,
+  tenantProviders,
+} from './lib/ai-provider.js';
 import { setInternals } from './lib/ai-crypto.js';
 import { triggerEmbedding } from './lib/ai-embed-hook.js';
 import { ZveltioAIEngine } from './lib/zveltio-ai/engine.js';
@@ -62,6 +69,12 @@ const extension: ZveltioExtension = {
     // Before anything that could touch a provider key: loading a firm's
     // providers decrypts its keys.
     setInternals(ctx.internals);
+
+    // A firm's provider change reaches every replica: the handler runs in that
+    // firm's transaction, so `ctx.db` names it. A replica that may have missed
+    // one drops them all and reloads each firm on its next call.
+    ctx.broadcast.on(PROVIDERS_CHANGED, () => forgetProviders(ctx.db));
+    ctx.broadcast.onMissed(() => tenantProviders.clear());
 
     // Providers are per firm and loaded on the firm's first AI call
     // (`providersFor`), so there is nothing to load here. A firm with none gets
