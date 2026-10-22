@@ -21,7 +21,8 @@ let cacheExpiry = 0;
 // The OWN tenant (the `tenant_id` column default's expression). Locale codes and
 // translation keys are unique per tenant (migrations 003/004), but the row
 // policy admits the caller's READ REACH — every firm for a god — so a match on
-// code, key or `is_default` alone hit every firm's rows.
+// code, key, id or `is_default` alone hit every firm's rows — and a
+// translation written under the own tenant against another firm's key id.
 const OWN_TENANT = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
                                 '00000000-0000-0000-0000-000000000001'::uuid)`;
 
@@ -214,7 +215,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
         COALESCE(json_agg(json_build_object('locale', t.locale, 'value', t.value, 'reviewed', t.reviewed)) FILTER (WHERE t.id IS NOT NULL), '[]') AS translations
       FROM zvd_translation_keys tk
       LEFT JOIN zvd_translations t ON t.key_id = tk.id
-      WHERE tk.id = ${c.req.param('keyId')}
+      WHERE tk.id = ${c.req.param('keyId')} AND tk.tenant_id = ${OWN_TENANT}
       GROUP BY tk.id
     `.execute(db);
     if (!rows.rows[0]) return c.json({ error: 'Key not found' }, 404);
@@ -222,7 +223,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.delete('/:keyId', async (c) => {
-    await (db as any).deleteFrom('zvd_translation_keys').where('id', '=', c.req.param('keyId')).execute();
+    await (db as any).deleteFrom('zvd_translation_keys').where('id', '=', c.req.param('keyId')).where('tenant_id', '=', OWN_TENANT).execute();
     invalidateCache();
     return c.json({ success: true });
   });
@@ -239,7 +240,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
       const { keyId, locale } = c.req.param();
       const data = c.req.valid('json');
 
-      const key = await (db as any).selectFrom('zvd_translation_keys').where('id', '=', keyId).executeTakeFirst();
+      const key = await (db as any).selectFrom('zvd_translation_keys').where('id', '=', keyId).where('tenant_id', '=', OWN_TENANT).executeTakeFirst();
       if (!key) return c.json({ error: 'Translation key not found' }, 404);
 
       const translation = await sql`
@@ -264,7 +265,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
     const result = await sql<any>`
       UPDATE zvd_translations
       SET reviewed = true, approved_by = ${user.id}, approved_at = NOW(), updated_at = NOW()
-      WHERE key_id = ${keyId}::uuid AND locale = ${locale}
+      WHERE key_id = ${keyId}::uuid AND locale = ${locale} AND tenant_id = ${OWN_TENANT}
       RETURNING id
     `.execute(db);
 
@@ -274,7 +275,7 @@ export function translationsRoutes(ctx: ExtensionContext): Hono {
   });
 
   app.delete('/:keyId/:locale', async (c) => {
-    await (db as any).deleteFrom('zvd_translations').where('key_id', '=', c.req.param('keyId')).where('locale', '=', c.req.param('locale')).execute();
+    await (db as any).deleteFrom('zvd_translations').where('key_id', '=', c.req.param('keyId')).where('locale', '=', c.req.param('locale')).where('tenant_id', '=', OWN_TENANT).execute();
     invalidateCache();
     return c.json({ success: true });
   });

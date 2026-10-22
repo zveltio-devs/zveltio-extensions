@@ -81,4 +81,29 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('i18n: locales and keys are the 
       expect(((await res.json()) as any).translations['q.shared']).toBe(tag);
     }
   });
+
+  // By id: another firm's key is not found, so no translation is written under
+  // the own tenant against it, and its translations are neither approved nor deleted.
+  it('another firm’s key id is not found', async () => {
+    const [{ id }] = await q(`SELECT id FROM zvd_translation_keys WHERE tenant_id = ANY($1) AND key = 'q.only.b'
+                               AND tenant_id::text = '${B}'`);
+    const god = await h.asGod(A);
+    expect((await god.request(`/${id}`)).status).toBe(404);
+    const put = await god.request(`/${id}/q3`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ value: 'from A' }),
+    });
+    expect(put.status).toBe(404);
+    const [{ id: bShared }] = await q(`SELECT id FROM zvd_translation_keys WHERE tenant_id = ANY($1)
+                                         AND key = 'q.shared' AND tenant_id::text = '${B}'`);
+    expect((await god.request(`/${bShared}/q3/approve`, { method: 'POST' })).status).toBe(404);
+    expect((await god.request(`/${bShared}/q3`, { method: 'DELETE' })).status).toBe(200);
+    expect((await god.request(`/${id}`, { method: 'DELETE' })).status).toBe(200);
+    expect(
+      await q(`SELECT tk.tenant_id::text AS t, count(t.id)::int AS n FROM zvd_translation_keys tk
+                LEFT JOIN zvd_translations t ON t.key_id = tk.id
+                WHERE tk.tenant_id = ANY($1) AND tk.id IN ('${id}', '${bShared}') GROUP BY 1`),
+    ).toEqual([{ t: B, n: 1 }]);
+  });
 });

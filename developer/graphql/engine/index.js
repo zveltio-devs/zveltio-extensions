@@ -32710,27 +32710,22 @@ function mapFieldType(fieldType) {
   return map2[fieldType] ?? GraphQLString;
 }
 async function getFieldPolicies(dbh) {
-  try {
-    const result = await sql`
-      SELECT collection, field, allowed_roles, deny_roles
-      FROM zvd_graphql_field_policies
-      WHERE tenant_id = ${OWN_TENANT}
-    `.execute(dbh);
-    return result.rows;
-  } catch {
-    return [];
-  }
+  const result = await sql`
+    SELECT collection, field, allowed_roles, deny_roles
+    FROM zvd_graphql_field_policies
+    WHERE tenant_id = ${OWN_TENANT}
+  `.execute(dbh);
+  return result.rows;
 }
 async function buildDynamicSchema(ctx) {
   const { db, DDLManager } = ctx;
   let collections = [];
   let relations = [];
-  let fieldPolicies = [];
   try {
     collections = await DDLManager.getCollections(db);
     relations = await DDLManager.getRelations(db);
-    fieldPolicies = await getFieldPolicies(db);
   } catch {}
+  const fieldPolicies = await getFieldPolicies(db);
   const fieldPolicyMap = new Map;
   for (const p of fieldPolicies) {
     fieldPolicyMap.set(`${p.collection}.${p.field}`, {
@@ -33214,11 +33209,11 @@ function graphqlRoutes(ctx) {
       const tenantKey = c.get?.("tenant")?.id ?? "default";
       const schema = await getSchema(ctx, tenantKey);
       const result = await run(c, user, schema, pq.query, variables);
-      sql`
+      await sql`
         UPDATE zvd_graphql_persisted_queries
         SET use_count = use_count + 1, last_used_at = NOW(), updated_at = NOW()
         WHERE name = ${name} AND tenant_id = ${OWN_TENANT}
-      `.execute(db).catch(() => {});
+      `.execute(db);
       return c.json(result);
     } catch (err) {
       return c.json({ errors: [{ message: String(err) }] }, 400);

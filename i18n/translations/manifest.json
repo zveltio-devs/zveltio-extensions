@@ -3,7 +3,7 @@
   "displayName": "Translations",
   "category": "i18n",
   "description": "Internationalization: manage locales, translation keys and per-locale string values",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-translations",
@@ -36,8 +36,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "d042c4ec16e79320766c0e760405cb792af8bf61359e453efb7c82d5b082c1db",
-    "sourceSha256": "58a75a0f321466d354b1d3f98d32e6a09bfc01ddec69f200494b1872fd6b2bae"
+    "engineSha256": "4b1e1c7aa8a6bb8218b329f2967e46fa9afe8c48f4f956f51c8a15f438d15da9",
+    "sourceSha256": "fbe2da9c856f3a0d12ea72c99ad7336493371f1e9e4317d64c38e4a49c7c1640"
   },
   "publicRoutes": [
     "/public/*"
