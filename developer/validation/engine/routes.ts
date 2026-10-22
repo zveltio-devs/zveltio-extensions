@@ -287,7 +287,8 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
     try {
       const aiProviders = ctx.services.get<{ getDefault(): any }>('ai.providers');
       const provider = aiProviders?.getDefault?.();
-      if (!provider) return c.json({ error: 'AI extension is not active or no AI provider is configured' }, 503);
+      // A stand-in, never null: `configured()` says whether the firm has one.
+      if (!provider || (await provider.configured?.()) === false) return c.json({ error: 'AI extension is not active or no AI provider is configured' }, 503);
 
       const response = await provider.chat(
         [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }],
