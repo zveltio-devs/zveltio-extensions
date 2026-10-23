@@ -24656,7 +24656,10 @@ function validationRoutes(ctx) {
     try {
       return { rule: await writeValidationRule(c, write) };
     } catch (err) {
-      return { refused: String(err?.message ?? err) };
+      return {
+        refused: String(err?.message ?? err),
+        status: err?.errno === "23505" ? 409 : 403
+      };
     }
   };
   const visibleTo = (c) => {
@@ -24771,7 +24774,7 @@ Description: ${description}`;
       rule: { ...body, nl_description: body.nl_description || null }
     });
     if ("refused" in r)
-      return c.json({ error: r.refused }, 403);
+      return c.json({ error: r.refused }, r.status);
     return c.json({ rule: r.rule }, 201);
   });
   app.patch("/rules/:id", zValidator("json", RuleUpdateSchema), async (c) => {
@@ -24813,7 +24816,7 @@ Description: ${description}`;
       rule: { ...body, collection, nl_description: body.nl_description || null }
     });
     if ("refused" in r)
-      return c.json({ error: r.refused }, 403);
+      return c.json({ error: r.refused }, r.status);
     return c.json({ rule: r.rule }, 201);
   });
   app.post("/:collection/bulk-test", async (c) => {
