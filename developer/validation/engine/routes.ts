@@ -238,7 +238,11 @@ export function validationRoutes(ctx: ExtensionContext): Hono {
     try {
       return { rule: await writeValidationRule(c, write) };
     } catch (err: any) {
-      return { refused: String(err?.message ?? err) };
+      // 23505: an instance rule with this field, type and config exists (engine 098).
+      return {
+        refused: String(err?.message ?? err),
+        status: (err?.errno === '23505' ? 409 : 403) as 403 | 409,
+      };
     }
   };
   /** Rules this request answers to: instance rules and its own tenant's. */
@@ -389,7 +393,7 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
       op: 'create',
       rule: { ...body, nl_description: body.nl_description || null },
     });
-    if ('refused' in r) return c.json({ error: r.refused }, 403);
+    if ('refused' in r) return c.json({ error: r.refused }, r.status);
     return c.json({ rule: r.rule }, 201);
   });
 
@@ -443,7 +447,7 @@ For nlp (complex): rule_config = { "expression": "CEL boolean expression using '
       op: 'create',
       rule: { ...body, collection, nl_description: body.nl_description || null },
     });
-    if ('refused' in r) return c.json({ error: r.refused }, 403);
+    if ('refused' in r) return c.json({ error: r.refused }, r.status);
     return c.json({ rule: r.rule }, 201);
   });
 
