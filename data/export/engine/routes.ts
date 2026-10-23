@@ -33,7 +33,7 @@ async function runExportJob(
   fields: string[],
   sortField: string | undefined,
   sortOrder: string,
-  user: { id: string; email?: string; role?: string },
+  user: { id: string; email?: string; role?: string; authorUserId?: string | null },
   authType: 'session' | 'api_key',
 ): Promise<void> {
   const { DDLManager, fieldTypeRegistry } = ctx;
@@ -315,7 +315,7 @@ export function exportRoutes(ctx: ExtensionContext): Hono {
         // caller from — the same shape as the `tenantId` follow-up above, and
         // for the same reason: an export is answered on behalf of somebody, and
         // RLS and column permissions are both questions about who.
-        { id: user.id, email: user.email, role: user.role },
+        { id: user.id, email: user.email, role: user.role, authorUserId: user.authorUserId },
         (c.get('authType') as 'session' | 'api_key') ?? 'session',
       ).catch(() => { /* errors handled inside runExportJob */ });
 

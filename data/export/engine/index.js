@@ -24755,7 +24755,7 @@ function exportRoutes(ctx) {
       status: "pending",
       created_by: user.id
     }).returningAll().executeTakeFirst();
-    runExportJob(ctx, tenantOf(c), job.id, body.collection, body.format, body.filters, body.fields, body.sort_field, body.sort_order, { id: user.id, email: user.email, role: user.role }, c.get("authType") ?? "session").catch(() => {});
+    runExportJob(ctx, tenantOf(c), job.id, body.collection, body.format, body.filters, body.fields, body.sort_field, body.sort_order, { id: user.id, email: user.email, role: user.role, authorUserId: user.authorUserId }, c.get("authType") ?? "session").catch(() => {});
     return c.json({ job_id: job.id, status: "pending", message: "Export job queued" }, 202);
   });
   app.get("/jobs/:id", async (c) => {
