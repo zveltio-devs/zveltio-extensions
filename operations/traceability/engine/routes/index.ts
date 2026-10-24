@@ -35,11 +35,11 @@ export function traceRoutes(ctx: ExtensionContext): Hono {
    *     deployment on upgrade, and an operator who hits a wall of 403s turns
    *     the control off rather than writing policy.
    *
-   *   - Writes require `traceability` / `write`. Admins already match through
-   *     the seeded `p, admin, *, *, *` rule, so an upgrade keeps working for
-   *     them; anyone else needs an explicit grant. The extension's tables are
-   *     `trace_*`, not `zvd_*`, so the seeded `member → zvd_* read` policy
-   *     never covered them and no existing grant is silently widened here.
+   *   - Writes require the engine object `admin` (tenant admin, or god). They
+   *     used to require `traceability` / `write`, a name no engine object owns:
+   *     a bare Casbin object is a collection (ADR 0002), so a collection named
+   *     `traceability` handed its writers this whole API. Per-role write
+   *     access comes back as declared actions in the extension migration wave.
    *
    * Read exposure inside a tenant is a real remaining gap, not an oversight —
    * closing it belongs with a per-collection permission model, not with a
@@ -52,16 +52,9 @@ export function traceRoutes(ctx: ExtensionContext): Hono {
 
     const method = c.req.method.toUpperCase();
     if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
-      const allowed = await ctx.checkPermission(session.user.id, 'traceability', 'write');
-      if (!allowed) {
-        return c.json(
-          {
-            error:
-              'Writing traceability records requires the "traceability" write permission. ' +
-              'Grant it to the role that needs it.',
-          },
-          403,
-        );
+      // `admin:*` is what the engine's isTenantAdmin checks; the god bypass matches it too.
+      if (!(await ctx.checkPermission(session.user.id, 'admin', '*'))) {
+        return c.json({ error: 'Writing traceability records requires a tenant admin.' }, 403);
       }
     }
 

@@ -8382,7 +8382,7 @@ var require_pako = __commonJS((exports, module) => {
   module.exports = pako;
 });
 
-// /zveltio-extension/node_modules/tslib/tslib.js
+// /zveltio-extension/node_modules/pdf-lib/node_modules/tslib/tslib.js
 var require_tslib = __commonJS((exports, module) => {
   /*! *****************************************************************************
   Copyright (c) Microsoft Corporation.
@@ -66854,7 +66854,7 @@ fontkit.registerFormat(TrueTypeCollection);
 fontkit.registerFormat(DFont);
 var fontkit_es_default = fontkit;
 
-// /zveltio-extension/node_modules/tslib/modules/index.js
+// /zveltio-extension/node_modules/pdf-lib/node_modules/tslib/modules/index.js
 var import_tslib = __toESM(require_tslib(), 1);
 var {
   __extends,
@@ -82511,11 +82511,8 @@ function traceRoutes(ctx) {
     c.set("user", session.user);
     const method2 = c.req.method.toUpperCase();
     if (method2 !== "GET" && method2 !== "HEAD" && method2 !== "OPTIONS") {
-      const allowed = await ctx.checkPermission(session.user.id, "traceability", "write");
-      if (!allowed) {
-        return c.json({
-          error: 'Writing traceability records requires the "traceability" write permission. ' + "Grant it to the role that needs it."
-        }, 403);
+      if (!await ctx.checkPermission(session.user.id, "admin", "*")) {
+        return c.json({ error: "Writing traceability records requires a tenant admin." }, 403);
       }
     }
     await next();
@@ -82597,3 +82594,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
+// @zveltio-bundled kysely@0.29.6
+// @zveltio-bundled @hono/zod-validator@0.9.1
