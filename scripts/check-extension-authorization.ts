@@ -57,6 +57,7 @@ const AUTHORIZATION = [
   /\brequireAdmin\s*\(/,
   /\bisAdmin\b/,
   /\bisGodUser\s*\(/,
+  /\bisTenantAdmin\s*\(/,
   /\bhasCapability\s*\(/,
 ];
 

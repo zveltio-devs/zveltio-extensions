@@ -1,5 +1,5 @@
 // A widget that reports on the tenant needs the engine object `admin`, never
-// a bare name: a bare Casbin object is a collection (ADR 0002). A collection
+// a bare name: a bare Casbin object is a collection (extension model v3). A collection
 // named `audit`, `users` or `collections` hands every member `read` on that
 // name through the default member grants, and that must not reveal a widget.
 import { describe, expect, it } from 'bun:test';
