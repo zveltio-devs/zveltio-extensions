@@ -10,7 +10,7 @@
  * choice can widen that. A widget that reports on the tenant (health, people,
  * data, activity) needs the engine object `admin`. It used to check `users`,
  * `collections` and `audit`, names no engine object owns: a bare Casbin object
- * is a collection (ADR 0002), so a collection named `audit` handed every member
+ * is a collection (extension model v3), so a collection named `audit` handed every member
  * the activity widget through the default member grants.
  */
 

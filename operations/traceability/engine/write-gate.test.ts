@@ -1,5 +1,5 @@
 // Writes need the engine object `admin`, never the bare name `traceability`:
-// a bare Casbin object is a collection (ADR 0002), so a collection named
+// a bare Casbin object is a collection (extension model v3), so a collection named
 // `traceability` would hand its writers this whole API.
 import { describe, expect, it } from 'bun:test';
 import { mountForTest } from '../../../testing/ext-harness';
