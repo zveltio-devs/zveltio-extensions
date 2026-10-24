@@ -390,8 +390,8 @@ describe.skipIf(!DB_URL)('traceability: completing a production order twice', ()
  * endpoint.
  *
  * Everything else in this extension was hardened so a recall cannot be undone by
- * accident. `PATCH /lots/:id/status` undid all of it on purpose: any holder of
- * `traceability` write could set a recalled lot to `available` in one request,
+ * accident. `PATCH /lots/:id/status` undid all of it on purpose: any
+ * writer could set a recalled lot to `available` in one request,
  * leaving nothing in the movement ledger.
  *
  * Exercised against the statement rather than through HTTP, because what changed

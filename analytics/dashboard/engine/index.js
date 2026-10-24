@@ -24529,12 +24529,12 @@ function parseParameter(param) {
 }
 // engine/routes.ts
 var WIDGET_CATALOG = [
-  { id: "welcome", permission: null, removable: false },
-  { id: "health", permission: { resource: "admin", action: "*" }, removable: true },
-  { id: "people", permission: { resource: "users", action: "read" }, removable: true },
-  { id: "data", permission: { resource: "collections", action: "read" }, removable: true },
-  { id: "activity", permission: { resource: "audit", action: "read" }, removable: true },
-  { id: "trust", permission: null, removable: true }
+  { id: "welcome", admin: false, removable: false },
+  { id: "health", admin: true, removable: true },
+  { id: "people", admin: true, removable: true },
+  { id: "data", admin: true, removable: true },
+  { id: "activity", admin: true, removable: true },
+  { id: "trust", admin: false, removable: true }
 ];
 var CATALOG_IDS = WIDGET_CATALOG.map((w) => w.id);
 var CATALOG_ORDER = new Map(CATALOG_IDS.map((id, i) => [id, i]));
@@ -24553,17 +24553,7 @@ function normalise(ids) {
 }
 async function visibleWidgets(userId, checkPermission) {
   const admin = await checkPermission(userId, "admin", "*").catch(() => false);
-  const out = new Set;
-  for (const w of WIDGET_CATALOG) {
-    if (w.permission === null || admin) {
-      out.add(w.id);
-    } else {
-      const ok = await checkPermission(userId, w.permission.resource, w.permission.action).catch(() => false);
-      if (ok)
-        out.add(w.id);
-    }
-  }
-  return out;
+  return new Set(WIDGET_CATALOG.filter((w) => admin || !w.admin).map((w) => w.id));
 }
 async function readLayout(dbh, scope, owner) {
   const r = await sql`
@@ -24739,7 +24729,11 @@ function dashboardRoutes(ctx) {
       return c.json({ error: "Forbidden" }, 403);
     const roles = (await ctx.internals.listRoles().catch(failed("roles", []))).filter(Boolean);
     return c.json({
-      catalog: WIDGET_CATALOG.map((w) => ({ id: w.id, removable: w.removable, permission: w.permission })),
+      catalog: WIDGET_CATALOG.map((w) => ({
+        id: w.id,
+        removable: w.removable,
+        permission: w.admin ? { resource: "admin", action: "*" } : null
+      })),
       roles,
       default: DEFAULT_LAYOUT
     });

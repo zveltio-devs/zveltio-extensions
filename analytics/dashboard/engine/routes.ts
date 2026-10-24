@@ -7,9 +7,11 @@
  *
  * A widget is only ever rendered — and its data only ever computed — if the
  * viewer is permitted to see it. Neither a role config nor a user's personal
- * choice can widen that. Visibility is decided by the engine's Casbin
- * permissions via `ctx.checkPermission`, so IT grants a role e.g.
- * `collections:read` and the `data` widget appears.
+ * choice can widen that. A widget that reports on the tenant (health, people,
+ * data, activity) needs the engine object `admin`. It used to check `users`,
+ * `collections` and `audit`, names no engine object owns: a bare Casbin object
+ * is a collection (ADR 0002), so a collection named `audit` handed every member
+ * the activity widget through the default member grants.
  */
 
 import { Hono } from 'hono';
@@ -23,19 +25,19 @@ type WidgetId = 'welcome' | 'health' | 'people' | 'data' | 'activity' | 'trust';
 
 interface WidgetDef {
   id: WidgetId;
-  /** Permission required to see the widget; `null` = visible to everyone. */
-  permission: { resource: string; action: string } | null;
+  /** Needs `admin` (tenant admin, or god); otherwise visible to everyone. */
+  admin: boolean;
   /** May a user hide it from their personal dashboard? `welcome` cannot. */
   removable: boolean;
 }
 
 const WIDGET_CATALOG: WidgetDef[] = [
-  { id: 'welcome', permission: null, removable: false },
-  { id: 'health', permission: { resource: 'admin', action: '*' }, removable: true },
-  { id: 'people', permission: { resource: 'users', action: 'read' }, removable: true },
-  { id: 'data', permission: { resource: 'collections', action: 'read' }, removable: true },
-  { id: 'activity', permission: { resource: 'audit', action: 'read' }, removable: true },
-  { id: 'trust', permission: null, removable: true },
+  { id: 'welcome', admin: false, removable: false },
+  { id: 'health', admin: true, removable: true },
+  { id: 'people', admin: true, removable: true },
+  { id: 'data', admin: true, removable: true },
+  { id: 'activity', admin: true, removable: true },
+  { id: 'trust', admin: false, removable: true },
 ];
 
 const CATALOG_IDS = WIDGET_CATALOG.map((w) => w.id);
@@ -67,21 +69,10 @@ type GetUserRoles = ExtensionContext['getUserRoles'];
 // ── Visibility (the permission ceiling) ──────────────────────────────
 
 async function visibleWidgets(userId: string, checkPermission: CheckPermission): Promise<Set<WidgetId>> {
-  // `admin:*` carries the god bypass inside checkPermission, so this covers
-  // both super-admins and anyone Casbin grants blanket admin.
+  // `admin:*` carries the god bypass inside checkPermission; it is what the
+  // engine's isTenantAdmin checks.
   const admin = await checkPermission(userId, 'admin', '*').catch(() => false);
-  const out = new Set<WidgetId>();
-  for (const w of WIDGET_CATALOG) {
-    if (w.permission === null || admin) {
-      out.add(w.id);
-    } else {
-      const ok = await checkPermission(userId, w.permission.resource, w.permission.action).catch(
-        () => false,
-      );
-      if (ok) out.add(w.id);
-    }
-  }
-  return out;
+  return new Set(WIDGET_CATALOG.filter((w) => admin || !w.admin).map((w) => w.id));
 }
 
 // ── Layout storage (own table, tenant-scoped via RLS) ────────────────
@@ -445,7 +436,11 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
       Boolean,
     );
     return c.json({
-      catalog: WIDGET_CATALOG.map((w) => ({ id: w.id, removable: w.removable, permission: w.permission })),
+      catalog: WIDGET_CATALOG.map((w) => ({
+        id: w.id,
+        removable: w.removable,
+        permission: w.admin ? { resource: 'admin', action: '*' } : null,
+      })),
       roles,
       default: DEFAULT_LAYOUT,
     });
