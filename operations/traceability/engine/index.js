@@ -82511,7 +82511,7 @@ function traceRoutes(ctx) {
     c.set("user", session.user);
     const method2 = c.req.method.toUpperCase();
     if (method2 !== "GET" && method2 !== "HEAD" && method2 !== "OPTIONS") {
-      if (!await ctx.internals.isTenantAdmin(session.user.id)) {
+      if (!await ctx.checkPermission(session.user.id, "admin", "*")) {
         return c.json({ error: "Writing traceability records requires a tenant admin." }, 403);
       }
     }

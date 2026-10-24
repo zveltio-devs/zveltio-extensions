@@ -52,7 +52,8 @@ export function traceRoutes(ctx: ExtensionContext): Hono {
 
     const method = c.req.method.toUpperCase();
     if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
-      if (!(await ctx.internals.isTenantAdmin(session.user.id))) {
+      // `admin:*` is what the engine's isTenantAdmin checks; the god bypass matches it too.
+      if (!(await ctx.checkPermission(session.user.id, 'admin', '*'))) {
         return c.json({ error: 'Writing traceability records requires a tenant admin.' }, 403);
       }
     }
