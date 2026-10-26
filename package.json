@@ -30,7 +30,7 @@
     "mailparser": "^3.9.39",
     "nanoid": "^5.1.16",
     "node-forge": "^1.4.0",
-    "nodemailer": "^10.1.1",
+    "nodemailer": "^10.2.1",
     "pdf-lib": "^1.17.1",
     "pg": "8.23.1",
     "qrcode": "^1.5.4",
