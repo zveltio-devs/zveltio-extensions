@@ -3,7 +3,7 @@
   "displayName": "Accounting",
   "category": "finance",
   "description": "Double-entry bookkeeping, chart of accounts, journal entries, P&L and balance sheet reports",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "zveltioMinVersion": "1.0.0",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-accounting",
@@ -38,7 +38,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "6c33a1a84dc0a71ca4a2425ea0e43e712abf8a1d2cec5a59400e79826deb1ad4",
+    "engineSha256": "920f26aae54a42ef33adaf8a511b61560ba40d2d5f1f6450d43704e23627cdee",
     "sourceSha256": "43bf338a0443db9e7784ab4036247a82023a2a8b482603d9f130223af5e2286c"
   },
   "resources": [
