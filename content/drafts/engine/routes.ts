@@ -565,8 +565,10 @@ export function draftsRoutes(ctx: ExtensionContext): Hono {
 
     if (!draft) return c.json({ error: 'Draft not found' }, 404);
 
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
-    if (draft.created_by !== user.id && !isAdmin) return c.json({ error: 'Forbidden' }, 403);
+    // Lazily: an `admin` grant on a write needs the configuration window, so the
+    // owner acting on their own record is not asked to step up.
+    if (draft.created_by !== user.id && !(await checkPermission(user.id, 'admin', '*')))
+      return c.json({ error: 'Forbidden' }, 403);
 
     await (db as any).deleteFrom('zv_content_drafts').where('id', '=', id).execute();
     return c.json({ success: true });

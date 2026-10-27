@@ -353,8 +353,9 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       SELECT created_by FROM zvd_contacts WHERE id = ${id}
     `.execute(db);
     if (!existing.rows[0]) return c.json({ error: 'Not found' }, 404);
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
-    if (existing.rows[0].created_by !== user.id && !isAdmin) {
+    // Lazily: an `admin` grant on a write needs the configuration window, so the
+    // owner acting on their own record is not asked to step up.
+    if (existing.rows[0].created_by !== user.id && !(await checkPermission(user.id, 'admin', '*'))) {
       return c.json({ error: 'Forbidden' }, 403);
     }
     const res = await internals.deleteRecord(c, 'contacts', id);
@@ -480,8 +481,9 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       SELECT created_by FROM zvd_organizations WHERE id = ${id}
     `.execute(db);
     if (!existing.rows[0]) return c.json({ error: 'Not found' }, 404);
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
-    if (existing.rows[0].created_by !== user.id && !isAdmin) {
+    // Lazily: an `admin` grant on a write needs the configuration window, so the
+    // owner acting on their own record is not asked to step up.
+    if (existing.rows[0].created_by !== user.id && !(await checkPermission(user.id, 'admin', '*'))) {
       return c.json({ error: 'Forbidden' }, 403);
     }
     const res = await internals.deleteRecord(c, 'organizations', id);
@@ -602,8 +604,9 @@ export function crmRoutes(ctx: ExtensionContext): Hono {
       SELECT created_by FROM zvd_transactions WHERE id = ${id}
     `.execute(db);
     if (!existing.rows[0]) return c.json({ error: 'Not found' }, 404);
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
-    if (existing.rows[0].created_by !== user.id && !isAdmin) {
+    // Lazily: an `admin` grant on a write needs the configuration window, so the
+    // owner acting on their own record is not asked to step up.
+    if (existing.rows[0].created_by !== user.id && !(await checkPermission(user.id, 'admin', '*'))) {
       return c.json({ error: 'Forbidden' }, 403);
     }
     const res = await internals.deleteRecord(c, 'transactions', id);
