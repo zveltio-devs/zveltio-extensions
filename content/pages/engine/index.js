@@ -288,7 +288,7 @@ var init_bin_trie_flags = __esm(() => {
 });
 
 // /zveltio-extension/node_modules/entities/dist/decode.js
-function isNumber(code) {
+function isNumber2(code) {
   return code - CharCodes.ZERO >>> 0 <= 9;
 }
 function isHexadecimalCharacter(code) {
@@ -298,7 +298,7 @@ function isAlpha(code) {
   return (code | TO_LOWER_BIT) - CharCodes.LOWER_A >>> 0 <= 25;
 }
 function isEntityInAttributeInvalidEnd(code) {
-  return code === CharCodes.EQUALS || isAlpha(code) || isNumber(code);
+  return code === CharCodes.EQUALS || isAlpha(code) || isNumber2(code);
 }
 
 class EntityDecoder {
@@ -369,7 +369,7 @@ class EntityDecoder {
     let { consumed } = this;
     while (offset < inputLength) {
       const char = input.charCodeAt(offset);
-      if (isNumber(char) || isHexadecimalCharacter(char)) {
+      if (isNumber2(char) || isHexadecimalCharacter(char)) {
         const digit = char <= CharCodes.NINE ? char - CharCodes.ZERO : (char | TO_LOWER_BIT) - CharCodes.LOWER_A + 10;
         result = result * 16 + digit;
         consumed += 1;
@@ -2015,18 +2015,18 @@ var require_escape_string_regexp = __commonJS(function(exports, module) {
 });
 
 // /zveltio-extension/node_modules/is-plain-object/dist/is-plain-object.mjs
-function isObject2(o) {
+function isObject3(o) {
   return Object.prototype.toString.call(o) === "[object Object]";
 }
 function isPlainObject2(o) {
   var ctor, prot;
-  if (isObject2(o) === false)
+  if (isObject3(o) === false)
     return false;
   ctor = o.constructor;
   if (ctor === undefined)
     return true;
   prot = ctor.prototype;
-  if (isObject2(prot) === false)
+  if (isObject3(prot) === false)
     return false;
   if (prot.hasOwnProperty("isPrototypeOf") === false) {
     return false;
@@ -17654,420 +17654,25 @@ function preprocess(fn, schema) {
     out: schema
   });
 }
-// engine/hydrate.ts
-function createCollectionCache(deps) {
-  const seen = new Map;
-  return async function lookup(name) {
-    if (typeof name !== "string" || name.length === 0)
-      return null;
-    if (seen.has(name))
-      return seen.get(name) ?? null;
-    const row = await deps.ddl.getCollection(deps.db, name);
-    if (!row) {
-      seen.set(name, null);
-      return null;
-    }
-    const table = `zvd_${name}`;
-    const cols = await deps.ddl.columnNames(deps.db, name);
-    if (cols.length === 0) {
-      seen.set(name, null);
-      return null;
-    }
-    const meta = {
-      name,
-      table,
-      columns: new Set(cols)
-    };
-    seen.set(name, meta);
-    return meta;
-  };
-}
-function blockError(block, message) {
-  return { ...block, content: { ...block.content, _data: [], _error: message } };
-}
-async function refuseReason(deps, audience, collection) {
-  if (!audience.user) {
-    const allowed = audience.publicCollections ?? [];
-    return allowed.includes(collection) ? null : "This collection is not published on this site";
-  }
-  const mayRead = await deps.engine.checkAccess(deps.db, audience.user, collection, "read").catch(() => false);
-  return mayRead ? null : "Not permitted to read this collection";
-}
-async function resolveBlock(deps, audience, lookup, block, viewer = {}) {
-  return resolveWithViewer(deps, audience, lookup, block, viewer);
-}
-async function resolveWithViewer(deps, audience, lookup, block, viewer) {
-  const offset = Math.max(0, Math.floor(Number(viewer.offset) || 0));
-  if (block?.type === "container") {
-    const kids = block.content?.children;
-    if (!Array.isArray(kids))
-      return block;
-    const resolvedKids = await Promise.all(kids.map((k) => resolveWithViewer(deps, audience, lookup, k, {})));
-    return { ...block, content: { ...block.content, children: resolvedKids } };
-  }
-  if (block?.type !== "collection_list")
-    return block;
-  const content = block.content ?? {};
-  let meta;
-  try {
-    meta = await lookup(content.collection);
-  } catch (err) {
-    console.error(`[content/pages] could not resolve collection "${String(content.collection)}":`, err?.message ?? err);
-    return blockError(block, "Could not load this data");
-  }
-  if (!meta)
-    return blockError(block, "Unknown collection");
-  const refusal = await refuseReason(deps, audience, meta.name);
-  if (refusal)
-    return blockError(block, refusal);
-  const requested = parseFields(content);
-  const fields = requested.filter((f) => meta.columns.has(f));
-  if (requested.length > 0 && fields.length === 0) {
-    return blockError(block, "No readable fields named");
-  }
-  const shown = fields.length > 0 ? new Set(fields) : meta.columns;
-  const authorSort = typeof content.sort_field === "string" && meta.columns.has(content.sort_field) ? content.sort_field : meta.columns.has("created_at") ? "created_at" : "id";
-  const limit = Math.min(Math.max(Number(content.limit) || 20, 1), 100);
-  try {
-    const role = await deps.engine.resolveUserRole(audience.user ?? {});
-    const colAccess = await deps.engine.getColumnAccess(meta.name, role, audience.user ?? undefined);
-    const visible = [...shown].filter((c) => !colAccess?.hidden?.has(c));
-    const sortField = typeof viewer.sort === "string" && visible.includes(viewer.sort) ? viewer.sort : authorSort;
-    const sortDir = viewer.sort ? viewer.sortDir === "asc" ? "asc" : "desc" : content.sort_dir === "asc" ? "asc" : "desc";
-    let q = deps.db.selectFrom(meta.table).select(fields.length > 0 ? fields : [...meta.columns]);
-    if (meta.columns.has("tenant_id")) {
-      q = q.where("tenant_id", "=", audience.tenantId);
-    }
-    for (const f of parseFilters(content)) {
-      if (!meta.columns.has(f.field))
-        continue;
-      q = q.where(deps.engine.buildCondition(f.field, { op: f.op, value: f.value }));
-    }
-    const term = typeof viewer.q === "string" ? viewer.q.trim() : "";
-    if (term.length > 0) {
-      const searchable = visible.filter((c) => meta.columns.has(c));
-      if (searchable.length > 0) {
-        q = q.where((eb) => eb.or(searchable.map((col) => deps.engine.buildCondition(col, { op: "ilike", value: term }))));
-      }
-    }
-    if (audience.user) {
-      const rls = await deps.engine.getRlsFilters(meta.name, audience.user, audience.authType ?? "session");
-      q = deps.engine.applyRlsFilters(q, rls);
-    }
-    const window2 = await q.orderBy(sortField, sortDir).limit(limit + 1).offset(Math.max(0, Math.floor(offset))).execute();
-    const hasMore = window2.length > limit;
-    let records = hasMore ? window2.slice(0, limit) : window2;
-    if (colAccess) {
-      records = records.map((r) => deps.engine.applyColumnAccess(r, colAccess));
-    }
-    return {
-      ...block,
-      content: {
-        ...content,
-        _data: records,
-        _offset: offset,
-        _limit: limit,
-        _has_more: hasMore
-      }
-    };
-  } catch (err) {
-    console.error(`[content/pages] collection_list failed for "${meta.name}":`, err?.message ?? err);
-    return blockError(block, "Could not load this data");
-  }
-}
-async function resolveBlocks(deps, audience, blocks) {
-  const lookup = createCollectionCache(deps);
-  return Promise.all(blocks.map((b) => resolveBlock(deps, audience, lookup, b)));
-}
-async function resolveRecord(deps, audience, collection, keyField, keyValue, recordFilter) {
-  const lookup = createCollectionCache(deps);
-  const meta = await lookup(collection);
-  if (!meta)
-    return null;
-  if (await refuseReason(deps, audience, meta.name))
-    return null;
-  const field = meta.columns.has(keyField) ? keyField : null;
-  if (!field)
-    return null;
-  let q = deps.db.selectFrom(meta.table).select([...meta.columns]).where(field, "=", keyValue);
-  if (meta.columns.has("tenant_id"))
-    q = q.where("tenant_id", "=", audience.tenantId);
-  const declared = typeof recordFilter === "string" ? safeParse2(recordFilter) : recordFilter;
-  const declaredCount = Array.isArray(declared) ? declared.length : 0;
-  const filters = parseFilterList(recordFilter);
-  if (filters.length !== declaredCount)
-    return null;
-  for (const f of filters) {
-    if (!meta.columns.has(f.field))
-      return null;
-    q = q.where(deps.engine.buildCondition(f.field, { op: f.op, value: f.value }));
-  }
-  if (audience.user) {
-    const rls = await deps.engine.getRlsFilters(meta.name, audience.user, audience.authType ?? "session");
-    q = deps.engine.applyRlsFilters(q, rls);
-  }
-  const row = await q.limit(1).executeTakeFirst();
-  if (!row)
-    return null;
-  const role = await deps.engine.resolveUserRole(audience.user ?? {});
-  const colAccess = await deps.engine.getColumnAccess(meta.name, role, audience.user ?? undefined);
-  return colAccess ? deps.engine.applyColumnAccess(row, colAccess) : row;
-}
-function findBlockById(blocks, id) {
-  if (!Array.isArray(blocks))
-    return null;
-  for (const b of blocks) {
-    if (String(b?.id) === id)
-      return b;
-    if (b?.type === "container") {
-      const hit = findBlockById(b.content?.children, id);
-      if (hit)
-        return hit;
-    }
-  }
-  return null;
-}
-async function resolveBlockAt(deps, audience, block, viewer) {
-  return resolveWithViewer(deps, audience, createCollectionCache(deps), block, viewer);
-}
-function parseFields(content) {
-  const out = [];
-  if (typeof content.display_fields === "string") {
-    for (const s of content.display_fields.split(",")) {
-      const t = s.trim();
-      if (t)
-        out.push(t);
-    }
-  }
-  if (Array.isArray(content.fields)) {
-    for (const f of content.fields) {
-      if (typeof f === "string" && f.trim())
-        out.push(f.trim());
-      else if (f && typeof f === "object" && typeof f.field === "string")
-        out.push(f.field);
-      else if (f && typeof f === "object" && typeof f.name === "string")
-        out.push(f.name);
-    }
-  }
-  return [...new Set(out)];
-}
-var OP_ALIASES = {
-  is_null: "null",
-  is_not_null: "not_null",
-  ne: "neq",
-  contains: "ilike"
-};
-var KNOWN_OPS = new Set([
-  "eq",
-  "neq",
-  "lt",
-  "lte",
-  "gt",
-  "gte",
-  "like",
-  "ilike",
-  "not_contains",
-  "starts_with",
-  "ends_with",
-  "in",
-  "not_in",
-  "null",
-  "not_null"
-]);
-function parseFilters(content) {
-  return parseFilterList(content.filters);
-}
-function parseFilterList(raw) {
-  const list = typeof raw === "string" ? safeParse2(raw) : raw;
-  if (!Array.isArray(list))
-    return [];
-  const out = [];
-  for (const f of list) {
-    if (!f || typeof f !== "object")
-      continue;
-    if (typeof f.field !== "string" || typeof f.op !== "string")
-      continue;
-    const op = OP_ALIASES[f.op] ?? f.op;
-    if (!KNOWN_OPS.has(op))
-      continue;
-    out.push({ field: f.field, op, value: f.value });
-  }
-  return out;
-}
-function safeParse2(s) {
-  try {
-    return JSON.parse(s);
-  } catch {
-    return null;
-  }
-}
-
-// engine/sanitize.ts
-var import_sanitize_html = __toESM(require_sanitize_html());
-var OPTIONS = {
-  allowedTags: [
-    "p",
-    "br",
-    "hr",
-    "span",
-    "div",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
-    "strong",
-    "b",
-    "em",
-    "i",
-    "u",
-    "s",
-    "mark",
-    "small",
-    "sub",
-    "sup",
-    "del",
-    "ins",
-    "ul",
-    "ol",
-    "li",
-    "blockquote",
-    "code",
-    "pre",
-    "a",
-    "img",
-    "figure",
-    "figcaption",
-    "table",
-    "thead",
-    "tbody",
-    "tfoot",
-    "tr",
-    "th",
-    "td",
-    "caption",
-    "colgroup",
-    "col"
-  ],
-  allowedAttributes: {
-    a: ["href", "title", "target", "rel"],
-    img: ["src", "alt", "title", "width", "height", "loading"],
-    td: ["colspan", "rowspan"],
-    th: ["colspan", "rowspan", "scope"],
-    col: ["span"],
-    "*": ["class", "style"]
-  },
-  allowedSchemes: ["http", "https", "mailto", "tel"],
-  allowedSchemesAppliedToAttributes: ["href", "src"],
-  allowProtocolRelative: true,
-  allowedStyles: {
-    "*": {
-      color: [/^#[0-9a-fA-F]{3,8}$/, /^rgba?\([\d\s.,%]+\)$/, /^hsla?\([\d\s.,%]+\)$/, /^[a-zA-Z]{3,20}$/],
-      "background-color": [/^#[0-9a-fA-F]{3,8}$/, /^rgba?\([\d\s.,%]+\)$/, /^hsla?\([\d\s.,%]+\)$/, /^[a-zA-Z]{3,20}$/],
-      "text-align": [/^(left|right|center|justify)$/],
-      "font-weight": [/^(normal|bold|bolder|lighter|[1-9]00)$/],
-      "font-style": [/^(normal|italic|oblique)$/],
-      "text-decoration": [/^(none|underline|line-through|overline)$/]
-    }
-  },
-  transformTags: {
-    a: (tagName, attribs) => {
-      if (attribs.target)
-        attribs.rel = "noopener noreferrer";
-      return { tagName, attribs };
-    }
-  },
-  nonTextTags: ["script", "style", "textarea", "option", "noscript"],
-  disallowedTagsMode: "discard"
-};
-function scrubHtml(input) {
-  if (typeof input !== "string" || input.length === 0)
-    return input;
-  return import_sanitize_html.default(input, OPTIONS);
-}
-var HTML_FIELDS = ["html", "code", "content", "caption", "text"];
-function sanitizeBlocks(blocks) {
-  if (!Array.isArray(blocks))
-    return blocks;
-  return blocks.map((b) => {
-    const content = b?.content;
-    if (!content || typeof content !== "object")
-      return b;
-    const next = { ...content };
-    if (Array.isArray(next.children))
-      next.children = sanitizeBlocks(next.children);
-    if (next.item_template && typeof next.item_template === "object") {
-      next.item_template = sanitizeBlocks([next.item_template])[0];
-    }
-    for (const field of HTML_FIELDS) {
-      if (typeof next[field] === "string")
-        next[field] = scrubHtml(next[field]);
-    }
-    if (Array.isArray(next.items)) {
-      next.items = next.items.map((v) => typeof v === "string" ? scrubHtml(v) : v);
-    }
-    return { ...b, content: next };
-  });
-}
-function assignBlockIds(blocks) {
-  if (!Array.isArray(blocks))
-    return blocks;
-  return blocks.map((b) => {
-    if (!b || typeof b !== "object")
-      return b;
-    const next = { ...b, id: b.id ?? crypto.randomUUID() };
-    const content = next.content;
-    if (content && typeof content === "object") {
-      const c = { ...content };
-      if (Array.isArray(c.children))
-        c.children = assignBlockIds(c.children);
-      if (c.item_template)
-        c.item_template = assignBlockIds([c.item_template])[0];
-      next.content = c;
-    }
-    return next;
-  });
-}
-function sanitizeBlocksForWrite(blocks) {
-  return assignBlockIds(sanitizeBlocks(blocks));
-}
-
-// client/bind.ts
-var PLACEHOLDER = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
-var HTML_KEYS = new Set(["content", "html", "code", "items"]);
-var URL_KEYS = new Set([
-  "href",
-  "url",
-  "src",
-  "link",
-  "cta_url",
-  "button_url",
-  "image_url"
-]);
-function placeholdersIn(block) {
-  const found = new Set;
-  walk(block);
-  return [...found];
-  function walk(node) {
-    if (typeof node === "string") {
-      for (const m of node.matchAll(PLACEHOLDER))
-        found.add(m[1]);
-      return;
-    }
-    if (Array.isArray(node)) {
-      for (const v of node)
-        walk(v);
-      return;
-    }
-    if (node && typeof node === "object") {
-      for (const v of Object.values(node))
-        walk(v);
-    }
-  }
-}
 // /zveltio-extension/packages/sdk/src/extension/action-refusal.ts
 var ACTION_REFUSAL = Symbol.for("zveltio.extension.action-refusal");
+// /zveltio-extension/packages/sdk/src/extension/reserved-paths.ts
+var RESERVED_PATH_SEGMENTS = Object.freeze([
+  "api",
+  "ext",
+  "admin",
+  "app",
+  "auth",
+  "_app",
+  "_server",
+  ".well-known",
+  "robots.txt",
+  "sitemap.xml"
+]);
+function isReservedPath(path) {
+  const first = path.replace(/^\/+/, "").split("/")[0]?.toLowerCase() ?? "";
+  return RESERVED_PATH_SEGMENTS.includes(first) || first.startsWith("favicon.");
+}
 // /zveltio-extension/node_modules/kysely/dist/util/object-utils.js
 function isUndefined(obj) {
   return typeof obj === "undefined" || obj === undefined;
@@ -18075,7 +17680,7 @@ function isUndefined(obj) {
 function isString(obj) {
   return typeof obj === "string";
 }
-function isNumber2(obj) {
+function isNumber(obj) {
   return typeof obj === "number";
 }
 function isBoolean(obj) {
@@ -18090,7 +17695,7 @@ function isBigInt(obj) {
 function isFunction(obj) {
   return typeof obj === "function";
 }
-function isObject3(obj) {
+function isObject2(obj) {
   return typeof obj === "object" && obj !== null;
 }
 function freeze(obj) {
@@ -18178,15 +17783,15 @@ var TableNode = freeze({
 
 // /zveltio-extension/node_modules/kysely/dist/operation-node/operation-node-source.js
 function isOperationNodeSource(obj) {
-  return isObject3(obj) && isFunction(obj.toOperationNode);
+  return isObject2(obj) && isFunction(obj.toOperationNode);
 }
 
 // /zveltio-extension/node_modules/kysely/dist/expression/expression.js
 function isExpression(obj) {
-  return isObject3(obj) && "expressionType" in obj && isOperationNodeSource(obj);
+  return isObject2(obj) && "expressionType" in obj && isOperationNodeSource(obj);
 }
 function isAliasedExpression(obj) {
-  return isObject3(obj) && "expression" in obj && isString(obj.alias) && isOperationNodeSource(obj);
+  return isObject2(obj) && "expression" in obj && isString(obj.alias) && isOperationNodeSource(obj);
 }
 
 // /zveltio-extension/node_modules/kysely/dist/operation-node/select-modifier-node.js
@@ -18454,7 +18059,7 @@ var ReferenceNode = freeze({
 
 // /zveltio-extension/node_modules/kysely/dist/dynamic/dynamic-reference-builder.js
 function isDynamicReferenceBuilder(obj) {
-  return isObject3(obj) && isOperationNodeSource(obj) && isString(obj.dynamicReference);
+  return isObject2(obj) && isOperationNodeSource(obj) && isString(obj.dynamicReference);
 }
 
 // /zveltio-extension/node_modules/kysely/dist/operation-node/order-by-item-node.js
@@ -18809,7 +18414,7 @@ function parseValueExpression(exp) {
   return ValueNode.create(exp);
 }
 function isSafeImmediateValue(value) {
-  return isNumber2(value) || isBoolean(value) || isNull(value);
+  return isNumber(value) || isBoolean(value) || isNull(value);
 }
 function parseSafeImmediateValue(value) {
   if (!isSafeImmediateValue(value)) {
@@ -18856,9 +18461,9 @@ function parseReferentialBinaryOperation(left, operator, right) {
   return BinaryOperationNode.create(parseReferenceExpression(left), parseBinaryOperator(operator), parseReferenceExpression(right));
 }
 function parseFilterObject(obj, combinator) {
-  return parseFilterList2(Object.entries(obj).filter(([, v]) => !isUndefined(v)).map(([k, v]) => parseValueBinaryOperation(k, needsIsOperator(v) ? "is" : "=", v)), combinator);
+  return parseFilterList(Object.entries(obj).filter(([, v]) => !isUndefined(v)).map(([k, v]) => parseValueBinaryOperation(k, needsIsOperator(v) ? "is" : "=", v)), combinator);
 }
-function parseFilterList2(list, combinator, withParens = true) {
+function parseFilterList(list, combinator, withParens = true) {
   const combine = combinator === "and" ? AndNode.create : OrNode.create;
   if (list.length === 0) {
     return BinaryOperationNode.create(ValueNode.createImmediate(1), OperatorNode.create("="), ValueNode.createImmediate(combinator === "and" ? 1 : 0));
@@ -19604,7 +19209,7 @@ var TopNode = freeze({
 
 // /zveltio-extension/node_modules/kysely/dist/parser/top-parser.js
 function parseTop(expression, modifiers) {
-  if (!isNumber2(expression) && !isBigInt(expression)) {
+  if (!isNumber(expression) && !isBigInt(expression)) {
     throw new Error(`Invalid top expression: ${expression}`);
   }
   if (!isUndefined(modifiers) && !isTopModifiers(modifiers)) {
@@ -20189,7 +19794,7 @@ var FetchNode = freeze({
 
 // /zveltio-extension/node_modules/kysely/dist/parser/fetch-parser.js
 function parseFetch(rowCount, modifier) {
-  if (!isNumber2(rowCount) && !isBigInt(rowCount)) {
+  if (!isNumber(rowCount) && !isBigInt(rowCount)) {
     throw new Error(`Invalid fetch row count: ${rowCount}`);
   }
   if (!isFetchModifier(modifier)) {
@@ -21172,13 +20777,13 @@ function createExpressionBuilder(executor = NOOP_QUERY_EXECUTOR) {
     },
     and(exprs) {
       if (isReadonlyArray(exprs)) {
-        return new ExpressionWrapper(parseFilterList2(exprs, "and"));
+        return new ExpressionWrapper(parseFilterList(exprs, "and"));
       }
       return new ExpressionWrapper(parseFilterObject(exprs, "and"));
     },
     or(exprs) {
       if (isReadonlyArray(exprs)) {
-        return new ExpressionWrapper(parseFilterList2(exprs, "or"));
+        return new ExpressionWrapper(parseFilterList(exprs, "or"));
       }
       return new ExpressionWrapper(parseFilterObject(exprs, "or"));
     },
@@ -21225,7 +20830,7 @@ function isExpressionOrFactory(obj) {
 
 // /zveltio-extension/node_modules/kysely/dist/dynamic/dynamic-table-builder.js
 function isAliasedDynamicTableBuilder(obj) {
-  return isObject3(obj) && isOperationNodeSource(obj) && isString(obj.table) && isString(obj.alias);
+  return isObject2(obj) && isOperationNodeSource(obj) && isString(obj.table) && isString(obj.alias);
 }
 
 // /zveltio-extension/node_modules/kysely/dist/parser/table-parser.js
@@ -21409,6 +21014,418 @@ function parseParameter(param) {
 function toJsonb(value) {
   return sql`${JSON.stringify(value ?? null)}::text::jsonb`;
 }
+// engine/hydrate.ts
+function createCollectionCache(deps) {
+  const seen = new Map;
+  return async function lookup(name) {
+    if (typeof name !== "string" || name.length === 0)
+      return null;
+    if (seen.has(name))
+      return seen.get(name) ?? null;
+    const row = await deps.ddl.getCollection(deps.db, name);
+    if (!row) {
+      seen.set(name, null);
+      return null;
+    }
+    const table = `zvd_${name}`;
+    const cols = await deps.ddl.columnNames(deps.db, name);
+    if (cols.length === 0) {
+      seen.set(name, null);
+      return null;
+    }
+    const meta = {
+      name,
+      table,
+      columns: new Set(cols)
+    };
+    seen.set(name, meta);
+    return meta;
+  };
+}
+function blockError(block, message) {
+  return { ...block, content: { ...block.content, _data: [], _error: message } };
+}
+async function refuseReason(deps, audience, collection) {
+  if (!audience.user) {
+    const allowed = audience.publicCollections ?? [];
+    return allowed.includes(collection) ? null : "This collection is not published on this site";
+  }
+  const mayRead = await deps.engine.checkAccess(deps.db, audience.user, collection, "read").catch(() => false);
+  return mayRead ? null : "Not permitted to read this collection";
+}
+async function resolveBlock(deps, audience, lookup, block, viewer = {}) {
+  return resolveWithViewer(deps, audience, lookup, block, viewer);
+}
+async function resolveWithViewer(deps, audience, lookup, block, viewer) {
+  const offset = Math.max(0, Math.floor(Number(viewer.offset) || 0));
+  if (block?.type === "container") {
+    const kids = block.content?.children;
+    if (!Array.isArray(kids))
+      return block;
+    const resolvedKids = await Promise.all(kids.map((k) => resolveWithViewer(deps, audience, lookup, k, {})));
+    return { ...block, content: { ...block.content, children: resolvedKids } };
+  }
+  if (block?.type !== "collection_list")
+    return block;
+  const content = block.content ?? {};
+  let meta;
+  try {
+    meta = await lookup(content.collection);
+  } catch (err) {
+    console.error(`[content/pages] could not resolve collection "${String(content.collection)}":`, err?.message ?? err);
+    return blockError(block, "Could not load this data");
+  }
+  if (!meta)
+    return blockError(block, "Unknown collection");
+  const refusal = await refuseReason(deps, audience, meta.name);
+  if (refusal)
+    return blockError(block, refusal);
+  const requested = parseFields(content);
+  const fields = requested.filter((f) => meta.columns.has(f));
+  if (requested.length > 0 && fields.length === 0) {
+    return blockError(block, "No readable fields named");
+  }
+  const shown = fields.length > 0 ? new Set(fields) : meta.columns;
+  const authorSort = typeof content.sort_field === "string" && meta.columns.has(content.sort_field) ? content.sort_field : meta.columns.has("created_at") ? "created_at" : "id";
+  const limit = Math.min(Math.max(Number(content.limit) || 20, 1), 100);
+  try {
+    const role = await deps.engine.resolveUserRole(audience.user ?? {});
+    const colAccess = await deps.engine.getColumnAccess(meta.name, role, audience.user ?? undefined);
+    const visible = [...shown].filter((c) => !colAccess?.hidden?.has(c));
+    const sortField = typeof viewer.sort === "string" && visible.includes(viewer.sort) ? viewer.sort : authorSort;
+    const sortDir = viewer.sort ? viewer.sortDir === "asc" ? "asc" : "desc" : content.sort_dir === "asc" ? "asc" : "desc";
+    let q = deps.db.selectFrom(meta.table).select(fields.length > 0 ? fields : [...meta.columns]);
+    if (meta.columns.has("tenant_id")) {
+      q = q.where("tenant_id", "=", audience.tenantId);
+    }
+    for (const f of parseFilters(content)) {
+      if (!meta.columns.has(f.field))
+        continue;
+      q = q.where(deps.engine.buildCondition(f.field, { op: f.op, value: f.value }));
+    }
+    const term = typeof viewer.q === "string" ? viewer.q.trim() : "";
+    if (term.length > 0) {
+      const searchable = visible.filter((c) => meta.columns.has(c));
+      if (searchable.length > 0) {
+        q = q.where((eb) => eb.or(searchable.map((col) => deps.engine.buildCondition(col, { op: "ilike", value: term }))));
+      }
+    }
+    if (audience.user) {
+      const rls = await deps.engine.getRlsFilters(meta.name, audience.user, audience.authType ?? "session");
+      q = deps.engine.applyRlsFilters(q, rls);
+    }
+    const window2 = await q.orderBy(sortField, sortDir).limit(limit + 1).offset(Math.max(0, Math.floor(offset))).execute();
+    const hasMore = window2.length > limit;
+    let records = hasMore ? window2.slice(0, limit) : window2;
+    if (colAccess) {
+      records = records.map((r) => deps.engine.applyColumnAccess(r, colAccess));
+    }
+    return {
+      ...block,
+      content: {
+        ...content,
+        _data: records,
+        _offset: offset,
+        _limit: limit,
+        _has_more: hasMore
+      }
+    };
+  } catch (err) {
+    console.error(`[content/pages] collection_list failed for "${meta.name}":`, err?.message ?? err);
+    return blockError(block, "Could not load this data");
+  }
+}
+async function resolveBlocks(deps, audience, blocks) {
+  const lookup = createCollectionCache(deps);
+  return Promise.all(blocks.map((b) => resolveBlock(deps, audience, lookup, b)));
+}
+async function resolveRecord(deps, audience, collection, keyField, keyValue, recordFilter) {
+  const lookup = createCollectionCache(deps);
+  const meta = await lookup(collection);
+  if (!meta)
+    return null;
+  if (await refuseReason(deps, audience, meta.name))
+    return null;
+  const field = meta.columns.has(keyField) ? keyField : null;
+  if (!field)
+    return null;
+  let q = deps.db.selectFrom(meta.table).select([...meta.columns]).where(field, "=", keyValue);
+  if (meta.columns.has("tenant_id"))
+    q = q.where("tenant_id", "=", audience.tenantId);
+  const declared = typeof recordFilter === "string" ? safeParse2(recordFilter) : recordFilter;
+  const declaredCount = Array.isArray(declared) ? declared.length : 0;
+  const filters = parseFilterList2(recordFilter);
+  if (filters.length !== declaredCount)
+    return null;
+  for (const f of filters) {
+    if (!meta.columns.has(f.field))
+      return null;
+    q = q.where(deps.engine.buildCondition(f.field, { op: f.op, value: f.value }));
+  }
+  if (audience.user) {
+    const rls = await deps.engine.getRlsFilters(meta.name, audience.user, audience.authType ?? "session");
+    q = deps.engine.applyRlsFilters(q, rls);
+  }
+  const row = await q.limit(1).executeTakeFirst();
+  if (!row)
+    return null;
+  const role = await deps.engine.resolveUserRole(audience.user ?? {});
+  const colAccess = await deps.engine.getColumnAccess(meta.name, role, audience.user ?? undefined);
+  return colAccess ? deps.engine.applyColumnAccess(row, colAccess) : row;
+}
+function findBlockById(blocks, id) {
+  if (!Array.isArray(blocks))
+    return null;
+  for (const b of blocks) {
+    if (String(b?.id) === id)
+      return b;
+    if (b?.type === "container") {
+      const hit = findBlockById(b.content?.children, id);
+      if (hit)
+        return hit;
+    }
+  }
+  return null;
+}
+async function resolveBlockAt(deps, audience, block, viewer) {
+  return resolveWithViewer(deps, audience, createCollectionCache(deps), block, viewer);
+}
+function parseFields(content) {
+  const out = [];
+  if (typeof content.display_fields === "string") {
+    for (const s of content.display_fields.split(",")) {
+      const t = s.trim();
+      if (t)
+        out.push(t);
+    }
+  }
+  if (Array.isArray(content.fields)) {
+    for (const f of content.fields) {
+      if (typeof f === "string" && f.trim())
+        out.push(f.trim());
+      else if (f && typeof f === "object" && typeof f.field === "string")
+        out.push(f.field);
+      else if (f && typeof f === "object" && typeof f.name === "string")
+        out.push(f.name);
+    }
+  }
+  return [...new Set(out)];
+}
+var OP_ALIASES = {
+  is_null: "null",
+  is_not_null: "not_null",
+  ne: "neq",
+  contains: "ilike"
+};
+var KNOWN_OPS = new Set([
+  "eq",
+  "neq",
+  "lt",
+  "lte",
+  "gt",
+  "gte",
+  "like",
+  "ilike",
+  "not_contains",
+  "starts_with",
+  "ends_with",
+  "in",
+  "not_in",
+  "null",
+  "not_null"
+]);
+function parseFilters(content) {
+  return parseFilterList2(content.filters);
+}
+function parseFilterList2(raw) {
+  const list = typeof raw === "string" ? safeParse2(raw) : raw;
+  if (!Array.isArray(list))
+    return [];
+  const out = [];
+  for (const f of list) {
+    if (!f || typeof f !== "object")
+      continue;
+    if (typeof f.field !== "string" || typeof f.op !== "string")
+      continue;
+    const op = OP_ALIASES[f.op] ?? f.op;
+    if (!KNOWN_OPS.has(op))
+      continue;
+    out.push({ field: f.field, op, value: f.value });
+  }
+  return out;
+}
+function safeParse2(s) {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+}
+
+// engine/sanitize.ts
+var import_sanitize_html = __toESM(require_sanitize_html());
+var OPTIONS = {
+  allowedTags: [
+    "p",
+    "br",
+    "hr",
+    "span",
+    "div",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "strong",
+    "b",
+    "em",
+    "i",
+    "u",
+    "s",
+    "mark",
+    "small",
+    "sub",
+    "sup",
+    "del",
+    "ins",
+    "ul",
+    "ol",
+    "li",
+    "blockquote",
+    "code",
+    "pre",
+    "a",
+    "img",
+    "figure",
+    "figcaption",
+    "table",
+    "thead",
+    "tbody",
+    "tfoot",
+    "tr",
+    "th",
+    "td",
+    "caption",
+    "colgroup",
+    "col"
+  ],
+  allowedAttributes: {
+    a: ["href", "title", "target", "rel"],
+    img: ["src", "alt", "title", "width", "height", "loading"],
+    td: ["colspan", "rowspan"],
+    th: ["colspan", "rowspan", "scope"],
+    col: ["span"],
+    "*": ["class", "style"]
+  },
+  allowedSchemes: ["http", "https", "mailto", "tel"],
+  allowedSchemesAppliedToAttributes: ["href", "src"],
+  allowProtocolRelative: true,
+  allowedStyles: {
+    "*": {
+      color: [/^#[0-9a-fA-F]{3,8}$/, /^rgba?\([\d\s.,%]+\)$/, /^hsla?\([\d\s.,%]+\)$/, /^[a-zA-Z]{3,20}$/],
+      "background-color": [/^#[0-9a-fA-F]{3,8}$/, /^rgba?\([\d\s.,%]+\)$/, /^hsla?\([\d\s.,%]+\)$/, /^[a-zA-Z]{3,20}$/],
+      "text-align": [/^(left|right|center|justify)$/],
+      "font-weight": [/^(normal|bold|bolder|lighter|[1-9]00)$/],
+      "font-style": [/^(normal|italic|oblique)$/],
+      "text-decoration": [/^(none|underline|line-through|overline)$/]
+    }
+  },
+  transformTags: {
+    a: (tagName, attribs) => {
+      if (attribs.target)
+        attribs.rel = "noopener noreferrer";
+      return { tagName, attribs };
+    }
+  },
+  nonTextTags: ["script", "style", "textarea", "option", "noscript"],
+  disallowedTagsMode: "discard"
+};
+function scrubHtml(input) {
+  if (typeof input !== "string" || input.length === 0)
+    return input;
+  return import_sanitize_html.default(input, OPTIONS);
+}
+var HTML_FIELDS = ["html", "code", "content", "caption", "text"];
+function sanitizeBlocks(blocks) {
+  if (!Array.isArray(blocks))
+    return blocks;
+  return blocks.map((b) => {
+    const content = b?.content;
+    if (!content || typeof content !== "object")
+      return b;
+    const next = { ...content };
+    if (Array.isArray(next.children))
+      next.children = sanitizeBlocks(next.children);
+    if (next.item_template && typeof next.item_template === "object") {
+      next.item_template = sanitizeBlocks([next.item_template])[0];
+    }
+    for (const field of HTML_FIELDS) {
+      if (typeof next[field] === "string")
+        next[field] = scrubHtml(next[field]);
+    }
+    if (Array.isArray(next.items)) {
+      next.items = next.items.map((v) => typeof v === "string" ? scrubHtml(v) : v);
+    }
+    return { ...b, content: next };
+  });
+}
+function assignBlockIds(blocks) {
+  if (!Array.isArray(blocks))
+    return blocks;
+  return blocks.map((b) => {
+    if (!b || typeof b !== "object")
+      return b;
+    const next = { ...b, id: b.id ?? crypto.randomUUID() };
+    const content = next.content;
+    if (content && typeof content === "object") {
+      const c = { ...content };
+      if (Array.isArray(c.children))
+        c.children = assignBlockIds(c.children);
+      if (c.item_template)
+        c.item_template = assignBlockIds([c.item_template])[0];
+      next.content = c;
+    }
+    return next;
+  });
+}
+function sanitizeBlocksForWrite(blocks) {
+  return assignBlockIds(sanitizeBlocks(blocks));
+}
+
+// client/bind.ts
+var PLACEHOLDER = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
+var HTML_KEYS = new Set(["content", "html", "code", "items"]);
+var URL_KEYS = new Set([
+  "href",
+  "url",
+  "src",
+  "link",
+  "cta_url",
+  "button_url",
+  "image_url"
+]);
+function placeholdersIn(block) {
+  const found = new Set;
+  walk(block);
+  return [...found];
+  function walk(node) {
+    if (typeof node === "string") {
+      for (const m of node.matchAll(PLACEHOLDER))
+        found.add(m[1]);
+      return;
+    }
+    if (Array.isArray(node)) {
+      for (const v of node)
+        walk(v);
+      return;
+    }
+    if (node && typeof node === "object") {
+      for (const v of Object.values(node))
+        walk(v);
+    }
+  }
+}
 // engine/tenant.ts
 class TenantUnresolved extends Error {
   constructor() {
@@ -21427,15 +21444,16 @@ function tenantId(c) {
 }
 
 // engine/sites.ts
+var RESERVED = { message: "starts with a path the engine reserves (api, ext, admin, app, auth, \u2026)" };
 var SiteCreateSchema = object({
   name: string2().min(1).max(100),
-  slug: string2().min(1).max(50).regex(/^[a-z0-9-]+$/),
+  slug: string2().min(1).max(50).regex(/^[a-z0-9-]+$/).refine((s) => !isReservedPath(s), RESERVED),
   description: string2().max(500).optional(),
   is_active: boolean2().optional(),
   is_public: boolean2().optional(),
   access_roles: array(string2()).optional(),
   public_collections: array(string2()).optional(),
-  base_path: string2().min(1).max(200).optional(),
+  base_path: string2().min(1).max(200).refine((s) => !isReservedPath(s), RESERVED).optional(),
   site_name: string2().max(100).nullable().optional(),
   site_logo_url: preprocess((v) => v === "" ? null : v, string2().url().nullable().optional()),
   primary_color: preprocess((v) => v === "" ? null : v, string2().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional()),
@@ -21447,7 +21465,7 @@ var SiteCreateSchema = object({
 var SiteUpdateSchema = SiteCreateSchema.partial();
 var PageCreateSchema = object({
   title: string2().min(1).max(200),
-  slug: string2().min(1).max(100).regex(/^[a-z0-9/-]+$/),
+  slug: string2().min(1).max(100).regex(/^[a-z0-9/-]+$/).refine((s) => !isReservedPath(s), RESERVED),
   icon: string2().max(50).optional(),
   description: string2().max(500).optional(),
   is_active: boolean2().optional(),
@@ -21889,7 +21907,7 @@ function registerPublicSeoRoutes(ctx) {
         const names = new Set(await ctx.DDLManager.columnNames(db, row.record_collection));
         if (!names.has(field))
           return [];
-        const filters = parseFilterList(row.record_filter);
+        const filters = parseFilterList2(row.record_filter);
         const declared = Array.isArray(row.record_filter) ? row.record_filter.length : 0;
         if (filters.length !== declared)
           return [];
@@ -22011,9 +22029,10 @@ async function requireAdmin(c, auth, isTenantAdmin) {
   }
   return { user, res: null };
 }
+var RESERVED2 = { message: "starts with a path the engine reserves (api, ext, admin, app, auth, \u2026)" };
 var PageSchema = object({
   title: string2().min(1),
-  slug: string2().regex(/^[a-z0-9-/]+$/).min(1),
+  slug: string2().regex(/^[a-z0-9-/]+$/).min(1).refine((s) => !isReservedPath(s), RESERVED2),
   description: string2().optional(),
   template: string2().default("default"),
   blocks: array(any()).default([]),

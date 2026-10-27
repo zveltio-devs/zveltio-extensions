@@ -12,7 +12,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { isReservedPath, type ExtensionContext } from '@zveltio/sdk/extension';
 import { sanitizeBlocks, sanitizeBlocksForWrite } from './sanitize.js';
 import { escapeXml } from './public-seo.js';
 import { jsonb } from './jsonb.js';
@@ -74,9 +74,12 @@ async function requireAdmin(c: Any, auth: Any, isTenantAdmin: Any) {
   return { user, res: null };
 }
 
+/** The engine and the App own these first segments (`/admin`, `/app`, `/api`, …). */
+const RESERVED = { message: 'starts with a path the engine reserves (api, ext, admin, app, auth, …)' };
+
 const PageSchema = z.object({
   title: z.string().min(1),
-  slug: z.string().regex(/^[a-z0-9-/]+$/).min(1),
+  slug: z.string().regex(/^[a-z0-9-/]+$/).min(1).refine((s) => !isReservedPath(s), RESERVED),
   description: z.string().optional(),
   template: z.string().default('default'),
   blocks: z.array(z.any()).default([]),

@@ -26,7 +26,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { sql } from 'kysely';
 import { z } from 'zod';
-import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { isReservedPath, type ExtensionContext } from '@zveltio/sdk/extension';
 import { findBlockById, resolveBlockAt, resolveBlocks, resolveRecord } from './hydrate.js';
 import { sanitizeBlocks, sanitizeBlocksForWrite } from './sanitize.js';
 import { placeholdersIn } from '../client/bind.js';
@@ -36,15 +36,18 @@ import { tenantId, TenantUnresolved } from './tenant.js';
 // biome-ignore lint/suspicious/noExplicitAny: the internals bag is typed engine-side
 type Any = any;
 
+/** The engine and the App own these first segments (`/admin`, `/app`, `/api`, …). */
+const RESERVED = { message: 'starts with a path the engine reserves (api, ext, admin, app, auth, …)' };
+
 const SiteCreateSchema = z.object({
   name: z.string().min(1).max(100),
-  slug: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/),
+  slug: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/).refine((s) => !isReservedPath(s), RESERVED),
   description: z.string().max(500).optional(),
   is_active: z.boolean().optional(),
   is_public: z.boolean().optional(),
   access_roles: z.array(z.string()).optional(),
   public_collections: z.array(z.string()).optional(),
-  base_path: z.string().min(1).max(200).optional(),
+  base_path: z.string().min(1).max(200).refine((s) => !isReservedPath(s), RESERVED).optional(),
   site_name: z.string().max(100).nullable().optional(),
   site_logo_url: z.preprocess((v) => (v === '' ? null : v), z.string().url().nullable().optional()),
   primary_color: z.preprocess(
@@ -64,7 +67,7 @@ const SiteUpdateSchema = SiteCreateSchema.partial();
 
 const PageCreateSchema = z.object({
   title: z.string().min(1).max(200),
-  slug: z.string().min(1).max(100).regex(/^[a-z0-9/-]+$/),
+  slug: z.string().min(1).max(100).regex(/^[a-z0-9/-]+$/).refine((s) => !isReservedPath(s), RESERVED),
   icon: z.string().max(50).optional(),
   description: z.string().max(500).optional(),
   is_active: z.boolean().optional(),
