@@ -11062,8 +11062,7 @@ function crmRoutes(ctx) {
     `.execute(db);
     if (!existing.rows[0])
       return c.json({ error: "Not found" }, 404);
-    const isAdmin = await checkPermission(user.id, "admin", "*");
-    if (existing.rows[0].created_by !== user.id && !isAdmin) {
+    if (existing.rows[0].created_by !== user.id && !await checkPermission(user.id, "admin", "*")) {
       return c.json({ error: "Forbidden" }, 403);
     }
     const res = await internals.deleteRecord(c, "contacts", id);
@@ -11174,8 +11173,7 @@ function crmRoutes(ctx) {
     `.execute(db);
     if (!existing.rows[0])
       return c.json({ error: "Not found" }, 404);
-    const isAdmin = await checkPermission(user.id, "admin", "*");
-    if (existing.rows[0].created_by !== user.id && !isAdmin) {
+    if (existing.rows[0].created_by !== user.id && !await checkPermission(user.id, "admin", "*")) {
       return c.json({ error: "Forbidden" }, 403);
     }
     const res = await internals.deleteRecord(c, "organizations", id);
@@ -11282,8 +11280,7 @@ function crmRoutes(ctx) {
     `.execute(db);
     if (!existing.rows[0])
       return c.json({ error: "Not found" }, 404);
-    const isAdmin = await checkPermission(user.id, "admin", "*");
-    if (existing.rows[0].created_by !== user.id && !isAdmin) {
+    if (existing.rows[0].created_by !== user.id && !await checkPermission(user.id, "admin", "*")) {
       return c.json({ error: "Forbidden" }, 403);
     }
     const res = await internals.deleteRecord(c, "transactions", id);

@@ -10990,7 +10990,6 @@ function approvalsRoutes(ctx) {
     if (!currentStep)
       return c.json({ error: "No current step found" }, 400);
     const userRoles = await getUserRoles(user.id);
-    const isAdmin = await checkPermission(user.id, "admin", "*");
     let hasDelegation = false;
     if (currentStep.approver_user_id && currentStep.approver_user_id !== user.id) {
       const delegation = await db.selectFrom("zv_approval_delegates").select("id").where("delegator_id", "=", currentStep.approver_user_id).where("delegate_id", "=", user.id).where("is_active", "=", true).where((eb) => eb.or([
@@ -11002,7 +11001,7 @@ function approvalsRoutes(ctx) {
       ])).executeTakeFirst();
       hasDelegation = !!delegation;
     }
-    const canDecide = currentStep.approver_user_id === user.id || currentStep.approver_role && userRoles.includes(currentStep.approver_role) || hasDelegation || isAdmin;
+    const canDecide = currentStep.approver_user_id === user.id || currentStep.approver_role && userRoles.includes(currentStep.approver_role) || hasDelegation || await checkPermission(user.id, "admin", "*");
     if (!canDecide)
       return c.json({ error: "You are not authorized to decide on this step" }, 403);
     const outcome = await db.transaction().execute(async (trx) => {
@@ -11040,8 +11039,7 @@ function approvalsRoutes(ctx) {
     if (request.status !== "pending")
       return c.json({ error: "Request is not pending" }, 400);
     const isOwner = request.requested_by === user.id;
-    const isAdmin = await checkPermission(user.id, "admin", "*");
-    if (!isOwner && !isAdmin)
+    if (!isOwner && !await checkPermission(user.id, "admin", "*"))
       return c.json({ error: "Unauthorized" }, 403);
     await db.updateTable("zv_approval_requests").set({ status: "cancelled", completed_at: new Date, current_step_id: null }).where("id", "=", request.id).execute();
     return c.json({ success: true });
@@ -11117,8 +11115,7 @@ function approvalsRoutes(ctx) {
     const delegation = await db.selectFrom("zv_approval_delegates").selectAll().where("id", "=", id).executeTakeFirst();
     if (!delegation)
       return c.json({ error: "Delegation not found" }, 404);
-    const isAdmin = await checkPermission(user.id, "admin", "*");
-    if (delegation.delegator_id !== user.id && !isAdmin) {
+    if (delegation.delegator_id !== user.id && !await checkPermission(user.id, "admin", "*")) {
       return c.json({ error: "Unauthorized" }, 403);
     }
     await db.updateTable("zv_approval_delegates").set({ is_active: false }).where("id", "=", id).execute();

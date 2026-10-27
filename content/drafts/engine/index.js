@@ -10725,8 +10725,7 @@ function draftsRoutes(ctx) {
     const draft = await db.selectFrom("zv_content_drafts").select(["id", "collection", "created_by"]).where("id", "=", id).executeTakeFirst();
     if (!draft)
       return c.json({ error: "Draft not found" }, 404);
-    const isAdmin = await checkPermission(user.id, "admin", "*");
-    if (draft.created_by !== user.id && !isAdmin)
+    if (draft.created_by !== user.id && !await checkPermission(user.id, "admin", "*"))
       return c.json({ error: "Forbidden" }, 403);
     await db.deleteFrom("zv_content_drafts").where("id", "=", id).execute();
     return c.json({ success: true });
