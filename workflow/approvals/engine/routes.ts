@@ -395,7 +395,6 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
     if (!currentStep) return c.json({ error: 'No current step found' }, 400);
 
     const userRoles = await getUserRoles(user.id);
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
 
     // Check delegation: if step has approver_user_id, check if that user delegated to current user
     let hasDelegation = false;
@@ -426,7 +425,9 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
       currentStep.approver_user_id === user.id ||
       (currentStep.approver_role && userRoles.includes(currentStep.approver_role)) ||
       hasDelegation ||
-      isAdmin;
+      // Last and lazily: an `admin` grant on a write needs the configuration
+      // window, so an approver deciding their own step is not asked to step up.
+      (await checkPermission(user.id, 'admin', '*'));
 
     if (!canDecide) return c.json({ error: 'You are not authorized to decide on this step' }, 403);
 
@@ -508,9 +509,10 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
     if (request.status !== 'pending') return c.json({ error: 'Request is not pending' }, 400);
 
     const isOwner = request.requested_by === user.id;
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
-
-    if (!isOwner && !isAdmin) return c.json({ error: 'Unauthorized' }, 403);
+    // Lazily: an `admin` grant on a write needs the configuration window, so the
+    // owner acting on their own record is not asked to step up.
+    if (!isOwner && !(await checkPermission(user.id, 'admin', '*')))
+      return c.json({ error: 'Unauthorized' }, 403);
 
     await (db as any)
       .updateTable('zv_approval_requests')
@@ -664,8 +666,9 @@ export function approvalsRoutes(ctx: ExtensionContext): Hono {
 
     if (!delegation) return c.json({ error: 'Delegation not found' }, 404);
 
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
-    if (delegation.delegator_id !== user.id && !isAdmin) {
+    // Lazily: an `admin` grant on a write needs the configuration window, so the
+    // owner acting on their own record is not asked to step up.
+    if (delegation.delegator_id !== user.id && !(await checkPermission(user.id, 'admin', '*'))) {
       return c.json({ error: 'Unauthorized' }, 403);
     }
 
