@@ -93,3 +93,26 @@ describe.skipIf(!DB_URL)('content/pages: the editor gate refuses a non-admin', (
     expect(res.status).not.toBe(401);
   });
 });
+
+// The engine and the App own `/admin`, `/app`, `/api`, … (RESERVED_PATH_SEGMENTS):
+// a page or a site there would be shadowed by them, so the write is refused.
+describe.skipIf(!DB_URL)('content/pages: a slug under a reserved path is refused', () => {
+  let app: any;
+  beforeAll(async () => {
+    app = (await mountForTest(import.meta.dir, { admin: true })).app;
+  });
+
+  const post = (path: string, body: unknown) =>
+    app.request(path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+  it('a page slug, a site slug and a site base path', async () => {
+    expect((await post('/pages', { title: 'x', slug: 'admin/x' })).status).toBe(400);
+    expect((await post('/sites', { name: 'x', slug: 'app' })).status).toBe(400);
+    expect((await post('/sites', { name: 'x', slug: 'shop', base_path: '/api' })).status).toBe(400);
+    expect((await post('/sites/shop/pages', { title: 'x', slug: 'auth' })).status).toBe(400);
+  });
+});
