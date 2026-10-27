@@ -19,9 +19,9 @@ This repository contains first-party signed extensions for **Zveltio** (the core
   still cite the old `CONTEXT.md` filename; they are left as-is deliberately,
   because editing a packed source forces a repack and a manifest version bump.
 - **Core Engine Location:** `../zveltio` (sibling directory).
-- **Execution Rules:** Never use `cd` to jump between repos. Use `bun --cwd` to execute cross-repo commands.
-  - Test against core: `bun --cwd ../zveltio test`
-  - Build core studio: `bun --cwd ../zveltio studio:build`
+- **Execution Rules:** Never use `cd` to jump between repos. Use `bun --cwd=<dir>` (with `=`) to execute cross-repo commands.
+  - Test against core: `bun --cwd=../zveltio test`
+  - Build core studio: `bun --cwd=../zveltio studio:build`
 
 ## Tech Stack & Lockstep Requirements
 
@@ -35,6 +35,6 @@ This repository contains first-party signed extensions for **Zveltio** (the core
   bun run scripts/check-bundle-build-paths.ts  # no packing machine's paths in a bundle
   bun ../zveltio/scripts/validate-all-extensions.ts
   ```
-  Note the last one: `bun --cwd ../zveltio run scripts/<file>.ts` does **not**
-  execute the file — bun prints the package's script list instead. Give the path
+  Note the last one: `bun --cwd ../zveltio run scripts/<file>.ts` (space, not
+  `=`) does **not** execute the file — bun prints its usage and exits 0. Give the path
   directly, as CI does.

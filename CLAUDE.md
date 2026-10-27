@@ -12,7 +12,9 @@ here is paid for in every session, forever.
 
 The engine is a sibling checkout at `../zveltio`.
 
-- Do not `cd` between them — use `bun --cwd ../zveltio <command>`.
+- Do not `cd` between them — use `bun --cwd=../zveltio <command>`.
+  Always `--cwd=<dir>`, with `=`: `bun --cwd <dir> run <x>` prints bun's usage
+  and exits 0 without running anything.
 - Several engine gates read this repository through a hardcoded relative path,
   so a command run from the wrong directory measures the wrong tree and reports
   a confident, wrong answer.
