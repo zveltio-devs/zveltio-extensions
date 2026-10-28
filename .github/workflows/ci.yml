@@ -13,6 +13,12 @@ on:
   push:
     branches: [main, master]
   pull_request:
+  # Every job runs against the engine's master. An engine change that breaks an
+  # extension otherwise shows only on the next extension PR, days later and on
+  # someone else's change; nightly, it shows the day it lands.
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
