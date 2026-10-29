@@ -112,6 +112,8 @@ for (const p of manifestPaths) {
     version: m.version ?? version,
     zveltioMinVersion: m.zveltioMinVersion ?? '1.0.0',
     zveltioMaxVersion: m.zveltioMaxVersion,
+    // Served by the registry to the engine's "what's new" (check-changelogs.ts keeps it current).
+    changelog: existsSync(join(dirname(p), 'CHANGELOG.md')) ? readFileSync(join(dirname(p), 'CHANGELOG.md'), 'utf8') : undefined,
     // Needed for build step
     contributes: m.contributes ?? {},
     peerDependencies: m.peerDependencies ?? {},
