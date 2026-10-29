@@ -245,6 +245,12 @@ for (const ext of extensions) {
   }
 
   const j = await res.json().catch(() => ({}));
+  // The registry keeps a version's stored bytes when only zip metadata
+  // (mtimes) differs, and answers 409 for other contents under that version.
+  if (j.unchanged) {
+    console.log(`  = ${ext.name}  ${j.version} unchanged — stored archive kept`);
+    continue;
+  }
   console.log(`  ✓ ${ext.name}  (${(bytes.length / 1024).toFixed(1)} KB → ${j.storage_key ?? 'r2'})`);
   uploaded++;
 }
