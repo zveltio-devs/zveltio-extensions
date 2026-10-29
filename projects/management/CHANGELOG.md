@@ -5,6 +5,7 @@
 - feat!: the data lives in ten declared collections (`schema/collections/`), created and owned by the engine (ADR 0012); no SQL migrations
 - feat!: the hand-written `/ext/projects/management/*` routes are gone — read and write projects, milestones, tasks, comments and the rest through `/api/data/<collection>`
 - feat: the Projects page and the kanban board use the data API; the board is translated
+- feat: a member, a dependency, a custom field name and a custom value are each unique per project or task again (composite `indexes`), and `schema/` is under the manifest integrity hash
 - requires engine 3.0.0-beta.92
 
 ## 1.0.7 (2026-10-26)

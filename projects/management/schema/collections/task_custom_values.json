@@ -43,5 +43,14 @@
       "onUpdate": "CASCADE",
       "metadata": {}
     }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "task_id",
+        "field_id"
+      ],
+      "unique": true
+    }
   ]
 }

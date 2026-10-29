@@ -35,7 +35,7 @@ d(`${NAME}: declared collections`, () => {
       join(ENGINE, 'lib/extensions/declared-collections.js')
     );
     ({ db } = await getTestApp());
-    const files = await readDeclaredCollections(NAME, EXT_DIR, COLLECTIONS);
+    const files = await readDeclaredCollections(NAME, EXT_DIR, COLLECTIONS, manifest.integrity?.schemaSha256);
     await applyDeclaredCollections(db, NAME, files, true);
     // `false` is the boot / firm-activation path: it throws while any step is owed.
     await applyDeclaredCollections(db, NAME, files, false);
@@ -54,5 +54,13 @@ d(`${NAME}: declared collections`, () => {
        WHERE c.contype = 'f' AND c.confrelid::regclass::text <> '"user"'
          AND c.conrelid::regclass::text IN (${sql.join(COLLECTIONS.map((n) => `zvd_${n}`))})`.execute(db);
     expect(fks.rows.map((r: { fk: string }) => r.fk).sort()).toEqual(declared.sort());
+
+    // Each declared composite key is a real unique index: tenant_id plus its fields.
+    const keyed = COLLECTIONS.filter((c) => JSON.parse(files[`collections/${c}.json`]).indexes?.length);
+    const uniques = await sql`
+      SELECT DISTINCT indrelid::regclass::text AS t FROM pg_index
+       WHERE indisunique AND indnatts = 3
+         AND indrelid::regclass::text IN (${sql.join(COLLECTIONS.map((n) => `zvd_${n}`))})`.execute(db);
+    expect(uniques.rows.map((r: { t: string }) => r.t).sort()).toEqual(keyed.map((c) => `zvd_${c}`).sort());
   }, 120_000);
 });

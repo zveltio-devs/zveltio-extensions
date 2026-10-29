@@ -41,5 +41,14 @@
       "onUpdate": "CASCADE",
       "metadata": {}
     }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "project_id",
+        "user_id"
+      ],
+      "unique": true
+    }
   ]
 }
