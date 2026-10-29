@@ -197,6 +197,9 @@ for (const ext of extensions) {
   const zipArgs = [
     '-r', '-q', zipPath, '.',
     '-x', 'node_modules/*', '-x', '.git/*', '-x', 'dist/*', '-x', '*.log', '-x', '.DS_Store',
+    // Served by the registry from the metadata phase; in the archive it would
+    // change the bytes of versions engines already pinned (installed_sha256).
+    '-x', 'CHANGELOG.md',
   ];
   const zr = spawnSync(ZIP, zipArgs, { cwd: ext.dir, encoding: 'utf8' });
 
