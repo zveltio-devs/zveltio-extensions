@@ -1,0 +1,132 @@
+{
+  "name": "tasks",
+  "fields": [
+    {
+      "name": "project_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "projects"
+      }
+    },
+    {
+      "name": "milestone_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "milestones"
+      }
+    },
+    {
+      "name": "parent_task_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "tasks"
+      }
+    },
+    {
+      "name": "title",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "todo",
+      "options": {
+        "values": [
+          "todo",
+          "in_progress",
+          "in_review",
+          "done",
+          "blocked"
+        ]
+      }
+    },
+    {
+      "name": "priority",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "medium",
+      "options": {
+        "values": [
+          "low",
+          "medium",
+          "high",
+          "critical"
+        ]
+      }
+    },
+    {
+      "name": "assignee_id",
+      "type": "text",
+      "indexed": true
+    },
+    {
+      "name": "start_date",
+      "type": "date"
+    },
+    {
+      "name": "due_date",
+      "type": "date"
+    },
+    {
+      "name": "estimated_hours",
+      "type": "decimal"
+    },
+    {
+      "name": "actual_hours",
+      "type": "decimal"
+    },
+    {
+      "name": "story_points",
+      "type": "integer"
+    },
+    {
+      "name": "tags",
+      "type": "tags"
+    },
+    {
+      "name": "sort_order",
+      "type": "integer",
+      "defaultValue": 0
+    }
+  ],
+  "relations": [
+    {
+      "name": "tasks_project_id",
+      "type": "m2o",
+      "field": "project_id",
+      "target": "projects",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "tasks_milestone_id",
+      "type": "m2o",
+      "field": "milestone_id",
+      "target": "milestones",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "tasks_parent_task_id",
+      "type": "m2o",
+      "field": "parent_task_id",
+      "target": "tasks",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

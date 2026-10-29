@@ -1,0 +1,47 @@
+{
+  "name": "task_custom_values",
+  "fields": [
+    {
+      "name": "task_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "tasks"
+      }
+    },
+    {
+      "name": "field_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "project_custom_fields"
+      }
+    },
+    {
+      "name": "value",
+      "type": "text"
+    }
+  ],
+  "relations": [
+    {
+      "name": "task_custom_values_task_id",
+      "type": "m2o",
+      "field": "task_id",
+      "target": "tasks",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "task_custom_values_field_id",
+      "type": "m2o",
+      "field": "field_id",
+      "target": "project_custom_fields",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

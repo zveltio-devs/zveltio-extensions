@@ -1,0 +1,30 @@
+{
+  "name": "task_comments",
+  "fields": [
+    {
+      "name": "task_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "tasks"
+      }
+    },
+    {
+      "name": "content",
+      "type": "textarea",
+      "required": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "task_comments_task_id",
+      "type": "m2o",
+      "field": "task_id",
+      "target": "tasks",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

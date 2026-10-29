@@ -1,23 +1,13 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
-import { projectsRoutes } from './routes.js';
 
+// Everything this extension stores is a collection it declares in
+// `schema/collections/` (manifest `collections`); the engine creates it and serves
+// it through the data API. The engine loads declared collections only for an
+// extension with an engine entry, so this one stays, with nothing to register.
 const extension: ZveltioExtension = {
   name: 'projects/management',
   category: 'projects',
-  // S3-01: sub-app mounted at /ext/projects/management by the engine.
-  mountStrategy: 'subapp',
-
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_initial.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
-    ];
-  },
-
-  async register(app, ctx) {
-    app.route('/', projectsRoutes(ctx));
-  },
+  async register() {},
 };
 
 export default extension;

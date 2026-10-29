@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.0 (2026-10-29)
+
+- feat!: the data lives in ten declared collections (`schema/collections/`), created and owned by the engine (ADR 0012); no SQL migrations
+- feat!: the hand-written `/ext/projects/management/*` routes are gone — read and write projects, milestones, tasks, comments and the rest through `/api/data/<collection>`
+- feat: the Projects page and the kanban board use the data API; the board is translated
+- requires engine 3.0.0-beta.92
+
 ## 1.0.7 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)
