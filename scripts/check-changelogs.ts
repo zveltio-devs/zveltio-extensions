@@ -13,9 +13,9 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { $ } from 'bun';
+import { execFileSync } from 'node:child_process';
 
-const manifests = (await $`git ls-files '*manifest.json'`.quiet().text()).trim().split('\n');
+const manifests = execFileSync('git', ['ls-files', '*manifest.json'], { encoding: 'utf8' }).trim().split('\n');
 const errors: string[] = [];
 for (const m of manifests) {
   const { name, version } = JSON.parse(readFileSync(m, 'utf8'));
