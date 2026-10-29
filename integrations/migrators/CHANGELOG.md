@@ -1,0 +1,38 @@
+# Changelog
+
+## 1.0.7 (2026-10-26)
+
+- chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)
+
+## 1.0.6 (2026-10-07)
+
+- fix(migrators): target columns come from ctx.DDLManager.introspectTable (1.0.6) (#185)
+
+## 1.0.5 (2026-09-22)
+
+- chore: repack all 50 bundles reproducibly, and gate the spelling that let them drift (#139)
+
+## 1.0.4 (2026-09-22)
+
+- build(deps): hono 4.13.8, in lockstep with the engine (#136)
+
+## 1.0.3 (2026-09-14)
+
+- chore: fiecare extensie își declară namespace-urile de mesaje
+- chore(deps): hono 4.13.7 and zod 4.6.5 — 50 bundles repacked (#123)
+
+## 1.0.2 (2026-09-01)
+
+- fix(securitate): cele 44 de bundle-uri repachetate — includeau hono vulnerabil
+
+## 1.0.1 (2026-08-25)
+
+- feat(sdui): Studio pages for auth/scim and integrations/migrators
+- refactor(extensions): delegate crypto to the host keyring
+- ci: a bundle now has to prove it was built from the committed source
+- refactor: one spelling for the database handle, and a gate I should not have written
+- fix(migrators, validation): rulările în lot și `catch`-urile care mint
+
+## 1.0.0 (2026-07-19)
+
+- feat(integrations/migrators): HubSpot / Notion / Airtable → Zveltio importers

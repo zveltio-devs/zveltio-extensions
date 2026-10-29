@@ -138,6 +138,11 @@ jobs:
         # every gate stayed green.
         run: bun scripts/check-bespoke-contracts.ts
 
+      - name: Every extension's CHANGELOG.md has an entry for its manifest version
+        # Merging publishes, and the engine's marketplace shows these entries
+        # before an administrator updates. A bump without one shows nothing.
+        run: bun scripts/check-changelogs.ts
+
       - name: A route that decides something asks who is asking
         # The gate existed in scripts/ and nothing ran it, so the class it was
         # written for could come back unobserved: `permissionGate(ctx, 'leave')`

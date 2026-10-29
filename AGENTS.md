@@ -18,6 +18,9 @@ This repository contains first-party signed extensions for **Zveltio** (the core
   touching it, and update it there. Six comments in packed extension sources
   still cite the old `CONTEXT.md` filename; they are left as-is deliberately,
   because editing a packed source forces a repack and a manifest version bump.
+- **A manifest version bump needs a `## <version>` entry** at the top of that
+  extension's `CHANGELOG.md` (`scripts/check-changelogs.ts`). The registry
+  serves the file; the engine's marketplace shows it before an update.
 - **Core Engine Location:** `../zveltio` (sibling directory).
 - **Execution Rules:** Never use `cd` to jump between repos. Use `bun --cwd=<dir>` (with `=`) to execute cross-repo commands.
   - Test against core: `bun --cwd=../zveltio test`
