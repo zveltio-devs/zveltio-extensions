@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.1 (2026-10-30)
+
+- fix: an entry dated where two fiscal years overlap is refused (`overlapping_years`) instead of landing in whichever year came first
+- fix: a posted entry of a closed year can be voided: the reversal is booked today in the open year (storno in the current period) and the closed year stays closed
+
 ## 2.0.0 (2026-10-30)
 
 - feat!: accounts, cost centres, fiscal years, exchange rates, budgets, journal entries and lines, recurring templates and their lines, and tax reports are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations

@@ -3,7 +3,7 @@
 // operator per field, and `expect` guards an update. The engine's own data API
 // and its checks are tested in the engine; this proves what the actions ask of it.
 import { describe, expect, it } from 'bun:test';
-import { ActionRefusal } from '@zveltio/sdk/extension';
+import { ActionRefusal, todayIn } from '@zveltio/sdk/extension';
 import { accountingActions as a, advance } from './actions';
 
 type Row = Record<string, unknown>;
@@ -158,6 +158,36 @@ describe('fiscal years', () => {
     await refusal(a.closeFiscalYear({ id: fy }, host), 'year_not_open');
     await refusal(a.createEntry({ date: '2026-07-01', description: 'x', lines: [{ account_id: ids.bank, debit: 1 }, { account_id: ids.sales, credit: 1 }] }, host), 'year_closed');
     await refusal(a.voidEntry({ id }, host), 'year_closed');
+  });
+});
+
+describe('fiscal years overlap and storno', () => {
+  it('refuses a date two years cover', async () => {
+    const { host, ids, c } = await books();
+    await c.insert('fiscal_years', { year: 2027, start_date: '2026-07-01', end_date: '2027-06-30' });
+    const lines = [{ account_id: ids.bank, debit: 1 }, { account_id: ids.sales, credit: 1 }];
+    await refusal(a.createEntry({ date: '2026-08-01', description: 'x', lines }, host), 'overlapping_years');
+    expect(await a.createEntry({ date: '2026-03-01', description: 'x', lines }, host)).toMatchObject({ status: 'draft' });
+  });
+
+  it('voids an entry of a closed year with a reversal in the open year', async () => {
+    const f = fakeHost();
+    const acc = async (code: string, type: string) => String((await f.c.insert('accounts', { code, name: code, type })).id);
+    const bank = await acc('5121', 'asset');
+    const sales = await acc('704', 'revenue');
+    const now = Number(todayIn('UTC').slice(0, 4));
+    const old = await f.c.insert('fiscal_years', { year: now - 1, start_date: `${now - 1}-01-01`, end_date: `${now - 1}-12-31` });
+    const open = await f.c.insert('fiscal_years', { year: now, start_date: `${now}-01-01`, end_date: `${now}-12-31` });
+    const e = (await a.createEntry(
+      { date: `${now - 1}-06-01`, description: 'x', lines: [{ account_id: bank, debit: 5 }, { account_id: sales, credit: 5 }] },
+      f.host,
+    )) as Row;
+    await a.postEntry({ id: e.id }, f.host);
+    await a.closeFiscalYear({ id: old.id }, f.host);
+    const { reversal, original } = (await a.voidEntry({ id: e.id }, f.host)) as { reversal: Row; original: Row };
+    expect(original).toMatchObject({ status: 'voided' });
+    expect(reversal).toMatchObject({ status: 'posted', fiscal_year_id: open.id });
+    expect(String(reversal.date).slice(0, 10)).toBe(todayIn('UTC'));
   });
 });
 
