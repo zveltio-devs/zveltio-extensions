@@ -105,5 +105,6 @@
   "crm.ui.search_organizations": "Organisaties zoeken...",
   "crm.ui.tax": "Belasting",
   "crm.ui.tax_id_cui": "Fiscaal nummer (CUI)",
+  "crm.ui.vat_payer": "Btw-plichtig (RO)",
   "crm.ui.type": "Type *"
 }

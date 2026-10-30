@@ -104,6 +104,7 @@
   "crm.ui.search_organizations": "Search organizations...",
   "crm.ui.tax": "Tax",
   "crm.ui.tax_id_cui": "Tax ID (CUI)",
+  "crm.ui.vat_payer": "VAT payer (RO)",
   "crm.ui.type": "Type *",
   "briefing.allSettled": "Nothing is overdue.",
   "briefing.dueSoon": "{count} due in the next 7 days",

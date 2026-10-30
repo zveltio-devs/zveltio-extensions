@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.0 (2026-10-30)
+
+- feat!: contacts, organizations and transactions are collections declared in `schema/collections/`, created and owned by the engine (ADR 0012); no SQL migrations
+- feat!: the hand-written `/ext/crm/contacts|organizations|transactions` routes and `/ext/crm/briefing` are gone — read and write through `/api/data/<collection>`; the CRM page and the receivables card use it
+- feat!: the `crm.contacts.*` and `crm.organizations.*` services are gone; pos, invoicing and store already treat them as optional and read contacts through their own actions once they move to declared collections
+- feat!: a contact has one organization (`organization_id`, `organization_role`); the contact–organization junction and the five unused tables (pipeline stages, custom fields, activities, email sequences, lead scores) are dropped
+- feat: `tax_id` is a Romanian CUI checked by a validation rule (digits and check digit); the `RO` prefix is the new `vat_payer` flag
+- fix: the receivables card shows only what the caller may read on `transactions` (it used to show amounts to any signed-in user)
+- requires engine 3.0.0-beta.92
+
 ## 1.0.21 (2026-10-27)
 
 - fix(crm,drafts,approvals): check the admin override only when ownership does not decide (#265)

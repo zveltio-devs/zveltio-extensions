@@ -105,5 +105,6 @@
   "crm.ui.search_organizations": "Rechercher des organisations...",
   "crm.ui.tax": "Taxe",
   "crm.ui.tax_id_cui": "Numéro fiscal (CUI)",
+  "crm.ui.vat_payer": "Assujetti à la TVA (RO)",
   "crm.ui.type": "Type *"
 }

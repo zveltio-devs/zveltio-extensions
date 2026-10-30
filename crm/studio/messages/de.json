@@ -105,5 +105,6 @@
   "crm.ui.search_organizations": "Organisationen suchen...",
   "crm.ui.tax": "Steuer",
   "crm.ui.tax_id_cui": "Steuernummer (CUI)",
+  "crm.ui.vat_payer": "Umsatzsteuerpflichtig (RO)",
   "crm.ui.type": "Typ *"
 }
