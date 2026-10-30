@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.0 (2026-10-30)
+
+- feat!: quotes and their lines are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/finance/quotes/*` routes are gone — reads and edits go through `/api/data/quotes` and `/api/data/quote_lines` (sending, accepting, rejecting are `status` edits; the internal approval is an `approval_status` edit); the rest is the actions `createQuote` and `convertToInvoice` (`POST /ext/finance/quotes/actions/<name>`)
+- feat!: who may approve, reject or convert a quote is the engine's rules on these collections; `quotes:approve` is gone
+- feat!: gone with them: the unauthenticated `/public/:token` link and its tokens, the quote revisions table (the engine keeps every record's revisions), the approvals table and `/stats`
+- feat!: a quote's number comes from a `quote` document series of `finance/invoicing` (2.0.0 or later); without one, `createQuote` refuses
+- fix: a quote's status goes draft, sent, then accepted, rejected or expired, and stays there
+- fix: converting builds the invoice through invoicing's own `createInvoice` — a number from the invoice series instead of `INV-Q-*`, an issue date, the seller copied, the VAT rules checked — and a quote is invoiced once, even by two conversions at the same time
+- requires engine 3.0.0-beta.92
+
 ## 1.0.9 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

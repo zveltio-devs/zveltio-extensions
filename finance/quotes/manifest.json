@@ -2,25 +2,22 @@
   "name": "finance/quotes",
   "displayName": "Quotes & Proposals",
   "category": "finance",
-  "description": "Generate branded PDF quotes and proposals linked to CRM contacts, with convert-to-invoice action",
-  "version": "1.0.9",
-  "zveltioMinVersion": "1.0.0",
+  "description": "Quotes and proposals linked to CRM contacts, converted into invoices",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.92",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-quotes",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "finance.quotes",
     "quotes"
   ],
-  "publicRoutes": [
-    "/public/*"
-  ],
   "dependencies": [
     {
       "name": "finance/invoicing",
-      "minVersion": "1.0.0"
+      "minVersion": "2.0.0"
     }
   ],
   "studio": {
@@ -46,11 +43,186 @@
     "bundled": true,
     "bundlePeers": false
   },
+  "collections": [
+    "quotes",
+    "quote_lines"
+  ],
+  "actions": [
+    {
+      "name": "createQuote",
+      "permission": {
+        "resource": "quotes",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "title",
+          "client_name",
+          "lines"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "client_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "contact_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "client_email": {
+            "type": "string"
+          },
+          "valid_until": {
+            "type": "string",
+            "format": "date"
+          },
+          "valid_days": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3
+          },
+          "tax_rate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "discount_percent": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "series": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "terms": {
+            "type": "string"
+          },
+          "footer_notes": {
+            "type": "string"
+          },
+          "po_number": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "description"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quantity": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "unit_price": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "tax_rate": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "discount": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "sort_order": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "reads": [
+        "quotes",
+        "quote_lines",
+        "document_series"
+      ],
+      "writes": [
+        "document_series",
+        "quotes",
+        "quote_lines"
+      ]
+    },
+    {
+      "name": "convertToInvoice",
+      "permission": {
+        "resource": "invoices",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "series": {
+            "type": "string"
+          },
+          "client_tax_id": {
+            "type": "string"
+          },
+          "exchange_rate": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "due_days": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "reads": [
+        "quotes",
+        "quote_lines",
+        "document_series",
+        "company_profile",
+        "invoices",
+        "invoice_lines"
+      ],
+      "writes": [
+        "quotes",
+        "document_series",
+        "invoices",
+        "invoice_lines"
+      ]
+    }
+  ],
   "integrity": {
-    "engineSha256": "b0078fcee4ca8d48a18184d7b77be3ec35793a042557fc2201ea75dae98c2f2e",
-    "sourceSha256": "327d85cf8f05854c670bed984c160b040cd66bc5ab1c36c52d43ecee2636fcf9"
-  },
-  "resources": [
-    "quotes"
-  ]
+    "engineSha256": "0609fbbea9ddf1391eec5a1710157c3ef34f5c5622b1afbbee0bfb4aed7aefc6",
+    "sourceSha256": "72b458f4d0515be5aa00bb976dd9b54150ec4e36af97095d88fe2a672184c4c2",
+    "schemaSha256": "e05ed125316c2f2fb0e081ca1d54aa26608f67423a32c6c3785f6444675b026a"
+  }
 }

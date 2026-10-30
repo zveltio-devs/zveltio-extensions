@@ -1,8 +1,10 @@
 {
   "finance.quotes.btn.accept": "Marcar como aceptado",
   "finance.quotes.btn.addLine": "Añadir línea",
+  "finance.quotes.btn.convert": "Convertir en factura",
   "finance.quotes.btn.create": "Crear presupuesto",
   "finance.quotes.btn.new": "Nuevo presupuesto",
+  "finance.quotes.btn.reject": "Rechazar",
   "finance.quotes.btn.send": "Enviar",
   "finance.quotes.deleteConfirm": "¿Eliminar este presupuesto?",
   "finance.quotes.empty": "Aún no hay presupuestos. Crea tu primer presupuesto.",
@@ -12,6 +14,7 @@
   "finance.quotes.toast.created": "Presupuesto creado.",
   "finance.quotes.ui.client_email": "Correo del cliente",
   "finance.quotes.ui.client_name": "Nombre del cliente *",
+  "finance.quotes.ui.client_tax_id": "NIF del cliente",
   "finance.quotes.ui.disc": "Disc %",
   "finance.quotes.ui.service_or_product": "Servicio o producto",
   "finance.quotes.ui.unit_price": "Precio unitario",
