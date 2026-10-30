@@ -358,7 +358,8 @@ const markOverdue: ExtensionAction = async (_input, host) => {
 
 /**
  * A proforma requests payment and records no supply. Converting copies it into
- * a draft invoice numbered from the invoice series, and remembers its source.
+ * a draft invoice, numbered from the invoice series when sent, and remembers
+ * its source.
  */
 const convertProforma: ExtensionAction = async (input, host) => {
   const { id } = input as { id: string };
@@ -368,7 +369,7 @@ const convertProforma: ExtensionAction = async (input, host) => {
   // conversion waits here and then sees this one's invoice.
   await host.collections.update(I, id, { status: p.status }, { expect: { status: [String(p.status)] } });
   const done = records(await host.collections.list(I, { filter: { converted_from_id: id }, limit: 1, count: 'none' }))[0];
-  if (done) throw new ActionRefusal(409, 'already_converted', `Already converted to ${done.number}.`);
+  if (done) throw new ActionRefusal(409, 'already_converted', `Already converted to ${done.number ?? done.id}.`);
   const inv = await host.collections.insert(I, {
     ...pick(p, [...PARTY, ...AMOUNTS, 'delivery_date', 'due_date']),
     doc_type: 'invoice',

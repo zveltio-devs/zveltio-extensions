@@ -337,7 +337,7 @@ var convertProforma = async (input, host) => {
   await host.collections.update(I, id, { status: p.status }, { expect: { status: [String(p.status)] } });
   const done = records(await host.collections.list(I, { filter: { converted_from_id: id }, limit: 1, count: "none" }))[0];
   if (done)
-    throw new ActionRefusal(409, "already_converted", `Already converted to ${done.number}.`);
+    throw new ActionRefusal(409, "already_converted", `Already converted to ${done.number ?? done.id}.`);
   const inv = await host.collections.insert(I, {
     ...pick(p, [...PARTY, ...AMOUNTS, "delivery_date", "due_date"]),
     doc_type: "invoice",
