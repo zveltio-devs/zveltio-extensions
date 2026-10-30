@@ -1,4 +1,4 @@
-// The declared collections (ADR 0012), through the engine's own load path: they
+// The declared collections, through the engine's own load path: they
 // apply on a fresh instance, owned by this extension, with a foreign key per
 // relation, and nothing is owed afterwards — a boot or a firm's activation runs
 // the same plan and refuses while it has steps, so a file the engine reads back

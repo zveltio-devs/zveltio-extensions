@@ -2,7 +2,7 @@
 
 ## 2.0.0 (2026-10-30)
 
-- feat!: contacts, organizations and transactions are collections declared in `schema/collections/`, created and owned by the engine (ADR 0012); no SQL migrations
+- feat!: contacts, organizations and transactions are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations
 - feat!: the hand-written `/ext/crm/contacts|organizations|transactions` routes and `/ext/crm/briefing` are gone — read and write through `/api/data/<collection>`; the CRM page and the receivables card use it
 - feat!: the `crm.contacts.*` and `crm.organizations.*` services are gone; pos, invoicing and store already treat them as optional and read contacts through their own actions once they move to declared collections
 - feat!: a contact has one organization (`organization_id`, `organization_role`); the contact–organization junction and the five unused tables (pipeline stages, custom fields, activities, email sequences, lead scores) are dropped
