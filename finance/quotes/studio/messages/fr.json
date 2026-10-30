@@ -1,8 +1,10 @@
 {
   "finance.quotes.btn.accept": "Marquer comme accepté",
   "finance.quotes.btn.addLine": "Ajouter une ligne",
+  "finance.quotes.btn.convert": "Convertir en facture",
   "finance.quotes.btn.create": "Créer un devis",
   "finance.quotes.btn.new": "Nouveau devis",
+  "finance.quotes.btn.reject": "Refuser",
   "finance.quotes.btn.send": "Envoyer",
   "finance.quotes.deleteConfirm": "Supprimer ce devis ?",
   "finance.quotes.empty": "Aucun devis pour l'instant. Créez votre premier devis.",
@@ -12,6 +14,7 @@
   "finance.quotes.toast.created": "Devis créé.",
   "finance.quotes.ui.client_email": "E-mail du client",
   "finance.quotes.ui.client_name": "Nom du client *",
+  "finance.quotes.ui.client_tax_id": "N° fiscal du client",
   "finance.quotes.ui.disc": "Remise %",
   "finance.quotes.ui.service_or_product": "Service ou produit",
   "finance.quotes.ui.unit_price": "Prix unitaire",

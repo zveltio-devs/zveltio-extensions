@@ -1,8 +1,10 @@
 {
   "finance.quotes.btn.accept": "Mark accepted",
   "finance.quotes.btn.addLine": "Add line",
+  "finance.quotes.btn.convert": "Convert to invoice",
   "finance.quotes.btn.create": "Create Quote",
   "finance.quotes.btn.new": "New Quote",
+  "finance.quotes.btn.reject": "Reject",
   "finance.quotes.btn.send": "Send",
   "finance.quotes.deleteConfirm": "Delete this quote?",
   "finance.quotes.empty": "No quotes yet. Create your first quote.",
@@ -12,6 +14,7 @@
   "finance.quotes.toast.created": "Quote created.",
   "finance.quotes.ui.client_email": "Client Email",
   "finance.quotes.ui.client_name": "Client Name *",
+  "finance.quotes.ui.client_tax_id": "Client tax ID",
   "finance.quotes.ui.disc": "Disc %",
   "finance.quotes.ui.service_or_product": "Service or product",
   "finance.quotes.ui.unit_price": "Unit Price",

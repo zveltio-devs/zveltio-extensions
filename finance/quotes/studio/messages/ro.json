@@ -1,8 +1,10 @@
 {
   "finance.quotes.btn.accept": "Marchează acceptat",
   "finance.quotes.btn.addLine": "Adaugă linie",
+  "finance.quotes.btn.convert": "Facturează",
   "finance.quotes.btn.create": "Creează ofertă",
   "finance.quotes.btn.new": "Ofertă nouă",
+  "finance.quotes.btn.reject": "Respinge",
   "finance.quotes.btn.send": "Trimite",
   "finance.quotes.deleteConfirm": "Ștergeți această ofertă?",
   "finance.quotes.empty": "Nicio ofertă încă. Creează prima ofertă.",
@@ -12,6 +14,7 @@
   "finance.quotes.toast.created": "Ofertă creată.",
   "finance.quotes.ui.client_email": "Email client",
   "finance.quotes.ui.client_name": "Nume client *",
+  "finance.quotes.ui.client_tax_id": "CUI client",
   "finance.quotes.ui.disc": "Disc %",
   "finance.quotes.ui.service_or_product": "Serviciu sau produs",
   "finance.quotes.ui.unit_price": "Preț unitar",

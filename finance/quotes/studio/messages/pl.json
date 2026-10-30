@@ -1,8 +1,10 @@
 {
   "finance.quotes.btn.accept": "Oznacz jako zaakceptowane",
   "finance.quotes.btn.addLine": "Dodaj wiersz",
+  "finance.quotes.btn.convert": "Zamień na fakturę",
   "finance.quotes.btn.create": "Utwórz ofertę",
   "finance.quotes.btn.new": "Nowa oferta",
+  "finance.quotes.btn.reject": "Odrzuć",
   "finance.quotes.btn.send": "Wyślij",
   "finance.quotes.deleteConfirm": "Usunąć tę ofertę?",
   "finance.quotes.empty": "Brak ofert. Utwórz pierwszą ofertę.",
@@ -12,6 +14,7 @@
   "finance.quotes.toast.created": "Utworzono ofertę.",
   "finance.quotes.ui.client_email": "E-mail klienta",
   "finance.quotes.ui.client_name": "Nazwa klienta *",
+  "finance.quotes.ui.client_tax_id": "NIP klienta",
   "finance.quotes.ui.disc": "Disc %",
   "finance.quotes.ui.service_or_product": "Usługa lub produkt",
   "finance.quotes.ui.unit_price": "Cena jednostkowa",

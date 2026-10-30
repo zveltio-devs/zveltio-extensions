@@ -1,8 +1,10 @@
 {
   "finance.quotes.btn.accept": "Als akzeptiert markieren",
   "finance.quotes.btn.addLine": "Zeile hinzufügen",
+  "finance.quotes.btn.convert": "In Rechnung umwandeln",
   "finance.quotes.btn.create": "Angebot erstellen",
   "finance.quotes.btn.new": "Neues Angebot",
+  "finance.quotes.btn.reject": "Ablehnen",
   "finance.quotes.btn.send": "Senden",
   "finance.quotes.deleteConfirm": "Dieses Angebot löschen?",
   "finance.quotes.empty": "Noch keine Angebote. Erstellen Sie Ihr erstes Angebot.",
@@ -12,6 +14,7 @@
   "finance.quotes.toast.created": "Angebot erstellt.",
   "finance.quotes.ui.client_email": "Kunden-E-Mail",
   "finance.quotes.ui.client_name": "Kundenname *",
+  "finance.quotes.ui.client_tax_id": "Steuer-ID des Kunden",
   "finance.quotes.ui.disc": "Rabatt %",
   "finance.quotes.ui.service_or_product": "Dienstleistung oder Produkt",
   "finance.quotes.ui.unit_price": "Stückpreis",
