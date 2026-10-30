@@ -6,11 +6,11 @@
   "resources": [
     {
       "id": "quotes",
-      "dataSource": "/ext/finance/quotes",
-      "dataPath": "data",
+      "dataSource": "/api/data/quotes?sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
-          "key": "quote_number",
+          "key": "number",
           "label": "common.col.number",
           "type": "mono"
         },
@@ -56,31 +56,84 @@
         {
           "id": "send",
           "icon": "Send",
-          "method": "POST",
-          "endpoint": "/ext/finance/quotes/{id}/send",
+          "label": "finance.quotes.btn.send",
+          "method": "PATCH",
+          "endpoint": "/api/data/quotes/{id}",
           "visibleWhen": {
             "field": "status",
             "equals": "draft"
+          },
+          "body": {
+            "status": "sent"
           }
         },
         {
           "id": "accept",
           "icon": "CheckCircle",
+          "label": "finance.quotes.btn.accept",
           "variant": "text-success",
-          "method": "POST",
-          "endpoint": "/ext/finance/quotes/{id}/accept",
+          "method": "PATCH",
+          "endpoint": "/api/data/quotes/{id}",
           "visibleWhen": {
             "field": "status",
             "equals": "sent"
+          },
+          "body": {
+            "status": "accepted"
+          }
+        },
+        {
+          "id": "reject",
+          "icon": "XCircle",
+          "label": "finance.quotes.btn.reject",
+          "variant": "text-error",
+          "method": "PATCH",
+          "endpoint": "/api/data/quotes/{id}",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "sent"
+          },
+          "body": {
+            "status": "rejected"
+          }
+        },
+        {
+          "id": "convert",
+          "icon": "FileCheck",
+          "label": "finance.quotes.btn.convert",
+          "method": "POST",
+          "endpoint": "/ext/finance/quotes/actions/convertToInvoice",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "accepted"
+          },
+          "prompt": {
+            "title": "finance.quotes.btn.convert",
+            "submitLabel": "finance.quotes.btn.convert",
+            "fields": [
+              {
+                "name": "client_tax_id",
+                "label": "finance.quotes.ui.client_tax_id",
+                "type": "text"
+              }
+            ]
+          },
+          "body": {
+            "id": "{id}"
           }
         },
         {
           "id": "delete",
           "icon": "Trash2",
           "variant": "text-error",
+          "label": "common.delete",
           "method": "DELETE",
-          "endpoint": "/ext/finance/quotes/{id}",
-          "confirm": "finance.quotes.deleteConfirm"
+          "endpoint": "/api/data/quotes/{id}",
+          "confirm": "finance.quotes.deleteConfirm",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "draft"
+          }
         }
       ],
       "readOnlyReason": "a quote needs at least one line item; a flat form cannot express it, so this resource lists rather than creates. A dedicated page is the fix, not a schema field."

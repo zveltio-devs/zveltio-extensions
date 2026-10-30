@@ -1,0 +1,102 @@
+{
+  "name": "credit_notes",
+  "fields": [
+    {
+      "name": "number",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "original_invoice_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "invoices"
+      }
+    },
+    {
+      "name": "client_id",
+      "type": "uuid"
+    },
+    {
+      "name": "client_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "client_email",
+      "type": "email"
+    },
+    {
+      "name": "reason",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "issue_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON"
+    },
+    {
+      "name": "subtotal",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "tax_amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "total",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "draft",
+      "options": {
+        "values": [
+          "draft",
+          "issued",
+          "applied"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "credit_notes_original_invoice_id",
+      "type": "m2o",
+      "field": "original_invoice_id",
+      "target": "invoices",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "status",
+      "rule": "transition",
+      "config": {
+        "expression": "value == previous || (previous == 'draft' && value == 'issued') || (previous == 'issued' && value == 'applied')"
+      },
+      "message": "A credit note goes draft, issued, then applied."
+    }
+  ]
+}

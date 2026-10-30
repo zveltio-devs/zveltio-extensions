@@ -14,6 +14,7 @@
   "invoicing.col.total": "Összesen",
   "invoicing.deleteConfirm": "Törli ezt a számlát?",
   "invoicing.doc.deliveryNote": "Szállítólevél",
+  "invoicing.doc.quote": "Árajánlat",
   "invoicing.doc.invoice": "Számla",
   "invoicing.doc.proforma": "Díjbekérő",
   "invoicing.empty": "Még nincsenek számlák. Hozd létre az első számlát.",
@@ -109,5 +110,9 @@
   "invoicing.vat.nonTaxable": "Nem adóköteles",
   "invoicing.vat.onCollection": "Pénzforgalmi ÁFA",
   "invoicing.vat.reverseCharge": "Fordított adózás",
-  "invoicing.vat.standard": "Általános"
+  "invoicing.vat.standard": "Általános",
+  "invoicing.doc.creditNote": "Jóváírás",
+  "invoicing.action.cancel": "Sztornó",
+  "invoicing.action.convert": "Számlává alakítás",
+  "invoicing.cancelConfirm": "Sztornózza a számlát? A sorszáma megmarad; a számlázott összeg visszafordításához állítson ki jóváírást."
 }

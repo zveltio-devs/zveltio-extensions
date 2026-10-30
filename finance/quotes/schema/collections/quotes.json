@@ -1,0 +1,153 @@
+{
+  "name": "quotes",
+  "fields": [
+    {
+      "name": "number",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "title",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "contact_id",
+      "type": "uuid",
+      "indexed": true
+    },
+    {
+      "name": "organization_id",
+      "type": "uuid",
+      "indexed": true
+    },
+    {
+      "name": "client_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "client_email",
+      "type": "email"
+    },
+    {
+      "name": "issue_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "valid_until",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON"
+    },
+    {
+      "name": "subtotal",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "tax_rate",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 19
+    },
+    {
+      "name": "tax_amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "discount_percent",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "discount_amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "total",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "draft",
+      "options": {
+        "values": [
+          "draft",
+          "sent",
+          "accepted",
+          "rejected",
+          "expired"
+        ]
+      }
+    },
+    {
+      "name": "approval_status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "pending",
+          "approved",
+          "rejected"
+        ]
+      }
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    },
+    {
+      "name": "terms",
+      "type": "textarea"
+    },
+    {
+      "name": "footer_notes",
+      "type": "textarea"
+    },
+    {
+      "name": "po_number",
+      "type": "text"
+    },
+    {
+      "name": "converted_to_invoice_id",
+      "type": "uuid"
+    }
+  ],
+  "validation": [
+    {
+      "field": "discount_percent",
+      "rule": "range",
+      "config": {
+        "min": 0,
+        "max": 100
+      },
+      "message": "A discount is 0 to 100 percent."
+    },
+    {
+      "field": "status",
+      "rule": "transition",
+      "config": {
+        "expression": "value == previous || (previous == 'draft' && value in ['sent', 'expired']) || (previous == 'sent' && value in ['accepted', 'rejected', 'expired'])"
+      },
+      "message": "A quote goes draft, sent, then accepted, rejected or expired, and stays there."
+    }
+  ]
+}

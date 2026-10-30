@@ -1,0 +1,124 @@
+{
+  "name": "bank_transactions",
+  "fields": [
+    {
+      "name": "account_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "bank_accounts"
+      },
+      "required": true
+    },
+    {
+      "name": "import_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "bank_imports"
+      }
+    },
+    {
+      "name": "date",
+      "type": "date",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "value_date",
+      "type": "date"
+    },
+    {
+      "name": "description",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "reference",
+      "type": "text"
+    },
+    {
+      "name": "counterparty_name",
+      "type": "text"
+    },
+    {
+      "name": "amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "type",
+      "type": "enum",
+      "options": {
+        "values": [
+          "credit",
+          "debit"
+        ]
+      },
+      "required": true
+    },
+    {
+      "name": "balance_after",
+      "type": "decimal"
+    },
+    {
+      "name": "category",
+      "type": "text"
+    },
+    {
+      "name": "auto_categorized",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    },
+    {
+      "name": "is_reconciled",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false,
+      "indexed": true
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    },
+    {
+      "name": "import_hash",
+      "type": "text",
+      "unique": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "bank_transactions_account_id",
+      "type": "m2o",
+      "field": "account_id",
+      "target": "bank_accounts",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "bank_transactions_import_id",
+      "type": "m2o",
+      "field": "import_id",
+      "target": "bank_imports",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "amount",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "An amount is not negative; the type says which way it went."
+    }
+  ]
+}

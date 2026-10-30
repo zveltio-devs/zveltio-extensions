@@ -3,12 +3,12 @@
   "displayName": "Banking Sync",
   "category": "finance",
   "description": "Import bank statements, auto-reconcile transactions with invoices and track cash flow",
-  "version": "1.0.13",
-  "zveltioMinVersion": "1.0.0",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.92",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-banking",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "finance.banking"
@@ -16,7 +16,7 @@
   "dependencies": [
     {
       "name": "finance/invoicing",
-      "minVersion": "1.0.0"
+      "minVersion": "2.0.0"
     }
   ],
   "studio": {
@@ -42,14 +42,327 @@
     "bundled": true,
     "bundlePeers": false
   },
-  "integrity": {
-    "engineSha256": "20da9e00bcd38f9beaf59430aaea12a0b5cd1e97d71398be959db3e91d77bb04",
-    "sourceSha256": "277bc90592f6854be1e76ceb9d54468b76eca6a956365ed4e002a4795e1a4eb8"
-  },
-  "resources": [
-    "banking"
+  "collections": [
+    "bank_accounts",
+    "bank_imports",
+    "bank_transactions",
+    "bank_rules",
+    "bank_reconciliations",
+    "bank_balance_history",
+    "cash_flow_entries"
   ],
-  "sensitiveResources": [
-    "banking"
-  ]
+  "actions": [
+    {
+      "name": "addTransaction",
+      "permission": {
+        "resource": "bank_transactions",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "account_id",
+          "date",
+          "type",
+          "amount",
+          "description"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "type": {
+            "enum": [
+              "credit",
+              "debit"
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reference": {
+            "type": "string"
+          },
+          "counterparty_name": {
+            "type": "string"
+          },
+          "account_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "category": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "bank_accounts",
+        "bank_transactions",
+        "bank_rules"
+      ],
+      "writes": [
+        "bank_accounts",
+        "bank_transactions"
+      ]
+    },
+    {
+      "name": "importTransactions",
+      "permission": {
+        "resource": "bank_transactions",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "account_id",
+          "transactions"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "transactions": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "date",
+                "type",
+                "amount",
+                "description"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "type": {
+                  "enum": [
+                    "credit",
+                    "debit"
+                  ]
+                },
+                "amount": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "counterparty_name": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "reads": [
+        "bank_accounts",
+        "bank_transactions",
+        "bank_rules",
+        "bank_imports"
+      ],
+      "writes": [
+        "bank_accounts",
+        "bank_transactions",
+        "bank_imports"
+      ]
+    },
+    {
+      "name": "importMT940",
+      "permission": {
+        "resource": "bank_transactions",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "account_id",
+          "content"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "content": {
+            "type": "string",
+            "minLength": 10
+          },
+          "filename": {
+            "type": "string",
+            "maxLength": 255
+          }
+        }
+      },
+      "reads": [
+        "bank_accounts",
+        "bank_transactions",
+        "bank_rules",
+        "bank_imports"
+      ],
+      "writes": [
+        "bank_accounts",
+        "bank_transactions",
+        "bank_imports"
+      ]
+    },
+    {
+      "name": "recategorize",
+      "permission": {
+        "resource": "bank_transactions",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "account_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "bank_transactions",
+        "bank_rules"
+      ],
+      "writes": [
+        "bank_transactions"
+      ]
+    },
+    {
+      "name": "reconcile",
+      "permission": {
+        "resource": "bank_reconciliations",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "transaction_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "transaction_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "linked_type": {
+            "enum": [
+              "invoice",
+              "expense",
+              "manual"
+            ]
+          },
+          "linked_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "bank_transactions",
+        "bank_reconciliations",
+        "invoices"
+      ],
+      "writes": [
+        "bank_transactions",
+        "bank_reconciliations",
+        "invoices",
+        "invoice_payments"
+      ]
+    },
+    {
+      "name": "snapshotBalance",
+      "permission": {
+        "resource": "bank_balance_history",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "account_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "bank_accounts",
+        "bank_transactions",
+        "bank_balance_history"
+      ],
+      "writes": [
+        "bank_accounts",
+        "bank_balance_history"
+      ]
+    },
+    {
+      "name": "refreshBalance",
+      "permission": {
+        "resource": "bank_accounts",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "bank_accounts",
+        "bank_transactions"
+      ],
+      "writes": [
+        "bank_accounts"
+      ]
+    }
+  ],
+  "integrity": {
+    "engineSha256": "a1799755c824fc95a7477eba42fb13809f2131d9d699211900d588bbd1b53430",
+    "sourceSha256": "ceb3b75b6bd3d9f0675b7840e6f3d3f93fde426fdd7cf4258d15ca04bebe6c96",
+    "schemaSha256": "a3be61ca206b28bfc471fc83c4b41e672689e08c088908c1e969adc1ef2019c2"
+  }
 }

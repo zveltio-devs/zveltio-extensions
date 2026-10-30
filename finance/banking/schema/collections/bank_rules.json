@@ -1,0 +1,93 @@
+{
+  "name": "bank_rules",
+  "fields": [
+    {
+      "name": "account_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "bank_accounts"
+      }
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "match_field",
+      "type": "enum",
+      "options": {
+        "values": [
+          "description",
+          "counterparty_name",
+          "reference",
+          "amount"
+        ]
+      },
+      "required": true,
+      "defaultValue": "description"
+    },
+    {
+      "name": "match_operator",
+      "type": "enum",
+      "options": {
+        "values": [
+          "contains",
+          "equals",
+          "starts_with",
+          "ends_with",
+          "regex",
+          "gt",
+          "lt"
+        ]
+      },
+      "required": true,
+      "defaultValue": "contains"
+    },
+    {
+      "name": "match_value",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "category",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "type_override",
+      "type": "enum",
+      "options": {
+        "values": [
+          "credit",
+          "debit"
+        ]
+      }
+    },
+    {
+      "name": "priority",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "bank_rules_account_id",
+      "type": "m2o",
+      "field": "account_id",
+      "target": "bank_accounts",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

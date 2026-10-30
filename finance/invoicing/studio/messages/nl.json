@@ -14,6 +14,7 @@
   "invoicing.col.total": "Totaal",
   "invoicing.deleteConfirm": "Deze factuur verwijderen?",
   "invoicing.doc.deliveryNote": "Pakbon",
+  "invoicing.doc.quote": "Offerte",
   "invoicing.doc.invoice": "Factuur",
   "invoicing.doc.proforma": "Proformafactuur",
   "invoicing.empty": "Nog geen facturen. Maak je eerste factuur.",
@@ -109,5 +110,9 @@
   "invoicing.vat.nonTaxable": "Niet belastbaar",
   "invoicing.vat.onCollection": "Kasstelsel",
   "invoicing.vat.reverseCharge": "Verlegd",
-  "invoicing.vat.standard": "Standaard"
+  "invoicing.vat.standard": "Standaard",
+  "invoicing.doc.creditNote": "Creditnota",
+  "invoicing.action.cancel": "Annuleren",
+  "invoicing.action.convert": "Omzetten naar factuur",
+  "invoicing.cancelConfirm": "Deze factuur annuleren? Het nummer blijft behouden; maak een creditnota om het gefactureerde terug te draaien."
 }

@@ -1,8 +1,10 @@
 {
   "finance.quotes.btn.accept": "Segna come accettato",
   "finance.quotes.btn.addLine": "Aggiungi riga",
+  "finance.quotes.btn.convert": "Converti in fattura",
   "finance.quotes.btn.create": "Crea preventivo",
   "finance.quotes.btn.new": "Nuovo preventivo",
+  "finance.quotes.btn.reject": "Rifiuta",
   "finance.quotes.btn.send": "Invia",
   "finance.quotes.deleteConfirm": "Eliminare questo preventivo?",
   "finance.quotes.empty": "Ancora nessun preventivo. Crea il tuo primo preventivo.",
@@ -12,6 +14,7 @@
   "finance.quotes.toast.created": "Preventivo creato.",
   "finance.quotes.ui.client_email": "E-mail cliente",
   "finance.quotes.ui.client_name": "Nome cliente *",
+  "finance.quotes.ui.client_tax_id": "Partita IVA cliente",
   "finance.quotes.ui.disc": "Disc %",
   "finance.quotes.ui.service_or_product": "Servizio o prodotto",
   "finance.quotes.ui.unit_price": "Prezzo unitario",

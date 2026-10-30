@@ -6,8 +6,8 @@
   "resources": [
     {
       "id": "series",
-      "dataSource": "/ext/finance/invoicing/series",
-      "dataPath": "data",
+      "dataSource": "/api/data/document_series?sort=doc_type&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "doc_type",
@@ -17,12 +17,14 @@
             "colors": {
               "invoice": "badge-primary",
               "proforma": "badge-ghost",
-              "delivery_note": "badge-info"
+              "delivery_note": "badge-info",
+              "quote": "badge-accent"
             },
             "labels": {
               "invoice": "invoicing.doc.invoice",
               "proforma": "invoicing.doc.proforma",
-              "delivery_note": "invoicing.doc.deliveryNote"
+              "delivery_note": "invoicing.doc.deliveryNote",
+              "quote": "invoicing.doc.quote"
             }
           }
         },
@@ -61,12 +63,12 @@
           "label": "common.delete",
           "variant": "text-error",
           "method": "DELETE",
-          "endpoint": "/ext/finance/invoicing/series/{id}",
+          "endpoint": "/api/data/document_series/{id}",
           "confirm": "invoicing.series.confirmDelete"
         }
       ],
       "form": {
-        "endpoint": "/ext/finance/invoicing/series",
+        "endpoint": "/api/data/document_series",
         "fields": [
           {
             "name": "doc_type",
@@ -86,6 +88,14 @@
               {
                 "value": "delivery_note",
                 "label": "invoicing.doc.deliveryNote"
+              },
+              {
+                "value": "quote",
+                "label": "invoicing.doc.quote"
+              },
+              {
+                "value": "credit_note",
+                "label": "invoicing.doc.creditNote"
               }
             ]
           },

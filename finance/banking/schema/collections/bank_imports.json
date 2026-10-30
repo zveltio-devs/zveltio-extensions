@@ -1,0 +1,46 @@
+{
+  "name": "bank_imports",
+  "fields": [
+    {
+      "name": "account_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "bank_accounts"
+      },
+      "required": true
+    },
+    {
+      "name": "source",
+      "type": "text"
+    },
+    {
+      "name": "filename",
+      "type": "text"
+    },
+    {
+      "name": "rows_imported",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "rows_skipped",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    }
+  ],
+  "relations": [
+    {
+      "name": "bank_imports_account_id",
+      "type": "m2o",
+      "field": "account_id",
+      "target": "bank_accounts",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

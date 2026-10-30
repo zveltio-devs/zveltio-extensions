@@ -1,0 +1,80 @@
+{
+  "name": "catalogue_items",
+  "fields": [
+    {
+      "name": "code",
+      "type": "text",
+      "unique": true
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "kind",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "service",
+      "options": {
+        "values": [
+          "product",
+          "service"
+        ]
+      }
+    },
+    {
+      "name": "unit",
+      "type": "text",
+      "required": true,
+      "defaultValue": "buc"
+    },
+    {
+      "name": "unit_price",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON"
+    },
+    {
+      "name": "tax_rate",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 19
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    }
+  ],
+  "validation": [
+    {
+      "field": "unit_price",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A price is not negative."
+    },
+    {
+      "field": "tax_rate",
+      "rule": "range",
+      "config": {
+        "min": 0,
+        "max": 100
+      },
+      "message": "A VAT rate is 0 to 100."
+    }
+  ]
+}

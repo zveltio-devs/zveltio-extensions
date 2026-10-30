@@ -14,6 +14,7 @@
   "invoicing.col.total": "Total",
   "invoicing.deleteConfirm": "Supprimer cette facture ?",
   "invoicing.doc.deliveryNote": "Bon de livraison",
+  "invoicing.doc.quote": "Devis",
   "invoicing.doc.invoice": "Facture",
   "invoicing.doc.proforma": "Facture pro forma",
   "invoicing.empty": "Aucune facture pour l'instant. Créez votre première facture.",
@@ -109,5 +110,9 @@
   "invoicing.vat.nonTaxable": "Non imposable",
   "invoicing.vat.onCollection": "TVA sur encaissements",
   "invoicing.vat.reverseCharge": "Autoliquidation",
-  "invoicing.vat.standard": "Normal"
+  "invoicing.vat.standard": "Normal",
+  "invoicing.doc.creditNote": "Avoir",
+  "invoicing.action.cancel": "Annuler",
+  "invoicing.action.convert": "Convertir en facture",
+  "invoicing.cancelConfirm": "Annuler cette facture ? Elle garde son numéro ; émettez un avoir pour annuler le montant facturé."
 }

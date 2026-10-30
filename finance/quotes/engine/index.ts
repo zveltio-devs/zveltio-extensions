@@ -1,27 +1,18 @@
-import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
-import { quotesRoutes } from './routes.js';
+import type { ZveltioExtension } from "@zveltio/sdk/extension";
+import { quotesActions } from "./actions.js";
 
+// Quotes and their lines are collections this extension declares in
+// `schema/collections/` (manifest `collections`); the engine creates them, owns
+// their rules and serves them through the data API. What is left in code is
+// what quotes does beyond a plain edit: the actions in `actions.ts`.
 const extension: ZveltioExtension = {
-  name: 'finance/quotes',
-  category: 'finance',
-  // S3-01: sub-app mounted at /ext/finance/quotes by the engine.
-  mountStrategy: 'subapp',
+	name: "finance/quotes",
+	category: "finance",
+	mountStrategy: "subapp",
 
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_initial.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
-      join(import.meta.dir, 'migrations/003_user_ref_text.sql'),
-      join(import.meta.dir, 'migrations/004_tenant_scoped_unique_keys.sql'),
-      join(import.meta.dir, 'migrations/005_user_ref_text.sql'),
-      join(import.meta.dir, 'migrations/006_user_ref_text.sql'),
-    ];
-  },
+	actions: quotesActions,
 
-  async register(app, ctx) {
-    app.route('/', quotesRoutes(ctx));
-  },
+	async register() {},
 };
 
 export default extension;

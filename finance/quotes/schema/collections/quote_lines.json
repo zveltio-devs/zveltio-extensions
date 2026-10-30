@@ -1,0 +1,78 @@
+{
+  "name": "quote_lines",
+  "fields": [
+    {
+      "name": "quote_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "quotes"
+      }
+    },
+    {
+      "name": "description",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "quantity",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 1
+    },
+    {
+      "name": "unit_price",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "tax_rate",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 19
+    },
+    {
+      "name": "discount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "total",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "sort_order",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    }
+  ],
+  "relations": [
+    {
+      "name": "quote_lines_quote_id",
+      "type": "m2o",
+      "field": "quote_id",
+      "target": "quotes",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "discount",
+      "rule": "range",
+      "config": {
+        "min": 0,
+        "max": 100
+      },
+      "message": "A discount is 0 to 100 percent."
+    }
+  ]
+}

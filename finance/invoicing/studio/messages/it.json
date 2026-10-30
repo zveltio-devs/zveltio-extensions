@@ -14,6 +14,7 @@
   "invoicing.col.total": "Totale",
   "invoicing.deleteConfirm": "Eliminare questa fattura?",
   "invoicing.doc.deliveryNote": "DDT",
+  "invoicing.doc.quote": "Preventivo",
   "invoicing.doc.invoice": "Fattura",
   "invoicing.doc.proforma": "Fattura proforma",
   "invoicing.empty": "Ancora nessuna fattura. Crea la tua prima fattura.",
@@ -109,5 +110,9 @@
   "invoicing.vat.nonTaxable": "Non imponibile",
   "invoicing.vat.onCollection": "IVA per cassa",
   "invoicing.vat.reverseCharge": "Inversione contabile",
-  "invoicing.vat.standard": "Ordinario"
+  "invoicing.vat.standard": "Ordinario",
+  "invoicing.doc.creditNote": "Nota di credito",
+  "invoicing.action.cancel": "Annulla",
+  "invoicing.action.convert": "Converti in fattura",
+  "invoicing.cancelConfirm": "Annullare questa fattura? Mantiene il suo numero; emetti una nota di credito per stornare l'importo fatturato."
 }

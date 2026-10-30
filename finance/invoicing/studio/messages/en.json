@@ -14,6 +14,7 @@
   "invoicing.col.total": "Total",
   "invoicing.deleteConfirm": "Delete this invoice?",
   "invoicing.doc.deliveryNote": "Delivery note",
+  "invoicing.doc.quote": "Quote",
   "invoicing.doc.invoice": "Invoice",
   "invoicing.doc.proforma": "Pro forma invoice",
   "invoicing.empty": "No invoices yet. Create your first invoice.",
@@ -111,5 +112,9 @@
   "invoicing.widget.overdueCount": "{count} overdue",
   "invoicing.widget.title": "Outstanding invoices",
   "invoicing.suggestions.overdueTitle": "{count} overdue invoice(s)",
-  "invoicing.suggestions.overdueHint": "Review and send reminders from Invoicing."
+  "invoicing.suggestions.overdueHint": "Review and send reminders from Invoicing.",
+  "invoicing.doc.creditNote": "Credit note",
+  "invoicing.action.cancel": "Cancel",
+  "invoicing.action.convert": "Convert to invoice",
+  "invoicing.cancelConfirm": "Cancel this invoice? It stays numbered; issue a credit note to reverse what was invoiced."
 }

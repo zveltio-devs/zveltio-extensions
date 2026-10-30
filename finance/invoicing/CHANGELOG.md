@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.0.0 (2026-10-30)
+
+- feat!: invoices, their lines, payments, reminders, credit notes and their lines, document series, the company profile and the catalogue are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/finance/invoicing/*` routes are gone — plain reads and edits go through `/api/data/<collection>` (sending is `status: sent`, cancelling is `status: cancelled`); the rest is the actions `saveCompany`, `createInvoice`, `recordPayment`, `markOverdue`, `convertProforma`, `generateNext`, `createCreditNote`, `applyCreditNote` and `renderInvoice` (`POST /ext/finance/invoicing/actions/<name>`)
+- feat!: who may record a payment or cancel an invoice is the engine's rules on these collections; `invoices:settle` and `invoices:cancel` are gone
+- feat!: the published services (`finance/invoicing.lookup`, `findByNumber`, `listByClient`, `recordPayment`, `openReceivables`) and the `invoice.*` events are gone; other extensions read and act through the data API and these actions
+- feat!: gone with them: client details looked up from CRM, the inventory products merged into the catalogue, stock moved when a delivery note is sent, `POST /invoices/:id/pay` (`recordPayment` without an amount settles the balance), `/invoices/stats` and the API-key routes
+- fix: a series number is claimed only if nobody claimed it since it was read, and a refused document rolls its claim back — no shared numbers, no holes
+- fix: an invoice's status goes draft, sent, then paid or cancelled, and a paid or cancelled invoice stays that way; a credit note goes draft, issued, applied and is applied once, to an issued invoice only
+- fix: the create form's "due in N days" is honoured; reverse-charge and exempt lines carry no VAT in their totals; a generated recurring invoice keeps its lines' units
+- fix: two concurrent first saves of the company profile leave one profile (`singleton` is unique)
+- fix: the outstanding-invoices widget reads every open invoice, not the first 500, and sums in cents
+- feat: a document series may be a `quote` series, which `finance/quotes` numbers its quotes from
+- requires engine 3.0.0-beta.92
+
 ## 1.3.2 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

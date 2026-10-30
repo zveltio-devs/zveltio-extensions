@@ -6,36 +6,8 @@
   "resources": [
     {
       "id": "invoices",
-      "dataSource": "/ext/finance/invoicing/invoices",
-      "dataPath": "data",
-      "stats": {
-        "dataSource": "/ext/finance/invoicing/invoices/stats",
-        "dataPath": "stats",
-        "cards": [
-          {
-            "label": "invoicing.stat.invoiced",
-            "key": "total_invoiced",
-            "format": "number"
-          },
-          {
-            "label": "invoicing.stat.collected",
-            "key": "total_paid",
-            "format": "number",
-            "color": "text-success"
-          },
-          {
-            "label": "invoicing.stat.overdue",
-            "key": "total_overdue",
-            "format": "number",
-            "color": "text-error"
-          },
-          {
-            "label": "invoicing.stat.drafts",
-            "key": "count_draft",
-            "format": "number"
-          }
-        ]
-      },
+      "dataSource": "/api/data/invoices?sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "number",
@@ -121,11 +93,14 @@
           "id": "send",
           "icon": "Send",
           "label": "invoicing.action.send",
-          "method": "POST",
-          "endpoint": "/ext/finance/invoicing/invoices/{id}/send",
+          "method": "PATCH",
+          "endpoint": "/api/data/invoices/{id}",
           "visibleWhen": {
             "field": "status",
             "equals": "draft"
+          },
+          "body": {
+            "status": "sent"
           }
         },
         {
@@ -133,7 +108,7 @@
           "icon": "DollarSign",
           "label": "invoicing.action.recordPayment",
           "method": "POST",
-          "endpoint": "/ext/finance/invoicing/invoices/{id}/payments",
+          "endpoint": "/ext/finance/invoicing/actions/recordPayment",
           "visibleWhen": {
             "field": "status",
             "in": [
@@ -194,6 +169,44 @@
                 "type": "text"
               }
             ]
+          },
+          "body": {
+            "id": "{id}"
+          }
+        },
+        {
+          "id": "convert",
+          "icon": "FileCheck",
+          "label": "invoicing.action.convert",
+          "method": "POST",
+          "endpoint": "/ext/finance/invoicing/actions/convertProforma",
+          "visibleWhen": {
+            "field": "doc_type",
+            "equals": "proforma"
+          },
+          "body": {
+            "id": "{id}"
+          }
+        },
+        {
+          "id": "cancel",
+          "icon": "Ban",
+          "label": "invoicing.action.cancel",
+          "variant": "text-warning",
+          "method": "PATCH",
+          "endpoint": "/api/data/invoices/{id}",
+          "confirm": "invoicing.cancelConfirm",
+          "visibleWhen": {
+            "field": "status",
+            "in": [
+              "draft",
+              "sent",
+              "overdue",
+              "partially_paid"
+            ]
+          },
+          "body": {
+            "status": "cancelled"
           }
         },
         {
@@ -202,7 +215,7 @@
           "variant": "text-error",
           "label": "common.delete",
           "method": "DELETE",
-          "endpoint": "/ext/finance/invoicing/invoices/{id}",
+          "endpoint": "/api/data/invoices/{id}",
           "confirm": "invoicing.deleteConfirm",
           "visibleWhen": {
             "field": "status",
@@ -211,7 +224,7 @@
         }
       ],
       "form": {
-        "endpoint": "/ext/finance/invoicing/invoices",
+        "endpoint": "/ext/finance/invoicing/actions/createInvoice",
         "fields": [
           {
             "name": "doc_type",
@@ -293,8 +306,8 @@
             "type": "relation",
             "colSpan": 1,
             "relation": {
-              "dataSource": "/ext/finance/invoicing/series",
-              "dataPath": "data",
+              "dataSource": "/api/data/document_series?sort=series&order=asc&limit=500",
+              "dataPath": "records",
               "valueKey": "series",
               "labelKey": "series"
             },
@@ -453,8 +466,8 @@
               "label": "invoicing.line.fromCatalogue",
               "type": "relation",
               "relation": {
-                "dataSource": "/ext/finance/invoicing/catalogue",
-                "dataPath": "data",
+                "dataSource": "/api/data/catalogue_items?is_active[eq]=true&sort=name&order=asc&limit=500",
+                "dataPath": "records",
                 "valueKey": "id",
                 "labelKey": "name",
                 "autofill": {

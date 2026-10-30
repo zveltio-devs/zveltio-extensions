@@ -14,6 +14,7 @@
   "invoicing.col.total": "Total",
   "invoicing.deleteConfirm": "¿Eliminar esta factura?",
   "invoicing.doc.deliveryNote": "Albarán",
+  "invoicing.doc.quote": "Presupuesto",
   "invoicing.doc.invoice": "Factura",
   "invoicing.doc.proforma": "Factura proforma",
   "invoicing.empty": "Aún no hay facturas. Crea tu primera factura.",
@@ -109,5 +110,9 @@
   "invoicing.vat.nonTaxable": "No sujeto",
   "invoicing.vat.onCollection": "IVA de caja",
   "invoicing.vat.reverseCharge": "Inversión del sujeto pasivo",
-  "invoicing.vat.standard": "Estándar"
+  "invoicing.vat.standard": "Estándar",
+  "invoicing.doc.creditNote": "Nota de crédito",
+  "invoicing.action.cancel": "Anular",
+  "invoicing.action.convert": "Convertir en factura",
+  "invoicing.cancelConfirm": "¿Anular esta factura? Conserva su número; emita una nota de crédito para revertir lo facturado."
 }

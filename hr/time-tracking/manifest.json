@@ -3,7 +3,7 @@
   "displayName": "Time Tracking",
   "category": "hr",
   "description": "Timesheets, project-based time logging and billable hours",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "zveltioMinVersion": "3.0.0-beta.92",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-time-tracking",
@@ -44,8 +44,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "c3f173c38ef6c38cbad826589f5ee06b882989b05df65608ab84855fc2807fd0",
-    "sourceSha256": "a0532948b75c2d76e503a7d322ef4d36222fea4099dda6beaf1066cbe4bfba4d",
+    "engineSha256": "ba319f48695df1cad1b8ab9e5f28fcb5c3ebfcd1ae6cf6f62a4cb3050de32c29",
+    "sourceSha256": "6f8170603434dab983fd2b4b503dce987ca3f94ffa63bc417c57cd96b846c761",
     "schemaSha256": "9939f71ca744e78fb13d7f3c9faac95dad41a9d1164d57a9c8fbbafc0b59d2e3"
   },
   "collections": [
@@ -220,6 +220,80 @@
       "writes": [
         "timesheets"
       ]
+    },
+    {
+      "name": "invoiceEntries",
+      "permission": {
+        "resource": "time_entries",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "entry_ids"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "entry_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 500,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "invoice_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "due_days": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "client_name": {
+            "type": "string"
+          },
+          "client_tax_id": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "series": {
+            "type": "string"
+          },
+          "exchange_rate": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      },
+      "reads": [
+        "time_projects",
+        "time_entries",
+        "invoices",
+        "invoice_lines",
+        "document_series",
+        "company_profile"
+      ],
+      "writes": [
+        "time_entries",
+        "invoices",
+        "invoice_lines",
+        "document_series"
+      ]
+    }
+  ],
+  "optionalDependencies": [
+    {
+      "name": "finance/invoicing",
+      "minVersion": "2.0.0"
     }
   ]
 }
