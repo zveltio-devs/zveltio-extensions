@@ -1,0 +1,14 @@
+{
+  "name": "active_timers",
+  "fields": [
+    {"name": "employee_id", "type": "uuid", "required": true, "unique": true},
+    {"name": "project_id", "type": "m2o", "required": true, "options": {"related_collection": "time_projects"}},
+    {"name": "task_description", "type": "text", "required": true, "defaultValue": ""},
+    {"name": "started_at", "type": "datetime", "required": true},
+    {"name": "is_billable", "type": "boolean", "required": true, "defaultValue": true},
+    {"name": "notes", "type": "textarea"}
+  ],
+  "relations": [
+    {"name": "active_timers_project_id", "type": "m2o", "field": "project_id", "target": "time_projects", "targetField": "id", "onDelete": "CASCADE", "onUpdate": "CASCADE", "metadata": {}}
+  ]
+}

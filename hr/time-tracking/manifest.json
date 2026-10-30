@@ -2,13 +2,13 @@
   "name": "hr/time-tracking",
   "displayName": "Time Tracking",
   "category": "hr",
-  "description": "Timesheets, project-based time logging, billable hours and client reports",
-  "version": "1.0.11",
-  "zveltioMinVersion": "1.0.0",
+  "description": "Timesheets, project-based time logging and billable hours",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.92",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-time-tracking",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "hr.time-tracking",
@@ -17,11 +17,7 @@
   "dependencies": [
     {
       "name": "hr/employees",
-      "minVersion": "1.0.0"
-    },
-    {
-      "name": "finance/invoicing",
-      "minVersion": "1.0.0"
+      "minVersion": "2.0.0"
     }
   ],
   "studio": {
@@ -48,13 +44,182 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "5cf24970a661ce43659e5ab80dc46b52709466fe13998c888ce025fee0def89c",
-    "sourceSha256": "c6ed3a3bf7390a701954323e37923c447683e52ce1cf5be91bc6d25e6ca8efd8"
+    "engineSha256": "c3f173c38ef6c38cbad826589f5ee06b882989b05df65608ab84855fc2807fd0",
+    "sourceSha256": "a0532948b75c2d76e503a7d322ef4d36222fea4099dda6beaf1066cbe4bfba4d",
+    "schemaSha256": "9939f71ca744e78fb13d7f3c9faac95dad41a9d1164d57a9c8fbbafc0b59d2e3"
   },
-  "resources": [
-    "time-tracking"
+  "collections": [
+    "time_projects",
+    "time_entries",
+    "timesheets",
+    "active_timers"
   ],
-  "sensitiveResources": [
-    "time-tracking"
+  "actions": [
+    {
+      "name": "logTime",
+      "permission": {
+        "resource": "time_entries",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "employee_id",
+          "project_id",
+          "date",
+          "duration_minutes"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "employee_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "project_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "duration_minutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1440
+          },
+          "task_description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "is_billable": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 5000
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "reads": [
+        "time_projects",
+        "time_entries"
+      ],
+      "writes": [
+        "time_entries"
+      ]
+    },
+    {
+      "name": "startTimer",
+      "permission": {
+        "resource": "active_timers",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "employee_id",
+          "project_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "employee_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "project_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "task_description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "is_billable": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 5000
+          }
+        }
+      },
+      "reads": [
+        "time_projects",
+        "active_timers"
+      ],
+      "writes": [
+        "active_timers"
+      ]
+    },
+    {
+      "name": "stopTimer",
+      "permission": {
+        "resource": "active_timers",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "employee_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "employee_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "time_projects",
+        "active_timers",
+        "time_entries"
+      ],
+      "writes": [
+        "active_timers",
+        "time_entries"
+      ]
+    },
+    {
+      "name": "computeTimesheet",
+      "permission": {
+        "resource": "timesheets",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "employee_id",
+          "week_start"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "employee_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "week_start": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "reads": [
+        "time_entries",
+        "timesheets"
+      ],
+      "writes": [
+        "timesheets"
+      ]
+    }
   ]
 }

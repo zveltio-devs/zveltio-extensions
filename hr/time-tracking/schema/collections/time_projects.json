@@ -1,0 +1,21 @@
+{
+  "name": "time_projects",
+  "fields": [
+    {"name": "name", "type": "text", "required": true},
+    {"name": "code", "type": "text"},
+    {"name": "client_name", "type": "text"},
+    {"name": "client_id", "type": "text"},
+    {"name": "description", "type": "textarea"},
+    {"name": "is_billable", "type": "boolean", "required": true, "defaultValue": true},
+    {"name": "hourly_rate", "type": "decimal", "required": true, "defaultValue": 0},
+    {"name": "currency", "type": "text", "required": true, "defaultValue": "RON"},
+    {"name": "status", "type": "enum", "required": true, "defaultValue": "active", "indexed": true, "options": {"values": ["active", "archived"]}},
+    {"name": "budget_hours", "type": "decimal"},
+    {"name": "budget_amount", "type": "decimal"}
+  ],
+  "validation": [
+    {"field": "hourly_rate", "rule": "min", "config": {"value": 0}, "message": "A rate is not negative."},
+    {"field": "budget_hours", "rule": "min", "config": {"value": 0}, "message": "A budget is not negative."},
+    {"field": "budget_amount", "rule": "min", "config": {"value": 0}, "message": "A budget is not negative."}
+  ]
+}
