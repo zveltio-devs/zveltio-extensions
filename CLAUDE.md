@@ -19,6 +19,29 @@ The engine is a sibling checkout at `../zveltio`.
   so a command run from the wrong directory measures the wrong tree and reports
   a confident, wrong answer.
 
+## The extension model — do not deviate
+
+Every extension moved in the migration wave follows the same model. `crm` is the
+reference.
+
+- **An extension declares collections and actions. The engine does the rest.**
+  Collections live in `schema/collections/<name>.json` and are listed in the
+  manifest `collections`. The engine creates them, owns them and serves them
+  through the data API. There are no SQL migrations and no hand-written CRUD
+  routes.
+- **No authorization in extension code.** Do not use `resources`,
+  `sensitiveResources`, `ctx.checkPermission`, `permissionGate`, invented verbs
+  (`<ext>:cancel`) or `mayDecide`-style helpers. An action names a collection
+  the extension declares and uses the default `execute`. Who may do what is set
+  by the engine's rules, which the operator configures. Never design
+  permissions for an extension.
+- **The format is the engine's, and the extension adapts.** If the format cannot
+  express an old behaviour, drop that behaviour and record it in the PR body.
+  Business logic goes into actions, jobs and validation rules. A new engine
+  capability is a last resort. Ask for one only when actions, jobs,
+  `host.collections`, the data API and validation rules cannot cover the need,
+  and treat the request as the owner's decision.
+
 ## What costs more here than it looks
 
 - **Editing a packed extension source is not free.** `check-bundle-sources`
