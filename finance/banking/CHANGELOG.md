@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.0 (2026-10-30)
+
+- feat!: accounts, transactions, imports, categorization rules, reconciliations, balance history and cash-flow entries are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/finance/banking/*` routes are gone — accounts, rules and cash-flow entries are plain edits through `/api/data`; the rest is the actions `addTransaction`, `importTransactions`, `importMT940`, `recategorize`, `reconcile`, `snapshotBalance` and `refreshBalance` (`POST /ext/finance/banking/actions/<name>`)
+- feat!: who may import, reconcile or edit is the engine's rules on these collections; the `banking` resource and its sensitive flag are gone
+- feat!: gone with them: `/suggest-matches`, `/stats`, and the open receivables merged into `/cash-flow` (they read invoicing's tables directly)
+- fix: a credit reconciled against an invoice records the payment through invoicing's own `recordPayment` in the same transaction; an invoice that cannot take it refuses the reconciliation, instead of a reconciled line whose invoice still reads unpaid (1.x logged a warning and carried on)
+- fix: an account's balance is recomputed from its opening balance and every transaction, never incremented, so it cannot drift; `refreshBalance` recomputes it on demand
+- fix: the transactions list reads the columns that exist (`date`, `is_reconciled`), not `booking_date` and `reconciled`
+- requires engine 3.0.0-beta.92 and `finance/invoicing` 2.0.0
+
 ## 1.0.13 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

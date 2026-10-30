@@ -1,0 +1,66 @@
+{
+  "name": "bank_accounts",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "bank_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "iban",
+      "type": "text"
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON"
+    },
+    {
+      "name": "account_type",
+      "type": "enum",
+      "options": {
+        "values": [
+          "checking",
+          "savings",
+          "credit",
+          "cash"
+        ]
+      },
+      "required": true,
+      "defaultValue": "checking"
+    },
+    {
+      "name": "opening_balance",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "balance",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    },
+    {
+      "name": "color",
+      "type": "text",
+      "defaultValue": "#069494"
+    }
+  ]
+}
