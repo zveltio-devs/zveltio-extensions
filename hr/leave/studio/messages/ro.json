@@ -1,4 +1,7 @@
 {
+  "hr.leave.btn.approve": "Aprobă",
+  "hr.leave.btn.cancel": "Anulează",
+  "hr.leave.btn.reject": "Respinge",
   "hr.leave.empty": "Niciun date încă.",
   "hr.leave.emptyRequests": "Nicio cerere de concediu încă.",
   "hr.leave.form.new": "Cerere de concediu nouă",

@@ -3,17 +3,12 @@
   "displayName": "HR",
   "category": "hr",
   "description": "Employee records, departments, job positions, contracts and onboarding checklists",
-  "version": "1.2.1",
-  "zveltioMinVersion": "1.0.0",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.92",
   "zveltioMaxVersion": "4.0.0",
-  "optionalDependencies": [
-    {
-      "name": "compliance/ro/documents"
-    }
-  ],
   "package": "@zveltio/ext-hr",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "hr.employees"
@@ -42,13 +37,662 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "833596303faaeaa05c364a699613d0f7839be408a56db720e4c2edd0f837ed36",
-    "sourceSha256": "0e2411122d6f1e3207fc142a636b286ca925577923959253ee9365e2a4bd4b94"
+    "engineSha256": "5e27fc26e344b46f8b3c94eee8914bb577942fe09ed2930e17b7758c1197da81",
+    "sourceSha256": "0fe7b4475e498cd15c304690f7d73a9a4cdc6855741d12dac135a5660ae640ec",
+    "schemaSha256": "1ab17a673e63baadbda12316177cb4b8e6559158d9b1e95222ed2330ae0a9e82"
   },
-  "resources": [
-    "employees"
+  "collections": [
+    "departments",
+    "job_positions",
+    "employees",
+    "employee_emergency_contacts",
+    "employee_documents",
+    "employee_benefits",
+    "onboarding_tasks",
+    "salary_history",
+    "performance_cycles",
+    "performance_reviews",
+    "employment_contracts",
+    "contract_amendments",
+    "contract_suspensions"
   ],
-  "sensitiveResources": [
-    "employees"
+  "actions": [
+    {
+      "name": "hire",
+      "permission": {
+        "resource": "employees",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "first_name",
+          "last_name",
+          "email",
+          "hire_date"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "first_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "last_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "work_email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "birth_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "m",
+              "f",
+              "other"
+            ]
+          },
+          "national_id": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "tax_id": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "hire_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "department_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "position_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "manager_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "employment_type": {
+            "type": "string",
+            "enum": [
+              "full_time",
+              "part_time",
+              "contractor",
+              "intern"
+            ]
+          },
+          "probation_end_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "salary": {
+            "type": "number",
+            "minimum": 0
+          },
+          "salary_type": {
+            "type": "string",
+            "enum": [
+              "gross",
+              "net"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3
+          },
+          "iban": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "bank_name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 5000
+          }
+        }
+      },
+      "reads": [
+        "employees"
+      ],
+      "writes": [
+        "employees",
+        "salary_history"
+      ]
+    },
+    {
+      "name": "terminate",
+      "permission": {
+        "resource": "employees",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "end_date"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        }
+      },
+      "reads": [
+        "employees"
+      ],
+      "writes": [
+        "employees"
+      ]
+    },
+    {
+      "name": "setSalary",
+      "permission": {
+        "resource": "employees",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "effective_date",
+          "salary"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "effective_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "salary": {
+            "type": "number",
+            "minimum": 0
+          },
+          "salary_type": {
+            "type": "string",
+            "enum": [
+              "gross",
+              "net"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "reads": [
+        "employees",
+        "employment_contracts"
+      ],
+      "writes": [
+        "employees",
+        "salary_history"
+      ]
+    },
+    {
+      "name": "addEmergencyContact",
+      "permission": {
+        "resource": "employee_emergency_contacts",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "employee_id",
+          "name",
+          "relationship",
+          "phone"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "employee_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "relationship": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "is_primary": {
+            "type": "boolean"
+          }
+        }
+      },
+      "reads": [
+        "employees",
+        "employee_emergency_contacts"
+      ],
+      "writes": [
+        "employee_emergency_contacts"
+      ]
+    },
+    {
+      "name": "submitReview",
+      "permission": {
+        "resource": "performance_reviews",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "overall_rating": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "goals_rating": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "competency_rating": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "strengths": {
+            "type": "string",
+            "maxLength": 5000
+          },
+          "improvements": {
+            "type": "string",
+            "maxLength": 5000
+          },
+          "comments": {
+            "type": "string",
+            "maxLength": 5000
+          }
+        }
+      },
+      "reads": [
+        "performance_reviews"
+      ],
+      "writes": [
+        "performance_reviews"
+      ]
+    },
+    {
+      "name": "acknowledgeReview",
+      "permission": {
+        "resource": "performance_reviews",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "performance_reviews"
+      ],
+      "writes": [
+        "performance_reviews"
+      ]
+    },
+    {
+      "name": "signContract",
+      "permission": {
+        "resource": "employment_contracts",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "employee_id",
+          "contract_number",
+          "start_date"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "employee_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "contract_number": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "contract_type": {
+            "type": "string",
+            "enum": [
+              "indefinite",
+              "fixed_term"
+            ]
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "probation_end_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "salary_period": {
+            "type": "string",
+            "enum": [
+              "hour",
+              "day",
+              "month",
+              "year"
+            ]
+          },
+          "signed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "salary": {
+            "type": "number",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3
+          },
+          "weekly_hours": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 168
+          },
+          "position_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "department_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "reads": [
+        "employees",
+        "employment_contracts"
+      ],
+      "writes": [
+        "employees",
+        "employment_contracts"
+      ]
+    },
+    {
+      "name": "amendContract",
+      "permission": {
+        "resource": "employment_contracts",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "amendment_number",
+          "effective_date",
+          "changes"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amendment_number": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "effective_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "changes": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": false,
+            "properties": {
+              "salary": {
+                "type": "number",
+                "minimum": 0
+              },
+              "currency": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 3
+              },
+              "weekly_hours": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 168
+              },
+              "position_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "department_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "end_date": {
+                "type": "string",
+                "format": "date"
+              }
+            }
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "signed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "reads": [
+        "employees",
+        "employment_contracts"
+      ],
+      "writes": [
+        "employees",
+        "employment_contracts",
+        "contract_amendments",
+        "salary_history"
+      ]
+    },
+    {
+      "name": "suspendContract",
+      "permission": {
+        "resource": "employment_contracts",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "start_date"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "reason_code": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        }
+      },
+      "reads": [
+        "employment_contracts"
+      ],
+      "writes": [
+        "employment_contracts",
+        "contract_suspensions"
+      ]
+    },
+    {
+      "name": "resumeContract",
+      "permission": {
+        "resource": "employment_contracts",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "end_date"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "reads": [
+        "contract_suspensions"
+      ],
+      "writes": [
+        "employment_contracts",
+        "contract_suspensions"
+      ]
+    },
+    {
+      "name": "endContract",
+      "permission": {
+        "resource": "employment_contracts",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "ended_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date"
+          },
+          "end_reason_code": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        }
+      },
+      "reads": [
+        "employment_contracts"
+      ],
+      "writes": [
+        "employees",
+        "employment_contracts"
+      ]
+    }
   ]
 }

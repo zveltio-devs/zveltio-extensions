@@ -2,13 +2,13 @@
   "name": "hr/leave",
   "displayName": "Leave Management",
   "category": "hr",
-  "description": "Vacation and leave requests with balance tracking, approval workflow and calendar view",
-  "version": "1.0.11",
-  "zveltioMinVersion": "1.0.0",
+  "description": "Vacation and leave requests with balance tracking and an approval workflow",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.92",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-leave",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "hr.leave"
@@ -16,7 +16,7 @@
   "dependencies": [
     {
       "name": "hr/employees",
-      "minVersion": "1.0.0"
+      "minVersion": "2.0.0"
     }
   ],
   "contributes": {
@@ -43,13 +43,243 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "837039b6f5d70326872a8954849aabcccb97d396c4b7bf53579331e8c7c08302",
-    "sourceSha256": "cdbd7065c5e572238c0d4e414359226cb33fbb1df8ffb43bfc428fdd7c5e9d6f"
+    "engineSha256": "3447caa12ae7dee1b70542345cb6f9fcadbcc8d3e310734c8a786767e447f337",
+    "sourceSha256": "6dd00617d06aaf704422cb9502ae4fc9dca2bac5cc36af9c3fed826a0e5e0254",
+    "schemaSha256": "a1d1e3f9be251babc337d910127a053da52e4c5918159cff270bad3e8cb1c157"
   },
-  "resources": [
-    "leave"
+  "collections": [
+    "leave_types",
+    "public_holidays",
+    "leave_balances",
+    "leave_requests"
   ],
-  "sensitiveResources": [
-    "leave"
+  "actions": [
+    {
+      "name": "requestLeave",
+      "permission": {
+        "resource": "leave_requests",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "employee_id",
+          "leave_type_id",
+          "start_date",
+          "end_date"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "employee_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "leave_type_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "is_half_day": {
+            "type": "boolean"
+          },
+          "half_day_period": {
+            "type": "string",
+            "enum": [
+              "am",
+              "pm"
+            ]
+          },
+          "cover_employee_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        }
+      },
+      "reads": [
+        "leave_requests",
+        "leave_types",
+        "leave_balances",
+        "public_holidays"
+      ],
+      "writes": [
+        "leave_requests",
+        "leave_balances"
+      ]
+    },
+    {
+      "name": "approveRequest",
+      "permission": {
+        "resource": "leave_requests",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "leave_requests",
+        "leave_balances"
+      ],
+      "writes": [
+        "leave_requests",
+        "leave_balances"
+      ]
+    },
+    {
+      "name": "rejectRequest",
+      "permission": {
+        "resource": "leave_requests",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        }
+      },
+      "reads": [
+        "leave_requests",
+        "leave_balances"
+      ],
+      "writes": [
+        "leave_requests",
+        "leave_balances"
+      ]
+    },
+    {
+      "name": "cancelRequest",
+      "permission": {
+        "resource": "leave_requests",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "leave_requests",
+        "leave_balances"
+      ],
+      "writes": [
+        "leave_requests",
+        "leave_balances"
+      ]
+    },
+    {
+      "name": "initBalances",
+      "permission": {
+        "resource": "leave_balances",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "year"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "year": {
+            "type": "integer",
+            "minimum": 2000,
+            "maximum": 2100
+          },
+          "employee_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 1000
+          }
+        }
+      },
+      "reads": [
+        "employees",
+        "leave_types",
+        "leave_balances"
+      ],
+      "writes": [
+        "leave_balances"
+      ]
+    },
+    {
+      "name": "carryOver",
+      "permission": {
+        "resource": "leave_balances",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "from_year"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "from_year": {
+            "type": "integer",
+            "minimum": 2000,
+            "maximum": 2099
+          },
+          "employee_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 1000
+          }
+        }
+      },
+      "reads": [
+        "employees",
+        "leave_types",
+        "leave_balances"
+      ],
+      "writes": [
+        "leave_balances"
+      ]
+    }
   ]
 }

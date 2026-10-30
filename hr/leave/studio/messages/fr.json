@@ -1,4 +1,7 @@
 {
+  "hr.leave.btn.approve": "Approuver",
+  "hr.leave.btn.cancel": "Annuler",
+  "hr.leave.btn.reject": "Refuser",
   "hr.leave.empty": "Aucune donnée pour l'instant.",
   "hr.leave.emptyRequests": "Aucune demande de congé pour l'instant.",
   "hr.leave.form.new": "Nouvelle demande de congé",

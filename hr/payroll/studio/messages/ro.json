@@ -1,6 +1,8 @@
 {
+  "hr.payroll.btn.approve": "Aprobă",
   "hr.payroll.btn.generate": "Generează",
   "hr.payroll.btn.newPeriod": "Perioadă nouă",
+  "hr.payroll.btn.pay": "Marchează plătit",
   "hr.payroll.btn.revisal": "XML Revisal",
   "hr.payroll.col.gross": "Brut",
   "hr.payroll.col.net": "Net",

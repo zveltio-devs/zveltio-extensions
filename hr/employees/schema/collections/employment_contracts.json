@@ -1,0 +1,32 @@
+{
+  "name": "employment_contracts",
+  "fields": [
+    {"name": "employee_id", "type": "m2o", "required": true, "indexed": true, "options": {"related_collection": "employees"}},
+    {"name": "contract_number", "type": "text", "unique": true, "required": true},
+    {"name": "contract_type", "type": "enum", "required": true, "defaultValue": "indefinite", "options": {"values": ["indefinite", "fixed_term"]}},
+    {"name": "start_date", "type": "date", "required": true},
+    {"name": "end_date", "type": "date"},
+    {"name": "probation_end_date", "type": "date"},
+    {"name": "weekly_hours", "type": "decimal", "required": true, "defaultValue": 40},
+    {"name": "salary", "type": "decimal"},
+    {"name": "currency", "type": "text", "required": true, "defaultValue": "RON"},
+    {"name": "salary_period", "type": "enum", "required": true, "defaultValue": "month", "options": {"values": ["hour", "day", "month", "year"]}},
+    {"name": "position_id", "type": "m2o", "options": {"related_collection": "job_positions"}},
+    {"name": "department_id", "type": "m2o", "options": {"related_collection": "departments"}},
+    {"name": "status", "type": "enum", "required": true, "indexed": true, "defaultValue": "draft", "options": {"values": ["draft", "active", "suspended", "ended"]}},
+    {"name": "signed_at", "type": "datetime"},
+    {"name": "ended_at", "type": "date"},
+    {"name": "end_reason_code", "type": "text"},
+    {"name": "end_notes", "type": "textarea"}
+  ],
+  "relations": [
+    {"name": "employment_contracts_employee_id", "type": "m2o", "field": "employee_id", "target": "employees", "targetField": "id", "onDelete": "CASCADE", "onUpdate": "CASCADE", "metadata": {}},
+    {"name": "employment_contracts_position_id", "type": "m2o", "field": "position_id", "target": "job_positions", "targetField": "id", "onDelete": "SET NULL", "onUpdate": "CASCADE", "metadata": {}},
+    {"name": "employment_contracts_department_id", "type": "m2o", "field": "department_id", "target": "departments", "targetField": "id", "onDelete": "SET NULL", "onUpdate": "CASCADE", "metadata": {}}
+  ],
+  "validation": [
+    {"field": "weekly_hours", "rule": "range", "config": {"min": 0.5, "max": 168}, "message": "Weekly hours are between 0.5 and 168."},
+    {"field": "salary", "rule": "min", "config": {"value": 0}, "message": "A salary is not negative."},
+    {"field": "status", "rule": "transition", "config": {"expression": "previous != 'ended' || value == 'ended'"}, "message": "An ended contract stays ended: sign a new one."}
+  ]
+}

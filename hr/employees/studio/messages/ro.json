@@ -1,4 +1,5 @@
 {
+  "hr.employees.btn.terminate": "Încetează",
   "hr.employees.col.department": "Departament",
   "hr.employees.col.email": "Email",
   "hr.employees.col.hireDate": "Data angajării",
@@ -20,6 +21,7 @@
   "hr.employees.form.department": "Departament",
   "hr.employees.form.email": "Email",
   "hr.employees.form.employmentType": "Tip de angajare",
+  "hr.employees.form.endDate": "Data încetării",
   "hr.employees.form.firstName": "Prenume",
   "hr.employees.form.hireDate": "Data angajării",
   "hr.employees.form.lastName": "Nume",

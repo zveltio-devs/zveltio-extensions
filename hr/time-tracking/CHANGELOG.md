@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.0 (2026-10-30)
+
+- feat!: projects, time entries, timesheets and running timers are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/hr/time-tracking/*` routes are gone — plain reads and edits go through `/api/data/<collection>`; the rest is the actions `logTime`, `startTimer`, `stopTimer` and `computeTimesheet` (`POST /ext/hr/time-tracking/actions/<name>`); a timesheet is submitted, approved or rejected by a PATCH its transition rule checks
+- feat!: who may log, approve or reject time for whom is the engine's rules on these collections; the self-approval refusal, the manager check through `hr/employees` and "my timer" (timers take an `employee_id`) are gone
+- feat!: invoicing time entries (`/entries/invoice`) is gone with the `finance/invoicing` dependency, until that extension is ported; an entry's `amount` is gone (it is `duration_minutes / 60 × hourly_rate` when billable); the unused tags, `approved_by`/`submitted_at`/`approved_at`, project totals, `/stats` are gone
+- fix: a billed entry stays billed (transition rule); timer durations are computed in UTC
+- requires engine 3.0.0-beta.92 and `hr/employees` 2.0.0
+
 ## 1.0.11 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

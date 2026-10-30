@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.0 (2026-10-30)
+
+- feat!: employees, departments, job positions, employment contracts with their amendments and suspensions, salary history, documents, benefits, emergency contacts, onboarding tasks, review cycles and reviews are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/hr/employees/*` routes are gone — plain reads and edits go through `/api/data/<collection>`; the rest is the actions `hire`, `terminate`, `setSalary`, `addEmergencyContact`, `submitReview`, `acknowledgeReview`, `signContract`, `amendContract`, `suspendContract`, `resumeContract` and `endContract` (`POST /ext/hr/employees/actions/<name>`)
+- feat!: the `hr/employees.*` services, the `employee.*` events, `/stats`, `/org-chart` and the department head count are gone; the national-ID check through `compliance/ro/documents` is gone
+- feat!: employee numbers are `EMP-000001` (six digits); `setSalary` refuses an employee with a live contract (amend the contract)
+- fix: a closed review cycle and an ended contract stay that way (validation rules), and a rating is from 1 to 5
+- requires engine 3.0.0-beta.92
+
 ## 1.2.1 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

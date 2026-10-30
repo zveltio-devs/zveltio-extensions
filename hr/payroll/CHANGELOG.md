@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.0 (2026-10-30)
+
+- feat!: periods, payslips, adjustments, sick leave, meal vouchers, overtime, rates and exports are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/hr/payroll/*` routes are gone — plain reads and edits (periods, rates, meal vouchers, adjustments) go through `/api/data/<collection>`; the rest is the actions `generatePayroll`, `approvePeriod`, `payPeriod`, `recordSickLeave`, `recordOvertime`, `exportD112`, `exportRevisal` and `simulate` (`POST /ext/hr/payroll/actions/<name>`)
+- feat!: who may approve or pay a period is the engine's rules on these collections; the `payroll:approve`/`payroll:pay` verbs and the `hr/employees.employment` service calls are gone; terms are read from `hr/employees`' `employees` and `employment_contracts`
+- feat!: D112 and Revisal exports are stored in `payroll_exports` and read through the data API instead of being downloaded; `/stats`, period totals, `other_benefits` and the employer CASS columns (always 0) are gone
+- fix: `generatePayroll` recomputes a calculated period's drafts, so adjustments (which hang off an entry) count; before, a period was generated once and adjustments never reached the payslip
+- fix: names in the D112 XML are escaped; a period moves only open → calculated → approved → closed (transition rule)
+- requires engine 3.0.0-beta.92 and `hr/employees` 2.0.0
+
 ## 1.1.15 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

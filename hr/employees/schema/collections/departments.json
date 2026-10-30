@@ -1,0 +1,13 @@
+{
+  "name": "departments",
+  "fields": [
+    {"name": "name", "type": "text", "required": true},
+    {"name": "description", "type": "textarea"},
+    {"name": "parent_id", "type": "m2o", "options": {"related_collection": "departments"}},
+    {"name": "manager_id", "type": "m2o", "options": {"related_collection": "employees"}}
+  ],
+  "relations": [
+    {"name": "departments_parent_id", "type": "m2o", "field": "parent_id", "target": "departments", "targetField": "id", "onDelete": "SET NULL", "onUpdate": "CASCADE", "metadata": {}},
+    {"name": "departments_manager_id", "type": "m2o", "field": "manager_id", "target": "employees", "targetField": "id", "onDelete": "SET NULL", "onUpdate": "CASCADE", "metadata": {}}
+  ]
+}

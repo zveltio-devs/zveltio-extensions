@@ -1,0 +1,7 @@
+{
+  "name": "public_holidays",
+  "fields": [
+    {"name": "date", "type": "date", "required": true, "unique": true},
+    {"name": "name", "type": "text", "required": true}
+  ]
+}

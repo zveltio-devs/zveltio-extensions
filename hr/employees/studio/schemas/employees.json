@@ -6,65 +6,230 @@
   "resources": [
     {
       "id": "employees",
-      "dataSource": "/ext/hr/employees",
-      "dataPath": "data",
-      "search": { "param": "q", "placeholder": "hr.employees.searchPlaceholder" },
+      "dataSource": "/api/data/employees?expand=department_id,position_id&sort=last_name&order=asc&limit=500",
+      "dataPath": "records",
+      "search": {
+        "fields": [
+          "first_name",
+          "last_name",
+          "email",
+          "employee_number"
+        ],
+        "placeholder": "hr.employees.searchPlaceholder"
+      },
       "filters": [
         {
-          "param": "status",
+          "param": "status[eq]",
           "options": [
-            { "value": "all", "label": "hr.employees.filter.all" },
-            { "value": "active", "label": "hr.employees.filter.active" },
-            { "value": "on_leave", "label": "hr.employees.filter.onLeave" },
-            { "value": "terminated", "label": "hr.employees.filter.terminated" }
+            {
+              "value": "all",
+              "label": "hr.employees.filter.all"
+            },
+            {
+              "value": "active",
+              "label": "hr.employees.filter.active"
+            },
+            {
+              "value": "on_leave",
+              "label": "hr.employees.filter.onLeave"
+            },
+            {
+              "value": "terminated",
+              "label": "hr.employees.filter.terminated"
+            }
           ]
         }
       ],
       "columns": [
-        { "key": "employee_number", "label": "hr.employees.col.number", "type": "mono" },
-        { "key": "first_name", "label": "hr.employees.col.name", "join": { "keys": ["first_name", "last_name"], "sep": " " } },
-        { "key": "email", "label": "hr.employees.col.email" },
-        { "key": "department_name", "label": "hr.employees.col.department" },
-        { "key": "position_title", "label": "hr.employees.col.position" },
-        { "key": "hire_date", "label": "hr.employees.col.hireDate", "type": "date" },
+        {
+          "key": "employee_number",
+          "label": "hr.employees.col.number",
+          "type": "mono"
+        },
+        {
+          "key": "first_name",
+          "label": "hr.employees.col.name",
+          "join": {
+            "keys": [
+              "first_name",
+              "last_name"
+            ],
+            "sep": " "
+          }
+        },
+        {
+          "key": "email",
+          "label": "hr.employees.col.email"
+        },
+        {
+          "key": "department_id_expanded.name",
+          "label": "hr.employees.col.department"
+        },
+        {
+          "key": "position_id_expanded.title",
+          "label": "hr.employees.col.position"
+        },
+        {
+          "key": "hire_date",
+          "label": "hr.employees.col.hireDate",
+          "type": "date"
+        },
         {
           "key": "status",
           "label": "hr.employees.col.status",
           "type": "badge",
-          "badge": { "colors": { "active": "badge-success", "on_leave": "badge-warning", "terminated": "badge-ghost" } }
+          "badge": {
+            "colors": {
+              "active": "badge-success",
+              "on_leave": "badge-warning",
+              "terminated": "badge-ghost"
+            }
+          }
         }
       ],
       "form": {
-        "endpoint": "/ext/hr/employees",
+        "endpoint": "/ext/hr/employees/actions/hire",
         "fields": [
-          { "name": "first_name", "label": "hr.employees.form.firstName", "colSpan": 1, "required": true },
-          { "name": "last_name", "label": "hr.employees.form.lastName", "colSpan": 1, "required": true },
-          { "name": "email", "label": "hr.employees.form.email", "type": "email", "colSpan": 1, "required": true },
-          { "name": "work_email", "label": "hr.employees.form.workEmail", "type": "email", "colSpan": 1 },
-          { "name": "phone", "label": "hr.employees.form.phone", "type": "tel", "colSpan": 1 },
-          { "name": "hire_date", "label": "hr.employees.form.hireDate", "type": "date", "colSpan": 1, "default": "today" },
           {
-            "name": "department_id", "label": "hr.employees.form.department", "type": "relation", "colSpan": 1,
-            "relation": { "dataSource": "/ext/hr/employees/departments", "dataPath": "data", "valueKey": "id", "labelKey": "name" }
+            "name": "first_name",
+            "label": "hr.employees.form.firstName",
+            "colSpan": 1,
+            "required": true
           },
           {
-            "name": "position_id", "label": "hr.employees.form.position", "type": "relation", "colSpan": 1,
-            "relation": { "dataSource": "/ext/hr/employees/positions", "dataPath": "data", "valueKey": "id", "labelKey": "title" }
+            "name": "last_name",
+            "label": "hr.employees.form.lastName",
+            "colSpan": 1,
+            "required": true
           },
           {
-            "name": "employment_type", "label": "hr.employees.form.employmentType", "type": "select", "colSpan": 1, "default": "full_time",
+            "name": "email",
+            "label": "hr.employees.form.email",
+            "type": "email",
+            "colSpan": 1,
+            "required": true
+          },
+          {
+            "name": "work_email",
+            "label": "hr.employees.form.workEmail",
+            "type": "email",
+            "colSpan": 1
+          },
+          {
+            "name": "phone",
+            "label": "hr.employees.form.phone",
+            "type": "tel",
+            "colSpan": 1
+          },
+          {
+            "name": "hire_date",
+            "label": "hr.employees.form.hireDate",
+            "type": "date",
+            "colSpan": 1,
+            "default": "today"
+          },
+          {
+            "name": "department_id",
+            "label": "hr.employees.form.department",
+            "type": "relation",
+            "colSpan": 1,
+            "relation": {
+              "dataSource": "/api/data/departments?sort=name&order=asc&limit=500",
+              "dataPath": "records",
+              "valueKey": "id",
+              "labelKey": "name"
+            }
+          },
+          {
+            "name": "position_id",
+            "label": "hr.employees.form.position",
+            "type": "relation",
+            "colSpan": 1,
+            "relation": {
+              "dataSource": "/api/data/job_positions?is_active[eq]=true&sort=title&order=asc&limit=500",
+              "dataPath": "records",
+              "valueKey": "id",
+              "labelKey": "title"
+            }
+          },
+          {
+            "name": "employment_type",
+            "label": "hr.employees.form.employmentType",
+            "type": "select",
+            "colSpan": 1,
+            "default": "full_time",
             "options": [
-              { "value": "full_time", "label": "hr.employees.employment.fullTime" },
-              { "value": "part_time", "label": "hr.employees.employment.partTime" },
-              { "value": "contractor", "label": "hr.employees.employment.contractor" },
-              { "value": "intern", "label": "hr.employees.employment.intern" }
+              {
+                "value": "full_time",
+                "label": "hr.employees.employment.fullTime"
+              },
+              {
+                "value": "part_time",
+                "label": "hr.employees.employment.partTime"
+              },
+              {
+                "value": "contractor",
+                "label": "hr.employees.employment.contractor"
+              },
+              {
+                "value": "intern",
+                "label": "hr.employees.employment.intern"
+              }
             ]
           },
-          { "name": "salary", "label": "hr.employees.form.salary", "type": "number", "colSpan": 1 },
-          { "name": "currency", "label": "hr.employees.form.currency", "colSpan": 1, "default": "RON" },
-          { "name": "address", "label": "common.col.address", "colSpan": 2 }
+          {
+            "name": "salary",
+            "label": "hr.employees.form.salary",
+            "type": "number",
+            "colSpan": 1
+          },
+          {
+            "name": "currency",
+            "label": "hr.employees.form.currency",
+            "colSpan": 1,
+            "default": "RON"
+          },
+          {
+            "name": "address",
+            "label": "common.col.address",
+            "colSpan": 2
+          }
         ]
-      }
+      },
+      "rowActions": [
+        {
+          "id": "terminate",
+          "icon": "UserX",
+          "label": "hr.employees.btn.terminate",
+          "variant": "text-error",
+          "method": "POST",
+          "endpoint": "/ext/hr/employees/actions/terminate",
+          "visibleWhen": {
+            "field": "status",
+            "in": [
+              "active",
+              "inactive",
+              "on_leave"
+            ]
+          },
+          "prompt": {
+            "title": "hr.employees.btn.terminate",
+            "submitLabel": "hr.employees.btn.terminate",
+            "fields": [
+              {
+                "name": "end_date",
+                "label": "hr.employees.form.endDate",
+                "type": "date",
+                "required": true,
+                "default": "today"
+              }
+            ]
+          },
+          "body": {
+            "id": "{id}"
+          }
+        }
+      ]
     }
   ]
 }

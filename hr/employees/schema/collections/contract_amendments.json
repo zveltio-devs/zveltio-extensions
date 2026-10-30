@@ -1,0 +1,17 @@
+{
+  "name": "contract_amendments",
+  "fields": [
+    {"name": "contract_id", "type": "m2o", "required": true, "options": {"related_collection": "employment_contracts"}},
+    {"name": "amendment_number", "type": "text", "required": true},
+    {"name": "effective_date", "type": "date", "required": true},
+    {"name": "changes", "type": "json", "required": true},
+    {"name": "reason", "type": "text"},
+    {"name": "signed_at", "type": "datetime"}
+  ],
+  "indexes": [
+    {"fields": ["contract_id", "amendment_number"], "unique": true}
+  ],
+  "relations": [
+    {"name": "contract_amendments_contract_id", "type": "m2o", "field": "contract_id", "target": "employment_contracts", "targetField": "id", "onDelete": "CASCADE", "onUpdate": "CASCADE", "metadata": {}}
+  ]
+}

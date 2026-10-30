@@ -1,0 +1,78 @@
+{
+  "name": "payroll_periods",
+  "fields": [
+    {
+      "name": "year",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "month",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "open",
+      "options": {
+        "values": [
+          "open",
+          "calculated",
+          "approved",
+          "closed"
+        ]
+      }
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    },
+    {
+      "name": "approved_at",
+      "type": "datetime"
+    },
+    {
+      "name": "paid_at",
+      "type": "datetime"
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "year",
+        "month"
+      ],
+      "unique": true
+    }
+  ],
+  "validation": [
+    {
+      "field": "month",
+      "rule": "range",
+      "config": {
+        "min": 1,
+        "max": 12
+      },
+      "message": "A month is from 1 to 12."
+    },
+    {
+      "field": "year",
+      "rule": "range",
+      "config": {
+        "min": 2000,
+        "max": 2100
+      },
+      "message": "A year is from 2000 to 2100."
+    },
+    {
+      "field": "status",
+      "rule": "transition",
+      "config": {
+        "expression": "value == previous || (previous == 'open' && value == 'calculated') || (previous == 'calculated' && value == 'approved') || (previous == 'approved' && value == 'closed')"
+      },
+      "message": "A period goes open, calculated, approved, then closed."
+    }
+  ]
+}

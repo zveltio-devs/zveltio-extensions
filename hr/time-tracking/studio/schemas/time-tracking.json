@@ -8,13 +8,25 @@
       "id": "projects",
       "label": "hr.time-tracking.tab.projects",
       "icon": "FolderOpen",
-      "dataSource": "/ext/hr/time-tracking/projects",
-      "dataPath": "data",
+      "dataSource": "/api/data/time_projects?sort=name&order=asc&limit=500",
+      "dataPath": "records",
       "columns": [
-        { "key": "name", "label": "common.col.name" },
-        { "key": "client_name", "label": "hr.time-tracking.col.client" },
-        { "key": "hourly_rate", "label": "hr.time-tracking.col.rate" },
-        { "key": "currency", "label": "common.col.currency" },
+        {
+          "key": "name",
+          "label": "common.col.name"
+        },
+        {
+          "key": "client_name",
+          "label": "hr.time-tracking.col.client"
+        },
+        {
+          "key": "hourly_rate",
+          "label": "hr.time-tracking.col.rate"
+        },
+        {
+          "key": "currency",
+          "label": "common.col.currency"
+        },
         {
           "key": "is_billable",
           "label": "hr.time-tracking.col.billable",
@@ -38,13 +50,34 @@
           "icon": "Play",
           "label": "hr.time-tracking.btn.startTimer",
           "method": "POST",
-          "endpoint": "/ext/hr/time-tracking/timer/start",
-          "body": { "project_id": "{id}" },
-          "visibleWhen": { "field": "status", "equals": "active" },
+          "endpoint": "/ext/hr/time-tracking/actions/startTimer",
+          "body": {
+            "project_id": "{id}"
+          },
+          "visibleWhen": {
+            "field": "status",
+            "equals": "active"
+          },
           "prompt": {
             "title": "hr.time-tracking.btn.startTimer",
             "submitLabel": "hr.time-tracking.btn.startTimer",
             "fields": [
+              {
+                "name": "employee_id",
+                "label": "common.col.employee",
+                "type": "relation",
+                "required": true,
+                "colSpan": 2,
+                "relation": {
+                  "dataSource": "/api/data/employees?status[eq]=active&sort=last_name&order=asc&limit=500",
+                  "dataPath": "records",
+                  "valueKey": "id",
+                  "labelKey": [
+                    "first_name",
+                    "last_name"
+                  ]
+                }
+              },
               {
                 "name": "task_description",
                 "label": "hr.time-tracking.ui.description",
@@ -59,11 +92,33 @@
           "icon": "Square",
           "label": "hr.time-tracking.btn.stopTimer",
           "method": "POST",
-          "endpoint": "/ext/hr/time-tracking/timer/stop"
+          "endpoint": "/ext/hr/time-tracking/actions/stopTimer",
+          "prompt": {
+            "title": "hr.time-tracking.btn.stopTimer",
+            "submitLabel": "hr.time-tracking.btn.stopTimer",
+            "fields": [
+              {
+                "name": "employee_id",
+                "label": "common.col.employee",
+                "type": "relation",
+                "required": true,
+                "colSpan": 2,
+                "relation": {
+                  "dataSource": "/api/data/employees?status[eq]=active&sort=last_name&order=asc&limit=500",
+                  "dataPath": "records",
+                  "valueKey": "id",
+                  "labelKey": [
+                    "first_name",
+                    "last_name"
+                  ]
+                }
+              }
+            ]
+          }
         }
       ],
       "form": {
-        "endpoint": "/ext/hr/time-tracking/projects",
+        "endpoint": "/api/data/time_projects",
         "fields": [
           {
             "name": "name",
@@ -103,13 +158,26 @@
       "id": "entries",
       "label": "hr.time-tracking.tab.entries",
       "icon": "Clock",
-      "dataSource": "/ext/hr/time-tracking/entries",
-      "dataPath": "data",
+      "dataSource": "/api/data/time_entries?expand=project_id&sort=date&order=desc&limit=500",
+      "dataPath": "records",
       "columns": [
-        { "key": "project_name", "label": "common.col.project" },
-        { "key": "task_description", "label": "hr.time-tracking.ui.description" },
-        { "key": "date", "label": "common.col.date", "type": "date" },
-        { "key": "duration_minutes", "label": "hr.time-tracking.col.hours" },
+        {
+          "key": "project_id_expanded.name",
+          "label": "common.col.project"
+        },
+        {
+          "key": "task_description",
+          "label": "hr.time-tracking.ui.description"
+        },
+        {
+          "key": "date",
+          "label": "common.col.date",
+          "type": "date"
+        },
+        {
+          "key": "duration_minutes",
+          "label": "hr.time-tracking.col.hours"
+        },
         {
           "key": "is_billable",
           "label": "hr.time-tracking.col.billable",
@@ -123,13 +191,29 @@
           "variant": "text-error",
           "label": "common.delete",
           "method": "DELETE",
-          "endpoint": "/ext/hr/time-tracking/entries/{id}",
+          "endpoint": "/api/data/time_entries/{id}",
           "confirm": "hr.timeTracking.confirmDelete"
         }
       ],
       "form": {
-        "endpoint": "/ext/hr/time-tracking/entries",
+        "endpoint": "/ext/hr/time-tracking/actions/logTime",
         "fields": [
+          {
+            "name": "employee_id",
+            "label": "common.col.employee",
+            "type": "relation",
+            "required": true,
+            "colSpan": 2,
+            "relation": {
+              "dataSource": "/api/data/employees?status[eq]=active&sort=last_name&order=asc&limit=500",
+              "dataPath": "records",
+              "valueKey": "id",
+              "labelKey": [
+                "first_name",
+                "last_name"
+              ]
+            }
+          },
           {
             "name": "project_id",
             "label": "common.col.project",
@@ -137,8 +221,8 @@
             "required": true,
             "colSpan": 1,
             "relation": {
-              "dataSource": "/ext/hr/time-tracking/projects",
-              "dataPath": "data",
+              "dataSource": "/api/data/time_projects?status[eq]=active&sort=name&order=asc&limit=500",
+              "dataPath": "records",
               "valueKey": "id",
               "labelKey": "name"
             }

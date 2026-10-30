@@ -1,6 +1,8 @@
 {
+  "hr.payroll.btn.approve": "Approve",
   "hr.payroll.btn.generate": "Generate",
   "hr.payroll.btn.newPeriod": "New period",
+  "hr.payroll.btn.pay": "Mark paid",
   "hr.payroll.btn.revisal": "Revisal XML",
   "hr.payroll.col.gross": "Gross",
   "hr.payroll.col.net": "Net",

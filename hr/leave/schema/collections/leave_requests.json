@@ -1,0 +1,25 @@
+{
+  "name": "leave_requests",
+  "fields": [
+    {"name": "employee_id", "type": "uuid", "required": true, "indexed": true},
+    {"name": "leave_type_id", "type": "m2o", "required": true, "options": {"related_collection": "leave_types"}},
+    {"name": "start_date", "type": "date", "required": true, "indexed": true},
+    {"name": "end_date", "type": "date", "required": true},
+    {"name": "is_half_day", "type": "boolean", "required": true, "defaultValue": false},
+    {"name": "half_day_period", "type": "enum", "options": {"values": ["am", "pm"]}},
+    {"name": "working_days", "type": "decimal", "required": true, "defaultValue": 0},
+    {"name": "status", "type": "enum", "required": true, "defaultValue": "pending", "indexed": true, "options": {"values": ["pending", "approved", "rejected", "cancelled"]}},
+    {"name": "cover_employee_id", "type": "uuid"},
+    {"name": "reason", "type": "textarea"},
+    {"name": "approved_by", "type": "text"},
+    {"name": "approved_at", "type": "datetime"},
+    {"name": "rejection_reason", "type": "textarea"}
+  ],
+  "relations": [
+    {"name": "leave_requests_leave_type_id", "type": "m2o", "field": "leave_type_id", "target": "leave_types", "targetField": "id", "onDelete": "RESTRICT", "onUpdate": "CASCADE", "metadata": {}}
+  ],
+  "validation": [
+    {"field": "working_days", "rule": "min", "config": {"value": 0}, "message": "Working days are not negative."},
+    {"field": "status", "rule": "transition", "config": {"expression": "!(previous in ['rejected', 'cancelled']) || value == previous"}, "message": "A rejected or cancelled request stays that way: file a new one."}
+  ]
+}

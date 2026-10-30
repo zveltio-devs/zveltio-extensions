@@ -1,6 +1,8 @@
 {
+  "hr.payroll.btn.approve": "Goedkeuren",
   "hr.payroll.btn.generate": "Genereren",
   "hr.payroll.btn.newPeriod": "Nieuwe periode",
+  "hr.payroll.btn.pay": "Markeer als betaald",
   "hr.payroll.btn.revisal": "Revisal XML",
   "hr.payroll.col.gross": "Bruto",
   "hr.payroll.col.net": "Netto",

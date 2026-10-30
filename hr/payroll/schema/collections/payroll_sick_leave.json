@@ -1,0 +1,68 @@
+{
+  "name": "payroll_sick_leave",
+  "fields": [
+    {
+      "name": "period_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "payroll_periods"
+      }
+    },
+    {
+      "name": "employee_id",
+      "type": "uuid",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "days",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "leave_request_id",
+      "type": "uuid"
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "payroll_sick_leave_period_id",
+      "type": "m2o",
+      "field": "period_id",
+      "target": "payroll_periods",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "days",
+      "rule": "min",
+      "config": {
+        "value": 1
+      },
+      "message": "Sick leave is at least a day."
+    },
+    {
+      "field": "amount",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "This figure is not negative."
+    }
+  ]
+}

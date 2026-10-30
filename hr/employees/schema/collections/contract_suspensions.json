@@ -1,0 +1,13 @@
+{
+  "name": "contract_suspensions",
+  "fields": [
+    {"name": "contract_id", "type": "m2o", "required": true, "indexed": true, "options": {"related_collection": "employment_contracts"}},
+    {"name": "start_date", "type": "date", "required": true},
+    {"name": "end_date", "type": "date"},
+    {"name": "reason_code", "type": "text"},
+    {"name": "notes", "type": "textarea"}
+  ],
+  "relations": [
+    {"name": "contract_suspensions_contract_id", "type": "m2o", "field": "contract_id", "target": "employment_contracts", "targetField": "id", "onDelete": "CASCADE", "onUpdate": "CASCADE", "metadata": {}}
+  ]
+}

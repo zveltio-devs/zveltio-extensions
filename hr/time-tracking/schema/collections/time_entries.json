@@ -1,0 +1,25 @@
+{
+  "name": "time_entries",
+  "fields": [
+    {"name": "employee_id", "type": "uuid", "required": true, "indexed": true},
+    {"name": "project_id", "type": "m2o", "required": true, "options": {"related_collection": "time_projects"}},
+    {"name": "task_description", "type": "text", "required": true, "defaultValue": ""},
+    {"name": "date", "type": "date", "required": true, "indexed": true},
+    {"name": "start_time", "type": "datetime"},
+    {"name": "end_time", "type": "datetime"},
+    {"name": "duration_minutes", "type": "integer", "required": true},
+    {"name": "is_billable", "type": "boolean", "required": true, "defaultValue": true},
+    {"name": "hourly_rate", "type": "decimal", "required": true},
+    {"name": "is_billed", "type": "boolean", "required": true, "defaultValue": false},
+    {"name": "invoice_id", "type": "uuid"},
+    {"name": "notes", "type": "textarea"}
+  ],
+  "relations": [
+    {"name": "time_entries_project_id", "type": "m2o", "field": "project_id", "target": "time_projects", "targetField": "id", "onDelete": "CASCADE", "onUpdate": "CASCADE", "metadata": {}}
+  ],
+  "validation": [
+    {"field": "duration_minutes", "rule": "min", "config": {"value": 1}, "message": "An entry is at least a minute."},
+    {"field": "hourly_rate", "rule": "min", "config": {"value": 0}, "message": "A rate is not negative."},
+    {"field": "is_billed", "rule": "transition", "config": {"expression": "previous != true || value == true"}, "message": "A billed entry stays billed."}
+  ]
+}

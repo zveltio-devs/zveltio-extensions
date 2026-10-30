@@ -1,0 +1,17 @@
+{
+  "name": "salary_history",
+  "fields": [
+    {"name": "employee_id", "type": "m2o", "required": true, "options": {"related_collection": "employees"}},
+    {"name": "effective_date", "type": "date", "required": true},
+    {"name": "salary", "type": "decimal", "required": true},
+    {"name": "salary_type", "type": "enum", "required": true, "defaultValue": "gross", "options": {"values": ["gross", "net"]}},
+    {"name": "currency", "type": "text", "required": true, "defaultValue": "RON"},
+    {"name": "reason", "type": "text"}
+  ],
+  "relations": [
+    {"name": "salary_history_employee_id", "type": "m2o", "field": "employee_id", "target": "employees", "targetField": "id", "onDelete": "CASCADE", "onUpdate": "CASCADE", "metadata": {}}
+  ],
+  "validation": [
+    {"field": "salary", "rule": "min", "config": {"value": 0}, "message": "A salary is not negative."}
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "name": "payroll_adjustments",
+  "fields": [
+    {
+      "name": "entry_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "payroll_entries"
+      }
+    },
+    {
+      "name": "type",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "bonus",
+          "deduction",
+          "advance",
+          "other"
+        ]
+      }
+    },
+    {
+      "name": "description",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "amount",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "taxable",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "payroll_adjustments_entry_id",
+      "type": "m2o",
+      "field": "entry_id",
+      "target": "payroll_entries",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "amount",
+      "rule": "min",
+      "config": {
+        "value": 0.01
+      },
+      "message": "An adjustment is a positive amount."
+    }
+  ]
+}

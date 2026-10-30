@@ -1,0 +1,29 @@
+{
+  "name": "performance_reviews",
+  "fields": [
+    {"name": "cycle_id", "type": "m2o", "required": true, "options": {"related_collection": "performance_cycles"}},
+    {"name": "employee_id", "type": "m2o", "required": true, "options": {"related_collection": "employees"}},
+    {"name": "reviewer_id", "type": "text"},
+    {"name": "overall_rating", "type": "decimal"},
+    {"name": "goals_rating", "type": "decimal"},
+    {"name": "competency_rating", "type": "decimal"},
+    {"name": "strengths", "type": "textarea"},
+    {"name": "improvements", "type": "textarea"},
+    {"name": "comments", "type": "textarea"},
+    {"name": "status", "type": "enum", "required": true, "defaultValue": "pending", "options": {"values": ["pending", "submitted", "acknowledged"]}},
+    {"name": "submitted_at", "type": "datetime"},
+    {"name": "acknowledged_at", "type": "datetime"}
+  ],
+  "indexes": [
+    {"fields": ["cycle_id", "employee_id"], "unique": true}
+  ],
+  "relations": [
+    {"name": "performance_reviews_cycle_id", "type": "m2o", "field": "cycle_id", "target": "performance_cycles", "targetField": "id", "onDelete": "CASCADE", "onUpdate": "CASCADE", "metadata": {}},
+    {"name": "performance_reviews_employee_id", "type": "m2o", "field": "employee_id", "target": "employees", "targetField": "id", "onDelete": "CASCADE", "onUpdate": "CASCADE", "metadata": {}}
+  ],
+  "validation": [
+    {"field": "overall_rating", "rule": "range", "config": {"min": 1, "max": 5}, "message": "A rating is from 1 to 5."},
+    {"field": "goals_rating", "rule": "range", "config": {"min": 1, "max": 5}, "message": "A rating is from 1 to 5."},
+    {"field": "competency_rating", "rule": "range", "config": {"min": 1, "max": 5}, "message": "A rating is from 1 to 5."}
+  ]
+}

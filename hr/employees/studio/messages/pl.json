@@ -1,4 +1,5 @@
 {
+  "hr.employees.btn.terminate": "Zakończ zatrudnienie",
   "hr.employees.col.department": "Dział",
   "hr.employees.col.email": "E-mail",
   "hr.employees.col.hireDate": "Data zatrudnienia",
@@ -20,6 +21,7 @@
   "hr.employees.form.department": "Dział",
   "hr.employees.form.email": "E-mail",
   "hr.employees.form.employmentType": "Rodzaj zatrudnienia",
+  "hr.employees.form.endDate": "Data zakończenia",
   "hr.employees.form.firstName": "Imię",
   "hr.employees.form.hireDate": "Data zatrudnienia",
   "hr.employees.form.lastName": "Nazwisko",

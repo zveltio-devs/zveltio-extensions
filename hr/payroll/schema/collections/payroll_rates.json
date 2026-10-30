@@ -1,0 +1,96 @@
+{
+  "name": "payroll_rates",
+  "fields": [
+    {
+      "name": "cas_employee",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0.25
+    },
+    {
+      "name": "cass_employee",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0.1
+    },
+    {
+      "name": "income_tax",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0.1
+    },
+    {
+      "name": "cas_employer",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0.04
+    },
+    {
+      "name": "cam_employer",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0.0225
+    },
+    {
+      "name": "personal_deduction_base",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 500
+    }
+  ],
+  "validation": [
+    {
+      "field": "cas_employee",
+      "rule": "range",
+      "config": {
+        "min": 0,
+        "max": 1
+      },
+      "message": "A rate is a fraction from 0 to 1."
+    },
+    {
+      "field": "cass_employee",
+      "rule": "range",
+      "config": {
+        "min": 0,
+        "max": 1
+      },
+      "message": "A rate is a fraction from 0 to 1."
+    },
+    {
+      "field": "income_tax",
+      "rule": "range",
+      "config": {
+        "min": 0,
+        "max": 1
+      },
+      "message": "A rate is a fraction from 0 to 1."
+    },
+    {
+      "field": "cas_employer",
+      "rule": "range",
+      "config": {
+        "min": 0,
+        "max": 1
+      },
+      "message": "A rate is a fraction from 0 to 1."
+    },
+    {
+      "field": "cam_employer",
+      "rule": "range",
+      "config": {
+        "min": 0,
+        "max": 1
+      },
+      "message": "A rate is a fraction from 0 to 1."
+    },
+    {
+      "field": "personal_deduction_base",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "This figure is not negative."
+    }
+  ]
+}

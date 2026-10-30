@@ -1,0 +1,14 @@
+{
+  "name": "onboarding_tasks",
+  "fields": [
+    {"name": "employee_id", "type": "m2o", "required": true, "options": {"related_collection": "employees"}},
+    {"name": "title", "type": "text", "required": true},
+    {"name": "description", "type": "textarea"},
+    {"name": "assigned_to", "type": "text"},
+    {"name": "due_date", "type": "date"},
+    {"name": "completed_at", "type": "datetime"}
+  ],
+  "relations": [
+    {"name": "onboarding_tasks_employee_id", "type": "m2o", "field": "employee_id", "target": "employees", "targetField": "id", "onDelete": "CASCADE", "onUpdate": "CASCADE", "metadata": {}}
+  ]
+}

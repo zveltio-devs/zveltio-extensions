@@ -1,0 +1,17 @@
+{
+  "name": "timesheets",
+  "fields": [
+    {"name": "employee_id", "type": "uuid", "required": true},
+    {"name": "week_start", "type": "date", "required": true},
+    {"name": "week_end", "type": "date", "required": true},
+    {"name": "status", "type": "enum", "required": true, "defaultValue": "draft", "indexed": true, "options": {"values": ["draft", "submitted", "approved", "rejected"]}},
+    {"name": "total_hours", "type": "decimal", "required": true, "defaultValue": 0},
+    {"name": "rejection_reason", "type": "textarea"}
+  ],
+  "indexes": [
+    {"fields": ["employee_id", "week_start"], "unique": true}
+  ],
+  "validation": [
+    {"field": "status", "rule": "transition", "config": {"expression": "value == previous || (previous == 'draft' && value == 'submitted') || (previous == 'submitted' && value in ['approved', 'rejected'])"}, "message": "A timesheet goes draft, submitted, then approved or rejected."}
+  ]
+}

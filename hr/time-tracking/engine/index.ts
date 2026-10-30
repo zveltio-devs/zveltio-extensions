@@ -1,24 +1,20 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
-import { timeTrackingRoutes } from './routes.js';
+import { timeTrackingActions } from './actions.js';
 
+// Projects, time entries, timesheets and running timers are collections this
+// extension declares in `schema/collections/` (manifest `collections`); the
+// engine creates them, owns their rules and serves them through the data API.
+// Employees are `hr/employees`' collection, read through the same API. What is
+// left in code is what time tracking does beyond a plain edit: the actions in
+// `actions.ts`.
 const extension: ZveltioExtension = {
   name: 'hr/time-tracking',
   category: 'hr',
-  // S3-01: sub-app mounted at /ext/hr/time-tracking by the engine.
   mountStrategy: 'subapp',
 
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_initial.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
-      join(import.meta.dir, 'migrations/003_tenant_scoped_unique_keys.sql'),
-    ];
-  },
+  actions: timeTrackingActions,
 
-  async register(app, ctx) {
-    app.route('/', timeTrackingRoutes(ctx));
-  },
+  async register() {},
 };
 
 export default extension;

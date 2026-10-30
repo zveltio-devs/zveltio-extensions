@@ -1,4 +1,5 @@
 {
+  "hr.employees.btn.terminate": "Dar de baja",
   "hr.employees.col.department": "Departamento",
   "hr.employees.col.email": "Correo electrónico",
   "hr.employees.col.hireDate": "Fecha de contratación",
@@ -20,6 +21,7 @@
   "hr.employees.form.department": "Departamento",
   "hr.employees.form.email": "Correo electrónico",
   "hr.employees.form.employmentType": "Tipo de empleo",
+  "hr.employees.form.endDate": "Fecha de fin",
   "hr.employees.form.firstName": "Nombre",
   "hr.employees.form.hireDate": "Fecha de contratación",
   "hr.employees.form.lastName": "Apellido",
