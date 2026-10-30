@@ -1,0 +1,53 @@
+{
+  "name": "bank_reconciliations",
+  "fields": [
+    {
+      "name": "transaction_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "bank_transactions"
+      },
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "linked_type",
+      "type": "enum",
+      "options": {
+        "values": [
+          "invoice",
+          "expense",
+          "manual"
+        ]
+      },
+      "required": true,
+      "defaultValue": "manual"
+    },
+    {
+      "name": "linked_id",
+      "type": "uuid"
+    },
+    {
+      "name": "matched_amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "bank_reconciliations_transaction_id",
+      "type": "m2o",
+      "field": "transaction_id",
+      "target": "bank_transactions",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

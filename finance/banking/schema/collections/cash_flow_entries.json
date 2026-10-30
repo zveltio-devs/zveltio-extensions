@@ -1,0 +1,106 @@
+{
+  "name": "cash_flow_entries",
+  "fields": [
+    {
+      "name": "account_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "bank_accounts"
+      }
+    },
+    {
+      "name": "expected_date",
+      "type": "date",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "type",
+      "type": "enum",
+      "options": {
+        "values": [
+          "inflow",
+          "outflow"
+        ]
+      },
+      "required": true
+    },
+    {
+      "name": "amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "description",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "category",
+      "type": "text"
+    },
+    {
+      "name": "probability",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 100
+    },
+    {
+      "name": "actual_transaction_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "bank_transactions"
+      }
+    },
+    {
+      "name": "is_realized",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    }
+  ],
+  "relations": [
+    {
+      "name": "cash_flow_entries_account_id",
+      "type": "m2o",
+      "field": "account_id",
+      "target": "bank_accounts",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "cash_flow_entries_actual_transaction_id",
+      "type": "m2o",
+      "field": "actual_transaction_id",
+      "target": "bank_transactions",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "amount",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "An amount is not negative; the type says which way it goes."
+    },
+    {
+      "field": "probability",
+      "rule": "range",
+      "config": {
+        "min": 0,
+        "max": 100
+      },
+      "message": "A probability is 0 to 100 percent."
+    }
+  ]
+}

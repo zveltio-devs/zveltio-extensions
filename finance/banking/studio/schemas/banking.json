@@ -8,31 +8,85 @@
       "id": "accounts",
       "label": "finance.banking.tab.accounts",
       "icon": "Landmark",
-      "dataSource": "/ext/finance/banking/accounts",
-      "dataPath": "data",
+      "dataSource": "/api/data/bank_accounts?sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
       "columns": [
-        { "key": "name", "label": "common.col.name" },
-        { "key": "bank_name", "label": "common.col.bank" },
-        { "key": "iban", "label": "common.col.iban", "type": "mono" },
-        { "key": "currency", "label": "common.col.currency", "type": "mono" },
+        {
+          "key": "name",
+          "label": "common.col.name"
+        },
+        {
+          "key": "bank_name",
+          "label": "common.col.bank"
+        },
+        {
+          "key": "iban",
+          "label": "common.col.iban",
+          "type": "mono"
+        },
+        {
+          "key": "currency",
+          "label": "common.col.currency",
+          "type": "mono"
+        },
         {
           "key": "balance",
           "label": "common.col.balance",
           "type": "currency",
-          "currency": { "codeKey": "currency" }
+          "currency": {
+            "codeKey": "currency"
+          }
         },
-        { "key": "is_active", "label": "common.col.active", "type": "boolean" }
+        {
+          "key": "is_active",
+          "label": "common.col.active",
+          "type": "boolean"
+        }
       ],
       "rowActions": [
-        { "id": "edit", "kind": "edit", "label": "common.edit" }
+        {
+          "id": "edit",
+          "kind": "edit",
+          "label": "common.edit"
+        },
+        {
+          "id": "refresh",
+          "icon": "RefreshCw",
+          "label": "finance.banking.action.refresh",
+          "method": "POST",
+          "endpoint": "/ext/finance/banking/actions/refreshBalance",
+          "body": {
+            "id": "{id}"
+          }
+        }
       ],
       "form": {
-        "endpoint": "/ext/finance/banking/accounts",
+        "endpoint": "/api/data/bank_accounts",
         "fields": [
-          { "name": "name", "label": "common.col.name", "required": true, "colSpan": 1 },
-          { "name": "bank_name", "label": "common.col.bank", "required": true, "colSpan": 1 },
-          { "name": "iban", "label": "common.col.iban", "mono": true, "colSpan": 1 },
-          { "name": "currency", "label": "common.col.currency", "colSpan": 1, "default": "RON" },
+          {
+            "name": "name",
+            "label": "common.col.name",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "bank_name",
+            "label": "common.col.bank",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "iban",
+            "label": "common.col.iban",
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "currency",
+            "label": "common.col.currency",
+            "colSpan": 1,
+            "default": "RON"
+          },
           {
             "name": "account_type",
             "label": "common.col.type",
@@ -40,10 +94,22 @@
             "colSpan": 1,
             "default": "checking",
             "options": [
-              { "value": "checking", "label": "finance.banking.type.checking" },
-              { "value": "savings", "label": "finance.banking.type.savings" },
-              { "value": "credit", "label": "finance.banking.type.credit" },
-              { "value": "cash", "label": "finance.banking.type.cash" }
+              {
+                "value": "checking",
+                "label": "finance.banking.type.checking"
+              },
+              {
+                "value": "savings",
+                "label": "finance.banking.type.savings"
+              },
+              {
+                "value": "credit",
+                "label": "finance.banking.type.credit"
+              },
+              {
+                "value": "cash",
+                "label": "finance.banking.type.cash"
+              }
             ]
           },
           {
@@ -53,7 +119,12 @@
             "colSpan": 1,
             "default": 0
           },
-          { "name": "notes", "label": "common.col.notes", "type": "textarea", "colSpan": 2 }
+          {
+            "name": "notes",
+            "label": "common.col.notes",
+            "type": "textarea",
+            "colSpan": 2
+          }
         ]
       }
     },
@@ -61,27 +132,102 @@
       "id": "transactions",
       "label": "finance.banking.tab.transactions",
       "icon": "ArrowLeftRight",
-      "dataSource": "/ext/finance/banking/accounts/{masterId}/transactions?limit=100",
-      "dataPath": "data",
+      "dataSource": "/api/data/bank_transactions?account_id[eq]={masterId}&sort=date&order=desc&limit=500",
+      "dataPath": "records",
       "master": {
-        "dataSource": "/ext/finance/banking/accounts",
-        "dataPath": "data",
+        "dataSource": "/api/data/bank_accounts?sort=created_at&order=desc&limit=500",
+        "dataPath": "records",
         "idKey": "id",
         "titleKey": "name",
-        "subtitle": { "keys": ["bank_name", "iban"], "sep": " · " },
+        "subtitle": {
+          "keys": [
+            "bank_name",
+            "iban"
+          ],
+          "sep": " · "
+        },
         "badgeKey": "currency"
       },
       "columns": [
-        { "key": "booking_date", "label": "common.col.date", "type": "date" },
-        { "key": "description", "label": "common.col.description" },
+        {
+          "key": "date",
+          "label": "common.col.date",
+          "type": "date"
+        },
+        {
+          "key": "description",
+          "label": "common.col.description",
+          "secondary": "counterparty_name"
+        },
+        {
+          "key": "type",
+          "label": "common.col.type",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "credit": "badge-success",
+              "debit": "badge-warning"
+            }
+          }
+        },
         {
           "key": "amount",
           "label": "common.col.amount",
-          "type": "currency",
-          "currency": { "code": "RON" }
+          "type": "number"
         },
-        { "key": "category", "label": "common.col.category" },
-        { "key": "reconciled", "label": "finance.banking.status.reconciled", "type": "boolean" }
+        {
+          "key": "category",
+          "label": "common.col.category"
+        },
+        {
+          "key": "is_reconciled",
+          "label": "finance.banking.status.reconciled",
+          "type": "boolean"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "reconcile",
+          "icon": "Check",
+          "label": "finance.banking.action.reconcile",
+          "method": "POST",
+          "endpoint": "/ext/finance/banking/actions/reconcile",
+          "visibleWhen": {
+            "field": "is_reconciled",
+            "equals": false
+          },
+          "body": {
+            "transaction_id": "{id}",
+            "linked_type": "manual"
+          }
+        },
+        {
+          "id": "payInvoice",
+          "icon": "FileCheck",
+          "label": "finance.banking.action.payInvoice",
+          "method": "POST",
+          "endpoint": "/ext/finance/banking/actions/reconcile",
+          "visibleWhen": {
+            "field": "type",
+            "equals": "credit"
+          },
+          "prompt": {
+            "title": "finance.banking.action.payInvoice",
+            "submitLabel": "finance.banking.action.payInvoice",
+            "fields": [
+              {
+                "name": "linked_id",
+                "label": "finance.banking.prompt.invoiceId",
+                "type": "text",
+                "required": true
+              }
+            ]
+          },
+          "body": {
+            "transaction_id": "{id}",
+            "linked_type": "invoice"
+          }
+        }
       ]
     }
   ]

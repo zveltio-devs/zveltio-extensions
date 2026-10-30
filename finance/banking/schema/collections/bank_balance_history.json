@@ -1,0 +1,46 @@
+{
+  "name": "bank_balance_history",
+  "fields": [
+    {
+      "name": "account_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "bank_accounts"
+      },
+      "required": true
+    },
+    {
+      "name": "snapshot_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "balance",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "account_id",
+        "snapshot_date"
+      ],
+      "unique": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "bank_balance_history_account_id",
+      "type": "m2o",
+      "field": "account_id",
+      "target": "bank_accounts",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}
