@@ -1,0 +1,145 @@
+{
+  "name": "stock_movements",
+  "fields": [
+    {
+      "name": "product_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "products"
+      }
+    },
+    {
+      "name": "warehouse_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "warehouses"
+      }
+    },
+    {
+      "name": "destination_warehouse_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "warehouses"
+      }
+    },
+    {
+      "name": "type",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "values": [
+          "in",
+          "out",
+          "transfer",
+          "adjustment"
+        ]
+      }
+    },
+    {
+      "name": "quantity",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "unit_cost",
+      "type": "decimal"
+    },
+    {
+      "name": "avg_cost_after",
+      "type": "decimal"
+    },
+    {
+      "name": "reference",
+      "type": "text",
+      "indexed": true
+    },
+    {
+      "name": "note",
+      "type": "textarea"
+    },
+    {
+      "name": "batch_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "product_batches"
+      }
+    },
+    {
+      "name": "po_line_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "purchase_order_lines"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "stock_movements_product_id",
+      "type": "m2o",
+      "field": "product_id",
+      "target": "products",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "stock_movements_warehouse_id",
+      "type": "m2o",
+      "field": "warehouse_id",
+      "target": "warehouses",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "stock_movements_destination_warehouse_id",
+      "type": "m2o",
+      "field": "destination_warehouse_id",
+      "target": "warehouses",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "stock_movements_batch_id",
+      "type": "m2o",
+      "field": "batch_id",
+      "target": "product_batches",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "stock_movements_po_line_id",
+      "type": "m2o",
+      "field": "po_line_id",
+      "target": "purchase_order_lines",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "quantity",
+      "rule": "min",
+      "config": {
+        "value": 1e-06
+      },
+      "message": "A movement moves a positive quantity."
+    }
+  ]
+}

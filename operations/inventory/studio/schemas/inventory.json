@@ -8,10 +8,10 @@
       "id": "products",
       "label": "inventory.tab.products",
       "icon": "Package",
-      "dataSource": "/ext/operations/inventory/products",
-      "dataPath": "data",
+      "dataSource": "/api/data/products?sort=name&order=asc&limit=500",
+      "dataPath": "records",
       "search": {
-        "param": "q",
+        "param": "search",
         "placeholder": "inventory.searchPlaceholder"
       },
       "columns": [
@@ -25,8 +25,16 @@
           "label": "inventory.col.name"
         },
         {
-          "key": "price",
+          "key": "sale_price",
           "label": "common.col.price",
+          "type": "currency",
+          "currency": {
+            "codeKey": "currency"
+          }
+        },
+        {
+          "key": "avg_cost",
+          "label": "inventory.col.avgCost",
           "type": "currency",
           "currency": {
             "codeKey": "currency"
@@ -43,13 +51,14 @@
         }
       ],
       "form": {
-        "endpoint": "/ext/operations/inventory/products",
+        "endpoint": "/api/data/products",
         "fields": [
           {
             "name": "sku",
             "label": "inventory.form.sku",
             "colSpan": 1,
-            "mono": true
+            "mono": true,
+            "required": true
           },
           {
             "name": "name",
@@ -64,7 +73,55 @@
             "colSpan": 2
           },
           {
-            "name": "unit_price",
+            "name": "category",
+            "label": "common.col.category",
+            "colSpan": 1
+          },
+          {
+            "name": "unit",
+            "label": "inventory.col.unit",
+            "type": "select",
+            "default": "piece",
+            "colSpan": 1,
+            "options": [
+              {
+                "value": "piece",
+                "label": "inventory.unit.piece"
+              },
+              {
+                "value": "kg",
+                "label": "inventory.unit.kg"
+              },
+              {
+                "value": "liter",
+                "label": "inventory.unit.liter"
+              },
+              {
+                "value": "box",
+                "label": "inventory.unit.box"
+              },
+              {
+                "value": "meter",
+                "label": "inventory.unit.meter"
+              },
+              {
+                "value": "hour",
+                "label": "inventory.unit.hour"
+              },
+              {
+                "value": "other",
+                "label": "inventory.unit.other"
+              }
+            ]
+          },
+          {
+            "name": "cost_price",
+            "label": "inventory.col.costPrice",
+            "type": "number",
+            "colSpan": 1
+          },
+          {
+            "name": "sale_price",
             "label": "inventory.form.unitPrice",
             "type": "number",
             "colSpan": 1
@@ -75,6 +132,12 @@
             "type": "number",
             "colSpan": 1,
             "default": 19
+          },
+          {
+            "name": "reorder_point",
+            "label": "inventory.col.reorderPoint",
+            "type": "number",
+            "colSpan": 1
           }
         ]
       }
@@ -83,25 +146,25 @@
       "id": "warehouses",
       "label": "inventory.tab.warehouses",
       "icon": "Warehouse",
-      "dataSource": "/ext/operations/inventory/warehouses",
-      "dataPath": "data",
+      "dataSource": "/api/data/warehouses?sort=name&order=asc&limit=500",
+      "dataPath": "records",
       "columns": [
-        {
-          "key": "code",
-          "label": "inventory.col.code",
-          "type": "mono"
-        },
         {
           "key": "name",
           "label": "inventory.col.name"
         },
         {
-          "key": "address",
-          "label": "inventory.col.address"
+          "key": "location",
+          "label": "inventory.col.location"
+        },
+        {
+          "key": "is_active",
+          "label": "inventory.col.active",
+          "type": "boolean"
         }
       ],
       "form": {
-        "endpoint": "/ext/operations/inventory/warehouses",
+        "endpoint": "/api/data/warehouses",
         "fields": [
           {
             "name": "name",
@@ -110,9 +173,75 @@
             "required": true
           },
           {
-            "name": "address",
-            "label": "inventory.col.address",
+            "name": "location",
+            "label": "inventory.col.location",
             "colSpan": 1
+          },
+          {
+            "name": "notes",
+            "label": "common.col.notes",
+            "type": "textarea",
+            "colSpan": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "suppliers",
+      "label": "inventory.tab.suppliers",
+      "icon": "Truck",
+      "dataSource": "/api/data/suppliers?sort=name&order=asc&limit=500",
+      "dataPath": "records",
+      "columns": [
+        {
+          "key": "name",
+          "label": "inventory.col.name"
+        },
+        {
+          "key": "email",
+          "label": "common.col.email"
+        },
+        {
+          "key": "phone",
+          "label": "common.col.phone"
+        },
+        {
+          "key": "tax_id",
+          "label": "inventory.col.taxId",
+          "type": "mono"
+        }
+      ],
+      "form": {
+        "endpoint": "/api/data/suppliers",
+        "fields": [
+          {
+            "name": "name",
+            "label": "inventory.col.name",
+            "colSpan": 2,
+            "required": true
+          },
+          {
+            "name": "email",
+            "label": "common.col.email",
+            "colSpan": 1
+          },
+          {
+            "name": "phone",
+            "label": "common.col.phone",
+            "colSpan": 1
+          },
+          {
+            "name": "tax_id",
+            "label": "inventory.col.taxId",
+            "colSpan": 1,
+            "mono": true
+          },
+          {
+            "name": "payment_terms",
+            "label": "inventory.col.paymentTerms",
+            "type": "number",
+            "colSpan": 1,
+            "default": 30
           }
         ]
       }
@@ -121,23 +250,215 @@
       "id": "stock",
       "label": "inventory.tab.stock",
       "icon": "Boxes",
-      "dataSource": "/ext/operations/inventory/low-stock",
-      "dataPath": "data",
+      "dataSource": "/api/data/stock_levels?expand=product_id,warehouse_id&limit=500",
+      "dataPath": "records",
       "columns": [
         {
-          "key": "product_name",
+          "key": "product_id_expanded.name",
           "label": "inventory.col.product"
         },
         {
-          "key": "warehouse_name",
+          "key": "warehouse_id_expanded.name",
           "label": "inventory.col.warehouse"
         },
         {
           "key": "quantity",
           "label": "inventory.col.quantity",
           "type": "mono"
+        },
+        {
+          "key": "reserved_qty",
+          "label": "inventory.col.reserved",
+          "type": "mono"
         }
-      ]
+      ],
+      "readOnlyReason": "a stock level changes only with a movement, so it is recorded on the Movements tab (the moveStock action), never typed in."
+    },
+    {
+      "id": "movements",
+      "label": "inventory.tab.movements",
+      "icon": "ArrowLeftRight",
+      "dataSource": "/api/data/stock_movements?expand=product_id,warehouse_id&sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
+      "columns": [
+        {
+          "key": "created_at",
+          "label": "common.col.date",
+          "type": "date"
+        },
+        {
+          "key": "product_id_expanded.name",
+          "label": "inventory.col.product"
+        },
+        {
+          "key": "warehouse_id_expanded.name",
+          "label": "inventory.col.warehouse"
+        },
+        {
+          "key": "type",
+          "label": "common.col.type",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "in": "badge-success",
+              "out": "badge-warning",
+              "transfer": "badge-info",
+              "adjustment": "badge-ghost"
+            }
+          }
+        },
+        {
+          "key": "quantity",
+          "label": "inventory.col.quantity",
+          "type": "mono"
+        },
+        {
+          "key": "reference",
+          "label": "common.col.docNumber",
+          "type": "mono"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/operations/inventory/actions/moveStock",
+        "fields": [
+          {
+            "name": "product_id",
+            "label": "inventory.col.product",
+            "type": "relation",
+            "required": true,
+            "colSpan": 1,
+            "relation": {
+              "dataSource": "/api/data/products?is_active[eq]=true&sort=name&order=asc&limit=500",
+              "dataPath": "records",
+              "valueKey": "id",
+              "labelKey": "name"
+            }
+          },
+          {
+            "name": "warehouse_id",
+            "label": "inventory.col.warehouse",
+            "type": "relation",
+            "required": true,
+            "colSpan": 1,
+            "relation": {
+              "dataSource": "/api/data/warehouses?is_active[eq]=true&sort=name&order=asc&limit=500",
+              "dataPath": "records",
+              "valueKey": "id",
+              "labelKey": "name"
+            }
+          },
+          {
+            "name": "type",
+            "label": "common.col.type",
+            "type": "select",
+            "required": true,
+            "default": "in",
+            "colSpan": 1,
+            "options": [
+              {
+                "value": "in",
+                "label": "inventory.type.in"
+              },
+              {
+                "value": "out",
+                "label": "inventory.type.out"
+              },
+              {
+                "value": "transfer",
+                "label": "inventory.type.transfer"
+              },
+              {
+                "value": "adjustment",
+                "label": "inventory.type.adjustment"
+              }
+            ]
+          },
+          {
+            "name": "quantity",
+            "label": "inventory.col.quantity",
+            "type": "number",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "destination_warehouse_id",
+            "label": "inventory.col.destination",
+            "type": "relation",
+            "required": false,
+            "colSpan": 1,
+            "relation": {
+              "dataSource": "/api/data/warehouses?is_active[eq]=true&sort=name&order=asc&limit=500",
+              "dataPath": "records",
+              "valueKey": "id",
+              "labelKey": "name"
+            }
+          },
+          {
+            "name": "unit_cost",
+            "label": "inventory.col.unitCost",
+            "type": "number",
+            "colSpan": 1
+          },
+          {
+            "name": "reference",
+            "label": "common.col.docNumber",
+            "colSpan": 1,
+            "mono": true
+          },
+          {
+            "name": "note",
+            "label": "common.col.notes",
+            "type": "textarea",
+            "colSpan": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "purchase-orders",
+      "label": "inventory.tab.purchaseOrders",
+      "icon": "ClipboardList",
+      "dataSource": "/api/data/purchase_orders?expand=supplier_id&sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
+      "columns": [
+        {
+          "key": "number",
+          "label": "common.col.number",
+          "type": "mono"
+        },
+        {
+          "key": "supplier_id_expanded.name",
+          "label": "inventory.col.supplier"
+        },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "draft": "badge-ghost",
+              "sent": "badge-info",
+              "partial": "badge-warning",
+              "received": "badge-success",
+              "cancelled": "badge-error"
+            }
+          }
+        },
+        {
+          "key": "expected_date",
+          "label": "inventory.col.expected",
+          "type": "date"
+        },
+        {
+          "key": "total",
+          "label": "common.col.total",
+          "type": "currency",
+          "currency": {
+            "codeKey": "currency"
+          }
+        }
+      ],
+      "readOnlyReason": "a purchase order carries its lines, and a receipt names lines, batches and quantities; a flat form cannot express either, so this resource lists rather than creates (the createPurchaseOrder and receivePurchaseOrder actions do). A dedicated page is the fix, not a schema field."
     }
   ]
 }

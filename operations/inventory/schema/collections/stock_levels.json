@@ -1,0 +1,84 @@
+{
+  "name": "stock_levels",
+  "fields": [
+    {
+      "name": "product_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "products"
+      }
+    },
+    {
+      "name": "warehouse_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "warehouses"
+      }
+    },
+    {
+      "name": "quantity",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "reserved_qty",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "product_id",
+        "warehouse_id"
+      ],
+      "unique": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "stock_levels_product_id",
+      "type": "m2o",
+      "field": "product_id",
+      "target": "products",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "stock_levels_warehouse_id",
+      "type": "m2o",
+      "field": "warehouse_id",
+      "target": "warehouses",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "quantity",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "Stock on hand is not negative."
+    },
+    {
+      "field": "reserved_qty",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A reservation is not negative."
+    }
+  ]
+}

@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.0 (2026-10-30)
+
+- feat!: warehouses, suppliers, products and variants, stock levels and movements, batches, purchase orders and their lines are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/operations/inventory/*` routes are gone — plain reads and edits go through `/api/data/<collection>`; the rest is the actions `moveStock`, `createPurchaseOrder`, `receivePurchaseOrder` and the reports `lowStock`, `valuation`, `expiringBatches` (`POST /ext/operations/inventory/actions/<name>`)
+- feat!: the `inventory` permission resource is gone; who may move stock or receive an order is the engine's rules on these collections
+- feat!: the services `operations/inventory.products.*` and `operations/inventory.stock.*` and the `stock.*` / `product.*` events are gone; until `operations/pos` and `ecommerce/store` move, a sale no longer moves stock and a storefront product is not linked to inventory
+- feat!: a product's variants are created through `/api/data/product_variants`, not with the product; `zvd_products.total_value` is gone (the `valuation` report computes it)
+- fix: a stock level never goes negative (a collection rule, and `moveStock` refuses with `insufficient_stock`); a level written by two requests at once is refused, not lost
+- fix: a receipt names only lines of its order (an unknown line is refused, not skipped); a fractional quantity averages the cost over what is held, not over at least one unit; a product never costed averages from its cost price
+- requires engine 3.0.0-beta.92
+
 ## 1.1.1 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

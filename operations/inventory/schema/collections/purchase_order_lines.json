@@ -1,0 +1,105 @@
+{
+  "name": "purchase_order_lines",
+  "fields": [
+    {
+      "name": "po_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "purchase_orders"
+      }
+    },
+    {
+      "name": "product_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "products"
+      }
+    },
+    {
+      "name": "quantity_ordered",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "quantity_received",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "unit_cost",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "tax_rate",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "total",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "sort_order",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    }
+  ],
+  "relations": [
+    {
+      "name": "purchase_order_lines_po_id",
+      "type": "m2o",
+      "field": "po_id",
+      "target": "purchase_orders",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "purchase_order_lines_product_id",
+      "type": "m2o",
+      "field": "product_id",
+      "target": "products",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "quantity_ordered",
+      "rule": "min",
+      "config": {
+        "value": 1e-06
+      },
+      "message": "An ordered quantity is positive."
+    },
+    {
+      "field": "quantity_received",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A received quantity is not negative."
+    },
+    {
+      "field": "unit_cost",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A unit cost is not negative."
+    }
+  ]
+}

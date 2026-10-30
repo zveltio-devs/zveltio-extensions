@@ -1,0 +1,78 @@
+{
+  "name": "product_variants",
+  "fields": [
+    {
+      "name": "product_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "products"
+      }
+    },
+    {
+      "name": "sku",
+      "type": "text",
+      "unique": true
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "attributes",
+      "type": "json",
+      "required": true,
+      "defaultValue": {}
+    },
+    {
+      "name": "unit_price",
+      "type": "decimal"
+    },
+    {
+      "name": "unit_cost",
+      "type": "decimal"
+    },
+    {
+      "name": "barcode",
+      "type": "text"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "product_variants_product_id",
+      "type": "m2o",
+      "field": "product_id",
+      "target": "products",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "unit_price",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A price is not negative."
+    },
+    {
+      "field": "unit_cost",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A cost is not negative."
+    }
+  ]
+}
