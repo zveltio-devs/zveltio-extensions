@@ -73,7 +73,11 @@ function addDays(iso, days) {
 }
 function addMonths(iso, months) {
   const d = new Date(`${iso}T00:00:00Z`);
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
   d.setUTCMonth(d.getUTCMonth() + months);
+  const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, last));
   return d.toISOString().slice(0, 10);
 }
 function isValidCui(value) {
@@ -230,7 +234,7 @@ var createInvoice = async (input, host) => {
     const unit_price = l.unit_price ?? 0;
     const tax_rate = l.tax_rate ?? 19;
     const base = quantity * unit_price * (1 - disc / 100);
-    const vat = chargesVat ? base * tax_rate / 100 : 0;
+    const vat = chargesVat ? round2(base * tax_rate / 100) : 0;
     return { l, quantity, unit_price, tax_rate, base, vat, sort_order: l.sort_order ?? i };
   });
   const gross = lines.reduce((s, x) => s + x.quantity * x.unit_price, 0);
@@ -317,10 +321,10 @@ var convertProforma = async (input, host) => {
   const p = await load(host, I, id, "invoice");
   if (p.doc_type !== "proforma")
     throw new ActionRefusal(409, "not_a_proforma", "Only a proforma converts to an invoice.");
+  const claimed = await claimNumber(host, "invoice");
   const done = records(await host.collections.list(I, { filter: { converted_from_id: id }, limit: 1, count: "none" }))[0];
   if (done)
     throw new ActionRefusal(409, "already_converted", `Already converted to ${done.number}.`);
-  const claimed = await claimNumber(host, "invoice");
   const inv = await host.collections.insert(I, {
     ...pick(p, [...PARTY, ...AMOUNTS, "delivery_date", "due_date"]),
     number: claimed.number,
@@ -338,6 +342,9 @@ var generateNext = async (input, host) => {
   const months = { monthly: 1, quarterly: 3, yearly: 12 }[String(i.recurring_interval)];
   if (!months)
     throw new ActionRefusal(409, "not_recurring", "This invoice does not recur.");
+  if (i.status === "draft" || i.status === "cancelled") {
+    throw new ActionRefusal(409, "invoice_not_issued", "Only an issued invoice generates the next one.");
+  }
   const issue = addDays(day(i.due_date), 1);
   const claimed = await claimNumber(host, "invoice", i.series ? String(i.series) : undefined);
   const inv = await host.collections.insert(I, {

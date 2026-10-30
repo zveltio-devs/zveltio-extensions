@@ -202,8 +202,13 @@ describe('documents from documents', () => {
   it('a recurring invoice generates the next period in its own series', async () => {
     const { host } = await setup();
     const inv = (await a.createInvoice({ ...BASE, series: 'OLD', recurring_interval: 'quarterly' }, host as never)) as Row;
+    await refusal(a.generateNext({ id: inv.id }, host as never), 'invoice_not_issued');
+    await host.collections.update('invoices', String(inv.id), { status: 'sent' });
     const next = (await a.generateNext({ id: inv.id }, host as never)) as Row;
     expect(next).toMatchObject({ number: 'OLD-02', issue_date: '2026-12-01', due_date: '2027-03-01', status: 'draft' });
+    const jan = (await a.createInvoice({ ...BASE, issue_date: '2027-01-01', due_date: '2027-01-30', recurring_interval: 'monthly' }, host as never)) as Row;
+    await host.collections.update('invoices', String(jan.id), { status: 'sent' });
+    expect(await a.generateNext({ id: jan.id }, host as never)).toMatchObject({ issue_date: '2027-01-31', due_date: '2027-02-28' });
     const once = (await a.createInvoice(BASE, host as never)) as Row;
     await refusal(a.generateNext({ id: once.id }, host as never), 'not_recurring');
   });
