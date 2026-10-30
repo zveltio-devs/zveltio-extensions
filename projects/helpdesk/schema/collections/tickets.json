@@ -1,0 +1,67 @@
+{
+  "name": "tickets",
+  "fields": [
+    { "name": "number", "type": "text", "unique": true, "required": true },
+    { "name": "title", "type": "text", "required": true },
+    { "name": "description", "type": "textarea", "required": true },
+    { "name": "category_id", "type": "m2o", "options": { "related_collection": "ticket_categories" } },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "open",
+      "options": { "values": ["open", "in_progress", "pending_customer", "resolved", "closed"] }
+    },
+    { "name": "priority", "type": "enum", "required": true, "indexed": true, "defaultValue": "medium", "options": { "values": ["low", "medium", "high", "critical"] } },
+    { "name": "requester_email", "type": "email", "required": true },
+    { "name": "requester_name", "type": "text" },
+    { "name": "assignee_id", "type": "text", "indexed": true },
+    {
+      "name": "channel",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "web",
+      "options": { "values": ["email", "web", "phone", "api"] }
+    },
+    { "name": "sla_due_at", "type": "datetime", "indexed": true },
+    { "name": "first_response_at", "type": "datetime" },
+    { "name": "resolved_at", "type": "datetime" },
+    { "name": "closed_at", "type": "datetime" },
+    { "name": "tags", "type": "tags" },
+    { "name": "metadata", "type": "json" },
+    { "name": "merged_into_id", "type": "m2o", "options": { "related_collection": "tickets" } },
+    { "name": "is_merged", "type": "boolean", "required": true, "defaultValue": false },
+    { "name": "sla_breached", "type": "boolean", "required": true, "defaultValue": false }
+  ],
+  "relations": [
+    {
+      "name": "tickets_category_id",
+      "type": "m2o",
+      "field": "category_id",
+      "target": "ticket_categories",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "tickets_merged_into_id",
+      "type": "m2o",
+      "field": "merged_into_id",
+      "target": "tickets",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "is_merged",
+      "rule": "transition",
+      "config": { "expression": "previous != true || value == true" },
+      "message": "A merged ticket stays merged: its messages live on the ticket it was merged into."
+    }
+  ]
+}

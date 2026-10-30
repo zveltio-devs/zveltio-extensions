@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.0 (2026-10-30)
+
+- feat!: tickets, messages, categories, canned responses, CSAT, escalation rules and the escalation log are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/projects/helpdesk/*` routes are gone — plain reads and edits go through `/api/data/<collection>`; a ticket's life is the actions `open`, `reply`, `resolve`, `close`, `merge` and `escalate` (`POST /ext/projects/helpdesk/actions/<name>`)
+- feat!: `/stats` and the categories' open-ticket count are gone
+- fix: an escalation rule fires once per ticket (the old `ON CONFLICT DO NOTHING` had no key to conflict on, so every run escalated again); a merged ticket refuses a reply
+- requires engine 3.0.0-beta.92
+
 ## 1.0.8 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

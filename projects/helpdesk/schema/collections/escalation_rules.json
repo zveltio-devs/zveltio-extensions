@@ -1,0 +1,24 @@
+{
+  "name": "escalation_rules",
+  "fields": [
+    { "name": "name", "type": "text", "required": true },
+    { "name": "priority", "type": "enum", "options": { "values": ["low", "medium", "high", "critical"] } },
+    { "name": "category_id", "type": "m2o", "options": { "related_collection": "ticket_categories" } },
+    { "name": "condition_hours", "type": "integer", "required": true, "defaultValue": 4 },
+    {
+      "name": "condition_type",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "no_response",
+      "options": { "values": ["no_response", "no_resolution", "sla_breach"] }
+    },
+    { "name": "action_assign_to", "type": "text" },
+    { "name": "action_priority", "type": "enum", "options": { "values": ["low", "medium", "high", "critical"] } },
+    { "name": "action_notify_email", "type": "email" },
+    { "name": "is_active", "type": "boolean", "required": true, "defaultValue": true }
+  ],
+  "relations": [{ "name": "escalation_rules_category_id", "type": "m2o", "field": "category_id", "target": "ticket_categories", "targetField": "id", "onDelete": "SET NULL", "onUpdate": "CASCADE", "metadata": {} }],
+  "validation": [
+    { "field": "condition_hours", "rule": "min", "config": { "value": 1 }, "message": "A rule waits at least one hour." }
+  ]
+}

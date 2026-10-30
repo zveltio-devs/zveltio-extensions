@@ -1,0 +1,10 @@
+{
+  "name": "canned_responses",
+  "fields": [
+    { "name": "name", "type": "text", "required": true },
+    { "name": "shortcut", "type": "text", "unique": true },
+    { "name": "content", "type": "textarea", "required": true },
+    { "name": "category_id", "type": "m2o", "options": { "related_collection": "ticket_categories" } }
+  ],
+  "relations": [{ "name": "canned_responses_category_id", "type": "m2o", "field": "category_id", "target": "ticket_categories", "targetField": "id", "onDelete": "SET NULL", "onUpdate": "CASCADE", "metadata": {} }]
+}

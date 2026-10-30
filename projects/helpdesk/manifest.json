@@ -3,12 +3,12 @@
   "displayName": "Helpdesk",
   "category": "projects",
   "description": "Support ticket management with SLA timers, priorities, assignments and message threads",
-  "version": "1.0.8",
-  "zveltioMinVersion": "1.0.0",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.92",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-helpdesk",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "projects.helpdesk"
@@ -37,10 +37,249 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "39eb5cf6a71375696ede84edde261f7792e67931362863129a04f63b80293669",
-    "sourceSha256": "111df05a014fd7f4e65436209214b6fe3389465ca610c098cfe1b95f3622d736"
+    "engineSha256": "baf8f41392942f699341dd47440574c8f8719efb3659ac445808bfbef52fe880",
+    "sourceSha256": "4fd24750a2a14fd6491d36581f77416e032222646a2a250a75b6a77ba23cd91b",
+    "schemaSha256": "8a44807b835503dadd847a28ec3da5841818431e9dddc32f2c34203dfb71dd60"
   },
-  "resources": [
-    "helpdesk"
+  "collections": [
+    "ticket_categories",
+    "tickets",
+    "ticket_messages",
+    "canned_responses",
+    "ticket_csat",
+    "escalation_rules",
+    "ticket_escalations"
+  ],
+  "actions": [
+    {
+      "name": "open",
+      "permission": {
+        "resource": "tickets",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "title",
+          "description",
+          "requester_email"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "requester_email": {
+            "type": "string",
+            "format": "email"
+          },
+          "requester_name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          },
+          "category_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "web",
+              "phone",
+              "api"
+            ]
+          },
+          "assignee_id": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        }
+      },
+      "reads": [
+        "tickets",
+        "ticket_categories"
+      ],
+      "writes": [
+        "tickets",
+        "ticket_messages"
+      ]
+    },
+    {
+      "name": "reply",
+      "permission": {
+        "resource": "tickets",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "content"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1
+          },
+          "is_internal": {
+            "type": "boolean"
+          },
+          "author_name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "author_email": {
+            "type": "string",
+            "format": "email"
+          }
+        }
+      },
+      "reads": [
+        "tickets"
+      ],
+      "writes": [
+        "tickets",
+        "ticket_messages"
+      ]
+    },
+    {
+      "name": "resolve",
+      "permission": {
+        "resource": "tickets",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "tickets"
+      ],
+      "writes": [
+        "tickets"
+      ]
+    },
+    {
+      "name": "close",
+      "permission": {
+        "resource": "tickets",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "tickets"
+      ],
+      "writes": [
+        "tickets"
+      ]
+    },
+    {
+      "name": "merge",
+      "permission": {
+        "resource": "tickets",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "into_ticket_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "into_ticket_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        }
+      },
+      "reads": [
+        "tickets",
+        "ticket_messages"
+      ],
+      "writes": [
+        "tickets",
+        "ticket_messages"
+      ]
+    },
+    {
+      "name": "escalate",
+      "permission": {
+        "resource": "escalation_rules",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "reads": [
+        "escalation_rules",
+        "tickets",
+        "ticket_escalations"
+      ],
+      "writes": [
+        "tickets",
+        "ticket_escalations"
+      ]
+    }
   ]
 }
