@@ -3,12 +3,12 @@
   "displayName": "Expenses",
   "category": "finance",
   "description": "Employee expense reports with receipt management, categorization and approval flow",
-  "version": "1.0.9",
-  "zveltioMinVersion": "1.0.0",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.92",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-expenses",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "expenses",
@@ -37,14 +37,183 @@
     "bundled": true,
     "bundlePeers": false
   },
-  "integrity": {
-    "engineSha256": "8f87d4e7e7212f77f91d886556dd4690025ef192cb14121339e5e62b5af10f02",
-    "sourceSha256": "712f064199b81e724c79c406676f9e7784c2d1f198546db8887ac813b95ca2e6"
-  },
-  "resources": [
-    "expenses"
+  "collections": [
+    "expense_reports",
+    "expenses",
+    "mileage_entries",
+    "per_diem_entries",
+    "expense_reimbursements"
   ],
-  "sensitiveResources": [
-    "expenses"
-  ]
+  "actions": [
+    {
+      "name": "recalculate",
+      "permission": {
+        "resource": "expense_reports",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "expense_reports",
+        "expenses",
+        "mileage_entries",
+        "per_diem_entries"
+      ],
+      "writes": [
+        "expense_reports"
+      ]
+    },
+    {
+      "name": "submit",
+      "permission": {
+        "resource": "expense_reports",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "expense_reports",
+        "expenses",
+        "mileage_entries",
+        "per_diem_entries"
+      ],
+      "writes": [
+        "expense_reports"
+      ]
+    },
+    {
+      "name": "approve",
+      "permission": {
+        "resource": "expense_reports",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "expense_reports"
+      ],
+      "writes": [
+        "expense_reports"
+      ]
+    },
+    {
+      "name": "reject",
+      "permission": {
+        "resource": "expense_reports",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "reads": [
+        "expense_reports"
+      ],
+      "writes": [
+        "expense_reports"
+      ]
+    },
+    {
+      "name": "reimburse",
+      "permission": {
+        "resource": "expense_reports",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "payment_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "payment_method": {
+            "enum": [
+              "cash",
+              "card",
+              "transfer",
+              "check",
+              "other"
+            ]
+          },
+          "reference": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "expense_reports"
+      ],
+      "writes": [
+        "expense_reports",
+        "expense_reimbursements"
+      ]
+    }
+  ],
+  "integrity": {
+    "engineSha256": "9069702d95fce7a5aa59981badc244fcefa9d9a2d6d5ecbcf6886277c3b5cf2b",
+    "sourceSha256": "b1c78ad6ae78bb0bbd28a3b5a598198707b5ece74b6fabec87d6c29104592575",
+    "schemaSha256": "63265174970becd109d8e247bedd729b9d28d35b7abf3e1e41da25f42f0d9d18"
+  }
 }

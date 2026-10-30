@@ -5,9 +5,9 @@
   "newLabel": "finance.expenses.new",
   "resources": [
     {
-      "id": "expenses",
-      "dataSource": "/ext/finance/expenses/reports",
-      "dataPath": "data",
+      "id": "reports",
+      "dataSource": "/api/data/expense_reports?sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
       "filters": [
         {
           "param": "status",
@@ -29,6 +29,10 @@
               "label": "finance.expenses.filter.approved"
             },
             {
+              "value": "rejected",
+              "label": "finance.expenses.filter.rejected"
+            },
+            {
               "value": "reimbursed",
               "label": "finance.expenses.filter.reimbursed"
             }
@@ -37,29 +41,25 @@
       ],
       "columns": [
         {
-          "key": "expense_date",
+          "key": "title",
+          "label": "finance.expenses.col.title"
+        },
+        {
+          "key": "submitted_at",
           "label": "finance.expenses.col.date",
           "type": "date"
         },
         {
-          "key": "category",
-          "label": "common.col.category",
-          "type": "badge",
-          "badge": {
-            "colors": {}
+          "key": "grand_total",
+          "label": "finance.expenses.col.amount",
+          "type": "currency",
+          "currency": {
+            "codeKey": "currency"
           }
         },
         {
-          "key": "vendor",
-          "label": "finance.expenses.col.vendor"
-        },
-        {
-          "key": "description",
-          "label": "finance.expenses.col.description"
-        },
-        {
-          "key": "amount",
-          "label": "finance.expenses.col.amount",
+          "key": "reimbursed_amount",
+          "label": "finance.expenses.col.reimbursed",
           "type": "currency",
           "currency": {
             "codeKey": "currency"
@@ -82,20 +82,117 @@
       ],
       "rowActions": [
         {
+          "id": "recalculate",
+          "icon": "RefreshCw",
+          "label": "finance.expenses.action.recalculate",
+          "method": "POST",
+          "endpoint": "/ext/finance/expenses/actions/recalculate",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "draft"
+          },
+          "body": {
+            "id": "{id}"
+          }
+        },
+        {
+          "id": "submit",
+          "icon": "Send",
+          "label": "finance.expenses.action.submit",
+          "method": "POST",
+          "endpoint": "/ext/finance/expenses/actions/submit",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "draft"
+          },
+          "body": {
+            "id": "{id}"
+          }
+        },
+        {
           "id": "approve",
-          "label": "finance.expenses.action.approve",
           "icon": "CheckCircle",
+          "label": "finance.expenses.action.approve",
           "variant": "text-success",
           "method": "POST",
-          "endpoint": "/ext/finance/expenses/reports/{id}/approve",
+          "endpoint": "/ext/finance/expenses/actions/approve",
           "visibleWhen": {
             "field": "status",
             "equals": "submitted"
+          },
+          "body": {
+            "id": "{id}"
+          }
+        },
+        {
+          "id": "reject",
+          "icon": "XCircle",
+          "label": "finance.expenses.action.reject",
+          "variant": "text-error",
+          "method": "POST",
+          "endpoint": "/ext/finance/expenses/actions/reject",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "submitted"
+          },
+          "prompt": {
+            "title": "finance.expenses.action.reject",
+            "submitLabel": "finance.expenses.action.reject",
+            "fields": [
+              {
+                "name": "reason",
+                "label": "finance.expenses.form.reason",
+                "type": "textarea",
+                "required": true
+              }
+            ]
+          },
+          "body": {
+            "id": "{id}"
+          }
+        },
+        {
+          "id": "reimburse",
+          "icon": "DollarSign",
+          "label": "finance.expenses.action.reimburse",
+          "method": "POST",
+          "endpoint": "/ext/finance/expenses/actions/reimburse",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "approved"
+          },
+          "prompt": {
+            "title": "finance.expenses.action.reimburse",
+            "submitLabel": "finance.expenses.action.reimburse",
+            "fields": [
+              {
+                "name": "amount",
+                "label": "finance.expenses.col.amount",
+                "type": "number",
+                "required": true,
+                "default": "{grand_total-reimbursed_amount}"
+              },
+              {
+                "name": "payment_date",
+                "label": "finance.expenses.col.date",
+                "type": "date",
+                "required": true,
+                "default": "today"
+              },
+              {
+                "name": "reference",
+                "label": "finance.expenses.form.reference",
+                "type": "text"
+              }
+            ]
+          },
+          "body": {
+            "id": "{id}"
           }
         }
       ],
       "form": {
-        "endpoint": "/ext/finance/expenses/reports",
+        "endpoint": "/api/data/expense_reports",
         "fields": [
           {
             "name": "title",

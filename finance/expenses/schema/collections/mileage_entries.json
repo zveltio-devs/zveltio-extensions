@@ -1,0 +1,87 @@
+{
+  "name": "mileage_entries",
+  "fields": [
+    {
+      "name": "report_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "expense_reports"
+      }
+    },
+    {
+      "name": "date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "from_location",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "to_location",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "distance_km",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "rate_per_km",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0.25
+    },
+    {
+      "name": "purpose",
+      "type": "text"
+    },
+    {
+      "name": "vehicle_type",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "personal",
+      "options": {
+        "values": [
+          "personal",
+          "company",
+          "rental"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "mileage_entries_report_id",
+      "type": "m2o",
+      "field": "report_id",
+      "target": "expense_reports",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "distance_km",
+      "rule": "min",
+      "config": {
+        "value": 0.01
+      },
+      "message": "A distance is positive."
+    },
+    {
+      "field": "rate_per_km",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A rate is not negative."
+    }
+  ]
+}

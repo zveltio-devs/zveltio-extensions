@@ -1,0 +1,83 @@
+{
+  "name": "per_diem_entries",
+  "fields": [
+    {
+      "name": "report_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "expense_reports"
+      }
+    },
+    {
+      "name": "date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "destination",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "rate",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON"
+    },
+    {
+      "name": "is_domestic",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    },
+    {
+      "name": "partial_day",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    },
+    {
+      "name": "meals_deducted",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    }
+  ],
+  "relations": [
+    {
+      "name": "per_diem_entries_report_id",
+      "type": "m2o",
+      "field": "report_id",
+      "target": "expense_reports",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "rate",
+      "rule": "min",
+      "config": {
+        "value": 0.01
+      },
+      "message": "A per diem rate is positive."
+    },
+    {
+      "field": "meals_deducted",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A meal deduction is not negative."
+    }
+  ]
+}
