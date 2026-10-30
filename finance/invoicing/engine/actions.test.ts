@@ -41,6 +41,7 @@ function fakeHost() {
       },
       insert: async (c: string, data: Row) => {
         const row = { id: `00000000-0000-0000-0000-${String(++seq).padStart(12, '0')}`, created_at: String(seq).padStart(6, '0'), ...DEFAULTS[c], ...data };
+        if (c === 'company_profile' && rows(c).some((r) => r.singleton === row.singleton)) throw new Error('unique: singleton');
         rows(c).push(row);
         return { ...row };
       },
@@ -239,6 +240,12 @@ describe('saveCompany', () => {
     await a.saveCompany({ id: 'ignored', name: 'B', city: 'Cluj' }, host as never);
     expect(rows('company_profile')).toHaveLength(1);
     expect(rows('company_profile')[0]).toMatchObject({ name: 'B', city: 'Cluj', tax_id: null });
+  });
+
+  it('two concurrent first saves leave one profile', async () => {
+    const { host, rows } = fakeHost();
+    await Promise.all([a.saveCompany({ name: 'A' }, host as never), a.saveCompany({ name: 'B' }, host as never)]);
+    expect(rows('company_profile')).toHaveLength(1);
   });
 });
 

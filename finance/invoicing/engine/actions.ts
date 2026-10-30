@@ -150,10 +150,16 @@ const COMPANY = [
 const saveCompany: ExtensionAction = async (input, host) => {
   const d = input as Row;
   const data = Object.fromEntries(COMPANY.filter((k) => k in d).map((k) => [k, d[k] === '' ? null : d[k]]));
-  const current = records(await host.collections.list('company_profile', { sort: 'created_at', limit: 1, count: 'none' }))[0];
-  return current
-    ? host.collections.update('company_profile', String(current.id), data)
-    : host.collections.insert('company_profile', data);
+  const current = async () =>
+    records(await host.collections.list('company_profile', { sort: 'created_at', limit: 1, count: 'none' }))[0];
+  const row = await current();
+  if (row) return host.collections.update('company_profile', String(row.id), data);
+  // `singleton` is unique: a concurrent first save loses the insert and updates the winner's row.
+  return host.collections.insert('company_profile', { ...data, singleton: 'company' }).catch(async (err) => {
+    const won = await current();
+    if (!won) throw err;
+    return host.collections.update('company_profile', String(won.id), data);
+  });
 };
 
 const PARTY = [

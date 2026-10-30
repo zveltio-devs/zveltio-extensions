@@ -1,5 +1,5 @@
 // @bun
-// /zveltio-extension/packages/sdk/src/extension/action-refusal.ts
+// packages/sdk/src/extension/action-refusal.ts
 var ACTION_REFUSAL = Symbol.for("zveltio.extension.action-refusal");
 
 class ActionRefusal extends Error {
@@ -13,7 +13,7 @@ class ActionRefusal extends Error {
     this.name = "ActionRefusal";
   }
 }
-// /zveltio-extension/packages/sdk/src/extension/dates.ts
+// packages/sdk/src/extension/dates.ts
 function todayIn(timeZone, now = new Date) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone,
@@ -22,7 +22,7 @@ function todayIn(timeZone, now = new Date) {
     day: "2-digit"
   }).format(now);
 }
-// /zveltio-extension/packages/sdk/src/extension/reserved-paths.ts
+// packages/sdk/src/extension/reserved-paths.ts
 var RESERVED_PATH_SEGMENTS = Object.freeze([
   "api",
   "ext",
@@ -35,7 +35,7 @@ var RESERVED_PATH_SEGMENTS = Object.freeze([
   "robots.txt",
   "sitemap.xml"
 ]);
-// engine/actions.ts
+// ../zveltio-extensions/finance/invoicing/engine/actions.ts
 var I = "invoices";
 var L = "invoice_lines";
 var CN = "credit_notes";
@@ -152,8 +152,16 @@ var COMPANY = [
 var saveCompany = async (input, host) => {
   const d = input;
   const data = Object.fromEntries(COMPANY.filter((k) => (k in d)).map((k) => [k, d[k] === "" ? null : d[k]]));
-  const current = records(await host.collections.list("company_profile", { sort: "created_at", limit: 1, count: "none" }))[0];
-  return current ? host.collections.update("company_profile", String(current.id), data) : host.collections.insert("company_profile", data);
+  const current = async () => records(await host.collections.list("company_profile", { sort: "created_at", limit: 1, count: "none" }))[0];
+  const row = await current();
+  if (row)
+    return host.collections.update("company_profile", String(row.id), data);
+  return host.collections.insert("company_profile", { ...data, singleton: "company" }).catch(async (err) => {
+    const won = await current();
+    if (!won)
+      throw err;
+    return host.collections.update("company_profile", String(won.id), data);
+  });
 };
 var PARTY = [
   "client_id",
@@ -504,7 +512,7 @@ var invoicingActions = {
   renderInvoice
 };
 
-// engine/index.ts
+// ../zveltio-extensions/finance/invoicing/engine/index.ts
 var extension = {
   name: "finance/invoicing",
   category: "finance",

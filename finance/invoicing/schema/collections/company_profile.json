@@ -2,6 +2,13 @@
   "name": "company_profile",
   "fields": [
     {
+      "name": "singleton",
+      "type": "text",
+      "required": true,
+      "unique": true,
+      "defaultValue": "company"
+    },
+    {
       "name": "name",
       "type": "text",
       "required": true

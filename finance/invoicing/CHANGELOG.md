@@ -10,6 +10,8 @@
 - fix: a series number is claimed only if nobody claimed it since it was read, and a refused document rolls its claim back — no shared numbers, no holes
 - fix: an invoice's status goes draft, sent, then paid or cancelled, and a paid or cancelled invoice stays that way; a credit note goes draft, issued, applied and is applied once, to an issued invoice only
 - fix: the create form's "due in N days" is honoured; reverse-charge and exempt lines carry no VAT in their totals; a generated recurring invoice keeps its lines' units
+- fix: two concurrent first saves of the company profile leave one profile (`singleton` is unique)
+- fix: the outstanding-invoices widget reads every open invoice, not the first 500, and sums in cents
 - requires engine 3.0.0-beta.92
 
 ## 1.3.2 (2026-10-26)

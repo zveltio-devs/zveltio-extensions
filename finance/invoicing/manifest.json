@@ -54,9 +54,9 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "7624d400288bc03431d34ae0cf1c299932bf64d61422d9c9e863da4bfcbb6677",
-    "sourceSha256": "a5ad5bc9bd985de06315eb1f227581864afdd42c1a0d5f23b7fa3c1773745175",
-    "schemaSha256": "a7594a99513a0ca58689e766dd3a064bdf2e363ab937f05d65044a0438215495"
+    "engineSha256": "00ffeb07947ea5e4dccabb542f5c1aa5b06437cd50554bf3b94bcdb8fe9d28df",
+    "sourceSha256": "d9c122b66d508f5652255cc3a4bcb6dfb333bf332d3b64ccc723e24a77a8194b",
+    "schemaSha256": "d1bfcc79a3147ddb1606f3018f29f1e55dc1b700c81dedeae0aec983c872b0c4"
   },
   "collections": [
     "company_profile",

@@ -13,20 +13,26 @@ let stats = $state<Stats | null>(null);
 
 /**
  * What is still owed on sent, overdue and partly paid invoices, read as the
- * viewer. ponytail: summed here over the first 500 open invoices; an aggregate
- * read when an instance carries more.
+ * viewer, page by page, summed in cents so float drift never shows.
  */
 async function loadStats(): Promise<void> {
   try {
     const filter = encodeURIComponent(JSON.stringify({ status: { in: ['sent', 'overdue', 'partially_paid'] } }));
-    const r = await api.get<{ records?: { status: string; total: unknown; amount_paid: unknown }[] }>(
-      `/api/data/invoices?filter=${filter}&limit=500`,
-    );
-    const open = r.records ?? [];
-    stats = {
-      overdue_count: open.filter((i) => i.status === 'overdue').length,
-      outstanding: open.reduce((s, i) => s + Number(i.total ?? 0) - Number(i.amount_paid ?? 0), 0),
-    };
+    const limit = 500;
+    let overdue = 0;
+    let cents = 0;
+    for (let page = 1; ; page++) {
+      const r = await api.get<{ records?: { status: string; total: unknown; amount_paid: unknown }[] }>(
+        `/api/data/invoices?filter=${filter}&sort=id&count=none&limit=${limit}&page=${page}`,
+      );
+      const rows = r.records ?? [];
+      for (const i of rows) {
+        if (i.status === 'overdue') overdue++;
+        cents += Math.round(Number(i.total ?? 0) * 100) - Math.round(Number(i.amount_paid ?? 0) * 100);
+      }
+      if (rows.length < limit) break;
+    }
+    stats = { overdue_count: overdue, outstanding: cents / 100 };
   } catch {
     stats = null;
   }
