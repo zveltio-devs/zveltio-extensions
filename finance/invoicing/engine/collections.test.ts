@@ -80,6 +80,7 @@ d(`${NAME}: declared collections`, () => {
       'catalogue_items.tax_rate:range',
       'catalogue_items.unit_price:min',
       'company_profile.tax_id:custom',
+      'credit_notes.applied_amount:min',
       'credit_notes.status:transition',
       'document_series.next_number:min',
       'document_series.padding:range',

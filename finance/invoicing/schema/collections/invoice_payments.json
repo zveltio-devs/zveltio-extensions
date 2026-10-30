@@ -37,7 +37,8 @@
           "card",
           "transfer",
           "check",
-          "other"
+          "other",
+          "credit_note"
         ]
       }
     },
@@ -48,6 +49,11 @@
     {
       "name": "notes",
       "type": "textarea"
+    },
+    {
+      "name": "credit_note_id",
+      "type": "uuid",
+      "indexed": true
     }
   ],
   "relations": [

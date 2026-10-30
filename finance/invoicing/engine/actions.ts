@@ -5,10 +5,12 @@ import { ActionRefusal, type ExtensionAction, todayIn } from '@zveltio/sdk/exten
 // the data API (`host.collections`): the collections' permissions, column
 // rules, revisions, flows and audit are a PATCH's own, and a throw rolls back
 // everything the action wrote — a number claimed from a series included, so a
-// refused invoice leaves no hole in the numbering. The company profile, series,
-// catalogue, reminders, sending (`status: sent`) and cancelling (`status:
-// cancelled`) are plain edits through `/api/data`; the status rule on
-// `invoices` keeps a paid or cancelled invoice that way. Who may do what is the
+// refused invoice leaves no hole in the numbering. A draft has no number: it
+// takes one when it is sent (`sendInvoice`), and only a draft is deleted
+// (`deleteDraft`), so the series stays continuous. The company profile, series,
+// catalogue, reminders and cancelling (`status: cancelled`) are plain edits
+// through `/api/data`; the status rule on `invoices` keeps a paid or cancelled
+// invoice that way. Who may do what is the
 // engine's rules on these collections, not this file's.
 
 type Host = Parameters<ExtensionAction>[1];
@@ -89,25 +91,31 @@ export function isValidCui(value: string): boolean {
  * precondition, and this reads again — so two invoices never share a number,
  * and a refusal later in the action rolls the claim back with everything else.
  */
+/** The named series of a document type, else its default, else its oldest. */
+async function findSeries(host: Host, docType: string, series?: string) {
+  const found = records(
+    await host.collections.list('document_series', {
+      filter: { doc_type: docType, ...(series && { series }) },
+      limit: 100,
+      count: 'none',
+    }),
+  ).sort(
+    (a, b) => Number(Boolean(b.is_default)) - Number(Boolean(a.is_default)) || String(a.created_at).localeCompare(String(b.created_at)),
+  );
+  const s = found[0];
+  if (!s) {
+    throw new ActionRefusal(
+      400,
+      'no_series',
+      series ? `There is no ${docType} series "${series}".` : `No ${docType} series is configured.`,
+    );
+  }
+  return s;
+}
+
 export async function claimNumber(host: Host, docType: string, series?: string) {
   for (let attempt = 0; attempt < 5; attempt++) {
-    const found = records(
-      await host.collections.list('document_series', {
-        filter: { doc_type: docType, ...(series && { series }) },
-        limit: 100,
-        count: 'none',
-      }),
-    ).sort(
-      (a, b) => Number(Boolean(b.is_default)) - Number(Boolean(a.is_default)) || String(a.created_at).localeCompare(String(b.created_at)),
-    );
-    const s = found[0];
-    if (!s) {
-      throw new ActionRefusal(
-        400,
-        'no_series',
-        series ? `There is no ${docType} series "${series}".` : `No ${docType} series is configured.`,
-      );
-    }
+    const s = await findSeries(host, docType, series);
     const next = n(s.next_number);
     try {
       await host.collections.update('document_series', String(s.id), { next_number: next + 1 }, { expect: { next_number: [String(s.next_number)] } });
@@ -219,7 +227,6 @@ const createInvoice: ExtensionAction = async (input, host) => {
   const docType = d.doc_type ?? 'invoice';
   const regime = d.vat_regime ?? 'standard';
   const currency = d.currency ?? 'RON';
-  // Every refusal before the number is claimed — though a throw would roll the claim back anyway.
   if (d.client_type === 'organization' && !d.client_tax_id) {
     throw new ActionRefusal(400, 'client_tax_id_required', 'An invoice to an organization names its tax code (Cod fiscal art. 319).');
   }
@@ -263,13 +270,13 @@ const createInvoice: ExtensionAction = async (input, host) => {
     byRate.set(x.tax_rate, e);
   }
 
-  const claimed = await claimNumber(host, docType, d.series);
+  // The series must exist now; its number is claimed when the draft is sent.
+  await findSeries(host, docType, d.series);
   const inv = await host.collections.insert(I, {
     ...pick(d, PARTY.filter((k) => k.startsWith('client_'))),
     ...(await seller(host)),
     ...pick(d, ['delegate_name', 'delegate_id_card', 'delegate_vehicle', 'delivery_date', 'exchange_date', 'notes', 'footer_notes', 'po_number', 'recurring_interval', 'vat_exemption_reason']),
-    number: claimed.number,
-    series: claimed.series,
+    series: d.series ?? null,
     doc_type: docType,
     issue_date: issue,
     due_date: due,
@@ -351,21 +358,20 @@ const markOverdue: ExtensionAction = async (_input, host) => {
 
 /**
  * A proforma requests payment and records no supply. Converting copies it into
- * a draft invoice numbered from the invoice series, and remembers its source.
+ * a draft invoice, numbered from the invoice series when sent, and remembers
+ * its source.
  */
 const convertProforma: ExtensionAction = async (input, host) => {
   const { id } = input as { id: string };
   const p = await load(host, I, id, 'invoice');
   if (p.doc_type !== 'proforma') throw new ActionRefusal(409, 'not_a_proforma', 'Only a proforma converts to an invoice.');
-  // Claimed before the duplicate test: the series row is locked until commit, so a
-  // concurrent conversion waits here and then sees this one's invoice.
-  const claimed = await claimNumber(host, 'invoice');
+  // A same-value write locks the proforma until commit, so a concurrent
+  // conversion waits here and then sees this one's invoice.
+  await host.collections.update(I, id, { status: p.status }, { expect: { status: [String(p.status)] } });
   const done = records(await host.collections.list(I, { filter: { converted_from_id: id }, limit: 1, count: 'none' }))[0];
-  if (done) throw new ActionRefusal(409, 'already_converted', `Already converted to ${done.number}.`);
+  if (done) throw new ActionRefusal(409, 'already_converted', `Already converted to ${done.number ?? done.id}.`);
   const inv = await host.collections.insert(I, {
     ...pick(p, [...PARTY, ...AMOUNTS, 'delivery_date', 'due_date']),
-    number: claimed.number,
-    series: claimed.series,
     doc_type: 'invoice',
     issue_date: todayIn(host.timezone),
     converted_from_id: id,
@@ -384,17 +390,50 @@ const generateNext: ExtensionAction = async (input, host) => {
     throw new ActionRefusal(409, 'invoice_not_issued', 'Only an issued invoice generates the next one.');
   }
   const issue = addDays(day(i.due_date), 1);
-  const claimed = await claimNumber(host, 'invoice', i.series ? String(i.series) : undefined);
   const inv = await host.collections.insert(I, {
     ...pick(i, [...PARTY, ...AMOUNTS, 'recurring_interval']),
-    number: claimed.number,
-    series: claimed.series,
+    series: i.series ?? null,
     doc_type: i.doc_type,
     issue_date: issue,
     due_date: addMonths(issue, months),
   });
   await copyLines(host, id, String(inv.id));
   return inv;
+};
+
+/**
+ * Issue a draft: it takes the next number of its series (the one named at
+ * create, else its type's default) and becomes `sent`. The status moves only
+ * from draft (`expect`), so a draft is numbered once.
+ */
+const sendInvoice: ExtensionAction = async (input, host) => {
+  const { id } = input as { id: string };
+  const inv = await load(host, I, id, 'invoice');
+  if (inv.status !== 'draft') throw new ActionRefusal(409, 'invoice_not_draft', 'Only a draft is sent.');
+  // A draft numbered at create (1.x, 2.0.0) keeps its number.
+  const claimed = inv.number
+    ? { number: inv.number, series: inv.series }
+    : await claimNumber(host, String(inv.doc_type), inv.series ? String(inv.series) : undefined);
+  return host.collections.update(
+    I,
+    id,
+    { status: 'sent', number: claimed.number, series: claimed.series },
+    { expect: { status: ['draft'] } },
+  );
+};
+
+/**
+ * Delete a draft, never an issued document: a draft holds no number, so the
+ * series keeps no gap. The same-value write locks the row as a draft, so a
+ * concurrent send cannot slip in between the check and the delete.
+ */
+const deleteDraft: ExtensionAction = async (input, host) => {
+  const { id } = input as { id: string };
+  const inv = await load(host, I, id, 'invoice');
+  if (inv.status !== 'draft') throw new ActionRefusal(409, 'invoice_not_draft', 'Only a draft is deleted; cancel an issued invoice.');
+  await host.collections.update(I, id, { status: 'draft' }, { expect: { status: ['draft'] } });
+  await host.collections.delete(I, id);
+  return { deleted: id };
 };
 
 const createCreditNote: ExtensionAction = async (input, host) => {
@@ -446,20 +485,36 @@ const createCreditNote: ExtensionAction = async (input, host) => {
 };
 
 /**
- * An issued credit note against an issued invoice's balance: at most what is
- * outstanding. The note is claimed first (`expect` issued), so applying it
- * twice credits once.
+ * An issued credit note against an issued invoice's balance, in the same
+ * currency: what is left of the note, at most what is outstanding. The rest
+ * stays on the note (`partially_applied`) for another invoice. Each
+ * application is a `credit_note` payment on the invoice naming the note. Note
+ * and invoice move only if nobody moved them since they were read (`expect`),
+ * so one note never credits more than its total.
  */
 const applyCreditNote: ExtensionAction = async (input, host) => {
   const { id, invoice_id } = input as { id: string; invoice_id: string };
   const cn = await load(host, CN, id, 'credit_note');
-  if (cn.status !== 'issued') throw new ActionRefusal(409, 'credit_note_not_issued', 'Only an issued credit note can be applied.');
+  if (cn.status !== 'issued' && cn.status !== 'partially_applied') {
+    throw new ActionRefusal(409, 'credit_note_not_issued', 'Only an issued credit note with a balance left can be applied.');
+  }
   const inv = await load(host, I, invoice_id, 'invoice');
   if (!PAYABLE.includes(String(inv.status))) {
     throw new ActionRefusal(409, 'invoice_not_payable', 'A credit note applies to a sent, overdue or partly paid invoice.');
   }
-  await host.collections.update(CN, id, { status: 'applied' }, { expect: { status: ['issued'] } });
-  const applied = round2(Math.max(0, Math.min(n(cn.total), n(inv.total) - n(inv.amount_paid))));
+  if (cn.currency !== inv.currency) {
+    throw new ActionRefusal(409, 'currency_mismatch', `The credit note is in ${cn.currency}, the invoice in ${inv.currency}.`);
+  }
+  const used = n(cn.applied_amount);
+  const applied = round2(Math.min(n(cn.total) - used, n(inv.total) - n(inv.amount_paid)));
+  if (applied <= 0) throw new ActionRefusal(409, 'nothing_to_apply', 'Nothing is left to credit.');
+  const left = round2(n(cn.total) - used - applied);
+  await host.collections.update(
+    CN,
+    id,
+    { applied_amount: round2(used + applied), status: left > 0 ? 'partially_applied' : 'applied' },
+    { expect: { status: [String(cn.status)], applied_amount: [String(cn.applied_amount)] } },
+  );
   const paid = round2(n(inv.amount_paid) + applied);
   const full = paid >= n(inv.total);
   const invoice = await host.collections.update(
@@ -468,7 +523,16 @@ const applyCreditNote: ExtensionAction = async (input, host) => {
     { amount_paid: paid, status: full ? 'paid' : 'partially_paid', ...(full && { paid_at: new Date().toISOString() }) },
     { expect: { amount_paid: [String(inv.amount_paid)], status: [String(inv.status)] } },
   );
-  return { applied_amount: applied, invoice_status: invoice.status };
+  await host.collections.insert('invoice_payments', {
+    invoice_id,
+    amount: applied,
+    currency: inv.currency,
+    payment_date: todayIn(host.timezone),
+    payment_method: 'credit_note',
+    reference: cn.number,
+    credit_note_id: id,
+  });
+  return { applied_amount: applied, credit_note_left: left, invoice_status: invoice.status };
 };
 
 /** HTML-escape: every value printed on the invoice is free text somebody typed. */
@@ -570,6 +634,8 @@ export const invoicingActions: Record<string, ExtensionAction> = {
   markOverdue,
   convertProforma,
   generateNext,
+  sendInvoice,
+  deleteDraft,
   createCreditNote,
   applyCreditNote,
   renderInvoice,

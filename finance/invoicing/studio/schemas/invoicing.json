@@ -93,14 +93,14 @@
           "id": "send",
           "icon": "Send",
           "label": "invoicing.action.send",
-          "method": "PATCH",
-          "endpoint": "/api/data/invoices/{id}",
+          "method": "POST",
+          "endpoint": "/ext/finance/invoicing/actions/sendInvoice",
           "visibleWhen": {
             "field": "status",
             "equals": "draft"
           },
           "body": {
-            "status": "sent"
+            "id": "{id}"
           }
         },
         {
@@ -214,12 +214,15 @@
           "icon": "Trash2",
           "variant": "text-error",
           "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/invoices/{id}",
+          "method": "POST",
+          "endpoint": "/ext/finance/invoicing/actions/deleteDraft",
           "confirm": "invoicing.deleteConfirm",
           "visibleWhen": {
             "field": "status",
             "equals": "draft"
+          },
+          "body": {
+            "id": "{id}"
           }
         }
       ],

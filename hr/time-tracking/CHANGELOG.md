@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.1 (2026-10-30)
+
+- fix: bundles finance/invoicing 2.1.0: an invoice created here is a draft without a number until it is sent (`sendInvoice`)
+
 ## 2.1.0 (2026-10-30)
 
 - feat: `invoiceEntries` bills a project's billable, unbilled entries as one invoice through `finance/invoicing`'s own `createInvoice` (an optional dependency, 2.0.0 or later): a number from the invoice series, hours at the rate each entry carries, and each entry marked billed only if it still is not — two invoices for the same hours fail one of them

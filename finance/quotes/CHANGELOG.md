@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 (2026-10-30)
+
+- fix: bundles finance/invoicing 2.1.0: an invoice created here is a draft without a number until it is sent (`sendInvoice`)
+
 ## 2.0.0 (2026-10-30)
 
 - feat!: quotes and their lines are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations

@@ -9,7 +9,7 @@ type Row = Record<string, unknown>;
 
 const DEFAULTS: Record<string, Row> = {
   invoices: { status: 'draft', amount_paid: 0 },
-  credit_notes: { status: 'draft' },
+  credit_notes: { status: 'draft', applied_amount: 0 },
 };
 
 function fakeHost() {
@@ -58,7 +58,9 @@ function fakeHost() {
         }
         return { ...Object.assign(row, data) };
       },
-      delete: async () => {},
+      delete: async (c: string, id: string) => {
+        tables[c] = rows(c).filter((r) => r.id !== id);
+      },
     },
   };
   return { host, rows, contend: (n: number) => (busy = n) };
@@ -92,11 +94,19 @@ const BASE = {
   ],
 };
 
+/** Create and send: the number is claimed when a draft is sent. */
+async function issue(host: unknown, input: Row) {
+  const inv = (await a.createInvoice(input, host as never)) as Row;
+  return (await a.sendInvoice({ id: inv.id }, host as never)) as Row;
+}
+
 describe('createInvoice', () => {
-  it('numbers from the default series, snapshots the seller and totals the lines per rate', async () => {
+  it('drafts without a number, snapshots the seller and totals the lines per rate', async () => {
     const { host, rows } = await setup();
     const inv = (await a.createInvoice({ ...BASE, discount_percent: 10 }, host as never)) as Row;
-    expect(inv.number).toBe('INV-0007');
+    expect(inv.number).toBeUndefined();
+    expect(rows('document_series')[0].next_number).toBe(7);
+    expect(((await a.sendInvoice({ id: inv.id }, host as never)) as Row).number).toBe('INV-0007');
     expect(inv.seller_name).toBe('Acme SRL');
     expect(inv.subtotal).toBe(225);
     expect(inv.discount_amount).toBe(25);
@@ -112,7 +122,7 @@ describe('createInvoice', () => {
 
   it('numbers from a named series, and blank form fields are not values', async () => {
     const { host } = await setup();
-    const inv = (await a.createInvoice({ ...BASE, series: 'OLD', client_email: '', due_date: '', due_days: 14 }, host as never)) as Row;
+    const inv = await issue(host, { ...BASE, series: 'OLD', client_email: '', due_date: '', due_days: 14 });
     expect(inv.number).toBe('OLD-01');
     expect(inv.client_email).toBeNull();
     expect(inv.due_date).toBe('2026-11-13');
@@ -121,7 +131,7 @@ describe('createInvoice', () => {
   it('reads the series again when a concurrent claim moved it', async () => {
     const { host, contend } = await setup();
     contend(1);
-    expect(((await a.createInvoice(BASE, host as never)) as Row).number).toBe('INV-0008');
+    expect((await issue(host, BASE)).number).toBe('INV-0008');
   });
 
   it('charges no VAT under reverse charge, and keeps the line rates', async () => {
@@ -131,7 +141,7 @@ describe('createInvoice', () => {
     expect(inv.total).toBe(250);
   });
 
-  it('refuses what an invoice may not be, before claiming a number', async () => {
+  it('refuses what an invoice may not be', async () => {
     const { host, rows } = await setup();
     await refusal(a.createInvoice({ ...BASE, client_type: 'organization' }, host as never), 'client_tax_id_required');
     await refusal(a.createInvoice({ ...BASE, client_tax_id: 'RO14399841' }, host as never), 'client_tax_id_invalid');
@@ -145,11 +155,31 @@ describe('createInvoice', () => {
   });
 });
 
+describe('sendInvoice and deleteDraft', () => {
+  it('a draft is sent once, and a deleted draft leaves no gap in the series', async () => {
+    const { host, rows } = await setup();
+    const gone = (await a.createInvoice(BASE, host as never)) as Row;
+    expect(await a.deleteDraft({ id: gone.id }, host as never)).toEqual({ deleted: gone.id });
+    expect(rows('invoices')).toHaveLength(0);
+    const inv = await issue(host, BASE);
+    expect(inv).toMatchObject({ status: 'sent', number: 'INV-0007', series: 'INV' });
+    await refusal(a.sendInvoice({ id: inv.id }, host as never), 'invoice_not_draft');
+    await refusal(a.deleteDraft({ id: inv.id }, host as never), 'invoice_not_draft');
+    expect(rows('invoices')).toHaveLength(1);
+  });
+
+  it('a draft numbered before 2.1.0 keeps its number', async () => {
+    const { host, rows } = await setup();
+    const old = await host.collections.insert('invoices', { doc_type: 'invoice', number: 'INV-0003', series: 'INV' });
+    expect(await a.sendInvoice({ id: old.id }, host as never)).toMatchObject({ number: 'INV-0003', status: 'sent' });
+    expect(rows('document_series')[0].next_number).toBe(7);
+  });
+});
+
 describe('payments and credit notes', () => {
   async function sent() {
     const f = await setup();
-    const inv = (await a.createInvoice({ ...BASE, lines: [{ description: 'x', quantity: 1, unit_price: 100, tax_rate: 19 }] }, f.host as never)) as Row;
-    await f.host.collections.update('invoices', String(inv.id), { status: 'sent' });
+    const inv = await issue(f.host, { ...BASE, lines: [{ description: 'x', quantity: 1, unit_price: 100, tax_rate: 19 }] });
     return { ...f, id: String(inv.id) };
   }
 
@@ -172,8 +202,8 @@ describe('payments and credit notes', () => {
     await refusal(a.recordPayment({ id: inv.id }, host as never), 'invoice_not_payable');
   });
 
-  it('a credit note credits at most what is outstanding, once', async () => {
-    const { host, id } = await sent();
+  it('a credit note credits at most what is outstanding, and keeps the rest for another invoice', async () => {
+    const { host, rows, id } = await sent();
     const cn = (await a.createCreditNote(
       { client_name: 'Client SRL', reason: 'Return', original_invoice_id: id, lines: [{ description: 'x', quantity: 2, unit_price: 100 }] },
       host as never,
@@ -182,19 +212,34 @@ describe('payments and credit notes', () => {
     expect(cn.total).toBe(238);
     await refusal(a.applyCreditNote({ id: cn.id, invoice_id: id }, host as never), 'credit_note_not_issued');
     await host.collections.update('credit_notes', String(cn.id), { status: 'issued' });
-    expect(await a.applyCreditNote({ id: cn.id, invoice_id: id }, host as never)).toEqual({ applied_amount: 119, invoice_status: 'paid' });
-    await refusal(a.applyCreditNote({ id: cn.id, invoice_id: id }, host as never), 'credit_note_not_issued');
+    expect(await a.applyCreditNote({ id: cn.id, invoice_id: id }, host as never)).toEqual({
+      applied_amount: 119,
+      credit_note_left: 119,
+      invoice_status: 'paid',
+    });
+    expect(rows('credit_notes')[0]).toMatchObject({ status: 'partially_applied', applied_amount: 119 });
+    expect(rows('invoice_payments')[0]).toMatchObject({ invoice_id: id, amount: 119, payment_method: 'credit_note', reference: 'CN-001', credit_note_id: cn.id });
+    await refusal(a.applyCreditNote({ id: cn.id, invoice_id: id }, host as never), 'invoice_not_payable');
+    const other = await issue(host, { ...BASE, lines: [{ description: 'y', quantity: 1, unit_price: 200, tax_rate: 19 }] });
+    expect(await a.applyCreditNote({ id: cn.id, invoice_id: other.id }, host as never)).toMatchObject({ applied_amount: 119, credit_note_left: 0, invoice_status: 'partially_paid' });
+    expect(rows('credit_notes')[0].status).toBe('applied');
+    await refusal(a.applyCreditNote({ id: cn.id, invoice_id: other.id }, host as never), 'credit_note_not_issued');
+    const eur = await issue(host, { ...BASE, currency: 'EUR', exchange_rate: 5 });
+    const cn2 = (await a.createCreditNote({ client_name: 'C', reason: 'R', lines: [{ description: 'x' }] }, host as never)) as Row;
+    await host.collections.update('credit_notes', String(cn2.id), { status: 'issued' });
+    await refusal(a.applyCreditNote({ id: cn2.id, invoice_id: eur.id }, host as never), 'currency_mismatch');
   });
 });
 
 describe('documents from documents', () => {
-  it('a proforma converts once, into a numbered draft invoice with its lines', async () => {
+  it('a proforma converts once, into a draft invoice with its lines', async () => {
     const { host, rows } = await setup();
     await host.collections.insert('document_series', { doc_type: 'proforma', series: 'PF', next_number: 1, padding: 3, is_default: true });
-    const pf = (await a.createInvoice({ ...BASE, doc_type: 'proforma' }, host as never)) as Row;
+    const pf = await issue(host, { ...BASE, doc_type: 'proforma' });
     expect(pf.number).toBe('PF-001');
     const inv = (await a.convertProforma({ id: pf.id }, host as never)) as Row;
-    expect(inv).toMatchObject({ number: 'INV-0007', doc_type: 'invoice', converted_from_id: pf.id, total: pf.total });
+    expect(inv).toMatchObject({ doc_type: 'invoice', status: 'draft', converted_from_id: pf.id, total: pf.total });
+    expect(((await a.sendInvoice({ id: inv.id }, host as never)) as Row).number).toBe('INV-0007');
     expect(rows('invoice_lines').filter((l) => l.invoice_id === inv.id)).toHaveLength(2);
     await refusal(a.convertProforma({ id: pf.id }, host as never), 'already_converted');
     await refusal(a.convertProforma({ id: inv.id }, host as never), 'not_a_proforma');
@@ -204,9 +249,10 @@ describe('documents from documents', () => {
     const { host } = await setup();
     const inv = (await a.createInvoice({ ...BASE, series: 'OLD', recurring_interval: 'quarterly' }, host as never)) as Row;
     await refusal(a.generateNext({ id: inv.id }, host as never), 'invoice_not_issued');
-    await host.collections.update('invoices', String(inv.id), { status: 'sent' });
+    await a.sendInvoice({ id: inv.id }, host as never);
     const next = (await a.generateNext({ id: inv.id }, host as never)) as Row;
-    expect(next).toMatchObject({ number: 'OLD-02', issue_date: '2026-12-01', due_date: '2027-03-01', status: 'draft' });
+    expect(next).toMatchObject({ series: 'OLD', issue_date: '2026-12-01', due_date: '2027-03-01', status: 'draft' });
+    expect(((await a.sendInvoice({ id: next.id }, host as never)) as Row).number).toBe('OLD-02');
     const jan = (await a.createInvoice({ ...BASE, issue_date: '2027-01-01', due_date: '2027-01-30', recurring_interval: 'monthly' }, host as never)) as Row;
     await host.collections.update('invoices', String(jan.id), { status: 'sent' });
     expect(await a.generateNext({ id: jan.id }, host as never)).toMatchObject({ issue_date: '2027-01-31', due_date: '2027-02-28' });

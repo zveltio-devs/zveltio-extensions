@@ -147,7 +147,6 @@ describe("convertToInvoice", () => {
 		const { host, rows, q } = await accepted();
 		const inv = await a.convertToInvoice({ id: q.id }, host as never);
 		expect(inv).toMatchObject({
-			number: "INV-0007",
 			client_name: "Client SRL",
 			subtotal: 135,
 			total: 156.15,

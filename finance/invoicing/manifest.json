@@ -3,7 +3,7 @@
   "displayName": "Invoicing",
   "category": "finance",
   "description": "Recurring invoices, payment tracking and overdue management",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "zveltioMinVersion": "3.0.0-beta.92",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-invoicing",
@@ -54,9 +54,9 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "00ffeb07947ea5e4dccabb542f5c1aa5b06437cd50554bf3b94bcdb8fe9d28df",
-    "sourceSha256": "d9c122b66d508f5652255cc3a4bcb6dfb333bf332d3b64ccc723e24a77a8194b",
-    "schemaSha256": "80c50d9d875802702ea33a8762b5346ea9b8c2d490f39b771ea53672e63ffa60"
+    "engineSha256": "c962b6b7307dee7b902abec120c655fd1c2d71f17dc0808aba55cf85bf3de30c",
+    "sourceSha256": "b45cc9e6ff61215ce706e396fc7849b6a67816a1842f380f9c99f961dea397a1",
+    "schemaSha256": "79979dbd58e8c6b09fcd08cb53ea99cf2bdb39e9d6e135ec906d0b9ff7d2bf10"
   },
   "collections": [
     "company_profile",
@@ -370,8 +370,7 @@
       ],
       "writes": [
         "invoices",
-        "invoice_lines",
-        "document_series"
+        "invoice_lines"
       ]
     },
     {
@@ -464,13 +463,11 @@
       },
       "reads": [
         "invoices",
-        "invoice_lines",
-        "document_series"
+        "invoice_lines"
       ],
       "writes": [
         "invoices",
-        "invoice_lines",
-        "document_series"
+        "invoice_lines"
       ]
     },
     {
@@ -494,13 +491,65 @@
       },
       "reads": [
         "invoices",
-        "invoice_lines",
+        "invoice_lines"
+      ],
+      "writes": [
+        "invoices",
+        "invoice_lines"
+      ]
+    },
+    {
+      "name": "sendInvoice",
+      "permission": {
+        "resource": "invoices",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "invoices",
         "document_series"
       ],
       "writes": [
         "invoices",
-        "invoice_lines",
         "document_series"
+      ]
+    },
+    {
+      "name": "deleteDraft",
+      "permission": {
+        "resource": "invoices",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "invoices"
+      ],
+      "writes": [
+        "invoices"
       ]
     },
     {
@@ -612,7 +661,8 @@
       ],
       "writes": [
         "invoices",
-        "credit_notes"
+        "credit_notes",
+        "invoice_payments"
       ]
     },
     {
