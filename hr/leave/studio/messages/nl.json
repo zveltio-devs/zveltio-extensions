@@ -1,4 +1,7 @@
 {
+  "hr.leave.btn.approve": "Goedkeuren",
+  "hr.leave.btn.cancel": "Annuleren",
+  "hr.leave.btn.reject": "Afwijzen",
   "hr.leave.empty": "Nog geen gegevens.",
   "hr.leave.emptyRequests": "Nog geen verlofaanvragen.",
   "hr.leave.form.new": "Nieuwe verlofaanvraag",

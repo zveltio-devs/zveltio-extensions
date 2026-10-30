@@ -1,0 +1,25 @@
+{
+  "name": "leave_balances",
+  "fields": [
+    {"name": "employee_id", "type": "uuid", "required": true, "indexed": true},
+    {"name": "leave_type_id", "type": "m2o", "required": true, "options": {"related_collection": "leave_types"}},
+    {"name": "year", "type": "integer", "required": true},
+    {"name": "allocated_days", "type": "decimal", "required": true, "defaultValue": 0},
+    {"name": "carried_over_days", "type": "decimal", "required": true, "defaultValue": 0},
+    {"name": "carryover_expires_at", "type": "date"},
+    {"name": "used_days", "type": "decimal", "required": true, "defaultValue": 0},
+    {"name": "pending_days", "type": "decimal", "required": true, "defaultValue": 0}
+  ],
+  "indexes": [
+    {"fields": ["employee_id", "leave_type_id", "year"], "unique": true}
+  ],
+  "relations": [
+    {"name": "leave_balances_leave_type_id", "type": "m2o", "field": "leave_type_id", "target": "leave_types", "targetField": "id", "onDelete": "CASCADE", "onUpdate": "CASCADE", "metadata": {}}
+  ],
+  "validation": [
+    {"field": "allocated_days", "rule": "min", "config": {"value": 0}, "message": "Allocated days are not negative."},
+    {"field": "carried_over_days", "rule": "min", "config": {"value": 0}, "message": "Carried days are not negative."},
+    {"field": "used_days", "rule": "min", "config": {"value": 0}, "message": "Used days are not negative."},
+    {"field": "pending_days", "rule": "min", "config": {"value": 0}, "message": "Pending days are not negative."}
+  ]
+}

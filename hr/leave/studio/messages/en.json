@@ -1,4 +1,7 @@
 {
+  "hr.leave.btn.approve": "Approve",
+  "hr.leave.btn.cancel": "Cancel",
+  "hr.leave.btn.reject": "Reject",
   "hr.leave.empty": "No data yet.",
   "hr.leave.emptyRequests": "No leave requests yet.",
   "hr.leave.form.new": "New leave request",

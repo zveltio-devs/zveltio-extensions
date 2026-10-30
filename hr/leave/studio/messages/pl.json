@@ -1,4 +1,7 @@
 {
+  "hr.leave.btn.approve": "Zatwierdź",
+  "hr.leave.btn.cancel": "Anuluj",
+  "hr.leave.btn.reject": "Odrzuć",
   "hr.leave.empty": "Brak danych.",
   "hr.leave.emptyRequests": "Brak wniosków urlopowych.",
   "hr.leave.form.new": "Nowy wniosek urlopowy",

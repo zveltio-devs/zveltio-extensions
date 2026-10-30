@@ -1,0 +1,18 @@
+{
+  "name": "leave_types",
+  "fields": [
+    {"name": "name", "type": "text", "required": true},
+    {"name": "code", "type": "text", "required": true, "unique": true},
+    {"name": "days_per_year", "type": "decimal", "required": true, "defaultValue": 21},
+    {"name": "is_paid", "type": "boolean", "required": true, "defaultValue": true},
+    {"name": "requires_approval", "type": "boolean", "required": true, "defaultValue": true},
+    {"name": "color", "type": "color", "defaultValue": "#069494"},
+    {"name": "max_carry_days", "type": "decimal", "required": true, "defaultValue": 0},
+    {"name": "carryover_expiry_months", "type": "integer", "required": true, "defaultValue": 3}
+  ],
+  "validation": [
+    {"field": "days_per_year", "rule": "min", "config": {"value": 0}, "message": "Days per year are not negative."},
+    {"field": "max_carry_days", "rule": "min", "config": {"value": 0}, "message": "Carried days are not negative."},
+    {"field": "carryover_expiry_months", "rule": "min", "config": {"value": 0}, "message": "An expiry is not negative."}
+  ]
+}

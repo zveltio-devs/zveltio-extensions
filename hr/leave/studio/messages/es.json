@@ -1,4 +1,7 @@
 {
+  "hr.leave.btn.approve": "Aprobar",
+  "hr.leave.btn.cancel": "Cancelar",
+  "hr.leave.btn.reject": "Rechazar",
   "hr.leave.empty": "Aún no hay datos.",
   "hr.leave.emptyRequests": "Aún no hay solicitudes de ausencia.",
   "hr.leave.form.new": "Nueva solicitud de ausencia",

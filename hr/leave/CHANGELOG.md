@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.0 (2026-10-30)
+
+- feat!: leave types, public holidays, balances and requests are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/hr/leave/*` routes are gone — plain reads and edits go through `/api/data/<collection>`; the rest is the actions `requestLeave`, `approveRequest`, `rejectRequest`, `cancelRequest`, `initBalances` and `carryOver` (`POST /ext/hr/leave/actions/<name>`)
+- feat!: who may request, approve or cancel leave for whom is the engine's rules on these collections; the self-approval refusal, the manager check through `hr/employees` and `/requests/my` are gone
+- feat!: carry-over rules are two fields on the leave type (`max_carry_days`, `carryover_expiry_months`); the carry-over log, `approved_by`, the `draft` status, `/calendar`, `/stats` and the seeded leave types and 2025 Romanian holidays are gone
+- fix: a balance changed since it was read fails the request with 409 instead of being overwritten; a half day on a weekend or holiday is refused; a rejected or cancelled request stays that way
+- requires engine 3.0.0-beta.92 and `hr/employees` 2.0.0
+
 ## 1.0.11 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

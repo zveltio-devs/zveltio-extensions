@@ -1,4 +1,7 @@
 {
+  "hr.leave.btn.approve": "Approva",
+  "hr.leave.btn.cancel": "Annulla",
+  "hr.leave.btn.reject": "Rifiuta",
   "hr.leave.empty": "Ancora nessun dato.",
   "hr.leave.emptyRequests": "Ancora nessuna richiesta di ferie.",
   "hr.leave.form.new": "Nuova richiesta di ferie",

@@ -1,4 +1,7 @@
 {
+  "hr.leave.btn.approve": "Genehmigen",
+  "hr.leave.btn.cancel": "Stornieren",
+  "hr.leave.btn.reject": "Ablehnen",
   "hr.leave.empty": "Noch keine Daten.",
   "hr.leave.emptyRequests": "Noch keine Urlaubsanträge.",
   "hr.leave.form.new": "Neuer Urlaubsantrag",

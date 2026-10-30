@@ -1,4 +1,7 @@
 {
+  "hr.leave.btn.approve": "Jóváhagyás",
+  "hr.leave.btn.cancel": "Visszavonás",
+  "hr.leave.btn.reject": "Elutasítás",
   "hr.leave.empty": "Még nincsenek adatok.",
   "hr.leave.emptyRequests": "Még nincsenek szabadságkérelmek.",
   "hr.leave.form.new": "Új szabadságkérelem",
