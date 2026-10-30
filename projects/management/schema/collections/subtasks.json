@@ -1,0 +1,39 @@
+{
+  "name": "subtasks",
+  "fields": [
+    {
+      "name": "task_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "tasks"
+      }
+    },
+    {
+      "name": "title",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "is_completed",
+      "type": "boolean",
+      "defaultValue": false
+    },
+    {
+      "name": "assignee_id",
+      "type": "text"
+    }
+  ],
+  "relations": [
+    {
+      "name": "subtasks_task_id",
+      "type": "m2o",
+      "field": "task_id",
+      "target": "tasks",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

@@ -6,11 +6,11 @@
   "resources": [
     {
       "id": "projects",
-      "dataSource": "/ext/projects/management/{masterId}/tasks",
-      "dataPath": "data",
+      "dataSource": "/api/data/tasks?project_id[eq]={masterId}&parent_task_id[is_null]=true&sort=sort_order&order=asc&limit=500",
+      "dataPath": "records",
       "master": {
-        "dataSource": "/ext/projects/management",
-        "dataPath": "data",
+        "dataSource": "/api/data/projects?sort=created_at&order=desc&limit=500",
+        "dataPath": "records",
         "idKey": "id",
         "titleKey": "name",
         "subtitle": {
@@ -25,7 +25,8 @@
           "icon": "Plus",
           "label": "projects.management.btn.newTask",
           "method": "POST",
-          "endpoint": "/ext/projects/management/{id}/tasks",
+          "endpoint": "/api/data/tasks",
+          "body": { "project_id": "{id}" },
           "prompt": {
             "title": "projects.management.ui.new_task",
             "submitLabel": "projects.management.btn.newTask",
@@ -91,7 +92,7 @@
             }
           },
           "editable": {
-            "endpoint": "/ext/projects/management/tasks/{id}",
+            "endpoint": "/api/data/tasks/{id}",
             "options": [
               { "value": "todo", "label": "projects.management.status.todo" },
               { "value": "in_progress", "label": "projects.management.status.in_progress" },
@@ -123,12 +124,12 @@
           "variant": "text-error",
           "label": "common.delete",
           "method": "DELETE",
-          "endpoint": "/ext/projects/management/tasks/{id}",
+          "endpoint": "/api/data/tasks/{id}",
           "confirm": "projects.management.confirmDeleteTask"
         }
       ],
       "form": {
-        "endpoint": "/ext/projects/management",
+        "endpoint": "/api/data/projects",
         "fields": [
           {
             "name": "name",

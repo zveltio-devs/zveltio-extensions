@@ -1,0 +1,90 @@
+{
+  "name": "projects",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "client_id",
+      "type": "text"
+    },
+    {
+      "name": "client_type",
+      "type": "text"
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "planning",
+      "options": {
+        "values": [
+          "planning",
+          "active",
+          "on_hold",
+          "completed",
+          "cancelled"
+        ]
+      }
+    },
+    {
+      "name": "priority",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "medium",
+      "options": {
+        "values": [
+          "low",
+          "medium",
+          "high",
+          "critical"
+        ]
+      }
+    },
+    {
+      "name": "start_date",
+      "type": "date"
+    },
+    {
+      "name": "end_date",
+      "type": "date"
+    },
+    {
+      "name": "budget",
+      "type": "decimal"
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "defaultValue": "RON"
+    },
+    {
+      "name": "progress_percent",
+      "type": "integer",
+      "defaultValue": 0
+    },
+    {
+      "name": "color",
+      "type": "color",
+      "defaultValue": "#069494"
+    }
+  ],
+  "validation": [
+    {
+      "field": "progress_percent",
+      "rule": "range",
+      "config": {
+        "min": 0,
+        "max": 100
+      },
+      "message": "Progress must be between 0 and 100."
+    }
+  ]
+}

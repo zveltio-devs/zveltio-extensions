@@ -1,0 +1,59 @@
+{
+  "name": "task_attachments",
+  "fields": [
+    {
+      "name": "task_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "tasks"
+      }
+    },
+    {
+      "name": "project_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "projects"
+      }
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "file_url",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "file_size",
+      "type": "integer"
+    },
+    {
+      "name": "mime_type",
+      "type": "text"
+    }
+  ],
+  "relations": [
+    {
+      "name": "task_attachments_task_id",
+      "type": "m2o",
+      "field": "task_id",
+      "target": "tasks",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "task_attachments_project_id",
+      "type": "m2o",
+      "field": "project_id",
+      "target": "projects",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

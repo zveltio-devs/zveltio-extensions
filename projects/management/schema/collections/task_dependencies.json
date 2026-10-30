@@ -1,0 +1,65 @@
+{
+  "name": "task_dependencies",
+  "fields": [
+    {
+      "name": "task_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "tasks"
+      }
+    },
+    {
+      "name": "depends_on_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "tasks"
+      }
+    },
+    {
+      "name": "type",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "finish_to_start",
+      "options": {
+        "values": [
+          "finish_to_start",
+          "start_to_start",
+          "finish_to_finish"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "task_dependencies_task_id",
+      "type": "m2o",
+      "field": "task_id",
+      "target": "tasks",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "task_dependencies_depends_on_id",
+      "type": "m2o",
+      "field": "depends_on_id",
+      "target": "tasks",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "task_id",
+        "depends_on_id"
+      ],
+      "unique": true
+    }
+  ]
+}

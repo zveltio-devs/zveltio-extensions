@@ -1,0 +1,64 @@
+{
+  "name": "project_custom_fields",
+  "fields": [
+    {
+      "name": "project_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "projects"
+      }
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "field_type",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "text",
+      "options": {
+        "values": [
+          "text",
+          "number",
+          "date",
+          "select",
+          "boolean",
+          "url"
+        ]
+      }
+    },
+    {
+      "name": "options",
+      "type": "json"
+    },
+    {
+      "name": "is_required",
+      "type": "boolean",
+      "defaultValue": false
+    }
+  ],
+  "relations": [
+    {
+      "name": "project_custom_fields_project_id",
+      "type": "m2o",
+      "field": "project_id",
+      "target": "projects",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "project_id",
+        "name"
+      ],
+      "unique": true
+    }
+  ]
+}

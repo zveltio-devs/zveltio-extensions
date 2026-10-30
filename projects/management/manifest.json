@@ -3,15 +3,24 @@
   "displayName": "Project Management",
   "category": "projects",
   "description": "Projects, milestones, tasks, kanban board, team assignments and progress tracking",
-  "version": "1.0.7",
-  "zveltioMinVersion": "1.0.0",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.92",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-projects",
-  "permissions": [
-    "database"
-  ],
   "i18nPrefixes": [
     "projects.management"
+  ],
+  "collections": [
+    "projects",
+    "project_members",
+    "milestones",
+    "tasks",
+    "task_comments",
+    "task_dependencies",
+    "subtasks",
+    "task_attachments",
+    "project_custom_fields",
+    "task_custom_values"
   ],
   "studio": {
     "pages": [
@@ -42,10 +51,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "0d076be87e7dbe65cfc2af3e54c04763d219df29a7152a8db8660a80a519b15c",
-    "sourceSha256": "fbbe903323bd009355cdbaa8844605f8adf531baed12b0dbd7323e1167142a1f"
-  },
-  "resources": [
-    "projects"
-  ]
+    "engineSha256": "0338a1f1f014eef53eb3ca400aa51bf6d42c55562e735529c0c18c0eda356ae6",
+    "sourceSha256": "dd4d92f68a955a55dc775341b80e6966d871846f8cfbfbb87cc5871d06b6b587",
+    "schemaSha256": "8dcda6201e1143d4ca5f013e854b36e9ddcd93617ed0f4c2a69515c9915f2566"
+  }
 }
