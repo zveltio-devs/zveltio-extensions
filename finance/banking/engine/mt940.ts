@@ -36,77 +36,82 @@
  *     refuses: the operator reconciles against a total that was never right.
  */
 export interface MT940Result {
-  transactions: Array<{
-    date: string;
-    type: 'credit' | 'debit';
-    amount: number;
-    description: string;
-    reference: string;
-    /** True for RC/RD — the line undoes an earlier movement. */
-    reversal: boolean;
-  }>;
-  /** `:61:` lines that could not be read, verbatim, for the operator to see. */
-  unparsed: string[];
+	transactions: Array<{
+		date: string;
+		type: "credit" | "debit";
+		amount: number;
+		description: string;
+		reference: string;
+		/** True for RC/RD — the line undoes an earlier movement. */
+		reversal: boolean;
+	}>;
+	/** `:61:` lines that could not be read, verbatim, for the operator to see. */
+	unparsed: string[];
 }
 
 const MT940_LINE =
-  /^:61:(\d{6})(\d{4})?(RC|RD|C|D)([A-Z])?(\d+,\d*)([NSF]\w{0,3})(.*)?$/;
+	/^:61:(\d{6})(\d{4})?(RC|RD|C|D)([A-Z])?(\d+,\d*)([NSF]\w{0,3})(.*)?$/;
 
 export function parseMT940(text: string): MT940Result {
-  const lines = text.replace(/\r\n/g, '\n').split('\n');
-  const transactions: MT940Result['transactions'] = [];
-  const unparsed: string[] = [];
-  let i = 0;
+	const lines = text.replace(/\r\n/g, "\n").split("\n");
+	const transactions: MT940Result["transactions"] = [];
+	const unparsed: string[] = [];
+	let i = 0;
 
-  while (i < lines.length) {
-    const line = (lines[i] ?? '').trim();
-    if (!line.startsWith(':61:')) {
-      i++;
-      continue;
-    }
+	while (i < lines.length) {
+		const line = (lines[i] ?? "").trim();
+		if (!line.startsWith(":61:")) {
+			i++;
+			continue;
+		}
 
-    const match = line.match(MT940_LINE);
-    if (!match) {
-      unparsed.push(line);
-      i++;
-      continue;
-    }
+		const match = line.match(MT940_LINE);
+		if (!match) {
+			unparsed.push(line);
+			i++;
+			continue;
+		}
 
-    const [, ymd, , mark, , rawAmount, , rest] = match;
-    const yy = ymd!.slice(0, 2);
-    const year = Number.parseInt(yy, 10) < 50 ? `20${yy}` : `19${yy}`;
-    const date = `${year}-${ymd!.slice(2, 4)}-${ymd!.slice(4, 6)}`;
+		const [, ymd, , mark, , rawAmount, , rest] = match;
+		const yy = ymd!.slice(0, 2);
+		const year = Number.parseInt(yy, 10) < 50 ? `20${yy}` : `19${yy}`;
+		const date = `${year}-${ymd!.slice(2, 4)}-${ymd!.slice(4, 6)}`;
 
-    // An RC undoes a credit, so the money moves the other way. Recording it as a
-    // credit — which is what dropping the R would do — would double-count the
-    // original instead of cancelling it.
-    const reversal = mark === 'RC' || mark === 'RD';
-    const credit = mark === 'C' || mark === 'RD';
-    const amount = Number.parseFloat(rawAmount!.replace(',', '.').replace(/\.$/, ''));
+		// An RC undoes a credit, so the money moves the other way. Recording it as a
+		// credit — which is what dropping the R would do — would double-count the
+		// original instead of cancelling it.
+		const reversal = mark === "RC" || mark === "RD";
+		const credit = mark === "C" || mark === "RD";
+		const amount = Number.parseFloat(
+			rawAmount!.replace(",", ".").replace(/\.$/, ""),
+		);
 
-    // The narrative runs from `:86:` until the next tag, not just one line.
-    let description = '';
-    let j = i + 1;
-    if ((lines[j] ?? '').startsWith(':86:')) {
-      description = (lines[j] ?? '').slice(4).trim();
-      j++;
-      while (j < lines.length && !(lines[j] ?? '').trimStart().startsWith(':')) {
-        description += ` ${(lines[j] ?? '').trim()}`;
-        j++;
-      }
-      description = description.trim();
-    }
+		// The narrative runs from `:86:` until the next tag, not just one line.
+		let description = "";
+		let j = i + 1;
+		if ((lines[j] ?? "").startsWith(":86:")) {
+			description = (lines[j] ?? "").slice(4).trim();
+			j++;
+			while (
+				j < lines.length &&
+				!(lines[j] ?? "").trimStart().startsWith(":")
+			) {
+				description += ` ${(lines[j] ?? "").trim()}`;
+				j++;
+			}
+			description = description.trim();
+		}
 
-    transactions.push({
-      date,
-      type: credit ? 'credit' : 'debit',
-      amount,
-      description,
-      reference: (rest ?? '').trim(),
-      reversal,
-    });
-    i = j;
-  }
+		transactions.push({
+			date,
+			type: credit ? "credit" : "debit",
+			amount,
+			description,
+			reference: (rest ?? "").trim(),
+			reversal,
+		});
+		i = j;
+	}
 
-  return { transactions, unparsed };
+	return { transactions, unparsed };
 }

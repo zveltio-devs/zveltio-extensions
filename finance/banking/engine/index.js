@@ -575,7 +575,13 @@ var round22 = (x) => Math.round(x * 100) / 100;
 async function all2(host, collection, filter, sort = "id") {
   const out = [];
   for (let page = 1;; page++) {
-    const res = await host.collections.list(collection, { filter, sort, limit: PAGE2, page, count: "none" });
+    const res = await host.collections.list(collection, {
+      filter,
+      sort,
+      limit: PAGE2,
+      page,
+      count: "none"
+    });
     const rows = res.records ?? [];
     out.push(...rows);
     if (rows.length < PAGE2)
@@ -587,6 +593,11 @@ async function account(host, id) {
   if (!row)
     throw new ActionRefusal(404, "account_not_found", "No such bank account.");
   return row;
+}
+async function lockAccount(host, id) {
+  const acc = await account(host, id);
+  await host.collections.update(A, id, { balance: acc.balance });
+  return acc;
 }
 function categorize(rules, tx) {
   const sorted = [...rules].filter((r) => r.is_active !== false).sort((a, b) => n2(b.priority) - n2(a.priority) || String(a.created_at).localeCompare(String(b.created_at)));
@@ -628,25 +639,46 @@ function categorize(rules, tx) {
   return null;
 }
 async function rulesFor(host, accountId) {
-  const [own, global] = await Promise.all([all2(host, "bank_rules", { account_id: accountId }), all2(host, "bank_rules", { account_id: null })]);
+  const [own, global] = await Promise.all([
+    all2(host, "bank_rules", { account_id: accountId }),
+    all2(host, "bank_rules", { account_id: null })
+  ]);
   return [...own, ...global];
 }
 function fingerprint(accountId, t) {
-  return createHash("sha256").update([accountId, String(t.date), t.type, String(t.amount), t.description ?? "", t.reference ?? ""].join("\x00")).digest("hex");
+  return createHash("sha256").update([
+    accountId,
+    String(t.date),
+    t.type,
+    String(t.amount),
+    t.description ?? "",
+    t.reference ?? ""
+  ].join("\x00")).digest("hex");
 }
 async function settleBalance(host, accountId) {
   const acc = await account(host, accountId);
   const moved = (await all2(host, T, { account_id: accountId })).reduce((s, t) => s + Math.round(n2(t.amount) * 100) * (t.type === "credit" ? 1 : -1), 0);
-  return host.collections.update(A, accountId, { balance: round22(n2(acc.opening_balance) + moved / 100) });
+  return host.collections.update(A, accountId, {
+    balance: round22(n2(acc.opening_balance) + moved / 100)
+  });
 }
 async function importRows(host, accountId, source, filename, txs) {
-  await account(host, accountId);
+  await lockAccount(host, accountId);
   const rules = await rulesFor(host, accountId);
-  const imp = await host.collections.insert("bank_imports", { account_id: accountId, source, filename: filename ?? null, rows_imported: 0 });
+  const imp = await host.collections.insert("bank_imports", {
+    account_id: accountId,
+    source,
+    filename: filename ?? null,
+    rows_imported: 0
+  });
   let imported = 0;
   for (const t of txs) {
     const hash = fingerprint(accountId, t);
-    const seen = await host.collections.list(T, { filter: { import_hash: hash }, limit: 1, count: "none" });
+    const seen = await host.collections.list(T, {
+      filter: { import_hash: hash },
+      limit: 1,
+      count: "none"
+    });
     if ((seen.records ?? []).length)
       continue;
     const category = categorize(rules, t);
@@ -665,13 +697,21 @@ async function importRows(host, accountId, source, filename, txs) {
     });
     imported++;
   }
-  await host.collections.update("bank_imports", String(imp.id), { rows_imported: imported, rows_skipped: txs.length - imported });
+  await host.collections.update("bank_imports", String(imp.id), {
+    rows_imported: imported,
+    rows_skipped: txs.length - imported
+  });
   await settleBalance(host, accountId);
-  return { import_id: imp.id, total: txs.length, imported, skipped: txs.length - imported };
+  return {
+    import_id: imp.id,
+    total: txs.length,
+    imported,
+    skipped: txs.length - imported
+  };
 }
 var addTransaction = async (input, host) => {
   const d = input;
-  await account(host, d.account_id);
+  await lockAccount(host, d.account_id);
   const category = d.category ?? categorize(await rulesFor(host, d.account_id), d);
   const tx = await host.collections.insert(T, {
     account_id: d.account_id,
@@ -705,10 +745,16 @@ var recategorize = async (input, host) => {
   const d = input;
   const rules = await rulesFor(host, d.account_id);
   let updated = 0;
-  for (const tx of await all2(host, T, { account_id: d.account_id, is_reconciled: false })) {
+  for (const tx of await all2(host, T, {
+    account_id: d.account_id,
+    is_reconciled: false
+  })) {
     const category = categorize(rules, tx);
     if (category && category !== tx.category) {
-      await host.collections.update(T, String(tx.id), { category, auto_categorized: true });
+      await host.collections.update(T, String(tx.id), {
+        category,
+        auto_categorized: true
+      });
       updated++;
     }
   }
@@ -724,12 +770,22 @@ var reconcile = async (input, host) => {
     throw new ActionRefusal(400, "invoice_required", "An invoice reconciliation names the invoice.");
   if (linked === "invoice" && tx.type !== "credit")
     throw new ActionRefusal(409, "not_a_credit", "Only money received pays an invoice.");
-  const existing = (await all2(host, "bank_reconciliations", { transaction_id: d.transaction_id }))[0];
-  if (linked === "invoice" && existing?.linked_type === "invoice") {
+  const existing = (await all2(host, "bank_reconciliations", {
+    transaction_id: d.transaction_id
+  }))[0];
+  if (existing?.linked_type === "invoice") {
     throw new ActionRefusal(409, "already_reconciled", "This transaction already paid an invoice.");
   }
-  const data = { linked_type: linked, linked_id: d.linked_id ?? null, matched_amount: n2(tx.amount), notes: d.notes ?? null };
-  const rec = existing ? await host.collections.update("bank_reconciliations", String(existing.id), data) : await host.collections.insert("bank_reconciliations", { transaction_id: d.transaction_id, ...data });
+  const data = {
+    linked_type: linked,
+    linked_id: d.linked_id ?? null,
+    matched_amount: n2(tx.amount),
+    notes: d.notes ?? null
+  };
+  const rec = existing ? await host.collections.update("bank_reconciliations", String(existing.id), data) : await host.collections.insert("bank_reconciliations", {
+    transaction_id: d.transaction_id,
+    ...data
+  });
   await host.collections.update(T, d.transaction_id, { is_reconciled: true });
   let invoice = null;
   if (linked === "invoice") {
@@ -748,8 +804,17 @@ var snapshotBalance = async (input, host) => {
   const d = input;
   const acc = await settleBalance(host, d.account_id);
   const day = todayIn(host.timezone);
-  const prior = (await all2(host, "bank_balance_history", { account_id: d.account_id, snapshot_date: day }))[0];
-  return prior ? host.collections.update("bank_balance_history", String(prior.id), { balance: acc.balance }) : host.collections.insert("bank_balance_history", { account_id: d.account_id, snapshot_date: day, balance: acc.balance });
+  const prior = (await all2(host, "bank_balance_history", {
+    account_id: d.account_id,
+    snapshot_date: day
+  }))[0];
+  return prior ? host.collections.update("bank_balance_history", String(prior.id), {
+    balance: acc.balance
+  }) : host.collections.insert("bank_balance_history", {
+    account_id: d.account_id,
+    snapshot_date: day,
+    balance: acc.balance
+  });
 };
 var refreshBalance = async (input, host) => settleBalance(host, input.id);
 var bankingActions = {

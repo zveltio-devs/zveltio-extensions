@@ -1,5 +1,5 @@
-import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { bankingActions } from './actions.js';
+import type { ZveltioExtension } from "@zveltio/sdk/extension";
+import { bankingActions } from "./actions.js";
 
 // Bank accounts, transactions, imports, rules, reconciliations, balance
 // history and cash-flow entries are collections this extension declares in
@@ -7,13 +7,13 @@ import { bankingActions } from './actions.js';
 // their rules and serves them through the data API. What is left in code is
 // what banking does beyond a plain edit: the actions in `actions.ts`.
 const extension: ZveltioExtension = {
-  name: 'finance/banking',
-  category: 'finance',
-  mountStrategy: 'subapp',
+	name: "finance/banking",
+	category: "finance",
+	mountStrategy: "subapp",
 
-  actions: bankingActions,
+	actions: bankingActions,
 
-  async register() {},
+	async register() {},
 };
 
 export default extension;
