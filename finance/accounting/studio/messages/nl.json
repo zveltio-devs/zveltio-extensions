@@ -12,6 +12,9 @@
   "accounting.tab.trialBalance": "Proefbalans",
   "accounting.yes": "Ja",
   "finance.accounting.actions": "Journaalacties",
+  "finance.accounting.closeConfirm": "Dit boekjaar afsluiten? Daarna kan er niets meer in worden geboekt.",
+  "finance.accounting.closeYear": "Jaar afsluiten",
+  "finance.accounting.deleteConfirm": "Dit concept en de regels ervan verwijderen?",
   "finance.accounting.empty": "Nog geen gegevens.",
   "finance.accounting.newEntry": "Nieuwe vermelding",
   "finance.accounting.postEntry": "Boeking boeken",
@@ -38,5 +41,7 @@
   "finance.accounting.ui.offBy": "Off by",
   "finance.accounting.ui.parent_code_optional": "Bovenliggende code (optioneel)",
   "finance.accounting.ui.revenue": "Omzet",
-  "finance.accounting.ui.totals": "Totalen"
+  "finance.accounting.ui.totals": "Totalen",
+  "finance.accounting.voidConfirm": "Deze boeking tegenboeken? Een tegenboeking van vandaag haalt haar uit de boeken.",
+  "finance.accounting.voidEntry": "Boeking tegenboeken"
 }

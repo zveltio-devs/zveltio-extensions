@@ -12,6 +12,9 @@
   "accounting.tab.trialBalance": "Főkönyvi kivonat",
   "accounting.yes": "Igen",
   "finance.accounting.actions": "Naplóműveletek",
+  "finance.accounting.closeConfirm": "Lezárja ezt az üzleti évet? Utána nem könyvelhető bele tétel.",
+  "finance.accounting.closeYear": "Év lezárása",
+  "finance.accounting.deleteConfirm": "Törli ezt a piszkozatot és sorait?",
   "finance.accounting.empty": "Még nincsenek adatok.",
   "finance.accounting.newEntry": "Új bejegyzés",
   "finance.accounting.postEntry": "Bejegyzés könyvelése",
@@ -38,5 +41,7 @@
   "finance.accounting.ui.offBy": "Off by",
   "finance.accounting.ui.parent_code_optional": "Szülőkód (opcionális)",
   "finance.accounting.ui.revenue": "Árbevétel",
-  "finance.accounting.ui.totals": "Összegek"
+  "finance.accounting.ui.totals": "Összegek",
+  "finance.accounting.voidConfirm": "Sztornózza ezt a tételt? Egy mai keltezésű ellentétel kiveszi a könyvekből.",
+  "finance.accounting.voidEntry": "Tétel sztornózása"
 }

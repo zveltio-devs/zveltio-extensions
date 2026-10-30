@@ -1,0 +1,48 @@
+{
+  "name": "recurring_journals",
+  "fields": [
+    {
+      "name": "description",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "reference",
+      "type": "text"
+    },
+    {
+      "name": "frequency",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "daily",
+          "weekly",
+          "monthly",
+          "quarterly",
+          "yearly"
+        ]
+      }
+    },
+    {
+      "name": "next_run_date",
+      "type": "date",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "end_date",
+      "type": "date"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    },
+    {
+      "name": "last_run_date",
+      "type": "date"
+    }
+  ]
+}

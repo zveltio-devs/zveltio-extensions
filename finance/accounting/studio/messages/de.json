@@ -12,6 +12,9 @@
   "accounting.tab.trialBalance": "Rohbilanz",
   "accounting.yes": "Ja",
   "finance.accounting.actions": "Journalaktionen",
+  "finance.accounting.closeConfirm": "Dieses Geschäftsjahr abschließen? Danach kann nichts mehr darin gebucht werden.",
+  "finance.accounting.closeYear": "Jahr abschließen",
+  "finance.accounting.deleteConfirm": "Diesen Buchungsentwurf und seine Zeilen löschen?",
   "finance.accounting.empty": "Noch keine Daten.",
   "finance.accounting.newEntry": "Neuer Eintrag",
   "finance.accounting.postEntry": "Buchung buchen",
@@ -38,5 +41,7 @@
   "finance.accounting.ui.offBy": "Off by",
   "finance.accounting.ui.parent_code_optional": "Übergeordneter Code (optional)",
   "finance.accounting.ui.revenue": "Umsatz",
-  "finance.accounting.ui.totals": "Summen"
+  "finance.accounting.ui.totals": "Summen",
+  "finance.accounting.voidConfirm": "Diese Buchung stornieren? Eine Gegenbuchung mit heutigem Datum nimmt sie aus den Büchern.",
+  "finance.accounting.voidEntry": "Buchung stornieren"
 }

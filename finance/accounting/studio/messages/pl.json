@@ -12,6 +12,9 @@
   "accounting.tab.trialBalance": "Zestawienie obrotów",
   "accounting.yes": "Tak",
   "finance.accounting.actions": "Akcje dziennika",
+  "finance.accounting.closeConfirm": "Zamknąć ten rok obrotowy? Później nie można w nim księgować.",
+  "finance.accounting.closeYear": "Zamknij rok",
+  "finance.accounting.deleteConfirm": "Usunąć ten szkic i jego linie?",
   "finance.accounting.empty": "Brak danych.",
   "finance.accounting.newEntry": "Nowy wpis",
   "finance.accounting.postEntry": "Zaksięguj wpis",
@@ -38,5 +41,7 @@
   "finance.accounting.ui.offBy": "Off by",
   "finance.accounting.ui.parent_code_optional": "Kod nadrzędny (opcjonalnie)",
   "finance.accounting.ui.revenue": "Przychód",
-  "finance.accounting.ui.totals": "Sumy"
+  "finance.accounting.ui.totals": "Sumy",
+  "finance.accounting.voidConfirm": "Stornować ten zapis? Zapis stornujący z dzisiejszą datą wycofa go z ksiąg.",
+  "finance.accounting.voidEntry": "Storno zapisu"
 }

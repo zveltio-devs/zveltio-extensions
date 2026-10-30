@@ -8,11 +8,8 @@
       "id": "entries",
       "label": "finance.accounting.tab.entries",
       "icon": "BookOpen",
-      "dataSource": "/ext/finance/accounting/journal",
-      "dataPath": "data",
-      "pagination": {
-        "limit": 100
-      },
+      "dataSource": "/api/data/journal_entries?sort=date&order=desc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "date",
@@ -36,19 +33,68 @@
             "colors": {
               "posted": "badge-success",
               "draft": "badge-ghost",
-              "void": "badge-error"
+              "voided": "badge-error"
             }
           }
         }
       ],
-      "readOnlyReason": "a journal entry needs balanced debit/credit lines; a flat form cannot express it, so this resource lists rather than creates. A dedicated page is the fix, not a schema field."
+      "readOnlyReason": "a journal entry needs balanced debit/credit lines; a flat form cannot express it, so this resource lists rather than creates (the createEntry action does). A dedicated page is the fix, not a schema field.",
+      "rowActions": [
+        {
+          "id": "post",
+          "icon": "CheckCircle",
+          "label": "finance.accounting.postEntry",
+          "variant": "text-success",
+          "method": "POST",
+          "endpoint": "/ext/finance/accounting/actions/postEntry",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "draft"
+          },
+          "body": {
+            "id": "{id}"
+          }
+        },
+        {
+          "id": "void",
+          "icon": "Ban",
+          "label": "finance.accounting.voidEntry",
+          "variant": "text-warning",
+          "method": "POST",
+          "endpoint": "/ext/finance/accounting/actions/voidEntry",
+          "confirm": "finance.accounting.voidConfirm",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "posted"
+          },
+          "body": {
+            "id": "{id}"
+          }
+        },
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "label": "common.delete",
+          "variant": "text-error",
+          "method": "POST",
+          "endpoint": "/ext/finance/accounting/actions/deleteEntry",
+          "confirm": "finance.accounting.deleteConfirm",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "draft"
+          },
+          "body": {
+            "id": "{id}"
+          }
+        }
+      ]
     },
     {
       "id": "accounts",
       "label": "finance.accounting.tab.accounts",
       "icon": "Coins",
-      "dataSource": "/ext/finance/accounting/accounts",
-      "dataPath": "data",
+      "dataSource": "/api/data/accounts?sort=code&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "code",
@@ -74,12 +120,23 @@
           }
         },
         {
-          "key": "parent_name",
-          "label": "common.col.parent"
+          "key": "is_active",
+          "label": "accounting.col.active",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "true": "badge-success",
+              "false": "badge-ghost"
+            },
+            "labels": {
+              "true": "accounting.yes",
+              "false": "accounting.no"
+            }
+          }
         }
       ],
       "form": {
-        "endpoint": "/ext/finance/accounting/accounts",
+        "endpoint": "/api/data/accounts",
         "fields": [
           {
             "name": "code",
@@ -125,8 +182,8 @@
             "label": "common.col.parent",
             "type": "relation",
             "relation": {
-              "dataSource": "/ext/finance/accounting/accounts",
-              "dataPath": "data",
+              "dataSource": "/api/data/accounts?sort=code&limit=500",
+              "dataPath": "records",
               "valueKey": "id",
               "labelKey": [
                 "code",
@@ -141,8 +198,8 @@
       "id": "fiscal",
       "label": "finance.accounting.tab.fiscal",
       "icon": "TrendingUp",
-      "dataSource": "/ext/finance/accounting/fiscal-years",
-      "dataPath": "data",
+      "dataSource": "/api/data/fiscal_years?sort=year&order=desc&limit=100",
+      "dataPath": "records",
       "columns": [
         {
           "key": "year",
@@ -159,81 +216,60 @@
           "type": "date"
         },
         {
-          "key": "is_closed",
+          "key": "status",
           "label": "common.col.status",
           "type": "badge",
           "badge": {
             "colors": {
-              "true": "badge-ghost",
-              "false": "badge-success"
+              "open": "badge-success",
+              "closed": "badge-ghost"
             },
             "labels": {
-              "true": "finance.accounting.status.closed",
-              "false": "finance.accounting.status.open"
+              "open": "finance.accounting.status.open",
+              "closed": "finance.accounting.status.closed"
             }
           }
         }
-      ]
-    },
-    {
-      "id": "trial-balance",
-      "label": "accounting.tab.trialBalance",
-      "icon": "TrendingUp",
-      "dataSource": "/ext/finance/accounting/reports/trial-balance",
-      "dataPath": "data",
-      "columns": [
+      ],
+      "form": {
+        "endpoint": "/api/data/fiscal_years",
+        "fields": [
+          {
+            "name": "year",
+            "label": "common.col.year",
+            "type": "number",
+            "required": true
+          },
+          {
+            "name": "start_date",
+            "label": "common.col.start",
+            "type": "date",
+            "required": true
+          },
+          {
+            "name": "end_date",
+            "label": "common.col.end",
+            "type": "date",
+            "required": true
+          }
+        ]
+      },
+      "rowActions": [
         {
-          "key": "code",
-          "label": "accounting.col.code"
-        },
-        {
-          "key": "name",
-          "label": "accounting.col.name"
-        },
-        {
-          "key": "type",
-          "label": "accounting.col.type"
-        },
-        {
-          "key": "total_debit",
-          "label": "accounting.col.debit",
-          "format": "currency"
-        },
-        {
-          "key": "total_credit",
-          "label": "accounting.col.credit",
-          "format": "currency"
-        },
-        {
-          "key": "balance",
-          "label": "accounting.col.balance",
-          "format": "currency"
-        }
-      ]
-    },
-    {
-      "id": "balance-sheet",
-      "label": "accounting.tab.balanceSheet",
-      "icon": "FolderOpen",
-      "dataSource": "/ext/finance/accounting/reports/balance-sheet",
-      "dataPath": "data",
-      "columns": [
-        {
-          "key": "code",
-          "label": "accounting.col.code"
-        },
-        {
-          "key": "name",
-          "label": "accounting.col.name"
-        },
-        {
-          "key": "type",
-          "label": "accounting.col.type"
-        },
-        {
-          "key": "balance",
-          "label": "accounting.col.balance",
-          "format": "currency"
+          "id": "close",
+          "icon": "Lock",
+          "label": "finance.accounting.closeYear",
+          "variant": "text-warning",
+          "method": "POST",
+          "endpoint": "/ext/finance/accounting/actions/closeFiscalYear",
+          "confirm": "finance.accounting.closeConfirm",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "open"
+          },
+          "body": {
+            "id": "{id}"
+          }
         }
       ]
     },
@@ -241,8 +277,8 @@
       "id": "cost-centers",
       "label": "accounting.tab.costCenters",
       "icon": "Boxes",
-      "dataSource": "/ext/finance/accounting/cost-centers",
-      "dataPath": "data",
+      "dataSource": "/api/data/cost_centers?sort=code&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "code",
@@ -269,7 +305,7 @@
         }
       ],
       "form": {
-        "endpoint": "/ext/finance/accounting/cost-centers",
+        "endpoint": "/api/data/cost_centers",
         "fields": [
           {
             "name": "code",

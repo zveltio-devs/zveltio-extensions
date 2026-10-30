@@ -1,0 +1,121 @@
+{
+  "name": "journal_lines",
+  "fields": [
+    {
+      "name": "entry_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "journal_entries"
+      }
+    },
+    {
+      "name": "account_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "accounts"
+      }
+    },
+    {
+      "name": "debit",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "credit",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "description",
+      "type": "text"
+    },
+    {
+      "name": "cost_center_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "cost_centers"
+      }
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON"
+    },
+    {
+      "name": "exchange_rate",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 1
+    },
+    {
+      "name": "amount_foreign",
+      "type": "decimal"
+    }
+  ],
+  "relations": [
+    {
+      "name": "journal_lines_entry_id",
+      "type": "m2o",
+      "field": "entry_id",
+      "target": "journal_entries",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "journal_lines_account_id",
+      "type": "m2o",
+      "field": "account_id",
+      "target": "accounts",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "journal_lines_cost_center_id",
+      "type": "m2o",
+      "field": "cost_center_id",
+      "target": "cost_centers",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "debit",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A debit is not negative."
+    },
+    {
+      "field": "credit",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A credit is not negative."
+    },
+    {
+      "field": "exchange_rate",
+      "rule": "min",
+      "config": {
+        "value": 1e-06
+      },
+      "message": "An exchange rate is positive."
+    }
+  ]
+}
