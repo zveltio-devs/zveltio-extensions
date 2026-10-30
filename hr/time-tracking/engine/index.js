@@ -524,7 +524,11 @@ async function load2(host, collection, id, what) {
   return row;
 }
 async function timerOf(host, employee_id) {
-  const res = await host.collections.list(T, { filter: { employee_id }, limit: 1, count: "none" });
+  const res = await host.collections.list(T, {
+    filter: { employee_id },
+    limit: 1,
+    count: "none"
+  });
   return (res.records ?? [])[0] ?? null;
 }
 async function insertEntry(host, d) {
@@ -535,7 +539,13 @@ var logTime = async (input, host) => insertEntry(host, input);
 var startTimer = async (input, host) => {
   const d = input;
   await load2(host, P, d.project_id, "project");
-  const data = { task_description: "", is_billable: true, notes: null, ...d, started_at: new Date().toISOString() };
+  const data = {
+    task_description: "",
+    is_billable: true,
+    notes: null,
+    ...d,
+    started_at: new Date().toISOString()
+  };
   const running = await timerOf(host, d.employee_id);
   return running ? host.collections.update(T, running.id, data) : host.collections.insert(T, data);
 };
@@ -583,10 +593,19 @@ var computeTimesheet = async (input, host) => {
       break;
   }
   const total_hours = Math.round(minutes / 60 * 100) / 100;
-  const found = await host.collections.list("timesheets", { filter: { employee_id, week_start }, limit: 1, count: "none" });
+  const found = await host.collections.list("timesheets", {
+    filter: { employee_id, week_start },
+    limit: 1,
+    count: "none"
+  });
   const sheet = (found.records ?? [])[0];
   if (!sheet)
-    return host.collections.insert("timesheets", { employee_id, week_start, week_end, total_hours });
+    return host.collections.insert("timesheets", {
+      employee_id,
+      week_start,
+      week_end,
+      total_hours
+    });
   if (sheet.status !== "draft")
     throw new ActionRefusal(409, "timesheet_not_draft", "Only a draft timesheet is recomputed.");
   return host.collections.update("timesheets", sheet.id, { total_hours }, { expect: { status: ["draft"] } });
@@ -616,7 +635,7 @@ var invoiceEntries = async (input, host) => {
     ...d.notes && { notes: d.notes },
     lines: entries.map((e, i) => ({
       description: String(e.task_description || "Time entry"),
-      quantity: Math.round(Number(e.duration_minutes) / 60 * 100) / 100,
+      quantity: Math.round(Number(e.duration_minutes) / 60 * 1e6) / 1e6,
       unit: "h",
       unit_price: Number(e.hourly_rate ?? project.hourly_rate ?? 0),
       sort_order: i,
@@ -628,7 +647,13 @@ var invoiceEntries = async (input, host) => {
   }
   return inv;
 };
-var timeTrackingActions = { logTime, startTimer, stopTimer, computeTimesheet, invoiceEntries };
+var timeTrackingActions = {
+  logTime,
+  startTimer,
+  stopTimer,
+  computeTimesheet,
+  invoiceEntries
+};
 
 // ../zveltio-extensions/hr/time-tracking/engine/index.ts
 var extension = {

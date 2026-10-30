@@ -44,8 +44,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "59f8adc89afaff64bc16243aa2450096ce9b4c4f236dcc6fddcf2d02036bbecc",
-    "sourceSha256": "8bb9aa41533c9ec13ee924fad9da8853b09c3150ab4b4523ec5d52dce2d36a74",
+    "engineSha256": "ba319f48695df1cad1b8ab9e5f28fcb5c3ebfcd1ae6cf6f62a4cb3050de32c29",
+    "sourceSha256": "6f8170603434dab983fd2b4b503dce987ca3f94ffa63bc417c57cd96b846c761",
     "schemaSha256": "9939f71ca744e78fb13d7f3c9faac95dad41a9d1164d57a9c8fbbafc0b59d2e3"
   },
   "collections": [
