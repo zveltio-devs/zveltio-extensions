@@ -7,7 +7,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const ENGINE = join(import.meta.dir, '../../../../zveltio/packages/engine/src');
+const ENGINE = join(import.meta.dir, '../../../zveltio/packages/engine/src');
 const EXT_DIR = join(import.meta.dir, '..');
 const manifest = JSON.parse(readFileSync(join(EXT_DIR, 'manifest.json'), 'utf8'));
 const NAME: string = manifest.name;
