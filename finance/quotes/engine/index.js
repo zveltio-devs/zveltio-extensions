@@ -521,19 +521,39 @@ function addDays2(iso, days) {
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
-var HEADER = ["contact_id", "organization_id", "client_email", "currency", "tax_rate", "notes", "terms", "footer_notes", "po_number"];
+var HEADER = [
+  "contact_id",
+  "organization_id",
+  "client_email",
+  "currency",
+  "tax_rate",
+  "notes",
+  "terms",
+  "footer_notes",
+  "po_number"
+];
 var createQuote = async (input, host) => {
   const d = input;
   const disc = d.discount_percent ?? 0;
   const lines = d.lines.map((l, i) => {
     const quantity = l.quantity ?? 1;
     const unit_price = l.unit_price ?? 0;
-    const tax_rate = l.tax_rate ?? 19;
+    const tax_rate = l.tax_rate ?? d.tax_rate ?? 19;
     const discount = l.discount ?? 0;
     const net = quantity * unit_price * (1 - discount / 100);
     const base = net * (1 - disc / 100);
     const vat = round22(base * tax_rate / 100);
-    return { description: l.description, quantity, unit_price, tax_rate, discount, net, base, vat, sort_order: l.sort_order ?? i };
+    return {
+      description: l.description,
+      quantity,
+      unit_price,
+      tax_rate,
+      discount,
+      net,
+      base,
+      vat,
+      sort_order: l.sort_order ?? i
+    };
   });
   const gross = lines.reduce((s, x) => s + x.net, 0);
   const subtotal = lines.reduce((s, x) => s + x.base, 0);
@@ -541,7 +561,10 @@ var createQuote = async (input, host) => {
   const issue = todayIn(host.timezone);
   const claimed = await claimNumber(host, "quote", d.series);
   const quote = await host.collections.insert(Q, {
-    ...Object.fromEntries(HEADER.filter((k) => d[k] !== undefined && d[k] !== "").map((k) => [k, d[k]])),
+    ...Object.fromEntries(HEADER.filter((k) => d[k] !== undefined && d[k] !== "").map((k) => [
+      k,
+      d[k]
+    ])),
     number: claimed.number,
     title: d.title,
     client_name: d.client_name,
@@ -578,7 +601,13 @@ var convertToInvoice = async (input, host) => {
     throw new ActionRefusal(409, "quote_converted", "This quote is already invoiced.");
   const lines = [];
   for (let page = 1;; page++) {
-    const res = await host.collections.list(QL, { filter: { quote_id: d.id }, sort: "sort_order", limit: 500, page, count: "none" });
+    const res = await host.collections.list(QL, {
+      filter: { quote_id: d.id },
+      sort: "sort_order",
+      limit: 500,
+      page,
+      count: "none"
+    });
     const rows = res.records ?? [];
     lines.push(...rows);
     if (rows.length < 500)
@@ -601,7 +630,7 @@ var convertToInvoice = async (input, host) => {
     lines: lines.map((l) => ({
       description: String(l.description),
       quantity: Number(l.quantity),
-      unit_price: round22(Number(l.unit_price) * (1 - Number(l.discount ?? 0) / 100)),
+      unit_price: Math.round(Number(l.unit_price) * (1 - Number(l.discount ?? 0) / 100) * 1e6) / 1e6,
       tax_rate: Number(l.tax_rate),
       sort_order: Number(l.sort_order),
       metadata: { quote_id: d.id }
@@ -610,7 +639,10 @@ var convertToInvoice = async (input, host) => {
   await host.collections.update(Q, d.id, { converted_to_invoice_id: inv.id }, { expect: { status: ["accepted"], converted_to_invoice_id: [null] } });
   return inv;
 };
-var quotesActions = { createQuote, convertToInvoice };
+var quotesActions = {
+  createQuote,
+  convertToInvoice
+};
 
 // ../zveltio-extensions/finance/quotes/engine/index.ts
 var extension = {

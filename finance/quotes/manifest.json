@@ -221,8 +221,8 @@
     }
   ],
   "integrity": {
-    "engineSha256": "a62fa356d4facccd6d2157bae04ef4ad6b440efb98dada0a1683d050a406a756",
-    "sourceSha256": "9b0e5c3c8e87d5b1ca3c8af60d960e32c6ffefa257b2a502b41c73a1df33c36f",
+    "engineSha256": "0609fbbea9ddf1391eec5a1710157c3ef34f5c5622b1afbbee0bfb4aed7aefc6",
+    "sourceSha256": "72b458f4d0515be5aa00bb976dd9b54150ec4e36af97095d88fe2a672184c4c2",
     "schemaSha256": "e05ed125316c2f2fb0e081ca1d54aa26608f67423a32c6c3785f6444675b026a"
   }
 }
