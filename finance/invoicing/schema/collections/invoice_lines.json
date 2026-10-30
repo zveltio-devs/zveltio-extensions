@@ -1,0 +1,71 @@
+{
+  "name": "invoice_lines",
+  "fields": [
+    {
+      "name": "invoice_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "invoices"
+      }
+    },
+    {
+      "name": "description",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "quantity",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 1
+    },
+    {
+      "name": "unit",
+      "type": "text"
+    },
+    {
+      "name": "unit_price",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "tax_rate",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 19
+    },
+    {
+      "name": "total",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "sort_order",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "metadata",
+      "type": "json",
+      "required": true,
+      "defaultValue": {}
+    }
+  ],
+  "relations": [
+    {
+      "name": "invoice_lines_invoice_id",
+      "type": "m2o",
+      "field": "invoice_id",
+      "target": "invoices",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

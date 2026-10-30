@@ -109,5 +109,9 @@
   "invoicing.vat.nonTaxable": "No sujeto",
   "invoicing.vat.onCollection": "IVA de caja",
   "invoicing.vat.reverseCharge": "Inversión del sujeto pasivo",
-  "invoicing.vat.standard": "Estándar"
+  "invoicing.vat.standard": "Estándar",
+  "invoicing.doc.creditNote": "Nota de crédito",
+  "invoicing.action.cancel": "Anular",
+  "invoicing.action.convert": "Convertir en factura",
+  "invoicing.cancelConfirm": "¿Anular esta factura? Conserva su número; emita una nota de crédito para revertir lo facturado."
 }

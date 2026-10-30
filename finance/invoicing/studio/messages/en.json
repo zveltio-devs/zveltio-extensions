@@ -111,5 +111,9 @@
   "invoicing.widget.overdueCount": "{count} overdue",
   "invoicing.widget.title": "Outstanding invoices",
   "invoicing.suggestions.overdueTitle": "{count} overdue invoice(s)",
-  "invoicing.suggestions.overdueHint": "Review and send reminders from Invoicing."
+  "invoicing.suggestions.overdueHint": "Review and send reminders from Invoicing.",
+  "invoicing.doc.creditNote": "Credit note",
+  "invoicing.action.cancel": "Cancel",
+  "invoicing.action.convert": "Convert to invoice",
+  "invoicing.cancelConfirm": "Cancel this invoice? It stays numbered; issue a credit note to reverse what was invoiced."
 }

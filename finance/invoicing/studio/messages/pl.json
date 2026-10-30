@@ -109,5 +109,9 @@
   "invoicing.vat.nonTaxable": "Niepodlegający",
   "invoicing.vat.onCollection": "VAT kasowy",
   "invoicing.vat.reverseCharge": "Odwrotne obciążenie",
-  "invoicing.vat.standard": "Standardowy"
+  "invoicing.vat.standard": "Standardowy",
+  "invoicing.doc.creditNote": "Faktura korygująca",
+  "invoicing.action.cancel": "Anuluj",
+  "invoicing.action.convert": "Zamień na fakturę",
+  "invoicing.cancelConfirm": "Anulować tę fakturę? Zachowuje swój numer; wystaw fakturę korygującą, aby odwrócić zafakturowaną kwotę."
 }

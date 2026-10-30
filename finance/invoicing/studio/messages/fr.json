@@ -109,5 +109,9 @@
   "invoicing.vat.nonTaxable": "Non imposable",
   "invoicing.vat.onCollection": "TVA sur encaissements",
   "invoicing.vat.reverseCharge": "Autoliquidation",
-  "invoicing.vat.standard": "Normal"
+  "invoicing.vat.standard": "Normal",
+  "invoicing.doc.creditNote": "Avoir",
+  "invoicing.action.cancel": "Annuler",
+  "invoicing.action.convert": "Convertir en facture",
+  "invoicing.cancelConfirm": "Annuler cette facture ? Elle garde son numéro ; émettez un avoir pour annuler le montant facturé."
 }

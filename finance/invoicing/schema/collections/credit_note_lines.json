@@ -1,0 +1,61 @@
+{
+  "name": "credit_note_lines",
+  "fields": [
+    {
+      "name": "credit_note_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "credit_notes"
+      }
+    },
+    {
+      "name": "description",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "quantity",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 1
+    },
+    {
+      "name": "unit_price",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "tax_rate",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 19
+    },
+    {
+      "name": "total",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "sort_order",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    }
+  ],
+  "relations": [
+    {
+      "name": "credit_note_lines_credit_note_id",
+      "type": "m2o",
+      "field": "credit_note_id",
+      "target": "credit_notes",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

@@ -109,5 +109,9 @@
   "invoicing.vat.nonTaxable": "Neimpozabil",
   "invoicing.vat.onCollection": "TVA la încasare",
   "invoicing.vat.reverseCharge": "Taxare inversă",
-  "invoicing.vat.standard": "Normal"
+  "invoicing.vat.standard": "Normal",
+  "invoicing.doc.creditNote": "Notă de credit",
+  "invoicing.action.cancel": "Anulează",
+  "invoicing.action.convert": "Transformă în factură",
+  "invoicing.cancelConfirm": "Anulezi factura? Își păstrează numărul; emite o notă de credit pentru a storna ce s-a facturat."
 }

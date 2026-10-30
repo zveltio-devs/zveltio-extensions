@@ -1,0 +1,56 @@
+{
+  "name": "payment_reminders",
+  "fields": [
+    {
+      "name": "invoice_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "invoices"
+      }
+    },
+    {
+      "name": "reminder_type",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "gentle",
+      "options": {
+        "values": [
+          "gentle",
+          "firm",
+          "final"
+        ]
+      }
+    },
+    {
+      "name": "channel",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "email",
+      "options": {
+        "values": [
+          "email",
+          "sms",
+          "manual"
+        ]
+      }
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "payment_reminders_invoice_id",
+      "type": "m2o",
+      "field": "invoice_id",
+      "target": "invoices",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

@@ -4,20 +4,29 @@
  */
 import { resolve } from '$app/paths';
 import { FileWarning } from '@lucide/svelte';
-import { api } from '#lib/api.js';
 import { m } from '#lib/i18n.svelte.js';
+import { api } from '#lib/api.js';
 
-type Stats = {
-  outstanding?: number | string;
-  overdue_count?: number | string;
-};
+type Stats = { overdue_count: number; outstanding: number };
 
 let stats = $state<Stats | null>(null);
 
+/**
+ * What is still owed on sent, overdue and partly paid invoices, read as the
+ * viewer. ponytail: summed here over the first 500 open invoices; an aggregate
+ * read when an instance carries more.
+ */
 async function loadStats(): Promise<void> {
   try {
-    const r = await api.get<{ data?: Stats }>('/ext/finance/invoicing/invoices/stats');
-    stats = r.data ?? null;
+    const filter = encodeURIComponent(JSON.stringify({ status: { in: ['sent', 'overdue', 'partially_paid'] } }));
+    const r = await api.get<{ records?: { status: string; total: unknown; amount_paid: unknown }[] }>(
+      `/api/data/invoices?filter=${filter}&limit=500`,
+    );
+    const open = r.records ?? [];
+    stats = {
+      overdue_count: open.filter((i) => i.status === 'overdue').length,
+      outstanding: open.reduce((s, i) => s + Number(i.total ?? 0) - Number(i.amount_paid ?? 0), 0),
+    };
   } catch {
     stats = null;
   }

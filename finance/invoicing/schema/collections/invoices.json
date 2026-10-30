@@ -1,0 +1,315 @@
+{
+  "name": "invoices",
+  "fields": [
+    {
+      "name": "number",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "series",
+      "type": "text"
+    },
+    {
+      "name": "doc_type",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "invoice",
+      "options": {
+        "values": [
+          "invoice",
+          "proforma",
+          "delivery_note"
+        ]
+      }
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "draft",
+      "options": {
+        "values": [
+          "draft",
+          "sent",
+          "partially_paid",
+          "paid",
+          "overdue",
+          "cancelled"
+        ]
+      }
+    },
+    {
+      "name": "client_id",
+      "type": "uuid",
+      "indexed": true
+    },
+    {
+      "name": "client_type",
+      "type": "enum",
+      "options": {
+        "values": [
+          "contact",
+          "organization"
+        ]
+      }
+    },
+    {
+      "name": "client_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "client_email",
+      "type": "email"
+    },
+    {
+      "name": "client_address",
+      "type": "textarea"
+    },
+    {
+      "name": "client_tax_id",
+      "type": "text"
+    },
+    {
+      "name": "client_reg_no",
+      "type": "text"
+    },
+    {
+      "name": "client_city",
+      "type": "text"
+    },
+    {
+      "name": "client_county",
+      "type": "text"
+    },
+    {
+      "name": "client_country",
+      "type": "text"
+    },
+    {
+      "name": "seller_name",
+      "type": "text"
+    },
+    {
+      "name": "seller_tax_id",
+      "type": "text"
+    },
+    {
+      "name": "seller_reg_no",
+      "type": "text"
+    },
+    {
+      "name": "seller_address",
+      "type": "textarea"
+    },
+    {
+      "name": "seller_city",
+      "type": "text"
+    },
+    {
+      "name": "seller_county",
+      "type": "text"
+    },
+    {
+      "name": "seller_country",
+      "type": "text"
+    },
+    {
+      "name": "seller_iban",
+      "type": "text"
+    },
+    {
+      "name": "seller_bank",
+      "type": "text"
+    },
+    {
+      "name": "delegate_name",
+      "type": "text"
+    },
+    {
+      "name": "delegate_id_card",
+      "type": "text"
+    },
+    {
+      "name": "delegate_vehicle",
+      "type": "text"
+    },
+    {
+      "name": "issue_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "delivery_date",
+      "type": "date"
+    },
+    {
+      "name": "due_date",
+      "type": "date",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON"
+    },
+    {
+      "name": "subtotal",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "tax_rate",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 19
+    },
+    {
+      "name": "tax_amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "total",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "discount_amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "discount_percent",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "amount_paid",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "vat_breakdown",
+      "type": "json",
+      "required": true,
+      "defaultValue": []
+    },
+    {
+      "name": "vat_regime",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "standard",
+      "options": {
+        "values": [
+          "standard",
+          "reverse_charge",
+          "vat_on_collection",
+          "exempt",
+          "non_taxable"
+        ]
+      }
+    },
+    {
+      "name": "vat_exemption_reason",
+      "type": "text"
+    },
+    {
+      "name": "exchange_rate",
+      "type": "decimal"
+    },
+    {
+      "name": "exchange_date",
+      "type": "date"
+    },
+    {
+      "name": "tax_amount_ron",
+      "type": "decimal"
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    },
+    {
+      "name": "footer_notes",
+      "type": "textarea"
+    },
+    {
+      "name": "po_number",
+      "type": "text"
+    },
+    {
+      "name": "recurring_interval",
+      "type": "enum",
+      "options": {
+        "values": [
+          "monthly",
+          "quarterly",
+          "yearly"
+        ]
+      }
+    },
+    {
+      "name": "paid_at",
+      "type": "datetime"
+    },
+    {
+      "name": "converted_from_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "invoices"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "invoices_converted_from_id",
+      "type": "m2o",
+      "field": "converted_from_id",
+      "target": "invoices",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "amount_paid",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A paid amount is not negative."
+    },
+    {
+      "field": "discount_percent",
+      "rule": "range",
+      "config": {
+        "min": 0,
+        "max": 100
+      },
+      "message": "A discount is 0 to 100 percent."
+    },
+    {
+      "field": "status",
+      "rule": "transition",
+      "config": {
+        "expression": "value == previous || (previous == 'draft' && value in ['sent', 'cancelled']) || (previous in ['sent', 'overdue', 'partially_paid'] && value in ['overdue', 'partially_paid', 'paid', 'cancelled'])"
+      },
+      "message": "An invoice goes draft, sent, then paid or cancelled; a paid or cancelled invoice stays that way."
+    }
+  ]
+}

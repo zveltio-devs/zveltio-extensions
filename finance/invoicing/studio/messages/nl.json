@@ -109,5 +109,9 @@
   "invoicing.vat.nonTaxable": "Niet belastbaar",
   "invoicing.vat.onCollection": "Kasstelsel",
   "invoicing.vat.reverseCharge": "Verlegd",
-  "invoicing.vat.standard": "Standaard"
+  "invoicing.vat.standard": "Standaard",
+  "invoicing.doc.creditNote": "Creditnota",
+  "invoicing.action.cancel": "Annuleren",
+  "invoicing.action.convert": "Omzetten naar factuur",
+  "invoicing.cancelConfirm": "Deze factuur annuleren? Het nummer blijft behouden; maak een creditnota om het gefactureerde terug te draaien."
 }

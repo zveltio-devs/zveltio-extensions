@@ -3,9 +3,9 @@
   "kind": "settings",
   "title": "invoicing.settings.title",
   "subtitle": "invoicing.settings.subtitle",
-  "dataSource": "/ext/finance/invoicing/company",
-  "dataPath": "data",
-  "saveEndpoint": "/ext/finance/invoicing/company",
+  "dataSource": "/api/data/company_profile?sort=created_at&limit=1",
+  "dataPath": "records.0",
+  "saveEndpoint": "/ext/finance/invoicing/actions/saveCompany",
   "sections": [
     {
       "title": "invoicing.settings.identity",

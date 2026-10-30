@@ -1,0 +1,71 @@
+{
+  "name": "document_series",
+  "fields": [
+    {
+      "name": "doc_type",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "invoice",
+      "options": {
+        "values": [
+          "invoice",
+          "proforma",
+          "credit_note",
+          "receipt",
+          "delivery_note"
+        ]
+      }
+    },
+    {
+      "name": "series",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "next_number",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 1
+    },
+    {
+      "name": "padding",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 4
+    },
+    {
+      "name": "is_default",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "doc_type",
+        "series"
+      ],
+      "unique": true
+    }
+  ],
+  "validation": [
+    {
+      "field": "next_number",
+      "rule": "min",
+      "config": {
+        "value": 1
+      },
+      "message": "A series counts from 1."
+    },
+    {
+      "field": "padding",
+      "rule": "range",
+      "config": {
+        "min": 1,
+        "max": 10
+      },
+      "message": "Padding is 1 to 10 digits."
+    }
+  ]
+}

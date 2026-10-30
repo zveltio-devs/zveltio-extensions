@@ -1,0 +1,75 @@
+{
+  "name": "invoice_payments",
+  "fields": [
+    {
+      "name": "invoice_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "invoices"
+      }
+    },
+    {
+      "name": "amount",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON"
+    },
+    {
+      "name": "payment_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "payment_method",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "transfer",
+      "options": {
+        "values": [
+          "cash",
+          "card",
+          "transfer",
+          "check",
+          "other"
+        ]
+      }
+    },
+    {
+      "name": "reference",
+      "type": "text"
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "invoice_payments_invoice_id",
+      "type": "m2o",
+      "field": "invoice_id",
+      "target": "invoices",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "amount",
+      "rule": "min",
+      "config": {
+        "value": 0.01
+      },
+      "message": "A payment is a positive amount."
+    }
+  ]
+}

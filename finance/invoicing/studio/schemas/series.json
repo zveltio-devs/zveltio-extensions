@@ -6,8 +6,8 @@
   "resources": [
     {
       "id": "series",
-      "dataSource": "/ext/finance/invoicing/series",
-      "dataPath": "data",
+      "dataSource": "/api/data/document_series?sort=doc_type&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "doc_type",
@@ -61,12 +61,12 @@
           "label": "common.delete",
           "variant": "text-error",
           "method": "DELETE",
-          "endpoint": "/ext/finance/invoicing/series/{id}",
+          "endpoint": "/api/data/document_series/{id}",
           "confirm": "invoicing.series.confirmDelete"
         }
       ],
       "form": {
-        "endpoint": "/ext/finance/invoicing/series",
+        "endpoint": "/api/data/document_series",
         "fields": [
           {
             "name": "doc_type",
@@ -86,6 +86,10 @@
               {
                 "value": "delivery_note",
                 "label": "invoicing.doc.deliveryNote"
+              },
+              {
+                "value": "credit_note",
+                "label": "invoicing.doc.creditNote"
               }
             ]
           },

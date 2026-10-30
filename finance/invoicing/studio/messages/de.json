@@ -109,5 +109,9 @@
   "invoicing.vat.nonTaxable": "Nicht steuerbar",
   "invoicing.vat.onCollection": "Ist-Besteuerung",
   "invoicing.vat.reverseCharge": "Reverse Charge",
-  "invoicing.vat.standard": "Regelbesteuerung"
+  "invoicing.vat.standard": "Regelbesteuerung",
+  "invoicing.doc.creditNote": "Gutschrift",
+  "invoicing.action.cancel": "Stornieren",
+  "invoicing.action.convert": "In Rechnung umwandeln",
+  "invoicing.cancelConfirm": "Diese Rechnung stornieren? Sie behält ihre Nummer; erstellen Sie eine Gutschrift, um den Betrag zu erstatten."
 }
